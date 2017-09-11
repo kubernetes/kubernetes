@@ -39,8 +39,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
-	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var patchTypes = map[string]types.PatchType{"json": types.JSONPatchType, "merge": types.MergePatchType, "strategic": types.StrategicMergePatchType}
@@ -136,24 +136,28 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		ok := false
 		patchType, ok = patchTypes[patchTypeString]
 		if !ok {
-			return cmdutil.UsageError(cmd, fmt.Sprintf("--type must be one of %v, not %q", sets.StringKeySet(patchTypes).List(), patchTypeString))
+			return cmdutil.UsageErrorf(cmd, "--type must be one of %v, not %q",
+				sets.StringKeySet(patchTypes).List(), patchTypeString)
 		}
 	}
 
 	patch := cmdutil.GetFlagString(cmd, "patch")
 	if len(patch) == 0 {
-		return cmdutil.UsageError(cmd, "Must specify -p to patch")
+		return cmdutil.UsageErrorf(cmd, "Must specify -p to patch")
 	}
 	patchBytes, err := yaml.ToJSON([]byte(patch))
 	if err != nil {
 		return fmt.Errorf("unable to parse %q: %v", patch, err)
 	}
 
-	mapper, typer, err := f.UnstructuredObject()
+	// TODO: fix --local to work with customresources without making use of the discovery client.
+	// https://github.com/kubernetes/kubernetes/issues/46722
+	builder, err := f.NewUnstructuredBuilder(true)
 	if err != nil {
 		return err
 	}
-	r := resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
+
+	r := builder.
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
@@ -220,6 +224,10 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 			if len(options.OutputFormat) > 0 && options.OutputFormat != "name" {
 				return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
 			}
+			mapper, _, err := f.UnstructuredObject()
+			if err != nil {
+				return err
+			}
 			cmdutil.PrintSuccess(mapper, options.OutputFormat == "name", out, info.Mapping.Resource, info.Name, false, dataChangedMsg)
 			return nil
 		}
@@ -230,14 +238,17 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		if err != nil {
 			return err
 		}
+
 		originalPatchedObjJS, err := getPatchedJSON(patchType, originalObjJS, patchBytes, mapping.GroupVersionKind, api.Scheme)
 		if err != nil {
 			return err
 		}
+
 		targetObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, originalPatchedObjJS)
 		if err != nil {
 			return err
 		}
+
 		// TODO: if we ever want to go generic, this allows a clean -o yaml without trying to print columns or anything
 		// rawExtension := &runtime.Unknown{
 		//	Raw: originalPatchedObjJS,

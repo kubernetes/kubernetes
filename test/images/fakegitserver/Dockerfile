@@ -13,6 +13,7 @@
 # limitations under the License.
 
 FROM scratch
-ADD GITHASH.txt /
-ADD gitserver /
-ENTRYPOINT ["/gitserver"]
+COPY GITHASH.txt /
+COPY fakegitserver /
+ENTRYPOINT ["/fakegitserver"]
+

@@ -23,8 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 func DeletePodOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
@@ -38,6 +38,7 @@ func DeletePodOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
 var Code200 = map[int]bool{200: true}
 var Code201 = map[int]bool{201: true}
 var Code400 = map[int]bool{400: true}
+var Code401 = map[int]bool{401: true}
 var Code403 = map[int]bool{403: true}
 var Code404 = map[int]bool{404: true}
 var Code405 = map[int]bool{405: true}

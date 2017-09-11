@@ -24,12 +24,12 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -49,10 +49,9 @@ func generateNodeAndTaintedNode(oldTaints []v1.Taint, newTaints []v1.Taint) (*v1
 		},
 		Status: v1.NodeStatus{},
 	}
-	clone, _ := api.Scheme.DeepCopy(node)
 
 	// A copy of the same node, but tainted.
-	taintedNode = clone.(*v1.Node)
+	taintedNode = node.DeepCopy()
 	taintedNode.Spec.Taints = newTaints
 
 	return node, taintedNode

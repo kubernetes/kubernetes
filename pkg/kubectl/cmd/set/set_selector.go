@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 // SelectorOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -89,13 +89,14 @@ func NewCmdSelector(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 	}
 	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().Bool("all", false, "Select all resources in the namespace of the specified resource types")
+	cmd.Flags().Bool("all", false, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
 	cmd.Flags().Bool("local", false, "If true, set selector will NOT contact api-server but run locally.")
 	cmd.Flags().String("resource-version", "", "If non-empty, the selectors update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.")
 	usage := "the resource to update the selectors"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.fileOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddRecordFlag(cmd)
+	cmdutil.AddIncludeUninitializedFlag(cmd)
 
 	return cmd
 }
@@ -116,27 +117,37 @@ func (o *SelectorOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	mapper, _ := f.Object()
 	o.mapper = mapper
 	o.encoder = f.JSONEncoder()
+	o.resources, o.selector, err = getResourcesAndSelector(args)
+	if err != nil {
+		return err
+	}
 
-	o.builder = f.NewBuilder().
+	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
+	o.builder = f.NewBuilder(!o.local).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.fileOptions).
+		IncludeUninitialized(includeUninitialized).
 		Flatten()
 
+	if !o.local {
+		o.builder = o.builder.
+			ResourceTypeOrNameArgs(o.all, o.resources...).
+			Latest()
+	}
+
 	o.PrintObject = func(obj runtime.Object) error {
-		return f.PrintObject(cmd, mapper, obj, o.out)
+		return f.PrintObject(cmd, o.local, mapper, obj, o.out)
 	}
 	o.ClientForMapping = func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 		return f.ClientForMapping(mapping)
 	}
-
-	o.resources, o.selector, err = getResourcesAndSelector(args)
 	return err
 }
 
 // Validate basic inputs
 func (o *SelectorOptions) Validate() error {
-	if len(o.resources) < 1 && cmdutil.IsFilenameEmpty(o.fileOptions.Filenames) {
+	if len(o.resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.fileOptions.Filenames) {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
 	if o.selector == nil {
@@ -147,10 +158,6 @@ func (o *SelectorOptions) Validate() error {
 
 // RunSelector executes the command.
 func (o *SelectorOptions) RunSelector() error {
-	if !o.local {
-		o.builder = o.builder.ResourceTypeOrNameArgs(o.all, o.resources...).
-			Latest()
-	}
 	r := o.builder.Do()
 	err := r.Err()
 	if err != nil {
@@ -172,7 +179,6 @@ func (o *SelectorOptions) RunSelector() error {
 			return patch.Err
 		}
 		if o.local || o.dryrun {
-			fmt.Fprintln(o.out, "running in local/dry-run mode...")
 			o.PrintObject(info.Object)
 			return nil
 		}

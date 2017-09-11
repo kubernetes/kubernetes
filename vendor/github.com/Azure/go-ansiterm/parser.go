@@ -2,28 +2,27 @@ package ansiterm
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var logger *logrus.Logger
 
 type AnsiParser struct {
-	currState          State
+	currState          state
 	eventHandler       AnsiEventHandler
-	context            *AnsiContext
-	CsiEntry           State
-	CsiParam           State
-	DcsEntry           State
-	Escape             State
-	EscapeIntermediate State
-	Error              State
-	Ground             State
-	OscString          State
-	stateMap           []State
+	context            *ansiContext
+	csiEntry           state
+	csiParam           state
+	dcsEntry           state
+	escape             state
+	escapeIntermediate state
+	error              state
+	ground             state
+	oscString          state
+	stateMap           []state
 }
 
 func CreateParser(initialState string, evtHandler AnsiEventHandler) *AnsiParser {
@@ -41,27 +40,27 @@ func CreateParser(initialState string, evtHandler AnsiEventHandler) *AnsiParser 
 
 	parser := &AnsiParser{
 		eventHandler: evtHandler,
-		context:      &AnsiContext{},
+		context:      &ansiContext{},
 	}
 
-	parser.CsiEntry = CsiEntryState{BaseState{name: "CsiEntry", parser: parser}}
-	parser.CsiParam = CsiParamState{BaseState{name: "CsiParam", parser: parser}}
-	parser.DcsEntry = DcsEntryState{BaseState{name: "DcsEntry", parser: parser}}
-	parser.Escape = EscapeState{BaseState{name: "Escape", parser: parser}}
-	parser.EscapeIntermediate = EscapeIntermediateState{BaseState{name: "EscapeIntermediate", parser: parser}}
-	parser.Error = ErrorState{BaseState{name: "Error", parser: parser}}
-	parser.Ground = GroundState{BaseState{name: "Ground", parser: parser}}
-	parser.OscString = OscStringState{BaseState{name: "OscString", parser: parser}}
+	parser.csiEntry = csiEntryState{baseState{name: "CsiEntry", parser: parser}}
+	parser.csiParam = csiParamState{baseState{name: "CsiParam", parser: parser}}
+	parser.dcsEntry = dcsEntryState{baseState{name: "DcsEntry", parser: parser}}
+	parser.escape = escapeState{baseState{name: "Escape", parser: parser}}
+	parser.escapeIntermediate = escapeIntermediateState{baseState{name: "EscapeIntermediate", parser: parser}}
+	parser.error = errorState{baseState{name: "Error", parser: parser}}
+	parser.ground = groundState{baseState{name: "Ground", parser: parser}}
+	parser.oscString = oscStringState{baseState{name: "OscString", parser: parser}}
 
-	parser.stateMap = []State{
-		parser.CsiEntry,
-		parser.CsiParam,
-		parser.DcsEntry,
-		parser.Escape,
-		parser.EscapeIntermediate,
-		parser.Error,
-		parser.Ground,
-		parser.OscString,
+	parser.stateMap = []state{
+		parser.csiEntry,
+		parser.csiParam,
+		parser.dcsEntry,
+		parser.escape,
+		parser.escapeIntermediate,
+		parser.error,
+		parser.ground,
+		parser.oscString,
 	}
 
 	parser.currState = getState(initialState, parser.stateMap)
@@ -70,7 +69,7 @@ func CreateParser(initialState string, evtHandler AnsiEventHandler) *AnsiParser 
 	return parser
 }
 
-func getState(name string, states []State) State {
+func getState(name string, states []state) state {
 	for _, el := range states {
 		if el.Name() == name {
 			return el
@@ -99,7 +98,7 @@ func (ap *AnsiParser) handle(b byte) error {
 
 	if newState == nil {
 		logger.Warning("newState is nil")
-		return errors.New(fmt.Sprintf("New state of 'nil' is invalid."))
+		return errors.New("New state of 'nil' is invalid.")
 	}
 
 	if newState != ap.currState {
@@ -111,7 +110,7 @@ func (ap *AnsiParser) handle(b byte) error {
 	return nil
 }
 
-func (ap *AnsiParser) changeState(newState State) error {
+func (ap *AnsiParser) changeState(newState state) error {
 	logger.Infof("ChangeState %s --> %s", ap.currState.Name(), newState.Name())
 
 	// Exit old state

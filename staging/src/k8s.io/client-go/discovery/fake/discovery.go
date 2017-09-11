@@ -20,19 +20,22 @@ import (
 	"fmt"
 
 	"github.com/emicklei/go-restful-swagger12"
+	"github.com/googleapis/gnostic/OpenAPIv2"
 
-	"github.com/go-openapi/spec"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/client-go/pkg/api/v1"
 	kubeversion "k8s.io/client-go/pkg/version"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/testing"
 )
 
+// FakeDiscovery implements discovery.DiscoveryInterface and sometimes calls testing.Fake.Invoke with an action,
+// but doesn't respect the return value if any. There is a way to fake static values like ServerVersion by using the Faked... fields on the struct.
 type FakeDiscovery struct {
 	*testing.Fake
+	FakedServerVersion *version.Info
 }
 
 func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
@@ -74,8 +77,12 @@ func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 	action := testing.ActionImpl{}
 	action.Verb = "get"
 	action.Resource = schema.GroupVersionResource{Resource: "version"}
-
 	c.Invokes(action, nil)
+
+	if c.FakedServerVersion != nil {
+		return c.FakedServerVersion, nil
+	}
+
 	versionInfo := kubeversion.Get()
 	return &versionInfo, nil
 }
@@ -93,7 +100,9 @@ func (c *FakeDiscovery) SwaggerSchema(version schema.GroupVersion) (*swagger.Api
 	return &swagger.ApiDeclaration{}, nil
 }
 
-func (c *FakeDiscovery) OpenAPISchema() (*spec.Swagger, error) { return &spec.Swagger{}, nil }
+func (c *FakeDiscovery) OpenAPISchema() (*openapi_v2.Document, error) {
+	return &openapi_v2.Document{}, nil
+}
 
 func (c *FakeDiscovery) RESTClient() restclient.Interface {
 	return nil

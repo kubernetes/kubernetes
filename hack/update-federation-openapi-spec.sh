@@ -63,7 +63,7 @@ kube::log::status "Starting federation-apiserver"
   --cert-dir="${TMP_DIR}/certs" \
   --token-auth-file=$TMP_DIR/tokenauth.csv >/tmp/openapi-federation-api-server.log 2>&1 &
 APISERVER_PID=$!
-kube::util::wait_for_url "${API_HOST}:${API_PORT}/" "apiserver: "
+kube::util::wait_for_url "${API_HOST}:${API_PORT}/healthz" "apiserver: "
 
 kube::log::status "Updating " ${OPENAPI_ROOT_DIR}
 

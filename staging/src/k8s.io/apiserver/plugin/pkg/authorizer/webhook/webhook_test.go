@@ -32,11 +32,11 @@ import (
 	"text/template"
 	"time"
 
+	"k8s.io/api/authorization/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/client-go/pkg/apis/authorization/v1beta1"
 	"k8s.io/client-go/tools/clientcmd/api/v1"
 )
 
@@ -505,6 +505,7 @@ func TestWebhook(t *testing.T) {
 				TypeMeta: expTypeMeta,
 				Spec: v1beta1.SubjectAccessReviewSpec{
 					User:   "jane",
+					UID:    "1",
 					Groups: []string{"group1", "group2"},
 					ResourceAttributes: &v1beta1.ResourceAttributes{
 						Verb:        "GET",

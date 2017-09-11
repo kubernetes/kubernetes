@@ -19,12 +19,15 @@ package cache
 import (
 	"time"
 
+	"golang.org/x/net/context"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/pager"
 )
 
 // ListerWatcher is any object that knows how to perform an initial list and start a watch on a resource.
@@ -48,6 +51,9 @@ type WatchFunc func(options metav1.ListOptions) (watch.Interface, error)
 type ListWatch struct {
 	ListFunc  ListFunc
 	WatchFunc WatchFunc
+	// DisableChunking requests no chunking for this list watcher. It has no effect in Kubernetes 1.8, but in
+	// 1.9 will allow a controller to opt out of chunking.
+	DisableChunking bool
 }
 
 // Getter interface knows how to access Get method from RESTClient.
@@ -58,21 +64,21 @@ type Getter interface {
 // NewListWatchFromClient creates a new ListWatch from the specified client, resource, namespace and field selector.
 func NewListWatchFromClient(c Getter, resource string, namespace string, fieldSelector fields.Selector) *ListWatch {
 	listFunc := func(options metav1.ListOptions) (runtime.Object, error) {
+		options.FieldSelector = fieldSelector.String()
 		return c.Get().
 			Namespace(namespace).
 			Resource(resource).
 			VersionedParams(&options, metav1.ParameterCodec).
-			FieldsSelectorParam(fieldSelector).
 			Do().
 			Get()
 	}
 	watchFunc := func(options metav1.ListOptions) (watch.Interface, error) {
 		options.Watch = true
+		options.FieldSelector = fieldSelector.String()
 		return c.Get().
 			Namespace(namespace).
 			Resource(resource).
 			VersionedParams(&options, metav1.ParameterCodec).
-			FieldsSelectorParam(fieldSelector).
 			Watch()
 	}
 	return &ListWatch{ListFunc: listFunc, WatchFunc: watchFunc}
@@ -87,6 +93,11 @@ func timeoutFromListOptions(options metav1.ListOptions) time.Duration {
 
 // List a set of apiserver resources
 func (lw *ListWatch) List(options metav1.ListOptions) (runtime.Object, error) {
+	// chunking will become the default for list watchers starting in Kubernetes 1.9, unless
+	// otherwise disabled.
+	if false && !lw.DisableChunking {
+		return pager.New(pager.SimplePageFunc(lw.ListFunc)).List(context.TODO(), options)
+	}
 	return lw.ListFunc(options)
 }
 

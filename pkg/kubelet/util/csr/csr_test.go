@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"testing"
 
+	certificates "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	watch "k8s.io/apimachinery/pkg/watch"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
-	certificates "k8s.io/client-go/pkg/apis/certificates/v1beta1"
 	certutil "k8s.io/client-go/util/cert"
 )
 
@@ -96,6 +96,10 @@ func (c *fakeClient) Create(*certificates.CertificateSigningRequest) (*certifica
 		},
 	}
 	return &csr, nil
+}
+
+func (c *fakeClient) List(opts v1.ListOptions) (*certificates.CertificateSigningRequestList, error) {
+	return &certificates.CertificateSigningRequestList{}, nil
 }
 
 func (c *fakeClient) Watch(opts v1.ListOptions) (watch.Interface, error) {

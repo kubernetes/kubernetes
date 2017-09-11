@@ -41,5 +41,5 @@ func (s *GenericAPIServer) installHealthz() {
 	defer s.healthzLock.Unlock()
 	s.healthzCreated = true
 
-	healthz.InstallHandler(s.Handler.PostGoRestfulMux, s.healthzChecks...)
+	healthz.InstallHandler(s.Handler.NonGoRestfulMux, s.healthzChecks...)
 }

@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 
 	"hash/fnv"
 	"math/rand"
@@ -180,7 +180,10 @@ func (c *realRecyclerClient) Event(eventtype, message string) {
 }
 
 func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan struct{}) (<-chan watch.Event, error) {
-	podSelector, _ := fields.ParseSelector("metadata.name=" + name)
+	podSelector, err := fields.ParseSelector("metadata.name=" + name)
+	if err != nil {
+		return nil, err
+	}
 	options := metav1.ListOptions{
 		FieldSelector: podSelector.String(),
 		Watch:         true,
@@ -295,9 +298,52 @@ func GetPath(mounter Mounter) (string, error) {
 func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 	// We create the volume in a zone determined by the name
 	// Eventually the scheduler will coordinate placement into an available zone
-	var hash uint32
-	var index uint32
+	hash, index := getPVCNameHashAndIndexOffset(pvcName)
 
+	// Zones.List returns zones in a consistent order (sorted)
+	// We do have a potential failure case where volumes will not be properly spread,
+	// if the set of zones changes during StatefulSet volume creation.  However, this is
+	// probably relatively unlikely because we expect the set of zones to be essentially
+	// static for clusters.
+	// Hopefully we can address this problem if/when we do full scheduler integration of
+	// PVC placement (which could also e.g. avoid putting volumes in overloaded or
+	// unhealthy zones)
+	zoneSlice := zones.List()
+	zone := zoneSlice[(hash+index)%uint32(len(zoneSlice))]
+
+	glog.V(2).Infof("Creating volume for PVC %q; chose zone=%q from zones=%q", pvcName, zone, zoneSlice)
+	return zone
+}
+
+// ChooseZonesForVolume is identical to ChooseZoneForVolume, but selects a multiple zones, for multi-zone disks.
+func ChooseZonesForVolume(zones sets.String, pvcName string, numZones uint32) sets.String {
+	// We create the volume in a zone determined by the name
+	// Eventually the scheduler will coordinate placement into an available zone
+	hash, index := getPVCNameHashAndIndexOffset(pvcName)
+
+	// Zones.List returns zones in a consistent order (sorted)
+	// We do have a potential failure case where volumes will not be properly spread,
+	// if the set of zones changes during StatefulSet volume creation.  However, this is
+	// probably relatively unlikely because we expect the set of zones to be essentially
+	// static for clusters.
+	// Hopefully we can address this problem if/when we do full scheduler integration of
+	// PVC placement (which could also e.g. avoid putting volumes in overloaded or
+	// unhealthy zones)
+	zoneSlice := zones.List()
+	replicaZones := sets.NewString()
+
+	startingIndex := index * numZones
+	for index = startingIndex; index < startingIndex+numZones; index++ {
+		zone := zoneSlice[(hash+index)%uint32(len(zoneSlice))]
+		replicaZones.Insert(zone)
+	}
+
+	glog.V(2).Infof("Creating volume for replicated PVC %q; chosen zones=%q from zones=%q",
+		pvcName, replicaZones.UnsortedList(), zoneSlice)
+	return replicaZones
+}
+
+func getPVCNameHashAndIndexOffset(pvcName string) (hash uint32, index uint32) {
 	if pvcName == "" {
 		// We should always be called with a name; this shouldn't happen
 		glog.Warningf("No name defined during volume create; choosing random zone")
@@ -346,19 +392,7 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 		hash = h.Sum32()
 	}
 
-	// Zones.List returns zones in a consistent order (sorted)
-	// We do have a potential failure case where volumes will not be properly spread,
-	// if the set of zones changes during StatefulSet volume creation.  However, this is
-	// probably relatively unlikely because we expect the set of zones to be essentially
-	// static for clusters.
-	// Hopefully we can address this problem if/when we do full scheduler integration of
-	// PVC placement (which could also e.g. avoid putting volumes in overloaded or
-	// unhealthy zones)
-	zoneSlice := zones.List()
-	zone := zoneSlice[(hash+index)%uint32(len(zoneSlice))]
-
-	glog.V(2).Infof("Creating volume for PVC %q; chose zone=%q from zones=%q", pvcName, zone, zoneSlice)
-	return zone
+	return hash, index
 }
 
 // UnmountViaEmptyDir delegates the tear down operation for secret, configmap, git_repo and downwardapi
@@ -386,12 +420,17 @@ func MountOptionFromSpec(spec *Spec, options ...string) []string {
 	pv := spec.PersistentVolume
 
 	if pv != nil {
+		// Use beta annotation first
 		if mo, ok := pv.Annotations[v1.MountOptionAnnotation]; ok {
 			moList := strings.Split(mo, ",")
 			return JoinMountOptions(moList, options)
 		}
 
+		if len(pv.Spec.MountOptions) > 0 {
+			return JoinMountOptions(pv.Spec.MountOptions, options)
+		}
 	}
+
 	return options
 }
 
@@ -409,4 +448,34 @@ func JoinMountOptions(userOptions []string, systemOptions []string) []string {
 		allMountOptions.Insert(mountOption)
 	}
 	return allMountOptions.UnsortedList()
+}
+
+// ValidateZone returns:
+// - an error in case zone is an empty string or contains only any combination of spaces and tab characters
+// - nil otherwise
+func ValidateZone(zone string) error {
+	if strings.TrimSpace(zone) == "" {
+		return fmt.Errorf("the provided %q zone is not valid, it's an empty string or contains only spaces and tab characters", zone)
+	}
+	return nil
+}
+
+// AccessModesContains returns whether the requested mode is contained by modes
+func AccessModesContains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
+}
+
+// AccessModesContainedInAll returns whether all of the requested modes are contained by modes
+func AccessModesContainedInAll(indexedModes []v1.PersistentVolumeAccessMode, requestedModes []v1.PersistentVolumeAccessMode) bool {
+	for _, mode := range requestedModes {
+		if !AccessModesContains(indexedModes, mode) {
+			return false
+		}
+	}
+	return true
 }

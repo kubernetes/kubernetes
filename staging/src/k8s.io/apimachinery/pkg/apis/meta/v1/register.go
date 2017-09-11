@@ -27,6 +27,10 @@ const GroupName = "meta.k8s.io"
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1"}
 
+// Unversioned is group version for unversioned API objects
+// TODO: this should be v1 probably
+var Unversioned = schema.GroupVersion{Group: "", Version: "v1"}
+
 // WatchEventKind is name reserved for serializing watch events.
 const WatchEventKind = "WatchEvent"
 
@@ -54,6 +58,15 @@ func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		Convert_versioned_InternalEvent_to_versioned_Event,
 		Convert_watch_Event_to_versioned_Event,
 		Convert_versioned_Event_to_versioned_InternalEvent,
+	)
+
+	// Register Unversioned types under their own special group
+	scheme.AddUnversionedTypes(Unversioned,
+		&Status{},
+		&APIVersions{},
+		&APIGroupList{},
+		&APIGroup{},
+		&APIResourceList{},
 	)
 
 	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.

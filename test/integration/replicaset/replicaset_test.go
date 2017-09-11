@@ -20,18 +20,19 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -147,6 +148,18 @@ func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.R
 		t.Fatalf("Failed to create replicaset controller")
 	}
 	return s, closeFn, rm, informers, clientSet
+}
+
+func rmSimpleSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, clientset.Interface) {
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+
+	config := restclient.Config{Host: s.URL}
+	clientSet, err := clientset.NewForConfig(&config)
+	if err != nil {
+		t.Fatalf("Error in create clientset: %v", err)
+	}
+	return s, closeFn, clientSet
 }
 
 // wait for the podInformer to observe the pods. Call this function before
@@ -461,4 +474,44 @@ func TestUpdateLabelToBeAdopted(t *testing.T) {
 		t.Fatal(err)
 	}
 	close(stopCh)
+}
+
+// selectors are IMMUTABLE for all API versions except extensions/v1beta1
+func TestRSSelectorImmutability(t *testing.T) {
+	s, closeFn, clientSet := rmSimpleSetup(t)
+	defer closeFn()
+	ns := framework.CreateTestingNamespace("rs-selector-immutability", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+	rs := newRS("rs", ns.Name, 0)
+	createRSsPods(t, clientSet, []*v1beta1.ReplicaSet{rs}, []*v1.Pod{}, ns.Name)
+
+	// test to ensure extensions/v1beta1 selector is mutable
+	newSelectorLabels := map[string]string{"changed_name_extensions_v1beta1": "changed_test_extensions_v1beta1"}
+	rs.Spec.Selector.MatchLabels = newSelectorLabels
+	rs.Spec.Template.Labels = newSelectorLabels
+	replicaset, err := clientSet.ExtensionsV1beta1().ReplicaSets(ns.Name).Update(rs)
+	if err != nil {
+		t.Fatalf("failed to update extensions/v1beta1 replicaset %s: %v", replicaset.Name, err)
+	}
+	if !reflect.DeepEqual(replicaset.Spec.Selector.MatchLabels, newSelectorLabels) {
+		t.Errorf("selector should be changed for extensions/v1beta1, expected: %v, got: %v", newSelectorLabels, replicaset.Spec.Selector.MatchLabels)
+	}
+
+	// test to ensure apps/v1beta2 selector is immutable
+	rsV1beta2, err := clientSet.AppsV1beta2().ReplicaSets(ns.Name).Get(replicaset.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("failed to get apps/v1beta2 replicaset %s: %v", replicaset.Name, err)
+	}
+	newSelectorLabels = map[string]string{"changed_name_apps_v1beta2": "changed_test_apps_v1beta2"}
+	rsV1beta2.Spec.Selector.MatchLabels = newSelectorLabels
+	rsV1beta2.Spec.Template.Labels = newSelectorLabels
+	_, err = clientSet.AppsV1beta2().ReplicaSets(ns.Name).Update(rsV1beta2)
+	if err == nil {
+		t.Fatalf("failed to provide validation error when changing immutable selector when updating apps/v1beta2 replicaset %s", rsV1beta2.Name)
+	}
+	expectedErrType := "Invalid value"
+	expectedErrDetail := "field is immutable"
+	if !strings.Contains(err.Error(), expectedErrType) || !strings.Contains(err.Error(), expectedErrDetail) {
+		t.Errorf("error message does not match, expected type: %s, expected detail: %s, got: %s", expectedErrType, expectedErrDetail, err.Error())
+	}
 }

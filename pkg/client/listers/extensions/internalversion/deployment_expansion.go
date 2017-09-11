@@ -31,7 +31,7 @@ type DeploymentListerExpansion interface {
 }
 
 // DeploymentNamespaceListerExpansion allows custom methods to be added to
-// DeploymentNamespaeLister.
+// DeploymentNamespaceLister.
 type DeploymentNamespaceListerExpansion interface{}
 
 // GetDeploymentsForReplicaSet returns a list of Deployments that potentially

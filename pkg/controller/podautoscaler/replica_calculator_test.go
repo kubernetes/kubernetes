@@ -22,22 +22,21 @@ import (
 	"testing"
 	"time"
 
+	autoscalingv2 "k8s.io/api/autoscaling/v2beta1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	autoscalingv2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	metricsfake "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 
-	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"
-	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
+	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -135,7 +134,7 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 
 	fakeMetricsClient := &metricsfake.Clientset{}
 	// NB: we have to sound like Gollum due to gengo's inability to handle already-plural resource names
-	fakeMetricsClient.AddReactor("list", "podmetricses", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+	fakeMetricsClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		if tc.resource != nil {
 			metrics := &metricsapi.PodMetricsList{}
 			for i, resValue := range tc.resource.levels {
@@ -158,8 +157,8 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 				for i := 0; i < numContainersPerPod; i++ {
 					podMetric.Containers[i] = metricsapi.ContainerMetrics{
 						Name: fmt.Sprintf("container%v", i),
-						Usage: clientv1.ResourceList{
-							clientv1.ResourceName(tc.resource.name): *resource.NewMilliQuantity(
+						Usage: v1.ResourceList{
+							v1.ResourceName(tc.resource.name): *resource.NewMilliQuantity(
 								int64(resValue),
 								resource.DecimalSI),
 						},
@@ -194,7 +193,7 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 
 			for i, level := range tc.metric.levels {
 				podMetric := cmapi.MetricValue{
-					DescribedObject: clientv1.ObjectReference{
+					DescribedObject: v1.ObjectReference{
 						Kind:      "Pod",
 						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
 						Namespace: testNamespace,
@@ -224,7 +223,7 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 
 			metrics.Items = []cmapi.MetricValue{
 				{
-					DescribedObject: clientv1.ObjectReference{
+					DescribedObject: v1.ObjectReference{
 						Kind:       tc.metric.singleObject.Kind,
 						APIVersion: tc.metric.singleObject.APIVersion,
 						Name:       name,
@@ -244,7 +243,7 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 
 func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	testClient, testMetricsClient, testCMClient := tc.prepareTestClient(t)
-	metricsClient := metrics.NewRESTMetricsClient(testMetricsClient.MetricsV1alpha1(), testCMClient)
+	metricsClient := metrics.NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient)
 
 	replicaCalc := &ReplicaCalculator{
 		metricsClient: metricsClient,

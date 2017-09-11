@@ -26,26 +26,26 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
-	extensionsinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/extensions/v1beta1"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
-	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
@@ -106,7 +106,7 @@ func NewReplicaSetController(rsInformer extensionsinformers.ReplicaSetInformer, 
 		kubeClient: kubeClient,
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "replicaset-controller"}),
+			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replicaset-controller"}),
 		},
 		burstReplicas: burstReplicas,
 		expectations:  controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
@@ -183,7 +183,7 @@ func (rsc *ReplicaSetController) getPodReplicaSets(pod *v1.Pod) []*extensions.Re
 
 // resolveControllerRef returns the controller referenced by a ControllerRef,
 // or nil if the ControllerRef could not be resolved to a matching controller
-// of the corrrect Kind.
+// of the correct Kind.
 func (rsc *ReplicaSetController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *extensions.ReplicaSet {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
@@ -237,7 +237,7 @@ func (rsc *ReplicaSetController) addPod(obj interface{}) {
 	}
 
 	// If it has a ControllerRef, that's all that matters.
-	if controllerRef := controller.GetControllerOf(pod); controllerRef != nil {
+	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil {
 		rs := rsc.resolveControllerRef(pod.Namespace, controllerRef)
 		if rs == nil {
 			return
@@ -293,8 +293,8 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 		return
 	}
 
-	curControllerRef := controller.GetControllerOf(curPod)
-	oldControllerRef := controller.GetControllerOf(oldPod)
+	curControllerRef := metav1.GetControllerOf(curPod)
+	oldControllerRef := metav1.GetControllerOf(oldPod)
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
 	if controllerRefChanged && oldControllerRef != nil {
 		// The ControllerRef was changed. Sync the old controller, if any.
@@ -363,7 +363,7 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 		}
 	}
 
-	controllerRef := controller.GetControllerOf(pod)
+	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef == nil {
 		// No controller should care about orphans being deleted.
 		return
@@ -451,31 +451,65 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *exte
 		// beforehand and store it via ExpectCreations.
 		rsc.expectations.ExpectCreations(rsKey, diff)
 		var wg sync.WaitGroup
-		wg.Add(diff)
 		glog.V(2).Infof("Too few %q/%q replicas, need %d, creating %d", rs.Namespace, rs.Name, *(rs.Spec.Replicas), diff)
-		for i := 0; i < diff; i++ {
-			go func() {
-				defer wg.Done()
-				var err error
-				boolPtr := func(b bool) *bool { return &b }
-				controllerRef := &metav1.OwnerReference{
-					APIVersion:         controllerKind.GroupVersion().String(),
-					Kind:               controllerKind.Kind,
-					Name:               rs.Name,
-					UID:                rs.UID,
-					BlockOwnerDeletion: boolPtr(true),
-					Controller:         boolPtr(true),
-				}
-				err = rsc.podControl.CreatePodsWithControllerRef(rs.Namespace, &rs.Spec.Template, rs, controllerRef)
-				if err != nil {
+		// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
+		// and double with each successful iteration in a kind of "slow start".
+		// This handles attempts to start large numbers of pods that would
+		// likely all fail with the same error. For example a project with a
+		// low quota that attempts to create a large number of pods will be
+		// prevented from spamming the API service with the pod create requests
+		// after one of its pods fails.  Conveniently, this also prevents the
+		// event spam that those failures would generate.
+		for batchSize := integer.IntMin(diff, controller.SlowStartInitialBatchSize); diff > 0; batchSize = integer.IntMin(2*batchSize, diff) {
+			errorCount := len(errCh)
+			wg.Add(batchSize)
+			for i := 0; i < batchSize; i++ {
+				go func() {
+					defer wg.Done()
+					var err error
+					boolPtr := func(b bool) *bool { return &b }
+					controllerRef := &metav1.OwnerReference{
+						APIVersion:         controllerKind.GroupVersion().String(),
+						Kind:               controllerKind.Kind,
+						Name:               rs.Name,
+						UID:                rs.UID,
+						BlockOwnerDeletion: boolPtr(true),
+						Controller:         boolPtr(true),
+					}
+					err = rsc.podControl.CreatePodsWithControllerRef(rs.Namespace, &rs.Spec.Template, rs, controllerRef)
+					if err != nil && errors.IsTimeout(err) {
+						// Pod is created but its initialization has timed out.
+						// If the initialization is successful eventually, the
+						// controller will observe the creation via the informer.
+						// If the initialization fails, or if the pod keeps
+						// uninitialized for a long time, the informer will not
+						// receive any update, and the controller will create a new
+						// pod when the expectation expires.
+						return
+					}
+					if err != nil {
+						// Decrement the expected number of creates because the informer won't observe this pod
+						glog.V(2).Infof("Failed creation, decrementing expectations for replica set %q/%q", rs.Namespace, rs.Name)
+						rsc.expectations.CreationObserved(rsKey)
+						errCh <- err
+					}
+				}()
+			}
+			wg.Wait()
+			// any skipped pods that we never attempted to start shouldn't be expected.
+			skippedPods := diff - batchSize
+			if errorCount < len(errCh) && skippedPods > 0 {
+				glog.V(2).Infof("Slow-start failure. Skipping creation of %d pods, decrementing expectations for replica set %q/%q", skippedPods, rs.Namespace, rs.Name)
+				for i := 0; i < skippedPods; i++ {
 					// Decrement the expected number of creates because the informer won't observe this pod
-					glog.V(2).Infof("Failed creation, decrementing expectations for replica set %q/%q", rs.Namespace, rs.Name)
 					rsc.expectations.CreationObserved(rsKey)
-					errCh <- err
 				}
-			}()
+				// The skipped pods will be retried later. The next controller resync will
+				// retry the slow start process.
+				break
+			}
+			diff -= batchSize
 		}
-		wg.Wait()
 	} else if diff > 0 {
 		if diff > rsc.burstReplicas {
 			diff = rsc.burstReplicas
@@ -597,11 +631,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		manageReplicasErr = rsc.manageReplicas(filteredPods, rs)
 	}
 
-	copy, err := api.Scheme.DeepCopy(rs)
-	if err != nil {
-		return err
-	}
-	rs = copy.(*extensions.ReplicaSet)
+	rs = rs.DeepCopy()
 
 	newStatus := calculateStatus(rs, filteredPods, manageReplicasErr)
 

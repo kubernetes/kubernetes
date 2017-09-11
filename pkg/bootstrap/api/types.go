@@ -17,7 +17,7 @@ limitations under the License.
 package api
 
 import (
-	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/api/core/v1"
 )
 
 const (
@@ -51,6 +51,11 @@ const (
 	// describes what the bootstrap token is used for. Optional.
 	BootstrapTokenDescriptionKey = "description"
 
+	// BootstrapTokenExtraGroupsKey is a comma-separated list of group names.
+	// The  bootstrap token will authenticate as these groups in addition to the
+	// "system:bootstrappers" group.
+	BootstrapTokenExtraGroupsKey = "auth-extra-groups"
+
 	// BootstrapTokenUsagePrefix is the prefix for the other usage constants that specifies different
 	// functions of a bootstrap token
 	BootstrapTokenUsagePrefix = "usage-bootstrap-"
@@ -63,7 +68,8 @@ const (
 	// BootstrapTokenUsageAuthentication signals that this token should be used
 	// as a bearer token to authenticate against the Kubernetes API. The bearer
 	// token takes the form "<token-id>.<token-secret>" and authenticates as the
-	// user "system:bootstrap:<token-id>" in the group "system:bootstrappers".
+	// user "system:bootstrap:<token-id>" in the "system:bootstrappers" group
+	// as well as any groups specified using BootstrapTokenExtraGroupsKey.
 	// Value must be "true". Any other value is assumed to be false. Optional.
 	BootstrapTokenUsageAuthentication = "usage-bootstrap-authentication"
 
@@ -80,6 +86,12 @@ const (
 	// authenticate as. The full username given is "system:bootstrap:<token-id>".
 	BootstrapUserPrefix = "system:bootstrap:"
 
-	// BootstrapGroup is the group bootstrapping bearer tokens authenticate in.
-	BootstrapGroup = "system:bootstrappers"
+	// BootstrapGroupPattern is the valid regex pattern that all groups
+	// assigned to a bootstrap token by BootstrapTokenExtraGroupsKey must match.
+	// See also ValidateBootstrapGroupName().
+	BootstrapGroupPattern = "system:bootstrappers:[a-z0-9:-]{0,255}[a-z0-9]"
+
+	// BootstrapDefaultGroup is the default group for bootstrapping bearer
+	// tokens (in addition to any groups from BootstrapTokenExtraGroupsKey).
+	BootstrapDefaultGroup = "system:bootstrappers"
 )

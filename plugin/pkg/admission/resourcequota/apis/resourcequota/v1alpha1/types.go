@@ -18,6 +18,8 @@ package v1alpha1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // Configuration provides configuration for the ResourceQuota admission controller.
 type Configuration struct {
 	metav1.TypeMeta `json:",inline"`

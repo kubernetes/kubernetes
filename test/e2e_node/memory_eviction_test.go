@@ -22,11 +22,11 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -54,7 +54,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 			logPodEvents(f)
 		})
 		Context("", func() {
-			tempSetCurrentKubeletConfig(f, func(c *componentconfig.KubeletConfiguration) {
+			tempSetCurrentKubeletConfig(f, func(c *kubeletconfig.KubeletConfiguration) {
 				c.EvictionHard = evictionHard
 			})
 
@@ -139,12 +139,12 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 					// A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
 					guaranteed := getMemhogPod("guaranteed-pod", "guaranteed", v1.ResourceRequirements{
 						Requests: v1.ResourceList{
-							"cpu":    resource.MustParse("100m"),
-							"memory": resource.MustParse("100Mi"),
+							v1.ResourceCPU:    resource.MustParse("100m"),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
 						},
 						Limits: v1.ResourceList{
-							"cpu":    resource.MustParse("100m"),
-							"memory": resource.MustParse("100Mi"),
+							v1.ResourceCPU:    resource.MustParse("100m"),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
 						}})
 					guaranteed = f.PodClient().CreateSync(guaranteed)
 					glog.Infof("pod created with name: %s", guaranteed.Name)
@@ -152,8 +152,8 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 					// A pod is burstable if limits and requests do not match across all containers.
 					burstable := getMemhogPod("burstable-pod", "burstable", v1.ResourceRequirements{
 						Requests: v1.ResourceList{
-							"cpu":    resource.MustParse("100m"),
-							"memory": resource.MustParse("100Mi"),
+							v1.ResourceCPU:    resource.MustParse("100m"),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
 						}})
 					burstable = f.PodClient().CreateSync(burstable)
 					glog.Infof("pod created with name: %s", burstable.Name)
@@ -256,7 +256,7 @@ func getMemhogPod(podName string, ctnName string, res v1.ResourceRequirements) *
 	// This helps prevent a guaranteed pod from triggering an OOM kill due to it's low memory limit,
 	// which will cause the test to fail inappropriately.
 	var memLimit string
-	if limit, ok := res.Limits["memory"]; ok {
+	if limit, ok := res.Limits[v1.ResourceMemory]; ok {
 		memLimit = strconv.Itoa(int(
 			float64(limit.Value()) * 0.8))
 	} else {

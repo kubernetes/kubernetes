@@ -17,11 +17,11 @@ limitations under the License.
 package v1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	v1 "k8s.io/client-go/pkg/api/v1"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -56,6 +56,41 @@ func newSecrets(c *CoreV1Client, namespace string) *secrets {
 		client: c.RESTClient(),
 		ns:     namespace,
 	}
+}
+
+// Get takes name of the secret, and returns the corresponding secret object, and an error if there is any.
+func (c *secrets) Get(name string, options meta_v1.GetOptions) (result *v1.Secret, err error) {
+	result = &v1.Secret{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("secrets").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of Secrets that match those selectors.
+func (c *secrets) List(opts meta_v1.ListOptions) (result *v1.SecretList, err error) {
+	result = &v1.SecretList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("secrets").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested secrets.
+func (c *secrets) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("secrets").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
 }
 
 // Create takes the representation of a secret and creates it.  Returns the server's representation of the secret, and an error, if there is any.
@@ -103,41 +138,6 @@ func (c *secrets) DeleteCollection(options *meta_v1.DeleteOptions, listOptions m
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the secret, and returns the corresponding secret object, and an error if there is any.
-func (c *secrets) Get(name string, options meta_v1.GetOptions) (result *v1.Secret, err error) {
-	result = &v1.Secret{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("secrets").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Secrets that match those selectors.
-func (c *secrets) List(opts meta_v1.ListOptions) (result *v1.SecretList, err error) {
-	result = &v1.SecretList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("secrets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested secrets.
-func (c *secrets) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("secrets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched secret.

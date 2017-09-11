@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -16,7 +14,6 @@ go_library(
         "fake_poddisruptionbudget.go",
         "fake_policy_client.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/apis/policy:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/policy/internalversion:go_default_library",

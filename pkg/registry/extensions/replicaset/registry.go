@@ -75,7 +75,7 @@ func (s *storage) GetReplicaSet(ctx genericapirequest.Context, replicaSetID stri
 }
 
 func (s *storage) CreateReplicaSet(ctx genericapirequest.Context, replicaSet *extensions.ReplicaSet) (*extensions.ReplicaSet, error) {
-	obj, err := s.Create(ctx, replicaSet)
+	obj, err := s.Create(ctx, replicaSet, false)
 	if err != nil {
 		return nil, err
 	}

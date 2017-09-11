@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -14,14 +7,19 @@ go_library(
         "balancer.go",
         "call.go",
         "clientconn.go",
+        "codec.go",
         "doc.go",
+        "go16.go",
+        "go17.go",
+        "grpclb.go",
         "interceptor.go",
+        "proxy.go",
         "rpc_util.go",
         "server.go",
         "stream.go",
         "trace.go",
     ],
-    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
@@ -29,10 +27,16 @@ go_library(
         "//vendor/golang.org/x/net/trace:go_default_library",
         "//vendor/google.golang.org/grpc/codes:go_default_library",
         "//vendor/google.golang.org/grpc/credentials:go_default_library",
+        "//vendor/google.golang.org/grpc/grpclb/grpc_lb_v1:go_default_library",
         "//vendor/google.golang.org/grpc/grpclog:go_default_library",
         "//vendor/google.golang.org/grpc/internal:go_default_library",
+        "//vendor/google.golang.org/grpc/keepalive:go_default_library",
         "//vendor/google.golang.org/grpc/metadata:go_default_library",
         "//vendor/google.golang.org/grpc/naming:go_default_library",
+        "//vendor/google.golang.org/grpc/peer:go_default_library",
+        "//vendor/google.golang.org/grpc/stats:go_default_library",
+        "//vendor/google.golang.org/grpc/status:go_default_library",
+        "//vendor/google.golang.org/grpc/tap:go_default_library",
         "//vendor/google.golang.org/grpc/transport:go_default_library",
     ],
 )
@@ -50,12 +54,18 @@ filegroup(
         ":package-srcs",
         "//vendor/google.golang.org/grpc/codes:all-srcs",
         "//vendor/google.golang.org/grpc/credentials:all-srcs",
+        "//vendor/google.golang.org/grpc/grpclb/grpc_lb_v1:all-srcs",
         "//vendor/google.golang.org/grpc/grpclog:all-srcs",
         "//vendor/google.golang.org/grpc/internal:all-srcs",
+        "//vendor/google.golang.org/grpc/keepalive:all-srcs",
         "//vendor/google.golang.org/grpc/metadata:all-srcs",
         "//vendor/google.golang.org/grpc/naming:all-srcs",
         "//vendor/google.golang.org/grpc/peer:all-srcs",
+        "//vendor/google.golang.org/grpc/stats:all-srcs",
+        "//vendor/google.golang.org/grpc/status:all-srcs",
+        "//vendor/google.golang.org/grpc/tap:all-srcs",
         "//vendor/google.golang.org/grpc/transport:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

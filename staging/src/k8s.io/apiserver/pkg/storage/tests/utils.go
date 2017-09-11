@@ -18,8 +18,6 @@ package tests
 
 import (
 	"k8s.io/apiserver/pkg/apis/example"
-
-	_ "k8s.io/client-go/pkg/api/install"
 )
 
 func DeepEqualSafePodSpec() example.PodSpec {

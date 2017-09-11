@@ -1,0 +1,61 @@
+package(default_visibility = ["//visibility:public"])
+
+load(
+    "@io_bazel_rules_go//go:def.bzl",
+    "go_library",
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "addon_update.go",
+        "cluster_upgrade.go",
+        "framework.go",
+        "ha_master.go",
+        "reboot.go",
+        "resize_nodes.go",
+        "restart.go",
+    ],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/kubelet/pod:go_default_library",
+        "//pkg/util/version:go_default_library",
+        "//test/e2e/chaosmonkey:go_default_library",
+        "//test/e2e/common:go_default_library",
+        "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/ginkgowrapper:go_default_library",
+        "//test/e2e/upgrades:go_default_library",
+        "//test/e2e/upgrades/apps:go_default_library",
+        "//test/e2e/upgrades/storage:go_default_library",
+        "//test/utils:go_default_library",
+        "//test/utils/image:go_default_library",
+        "//test/utils/junit:go_default_library",
+        "//vendor/github.com/onsi/ginkgo:go_default_library",
+        "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/golang.org/x/crypto/ssh:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/k8s.io/client-go/discovery:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+    ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//test/e2e/lifecycle/bootstrap:all-srcs",
+    ],
+    tags = ["automanaged"],
+)

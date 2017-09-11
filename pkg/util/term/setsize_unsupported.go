@@ -19,7 +19,7 @@ limitations under the License.
 package term
 
 import (
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
+	"k8s.io/client-go/tools/remotecommand"
 )
 
 func SetSize(fd uintptr, size remotecommand.TerminalSize) error {

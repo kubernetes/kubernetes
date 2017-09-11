@@ -16,6 +16,10 @@
 
 # Script that creates a Kubemark cluster for any given cloud provider.
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 TMP_ROOT="$(dirname "${BASH_SOURCE}")/../.."
 KUBE_ROOT=$(readlink -e ${TMP_ROOT} 2> /dev/null || perl -MCwd -e 'print Cwd::abs_path shift' ${TMP_ROOT})
 
@@ -66,7 +70,7 @@ SCHEDULER_TEST_ARGS="${SCHEDULER_TEST_ARGS:-}"
 APISERVER_TEST_ARGS="${APISERVER_TEST_ARGS:-}"
 STORAGE_BACKEND="${STORAGE_BACKEND:-}"
 NUM_NODES="${NUM_NODES:-}"
-CUSTOM_ADMISSION_PLUGINS="${CUSTOM_ADMISSION_PLUGINS:-NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota}"
+CUSTOM_ADMISSION_PLUGINS="${CUSTOM_ADMISSION_PLUGINS:-}"
 EOF
   echo "Created the environment file for master."
 }
@@ -98,6 +102,9 @@ function write-pki-config-to-master {
     sudo bash -c \"echo ${CA_CERT_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/ca.crt\" && \
     sudo bash -c \"echo ${MASTER_CERT_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/server.cert\" && \
     sudo bash -c \"echo ${MASTER_KEY_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/server.key\" && \
+    sudo bash -c \"echo ${REQUESTHEADER_CA_CERT_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/aggr_ca.crt\" && \
+    sudo bash -c \"echo ${PROXY_CLIENT_CERT_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/proxy_client.crt\" && \
+    sudo bash -c \"echo ${PROXY_CLIENT_KEY_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/proxy_client.key\" && \
     sudo bash -c \"echo ${KUBECFG_CERT_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/kubecfg.crt\" && \
     sudo bash -c \"echo ${KUBECFG_KEY_BASE64} | base64 --decode > /home/kubernetes/k8s_auth_data/kubecfg.key\" && \
     sudo bash -c \"echo \"${KUBE_BEARER_TOKEN},admin,admin\" > /home/kubernetes/k8s_auth_data/known_tokens.csv\" && \
@@ -108,34 +115,6 @@ function write-pki-config-to-master {
     sudo bash -c \"echo ${KUBE_PASSWORD},admin,admin > /home/kubernetes/k8s_auth_data/basic_auth.csv\""
   execute-cmd-on-master-with-retries "${PKI_SETUP_CMD}" 3
   echo "Wrote PKI certs, keys, tokens and admin password to master."
-}
-
-# Copy all the necessary resource files (scripts/configs/manifests) to the master.
-function copy-resource-files-to-master {
-  copy-files \
-    "${SERVER_BINARY_TAR}" \
-    "${RESOURCE_DIRECTORY}/kubemark-master-env.sh" \
-    "${RESOURCE_DIRECTORY}/start-kubemark-master.sh" \
-    "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
-    "${RESOURCE_DIRECTORY}/manifests/etcd.yaml" \
-    "${RESOURCE_DIRECTORY}/manifests/etcd-events.yaml" \
-    "${RESOURCE_DIRECTORY}/manifests/kube-apiserver.yaml" \
-    "${RESOURCE_DIRECTORY}/manifests/kube-scheduler.yaml" \
-    "${RESOURCE_DIRECTORY}/manifests/kube-controller-manager.yaml" \
-    "${RESOURCE_DIRECTORY}/manifests/kube-addon-manager.yaml" \
-    "${RESOURCE_DIRECTORY}/manifests/addons/kubemark-rbac-bindings" \
-    "kubernetes@${MASTER_NAME}":/home/kubernetes/
-  echo "Copied server binary, master startup scripts, configs and resource manifests to master."
-}
-
-# Make startup scripts executable and run start-kubemark-master.sh.
-function start-master-components {
-  echo ""
-  MASTER_STARTUP_CMD="sudo chmod a+x /home/kubernetes/configure-kubectl.sh && \
-    sudo chmod a+x /home/kubernetes/start-kubemark-master.sh && \
-    sudo bash /home/kubernetes/start-kubemark-master.sh"
-  execute-cmd-on-master-with-retries "${MASTER_STARTUP_CMD}"
-  echo "The master has started and is now live."
 }
 
 # Write kubeconfig to ${RESOURCE_DIRECTORY}/kubeconfig.kubemark in order to
@@ -165,6 +144,33 @@ contexts:
 current-context: kubemark-context
 EOF
   echo "Kubeconfig file for kubemark master written to ${LOCAL_KUBECONFIG}."
+}
+
+# Copy all the necessary resource files (scripts/configs/manifests) to the master.
+function copy-resource-files-to-master {
+  copy-files \
+    "${SERVER_BINARY_TAR}" \
+    "${RESOURCE_DIRECTORY}/kubemark-master-env.sh" \
+    "${RESOURCE_DIRECTORY}/start-kubemark-master.sh" \
+    "${RESOURCE_DIRECTORY}/kubeconfig.kubemark" \
+    "${KUBEMARK_DIRECTORY}/configure-kubectl.sh" \
+    "${RESOURCE_DIRECTORY}/manifests/etcd.yaml" \
+    "${RESOURCE_DIRECTORY}/manifests/etcd-events.yaml" \
+    "${RESOURCE_DIRECTORY}/manifests/kube-apiserver.yaml" \
+    "${RESOURCE_DIRECTORY}/manifests/kube-scheduler.yaml" \
+    "${RESOURCE_DIRECTORY}/manifests/kube-controller-manager.yaml" \
+    "${RESOURCE_DIRECTORY}/manifests/kube-addon-manager.yaml" \
+    "${RESOURCE_DIRECTORY}/manifests/addons/kubemark-rbac-bindings" \
+    "kubernetes@${MASTER_NAME}":/home/kubernetes/
+  echo "Copied server binary, master startup scripts, configs and resource manifests to master."
+}
+
+# Make startup scripts executable and run start-kubemark-master.sh.
+function start-master-components {
+  echo ""
+  MASTER_STARTUP_CMD="sudo bash /home/kubernetes/start-kubemark-master.sh"
+  execute-cmd-on-master-with-retries "${MASTER_STARTUP_CMD}"
+  echo "The master has started and is now live."
 }
 
 # Finds the right kubemark binary for 'linux/amd64' platform and uses it to
@@ -302,6 +308,10 @@ current-context: kubemark-context")
   metrics_mem_per_node=4
   metrics_mem=$((200 + ${metrics_mem_per_node}*${NUM_NODES:-10}))
   sed -i'' -e "s/{{METRICS_MEM}}/${metrics_mem}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
+  metrics_cpu_per_node_numerator=${NUM_NODES:-10}
+  metrics_cpu_per_node_denominator=2
+  metrics_cpu=$((80 + metrics_cpu_per_node_numerator / metrics_cpu_per_node_denominator))
+  sed -i'' -e "s/{{METRICS_CPU}}/${metrics_cpu}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
   eventer_mem_per_node=500
   eventer_mem=$((200 * 1024 + ${eventer_mem_per_node}*${NUM_NODES:-10}))
   sed -i'' -e "s/{{EVENTER_MEM}}/${eventer_mem}/g" "${RESOURCE_DIRECTORY}/addons/heapster.json"
@@ -313,7 +323,7 @@ current-context: kubemark-context")
   if [ "${NUM_NODES:-10}" -gt 1000 ]; then
     proxy_cpu=50
   fi
-  proxy_mem_per_node=100
+  proxy_mem_per_node=50
   proxy_mem=$((100 * 1024 + ${proxy_mem_per_node}*${NUM_NODES:-10}))
   sed -i'' -e "s/{{HOLLOW_PROXY_CPU}}/${proxy_cpu}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{HOLLOW_PROXY_MEM}}/${proxy_mem}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
@@ -322,6 +332,7 @@ current-context: kubemark-context")
   sed -i'' -e "s/{{master_ip}}/${MASTER_IP}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{kubelet_verbosity_level}}/${KUBELET_TEST_LOG_LEVEL}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s/{{kubeproxy_verbosity_level}}/${KUBEPROXY_TEST_LOG_LEVEL}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s/{{use_real_proxier}}/${USE_REAL_PROXIER}/g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/hollow-node.yaml" --namespace="kubemark"
 
   echo "Created secrets, configMaps, replication-controllers required for hollow-nodes."
@@ -348,7 +359,7 @@ function wait-for-hollow-nodes-to-run-or-timeout {
       else
         echo "Got error while trying to list hollow-nodes. Probably API server is down."
       fi
-      pods=$("${KUBECTL}" get pods --namespace=kubemark) || true
+      pods=$("${KUBECTL}" get pods -l name=hollow-node --namespace=kubemark) || true
       running=$(($(echo "${pods}" | grep "Running" | wc -l)))
       echo "${running} hollow-nodes are reported as 'Running'"
       not_running=$(($(echo "${pods}" | grep -v "Running" | wc -l) - 1))
@@ -373,13 +384,13 @@ create-master-instance-with-resources
 generate-pki-config
 wait-for-master-reachability
 write-pki-config-to-master
+write-local-kubeconfig
 copy-resource-files-to-master
 start-master-components
 
 # Setup for hollow-nodes.
 echo ""
 echo -e "${color_yellow}STARTING SETUP FOR HOLLOW-NODES${color_norm}"
-write-local-kubeconfig
 create-and-upload-hollow-node-image
 create-kube-hollow-node-resources
 wait-for-hollow-nodes-to-run-or-timeout

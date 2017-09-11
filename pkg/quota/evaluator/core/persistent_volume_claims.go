@@ -20,17 +20,24 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/initialization"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	k8sfeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 )
@@ -140,8 +147,31 @@ func (p *pvcEvaluator) GroupKind() schema.GroupKind {
 }
 
 // Handles returns true if the evaluator should handle the specified operation.
-func (p *pvcEvaluator) Handles(operation admission.Operation) bool {
-	return admission.Create == operation
+func (p *pvcEvaluator) Handles(a admission.Attributes) bool {
+	op := a.GetOperation()
+	if op == admission.Create {
+		return true
+	}
+	if op == admission.Update && utilfeature.DefaultFeatureGate.Enabled(k8sfeatures.ExpandPersistentVolumes) {
+		initialized, err := initialization.IsObjectInitialized(a.GetObject())
+		if err != nil {
+			// fail closed, will try to give an evaluation.
+			utilruntime.HandleError(err)
+			return true
+		}
+		// only handle the update if the object is initialized after the update.
+		return initialized
+	}
+	// TODO: when the ExpandPersistentVolumes feature gate is removed, remove
+	// the initializationCompletion check as well, because it will become a
+	// subset of the "initialized" condition.
+	initializationCompletion, err := util.IsInitializationCompletion(a)
+	if err != nil {
+		// fail closed, will try to give an evaluation.
+		utilruntime.HandleError(err)
+		return true
+	}
+	return initializationCompletion
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
@@ -176,10 +206,16 @@ func (p *pvcEvaluator) Usage(item runtime.Object) (api.ResourceList, error) {
 	if err != nil {
 		return result, err
 	}
-	storageClassRef := helper.GetPersistentVolumeClaimClass(pvc)
 
 	// charge for claim
 	result[api.ResourcePersistentVolumeClaims] = resource.MustParse("1")
+	if utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
+		if !initialization.IsInitialized(pvc.Initializers) {
+			// Only charge pvc count for uninitialized pvc.
+			return result, nil
+		}
+	}
+	storageClassRef := helper.GetPersistentVolumeClaimClass(pvc)
 	if len(storageClassRef) > 0 {
 		storageClassClaim := api.ResourceName(storageClassRef + storageClassSuffix + string(api.ResourcePersistentVolumeClaims))
 		result[storageClassClaim] = resource.MustParse("1")
@@ -209,7 +245,7 @@ func toInternalPersistentVolumeClaimOrError(obj runtime.Object) (*api.Persistent
 	pvc := &api.PersistentVolumeClaim{}
 	switch t := obj.(type) {
 	case *v1.PersistentVolumeClaim:
-		if err := v1.Convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(t, pvc, nil); err != nil {
+		if err := k8s_api_v1.Convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(t, pvc, nil); err != nil {
 			return nil, err
 		}
 	case *api.PersistentVolumeClaim:

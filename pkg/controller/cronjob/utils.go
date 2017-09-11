@@ -17,29 +17,26 @@ limitations under the License.
 package cronjob
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/golang/glog"
 	"github.com/robfig/cron"
 
+	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/v1/ref"
-	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
-	"k8s.io/kubernetes/pkg/controller"
 )
 
 // Utilities for dealing with Jobs and CronJobs and time.
 
-func inActiveList(sj batchv2alpha1.CronJob, uid types.UID) bool {
+func inActiveList(sj batchv1beta1.CronJob, uid types.UID) bool {
 	for _, j := range sj.Status.Active {
 		if j.UID == uid {
 			return true
@@ -48,7 +45,7 @@ func inActiveList(sj batchv2alpha1.CronJob, uid types.UID) bool {
 	return false
 }
 
-func deleteFromActiveList(sj *batchv2alpha1.CronJob, uid types.UID) {
+func deleteFromActiveList(sj *batchv1beta1.CronJob, uid types.UID) {
 	if sj == nil {
 		return
 	}
@@ -63,28 +60,18 @@ func deleteFromActiveList(sj *batchv2alpha1.CronJob, uid types.UID) {
 
 // getParentUIDFromJob extracts UID of job's parent and whether it was found
 func getParentUIDFromJob(j batchv1.Job) (types.UID, bool) {
-	creatorRefJson, found := j.ObjectMeta.Annotations[v1.CreatedByAnnotation]
-	if !found {
-		glog.V(4).Infof("Job with no created-by annotation, name %s namespace %s", j.Name, j.Namespace)
-		return types.UID(""), false
-	}
-	var sr v1.SerializedReference
-	err := json.Unmarshal([]byte(creatorRefJson), &sr)
-	if err != nil {
-		glog.V(4).Infof("Job with unparsable created-by annotation, name %s namespace %s: %v", j.Name, j.Namespace, err)
-		return types.UID(""), false
-	}
-	if sr.Reference.Kind != "CronJob" {
-		glog.V(4).Infof("Job with non-CronJob parent, name %s namespace %s", j.Name, j.Namespace)
-		return types.UID(""), false
-	}
-	// Don't believe a job that claims to have a parent in a different namespace.
-	if sr.Reference.Namespace != j.Namespace {
-		glog.V(4).Infof("Alleged scheduledJob parent in different namespace (%s) from Job name %s namespace %s", sr.Reference.Namespace, j.Name, j.Namespace)
+	controllerRef := metav1.GetControllerOf(&j)
+
+	if controllerRef == nil {
 		return types.UID(""), false
 	}
 
-	return sr.Reference.UID, true
+	if controllerRef.Kind != "CronJob" {
+		glog.V(4).Infof("Job with non-CronJob parent, name %s namespace %s", j.Name, j.Namespace)
+		return types.UID(""), false
+	}
+
+	return controllerRef.UID, true
 }
 
 // groupJobsByParent groups jobs into a map keyed by the job parent UID (e.g. scheduledJob).
@@ -124,7 +111,7 @@ func getNextStartTimeAfter(schedule string, now time.Time) (time.Time, error) {
 //
 // If there are too many (>100) unstarted times, just give up and return an empty slice.
 // If there were missed times prior to the last known start time, then those are not returned.
-func getRecentUnmetScheduleTimes(sj batchv2alpha1.CronJob, now time.Time) ([]time.Time, error) {
+func getRecentUnmetScheduleTimes(sj batchv1beta1.CronJob, now time.Time) ([]time.Time, error) {
 	starts := []time.Time{}
 	sched, err := cron.ParseStandard(sj.Spec.Schedule)
 	if err != nil {
@@ -170,7 +157,7 @@ func getRecentUnmetScheduleTimes(sj batchv2alpha1.CronJob, now time.Time) ([]tim
 		// then there could be so many missed start times (it could be off
 		// by decades or more), that it would eat up all the CPU and memory
 		// of this controller. In that case, we want to not try to list
-		// all the misseded start times.
+		// all the missed start times.
 		//
 		// I've somewhat arbitrarily picked 100, as more than 80, but
 		// but less than "lots".
@@ -182,23 +169,8 @@ func getRecentUnmetScheduleTimes(sj batchv2alpha1.CronJob, now time.Time) ([]tim
 	return starts, nil
 }
 
-func newControllerRef(sj *batchv2alpha1.CronJob) *metav1.OwnerReference {
-	blockOwnerDeletion := true
-	isController := true
-	return &metav1.OwnerReference{
-		APIVersion:         controllerKind.GroupVersion().String(),
-		Kind:               controllerKind.Kind,
-		Name:               sj.Name,
-		UID:                sj.UID,
-		BlockOwnerDeletion: &blockOwnerDeletion,
-		Controller:         &isController,
-	}
-}
-
-// XXX unit test this
-
 // getJobFromTemplate makes a Job from a CronJob
-func getJobFromTemplate(sj *batchv2alpha1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
+func getJobFromTemplate(sj *batchv1beta1.CronJob, scheduledTime time.Time) (*batchv1.Job, error) {
 	// TODO: consider adding the following labels:
 	// nominal-start-time=$RFC_3339_DATE_OF_INTENDED_START -- for user convenience
 	// scheduled-job-name=$SJ_NAME -- for user convenience
@@ -217,7 +189,7 @@ func getJobFromTemplate(sj *batchv2alpha1.CronJob, scheduledTime time.Time) (*ba
 			Labels:          labels,
 			Annotations:     annotations,
 			Name:            name,
-			OwnerReferences: []metav1.OwnerReference{*newControllerRef(sj)},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(sj, controllerKind)},
 		},
 	}
 	if err := api.Scheme.Convert(&sj.Spec.JobTemplate.Spec, &job.Spec, nil); err != nil {
@@ -226,7 +198,7 @@ func getJobFromTemplate(sj *batchv2alpha1.CronJob, scheduledTime time.Time) (*ba
 	return job, nil
 }
 
-// Return Unix Epoch Time
+// getTimeHash returns Unix Epoch Time
 func getTimeHash(scheduledTime time.Time) int64 {
 	return scheduledTime.Unix()
 }
@@ -277,47 +249,9 @@ func (o byJobStartTime) Less(i, j int) bool {
 		return o[i].Status.StartTime != nil
 	}
 
-	if (*o[i].Status.StartTime).Equal(*o[j].Status.StartTime) {
+	if o[i].Status.StartTime.Equal(o[j].Status.StartTime) {
 		return o[i].Name < o[j].Name
 	}
 
-	return (*o[i].Status.StartTime).Before(*o[j].Status.StartTime)
-}
-
-// adoptJobs applies missing ControllerRefs to Jobs created by a CronJob.
-//
-// This should only happen if the Jobs were created by an older version of the
-// CronJob controller, since from now on we add ControllerRef upon creation.
-//
-// CronJob doesn't do actual adoption because it doesn't use label selectors to
-// find its Jobs. However, we should apply ControllerRef for potential
-// server-side cascading deletion, and to advise other controllers we own these
-// objects.
-func adoptJobs(sj *batchv2alpha1.CronJob, js []batchv1.Job, jc jobControlInterface) error {
-	var errs []error
-	controllerRef := newControllerRef(sj)
-	controllerRefJSON, err := json.Marshal(controllerRef)
-	if err != nil {
-		return fmt.Errorf("can't adopt Jobs: failed to marshal ControllerRef %#v: %v", controllerRef, err)
-	}
-
-	for i := range js {
-		job := &js[i]
-		controllerRef := controller.GetControllerOf(job)
-		if controllerRef != nil {
-			continue
-		}
-		controllerRefPatch := fmt.Sprintf(`{"metadata":{"ownerReferences":[%s],"uid":"%s"}}`,
-			controllerRefJSON, job.UID)
-		updatedJob, err := jc.PatchJob(job.Namespace, job.Name, types.StrategicMergePatchType, []byte(controllerRefPatch))
-		if err != nil {
-			// If there's a ResourceVersion or other error, don't bother retrying.
-			// We will just try again on a subsequent CronJob sync.
-			errs = append(errs, err)
-			continue
-		}
-		// Save it back to the array for later consumers.
-		js[i] = *updatedJob
-	}
-	return utilerrors.NewAggregate(errs)
+	return o[i].Status.StartTime.Before(o[j].Status.StartTime)
 }

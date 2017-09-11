@@ -28,7 +28,6 @@ import (
 )
 
 var allModels = make(map[string]*swagger.NamedModel)
-var recursive = false // this is global for convenience, can become int for multiple levels
 
 // SplitAndParseResourceRequest separates the users input into a model and fields
 func SplitAndParseResourceRequest(inResource string, mapper meta.RESTMapper) (string, []string, error) {
@@ -37,9 +36,10 @@ func SplitAndParseResourceRequest(inResource string, mapper meta.RESTMapper) (st
 	return inResource, fieldsPath, nil
 }
 
-// PrintModelDescription prints the description of a specific model or dot path
-func PrintModelDescription(inModel string, fieldsPath []string, w io.Writer, swaggerSchema *swagger.ApiDeclaration, r bool) error {
-	recursive = r // this is global for convenience
+// PrintModelDescription prints the description of a specific model or dot path.
+// If recursive, all components nested within the fields of the schema will be
+// printed.
+func PrintModelDescription(inModel string, fieldsPath []string, w io.Writer, swaggerSchema *swagger.ApiDeclaration, recursive bool) error {
 	apiVer := apiutil.GetVersion(swaggerSchema.ApiVersion) + "."
 
 	var pointedModel *swagger.NamedModel
@@ -56,7 +56,7 @@ func PrintModelDescription(inModel string, fieldsPath []string, w io.Writer, swa
 	}
 
 	if len(fieldsPath) == 0 {
-		return printTopLevelResourceInfo(w, pointedModel)
+		return printTopLevelResourceInfo(w, pointedModel, recursive)
 	}
 
 	var pointedModelAsProp *swagger.NamedModelProperty
@@ -72,7 +72,7 @@ func PrintModelDescription(inModel string, fieldsPath []string, w io.Writer, swa
 			return fmt.Errorf("field %q does not exist", field)
 		}
 	}
-	return printModelInfo(w, pointedModel, pointedModelAsProp)
+	return printModelInfo(w, pointedModel, pointedModelAsProp, recursive)
 }
 
 func splitDotNotation(model string) (string, []string) {
@@ -103,12 +103,12 @@ func getField(model *swagger.NamedModel, sField string) (*swagger.NamedModelProp
 	return nil, "", false
 }
 
-func printModelInfo(w io.Writer, model *swagger.NamedModel, modelProp *swagger.NamedModelProperty) error {
+func printModelInfo(w io.Writer, model *swagger.NamedModel, modelProp *swagger.NamedModelProperty, recursive bool) error {
 	t, _ := getFieldType(&modelProp.Property)
 	fmt.Fprintf(w, "RESOURCE: %s <%s>\n\n", modelProp.Name, t)
 	fieldDesc, _ := wrapAndIndentText(modelProp.Property.Description, "    ", 80)
 	fmt.Fprintf(w, "DESCRIPTION:\n%s\n\n%s\n", fieldDesc, indentText(model.Model.Description, "    "))
-	return printFields(w, model)
+	return printFields(w, model, recursive)
 }
 
 func printPrimitive(w io.Writer, field *swagger.NamedModelProperty) error {
@@ -119,12 +119,12 @@ func printPrimitive(w io.Writer, field *swagger.NamedModelProperty) error {
 	return nil
 }
 
-func printTopLevelResourceInfo(w io.Writer, model *swagger.NamedModel) error {
+func printTopLevelResourceInfo(w io.Writer, model *swagger.NamedModel, recursive bool) error {
 	fmt.Fprintf(w, "DESCRIPTION:\n%s\n", model.Model.Description)
-	return printFields(w, model)
+	return printFields(w, model, recursive)
 }
 
-func printFields(w io.Writer, model *swagger.NamedModel) error {
+func printFields(w io.Writer, model *swagger.NamedModel, recursive bool) error {
 	fmt.Fprint(w, "\nFIELDS:\n")
 	for _, field := range model.Model.Properties.List {
 		fieldType, err := getFieldType(&field.Property)

@@ -21,9 +21,13 @@ package cm
 import (
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/v1"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
@@ -32,7 +36,7 @@ type unsupportedContainerManager struct {
 
 var _ ContainerManager = &unsupportedContainerManager{}
 
-func (unsupportedContainerManager) Start(_ *v1.Node, _ ActivePodsFunc) error {
+func (unsupportedContainerManager) Start(_ *v1.Node, _ ActivePodsFunc, _ status.PodStatusProvider, _ internalapi.RuntimeService) error {
 	return fmt.Errorf("Container Manager is unsupported in this build")
 }
 
@@ -64,10 +68,22 @@ func (cm *unsupportedContainerManager) GetNodeAllocatableReservation() v1.Resour
 	return nil
 }
 
+func (cm *unsupportedContainerManager) GetCapacity() v1.ResourceList {
+	return nil
+}
+
 func (cm *unsupportedContainerManager) NewPodContainerManager() PodContainerManager {
 	return &unsupportedPodContainerManager{}
 }
 
-func NewContainerManager(_ mount.Interface, _ cadvisor.Interface, _ NodeConfig, failSwapOn bool, recorder record.EventRecorder) (ContainerManager, error) {
+func (cm *unsupportedContainerManager) GetResources(pod *v1.Pod, container *v1.Container, activePods []*v1.Pod) (*kubecontainer.RunContainerOptions, error) {
+	return &kubecontainer.RunContainerOptions{}, nil
+}
+
+func (cm *unsupportedContainerManager) InternalContainerLifecycle() InternalContainerLifecycle {
+	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager()}
+}
+
+func NewContainerManager(_ mount.Interface, _ cadvisor.Interface, _ NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {
 	return &unsupportedContainerManager{}, nil
 }

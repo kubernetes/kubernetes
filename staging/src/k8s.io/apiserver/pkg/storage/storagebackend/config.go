@@ -16,7 +16,10 @@ limitations under the License.
 
 package storagebackend
 
-import "k8s.io/apimachinery/pkg/runtime"
+import (
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/storage/value"
+)
 
 const (
 	StorageTypeUnset = ""
@@ -38,6 +41,11 @@ type Config struct {
 	CAFile   string
 	// Quorum indicates that whether read operations should be quorum-level consistent.
 	Quorum bool
+	// Paging indicates whether the server implementation should allow paging (if it is
+	// supported). This is generally configured by feature gating, or by a specific
+	// resource type not wishing to allow paging, and is not intended for end users to
+	// set.
+	Paging bool
 	// DeserializationCacheSize is the size of cache of deserialized objects.
 	// Currently this is only supported in etcd2.
 	// We will drop the cache once using protobuf.
@@ -45,6 +53,8 @@ type Config struct {
 
 	Codec  runtime.Codec
 	Copier runtime.ObjectCopier
+	// Transformer allows the value to be transformed prior to persisting into etcd.
+	Transformer value.Transformer
 }
 
 func NewDefaultConfig(prefix string, copier runtime.ObjectCopier, codec runtime.Codec) *Config {

@@ -19,9 +19,9 @@ package volume
 import (
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 func TestSpecSourceConverters(t *testing.T) {
@@ -103,7 +103,8 @@ func newTestPlugin() []VolumePlugin {
 
 func TestVolumePluginMgrFunc(t *testing.T) {
 	vpm := VolumePluginMgr{}
-	vpm.InitPlugins(newTestPlugin(), nil)
+	var prober DynamicPluginProber = nil // TODO (#51147) inject mock
+	vpm.InitPlugins(newTestPlugin(), prober, nil)
 
 	plug, err := vpm.FindPluginByName("testPlugin")
 	if err != nil {
@@ -111,6 +112,17 @@ func TestVolumePluginMgrFunc(t *testing.T) {
 	}
 	if plug.GetPluginName() != "testPlugin" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
+	}
+
+	plug, err = vpm.FindPluginBySpec(nil)
+	if err == nil {
+		t.Errorf("Should return error if volume spec is nil")
+	}
+
+	volumeSpec := &Spec{}
+	plug, err = vpm.FindPluginBySpec(volumeSpec)
+	if err != nil {
+		t.Errorf("Should return test plugin if volume spec is not nil")
 	}
 }
 

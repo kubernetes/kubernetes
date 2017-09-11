@@ -17,16 +17,10 @@ limitations under the License.
 package ingress
 
 import (
-	"fmt"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -98,31 +92,6 @@ func (ingressStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old ru
 // AllowUnconditionalUpdate is the default update policy for Ingress objects.
 func (ingressStrategy) AllowUnconditionalUpdate() bool {
 	return true
-}
-
-// IngressToSelectableFields returns a field set that represents the object.
-func IngressToSelectableFields(ingress *extensions.Ingress) fields.Set {
-	return generic.ObjectMetaFieldsSet(&ingress.ObjectMeta, true)
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	ingress, ok := obj.(*extensions.Ingress)
-	if !ok {
-		return nil, nil, fmt.Errorf("Given object is not an Ingress.")
-	}
-	return labels.Set(ingress.ObjectMeta.Labels), IngressToSelectableFields(ingress), nil
-}
-
-// MatchIngress is the filter used by the generic etcd backend to ingress
-// watch events from etcd to clients of the apiserver only interested in specific
-// labels/fields.
-func MatchIngress(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
 }
 
 type ingressStatusStrategy struct {

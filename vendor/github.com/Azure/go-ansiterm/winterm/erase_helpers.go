@@ -2,11 +2,9 @@
 
 package winterm
 
-import (
-	. "github.com/Azure/go-ansiterm"
-)
+import "github.com/Azure/go-ansiterm"
 
-func (h *WindowsAnsiEventHandler) clearRange(attributes WORD, fromCoord COORD, toCoord COORD) error {
+func (h *windowsAnsiEventHandler) clearRange(attributes uint16, fromCoord COORD, toCoord COORD) error {
 	// Ignore an invalid (negative area) request
 	if toCoord.Y < fromCoord.Y {
 		return nil
@@ -60,7 +58,7 @@ func (h *WindowsAnsiEventHandler) clearRange(attributes WORD, fromCoord COORD, t
 	return nil
 }
 
-func (h *WindowsAnsiEventHandler) clearRect(attributes WORD, fromCoord COORD, toCoord COORD) error {
+func (h *windowsAnsiEventHandler) clearRect(attributes uint16, fromCoord COORD, toCoord COORD) error {
 	region := SMALL_RECT{Top: fromCoord.Y, Left: fromCoord.X, Bottom: toCoord.Y, Right: toCoord.X}
 	width := toCoord.X - fromCoord.X + 1
 	height := toCoord.Y - fromCoord.Y + 1
@@ -72,7 +70,7 @@ func (h *WindowsAnsiEventHandler) clearRect(attributes WORD, fromCoord COORD, to
 
 	buffer := make([]CHAR_INFO, size)
 
-	char := CHAR_INFO{WCHAR(FILL_CHARACTER), attributes}
+	char := CHAR_INFO{ansiterm.FILL_CHARACTER, attributes}
 	for i := 0; i < int(size); i++ {
 		buffer[i] = char
 	}

@@ -17,13 +17,17 @@ limitations under the License.
 package cloudstack
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/golang/glog"
 	"github.com/xanzy/go-cloudstack/cloudstack"
 	"gopkg.in/gcfg.v1"
+
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 // ProviderName is the name of this cloud provider.
@@ -81,6 +85,9 @@ func newCSCloud(cfg *CSConfig) (*CSCloud, error) {
 	return &CSCloud{client, cfg.Global.ProjectID, cfg.Global.Zone}, nil
 }
 
+// Initialize passes a Kubernetes clientBuilder interface to the cloud provider
+func (cs *CSCloud) Initialize(clientBuilder controller.ControllerClientBuilder) {}
+
 // LoadBalancer returns an implementation of LoadBalancer for CloudStack.
 func (cs *CSCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	return cs, true
@@ -116,8 +123,27 @@ func (cs *CSCloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []st
 	return nameservers, searches
 }
 
+// HasClusterID returns true if the cluster has a clusterID
+func (cs *CSCloud) HasClusterID() bool {
+	return true
+}
+
 // GetZone returns the Zone containing the region that the program is running in.
 func (cs *CSCloud) GetZone() (cloudprovider.Zone, error) {
 	glog.V(2).Infof("Current zone is %v", cs.zone)
 	return cloudprovider.Zone{Region: cs.zone}, nil
+}
+
+// GetZoneByProviderID implements Zones.GetZoneByProviderID
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (cs *CSCloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, errors.New("GetZoneByProviderID not implemented")
+}
+
+// GetZoneByNodeName implements Zones.GetZoneByNodeName
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (cs *CSCloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, errors.New("GetZoneByNodeName not imeplemented")
 }

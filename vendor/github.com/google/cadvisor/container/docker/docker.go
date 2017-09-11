@@ -37,7 +37,10 @@ func Status() (v1.DockerStatus, error) {
 	if err != nil {
 		return v1.DockerStatus{}, err
 	}
+	return StatusFromDockerInfo(dockerInfo), nil
+}
 
+func StatusFromDockerInfo(dockerInfo dockertypes.Info) v1.DockerStatus {
 	out := v1.DockerStatus{}
 	out.Version = VersionString()
 	out.APIVersion = APIVersionString()
@@ -53,7 +56,7 @@ func Status() (v1.DockerStatus, error) {
 	for _, v := range dockerInfo.DriverStatus {
 		out.DriverStatus[v[0]] = v[1]
 	}
-	return out, nil
+	return out
 }
 
 func Images() ([]v1.DockerImage, error) {

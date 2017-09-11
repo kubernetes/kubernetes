@@ -24,15 +24,17 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 )
 
-// RecommendedOptions contains the recommended options for running an API server
-// If you add something to this list, it should be in a logical grouping
+// RecommendedOptions contains the recommended options for running an API server.
+// If you add something to this list, it should be in a logical grouping.
+// Each of them can be nil to leave the feature unconfigured on ApplyTo.
 type RecommendedOptions struct {
 	Etcd           *EtcdOptions
 	SecureServing  *SecureServingOptions
 	Authentication *DelegatingAuthenticationOptions
 	Authorization  *DelegatingAuthorizationOptions
-	Audit          *AuditLogOptions
+	Audit          *AuditOptions
 	Features       *FeatureOptions
+	CoreAPI        *CoreAPIOptions
 }
 
 func NewRecommendedOptions(prefix string, copier runtime.ObjectCopier, codec runtime.Codec) *RecommendedOptions {
@@ -41,8 +43,9 @@ func NewRecommendedOptions(prefix string, copier runtime.ObjectCopier, codec run
 		SecureServing:  NewSecureServingOptions(),
 		Authentication: NewDelegatingAuthenticationOptions(),
 		Authorization:  NewDelegatingAuthorizationOptions(),
-		Audit:          NewAuditLogOptions(),
+		Audit:          NewAuditOptions(),
 		Features:       NewFeatureOptions(),
+		CoreAPI:        NewCoreAPIOptions(),
 	}
 }
 
@@ -53,27 +56,43 @@ func (o *RecommendedOptions) AddFlags(fs *pflag.FlagSet) {
 	o.Authorization.AddFlags(fs)
 	o.Audit.AddFlags(fs)
 	o.Features.AddFlags(fs)
+	o.CoreAPI.AddFlags(fs)
 }
 
-func (o *RecommendedOptions) ApplyTo(config *server.Config) error {
-	if err := o.Etcd.ApplyTo(config); err != nil {
+func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
+	if err := o.Etcd.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-	if err := o.SecureServing.ApplyTo(config); err != nil {
+	if err := o.SecureServing.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-	if err := o.Authentication.ApplyTo(config); err != nil {
+	if err := o.Authentication.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-	if err := o.Authorization.ApplyTo(config); err != nil {
+	if err := o.Authorization.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-	if err := o.Audit.ApplyTo(config); err != nil {
+	if err := o.Audit.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-	if err := o.Features.ApplyTo(config); err != nil {
+	if err := o.Features.ApplyTo(&config.Config); err != nil {
 		return err
 	}
-
+	if err := o.CoreAPI.ApplyTo(config); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (o *RecommendedOptions) Validate() []error {
+	errors := []error{}
+	errors = append(errors, o.Etcd.Validate()...)
+	errors = append(errors, o.SecureServing.Validate()...)
+	errors = append(errors, o.Authentication.Validate()...)
+	errors = append(errors, o.Authorization.Validate()...)
+	errors = append(errors, o.Audit.Validate()...)
+	errors = append(errors, o.Features.Validate()...)
+	errors = append(errors, o.CoreAPI.Validate()...)
+
+	return errors
 }

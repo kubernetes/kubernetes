@@ -19,7 +19,7 @@ package priorities
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 
@@ -57,7 +57,7 @@ func calculateUsedScore(requested int64, capacity int64, node string) int64 {
 			requested, capacity, node)
 		return 0
 	}
-	return (requested * 10) / capacity
+	return (requested * schedulerapi.MaxPriority) / capacity
 }
 
 // Calculate the resource used on a node.  'node' has information about the resources on the node.

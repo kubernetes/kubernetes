@@ -18,17 +18,18 @@ package framework
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	kubeclientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/pkg/api/v1"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -119,7 +120,7 @@ func waitForNamespaceInFederatedClusters(clusters ClusterSlice, nsName string) {
 		name := c.Name
 		By(fmt.Sprintf("Waiting for namespace %q to be created in cluster %q", nsName, name))
 		err := wait.PollImmediate(framework.Poll, FederatedDefaultTestTimeout, func() (bool, error) {
-			_, err := c.Clientset.Core().Namespaces().Get(nsName, metav1.GetOptions{})
+			_, err := c.Clientset.CoreV1().Namespaces().Get(nsName, metav1.GetOptions{})
 			if errors.IsNotFound(err) {
 				return false, nil
 			} else if err != nil {
@@ -230,4 +231,10 @@ func restConfigForCluster(clusterConf *clusterConfig) *restclient.Config {
 	restConfig, err := clientcmd.NewDefaultClientConfig(*cfg, &clientcmd.ConfigOverrides{}).ClientConfig()
 	framework.ExpectNoError(err, fmt.Sprintf("Error creating client for cluster %q: %+v", clusterConf.name, err))
 	return restConfig
+}
+
+func GetZoneFromClusterName(clusterName string) string {
+	// Ref: https://github.com/kubernetes/kubernetes/blob/master/cluster/kube-util.sh#L55
+	prefix := "federation-e2e-" + framework.TestContext.Provider + "-"
+	return strings.TrimPrefix(clusterName, prefix)
 }

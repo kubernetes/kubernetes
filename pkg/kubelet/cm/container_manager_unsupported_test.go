@@ -40,6 +40,14 @@ func (mi *fakeMountInterface) List() ([]mount.MountPoint, error) {
 	return mi.mountPoints, nil
 }
 
+func (f *fakeMountInterface) IsMountPointMatch(mp mount.MountPoint, dir string) bool {
+	return (mp.Path == dir)
+}
+
+func (f *fakeMountInterface) IsNotMountPoint(dir string) (bool, error) {
+	return false, fmt.Errorf("unsupported")
+}
+
 func (mi *fakeMountInterface) IsLikelyNotMountPoint(file string) (bool, error) {
 	return false, fmt.Errorf("unsupported")
 }
@@ -59,6 +67,10 @@ func (mi *fakeMountInterface) PathIsDevice(pathname string) (bool, error) {
 
 func (mi *fakeMountInterface) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
 	return "", nil
+}
+
+func (mi *fakeMountInterface) MakeRShared(path string) error {
+	return nil
 }
 
 func fakeContainerMgrMountInt() mount.Interface {

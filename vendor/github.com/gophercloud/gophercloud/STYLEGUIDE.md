@@ -57,7 +57,7 @@
 
 ### Naming
 
-- For methods on a type in `response.go`, the receiver should be named `r` and the
+- For methods on a type in `results.go`, the receiver should be named `r` and the
   variable into which it will be unmarshalled `s`.
 
 - Functions in `requests.go`, with the exception of functions that return a

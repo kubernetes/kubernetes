@@ -1,29 +1,37 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-    "go_test",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["conntrack.go"],
-    tags = ["automanaged"],
+    srcs = [
+        "conntrack.go",
+        "port.go",
+        "utils.go",
+    ],
+    visibility = ["//visibility:public"],
     deps = [
-        "//pkg/util/exec:go_default_library",
+        "//pkg/api:go_default_library",
+        "//pkg/api/helper:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["conntrack_test.go"],
+    srcs = [
+        "conntrack_test.go",
+        "port_test.go",
+        "utils_test.go",
+    ],
     library = ":go_default_library",
-    tags = ["automanaged"],
-    deps = ["//pkg/util/exec:go_default_library"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/k8s.io/utils/exec/testing:go_default_library",
+    ],
 )
 
 filegroup(
@@ -37,4 +45,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

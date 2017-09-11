@@ -19,10 +19,10 @@ package v1beta1
 import (
 	"fmt"
 
+	apps "k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/pkg/api/v1"
-	apps "k8s.io/client-go/pkg/apis/apps/v1beta1"
 )
 
 // StatefulSetListerExpansion allows custom methods to be added to
@@ -32,7 +32,7 @@ type StatefulSetListerExpansion interface {
 }
 
 // StatefulSetNamespaceListerExpansion allows custom methods to be added to
-// StatefulSetNamespaeLister.
+// StatefulSetNamespaceLister.
 type StatefulSetNamespaceListerExpansion interface{}
 
 // GetPodStatefulSets returns a list of StatefulSets that potentially match a pod.

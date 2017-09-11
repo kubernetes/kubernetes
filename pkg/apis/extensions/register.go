@@ -19,6 +19,7 @@ package extensions
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/apis/networking"
 )
 
 // GroupName is the group name use in this package
@@ -63,8 +64,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ReplicaSetList{},
 		&PodSecurityPolicy{},
 		&PodSecurityPolicyList{},
-		&NetworkPolicy{},
-		&NetworkPolicyList{},
+		&networking.NetworkPolicy{},
+		&networking.NetworkPolicyList{},
 	)
 	return nil
 }

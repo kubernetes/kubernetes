@@ -17,8 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/pkg/api/v1"
 )
 
 // NodeConditionPredicate is a function that indicates whether the given node's conditions meet

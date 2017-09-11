@@ -19,16 +19,16 @@ package federatedtypes
 import (
 	"reflect"
 
+	"k8s.io/api/core/v1"
+	extensionsv1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+	kubeclientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 )
 
 const (
@@ -44,7 +44,7 @@ type DaemonSetAdapter struct {
 	client federationclientset.Interface
 }
 
-func NewDaemonSetAdapter(client federationclientset.Interface) FederatedTypeAdapter {
+func NewDaemonSetAdapter(client federationclientset.Interface, config *restclient.Config, adapterSpecificArgs map[string]interface{}) FederatedTypeAdapter {
 	return &DaemonSetAdapter{client: client}
 }
 
@@ -75,9 +75,9 @@ func (a *DaemonSetAdapter) Equivalent(obj1, obj2 pkgruntime.Object) bool {
 	return util.ObjectMetaEquivalent(daemonset1.ObjectMeta, daemonset2.ObjectMeta) && reflect.DeepEqual(daemonset1.Spec, daemonset2.Spec)
 }
 
-func (a *DaemonSetAdapter) NamespacedName(obj pkgruntime.Object) types.NamespacedName {
+func (a *DaemonSetAdapter) QualifiedName(obj pkgruntime.Object) QualifiedName {
 	daemonset := obj.(*extensionsv1.DaemonSet)
-	return types.NamespacedName{Namespace: daemonset.Namespace, Name: daemonset.Name}
+	return QualifiedName{Namespace: daemonset.Namespace, Name: daemonset.Name}
 }
 
 func (a *DaemonSetAdapter) ObjectMeta(obj pkgruntime.Object) *metav1.ObjectMeta {
@@ -89,12 +89,12 @@ func (a *DaemonSetAdapter) FedCreate(obj pkgruntime.Object) (pkgruntime.Object, 
 	return a.client.Extensions().DaemonSets(daemonset.Namespace).Create(daemonset)
 }
 
-func (a *DaemonSetAdapter) FedDelete(namespacedName types.NamespacedName, options *metav1.DeleteOptions) error {
-	return a.client.Extensions().DaemonSets(namespacedName.Namespace).Delete(namespacedName.Name, options)
+func (a *DaemonSetAdapter) FedDelete(qualifiedName QualifiedName, options *metav1.DeleteOptions) error {
+	return a.client.Extensions().DaemonSets(qualifiedName.Namespace).Delete(qualifiedName.Name, options)
 }
 
-func (a *DaemonSetAdapter) FedGet(namespacedName types.NamespacedName) (pkgruntime.Object, error) {
-	return a.client.Extensions().DaemonSets(namespacedName.Namespace).Get(namespacedName.Name, metav1.GetOptions{})
+func (a *DaemonSetAdapter) FedGet(qualifiedName QualifiedName) (pkgruntime.Object, error) {
+	return a.client.Extensions().DaemonSets(qualifiedName.Namespace).Get(qualifiedName.Name, metav1.GetOptions{})
 }
 
 func (a *DaemonSetAdapter) FedList(namespace string, options metav1.ListOptions) (pkgruntime.Object, error) {
@@ -115,12 +115,12 @@ func (a *DaemonSetAdapter) ClusterCreate(client kubeclientset.Interface, obj pkg
 	return client.Extensions().DaemonSets(daemonset.Namespace).Create(daemonset)
 }
 
-func (a *DaemonSetAdapter) ClusterDelete(client kubeclientset.Interface, nsName types.NamespacedName, options *metav1.DeleteOptions) error {
-	return client.Extensions().DaemonSets(nsName.Namespace).Delete(nsName.Name, options)
+func (a *DaemonSetAdapter) ClusterDelete(client kubeclientset.Interface, qualifiedName QualifiedName, options *metav1.DeleteOptions) error {
+	return client.Extensions().DaemonSets(qualifiedName.Namespace).Delete(qualifiedName.Name, options)
 }
 
-func (a *DaemonSetAdapter) ClusterGet(client kubeclientset.Interface, namespacedName types.NamespacedName) (pkgruntime.Object, error) {
-	return client.Extensions().DaemonSets(namespacedName.Namespace).Get(namespacedName.Name, metav1.GetOptions{})
+func (a *DaemonSetAdapter) ClusterGet(client kubeclientset.Interface, qualifiedName QualifiedName) (pkgruntime.Object, error) {
+	return client.Extensions().DaemonSets(qualifiedName.Namespace).Get(qualifiedName.Name, metav1.GetOptions{})
 }
 
 func (a *DaemonSetAdapter) ClusterList(client kubeclientset.Interface, namespace string, options metav1.ListOptions) (pkgruntime.Object, error) {
@@ -134,6 +134,10 @@ func (a *DaemonSetAdapter) ClusterUpdate(client kubeclientset.Interface, obj pkg
 
 func (a *DaemonSetAdapter) ClusterWatch(client kubeclientset.Interface, namespace string, options metav1.ListOptions) (watch.Interface, error) {
 	return client.Extensions().DaemonSets(namespace).Watch(options)
+}
+
+func (a *DaemonSetAdapter) IsSchedulingAdapter() bool {
+	return false
 }
 
 func (a *DaemonSetAdapter) NewTestObject(namespace string) pkgruntime.Object {

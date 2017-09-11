@@ -19,6 +19,7 @@ package garbagecollector
 import (
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -27,11 +28,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -62,6 +65,7 @@ type event struct {
 	obj       interface{}
 	// the update event comes with an old object, but it's not used by the garbage collector.
 	oldObj interface{}
+	gvk    schema.GroupVersionKind
 }
 
 // GraphBuilder: based on the events supplied by the informers, GraphBuilder updates
@@ -69,9 +73,22 @@ type event struct {
 // items to the attemptToDelete and attemptToOrphan.
 type GraphBuilder struct {
 	restMapper meta.RESTMapper
+
 	// each monitor list/watches a resource, the results are funneled to the
 	// dependencyGraphBuilder
-	monitors []cache.Controller
+	monitors    monitors
+	monitorLock sync.Mutex
+	// informersStarted is closed after after all of the controllers have been initialized and are running.
+	// After that it is safe to start them here, before that it is not.
+	informersStarted <-chan struct{}
+
+	// stopCh drives shutdown. If it is nil, it indicates that Run() has not been
+	// called yet. If it is non-nil, then when closed it indicates everything
+	// should shut down.
+	//
+	// This channel is also protected by monitorLock.
+	stopCh <-chan struct{}
+
 	// metaOnlyClientPool uses a special codec, which removes fields except for
 	// apiVersion, kind, and metadata during decoding.
 	metaOnlyClientPool dynamic.ClientPool
@@ -90,9 +107,28 @@ type GraphBuilder struct {
 	// GraphBuilder and GC share the absentOwnerCache. Objects that are known to
 	// be non-existent are added to the cached.
 	absentOwnerCache *UIDCache
+	sharedInformers  informers.SharedInformerFactory
+	ignoredResources map[schema.GroupResource]struct{}
 }
 
-func listWatcher(client *dynamic.Client, resource schema.GroupVersionResource) *cache.ListWatch {
+// monitor runs a Controller with a local stop channel.
+type monitor struct {
+	controller cache.Controller
+
+	// stopCh stops Controller. If stopCh is nil, the monitor is considered to be
+	// not yet started.
+	stopCh chan struct{}
+}
+
+// Run is intended to be called in a goroutine. Multiple calls of this is an
+// error.
+func (m *monitor) Run() {
+	m.controller.Run(m.stopCh)
+}
+
+type monitors map[schema.GroupVersionResource]*monitor
+
+func listWatcher(client dynamic.Interface, resource schema.GroupVersionResource) *cache.ListWatch {
 	return &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			// APIResource.Kind is not used by the dynamic client, so
@@ -118,105 +154,221 @@ func listWatcher(client *dynamic.Client, resource schema.GroupVersionResource) *
 }
 
 func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, error) {
+	handlers := cache.ResourceEventHandlerFuncs{
+		// add the event to the dependencyGraphBuilder's graphChanges.
+		AddFunc: func(obj interface{}) {
+			event := &event{
+				eventType: addEvent,
+				obj:       obj,
+				gvk:       kind,
+			}
+			gb.graphChanges.Add(event)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			// TODO: check if there are differences in the ownerRefs,
+			// finalizers, and DeletionTimestamp; if not, ignore the update.
+			event := &event{
+				eventType: updateEvent,
+				obj:       newObj,
+				oldObj:    oldObj,
+				gvk:       kind,
+			}
+			gb.graphChanges.Add(event)
+		},
+		DeleteFunc: func(obj interface{}) {
+			// delta fifo may wrap the object in a cache.DeletedFinalStateUnknown, unwrap it
+			if deletedFinalStateUnknown, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+				obj = deletedFinalStateUnknown.Obj
+			}
+			event := &event{
+				eventType: deleteEvent,
+				obj:       obj,
+				gvk:       kind,
+			}
+			gb.graphChanges.Add(event)
+		},
+	}
+	shared, err := gb.sharedInformers.ForResource(resource)
+	if err == nil {
+		glog.V(4).Infof("using a shared informer for resource %q, kind %q", resource.String(), kind.String())
+		// need to clone because it's from a shared cache
+		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)
+		return shared.Informer().GetController(), nil
+	} else {
+		glog.V(4).Infof("unable to use a shared informer for resource %q, kind %q: %v", resource.String(), kind.String(), err)
+	}
+
 	// TODO: consider store in one storage.
 	glog.V(5).Infof("create storage for resource %s", resource)
 	client, err := gb.metaOnlyClientPool.ClientForGroupVersionKind(kind)
 	if err != nil {
 		return nil, err
 	}
+	// TODO: since the gv is never unregistered, isn't this a memory leak?
 	gb.registeredRateLimiterForControllers.registerIfNotPresent(resource.GroupVersion(), client, "garbage_collector_monitoring")
-	setObjectTypeMeta := func(obj interface{}) {
-		runtimeObject, ok := obj.(runtime.Object)
-		if !ok {
-			utilruntime.HandleError(fmt.Errorf("expected runtime.Object, got %#v", obj))
-		}
-		runtimeObject.GetObjectKind().SetGroupVersionKind(kind)
-	}
 	_, monitor := cache.NewInformer(
 		listWatcher(client, resource),
 		nil,
 		ResourceResyncTime,
-		cache.ResourceEventHandlerFuncs{
-			// add the event to the dependencyGraphBuilder's graphChanges.
-			AddFunc: func(obj interface{}) {
-				setObjectTypeMeta(obj)
-				event := &event{
-					eventType: addEvent,
-					obj:       obj,
-				}
-				gb.graphChanges.Add(event)
-			},
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				setObjectTypeMeta(newObj)
-				// TODO: check if there are differences in the ownerRefs,
-				// finalizers, and DeletionTimestamp; if not, ignore the update.
-				event := &event{updateEvent, newObj, oldObj}
-				gb.graphChanges.Add(event)
-			},
-			DeleteFunc: func(obj interface{}) {
-				// delta fifo may wrap the object in a cache.DeletedFinalStateUnknown, unwrap it
-				if deletedFinalStateUnknown, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-					obj = deletedFinalStateUnknown.Obj
-				}
-				setObjectTypeMeta(obj)
-				event := &event{
-					eventType: deleteEvent,
-					obj:       obj,
-				}
-				gb.graphChanges.Add(event)
-			},
-		},
+		// don't need to clone because it's not from shared cache
+		handlers,
 	)
 	return monitor, nil
 }
 
-func (gb *GraphBuilder) monitorsForResources(resources map[schema.GroupVersionResource]struct{}) error {
+// syncMonitors rebuilds the monitor set according to the supplied resources,
+// creating or deleting monitors as necessary. It will return any error
+// encountered, but will make an attempt to create a monitor for each resource
+// instead of immediately exiting on an error. It may be called before or after
+// Run. Monitors are NOT started as part of the sync. To ensure all existing
+// monitors are started, call startMonitors.
+func (gb *GraphBuilder) syncMonitors(resources map[schema.GroupVersionResource]struct{}) error {
+	gb.monitorLock.Lock()
+	defer gb.monitorLock.Unlock()
+
+	toRemove := gb.monitors
+	if toRemove == nil {
+		toRemove = monitors{}
+	}
+	current := monitors{}
+	errs := []error{}
+	kept := 0
+	added := 0
 	for resource := range resources {
-		if _, ok := ignoredResources[resource]; ok {
-			glog.V(5).Infof("ignore resource %#v", resource)
+		if _, ok := ignoredResources[resource.GroupResource()]; ok {
+			continue
+		}
+		if m, ok := toRemove[resource]; ok {
+			current[resource] = m
+			delete(toRemove, resource)
+			kept++
 			continue
 		}
 		kind, err := gb.restMapper.KindFor(resource)
 		if err != nil {
-			nonCoreMsg := fmt.Sprintf(nonCoreMessage, resource)
-			utilruntime.HandleError(fmt.Errorf("%v. %s", err, nonCoreMsg))
+			errs = append(errs, fmt.Errorf("couldn't look up resource %q: %v", resource, err))
 			continue
 		}
-		monitor, err := gb.controllerFor(resource, kind)
+		c, err := gb.controllerFor(resource, kind)
 		if err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %v", resource, err))
+			continue
 		}
-		gb.monitors = append(gb.monitors, monitor)
+		current[resource] = &monitor{controller: c}
+		added++
 	}
-	return nil
+	gb.monitors = current
+
+	for _, monitor := range toRemove {
+		if monitor.stopCh != nil {
+			close(monitor.stopCh)
+		}
+	}
+
+	glog.V(4).Infof("synced monitors; added %d, kept %d, removed %d", added, kept, len(toRemove))
+	// NewAggregate returns nil if errs is 0-length
+	return utilerrors.NewAggregate(errs)
 }
 
-func (gb *GraphBuilder) HasSynced() bool {
+// startMonitors ensures the current set of monitors are running. Any newly
+// started monitors will also cause shared informers to be started.
+//
+// If called before Run, startMonitors does nothing (as there is no stop channel
+// to support monitor/informer execution).
+func (gb *GraphBuilder) startMonitors() {
+	gb.monitorLock.Lock()
+	defer gb.monitorLock.Unlock()
+
+	if gb.stopCh == nil {
+		return
+	}
+
+	// we're waiting until after the informer start that happens once all the controllers are initialized.  This ensures
+	// that they don't get unexpected events on their work queues.
+	<-gb.informersStarted
+
+	monitors := gb.monitors
+	started := 0
+	for _, monitor := range monitors {
+		if monitor.stopCh == nil {
+			monitor.stopCh = make(chan struct{})
+			gb.sharedInformers.Start(gb.stopCh)
+			go monitor.Run()
+			started++
+		}
+	}
+	glog.V(4).Infof("started %d new monitors, %d currently running", started, len(monitors))
+}
+
+// IsSynced returns true if any monitors exist AND all those monitors'
+// controllers HasSynced functions return true. This means IsSynced could return
+// true at one time, and then later return false if all monitors were
+// reconstructed.
+func (gb *GraphBuilder) IsSynced() bool {
+	gb.monitorLock.Lock()
+	defer gb.monitorLock.Unlock()
+
+	if len(gb.monitors) == 0 {
+		return false
+	}
+
 	for _, monitor := range gb.monitors {
-		if !monitor.HasSynced() {
+		if !monitor.controller.HasSynced() {
 			return false
 		}
 	}
 	return true
 }
 
+// Run sets the stop channel and starts monitor execution until stopCh is
+// closed. Any running monitors will be stopped before Run returns.
 func (gb *GraphBuilder) Run(stopCh <-chan struct{}) {
-	for _, monitor := range gb.monitors {
-		go monitor.Run(stopCh)
+	glog.Infof("GraphBuilder running")
+	defer glog.Infof("GraphBuilder stopping")
+
+	// Set up the stop channel.
+	gb.monitorLock.Lock()
+	gb.stopCh = stopCh
+	gb.monitorLock.Unlock()
+
+	// Start monitors and begin change processing until the stop channel is
+	// closed.
+	gb.startMonitors()
+	wait.Until(gb.runProcessGraphChanges, 1*time.Second, stopCh)
+
+	// Stop any running monitors.
+	gb.monitorLock.Lock()
+	defer gb.monitorLock.Unlock()
+	monitors := gb.monitors
+	stopped := 0
+	for _, monitor := range monitors {
+		if monitor.stopCh != nil {
+			stopped++
+			close(monitor.stopCh)
+		}
 	}
-	go wait.Until(gb.runProcessGraphChanges, 1*time.Second, stopCh)
+	glog.Infof("stopped %d of %d monitors", stopped, len(monitors))
 }
 
-var ignoredResources = map[schema.GroupVersionResource]struct{}{
-	{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollers"}:              {},
-	{Group: "", Version: "v1", Resource: "bindings"}:                                           {},
-	{Group: "", Version: "v1", Resource: "componentstatuses"}:                                  {},
-	{Group: "", Version: "v1", Resource: "events"}:                                             {},
-	{Group: "authentication.k8s.io", Version: "v1beta1", Resource: "tokenreviews"}:             {},
-	{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "subjectaccessreviews"}:      {},
-	{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "selfsubjectaccessreviews"}:  {},
-	{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "localsubjectaccessreviews"}: {},
-	{Group: "apiregistration.k8s.io", Version: "v1alpha1", Resource: "apiservices"}:            {},
+var ignoredResources = map[schema.GroupResource]struct{}{
+	{Group: "extensions", Resource: "replicationcontrollers"}:              {},
+	{Group: "", Resource: "bindings"}:                                      {},
+	{Group: "", Resource: "componentstatuses"}:                             {},
+	{Group: "", Resource: "events"}:                                        {},
+	{Group: "authentication.k8s.io", Resource: "tokenreviews"}:             {},
+	{Group: "authorization.k8s.io", Resource: "subjectaccessreviews"}:      {},
+	{Group: "authorization.k8s.io", Resource: "selfsubjectaccessreviews"}:  {},
+	{Group: "authorization.k8s.io", Resource: "localsubjectaccessreviews"}: {},
+	{Group: "authorization.k8s.io", Resource: "selfsubjectrulesreviews"}:   {},
+	{Group: "apiregistration.k8s.io", Resource: "apiservices"}:             {},
+	{Group: "apiextensions.k8s.io", Resource: "customresourcedefinitions"}: {},
+}
+
+// DefaultIgnoredResources returns the default set of resources that the garbage collector controller
+// should ignore. This is exposed so downstream integrators can have access to the defaults, and add
+// to them as necessary when constructing the controller.
+func DefaultIgnoredResources() map[schema.GroupResource]struct{} {
+	return ignoredResources
 }
 
 func (gb *GraphBuilder) enqueueChanges(e *event) {
@@ -226,7 +378,7 @@ func (gb *GraphBuilder) enqueueChanges(e *event) {
 // addDependentToOwners adds n to owners' dependents list. If the owner does not
 // exist in the gb.uidToNode yet, a "virtual" node will be created to represent
 // the owner. The "virtual" node will be enqueued to the attemptToDelete, so that
-// processItem() will verify if the owner exists according to the API server.
+// attemptToDeleteItem() will verify if the owner exists according to the API server.
 func (gb *GraphBuilder) addDependentToOwners(n *node, owners []metav1.OwnerReference) {
 	for _, owner := range owners {
 		ownerNode, ok := gb.uidToNode.Read(owner.UID)
@@ -285,13 +437,13 @@ type ownerRefPair struct {
 // when the number of references is small.
 func referencesDiffs(old []metav1.OwnerReference, new []metav1.OwnerReference) (added []metav1.OwnerReference, removed []metav1.OwnerReference, changed []ownerRefPair) {
 	oldUIDToRef := make(map[string]metav1.OwnerReference)
-	for i := 0; i < len(old); i++ {
-		oldUIDToRef[string(old[i].UID)] = old[i]
+	for _, value := range old {
+		oldUIDToRef[string(value.UID)] = value
 	}
 	oldUIDSet := sets.StringKeySet(oldUIDToRef)
 	newUIDToRef := make(map[string]metav1.OwnerReference)
-	for i := 0; i < len(new); i++ {
-		newUIDToRef[string(new[i].UID)] = new[i]
+	for _, value := range new {
+		newUIDToRef[string(value.UID)] = value
 	}
 	newUIDSet := sets.StringKeySet(newUIDToRef)
 
@@ -435,12 +587,7 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
 		return true
 	}
-	typeAccessor, err := meta.TypeAccessor(obj)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
-		return true
-	}
-	glog.V(5).Infof("GraphBuilder process object: %s/%s, namespace %s, name %s, event type %v", typeAccessor.GetAPIVersion(), typeAccessor.GetKind(), accessor.GetNamespace(), accessor.GetName(), event.eventType)
+	glog.V(5).Infof("GraphBuilder process object: %s/%s, namespace %s, name %s, uid %s, event type %v", event.gvk.GroupVersion().String(), event.gvk.Kind, accessor.GetNamespace(), accessor.GetName(), string(accessor.GetUID()), event.eventType)
 	// Check if the node already exsits
 	existingNode, found := gb.uidToNode.Read(accessor.GetUID())
 	switch {
@@ -448,8 +595,8 @@ func (gb *GraphBuilder) processGraphChanges() bool {
 		newNode := &node{
 			identity: objectReference{
 				OwnerReference: metav1.OwnerReference{
-					APIVersion: typeAccessor.GetAPIVersion(),
-					Kind:       typeAccessor.GetKind(),
+					APIVersion: event.gvk.GroupVersion().String(),
+					Kind:       event.gvk.Kind,
 					UID:        accessor.GetUID(),
 					Name:       accessor.GetName(),
 				},

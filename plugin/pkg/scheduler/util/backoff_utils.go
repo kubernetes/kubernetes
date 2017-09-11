@@ -18,11 +18,13 @@ package util
 
 import (
 	"fmt"
-	"github.com/golang/glog"
-	ktypes "k8s.io/apimachinery/pkg/types"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	ktypes "k8s.io/apimachinery/pkg/types"
+
+	"github.com/golang/glog"
 )
 
 type clock interface {
@@ -74,7 +76,7 @@ func (entry *backoffEntry) getBackoff(maxDuration time.Duration) time.Duration {
 		newDuration = maxDuration
 	}
 	entry.backoff = newDuration
-	glog.V(4).Infof("Backing off %s for pod %+v", duration.String(), entry)
+	glog.V(4).Infof("Backing off %s", duration.String())
 	return duration
 }
 

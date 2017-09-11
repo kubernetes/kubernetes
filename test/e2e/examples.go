@@ -27,15 +27,15 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/api/core/v1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
-	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/generated"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -72,7 +72,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 
 		// this test wants powerful permissions.  Since the namespace names are unique, we can leave this
 		// lying around so we don't have to race any caches
-		framework.BindClusterRoleInNamespace(c.Rbac(), "edit", f.Namespace.Name,
+		framework.BindClusterRoleInNamespace(c.RbacV1beta1(), "edit", f.Namespace.Name,
 			rbacv1beta1.Subject{Kind: rbacv1beta1.ServiceAccountKind, Namespace: f.Namespace.Name, Name: "default"})
 
 		err := framework.WaitForAuthorizationUpdate(c.AuthorizationV1beta1(),
@@ -265,7 +265,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("CassandraStatefulSet", func() {
 		It("should create statefulset", func() {
 			mkpath := func(file string) string {
-				return filepath.Join("examples/storage/cassandra", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "examples/storage/cassandra", file)
 			}
 			serviceYaml := mkpath("cassandra-service.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)

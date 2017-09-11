@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,26 +12,40 @@ go_library(
         "doc.go",
         "procfs.go",
         "procfs_fake.go",
-        "procfs_linux.go",
-    ],
-    tags = ["automanaged"],
-    deps = [
-        "//vendor/github.com/golang/glog:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
-    ],
+        "procfs_unsupported.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "procfs_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
+    deps = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/github.com/golang/glog:go_default_library",
+            "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 go_test(
     name = "go_default_test",
-    srcs = ["procfs_linux_test.go"],
+    srcs = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "procfs_linux_test.go",
+        ],
+        "//conditions:default": [],
+    }),
     data = [
         "example_proc_cgroup",
     ],
     library = ":go_default_library",
-    tags = [
-        "automanaged",
-    ],
-    deps = ["//vendor/github.com/stretchr/testify/assert:go_default_library"],
+    deps = select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(

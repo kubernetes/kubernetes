@@ -17,10 +17,15 @@ limitations under the License.
 package gce
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
+	"regexp"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"cloud.google.com/go/compute/metadata"
 	compute "google.golang.org/api/compute/v1"
@@ -34,6 +39,8 @@ type gceInstance struct {
 	Disks []*compute.AttachedDisk
 	Type  string
 }
+
+var providerIdRE = regexp.MustCompile(`^` + ProviderName + `://([^/]+)/([^/]+)/([^/]+)$`)
 
 func getProjectAndZone() (string, string, error) {
 	result, err := metadata.Get("instance/zone")
@@ -50,6 +57,43 @@ func getProjectAndZone() (string, string, error) {
 		return "", "", err
 	}
 	return projectID, zone, nil
+}
+
+func (gce *GCECloud) raiseFirewallChangeNeededEvent(svc *v1.Service, cmd string) {
+	msg := fmt.Sprintf("Firewall change required by network admin: `%v`", cmd)
+	if gce.eventRecorder != nil && svc != nil {
+		gce.eventRecorder.Event(svc, v1.EventTypeNormal, "LoadBalancerManualChange", msg)
+	}
+}
+
+// FirewallToGCloudCreateCmd generates a gcloud command to create a firewall with specified params
+func FirewallToGCloudCreateCmd(fw *compute.Firewall, projectID string) string {
+	args := firewallToGcloudArgs(fw, projectID)
+	return fmt.Sprintf("gcloud compute firewall-rules create %v --network %v %v", fw.Name, getNameFromLink(fw.Network), args)
+}
+
+// FirewallToGCloudCreateCmd generates a gcloud command to update a firewall to specified params
+func FirewallToGCloudUpdateCmd(fw *compute.Firewall, projectID string) string {
+	args := firewallToGcloudArgs(fw, projectID)
+	return fmt.Sprintf("gcloud compute firewall-rules update %v %v", fw.Name, args)
+}
+
+// FirewallToGCloudCreateCmd generates a gcloud command to delete a firewall to specified params
+func FirewallToGCloudDeleteCmd(fwName, projectID string) string {
+	return fmt.Sprintf("gcloud compute firewall-rules delete %v --project %v", fwName, projectID)
+}
+
+func firewallToGcloudArgs(fw *compute.Firewall, projectID string) string {
+	var allPorts []string
+	for _, a := range fw.Allowed {
+		for _, p := range a.Ports {
+			allPorts = append(allPorts, fmt.Sprintf("%v:%v", a.IPProtocol, p))
+		}
+	}
+	allow := strings.Join(allPorts, ",")
+	srcRngs := strings.Join(fw.SourceRanges, ",")
+	targets := strings.Join(fw.TargetTags, ",")
+	return fmt.Sprintf("--description %q --allow %v --source-ranges %v --target-tags %v --project %v", fw.Description, allow, srcRngs, targets, projectID)
 }
 
 // Take a GCE instance 'hostname' and break it down to something that can be fed
@@ -99,4 +143,71 @@ func GetGCERegion(zone string) (string, error) {
 func isHTTPErrorCode(err error, code int) bool {
 	apiErr, ok := err.(*googleapi.Error)
 	return ok && apiErr.Code == code
+}
+
+func isInUsedByError(err error) bool {
+	apiErr, ok := err.(*googleapi.Error)
+	if !ok || apiErr.Code != http.StatusBadRequest {
+		return false
+	}
+	return strings.Contains(apiErr.Message, "being used by")
+}
+
+// splitProviderID splits a provider's id into core components.
+// A providerID is build out of '${ProviderName}://${project-id}/${zone}/${instance-name}'
+// See cloudprovider.GetInstanceProviderID.
+func splitProviderID(providerID string) (project, zone, instance string, err error) {
+	matches := providerIdRE.FindStringSubmatch(providerID)
+	if len(matches) != 4 {
+		return "", "", "", errors.New("error splitting providerID")
+	}
+	return matches[1], matches[2], matches[3], nil
+}
+
+func equalStringSets(x, y []string) bool {
+	if len(x) != len(y) {
+		return false
+	}
+	xString := sets.NewString(x...)
+	yString := sets.NewString(y...)
+	return xString.Equal(yString)
+}
+
+func isNotFound(err error) bool {
+	return isHTTPErrorCode(err, http.StatusNotFound)
+}
+
+func ignoreNotFound(err error) error {
+	if err == nil || isNotFound(err) {
+		return nil
+	}
+	return err
+}
+
+func isNotFoundOrInUse(err error) bool {
+	return isNotFound(err) || isInUsedByError(err)
+}
+
+func isForbidden(err error) bool {
+	return isHTTPErrorCode(err, http.StatusForbidden)
+}
+
+func makeGoogleAPINotFoundError(message string) error {
+	return &googleapi.Error{Code: http.StatusNotFound, Message: message}
+}
+
+func makeGoogleAPIError(code int, message string) error {
+	return &googleapi.Error{Code: code, Message: message}
+}
+
+// TODO(#51665): Remove this once Network Tiers becomes Beta in GCP.
+func handleAlphaNetworkTierGetError(err error) (string, error) {
+	if isForbidden(err) {
+		// Network tier is still an Alpha feature in GCP, and not every project
+		// is whitelisted to access the API. If we cannot access the API, just
+		// assume the tier is premium.
+		return NetworkTierDefault.ToGCEValue(), nil
+	}
+	// Can't get the network tier, just return an error.
+	return "", err
 }

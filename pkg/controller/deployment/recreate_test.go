@@ -20,14 +20,13 @@ import (
 	"fmt"
 	"testing"
 
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -53,12 +52,7 @@ func TestScaleDownOldReplicaSets(t *testing.T) {
 			rs := newReplicaSet(test.d, fmt.Sprintf("%s-%d", test.d.Name, n), size)
 			oldRSs = append(oldRSs, rs)
 
-			objCopy, err := api.Scheme.Copy(rs)
-			if err != nil {
-				t.Errorf("unexpected error while deep-copying: %v", err)
-				continue
-			}
-			rsCopy := objCopy.(*extensions.ReplicaSet)
+			rsCopy := rs.DeepCopy()
 
 			zero := int32(0)
 			rsCopy.Spec.Replicas = &zero

@@ -29,6 +29,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,6 +38,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
+	fakeclientset "k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
@@ -43,12 +49,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -322,6 +322,33 @@ func TestSyncReplicaSetCreates(t *testing.T) {
 	manager.podControl = &fakePodControl
 	manager.syncReplicaSet(getKey(rs, t))
 	validateSyncReplicaSet(t, &fakePodControl, 2, 0, 0)
+}
+
+// Tell the rs to create 100 replicas, but simulate a limit (like a quota limit)
+// of 10, and verify that the rs doesn't make 100 create calls per sync pass
+func TestSyncReplicaSetCreateFailures(t *testing.T) {
+	fakePodControl := controller.FakePodControl{}
+	fakePodControl.CreateLimit = 10
+
+	labelMap := map[string]string{"foo": "bar"}
+	rs := newReplicaSet(fakePodControl.CreateLimit*10, labelMap)
+	client := fake.NewSimpleClientset(rs)
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas)
+
+	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
+
+	manager.podControl = &fakePodControl
+	manager.syncReplicaSet(getKey(rs, t))
+	validateSyncReplicaSet(t, &fakePodControl, fakePodControl.CreateLimit, 0, 0)
+	expectedLimit := 0
+	for pass := uint8(0); expectedLimit <= fakePodControl.CreateLimit; pass++ {
+		expectedLimit += controller.SlowStartInitialBatchSize << pass
+	}
+	if fakePodControl.CreateCallCount > expectedLimit {
+		t.Errorf("Unexpected number of create calls.  Expected <= %d, saw %d\n", fakePodControl.CreateLimit*2, fakePodControl.CreateCallCount)
+	}
 }
 
 func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {

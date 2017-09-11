@@ -1,0 +1,150 @@
+kind: DaemonSet
+apiVersion: extensions/v1beta1
+metadata:
+  name: calico-node
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+    k8s-app: calico-node
+spec:
+  selector:
+    matchLabels:
+      k8s-app: calico-node
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        k8s-app: calico-node
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      nodeSelector:
+        projectcalico.org/ds-ready: "true"
+      hostNetwork: true
+      serviceAccountName: calico
+      containers:
+        # Runs calico/node container on each Kubernetes node.  This
+        # container programs network policy and routes on each
+        # host.
+        - name: calico-node
+          image: calico/node:v2.5.1
+          env:
+            - name: CALICO_DISABLE_FILE_LOGGING
+              value: "true"
+            - name: CALICO_NETWORKING_BACKEND
+              value: "none"
+            - name: DATASTORE_TYPE
+              value: "kubernetes"
+            - name: FELIX_TYPHAK8SSERVICENAME
+              value: "calico-typha"
+            - name: FELIX_DEFAULTENDPOINTTOHOSTACTION
+              value: "ACCEPT"
+            - name: FELIX_IPV6SUPPORT
+              value: "false"
+            - name: FELIX_LOGSEVERITYSYS
+              value: "none"
+            - name: FELIX_PROMETHEUSMETRICSENABLED
+              value: "true"
+            - name: FELIX_HEALTHENABLED
+              value: "true"
+            - name: IP
+              value: ""
+            - name: NO_DEFAULT_POOLS
+              value: "true"
+            - name: NODENAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: WAIT_FOR_DATASTORE
+              value: "true"
+          securityContext:
+            privileged: true
+          livenessProbe:
+            httpGet:
+              path: /liveness
+              port: 9099
+            periodSeconds: 10
+            initialDelaySeconds: 10
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /readiness
+              port: 9099
+            periodSeconds: 10
+          volumeMounts:
+            - mountPath: /lib/modules
+              name: lib-modules
+              readOnly: true
+            - mountPath: /etc/calico
+              name: etc-calico
+              readOnly: true
+        # This container installs the Calico CNI binaries
+        # and CNI network config file on each node.
+        - name: install-cni
+          image: calico/cni:v1.10.0
+          command: ["/install-cni.sh"]
+          env:
+            - name: CNI_CONF_NAME
+              value: "10-calico.conflist"
+            - name: CNI_NETWORK_CONFIG
+              value: |-
+                {
+                  "name": "k8s-pod-network",
+                  "cniVersion": "0.3.0",
+                  "plugins": [
+                    {
+                      "type": "calico",
+                      "log_level": "debug",
+                      "datastore_type": "kubernetes",
+                      "nodename": "__KUBERNETES_NODE_NAME__",
+                      "ipam": {
+                        "type": "host-local",
+                        "subnet": "usePodCidr"
+                      },
+                      "policy": {
+                        "type": "k8s",
+                        "k8s_auth_token": "__SERVICEACCOUNT_TOKEN__"
+                      },
+                      "kubernetes": {
+                        "k8s_api_root": "https://__KUBERNETES_SERVICE_HOST__:__KUBERNETES_SERVICE_PORT__",
+                        "kubeconfig": "__KUBECONFIG_FILEPATH__"
+                      }
+                    },
+                    {
+                      "type": "portmap",
+                      "capabilities": {"portMappings": true},
+                      "snat": true
+                    }
+                  ]
+                }
+            - name: KUBERNETES_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - mountPath: /host/opt/cni/bin
+              name: cni-bin-dir
+            - mountPath: /host/etc/cni/net.d
+              name: cni-net-dir
+      volumes:
+        # Used to ensure proper kmods are installed.
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+        # Mount in the Felix config file from the host.
+        - name: etc-calico
+          hostPath:
+            path: /etc/calico
+        # Used to install CNI binaries.
+        - name: cni-bin-dir
+          hostPath:
+            path: __CALICO_CNI_DIR__
+        # Used to install CNI network config.
+        - name: cni-net-dir
+          hostPath:
+            path: /etc/cni/net.d
+      tolerations:
+        - key: "CriticalAddonsOnly"
+          operator: "Exists"

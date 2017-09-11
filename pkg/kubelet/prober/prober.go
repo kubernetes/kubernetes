@@ -26,9 +26,9 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -37,7 +37,7 @@ import (
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
 	httprobe "k8s.io/kubernetes/pkg/probe/http"
 	tcprobe "k8s.io/kubernetes/pkg/probe/tcp"
-	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/utils/exec"
 
 	"github.com/golang/glog"
 )
@@ -237,6 +237,10 @@ func (pb *prober) newExecInContainer(container v1.Container, containerID kubecon
 	}}
 }
 
+func (eic execInContainer) Run() error {
+	return fmt.Errorf("unimplemented")
+}
+
 func (eic execInContainer) CombinedOutput() ([]byte, error) {
 	return eic.run()
 }
@@ -254,6 +258,10 @@ func (eic execInContainer) SetStdin(in io.Reader) {
 }
 
 func (eic execInContainer) SetStdout(out io.Writer) {
+	//unimplemented
+}
+
+func (eic execInContainer) SetStderr(out io.Writer) {
 	//unimplemented
 }
 

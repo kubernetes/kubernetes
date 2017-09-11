@@ -20,21 +20,15 @@ set -o pipefail
 export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-# Remove generated files prior to running gazel.
+# Remove generated files prior to running kazel.
 # TODO(spxtr): Remove this line once Bazel is the only way to build.
 rm -f "${KUBE_ROOT}/pkg/generated/openapi/zz_generated.openapi.go"
 
-go get -u gopkg.in/mikedanese/gazel.v17/gazel
+# The git commit sha1s here should match the values in $KUBE_ROOT/WORKSPACE.
+kube::util::go_install_from_commit github.com/kubernetes/repo-infra/kazel 4eaf9e671bbb549fb4ec292cf251f921d7ef80ac
+kube::util::go_install_from_commit github.com/bazelbuild/rules_go/go/tools/gazelle/gazelle 82483596ec203eb9c1849937636f4cbed83733eb
 
-for path in ${GOPATH//:/ }; do
-  if [[ -e "${path}/bin/gazel" ]]; then
-    gazel="${path}/bin/gazel"
-    break
-  fi
-done
-if [[ -z "${gazel:-}" ]]; then
-  echo "Couldn't find gazel on the GOPATH."
-  exit 1
-fi
+touch "${KUBE_ROOT}/vendor/BUILD"
 
-"${gazel}" -root="$(kube::realpath ${KUBE_ROOT})"
+gazelle fix -build_file_name=BUILD,BUILD.bazel -external=vendored -mode=fix -repo_root="$(kube::realpath ${KUBE_ROOT})"
+kazel -root="$(kube::realpath ${KUBE_ROOT})"

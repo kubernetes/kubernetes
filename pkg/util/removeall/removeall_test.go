@@ -49,6 +49,12 @@ func (mounter *fakeMounter) PathIsDevice(pathname string) (bool, error) {
 func (mounter *fakeMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
 	return "", errors.New("not implemented")
 }
+func (mounter *fakeMounter) IsMountPointMatch(mp mount.MountPoint, dir string) bool {
+	return (mp.Path == dir)
+}
+func (mounter *fakeMounter) IsNotMountPoint(dir string) (bool, error) {
+	return mount.IsNotMountPoint(mounter, dir)
+}
 func (mounter *fakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	name := path.Base(file)
 	if strings.HasPrefix(name, "mount") {
@@ -58,6 +64,10 @@ func (mounter *fakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 		return false, errors.New("mock error")
 	}
 	return true, nil
+}
+
+func (mounter *fakeMounter) MakeRShared(path string) error {
+	return nil
 }
 
 func TestRemoveAllOneFilesystem(t *testing.T) {

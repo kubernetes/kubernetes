@@ -11,14 +11,12 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["expand.go"],
-    tags = ["automanaged"],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["expand_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//pkg/api:go_default_library"],
 )
 

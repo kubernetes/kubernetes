@@ -55,7 +55,7 @@ func newStorage(t *testing.T) (ControllerStorage, *etcdtesting.EtcdTestServer) {
 // createController is a helper function that returns a controller with the updated resource version.
 func createController(storage *REST, rc api.ReplicationController, t *testing.T) (api.ReplicationController, error) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), rc.Namespace)
-	obj, err := storage.Create(ctx, &rc)
+	obj, err := storage.Create(ctx, &rc, false)
 	if err != nil {
 		t.Errorf("Failed to create controller, %v", err)
 	}
@@ -334,4 +334,12 @@ func TestShortNames(t *testing.T) {
 	defer storage.Controller.Store.DestroyFunc()
 	expected := []string{"rc"}
 	registrytest.AssertShortNames(t, storage.Controller, expected)
+}
+
+func TestCategories(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Controller.Store.DestroyFunc()
+	expected := []string{"all"}
+	registrytest.AssertCategories(t, storage.Controller, expected)
 }

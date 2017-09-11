@@ -20,9 +20,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// +genclient=true
-// +nonNamespaced=true
-// +noMethods=true
+// +genclient
+// +genclient:nonNamespaced
+// +genclient:noVerbs
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // SubjectAccessReview checks whether or not a user or group can perform an action.  Not filling in a
 // spec.namespace means "in all namespaces".
@@ -37,9 +38,10 @@ type SubjectAccessReview struct {
 	Status SubjectAccessReviewStatus
 }
 
-// +genclient=true
-// +nonNamespaced=true
-// +noMethods=true
+// +genclient
+// +genclient:nonNamespaced
+// +genclient:noVerbs
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a
 // spec.namespace means "in all namespaces".  Self is a special case, because users should always be able
@@ -55,8 +57,9 @@ type SelfSubjectAccessReview struct {
 	Status SubjectAccessReviewStatus
 }
 
-// +genclient=true
-// +noMethods=true
+// +genclient
+// +genclient:noVerbs
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace.
 // Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions
@@ -118,6 +121,8 @@ type SubjectAccessReviewSpec struct {
 	// Extra corresponds to the user.Info.GetExtra() method from the authenticator.  Since that is input to the authorizer
 	// it needs a reflection here.
 	Extra map[string]ExtraValue
+	// UID information about the requesting user.
+	UID string
 }
 
 // ExtraValue masks the value so protobuf can generate
@@ -143,4 +148,75 @@ type SubjectAccessReviewStatus struct {
 	// It is entirely possible to get an error and be able to continue determine authorization status in spite of it.
 	// For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.
 	EvaluationError string
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +genclient:noVerbs
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// SelfSubjectRulesReview enumerates the set of actions the current user can perform within a namespace.
+// The returned list of actions may be incomplete depending on the server's authorization mode,
+// and any errors experienced during the evaluation. SelfSubjectRulesReview should be used by UIs to show/hide actions,
+// or to quickly let an end user reason about their permissions. It should NOT Be used by external systems to
+// drive authorization decisions as this raises confused deputy, cache lifetime/revocation, and correctness concerns.
+// SubjectAccessReview, and LocalAccessReview are the correct way to defer authorization decisions to the API server.
+type SelfSubjectRulesReview struct {
+	metav1.TypeMeta
+	metav1.ObjectMeta
+
+	// Spec holds information about the request being evaluated.
+	Spec SelfSubjectRulesReviewSpec
+
+	// Status is filled in by the server and indicates the set of actions a user can perform.
+	Status SubjectRulesReviewStatus
+}
+
+type SelfSubjectRulesReviewSpec struct {
+	// Namespace to evaluate rules for. Required.
+	Namespace string
+}
+
+// SubjectRulesReviewStatus contains the result of a rules check. This check can be incomplete depending on
+// the set of authorizers the server is configured with and any errors experienced during evaluation.
+// Because authorization rules are additive, if a rule appears in a list it's safe to assume the subject has that permission,
+// even if that list is incomplete.
+type SubjectRulesReviewStatus struct {
+	// ResourceRules is the list of actions the subject is allowed to perform on resources.
+	// The list ordering isn't significant, may contain duplicates, and possibly be incomplete.
+	ResourceRules []ResourceRule
+	// NonResourceRules is the list of actions the subject is allowed to perform on non-resources.
+	// The list ordering isn't significant, may contain duplicates, and possibly be incomplete.
+	NonResourceRules []NonResourceRule
+	// Incomplete is true when the rules returned by this call are incomplete. This is most commonly
+	// encountered when an authorizer, such as an external authorizer, doesn't support rules evaluation.
+	Incomplete bool
+	// EvaluationError can appear in combination with Rules. It indicates an error occurred during
+	// rule evaluation, such as an authorizer that doesn't support rule evaluation, and that
+	// ResourceRules and/or NonResourceRules may be incomplete.
+	EvaluationError string
+}
+
+// ResourceRule is the list of actions the subject is allowed to perform on resources. The list ordering isn't significant,
+// may contain duplicates, and possibly be incomplete.
+type ResourceRule struct {
+	// Verb is a list of kubernetes resource API verbs, like: get, list, watch, create, update, delete, proxy.  "*" means all.
+	Verbs []string
+	// APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
+	// the enumerated resources in any API group will be allowed.  "*" means all.
+	APIGroups []string
+	// Resources is a list of resources this rule applies to.  ResourceAll represents all resources.  "*" means all.
+	Resources []string
+	// ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  "*" means all.
+	ResourceNames []string
+}
+
+// NonResourceRule holds information that describes a rule for the non-resource
+type NonResourceRule struct {
+	// Verb is a list of kubernetes non-resource API verbs, like: get, post, put, delete, patch, head, options.  "*" means all.
+	Verbs []string
+
+	// NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full,
+	// final step in the path.  "*" means all.
+	NonResourceURLs []string
 }

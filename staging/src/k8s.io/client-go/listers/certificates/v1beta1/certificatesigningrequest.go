@@ -19,10 +19,10 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1beta1 "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	v1beta1 "k8s.io/client-go/pkg/apis/certificates/v1beta1"
 	"k8s.io/client-go/tools/cache"
 )
 

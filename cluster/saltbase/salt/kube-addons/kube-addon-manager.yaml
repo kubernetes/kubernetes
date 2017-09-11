@@ -3,6 +3,8 @@ kind: Pod
 metadata:
   name: kube-addon-manager
   namespace: kube-system
+  annotations:
+    scheduler.alpha.kubernetes.io/critical-pod: ''
   labels:
     component: kube-addon-manager
 spec:
@@ -13,7 +15,7 @@ spec:
     # - cluster/images/hyperkube/static-pods/addon-manager-singlenode.json
     # - cluster/images/hyperkube/static-pods/addon-manager-multinode.json
     # - test/kubemark/resources/manifests/kube-addon-manager.yaml
-    image: gcr.io/google-containers/kube-addon-manager:v6.4-beta.1
+    image: gcr.io/google-containers/kube-addon-manager:v6.4-beta.2
     command:
     - /bin/bash
     - -c

@@ -153,6 +153,9 @@ type CustomColumnsPrinter struct {
 	Columns   []Column
 	Decoder   runtime.Decoder
 	NoHeaders bool
+	// lastType records type of resource printed last so that we don't repeat
+	// header while printing same type of resources.
+	lastType reflect.Type
 }
 
 func (s *CustomColumnsPrinter) AfterPrint(w io.Writer, res string) error {
@@ -162,12 +165,14 @@ func (s *CustomColumnsPrinter) AfterPrint(w io.Writer, res string) error {
 func (s *CustomColumnsPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 	w := tabwriter.NewWriter(out, columnwidth, tabwidth, padding, padding_character, flags)
 
-	if !s.NoHeaders {
+	t := reflect.TypeOf(obj)
+	if !s.NoHeaders && t != s.lastType {
 		headers := make([]string, len(s.Columns))
 		for ix := range s.Columns {
 			headers[ix] = s.Columns[ix].Header
 		}
 		fmt.Fprintln(w, strings.Join(headers, "\t"))
+		s.lastType = t
 	}
 	parsers := make([]*jsonpath.JSONPath, len(s.Columns))
 	for ix := range s.Columns {
@@ -238,4 +243,8 @@ func (s *CustomColumnsPrinter) printOneObject(obj runtime.Object, parsers []*jso
 
 func (s *CustomColumnsPrinter) HandledResources() []string {
 	return []string{}
+}
+
+func (s *CustomColumnsPrinter) IsGeneric() bool {
+	return true
 }

@@ -1,0 +1,33 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: calico-typha-horizontal-autoscaler
+  namespace: kube-system
+  labels:
+    k8s-app: calico-typha-autoscaler
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        k8s-app: calico-typha-autoscaler
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      containers:
+        - image: gcr.io/google_containers/cluster-proportional-autoscaler-amd64:1.1.2
+          name: autoscaler
+          command:
+            - /cluster-proportional-autoscaler
+            - --namespace=kube-system
+            - --configmap=calico-typha-horizontal-autoscaler
+            - --target=deployment/calico-typha
+            - --logtostderr=true
+            - --v=2
+          resources:
+            requests:
+              cpu: 10m
+            limits:
+              cpu: 10m

@@ -185,7 +185,7 @@ func TestGetContainersToDeleteInPodWithNoMatch(t *testing.T) {
 	}
 
 	testCases := []struct {
-		filterId                   string
+		filterID                   string
 		expectedContainersToDelete containerStatusbyCreatedList
 	}{
 		{
@@ -195,7 +195,7 @@ func TestGetContainersToDeleteInPodWithNoMatch(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		candidates := getContainersToDeleteInPod(test.filterId, &pod, len(pod.ContainerStatuses))
+		candidates := getContainersToDeleteInPod(test.filterID, &pod, len(pod.ContainerStatuses))
 		if !reflect.DeepEqual(candidates, test.expectedContainersToDelete) {
 			t.Errorf("expected %v got %v", test.expectedContainersToDelete, candidates)
 		}

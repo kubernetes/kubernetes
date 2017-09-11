@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 var (
@@ -83,9 +84,10 @@ func getGroupList(t *testing.T, server *httptest.Server) (*metav1.APIGroupList, 
 }
 
 func TestDiscoveryAtAPIS(t *testing.T) {
-	handler := NewRootAPIsHandler(DefaultAddresses{DefaultAddress: "192.168.1.1"}, codecs)
+	mapper := request.NewRequestContextMapper()
+	handler := NewRootAPIsHandler(DefaultAddresses{DefaultAddress: "192.168.1.1"}, codecs, mapper)
 
-	server := httptest.NewServer(handler)
+	server := httptest.NewServer(request.WithRequestContext(handler, mapper))
 	groupList, err := getGroupList(t, server)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -133,9 +135,10 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 }
 
 func TestDiscoveryOrdering(t *testing.T) {
-	handler := NewRootAPIsHandler(DefaultAddresses{DefaultAddress: "192.168.1.1"}, codecs)
+	mapper := request.NewRequestContextMapper()
+	handler := NewRootAPIsHandler(DefaultAddresses{DefaultAddress: "192.168.1.1"}, codecs, mapper)
 
-	server := httptest.NewServer(handler)
+	server := httptest.NewServer(request.WithRequestContext(handler, mapper))
 	groupList, err := getGroupList(t, server)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

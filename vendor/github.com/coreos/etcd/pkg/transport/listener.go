@@ -28,7 +28,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/coreos/etcd/pkg/fileutil"
@@ -120,10 +119,11 @@ func SelfCert(dirpath string, hosts []string) (info TLSInfo, err error) {
 	}
 
 	for _, host := range hosts {
-		if ip := net.ParseIP(host); ip != nil {
+		h, _, _ := net.SplitHostPort(host)
+		if ip := net.ParseIP(h); ip != nil {
 			tmpl.IPAddresses = append(tmpl.IPAddresses, ip)
 		} else {
-			tmpl.DNSNames = append(tmpl.DNSNames, strings.Split(host, ":")[0])
+			tmpl.DNSNames = append(tmpl.DNSNames, h)
 		}
 	}
 

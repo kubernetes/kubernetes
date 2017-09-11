@@ -29,7 +29,7 @@ package v1beta1
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_Cluster = map[string]string{
 	"":         "Information about a registered cluster in a federated kubernetes setup. Clusters are not namespaced and have unique names in the federation.",
-	"metadata": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
 	"spec":     "Spec defines the behavior of the Cluster.",
 	"status":   "Status describes the current status of a Cluster",
 }
@@ -54,12 +54,22 @@ func (ClusterCondition) SwaggerDoc() map[string]string {
 
 var map_ClusterList = map[string]string{
 	"":         "A list of all the kubernetes clusters registered to the federation",
-	"metadata": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
 	"items":    "List of Cluster objects.",
 }
 
 func (ClusterList) SwaggerDoc() map[string]string {
 	return map_ClusterList
+}
+
+var map_ClusterSelectorRequirement = map[string]string{
+	"":         "ClusterSelectorRequirement contains values, a key, and an operator that relates the key and values. The zero value of ClusterSelectorRequirement is invalid. ClusterSelectorRequirement implements both set based match and exact match",
+	"operator": "The Operator defines how the Key is matched to the Values. One of \"in\", \"notin\", \"exists\", \"!\", \"=\", \"!=\", \"gt\" or \"lt\".",
+	"values":   "An array of string values. If the operator is \"in\" or \"notin\", the values array must be non-empty. If the operator is \"exists\" or \"!\", the values array must be empty. If the operator is \"gt\" or \"lt\", the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.",
+}
+
+func (ClusterSelectorRequirement) SwaggerDoc() map[string]string {
+	return map_ClusterSelectorRequirement
 }
 
 var map_ClusterSpec = map[string]string{

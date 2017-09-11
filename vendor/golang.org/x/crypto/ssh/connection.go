@@ -25,7 +25,7 @@ type ConnMetadata interface {
 	// User returns the user ID for this connection.
 	User() string
 
-	// SessionID returns the sesson hash, also denoted by H.
+	// SessionID returns the session hash, also denoted by H.
 	SessionID() []byte
 
 	// ClientVersion returns the client's version string as hashed

@@ -10,7 +10,7 @@ type Factory interface {
 	// between 1 and 1024 characters, inclusive.
 	//
 	// The id must not already be in use by an existing container. Containers created using
-	// a factory with the same path (and file system) must have distinct ids.
+	// a factory with the same path (and filesystem) must have distinct ids.
 	//
 	// Returns the new container with a running process.
 	//
@@ -28,7 +28,6 @@ type Factory interface {
 	//
 	// errors:
 	// Path does not exist
-	// Container is stopped
 	// System error
 	Load(id string) (Container, error)
 

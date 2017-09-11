@@ -27,7 +27,7 @@ import (
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/version"
 )
 
@@ -67,7 +67,7 @@ func RunVersion(out io.Writer, cmd *cobra.Command) error {
 		}
 		fmt.Fprintln(out, string(y))
 	case "json":
-		y, err := json.Marshal(&v)
+		y, err := json.MarshalIndent(&v, "", "  ")
 		if err != nil {
 			return err
 		}

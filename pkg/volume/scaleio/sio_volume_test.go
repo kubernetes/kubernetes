@@ -23,12 +23,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang/glog"
+
+	api "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	fakeclient "k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
-	api "k8s.io/kubernetes/pkg/api/v1"
-	fakeclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -59,10 +60,16 @@ func newPluginMgr(t *testing.T) (*volume.VolumePluginMgr, string) {
 			"password": []byte("password"),
 		},
 	}
+
 	fakeClient := fakeclient.NewSimpleClientset(config)
-	host := volumetest.NewFakeVolumeHost(tmpDir, fakeClient, nil)
+	host := volumetest.NewFakeVolumeHostWithNodeLabels(
+		tmpDir,
+		fakeClient,
+		nil,
+		map[string]string{sdcGuidLabelName: "abc-123"},
+	)
 	plugMgr := &volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), host)
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	return plugMgr, tmpDir
 }
@@ -136,8 +143,6 @@ func TestVolumeMounterUnmounter(t *testing.T) {
 		t.Errorf("Cannot assert plugin to be type sioPlugin")
 	}
 
-	sioPlug.mounter = &mount.FakeMounter{}
-
 	vol := &api.Volume{
 		Name: testSioVolName,
 		VolumeSource: api.VolumeSource{
@@ -149,6 +154,7 @@ func TestVolumeMounterUnmounter(t *testing.T) {
 				VolumeName:       testSioVol,
 				FSType:           "ext4",
 				SecretRef:        &api.LocalObjectReference{Name: "sio-secret"},
+				ReadOnly:         false,
 			},
 		},
 	}
@@ -189,6 +195,15 @@ func TestVolumeMounterUnmounter(t *testing.T) {
 		} else {
 			t.Errorf("SetUp() failed: %v", err)
 		}
+	}
+
+	if sio.isMultiMap {
+		t.Errorf("SetUp() - expecting multiple volume disabled by default")
+	}
+
+	// did we read sdcGuid label
+	if _, ok := sioVol.sioMgr.configData[confKey.sdcGuid]; !ok {
+		t.Errorf("Expected to find node label scaleio.sdcGuid, but did not find it")
 	}
 
 	// rebuild spec
@@ -235,25 +250,23 @@ func TestVolumeProvisioner(t *testing.T) {
 
 	plug, err := plugMgr.FindPluginByName(sioPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin %v", sioPluginName)
+		t.Fatalf("Can't find the plugin %v", sioPluginName)
 	}
 	sioPlug, ok := plug.(*sioPlugin)
 	if !ok {
-		t.Errorf("Cannot assert plugin to be type sioPlugin")
+		t.Fatal("Cannot assert plugin to be type sioPlugin")
 	}
 
 	options := volume.VolumeOptions{
 		ClusterName: "testcluster",
-		PVName:      "pvc-sio-dynamic-vol",
 		PVC:         volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
 	}
+	options.PVC.Name = "testpvc"
 	options.PVC.Namespace = testns
 
-	// incomplete options, test should fail
-	_, err = sioPlug.NewProvisioner(options)
-	if err == nil {
-		t.Fatal("expected failure due to incomplete options")
+	options.PVC.Spec.AccessModes = []api.PersistentVolumeAccessMode{
+		api.ReadOnlyMany,
 	}
 
 	options.Parameters = map[string]string{
@@ -288,16 +301,18 @@ func TestVolumeProvisioner(t *testing.T) {
 	// validate provision
 	actualSpecName := spec.Name
 	actualVolName := spec.Spec.PersistentVolumeSource.ScaleIO.VolumeName
-	if !strings.HasPrefix(actualSpecName, "pvc-") {
-		t.Errorf("expecting volume name to start with pov-, got %s", actualSpecName)
+	if !strings.HasPrefix(actualSpecName, "k8svol-") {
+		t.Errorf("expecting volume name to start with k8svol-, got %s", actualSpecName)
 	}
-
 	vol, err := sio.FindVolume(actualVolName)
 	if err != nil {
 		t.Fatalf("failed getting volume %v: %v", actualVolName, err)
 	}
 	if vol.Name != actualVolName {
 		t.Errorf("expected volume name to be %s, got %s", actualVolName, vol.Name)
+	}
+	if vol.SizeInKb != 8*1024*1024 {
+		glog.V(4).Info(log("unexpected volume size"))
 	}
 
 	// mount dynamic vol
@@ -315,8 +330,19 @@ func TestVolumeProvisioner(t *testing.T) {
 	}
 	sioVol.sioMgr.client = sio
 	if err := sioMounter.SetUp(nil); err != nil {
-		t.Errorf("Expected success, got: %v", err)
+		t.Fatalf("Expected success, got: %v", err)
 	}
+
+	// did we read sdcGuid label
+	if _, ok := sioVol.sioMgr.configData[confKey.sdcGuid]; !ok {
+		t.Errorf("Expected to find node label scaleio.sdcGuid, but did not find it")
+	}
+
+	// isMultiMap applied
+	if !sio.isMultiMap {
+		t.Errorf("SetUp()  expecting attached volume with multi-mapping")
+	}
+
 	// teardown dynamic vol
 	sioUnmounter, err := sioPlug.NewUnmounter(spec.Name, podUID)
 	if err != nil {
@@ -350,4 +376,84 @@ func TestVolumeProvisioner(t *testing.T) {
 	} else if !os.IsNotExist(err) {
 		t.Errorf("Deleter did not delete path %v: %v", path, err)
 	}
+}
+
+func TestVolumeProvisionerWithIncompleteConfig(t *testing.T) {
+	plugMgr, tmpDir := newPluginMgr(t)
+	defer os.RemoveAll(tmpDir)
+
+	plug, err := plugMgr.FindPluginByName(sioPluginName)
+	if err != nil {
+		t.Fatalf("Can't find the plugin %v", sioPluginName)
+	}
+	sioPlug, ok := plug.(*sioPlugin)
+	if !ok {
+		t.Fatal("Cannot assert plugin to be type sioPlugin")
+	}
+
+	options := volume.VolumeOptions{
+		ClusterName: "testcluster",
+		PVName:      "pvc-sio-dynamic-vol",
+		PVC:         volumetest.CreateTestPVC("100Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
+		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
+	}
+	options.PVC.Namespace = testns
+
+	options.PVC.Spec.AccessModes = []api.PersistentVolumeAccessMode{
+		api.ReadWriteOnce,
+	}
+
+	// incomplete options, test should fail
+	_, err = sioPlug.NewProvisioner(options)
+	if err == nil {
+		t.Fatal("expected failure due to incomplete options")
+	}
+}
+
+func TestVolumeProvisionerWithZeroCapacity(t *testing.T) {
+	plugMgr, tmpDir := newPluginMgr(t)
+	defer os.RemoveAll(tmpDir)
+
+	plug, err := plugMgr.FindPluginByName(sioPluginName)
+	if err != nil {
+		t.Fatalf("Can't find the plugin %v", sioPluginName)
+	}
+	sioPlug, ok := plug.(*sioPlugin)
+	if !ok {
+		t.Fatal("Cannot assert plugin to be type sioPlugin")
+	}
+
+	options := volume.VolumeOptions{
+		ClusterName: "testcluster",
+		PVName:      "pvc-sio-dynamic-vol",
+		PVC:         volumetest.CreateTestPVC("0Mi", []api.PersistentVolumeAccessMode{api.ReadWriteOnce}),
+		PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimDelete,
+	}
+	options.PVC.Namespace = testns
+
+	options.PVC.Spec.AccessModes = []api.PersistentVolumeAccessMode{
+		api.ReadWriteOnce,
+	}
+
+	options.Parameters = map[string]string{
+		confKey.gateway:          "http://test.scaleio:11111",
+		confKey.system:           "sio",
+		confKey.protectionDomain: testSioPD,
+		confKey.storagePool:      "default",
+		confKey.secretRef:        "sio-secret",
+	}
+
+	provisioner, _ := sioPlug.NewProvisioner(options)
+	sio := newFakeSio()
+	sioVol := provisioner.(*sioVolume)
+	if err := sioVol.setSioMgrFromConfig(); err != nil {
+		t.Fatalf("failed to create scaleio mgr from config: %v", err)
+	}
+	sioVol.sioMgr.client = sio
+
+	_, err = provisioner.Provision()
+	if err == nil {
+		t.Fatalf("call to Provision() should fail with invalid capacity")
+	}
+
 }

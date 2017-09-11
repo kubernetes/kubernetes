@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -18,7 +11,7 @@ go_library(
         "statistic.go",
         "time.go",
     ],
-    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/influxdata/influxdb/pkg/escape:go_default_library"],
 )
 
@@ -33,4 +26,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

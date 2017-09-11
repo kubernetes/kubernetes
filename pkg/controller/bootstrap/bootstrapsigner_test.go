@@ -21,10 +21,10 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/pkg/api/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"

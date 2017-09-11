@@ -18,25 +18,33 @@ package apiserver
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/pager"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func setup(t *testing.T) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.EnableCoreControllers = false
+	masterConfig.ExtraConfig.EnableCoreControllers = false
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 
 	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL})
@@ -102,7 +110,7 @@ func newRS(namespace string) *v1beta1.ReplicaSet {
 var cascDel = `
 {
   "kind": "DeleteOptions",
-  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
   "orphanDependents": false
 }
 `
@@ -153,4 +161,74 @@ func Test202StatusCode(t *testing.T) {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
 	verifyStatusCode(t, "DELETE", s.URL+path("replicasets", ns.Name, rs.Name), cascDel, 202)
+}
+
+func TestAPIListChunking(t *testing.T) {
+	if err := utilfeature.DefaultFeatureGate.Set(string(genericfeatures.APIListChunking) + "=true"); err != nil {
+		t.Fatal(err)
+	}
+	s, clientSet, closeFn := setup(t)
+	defer closeFn()
+
+	ns := framework.CreateTestingNamespace("list-paging", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	rsClient := clientSet.Extensions().ReplicaSets(ns.Name)
+
+	for i := 0; i < 4; i++ {
+		rs := newRS(ns.Name)
+		rs.Name = fmt.Sprintf("test-%d", i)
+		if _, err := rsClient.Create(rs); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	calls := 0
+	firstRV := ""
+	p := &pager.ListPager{
+		PageSize: 1,
+		PageFn: pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {
+			calls++
+			list, err := rsClient.List(opts)
+			if err != nil {
+				return nil, err
+			}
+			if calls == 1 {
+				firstRV = list.ResourceVersion
+			}
+			if calls == 2 {
+				rs := newRS(ns.Name)
+				rs.Name = "test-5"
+				if _, err := rsClient.Create(rs); err != nil {
+					t.Fatal(err)
+				}
+			}
+			return list, err
+		}),
+	}
+	listObj, err := p.List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 4 {
+		t.Errorf("unexpected list invocations: %d", calls)
+	}
+	list := listObj.(metav1.ListInterface)
+	if len(list.GetContinue()) != 0 {
+		t.Errorf("unexpected continue: %s", list.GetContinue())
+	}
+	if list.GetResourceVersion() != firstRV {
+		t.Errorf("unexpected resource version: %s instead of %s", list.GetResourceVersion(), firstRV)
+	}
+	var names []string
+	if err := meta.EachListItem(listObj, func(obj runtime.Object) error {
+		rs := obj.(*v1beta1.ReplicaSet)
+		names = append(names, rs.Name)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(names, []string{"test-0", "test-1", "test-2", "test-3"}) {
+		t.Errorf("unexpected items: %#v", list)
+	}
 }

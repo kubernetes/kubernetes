@@ -22,13 +22,13 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -255,17 +255,6 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	}
 
 	update := change.(kubetypes.PodUpdate)
-	// The InitContainers and InitContainerStatuses fields are lost during
-	// serialization and deserialization. They are conveyed via Annotations.
-	// Setting these fields here so that kubelet doesn't have to check for
-	// annotations.
-	if source == kubetypes.ApiserverSource {
-		for _, pod := range update.Pods {
-			if err := podutil.SetInitContainersAndStatuses(pod); err != nil {
-				glog.Error(err)
-			}
-		}
-	}
 	switch update.Op {
 	case kubetypes.ADD, kubetypes.UPDATE, kubetypes.DELETE:
 		if update.Op == kubetypes.ADD {
@@ -337,7 +326,7 @@ func filterInvalidPods(pods []*v1.Pod, source string, recorder record.EventRecor
 		var errlist field.ErrorList
 		// TODO: remove the conversion when validation is performed on versioned objects.
 		internalPod := &api.Pod{}
-		if err := v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
+		if err := k8s_api_v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
 			glog.Warningf("Pod[%d] (%s) from %s failed to convert to v1, ignoring: %v", i+1, format.Pod(pod), source, err)
 			recorder.Eventf(pod, v1.EventTypeWarning, "FailedConversion", "Error converting pod %s from %s, ignoring: %v", format.Pod(pod), source, err)
 			continue
@@ -505,6 +494,7 @@ func (s *podStorage) MergedState() interface{} {
 			pod, err := api.Scheme.Copy(podRef)
 			if err != nil {
 				glog.Errorf("unable to copy pod: %v", err)
+				continue
 			}
 			pods = append(pods, pod.(*v1.Pod))
 		}
@@ -519,6 +509,7 @@ func copyPods(sourcePods []*v1.Pod) []*v1.Pod {
 		pod, err := api.Scheme.Copy(source)
 		if err != nil {
 			glog.Errorf("unable to copy pod: %v", err)
+			continue
 		}
 		pods = append(pods, pod.(*v1.Pod))
 	}

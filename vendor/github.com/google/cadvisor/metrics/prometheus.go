@@ -45,9 +45,35 @@ type metricValue struct {
 
 type metricValues []metricValue
 
+// asFloat64 converts a uint64 into a float64.
+func asFloat64(v uint64) float64 { return float64(v) }
+
+// asNanosecondsToSeconds converts nanoseconds into a float64 representing seconds.
+func asNanosecondsToSeconds(v uint64) float64 {
+	return float64(v) / float64(time.Second)
+}
+
 // fsValues is a helper method for assembling per-filesystem stats.
 func fsValues(fsStats []info.FsStats, valueFn func(*info.FsStats) float64) metricValues {
 	values := make(metricValues, 0, len(fsStats))
+	for _, stat := range fsStats {
+		values = append(values, metricValue{
+			value:  valueFn(&stat),
+			labels: []string{stat.Device},
+		})
+	}
+	return values
+}
+
+// ioValues is a helper method for assembling per-disk and per-filesystem stats.
+func ioValues(ioStats []info.PerDiskStats, ioType string, ioValueFn func(uint64) float64, fsStats []info.FsStats, valueFn func(*info.FsStats) float64) metricValues {
+	values := make(metricValues, 0, len(ioStats)+len(fsStats))
+	for _, stat := range ioStats {
+		values = append(values, metricValue{
+			value:  ioValueFn(stat.Stats[ioType]),
+			labels: []string{stat.Device},
+		})
+	}
 	for _, stat := range fsStats {
 		values = append(values, metricValue{
 			value:  valueFn(&stat),
@@ -130,10 +156,12 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 				getValues: func(s *info.ContainerStats) metricValues {
 					values := make(metricValues, 0, len(s.Cpu.Usage.PerCpu))
 					for i, value := range s.Cpu.Usage.PerCpu {
-						values = append(values, metricValue{
-							value:  float64(value) / float64(time.Second),
-							labels: []string{fmt.Sprintf("cpu%02d", i)},
-						})
+						if value > 0 {
+							values = append(values, metricValue{
+								value:  float64(value) / float64(time.Second),
+								labels: []string{fmt.Sprintf("cpu%02d", i)},
+							})
+						}
 					}
 					return values
 				},
@@ -160,6 +188,13 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 				condition: func(s info.ContainerSpec) bool { return s.Cpu.Quota != 0 },
 				getValues: func(s *info.ContainerStats) metricValues {
 					return metricValues{{value: float64(s.Cpu.CFS.ThrottledTime) / float64(time.Second)}}
+				},
+			}, {
+				name:      "container_cpu_load_average_10s",
+				help:      "Value of container cpu load average over the last 10 seconds.",
+				valueType: prometheus.GaugeValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Cpu.LoadAverage)}}
 				},
 			}, {
 				name:      "container_memory_cache",
@@ -269,14 +304,28 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 					})
 				},
 			}, {
+				name:        "container_fs_reads_bytes_total",
+				help:        "Cumulative count of bytes read",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return ioValues(
+						s.DiskIo.IoServiceBytes, "Read", asFloat64,
+						nil, nil,
+					)
+				},
+			}, {
 				name:        "container_fs_reads_total",
 				help:        "Cumulative count of reads completed",
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
-					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
-						return float64(fs.ReadsCompleted)
-					})
+					return ioValues(
+						s.DiskIo.IoServiced, "Read", asFloat64,
+						s.Filesystem, func(fs *info.FsStats) float64 {
+							return float64(fs.ReadsCompleted)
+						},
+					)
 				},
 			}, {
 				name:        "container_fs_sector_reads_total",
@@ -284,9 +333,12 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
-					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
-						return float64(fs.SectorsRead)
-					})
+					return ioValues(
+						s.DiskIo.Sectors, "Read", asFloat64,
+						s.Filesystem, func(fs *info.FsStats) float64 {
+							return float64(fs.SectorsRead)
+						},
+					)
 				},
 			}, {
 				name:        "container_fs_reads_merged_total",
@@ -294,9 +346,12 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
-					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
-						return float64(fs.ReadsMerged)
-					})
+					return ioValues(
+						s.DiskIo.IoMerged, "Read", asFloat64,
+						s.Filesystem, func(fs *info.FsStats) float64 {
+							return float64(fs.ReadsMerged)
+						},
+					)
 				},
 			}, {
 				name:        "container_fs_read_seconds_total",
@@ -304,9 +359,23 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
-					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
-						return float64(fs.ReadTime) / float64(time.Second)
-					})
+					return ioValues(
+						s.DiskIo.IoServiceTime, "Read", asNanosecondsToSeconds,
+						s.Filesystem, func(fs *info.FsStats) float64 {
+							return float64(fs.ReadTime) / float64(time.Second)
+						},
+					)
+				},
+			}, {
+				name:        "container_fs_writes_bytes_total",
+				help:        "Cumulative count of bytes written",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return ioValues(
+						s.DiskIo.IoServiceBytes, "Write", asFloat64,
+						nil, nil,
+					)
 				},
 			}, {
 				name:        "container_fs_writes_total",
@@ -314,9 +383,12 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
-					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
-						return float64(fs.WritesCompleted)
-					})
+					return ioValues(
+						s.DiskIo.IoServiced, "Write", asFloat64,
+						s.Filesystem, func(fs *info.FsStats) float64 {
+							return float64(fs.WritesCompleted)
+						},
+					)
 				},
 			}, {
 				name:        "container_fs_sector_writes_total",
@@ -324,9 +396,12 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
-					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
-						return float64(fs.SectorsWritten)
-					})
+					return ioValues(
+						s.DiskIo.Sectors, "Write", asFloat64,
+						s.Filesystem, func(fs *info.FsStats) float64 {
+							return float64(fs.SectorsWritten)
+						},
+					)
 				},
 			}, {
 				name:        "container_fs_writes_merged_total",
@@ -334,9 +409,12 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
-					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
-						return float64(fs.WritesMerged)
-					})
+					return ioValues(
+						s.DiskIo.IoMerged, "Write", asFloat64,
+						s.Filesystem, func(fs *info.FsStats) float64 {
+							return float64(fs.WritesMerged)
+						},
+					)
 				},
 			}, {
 				name:        "container_fs_write_seconds_total",
@@ -344,9 +422,12 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
-					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
-						return float64(fs.WriteTime) / float64(time.Second)
-					})
+					return ioValues(
+						s.DiskIo.IoServiceTime, "Write", asNanosecondsToSeconds,
+						s.Filesystem, func(fs *info.FsStats) float64 {
+							return float64(fs.WriteTime) / float64(time.Second)
+						},
+					)
 				},
 			}, {
 				name:        "container_fs_io_current",
@@ -354,9 +435,12 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 				valueType:   prometheus.GaugeValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
-					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
-						return float64(fs.IoInProgress)
-					})
+					return ioValues(
+						s.DiskIo.IoQueued, "Total", asFloat64,
+						s.Filesystem, func(fs *info.FsStats) float64 {
+							return float64(fs.IoInProgress)
+						},
+					)
 				},
 			}, {
 				name:        "container_fs_io_time_seconds_total",
@@ -364,9 +448,12 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 				valueType:   prometheus.CounterValue,
 				extraLabels: []string{"device"},
 				getValues: func(s *info.ContainerStats) metricValues {
-					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
-						return float64(float64(fs.IoTime) / float64(time.Second))
-					})
+					return ioValues(
+						s.DiskIo.IoServiceTime, "Total", asNanosecondsToSeconds,
+						s.Filesystem, func(fs *info.FsStats) float64 {
+							return float64(float64(fs.IoTime) / float64(time.Second))
+						},
+					)
 				},
 			}, {
 				name:        "container_fs_io_time_weighted_seconds_total",
@@ -499,6 +586,84 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 					return values
 				},
 			}, {
+				name:        "container_network_tcp_usage_total",
+				help:        "tcp connection usage statistic for container",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"tcp_state"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{
+						{
+							value:  float64(s.Network.Tcp.Established),
+							labels: []string{"established"},
+						},
+						{
+							value:  float64(s.Network.Tcp.SynSent),
+							labels: []string{"synsent"},
+						},
+						{
+							value:  float64(s.Network.Tcp.SynRecv),
+							labels: []string{"synrecv"},
+						},
+						{
+							value:  float64(s.Network.Tcp.FinWait1),
+							labels: []string{"finwait1"},
+						},
+						{
+							value:  float64(s.Network.Tcp.FinWait2),
+							labels: []string{"finwait2"},
+						},
+						{
+							value:  float64(s.Network.Tcp.TimeWait),
+							labels: []string{"timewait"},
+						},
+						{
+							value:  float64(s.Network.Tcp.Close),
+							labels: []string{"close"},
+						},
+						{
+							value:  float64(s.Network.Tcp.CloseWait),
+							labels: []string{"closewait"},
+						},
+						{
+							value:  float64(s.Network.Tcp.LastAck),
+							labels: []string{"lastack"},
+						},
+						{
+							value:  float64(s.Network.Tcp.Listen),
+							labels: []string{"listen"},
+						},
+						{
+							value:  float64(s.Network.Tcp.Closing),
+							labels: []string{"closing"},
+						},
+					}
+				},
+			}, {
+				name:        "container_network_udp_usage_total",
+				help:        "udp connection usage statistic for container",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"udp_state"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{
+						{
+							value:  float64(s.Network.Udp.Listen),
+							labels: []string{"listen"},
+						},
+						{
+							value:  float64(s.Network.Udp.Dropped),
+							labels: []string{"dropped"},
+						},
+						{
+							value:  float64(s.Network.Udp.RxQueued),
+							labels: []string{"rxqueued"},
+						},
+						{
+							value:  float64(s.Network.Udp.TxQueued),
+							labels: []string{"txqueued"},
+						},
+					}
+				},
+			}, {
 				name:        "container_tasks_state",
 				help:        "Number of tasks in given state",
 				extraLabels: []string{"state"},
@@ -530,6 +695,7 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 			},
 		},
 	}
+
 	return c
 }
 

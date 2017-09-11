@@ -17,73 +17,79 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/pkg/api/v1"
 )
 
-// +genclient=true
+// +genclient
 // +resourceName=nodes
-// +readonly=true
-// +nonNamespaced=true
+// +genclient:readonly
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // resource usage metrics of a node.
 type NodeMetrics struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// The following fields define time interval from which metrics were
 	// collected from the interval [Timestamp-Window, Timestamp].
-	Timestamp metav1.Time     `json:"timestamp"`
-	Window    metav1.Duration `json:"window"`
+	Timestamp metav1.Time     `json:"timestamp" protobuf:"bytes,2,opt,name=timestamp"`
+	Window    metav1.Duration `json:"window" protobuf:"bytes,3,opt,name=window"`
 
 	// The memory usage is the memory working set.
-	Usage v1.ResourceList `json:"usage"`
+	Usage v1.ResourceList `json:"usage" protobuf:"bytes,4,rep,name=usage,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName,castvalue=k8s.io/apimachinery/pkg/api/resource.Quantity"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // NodeMetricsList is a list of NodeMetrics.
 type NodeMetricsList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	metav1.ListMeta `json:"metadata,omitempty"`
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// List of node metrics.
-	Items []NodeMetrics `json:"items"`
+	Items []NodeMetrics `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
-// +genclient=true
+// +genclient
 // +resourceName=pods
-// +readonly=true
+// +genclient:readonly
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // resource usage metrics of a pod.
 type PodMetrics struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// The following fields define time interval from which metrics were
 	// collected from the interval [Timestamp-Window, Timestamp].
-	Timestamp metav1.Time     `json:"timestamp"`
-	Window    metav1.Duration `json:"window"`
+	Timestamp metav1.Time     `json:"timestamp" protobuf:"bytes,2,opt,name=timestamp"`
+	Window    metav1.Duration `json:"window" protobuf:"bytes,3,opt,name=window"`
 
 	// Metrics for all containers are collected within the same time window.
-	Containers []ContainerMetrics `json:"containers"`
+	Containers []ContainerMetrics `json:"containers" protobuf:"bytes,4,rep,name=containers"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodMetricsList is a list of PodMetrics.
 type PodMetricsList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
-	metav1.ListMeta `json:"metadata,omitempty"`
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// List of pod metrics.
-	Items []PodMetrics `json:"items"`
+	Items []PodMetrics `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // resource usage metrics of a container.
 type ContainerMetrics struct {
 	// Container name corresponding to the one from pod.spec.containers.
-	Name string `json:"name"`
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// The memory usage is the memory working set.
-	Usage v1.ResourceList `json:"usage"`
+	Usage v1.ResourceList `json:"usage" protobuf:"bytes,2,rep,name=usage,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName,castvalue=k8s.io/apimachinery/pkg/api/resource.Quantity"`
 }

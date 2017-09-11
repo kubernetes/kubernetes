@@ -21,27 +21,25 @@ import (
 	"testing"
 	"time"
 
+	autoscalingapi "k8s.io/api/autoscaling/v2beta1"
+	"k8s.io/api/core/v1"
+	kv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/pkg/api/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
-	kv1 "k8s.io/kubernetes/pkg/api/v1"
-	autoscalingapi "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
+	// For api.Registry.RESTMapper()
+	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	metricsfake "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake"
 	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 
-	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"
-	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
+	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 
 	"github.com/stretchr/testify/assert"
-
-	// we need the API types for rest mapping lookup
-	_ "k8s.io/client-go/pkg/api/install"
-	_ "k8s.io/client-go/pkg/apis/extensions/install"
 )
 
 type restClientTestCase struct {
@@ -74,7 +72,7 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 	fakeCMClient := &cmfake.FakeCustomMetricsClient{}
 
 	if isResource {
-		fakeMetricsClient.AddReactor("list", "podmetricses", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		fakeMetricsClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 			metrics := &metricsapi.PodMetricsList{}
 			for i, containers := range tc.reportedPodMetrics {
 				metric := metricsapi.PodMetrics{
@@ -187,7 +185,7 @@ func (tc *restClientTestCase) verifyResults(t *testing.T, metrics PodMetricsInfo
 
 func (tc *restClientTestCase) runTest(t *testing.T) {
 	testMetricsClient, testCMClient := tc.prepareTestClient(t)
-	metricsClient := NewRESTMetricsClient(testMetricsClient.MetricsV1alpha1(), testCMClient)
+	metricsClient := NewRESTMetricsClient(testMetricsClient.MetricsV1beta1(), testCMClient)
 	isResource := len(tc.resourceName) > 0
 	if isResource {
 		info, timestamp, err := metricsClient.GetResourceMetric(kv1.ResourceName(tc.resourceName), tc.namespace, tc.selector)

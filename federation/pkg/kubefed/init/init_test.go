@@ -33,6 +33,9 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
+	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -44,17 +47,17 @@ import (
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/federation/apis/federation"
+	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns"
 	kubefedtesting "k8s.io/kubernetes/federation/pkg/kubefed/testing"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	rbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+
+	"gopkg.in/gcfg.v1"
 )
 
 const (
@@ -74,7 +77,6 @@ const (
 
 func TestInitFederation(t *testing.T) {
 	cmdErrMsg := ""
-	dnsProvider := "google-clouddns"
 	cmdutil.BehaviorOnFatal(func(str string, code int) {
 		cmdErrMsg = str
 	})
@@ -93,10 +95,13 @@ func TestInitFederation(t *testing.T) {
 		lbIP                         string
 		apiserverServiceType         v1.ServiceType
 		advertiseAddress             string
-		image                        string
+		serverImage                  string
+		etcdImage                    string
 		etcdPVCapacity               string
+		etcdPVStorageClass           string
 		etcdPersistence              string
 		expectedErr                  string
+		dnsProvider                  string
 		dnsProviderConfig            string
 		dryRun                       string
 		apiserverArgOverrides        string
@@ -112,10 +117,11 @@ func TestInitFederation(t *testing.T) {
 			dnsZoneName:           "example.test.",
 			lbIP:                  lbIP,
 			apiserverServiceType:  v1.ServiceTypeLoadBalancer,
-			image:                 "example.test/foo:bar",
+			serverImage:           "example.test/foo:bar",
 			etcdPVCapacity:        "5Gi",
 			etcdPersistence:       "true",
 			expectedErr:           "",
+			dnsProvider:           util.FedDNSProviderCoreDNS,
 			dnsProviderConfig:     "dns-provider.conf",
 			dryRun:                "",
 			apiserverArgOverrides: "--client-ca-file=override,--log-dir=override",
@@ -128,7 +134,7 @@ func TestInitFederation(t *testing.T) {
 			dnsZoneName:          "example.test.",
 			lbIP:                 lbIP,
 			apiserverServiceType: v1.ServiceTypeLoadBalancer,
-			image:                "example.test/foo:bar",
+			serverImage:          "example.test/foo:bar",
 			etcdPVCapacity:       "", //test for default value of pvc-size
 			etcdPersistence:      "true",
 			expectedErr:          "",
@@ -141,7 +147,7 @@ func TestInitFederation(t *testing.T) {
 			dnsZoneName:          "example.test.",
 			lbIP:                 lbIP,
 			apiserverServiceType: v1.ServiceTypeLoadBalancer,
-			image:                "example.test/foo:bar",
+			serverImage:          "example.test/foo:bar",
 			etcdPVCapacity:       "",
 			etcdPersistence:      "true",
 			expectedErr:          "",
@@ -154,7 +160,7 @@ func TestInitFederation(t *testing.T) {
 			dnsZoneName:          "example.test.",
 			lbIP:                 lbIP,
 			apiserverServiceType: v1.ServiceTypeLoadBalancer,
-			image:                "example.test/foo:bar",
+			serverImage:          "example.test/foo:bar",
 			etcdPVCapacity:       "5Gi",
 			etcdPersistence:      "false",
 			expectedErr:          "",
@@ -166,7 +172,7 @@ func TestInitFederation(t *testing.T) {
 			kubeconfigExplicit:   "",
 			dnsZoneName:          "example.test.",
 			apiserverServiceType: v1.ServiceTypeNodePort,
-			image:                "example.test/foo:bar",
+			serverImage:          "example.test/foo:bar",
 			etcdPVCapacity:       "5Gi",
 			etcdPersistence:      "true",
 			expectedErr:          "",
@@ -179,7 +185,7 @@ func TestInitFederation(t *testing.T) {
 			dnsZoneName:          "example.test.",
 			apiserverServiceType: v1.ServiceTypeNodePort,
 			advertiseAddress:     nodeIP,
-			image:                "example.test/foo:bar",
+			serverImage:          "example.test/foo:bar",
 			etcdPVCapacity:       "5Gi",
 			etcdPersistence:      "true",
 			expectedErr:          "",
@@ -192,8 +198,10 @@ func TestInitFederation(t *testing.T) {
 			dnsZoneName:          "example.test.",
 			apiserverServiceType: v1.ServiceTypeNodePort,
 			advertiseAddress:     nodeIP,
-			image:                "example.test/foo:bar",
+			serverImage:          "example.test/foo:bar",
+			etcdImage:            "gcr.io/google_containers/etcd:latest",
 			etcdPVCapacity:       "5Gi",
+			etcdPVStorageClass:   "fast",
 			etcdPersistence:      "true",
 			expectedErr:          "",
 			dryRun:               "",
@@ -203,6 +211,8 @@ func TestInitFederation(t *testing.T) {
 		},
 	}
 
+	defaultEtcdImage := "gcr.io/google_containers/etcd:3.0.17"
+
 	//TODO: implement a negative case for dry run
 
 	for i, tc := range testCases {
@@ -210,6 +220,9 @@ func TestInitFederation(t *testing.T) {
 		tmpDirPath := ""
 		buf := bytes.NewBuffer([]byte{})
 
+		if tc.dnsProvider == "" {
+			tc.dnsProvider = "google-clouddns"
+		}
 		if tc.dnsProviderConfig != "" {
 			tmpfile, err := ioutil.TempFile("", tc.dnsProviderConfig)
 			if err != nil {
@@ -227,7 +240,13 @@ func TestInitFederation(t *testing.T) {
 		}
 		defer os.Remove(tmpDirPath)
 
-		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.image, dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable)
+		// If tc.etcdImage is set, setting the etcd image via the flag will be
+		// validated.  If not set, the default value will be validated.
+		if tc.etcdImage == "" {
+			tc.etcdImage = defaultEtcdImage
+		}
+
+		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.serverImage, tc.etcdImage, tc.dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.etcdPVStorageClass, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -237,13 +256,14 @@ func TestInitFederation(t *testing.T) {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
 
-		cmd := NewCmdInit(buf, adminConfig)
+		cmd := NewCmdInit(buf, adminConfig, "serverImage", defaultEtcdImage)
 
 		cmd.Flags().Set("kubeconfig", tc.kubeconfigExplicit)
 		cmd.Flags().Set("host-cluster-context", "substrate")
 		cmd.Flags().Set("dns-zone-name", tc.dnsZoneName)
-		cmd.Flags().Set("image", tc.image)
-		cmd.Flags().Set("dns-provider", dnsProvider)
+		cmd.Flags().Set("image", tc.serverImage)
+		cmd.Flags().Set("etcd-image", tc.etcdImage)
+		cmd.Flags().Set("dns-provider", tc.dnsProvider)
 		cmd.Flags().Set("apiserver-arg-overrides", tc.apiserverArgOverrides)
 		cmd.Flags().Set("controllermanager-arg-overrides", tc.cmArgOverrides)
 
@@ -252,6 +272,9 @@ func TestInitFederation(t *testing.T) {
 		}
 		if tc.etcdPVCapacity != "" {
 			cmd.Flags().Set("etcd-pv-capacity", tc.etcdPVCapacity)
+		}
+		if tc.etcdPVStorageClass != "" {
+			cmd.Flags().Set("etcd-pv-storage-class", tc.etcdPVStorageClass)
 		}
 		if tc.etcdPersistence != "true" {
 			cmd.Flags().Set("etcd-persistent-storage", tc.etcdPersistence)
@@ -598,7 +621,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, image, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, apiserverOverrideArg, cmOverrideArg, tmpDirPath string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth, isRBACAPIAvailable bool) (cmdutil.Factory, error) {
+func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, serverImage, etcdImage, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, etcdPVStorageClass, apiserverOverrideArg, cmOverrideArg, tmpDirPath string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth, isRBACAPIAvailable bool) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -711,6 +734,11 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 		Data: nil,
 	}
 
+	var storageClassName *string
+	if len(etcdPVStorageClass) > 0 {
+		storageClassName = &etcdPVStorageClass
+	}
+
 	pvc := v1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "PersistentVolumeClaim",
@@ -721,8 +749,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 			Namespace: namespaceName,
 			Labels:    componentLabel,
 			Annotations: map[string]string{
-				"volume.alpha.kubernetes.io/storage-class": "yes",
-				federation.FederationNameAnnotation:        federationName,
+				federation.FederationNameAnnotation: federationName,
 			},
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
@@ -734,6 +761,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 					v1.ResourceStorage: capacity,
 				},
 			},
+			StorageClassName: storageClassName,
 		},
 	}
 
@@ -755,7 +783,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	role := rbacv1beta1.Role{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Role",
-			APIVersion: testapi.Rbac.GroupVersion().String(),
+			APIVersion: rbacv1beta1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "federation-system:federation-controller-manager",
@@ -777,7 +805,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	rolebinding := rbacv1beta1.RoleBinding{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "RoleBinding",
-			APIVersion: testapi.Rbac.GroupVersion().String(),
+			APIVersion: rbacv1beta1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "federation-system:federation-controller-manager",
@@ -885,7 +913,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 					Containers: []v1.Container{
 						{
 							Name:    "apiserver",
-							Image:   image,
+							Image:   serverImage,
 							Command: apiserverCommand,
 							Ports: []v1.ContainerPort{
 								{
@@ -907,7 +935,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 						},
 						{
 							Name:  "etcd",
-							Image: "gcr.io/google_containers/etcd:3.0.17",
+							Image: etcdImage,
 							Command: []string{
 								"/usr/local/bin/etcd",
 								"--data-dir",
@@ -1002,7 +1030,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 					Containers: []v1.Container{
 						{
 							Name:    "controller-manager",
-							Image:   image,
+							Image:   serverImage,
 							Command: cmCommand,
 							VolumeMounts: []v1.VolumeMount{
 								{
@@ -1043,6 +1071,12 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	}
 	if dnsProviderConfig != "" {
 		cm = addDNSProviderConfigTest(cm, cmDNSProviderSecret.Name)
+		if dnsProvider == util.FedDNSProviderCoreDNS {
+			cm, err = addCoreDNSServerAnnotationTest(cm, dnsZoneName, dnsProviderConfig)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	podList := v1.PodList{}
@@ -1410,7 +1444,11 @@ func tlsHandshake(t *testing.T, sCfg, cCfg *tls.Config) error {
 		}
 	}()
 
-	c, err := tls.Dial("tcp", s.Addr().String(), cCfg)
+	// workaround [::] not working in ipv4 only systems (https://github.com/golang/go/issues/18806)
+	// TODO: remove with Golang 1.9 with https://go-review.googlesource.com/c/45088/
+	addr := strings.TrimPrefix(s.Addr().String(), "[::]")
+
+	c, err := tls.Dial("tcp", addr, cCfg)
 	if err != nil {
 		// Intentionally not serializing the error received because we want to
 		// test for the failure case in the caller test function.
@@ -1539,4 +1577,17 @@ func addDNSProviderConfigTest(dep *v1beta1.Deployment, secretName string) *v1bet
 	dep.Spec.Template.Spec.Containers[0].Command = append(dep.Spec.Template.Spec.Containers[0].Command, fmt.Sprintf("--dns-provider-config=%s/%s", dnsProviderConfigMountPath, secretName))
 
 	return dep
+}
+
+// TODO: Reuse the function addCoreDNSServerAnnotation once that function is converted to use versioned objects.
+func addCoreDNSServerAnnotationTest(deployment *v1beta1.Deployment, dnsZoneName, dnsProviderConfig string) (*v1beta1.Deployment, error) {
+	var cfg coredns.Config
+	if err := gcfg.ReadFileInto(&cfg, dnsProviderConfig); err != nil {
+		return nil, err
+	}
+
+	deployment.Annotations[util.FedDNSZoneName] = dnsZoneName
+	deployment.Annotations[util.FedNameServer] = cfg.Global.CoreDNSEndpoints
+	deployment.Annotations[util.FedDNSProvider] = util.FedDNSProviderCoreDNS
+	return deployment, nil
 }

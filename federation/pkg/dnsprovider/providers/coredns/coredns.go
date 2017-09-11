@@ -36,8 +36,9 @@ const (
 // Config to override defaults
 type Config struct {
 	Global struct {
-		EtcdEndpoints string `gcfg:"etcd-endpoints"`
-		DNSZones      string `gcfg:"zones"`
+		EtcdEndpoints    string `gcfg:"etcd-endpoints"`
+		DNSZones         string `gcfg:"zones"`
+		CoreDNSEndpoints string `gcfg:"coredns-endpoints"`
 	}
 }
 

@@ -19,10 +19,10 @@ package volume
 import (
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // Volume represents a directory used by pods or hosts on a node. All method
@@ -109,14 +109,14 @@ type Mounter interface {
 	// content should be owned by 'fsGroup' so that it can be
 	// accessed by the pod. This may be called more than once, so
 	// implementations must be idempotent.
-	SetUp(fsGroup *types.UnixGroupID) error
+	SetUp(fsGroup *int64) error
 	// SetUpAt prepares and mounts/unpacks the volume to the
 	// specified directory path, which may or may not exist yet.
 	// The mount point and its content should be owned by
 	// 'fsGroup' so that it can be accessed by the pod. This may
 	// be called more than once, so implementations must be
 	// idempotent.
-	SetUpAt(dir string, fsGroup *types.UnixGroupID) error
+	SetUpAt(dir string, fsGroup *int64) error
 	// GetAttributes returns the attributes of the mounter.
 	GetAttributes() Attributes
 }
@@ -173,7 +173,7 @@ type Attacher interface {
 	// node. If it successfully attaches, the path to the device
 	// is returned. Otherwise, if the device does not attach after
 	// the given timeout period, an error will be returned.
-	WaitForAttach(spec *Spec, devicePath string, timeout time.Duration) (string, error)
+	WaitForAttach(spec *Spec, devicePath string, pod *v1.Pod, timeout time.Duration) (string, error)
 
 	// GetDeviceMountPath returns a path where the device should
 	// be mounted after it is attached. This is a global mount

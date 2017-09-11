@@ -30,19 +30,23 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	apimachineryopenapi "k8s.io/apimachinery/pkg/openapi"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	apiv1 "k8s.io/api/core/v1"
+	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/admission"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
+	serveroptions "k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
+	clientgoinformers "k8s.io/client-go/informers"
+	clientgoclientset "k8s.io/client-go/kubernetes"
+	clientset "k8s.io/client-go/kubernetes"
+	openapicommon "k8s.io/kube-openapi/pkg/common"
 	federationv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
-	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/generated/openapi"
@@ -50,6 +54,7 @@ import (
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeserver "k8s.io/kubernetes/pkg/kubeapiserver/server"
+	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/version"
@@ -85,6 +90,9 @@ func Run(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 // NonBlockingRun runs the specified APIServer and configures it to
 // stop with the given channel.
 func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
+	// register all admission plugins
+	RegisterAllAdmissionPlugins(s.Admission.Plugins)
+
 	// set defaults
 	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing); err != nil {
 		return err
@@ -177,29 +185,42 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to create clientset: %v", err)
 	}
+	externalClient, err := clientset.NewForConfig(genericConfig.LoopbackClientConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create external clientset: %v", err)
+	}
 	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
 
+	clientgoExternalClient, err := clientgoclientset.NewForConfig(genericConfig.LoopbackClientConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create real external clientset: %v", err)
+	}
+	versionedInformers := clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
+
 	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
-	apiAuthorizer, err := authorizationConfig.New()
+	apiAuthorizer, _, err := authorizationConfig.New()
 	if err != nil {
 		return fmt.Errorf("invalid Authorization Config: %v", err)
 	}
 
-	admissionControlPluginNames := strings.Split(s.Admission.Control, ",")
 	var cloudConfig []byte
-
 	if s.CloudProvider.CloudConfigFile != "" {
 		cloudConfig, err = ioutil.ReadFile(s.CloudProvider.CloudConfigFile)
 		if err != nil {
 			glog.Fatalf("Error reading from cloud configuration file %s: %#v", s.CloudProvider.CloudConfigFile, err)
 		}
 	}
-	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, apiAuthorizer, cloudConfig, nil)
-	admissionConfigProvider, err := admission.ReadAdmissionConfiguration(admissionControlPluginNames, s.Admission.ControlConfigFile)
-	if err != nil {
-		return fmt.Errorf("failed to read plugin config: %v", err)
-	}
-	admissionController, err := kubeapiserveradmission.Plugins.NewFromPlugins(admissionControlPluginNames, admissionConfigProvider, pluginInitializer)
+
+	// NOTE: we do not provide informers to the quota registry because admission level decisions
+	// do not require us to open watches for all items tracked by quota.
+	quotaRegistry := quotainstall.NewRegistry(nil, nil)
+	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, externalClient, sharedInformers, apiAuthorizer, cloudConfig, nil, quotaRegistry)
+
+	err = s.Admission.ApplyTo(
+		genericConfig,
+		versionedInformers,
+		pluginInitializer,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize plugins: %v", err)
 	}
@@ -208,7 +229,6 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	genericConfig.Version = &kubeVersion
 	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.Authorizer = apiAuthorizer
-	genericConfig.AdmissionControl = admissionController
 	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(openapi.GetOpenAPIDefinitions, api.Scheme)
 	genericConfig.OpenAPIConfig.PostProcessSpec = postProcessOpenAPISpecForBackwardCompatibility
 	genericConfig.OpenAPIConfig.SecurityDefinitions = securityDefinitions
@@ -220,16 +240,25 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 
 	// TODO: Move this to generic api server (Need to move the command line flag).
 	if s.Etcd.EnableWatchCache {
-		cachesize.InitializeWatchCacheSizes(s.GenericServerRunOptions.TargetRAMMB)
-		cachesize.SetWatchCacheSizes(s.GenericServerRunOptions.WatchCacheSizes)
+		glog.V(2).Infof("Initializing cache sizes based on %dMB limit", s.GenericServerRunOptions.TargetRAMMB)
+		sizes := cachesize.NewHeuristicWatchCacheSizes(s.GenericServerRunOptions.TargetRAMMB)
+		if userSpecified, err := serveroptions.ParseWatchCacheSizes(s.Etcd.WatchCacheSizes); err == nil {
+			for resource, size := range userSpecified {
+				sizes[resource] = size
+			}
+		}
+		s.Etcd.WatchCacheSizes, err = serveroptions.WriteWatchCacheSizes(sizes)
+		if err != nil {
+			return err
+		}
 	}
 
-	m, err := genericConfig.Complete().New(genericapiserver.EmptyDelegate)
+	m, err := genericConfig.Complete(versionedInformers).New("federation", genericapiserver.EmptyDelegate)
 	if err != nil {
 		return err
 	}
 
-	routes.UIRedirect{}.Install(m.Handler.PostGoRestfulMux)
+	routes.UIRedirect{}.Install(m.Handler.NonGoRestfulMux)
 	routes.Logs{}.Install(m.Handler.GoRestfulContainer)
 
 	apiResourceConfigSource := storageFactory.APIResourceConfigSource
@@ -275,6 +304,12 @@ func defaultResourceConfig() *serverstorage.ResourceConfig {
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("deployments"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
+	)
+	// All apps resources except these are disabled by default.
+	rc.EnableResources(
+		appsv1beta2.SchemeGroupVersion.WithResource("daemonsets"),
+		appsv1beta2.SchemeGroupVersion.WithResource("deployments"),
+		appsv1beta2.SchemeGroupVersion.WithResource("replicasets"),
 	)
 	return rc
 }
@@ -442,7 +477,7 @@ func postProcessOpenAPISpecForBackwardCompatibility(s *spec.Swagger) (*spec.Swag
 		}
 		s.Definitions[k] = spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Ref:         spec.MustCreateRef("#/definitions/" + apimachineryopenapi.EscapeJsonPointer(v)),
+				Ref:         spec.MustCreateRef("#/definitions/" + openapicommon.EscapeJsonPointer(v)),
 				Description: fmt.Sprintf("Deprecated. Please use %s instead.", v),
 			},
 		}

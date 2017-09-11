@@ -21,8 +21,12 @@ import (
 	"net/http"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/util/runtime"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
 // Avoid emitting errors that look like valid HTML. Quotes are okay.
@@ -37,17 +41,19 @@ func BadGatewayError(w http.ResponseWriter, req *http.Request) {
 }
 
 // Forbidden renders a simple forbidden error
-func Forbidden(attributes authorizer.Attributes, w http.ResponseWriter, req *http.Request, reason string) {
+func Forbidden(ctx request.Context, attributes authorizer.Attributes, w http.ResponseWriter, req *http.Request, reason string, s runtime.NegotiatedSerializer) {
 	msg := sanitizer.Replace(forbiddenMessage(attributes))
-	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.WriteHeader(http.StatusForbidden)
 
+	var errMsg string
 	if len(reason) == 0 {
-		fmt.Fprintf(w, "%s", msg)
+		errMsg = fmt.Sprintf("%s", msg)
 	} else {
-		fmt.Fprintf(w, "%s: %q", msg, reason)
+		errMsg = fmt.Sprintf("%s: %s", msg, reason)
 	}
+	gv := schema.GroupVersion{Group: attributes.GetAPIGroup(), Version: attributes.GetAPIVersion()}
+	gr := schema.GroupResource{Group: attributes.GetAPIGroup(), Resource: attributes.GetResource()}
+	ErrorNegotiated(ctx, apierrors.NewForbidden(gr, attributes.GetName(), fmt.Errorf(errMsg)), s, gv, w, req)
 }
 
 func forbiddenMessage(attributes authorizer.Attributes) string {
@@ -57,7 +63,7 @@ func forbiddenMessage(attributes authorizer.Attributes) string {
 	}
 
 	if !attributes.IsResourceRequest() {
-		return fmt.Sprintf("User %q cannot %s path %q.", username, attributes.GetVerb(), attributes.GetPath())
+		return fmt.Sprintf("User %q cannot %s path %q", username, attributes.GetVerb(), attributes.GetPath())
 	}
 
 	resource := attributes.GetResource()
@@ -69,10 +75,10 @@ func forbiddenMessage(attributes authorizer.Attributes) string {
 	}
 
 	if ns := attributes.GetNamespace(); len(ns) > 0 {
-		return fmt.Sprintf("User %q cannot %s %s in the namespace %q.", username, attributes.GetVerb(), resource, ns)
+		return fmt.Sprintf("User %q cannot %s %s in the namespace %q", username, attributes.GetVerb(), resource, ns)
 	}
 
-	return fmt.Sprintf("User %q cannot %s %s at the cluster scope.", username, attributes.GetVerb(), resource)
+	return fmt.Sprintf("User %q cannot %s %s at the cluster scope", username, attributes.GetVerb(), resource)
 }
 
 // InternalError renders a simple internal error
@@ -81,7 +87,7 @@ func InternalError(w http.ResponseWriter, req *http.Request, err error) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusInternalServerError)
 	fmt.Fprintf(w, "Internal Server Error: %q: %v", sanitizer.Replace(req.RequestURI), err)
-	runtime.HandleError(err)
+	utilruntime.HandleError(err)
 }
 
 // NotFound renders a simple not found error.

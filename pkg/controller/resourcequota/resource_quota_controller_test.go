@@ -20,15 +20,15 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/quota/install"
@@ -109,7 +109,7 @@ func TestSyncResourceQuota(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset(&podList, &resourceQuota)
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
-		KubeClient:            kubeClient,
+		QuotaClient:           kubeClient.Core(),
 		ResourceQuotaInformer: informerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:          controller.NoResyncPeriodFunc,
 		Registry:              install.NewRegistry(kubeClient, nil),
@@ -196,7 +196,7 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset(&resourceQuota)
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
-		KubeClient:            kubeClient,
+		QuotaClient:           kubeClient.Core(),
 		ResourceQuotaInformer: informerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:          controller.NoResyncPeriodFunc,
 		Registry:              install.NewRegistry(kubeClient, nil),
@@ -286,7 +286,7 @@ func TestSyncResourceQuotaSpecHardChange(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset(&resourceQuota)
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
-		KubeClient:            kubeClient,
+		QuotaClient:           kubeClient.Core(),
 		ResourceQuotaInformer: informerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:          controller.NoResyncPeriodFunc,
 		Registry:              install.NewRegistry(kubeClient, nil),
@@ -376,7 +376,7 @@ func TestSyncResourceQuotaNoChange(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset(&v1.PodList{}, &resourceQuota)
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
-		KubeClient:            kubeClient,
+		QuotaClient:           kubeClient.Core(),
 		ResourceQuotaInformer: informerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:          controller.NoResyncPeriodFunc,
 		Registry:              install.NewRegistry(kubeClient, nil),
@@ -410,7 +410,7 @@ func TestAddQuota(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
-		KubeClient:            kubeClient,
+		QuotaClient:           kubeClient.Core(),
 		ResourceQuotaInformer: informerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:          controller.NoResyncPeriodFunc,
 		Registry:              install.NewRegistry(kubeClient, nil),

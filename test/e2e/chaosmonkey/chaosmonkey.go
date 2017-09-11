@@ -98,14 +98,17 @@ func (cm *chaosmonkey) Do() {
 		sem.waitForReadyOrDone()
 	}
 
+	defer func() {
+		close(stopCh)
+		By("Waiting for async validations to complete")
+		for _, sem := range sems {
+			sem.waitForDone()
+		}
+	}()
+
 	By("Starting disruption")
 	cm.disruption()
 	By("Disruption complete; stopping async validations")
-	close(stopCh)
-	By("Waiting for async validations to complete")
-	for _, sem := range sems {
-		sem.waitForDone()
-	}
 }
 
 // Semaphore is taken by a Test and provides: Ready(), for the Test to call when it's ready for the

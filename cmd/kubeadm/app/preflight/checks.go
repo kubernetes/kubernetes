@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"crypto/tls"
@@ -35,15 +36,20 @@ import (
 
 	"github.com/PuerkitoBio/purell"
 	"github.com/blang/semver"
+	"github.com/spf13/pflag"
 
 	"net/url"
 
+	apiservoptions "k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	cmoptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/api/validation"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/util/initsystem"
-	"k8s.io/kubernetes/pkg/util/node"
+	versionutil "k8s.io/kubernetes/pkg/util/version"
+	kubeadmversion "k8s.io/kubernetes/pkg/version"
+	schoptions "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/test/e2e_node/system"
 )
 
@@ -141,7 +147,6 @@ type PortOpenCheck struct {
 
 func (poc PortOpenCheck) Check() (warnings, errors []error) {
 	errors = []error{}
-	// TODO: Get IP from KubeadmConfig
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", poc.port))
 	if err != nil {
 		errors = append(errors, fmt.Errorf("Port %d is in use", poc.port))
@@ -267,21 +272,22 @@ func (ipc InPathCheck) Check() (warnings, errors []error) {
 
 // HostnameCheck checks if hostname match dns sub domain regex.
 // If hostname doesn't match this regex, kubelet will not launch static pods like kube-apiserver/kube-controller-manager and so on.
-type HostnameCheck struct{}
+type HostnameCheck struct {
+	nodeName string
+}
 
 func (hc HostnameCheck) Check() (warnings, errors []error) {
 	errors = []error{}
 	warnings = []error{}
-	hostname := node.GetHostname("")
-	for _, msg := range validation.ValidateNodeName(hostname, false) {
-		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hostname, msg))
+	for _, msg := range validation.ValidateNodeName(hc.nodeName, false) {
+		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hc.nodeName, msg))
 	}
-	addr, err := net.LookupHost(hostname)
+	addr, err := net.LookupHost(hc.nodeName)
 	if addr == nil {
-		warnings = append(warnings, fmt.Errorf("hostname \"%s\" could not be reached", hostname))
+		warnings = append(warnings, fmt.Errorf("hostname \"%s\" could not be reached", hc.nodeName))
 	}
 	if err != nil {
-		warnings = append(warnings, fmt.Errorf("hostname \"%s\" %s", hostname, err))
+		warnings = append(warnings, fmt.Errorf("hostname \"%s\" %s", hc.nodeName, err))
 	}
 	return warnings, errors
 }
@@ -311,6 +317,46 @@ func (hst HTTPProxyCheck) Check() (warnings, errors []error) {
 		return []error{fmt.Errorf("Connection to %q uses proxy %q. If that is not intended, adjust your proxy settings", url, proxy)}, nil
 	}
 	return nil, nil
+}
+
+// ExtraArgsCheck checks if arguments are valid.
+type ExtraArgsCheck struct {
+	APIServerExtraArgs         map[string]string
+	ControllerManagerExtraArgs map[string]string
+	SchedulerExtraArgs         map[string]string
+}
+
+func (eac ExtraArgsCheck) Check() (warnings, errors []error) {
+	argsCheck := func(name string, args map[string]string, f *pflag.FlagSet) []error {
+		errs := []error{}
+		for k, v := range args {
+			if err := f.Set(k, v); err != nil {
+				errs = append(errs, fmt.Errorf("%s: failed to parse extra argument --%s=%s", name, k, v))
+			}
+		}
+		return errs
+	}
+
+	warnings = []error{}
+	if len(eac.APIServerExtraArgs) > 0 {
+		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+		s := apiservoptions.NewServerRunOptions()
+		s.AddFlags(flags)
+		warnings = append(warnings, argsCheck("kube-apiserver", eac.APIServerExtraArgs, flags)...)
+	}
+	if len(eac.ControllerManagerExtraArgs) > 0 {
+		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+		s := cmoptions.NewCMServer()
+		s.AddFlags(flags, []string{}, []string{})
+		warnings = append(warnings, argsCheck("kube-controller-manager", eac.ControllerManagerExtraArgs, flags)...)
+	}
+	if len(eac.SchedulerExtraArgs) > 0 {
+		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+		s := schoptions.NewSchedulerServer()
+		s.AddFlags(flags)
+		warnings = append(warnings, argsCheck("kube-scheduler", eac.SchedulerExtraArgs, flags)...)
+	}
+	return warnings, nil
 }
 
 type SystemVerificationCheck struct{}
@@ -349,6 +395,66 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 		return warns, errs
 	}
 	return warns, nil
+}
+
+type KubernetesVersionCheck struct {
+	KubeadmVersion    string
+	KubernetesVersion string
+}
+
+func (kubever KubernetesVersionCheck) Check() (warnings, errors []error) {
+
+	// Skip this check for "super-custom builds", where apimachinery/the overall codebase version is not set.
+	if strings.HasPrefix(kubever.KubeadmVersion, "v0.0.0") {
+		return nil, nil
+	}
+
+	kadmVersion, err := versionutil.ParseSemantic(kubever.KubeadmVersion)
+	if err != nil {
+		return nil, []error{fmt.Errorf("couldn't parse kubeadm version %q: %v", kubever.KubeadmVersion, err)}
+	}
+
+	k8sVersion, err := versionutil.ParseSemantic(kubever.KubernetesVersion)
+	if err != nil {
+		return nil, []error{fmt.Errorf("couldn't parse kubernetes version %q: %v", kubever.KubernetesVersion, err)}
+	}
+
+	// Checks if k8sVersion greater or equal than the first unsupported versions by current version of kubeadm,
+	// that is major.minor+1 (all patch and pre-releases versions included)
+	// NB. in semver patches number is a numeric, while prerelease is a string where numeric identifiers always have lower precedence than non-numeric identifiers.
+	//     thus setting the value to x.y.0-0 we are defining the very first patch - prereleases within x.y minor release.
+	firstUnsupportedVersion := versionutil.MustParseSemantic(fmt.Sprintf("%d.%d.%s", kadmVersion.Major(), kadmVersion.Minor()+1, "0-0"))
+	if k8sVersion.AtLeast(firstUnsupportedVersion) {
+		return []error{fmt.Errorf("kubernetes version is greater than kubeadm version. Please consider to upgrade kubeadm. kubernetes version: %s. Kubeadm version: %d.%d.x", k8sVersion, kadmVersion.Components()[0], kadmVersion.Components()[1])}, nil
+	}
+
+	return nil, nil
+}
+
+// SwapCheck warns if swap is enabled
+type SwapCheck struct{}
+
+func (swc SwapCheck) Check() (warnings, errors []error) {
+	f, err := os.Open("/proc/swaps")
+	if err != nil {
+		// /proc/swaps not available, thus no reasons to warn
+		return nil, nil
+	}
+	defer f.Close()
+	var buf []string
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		buf = append(buf, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, []error{fmt.Errorf("error parsing /proc/swaps: %v", err)}
+	}
+
+	if len(buf) > 1 {
+		return []error{fmt.Errorf("Running with swap on is not supported. Please disable swap or set kubelet's --fail-swap-on flag to false.")}, nil
+	}
+
+	return nil, nil
 }
 
 type etcdVersionResponse struct {
@@ -485,10 +591,16 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 	return err
 }
 func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
+	// First, check if we're root separately from the other preflight checks and fail fast
+	if err := RunRootCheckOnly(); err != nil {
+		return err
+	}
+
 	checks := []Checker{
+		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
 		SystemVerificationCheck{},
 		IsRootCheck{},
-		HostnameCheck{},
+		HostnameCheck{nodeName: cfg.NodeName},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		ServiceCheck{Service: "docker", CheckIfActive: true},
 		FirewalldCheck{ports: []int{int(cfg.API.BindPort), 10250}},
@@ -497,9 +609,10 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		PortOpenCheck{port: 10251},
 		PortOpenCheck{port: 10252},
 		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddress, Port: int(cfg.API.BindPort)},
-		DirAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")},
+		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
+		SwapCheck{},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},
 		InPathCheck{executable: "mount", mandatory: true},
@@ -509,6 +622,11 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		InPathCheck{executable: "socat", mandatory: false},
 		InPathCheck{executable: "tc", mandatory: false},
 		InPathCheck{executable: "touch", mandatory: false},
+		ExtraArgsCheck{
+			APIServerExtraArgs:         cfg.APIServerExtraArgs,
+			ControllerManagerExtraArgs: cfg.ControllerManagerExtraArgs,
+			SchedulerExtraArgs:         cfg.SchedulerExtraArgs,
+		},
 	}
 
 	if len(cfg.Etcd.Endpoints) == 0 {
@@ -538,18 +656,24 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 }
 
 func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
+	// First, check if we're root separately from the other preflight checks and fail fast
+	if err := RunRootCheckOnly(); err != nil {
+		return err
+	}
+
 	checks := []Checker{
 		SystemVerificationCheck{},
 		IsRootCheck{},
-		HostnameCheck{},
+		HostnameCheck{cfg.NodeName},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		ServiceCheck{Service: "docker", CheckIfActive: true},
 		PortOpenCheck{port: 10250},
-		DirAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, "manifests")},
+		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
 		DirAvailableCheck{Path: "/var/lib/kubelet"},
 		FileAvailableCheck{Path: cfg.CACertPath},
-		FileAvailableCheck{Path: filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
+		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
 		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
+		SwapCheck{},
 		InPathCheck{executable: "ip", mandatory: true},
 		InPathCheck{executable: "iptables", mandatory: true},
 		InPathCheck{executable: "mount", mandatory: true},

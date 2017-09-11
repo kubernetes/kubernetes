@@ -25,7 +25,7 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 const defaultBoilerPlate = `
@@ -186,14 +186,6 @@ __kubeadm_compopt() {
 	true # don't do anything. Not supported by bashcompinit in zsh
 }
 
-__kubeadm_declare() {
-	if [ "$1" == "-F" ]; then
-		whence -w "$@"
-	else
-		builtin declare "$@"
-	fi
-}
-
 __kubeadm_ltrim_colon_completions()
 {
 	if [[ "$1" == *:* && "$COMP_WORDBREAKS" == *:* ]]; then
@@ -280,7 +272,7 @@ __kubeadm_convert_bash_to_zsh() {
 	-e "s/${LWORD}__ltrim_colon_completions${RWORD}/__kubeadm_ltrim_colon_completions/g" \
 	-e "s/${LWORD}compgen${RWORD}/__kubeadm_compgen/g" \
 	-e "s/${LWORD}compopt${RWORD}/__kubeadm_compopt/g" \
-	-e "s/${LWORD}declare${RWORD}/__kubeadm_declare/g" \
+	-e "s/${LWORD}declare${RWORD}/builtin declare/g" \
 	-e "s/\\\$(type${RWORD}/\$(__kubeadm_type/g" \
 	<<'BASH_COMPLETION_EOF'
 `

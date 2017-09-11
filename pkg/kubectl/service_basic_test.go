@@ -58,13 +58,6 @@ func TestServiceBasicGenerate(t *testing.T) {
 			expectErr:   true,
 		},
 		{
-			name:        "clusterip-none and port mapping",
-			tcp:         []string{"456:9898"},
-			clusterip:   "None",
-			serviceType: api.ServiceTypeClusterIP,
-			expectErr:   true,
-		},
-		{
 			name:        "clusterip-none-wrong-type",
 			tcp:         []string{},
 			clusterip:   "None",
@@ -84,6 +77,23 @@ func TestServiceBasicGenerate(t *testing.T) {
 				Spec: api.ServiceSpec{Type: "ClusterIP",
 					Ports:     []api.ServicePort{},
 					Selector:  map[string]string{"app": "clusterip-none-ok"},
+					ClusterIP: "None", ExternalIPs: []string(nil), LoadBalancerIP: ""},
+			},
+			expectErr: false,
+		},
+		{
+			name:        "clusterip-none-and-port-mapping",
+			tcp:         []string{"456:9898"},
+			clusterip:   "None",
+			serviceType: api.ServiceTypeClusterIP,
+			expected: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "clusterip-none-and-port-mapping",
+					Labels: map[string]string{"app": "clusterip-none-and-port-mapping"},
+				},
+				Spec: api.ServiceSpec{Type: "ClusterIP",
+					Ports:     []api.ServicePort{{Name: "456-9898", Protocol: "TCP", Port: 456, TargetPort: intstr.IntOrString{Type: 0, IntVal: 9898, StrVal: ""}, NodePort: 0}},
+					Selector:  map[string]string{"app": "clusterip-none-and-port-mapping"},
 					ClusterIP: "None", ExternalIPs: []string(nil), LoadBalancerIP: ""},
 			},
 			expectErr: false,

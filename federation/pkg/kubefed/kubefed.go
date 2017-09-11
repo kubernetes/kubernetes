@@ -26,12 +26,22 @@ import (
 	kubectl "k8s.io/kubernetes/pkg/kubectl/cmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	"github.com/spf13/cobra"
 )
 
+var (
+	kubefedVersionExample = templates.Examples(i18n.T(`
+		# Print the client and server versions for the current context
+		kubefed version`))
+	kubefedOptionsExample = templates.Examples(i18n.T(`
+		# Print flags inherited by all commands
+		kubefed options`))
+)
+
 // NewKubeFedCommand creates the `kubefed` command and its nested children.
-func NewKubeFedCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
+func NewKubeFedCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer, defaultServerImage, defaultEtcdImage string) *cobra.Command {
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubefed",
@@ -53,7 +63,7 @@ func NewKubeFedCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		{
 			Message: "Basic Commands:",
 			Commands: []*cobra.Command{
-				kubefedinit.NewCmdInit(out, util.NewAdminConfig(clientcmd.NewDefaultPathOptions())),
+				kubefedinit.NewCmdInit(out, util.NewAdminConfig(clientcmd.NewDefaultPathOptions()), defaultServerImage, defaultEtcdImage),
 				NewCmdJoin(f, out, util.NewAdminConfig(clientcmd.NewDefaultPathOptions())),
 				NewCmdUnjoin(f, out, err, util.NewAdminConfig(clientcmd.NewDefaultPathOptions())),
 			},
@@ -66,8 +76,12 @@ func NewKubeFedCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	}
 	templates.ActsAsRootCommand(cmds, filters, groups...)
 
-	cmds.AddCommand(kubectl.NewCmdVersion(f, out))
-	cmds.AddCommand(kubectl.NewCmdOptions())
+	cmdVersion := kubectl.NewCmdVersion(f, out)
+	cmdVersion.Example = kubefedVersionExample
+	cmds.AddCommand(cmdVersion)
+	cmdOptions := kubectl.NewCmdOptions(out)
+	cmdOptions.Example = kubefedOptionsExample
+	cmds.AddCommand(cmdOptions)
 
 	return cmds
 }

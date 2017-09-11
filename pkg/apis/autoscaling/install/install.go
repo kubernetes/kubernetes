@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/autoscaling/v1"
-	"k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
+	"k8s.io/kubernetes/pkg/apis/autoscaling/v2beta1"
 )
 
 func init() {
@@ -37,13 +37,12 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  autoscaling.GroupName,
-			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version, v2alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/kubernetes/pkg/apis/autoscaling",
+			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version, v2beta1.SchemeGroupVersion.Version},
 			AddInternalObjectsToScheme: autoscaling.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
-			v1.SchemeGroupVersion.Version:       v1.AddToScheme,
-			v2alpha1.SchemeGroupVersion.Version: v2alpha1.AddToScheme,
+			v1.SchemeGroupVersion.Version:      v1.AddToScheme,
+			v2beta1.SchemeGroupVersion.Version: v2beta1.AddToScheme,
 		},
 	).Announce(groupFactoryRegistry).RegisterAndEnable(registry, scheme); err != nil {
 		panic(err)

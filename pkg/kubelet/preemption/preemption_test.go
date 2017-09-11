@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	kubeapi "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -338,47 +338,47 @@ func getTestPods() map[string]*v1.Pod {
 	allPods := map[string]*v1.Pod{
 		tinyBurstable: getPodWithResources(tinyBurstable, v1.ResourceRequirements{
 			Requests: v1.ResourceList{
-				"cpu":    resource.MustParse("1m"),
-				"memory": resource.MustParse("1Mi"),
+				v1.ResourceCPU:    resource.MustParse("1m"),
+				v1.ResourceMemory: resource.MustParse("1Mi"),
 			},
 		}),
 		bestEffort: getPodWithResources(bestEffort, v1.ResourceRequirements{}),
 		critical: getPodWithResources(critical, v1.ResourceRequirements{
 			Requests: v1.ResourceList{
-				"cpu":    resource.MustParse("100m"),
-				"memory": resource.MustParse("100Mi"),
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
 			},
 		}),
 		burstable: getPodWithResources(burstable, v1.ResourceRequirements{
 			Requests: v1.ResourceList{
-				"cpu":    resource.MustParse("100m"),
-				"memory": resource.MustParse("100Mi"),
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
 			},
 		}),
 		guaranteed: getPodWithResources(guaranteed, v1.ResourceRequirements{
 			Requests: v1.ResourceList{
-				"cpu":    resource.MustParse("100m"),
-				"memory": resource.MustParse("100Mi"),
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
 			},
 			Limits: v1.ResourceList{
-				"cpu":    resource.MustParse("100m"),
-				"memory": resource.MustParse("100Mi"),
+				v1.ResourceCPU:    resource.MustParse("100m"),
+				v1.ResourceMemory: resource.MustParse("100Mi"),
 			},
 		}),
 		highRequestBurstable: getPodWithResources(highRequestBurstable, v1.ResourceRequirements{
 			Requests: v1.ResourceList{
-				"cpu":    resource.MustParse("300m"),
-				"memory": resource.MustParse("300Mi"),
+				v1.ResourceCPU:    resource.MustParse("300m"),
+				v1.ResourceMemory: resource.MustParse("300Mi"),
 			},
 		}),
 		highRequestGuaranteed: getPodWithResources(highRequestGuaranteed, v1.ResourceRequirements{
 			Requests: v1.ResourceList{
-				"cpu":    resource.MustParse("300m"),
-				"memory": resource.MustParse("300Mi"),
+				v1.ResourceCPU:    resource.MustParse("300m"),
+				v1.ResourceMemory: resource.MustParse("300Mi"),
 			},
 			Limits: v1.ResourceList{
-				"cpu":    resource.MustParse("300m"),
-				"memory": resource.MustParse("300Mi"),
+				v1.ResourceCPU:    resource.MustParse("300m"),
+				v1.ResourceMemory: resource.MustParse("300Mi"),
 			},
 		}),
 	}
@@ -458,21 +458,21 @@ func admissionRequirementListEqual(list1 admissionRequirementList, list2 admissi
 	return true
 }
 
-// this checks if the lists contents contain all of the same elements.
-// this is not correct if there are duplicate pods in the list.
-// for example: podListEqual([a, a, b], [a, b, b]) will return true
+// podListEqual checks if the lists contents contain all of the same elements.
 func podListEqual(list1 []*v1.Pod, list2 []*v1.Pod) bool {
 	if len(list1) != len(list2) {
 		return false
 	}
-	for _, a := range list1 {
-		contains := false
-		for _, b := range list2 {
-			if a == b {
-				contains = true
-			}
-		}
-		if !contains {
+
+	m := map[*v1.Pod]int{}
+	for _, val := range list1 {
+		m[val] = m[val] + 1
+	}
+	for _, val := range list2 {
+		m[val] = m[val] - 1
+	}
+	for _, v := range m {
+		if v != 0 {
 			return false
 		}
 	}

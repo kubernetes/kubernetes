@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func TestIsDNS1123Label(t *testing.T) {
@@ -156,18 +156,42 @@ func TestIsValidPortNum(t *testing.T) {
 	}
 }
 
-func createGroupIDs(ids ...int64) []types.UnixGroupID {
-	var output []types.UnixGroupID
+func TestIsInRange(t *testing.T) {
+	goodValues := []struct {
+		value int
+		min   int
+		max   int
+	}{{1, 0, 10}, {5, 5, 20}, {25, 10, 25}}
+	for _, val := range goodValues {
+		if msgs := IsInRange(val.value, val.min, val.max); len(msgs) > 0 {
+			t.Errorf("expected no errors for %#v, but got %v", val, msgs)
+		}
+	}
+
+	badValues := []struct {
+		value int
+		min   int
+		max   int
+	}{{1, 2, 10}, {5, -4, 2}, {25, 100, 120}}
+	for _, val := range badValues {
+		if msgs := IsInRange(val.value, val.min, val.max); len(msgs) == 0 {
+			t.Errorf("expected errors for %#v", val)
+		}
+	}
+}
+
+func createGroupIDs(ids ...int64) []int64 {
+	var output []int64
 	for _, id := range ids {
-		output = append(output, types.UnixGroupID(id))
+		output = append(output, int64(id))
 	}
 	return output
 }
 
-func createUserIDs(ids ...int64) []types.UnixUserID {
-	var output []types.UnixUserID
+func createUserIDs(ids ...int64) []int64 {
+	var output []int64
 	for _, id := range ids {
-		output = append(output, types.UnixUserID(id))
+		output = append(output, int64(id))
 	}
 	return output
 }
@@ -449,6 +473,41 @@ func TestIsWildcardDNS1123Subdomain(t *testing.T) {
 	for _, val := range badValues {
 		if errs := IsWildcardDNS1123Subdomain(val); len(errs) == 0 {
 			t.Errorf("expected errors for %q", val)
+		}
+	}
+}
+
+func TestIsFullyQualifiedName(t *testing.T) {
+	tests := []struct {
+		name       string
+		targetName string
+		err        string
+	}{
+		{
+			name:       "name needs to be fully qualified, i.e., contains at least 2 dots",
+			targetName: "k8s.io",
+			err:        "should be a domain with at least three segments separated by dots",
+		},
+		{
+			name:       "name cannot be empty",
+			targetName: "",
+			err:        "Required value",
+		},
+		{
+			name:       "name must conform to RFC 1123",
+			targetName: "A.B.C",
+			err:        "a DNS-1123 subdomain must consist of lower case alphanumeric characters",
+		},
+	}
+	for _, tc := range tests {
+		err := IsFullyQualifiedName(field.NewPath(""), tc.targetName).ToAggregate()
+		switch {
+		case tc.err == "" && err != nil:
+			t.Errorf("%q: unexpected error: %v", tc.name, err)
+		case tc.err != "" && err == nil:
+			t.Errorf("%q: unexpected no error, expected %s", tc.name, tc.err)
+		case tc.err != "" && err != nil && !strings.Contains(err.Error(), tc.err):
+			t.Errorf("%q: expected %s, got %v", tc.name, tc.err, err)
 		}
 	}
 }

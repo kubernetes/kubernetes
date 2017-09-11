@@ -24,6 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+type RequestInfoResolver interface {
+	NewRequestInfo(req *http.Request) (*RequestInfo, error)
+}
+
 // RequestInfo holds information parsed from the http.Request
 type RequestInfo struct {
 	// IsResourceRequest indicates whether or not the request is for an API resource or subresource
@@ -54,10 +58,10 @@ type RequestInfo struct {
 // CRUDdy GET/POST/PUT/DELETE actions on REST objects.
 // TODO: find a way to keep this up to date automatically.  Maybe dynamically populate list as handlers added to
 // master's Mux.
-var specialVerbs = sets.NewString("proxy", "redirect", "watch")
+var specialVerbs = sets.NewString("proxy", "watch")
 
 // specialVerbsNoSubresources contains root verbs which do not allow subresources
-var specialVerbsNoSubresources = sets.NewString("proxy", "redirect")
+var specialVerbsNoSubresources = sets.NewString("proxy")
 
 // namespaceSubresources contains subresources of namespace
 // this list allows the parser to distinguish between a namespace subresource, and a namespaced resource
@@ -87,8 +91,6 @@ type RequestInfoFactory struct {
 // Special verbs without subresources:
 // /api/{version}/proxy/{resource}/{resourceName}
 // /api/{version}/proxy/namespaces/{namespace}/{resource}/{resourceName}
-// /api/{version}/redirect/namespaces/{namespace}/{resource}/{resourceName}
-// /api/{version}/redirect/{resource}/{resourceName}
 //
 // Special verbs with subresources:
 // /api/{version}/watch/{resource}
@@ -197,12 +199,17 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 	// if there's no name on the request and we thought it was a get before, then the actual verb is a list or a watch
 	if len(requestInfo.Name) == 0 && requestInfo.Verb == "get" {
 		// Assumes v1.ListOptions
-		// Duplicates logic of Convert_Slice_string_To_bool
-		switch strings.ToLower(req.URL.Query().Get("watch")) {
-		case "false", "0", "":
+		// Any query value that is not 0 or false is considered true
+		// see apimachinery/pkg/runtime/conversion.go Convert_Slice_string_To_bool
+		if values := req.URL.Query()["watch"]; len(values) > 0 {
+			switch strings.ToLower(values[0]) {
+			case "false", "0":
+				requestInfo.Verb = "list"
+			default:
+				requestInfo.Verb = "watch"
+			}
+		} else {
 			requestInfo.Verb = "list"
-		default:
-			requestInfo.Verb = "watch"
 		}
 	}
 	// if there's no name on the request and we thought it was a delete before, then the actual verb is deletecollection

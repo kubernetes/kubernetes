@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
 var FileExtensions = []string{".json", ".yaml", ".yml"}
@@ -51,8 +51,9 @@ type Builder struct {
 	stream bool
 	dir    bool
 
-	selector  labels.Selector
-	selectAll bool
+	selector             labels.Selector
+	selectAll            bool
+	includeUninitialized bool
 
 	resources []string
 
@@ -84,8 +85,8 @@ var missingResourceError = fmt.Errorf(`You must provide one or more resources by
 Example resource specifications include:
    '-f rsrc.yaml'
    '--filename=rsrc.json'
-   'pods my-pod'
-   'services'`)
+   '<resource> <name>'
+   '<resource>'`)
 
 // TODO: expand this to include other errors.
 func IsUsageError(err error) bool {
@@ -276,6 +277,12 @@ func (b *Builder) Selector(selector labels.Selector) *Builder {
 // ExportParam accepts the export boolean for these resources
 func (b *Builder) ExportParam(export bool) *Builder {
 	b.export = export
+	return b
+}
+
+// IncludeUninitialized accepts the include-uninitialized boolean for these resources
+func (b *Builder) IncludeUninitialized(includeUninitialized bool) *Builder {
+	b.includeUninitialized = includeUninitialized
 	return b
 }
 
@@ -607,7 +614,7 @@ func (b *Builder) visitBySelector() *Result {
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
 		}
-		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector, b.export))
+		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector, b.export, b.includeUninitialized))
 	}
 	if b.continueOnError {
 		result.visitor = EagerVisitorList(visitors)

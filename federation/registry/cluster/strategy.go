@@ -48,12 +48,12 @@ func ClusterToSelectableFields(cluster *federation.Cluster) fields.Set {
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	cluster, ok := obj.(*federation.Cluster)
 	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a cluster.")
+		return nil, nil, false, fmt.Errorf("given object is not a cluster.")
 	}
-	return labels.Set(cluster.ObjectMeta.Labels), ClusterToSelectableFields(cluster), nil
+	return labels.Set(cluster.ObjectMeta.Labels), ClusterToSelectableFields(cluster), cluster.Initializers != nil, nil
 }
 
 func MatchCluster(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {

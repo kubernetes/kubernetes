@@ -1,0 +1,4 @@
+amd64=busybox
+arm=arm32v6/busybox
+arm64=arm64v8/busybox
+ppc64le=ppc64le/busybox

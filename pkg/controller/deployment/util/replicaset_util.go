@@ -21,13 +21,12 @@ import (
 
 	"github.com/golang/glog"
 
+	extensions "k8s.io/api/extensions/v1beta1"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
-	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/client/retry"
+	unversionedextensions "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
+	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
+	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/pkg/controller"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
 
@@ -46,11 +45,7 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rsL
 		if err != nil {
 			return err
 		}
-		obj, deepCopyErr := api.Scheme.DeepCopy(rs)
-		if deepCopyErr != nil {
-			return deepCopyErr
-		}
-		rs = obj.(*extensions.ReplicaSet)
+		rs = rs.DeepCopy()
 		// Apply the update, then attempt to push it to the apiserver.
 		if applyErr := applyUpdate(rs); applyErr != nil {
 			return applyErr
@@ -69,21 +64,8 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rsL
 }
 
 // GetReplicaSetHash returns the pod template hash of a ReplicaSet's pod template space
-func GetReplicaSetHash(rs *extensions.ReplicaSet) string {
-	meta := rs.Spec.Template.ObjectMeta
-	meta.Labels = labelsutil.CloneAndRemoveLabel(meta.Labels, extensions.DefaultDeploymentUniqueLabelKey)
-	return fmt.Sprintf("%d", GetPodTemplateSpecHash(v1.PodTemplateSpec{
-		ObjectMeta: meta,
-		Spec:       rs.Spec.Template.Spec,
-	}))
-}
-
-// GetReplicaSetHashFnv returns the pod template hash of a ReplicaSet's pod template spec.
-func GetReplicaSetHashFnv(rs *extensions.ReplicaSet) string {
-	meta := rs.Spec.Template.ObjectMeta
-	meta.Labels = labelsutil.CloneAndRemoveLabel(meta.Labels, extensions.DefaultDeploymentUniqueLabelKey)
-	return fmt.Sprintf("%d", GetPodTemplateSpecHashFnv(v1.PodTemplateSpec{
-		ObjectMeta: meta,
-		Spec:       rs.Spec.Template.Spec,
-	}))
+func GetReplicaSetHash(rs *extensions.ReplicaSet, uniquifier *int32) (string, error) {
+	rsTemplate := rs.Spec.Template.DeepCopy()
+	rsTemplate.Labels = labelsutil.CloneAndRemoveLabel(rsTemplate.Labels, extensions.DefaultDeploymentUniqueLabelKey)
+	return fmt.Sprintf("%d", controller.ComputeHash(rsTemplate, uniquifier)), nil
 }

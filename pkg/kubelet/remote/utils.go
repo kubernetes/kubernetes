@@ -18,18 +18,12 @@ package remote
 
 import (
 	"fmt"
-	"net"
 	"time"
 
 	"golang.org/x/net/context"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
-
-// dial creates a net.Conn by unix socket addr.
-func dial(addr string, timeout time.Duration) (net.Conn, error) {
-	return net.DialTimeout("unix", addr, timeout)
-}
 
 // getContextWithTimeout returns a context with timeout.
 func getContextWithTimeout(timeout time.Duration) (context.Context, context.CancelFunc) {

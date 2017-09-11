@@ -30,12 +30,12 @@ import (
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
 
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 )
 
 // BuildAuth creates an authenticator, an authorizer, and a matching authorizer attributes getter compatible with the kubelet's needs
-func BuildAuth(nodeName types.NodeName, client clientset.Interface, config componentconfig.KubeletConfiguration) (server.AuthInterface, error) {
+func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubeletconfig.KubeletConfiguration) (server.AuthInterface, error) {
 	// Get clients, if provided
 	var (
 		tokenClient authenticationclient.TokenReviewInterface
@@ -62,7 +62,7 @@ func BuildAuth(nodeName types.NodeName, client clientset.Interface, config compo
 }
 
 // BuildAuthn creates an authenticator compatible with the kubelet's needs
-func BuildAuthn(client authenticationclient.TokenReviewInterface, authn componentconfig.KubeletAuthentication) (authenticator.Request, error) {
+func BuildAuthn(client authenticationclient.TokenReviewInterface, authn kubeletconfig.KubeletAuthentication) (authenticator.Request, error) {
 	authenticatorConfig := authenticatorfactory.DelegatingAuthenticatorConfig{
 		Anonymous:    authn.Anonymous.Enabled,
 		CacheTTL:     authn.Webhook.CacheTTL.Duration,
@@ -81,12 +81,12 @@ func BuildAuthn(client authenticationclient.TokenReviewInterface, authn componen
 }
 
 // BuildAuthz creates an authorizer compatible with the kubelet's needs
-func BuildAuthz(client authorizationclient.SubjectAccessReviewInterface, authz componentconfig.KubeletAuthorization) (authorizer.Authorizer, error) {
+func BuildAuthz(client authorizationclient.SubjectAccessReviewInterface, authz kubeletconfig.KubeletAuthorization) (authorizer.Authorizer, error) {
 	switch authz.Mode {
-	case componentconfig.KubeletAuthorizationModeAlwaysAllow:
+	case kubeletconfig.KubeletAuthorizationModeAlwaysAllow:
 		return authorizerfactory.NewAlwaysAllowAuthorizer(), nil
 
-	case componentconfig.KubeletAuthorizationModeWebhook:
+	case kubeletconfig.KubeletAuthorizationModeWebhook:
 		if client == nil {
 			return nil, errors.New("no client provided, cannot use webhook authorization")
 		}

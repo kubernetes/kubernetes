@@ -22,12 +22,14 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	kubeclientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
-	"k8s.io/kubernetes/pkg/api/v1"
-	kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -44,7 +46,10 @@ type Framework struct {
 	// should abort, the AfterSuite hook should run all Cleanup actions.
 	cleanupHandle framework.CleanupActionHandle
 
+	FederationConfig *restclient.Config
+
 	FederationClientset *federation_clientset.Clientset
+
 	FederationNamespace *v1.Namespace
 }
 
@@ -73,10 +78,16 @@ func (f *Framework) FederationBeforeEach() {
 	// https://github.com/onsi/ginkgo/issues/222
 	f.cleanupHandle = framework.AddCleanupAction(f.FederationAfterEach)
 
+	if f.FederationConfig == nil {
+		By("Reading the federation configuration")
+		var err error
+		f.FederationConfig, err = LoadFederatedConfig(&clientcmd.ConfigOverrides{})
+		Expect(err).NotTo(HaveOccurred())
+	}
 	if f.FederationClientset == nil {
 		By("Creating a release 1.5 federation Clientset")
 		var err error
-		f.FederationClientset, err = LoadFederationClientset()
+		f.FederationClientset, err = LoadFederationClientset(f.FederationConfig)
 		Expect(err).NotTo(HaveOccurred())
 	}
 	By("Waiting for federation-apiserver to be ready")

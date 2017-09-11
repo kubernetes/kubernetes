@@ -84,3 +84,30 @@ func testVolumeWithMountOption(name string, namespace string, mountOptions strin
 		Spec:       spec,
 	}
 }
+
+func TestValidatePathNoBacksteps(t *testing.T) {
+	testCases := map[string]struct {
+		path        string
+		expectedErr bool
+	}{
+		"valid path": {
+			path: "/foo/bar",
+		},
+		"invalid path": {
+			path:        "/foo/bar/..",
+			expectedErr: true,
+		},
+	}
+
+	for name, tc := range testCases {
+		err := ValidatePathNoBacksteps(tc.path)
+
+		if err == nil && tc.expectedErr {
+			t.Fatalf("expected test `%s` to return an error but it didnt", name)
+		}
+
+		if err != nil && !tc.expectedErr {
+			t.Fatalf("expected test `%s` to return no error but got `%v`", name, err)
+		}
+	}
+}

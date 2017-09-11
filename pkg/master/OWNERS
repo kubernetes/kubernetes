@@ -18,7 +18,6 @@ reviewers:
 - mikedanese
 - liggitt
 - nikhiljindal
-- bprashanth
 - gmarek
 - erictune
 - davidopp
@@ -31,7 +30,7 @@ reviewers:
 - justinsb
 - roberthbailey
 - ncdc
-- timstclair
+- tallclair
 - mwielgus
 - timothysc
 - soltysh
@@ -39,3 +38,4 @@ reviewers:
 - madhusudancs
 - hongchaodeng
 - jszczepkowski
+- enj

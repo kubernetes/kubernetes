@@ -16,7 +16,7 @@
 VERSION=v12
 PROJECT_ID?=google_samples
 PROJECT=gcr.io/${PROJECT_ID}
-CASSANDRA_VERSION=3.9
+CASSANDRA_VERSION=3.10
 
 all: kubernetes-cassandra.jar build
 
@@ -26,6 +26,7 @@ kubernetes-cassandra.jar: ../java/* ../java/src/main/java/io/k8s/cassandra/*.jav
 	cd ../java && mvn clean
 
 container:
+	@echo "Building ${PROJECT}/cassandra:${VERSION}"
 	docker build --pull --build-arg "CASSANDRA_VERSION=${CASSANDRA_VERSION}" -t ${PROJECT}/cassandra:${VERSION} .
 
 container-dev:

@@ -18,6 +18,7 @@ package cluster
 
 import (
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -36,16 +37,16 @@ import (
 )
 
 type ClusterController struct {
-	knownClusterSet sets.String
-
 	// federationClient used to operate cluster
 	federationClient federationclientset.Interface
 
 	// clusterMonitorPeriod is the period for updating status of cluster
 	clusterMonitorPeriod time.Duration
+
+	mu              sync.RWMutex
+	knownClusterSet sets.String
 	// clusterClusterStatusMap is a mapping of clusterName and cluster status of last sampling
 	clusterClusterStatusMap map[string]federationv1beta1.ClusterStatus
-
 	// clusterKubeClientMap is a mapping of clusterName and restclient
 	clusterKubeClientMap map[string]ClusterClient
 
@@ -94,22 +95,36 @@ func newClusterController(federationClient federationclientset.Interface, cluste
 // delFromClusterSet delete a cluster from clusterSet and
 // delete the corresponding restclient from the map clusterKubeClientMap
 func (cc *ClusterController) delFromClusterSet(obj interface{}) {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
 	cluster := obj.(*federationv1beta1.Cluster)
 	cc.delFromClusterSetByName(cluster.Name)
 }
 
 // delFromClusterSetByName delete a cluster from clusterSet by name and
-// delete the corresponding restclient from the map clusterKubeClientMap
+// delete the corresponding restclient from the map clusterKubeClientMap.
+// Caller must make sure that they hold the mutex
 func (cc *ClusterController) delFromClusterSetByName(clusterName string) {
 	glog.V(1).Infof("ClusterController observed a cluster deletion: %v", clusterName)
 	cc.knownClusterSet.Delete(clusterName)
 	delete(cc.clusterKubeClientMap, clusterName)
+	delete(cc.clusterClusterStatusMap, clusterName)
 }
 
-// addToClusterSet insert the new cluster to clusterSet and create a corresponding
-// restclient to map clusterKubeClientMap
 func (cc *ClusterController) addToClusterSet(obj interface{}) {
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
 	cluster := obj.(*federationv1beta1.Cluster)
+	cc.addToClusterSetWithoutLock(cluster)
+}
+
+// addToClusterSetWithoutLock inserts the new cluster to clusterSet and create
+// a corresponding restclient to map clusterKubeClientMap if the cluster is not
+// known. Caller must make sure that they hold the mutex.
+func (cc *ClusterController) addToClusterSetWithoutLock(cluster *federationv1beta1.Cluster) {
+	if cc.knownClusterSet.Has(cluster.Name) {
+		return
+	}
 	glog.V(1).Infof("ClusterController observed a new cluster: %v", cluster.Name)
 	cc.knownClusterSet.Insert(cluster.Name)
 	// create the restclient of cluster
@@ -127,69 +142,37 @@ func (cc *ClusterController) Run(stopChan <-chan struct{}) {
 	go cc.clusterController.Run(stopChan)
 	// monitor cluster status periodically, in phase 1 we just get the health state from "/healthz"
 	go wait.Until(func() {
-		if err := cc.UpdateClusterStatus(); err != nil {
+		if err := cc.updateClusterStatus(); err != nil {
 			glog.Errorf("Error monitoring cluster status: %v", err)
 		}
 	}, cc.clusterMonitorPeriod, stopChan)
 }
 
-func (cc *ClusterController) GetClusterClient(cluster *federationv1beta1.Cluster) (*ClusterClient, error) {
-	clusterClient, found := cc.clusterKubeClientMap[cluster.Name]
-	client := &clusterClient
-	if !found {
-		glog.Infof("It's a new cluster, a cluster client will be created")
-		client, err := NewClusterClientSet(cluster)
-		if err != nil || client == nil {
-			glog.Errorf("Failed to create cluster client, err: %v", err)
-			return nil, err
-		}
-	}
-	return client, nil
-}
-
-func (cc *ClusterController) GetClusterStatus(cluster *federationv1beta1.Cluster) (*federationv1beta1.ClusterStatus, error) {
-	// just get the status of cluster, by requesting the restapi "/healthz"
-	clusterClient, err := cc.GetClusterClient(cluster)
-	if err != nil {
-		return nil, err
-	}
-	clusterStatus := clusterClient.GetClusterHealthStatus()
-	return clusterStatus, nil
-}
-
-// UpdateClusterStatus checks cluster status and get the metrics from cluster's restapi
-func (cc *ClusterController) UpdateClusterStatus() error {
+// updateClusterStatus checks cluster status and get the metrics from cluster's restapi
+func (cc *ClusterController) updateClusterStatus() error {
 	clusters, err := cc.federationClient.Federation().Clusters().List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
-	for _, cluster := range clusters.Items {
-		if !cc.knownClusterSet.Has(cluster.Name) {
-			cc.addToClusterSet(&cluster)
-		}
-	}
 
-	// If there's a difference between lengths of known clusters and observed clusters
-	if len(cc.knownClusterSet) != len(clusters.Items) {
-		observedSet := make(sets.String)
-		for _, cluster := range clusters.Items {
-			observedSet.Insert(cluster.Name)
-		}
-		deleted := cc.knownClusterSet.Difference(observedSet)
-		for clusterName := range deleted {
-			cc.delFromClusterSetByName(clusterName)
-		}
-	}
 	for _, cluster := range clusters.Items {
-		clusterStatusNew, err := cc.GetClusterStatus(&cluster)
-		if err != nil {
-			glog.Infof("Failed to Get the status of cluster: %v", cluster.Name)
+		cc.mu.RLock()
+		// skip updating status of the cluster which is not yet added to knownClusterSet.
+		if !cc.knownClusterSet.Has(cluster.Name) {
+			cc.mu.RUnlock()
 			continue
 		}
-		clusterStatusOld, found := cc.clusterClusterStatusMap[cluster.Name]
-		if !found {
-			glog.Infof("There is no status stored for cluster: %v before", cluster.Name)
+		clusterClient, clientFound := cc.clusterKubeClientMap[cluster.Name]
+		clusterStatusOld, statusFound := cc.clusterClusterStatusMap[cluster.Name]
+		cc.mu.RUnlock()
 
+		if !clientFound {
+			glog.Warningf("Failed to get client for cluster %s", cluster.Name)
+			continue
+		}
+		clusterStatusNew := clusterClient.GetClusterHealthStatus()
+		if !statusFound {
+			glog.Infof("There is no status stored for cluster: %v before", cluster.Name)
 		} else {
 			hasTransition := false
 			if len(clusterStatusNew.Conditions) != len(clusterStatusOld.Conditions) {
@@ -210,21 +193,10 @@ func (cc *ClusterController) UpdateClusterStatus() error {
 				}
 			}
 		}
-		clusterClient, found := cc.clusterKubeClientMap[cluster.Name]
-		if !found {
-			glog.Warningf("Failed to get client for cluster %s", cluster.Name)
-			continue
-		}
 
-		zones, region, err := clusterClient.GetClusterZones()
-		if err != nil {
-			glog.Warningf("Failed to get zones and region for cluster %s: %v", cluster.Name, err)
-			// Don't return err here, as we want the rest of the status update to proceed.
-		} else {
-			clusterStatusNew.Zones = zones
-			clusterStatusNew.Region = region
-		}
+		cc.mu.Lock()
 		cc.clusterClusterStatusMap[cluster.Name] = *clusterStatusNew
+		cc.mu.Unlock()
 		cluster.Status = *clusterStatusNew
 		cluster, err := cc.federationClient.Federation().Clusters().UpdateStatus(&cluster)
 		if err != nil {

@@ -23,6 +23,11 @@ options:
       detected on a worker node.
   channel:
     type: string
-    default: "stable"
+    default: "1.7/stable"
     description: |
       Snap channel to install Kubernetes master services from
+  client_password:
+    type: string
+    default: ""
+    description: |
+      Password to be used for admin user (leave empty for random password).

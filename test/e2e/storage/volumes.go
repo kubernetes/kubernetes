@@ -49,11 +49,12 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -79,13 +80,13 @@ func DeleteCinderVolume(name string) error {
 }
 
 // These tests need privileged containers, which are disabled by default.
-var _ = framework.KubeDescribe("Volumes [Volume]", func() {
+var _ = SIGDescribe("Volumes", func() {
 	f := framework.NewDefaultFramework("volume")
 
 	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
 	// note that namespace deletion is handled by delete-namespace flag
 	clean := true
-	// filled in BeforeEach
+	// filled inside BeforeEach
 	var cs clientset.Interface
 	var namespace *v1.Namespace
 
@@ -98,23 +99,14 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	// NFS
 	////////////////////////////////////////////////////////////////////////
 
-	framework.KubeDescribe("NFS", func() {
+	Describe("NFS", func() {
 		It("should be mountable", func() {
-			config := framework.VolumeTestConfig{
-				Namespace:   namespace.Name,
-				Prefix:      "nfs",
-				ServerImage: framework.NfsServerImage,
-				ServerPorts: []int{2049},
-			}
-
+			config, _, serverIP := framework.NewNFSServer(cs, namespace.Name, []string{})
 			defer func() {
 				if clean {
 					framework.VolumeTestCleanup(f, config)
 				}
 			}()
-			pod := framework.StartVolumeServer(cs, config)
-			serverIP := pod.Status.PodIP
-			framework.Logf("NFS server IP address: %v", serverIP)
 
 			tests := []framework.VolumeTest{
 				{
@@ -138,71 +130,27 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	// Gluster
 	////////////////////////////////////////////////////////////////////////
 
-	framework.KubeDescribe("GlusterFS [Feature:Volumes]", func() {
+	Describe("GlusterFS", func() {
 		It("should be mountable", func() {
 			//TODO (copejon) GFS is not supported on debian image.
-			framework.SkipUnlessNodeOSDistroIs("gci")
+			framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu")
 
-			config := framework.VolumeTestConfig{
-				Namespace:   namespace.Name,
-				Prefix:      "gluster",
-				ServerImage: framework.GlusterfsServerImage,
-				ServerPorts: []int{24007, 24008, 49152},
-			}
-
+			// create gluster server and endpoints
+			config, _, _ := framework.NewGlusterfsServer(cs, namespace.Name)
+			name := config.Prefix + "-server"
 			defer func() {
 				if clean {
 					framework.VolumeTestCleanup(f, config)
+					err := cs.CoreV1().Endpoints(namespace.Name).Delete(name, nil)
+					Expect(err).NotTo(HaveOccurred(), "defer: Gluster delete endpoints failed")
 				}
 			}()
-			pod := framework.StartVolumeServer(cs, config)
-			serverIP := pod.Status.PodIP
-			framework.Logf("Gluster server IP address: %v", serverIP)
-
-			// create Endpoints for the server
-			endpoints := v1.Endpoints{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Endpoints",
-					APIVersion: "v1",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: config.Prefix + "-server",
-				},
-				Subsets: []v1.EndpointSubset{
-					{
-						Addresses: []v1.EndpointAddress{
-							{
-								IP: serverIP,
-							},
-						},
-						Ports: []v1.EndpointPort{
-							{
-								Name:     "gluster",
-								Port:     24007,
-								Protocol: v1.ProtocolTCP,
-							},
-						},
-					},
-				},
-			}
-
-			endClient := cs.Core().Endpoints(config.Namespace)
-
-			defer func() {
-				if clean {
-					endClient.Delete(config.Prefix+"-server", nil)
-				}
-			}()
-
-			if _, err := endClient.Create(&endpoints); err != nil {
-				framework.Failf("Failed to create endpoints for Gluster server: %v", err)
-			}
 
 			tests := []framework.VolumeTest{
 				{
 					Volume: v1.VolumeSource{
 						Glusterfs: &v1.GlusterfsVolumeSource{
-							EndpointsName: config.Prefix + "-server",
+							EndpointsName: name,
 							// 'test_vol' comes from test/images/volumes-tester/gluster/run_gluster.sh
 							Path:     "test_vol",
 							ReadOnly: true,
@@ -226,27 +174,14 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	// are installed on all nodes!
 	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=iSCSI"
 
-	framework.KubeDescribe("iSCSI [Feature:Volumes]", func() {
+	Describe("iSCSI [Feature:Volumes]", func() {
 		It("should be mountable", func() {
-			config := framework.VolumeTestConfig{
-				Namespace:   namespace.Name,
-				Prefix:      "iscsi",
-				ServerImage: framework.IscsiServerImage,
-				ServerPorts: []int{3260},
-				ServerVolumes: map[string]string{
-					// iSCSI container needs to insert modules from the host
-					"/lib/modules": "/lib/modules",
-				},
-			}
-
+			config, _, serverIP := framework.NewISCSIServer(cs, namespace.Name)
 			defer func() {
 				if clean {
 					framework.VolumeTestCleanup(f, config)
 				}
 			}()
-			pod := framework.StartVolumeServer(cs, config)
-			serverIP := pod.Status.PodIP
-			framework.Logf("iSCSI server IP address: %v", serverIP)
 
 			tests := []framework.VolumeTest{
 				{
@@ -264,7 +199,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 					ExpectedContent: "Hello from iSCSI",
 				},
 			}
-			fsGroup := types.UnixGroupID(1234)
+			fsGroup := int64(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
@@ -273,28 +208,14 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	// Ceph RBD
 	////////////////////////////////////////////////////////////////////////
 
-	framework.KubeDescribe("Ceph RBD [Feature:Volumes]", func() {
+	Describe("Ceph RBD [Feature:Volumes]", func() {
 		It("should be mountable", func() {
-			config := framework.VolumeTestConfig{
-				Namespace:   namespace.Name,
-				Prefix:      "rbd",
-				ServerImage: framework.RbdServerImage,
-				ServerPorts: []int{6789},
-				ServerVolumes: map[string]string{
-					// iSCSI container needs to insert modules from the host
-					"/lib/modules": "/lib/modules",
-					"/sys":         "/sys",
-				},
-			}
-
+			config, _, serverIP := framework.NewRBDServer(cs, namespace.Name)
 			defer func() {
 				if clean {
 					framework.VolumeTestCleanup(f, config)
 				}
 			}()
-			pod := framework.StartVolumeServer(cs, config)
-			serverIP := pod.Status.PodIP
-			framework.Logf("Ceph server IP address: %v", serverIP)
 
 			// create secrets for the server
 			secret := v1.Secret{
@@ -312,7 +233,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 				Type: "kubernetes.io/rbd",
 			}
 
-			secClient := cs.Core().Secrets(config.Namespace)
+			secClient := cs.CoreV1().Secrets(config.Namespace)
 
 			defer func() {
 				if clean {
@@ -343,15 +264,15 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 					ExpectedContent: "Hello from RBD",
 				},
 			}
-			fsGroup := types.UnixGroupID(1234)
+			fsGroup := int64(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
+
 	////////////////////////////////////////////////////////////////////////
 	// Ceph
 	////////////////////////////////////////////////////////////////////////
-
-	framework.KubeDescribe("CephFS [Feature:Volumes]", func() {
+	Describe("CephFS [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			config := framework.VolumeTestConfig{
 				Namespace:   namespace.Name,
@@ -365,9 +286,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 					framework.VolumeTestCleanup(f, config)
 				}
 			}()
-			pod := framework.StartVolumeServer(cs, config)
-			serverIP := pod.Status.PodIP
-			framework.Logf("Ceph server IP address: %v", serverIP)
+			_, serverIP := framework.CreateStorageServer(cs, config)
 			By("sleeping a bit to give ceph server time to initialize")
 			time.Sleep(20 * time.Second)
 
@@ -390,14 +309,14 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 
 			defer func() {
 				if clean {
-					if err := cs.Core().Secrets(namespace.Name).Delete(secret.Name, nil); err != nil {
+					if err := cs.CoreV1().Secrets(namespace.Name).Delete(secret.Name, nil); err != nil {
 						framework.Failf("unable to delete secret %v: %v", secret.Name, err)
 					}
 				}
 			}()
 
 			var err error
-			if secret, err = cs.Core().Secrets(namespace.Name).Create(secret); err != nil {
+			if secret, err = cs.CoreV1().Secrets(namespace.Name).Create(secret); err != nil {
 				framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 			}
 
@@ -428,8 +347,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	// (/usr/bin/nova, /usr/bin/cinder and /usr/bin/keystone)
 	// and that the usual OpenStack authentication env. variables are set
 	// (OS_USERNAME, OS_PASSWORD, OS_TENANT_NAME at least).
-
-	framework.KubeDescribe("Cinder [Feature:Volumes]", func() {
+	Describe("Cinder [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("openstack")
 			config := framework.VolumeTestConfig{
@@ -496,7 +414,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 
 			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
 
-			fsGroup := types.UnixGroupID(1234)
+			fsGroup := int64(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
@@ -504,62 +422,40 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	////////////////////////////////////////////////////////////////////////
 	// GCE PD
 	////////////////////////////////////////////////////////////////////////
+	Describe("PD", func() {
+		var config framework.VolumeTestConfig
 
-	framework.KubeDescribe("PD", func() {
-		// Flaky issue: #43977
-		It("should be mountable [Flaky]", func() {
+		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("gce", "gke")
-			config := framework.VolumeTestConfig{
+			config = framework.VolumeTestConfig{
 				Namespace: namespace.Name,
 				Prefix:    "pd",
-			}
-
-			By("creating a test gce pd volume")
-			volumeName, err := framework.CreatePDWithRetry()
-			Expect(err).NotTo(HaveOccurred())
-			defer func() {
-				// - Get NodeName from the pod spec to which the volume is mounted.
-				// - Force detach and delete.
-				pod, err := f.PodClient().Get(config.Prefix+"-client", metav1.GetOptions{})
-				Expect(err).NotTo(HaveOccurred(), "Failed getting pod %q.", config.Prefix+"-client")
-				detachAndDeletePDs(volumeName, []types.NodeName{types.NodeName(pod.Spec.NodeName)})
-			}()
-
-			defer func() {
-				if clean {
-					framework.Logf("Running volumeTestCleanup")
-					framework.VolumeTestCleanup(f, config)
-				}
-			}()
-
-			tests := []framework.VolumeTest{
-				{
-					Volume: v1.VolumeSource{
-						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-							PDName:   volumeName,
-							FSType:   "ext3",
-							ReadOnly: false,
-						},
-					},
-					File: "index.html",
-					// Randomize index.html to make sure we don't see the
-					// content from previous test runs.
-					ExpectedContent: "Hello from GCE from namespace " + volumeName,
+				// PD will be created in framework.TestContext.CloudConfig.Zone zone,
+				// so pods should be also scheduled there.
+				NodeSelector: map[string]string{
+					kubeletapis.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
 				},
 			}
+		})
 
-			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
-
-			fsGroup := types.UnixGroupID(1234)
-			framework.TestVolumeClient(cs, config, &fsGroup, tests)
+		It("should be mountable with ext3", func() {
+			testGCEPD(f, config, cs, clean, "ext3")
+		})
+		It("should be mountable with ext4", func() {
+			testGCEPD(f, config, cs, clean, "ext4")
+		})
+		It("should be mountable with xfs", func() {
+			// xfs is not supported on gci
+			// and not installed by default on debian
+			framework.SkipUnlessNodeOSDistroIs("ubuntu")
+			testGCEPD(f, config, cs, clean, "xfs")
 		})
 	})
 
 	////////////////////////////////////////////////////////////////////////
 	// ConfigMap
 	////////////////////////////////////////////////////////////////////////
-
-	framework.KubeDescribe("ConfigMap", func() {
+	Describe("ConfigMap", func() {
 		It("should be mountable", func() {
 			config := framework.VolumeTestConfig{
 				Namespace: namespace.Name,
@@ -585,11 +481,11 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 					"third":  "this is the third file",
 				},
 			}
-			if _, err := cs.Core().ConfigMaps(namespace.Name).Create(configMap); err != nil {
+			if _, err := cs.CoreV1().ConfigMaps(namespace.Name).Create(configMap); err != nil {
 				framework.Failf("unable to create test configmap: %v", err)
 			}
 			defer func() {
-				_ = cs.Core().ConfigMaps(namespace.Name).Delete(configMap.Name, nil)
+				_ = cs.CoreV1().ConfigMaps(namespace.Name).Delete(configMap.Name, nil)
 			}()
 
 			// Test one ConfigMap mounted several times to test #28502
@@ -636,8 +532,7 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 	////////////////////////////////////////////////////////////////////////
 	// vSphere
 	////////////////////////////////////////////////////////////////////////
-
-	framework.KubeDescribe("vsphere [Feature:Volumes]", func() {
+	Describe("vsphere [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("vsphere")
 			var (
@@ -682,14 +577,15 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 
 			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
 
-			fsGroup := types.UnixGroupID(1234)
+			fsGroup := int64(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
+
 	////////////////////////////////////////////////////////////////////////
 	// Azure Disk
 	////////////////////////////////////////////////////////////////////////
-	framework.KubeDescribe("Azure Disk [Feature:Volumes]", func() {
+	Describe("Azure Disk [Feature:Volumes]", func() {
 		It("should be mountable [Slow]", func() {
 			framework.SkipUnlessProviderIs("azure")
 			config := framework.VolumeTestConfig{
@@ -732,8 +628,49 @@ var _ = framework.KubeDescribe("Volumes [Volume]", func() {
 
 			framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
 
-			fsGroup := types.UnixGroupID(1234)
+			fsGroup := int64(1234)
 			framework.TestVolumeClient(cs, config, &fsGroup, tests)
 		})
 	})
 })
+
+func testGCEPD(f *framework.Framework, config framework.VolumeTestConfig, cs clientset.Interface, clean bool, fs string) {
+	By("creating a test gce pd volume")
+	volumeName, err := framework.CreatePDWithRetry()
+	Expect(err).NotTo(HaveOccurred())
+	defer func() {
+		// - Get NodeName from the pod spec to which the volume is mounted.
+		// - Force detach and delete.
+		pod, err := f.PodClient().Get(config.Prefix+"-client", metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred(), "Failed getting pod %q.", config.Prefix+"-client")
+		detachAndDeletePDs(volumeName, []types.NodeName{types.NodeName(pod.Spec.NodeName)})
+	}()
+
+	defer func() {
+		if clean {
+			framework.Logf("Running volumeTestCleanup")
+			framework.VolumeTestCleanup(f, config)
+		}
+	}()
+
+	tests := []framework.VolumeTest{
+		{
+			Volume: v1.VolumeSource{
+				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+					PDName:   volumeName,
+					FSType:   fs,
+					ReadOnly: false,
+				},
+			},
+			File: "index.html",
+			// Randomize index.html to make sure we don't see the
+			// content from previous test runs.
+			ExpectedContent: "Hello from GCE from namespace " + volumeName,
+		},
+	}
+
+	framework.InjectHtml(cs, config, tests[0].Volume, tests[0].ExpectedContent)
+
+	fsGroup := int64(1234)
+	framework.TestVolumeClient(cs, config, &fsGroup, tests)
+}

@@ -25,12 +25,17 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/golang/glog"
+
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // PathRecorderMux wraps a mux object and records the registered exposedPaths.
 type PathRecorderMux struct {
+	// name is used for logging so you can trace requests through
+	name string
+
 	lock            sync.Mutex
 	notFoundHandler http.Handler
 	pathToHandler   map[string]http.Handler
@@ -53,6 +58,9 @@ type PathRecorderMux struct {
 // pathHandler is an http.Handler that will satify requests first by exact match, then by prefix,
 // then by notFoundHandler
 type pathHandler struct {
+	// muxName is used for logging so you can trace requests through
+	muxName string
+
 	// pathToHandler is a map of exactly matching request to its handler
 	pathToHandler map[string]http.Handler
 
@@ -72,8 +80,9 @@ type prefixHandler struct {
 }
 
 // NewPathRecorderMux creates a new PathRecorderMux
-func NewPathRecorderMux() *PathRecorderMux {
+func NewPathRecorderMux(name string) *PathRecorderMux {
 	ret := &PathRecorderMux{
+		name:            name,
 		pathToHandler:   map[string]http.Handler{},
 		prefixToHandler: map[string]http.Handler{},
 		mux:             atomic.Value{},
@@ -104,6 +113,7 @@ func (m *PathRecorderMux) trackCallers(path string) {
 // not be consistent
 func (m *PathRecorderMux) refreshMuxLocked() {
 	newMux := &pathHandler{
+		muxName:         m.name,
 		pathToHandler:   map[string]http.Handler{},
 		prefixHandlers:  []prefixHandler{},
 		notFoundHandler: http.NotFoundHandler(),
@@ -227,17 +237,20 @@ func (m *PathRecorderMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // ServeHTTP makes it an http.Handler
 func (h *pathHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if exactHandler, ok := h.pathToHandler[r.URL.Path]; ok {
+		glog.V(5).Infof("%v: %q satisfied by exact match", h.muxName, r.URL.Path)
 		exactHandler.ServeHTTP(w, r)
 		return
 	}
 
 	for _, prefixHandler := range h.prefixHandlers {
 		if strings.HasPrefix(r.URL.Path, prefixHandler.prefix) {
+			glog.V(5).Infof("%v: %q satisfied by prefix %v", h.muxName, r.URL.Path, prefixHandler.prefix)
 			prefixHandler.handler.ServeHTTP(w, r)
 			return
 		}
 	}
 
+	glog.V(5).Infof("%v: %q satisfied by NotFoundHandler", h.muxName, r.URL.Path)
 	h.notFoundHandler.ServeHTTP(w, r)
 }
 

@@ -15,7 +15,6 @@ package prometheus
 
 import (
 	"fmt"
-	"hash/fnv"
 	"math"
 	"sort"
 	"sync"
@@ -54,8 +53,11 @@ type Summary interface {
 	Observe(float64)
 }
 
+// DefObjectives are the default Summary quantile values.
+//
+// Deprecated: DefObjectives will not be used as the default objectives in
+// v0.10 of the library. The default Summary will have no quantiles then.
 var (
-	// DefObjectives are the default Summary quantile values.
 	DefObjectives = map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
 
 	errQuantileLabelNotAllowed = fmt.Errorf(
@@ -114,9 +116,15 @@ type SummaryOpts struct {
 	ConstLabels Labels
 
 	// Objectives defines the quantile rank estimates with their respective
-	// absolute error. If Objectives[q] = e, then the value reported
-	// for q will be the φ-quantile value for some φ between q-e and q+e.
-	// The default value is DefObjectives.
+	// absolute error. If Objectives[q] = e, then the value reported for q
+	// will be the φ-quantile value for some φ between q-e and q+e.  The
+	// default value is DefObjectives. It is used if Objectives is left at
+	// its zero value (i.e. nil). To create a Summary without Objectives,
+	// set it to an empty map (i.e. map[float64]float64{}).
+	//
+	// Deprecated: Note that the current value of DefObjectives is
+	// deprecated. It will be replaced by an empty map in v0.10 of the
+	// library. Please explicitly set Objectives to the desired value.
 	Objectives map[float64]float64
 
 	// MaxAge defines the duration for which an observation stays relevant
@@ -140,11 +148,11 @@ type SummaryOpts struct {
 	BufCap uint32
 }
 
-// TODO: Great fuck-up with the sliding-window decay algorithm... The Merge
-// method of perk/quantile is actually not working as advertised - and it might
-// be unfixable, as the underlying algorithm is apparently not capable of
-// merging summaries in the first place. To avoid using Merge, we are currently
-// adding observations to _each_ age bucket, i.e. the effort to add a sample is
+// Great fuck-up with the sliding-window decay algorithm... The Merge method of
+// perk/quantile is actually not working as advertised - and it might be
+// unfixable, as the underlying algorithm is apparently not capable of merging
+// summaries in the first place. To avoid using Merge, we are currently adding
+// observations to _each_ age bucket, i.e. the effort to add a sample is
 // essentially multiplied by the number of age buckets. When rotating age
 // buckets, we empty the previous head stream. On scrape time, we simply take
 // the quantiles from the head stream (no merging required). Result: More effort
@@ -184,7 +192,7 @@ func newSummary(desc *Desc, opts SummaryOpts, labelValues ...string) Summary {
 		}
 	}
 
-	if len(opts.Objectives) == 0 {
+	if opts.Objectives == nil {
 		opts.Objectives = DefObjectives
 	}
 
@@ -228,12 +236,12 @@ func newSummary(desc *Desc, opts SummaryOpts, labelValues ...string) Summary {
 	}
 	sort.Float64s(s.sortedObjectives)
 
-	s.Init(s) // Init self-collection.
+	s.init(s) // Init self-collection.
 	return s
 }
 
 type summary struct {
-	SelfCollector
+	selfCollector
 
 	bufMtx sync.Mutex // Protects hotBuf and hotBufExpTime.
 	mtx    sync.Mutex // Protects every other moving part.
@@ -391,7 +399,7 @@ func (s quantSort) Less(i, j int) bool {
 // (e.g. HTTP request latencies, partitioned by status code and method). Create
 // instances with NewSummaryVec.
 type SummaryVec struct {
-	MetricVec
+	*MetricVec
 }
 
 // NewSummaryVec creates a new SummaryVec based on the provided SummaryOpts and
@@ -405,35 +413,30 @@ func NewSummaryVec(opts SummaryOpts, labelNames []string) *SummaryVec {
 		opts.ConstLabels,
 	)
 	return &SummaryVec{
-		MetricVec: MetricVec{
-			children: map[uint64]Metric{},
-			desc:     desc,
-			hash:     fnv.New64a(),
-			newMetric: func(lvs ...string) Metric {
-				return newSummary(desc, opts, lvs...)
-			},
-		},
+		MetricVec: newMetricVec(desc, func(lvs ...string) Metric {
+			return newSummary(desc, opts, lvs...)
+		}),
 	}
 }
 
-// GetMetricWithLabelValues replaces the method of the same name in
-// MetricVec. The difference is that this method returns a Summary and not a
-// Metric so that no type conversion is required.
-func (m *SummaryVec) GetMetricWithLabelValues(lvs ...string) (Summary, error) {
+// GetMetricWithLabelValues replaces the method of the same name in MetricVec.
+// The difference is that this method returns an Observer and not a Metric so
+// that no type conversion to an Observer is required.
+func (m *SummaryVec) GetMetricWithLabelValues(lvs ...string) (Observer, error) {
 	metric, err := m.MetricVec.GetMetricWithLabelValues(lvs...)
 	if metric != nil {
-		return metric.(Summary), err
+		return metric.(Observer), err
 	}
 	return nil, err
 }
 
 // GetMetricWith replaces the method of the same name in MetricVec. The
-// difference is that this method returns a Summary and not a Metric so that no
-// type conversion is required.
-func (m *SummaryVec) GetMetricWith(labels Labels) (Summary, error) {
+// difference is that this method returns an Observer and not a Metric so that
+// no type conversion to an Observer is required.
+func (m *SummaryVec) GetMetricWith(labels Labels) (Observer, error) {
 	metric, err := m.MetricVec.GetMetricWith(labels)
 	if metric != nil {
-		return metric.(Summary), err
+		return metric.(Observer), err
 	}
 	return nil, err
 }
@@ -442,15 +445,15 @@ func (m *SummaryVec) GetMetricWith(labels Labels) (Summary, error) {
 // GetMetricWithLabelValues would have returned an error. By not returning an
 // error, WithLabelValues allows shortcuts like
 //     myVec.WithLabelValues("404", "GET").Observe(42.21)
-func (m *SummaryVec) WithLabelValues(lvs ...string) Summary {
-	return m.MetricVec.WithLabelValues(lvs...).(Summary)
+func (m *SummaryVec) WithLabelValues(lvs ...string) Observer {
+	return m.MetricVec.WithLabelValues(lvs...).(Observer)
 }
 
 // With works as GetMetricWith, but panics where GetMetricWithLabels would have
 // returned an error. By not returning an error, With allows shortcuts like
 //     myVec.With(Labels{"code": "404", "method": "GET"}).Observe(42.21)
-func (m *SummaryVec) With(labels Labels) Summary {
-	return m.MetricVec.With(labels).(Summary)
+func (m *SummaryVec) With(labels Labels) Observer {
+	return m.MetricVec.With(labels).(Observer)
 }
 
 type constSummary struct {

@@ -19,9 +19,9 @@ limitations under the License.
 package v2alpha1
 
 import (
+	v2alpha1 "k8s.io/api/batch/v2alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	v2alpha1 "k8s.io/client-go/pkg/apis/batch/v2alpha1"
 	"k8s.io/client-go/tools/cache"
 )
 

@@ -38,7 +38,7 @@ type SimpleUpgradeTest struct {
 
 // Setup creates a resource and validates its propagation to member clusters
 func (ut *SimpleUpgradeTest) Setup(f *fedframework.Framework) {
-	adapter := ut.adapterFactory(f.FederationClientset)
+	adapter := ut.adapterFactory(f.FederationClientset, f.FederationConfig, nil)
 	clients := f.GetClusterClients()
 	ut.crudTester = fedframework.NewFederatedTypeCRUDTester(adapter, clients)
 

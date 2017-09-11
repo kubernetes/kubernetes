@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -10,7 +8,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["deletion_helper.go"],
-    tags = ["automanaged"],
     deps = [
         "//federation/pkg/federation-controller/util:go_default_library",
         "//federation/pkg/federation-controller/util/finalizers:go_default_library",

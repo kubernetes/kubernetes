@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/client/retry"
+	"k8s.io/client-go/util/retry"
 )
 
 // apiResource consults the REST mapper to translate an <apiVersion, kind,
@@ -69,7 +69,7 @@ func (gc *GarbageCollector) getObject(item objectReference) (*unstructured.Unstr
 	if err != nil {
 		return nil, err
 	}
-	return client.Resource(resource, item.Namespace).Get(item.Name)
+	return client.Resource(resource, item.Namespace).Get(item.Name, metav1.GetOptions{})
 }
 
 func (gc *GarbageCollector) updateObject(item objectReference, obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
@@ -115,7 +115,7 @@ func (gc *GarbageCollector) removeFinalizer(owner *node, targetFinalizer string)
 		for _, f := range finalizers {
 			if f == targetFinalizer {
 				found = true
-				break
+				continue
 			}
 			newFinalizers = append(newFinalizers, f)
 		}

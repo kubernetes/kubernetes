@@ -58,7 +58,7 @@ func getObject(version, kind, name string) *unstructured.Unstructured {
 	}
 }
 
-func getClientServer(gv *schema.GroupVersion, h func(http.ResponseWriter, *http.Request)) (*Client, *httptest.Server, error) {
+func getClientServer(gv *schema.GroupVersion, h func(http.ResponseWriter, *http.Request)) (Interface, *httptest.Server, error) {
 	srv := httptest.NewServer(http.HandlerFunc(h))
 	cl, err := NewClient(&restclient.Config{
 		Host:          srv.URL,
@@ -191,7 +191,7 @@ func TestGet(t *testing.T) {
 		}
 		defer srv.Close()
 
-		got, err := cl.Resource(resource, tc.namespace).Get(tc.name)
+		got, err := cl.Resource(resource, tc.namespace).Get(tc.name, metav1.GetOptions{})
 		if err != nil {
 			t.Errorf("unexpected error when getting %q: %v", tc.name, err)
 			continue

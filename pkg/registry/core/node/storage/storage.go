@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -28,9 +29,11 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubelet/client"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/node"
 	noderest "k8s.io/kubernetes/pkg/registry/core/node/rest"
 )
@@ -72,17 +75,18 @@ func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo 
 // NewStorage returns a NodeStorage object that will work against nodes.
 func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client.KubeletClientConfig, proxyTransport http.RoundTripper) (*NodeStorage, error) {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &api.Node{} },
-		NewListFunc:       func() runtime.Object { return &api.NodeList{} },
-		PredicateFunc:     node.MatchNode,
-		QualifiedResource: api.Resource("nodes"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("nodes"),
+		Copier:                   api.Scheme,
+		NewFunc:                  func() runtime.Object { return &api.Node{} },
+		NewListFunc:              func() runtime.Object { return &api.NodeList{} },
+		PredicateFunc:            node.MatchNode,
+		DefaultQualifiedResource: api.Resource("nodes"),
 
 		CreateStrategy: node.Strategy,
 		UpdateStrategy: node.Strategy,
 		DeleteStrategy: node.Strategy,
 		ExportStrategy: node.Strategy,
+
+		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: node.GetAttrs, TriggerFunc: node.NodeNameTriggerFunc}
 	if err := store.CompleteWithOptions(options); err != nil {
@@ -109,7 +113,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 		}
 		// TODO: Remove the conversion. Consider only return the NodeAddresses
 		externalNode := &v1.Node{}
-		err = v1.Convert_api_Node_To_v1_Node(node, externalNode, nil)
+		err = k8s_api_v1.Convert_api_Node_To_v1_Node(node, externalNode, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert to v1.Node: %v", err)
 		}

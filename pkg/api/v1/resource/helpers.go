@@ -21,13 +21,13 @@ import (
 	"math"
 	"strconv"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
 // containers of the pod.
-func PodRequestsAndLimits(pod *v1.Pod) (reqs map[v1.ResourceName]resource.Quantity, limits map[v1.ResourceName]resource.Quantity, err error) {
+func PodRequestsAndLimits(pod *v1.Pod) (reqs map[v1.ResourceName]resource.Quantity, limits map[v1.ResourceName]resource.Quantity) {
 	reqs, limits = map[v1.ResourceName]resource.Quantity{}, map[v1.ResourceName]resource.Quantity{}
 	for _, container := range pod.Spec.Containers {
 		for name, quantity := range container.Resources.Requests {
@@ -123,15 +123,7 @@ func ExtractResourceValueByContainerNameAndNodeAllocatable(copier deepCopier, fs
 		return "", err
 	}
 
-	containerCopy, err := copier.DeepCopy(realContainer)
-	if err != nil {
-		return "", fmt.Errorf("failed to perform a deep copy of container object: %v", err)
-	}
-
-	container, ok := containerCopy.(*v1.Container)
-	if !ok {
-		return "", fmt.Errorf("unexpected type returned from deep copy of container object")
-	}
+	container := realContainer.DeepCopy()
 
 	MergeContainerResourceLimits(container, nodeAllocatable)
 
@@ -153,10 +145,14 @@ func ExtractContainerResourceValue(fs *v1.ResourceFieldSelector, container *v1.C
 		return convertResourceCPUToString(container.Resources.Limits.Cpu(), divisor)
 	case "limits.memory":
 		return convertResourceMemoryToString(container.Resources.Limits.Memory(), divisor)
+	case "limits.ephemeral-storage":
+		return convertResourceEphemeralStorageToString(container.Resources.Limits.StorageEphemeral(), divisor)
 	case "requests.cpu":
 		return convertResourceCPUToString(container.Resources.Requests.Cpu(), divisor)
 	case "requests.memory":
 		return convertResourceMemoryToString(container.Resources.Requests.Memory(), divisor)
+	case "requests.ephemeral-storage":
+		return convertResourceEphemeralStorageToString(container.Resources.Requests.StorageEphemeral(), divisor)
 	}
 
 	return "", fmt.Errorf("Unsupported container resource : %v", fs.Resource)
@@ -173,6 +169,13 @@ func convertResourceCPUToString(cpu *resource.Quantity, divisor resource.Quantit
 // ceiling of the value.
 func convertResourceMemoryToString(memory *resource.Quantity, divisor resource.Quantity) (string, error) {
 	m := int64(math.Ceil(float64(memory.Value()) / float64(divisor.Value())))
+	return strconv.FormatInt(m, 10), nil
+}
+
+// convertResourceEphemeralStorageToString converts ephemeral storage value to the format of divisor and returns
+// ceiling of the value.
+func convertResourceEphemeralStorageToString(ephemeralStorage *resource.Quantity, divisor resource.Quantity) (string, error) {
+	m := int64(math.Ceil(float64(ephemeralStorage.Value()) / float64(divisor.Value())))
 	return strconv.FormatInt(m, 10), nil
 }
 

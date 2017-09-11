@@ -20,7 +20,15 @@ import (
 	"reflect"
 	"testing"
 
+	swagger "github.com/emicklei/go-restful-swagger12"
+
+	"github.com/googleapis/gnostic/OpenAPIv2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/client-go/discovery"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/rest/fake"
 )
 
 func TestCategoryExpansion(t *testing.T) {
@@ -46,6 +54,8 @@ func TestCategoryExpansion(t *testing.T) {
 				{Resource: "statefulsets", Group: "apps"},
 				{Resource: "horizontalpodautoscalers", Group: "autoscaling"},
 				{Resource: "jobs", Group: "batch"},
+				{Resource: "cronjobs", Group: "batch"},
+				{Resource: "daemonsets", Group: "extensions"},
 				{Resource: "deployments", Group: "extensions"},
 				{Resource: "replicasets", Group: "extensions"},
 			},
@@ -62,4 +72,121 @@ func TestCategoryExpansion(t *testing.T) {
 			t.Errorf("%s:  expected %v, got %v", test.name, e, a)
 		}
 	}
+}
+
+func TestDiscoveryCategoryExpander(t *testing.T) {
+	tests := []struct {
+		category       string
+		serverResponse []*metav1.APIResourceList
+		expected       []schema.GroupResource
+	}{
+		{
+			category: "all",
+			serverResponse: []*metav1.APIResourceList{
+				{
+					GroupVersion: "batch/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "jobs",
+							ShortNames: []string{"jz"},
+							Categories: []string{"all"},
+						},
+					},
+				},
+			},
+			expected: []schema.GroupResource{
+				{
+					Group:    "batch",
+					Resource: "jobs",
+				},
+			},
+		},
+		{
+			category: "all",
+			serverResponse: []*metav1.APIResourceList{
+				{
+					GroupVersion: "batch/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "jobs",
+							ShortNames: []string{"jz"},
+						},
+					},
+				},
+			},
+		},
+		{
+			category: "targaryens",
+			serverResponse: []*metav1.APIResourceList{
+				{
+					GroupVersion: "batch/v1",
+					APIResources: []metav1.APIResource{
+						{
+							Name:       "jobs",
+							ShortNames: []string{"jz"},
+							Categories: []string{"all"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	dc := &fakeDiscoveryClient{}
+	for _, test := range tests {
+		dc.serverResourcesHandler = func() ([]*metav1.APIResourceList, error) {
+			return test.serverResponse, nil
+		}
+		expander, err := NewDiscoveryCategoryExpander(SimpleCategoryExpander{}, dc)
+		if err != nil {
+			t.Fatalf("unexpected error %v", err)
+		}
+		expanded, _ := expander.Expand(test.category)
+		if !reflect.DeepEqual(expanded, test.expected) {
+			t.Errorf("expected %v, got %v", test.expected, expanded)
+		}
+	}
+
+}
+
+type fakeDiscoveryClient struct {
+	serverResourcesHandler func() ([]*metav1.APIResourceList, error)
+}
+
+var _ discovery.DiscoveryInterface = &fakeDiscoveryClient{}
+
+func (c *fakeDiscoveryClient) RESTClient() restclient.Interface {
+	return &fake.RESTClient{}
+}
+
+func (c *fakeDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
+	return nil, nil
+}
+
+func (c *fakeDiscoveryClient) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+	return &metav1.APIResourceList{}, nil
+}
+
+func (c *fakeDiscoveryClient) ServerResources() ([]*metav1.APIResourceList, error) {
+	return c.serverResourcesHandler()
+}
+
+func (c *fakeDiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+	return nil, nil
+}
+
+func (c *fakeDiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
+	return nil, nil
+}
+
+func (c *fakeDiscoveryClient) ServerVersion() (*version.Info, error) {
+	return &version.Info{}, nil
+}
+
+func (c *fakeDiscoveryClient) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
+	return &swagger.ApiDeclaration{}, nil
+}
+
+func (c *fakeDiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {
+	return &openapi_v2.Document{}, nil
 }

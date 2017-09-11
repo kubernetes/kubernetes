@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apimachinery"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/openapi"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -48,7 +47,10 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
+	openapi "k8s.io/kube-openapi/pkg/common"
 )
 
 const (
@@ -90,6 +92,11 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	config.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.LoopbackClientConfig = &restclient.Config{}
 
+	clientset := fake.NewSimpleClientset()
+	if clientset == nil {
+		t.Fatal("unable to create fake client set")
+	}
+
 	// TODO restore this test, but right now, eliminate our cycle
 	// config.OpenAPIConfig = DefaultOpenAPIConfig(testGetOpenAPIDefinitions, runtime.NewScheme())
 	// config.OpenAPIConfig.Info = &spec.Info{
@@ -99,6 +106,8 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 	// 	},
 	// }
 	config.SwaggerConfig = DefaultSwaggerConfig()
+	sharedInformers := informers.NewSharedInformerFactory(clientset, config.LoopbackClientConfig.Timeout)
+	config.Complete(sharedInformers)
 
 	return etcdServer, *config, assert.New(t)
 }
@@ -106,7 +115,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertion
 func newMaster(t *testing.T) (*GenericAPIServer, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
 	etcdserver, config, assert := setUp(t)
 
-	s, err := config.Complete().New(EmptyDelegate)
+	s, err := config.Complete(nil).New("test", EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -138,7 +147,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	config.LegacyAPIGroupPrefixes = sets.NewString("/apiPrefix")
 	config.DiscoveryAddresses = discovery.DefaultAddresses{DefaultAddress: "ExternalAddress"}
 
-	s, err := config.SkipComplete().New(EmptyDelegate)
+	s, err := config.Complete(nil).New("test", EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -159,7 +168,10 @@ func TestInstallAPIGroups(t *testing.T) {
 			}, nil
 		}
 
-		mapper := meta.NewDefaultRESTMapperFromScheme([]schema.GroupVersion{gv}, interfacesFor, "", sets.NewString(), sets.NewString(), scheme)
+		mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{gv}, interfacesFor)
+		for kind := range scheme.KnownTypes(gv) {
+			mapper.Add(gv.WithKind(kind), meta.RESTScopeNamespace)
+		}
 		groupMeta := apimachinery.GroupMeta{
 			GroupVersion:  gv,
 			GroupVersions: []schema.GroupVersion{gv},
@@ -300,17 +312,13 @@ func TestPrepareRun(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	assert.NotNil(config.SwaggerConfig)
-	// assert.NotNil(config.OpenAPIConfig)
 
-	server := httptest.NewServer(s.Handler.GoRestfulContainer.ServeMux)
+	server := httptest.NewServer(s.Handler.Director)
 	defer server.Close()
+	done := make(chan struct{})
 
 	s.PrepareRun()
-
-	// openapi is installed in PrepareRun
-	// resp, err := http.Get(server.URL + "/swagger.json")
-	// assert.NoError(err)
-	// assert.Equal(http.StatusOK, resp.StatusCode)
+	s.RunPostStartHooks(done)
 
 	// swagger is installed in PrepareRun
 	resp, err := http.Get(server.URL + "/swaggerapi/")
@@ -343,13 +351,13 @@ func TestCustomHandlerChain(t *testing.T) {
 		called = true
 	})
 
-	s, err := config.SkipComplete().New(EmptyDelegate)
+	s, err := config.Complete(nil).New("test", EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
 
-	s.Handler.PostGoRestfulMux.Handle("/nonswagger", handler)
-	s.Handler.PostGoRestfulMux.Handle("/secret", handler)
+	s.Handler.NonGoRestfulMux.Handle("/nonswagger", handler)
+	s.Handler.NonGoRestfulMux.Handle("/secret", handler)
 
 	type Test struct {
 		handler   http.Handler
@@ -398,7 +406,7 @@ func TestNotRestRoutesHaveAuth(t *testing.T) {
 	kubeVersion := fakeVersion()
 	config.Version = &kubeVersion
 
-	s, err := config.SkipComplete().New(EmptyDelegate)
+	s, err := config.Complete(nil).New("test", EmptyDelegate)
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}

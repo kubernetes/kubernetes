@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -16,7 +9,7 @@ go_library(
         "pod.go",
         "version.go",
     ],
-    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/appc/spec/schema/types:go_default_library",
         "//vendor/go4.org/errorutil:go_default_library",
@@ -38,4 +31,5 @@ filegroup(
         "//vendor/github.com/appc/spec/schema/types:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

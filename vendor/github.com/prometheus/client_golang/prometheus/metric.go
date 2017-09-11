@@ -22,10 +22,8 @@ import (
 const separatorByte byte = 255
 
 // A Metric models a single sample value with its meta data being exported to
-// Prometheus. Implementers of Metric in this package inclued Gauge, Counter,
-// Untyped, and Summary. Users can implement their own Metric types, but that
-// should be rarely needed. See the example for SelfCollector, which is also an
-// example for a user-implemented Metric.
+// Prometheus. Implementations of Metric in this package are Gauge, Counter,
+// Histogram, Summary, and Untyped.
 type Metric interface {
 	// Desc returns the descriptor for the Metric. This method idempotently
 	// returns the same descriptor throughout the lifetime of the
@@ -36,21 +34,23 @@ type Metric interface {
 	// Write encodes the Metric into a "Metric" Protocol Buffer data
 	// transmission object.
 	//
-	// Implementers of custom Metric types must observe concurrency safety
-	// as reads of this metric may occur at any time, and any blocking
-	// occurs at the expense of total performance of rendering all
-	// registered metrics. Ideally Metric implementations should support
-	// concurrent readers.
+	// Metric implementations must observe concurrency safety as reads of
+	// this metric may occur at any time, and any blocking occurs at the
+	// expense of total performance of rendering all registered
+	// metrics. Ideally, Metric implementations should support concurrent
+	// readers.
 	//
-	// The Prometheus client library attempts to minimize memory allocations
-	// and will provide a pre-existing reset dto.Metric pointer. Prometheus
-	// may recycle the dto.Metric proto message, so Metric implementations
-	// should just populate the provided dto.Metric and then should not keep
-	// any reference to it.
-	//
-	// While populating dto.Metric, labels must be sorted lexicographically.
-	// (Implementers may find LabelPairSorter useful for that.)
+	// While populating dto.Metric, it is the responsibility of the
+	// implementation to ensure validity of the Metric protobuf (like valid
+	// UTF-8 strings or syntactically valid metric and label names). It is
+	// recommended to sort labels lexicographically. (Implementers may find
+	// LabelPairSorter useful for that.) Callers of Write should still make
+	// sure of sorting if they depend on it.
 	Write(*dto.Metric) error
+	// TODO(beorn7): The original rationale of passing in a pre-allocated
+	// dto.Metric protobuf to save allocations has disappeared. The
+	// signature of this method should be changed to "Write() (*dto.Metric,
+	// error)".
 }
 
 // Opts bundles the options for creating most Metric types. Each metric

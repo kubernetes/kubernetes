@@ -23,16 +23,22 @@ import (
 
 	"github.com/spf13/cobra"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/sample-apiserver/pkg/admission/plugin/banflunder"
+	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
 	"k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/sample-apiserver/pkg/apiserver"
+	clientset "k8s.io/sample-apiserver/pkg/client/clientset_generated/internalclientset"
+	informers "k8s.io/sample-apiserver/pkg/client/informers_generated/internalversion"
 )
 
 const defaultEtcdPathPrefix = "/registry/wardle.kubernetes.io"
 
 type WardleServerOptions struct {
 	RecommendedOptions *genericoptions.RecommendedOptions
+	Admission          *genericoptions.AdmissionOptions
 
 	StdOut io.Writer
 	StdErr io.Writer
@@ -41,6 +47,7 @@ type WardleServerOptions struct {
 func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 	o := &WardleServerOptions{
 		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Scheme, apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
+		Admission:          genericoptions.NewAdmissionOptions(),
 
 		StdOut: out,
 		StdErr: errOut,
@@ -72,12 +79,16 @@ func NewCommandStartWardleServer(out, errOut io.Writer, stopCh <-chan struct{}) 
 
 	flags := cmd.Flags()
 	o.RecommendedOptions.AddFlags(flags)
+	o.Admission.AddFlags(flags)
 
 	return cmd
 }
 
 func (o WardleServerOptions) Validate(args []string) error {
-	return nil
+	errors := []error{}
+	errors = append(errors, o.RecommendedOptions.Validate()...)
+	errors = append(errors, o.Admission.Validate()...)
+	return utilerrors.NewAggregate(errors)
 }
 
 func (o *WardleServerOptions) Complete() error {
@@ -85,18 +96,36 @@ func (o *WardleServerOptions) Complete() error {
 }
 
 func (o WardleServerOptions) Config() (*apiserver.Config, error) {
+	// register admission plugins
+	banflunder.Register(o.Admission.Plugins)
+
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	serverConfig := genericapiserver.NewConfig(apiserver.Codecs)
+	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
 	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
+		return nil, err
+	}
+
+	client, err := clientset.NewForConfig(serverConfig.LoopbackClientConfig)
+	if err != nil {
+		return nil, err
+	}
+	informerFactory := informers.NewSharedInformerFactory(client, serverConfig.LoopbackClientConfig.Timeout)
+	admissionInitializer, err := wardleinitializer.New(informerFactory)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := o.Admission.ApplyTo(&serverConfig.Config, serverConfig.SharedInformerFactory, admissionInitializer); err != nil {
 		return nil, err
 	}
 
 	config := &apiserver.Config{
 		GenericConfig: serverConfig,
+		ExtraConfig:   apiserver.ExtraConfig{},
 	}
 	return config, nil
 }
@@ -111,5 +140,11 @@ func (o WardleServerOptions) RunWardleServer(stopCh <-chan struct{}) error {
 	if err != nil {
 		return err
 	}
+
+	server.GenericAPIServer.AddPostStartHook("start-sample-server-informers", func(context genericapiserver.PostStartHookContext) error {
+		config.GenericConfig.SharedInformerFactory.Start(context.StopCh)
+		return nil
+	})
+
 	return server.GenericAPIServer.PrepareRun().Run(stopCh)
 }

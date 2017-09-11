@@ -1,0 +1,5 @@
+Gotty is a library written in Go that determines and reads termcap database
+files to produce an interface for interacting with the capabilities of a
+terminal.
+See the godoc documentation or the source code for more information about
+function usage.

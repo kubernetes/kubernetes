@@ -22,7 +22,6 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/event"
 )
 
@@ -50,8 +49,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter, ttl uint64) *REST {
 		TTLFunc: func(runtime.Object, uint64, bool) (uint64, error) {
 			return ttl, nil
 		},
-		QualifiedResource: resource,
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource(resource.Resource),
+		DefaultQualifiedResource: resource,
 
 		CreateStrategy: event.Strategy,
 		UpdateStrategy: event.Strategy,

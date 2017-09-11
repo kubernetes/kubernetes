@@ -35,4 +35,5 @@ spec:
   - 'downwardAPI'
   - 'configMap'
   - 'persistentVolumeClaim'
+  - 'projected'
 

@@ -17,15 +17,9 @@ limitations under the License.
 package resourcequota
 
 import (
-	"fmt"
-
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -98,27 +92,4 @@ func (resourcequotaStatusStrategy) PrepareForUpdate(ctx genericapirequest.Contex
 
 func (resourcequotaStatusStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateResourceQuotaStatusUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	resourcequotaObj, ok := obj.(*api.ResourceQuota)
-	if !ok {
-		return nil, nil, fmt.Errorf("not a resourcequota")
-	}
-	return labels.Set(resourcequotaObj.Labels), ResourceQuotaToSelectableFields(resourcequotaObj), nil
-}
-
-// MatchResourceQuota returns a generic matcher for a given label and field selector.
-func MatchResourceQuota(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
-}
-
-// ResourceQuotaToSelectableFields returns a field set that represents the object
-func ResourceQuotaToSelectableFields(resourcequota *api.ResourceQuota) fields.Set {
-	return generic.ObjectMetaFieldsSet(&resourcequota.ObjectMeta, true)
 }

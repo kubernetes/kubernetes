@@ -14,14 +14,12 @@ go_library(
         "deep_equal.go",
         "type.go",
     ],
-    tags = ["automanaged"],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["deep_equal_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 filegroup(

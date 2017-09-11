@@ -35,7 +35,9 @@ type GeneratorParam struct {
 	Required bool
 }
 
-// Generator is an interface for things that can generate API objects from input parameters.
+// Generator is an interface for things that can generate API objects from input
+// parameters. One example is the "expose" generator that is capable of exposing
+// new replication controllers and services, among other things.
 type Generator interface {
 	// Generate creates an API object given a set of parameters
 	Generate(params map[string]interface{}) (runtime.Object, error)
@@ -157,6 +159,12 @@ func ParseProtocols(protocols interface{}) (map[string]string, error) {
 		if len(portProtocol) != 2 {
 			return nil, fmt.Errorf("unexpected port protocol mapping: %s", protocolsSlice[ix])
 		}
+		if len(portProtocol[0]) == 0 {
+			return nil, fmt.Errorf("unexpected empty port")
+		}
+		if len(portProtocol[1]) == 0 {
+			return nil, fmt.Errorf("unexpected empty protocol")
+		}
 		portProtocolMap[portProtocol[0]] = portProtocol[1]
 	}
 	return portProtocolMap, nil
@@ -185,6 +193,9 @@ func ParseLabels(labelSpec interface{}) (map[string]string, error) {
 		labelSpec := strings.Split(labelSpecs[ix], "=")
 		if len(labelSpec) != 2 {
 			return nil, fmt.Errorf("unexpected label spec: %s", labelSpecs[ix])
+		}
+		if len(labelSpec[0]) == 0 {
+			return nil, fmt.Errorf("unexpected empty label key")
 		}
 		labels[labelSpec[0]] = labelSpec[1]
 	}

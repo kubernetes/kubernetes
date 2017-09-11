@@ -16,6 +16,15 @@ if test -z "$GOARCH" -o -z "$GOOS"; then
 	exit 1
 fi
 
+# Check that we are using the new build system if we should
+if [[ "$GOOS" -eq "linux" ]] && [[ "$GOARCH" != "sparc64" ]]; then
+	if [[ "$GOLANG_SYS_BUILD" -ne "docker" ]]; then
+		echo 1>&2 "In the new build system, mkerrors should not be called directly."
+		echo 1>&2 "See README.md"
+		exit 1
+	fi
+fi
+
 CC=${CC:-cc}
 
 if [[ "$GOOS" -eq "solaris" ]]; then
@@ -36,6 +45,7 @@ includes_Darwin='
 #include <sys/sockio.h>
 #include <sys/sysctl.h>
 #include <sys/mman.h>
+#include <sys/mount.h>
 #include <sys/wait.h>
 #include <net/bpf.h>
 #include <net/if.h>
@@ -66,6 +76,7 @@ includes_DragonFly='
 '
 
 includes_FreeBSD='
+#include <sys/capability.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/event.h>
@@ -102,8 +113,39 @@ includes_Linux='
 #endif
 #define _GNU_SOURCE
 
+// <sys/ioctl.h> is broken on powerpc64, as it fails to include definitions of
+// these structures. We just include them copied from <bits/termios.h>.
+#if defined(__powerpc__)
+struct sgttyb {
+        char    sg_ispeed;
+        char    sg_ospeed;
+        char    sg_erase;
+        char    sg_kill;
+        short   sg_flags;
+};
+
+struct tchars {
+        char    t_intrc;
+        char    t_quitc;
+        char    t_startc;
+        char    t_stopc;
+        char    t_eofc;
+        char    t_brkc;
+};
+
+struct ltchars {
+        char    t_suspc;
+        char    t_dsuspc;
+        char    t_rprntc;
+        char    t_flushc;
+        char    t_werasc;
+        char    t_lnextc;
+};
+#endif
+
 #include <bits/sockaddr.h>
 #include <sys/epoll.h>
+#include <sys/eventfd.h>
 #include <sys/inotify.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -113,20 +155,34 @@ includes_Linux='
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/socket.h>
+#include <sys/xattr.h>
 #include <linux/if.h>
+#include <linux/if_alg.h>
 #include <linux/if_arp.h>
 #include <linux/if_ether.h>
 #include <linux/if_tun.h>
 #include <linux/if_packet.h>
 #include <linux/if_addr.h>
+#include <linux/falloc.h>
 #include <linux/filter.h>
+#include <linux/fs.h>
+#include <linux/keyctl.h>
 #include <linux/netlink.h>
+#include <linux/perf_event.h>
+#include <linux/random.h>
 #include <linux/reboot.h>
 #include <linux/rtnetlink.h>
 #include <linux/ptrace.h>
 #include <linux/sched.h>
+#include <linux/seccomp.h>
+#include <linux/sockios.h>
 #include <linux/wait.h>
 #include <linux/icmpv6.h>
+#include <linux/serial.h>
+#include <linux/can.h>
+#include <linux/vm_sockets.h>
+#include <linux/taskstats.h>
+#include <linux/genetlink.h>
 #include <net/route.h>
 #include <asm/termbits.h>
 
@@ -141,6 +197,21 @@ includes_Linux='
 #ifndef PTRACE_SETREGS
 #define PTRACE_SETREGS	0xd
 #endif
+
+#ifndef SOL_NETLINK
+#define SOL_NETLINK	270
+#endif
+
+#ifdef SOL_BLUETOOTH
+// SPARC includes this in /usr/include/sparc64-linux-gnu/bits/socket.h
+// but it is already in bluetooth_linux.go
+#undef SOL_BLUETOOTH
+#endif
+
+// Certain constants are missing from the fs/crypto UAPI
+#define FS_KEY_DESC_PREFIX              "fscrypt:"
+#define FS_KEY_DESC_PREFIX_SIZE         8
+#define FS_MAX_KEY_SIZE                 64
 '
 
 includes_NetBSD='
@@ -304,15 +375,16 @@ ccflags="$@"
 		$2 ~ /^IN_/ ||
 		$2 ~ /^LOCK_(SH|EX|NB|UN)$/ ||
 		$2 ~ /^(AF|SOCK|SO|SOL|IPPROTO|IP|IPV6|ICMP6|TCP|EVFILT|NOTE|EV|SHUT|PROT|MAP|PACKET|MSG|SCM|MCL|DT|MADV|PR)_/ ||
+		$2 ~ /^FALLOC_/ ||
 		$2 == "ICMPV6_FILTER" ||
 		$2 == "SOMAXCONN" ||
 		$2 == "NAME_MAX" ||
 		$2 == "IFNAMSIZ" ||
 		$2 ~ /^CTL_(MAXNAME|NET|QUERY)$/ ||
 		$2 ~ /^SYSCTL_VERS/ ||
-		$2 ~ /^(MS|MNT)_/ ||
+		$2 ~ /^(MS|MNT|UMOUNT)_/ ||
 		$2 ~ /^TUN(SET|GET|ATTACH|DETACH)/ ||
-		$2 ~ /^(O|F|FD|NAME|S|PTRACE|PT)_/ ||
+		$2 ~ /^(O|F|E?FD|NAME|S|PTRACE|PT)_/ ||
 		$2 ~ /^LINUX_REBOOT_CMD_/ ||
 		$2 ~ /^LINUX_REBOOT_MAGIC[12]$/ ||
 		$2 !~ "NLA_TYPE_MASK" &&
@@ -326,14 +398,29 @@ ccflags="$@"
 		$2 ~ /^(IFF|IFT|NET_RT|RTM|RTF|RTV|RTA|RTAX)_/ ||
 		$2 ~ /^BIOC/ ||
 		$2 ~ /^RUSAGE_(SELF|CHILDREN|THREAD)/ ||
-		$2 ~ /^RLIMIT_(AS|CORE|CPU|DATA|FSIZE|NOFILE|STACK)|RLIM_INFINITY/ ||
+		$2 ~ /^RLIMIT_(AS|CORE|CPU|DATA|FSIZE|LOCKS|MEMLOCK|MSGQUEUE|NICE|NOFILE|NPROC|RSS|RTPRIO|RTTIME|SIGPENDING|STACK)|RLIM_INFINITY/ ||
 		$2 ~ /^PRIO_(PROCESS|PGRP|USER)/ ||
 		$2 ~ /^CLONE_[A-Z_]+/ ||
 		$2 !~ /^(BPF_TIMEVAL)$/ &&
 		$2 ~ /^(BPF|DLT)_/ ||
 		$2 ~ /^CLOCK_/ ||
+		$2 ~ /^CAN_/ ||
+		$2 ~ /^CAP_/ ||
+		$2 ~ /^ALG_/ ||
+		$2 ~ /^FS_(POLICY_FLAGS|KEY_DESC|ENCRYPTION_MODE|[A-Z0-9_]+_KEY_SIZE|IOC_(GET|SET)_ENCRYPTION)/ ||
+		$2 ~ /^GRND_/ ||
+		$2 ~ /^KEY_(SPEC|REQKEY_DEFL)_/ ||
+		$2 ~ /^KEYCTL_/ ||
+		$2 ~ /^PERF_EVENT_IOC_/ ||
+		$2 ~ /^SECCOMP_MODE_/ ||
+		$2 ~ /^SPLICE_/ ||
+		$2 ~ /^(VM|VMADDR)_/ ||
+		$2 ~ /^(TASKSTATS|TS)_/ ||
+		$2 ~ /^GENL_/ ||
+		$2 ~ /^XATTR_(CREATE|REPLACE)/ ||
 		$2 !~ "WMESGLEN" &&
-		$2 ~ /^W[A-Z0-9]+$/ {printf("\t%s = C.%s\n", $2, $2)}
+		$2 ~ /^W[A-Z0-9]+$/ ||
+		$2 ~ /^BLK[A-Z]*(GET$|SET$|BUF$|PART$|SIZE)/ {printf("\t%s = C.%s\n", $2, $2)}
 		$2 ~ /^__WCOREFLAG$/ {next}
 		$2 ~ /^__W[A-Z0-9]+$/ {printf("\t%s = C.%s\n", substr($2,3), $2)}
 
@@ -368,7 +455,7 @@ echo '#include <signal.h>' | $CC -x c - -E -dM $ccflags |
 	sort >_signal.grep
 
 echo '// mkerrors.sh' "$@"
-echo '// MACHINE GENERATED BY THE COMMAND ABOVE; DO NOT EDIT'
+echo '// Code generated by the command above; see README.md. DO NOT EDIT.'
 echo
 echo "// +build ${GOARCH},${GOOS}"
 echo
@@ -430,7 +517,7 @@ intcmp(const void *a, const void *b)
 int
 main(void)
 {
-	int i, j, e;
+	int i, e;
 	char buf[1024], *p;
 
 	printf("\n\n// Error table\n");
@@ -447,7 +534,7 @@ main(void)
 		printf("\t%d: \"%s\",\n", e, buf);
 	}
 	printf("}\n\n");
-	
+
 	printf("\n\n// Signal table\n");
 	printf("var signals = [...]string {\n");
 	qsort(signals, nelem(signals), sizeof signals[0], intcmp);

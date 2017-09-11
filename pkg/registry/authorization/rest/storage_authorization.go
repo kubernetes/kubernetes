@@ -17,6 +17,8 @@ limitations under the License.
 package rest
 
 import (
+	authorizationv1 "k8s.io/api/authorization/v1"
+	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -24,15 +26,15 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/authorization"
-	authorizationv1 "k8s.io/kubernetes/pkg/apis/authorization/v1"
-	authorizationv1beta1 "k8s.io/kubernetes/pkg/apis/authorization/v1beta1"
 	"k8s.io/kubernetes/pkg/registry/authorization/localsubjectaccessreview"
 	"k8s.io/kubernetes/pkg/registry/authorization/selfsubjectaccessreview"
+	"k8s.io/kubernetes/pkg/registry/authorization/selfsubjectrulesreview"
 	"k8s.io/kubernetes/pkg/registry/authorization/subjectaccessreview"
 )
 
 type RESTStorageProvider struct {
-	Authorizer authorizer.Authorizer
+	Authorizer   authorizer.Authorizer
+	RuleResolver authorizer.RuleResolver
 }
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
@@ -41,6 +43,8 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 	}
 
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(authorization.GroupName, api.Registry, api.Scheme, api.ParameterCodec, api.Codecs)
+	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
+	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(authorizationv1beta1.SchemeGroupVersion) {
 		apiGroupInfo.VersionedResourcesStorageMap[authorizationv1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
@@ -68,6 +72,9 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("localsubjectaccessreviews")) {
 		storage["localsubjectaccessreviews"] = localsubjectaccessreview.NewREST(p.Authorizer)
 	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("selfsubjectrulesreviews")) {
+		storage["selfsubjectrulesreviews"] = selfsubjectrulesreview.NewREST(p.RuleResolver)
+	}
 
 	return storage
 }
@@ -84,6 +91,9 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("localsubjectaccessreviews")) {
 		storage["localsubjectaccessreviews"] = localsubjectaccessreview.NewREST(p.Authorizer)
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("selfsubjectrulesreviews")) {
+		storage["selfsubjectrulesreviews"] = selfsubjectrulesreview.NewREST(p.RuleResolver)
 	}
 
 	return storage

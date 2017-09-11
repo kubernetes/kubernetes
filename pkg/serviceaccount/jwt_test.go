@@ -17,17 +17,15 @@ limitations under the License.
 package serviceaccount_test
 
 import (
-	"io/ioutil"
-	"os"
 	"reflect"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
-	"k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/pkg/api/v1"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
+	certutil "k8s.io/client-go/util/cert"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
@@ -107,87 +105,14 @@ X2i8uIp/C/ASqiIGUeeKQtX0/IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
 -----END PUBLIC KEY-----`
 
 func getPrivateKey(data string) interface{} {
-	key, _ := cert.ParsePrivateKeyPEM([]byte(data))
+	key, _ := certutil.ParsePrivateKeyPEM([]byte(data))
 	return key
 }
 
 func getPublicKey(data string) interface{} {
-	keys, _ := serviceaccount.ReadPublicKeysFromPEM([]byte(data))
+	keys, _ := certutil.ParsePublicKeysPEM([]byte(data))
 	return keys[0]
 }
-func TestReadPrivateKey(t *testing.T) {
-	f, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatalf("error creating tmpfile: %v", err)
-	}
-	defer os.Remove(f.Name())
-
-	if _, err := serviceaccount.ReadPrivateKey(f.Name()); err == nil {
-		t.Fatalf("Expected error reading key from empty file, got none")
-	}
-
-	if err := ioutil.WriteFile(f.Name(), []byte(rsaPrivateKey), os.FileMode(0600)); err != nil {
-		t.Fatalf("error writing private key to tmpfile: %v", err)
-	}
-	if _, err := serviceaccount.ReadPrivateKey(f.Name()); err != nil {
-		t.Fatalf("error reading private RSA key: %v", err)
-	}
-
-	if err := ioutil.WriteFile(f.Name(), []byte(ecdsaPrivateKey), os.FileMode(0600)); err != nil {
-		t.Fatalf("error writing private key to tmpfile: %v", err)
-	}
-	if _, err := serviceaccount.ReadPrivateKey(f.Name()); err != nil {
-		t.Fatalf("error reading private ECDSA key: %v", err)
-	}
-
-	if err := ioutil.WriteFile(f.Name(), []byte(ecdsaPrivateKeyWithParams), os.FileMode(0600)); err != nil {
-		t.Fatalf("error writing private key to tmpfile: %v", err)
-	}
-	if _, err := serviceaccount.ReadPrivateKey(f.Name()); err != nil {
-		t.Fatalf("error reading private ECDSA key with params: %v", err)
-	}
-}
-
-func TestReadPublicKeys(t *testing.T) {
-	f, err := ioutil.TempFile("", "")
-	if err != nil {
-		t.Fatalf("error creating tmpfile: %v", err)
-	}
-	defer os.Remove(f.Name())
-
-	if _, err := serviceaccount.ReadPublicKeys(f.Name()); err == nil {
-		t.Fatalf("Expected error reading keys from empty file, got none")
-	}
-
-	if err := ioutil.WriteFile(f.Name(), []byte(rsaPublicKey), os.FileMode(0600)); err != nil {
-		t.Fatalf("error writing public key to tmpfile: %v", err)
-	}
-	if keys, err := serviceaccount.ReadPublicKeys(f.Name()); err != nil {
-		t.Fatalf("error reading RSA public key: %v", err)
-	} else if len(keys) != 1 {
-		t.Fatalf("expected 1 key, got %d", len(keys))
-	}
-
-	if err := ioutil.WriteFile(f.Name(), []byte(ecdsaPublicKey), os.FileMode(0600)); err != nil {
-		t.Fatalf("error writing public key to tmpfile: %v", err)
-	}
-	if keys, err := serviceaccount.ReadPublicKeys(f.Name()); err != nil {
-		t.Fatalf("error reading ECDSA public key: %v", err)
-	} else if len(keys) != 1 {
-		t.Fatalf("expected 1 key, got %d", len(keys))
-	}
-
-	if err := ioutil.WriteFile(f.Name(), []byte(rsaPublicKey+"\n"+ecdsaPublicKey), os.FileMode(0600)); err != nil {
-		t.Fatalf("error writing public key to tmpfile: %v", err)
-	}
-	if keys, err := serviceaccount.ReadPublicKeys(f.Name()); err != nil {
-		t.Fatalf("error reading combined RSA/ECDSA public key file: %v", err)
-	} else if len(keys) != 2 {
-		t.Fatalf("expected 2 keys, got %d", len(keys))
-	}
-
-}
-
 func TestTokenGenerateAndValidate(t *testing.T) {
 	expectedUserName := "system:serviceaccount:test:my-service-account"
 	expectedUserUID := "12345"

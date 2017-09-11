@@ -89,6 +89,48 @@ func findDisk(wwn, lun string, io ioHandler) (string, string) {
 	return "", ""
 }
 
+// given a wwid, find the device and associated devicemapper parent
+func findDiskWWIDs(wwid string, io ioHandler) (string, string) {
+	// Example wwid format:
+	//   3600508b400105e210000900000490000
+	//   <VENDOR NAME> <IDENTIFIER NUMBER>
+	// Example of symlink under by-id:
+	//   /dev/by-id/scsi-3600508b400105e210000900000490000
+	//   /dev/by-id/scsi-<VENDOR NAME>_<IDENTIFIER NUMBER>
+	// The wwid could contain white space and it will be replaced
+	// underscore when wwid is exposed under /dev/by-id.
+
+	fc_path := "scsi-" + wwid
+	dev_id := "/dev/disk/by-id/"
+	if dirs, err := io.ReadDir(dev_id); err == nil {
+		for _, f := range dirs {
+			name := f.Name()
+			if name == fc_path {
+				disk, err := io.EvalSymlinks(dev_id + name)
+				if err != nil {
+					glog.V(2).Infof("fc: failed to find a corresponding disk from symlink[%s], error %v", dev_id+name, err)
+					return "", ""
+				}
+				arr := strings.Split(disk, "/")
+				l := len(arr) - 1
+				dev := arr[l]
+				dm := findMultipathDeviceMapper(dev, io)
+				return disk, dm
+			}
+		}
+	}
+	glog.V(2).Infof("fc: failed to find a disk [%s]", dev_id+fc_path)
+	return "", ""
+}
+
+// Removes a scsi device based upon /dev/sdX name
+func removeFromScsiSubsystem(deviceName string, io ioHandler) {
+	fileName := "/sys/block/" + deviceName + "/device/delete"
+	glog.V(4).Infof("fc: remove device from scsi-subsystem: path: %s", fileName)
+	data := []byte("1")
+	io.WriteFile(fileName, data, 0666)
+}
+
 // rescan scsi bus
 func scsiHostRescan(io ioHandler) {
 	scsi_path := "/sys/class/scsi_host/"
@@ -102,27 +144,46 @@ func scsiHostRescan(io ioHandler) {
 }
 
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/pod/fc/target-lun-0
-func makePDNameInternal(host volume.VolumeHost, wwns []string, lun string) string {
-	return path.Join(host.GetPluginDir(fcPluginName), wwns[0]+"-lun-"+lun)
+func makePDNameInternal(host volume.VolumeHost, wwns []string, lun string, wwids []string) string {
+	if len(wwns) != 0 {
+		return path.Join(host.GetPluginDir(fcPluginName), wwns[0]+"-lun-"+lun)
+	} else {
+		return path.Join(host.GetPluginDir(fcPluginName), wwids[0])
+	}
 }
 
 type FCUtil struct{}
 
 func (util *FCUtil) MakeGlobalPDName(fc fcDisk) string {
-	return makePDNameInternal(fc.plugin.host, fc.wwns, fc.lun)
+	return makePDNameInternal(fc.plugin.host, fc.wwns, fc.lun, fc.wwids)
 }
 
-func searchDisk(wwns []string, lun string, io ioHandler) (string, string) {
-	disk := ""
-	dm := ""
+func searchDisk(b fcDiskMounter) (string, string) {
+	var diskIds []string
+	var disk string
+	var dm string
+	io := b.io
+	wwids := b.wwids
+	wwns := b.wwns
+	lun := b.lun
+
+	if len(wwns) != 0 {
+		diskIds = wwns
+	} else {
+		diskIds = wwids
+	}
 
 	rescaned := false
 	// two-phase search:
 	// first phase, search existing device path, if a multipath dm is found, exit loop
 	// otherwise, in second phase, rescan scsi bus and search again, return with any findings
 	for true {
-		for _, wwn := range wwns {
-			disk, dm = findDisk(wwn, lun, io)
+		for _, diskId := range diskIds {
+			if len(wwns) != 0 {
+				disk, dm = findDisk(diskId, lun, io)
+			} else {
+				disk, dm = findDiskWWIDs(diskId, io)
+			}
 			// if multipath device is found, break
 			if dm != "" {
 				break
@@ -140,15 +201,14 @@ func searchDisk(wwns []string, lun string, io ioHandler) (string, string) {
 	return disk, dm
 }
 
-func (util *FCUtil) AttachDisk(b fcDiskMounter) error {
+func (util *FCUtil) AttachDisk(b fcDiskMounter) (string, error) {
 	devicePath := ""
-	wwns := b.wwns
-	lun := b.lun
-	io := b.io
-	disk, dm := searchDisk(wwns, lun, io)
+	var disk, dm string
+
+	disk, dm = searchDisk(b)
 	// if no disk matches input wwn and lun, exit
 	if disk == "" && dm == "" {
-		return fmt.Errorf("no fc disk found")
+		return "", fmt.Errorf("no fc disk found")
 	}
 
 	// if multipath devicemapper device is found, use it; otherwise use raw disk
@@ -158,28 +218,32 @@ func (util *FCUtil) AttachDisk(b fcDiskMounter) error {
 		devicePath = disk
 	}
 	// mount it
-	globalPDPath := b.manager.MakeGlobalPDName(*b.fcDisk)
+	globalPDPath := util.MakeGlobalPDName(*b.fcDisk)
 	noMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
 	if !noMnt {
 		glog.Infof("fc: %s already mounted", globalPDPath)
-		return nil
+		return devicePath, nil
 	}
 
 	if err := os.MkdirAll(globalPDPath, 0750); err != nil {
-		return fmt.Errorf("fc: failed to mkdir %s, error", globalPDPath)
+		return devicePath, fmt.Errorf("fc: failed to mkdir %s, error", globalPDPath)
 	}
 
 	err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil)
 	if err != nil {
-		return fmt.Errorf("fc: failed to mount fc volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
+		return devicePath, fmt.Errorf("fc: failed to mount fc volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
 	}
 
-	return err
+	return devicePath, err
 }
 
-func (util *FCUtil) DetachDisk(c fcDiskUnmounter, mntPath string) error {
-	if err := c.mounter.Unmount(mntPath); err != nil {
-		return fmt.Errorf("fc detach disk: failed to unmount: %s\nError: %v", mntPath, err)
+func (util *FCUtil) DetachDisk(c fcDiskUnmounter, devName string) error {
+	// Remove scsi device from the node.
+	if !strings.HasPrefix(devName, "/dev/") {
+		return fmt.Errorf("fc detach disk: invalid device name: %s", devName)
 	}
+	arr := strings.Split(devName, "/")
+	dev := arr[len(arr)-1]
+	removeFromScsiSubsystem(dev, c.io)
 	return nil
 }

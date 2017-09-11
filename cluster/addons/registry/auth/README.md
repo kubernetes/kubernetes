@@ -83,7 +83,7 @@ Setup proxy or port-forwarding to the kube-registry. Image push/pull should fail
 
 ### Configure Nodes to Authenticate with Kube-Registry
 
-By default, nodes assume no authentication is required by kube-registry. Without authentication, nodes cannot pull images from kube-registry. To solve this, more documentation can be found [Here](https://github.com/kubernetes/kubernetes/blob/master/docs/user-guide/images.md#configuring-nodes-to-authenticate-to-a-private-repository)
+By default, nodes assume no authentication is required by kube-registry. Without authentication, nodes cannot pull images from kube-registry. To solve this, more documentation can be found [Here](https://github.com/kubernetes/kubernetes.github.io/blob/master/docs/concepts/containers/images.md#configuring-nodes-to-authenticate-to-a-private-repository).
 
 
 

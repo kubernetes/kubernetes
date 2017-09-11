@@ -17,8 +17,8 @@ limitations under the License.
 package v1beta1
 
 import (
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.
@@ -92,14 +92,15 @@ type ClusterStatus struct {
 	Region string `json:"region,omitempty" protobuf:"bytes,6,opt,name=region"`
 }
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +genclient:nonNamespaced
 
 // Information about a registered cluster in a federated kubernetes setup. Clusters are not namespaced and have unique names in the federation.
 type Cluster struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -111,11 +112,13 @@ type Cluster struct {
 	Status ClusterStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // A list of all the kubernetes clusters registered to the federation
 type ClusterList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -123,7 +126,36 @@ type ClusterList struct {
 	Items []Cluster `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// Expressed as value of annotation for selecting the clusters on which a resource is created.
+type ClusterSelector []ClusterSelectorRequirement
+
+// ClusterSelectorRequirement contains values, a key, and an operator that relates the key and values.
+// The zero value of ClusterSelectorRequirement is invalid.
+// ClusterSelectorRequirement implements both set based match and exact match
+type ClusterSelectorRequirement struct {
+	// +patchMergeKey=key
+	// +patchStrategy=merge
+	Key string `json:"key" patchStrategy:"merge" patchMergeKey:"key" protobuf:"bytes,1,opt,name=key"`
+	// The Operator defines how the Key is matched to the Values. One of "in", "notin",
+	// "exists", "!", "=", "!=", "gt" or "lt".
+	Operator string `json:"operator" protobuf:"bytes,2,opt,name=operator"`
+	// An array of string values. If the operator is "in" or "notin",
+	// the values array must be non-empty. If the operator is "exists" or "!",
+	// the values array must be empty. If the operator is "gt" or "lt", the values
+	// array must have a single element, which will be interpreted as an integer.
+	// This array is replaced during a strategic merge patch.
+	// +optional
+	Values []string `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
+}
+
 const (
 	// FederationNamespaceSystem is the system namespace where we place federation control plane components.
 	FederationNamespaceSystem string = "federation-system"
+
+	// FederationClusterSelectorAnnotation is used to determine placement of objects on federated clusters
+	FederationClusterSelectorAnnotation string = "federation.alpha.kubernetes.io/cluster-selector"
+
+	// FederationOnlyClusterSelector is the cluster selector to indicate any object in
+	// federation having this annotation should not be synced to federated clusters.
+	FederationOnlyClusterSelector string = "federation.kubernetes.io/federation-control-plane=true"
 )

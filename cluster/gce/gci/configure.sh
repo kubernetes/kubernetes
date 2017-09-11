@@ -110,39 +110,155 @@ function download-or-bust {
   done
 }
 
+function is-preloaded {
+  local -r key=$1
+  local -r value=$2
+  grep -qs "${key},${value}" "${KUBE_HOME}/preload_info"
+}
+
 function split-commas {
   echo $1 | tr "," "\n"
 }
 
 function install-gci-mounter-tools {
   CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
+  local -r mounter_tar_sha="8003b798cf33c7f91320cd6ee5cec4fa22244571"
+  if is-preloaded "mounter" "${mounter_tar_sha}"; then
+    echo "mounter is preloaded."
+    return
+  fi
+
+  echo "Downloading gci mounter tools."
   mkdir -p "${CONTAINERIZED_MOUNTER_HOME}"
   chmod a+x "${CONTAINERIZED_MOUNTER_HOME}"
   mkdir -p "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
-  local -r mounter_tar_sha="8003b798cf33c7f91320cd6ee5cec4fa22244571"
   download-or-bust "${mounter_tar_sha}" "https://storage.googleapis.com/kubernetes-release/gci-mounter/mounter.tar"
-  cp "${dst_dir}/kubernetes/gci-trusty/gci-mounter" "${CONTAINERIZED_MOUNTER_HOME}/mounter"
+  cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/gci-mounter" "${CONTAINERIZED_MOUNTER_HOME}/mounter"
   chmod a+x "${CONTAINERIZED_MOUNTER_HOME}/mounter"
   mv "${KUBE_HOME}/mounter.tar" /tmp/mounter.tar
-  tar xvf /tmp/mounter.tar -C "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
+  tar xf /tmp/mounter.tar -C "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
   rm /tmp/mounter.tar
   mkdir -p "${CONTAINERIZED_MOUNTER_HOME}/rootfs/var/lib/kubelet"
 }
 
 # Install node problem detector binary.
 function install-node-problem-detector {
-  local -r npd_version="v0.3.0"
-  local -r npd_sha1="2e6423c5798e14464271d9c944e56a637ee5a4bc"
+  if [[ -n "${NODE_PROBLEM_DETECTOR_VERSION:-}" ]]; then
+      local -r npd_version="${NODE_PROBLEM_DETECTOR_VERSION}"
+      local -r npd_sha1="${NODE_PROBLEM_DETECTOR_TAR_HASH}"
+  else
+      local -r npd_version="v0.4.1"
+      local -r npd_sha1="a57a3fe64cab8a18ec654f5cef0aec59dae62568"
+  fi
+
+  if is-preloaded "node-problem-detector" "${npd_sha1}"; then
+    echo "node-problem-detector is preloaded."
+    return
+  fi
+
+  echo "Downloading node problem detector."
   local -r npd_release_path="https://storage.googleapis.com/kubernetes-release"
   local -r npd_tar="node-problem-detector-${npd_version}.tar.gz"
   download-or-bust "${npd_sha1}" "${npd_release_path}/node-problem-detector/${npd_tar}"
   local -r npd_dir="${KUBE_HOME}/node-problem-detector"
   mkdir -p "${npd_dir}"
   tar xzf "${KUBE_HOME}/${npd_tar}" -C "${npd_dir}" --overwrite
-  mv "${npd_dir}/bin"/* "${KUBE_HOME}/bin"
-  chmod a+x "${KUBE_HOME}/bin/node-problem-detector"
+  mv "${npd_dir}/bin"/* "${KUBE_BIN}"
+  chmod a+x "${KUBE_BIN}/node-problem-detector"
   rmdir "${npd_dir}/bin"
   rm -f "${KUBE_HOME}/${npd_tar}"
+}
+
+function install-cni-binaries {
+  #TODO(andyzheng0831): We should make the cni version number as a k8s env variable.
+  local -r cni_tar="cni-0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff.tar.gz"
+  local -r cni_sha1="1d9788b0f5420e1a219aad2cb8681823fc515e7c"
+  if is-preloaded "${cni_tar}" "${cni_sha1}"; then
+    echo "${cni_tar} is preloaded."
+    return
+  fi
+
+  echo "Downloading cni binaries"
+  download-or-bust "${cni_sha1}" "https://storage.googleapis.com/kubernetes-release/network-plugins/${cni_tar}"
+  local -r cni_dir="${KUBE_HOME}/cni"
+  mkdir -p "${cni_dir}"
+  tar xzf "${KUBE_HOME}/${cni_tar}" -C "${cni_dir}" --overwrite
+  mv "${cni_dir}/bin"/* "${KUBE_BIN}"
+  rmdir "${cni_dir}/bin"
+  rm -f "${KUBE_HOME}/${cni_tar}"
+}
+
+function install-kube-manifests {
+  # Put kube-system pods manifests in ${KUBE_HOME}/kube-manifests/.
+  local dst_dir="${KUBE_HOME}/kube-manifests"
+  mkdir -p "${dst_dir}"
+  local -r manifests_tar_urls=( $(split-commas "${KUBE_MANIFESTS_TAR_URL}") )
+  local -r manifests_tar="${manifests_tar_urls[0]##*/}"
+  if [ -n "${KUBE_MANIFESTS_TAR_HASH:-}" ]; then
+    local -r manifests_tar_hash="${KUBE_MANIFESTS_TAR_HASH}"
+  else
+    echo "Downloading k8s manifests sha1 (not found in env)"
+    download-or-bust "" "${manifests_tar_urls[@]/.tar.gz/.tar.gz.sha1}"
+    local -r manifests_tar_hash=$(cat "${manifests_tar}.sha1")
+  fi
+
+  if is-preloaded "${manifests_tar}" "${manifests_tar_hash}"; then
+    echo "${manifests_tar} is preloaded."
+    return
+  fi
+
+  echo "Downloading k8s manifests tar"
+  download-or-bust "${manifests_tar_hash}" "${manifests_tar_urls[@]}"
+  tar xzf "${KUBE_HOME}/${manifests_tar}" -C "${dst_dir}" --overwrite
+  local -r kube_addon_registry="${KUBE_ADDON_REGISTRY:-gcr.io/google_containers}"
+  if [[ "${kube_addon_registry}" != "gcr.io/google_containers" ]]; then
+    find "${dst_dir}" -name \*.yaml -or -name \*.yaml.in | \
+      xargs sed -ri "s@(image:\s.*)gcr.io/google_containers@\1${kube_addon_registry}@"
+    find "${dst_dir}" -name \*.manifest -or -name \*.json | \
+      xargs sed -ri "s@(image\":\s+\")gcr.io/google_containers@\1${kube_addon_registry}@"
+  fi
+  cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_BIN}/configure-helper.sh"
+  cp "${dst_dir}/kubernetes/gci-trusty/health-monitor.sh" "${KUBE_BIN}/health-monitor.sh"
+
+  rm -f "${KUBE_HOME}/${manifests_tar}"
+  rm -f "${KUBE_HOME}/${manifests_tar}.sha1"
+}
+
+# A helper function for loading a docker image. It keeps trying up to 5 times.
+#
+# $1: Full path of the docker image
+function try-load-docker-image {
+  local -r img=$1
+  echo "Try to load docker image file ${img}"
+  # Temporarily turn off errexit, because we don't want to exit on first failure.
+  set +e
+  local -r max_attempts=5
+  local -i attempt_num=1
+  until timeout 30 docker load -i "${img}"; do
+    if [[ "${attempt_num}" == "${max_attempts}" ]]; then
+      echo "Fail to load docker image file ${img} after ${max_attempts} retries. Exit!!"
+      exit 1
+    else
+      attempt_num=$((attempt_num+1))
+      sleep 5
+    fi
+  done
+  # Re-enable errexit.
+  set -e
+}
+
+# Loads kube-system docker images. It is better to do it before starting kubelet,
+# as kubelet will restart docker daemon, which may interfere with loading images.
+function load-docker-images {
+  echo "Start loading kube-system docker images"
+  local -r img_dir="${KUBE_HOME}/kube-docker-files"
+  if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
+    try-load-docker-image "${img_dir}/kube-apiserver.tar"
+    try-load-docker-image "${img_dir}/kube-controller-manager.tar"
+    try-load-docker-image "${img_dir}/kube-scheduler.tar"
+  else
+    try-load-docker-image "${img_dir}/kube-proxy.tar"
+  fi
 }
 
 # Downloads kubernetes binaries and kube-system manifest tarball, unpacks them,
@@ -158,87 +274,62 @@ function install-kube-binary-config {
     download-or-bust "" "${server_binary_tar_urls[@]/.tar.gz/.tar.gz.sha1}"
     local -r server_binary_tar_hash=$(cat "${server_binary_tar}.sha1")
   fi
-  echo "Downloading binary release tar"
-  download-or-bust "${server_binary_tar_hash}" "${server_binary_tar_urls[@]}"
-  tar xzf "${KUBE_HOME}/${server_binary_tar}" -C "${KUBE_HOME}" --overwrite
-  # Copy docker_tag and image files to ${KUBE_HOME}/kube-docker-files.
-  src_dir="${KUBE_HOME}/kubernetes/server/bin"
-  dst_dir="${KUBE_HOME}/kube-docker-files"
-  mkdir -p "${dst_dir}"
-  cp "${src_dir}/"*.docker_tag "${dst_dir}"
-  if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
-    cp "${src_dir}/kube-proxy.tar" "${dst_dir}"
-    if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-      install-node-problem-detector
-    fi
+
+  if is-preloaded "${server_binary_tar}" "${server_binary_tar_hash}"; then
+    echo "${server_binary_tar} is preloaded."
   else
-    cp "${src_dir}/kube-apiserver.tar" "${dst_dir}"
-    cp "${src_dir}/kube-controller-manager.tar" "${dst_dir}"
-    cp "${src_dir}/kube-scheduler.tar" "${dst_dir}"
-    cp -r "${KUBE_HOME}/kubernetes/addons" "${dst_dir}"
+    echo "Downloading binary release tar"
+    download-or-bust "${server_binary_tar_hash}" "${server_binary_tar_urls[@]}"
+    tar xzf "${KUBE_HOME}/${server_binary_tar}" -C "${KUBE_HOME}" --overwrite
+    # Copy docker_tag and image files to ${KUBE_HOME}/kube-docker-files.
+    local -r src_dir="${KUBE_HOME}/kubernetes/server/bin"
+    local dst_dir="${KUBE_HOME}/kube-docker-files"
+    mkdir -p "${dst_dir}"
+    cp "${src_dir}/"*.docker_tag "${dst_dir}"
+    if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
+      cp "${src_dir}/kube-proxy.tar" "${dst_dir}"
+    else
+      cp "${src_dir}/kube-apiserver.tar" "${dst_dir}"
+      cp "${src_dir}/kube-controller-manager.tar" "${dst_dir}"
+      cp "${src_dir}/kube-scheduler.tar" "${dst_dir}"
+      cp -r "${KUBE_HOME}/kubernetes/addons" "${dst_dir}"
+    fi
+    load-docker-images
+    mv "${src_dir}/kubelet" "${KUBE_BIN}"
+    mv "${src_dir}/kubectl" "${KUBE_BIN}"
+
+    mv "${KUBE_HOME}/kubernetes/LICENSES" "${KUBE_HOME}"
+    mv "${KUBE_HOME}/kubernetes/kubernetes-src.tar.gz" "${KUBE_HOME}"
   fi
-  local -r kube_bin="${KUBE_HOME}/bin"
-  mv "${src_dir}/kubelet" "${kube_bin}"
-  mv "${src_dir}/kubectl" "${kube_bin}"
+
+  if [[ "${KUBERNETES_MASTER:-}" == "false" ]] && \
+     [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
+    install-node-problem-detector
+  fi
 
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]] || \
      [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
-    #TODO(andyzheng0831): We should make the cni version number as a k8s env variable.
-    local -r cni_tar="cni-0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff.tar.gz"
-    local -r cni_sha1="1d9788b0f5420e1a219aad2cb8681823fc515e7c"
-    download-or-bust "${cni_sha1}" "https://storage.googleapis.com/kubernetes-release/network-plugins/${cni_tar}"
-    local -r cni_dir="${KUBE_HOME}/cni"
-    mkdir -p "${cni_dir}"
-    tar xzf "${KUBE_HOME}/${cni_tar}" -C "${cni_dir}" --overwrite
-    mv "${cni_dir}/bin"/* "${kube_bin}"
-    rmdir "${cni_dir}/bin"
-    rm -f "${KUBE_HOME}/${cni_tar}"
+    install-cni-binaries
   fi
-
-  mv "${KUBE_HOME}/kubernetes/LICENSES" "${KUBE_HOME}"
-  mv "${KUBE_HOME}/kubernetes/kubernetes-src.tar.gz" "${KUBE_HOME}"
 
   # Put kube-system pods manifests in ${KUBE_HOME}/kube-manifests/.
-  dst_dir="${KUBE_HOME}/kube-manifests"
-  mkdir -p "${dst_dir}"
-  local -r manifests_tar_urls=( $(split-commas "${KUBE_MANIFESTS_TAR_URL}") )
-  local -r manifests_tar="${manifests_tar_urls[0]##*/}"
-  if [ -n "${KUBE_MANIFESTS_TAR_HASH:-}" ]; then
-    local -r manifests_tar_hash="${KUBE_MANIFESTS_TAR_HASH}"
-  else
-    echo "Downloading k8s manifests sha1 (not found in env)"
-    download-or-bust "" "${manifests_tar_urls[@]/.tar.gz/.tar.gz.sha1}"
-    local -r manifests_tar_hash=$(cat "${manifests_tar}.sha1")
-  fi
-  echo "Downloading k8s manifests tar"
-  download-or-bust "${manifests_tar_hash}" "${manifests_tar_urls[@]}"
-  tar xzf "${KUBE_HOME}/${manifests_tar}" -C "${dst_dir}" --overwrite
-  local -r kube_addon_registry="${KUBE_ADDON_REGISTRY:-gcr.io/google_containers}"
-  if [[ "${kube_addon_registry}" != "gcr.io/google_containers" ]]; then
-    find "${dst_dir}" -name \*.yaml -or -name \*.yaml.in | \
-      xargs sed -ri "s@(image:\s.*)gcr.io/google_containers@\1${kube_addon_registry}@"
-    find "${dst_dir}" -name \*.manifest -or -name \*.json | \
-      xargs sed -ri "s@(image\":\s+\")gcr.io/google_containers@\1${kube_addon_registry}@"
-  fi
-  cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_HOME}/bin/configure-helper.sh"
-  cp "${dst_dir}/kubernetes/gci-trusty/health-monitor.sh" "${KUBE_HOME}/bin/health-monitor.sh"
-  chmod -R 755 "${kube_bin}"
+  install-kube-manifests
+  chmod -R 755 "${KUBE_BIN}"
 
   # Install gci mounter related artifacts to allow mounting storage volumes in GCI
   install-gci-mounter-tools
-  
+
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"
   rm -f "${KUBE_HOME}/${server_binary_tar}"
   rm -f "${KUBE_HOME}/${server_binary_tar}.sha1"
-  rm -f "${KUBE_HOME}/${manifests_tar}"
-  rm -f "${KUBE_HOME}/${manifests_tar}.sha1"
 }
 
 ######### Main Function ##########
 echo "Start to install kubernetes files"
 set-broken-motd
 KUBE_HOME="/home/kubernetes"
+KUBE_BIN="${KUBE_HOME}/bin"
 download-kube-env
 source "${KUBE_HOME}/kube-env"
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
@@ -246,4 +337,3 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
 fi
 install-kube-binary-config
 echo "Done for installing kubernetes files"
-

@@ -8,10 +8,22 @@ import (
 
 var nilOptions = gophercloud.AuthOptions{}
 
-// AuthOptionsFromEnv fills out an identity.AuthOptions structure with the settings found on the various OpenStack
-// OS_* environment variables.  The following variables provide sources of truth: OS_AUTH_URL, OS_USERNAME,
-// OS_PASSWORD, OS_TENANT_ID, and OS_TENANT_NAME.  Of these, OS_USERNAME, OS_PASSWORD, and OS_AUTH_URL must
-// have settings, or an error will result.  OS_TENANT_ID and OS_TENANT_NAME are optional.
+/*
+AuthOptionsFromEnv fills out an identity.AuthOptions structure with the
+settings found on the various OpenStack OS_* environment variables.
+
+The following variables provide sources of truth: OS_AUTH_URL, OS_USERNAME,
+OS_PASSWORD, OS_TENANT_ID, and OS_TENANT_NAME.
+
+Of these, OS_USERNAME, OS_PASSWORD, and OS_AUTH_URL must have settings,
+or an error will result.  OS_TENANT_ID and OS_TENANT_NAME are optional.
+
+To use this function, first set the OS_* environment variables (for example,
+by sourcing an `openrc` file), then:
+
+	opts, err := openstack.AuthOptionsFromEnv()
+	provider, err := openstack.AuthenticatedClient(opts)
+*/
 func AuthOptionsFromEnv() (gophercloud.AuthOptions, error) {
 	authURL := os.Getenv("OS_AUTH_URL")
 	username := os.Getenv("OS_USERNAME")

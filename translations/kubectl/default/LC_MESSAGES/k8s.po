@@ -8,14 +8,14 @@ msgstr ""
 "Project-Id-Version: gettext-go-examples-hello\n"
 "Report-Msgid-Bugs-To: EMAIL\n"
 "POT-Creation-Date: 2017-03-14 21:32-0700\n"
-"PO-Revision-Date: 2017-03-14 21:34-0800\n"
+"PO-Revision-Date: 2017-05-24 18:01+0800\n"
 "Last-Translator: Brendan Burns <brendan.d.burns@gmail.com>\n"
 "Language-Team: \n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Generator: Poedit 1.6.10\n"
+"X-Generator: Poedit 1.8.12\n"
 "X-Poedit-SourceCharset: UTF-8\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
@@ -2850,18 +2850,18 @@ msgstr "Describe one or many contexts"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top_node.go#L77
 #: pkg/kubectl/cmd/top_node.go:78
-msgid "Display Resource (CPU/Memory/Storage) usage of nodes"
-msgstr "Display Resource (CPU/Memory/Storage) usage of nodes"
+msgid "Display Resource (CPU/Memory) usage of nodes"
+msgstr "Display Resource (CPU/Memory) usage of nodes"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top_pod.go#L79
 #: pkg/kubectl/cmd/top_pod.go:80
-msgid "Display Resource (CPU/Memory/Storage) usage of pods"
-msgstr "Display Resource (CPU/Memory/Storage) usage of pods"
+msgid "Display Resource (CPU/Memory) usage of pods"
+msgstr "Display Resource (CPU/Memory) usage of pods"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/top.go#L43
 #: pkg/kubectl/cmd/top.go:44
-msgid "Display Resource (CPU/Memory/Storage) usage."
-msgstr "Display Resource (CPU/Memory/Storage) usage."
+msgid "Display Resource (CPU/Memory) usage."
+msgstr "Display Resource (CPU/Memory) usage."
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/clusterinfo.go#L49
 #: pkg/kubectl/cmd/clusterinfo.go:51
@@ -3379,9 +3379,7 @@ msgstr "Update resource requests/limits on objects with pod templates"
 
 #: pkg/kubectl/cmd/annotate.go:116
 msgid "Update the annotations on a resource"
-msgstr ""
-"Update the annotations on a resourcewatch is only supported on individual "
-"resources and resource collections - %d resources were found"
+msgstr "Update the annotations on a resource"
 
 # https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/label.go#L109
 #: pkg/kubectl/cmd/label.go:114

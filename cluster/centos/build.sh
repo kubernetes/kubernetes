@@ -69,7 +69,7 @@ function unpack-releases() {
     cp ${RELEASES_DIR}/flanneld ${BINARY_DIR}/node/bin
   fi
 
-  # ectd
+  # etcd
   if [[ -f ${RELEASES_DIR}/etcd.tar.gz ]] ; then
     tar xzf ${RELEASES_DIR}/etcd.tar.gz -C ${RELEASES_DIR}
     ETCD="etcd-v${ETCD_VERSION}-linux-amd64"

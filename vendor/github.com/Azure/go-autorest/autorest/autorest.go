@@ -16,6 +16,7 @@ and Responding. A typical pattern is:
     DoRetryForAttempts(5, time.Second))
 
   err = Respond(resp,
+    ByDiscardingBody(),
     ByClosing())
 
 Each phase relies on decorators to modify and / or manage processing. Decorators may first modify

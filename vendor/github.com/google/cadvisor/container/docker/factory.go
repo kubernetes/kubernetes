@@ -41,6 +41,10 @@ import (
 )
 
 var ArgDockerEndpoint = flag.String("docker", "unix:///var/run/docker.sock", "docker endpoint")
+var ArgDockerTLS = flag.Bool("docker-tls", false, "use TLS to connect to docker")
+var ArgDockerCert = flag.String("docker-tls-cert", "cert.pem", "path to client certificate")
+var ArgDockerKey = flag.String("docker-tls-key", "key.pem", "path to private key")
+var ArgDockerCA = flag.String("docker-tls-ca", "ca.pem", "path to trusted CA")
 
 // The namespace under which Docker aliases are unique.
 const DockerNamespace = "docker"
@@ -84,6 +88,7 @@ const (
 	devicemapperStorageDriver storageDriver = "devicemapper"
 	aufsStorageDriver         storageDriver = "aufs"
 	overlayStorageDriver      storageDriver = "overlay"
+	overlay2StorageDriver     storageDriver = "overlay2"
 	zfsStorageDriver          storageDriver = "zfs"
 )
 
@@ -107,6 +112,7 @@ type dockerFactory struct {
 
 	ignoreMetrics container.MetricSet
 
+	thinPoolName    string
 	thinPoolWatcher *devicemapper.ThinPoolWatcher
 
 	zfsWatcher *zfs.ZfsWatcher
@@ -136,6 +142,7 @@ func (self *dockerFactory) NewContainerHandler(name string, inHostNamespace bool
 		metadataEnvs,
 		self.dockerVersion,
 		self.ignoreMetrics,
+		self.thinPoolName,
 		self.thinPoolWatcher,
 		self.zfsWatcher,
 	)
@@ -323,12 +330,18 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 		return fmt.Errorf("failed to get cgroup subsystems: %v", err)
 	}
 
-	var thinPoolWatcher *devicemapper.ThinPoolWatcher
+	var (
+		thinPoolWatcher *devicemapper.ThinPoolWatcher
+		thinPoolName    string
+	)
 	if storageDriver(dockerInfo.Driver) == devicemapperStorageDriver {
 		thinPoolWatcher, err = startThinPoolWatcher(dockerInfo)
 		if err != nil {
 			glog.Errorf("devicemapper filesystem stats will not be reported: %v", err)
 		}
+
+		status := StatusFromDockerInfo(*dockerInfo)
+		thinPoolName = status.DriverStatus[dockerutil.DriverStatusPoolName]
 	}
 
 	var zfsWatcher *zfs.ZfsWatcher
@@ -350,6 +363,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 		storageDriver:      storageDriver(dockerInfo.Driver),
 		storageDir:         RootDir(),
 		ignoreMetrics:      ignoreMetrics,
+		thinPoolName:       thinPoolName,
 		thinPoolWatcher:    thinPoolWatcher,
 		zfsWatcher:         zfsWatcher,
 	}

@@ -190,7 +190,7 @@ func TestWriteClientCAs(t *testing.T) {
 
 	for _, test := range tests {
 		client := fake.NewSimpleClientset(test.preexistingObjs...)
-		test.hook.writeClientCAs(client.Core())
+		test.hook.tryToWriteClientCAs(client.Core())
 
 		actualConfigMaps, updated := getFinalConfiMaps(client)
 		if !reflect.DeepEqual(test.expectedConfigMaps, actualConfigMaps) {

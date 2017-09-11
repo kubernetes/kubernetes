@@ -24,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 )
 
-// awsVolumeID represents the ID of the volume in the AWS API, e.g. vol-12345678a
+// awsVolumeID represents the ID of the volume in the AWS API, e.g. vol-12345678
 // The "traditional" format is "vol-12345678"
 // A new longer format is also being introduced: "vol-12345678abcdef01"
 // We should not assume anything about the length or format, though it seems

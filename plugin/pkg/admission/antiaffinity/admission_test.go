@@ -23,9 +23,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 // ensures the hard PodAntiAffinity is denied if it defines TopologyKey other than kubernetes.io/hostname.
+// TODO: Add test case "invalid topologyKey in requiredDuringSchedulingRequiredDuringExecution then admission fails"
+// after RequiredDuringSchedulingRequiredDuringExecution is implemented.
 func TestInterPodAffinityAdmission(t *testing.T) {
 	handler := NewInterPodAntiAffinity()
 	pod := api.Pod{
@@ -98,7 +101,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 									},
 								},
 							},
-							TopologyKey: metav1.LabelHostname,
+							TopologyKey: kubeletapis.LabelHostname,
 						},
 					},
 				},
@@ -120,7 +123,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 									},
 								},
 							},
-							TopologyKey: metav1.LabelHostname,
+							TopologyKey: kubeletapis.LabelHostname,
 						},
 					},
 				},
@@ -149,27 +152,6 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 			},
 			errorExpected: true,
 		},
-		// invalid topologyKey in requiredDuringSchedulingRequiredDuringExecution then admission fails.
-		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		// {
-		//         affinity: map[string]string{
-		//			api.AffinityAnnotationKey: `
-		//				{"podAntiAffinity": {
-		//					"requiredDuringSchedulingRequiredDuringExecution": [{
-		//						"labelSelector": {
-		//							"matchExpressions": [{
-		//								"key": "security",
-		//								"operator": "In",
-		//								"values":["S2"]
-		//							}]
-		//						},
-		//						"namespaces":[],
-		//						"topologyKey": " zone "
-		//					}]
-		//				}}`,
-		//			},
-		//			errorExpected: true,
-		//  }
 		// list of requiredDuringSchedulingIgnoredDuringExecution middle element topologyKey is not valid.
 		{
 			affinity: &api.Affinity{
@@ -185,7 +167,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 									},
 								},
 							},
-							TopologyKey: metav1.LabelHostname,
+							TopologyKey: kubeletapis.LabelHostname,
 						}, {
 							LabelSelector: &metav1.LabelSelector{
 								MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -207,7 +189,7 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 									},
 								},
 							},
-							TopologyKey: metav1.LabelHostname,
+							TopologyKey: kubeletapis.LabelHostname,
 						},
 					},
 				},

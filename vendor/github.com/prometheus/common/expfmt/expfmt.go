@@ -11,14 +11,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// A package for reading and writing Prometheus metrics.
+// Package expfmt contains tools for reading and writing Prometheus metrics.
 package expfmt
 
+// Format specifies the HTTP content type of the different wire protocols.
 type Format string
 
+// Constants to assemble the Content-Type values for the different wire protocols.
 const (
-	TextVersion = "0.0.4"
-
+	TextVersion   = "0.0.4"
 	ProtoType     = `application/vnd.google.protobuf`
 	ProtoProtocol = `io.prometheus.client.MetricFamily`
 	ProtoFmt      = ProtoType + "; proto=" + ProtoProtocol + ";"
@@ -29,9 +30,6 @@ const (
 	FmtProtoDelim   Format = ProtoFmt + ` encoding=delimited`
 	FmtProtoText    Format = ProtoFmt + ` encoding=text`
 	FmtProtoCompact Format = ProtoFmt + ` encoding=compact-text`
-
-	// fmtJSON2 is hidden as it is deprecated.
-	fmtJSON2 Format = `application/json; version=0.0.2`
 )
 
 const (

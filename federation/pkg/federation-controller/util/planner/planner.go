@@ -26,16 +26,16 @@ import (
 // Planner decides how many out of the given replicas should be placed in each of the
 // federated clusters.
 type Planner struct {
-	preferences *fedapi.FederatedReplicaSetPreferences
+	preferences *fedapi.ReplicaAllocationPreferences
 }
 
-type namedClusterReplicaSetPreferences struct {
+type namedClusterPreferences struct {
 	clusterName string
 	hash        uint32
-	fedapi.ClusterReplicaSetPreferences
+	fedapi.ClusterPreferences
 }
 
-type byWeight []*namedClusterReplicaSetPreferences
+type byWeight []*namedClusterPreferences
 
 func (a byWeight) Len() int      { return len(a) }
 func (a byWeight) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
@@ -46,7 +46,7 @@ func (a byWeight) Less(i, j int) bool {
 	return (a[i].Weight > a[j].Weight) || (a[i].Weight == a[j].Weight && a[i].hash < a[j].hash)
 }
 
-func NewPlanner(preferences *fedapi.FederatedReplicaSetPreferences) *Planner {
+func NewPlanner(preferences *fedapi.ReplicaAllocationPreferences) *Planner {
 	return &Planner{
 		preferences: preferences,
 	}
@@ -67,20 +67,20 @@ func NewPlanner(preferences *fedapi.FederatedReplicaSetPreferences) *Planner {
 func (p *Planner) Plan(replicasToDistribute int64, availableClusters []string, currentReplicaCount map[string]int64,
 	estimatedCapacity map[string]int64, replicaSetKey string) (map[string]int64, map[string]int64) {
 
-	preferences := make([]*namedClusterReplicaSetPreferences, 0, len(availableClusters))
+	preferences := make([]*namedClusterPreferences, 0, len(availableClusters))
 	plan := make(map[string]int64, len(preferences))
 	overflow := make(map[string]int64, len(preferences))
 
-	named := func(name string, pref fedapi.ClusterReplicaSetPreferences) *namedClusterReplicaSetPreferences {
+	named := func(name string, pref fedapi.ClusterPreferences) *namedClusterPreferences {
 		// Seems to work better than addler for our case.
 		hasher := fnv.New32()
 		hasher.Write([]byte(name))
 		hasher.Write([]byte(replicaSetKey))
 
-		return &namedClusterReplicaSetPreferences{
-			clusterName: name,
-			hash:        hasher.Sum32(),
-			ClusterReplicaSetPreferences: pref,
+		return &namedClusterPreferences{
+			clusterName:        name,
+			hash:               hasher.Sum32(),
+			ClusterPreferences: pref,
 		}
 	}
 
@@ -158,7 +158,7 @@ func (p *Planner) Plan(replicasToDistribute int64, availableClusters []string, c
 		for _, preference := range preferences {
 			weightSum += preference.Weight
 		}
-		newPreferences := make([]*namedClusterReplicaSetPreferences, 0, len(preferences))
+		newPreferences := make([]*namedClusterPreferences, 0, len(preferences))
 
 		distributeInThisLoop := remainingReplicas
 

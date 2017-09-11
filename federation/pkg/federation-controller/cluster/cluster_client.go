@@ -21,15 +21,15 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
 	federation_v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 const (
@@ -37,8 +37,7 @@ const (
 )
 
 type ClusterClient struct {
-	discoveryClient *discovery.DiscoveryClient
-	kubeClient      *clientset.Clientset
+	kubeClient *clientset.Clientset
 }
 
 func NewClusterClientSet(c *federation_v1beta1.Cluster) (*ClusterClient, error) {
@@ -48,10 +47,6 @@ func NewClusterClientSet(c *federation_v1beta1.Cluster) (*ClusterClient, error) 
 	}
 	var clusterClientSet = ClusterClient{}
 	if clusterConfig != nil {
-		clusterClientSet.discoveryClient = discovery.NewDiscoveryClientForConfigOrDie((restclient.AddUserAgent(clusterConfig, UserAgentName)))
-		if clusterClientSet.discoveryClient == nil {
-			return nil, nil
-		}
 		clusterClientSet.kubeClient = clientset.NewForConfigOrDie((restclient.AddUserAgent(clusterConfig, UserAgentName)))
 		if clusterClientSet.kubeClient == nil {
 			return nil, nil
@@ -96,7 +91,7 @@ func (self *ClusterClient) GetClusterHealthStatus() *federation_v1beta1.ClusterS
 		LastProbeTime:      currentTime,
 		LastTransitionTime: currentTime,
 	}
-	body, err := self.discoveryClient.RESTClient().Get().AbsPath("/healthz").Do().Raw()
+	body, err := self.kubeClient.DiscoveryClient.RESTClient().Get().AbsPath("/healthz").Do().Raw()
 	if err != nil {
 		clusterStatus.Conditions = append(clusterStatus.Conditions, newNodeOfflineCondition)
 	} else {
@@ -106,6 +101,15 @@ func (self *ClusterClient) GetClusterHealthStatus() *federation_v1beta1.ClusterS
 			clusterStatus.Conditions = append(clusterStatus.Conditions, newClusterReadyCondition)
 		}
 	}
+
+	zones, region, err := self.GetClusterZones()
+	if err != nil {
+		glog.Warningf("Failed to get zones and region for cluster with client %v: %v", self, err)
+	} else {
+		clusterStatus.Zones = zones
+		clusterStatus.Region = region
+	}
+
 	return &clusterStatus
 }
 
@@ -117,23 +121,23 @@ func (self *ClusterClient) GetClusterZones() (zones []string, region string, err
 // Find the name of the zone in which a Node is running
 func getZoneNameForNode(node api.Node) (string, error) {
 	for key, value := range node.Labels {
-		if key == metav1.LabelZoneFailureDomain {
+		if key == kubeletapis.LabelZoneFailureDomain {
 			return value, nil
 		}
 	}
 	return "", fmt.Errorf("Zone name for node %s not found. No label with key %s",
-		node.Name, metav1.LabelZoneFailureDomain)
+		node.Name, kubeletapis.LabelZoneFailureDomain)
 }
 
 // Find the name of the region in which a Node is running
 func getRegionNameForNode(node api.Node) (string, error) {
 	for key, value := range node.Labels {
-		if key == metav1.LabelZoneRegion {
+		if key == kubeletapis.LabelZoneRegion {
 			return value, nil
 		}
 	}
 	return "", fmt.Errorf("Region name for node %s not found. No label with key %s",
-		node.Name, metav1.LabelZoneRegion)
+		node.Name, kubeletapis.LabelZoneRegion)
 }
 
 // Find the names of all zones and the region in which we have nodes in this cluster.

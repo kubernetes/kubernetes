@@ -20,21 +20,30 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
+	"path/filepath"
 	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	// TODO: remove this import if
+	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
+	// to "v1"?
+	_ "k8s.io/kubernetes/pkg/api/install"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
@@ -42,79 +51,369 @@ import (
 )
 
 func TestMakeMounts(t *testing.T) {
-	container := v1.Container{
-		VolumeMounts: []v1.VolumeMount{
-			{
-				MountPath: "/etc/hosts",
-				Name:      "disk",
-				ReadOnly:  false,
+	bTrue := true
+	propagationHostToContainer := v1.MountPropagationHostToContainer
+	propagationBidirectional := v1.MountPropagationBidirectional
+
+	testCases := map[string]struct {
+		container      v1.Container
+		podVolumes     kubecontainer.VolumeMap
+		expectErr      bool
+		expectedErrMsg string
+		expectedMounts []kubecontainer.Mount
+	}{
+		"valid mounts in unprivileged container": {
+			podVolumes: kubecontainer.VolumeMap{
+				"disk":  kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk"}},
+				"disk4": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/host"}},
+				"disk5": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/var/lib/kubelet/podID/volumes/empty/disk5"}},
 			},
-			{
-				MountPath: "/mnt/path3",
-				Name:      "disk",
-				ReadOnly:  true,
+			container: v1.Container{
+				Name: "container1",
+				VolumeMounts: []v1.VolumeMount{
+					{
+						MountPath:        "/etc/hosts",
+						Name:             "disk",
+						ReadOnly:         false,
+						MountPropagation: &propagationHostToContainer,
+					},
+					{
+						MountPath: "/mnt/path3",
+						Name:      "disk",
+						ReadOnly:  true,
+					},
+					{
+						MountPath: "/mnt/path4",
+						Name:      "disk4",
+						ReadOnly:  false,
+					},
+					{
+						MountPath: "/mnt/path5",
+						Name:      "disk5",
+						ReadOnly:  false,
+					},
+				},
 			},
-			{
-				MountPath: "/mnt/path4",
-				Name:      "disk4",
-				ReadOnly:  false,
+			expectedMounts: []kubecontainer.Mount{
+				{
+					Name:           "disk",
+					ContainerPath:  "/etc/hosts",
+					HostPath:       "/mnt/disk",
+					ReadOnly:       false,
+					SELinuxRelabel: false,
+					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
+				},
+				{
+					Name:           "disk",
+					ContainerPath:  "/mnt/path3",
+					HostPath:       "/mnt/disk",
+					ReadOnly:       true,
+					SELinuxRelabel: false,
+					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
+				},
+				{
+					Name:           "disk4",
+					ContainerPath:  "/mnt/path4",
+					HostPath:       "/mnt/host",
+					ReadOnly:       false,
+					SELinuxRelabel: false,
+					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
+				},
+				{
+					Name:           "disk5",
+					ContainerPath:  "/mnt/path5",
+					HostPath:       "/var/lib/kubelet/podID/volumes/empty/disk5",
+					ReadOnly:       false,
+					SELinuxRelabel: false,
+					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
+				},
 			},
-			{
-				MountPath: "/mnt/path5",
-				Name:      "disk5",
-				ReadOnly:  false,
+			expectErr: false,
+		},
+		"valid mounts in privileged container": {
+			podVolumes: kubecontainer.VolumeMap{
+				"disk":  kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk"}},
+				"disk4": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/host"}},
+				"disk5": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/var/lib/kubelet/podID/volumes/empty/disk5"}},
 			},
+			container: v1.Container{
+				Name: "container1",
+				VolumeMounts: []v1.VolumeMount{
+					{
+						MountPath:        "/etc/hosts",
+						Name:             "disk",
+						ReadOnly:         false,
+						MountPropagation: &propagationBidirectional,
+					},
+					{
+						MountPath:        "/mnt/path3",
+						Name:             "disk",
+						ReadOnly:         true,
+						MountPropagation: &propagationHostToContainer,
+					},
+					{
+						MountPath: "/mnt/path4",
+						Name:      "disk4",
+						ReadOnly:  false,
+					},
+				},
+				SecurityContext: &v1.SecurityContext{
+					Privileged: &bTrue,
+				},
+			},
+			expectedMounts: []kubecontainer.Mount{
+				{
+					Name:           "disk",
+					ContainerPath:  "/etc/hosts",
+					HostPath:       "/mnt/disk",
+					ReadOnly:       false,
+					SELinuxRelabel: false,
+					Propagation:    runtimeapi.MountPropagation_PROPAGATION_BIDIRECTIONAL,
+				},
+				{
+					Name:           "disk",
+					ContainerPath:  "/mnt/path3",
+					HostPath:       "/mnt/disk",
+					ReadOnly:       true,
+					SELinuxRelabel: false,
+					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
+				},
+				{
+					Name:           "disk4",
+					ContainerPath:  "/mnt/path4",
+					HostPath:       "/mnt/host",
+					ReadOnly:       false,
+					SELinuxRelabel: false,
+					Propagation:    runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER,
+				},
+			},
+			expectErr: false,
+		},
+		"invalid absolute SubPath": {
+			podVolumes: kubecontainer.VolumeMap{
+				"disk": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk"}},
+			},
+			container: v1.Container{
+				VolumeMounts: []v1.VolumeMount{
+					{
+						MountPath: "/mnt/path3",
+						SubPath:   "/must/not/be/absolute",
+						Name:      "disk",
+						ReadOnly:  true,
+					},
+				},
+			},
+			expectErr:      true,
+			expectedErrMsg: "error SubPath `/must/not/be/absolute` must not be an absolute path",
+		},
+		"invalid SubPath with backsteps": {
+			podVolumes: kubecontainer.VolumeMap{
+				"disk": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk"}},
+			},
+			container: v1.Container{
+				VolumeMounts: []v1.VolumeMount{
+					{
+						MountPath: "/mnt/path3",
+						SubPath:   "no/backsteps/../allowed",
+						Name:      "disk",
+						ReadOnly:  true,
+					},
+				},
+			},
+			expectErr:      true,
+			expectedErrMsg: "unable to provision SubPath `no/backsteps/../allowed`: must not contain '..'",
 		},
 	}
 
-	podVolumes := kubecontainer.VolumeMap{
-		"disk":  kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk"}},
-		"disk4": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/host"}},
-		"disk5": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/var/lib/kubelet/podID/volumes/empty/disk5"}},
-	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			pod := v1.Pod{
+				Spec: v1.PodSpec{
+					HostNetwork: true,
+				},
+			}
+			// test makeMounts with enabled mount propagation
+			err := utilfeature.DefaultFeatureGate.Set("MountPropagation=true")
+			if err != nil {
+				t.Errorf("Failed to enable feature gate for MountPropagation: %v", err)
+				return
+			}
 
-	pod := v1.Pod{
-		Spec: v1.PodSpec{
-			HostNetwork: true,
-		},
-	}
+			mounts, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes)
 
-	mounts, _ := makeMounts(&pod, "/pod", &container, "fakepodname", "", "", podVolumes)
+			// validate only the error if we expect an error
+			if tc.expectErr {
+				if err == nil || err.Error() != tc.expectedErrMsg {
+					t.Fatalf("expected error message `%s` but got `%v`", tc.expectedErrMsg, err)
+				}
+				return
+			}
 
-	expectedMounts := []kubecontainer.Mount{
-		{
-			Name:           "disk",
-			ContainerPath:  "/etc/hosts",
-			HostPath:       "/mnt/disk",
-			ReadOnly:       false,
-			SELinuxRelabel: false,
-		},
-		{
-			Name:           "disk",
-			ContainerPath:  "/mnt/path3",
-			HostPath:       "/mnt/disk",
-			ReadOnly:       true,
-			SELinuxRelabel: false,
-		},
-		{
-			Name:           "disk4",
-			ContainerPath:  "/mnt/path4",
-			HostPath:       "/mnt/host",
-			ReadOnly:       false,
-			SELinuxRelabel: false,
-		},
-		{
-			Name:           "disk5",
-			ContainerPath:  "/mnt/path5",
-			HostPath:       "/var/lib/kubelet/podID/volumes/empty/disk5",
-			ReadOnly:       false,
-			SELinuxRelabel: false,
-		},
+			// otherwise validate the mounts
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, tc.expectedMounts, mounts, "mounts of container %+v", tc.container)
+
+			// test makeMounts with disabled mount propagation
+			err = utilfeature.DefaultFeatureGate.Set("MountPropagation=false")
+			if err != nil {
+				t.Errorf("Failed to enable feature gate for MountPropagation: %v", err)
+				return
+			}
+			mounts, err = makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", "", tc.podVolumes)
+			if !tc.expectErr {
+				expectedPrivateMounts := []kubecontainer.Mount{}
+				for _, mount := range tc.expectedMounts {
+					// all mounts are expected to be private when mount
+					// propagation is disabled
+					mount.Propagation = runtimeapi.MountPropagation_PROPAGATION_PRIVATE
+					expectedPrivateMounts = append(expectedPrivateMounts, mount)
+				}
+				assert.Equal(t, expectedPrivateMounts, mounts, "mounts of container %+v", tc.container)
+			}
+		})
 	}
-	assert.Equal(t, expectedMounts, mounts, "mounts of container %+v", container)
 }
 
-func TestHostsFileContent(t *testing.T) {
+func TestNodeHostsFileContent(t *testing.T) {
+	testCases := []struct {
+		hostsFileName            string
+		hostAliases              []v1.HostAlias
+		rawHostsFileContent      string
+		expectedHostsFileContent string
+	}{
+		{
+			"hosts_test_file1",
+			[]v1.HostAlias{},
+			`# hosts file for testing.
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+fe00::0	ip6-mcastprefix
+fe00::1	ip6-allnodes
+fe00::2	ip6-allrouters
+123.45.67.89	some.domain
+`,
+			`# hosts file for testing.
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+fe00::0	ip6-mcastprefix
+fe00::1	ip6-allnodes
+fe00::2	ip6-allrouters
+123.45.67.89	some.domain
+`,
+		},
+		{
+			"hosts_test_file2",
+			[]v1.HostAlias{},
+			`# another hosts file for testing.
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+fe00::0	ip6-mcastprefix
+fe00::1	ip6-allnodes
+fe00::2	ip6-allrouters
+12.34.56.78	another.domain
+`,
+			`# another hosts file for testing.
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+fe00::0	ip6-mcastprefix
+fe00::1	ip6-allnodes
+fe00::2	ip6-allrouters
+12.34.56.78	another.domain
+`,
+		},
+		{
+			"hosts_test_file1_with_host_aliases",
+			[]v1.HostAlias{
+				{IP: "123.45.67.89", Hostnames: []string{"foo", "bar", "baz"}},
+			},
+			`# hosts file for testing.
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+fe00::0	ip6-mcastprefix
+fe00::1	ip6-allnodes
+fe00::2	ip6-allrouters
+123.45.67.89	some.domain
+`,
+			`# hosts file for testing.
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+fe00::0	ip6-mcastprefix
+fe00::1	ip6-allnodes
+fe00::2	ip6-allrouters
+123.45.67.89	some.domain
+
+# Entries added by HostAliases.
+123.45.67.89	foo
+123.45.67.89	bar
+123.45.67.89	baz
+`,
+		},
+		{
+			"hosts_test_file2_with_host_aliases",
+			[]v1.HostAlias{
+				{IP: "123.45.67.89", Hostnames: []string{"foo", "bar", "baz"}},
+				{IP: "456.78.90.123", Hostnames: []string{"park", "doo", "boo"}},
+			},
+			`# another hosts file for testing.
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+fe00::0	ip6-mcastprefix
+fe00::1	ip6-allnodes
+fe00::2	ip6-allrouters
+12.34.56.78	another.domain
+`,
+			`# another hosts file for testing.
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+fe00::0	ip6-mcastprefix
+fe00::1	ip6-allnodes
+fe00::2	ip6-allrouters
+12.34.56.78	another.domain
+
+# Entries added by HostAliases.
+123.45.67.89	foo
+123.45.67.89	bar
+123.45.67.89	baz
+456.78.90.123	park
+456.78.90.123	doo
+456.78.90.123	boo
+`,
+		},
+	}
+
+	for _, testCase := range testCases {
+		tmpdir, err := writeHostsFile(testCase.hostsFileName, testCase.rawHostsFileContent)
+		require.NoError(t, err, "could not create a temp hosts file")
+		defer os.RemoveAll(tmpdir)
+
+		actualContent, fileReadErr := nodeHostsFileContent(filepath.Join(tmpdir, testCase.hostsFileName), testCase.hostAliases)
+		require.NoError(t, fileReadErr, "could not create read hosts file")
+		assert.Equal(t, testCase.expectedHostsFileContent, string(actualContent), "hosts file content not expected")
+	}
+}
+
+// writeHostsFile will write a hosts file into a temporary dir, and return that dir.
+// Caller is responsible for deleting the dir and its contents.
+func writeHostsFile(filename string, cfg string) (string, error) {
+	tmpdir, err := ioutil.TempDir("", "kubelet=kubelet_pods_test.go=")
+	if err != nil {
+		return "", err
+	}
+	return tmpdir, ioutil.WriteFile(filepath.Join(tmpdir, filename), []byte(cfg), 0644)
+}
+
+func TestManagedHostsFileContent(t *testing.T) {
 	testCases := []struct {
 		hostIP          string
 		hostName        string
@@ -167,6 +466,8 @@ fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
 203.0.113.1	podFoo.domainFoo	podFoo
+
+# Entries added by HostAliases.
 123.45.67.89	foo
 123.45.67.89	bar
 123.45.67.89	baz
@@ -188,6 +489,8 @@ fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
 203.0.113.1	podFoo.domainFoo	podFoo
+
+# Entries added by HostAliases.
 123.45.67.89	foo
 123.45.67.89	bar
 123.45.67.89	baz
@@ -199,8 +502,8 @@ fe00::2	ip6-allrouters
 	}
 
 	for _, testCase := range testCases {
-		actualContent := string(hostsFileContent(testCase.hostIP, testCase.hostName, testCase.hostDomainName, testCase.hostAliases))
-		assert.Equal(t, testCase.expectedContent, actualContent, "hosts file content not expected")
+		actualContent := managedHostsFileContent(testCase.hostIP, testCase.hostName, testCase.hostDomainName, testCase.hostAliases)
+		assert.Equal(t, testCase.expectedContent, string(actualContent), "hosts file content not expected")
 	}
 }
 
@@ -1154,14 +1457,14 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Name:      "test-secret",
 				},
 				Data: map[string][]byte{
-					"1234": []byte("abc"),
-					"1z":   []byte("abc"),
-					"key":  []byte("value"),
+					"1234":  []byte("abc"),
+					"1z":    []byte("abc"),
+					"key.1": []byte("value"),
 				},
 			},
 			expectedEnvs: []kubecontainer.EnvVar{
 				{
-					Name:  "key",
+					Name:  "key.1",
 					Value: "value",
 				},
 			},
@@ -1185,12 +1488,12 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					Name:      "test-secret",
 				},
 				Data: map[string][]byte{
-					"1234": []byte("abc"),
+					"1234.name": []byte("abc"),
 				},
 			},
 			expectedEnvs: []kubecontainer.EnvVar{
 				{
-					Name:  "p_1234",
+					Name:  "p_1234.name",
 					Value: "abc",
 				},
 			},
@@ -1658,7 +1961,7 @@ func TestExec(t *testing.T) {
 		tty                    = true
 	)
 	var (
-		podFullName = kubecontainer.GetPodFullName(podWithUidNameNs(podUID, podName, podNamespace))
+		podFullName = kubecontainer.GetPodFullName(podWithUIDNameNs(podUID, podName, podNamespace))
 		command     = []string{"ls"}
 		stdin       = &bytes.Buffer{}
 		stdout      = &fakeReadWriteCloser{}
@@ -1794,7 +2097,7 @@ func TestPortForward(t *testing.T) {
 			}},
 		}
 
-		podFullName := kubecontainer.GetPodFullName(podWithUidNameNs(podUID, tc.podName, podNamespace))
+		podFullName := kubecontainer.GetPodFullName(podWithUIDNameNs(podUID, tc.podName, podNamespace))
 		{ // No streaming case
 			description := "no streaming - " + tc.description
 			redirect, err := kubelet.GetPortForward(tc.podName, podNamespace, podUID, portforward.V4Options{})

@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubectl/util/hash"
 )
 
 // SecretForTLSGeneratorV1 supports stable generation of a TLS secret.
@@ -33,6 +34,8 @@ type SecretForTLSGeneratorV1 struct {
 	Key string
 	// Cert is the path to the user's public key certificate.
 	Cert string
+	// AppendHash; if true, derive a hash from the Secret and append it to the name
+	AppendHash bool
 }
 
 // Ensure it supports the generator pattern that uses parameter injection
@@ -47,6 +50,16 @@ func (s SecretForTLSGeneratorV1) Generate(genericParams map[string]interface{}) 
 	if err != nil {
 		return nil, err
 	}
+	delegate := &SecretForTLSGeneratorV1{}
+	hashParam, found := genericParams["append-hash"]
+	if found {
+		hashBool, isBool := hashParam.(bool)
+		if !isBool {
+			return nil, fmt.Errorf("expected bool, found :%v", hashParam)
+		}
+		delegate.AppendHash = hashBool
+		delete(genericParams, "append-hash")
+	}
 	params := map[string]string{}
 	for key, value := range genericParams {
 		strVal, isString := value.(string)
@@ -55,11 +68,9 @@ func (s SecretForTLSGeneratorV1) Generate(genericParams map[string]interface{}) 
 		}
 		params[key] = strVal
 	}
-	delegate := &SecretForTLSGeneratorV1{
-		Name: params["name"],
-		Key:  params["key"],
-		Cert: params["cert"],
-	}
+	delegate.Name = params["name"]
+	delegate.Key = params["key"]
+	delegate.Cert = params["cert"]
 	return delegate.StructuredGenerate()
 }
 
@@ -82,6 +93,13 @@ func (s SecretForTLSGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	secret.Data = map[string][]byte{}
 	secret.Data[api.TLSCertKey] = []byte(tlsCrt)
 	secret.Data[api.TLSPrivateKeyKey] = []byte(tlsKey)
+	if s.AppendHash {
+		h, err := hash.SecretHash(secret)
+		if err != nil {
+			return nil, err
+		}
+		secret.Name = fmt.Sprintf("%s-%s", secret.Name, h)
+	}
 	return secret, nil
 }
 
@@ -100,6 +118,7 @@ func (s SecretForTLSGeneratorV1) ParamNames() []GeneratorParam {
 		{"name", true},
 		{"key", true},
 		{"cert", true},
+		{"append-hash", false},
 	}
 }
 
@@ -109,10 +128,10 @@ func (s SecretForTLSGeneratorV1) validate() error {
 	// if no key/cert is given. The only requiredment is that we either get both
 	// or none. See test/e2e/ingress_utils for self signed cert generation.
 	if len(s.Key) == 0 {
-		return fmt.Errorf("key must be specified.")
+		return fmt.Errorf("key must be specified")
 	}
 	if len(s.Cert) == 0 {
-		return fmt.Errorf("certificate must be specified.")
+		return fmt.Errorf("certificate must be specified")
 	}
 	if _, err := tls.LoadX509KeyPair(s.Cert, s.Key); err != nil {
 		return fmt.Errorf("failed to load key pair %v", err)

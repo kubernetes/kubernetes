@@ -58,13 +58,13 @@ func GetValidatedClusterInfoObject(cfg *kubeadmapi.NodeConfiguration) (*clientcm
 		}
 		return file.RetrieveValidatedClusterInfo(cfg.DiscoveryFile)
 	case len(cfg.DiscoveryToken) != 0:
-		return token.RetrieveValidatedClusterInfo(cfg.DiscoveryToken, cfg.DiscoveryTokenAPIServers)
+		return token.RetrieveValidatedClusterInfo(cfg.DiscoveryToken, cfg.DiscoveryTokenAPIServers, cfg.DiscoveryTokenCACertHashes)
 	default:
 		return nil, fmt.Errorf("couldn't find a valid discovery configuration.")
 	}
 }
 
-// isHTTPSURL checks whether the string is parsable as an URL
+// isHTTPSURL checks whether the string is parsable as an URL and whether the Scheme is https
 func isHTTPSURL(s string) bool {
 	u, err := url.Parse(s)
 	return err == nil && u.Scheme == "https"

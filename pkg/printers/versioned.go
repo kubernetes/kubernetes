@@ -61,3 +61,7 @@ func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 func (p *VersionedPrinter) HandledResources() []string {
 	return []string{}
 }
+
+func (p *VersionedPrinter) IsGeneric() bool {
+	return p.printer.IsGeneric()
+}

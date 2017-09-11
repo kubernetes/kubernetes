@@ -27,8 +27,6 @@ import (
 	"github.com/golang/glog"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
-	utildbus "k8s.io/kubernetes/pkg/util/dbus"
-	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -51,11 +49,10 @@ type hostportManager struct {
 	mu          sync.Mutex
 }
 
-func NewHostportManager() HostPortManager {
-	iptInterface := utiliptables.New(utilexec.New(), utildbus.New(), utiliptables.ProtocolIpv4)
+func NewHostportManager(iptables utiliptables.Interface) HostPortManager {
 	return &hostportManager{
 		hostPortMap: make(map[hostport]closeable),
-		iptables:    iptInterface,
+		iptables:    iptables,
 		portOpener:  openLocalPort,
 	}
 }
@@ -275,11 +272,12 @@ func gatherHostportMappings(podPortMapping *PodPortMapping) []*PortMapping {
 // getExistingHostportIPTablesRules retrieves raw data from iptables-save, parse it,
 // return all the hostport related chains and rules
 func getExistingHostportIPTablesRules(iptables utiliptables.Interface) (map[utiliptables.Chain]string, []string, error) {
-	iptablesSaveRaw, err := iptables.Save(utiliptables.TableNAT)
+	iptablesData := bytes.NewBuffer(nil)
+	err := iptables.SaveInto(utiliptables.TableNAT, iptablesData)
 	if err != nil { // if we failed to get any rules
 		return nil, nil, fmt.Errorf("failed to execute iptables-save: %v", err)
 	}
-	existingNATChains := utiliptables.GetChainLines(utiliptables.TableNAT, iptablesSaveRaw)
+	existingNATChains := utiliptables.GetChainLines(utiliptables.TableNAT, iptablesData.Bytes())
 
 	existingHostportChains := make(map[utiliptables.Chain]string)
 	existingHostportRules := []string{}
@@ -290,7 +288,7 @@ func getExistingHostportIPTablesRules(iptables utiliptables.Interface) (map[util
 		}
 	}
 
-	for _, line := range strings.Split(string(iptablesSaveRaw), "\n") {
+	for _, line := range strings.Split(string(iptablesData.Bytes()), "\n") {
 		if strings.HasPrefix(line, fmt.Sprintf("-A %s", kubeHostportChainPrefix)) ||
 			strings.HasPrefix(line, fmt.Sprintf("-A %s", string(kubeHostportsChain))) {
 			existingHostportRules = append(existingHostportRules, line)

@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/extensions/deployment"
 )
 
@@ -63,18 +63,16 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against deployments.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *RollbackREST) {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &extensions.Deployment{} },
-		NewListFunc:       func() runtime.Object { return &extensions.DeploymentList{} },
-		PredicateFunc:     deployment.MatchDeployment,
-		QualifiedResource: extensions.Resource("deployments"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("deployments"),
+		Copier:                   api.Scheme,
+		NewFunc:                  func() runtime.Object { return &extensions.Deployment{} },
+		NewListFunc:              func() runtime.Object { return &extensions.DeploymentList{} },
+		DefaultQualifiedResource: extensions.Resource("deployments"),
 
 		CreateStrategy: deployment.Strategy,
 		UpdateStrategy: deployment.Strategy,
 		DeleteStrategy: deployment.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: deployment.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}
@@ -90,6 +88,14 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"deploy"}
+}
+
+// Implement CategoriesProvider
+var _ rest.CategoriesProvider = &REST{}
+
+// Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
+func (r *REST) Categories() []string {
+	return []string{"all"}
 }
 
 // StatusREST implements the REST endpoint for changing the status of a deployment
@@ -123,7 +129,7 @@ func (r *RollbackREST) New() runtime.Object {
 
 var _ = rest.Creater(&RollbackREST{})
 
-func (r *RollbackREST) Create(ctx genericapirequest.Context, obj runtime.Object) (runtime.Object, error) {
+func (r *RollbackREST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
 	rollback, ok := obj.(*extensions.DeploymentRollback)
 	if !ok {
 		return nil, errors.NewBadRequest(fmt.Sprintf("not a DeploymentRollback: %#v", obj))
@@ -139,6 +145,7 @@ func (r *RollbackREST) Create(ctx genericapirequest.Context, obj runtime.Object)
 		return nil, err
 	}
 	return &metav1.Status{
+		Status:  metav1.StatusSuccess,
 		Message: fmt.Sprintf("rollback request for deployment %q succeeded", rollback.Name),
 		Code:    http.StatusOK,
 	}, nil
@@ -186,6 +193,11 @@ type ScaleREST struct {
 
 // ScaleREST implements Patcher
 var _ = rest.Patcher(&ScaleREST{})
+var _ = rest.GroupVersionKindProvider(&ScaleREST{})
+
+func (r *ScaleREST) GroupVersionKind() schema.GroupVersionKind {
+	return schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Scale"}
+}
 
 // New creates a new Scale object
 func (r *ScaleREST) New() runtime.Object {

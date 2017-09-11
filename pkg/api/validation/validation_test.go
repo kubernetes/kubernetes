@@ -17,21 +17,22 @@ limitations under the License.
 package validation
 
 import (
+	"math"
 	"reflect"
 	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
-	"k8s.io/kubernetes/pkg/api/service"
-	"k8s.io/kubernetes/pkg/api/v1"
+	_ "k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
@@ -39,18 +40,37 @@ import (
 const (
 	dnsLabelErrMsg          = "a DNS-1123 label must consist of"
 	dnsSubdomainLabelErrMsg = "a DNS-1123 subdomain"
-	labelErrMsg             = "a valid label must be an empty string or consist of"
-	lowerCaseLabelErrMsg    = "a valid label must consist of"
-	maxLengthErrMsg         = "must be no more than"
-	namePartErrMsg          = "name part must consist of"
-	nameErrMsg              = "a qualified name must consist of"
-	idErrMsg                = "a valid C identifier must"
+	envVarNameErrMsg        = "a valid environment variable name must consist of"
 )
+
+func newHostPathType(pathType string) *api.HostPathType {
+	hostPathType := new(api.HostPathType)
+	*hostPathType = api.HostPathType(pathType)
+	return hostPathType
+}
 
 func testVolume(name string, namespace string, spec api.PersistentVolumeSpec) *api.PersistentVolume {
 	objMeta := metav1.ObjectMeta{Name: name}
 	if namespace != "" {
 		objMeta.Namespace = namespace
+	}
+
+	return &api.PersistentVolume{
+		ObjectMeta: objMeta,
+		Spec:       spec,
+	}
+}
+
+func testVolumeWithNodeAffinity(t *testing.T, name string, namespace string, affinity *api.NodeAffinity, spec api.PersistentVolumeSpec) *api.PersistentVolume {
+	objMeta := metav1.ObjectMeta{Name: name}
+	if namespace != "" {
+		objMeta.Namespace = namespace
+	}
+
+	objMeta.Annotations = map[string]string{}
+	err := helper.StorageNodeAffinityToAlphaAnnotation(objMeta.Annotations, affinity)
+	if err != nil {
+		t.Fatalf("Failed to get node affinity annotation: %v", err)
 	}
 
 	return &api.PersistentVolume{
@@ -72,7 +92,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 				StorageClassName: "valid",
 			}),
@@ -85,7 +108,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 				PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRetain,
 			}),
@@ -98,7 +124,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{"fakemode"},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 			}),
 		},
@@ -110,7 +139,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 				PersistentVolumeReclaimPolicy: "fakeReclaimPolicy",
 			}),
@@ -123,7 +155,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 			}),
 		},
@@ -135,7 +170,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 			}),
 		},
@@ -159,7 +197,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 				},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 			}),
 		},
@@ -170,7 +211,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 					api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
 				},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath:          &api.HostPathVolumeSource{Path: "/foo"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{PDName: "foo", FSType: "ext4"},
 				},
 			}),
@@ -183,7 +227,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 				PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
 			}),
@@ -196,7 +243,10 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/a/.."},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/a/..",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 				PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
 			}),
@@ -209,9 +259,79 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
 				},
 				StorageClassName: "-invalid-",
+			}),
+		},
+		// LocalVolume alpha feature disabled
+		// TODO: remove when no longer alpha
+		"alpha disabled valid local volume": {
+			isExpectedFailure: true,
+			volume: testVolumeWithNodeAffinity(
+				t,
+				"valid-local-volume",
+				"",
+				&api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+						NodeSelectorTerms: []api.NodeSelectorTerm{
+							{
+								MatchExpressions: []api.NodeSelectorRequirement{
+									{
+										Key:      "test-label-key",
+										Operator: api.NodeSelectorOpIn,
+										Values:   []string{"test-label-value"},
+									},
+								},
+							},
+						},
+					},
+				},
+				api.PersistentVolumeSpec{
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{
+							Path: "/foo",
+						},
+					},
+					StorageClassName: "test-storage-class",
+				}),
+		},
+		"bad-hostpath-volume-backsteps": {
+			isExpectedFailure: true,
+			volume: testVolume("foo", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/foo/..",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
+				},
+				StorageClassName: "backstep-hostpath",
+			}),
+		},
+		"bad-local-volume-backsteps": {
+			isExpectedFailure: true,
+			volume: testVolume("foo", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					Local: &api.LocalVolumeSource{
+						Path: "/foo/..",
+					},
+				},
+				StorageClassName: "backstep-local",
 			}),
 		},
 	}
@@ -228,10 +348,196 @@ func TestValidatePersistentVolumes(t *testing.T) {
 
 }
 
+func TestValidateLocalVolumes(t *testing.T) {
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		volume            *api.PersistentVolume
+	}{
+		"valid local volume": {
+			isExpectedFailure: false,
+			volume: testVolumeWithNodeAffinity(
+				t,
+				"valid-local-volume",
+				"",
+				&api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+						NodeSelectorTerms: []api.NodeSelectorTerm{
+							{
+								MatchExpressions: []api.NodeSelectorRequirement{
+									{
+										Key:      "test-label-key",
+										Operator: api.NodeSelectorOpIn,
+										Values:   []string{"test-label-value"},
+									},
+								},
+							},
+						},
+					},
+				},
+				api.PersistentVolumeSpec{
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{
+							Path: "/foo",
+						},
+					},
+					StorageClassName: "test-storage-class",
+				}),
+		},
+		"invalid local volume nil annotations": {
+			isExpectedFailure: true,
+			volume: testVolume(
+				"invalid-local-volume-nil-annotations",
+				"",
+				api.PersistentVolumeSpec{
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{
+							Path: "/foo",
+						},
+					},
+					StorageClassName: "test-storage-class",
+				}),
+		},
+		"invalid local volume empty affinity": {
+			isExpectedFailure: true,
+			volume: testVolumeWithNodeAffinity(
+				t,
+				"invalid-local-volume-empty-affinity",
+				"",
+				&api.NodeAffinity{},
+				api.PersistentVolumeSpec{
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{
+							Path: "/foo",
+						},
+					},
+					StorageClassName: "test-storage-class",
+				}),
+		},
+		"invalid local volume preferred affinity": {
+			isExpectedFailure: true,
+			volume: testVolumeWithNodeAffinity(
+				t,
+				"invalid-local-volume-preferred-affinity",
+				"",
+				&api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+						NodeSelectorTerms: []api.NodeSelectorTerm{
+							{
+								MatchExpressions: []api.NodeSelectorRequirement{
+									{
+										Key:      "test-label-key",
+										Operator: api.NodeSelectorOpIn,
+										Values:   []string{"test-label-value"},
+									},
+								},
+							},
+						},
+					},
+					PreferredDuringSchedulingIgnoredDuringExecution: []api.PreferredSchedulingTerm{
+						{
+							Weight: 10,
+							Preference: api.NodeSelectorTerm{
+								MatchExpressions: []api.NodeSelectorRequirement{
+									{
+										Key:      "test-label-key",
+										Operator: api.NodeSelectorOpIn,
+										Values:   []string{"test-label-value"},
+									},
+								},
+							},
+						},
+					},
+				},
+				api.PersistentVolumeSpec{
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{
+							Path: "/foo",
+						},
+					},
+					StorageClassName: "test-storage-class",
+				}),
+		},
+		"invalid local volume empty path": {
+			isExpectedFailure: true,
+			volume: testVolumeWithNodeAffinity(
+				t,
+				"invalid-local-volume-empty-path",
+				"",
+				&api.NodeAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+						NodeSelectorTerms: []api.NodeSelectorTerm{
+							{
+								MatchExpressions: []api.NodeSelectorRequirement{
+									{
+										Key:      "test-label-key",
+										Operator: api.NodeSelectorOpIn,
+										Values:   []string{"test-label-value"},
+									},
+								},
+							},
+						},
+					},
+				},
+				api.PersistentVolumeSpec{
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+					},
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					PersistentVolumeSource: api.PersistentVolumeSource{
+						Local: &api.LocalVolumeSource{},
+					},
+					StorageClassName: "test-storage-class",
+				}),
+		},
+	}
+
+	err := utilfeature.DefaultFeatureGate.Set("PersistentLocalVolumes=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for LocalPersistentVolumes: %v", err)
+		return
+	}
+	for name, scenario := range scenarios {
+		errs := ValidatePersistentVolume(scenario.volume)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
+}
+
 func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeClaimSpec) *api.PersistentVolumeClaim {
 	return &api.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec:       spec,
+	}
+}
+
+func testVolumeClaimWithStatus(
+	name, namespace string,
+	spec api.PersistentVolumeClaimSpec,
+	status api.PersistentVolumeClaimStatus) *api.PersistentVolumeClaim {
+	return &api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		Spec:       spec,
+		Status:     status,
 	}
 }
 
@@ -433,7 +739,7 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 }
 
 func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
-	validClaim := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+	validClaim := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
 		AccessModes: []api.PersistentVolumeAccessMode{
 			api.ReadWriteOnce,
 			api.ReadOnlyMany,
@@ -443,7 +749,10 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 			},
 		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimBound,
 	})
+
 	validClaimStorageClass := testVolumeClaimStorageClass("foo", "ns", "fast", api.PersistentVolumeClaimSpec{
 		AccessModes: []api.PersistentVolumeAccessMode{
 			api.ReadOnlyMany,
@@ -533,50 +842,125 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		VolumeName: "volume",
 	})
+	validSizeUpdate := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("15G"),
+			},
+		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimBound,
+	})
+
+	invalidSizeUpdate := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("5G"),
+			},
+		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimBound,
+	})
+
+	unboundSizeUpdate := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("12G"),
+			},
+		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimPending,
+	})
+
 	scenarios := map[string]struct {
 		isExpectedFailure bool
 		oldClaim          *api.PersistentVolumeClaim
 		newClaim          *api.PersistentVolumeClaim
+		enableResize      bool
 	}{
 		"valid-update-volumeName-only": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validUpdateClaim,
+			enableResize:      false,
 		},
 		"valid-no-op-update": {
 			isExpectedFailure: false,
 			oldClaim:          validUpdateClaim,
 			newClaim:          validUpdateClaim,
+			enableResize:      false,
 		},
 		"invalid-update-change-resources-on-bound-claim": {
 			isExpectedFailure: true,
 			oldClaim:          validUpdateClaim,
 			newClaim:          invalidUpdateClaimResources,
+			enableResize:      false,
 		},
 		"invalid-update-change-access-modes-on-bound-claim": {
 			isExpectedFailure: true,
 			oldClaim:          validUpdateClaim,
 			newClaim:          invalidUpdateClaimAccessModes,
+			enableResize:      false,
 		},
 		"invalid-update-change-storage-class-annotation-after-creation": {
 			isExpectedFailure: true,
 			oldClaim:          validClaimStorageClass,
 			newClaim:          invalidUpdateClaimStorageClass,
+			enableResize:      false,
 		},
 		"valid-update-mutable-annotation": {
 			isExpectedFailure: false,
 			oldClaim:          validClaimAnnotation,
 			newClaim:          validUpdateClaimMutableAnnotation,
+			enableResize:      false,
 		},
 		"valid-update-add-annotation": {
 			isExpectedFailure: false,
 			oldClaim:          validClaim,
 			newClaim:          validAddClaimAnnotation,
+			enableResize:      false,
+		},
+		"valid-size-update-resize-disabled": {
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          validSizeUpdate,
+			enableResize:      false,
+		},
+		"valid-size-update-resize-enabled": {
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validSizeUpdate,
+			enableResize:      true,
+		},
+		"invalid-size-update-resize-enabled": {
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          invalidSizeUpdate,
+			enableResize:      true,
+		},
+		"unbound-size-update-resize-enabled": {
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          unboundSizeUpdate,
+			enableResize:      true,
 		},
 	}
 
 	for name, scenario := range scenarios {
 		// ensure we have a resource version specified for updates
+		togglePVExpandFeature(scenario.enableResize, t)
 		scenario.oldClaim.ResourceVersion = "1"
 		scenario.newClaim.ResourceVersion = "1"
 		errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim)
@@ -585,6 +969,23 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		}
 		if len(errs) > 0 && !scenario.isExpectedFailure {
 			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
+}
+
+func togglePVExpandFeature(toggleFlag bool, t *testing.T) {
+	if toggleFlag {
+		// Enable alpha feature LocalStorageCapacityIsolation
+		err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=true")
+		if err != nil {
+			t.Errorf("Failed to enable feature gate for ExpandPersistentVolumes: %v", err)
+			return
+		}
+	} else {
+		err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=false")
+		if err != nil {
+			t.Errorf("Failed to disable feature gate for ExpandPersistentVolumes: %v", err)
+			return
 		}
 	}
 }
@@ -669,6 +1070,98 @@ func TestValidateKeyToPath(t *testing.T) {
 	}
 }
 
+func TestValidateNFSVolumeSource(t *testing.T) {
+	testCases := []struct {
+		name      string
+		nfs       *api.NFSVolumeSource
+		errtype   field.ErrorType
+		errfield  string
+		errdetail string
+	}{
+		{
+			name:     "missing server",
+			nfs:      &api.NFSVolumeSource{Server: "", Path: "/tmp"},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "server",
+		},
+		{
+			name:     "missing path",
+			nfs:      &api.NFSVolumeSource{Server: "my-server", Path: ""},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "path",
+		},
+		{
+			name:      "abs path",
+			nfs:       &api.NFSVolumeSource{Server: "my-server", Path: "tmp"},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "path",
+			errdetail: "must be an absolute path",
+		},
+	}
+
+	for i, tc := range testCases {
+		errs := validateNFSVolumeSource(tc.nfs, field.NewPath("field"))
+
+		if len(errs) > 0 && tc.errtype == "" {
+			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
+		} else if len(errs) == 0 && tc.errtype != "" {
+			t.Errorf("[%d: %q] expected error type %v", i, tc.name, tc.errtype)
+		} else if len(errs) >= 1 {
+			if errs[0].Type != tc.errtype {
+				t.Errorf("[%d: %q] expected error type %v, got %v", i, tc.name, tc.errtype, errs[0].Type)
+			} else if !strings.HasSuffix(errs[0].Field, "."+tc.errfield) {
+				t.Errorf("[%d: %q] expected error on field %q, got %q", i, tc.name, tc.errfield, errs[0].Field)
+			} else if !strings.Contains(errs[0].Detail, tc.errdetail) {
+				t.Errorf("[%d: %q] expected error detail %q, got %q", i, tc.name, tc.errdetail, errs[0].Detail)
+			}
+		}
+	}
+}
+
+func TestValidateGlusterfs(t *testing.T) {
+	testCases := []struct {
+		name     string
+		gfs      *api.GlusterfsVolumeSource
+		errtype  field.ErrorType
+		errfield string
+	}{
+		{
+			name:     "missing endpointname",
+			gfs:      &api.GlusterfsVolumeSource{EndpointsName: "", Path: "/tmp"},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "endpoints",
+		},
+		{
+			name:     "missing path",
+			gfs:      &api.GlusterfsVolumeSource{EndpointsName: "my-endpoint", Path: ""},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "path",
+		},
+		{
+			name:     "missing endpintname and path",
+			gfs:      &api.GlusterfsVolumeSource{EndpointsName: "", Path: ""},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "endpoints",
+		},
+	}
+
+	for i, tc := range testCases {
+		errs := validateGlusterfsVolumeSource(tc.gfs, field.NewPath("field"))
+
+		if len(errs) > 0 && tc.errtype == "" {
+			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
+		} else if len(errs) == 0 && tc.errtype != "" {
+			t.Errorf("[%d: %q] expected error type %v", i, tc.name, tc.errtype)
+		} else if len(errs) >= 1 {
+			if errs[0].Type != tc.errtype {
+				t.Errorf("[%d: %q] expected error type %v, got %v", i, tc.name, tc.errtype, errs[0].Type)
+			} else if !strings.HasSuffix(errs[0].Field, "."+tc.errfield) {
+				t.Errorf("[%d: %q] expected error on field %q, got %q", i, tc.name, tc.errfield, errs[0].Field)
+			}
+		}
+	}
+}
+
 // helper
 func newInt32(val int) *int32 {
 	p := new(int32)
@@ -680,6 +1173,8 @@ func newInt32(val int) *int32 {
 // type on its own, but we want to also make sure that the logic works through
 // the one-of wrapper, so we just do it all in one place.
 func TestValidateVolumes(t *testing.T) {
+	validInitiatorName := "iqn.2015-02.example.com:init"
+	invalidInitiatorName := "2015-02.example.com:init"
 	testCases := []struct {
 		name      string
 		vol       api.Volume
@@ -762,6 +1257,7 @@ func TestValidateVolumes(t *testing.T) {
 					EmptyDir: &api.EmptyDirVolumeSource{},
 					HostPath: &api.HostPathVolumeSource{
 						Path: "/mnt/path",
+						Type: newHostPathType(string(api.HostPathDirectory)),
 					},
 				},
 			},
@@ -769,7 +1265,20 @@ func TestValidateVolumes(t *testing.T) {
 			errfield:  "hostPath",
 			errdetail: "may not specify more than 1 volume",
 		},
-		// HostPath
+		// HostPath Default
+		{
+			name: "default HostPath",
+			vol: api.Volume{
+				Name: "hostpath",
+				VolumeSource: api.VolumeSource{
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/mnt/path",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
+				},
+			},
+		},
+		// HostPath Supported
 		{
 			name: "valid HostPath",
 			vol: api.Volume{
@@ -777,9 +1286,40 @@ func TestValidateVolumes(t *testing.T) {
 				VolumeSource: api.VolumeSource{
 					HostPath: &api.HostPathVolumeSource{
 						Path: "/mnt/path",
+						Type: newHostPathType(string(api.HostPathSocket)),
 					},
 				},
 			},
+		},
+		// HostPath Invalid
+		{
+			name: "invalid HostPath",
+			vol: api.Volume{
+				Name: "hostpath",
+				VolumeSource: api.VolumeSource{
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/mnt/path",
+						Type: newHostPathType("invalid"),
+					},
+				},
+			},
+			errtype:  field.ErrorTypeNotSupported,
+			errfield: "type",
+		},
+		{
+			name: "invalid HostPath backsteps",
+			vol: api.Volume{
+				Name: "hostpath",
+				VolumeSource: api.VolumeSource{
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/mnt/path/..",
+						Type: newHostPathType(string(api.HostPathDirectory)),
+					},
+				},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "path",
+			errdetail: "must not contain '..'",
 		},
 		// GcePersistentDisk
 		{
@@ -910,6 +1450,36 @@ func TestValidateVolumes(t *testing.T) {
 			},
 		},
 		{
+			name: "valid IQN: eui format",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal: "127.0.0.1",
+						IQN:          "eui.0123456789ABCDEF",
+						Lun:          1,
+						FSType:       "ext4",
+						ReadOnly:     false,
+					},
+				},
+			},
+		},
+		{
+			name: "valid IQN: naa format",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal: "127.0.0.1",
+						IQN:          "naa.62004567BA64678D0123456789ABCDEF",
+						Lun:          1,
+						FSType:       "ext4",
+						ReadOnly:     false,
+					},
+				},
+			},
+		},
+		{
 			name: "empty portal",
 			vol: api.Volume{
 				Name: "iscsi",
@@ -942,6 +1512,91 @@ func TestValidateVolumes(t *testing.T) {
 			},
 			errtype:  field.ErrorTypeRequired,
 			errfield: "iscsi.iqn",
+		},
+		{
+			name: "invalid IQN: iqn format",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal: "127.0.0.1",
+						IQN:          "iqn.2015-02.example.com:test;ls;",
+						Lun:          1,
+						FSType:       "ext4",
+						ReadOnly:     false,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "iscsi.iqn",
+		},
+		{
+			name: "invalid IQN: eui format",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal: "127.0.0.1",
+						IQN:          "eui.0123456789ABCDEFGHIJ",
+						Lun:          1,
+						FSType:       "ext4",
+						ReadOnly:     false,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "iscsi.iqn",
+		},
+		{
+			name: "invalid IQN: naa format",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal: "127.0.0.1",
+						IQN:          "naa.62004567BA_4-78D.123456789ABCDEF",
+						Lun:          1,
+						FSType:       "ext4",
+						ReadOnly:     false,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "iscsi.iqn",
+		},
+		{
+			name: "valid initiatorName",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal:  "127.0.0.1",
+						IQN:           "iqn.2015-02.example.com:test",
+						Lun:           1,
+						InitiatorName: &validInitiatorName,
+						FSType:        "ext4",
+						ReadOnly:      false,
+					},
+				},
+			},
+		},
+		{
+			name: "invalid initiatorName",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal:  "127.0.0.1",
+						IQN:           "iqn.2015-02.example.com:test",
+						Lun:           1,
+						InitiatorName: &invalidInitiatorName,
+						FSType:        "ext4",
+						ReadOnly:      false,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "iscsi.initiatorname",
 		},
 		{
 			name: "empty secret",
@@ -1742,7 +2397,7 @@ func TestValidateVolumes(t *testing.T) {
 		},
 		// FC
 		{
-			name: "valid FC",
+			name: "FC valid targetWWNs and lun",
 			vol: api.Volume{
 				Name: "fc",
 				VolumeSource: api.VolumeSource{
@@ -1756,23 +2411,56 @@ func TestValidateVolumes(t *testing.T) {
 			},
 		},
 		{
-			name: "fc empty wwn",
+			name: "FC valid wwids",
+			vol: api.Volume{
+				Name: "fc",
+				VolumeSource: api.VolumeSource{
+					FC: &api.FCVolumeSource{
+						WWIDs:    []string{"some_wwid"},
+						FSType:   "ext4",
+						ReadOnly: false,
+					},
+				},
+			},
+		},
+		{
+			name: "FC empty targetWWNs and wwids",
 			vol: api.Volume{
 				Name: "fc",
 				VolumeSource: api.VolumeSource{
 					FC: &api.FCVolumeSource{
 						TargetWWNs: []string{},
 						Lun:        newInt32(1),
+						WWIDs:      []string{},
 						FSType:     "ext4",
 						ReadOnly:   false,
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "fc.targetWWNs",
+			errtype:   field.ErrorTypeRequired,
+			errfield:  "fc.targetWWNs",
+			errdetail: "must specify either targetWWNs or wwids",
 		},
 		{
-			name: "fc empty lun",
+			name: "FC invalid: both targetWWNs and wwids simultaneously",
+			vol: api.Volume{
+				Name: "fc",
+				VolumeSource: api.VolumeSource{
+					FC: &api.FCVolumeSource{
+						TargetWWNs: []string{"some_wwn"},
+						Lun:        newInt32(1),
+						WWIDs:      []string{"some_wwid"},
+						FSType:     "ext4",
+						ReadOnly:   false,
+					},
+				},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "fc.targetWWNs",
+			errdetail: "targetWWNs and wwids can not be specified simultaneously",
+		},
+		{
+			name: "FC valid targetWWNs and empty lun",
 			vol: api.Volume{
 				Name: "fc",
 				VolumeSource: api.VolumeSource{
@@ -1784,8 +2472,26 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			errtype:  field.ErrorTypeRequired,
-			errfield: "fc.lun",
+			errtype:   field.ErrorTypeRequired,
+			errfield:  "fc.lun",
+			errdetail: "lun is required if targetWWNs is specified",
+		},
+		{
+			name: "FC valid targetWWNs and invalid lun",
+			vol: api.Volume{
+				Name: "fc",
+				VolumeSource: api.VolumeSource{
+					FC: &api.FCVolumeSource{
+						TargetWWNs: []string{"wwn"},
+						Lun:        newInt32(256),
+						FSType:     "ext4",
+						ReadOnly:   false,
+					},
+				},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "fc.lun",
+			errdetail: validation.InclusiveRangeError(0, 255),
 		},
 		// FlexVolume
 		{
@@ -2051,6 +2757,240 @@ func TestValidateVolumes(t *testing.T) {
 	} else if errs[0].Type != field.ErrorTypeDuplicate {
 		t.Errorf("expected error type %v, got %v", field.ErrorTypeDuplicate, errs[0].Type)
 	}
+
+	// Validate HugePages medium type for EmptyDir when HugePages feature is enabled/disabled
+	hugePagesCase := api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumHugePages}}
+
+	// Enable alpha feature HugePages
+	err := utilfeature.DefaultFeatureGate.Set("HugePages=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for HugePages: %v", err)
+	}
+	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "working"); len(errs) != 0 {
+		t.Errorf("Unexpected error when HugePages feature is enabled.")
+	}
+
+	// Disable alpha feature HugePages
+	err = utilfeature.DefaultFeatureGate.Set("HugePages=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for HugePages: %v", err)
+	}
+	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "failing"); len(errs) == 0 {
+		t.Errorf("Expected error when HugePages feature is disabled got nothing.")
+	}
+
+}
+
+func TestAlphaHugePagesIsolation(t *testing.T) {
+	successCases := []api.Pod{
+		{ // Basic fields.
+			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+							},
+							Limits: api.ResourceList{
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+	}
+	failureCases := []api.Pod{
+		{ // Basic fields.
+			ObjectMeta: metav1.ObjectMeta{Name: "hugepages-shared", Namespace: "ns"},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+							},
+							Limits: api.ResourceList{
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("2Gi"),
+							},
+						},
+					},
+				},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		{ // Basic fields.
+			ObjectMeta: metav1.ObjectMeta{Name: "hugepages-multiple", Namespace: "ns"},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+								api.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+							},
+							Limits: api.ResourceList{
+								api.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+								api.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+							},
+						},
+					},
+				},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+	}
+	// Enable alpha feature HugePages
+	err := utilfeature.DefaultFeatureGate.Set("HugePages=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for HugePages: %v", err)
+		return
+	}
+	for i := range successCases {
+		pod := &successCases[i]
+		if errs := ValidatePod(pod); len(errs) != 0 {
+			t.Errorf("Unexpected error for case[%d], err: %v", i, errs)
+		}
+	}
+	for i := range failureCases {
+		pod := &failureCases[i]
+		if errs := ValidatePod(pod); len(errs) == 0 {
+			t.Errorf("Expected error for case[%d], pod: %v", i, pod.Name)
+		}
+	}
+	// Disable alpha feature HugePages
+	err = utilfeature.DefaultFeatureGate.Set("HugePages=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for HugePages: %v", err)
+		return
+	}
+	// Disable alpha feature HugePages and ensure all success cases fail
+	for i := range successCases {
+		pod := &successCases[i]
+		if errs := ValidatePod(pod); len(errs) == 0 {
+			t.Errorf("Expected error for case[%d], pod: %v", i, pod.Name)
+		}
+	}
+}
+
+func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
+
+	testCases := []api.VolumeSource{
+		{EmptyDir: &api.EmptyDirVolumeSource{SizeLimit: resource.NewQuantity(int64(5), resource.BinarySI)}},
+	}
+	// Enable alpha feature LocalStorageCapacityIsolation
+	err := utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for LocalStorageCapacityIsolation: %v", err)
+		return
+	}
+	for _, tc := range testCases {
+		if errs := validateVolumeSource(&tc, field.NewPath("spec"), "tmpvol"); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+	// Disable alpha feature LocalStorageCapacityIsolation
+	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for LocalStorageCapacityIsolation: %v", err)
+		return
+	}
+	for _, tc := range testCases {
+		if errs := validateVolumeSource(&tc, field.NewPath("spec"), "tmpvol"); len(errs) == 0 {
+			t.Errorf("expected failure: %v", errs)
+		}
+	}
+
+	containerLimitCase := api.ResourceRequirements{
+		Limits: api.ResourceList{
+			api.ResourceEphemeralStorage: *resource.NewMilliQuantity(
+				int64(40000),
+				resource.BinarySI),
+		},
+	}
+	// Enable alpha feature LocalStorageCapacityIsolation
+	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for LocalStorageCapacityIsolation: %v", err)
+		return
+	}
+	if errs := ValidateResourceRequirements(&containerLimitCase, field.NewPath("resources")); len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+	// Disable alpha feature LocalStorageCapacityIsolation
+	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for LocalStorageCapacityIsolation: %v", err)
+		return
+	}
+	if errs := ValidateResourceRequirements(&containerLimitCase, field.NewPath("resources")); len(errs) == 0 {
+		t.Errorf("expected failure: %v", errs)
+	}
+
+}
+
+func TestValidateResourceQuotaWithAlphaLocalStorageCapacityIsolation(t *testing.T) {
+	spec := api.ResourceQuotaSpec{
+		Hard: api.ResourceList{
+			api.ResourceCPU:                      resource.MustParse("100"),
+			api.ResourceMemory:                   resource.MustParse("10000"),
+			api.ResourceRequestsCPU:              resource.MustParse("100"),
+			api.ResourceRequestsMemory:           resource.MustParse("10000"),
+			api.ResourceLimitsCPU:                resource.MustParse("100"),
+			api.ResourceLimitsMemory:             resource.MustParse("10000"),
+			api.ResourcePods:                     resource.MustParse("10"),
+			api.ResourceServices:                 resource.MustParse("0"),
+			api.ResourceReplicationControllers:   resource.MustParse("10"),
+			api.ResourceQuotas:                   resource.MustParse("10"),
+			api.ResourceConfigMaps:               resource.MustParse("10"),
+			api.ResourceSecrets:                  resource.MustParse("10"),
+			api.ResourceEphemeralStorage:         resource.MustParse("10000"),
+			api.ResourceRequestsEphemeralStorage: resource.MustParse("10000"),
+			api.ResourceLimitsEphemeralStorage:   resource.MustParse("10000"),
+		},
+	}
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "abc",
+			Namespace: "foo",
+		},
+		Spec: spec,
+	}
+
+	// Enable alpha feature LocalStorageCapacityIsolation
+	err := utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for LocalStorageCapacityIsolation: %v", err)
+		return
+	}
+	if errs := ValidateResourceQuota(resourceQuota); len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+
+	// Disable alpha feature LocalStorageCapacityIsolation
+	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for LocalStorageCapacityIsolation: %v", err)
+		return
+	}
+	errs := ValidateResourceQuota(resourceQuota)
+	if len(errs) == 0 {
+		t.Errorf("expected failure for %s", resourceQuota.Name)
+	}
+	expectedErrMes := "ResourceEphemeralStorage field disabled by feature-gate for ResourceQuota"
+	for i := range errs {
+		if !strings.Contains(errs[i].Detail, expectedErrMes) {
+			t.Errorf("[%s]: expected error detail either empty or %s, got %s", resourceQuota.Name, expectedErrMes, errs[i].Detail)
+		}
+	}
 }
 
 func TestValidatePorts(t *testing.T) {
@@ -2151,18 +3091,84 @@ func TestValidatePorts(t *testing.T) {
 	}
 }
 
+func TestLocalStorageEnvWithFeatureGate(t *testing.T) {
+	testCases := []api.EnvVar{
+		{
+			Name: "ephemeral-storage-limits",
+			ValueFrom: &api.EnvVarSource{
+				ResourceFieldRef: &api.ResourceFieldSelector{
+					ContainerName: "test-container",
+					Resource:      "limits.ephemeral-storage",
+				},
+			},
+		},
+		{
+			Name: "ephemeral-storage-requests",
+			ValueFrom: &api.EnvVarSource{
+				ResourceFieldRef: &api.ResourceFieldSelector{
+					ContainerName: "test-container",
+					Resource:      "requests.ephemeral-storage",
+				},
+			},
+		},
+	}
+	// Enable alpha feature LocalStorageCapacityIsolation
+	err := utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for LocalStorageCapacityIsolation: %v", err)
+		return
+	}
+	for _, testCase := range testCases {
+		if errs := validateEnvVarValueFrom(testCase, field.NewPath("field")); len(errs) != 0 {
+			t.Errorf("expected success, got: %v", errs)
+		}
+	}
+
+	// Disable alpha feature LocalStorageCapacityIsolation
+	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for LocalStorageCapacityIsolation: %v", err)
+		return
+	}
+	for _, testCase := range testCases {
+		if errs := validateEnvVarValueFrom(testCase, field.NewPath("field")); len(errs) == 0 {
+			t.Errorf("expected failure for %v", testCase.Name)
+		}
+	}
+}
+
 func TestValidateEnv(t *testing.T) {
 	successCase := []api.EnvVar{
 		{Name: "abc", Value: "value"},
 		{Name: "ABC", Value: "value"},
 		{Name: "AbC_123", Value: "value"},
 		{Name: "abc", Value: ""},
+		{Name: "a.b.c", Value: "value"},
+		{Name: "a-b-c", Value: "value"},
 		{
 			Name: "abc",
 			ValueFrom: &api.EnvVarSource{
 				FieldRef: &api.ObjectFieldSelector{
 					APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 					FieldPath:  "metadata.name",
+				},
+			},
+		},
+		{
+			Name: "abc",
+			ValueFrom: &api.EnvVarSource{
+				FieldRef: &api.ObjectFieldSelector{
+					APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+					FieldPath:  "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name: "abc",
+			ValueFrom: &api.EnvVarSource{
+				FieldRef: &api.ObjectFieldSelector{
+					APIVersion: api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+					FieldPath:  "metadata.uid",
 				},
 			},
 		},
@@ -2226,7 +3232,7 @@ func TestValidateEnv(t *testing.T) {
 		},
 	}
 	if errs := ValidateEnv(successCase, field.NewPath("field")); len(errs) != 0 {
-		t.Errorf("expected success: %v", errs)
+		t.Errorf("expected success, got: %v", errs)
 	}
 
 	errorCases := []struct {
@@ -2240,9 +3246,24 @@ func TestValidateEnv(t *testing.T) {
 			expectedError: "[0].name: Required value",
 		},
 		{
-			name:          "name not a C identifier",
-			envs:          []api.EnvVar{{Name: "a.b.c"}},
-			expectedError: `[0].name: Invalid value: "a.b.c": ` + idErrMsg,
+			name:          "illegal character",
+			envs:          []api.EnvVar{{Name: "a!b"}},
+			expectedError: `[0].name: Invalid value: "a!b": ` + envVarNameErrMsg,
+		},
+		{
+			name:          "dot only",
+			envs:          []api.EnvVar{{Name: "."}},
+			expectedError: `[0].name: Invalid value: ".": must not be`,
+		},
+		{
+			name:          "double dots only",
+			envs:          []api.EnvVar{{Name: ".."}},
+			expectedError: `[0].name: Invalid value: "..": must not be`,
+		},
+		{
+			name:          "leading double dots",
+			envs:          []api.EnvVar{{Name: "..abc"}},
+			expectedError: `[0].name: Invalid value: "..abc": must not start with`,
 		},
 		{
 			name: "value and valueFrom specified",
@@ -2330,6 +3351,34 @@ func TestValidateEnv(t *testing.T) {
 			expectedError: `[0].valueFrom: Invalid value: "": may not have more than one field specified at a time`,
 		},
 		{
+			name: "valueFrom.secretKeyRef.name invalid",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					SecretKeyRef: &api.SecretKeySelector{
+						LocalObjectReference: api.LocalObjectReference{
+							Name: "$%^&*#",
+						},
+						Key: "a-key",
+					},
+				},
+			}},
+		},
+		{
+			name: "valueFrom.configMapKeyRef.name invalid",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					ConfigMapKeyRef: &api.ConfigMapKeySelector{
+						LocalObjectReference: api.LocalObjectReference{
+							Name: "$%^&*#",
+						},
+						Key: "some-key",
+					},
+				},
+			}},
+		},
+		{
 			name: "missing FieldPath on ObjectFieldSelector",
 			envs: []api.EnvVar{{
 				Name: "abc",
@@ -2377,7 +3426,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: metadata.name, metadata.namespace, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.labels": supported values: metadata.name, metadata.namespace, metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
 		},
 		{
 			name: "invalid fieldPath annotations",
@@ -2390,7 +3439,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: metadata.name, metadata.namespace, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
+			expectedError: `[0].valueFrom.fieldRef.fieldPath: Unsupported value: "metadata.annotations": supported values: metadata.name, metadata.namespace, metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
 		},
 		{
 			name: "unsupported fieldPath",
@@ -2403,7 +3452,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: metadata.name, metadata.namespace, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
+			expectedError: `valueFrom.fieldRef.fieldPath: Unsupported value: "status.phase": supported values: metadata.name, metadata.namespace, metadata.uid, spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP`,
 		},
 	}
 	for _, tc := range errorCases {
@@ -2434,12 +3483,24 @@ func TestValidateEnvFrom(t *testing.T) {
 			},
 		},
 		{
+			Prefix: "a.b",
+			ConfigMapRef: &api.ConfigMapEnvSource{
+				LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+			},
+		},
+		{
 			SecretRef: &api.SecretEnvSource{
 				LocalObjectReference: api.LocalObjectReference{Name: "abc"},
 			},
 		},
 		{
 			Prefix: "pre_",
+			SecretRef: &api.SecretEnvSource{
+				LocalObjectReference: api.LocalObjectReference{Name: "abc"},
+			},
+		},
+		{
+			Prefix: "a.b",
 			SecretRef: &api.SecretEnvSource{
 				LocalObjectReference: api.LocalObjectReference{Name: "abc"},
 			},
@@ -2478,12 +3539,12 @@ func TestValidateEnvFrom(t *testing.T) {
 			name: "invalid prefix",
 			envs: []api.EnvFromSource{
 				{
-					Prefix: "a.b",
+					Prefix: "a!b",
 					ConfigMapRef: &api.ConfigMapEnvSource{
 						LocalObjectReference: api.LocalObjectReference{Name: "abc"}},
 				},
 			},
-			expectedError: `field[0].prefix: Invalid value: "a.b": ` + idErrMsg,
+			expectedError: `field[0].prefix: Invalid value: "a!b": ` + envVarNameErrMsg,
 		},
 		{
 			name: "zero-length name",
@@ -2509,12 +3570,12 @@ func TestValidateEnvFrom(t *testing.T) {
 			name: "invalid prefix",
 			envs: []api.EnvFromSource{
 				{
-					Prefix: "a.b",
+					Prefix: "a!b",
 					SecretRef: &api.SecretEnvSource{
 						LocalObjectReference: api.LocalObjectReference{Name: "abc"}},
 				},
 			},
-			expectedError: `field[0].prefix: Invalid value: "a.b": ` + idErrMsg,
+			expectedError: `field[0].prefix: Invalid value: "a!b": ` + envVarNameErrMsg,
 		},
 		{
 			name: "no refs",
@@ -2535,6 +3596,26 @@ func TestValidateEnvFrom(t *testing.T) {
 			},
 			expectedError: "field: Invalid value: \"\": may not have more than one field specified at a time",
 		},
+		{
+			name: "invalid secret ref name",
+			envs: []api.EnvFromSource{
+				{
+					SecretRef: &api.SecretEnvSource{
+						LocalObjectReference: api.LocalObjectReference{Name: "$%^&*#"}},
+				},
+			},
+			expectedError: "field[0].secretRef.name: Invalid value: \"$%^&*#\": " + dnsSubdomainLabelErrMsg,
+		},
+		{
+			name: "invalid config ref name",
+			envs: []api.EnvFromSource{
+				{
+					ConfigMapRef: &api.ConfigMapEnvSource{
+						LocalObjectReference: api.LocalObjectReference{Name: "$%^&*#"}},
+				},
+			},
+			expectedError: "field[0].configMapRef.name: Invalid value: \"$%^&*#\": " + dnsSubdomainLabelErrMsg,
+		},
 	}
 	for _, tc := range errorCases {
 		if errs := ValidateEnvFrom(tc.envs, field.NewPath("field")); len(errs) == 0 {
@@ -2552,6 +3633,10 @@ func TestValidateEnvFrom(t *testing.T) {
 
 func TestValidateVolumeMounts(t *testing.T) {
 	volumes := sets.NewString("abc", "123", "abc-123")
+	container := api.Container{
+		SecurityContext: nil,
+	}
+	propagation := api.MountPropagationBidirectional
 
 	successCase := []api.VolumeMount{
 		{Name: "abc", MountPath: "/foo"},
@@ -2561,27 +3646,153 @@ func TestValidateVolumeMounts(t *testing.T) {
 		{Name: "abc-123", MountPath: "/bab", SubPath: "baz"},
 		{Name: "abc-123", MountPath: "/bac", SubPath: ".baz"},
 		{Name: "abc-123", MountPath: "/bad", SubPath: "..baz"},
-		{Name: "abc", MountPath: "c:/foo/bar"},
 	}
-	if errs := ValidateVolumeMounts(successCase, volumes, field.NewPath("field")); len(errs) != 0 {
+	if errs := ValidateVolumeMounts(successCase, volumes, &container, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
 	errorCases := map[string][]api.VolumeMount{
-		"empty name":          {{Name: "", MountPath: "/foo"}},
-		"name not found":      {{Name: "", MountPath: "/foo"}},
-		"empty mountpath":     {{Name: "abc", MountPath: ""}},
-		"mountpath collision": {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
-		"absolute subpath":    {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
-		"subpath in ..":       {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
-		"subpath contains ..": {{Name: "abc", MountPath: "/bar", SubPath: "baz/../bat"}},
-		"subpath ends in ..":  {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
+		"empty name":                             {{Name: "", MountPath: "/foo"}},
+		"name not found":                         {{Name: "", MountPath: "/foo"}},
+		"empty mountpath":                        {{Name: "abc", MountPath: ""}},
+		"relative mountpath":                     {{Name: "abc", MountPath: "bar"}},
+		"mountpath collision":                    {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
+		"absolute subpath":                       {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
+		"subpath in ..":                          {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
+		"subpath contains ..":                    {{Name: "abc", MountPath: "/bar", SubPath: "baz/../bat"}},
+		"subpath ends in ..":                     {{Name: "abc", MountPath: "/bar", SubPath: "./.."}},
+		"disabled MountPropagation feature gate": {{Name: "abc", MountPath: "/bar", MountPropagation: &propagation}},
 	}
 	for k, v := range errorCases {
-		if errs := ValidateVolumeMounts(v, volumes, field.NewPath("field")); len(errs) == 0 {
+		if errs := ValidateVolumeMounts(v, volumes, &container, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
 	}
+}
+
+func TestValidateMountPropagation(t *testing.T) {
+	bTrue := true
+	bFalse := false
+	privilegedContainer := &api.Container{
+		SecurityContext: &api.SecurityContext{
+			Privileged: &bTrue,
+		},
+	}
+	nonPrivilegedContainer := &api.Container{
+		SecurityContext: &api.SecurityContext{
+			Privileged: &bFalse,
+		},
+	}
+	defaultContainer := &api.Container{}
+
+	propagationBidirectional := api.MountPropagationBidirectional
+	propagationHostToContainer := api.MountPropagationHostToContainer
+	propagationInvalid := api.MountPropagationMode("invalid")
+
+	tests := []struct {
+		mount       api.VolumeMount
+		container   *api.Container
+		expectError bool
+	}{
+		{
+			// implicitly non-privileged container + no propagation
+			api.VolumeMount{Name: "foo", MountPath: "/foo"},
+			defaultContainer,
+			false,
+		},
+		{
+			// implicitly non-privileged container + HostToContainer
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
+			defaultContainer,
+			false,
+		},
+		{
+			// error: implicitly non-privileged container + Bidirectional
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+			defaultContainer,
+			true,
+		},
+		{
+			// explicitly non-privileged container + no propagation
+			api.VolumeMount{Name: "foo", MountPath: "/foo"},
+			nonPrivilegedContainer,
+			false,
+		},
+		{
+			// explicitly non-privileged container + HostToContainer
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
+			nonPrivilegedContainer,
+			false,
+		},
+		{
+			// explicitly non-privileged container + HostToContainer
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+			nonPrivilegedContainer,
+			true,
+		},
+		{
+			// privileged container + no propagation
+			api.VolumeMount{Name: "foo", MountPath: "/foo"},
+			privilegedContainer,
+			false,
+		},
+		{
+			// privileged container + HostToContainer
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationHostToContainer},
+			privilegedContainer,
+			false,
+		},
+		{
+			// privileged container + Bidirectional
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+			privilegedContainer,
+			false,
+		},
+		{
+			// error: privileged container + invalid mount propagation
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationInvalid},
+			privilegedContainer,
+			true,
+		},
+		{
+			// no container + Bidirectional
+			api.VolumeMount{Name: "foo", MountPath: "/foo", MountPropagation: &propagationBidirectional},
+			nil,
+			false,
+		},
+	}
+
+	// Enable MountPropagation for this test
+	priorityEnabled := utilfeature.DefaultFeatureGate.Enabled("MountPropagation")
+	defer func() {
+		var err error
+		// restoring the old value
+		if priorityEnabled {
+			err = utilfeature.DefaultFeatureGate.Set("MountPropagation=true")
+		} else {
+			err = utilfeature.DefaultFeatureGate.Set("MountPropagation=false")
+		}
+		if err != nil {
+			t.Errorf("Failed to restore feature gate for MountPropagation: %v", err)
+		}
+	}()
+	err := utilfeature.DefaultFeatureGate.Set("MountPropagation=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for MountPropagation: %v", err)
+		return
+	}
+
+	for i, test := range tests {
+		volumes := sets.NewString("foo")
+		errs := ValidateVolumeMounts([]api.VolumeMount{test.mount}, volumes, test.container, field.NewPath("field"))
+		if test.expectError && len(errs) == 0 {
+			t.Errorf("test %d expected error, got none", i)
+		}
+		if !test.expectError && len(errs) != 0 {
+			t.Errorf("test %d expected success, got error: %v", i, errs)
+		}
+	}
+
 }
 
 func TestValidateProbe(t *testing.T) {
@@ -2703,6 +3914,9 @@ func TestValidateContainers(t *testing.T) {
 
 	successCase := []api.Container{
 		{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+		// backwards compatibility to ensure containers in pod template spec do not check for this
+		{Name: "def", Image: " ", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+		{Name: "ghi", Image: " some  ", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 		{Name: "123", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 		{Name: "abc-123", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 		{
@@ -2723,7 +3937,7 @@ func TestValidateContainers(t *testing.T) {
 				Limits: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.ResourceName("my.org/resource"):  resource.MustParse("10m"),
+					api.ResourceName("my.org/resource"):  resource.MustParse("10"),
 				},
 			},
 			ImagePullPolicy:          "IfNotPresent",
@@ -2785,12 +3999,12 @@ func TestValidateContainers(t *testing.T) {
 				Requests: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.ResourceName("my.org/resource"):  resource.MustParse("10m"),
+					api.ResourceName("my.org/resource"):  resource.MustParse("10"),
 				},
 				Limits: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-					api.ResourceName("my.org/resource"):  resource.MustParse("10m"),
+					api.ResourceName("my.org/resource"):  resource.MustParse("10"),
 				},
 			},
 			ImagePullPolicy:          "IfNotPresent",
@@ -2806,7 +4020,7 @@ func TestValidateContainers(t *testing.T) {
 				},
 				Limits: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):   resource.MustParse("10"),
-					api.ResourceName("my.org/resource"): resource.MustParse("10m"),
+					api.ResourceName("my.org/resource"): resource.MustParse("10"),
 				},
 			},
 			ImagePullPolicy:          "IfNotPresent",
@@ -2846,6 +4060,21 @@ func TestValidateContainers(t *testing.T) {
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
 		},
+		{
+			Name:                     "env-from-source",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			EnvFrom: []api.EnvFromSource{
+				{
+					ConfigMapRef: &api.ConfigMapEnvSource{
+						LocalObjectReference: api.LocalObjectReference{
+							Name: "test",
+						},
+					},
+				},
+			},
+		},
 		{Name: "abc-1234", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File", SecurityContext: fakeValidSecurityContext(true)},
 	}
 	if errs := validateContainers(successCase, volumes, field.NewPath("field")); len(errs) != 0 {
@@ -2857,6 +4086,7 @@ func TestValidateContainers(t *testing.T) {
 	})
 	errorCases := map[string][]api.Container{
 		"zero-length name":     {{Name: "", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+		"zero-length-image":    {{Name: "abc", Image: "", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 		"name > 63 characters": {{Name: strings.Repeat("a", 64), Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 		"name not a DNS label": {{Name: "a.b.c", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 		"name not unique": {
@@ -2871,7 +4101,7 @@ func TestValidateContainers(t *testing.T) {
 				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 		},
 		"invalid env var name": {
-			{Name: "abc", Image: "image", Env: []api.EnvVar{{Name: "ev.1"}}, ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+			{Name: "abc", Image: "image", Env: []api.EnvVar{{Name: "ev!1"}}, ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 		},
 		"unknown volume name": {
 			{Name: "abc", Image: "image", VolumeMounts: []api.VolumeMount{{Name: "anything", MountPath: "/foo"}},
@@ -3051,6 +4281,21 @@ func TestValidateContainers(t *testing.T) {
 				ImagePullPolicy:          "IfNotPresent",
 			},
 		},
+		"Resource GPU invalid setting only request": {
+			{
+				Name:  "gpu-resource-request-limit",
+				Image: "image",
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceName(api.ResourceCPU):       resource.MustParse("10"),
+						api.ResourceName(api.ResourceMemory):    resource.MustParse("10G"),
+						api.ResourceName(api.ResourceNvidiaGPU): resource.MustParse("1"),
+					},
+				},
+				TerminationMessagePolicy: "File",
+				ImagePullPolicy:          "IfNotPresent",
+			},
+		},
 		"Request limit simple invalid": {
 			{
 				Name:  "abc-123",
@@ -3073,6 +4318,23 @@ func TestValidateContainers(t *testing.T) {
 				},
 				ImagePullPolicy:          "IfNotPresent",
 				TerminationMessagePolicy: "File",
+			},
+		},
+		"Invalid env from": {
+			{
+				Name:                     "env-from-source",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				EnvFrom: []api.EnvFromSource{
+					{
+						ConfigMapRef: &api.ConfigMapEnvSource{
+							LocalObjectReference: api.LocalObjectReference{
+								Name: "$%^&*#",
+							},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -3122,12 +4384,31 @@ func TestValidateDNSPolicy(t *testing.T) {
 
 func TestValidatePodSpec(t *testing.T) {
 	activeDeadlineSeconds := int64(30)
+	activeDeadlineSecondsMax := int64(math.MaxInt32)
 
-	minUserID := types.UnixUserID(0)
-	maxUserID := types.UnixUserID(2147483647)
-	minGroupID := types.UnixGroupID(0)
-	maxGroupID := types.UnixGroupID(2147483647)
+	minUserID := int64(0)
+	maxUserID := int64(2147483647)
+	minGroupID := int64(0)
+	maxGroupID := int64(2147483647)
 
+	priorityEnabled := utilfeature.DefaultFeatureGate.Enabled("PodPriority")
+	defer func() {
+		var err error
+		// restoring the old value
+		if priorityEnabled {
+			err = utilfeature.DefaultFeatureGate.Set("PodPriority=true")
+		} else {
+			err = utilfeature.DefaultFeatureGate.Set("PodPriority=false")
+		}
+		if err != nil {
+			t.Errorf("Failed to restore feature gate for PodPriority: %v", err)
+		}
+	}()
+	err := utilfeature.DefaultFeatureGate.Set("PodPriority=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for PodPriority: %v", err)
+		return
+	}
 	successCases := []api.PodSpec{
 		{ // Populate basic fields, leave defaults for most.
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
@@ -3150,6 +4431,21 @@ func TestValidatePodSpec(t *testing.T) {
 			ActiveDeadlineSeconds: &activeDeadlineSeconds,
 			ServiceAccountName:    "acct",
 		},
+		{ // Populate all fields with larger active deadline.
+			Volumes: []api.Volume{
+				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+			},
+			Containers:     []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			InitContainers: []api.Container{{Name: "ictr", Image: "iimage", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:  api.RestartPolicyAlways,
+			NodeSelector: map[string]string{
+				"key": "value",
+			},
+			NodeName:              "foobar",
+			DNSPolicy:             api.DNSClusterFirst,
+			ActiveDeadlineSeconds: &activeDeadlineSecondsMax,
+			ServiceAccountName:    "acct",
+		},
 		{ // Populate HostNetwork.
 			Containers: []api.Container{
 				{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File",
@@ -3166,7 +4462,7 @@ func TestValidatePodSpec(t *testing.T) {
 		{ // Populate RunAsUser SupplementalGroups FSGroup with minID 0
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
-				SupplementalGroups: []types.UnixGroupID{minGroupID},
+				SupplementalGroups: []int64{minGroupID},
 				RunAsUser:          &minUserID,
 				FSGroup:            &minGroupID,
 			},
@@ -3176,7 +4472,7 @@ func TestValidatePodSpec(t *testing.T) {
 		{ // Populate RunAsUser SupplementalGroups FSGroup with maxID 2147483647
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
-				SupplementalGroups: []types.UnixGroupID{maxGroupID},
+				SupplementalGroups: []int64{maxGroupID},
 				RunAsUser:          &maxUserID,
 				FSGroup:            &maxGroupID,
 			},
@@ -3214,6 +4510,29 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
+		{ // Populate HostAliases with `foo.bar` hostnames.
+			HostAliases:   []api.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"host1.foo", "host2.bar"}}},
+			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
+		{ // Populate HostAliases with HostNetwork.
+			HostAliases: []api.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"host1.foo", "host2.bar"}}},
+			Containers:  []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			SecurityContext: &api.PodSecurityContext{
+				HostNetwork: true,
+			},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
+		{ // Populate PriorityClassName.
+			Volumes:           []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:        []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:     api.RestartPolicyAlways,
+			DNSPolicy:         api.DNSClusterFirst,
+			PriorityClassName: "valid-name",
+		},
 	}
 	for i := range successCases {
 		if errs := ValidatePodSpec(&successCases[i], field.NewPath("field")); len(errs) != 0 {
@@ -3222,11 +4541,12 @@ func TestValidatePodSpec(t *testing.T) {
 	}
 
 	activeDeadlineSeconds = int64(0)
+	activeDeadlineSecondsTooLarge := int64(math.MaxInt32 + 1)
 
-	minUserID = types.UnixUserID(-1)
-	maxUserID = types.UnixUserID(2147483648)
-	minGroupID = types.UnixGroupID(-1)
-	maxGroupID = types.UnixGroupID(2147483648)
+	minUserID = int64(-1)
+	maxUserID = int64(2147483648)
+	minGroupID = int64(-1)
+	maxGroupID = int64(2147483648)
 
 	failureCases := map[string]api.PodSpec{
 		"bad volume": {
@@ -3278,12 +4598,6 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
-		"with hostNetwork and hostAliases": {
-			SecurityContext: &api.PodSecurityContext{
-				HostNetwork: true,
-			},
-			HostAliases: []api.HostAlias{{IP: "12.34.56.78", Hostnames: []string{"host1", "host2"}}},
-		},
 		"with hostAliases with invalid IP": {
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork: false,
@@ -3300,7 +4614,7 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork:        false,
-				SupplementalGroups: []types.UnixGroupID{maxGroupID, 1234},
+				SupplementalGroups: []int64{maxGroupID, 1234},
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -3309,7 +4623,7 @@ func TestValidatePodSpec(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork:        false,
-				SupplementalGroups: []types.UnixGroupID{minGroupID, 1234},
+				SupplementalGroups: []int64{minGroupID, 1234},
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -3363,6 +4677,19 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:             api.DNSClusterFirst,
 			ActiveDeadlineSeconds: &activeDeadlineSeconds,
 		},
+		"active-deadline-seconds-too-large": {
+			Volumes: []api.Volume{
+				{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+			},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			NodeSelector: map[string]string{
+				"key": "value",
+			},
+			NodeName:              "foobar",
+			DNSPolicy:             api.DNSClusterFirst,
+			ActiveDeadlineSeconds: &activeDeadlineSecondsTooLarge,
+		},
 		"bad nodeName": {
 			NodeName:      "node name",
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
@@ -3370,10 +4697,45 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
+		"bad PriorityClassName": {
+			Volumes:           []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:        []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:     api.RestartPolicyAlways,
+			DNSPolicy:         api.DNSClusterFirst,
+			PriorityClassName: "InvalidName",
+		},
 	}
 	for k, v := range failureCases {
 		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
+		}
+	}
+
+	err = utilfeature.DefaultFeatureGate.Set("PodPriority=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for PodPriority: %v", err)
+		return
+	}
+	priority := int32(100)
+	featuregatedCases := map[string]api.PodSpec{
+		"set PriorityClassName": {
+			Volumes:           []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:        []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy:     api.RestartPolicyAlways,
+			DNSPolicy:         api.DNSClusterFirst,
+			PriorityClassName: "valid-name",
+		},
+		"set Priority": {
+			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+			Priority:      &priority,
+		},
+	}
+	for k, v := range featuregatedCases {
+		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
+			t.Errorf("expected failure due to gated feature: %q", k)
 		}
 	}
 }
@@ -3785,265 +5147,275 @@ func TestValidatePod(t *testing.T) {
 		}
 	}
 
-	errorCases := map[string]api.Pod{
+	errorCases := map[string]struct {
+		spec          api.Pod
+		expectedError string
+	}{
 		"bad name": {
-			ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: "ns"},
-			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			expectedError: "metadata.name",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "", Namespace: "ns"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+					Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				},
+			},
+		},
+		"image whitespace": {
+			expectedError: "spec.containers[0].image",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "ns"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+					Containers:    []api.Container{{Name: "ctr", Image: " ", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				},
+			},
+		},
+		"image leading and trailing whitespace": {
+			expectedError: "spec.containers[0].image",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "ns"},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+					Containers:    []api.Container{{Name: "ctr", Image: " something ", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				},
 			},
 		},
 		"bad namespace": {
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: ""},
-			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+			expectedError: "metadata.namespace",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: ""},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+					Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				},
 			},
 		},
 		"bad spec": {
-			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "ns"},
-			Spec: api.PodSpec{
-				Containers: []api.Container{{}},
+			expectedError: "spec.containers[0].name",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "ns"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{}},
+				},
 			},
 		},
 		"bad label": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "abc",
-				Namespace: "ns",
-				Labels: map[string]string{
-					"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+			expectedError: "NoUppercaseOrSpecialCharsLike=Equals",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "abc",
+					Namespace: "ns",
+					Labels: map[string]string{
+						"NoUppercaseOrSpecialCharsLike=Equals": "bar",
+					},
 				},
-			},
-			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+					Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+				},
 			},
 		},
 		"invalid node selector requirement in node affinity, operator can't be null": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: validPodSpec(&api.Affinity{
-				NodeAffinity: &api.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
-						NodeSelectorTerms: []api.NodeSelectorTerm{
-							{
-								MatchExpressions: []api.NodeSelectorRequirement{
-									{
-										Key: "key1",
+			expectedError: "spec.affinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0].operator",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&api.Affinity{
+					NodeAffinity: &api.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+							NodeSelectorTerms: []api.NodeSelectorTerm{
+								{
+									MatchExpressions: []api.NodeSelectorRequirement{
+										{
+											Key: "key1",
+										},
 									},
 								},
 							},
 						},
 					},
-				},
-			}),
+				}),
+			},
 		},
 		"invalid preferredSchedulingTerm in node affinity, weight should be in range 1-100": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: validPodSpec(&api.Affinity{
-				NodeAffinity: &api.NodeAffinity{
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.PreferredSchedulingTerm{
-						{
-							Weight: 199,
-							Preference: api.NodeSelectorTerm{
-								MatchExpressions: []api.NodeSelectorRequirement{
-									{
-										Key:      "foo",
-										Operator: api.NodeSelectorOpIn,
-										Values:   []string{"bar"},
+			expectedError: "must be in the range 1-100",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&api.Affinity{
+					NodeAffinity: &api.NodeAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []api.PreferredSchedulingTerm{
+							{
+								Weight: 199,
+								Preference: api.NodeSelectorTerm{
+									MatchExpressions: []api.NodeSelectorRequirement{
+										{
+											Key:      "foo",
+											Operator: api.NodeSelectorOpIn,
+											Values:   []string{"bar"},
+										},
 									},
 								},
 							},
 						},
 					},
-				},
-			}),
+				}),
+			},
 		},
 		"invalid requiredDuringSchedulingIgnoredDuringExecution node selector, nodeSelectorTerms must have at least one term": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: validPodSpec(&api.Affinity{
-				NodeAffinity: &api.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
-						NodeSelectorTerms: []api.NodeSelectorTerm{},
-					},
+			expectedError: "spec.affinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
 				},
-			}),
+				Spec: validPodSpec(&api.Affinity{
+					NodeAffinity: &api.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+							NodeSelectorTerms: []api.NodeSelectorTerm{},
+						},
+					},
+				}),
+			},
 		},
 		"invalid requiredDuringSchedulingIgnoredDuringExecution node selector term, matchExpressions must have at least one node selector requirement": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: validPodSpec(&api.Affinity{
-				NodeAffinity: &api.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
-						NodeSelectorTerms: []api.NodeSelectorTerm{
-							{
-								MatchExpressions: []api.NodeSelectorRequirement{},
+			expectedError: "spec.affinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&api.Affinity{
+					NodeAffinity: &api.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+							NodeSelectorTerms: []api.NodeSelectorTerm{
+								{
+									MatchExpressions: []api.NodeSelectorRequirement{},
+								},
 							},
 						},
 					},
-				},
-			}),
+				}),
+			},
 		},
 		"invalid weight in preferredDuringSchedulingIgnoredDuringExecution in pod affinity annotations, weight should be in range 1-100": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: validPodSpec(&api.Affinity{
-				PodAffinity: &api.PodAffinity{
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{
-							Weight: 109,
-							PodAffinityTerm: api.PodAffinityTerm{
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
-										{
-											Key:      "key2",
-											Operator: metav1.LabelSelectorOpNotIn,
-											Values:   []string{"value1", "value2"},
+			expectedError: "must be in the range 1-100",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&api.Affinity{
+					PodAffinity: &api.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+							{
+								Weight: 109,
+								PodAffinityTerm: api.PodAffinityTerm{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "key2",
+												Operator: metav1.LabelSelectorOpNotIn,
+												Values:   []string{"value1", "value2"},
+											},
 										},
 									},
+									Namespaces:  []string{"ns"},
+									TopologyKey: "region",
 								},
-								Namespaces:  []string{"ns"},
-								TopologyKey: "region",
 							},
 						},
 					},
-				},
-			}),
+				}),
+			},
 		},
 		"invalid labelSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, values should be empty if the operator is Exists": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: validPodSpec(&api.Affinity{
-				PodAntiAffinity: &api.PodAntiAffinity{
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{
-							Weight: 10,
-							PodAffinityTerm: api.PodAffinityTerm{
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
-										{
-											Key:      "key2",
-											Operator: metav1.LabelSelectorOpExists,
-											Values:   []string{"value1", "value2"},
+			expectedError: "spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.matchExpressions.matchExpressions[0].values",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&api.Affinity{
+					PodAntiAffinity: &api.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+							{
+								Weight: 10,
+								PodAffinityTerm: api.PodAffinityTerm{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "key2",
+												Operator: metav1.LabelSelectorOpExists,
+												Values:   []string{"value1", "value2"},
+											},
 										},
 									},
+									Namespaces:  []string{"ns"},
+									TopologyKey: "region",
 								},
-								Namespaces:  []string{"ns"},
-								TopologyKey: "region",
 							},
 						},
 					},
-				},
-			}),
+				}),
+			},
 		},
 		"invalid name space in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, name space shouldbe valid": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: validPodSpec(&api.Affinity{
-				PodAffinity: &api.PodAffinity{
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{
-							Weight: 10,
-							PodAffinityTerm: api.PodAffinityTerm{
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
-										{
-											Key:      "key2",
-											Operator: metav1.LabelSelectorOpExists,
+			expectedError: "spec.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].podAffinityTerm.namespace",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&api.Affinity{
+					PodAffinity: &api.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+							{
+								Weight: 10,
+								PodAffinityTerm: api.PodAffinityTerm{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "key2",
+												Operator: metav1.LabelSelectorOpExists,
+											},
 										},
 									},
+									Namespaces:  []string{"INVALID_NAMESPACE"},
+									TopologyKey: "region",
 								},
-								Namespaces:  []string{"INVALID_NAMESPACE"},
-								TopologyKey: "region",
 							},
 						},
 					},
-				},
-			}),
-		},
-		"invalid pod affinity, empty topologyKey is not allowed for hard pod affinity": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
+				}),
 			},
-			Spec: validPodSpec(&api.Affinity{
-				PodAffinity: &api.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "key2",
-										Operator: metav1.LabelSelectorOpIn,
-										Values:   []string{"value1", "value2"},
-									},
-								},
-							},
-							Namespaces: []string{"ns"},
-						},
-					},
-				},
-			}),
 		},
-		"invalid pod anti-affinity, empty topologyKey is not allowed for hard pod anti-affinity": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: validPodSpec(&api.Affinity{
-				PodAntiAffinity: &api.PodAntiAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "key2",
-										Operator: metav1.LabelSelectorOpIn,
-										Values:   []string{"value1", "value2"},
-									},
-								},
-							},
-							Namespaces: []string{"ns"},
-						},
-					},
+		"invalid hard pod affinity, empty topologyKey is not allowed for hard pod affinity": {
+			expectedError: "can not be empty",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
 				},
-			}),
-		},
-		"invalid pod anti-affinity, empty topologyKey is not allowed for soft pod affinity": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-			},
-			Spec: validPodSpec(&api.Affinity{
-				PodAffinity: &api.PodAffinity{
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{
-							Weight: 10,
-							PodAffinityTerm: api.PodAffinityTerm{
+				Spec: validPodSpec(&api.Affinity{
+					PodAffinity: &api.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+							{
 								LabelSelector: &metav1.LabelSelector{
 									MatchExpressions: []metav1.LabelSelectorRequirement{
 										{
 											Key:      "key2",
-											Operator: metav1.LabelSelectorOpNotIn,
+											Operator: metav1.LabelSelectorOpIn,
 											Values:   []string{"value1", "value2"},
 										},
 									},
@@ -4052,411 +5424,475 @@ func TestValidatePod(t *testing.T) {
 							},
 						},
 					},
+				}),
+			},
+		},
+		"invalid hard pod anti-affinity, empty topologyKey is not allowed for hard pod anti-affinity": {
+			expectedError: "can not be empty",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
 				},
-			}),
+				Spec: validPodSpec(&api.Affinity{
+					PodAntiAffinity: &api.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "key2",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"value1", "value2"},
+										},
+									},
+								},
+								Namespaces: []string{"ns"},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid soft pod affinity, empty topologyKey is not allowed for soft pod affinity": {
+			expectedError: "can not be empty",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&api.Affinity{
+					PodAffinity: &api.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+							{
+								Weight: 10,
+								PodAffinityTerm: api.PodAffinityTerm{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "key2",
+												Operator: metav1.LabelSelectorOpNotIn,
+												Values:   []string{"value1", "value2"},
+											},
+										},
+									},
+									Namespaces: []string{"ns"},
+								},
+							},
+						},
+					},
+				}),
+			},
+		},
+		"invalid soft pod anti-affinity, empty topologyKey is not allowed for soft pod anti-affinity": {
+			expectedError: "can not be empty",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: validPodSpec(&api.Affinity{
+					PodAntiAffinity: &api.PodAntiAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+							{
+								Weight: 10,
+								PodAffinityTerm: api.PodAffinityTerm{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      "key2",
+												Operator: metav1.LabelSelectorOpNotIn,
+												Values:   []string{"value1", "value2"},
+											},
+										},
+									},
+									Namespaces: []string{"ns"},
+								},
+							},
+						},
+					},
+				}),
+			},
 		},
 		"invalid toleration key": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
+			expectedError: "spec.tolerations[0].key",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "nospecialchars^=@", Operator: "Equal", Value: "bar", Effect: "NoSchedule"}}),
 			},
-			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "nospecialchars^=@", Operator: "Equal", Value: "bar", Effect: "NoSchedule"}}),
 		},
 		"invalid toleration operator": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
+			expectedError: "spec.tolerations[0].operator",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "foo", Operator: "In", Value: "bar", Effect: "NoSchedule"}}),
 			},
-			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "foo", Operator: "In", Value: "bar", Effect: "NoSchedule"}}),
 		},
 		"value must be empty when `operator` is 'Exists'": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
+			expectedError: "spec.tolerations[0].operator",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "foo", Operator: "Exists", Value: "bar", Effect: "NoSchedule"}}),
 			},
-			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "foo", Operator: "Exists", Value: "bar", Effect: "NoSchedule"}}),
 		},
 
 		"operator must be 'Exists' when `key` is empty": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
+			expectedError: "spec.tolerations[0].operator",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+				},
+				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Operator: "Equal", Value: "bar", Effect: "NoSchedule"}}),
 			},
-			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Operator: "Equal", Value: "bar", Effect: "NoSchedule"}}),
 		},
 		"effect must be 'NoExecute' when `TolerationSeconds` is set": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "pod-forgiveness-invalid",
-				Namespace: "ns",
+			expectedError: "spec.tolerations[0].effect",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-forgiveness-invalid",
+					Namespace: "ns",
+				},
+				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "node.alpha.kubernetes.io/notReady", Operator: "Exists", Effect: "NoSchedule", TolerationSeconds: &[]int64{20}[0]}}),
 			},
-			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "node.alpha.kubernetes.io/notReady", Operator: "Exists", Effect: "NoSchedule", TolerationSeconds: &[]int64{20}[0]}}),
 		},
 		"must be a valid pod seccomp profile": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SeccompPodAnnotationKey: "foo",
+			expectedError: "must be a valid seccomp profile",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+					Annotations: map[string]string{
+						api.SeccompPodAnnotationKey: "foo",
+					},
 				},
+				Spec: validPodSpec(nil),
 			},
-			Spec: validPodSpec(nil),
 		},
 		"must be a valid container seccomp profile": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SeccompContainerAnnotationKeyPrefix + "foo": "foo",
+			expectedError: "must be a valid seccomp profile",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+					Annotations: map[string]string{
+						api.SeccompContainerAnnotationKeyPrefix + "foo": "foo",
+					},
 				},
+				Spec: validPodSpec(nil),
 			},
-			Spec: validPodSpec(nil),
 		},
 		"must be a non-empty container name in seccomp annotation": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SeccompContainerAnnotationKeyPrefix: "foo",
+			expectedError: "name part must be non-empty",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+					Annotations: map[string]string{
+						api.SeccompContainerAnnotationKeyPrefix: "foo",
+					},
 				},
+				Spec: validPodSpec(nil),
 			},
-			Spec: validPodSpec(nil),
 		},
 		"must be a non-empty container profile in seccomp annotation": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SeccompContainerAnnotationKeyPrefix + "foo": "",
+			expectedError: "must be a valid seccomp profile",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+					Annotations: map[string]string{
+						api.SeccompContainerAnnotationKeyPrefix + "foo": "",
+					},
 				},
+				Spec: validPodSpec(nil),
 			},
-			Spec: validPodSpec(nil),
 		},
 		"must be a relative path in a node-local seccomp profile annotation": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SeccompPodAnnotationKey: "localhost//foo",
+			expectedError: "must be a relative path",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+					Annotations: map[string]string{
+						api.SeccompPodAnnotationKey: "localhost//foo",
+					},
 				},
+				Spec: validPodSpec(nil),
 			},
-			Spec: validPodSpec(nil),
 		},
 		"must not start with '../'": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SeccompPodAnnotationKey: "localhost/../foo",
+			expectedError: "must not contain '..'",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+					Annotations: map[string]string{
+						api.SeccompPodAnnotationKey: "localhost/../foo",
+					},
 				},
+				Spec: validPodSpec(nil),
 			},
-			Spec: validPodSpec(nil),
 		},
 		"AppArmor profile must apply to a container": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					apparmor.ContainerAnnotationKeyPrefix + "ctr":      apparmor.ProfileRuntimeDefault,
-					apparmor.ContainerAnnotationKeyPrefix + "init-ctr": apparmor.ProfileRuntimeDefault,
-					apparmor.ContainerAnnotationKeyPrefix + "fake-ctr": apparmor.ProfileRuntimeDefault,
+			expectedError: "metadata.annotations[container.apparmor.security.beta.kubernetes.io/fake-ctr]",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+					Annotations: map[string]string{
+						apparmor.ContainerAnnotationKeyPrefix + "ctr":      apparmor.ProfileRuntimeDefault,
+						apparmor.ContainerAnnotationKeyPrefix + "init-ctr": apparmor.ProfileRuntimeDefault,
+						apparmor.ContainerAnnotationKeyPrefix + "fake-ctr": apparmor.ProfileRuntimeDefault,
+					},
 				},
-			},
-			Spec: api.PodSpec{
-				InitContainers: []api.Container{{Name: "init-ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				Containers:     []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy:  api.RestartPolicyAlways,
-				DNSPolicy:      api.DNSClusterFirst,
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{{Name: "init-ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					Containers:     []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					RestartPolicy:  api.RestartPolicyAlways,
+					DNSPolicy:      api.DNSClusterFirst,
+				},
 			},
 		},
 		"AppArmor profile format must be valid": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					apparmor.ContainerAnnotationKeyPrefix + "ctr": "bad-name",
+			expectedError: "invalid AppArmor profile name",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+					Annotations: map[string]string{
+						apparmor.ContainerAnnotationKeyPrefix + "ctr": "bad-name",
+					},
 				},
+				Spec: validPodSpec(nil),
 			},
-			Spec: validPodSpec(nil),
 		},
 		"only default AppArmor profile may start with runtime/": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					apparmor.ContainerAnnotationKeyPrefix + "ctr": "runtime/foo",
+			expectedError: "invalid AppArmor profile name",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+					Annotations: map[string]string{
+						apparmor.ContainerAnnotationKeyPrefix + "ctr": "runtime/foo",
+					},
 				},
+				Spec: validPodSpec(nil),
 			},
-			Spec: validPodSpec(nil),
 		},
 		"invalid sysctl annotation": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SysctlsPodAnnotationKey: "foo:",
+			expectedError: "metadata.annotations[security.alpha.kubernetes.io/sysctls]",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+					Annotations: map[string]string{
+						api.SysctlsPodAnnotationKey: "foo:",
+					},
 				},
+				Spec: validPodSpec(nil),
 			},
-			Spec: validPodSpec(nil),
 		},
 		"invalid comma-separated sysctl annotation": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SysctlsPodAnnotationKey: "kernel.msgmax,",
+			expectedError: "not of the format sysctl_name=value",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+					Annotations: map[string]string{
+						api.SysctlsPodAnnotationKey: "kernel.msgmax,",
+					},
 				},
+				Spec: validPodSpec(nil),
 			},
-			Spec: validPodSpec(nil),
 		},
 		"invalid unsafe sysctl annotation": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SysctlsPodAnnotationKey: "foo:",
+			expectedError: "metadata.annotations[security.alpha.kubernetes.io/sysctls]",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+					Annotations: map[string]string{
+						api.SysctlsPodAnnotationKey: "foo:",
+					},
 				},
+				Spec: validPodSpec(nil),
 			},
-			Spec: validPodSpec(nil),
 		},
 		"intersecting safe sysctls and unsafe sysctls annotations": {
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SysctlsPodAnnotationKey:       "kernel.shmmax=10000000",
-					api.UnsafeSysctlsPodAnnotationKey: "kernel.shmmax=10000000",
+			expectedError: "can not be safe and unsafe",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "123",
+					Namespace: "ns",
+					Annotations: map[string]string{
+						api.SysctlsPodAnnotationKey:       "kernel.shmmax=10000000",
+						api.UnsafeSysctlsPodAnnotationKey: "kernel.shmmax=10000000",
+					},
 				},
+				Spec: validPodSpec(nil),
 			},
-			Spec: validPodSpec(nil),
 		},
 		"invalid opaque integer resource requirement: request must be <= limit": {
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name:            "invalid",
-						Image:           "image",
-						ImagePullPolicy: "IfNotPresent",
-						Resources: api.ResourceRequirements{
-							Requests: api.ResourceList{
-								helper.OpaqueIntResourceName("A"): resource.MustParse("2"),
-							},
-							Limits: api.ResourceList{
-								helper.OpaqueIntResourceName("A"): resource.MustParse("1"),
+			expectedError: "must be less than or equal to pod.alpha.kubernetes.io/opaque-int-resource-A",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:            "invalid",
+							Image:           "image",
+							ImagePullPolicy: "IfNotPresent",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									helper.OpaqueIntResourceName("A"): resource.MustParse("2"),
+								},
+								Limits: api.ResourceList{
+									helper.OpaqueIntResourceName("A"): resource.MustParse("1"),
+								},
 							},
 						},
 					},
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
 		"invalid fractional opaque integer resource in container request": {
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name:            "invalid",
-						Image:           "image",
-						ImagePullPolicy: "IfNotPresent",
-						Resources: api.ResourceRequirements{
-							Requests: api.ResourceList{
-								helper.OpaqueIntResourceName("A"): resource.MustParse("500m"),
+			expectedError: "must be an integer",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:            "invalid",
+							Image:           "image",
+							ImagePullPolicy: "IfNotPresent",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									helper.OpaqueIntResourceName("A"): resource.MustParse("500m"),
+								},
 							},
 						},
 					},
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
 		"invalid fractional opaque integer resource in init container request": {
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: api.PodSpec{
-				InitContainers: []api.Container{
-					{
-						Name:            "invalid",
-						Image:           "image",
-						ImagePullPolicy: "IfNotPresent",
-						Resources: api.ResourceRequirements{
-							Requests: api.ResourceList{
-								helper.OpaqueIntResourceName("A"): resource.MustParse("500m"),
+			expectedError: "must be an integer",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{
+						{
+							Name:            "invalid",
+							Image:           "image",
+							ImagePullPolicy: "IfNotPresent",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									helper.OpaqueIntResourceName("A"): resource.MustParse("500m"),
+								},
 							},
 						},
 					},
+					Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
 		"invalid fractional opaque integer resource in container limit": {
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name:            "invalid",
-						Image:           "image",
-						ImagePullPolicy: "IfNotPresent",
-						Resources: api.ResourceRequirements{
-							Requests: api.ResourceList{
-								helper.OpaqueIntResourceName("A"): resource.MustParse("5"),
-							},
-							Limits: api.ResourceList{
-								helper.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
+			expectedError: "must be an integer",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:            "invalid",
+							Image:           "image",
+							ImagePullPolicy: "IfNotPresent",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									helper.OpaqueIntResourceName("A"): resource.MustParse("5"),
+								},
+								Limits: api.ResourceList{
+									helper.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
+								},
 							},
 						},
 					},
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
 		"invalid fractional opaque integer resource in init container limit": {
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: api.PodSpec{
-				InitContainers: []api.Container{
-					{
-						Name:            "invalid",
-						Image:           "image",
-						ImagePullPolicy: "IfNotPresent",
-						Resources: api.ResourceRequirements{
-							Requests: api.ResourceList{
-								helper.OpaqueIntResourceName("A"): resource.MustParse("5"),
-							},
-							Limits: api.ResourceList{
-								helper.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
+			expectedError: "must be an integer",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
+				Spec: api.PodSpec{
+					InitContainers: []api.Container{
+						{
+							Name:            "invalid",
+							Image:           "image",
+							ImagePullPolicy: "IfNotPresent",
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									helper.OpaqueIntResourceName("A"): resource.MustParse("5"),
+								},
+								Limits: api.ResourceList{
+									helper.OpaqueIntResourceName("A"): resource.MustParse("2.5"),
+								},
 							},
 						},
 					},
+					Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"mirror-pod present without nodeName": {
+			expectedError: "mirror",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns", Annotations: map[string]string{api.MirrorPodAnnotationKey: ""}},
+				Spec: api.PodSpec{
+					Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
+		},
+		"mirror-pod populated without nodeName": {
+			expectedError: "mirror",
+			spec: api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns", Annotations: map[string]string{api.MirrorPodAnnotationKey: "foo"}},
+				Spec: api.PodSpec{
+					Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+				},
 			},
 		},
 	}
 	for k, v := range errorCases {
-		if errs := ValidatePod(&v); len(errs) == 0 {
+		if errs := ValidatePod(&v.spec); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
-		}
-	}
-}
-
-func TestValidatePodWithDisabledAffinityInAnnotations(t *testing.T) {
-	validPodSpec := func(affinity *api.Affinity) api.PodSpec {
-		spec := api.PodSpec{
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
-		}
-		if affinity != nil {
-			spec.Affinity = affinity
-		}
-		return spec
-	}
-
-	utilfeature.DefaultFeatureGate.Set("AffinityInAnnotations=False")
-	errorCases := []api.Pod{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: validPodSpec(&api.Affinity{
-				PodAffinity: &api.PodAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "key2",
-										Operator: metav1.LabelSelectorOpIn,
-										Values:   []string{"value1", "value2"},
-									},
-								},
-							},
-							TopologyKey: "",
-							Namespaces:  []string{"ns"},
-						},
-					},
-				},
-			}),
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: validPodSpec(&api.Affinity{
-				PodAffinity: &api.PodAffinity{
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{
-							Weight: 10,
-							PodAffinityTerm: api.PodAffinityTerm{
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
-										{
-											Key:      "key2",
-											Operator: metav1.LabelSelectorOpNotIn,
-											Values:   []string{"value1", "value2"},
-										},
-									},
-								},
-								Namespaces:  []string{"ns"},
-								TopologyKey: "",
-							},
-						},
-					},
-				},
-			}),
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: validPodSpec(&api.Affinity{
-				PodAntiAffinity: &api.PodAntiAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "key2",
-										Operator: metav1.LabelSelectorOpIn,
-										Values:   []string{"value1", "value2"},
-									},
-								},
-							},
-							TopologyKey: "",
-							Namespaces:  []string{"ns"},
-						},
-					},
-				},
-			}),
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
-			Spec: validPodSpec(&api.Affinity{
-				PodAntiAffinity: &api.PodAntiAffinity{
-					PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
-						{
-							Weight: 10,
-							PodAffinityTerm: api.PodAffinityTerm{
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
-										{
-											Key:      "key2",
-											Operator: metav1.LabelSelectorOpNotIn,
-											Values:   []string{"value1", "value2"},
-										},
-									},
-								},
-								Namespaces:  []string{"ns"},
-								TopologyKey: "",
-							},
-						},
-					},
-				},
-			}),
-		},
-	}
-
-	for _, v := range errorCases {
-		if errs := ValidatePod(&v); len(errs) == 0 {
-			t.Errorf("expected failure for %v", errs)
+		} else if v.expectedError == "" {
+			t.Errorf("missing expectedError for %q, got %q", k, errs.ToAggregate().Error())
+		} else if actualError := errs.ToAggregate().Error(); !strings.Contains(actualError, v.expectedError) {
+			t.Errorf("expected error for %q to contain %q, got %q", k, v.expectedError, actualError)
 		}
 	}
 }
@@ -4474,12 +5910,12 @@ func TestValidatePodUpdate(t *testing.T) {
 	)
 
 	tests := []struct {
-		a       api.Pod
-		b       api.Pod
-		isValid bool
-		test    string
+		a    api.Pod
+		b    api.Pod
+		err  string
+		test string
 	}{
-		{api.Pod{}, api.Pod{}, true, "nothing"},
+		{api.Pod{}, api.Pod{}, "", "nothing"},
 		{
 			api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
@@ -4487,7 +5923,7 @@ func TestValidatePodUpdate(t *testing.T) {
 			api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 			},
-			false,
+			"metadata.name",
 			"ids",
 		},
 		{
@@ -4507,7 +5943,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			true,
+			"",
 			"labels",
 		},
 		{
@@ -4527,7 +5963,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			true,
+			"",
 			"annotations",
 		},
 		{
@@ -4556,7 +5992,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			false,
+			"may not add or remove containers",
 			"more containers",
 		},
 		{
@@ -4585,7 +6021,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			false,
+			"may not add or remove containers",
 			"more init containers",
 		},
 		{
@@ -4597,7 +6033,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now},
 				Spec:       api.PodSpec{Containers: []api.Container{{Image: "foo:V1"}}},
 			},
-			true,
+			"",
 			"deletion timestamp filled out",
 		},
 		{
@@ -4609,7 +6045,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace2},
 				Spec:       api.PodSpec{Containers: []api.Container{{Image: "foo:V1"}}},
 			},
-			false,
+			"metadata.deletionGracePeriodSeconds",
 			"deletion grace period seconds cleared",
 		},
 		{
@@ -4633,7 +6069,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			true,
+			"",
 			"image change",
 		},
 		{
@@ -4657,7 +6093,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			true,
+			"",
 			"init container image change",
 		},
 		{
@@ -4679,7 +6115,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			false,
+			"spec.containers[0].image",
 			"image change to empty",
 		},
 		{
@@ -4701,7 +6137,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			false,
+			"spec.initContainers[0].image",
 			"init container image change to empty",
 		},
 		{
@@ -4711,7 +6147,7 @@ func TestValidatePodUpdate(t *testing.T) {
 			api.Pod{
 				Spec: api.PodSpec{},
 			},
-			true,
+			"",
 			"activeDeadlineSeconds no change, nil",
 		},
 		{
@@ -4725,7 +6161,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			true,
+			"",
 			"activeDeadlineSeconds no change, set",
 		},
 		{
@@ -4735,7 +6171,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				},
 			},
 			api.Pod{},
-			true,
+			"",
 			"activeDeadlineSeconds change to positive from nil",
 		},
 		{
@@ -4749,7 +6185,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					ActiveDeadlineSeconds: &activeDeadlineSecondsLarger,
 				},
 			},
-			true,
+			"",
 			"activeDeadlineSeconds change to smaller positive",
 		},
 		{
@@ -4763,7 +6199,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			false,
+			"spec.activeDeadlineSeconds",
 			"activeDeadlineSeconds change to larger positive",
 		},
 
@@ -4774,7 +6210,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				},
 			},
 			api.Pod{},
-			false,
+			"spec.activeDeadlineSeconds",
 			"activeDeadlineSeconds change to negative from nil",
 		},
 		{
@@ -4788,7 +6224,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			false,
+			"spec.activeDeadlineSeconds",
 			"activeDeadlineSeconds change to negative from positive",
 		},
 		{
@@ -4802,7 +6238,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			true,
+			"",
 			"activeDeadlineSeconds change to zero from positive",
 		},
 		{
@@ -4812,7 +6248,7 @@ func TestValidatePodUpdate(t *testing.T) {
 				},
 			},
 			api.Pod{},
-			true,
+			"",
 			"activeDeadlineSeconds change to zero from nil",
 		},
 		{
@@ -4822,7 +6258,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			false,
+			"spec.activeDeadlineSeconds",
 			"activeDeadlineSeconds change to nil from positive",
 		},
 		{
@@ -4852,7 +6288,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			false,
+			"spec: Forbidden: pod updates may not change fields",
 			"cpu change",
 		},
 		{
@@ -4882,7 +6318,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			false,
+			"spec: Forbidden: pod updates may not change fields",
 			"port change",
 		},
 		{
@@ -4902,7 +6338,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			true,
+			"",
 			"bad label change",
 		},
 		{
@@ -4924,7 +6360,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []api.Toleration{{Key: "key1", Value: "value1"}},
 				},
 			},
-			false,
+			"spec.tolerations: Forbidden",
 			"existing toleration value modified in pod spec updates",
 		},
 		{
@@ -4946,7 +6382,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []api.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
 				},
 			},
-			false,
+			"spec.tolerations: Forbidden",
 			"existing toleration value modified in pod spec updates with modified tolerationSeconds",
 		},
 		{
@@ -4967,7 +6403,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					NodeName:    "node1",
 					Tolerations: []api.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]}},
 				}},
-			true,
+			"",
 			"modified tolerationSeconds in existing toleration value in pod spec updates",
 		},
 		{
@@ -4988,7 +6424,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []api.Toleration{{Key: "key1", Value: "value1"}},
 				},
 			},
-			false,
+			"spec.tolerations: Forbidden",
 			"toleration modified in updates to an unscheduled pod",
 		},
 		{
@@ -5010,7 +6446,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []api.Toleration{{Key: "key1", Value: "value1"}},
 				},
 			},
-			true,
+			"",
 			"tolerations unmodified in updates to a scheduled pod",
 		},
 		{
@@ -5034,7 +6470,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []api.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
 				},
 			},
-			true,
+			"",
 			"added valid new toleration to existing tolerations in pod spec updates",
 		},
 		{
@@ -5053,8 +6489,76 @@ func TestValidatePodUpdate(t *testing.T) {
 				Spec: api.PodSpec{
 					NodeName: "node1", Tolerations: []api.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
 				}},
-			false,
+			"spec.tolerations[1].effect",
 			"added invalid new toleration to existing tolerations in pod spec updates",
+		},
+		{
+			api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: api.PodSpec{NodeName: "foo"}},
+			api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			"spec: Forbidden: pod updates may not change fields",
+			"removed nodeName from pod spec",
+		},
+		{
+			api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{api.MirrorPodAnnotationKey: ""}}, Spec: api.PodSpec{NodeName: "foo"}},
+			api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: api.PodSpec{NodeName: "foo"}},
+			"metadata.annotations[kubernetes.io/config.mirror]",
+			"removed mirror pod annotation",
+		},
+		{
+			api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: api.PodSpec{NodeName: "foo"}},
+			api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{api.MirrorPodAnnotationKey: ""}}, Spec: api.PodSpec{NodeName: "foo"}},
+			"metadata.annotations[kubernetes.io/config.mirror]",
+			"added mirror pod annotation",
+		},
+		{
+			api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{api.MirrorPodAnnotationKey: "foo"}}, Spec: api.PodSpec{NodeName: "foo"}},
+			api.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{api.MirrorPodAnnotationKey: "bar"}}, Spec: api.PodSpec{NodeName: "foo"}},
+			"metadata.annotations[kubernetes.io/config.mirror]",
+			"changed mirror pod annotation",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:          "node1",
+					PriorityClassName: "bar-priority",
+				},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:          "node1",
+					PriorityClassName: "foo-priority",
+				},
+			},
+			"spec: Forbidden: pod updates",
+			"changed priority class name",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:          "node1",
+					PriorityClassName: "",
+				},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: api.PodSpec{
+					NodeName:          "node1",
+					PriorityClassName: "foo-priority",
+				},
+			},
+			"spec: Forbidden: pod updates",
+			"removed priority class name",
 		},
 	}
 
@@ -5062,13 +6566,15 @@ func TestValidatePodUpdate(t *testing.T) {
 		test.a.ObjectMeta.ResourceVersion = "1"
 		test.b.ObjectMeta.ResourceVersion = "1"
 		errs := ValidatePodUpdate(&test.a, &test.b)
-		if test.isValid {
+		if test.err == "" {
 			if len(errs) != 0 {
 				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.a, test.b)
 			}
 		} else {
 			if len(errs) == 0 {
 				t.Errorf("unexpected valid: %s\nA: %+v\nB: %+v", test.test, test.a, test.b)
+			} else if actualErr := errs.ToAggregate().Error(); !strings.Contains(actualErr, test.err) {
+				t.Errorf("unexpected error message: %s\nExpected error: %s\nActual error: %s", test.test, test.err, actualErr)
 			}
 		}
 	}
@@ -5454,6 +6960,60 @@ func TestValidateService(t *testing.T) {
 			numErrs: 0,
 		},
 		{
+			name: "invalid duplicate ports (with same protocol)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(80)})
+			},
+			numErrs: 1,
+		},
+		{
+			name: "valid duplicate ports (with different protocols)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(80)})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid duplicate targetports (number with same protocol)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 2, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid duplicate targetports (name with same protocol)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", TargetPort: intstr.FromString("http")})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 2, Protocol: "TCP", TargetPort: intstr.FromString("http")})
+			},
+			numErrs: 1,
+		},
+		{
+			name: "valid duplicate targetports (number with different protocols)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", TargetPort: intstr.FromInt(8080)})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 2, Protocol: "UDP", TargetPort: intstr.FromInt(8080)})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid duplicate targetports (name with different protocols)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", TargetPort: intstr.FromString("http")})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "r", Port: 2, Protocol: "UDP", TargetPort: intstr.FromString("http")})
+			},
+			numErrs: 0,
+		},
+		{
 			name: "valid type - cluster",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Type = api.ServiceTypeClusterIP
@@ -5553,7 +7113,7 @@ func TestValidateService(t *testing.T) {
 			name: "valid LoadBalancer source range annotation",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Type = api.ServiceTypeLoadBalancer
-				s.Annotations[service.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.4/8,  5.6.7.8/16"
+				s.Annotations[api.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.4/8,  5.6.7.8/16"
 			},
 			numErrs: 0,
 		},
@@ -5561,14 +7121,14 @@ func TestValidateService(t *testing.T) {
 			name: "empty LoadBalancer source range annotation",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Type = api.ServiceTypeLoadBalancer
-				s.Annotations[service.AnnotationLoadBalancerSourceRangesKey] = ""
+				s.Annotations[api.AnnotationLoadBalancerSourceRangesKey] = ""
 			},
 			numErrs: 0,
 		},
 		{
 			name: "invalid LoadBalancer source range annotation (hostname)",
 			tweakSvc: func(s *api.Service) {
-				s.Annotations[service.AnnotationLoadBalancerSourceRangesKey] = "foo.bar"
+				s.Annotations[api.AnnotationLoadBalancerSourceRangesKey] = "foo.bar"
 			},
 			numErrs: 2,
 		},
@@ -5576,7 +7136,7 @@ func TestValidateService(t *testing.T) {
 			name: "invalid LoadBalancer source range annotation (invalid CIDR)",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Type = api.ServiceTypeLoadBalancer
-				s.Annotations[service.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.4/33"
+				s.Annotations[api.AnnotationLoadBalancerSourceRangesKey] = "1.2.3.4/33"
 			},
 			numErrs: 1,
 		},
@@ -5656,44 +7216,65 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "LoadBalancer allows onlyLocal alpha annotations",
-			tweakSvc: func(s *api.Service) {
-				s.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
-			},
-			numErrs: 0,
-		},
-		{
-			name: "invalid externalTraffic beta annotation",
-			tweakSvc: func(s *api.Service) {
-				s.Spec.Type = api.ServiceTypeLoadBalancer
-				s.Annotations[service.BetaAnnotationExternalTraffic] = "invalid"
-			},
-			numErrs: 1,
-		},
-		{
-			name: "nagative healthCheckNodePort beta annotation",
-			tweakSvc: func(s *api.Service) {
-				s.Spec.Type = api.ServiceTypeLoadBalancer
-				s.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
-				s.Annotations[service.BetaAnnotationHealthCheckNodePort] = "-1"
-			},
-			numErrs: 1,
-		},
-		{
-			name: "invalid healthCheckNodePort beta annotation",
-			tweakSvc: func(s *api.Service) {
-				s.Spec.Type = api.ServiceTypeLoadBalancer
-				s.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
-				s.Annotations[service.BetaAnnotationHealthCheckNodePort] = "whatisthis"
-			},
-			numErrs: 1,
-		},
-		{
 			name: "invalid node port with clusterIP None",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Type = api.ServiceTypeNodePort
 				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
 				s.Spec.ClusterIP = "None"
+			},
+			numErrs: 1,
+		},
+		// ESIPP section begins.
+		{
+			name: "invalid externalTraffic field",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = "invalid"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "nagative healthCheckNodePort field",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+				s.Spec.HealthCheckNodePort = -1
+			},
+			numErrs: 1,
+		},
+		{
+			name: "nagative healthCheckNodePort field",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+				s.Spec.HealthCheckNodePort = 31100
+			},
+			numErrs: 0,
+		},
+		// ESIPP section ends.
+		{
+			name: "invalid timeoutSeconds field",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.SessionAffinity = api.ServiceAffinityClientIP
+				s.Spec.SessionAffinityConfig = &api.SessionAffinityConfig{
+					ClientIP: &api.ClientIPConfig{
+						TimeoutSeconds: newInt32(-1),
+					},
+				}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "sessionAffinityConfig can't be set when session affinity is None",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.SessionAffinity = api.ServiceAffinityNone
+				s.Spec.SessionAffinityConfig = &api.SessionAffinityConfig{
+					ClientIP: &api.ClientIPConfig{
+						TimeoutSeconds: newInt32(90),
+					},
+				}
 			},
 			numErrs: 1,
 		},
@@ -5703,6 +7284,75 @@ func TestValidateService(t *testing.T) {
 		svc := makeValidService()
 		tc.tweakSvc(&svc)
 		errs := ValidateService(&svc)
+		if len(errs) != tc.numErrs {
+			t.Errorf("Unexpected error list for case %q: %v", tc.name, errs.ToAggregate())
+		}
+	}
+}
+
+func TestValidateServiceExternalTrafficFieldsCombination(t *testing.T) {
+	testCases := []struct {
+		name     string
+		tweakSvc func(svc *api.Service) // Given a basic valid service, each test case can customize it.
+		numErrs  int
+	}{
+		{
+			name: "valid loadBalancer service with externalTrafficPolicy and healthCheckNodePort set",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+				s.Spec.HealthCheckNodePort = 34567
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid nodePort service with externalTrafficPolicy set",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeNodePort
+				s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid clusterIP service with none of externalTrafficPolicy and healthCheckNodePort set",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+			},
+			numErrs: 0,
+		},
+		{
+			name: "cannot set healthCheckNodePort field on loadBalancer service with externalTrafficPolicy!=Local",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeCluster
+				s.Spec.HealthCheckNodePort = 34567
+			},
+			numErrs: 1,
+		},
+		{
+			name: "cannot set healthCheckNodePort field on nodePort service",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeNodePort
+				s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+				s.Spec.HealthCheckNodePort = 34567
+			},
+			numErrs: 1,
+		},
+		{
+			name: "cannot set externalTrafficPolicy or healthCheckNodePort fields on clusterIP service",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeClusterIP
+				s.Spec.ExternalTrafficPolicy = api.ServiceExternalTrafficPolicyTypeLocal
+				s.Spec.HealthCheckNodePort = 34567
+			},
+			numErrs: 2,
+		},
+	}
+
+	for _, tc := range testCases {
+		svc := makeValidService()
+		tc.tweakSvc(&svc)
+		errs := ValidateServiceExternalTrafficFieldsCombination(&svc)
 		if len(errs) != tc.numErrs {
 			t.Errorf("Unexpected error list for case %q: %v", tc.name, errs.ToAggregate())
 		}
@@ -6310,6 +7960,8 @@ func TestValidateNode(t *testing.T) {
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 					api.ResourceName("my.org/gpu"):       resource.MustParse("10"),
+					api.ResourceName("hugepages-2Mi"):    resource.MustParse("10Gi"),
+					api.ResourceName("hugepages-1Gi"):    resource.MustParse("0"),
 				},
 			},
 			Spec: api.NodeSpec{
@@ -6585,6 +8237,27 @@ func TestValidateNode(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
+				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
+			},
+		},
+		"multiple-pre-allocated-hugepages": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "abc",
+				Labels: validSelector,
+			},
+			Status: api.NodeStatus{
+				Addresses: []api.NodeAddress{
+					{Type: api.NodeExternalIP, Address: "something"},
+				},
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					api.ResourceName("my.org/gpu"):       resource.MustParse("10"),
+					api.ResourceName("hugepages-2Mi"):    resource.MustParse("10Gi"),
+					api.ResourceName("hugepages-1Gi"):    resource.MustParse("10Gi"),
 				},
 			},
 			Spec: api.NodeSpec{
@@ -6953,6 +8626,33 @@ func TestValidateNodeUpdate(t *testing.T) {
 				},
 			},
 		}, false},
+		{api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "update-provider-id-when-not-set",
+			},
+		}, api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "update-provider-id-when-not-set",
+			},
+			Spec: api.NodeSpec{
+				ProviderID: "provider:///new",
+			},
+		}, true},
+		{api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "update-provider-id-when-set",
+			},
+			Spec: api.NodeSpec{
+				ProviderID: "provider:///old",
+			},
+		}, api.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "update-provider-id-when-set",
+			},
+			Spec: api.NodeSpec{
+				ProviderID: "provider:///new",
+			},
+		}, false},
 	}
 	for i, test := range tests {
 		test.oldNode.ObjectMeta.ResourceVersion = "1"
@@ -7029,6 +8729,11 @@ func TestValidateServiceUpdate(t *testing.T) {
 			name: "change affinity",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
 				newSvc.Spec.SessionAffinity = "ClientIP"
+				newSvc.Spec.SessionAffinityConfig = &api.SessionAffinityConfig{
+					ClientIP: &api.ClientIPConfig{
+						TimeoutSeconds: newInt32(90),
+					},
+				}
 			},
 			numErrs: 0,
 		},
@@ -7075,7 +8780,7 @@ func TestValidateServiceUpdate(t *testing.T) {
 				oldSvc.Spec.Type = api.ServiceTypeLoadBalancer
 				oldSvc.Spec.LoadBalancerSourceRanges = []string{"10.0.0.0/8"}
 				newSvc.Spec.Type = api.ServiceTypeLoadBalancer
-				newSvc.Spec.LoadBalancerSourceRanges = []string{"10.180.0.0/16"}
+				newSvc.Spec.LoadBalancerSourceRanges = []string{"10.100.0.0/16"}
 			},
 			numErrs: 0,
 		},
@@ -7086,44 +8791,6 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Spec.Type = api.ServiceTypeLoadBalancer
 			},
 			numErrs: 1,
-		},
-		{
-			name: "Service allows removing onlyLocal alpha annotations",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				oldSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
-				oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = "3001"
-			},
-			numErrs: 0,
-		},
-		{
-			name: "Service allows modifying onlyLocal alpha annotations",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				oldSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
-				oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = "3001"
-				newSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficGlobal
-				newSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort]
-			},
-			numErrs: 0,
-		},
-		{
-			name: "Service disallows promoting one of the onlyLocal pair to beta",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				oldSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
-				oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = "3001"
-				newSvc.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficGlobal
-				newSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort]
-			},
-			numErrs: 1,
-		},
-		{
-			name: "Service allows changing both onlyLocal annotations from alpha to beta",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				oldSvc.Annotations[service.AlphaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
-				oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort] = "3001"
-				newSvc.Annotations[service.BetaAnnotationExternalTraffic] = service.AnnotationValueExternalTrafficLocal
-				newSvc.Annotations[service.BetaAnnotationHealthCheckNodePort] = oldSvc.Annotations[service.AlphaAnnotationHealthCheckNodePort]
-			},
-			numErrs: 0,
 		},
 		{
 			name: "`None` ClusterIP cannot be changed",
@@ -7452,6 +9119,71 @@ func getStorageResourceList(storage string) api.ResourceList {
 	return res
 }
 
+func getLocalStorageResourceList(ephemeralStorage string) api.ResourceList {
+	res := api.ResourceList{}
+	if ephemeralStorage != "" {
+		res[api.ResourceEphemeralStorage] = resource.MustParse(ephemeralStorage)
+	}
+	return res
+}
+
+func TestValidateLimitRangeForLocalStorage(t *testing.T) {
+	testCases := []struct {
+		name string
+		spec api.LimitRangeSpec
+	}{
+		{
+			name: "all-fields-valid",
+			spec: api.LimitRangeSpec{
+				Limits: []api.LimitRangeItem{
+					{
+						Type:                 api.LimitTypePod,
+						Max:                  getLocalStorageResourceList("10000Mi"),
+						Min:                  getLocalStorageResourceList("100Mi"),
+						MaxLimitRequestRatio: getLocalStorageResourceList(""),
+					},
+					{
+						Type:                 api.LimitTypeContainer,
+						Max:                  getLocalStorageResourceList("10000Mi"),
+						Min:                  getLocalStorageResourceList("100Mi"),
+						Default:              getLocalStorageResourceList("500Mi"),
+						DefaultRequest:       getLocalStorageResourceList("200Mi"),
+						MaxLimitRequestRatio: getLocalStorageResourceList(""),
+					},
+				},
+			},
+		},
+	}
+
+	// Enable alpha feature LocalStorageCapacityIsolation
+	err := utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for LocalStorageCapacityIsolation: %v", err)
+		return
+	}
+
+	for _, testCase := range testCases {
+		limitRange := &api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: testCase.name, Namespace: "foo"}, Spec: testCase.spec}
+		if errs := ValidateLimitRange(limitRange); len(errs) != 0 {
+			t.Errorf("Case %v, unexpected error: %v", testCase.name, errs)
+		}
+	}
+
+	// Disable alpha feature LocalStorageCapacityIsolation
+	err = utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=false")
+	if err != nil {
+		t.Errorf("Failed to disable feature gate for LocalStorageCapacityIsolation: %v", err)
+		return
+	}
+	for _, testCase := range testCases {
+		limitRange := &api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: testCase.name, Namespace: "foo"}, Spec: testCase.spec}
+		if errs := ValidateLimitRange(limitRange); len(errs) == 0 {
+			t.Errorf("Case %v, expected feature gate unable error but actually no error", testCase.name)
+		}
+	}
+
+}
+
 func TestValidateLimitRange(t *testing.T) {
 	successCases := []struct {
 		name string
@@ -7646,7 +9378,7 @@ func TestValidateLimitRange(t *testing.T) {
 			}},
 			"default value 2 is greater than max value 1",
 		},
-		"invalid spec defaultrequest outside range": {
+		"invalid spec default request outside range": {
 			api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
@@ -7659,7 +9391,7 @@ func TestValidateLimitRange(t *testing.T) {
 			}},
 			"default request value 2 is greater than max value 1",
 		},
-		"invalid spec defaultrequest more than default": {
+		"invalid spec default request more than default": {
 			api.LimitRange{ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: "foo"}, Spec: api.LimitRangeSpec{
 				Limits: []api.LimitRangeItem{
 					{
@@ -7749,6 +9481,68 @@ func TestValidateLimitRange(t *testing.T) {
 		}
 	}
 
+}
+
+func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
+	validClaim := testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	})
+	validConditionUpdate := testVolumeClaimWithStatus("foo", "ns", api.PersistentVolumeClaimSpec{
+		AccessModes: []api.PersistentVolumeAccessMode{
+			api.ReadWriteOnce,
+			api.ReadOnlyMany,
+		},
+		Resources: api.ResourceRequirements{
+			Requests: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+			},
+		},
+	}, api.PersistentVolumeClaimStatus{
+		Phase: api.ClaimPending,
+		Conditions: []api.PersistentVolumeClaimCondition{
+			{Type: api.PersistentVolumeClaimResizing, Status: api.ConditionTrue},
+		},
+	})
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		oldClaim          *api.PersistentVolumeClaim
+		newClaim          *api.PersistentVolumeClaim
+		enableResize      bool
+	}{
+		"condition-update-with-disabled-feature-gate": {
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          validConditionUpdate,
+			enableResize:      false,
+		},
+		"condition-update-with-enabled-feature-gate": {
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validConditionUpdate,
+			enableResize:      true,
+		},
+	}
+	for name, scenario := range scenarios {
+		// ensure we have a resource version specified for updates
+		togglePVExpandFeature(scenario.enableResize, t)
+		scenario.oldClaim.ResourceVersion = "1"
+		scenario.newClaim.ResourceVersion = "1"
+		errs := ValidatePersistentVolumeClaimStatusUpdate(scenario.newClaim, scenario.oldClaim)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
 }
 
 func TestValidateResourceQuota(t *testing.T) {
@@ -8396,19 +10190,10 @@ func TestValidateBasicAuthSecret(t *testing.T) {
 
 	var (
 		missingBasicAuthUsernamePasswordKeys = validBasicAuthSecret()
-		// invalidBasicAuthUsernamePasswordKey  = validBasicAuthSecret()
-		// emptyBasicAuthUsernameKey            = validBasicAuthSecret()
-		// emptyBasicAuthPasswordKey            = validBasicAuthSecret()
 	)
 
 	delete(missingBasicAuthUsernamePasswordKeys.Data, api.BasicAuthUsernameKey)
 	delete(missingBasicAuthUsernamePasswordKeys.Data, api.BasicAuthPasswordKey)
-
-	// invalidBasicAuthUsernamePasswordKey.Data[api.BasicAuthUsernameKey] = []byte("bad")
-	// invalidBasicAuthUsernamePasswordKey.Data[api.BasicAuthPasswordKey] = []byte("bad")
-
-	// emptyBasicAuthUsernameKey.Data[api.BasicAuthUsernameKey] = []byte("")
-	// emptyBasicAuthPasswordKey.Data[api.BasicAuthPasswordKey] = []byte("")
 
 	tests := map[string]struct {
 		secret api.Secret
@@ -8416,9 +10201,6 @@ func TestValidateBasicAuthSecret(t *testing.T) {
 	}{
 		"valid": {validBasicAuthSecret(), true},
 		"missing username and password": {missingBasicAuthUsernamePasswordKeys, false},
-		// "invalid username and password": {invalidBasicAuthUsernamePasswordKey, false},
-		// "empty username":   {emptyBasicAuthUsernameKey, false},
-		// "empty password":   {emptyBasicAuthPasswordKey, false},
 	}
 
 	for name, tc := range tests {
@@ -8493,6 +10275,14 @@ func TestValidateEndpoints(t *testing.T) {
 				},
 			},
 		},
+		"empty ports": {
+			ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+			Subsets: []api.EndpointSubset{
+				{
+					Addresses: []api.EndpointAddress{{IP: "10.10.3.3"}},
+				},
+			},
+		},
 	}
 
 	for k, v := range successCases {
@@ -8530,17 +10320,6 @@ func TestValidateEndpoints(t *testing.T) {
 				Subsets: []api.EndpointSubset{
 					{
 						Ports: []api.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}},
-					},
-				},
-			},
-			errorType: "FieldValueRequired",
-		},
-		"empty ports": {
-			endpoints: api.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
-				Subsets: []api.EndpointSubset{
-					{
-						Addresses: []api.EndpointAddress{{IP: "10.10.3.3"}},
 					},
 				},
 			},
@@ -8684,7 +10463,7 @@ func TestValidateEndpoints(t *testing.T) {
 
 func TestValidateTLSSecret(t *testing.T) {
 	successCases := map[string]api.Secret{
-		"emtpy certificate chain": {
+		"empty certificate chain": {
 			ObjectMeta: metav1.ObjectMeta{Name: "tls-cert", Namespace: "namespace"},
 			Data: map[string][]byte{
 				api.TLSCertKey:       []byte("public key"),
@@ -8730,7 +10509,7 @@ func TestValidateTLSSecret(t *testing.T) {
 
 func TestValidateSecurityContext(t *testing.T) {
 	priv := false
-	runAsUser := types.UnixUserID(1)
+	runAsUser := int64(1)
 	fullValidSC := func() *api.SecurityContext {
 		return &api.SecurityContext{
 			Privileged: &priv,
@@ -8782,7 +10561,7 @@ func TestValidateSecurityContext(t *testing.T) {
 	privRequestWithGlobalDeny.Privileged = &requestPrivileged
 
 	negativeRunAsUser := fullValidSC()
-	negativeUser := types.UnixUserID(-1)
+	negativeUser := int64(-1)
 	negativeRunAsUser.RunAsUser = &negativeUser
 
 	errorCases := map[string]struct {
@@ -9200,6 +10979,65 @@ func TestValidateFlexVolumeSource(t *testing.T) {
 		if len(errs) != len(tc.expectedErrs) {
 			t.Errorf("%s: expected errs %#v, got %#v", k, tc.expectedErrs, errs)
 			continue
+		}
+	}
+}
+
+func TestValidateOrSetClientIPAffinityConfig(t *testing.T) {
+	successCases := map[string]*api.SessionAffinityConfig{
+		"non-empty config, valid timeout: 1": {
+			ClientIP: &api.ClientIPConfig{
+				TimeoutSeconds: newInt32(1),
+			},
+		},
+		"non-empty config, valid timeout: api.MaxClientIPServiceAffinitySeconds-1": {
+			ClientIP: &api.ClientIPConfig{
+				TimeoutSeconds: newInt32(int(api.MaxClientIPServiceAffinitySeconds - 1)),
+			},
+		},
+		"non-empty config, valid timeout: api.MaxClientIPServiceAffinitySeconds": {
+			ClientIP: &api.ClientIPConfig{
+				TimeoutSeconds: newInt32(int(api.MaxClientIPServiceAffinitySeconds)),
+			},
+		},
+	}
+
+	for name, test := range successCases {
+		if errs := validateClientIPAffinityConfig(test, field.NewPath("field")); len(errs) != 0 {
+			t.Errorf("case: %s, expected success: %v", name, errs)
+		}
+	}
+
+	errorCases := map[string]*api.SessionAffinityConfig{
+		"empty session affinity config": nil,
+		"empty client IP config": {
+			ClientIP: nil,
+		},
+		"empty timeoutSeconds": {
+			ClientIP: &api.ClientIPConfig{
+				TimeoutSeconds: nil,
+			},
+		},
+		"non-empty config, invalid timeout: api.MaxClientIPServiceAffinitySeconds+1": {
+			ClientIP: &api.ClientIPConfig{
+				TimeoutSeconds: newInt32(int(api.MaxClientIPServiceAffinitySeconds + 1)),
+			},
+		},
+		"non-empty config, invalid timeout: -1": {
+			ClientIP: &api.ClientIPConfig{
+				TimeoutSeconds: newInt32(-1),
+			},
+		},
+		"non-empty config, invalid timeout: 0": {
+			ClientIP: &api.ClientIPConfig{
+				TimeoutSeconds: newInt32(0),
+			},
+		},
+	}
+
+	for name, test := range errorCases {
+		if errs := validateClientIPAffinityConfig(test, field.NewPath("field")); len(errs) == 0 {
+			t.Errorf("case: %v, expected failures: %v", name, errs)
 		}
 	}
 }

@@ -24,8 +24,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 BINS=(
-	cmd/libs/go2idl/go-to-protobuf
-	cmd/libs/go2idl/go-to-protobuf/protoc-gen-gogo
+	vendor/k8s.io/code-generator/cmd/go-to-protobuf
+	vendor/k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
 )
 make -C "${KUBE_ROOT}" WHAT="${BINS[*]}"
 
@@ -41,6 +41,43 @@ fi
 
 gotoprotobuf=$(kube::util::find-binary "go-to-protobuf")
 
+PACKAGES=(
+  k8s.io/apiserver/pkg/apis/example/v1
+  k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
+  k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
+  k8s.io/api/core/v1
+  k8s.io/api/policy/v1beta1
+  k8s.io/api/extensions/v1beta1
+  k8s.io/api/autoscaling/v1
+  k8s.io/api/authorization/v1
+  k8s.io/api/autoscaling/v2beta1
+  k8s.io/api/authorization/v1beta1
+  k8s.io/api/batch/v1
+  k8s.io/api/batch/v1beta1
+  k8s.io/api/batch/v2alpha1
+  k8s.io/api/apps/v1beta1
+  k8s.io/api/apps/v1beta2
+  k8s.io/api/authentication/v1
+  k8s.io/api/authentication/v1beta1
+  k8s.io/api/rbac/v1alpha1
+  k8s.io/api/rbac/v1beta1
+  k8s.io/api/certificates/v1beta1
+  k8s.io/api/imagepolicy/v1alpha1
+  k8s.io/api/scheduling/v1alpha1
+  k8s.io/api/settings/v1alpha1
+  k8s.io/api/storage/v1beta1
+  k8s.io/api/storage/v1
+  k8s.io/api/admissionregistration/v1alpha1
+  k8s.io/api/admission/v1alpha1
+  k8s.io/api/networking/v1
+  k8s.io/kubernetes/federation/apis/federation/v1beta1
+  k8s.io/metrics/pkg/apis/metrics/v1alpha1
+  k8s.io/metrics/pkg/apis/metrics/v1beta1
+  k8s.io/metrics/pkg/apis/custom_metrics/v1beta1
+  k8s.io/apiserver/pkg/apis/audit/v1alpha1
+  k8s.io/apiserver/pkg/apis/audit/v1beta1
+)
+
 # requires the 'proto' tag to build (will remove when ready)
 # searches for the protoc-gen-gogo extension in the output directory
 # satisfies import of github.com/gogo/protobuf/gogoproto/gogo.proto and the
@@ -49,4 +86,5 @@ PATH="${KUBE_ROOT}/_output/bin:${PATH}" \
   "${gotoprotobuf}" \
   --proto-import="${KUBE_ROOT}/vendor" \
   --proto-import="${KUBE_ROOT}/third_party/protobuf" \
+  --packages=$(IFS=, ; echo "${PACKAGES[*]}")
   "$@"

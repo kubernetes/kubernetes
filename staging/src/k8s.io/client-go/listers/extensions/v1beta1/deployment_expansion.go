@@ -19,9 +19,9 @@ package v1beta1
 import (
 	"fmt"
 
+	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	extensions "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 )
 
 // DeploymentListerExpansion allows custom methods to be added to
@@ -31,7 +31,7 @@ type DeploymentListerExpansion interface {
 }
 
 // DeploymentNamespaceListerExpansion allows custom methods to be added to
-// DeploymentNamespaeLister.
+// DeploymentNamespaceLister.
 type DeploymentNamespaceListerExpansion interface{}
 
 // GetDeploymentsForReplicaSet returns a list of Deployments that potentially

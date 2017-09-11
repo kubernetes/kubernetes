@@ -19,11 +19,11 @@ package e2e_node
 import (
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeapi "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -42,7 +42,7 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("critical-pod-test")
 
 	Context("when we need to admit a critical pod", func() {
-		tempSetCurrentKubeletConfig(f, func(initialConfig *componentconfig.KubeletConfiguration) {
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			initialConfig.FeatureGates += ", ExperimentalCriticalPodAnnotation=true"
 		})
 
@@ -56,18 +56,18 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive]", func() {
 			// Define test pods
 			nonCriticalGuaranteed := getTestPod(false, guaranteedPodName, v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					"cpu":    resource.MustParse("100m"),
-					"memory": resource.MustParse("100Mi"),
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
 				Limits: v1.ResourceList{
-					"cpu":    resource.MustParse("100m"),
-					"memory": resource.MustParse("100Mi"),
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
 			})
 			nonCriticalBurstable := getTestPod(false, burstablePodName, v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					"cpu":    resource.MustParse("100m"),
-					"memory": resource.MustParse("100Mi"),
+					v1.ResourceCPU:    resource.MustParse("100m"),
+					v1.ResourceMemory: resource.MustParse("100Mi"),
 				},
 			})
 			nonCriticalBestEffort := getTestPod(false, bestEffortPodName, v1.ResourceRequirements{})

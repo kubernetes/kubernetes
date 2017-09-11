@@ -43,17 +43,17 @@ limitations under the License.
 package common
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/api/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 // These tests need privileged containers, which are disabled by default.  Run
 // the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"
-var _ = framework.KubeDescribe("GCP Volumes", func() {
+var _ = Describe("[sig-storage] GCP Volumes", func() {
 	f := framework.NewDefaultFramework("gcp-volume")
 
 	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
@@ -64,7 +64,7 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 	var c clientset.Interface
 
 	BeforeEach(func() {
-		framework.SkipUnlessNodeOSDistroIs("gci")
+		framework.SkipUnlessNodeOSDistroIs("gci", "ubuntu")
 
 		namespace = f.Namespace
 		c = f.ClientSet
@@ -73,26 +73,14 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 	// NFS
 	////////////////////////////////////////////////////////////////////////
-
-	framework.KubeDescribe("NFSv4", func() {
-		It("should be mountable for NFSv4 [Volume]", func() {
-
-			config := framework.VolumeTestConfig{
-				Namespace:   namespace.Name,
-				Prefix:      "nfs",
-				ServerImage: framework.NfsServerImage,
-				ServerPorts: []int{2049},
-			}
-
+	Describe("NFSv4", func() {
+		It("should be mountable for NFSv4", func() {
+			config, _, serverIP := framework.NewNFSServer(c, namespace.Name, []string{})
 			defer func() {
 				if clean {
 					framework.VolumeTestCleanup(f, config)
 				}
 			}()
-
-			pod := framework.StartVolumeServer(c, config)
-			serverIP := pod.Status.PodIP
-			framework.Logf("NFS server IP address: %v", serverIP)
 
 			tests := []framework.VolumeTest{
 				{
@@ -113,23 +101,15 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 		})
 	})
 
-	framework.KubeDescribe("NFSv3", func() {
-		It("should be mountable for NFSv3 [Volume]", func() {
-			config := framework.VolumeTestConfig{
-				Namespace:   namespace.Name,
-				Prefix:      "nfs",
-				ServerImage: framework.NfsServerImage,
-				ServerPorts: []int{2049},
-			}
-
+	Describe("NFSv3", func() {
+		It("should be mountable for NFSv3", func() {
+			config, _, serverIP := framework.NewNFSServer(c, namespace.Name, []string{})
 			defer func() {
 				if clean {
 					framework.VolumeTestCleanup(f, config)
 				}
 			}()
-			pod := framework.StartVolumeServer(c, config)
-			serverIP := pod.Status.PodIP
-			framework.Logf("NFS server IP address: %v", serverIP)
+
 			tests := []framework.VolumeTest{
 				{
 					Volume: v1.VolumeSource{
@@ -151,70 +131,24 @@ var _ = framework.KubeDescribe("GCP Volumes", func() {
 	////////////////////////////////////////////////////////////////////////
 	// Gluster
 	////////////////////////////////////////////////////////////////////////
-
-	framework.KubeDescribe("GlusterFS", func() {
-		It("should be mountable [Volume]", func() {
-			config := framework.VolumeTestConfig{
-				Namespace:   namespace.Name,
-				Prefix:      "gluster",
-				ServerImage: framework.GlusterfsServerImage,
-				ServerPorts: []int{24007, 24008, 49152},
-			}
-
+	Describe("GlusterFS", func() {
+		It("should be mountable", func() {
+			// create gluster server and endpoints
+			config, _, _ := framework.NewGlusterfsServer(c, namespace.Name)
+			name := config.Prefix + "-server"
 			defer func() {
 				if clean {
 					framework.VolumeTestCleanup(f, config)
+					err := c.Core().Endpoints(namespace.Name).Delete(name, nil)
+					Expect(err).NotTo(HaveOccurred(), "defer: Gluster delete endpoints failed")
 				}
 			}()
-
-			pod := framework.StartVolumeServer(c, config)
-			serverIP := pod.Status.PodIP
-			framework.Logf("Gluster server IP address: %v", serverIP)
-
-			// create Endpoints for the server
-			endpoints := v1.Endpoints{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Endpoints",
-					APIVersion: "v1",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: config.Prefix + "-server",
-				},
-				Subsets: []v1.EndpointSubset{
-					{
-						Addresses: []v1.EndpointAddress{
-							{
-								IP: serverIP,
-							},
-						},
-						Ports: []v1.EndpointPort{
-							{
-								Name:     "gluster",
-								Port:     24007,
-								Protocol: v1.ProtocolTCP,
-							},
-						},
-					},
-				},
-			}
-
-			endClient := f.ClientSet.CoreV1().Endpoints(config.Namespace)
-
-			defer func() {
-				if clean {
-					endClient.Delete(config.Prefix+"-server", nil)
-				}
-			}()
-
-			if _, err := endClient.Create(&endpoints); err != nil {
-				framework.Failf("Failed to create endpoints for Gluster server: %v", err)
-			}
 
 			tests := []framework.VolumeTest{
 				{
 					Volume: v1.VolumeSource{
 						Glusterfs: &v1.GlusterfsVolumeSource{
-							EndpointsName: config.Prefix + "-server",
+							EndpointsName: name,
 							// 'test_vol' comes from test/images/volumes-tester/gluster/run_gluster.sh
 							Path:     "test_vol",
 							ReadOnly: true,

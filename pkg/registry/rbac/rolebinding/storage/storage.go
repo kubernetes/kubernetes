@@ -22,7 +22,6 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/rbac/rolebinding"
 )
 
@@ -34,18 +33,16 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against RoleBinding objects.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &rbac.RoleBinding{} },
-		NewListFunc:       func() runtime.Object { return &rbac.RoleBindingList{} },
-		PredicateFunc:     rolebinding.Matcher,
-		QualifiedResource: rbac.Resource("rolebindings"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("rolebindings"),
+		Copier:                   api.Scheme,
+		NewFunc:                  func() runtime.Object { return &rbac.RoleBinding{} },
+		NewListFunc:              func() runtime.Object { return &rbac.RoleBindingList{} },
+		DefaultQualifiedResource: rbac.Resource("rolebindings"),
 
 		CreateStrategy: rolebinding.Strategy,
 		UpdateStrategy: rolebinding.Strategy,
 		DeleteStrategy: rolebinding.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: rolebinding.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

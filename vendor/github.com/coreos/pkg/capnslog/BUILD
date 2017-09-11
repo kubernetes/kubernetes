@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -18,8 +11,13 @@ go_library(
         "logmap.go",
         "pkg_logger.go",
         "syslog_formatter.go",
-    ],
-    tags = ["automanaged"],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "init_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/coreos/go-systemd/journal:go_default_library"],
 )
 
@@ -34,4 +32,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

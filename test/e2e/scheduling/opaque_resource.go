@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/util/system"
 	"k8s.io/kubernetes/test/e2e/common"
@@ -33,7 +33,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", func() {
+var _ = SIGDescribe("Opaque resources [Feature:OpaqueResources]", func() {
 	f := framework.NewDefaultFramework("opaque-resource")
 	opaqueResName := v1helper.OpaqueIntResourceName("foo")
 	var node *v1.Node
@@ -41,7 +41,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 	BeforeEach(func() {
 		if node == nil {
 			// Priming invocation; select the first non-master node.
-			nodes, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
+			nodes, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, n := range nodes.Items {
 				if !system.IsMasterNode(n.Name) {
@@ -50,7 +50,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 				}
 			}
 			if node == nil {
-				Fail("unable to select a non-master node")
+				framework.Failf("unable to select a non-master node")
 			}
 		}
 
@@ -74,7 +74,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 
 		By("Observing an event that indicates the pod was scheduled")
 		action := func() error {
-			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
+			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 			return err
 		}
 		// Here we don't check for the bound node name since it can land on
@@ -101,7 +101,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 
 		By("Observing an event that indicates the pod was scheduled")
 		action := func() error {
-			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
+			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 			return err
 		}
 		predicate := scheduleSuccessEvent(pod.Name, node.Name)
@@ -119,7 +119,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 
 		By("Observing an event that indicates the pod was not scheduled")
 		action := func() error {
-			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(f.NewTestPod("over-max-oir", requests, limits))
+			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(f.NewTestPod("over-max-oir", requests, limits))
 			return err
 		}
 		predicate := scheduleFailureEvent("over-max-oir")
@@ -164,7 +164,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 
 		By("Observing an event that indicates the pod was scheduled")
 		action := func() error {
-			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
+			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 			return err
 		}
 		predicate := scheduleSuccessEvent(pod.Name, node.Name)
@@ -204,7 +204,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 
 		By("Observing an event that indicates the pod was not scheduled")
 		action = func() error {
-			_, err = f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
+			_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 			return err
 		}
 		predicate = scheduleFailureEvent(pod.Name)
@@ -230,7 +230,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 
 		By("Observing an event that indicates one pod was scheduled")
 		action := func() error {
-			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod1)
+			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod1)
 			return err
 		}
 		predicate := scheduleSuccessEvent(pod1.Name, node.Name)
@@ -240,7 +240,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 
 		By("Observing an event that indicates a subsequent pod was not scheduled")
 		action = func() error {
-			_, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod2)
+			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod2)
 			return err
 		}
 		predicate = scheduleFailureEvent(pod2.Name)
@@ -250,7 +250,7 @@ var _ = framework.KubeDescribe("Opaque resources [Feature:OpaqueResources]", fun
 
 		By("Observing an event that indicates the second pod was scheduled after deleting the first pod")
 		action = func() error {
-			err := f.ClientSet.Core().Pods(f.Namespace.Name).Delete(pod1.Name, nil)
+			err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(pod1.Name, nil)
 			return err
 		}
 		predicate = scheduleSuccessEvent(pod2.Name, node.Name)
@@ -265,7 +265,7 @@ func addOpaqueResource(f *framework.Framework, nodeName string, opaqueResName v1
 	action := func() error {
 		By(fmt.Sprintf("Adding OIR to node [%s]", nodeName))
 		patch := []byte(fmt.Sprintf(`[{"op": "add", "path": "/status/capacity/%s", "value": "5"}]`, escapeForJSONPatch(opaqueResName)))
-		return f.ClientSet.Core().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(nodeName).SubResource("status").Body(patch).Do().Error()
+		return f.ClientSet.CoreV1().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(nodeName).SubResource("status").Body(patch).Do().Error()
 	}
 	predicate := func(n *v1.Node) bool {
 		capacity, foundCap := n.Status.Capacity[opaqueResName]
@@ -284,7 +284,7 @@ func removeOpaqueResource(f *framework.Framework, nodeName string, opaqueResName
 	action := func() error {
 		By(fmt.Sprintf("Removing OIR from node [%s]", nodeName))
 		patch := []byte(fmt.Sprintf(`[{"op": "remove", "path": "/status/capacity/%s"}]`, escapeForJSONPatch(opaqueResName)))
-		f.ClientSet.Core().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(nodeName).SubResource("status").Body(patch).Do()
+		f.ClientSet.CoreV1().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(nodeName).SubResource("status").Body(patch).Do()
 		return nil // Ignore error -- the opaque resource may not exist.
 	}
 	predicate := func(n *v1.Node) bool {

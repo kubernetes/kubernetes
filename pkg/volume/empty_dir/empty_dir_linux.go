@@ -20,14 +20,17 @@ package empty_dir
 
 import (
 	"fmt"
-	"syscall"
 
 	"github.com/golang/glog"
+	"golang.org/x/sys/unix"
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 // Defined by Linux - the type number for tmpfs mounts.
-const linuxTmpfsMagic = 0x01021994
+const (
+	linuxTmpfsMagic     = 0x01021994
+	linuxHugetlbfsMagic = 0x958458f6
+)
 
 // realMountDetector implements mountDetector in terms of syscalls.
 type realMountDetector struct {
@@ -40,14 +43,16 @@ func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, er
 	if err != nil {
 		return 0, false, fmt.Errorf("IsLikelyNotMountPoint(%q): %v", path, err)
 	}
-	buf := syscall.Statfs_t{}
-	if err := syscall.Statfs(path, &buf); err != nil {
+	buf := unix.Statfs_t{}
+	if err := unix.Statfs(path, &buf); err != nil {
 		return 0, false, fmt.Errorf("statfs(%q): %v", path, err)
 	}
 
 	glog.V(5).Infof("Statfs_t of %v: %+v", path, buf)
 	if buf.Type == linuxTmpfsMagic {
 		return mediumMemory, !notMnt, nil
+	} else if int64(buf.Type) == linuxHugetlbfsMagic {
+		return mediumHugepages, !notMnt, nil
 	}
 	return mediumUnknown, !notMnt, nil
 }

@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"testing"
 
-	dockertypes "github.com/docker/engine-api/types"
+	dockertypes "github.com/docker/docker/api/types"
 )
 
 func TestUrlsMatch(t *testing.T) {

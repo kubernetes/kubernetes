@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app"
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
+	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
 	"k8s.io/kubernetes/pkg/version/verflag"
 )

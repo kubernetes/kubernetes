@@ -25,12 +25,13 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 const (
@@ -40,8 +41,9 @@ const (
 	NodeUnreachablePodMessage = "Node %v which was running pod %v is unresponsive"
 )
 
+// GetHostname returns OS's hostname if 'hostnameOverride' is empty; otherwise, return 'hostnameOverride'.
 func GetHostname(hostnameOverride string) string {
-	var hostname string = hostnameOverride
+	hostname := hostnameOverride
 	if hostname == "" {
 		nodename, err := os.Hostname()
 		if err != nil {
@@ -64,7 +66,7 @@ func GetPreferredNodeAddress(node *v1.Node, preferredAddressTypes []v1.NodeAddre
 		// If hostname was requested and no Hostname address was registered...
 		if addressType == v1.NodeHostName {
 			// ...fall back to the kubernetes.io/hostname label for compatibility with kubelets before 1.5
-			if hostname, ok := node.Labels[metav1.LabelHostname]; ok && len(hostname) > 0 {
+			if hostname, ok := node.Labels[kubeletapis.LabelHostname]; ok && len(hostname) > 0 {
 				return hostname, nil
 			}
 		}
@@ -108,16 +110,16 @@ func InternalGetNodeHostIP(node *api.Node) (net.IP, error) {
 	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)
 }
 
-// Helper function that builds a string identifier that is unique per failure-zone
-// Returns empty-string for no zone
+// GetZoneKey is a helper function that builds a string identifier that is unique per failure-zone;
+// it returns empty-string for no zone.
 func GetZoneKey(node *v1.Node) string {
 	labels := node.Labels
 	if labels == nil {
 		return ""
 	}
 
-	region, _ := labels[metav1.LabelZoneRegion]
-	failureDomain, _ := labels[metav1.LabelZoneFailureDomain]
+	region, _ := labels[kubeletapis.LabelZoneRegion]
+	failureDomain, _ := labels[kubeletapis.LabelZoneFailureDomain]
 
 	if region == "" && failureDomain == "" {
 		return ""

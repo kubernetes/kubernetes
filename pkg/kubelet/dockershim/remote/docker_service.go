@@ -22,10 +22,10 @@ import (
 
 	"golang.org/x/net/context"
 
-	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
-	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	utilexec "k8s.io/utils/exec"
 )
 
 // DockerService is the interface implement CRI remote service server.
@@ -147,6 +147,14 @@ func (d *dockerService) ContainerStatus(ctx context.Context, r *runtimeapi.Conta
 	return &runtimeapi.ContainerStatusResponse{Status: status}, nil
 }
 
+func (d *dockerService) UpdateContainerResources(ctx context.Context, r *runtimeapi.UpdateContainerResourcesRequest) (*runtimeapi.UpdateContainerResourcesResponse, error) {
+	err := d.runtimeService.UpdateContainerResources(r.ContainerId, r.Linux)
+	if err != nil {
+		return nil, err
+	}
+	return &runtimeapi.UpdateContainerResourcesResponse{}, nil
+}
+
 func (d *dockerService) ExecSync(ctx context.Context, r *runtimeapi.ExecSyncRequest) (*runtimeapi.ExecSyncResponse, error) {
 	stdout, stderr, err := d.runtimeService.ExecSync(r.ContainerId, r.Cmd, time.Duration(r.Timeout)*time.Second)
 	var exitCode int32
@@ -218,5 +226,13 @@ func (d *dockerService) RemoveImage(ctx context.Context, r *runtimeapi.RemoveIma
 
 // ImageFsInfo returns information of the filesystem that is used to store images.
 func (d *dockerService) ImageFsInfo(ctx context.Context, r *runtimeapi.ImageFsInfoRequest) (*runtimeapi.ImageFsInfoResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (d *dockerService) ContainerStats(ctx context.Context, r *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (d *dockerService) ListContainerStats(ctx context.Context, r *runtimeapi.ListContainerStatsRequest) (*runtimeapi.ListContainerStatsResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }

@@ -21,10 +21,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
+
+	"github.com/golang/glog"
 )
 
 var (
@@ -93,12 +94,17 @@ func (cache *schedulerCache) UpdateNodeNameToInfoMap(nodeNameToInfo map[string]*
 }
 
 func (cache *schedulerCache) List(selector labels.Selector) ([]*v1.Pod, error) {
+	alwaysTrue := func(p *v1.Pod) bool { return true }
+	return cache.FilteredList(alwaysTrue, selector)
+}
+
+func (cache *schedulerCache) FilteredList(podFilter PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	var pods []*v1.Pod
 	for _, info := range cache.nodes {
 		for _, pod := range info.pods {
-			if selector.Matches(labels.Set(pod.Labels)) {
+			if podFilter(pod) && selector.Matches(labels.Set(pod.Labels)) {
 				pods = append(pods, pod)
 			}
 		}
@@ -187,7 +193,7 @@ func (cache *schedulerCache) addPod(pod *v1.Pod) {
 		n = NewNodeInfo()
 		cache.nodes[pod.Spec.NodeName] = n
 	}
-	n.addPod(pod)
+	n.AddPod(pod)
 }
 
 // Assumes that lock is already acquired.
@@ -202,7 +208,7 @@ func (cache *schedulerCache) updatePod(oldPod, newPod *v1.Pod) error {
 // Assumes that lock is already acquired.
 func (cache *schedulerCache) removePod(pod *v1.Pod) error {
 	n := cache.nodes[pod.Spec.NodeName]
-	if err := n.removePod(pod); err != nil {
+	if err := n.RemovePod(pod); err != nil {
 		return err
 	}
 	if len(n.pods) == 0 && n.node == nil {

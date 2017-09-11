@@ -23,22 +23,21 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
 	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/core"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	schedulertesting "k8s.io/kubernetes/plugin/pkg/scheduler/testing"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
 
 type fakeBinder struct {
@@ -55,7 +54,7 @@ func (fc fakePodConditionUpdater) Update(pod *v1.Pod, podCondition *v1.PodCondit
 
 func podWithID(id, desiredHost string) *v1.Pod {
 	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: id, SelfLink: testapi.Default.SelfLink("pods", id)},
+		ObjectMeta: metav1.ObjectMeta{Name: id, SelfLink: util.Test.SelfLink(string(v1.ResourcePods), id)},
 		Spec: v1.PodSpec{
 			NodeName: desiredHost,
 		},
@@ -65,7 +64,7 @@ func podWithID(id, desiredHost string) *v1.Pod {
 func deletingPod(id string) *v1.Pod {
 	deletionTimestamp := metav1.Now()
 	return &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: id, SelfLink: testapi.Default.SelfLink("pods", id), DeletionTimestamp: &deletionTimestamp},
+		ObjectMeta: metav1.ObjectMeta{Name: id, SelfLink: util.Test.SelfLink(string(v1.ResourcePods), id), DeletionTimestamp: &deletionTimestamp},
 		Spec: v1.PodSpec{
 			NodeName: "",
 		},
@@ -104,6 +103,10 @@ func (es mockScheduler) Prioritizers() []algorithm.PriorityConfig {
 	return nil
 }
 
+func (es mockScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister, scheduleErr error) (*v1.Node, []*v1.Pod, error) {
+	return nil, nil, nil
+}
+
 func TestScheduler(t *testing.T) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(t.Logf).Stop()
@@ -116,6 +119,7 @@ func TestScheduler(t *testing.T) {
 		sendPod          *v1.Pod
 		algo             algorithm.ScheduleAlgorithm
 		expectErrorPod   *v1.Pod
+		expectForgetPod  *v1.Pod
 		expectAssumedPod *v1.Pod
 		expectError      error
 		expectBind       *v1.Binding
@@ -140,7 +144,8 @@ func TestScheduler(t *testing.T) {
 			expectAssumedPod: podWithID("foo", testNode.Name),
 			injectBindError:  errB,
 			expectError:      errB,
-			expectErrorPod:   podWithID("foo", ""),
+			expectErrorPod:   podWithID("foo", testNode.Name),
+			expectForgetPod:  podWithID("foo", testNode.Name),
 			eventReason:      "FailedScheduling",
 		}, {
 			sendPod:     deletingPod("foo"),
@@ -152,11 +157,15 @@ func TestScheduler(t *testing.T) {
 	for i, item := range table {
 		var gotError error
 		var gotPod *v1.Pod
+		var gotForgetPod *v1.Pod
 		var gotAssumedPod *v1.Pod
 		var gotBinding *v1.Binding
 		configurator := &FakeConfigurator{
 			Config: &Config{
 				SchedulerCache: &schedulertesting.FakeCache{
+					ForgetFunc: func(pod *v1.Pod) {
+						gotForgetPod = pod
+					},
 					AssumeFunc: func(pod *v1.Pod) {
 						gotAssumedPod = pod
 					},
@@ -177,13 +186,13 @@ func TestScheduler(t *testing.T) {
 				NextPod: func() *v1.Pod {
 					return item.sendPod
 				},
-				Recorder: eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "scheduler"}),
+				Recorder: eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: "scheduler"}),
 			},
 		}
 
 		s, _ := NewFromConfigurator(configurator, nil...)
 		called := make(chan struct{})
-		events := eventBroadcaster.StartEventWatcher(func(e *clientv1.Event) {
+		events := eventBroadcaster.StartEventWatcher(func(e *v1.Event) {
 			if e, a := item.eventReason, e.Reason; e != a {
 				t.Errorf("%v: expected %v, got %v", i, e, a)
 			}
@@ -196,6 +205,9 @@ func TestScheduler(t *testing.T) {
 		}
 		if e, a := item.expectErrorPod, gotPod; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v: error pod: wanted %v, got %v", i, e, a)
+		}
+		if e, a := item.expectForgetPod, gotForgetPod; !reflect.DeepEqual(e, a) {
+			t.Errorf("%v: forget pod: wanted %v, got %v", i, e, a)
 		}
 		if e, a := item.expectError, gotError; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v: error: wanted %v, got %v", i, e, a)
@@ -492,7 +504,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 		scache,
 		nil,
 		predicateMap,
-		algorithm.EmptyMetadataProducer,
+		algorithm.EmptyPredicateMetadataProducer,
 		[]algorithm.PriorityConfig{},
 		algorithm.EmptyMetadataProducer,
 		[]algorithm.SchedulerExtender{})
@@ -528,7 +540,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		scache,
 		nil,
 		predicateMap,
-		algorithm.EmptyMetadataProducer,
+		algorithm.EmptyPredicateMetadataProducer,
 		[]algorithm.PriorityConfig{},
 		algorithm.EmptyMetadataProducer,
 		[]algorithm.SchedulerExtender{})

@@ -24,21 +24,25 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	_ "net/http/pprof"
-	"runtime"
+	"net/http/pprof"
+	"os"
+	goruntime "runtime"
 	"strings"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/util"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/record"
@@ -49,37 +53,44 @@ import (
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
+	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
 	"k8s.io/kubernetes/pkg/proxy/winuserspace"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
-	"k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	utilnetsh "k8s.io/kubernetes/pkg/util/netsh"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
+	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	"k8s.io/kubernetes/pkg/util/resourcecontainer"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
+	"k8s.io/kubernetes/pkg/version/verflag"
+	"k8s.io/utils/exec"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
 	proxyModeUserspace = "userspace"
 	proxyModeIPTables  = "iptables"
+	proxyModeIPVS      = "ipvs"
 )
 
 // checkKnownProxyMode returns true if proxyMode is valid.
 func checkKnownProxyMode(proxyMode string) bool {
 	switch proxyMode {
-	case "", proxyModeUserspace, proxyModeIPTables:
+	case "", proxyModeUserspace, proxyModeIPTables, proxyModeIPVS:
 		return true
 	}
 	return false
@@ -89,6 +100,8 @@ func checkKnownProxyMode(proxyMode string) bool {
 type Options struct {
 	// ConfigFile is the location of the proxy server's configuration file.
 	ConfigFile string
+	// WriteConfigTo is the path where the default configuration will be written.
+	WriteConfigTo string
 	// CleanupAndExit, when true, makes the proxy server clean up iptables rules, then exit.
 	CleanupAndExit bool
 
@@ -104,12 +117,17 @@ type Options struct {
 	master string
 	// healthzPort is the port to be used by the healthz server.
 	healthzPort int32
+
+	scheme *runtime.Scheme
+	codecs serializer.CodecFactory
 }
 
 // AddFlags adds flags to fs and binds them to options.
 func AddFlags(options *Options, fs *pflag.FlagSet) {
 	fs.StringVar(&options.ConfigFile, "config", options.ConfigFile, "The path to the configuration file.")
-	fs.BoolVar(&options.CleanupAndExit, "cleanup-iptables", options.CleanupAndExit, "If true cleanup iptables rules and exit.")
+	fs.StringVar(&options.WriteConfigTo, "write-config-to", options.WriteConfigTo, "If set, write the default configuration values to this file and exit.")
+	fs.MarkDeprecated("cleanup-iptables", "This flag is replaced by cleanup-proxyrules.")
+	fs.BoolVar(&options.CleanupAndExit, "cleanup", options.CleanupAndExit, "If true cleanup iptables and ipvs rules and exit.")
 
 	// All flags below here are deprecated and will eventually be removed.
 
@@ -117,19 +135,22 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 	fs.StringVar(&options.master, "master", options.master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.Int32Var(&options.healthzPort, "healthz-port", options.healthzPort, "The port to bind the health check server. Use 0 to disable.")
 	fs.Var(componentconfig.IPVar{Val: &options.config.HealthzBindAddress}, "healthz-bind-address", "The IP address and port for the health check server to serve on (set to 0.0.0.0 for all interfaces)")
-	fs.Int32Var(options.config.OOMScoreAdj, "oom-score-adj", util.Int32PtrDerefOr(options.config.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
+	fs.Var(componentconfig.IPVar{Val: &options.config.MetricsBindAddress}, "metrics-bind-address", "The IP address and port for the metrics server to serve on (set to 0.0.0.0 for all interfaces)")
+	fs.Int32Var(options.config.OOMScoreAdj, "oom-score-adj", utilpointer.Int32PtrDerefOr(options.config.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
 	fs.StringVar(&options.config.ResourceContainer, "resource-container", options.config.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
 	fs.MarkDeprecated("resource-container", "This feature will be removed in a later release.")
 	fs.StringVar(&options.config.ClientConnection.KubeConfigFile, "kubeconfig", options.config.ClientConnection.KubeConfigFile, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
 	fs.Var(componentconfig.PortRangeVar{Val: &options.config.PortRange}, "proxy-port-range", "Range of host ports (beginPort-endPort, inclusive) that may be consumed in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.")
 	fs.StringVar(&options.config.HostnameOverride, "hostname-override", options.config.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
-	fs.Var(&options.config.Mode, "proxy-mode", "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster). If blank, use the best-available proxy (currently iptables).  If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
-	fs.Int32Var(options.config.IPTables.MasqueradeBit, "iptables-masquerade-bit", util.Int32PtrDerefOr(options.config.IPTables.MasqueradeBit, 14), "If using the pure iptables proxy, the bit of the fwmark space to mark packets requiring SNAT with.  Must be within the range [0, 31].")
+	fs.Var(&options.config.Mode, "proxy-mode", "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster) or 'ipvs'(experimental). If blank, use the best-available proxy (currently iptables).  If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
+	fs.Int32Var(options.config.IPTables.MasqueradeBit, "iptables-masquerade-bit", utilpointer.Int32PtrDerefOr(options.config.IPTables.MasqueradeBit, 14), "If using the pure iptables proxy, the bit of the fwmark space to mark packets requiring SNAT with.  Must be within the range [0, 31].")
 	fs.DurationVar(&options.config.IPTables.SyncPeriod.Duration, "iptables-sync-period", options.config.IPTables.SyncPeriod.Duration, "The maximum interval of how often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
 	fs.DurationVar(&options.config.IPTables.MinSyncPeriod.Duration, "iptables-min-sync-period", options.config.IPTables.MinSyncPeriod.Duration, "The minimum interval of how often the iptables rules can be refreshed as endpoints and services change (e.g. '5s', '1m', '2h22m').")
+	fs.DurationVar(&options.config.IPVS.SyncPeriod.Duration, "ipvs-sync-period", options.config.IPVS.SyncPeriod.Duration, "The maximum interval of how often ipvs rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
+	fs.DurationVar(&options.config.IPVS.MinSyncPeriod.Duration, "ipvs-min-sync-period", options.config.IPVS.MinSyncPeriod.Duration, "The minimum interval of how often the ipvs rules can be refreshed as endpoints and services change (e.g. '5s', '1m', '2h22m').")
 	fs.DurationVar(&options.config.ConfigSyncPeriod.Duration, "config-sync-period", options.config.ConfigSyncPeriod.Duration, "How often configuration from the apiserver is refreshed.  Must be greater than 0.")
-	fs.BoolVar(&options.config.IPTables.MasqueradeAll, "masquerade-all", options.config.IPTables.MasqueradeAll, "If using the pure iptables proxy, SNAT everything")
-	fs.StringVar(&options.config.ClusterCIDR, "cluster-cidr", options.config.ClusterCIDR, "The CIDR range of pods in the cluster. It is used to bridge traffic coming from outside of the cluster. If not provided, no off-cluster bridging will be performed.")
+	fs.BoolVar(&options.config.IPTables.MasqueradeAll, "masquerade-all", options.config.IPTables.MasqueradeAll, "If using the pure iptables proxy, SNAT all traffic sent via Service cluster IPs (this not commonly needed)")
+	fs.StringVar(&options.config.ClusterCIDR, "cluster-cidr", options.config.ClusterCIDR, "The CIDR range of pods in the cluster. When configured, traffic sent to a Service cluster IP from outside this range will be masqueraded and traffic sent from pods to an external LoadBalancer IP will be directed to the respective cluster IP instead")
 	fs.StringVar(&options.config.ClientConnection.ContentType, "kube-api-content-type", options.config.ClientConnection.ContentType, "Content type of requests sent to apiserver.")
 	fs.Float32Var(&options.config.ClientConnection.QPS, "kube-api-qps", options.config.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver")
 	fs.IntVar(&options.config.ClientConnection.Burst, "kube-api-burst", options.config.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver")
@@ -146,21 +167,42 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 		&options.config.Conntrack.TCPCloseWaitTimeout.Duration, "conntrack-tcp-timeout-close-wait",
 		options.config.Conntrack.TCPCloseWaitTimeout.Duration,
 		"NAT timeout for TCP connections in the CLOSE_WAIT state")
-
+	fs.BoolVar(&options.config.EnableProfiling, "profiling", options.config.EnableProfiling, "If true enables profiling via web interface on /debug/pprof handler.")
+	fs.StringVar(&options.config.IPVS.Scheduler, "ipvs-scheduler", options.config.IPVS.Scheduler, "The ipvs scheduler type when proxy mode is ipvs")
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
 
+func NewOptions() (*Options, error) {
+	o := &Options{
+		config:      new(componentconfig.KubeProxyConfiguration),
+		healthzPort: ports.ProxyHealthzPort,
+	}
+
+	o.scheme = runtime.NewScheme()
+	o.codecs = serializer.NewCodecFactory(o.scheme)
+
+	if err := componentconfig.AddToScheme(o.scheme); err != nil {
+		return nil, err
+	}
+	if err := v1alpha1.AddToScheme(o.scheme); err != nil {
+		return nil, err
+	}
+
+	return o, nil
+}
+
 // Complete completes all the required options.
-func (o Options) Complete() error {
-	if len(o.ConfigFile) == 0 {
-		glog.Warning("WARNING: all flags other than --config and --cleanup-iptables are deprecated. Please begin using a config file ASAP.")
+func (o *Options) Complete() error {
+	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
+		glog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
 		o.applyDeprecatedHealthzPortToConfig()
 	}
+
 	return nil
 }
 
 // Validate validates all the required options.
-func (o Options) Validate(args []string) error {
+func (o *Options) Validate(args []string) error {
 	if len(args) != 0 {
 		return errors.New("no arguments are supported")
 	}
@@ -168,11 +210,15 @@ func (o Options) Validate(args []string) error {
 	return nil
 }
 
-func (o Options) Run() error {
+func (o *Options) Run() error {
 	config := o.config
 
+	if len(o.WriteConfigTo) > 0 {
+		return o.writeConfigFile()
+	}
+
 	if len(o.ConfigFile) > 0 {
-		if c, err := loadConfigFromFile(o.ConfigFile); err != nil {
+		if c, err := o.loadConfigFromFile(o.ConfigFile); err != nil {
 			return err
 		} else {
 			config = c
@@ -181,12 +227,42 @@ func (o Options) Run() error {
 		}
 	}
 
-	proxyServer, err := NewProxyServer(config, o.CleanupAndExit, o.master)
+	proxyServer, err := NewProxyServer(config, o.CleanupAndExit, o.scheme, o.master)
 	if err != nil {
 		return err
 	}
 
 	return proxyServer.Run()
+}
+
+func (o *Options) writeConfigFile() error {
+	var encoder runtime.Encoder
+	mediaTypes := o.codecs.SupportedMediaTypes()
+	for _, info := range mediaTypes {
+		if info.MediaType == "application/yaml" {
+			encoder = info.Serializer
+			break
+		}
+	}
+	if encoder == nil {
+		return errors.New("unable to locate yaml encoder")
+	}
+	encoder = json.NewYAMLSerializer(json.DefaultMetaFactory, o.scheme, o.scheme)
+	encoder = o.codecs.EncoderForVersion(encoder, v1alpha1.SchemeGroupVersion)
+
+	configFile, err := os.Create(o.WriteConfigTo)
+	if err != nil {
+		return err
+	}
+	defer configFile.Close()
+
+	if err := encoder.Encode(o.config, configFile); err != nil {
+		return err
+	}
+
+	glog.Infof("Wrote configuration to: %s\n", o.WriteConfigTo)
+
+	return nil
 }
 
 // applyDeprecatedHealthzPortToConfig sets o.config.HealthzBindAddress from
@@ -195,7 +271,7 @@ func (o Options) Run() error {
 // 1. If --healthz-port is 0, disable the healthz server.
 // 2. Otherwise, use the value of --healthz-port for the port portion of
 //    o.config.HealthzBindAddress
-func (o Options) applyDeprecatedHealthzPortToConfig() {
+func (o *Options) applyDeprecatedHealthzPortToConfig() {
 	if o.healthzPort == 0 {
 		o.config.HealthzBindAddress = ""
 		return
@@ -211,13 +287,18 @@ func (o Options) applyDeprecatedHealthzPortToConfig() {
 
 // loadConfigFromFile loads the contents of file and decodes it as a
 // KubeProxyConfiguration object.
-func loadConfigFromFile(file string) (*componentconfig.KubeProxyConfiguration, error) {
+func (o *Options) loadConfigFromFile(file string) (*componentconfig.KubeProxyConfiguration, error) {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
 
-	configObj, gvk, err := api.Codecs.UniversalDecoder().Decode(data, nil, nil)
+	return o.loadConfig(data)
+}
+
+// loadConfig decodes data as a KubeProxyConfiguration object.
+func (o *Options) loadConfig(data []byte) (*componentconfig.KubeProxyConfiguration, error) {
+	configObj, gvk, err := o.codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -228,15 +309,15 @@ func loadConfigFromFile(file string) (*componentconfig.KubeProxyConfiguration, e
 	return config, nil
 }
 
-func applyDefaults(in *componentconfig.KubeProxyConfiguration) (*componentconfig.KubeProxyConfiguration, error) {
-	external, err := api.Scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
+func (o *Options) ApplyDefaults(in *componentconfig.KubeProxyConfiguration) (*componentconfig.KubeProxyConfiguration, error) {
+	external, err := o.scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	api.Scheme.Default(external)
+	o.scheme.Default(external)
 
-	internal, err := api.Scheme.ConvertToVersion(external, componentconfig.SchemeGroupVersion)
+	internal, err := o.scheme.ConvertToVersion(external, componentconfig.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -248,9 +329,9 @@ func applyDefaults(in *componentconfig.KubeProxyConfiguration) (*componentconfig
 
 // NewProxyCommand creates a *cobra.Command object with default parameters
 func NewProxyCommand() *cobra.Command {
-	opts := Options{
-		config:      new(componentconfig.KubeProxyConfiguration),
-		healthzPort: 10256,
+	opts, err := NewOptions()
+	if err != nil {
+		glog.Fatalf("Unable to initialize command options: %v", err)
 	}
 
 	cmd := &cobra.Command{
@@ -263,20 +344,20 @@ environment variables specifying ports opened by the service proxy. There is an 
 addon that provides cluster DNS for these cluster IPs. The user must create a service
 with the apiserver API to configure the proxy.`,
 		Run: func(cmd *cobra.Command, args []string) {
+			verflag.PrintAndExitIfRequested()
 			cmdutil.CheckErr(opts.Complete())
 			cmdutil.CheckErr(opts.Validate(args))
 			cmdutil.CheckErr(opts.Run())
 		},
 	}
 
-	var err error
-	opts.config, err = applyDefaults(opts.config)
+	opts.config, err = opts.ApplyDefaults(opts.config)
 	if err != nil {
 		glog.Fatalf("unable to create flag defaults: %v", err)
 	}
 
 	flags := cmd.Flags()
-	AddFlags(&opts, flags)
+	AddFlags(opts, flags)
 
 	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
 
@@ -289,15 +370,18 @@ type ProxyServer struct {
 	Client                 clientset.Interface
 	EventClient            v1core.EventsGetter
 	IptInterface           utiliptables.Interface
+	IpvsInterface          utilipvs.Interface
+	execer                 exec.Interface
 	Proxier                proxy.ProxyProvider
 	Broadcaster            record.EventBroadcaster
 	Recorder               record.EventRecorder
 	ConntrackConfiguration componentconfig.KubeProxyConntrackConfiguration
 	Conntracker            Conntracker // if nil, ignored
 	ProxyMode              string
-	NodeRef                *clientv1.ObjectReference
+	NodeRef                *v1.ObjectReference
 	CleanupAndExit         bool
 	MetricsBindAddress     string
+	EnableProfiling        bool
 	OOMScoreAdj            *int32
 	ResourceContainer      string
 	ConfigSyncPeriod       time.Duration
@@ -338,11 +422,11 @@ func createClients(config componentconfig.ClientConnectionConfiguration, masterO
 		return nil, nil, err
 	}
 
-	return client, eventClient, nil
+	return client, eventClient.CoreV1(), nil
 }
 
 // NewProxyServer returns a new ProxyServer.
-func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndExit bool, master string) (*ProxyServer, error) {
+func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndExit bool, scheme *runtime.Scheme, master string) (*ProxyServer, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
 	}
@@ -360,21 +444,23 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 
 	var netshInterface utilnetsh.Interface
 	var iptInterface utiliptables.Interface
+	var ipvsInterface utilipvs.Interface
 	var dbus utildbus.Interface
 
 	// Create a iptables utils.
 	execer := exec.New()
 
-	if runtime.GOOS == "windows" {
+	if goruntime.GOOS == "windows" {
 		netshInterface = utilnetsh.New(execer)
 	} else {
 		dbus = utildbus.New()
 		iptInterface = utiliptables.New(execer, dbus, protocol)
+		ipvsInterface = utilipvs.New(execer)
 	}
 
 	// We omit creation of pretty much everything if we run in cleanup mode
 	if cleanupAndExit {
-		return &ProxyServer{IptInterface: iptInterface}, nil
+		return &ProxyServer{IptInterface: iptInterface, IpvsInterface: ipvsInterface, CleanupAndExit: cleanupAndExit}, nil
 	}
 
 	client, eventClient, err := createClients(config.ClientConnection, master)
@@ -383,13 +469,22 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 	}
 
 	// Create event recorder
-	hostname := nodeutil.GetHostname(config.HostnameOverride)
+	hostname := utilnode.GetHostname(config.HostnameOverride)
 	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "kube-proxy", Host: hostname})
+	recorder := eventBroadcaster.NewRecorder(scheme, v1.EventSource{Component: "kube-proxy", Host: hostname})
+
+	nodeRef := &v1.ObjectReference{
+		Kind:      "Node",
+		Name:      hostname,
+		UID:       types.UID(hostname),
+		Namespace: "",
+	}
 
 	var healthzServer *healthcheck.HealthzServer
+	var healthzUpdater healthcheck.HealthzUpdater
 	if len(config.HealthzBindAddress) > 0 {
-		healthzServer = healthcheck.NewDefaultHealthzServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration)
+		healthzServer = healthcheck.NewDefaultHealthzServer(config.HealthzBindAddress, 2*config.IPTables.SyncPeriod.Duration, recorder, nodeRef)
+		healthzUpdater = healthzServer
 	}
 
 	var proxier proxy.ProxyProvider
@@ -399,6 +494,12 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 	proxyMode := getProxyMode(string(config.Mode), iptInterface, iptables.LinuxKernelCompatTester{})
 	if proxyMode == proxyModeIPTables {
 		glog.V(0).Info("Using iptables Proxier.")
+		var nodeIP net.IP
+		if config.BindAddress != "0.0.0.0" {
+			nodeIP = net.ParseIP(config.BindAddress)
+		} else {
+			nodeIP = getNodeIP(client, hostname)
+		}
 		if config.IPTables.MasqueradeBit == nil {
 			// MasqueradeBit must be specified or defaulted.
 			return nil, fmt.Errorf("unable to read IPTables MasqueradeBit from config")
@@ -415,23 +516,55 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 			int(*config.IPTables.MasqueradeBit),
 			config.ClusterCIDR,
 			hostname,
-			getNodeIP(client, hostname),
+			nodeIP,
 			recorder,
-			healthzServer,
+			healthzUpdater,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
+		iptables.RegisterMetrics()
 		proxier = proxierIPTables
 		serviceEventHandler = proxierIPTables
 		endpointsEventHandler = proxierIPTables
 		// No turning back. Remove artifacts that might still exist from the userspace Proxier.
-		glog.V(0).Info("Tearing down userspace rules.")
+		glog.V(0).Info("Tearing down inactive rules.")
 		// TODO this has side effects that should only happen when Run() is invoked.
 		userspace.CleanupLeftovers(iptInterface)
+		// IPVS Proxier will generate some iptables rules,
+		// need to clean them before switching to other proxy mode.
+		ipvs.CleanupLeftovers(execer, ipvsInterface, iptInterface)
+	} else if proxyMode == proxyModeIPVS {
+		glog.V(0).Info("Using ipvs Proxier.")
+		proxierIPVS, err := ipvs.NewProxier(
+			iptInterface,
+			ipvsInterface,
+			utilsysctl.New(),
+			execer,
+			config.IPVS.SyncPeriod.Duration,
+			config.IPVS.MinSyncPeriod.Duration,
+			config.IPTables.MasqueradeAll,
+			int(*config.IPTables.MasqueradeBit),
+			config.ClusterCIDR,
+			hostname,
+			getNodeIP(client, hostname),
+			recorder,
+			healthzServer,
+			config.IPVS.Scheduler,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("unable to create proxier: %v", err)
+		}
+		proxier = proxierIPVS
+		serviceEventHandler = proxierIPVS
+		endpointsEventHandler = proxierIPVS
+		glog.V(0).Info("Tearing down inactive rules.")
+		// TODO this has side effects that should only happen when Run() is invoked.
+		userspace.CleanupLeftovers(iptInterface)
+		iptables.CleanupLeftovers(iptInterface)
 	} else {
 		glog.V(0).Info("Using userspace Proxier.")
-		if runtime.GOOS == "windows" {
+		if goruntime.GOOS == "windows" {
 			// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
 			// our config.EndpointsConfigHandler.
 			loadBalancer := winuserspace.NewLoadBalancerRR()
@@ -475,30 +608,28 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 			serviceEventHandler = proxierUserspace
 			proxier = proxierUserspace
 		}
-		// Remove artifacts from the pure-iptables Proxier, if not on Windows.
-		if runtime.GOOS != "windows" {
-			glog.V(0).Info("Tearing down pure-iptables proxy rules.")
+		// Remove artifacts from the iptables and ipvs Proxier, if not on Windows.
+		if goruntime.GOOS != "windows" {
+			glog.V(0).Info("Tearing down inactive rules.")
 			// TODO this has side effects that should only happen when Run() is invoked.
 			iptables.CleanupLeftovers(iptInterface)
+			// IPVS Proxier will generate some iptables rules,
+			// need to clean them before switching to other proxy mode.
+			ipvs.CleanupLeftovers(execer, ipvsInterface, iptInterface)
 		}
 	}
 
 	// Add iptables reload function, if not on Windows.
-	if runtime.GOOS != "windows" {
+	if goruntime.GOOS != "windows" {
 		iptInterface.AddReloadFunc(proxier.Sync)
-	}
-
-	nodeRef := &clientv1.ObjectReference{
-		Kind:      "Node",
-		Name:      hostname,
-		UID:       types.UID(hostname),
-		Namespace: "",
 	}
 
 	return &ProxyServer{
 		Client:                 client,
 		EventClient:            eventClient,
 		IptInterface:           iptInterface,
+		IpvsInterface:          ipvsInterface,
+		execer:                 execer,
 		Proxier:                proxier,
 		Broadcaster:            eventBroadcaster,
 		Recorder:               recorder,
@@ -507,6 +638,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 		ProxyMode:              proxyMode,
 		NodeRef:                nodeRef,
 		MetricsBindAddress:     config.MetricsBindAddress,
+		EnableProfiling:        config.EnableProfiling,
 		OOMScoreAdj:            config.OOMScoreAdj,
 		ResourceContainer:      config.ResourceContainer,
 		ConfigSyncPeriod:       config.ConfigSyncPeriod.Duration,
@@ -522,6 +654,7 @@ func (s *ProxyServer) Run() error {
 	if s.CleanupAndExit {
 		encounteredError := userspace.CleanupLeftovers(s.IptInterface)
 		encounteredError = iptables.CleanupLeftovers(s.IptInterface) || encounteredError
+		encounteredError = ipvs.CleanupLeftovers(s.execer, s.IpvsInterface, s.IptInterface) || encounteredError
 		if encounteredError {
 			return errors.New("encountered an error while tearing down rules.")
 		}
@@ -546,7 +679,9 @@ func (s *ProxyServer) Run() error {
 		}
 	}
 
-	s.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: s.EventClient.Events("")})
+	if s.Broadcaster != nil && s.EventClient != nil {
+		s.Broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: s.EventClient.Events("")})
+	}
 
 	// Start up a healthz server if requested
 	if s.HealthzServer != nil {
@@ -555,13 +690,21 @@ func (s *ProxyServer) Run() error {
 
 	// Start up a metrics server if requested
 	if len(s.MetricsBindAddress) > 0 {
-		http.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
+		mux := http.NewServeMux()
+		healthz.InstallHandler(mux)
+		mux.HandleFunc("/proxyMode", func(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(w, "%s", s.ProxyMode)
 		})
-		http.Handle("/metrics", prometheus.Handler())
-		configz.InstallHandler(http.DefaultServeMux)
+		mux.Handle("/metrics", prometheus.Handler())
+		if s.EnableProfiling {
+			mux.HandleFunc("/debug/pprof/", pprof.Index)
+			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+			mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		}
+		configz.InstallHandler(mux)
 		go wait.Until(func() {
-			err := http.ListenAndServe(s.MetricsBindAddress, nil)
+			err := http.ListenAndServe(s.MetricsBindAddress, mux)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("starting metrics server failed: %v", err))
 			}
@@ -569,7 +712,7 @@ func (s *ProxyServer) Run() error {
 	}
 
 	// Tune conntrack, if requested
-	if s.Conntracker != nil && runtime.GOOS != "windows" {
+	if s.Conntracker != nil && goruntime.GOOS != "windows" {
 		max, err := getConntrackMax(s.ConntrackConfiguration)
 		if err != nil {
 			return err
@@ -643,7 +786,7 @@ func getConntrackMax(config componentconfig.KubeProxyConntrackConfiguration) (in
 	}
 	if config.MaxPerCore > 0 {
 		floor := int(config.Min)
-		scaled := int(config.MaxPerCore) * runtime.NumCPU()
+		scaled := int(config.MaxPerCore) * goruntime.NumCPU()
 		if scaled > floor {
 			glog.V(3).Infof("getConntrackMax: using scaled conntrack-max-per-core")
 			return scaled, nil
@@ -659,10 +802,38 @@ func getProxyMode(proxyMode string, iptver iptables.IPTablesVersioner, kcompat i
 		return proxyModeUserspace
 	}
 
-	if len(proxyMode) > 0 && proxyMode != proxyModeIPTables {
-		glog.Warningf("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
+	if len(proxyMode) > 0 && proxyMode == proxyModeIPTables {
+		return tryIPTablesProxy(iptver, kcompat)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.SupportIPVSProxyMode) {
+		if proxyMode == proxyModeIPVS {
+			return tryIPVSProxy(iptver, kcompat)
+		} else {
+			glog.Warningf("Can't use ipvs proxier, trying iptables proxier")
+			return tryIPTablesProxy(iptver, kcompat)
+		}
+	}
+	glog.Warningf("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
+	return tryIPTablesProxy(iptver, kcompat)
+}
+
+func tryIPVSProxy(iptver iptables.IPTablesVersioner, kcompat iptables.KernelCompatTester) string {
+	// guaranteed false on error, error only necessary for debugging
+	// IPVS Proxier relies on iptables
+	useIPVSProxy, err := ipvs.CanUseIPVSProxier()
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("can't determine whether to use ipvs proxy, using userspace proxier: %v", err))
+		return proxyModeUserspace
+	}
+	if useIPVSProxy {
+		return proxyModeIPVS
+	}
+
+	// TODO: Check ipvs version
+
+	// Try to fallback to iptables before falling back to userspace
+	glog.V(1).Infof("Can't use ipvs proxier, trying iptables proxier")
 	return tryIPTablesProxy(iptver, kcompat)
 }
 
@@ -692,7 +863,7 @@ func getNodeIP(client clientset.Interface, hostname string) net.IP {
 		glog.Warningf("Failed to retrieve node info: %v", err)
 		return nil
 	}
-	nodeIP, err = nodeutil.InternalGetNodeHostIP(node)
+	nodeIP, err = utilnode.InternalGetNodeHostIP(node)
 	if err != nil {
 		glog.Warningf("Failed to retrieve node IP: %v", err)
 		return nil

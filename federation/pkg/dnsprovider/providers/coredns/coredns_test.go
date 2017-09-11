@@ -176,6 +176,9 @@ func TestResourceRecordSetsAddSuccess(t *testing.T) {
 	addRrsetOrFail(t, sets, set)
 	defer sets.StartChangeset().Remove(set).Apply()
 	t.Logf("Successfully added resource record set: %v", set)
+	if sets.Zone().ID() != zone.ID() {
+		t.Errorf("Zone for rrset does not match expected")
+	}
 }
 
 /* TestResourceRecordSetsAdditionVisible verifies that added RRS is visible after addition */
@@ -254,8 +257,14 @@ func TestResourceRecordSetsReplace(t *testing.T) {
 	tests.CommonTestResourceRecordSetsReplace(t, zone)
 }
 
-/* TestResourceRecordSetsReplaceAll verifies that we can remove an RRS and create one with a different name*/
+/* TestResourceRecordSetsReplaceAll verifies that we can remove an RRS and create one with a different name */
 func TestResourceRecordSetsReplaceAll(t *testing.T) {
 	zone := firstZone(t)
 	tests.CommonTestResourceRecordSetsReplaceAll(t, zone)
+}
+
+/* TestResourceRecordSetsDifferentTypes verifies that we can add records with same name, but different types */
+func TestResourceRecordSetsDifferentTypes(t *testing.T) {
+	zone := firstZone(t)
+	tests.CommonTestResourceRecordSetsDifferentTypes(t, zone)
 }

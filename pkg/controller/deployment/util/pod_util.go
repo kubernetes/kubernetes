@@ -17,38 +17,14 @@ limitations under the License.
 package util
 
 import (
-	"hash/adler32"
-	"hash/fnv"
-
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
-	"k8s.io/kubernetes/pkg/client/retry"
-	hashutil "k8s.io/kubernetes/pkg/util/hash"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/util/retry"
 )
-
-func GetPodTemplateSpecHash(template v1.PodTemplateSpec) uint32 {
-	podTemplateSpecHasher := adler32.New()
-	hashutil.DeepHashObject(podTemplateSpecHasher, template)
-	return podTemplateSpecHasher.Sum32()
-}
-
-// TODO: remove the duplicate
-func GetInternalPodTemplateSpecHash(template api.PodTemplateSpec) uint32 {
-	podTemplateSpecHasher := adler32.New()
-	hashutil.DeepHashObject(podTemplateSpecHasher, template)
-	return podTemplateSpecHasher.Sum32()
-}
-
-func GetPodTemplateSpecHashFnv(template v1.PodTemplateSpec) uint32 {
-	podTemplateSpecHasher := fnv.New32a()
-	hashutil.DeepHashObject(podTemplateSpecHasher, template)
-	return podTemplateSpecHasher.Sum32()
-}
 
 // TODO: use client library instead when it starts to support update retries
 //       see https://github.com/kubernetes/kubernetes/issues/21479
@@ -65,11 +41,7 @@ func UpdatePodWithRetries(podClient v1core.PodInterface, podLister corelisters.P
 		if err != nil {
 			return err
 		}
-		obj, deepCopyErr := api.Scheme.DeepCopy(pod)
-		if deepCopyErr != nil {
-			return deepCopyErr
-		}
-		pod = obj.(*v1.Pod)
+		pod = pod.DeepCopy()
 		// Apply the update, then attempt to push it to the apiserver.
 		if applyErr := applyUpdate(pod); applyErr != nil {
 			return applyErr

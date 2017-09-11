@@ -72,12 +72,12 @@ port = 8730
   numeric ids = true
   $USER_CONFIG
   hosts deny = *
-  hosts allow = ${ALLOW}
+  hosts allow = ${ALLOW} ${ALLOW_HOST-}
   auth users = k8s
   secrets file = ${SECRETS}
   read only = false
   path = ${VOLUME}
-  filter = - /.make/ - /.git/ - /_tmp/
+  filter = - /.make/ - /_tmp/
 EOF
 
 exec /usr/bin/rsync --no-detach --daemon --config="${CONFFILE}" "$@"

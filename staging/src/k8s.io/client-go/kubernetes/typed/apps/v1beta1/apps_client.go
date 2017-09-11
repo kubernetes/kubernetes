@@ -17,14 +17,15 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1beta1 "k8s.io/api/apps/v1beta1"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1beta1 "k8s.io/client-go/pkg/apis/apps/v1beta1"
 	rest "k8s.io/client-go/rest"
 )
 
 type AppsV1beta1Interface interface {
 	RESTClient() rest.Interface
+	ControllerRevisionsGetter
 	DeploymentsGetter
 	ScalesGetter
 	StatefulSetsGetter
@@ -33,6 +34,10 @@ type AppsV1beta1Interface interface {
 // AppsV1beta1Client is used to interact with features provided by the apps group.
 type AppsV1beta1Client struct {
 	restClient rest.Interface
+}
+
+func (c *AppsV1beta1Client) ControllerRevisions(namespace string) ControllerRevisionInterface {
+	return newControllerRevisions(c, namespace)
 }
 
 func (c *AppsV1beta1Client) Deployments(namespace string) DeploymentInterface {

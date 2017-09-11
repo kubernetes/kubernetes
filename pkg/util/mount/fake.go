@@ -124,6 +124,14 @@ func (f *FakeMounter) List() ([]MountPoint, error) {
 	return f.MountPoints, nil
 }
 
+func (f *FakeMounter) IsMountPointMatch(mp MountPoint, dir string) bool {
+	return (mp.Path == dir)
+}
+
+func (f *FakeMounter) IsNotMountPoint(dir string) (bool, error) {
+	return IsNotMountPoint(f, dir)
+}
+
 func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
@@ -162,4 +170,8 @@ func (f *FakeMounter) PathIsDevice(pathname string) (bool, error) {
 
 func (f *FakeMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
 	return getDeviceNameFromMount(f, mountPath, pluginDir)
+}
+
+func (f *FakeMounter) MakeRShared(path string) error {
+	return nil
 }

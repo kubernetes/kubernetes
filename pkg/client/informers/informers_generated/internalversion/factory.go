@@ -23,6 +23,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	admissionregistration "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/admissionregistration"
 	apps "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/apps"
 	autoscaling "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/autoscaling"
 	batch "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/batch"
@@ -30,8 +31,10 @@ import (
 	core "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/core"
 	extensions "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/extensions"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/internalinterfaces"
+	networking "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/networking"
 	policy "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/policy"
 	rbac "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/rbac"
+	scheduling "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/scheduling"
 	settings "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/settings"
 	storage "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/storage"
 	reflect "reflect"
@@ -119,16 +122,23 @@ type SharedInformerFactory interface {
 	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
+	Admissionregistration() admissionregistration.Interface
 	Apps() apps.Interface
 	Autoscaling() autoscaling.Interface
 	Batch() batch.Interface
 	Certificates() certificates.Interface
 	Core() core.Interface
 	Extensions() extensions.Interface
+	Networking() networking.Interface
 	Policy() policy.Interface
 	Rbac() rbac.Interface
+	Scheduling() scheduling.Interface
 	Settings() settings.Interface
 	Storage() storage.Interface
+}
+
+func (f *sharedInformerFactory) Admissionregistration() admissionregistration.Interface {
+	return admissionregistration.New(f)
 }
 
 func (f *sharedInformerFactory) Apps() apps.Interface {
@@ -155,12 +165,20 @@ func (f *sharedInformerFactory) Extensions() extensions.Interface {
 	return extensions.New(f)
 }
 
+func (f *sharedInformerFactory) Networking() networking.Interface {
+	return networking.New(f)
+}
+
 func (f *sharedInformerFactory) Policy() policy.Interface {
 	return policy.New(f)
 }
 
 func (f *sharedInformerFactory) Rbac() rbac.Interface {
 	return rbac.New(f)
+}
+
+func (f *sharedInformerFactory) Scheduling() scheduling.Interface {
+	return scheduling.New(f)
 }
 
 func (f *sharedInformerFactory) Settings() settings.Interface {

@@ -36,8 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
-	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/iptables"
+	utilexec "k8s.io/utils/exec"
 )
 
 type portal struct {
@@ -61,7 +61,7 @@ type ServiceInfo struct {
 	nodePort            int
 	loadBalancerStatus  api.LoadBalancerStatus
 	sessionAffinityType api.ServiceAffinity
-	stickyMaxAgeMinutes int
+	stickyMaxAgeSeconds int
 	// Deprecated, but required for back-compat (including e2e)
 	externalIPs []string
 }
@@ -166,9 +166,15 @@ func NewCustomProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptab
 		return nil, ErrProxyOnLocalhost
 	}
 
-	hostIP, err := utilnet.ChooseHostInterface()
-	if err != nil {
-		return nil, fmt.Errorf("failed to select a host interface: %v", err)
+	// If listenIP is given, assume that is the intended host IP.  Otherwise
+	// try to find a suitable host IP address from network interfaces.
+	var err error
+	hostIP := listenIP
+	if hostIP.Equal(net.IPv4zero) {
+		hostIP, err = utilnet.ChooseHostInterface()
+		if err != nil {
+			return nil, fmt.Errorf("failed to select a host interface: %v", err)
+		}
 	}
 
 	err = setRLimit(64 * 1000)
@@ -372,15 +378,13 @@ func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol
 		return nil, err
 	}
 	si := &ServiceInfo{
-		Timeout:       timeout,
-		ActiveClients: newClientCache(),
-
+		Timeout:             timeout,
+		ActiveClients:       newClientCache(),
 		isAliveAtomic:       1,
 		proxyPort:           portNum,
 		protocol:            protocol,
 		socket:              sock,
 		sessionAffinityType: api.ServiceAffinityNone, // default
-		stickyMaxAgeMinutes: 180,                     // TODO: parameterize this in the API.
 	}
 	proxier.setServiceInfo(service, si)
 
@@ -444,12 +448,17 @@ func (proxier *Proxier) mergeService(service *api.Service) sets.String {
 		info.loadBalancerStatus = *helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 		info.nodePort = int(servicePort.NodePort)
 		info.sessionAffinityType = service.Spec.SessionAffinity
+		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
+		if service.Spec.SessionAffinity == api.ServiceAffinityClientIP {
+			info.stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
+		}
+
 		glog.V(4).Infof("info: %#v", info)
 
 		if err := proxier.openPortal(serviceName, info); err != nil {
 			glog.Errorf("Failed to open portal for %q: %v", serviceName, err)
 		}
-		proxier.loadBalancer.NewService(serviceName, info.sessionAffinityType, info.stickyMaxAgeMinutes)
+		proxier.loadBalancer.NewService(serviceName, info.sessionAffinityType, info.stickyMaxAgeSeconds)
 	}
 
 	return existingPorts
@@ -494,7 +503,11 @@ func (proxier *Proxier) unmergeService(service *api.Service, existingPorts sets.
 		}
 		proxier.loadBalancer.DeleteService(serviceName)
 	}
-	utilproxy.DeleteServiceConnections(proxier.exec, staleUDPServices.List())
+	for _, svcIP := range staleUDPServices.List() {
+		if err := utilproxy.ClearUDPConntrackForIP(proxier.exec, svcIP); err != nil {
+			glog.Errorf("Failed to delete stale service IP %s connections, error: %v", svcIP, err)
+		}
+	}
 }
 
 func (proxier *Proxier) OnServiceAdd(service *api.Service) {
@@ -573,7 +586,7 @@ func (proxier *Proxier) openPortal(service proxy.ServicePortName, info *ServiceI
 }
 
 func (proxier *Proxier) openOnePortal(portal portal, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) error {
-	if local, err := isLocalIP(portal.ip); err != nil {
+	if local, err := utilproxy.IsLocalIP(portal.ip.String()); err != nil {
 		return fmt.Errorf("can't determine if IP %s is local, assuming not: %v", portal.ip, err)
 	} else if local {
 		err := proxier.claimNodePort(portal.ip, portal.port, protocol, name)
@@ -751,7 +764,7 @@ func (proxier *Proxier) closePortal(service proxy.ServicePortName, info *Service
 func (proxier *Proxier) closeOnePortal(portal portal, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) []error {
 	el := []error{}
 
-	if local, err := isLocalIP(portal.ip); err != nil {
+	if local, err := utilproxy.IsLocalIP(portal.ip.String()); err != nil {
 		el = append(el, fmt.Errorf("can't determine if IP %s is local, assuming not: %v", portal.ip, err))
 	} else if local {
 		if err := proxier.releaseNodePort(portal.ip, portal.port, protocol, name); err != nil {
@@ -820,23 +833,6 @@ func (proxier *Proxier) closeNodePort(nodePort int, protocol api.Protocol, proxy
 	}
 
 	return el
-}
-
-func isLocalIP(ip net.IP) (bool, error) {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return false, err
-	}
-	for i := range addrs {
-		intf, _, err := net.ParseCIDR(addrs[i].String())
-		if err != nil {
-			return false, err
-		}
-		if ip.Equal(intf) {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 // See comments in the *PortalArgs() functions for some details about why we

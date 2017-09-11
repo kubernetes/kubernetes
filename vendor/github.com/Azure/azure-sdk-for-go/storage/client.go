@@ -2,6 +2,7 @@
 package storage
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
@@ -10,22 +11,27 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"regexp"
-	"sort"
-	"strconv"
+	"runtime"
 	"strings"
+	"time"
+
+	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/azure"
 )
 
 const (
-	// DefaultBaseURL is the domain name used for storage requests when a
-	// default client is created.
+	// DefaultBaseURL is the domain name used for storage requests in the
+	// public cloud when a default client is created.
 	DefaultBaseURL = "core.windows.net"
 
-	// DefaultAPIVersion is the  Azure Storage API version string used when a
+	// DefaultAPIVersion is the Azure Storage API version string used when a
 	// basic client is created.
-	DefaultAPIVersion = "2015-02-21"
+	DefaultAPIVersion = "2016-05-31"
 
 	defaultUseHTTPS = true
 
@@ -43,20 +49,75 @@ const (
 	storageEmulatorBlob  = "127.0.0.1:10000"
 	storageEmulatorTable = "127.0.0.1:10002"
 	storageEmulatorQueue = "127.0.0.1:10001"
+
+	userAgentHeader = "User-Agent"
+
+	userDefinedMetadataHeaderPrefix = "x-ms-meta-"
 )
+
+var (
+	validStorageAccount = regexp.MustCompile("^[0-9a-z]{3,24}$")
+)
+
+// Sender sends a request
+type Sender interface {
+	Send(*Client, *http.Request) (*http.Response, error)
+}
+
+// DefaultSender is the default sender for the client. It implements
+// an automatic retry strategy.
+type DefaultSender struct {
+	RetryAttempts    int
+	RetryDuration    time.Duration
+	ValidStatusCodes []int
+	attempts         int // used for testing
+}
+
+// Send is the default retry strategy in the client
+func (ds *DefaultSender) Send(c *Client, req *http.Request) (resp *http.Response, err error) {
+	b := []byte{}
+	if req.Body != nil {
+		b, err = ioutil.ReadAll(req.Body)
+		if err != nil {
+			return resp, err
+		}
+	}
+
+	for attempts := 0; attempts < ds.RetryAttempts; attempts++ {
+		if len(b) > 0 {
+			req.Body = ioutil.NopCloser(bytes.NewBuffer(b))
+		}
+		resp, err = c.HTTPClient.Do(req)
+		if err != nil || !autorest.ResponseHasStatusCode(resp, ds.ValidStatusCodes...) {
+			return resp, err
+		}
+		autorest.DelayForBackoff(ds.RetryDuration, attempts, req.Cancel)
+		ds.attempts = attempts
+	}
+	ds.attempts++
+	return resp, err
+}
 
 // Client is the object that needs to be constructed to perform
 // operations on the storage account.
 type Client struct {
 	// HTTPClient is the http.Client used to initiate API
-	// requests.  If it is nil, http.DefaultClient is used.
+	// requests. http.DefaultClient is used when creating a
+	// client.
 	HTTPClient *http.Client
 
-	accountName string
-	accountKey  []byte
-	useHTTPS    bool
-	baseURL     string
-	apiVersion  string
+	// Sender is an interface that sends the request. Clients are
+	// created with a DefaultSender. The DefaultSender has an
+	// automatic retry strategy built in. The Sender can be customized.
+	Sender Sender
+
+	accountName      string
+	accountKey       []byte
+	useHTTPS         bool
+	UseSharedKeyLite bool
+	baseURL          string
+	apiVersion       string
+	userAgent        string
 }
 
 type storageResponse struct {
@@ -67,7 +128,7 @@ type storageResponse struct {
 
 type odataResponse struct {
 	storageResponse
-	odata odataErrorMessage
+	odata odataErrorWrapper
 }
 
 // AzureStorageServiceError contains fields of the error response from
@@ -80,22 +141,25 @@ type AzureStorageServiceError struct {
 	QueryParameterName        string `xml:"QueryParameterName"`
 	QueryParameterValue       string `xml:"QueryParameterValue"`
 	Reason                    string `xml:"Reason"`
+	Lang                      string
 	StatusCode                int
 	RequestID                 string
+	Date                      string
+	APIVersion                string
 }
 
-type odataErrorMessageMessage struct {
+type odataErrorMessage struct {
 	Lang  string `json:"lang"`
 	Value string `json:"value"`
 }
 
-type odataErrorMessageInternal struct {
-	Code    string                   `json:"code"`
-	Message odataErrorMessageMessage `json:"message"`
+type odataError struct {
+	Code    string            `json:"code"`
+	Message odataErrorMessage `json:"message"`
 }
 
-type odataErrorMessage struct {
-	Err odataErrorMessageInternal `json:"odata.error"`
+type odataErrorWrapper struct {
+	Err odataError `json:"odata.error"`
 }
 
 // UnexpectedStatusCodeError is returned when a storage service responds with neither an error
@@ -128,7 +192,15 @@ func NewBasicClient(accountName, accountKey string) (Client, error) {
 		return NewEmulatorClient()
 	}
 	return NewClient(accountName, accountKey, DefaultBaseURL, DefaultAPIVersion, defaultUseHTTPS)
+}
 
+// NewBasicClientOnSovereignCloud constructs a Client with given storage service name and
+// key in the referenced cloud.
+func NewBasicClientOnSovereignCloud(accountName, accountKey string, env azure.Environment) (Client, error) {
+	if accountName == StorageEmulatorAccountName {
+		return NewEmulatorClient()
+	}
+	return NewClient(accountName, accountKey, env.StorageEndpointSuffix, DefaultAPIVersion, defaultUseHTTPS)
 }
 
 //NewEmulatorClient contructs a Client intended to only work with Azure
@@ -142,8 +214,8 @@ func NewEmulatorClient() (Client, error) {
 // storage endpoint than Azure Public Cloud.
 func NewClient(accountName, accountKey, blobServiceBaseURL, apiVersion string, useHTTPS bool) (Client, error) {
 	var c Client
-	if accountName == "" {
-		return c, fmt.Errorf("azure: account name required")
+	if !IsValidStorageAccount(accountName) {
+		return c, fmt.Errorf("azure: account name is not valid: it must be between 3 and 24 characters, and only may contain numbers and lowercase letters: %v", accountName)
 	} else if accountKey == "" {
 		return c, fmt.Errorf("azure: account key required")
 	} else if blobServiceBaseURL == "" {
@@ -155,16 +227,67 @@ func NewClient(accountName, accountKey, blobServiceBaseURL, apiVersion string, u
 		return c, fmt.Errorf("azure: malformed storage account key: %v", err)
 	}
 
-	return Client{
-		accountName: accountName,
-		accountKey:  key,
-		useHTTPS:    useHTTPS,
-		baseURL:     blobServiceBaseURL,
-		apiVersion:  apiVersion,
-	}, nil
+	c = Client{
+		HTTPClient:       http.DefaultClient,
+		accountName:      accountName,
+		accountKey:       key,
+		useHTTPS:         useHTTPS,
+		baseURL:          blobServiceBaseURL,
+		apiVersion:       apiVersion,
+		UseSharedKeyLite: false,
+		Sender: &DefaultSender{
+			RetryAttempts: 5,
+			ValidStatusCodes: []int{
+				http.StatusRequestTimeout,      // 408
+				http.StatusInternalServerError, // 500
+				http.StatusBadGateway,          // 502
+				http.StatusServiceUnavailable,  // 503
+				http.StatusGatewayTimeout,      // 504
+			},
+			RetryDuration: time.Second * 5,
+		},
+	}
+	c.userAgent = c.getDefaultUserAgent()
+	return c, nil
 }
 
-func (c Client) getBaseURL(service string) string {
+// IsValidStorageAccount checks if the storage account name is valid.
+// See https://docs.microsoft.com/en-us/azure/storage/storage-create-storage-account
+func IsValidStorageAccount(account string) bool {
+	return validStorageAccount.MatchString(account)
+}
+
+func (c Client) getDefaultUserAgent() string {
+	return fmt.Sprintf("Go/%s (%s-%s) azure-storage-go/%s api-version/%s",
+		runtime.Version(),
+		runtime.GOARCH,
+		runtime.GOOS,
+		sdkVersion,
+		c.apiVersion,
+	)
+}
+
+// AddToUserAgent adds an extension to the current user agent
+func (c *Client) AddToUserAgent(extension string) error {
+	if extension != "" {
+		c.userAgent = fmt.Sprintf("%s %s", c.userAgent, extension)
+		return nil
+	}
+	return fmt.Errorf("Extension was empty, User Agent stayed as %s", c.userAgent)
+}
+
+// protectUserAgent is used in funcs that include extraheaders as a parameter.
+// It prevents the User-Agent header to be overwritten, instead if it happens to
+// be present, it gets added to the current User-Agent. Use it before getStandardHeaders
+func (c *Client) protectUserAgent(extraheaders map[string]string) map[string]string {
+	if v, ok := extraheaders[userAgentHeader]; ok {
+		c.AddToUserAgent(v)
+		delete(extraheaders, userAgentHeader)
+	}
+	return extraheaders
+}
+
+func (c Client) getBaseURL(service string) *url.URL {
 	scheme := "http"
 	if c.useHTTPS {
 		scheme = "https"
@@ -183,18 +306,14 @@ func (c Client) getBaseURL(service string) string {
 		host = fmt.Sprintf("%s.%s.%s", c.accountName, service, c.baseURL)
 	}
 
-	u := &url.URL{
+	return &url.URL{
 		Scheme: scheme,
-		Host:   host}
-	return u.String()
+		Host:   host,
+	}
 }
 
 func (c Client) getEndpoint(service, path string, params url.Values) string {
-	u, err := url.Parse(c.getBaseURL(service))
-	if err != nil {
-		// really should not be happening
-		panic(err)
-	}
+	u := c.getBaseURL(service)
 
 	// API doesn't accept path segments not starting with '/'
 	if !strings.HasPrefix(path, "/") {
@@ -213,181 +332,69 @@ func (c Client) getEndpoint(service, path string, params url.Values) string {
 // GetBlobService returns a BlobStorageClient which can operate on the blob
 // service of the storage account.
 func (c Client) GetBlobService() BlobStorageClient {
-	return BlobStorageClient{c}
+	b := BlobStorageClient{
+		client: c,
+	}
+	b.client.AddToUserAgent(blobServiceName)
+	b.auth = sharedKey
+	if c.UseSharedKeyLite {
+		b.auth = sharedKeyLite
+	}
+	return b
 }
 
 // GetQueueService returns a QueueServiceClient which can operate on the queue
 // service of the storage account.
 func (c Client) GetQueueService() QueueServiceClient {
-	return QueueServiceClient{c}
+	q := QueueServiceClient{
+		client: c,
+	}
+	q.client.AddToUserAgent(queueServiceName)
+	q.auth = sharedKey
+	if c.UseSharedKeyLite {
+		q.auth = sharedKeyLite
+	}
+	return q
 }
 
 // GetTableService returns a TableServiceClient which can operate on the table
 // service of the storage account.
 func (c Client) GetTableService() TableServiceClient {
-	return TableServiceClient{c}
+	t := TableServiceClient{
+		client: c,
+	}
+	t.client.AddToUserAgent(tableServiceName)
+	t.auth = sharedKeyForTable
+	if c.UseSharedKeyLite {
+		t.auth = sharedKeyLiteForTable
+	}
+	return t
 }
 
 // GetFileService returns a FileServiceClient which can operate on the file
 // service of the storage account.
 func (c Client) GetFileService() FileServiceClient {
-	return FileServiceClient{c}
-}
-
-func (c Client) createAuthorizationHeader(canonicalizedString string) string {
-	signature := c.computeHmac256(canonicalizedString)
-	return fmt.Sprintf("%s %s:%s", "SharedKey", c.getCanonicalizedAccountName(), signature)
-}
-
-func (c Client) getAuthorizationHeader(verb, url string, headers map[string]string) (string, error) {
-	canonicalizedResource, err := c.buildCanonicalizedResource(url)
-	if err != nil {
-		return "", err
+	f := FileServiceClient{
+		client: c,
 	}
-
-	canonicalizedString := c.buildCanonicalizedString(verb, headers, canonicalizedResource)
-	return c.createAuthorizationHeader(canonicalizedString), nil
+	f.client.AddToUserAgent(fileServiceName)
+	f.auth = sharedKey
+	if c.UseSharedKeyLite {
+		f.auth = sharedKeyLite
+	}
+	return f
 }
 
 func (c Client) getStandardHeaders() map[string]string {
 	return map[string]string{
-		"x-ms-version": c.apiVersion,
-		"x-ms-date":    currentTimeRfc1123Formatted(),
+		userAgentHeader: c.userAgent,
+		"x-ms-version":  c.apiVersion,
+		"x-ms-date":     currentTimeRfc1123Formatted(),
 	}
 }
 
-func (c Client) getCanonicalizedAccountName() string {
-	// since we may be trying to access a secondary storage account, we need to
-	// remove the -secondary part of the storage name
-	return strings.TrimSuffix(c.accountName, "-secondary")
-}
-
-func (c Client) buildCanonicalizedHeader(headers map[string]string) string {
-	cm := make(map[string]string)
-
-	for k, v := range headers {
-		headerName := strings.TrimSpace(strings.ToLower(k))
-		match, _ := regexp.MatchString("x-ms-", headerName)
-		if match {
-			cm[headerName] = v
-		}
-	}
-
-	if len(cm) == 0 {
-		return ""
-	}
-
-	keys := make([]string, 0, len(cm))
-	for key := range cm {
-		keys = append(keys, key)
-	}
-
-	sort.Strings(keys)
-
-	ch := ""
-
-	for i, key := range keys {
-		if i == len(keys)-1 {
-			ch += fmt.Sprintf("%s:%s", key, cm[key])
-		} else {
-			ch += fmt.Sprintf("%s:%s\n", key, cm[key])
-		}
-	}
-	return ch
-}
-
-func (c Client) buildCanonicalizedResourceTable(uri string) (string, error) {
-	errMsg := "buildCanonicalizedResourceTable error: %s"
-	u, err := url.Parse(uri)
-	if err != nil {
-		return "", fmt.Errorf(errMsg, err.Error())
-	}
-
-	cr := "/" + c.getCanonicalizedAccountName()
-
-	if len(u.Path) > 0 {
-		cr += u.EscapedPath()
-	}
-
-	return cr, nil
-}
-
-func (c Client) buildCanonicalizedResource(uri string) (string, error) {
-	errMsg := "buildCanonicalizedResource error: %s"
-	u, err := url.Parse(uri)
-	if err != nil {
-		return "", fmt.Errorf(errMsg, err.Error())
-	}
-
-	cr := "/" + c.getCanonicalizedAccountName()
-
-	if len(u.Path) > 0 {
-		// Any portion of the CanonicalizedResource string that is derived from
-		// the resource's URI should be encoded exactly as it is in the URI.
-		// -- https://msdn.microsoft.com/en-gb/library/azure/dd179428.aspx
-		cr += u.EscapedPath()
-	}
-
-	params, err := url.ParseQuery(u.RawQuery)
-	if err != nil {
-		return "", fmt.Errorf(errMsg, err.Error())
-	}
-
-	if len(params) > 0 {
-		cr += "\n"
-		keys := make([]string, 0, len(params))
-		for key := range params {
-			keys = append(keys, key)
-		}
-
-		sort.Strings(keys)
-
-		for i, key := range keys {
-			if len(params[key]) > 1 {
-				sort.Strings(params[key])
-			}
-
-			if i == len(keys)-1 {
-				cr += fmt.Sprintf("%s:%s", key, strings.Join(params[key], ","))
-			} else {
-				cr += fmt.Sprintf("%s:%s\n", key, strings.Join(params[key], ","))
-			}
-		}
-	}
-
-	return cr, nil
-}
-
-func (c Client) buildCanonicalizedString(verb string, headers map[string]string, canonicalizedResource string) string {
-	contentLength := headers["Content-Length"]
-	if contentLength == "0" {
-		contentLength = ""
-	}
-	canonicalizedString := fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s",
-		verb,
-		headers["Content-Encoding"],
-		headers["Content-Language"],
-		contentLength,
-		headers["Content-MD5"],
-		headers["Content-Type"],
-		headers["Date"],
-		headers["If-Modified-Since"],
-		headers["If-Match"],
-		headers["If-None-Match"],
-		headers["If-Unmodified-Since"],
-		headers["Range"],
-		c.buildCanonicalizedHeader(headers),
-		canonicalizedResource)
-
-	return canonicalizedString
-}
-
-func (c Client) exec(verb, url string, headers map[string]string, body io.Reader) (*storageResponse, error) {
-	authHeader, err := c.getAuthorizationHeader(verb, url, headers)
-	if err != nil {
-		return nil, err
-	}
-	headers["Authorization"] = authHeader
+func (c Client) exec(verb, url string, headers map[string]string, body io.Reader, auth authentication) (*storageResponse, error) {
+	headers, err := c.addAuthorizationHeader(verb, url, headers, auth)
 	if err != nil {
 		return nil, err
 	}
@@ -397,45 +404,44 @@ func (c Client) exec(verb, url string, headers map[string]string, body io.Reader
 		return nil, errors.New("azure/storage: error creating request: " + err.Error())
 	}
 
-	if clstr, ok := headers["Content-Length"]; ok {
-		// content length header is being signed, but completely ignored by golang.
-		// instead we have to use the ContentLength property on the request struct
-		// (see https://golang.org/src/net/http/request.go?s=18140:18370#L536 and
-		// https://golang.org/src/net/http/transfer.go?s=1739:2467#L49)
-		req.ContentLength, err = strconv.ParseInt(clstr, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-	}
 	for k, v := range headers {
 		req.Header.Add(k, v)
 	}
 
-	httpClient := c.HTTPClient
-	if httpClient == nil {
-		httpClient = http.DefaultClient
-	}
-	resp, err := httpClient.Do(req)
+	resp, err := c.Sender.Send(&c, req)
 	if err != nil {
 		return nil, err
 	}
 
-	statusCode := resp.StatusCode
-	if statusCode >= 400 && statusCode <= 505 {
+	if resp.StatusCode >= 400 && resp.StatusCode <= 505 {
 		var respBody []byte
-		respBody, err = readResponseBody(resp)
+		respBody, err = readAndCloseBody(resp.Body)
 		if err != nil {
 			return nil, err
 		}
 
+		requestID, date, version := getDebugHeaders(resp.Header)
 		if len(respBody) == 0 {
-			// no error in response body
-			err = fmt.Errorf("storage: service returned without a response body (%s)", resp.Status)
+			// no error in response body, might happen in HEAD requests
+			err = serviceErrFromStatusCode(resp.StatusCode, resp.Status, requestID, date, version)
 		} else {
+			storageErr := AzureStorageServiceError{
+				StatusCode: resp.StatusCode,
+				RequestID:  requestID,
+				Date:       date,
+				APIVersion: version,
+			}
 			// response contains storage service error object, unmarshal
-			storageErr, errIn := serviceErrFromXML(respBody, resp.StatusCode, resp.Header.Get("x-ms-request-id"))
-			if err != nil { // error unmarshaling the error response
-				err = errIn
+			if resp.Header.Get("Content-Type") == "application/xml" {
+				errIn := serviceErrFromXML(respBody, &storageErr)
+				if err != nil { // error unmarshaling the error response
+					err = errIn
+				}
+			} else {
+				errIn := serviceErrFromJSON(respBody, &storageErr)
+				if err != nil { // error unmarshaling the error response
+					err = errIn
+				}
 			}
 			err = storageErr
 		}
@@ -452,20 +458,20 @@ func (c Client) exec(verb, url string, headers map[string]string, body io.Reader
 		body:       resp.Body}, nil
 }
 
-func (c Client) execInternalJSON(verb, url string, headers map[string]string, body io.Reader) (*odataResponse, error) {
+func (c Client) execInternalJSONCommon(verb, url string, headers map[string]string, body io.Reader, auth authentication) (*odataResponse, *http.Request, *http.Response, error) {
+	headers, err := c.addAuthorizationHeader(verb, url, headers, auth)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	req, err := http.NewRequest(verb, url, body)
 	for k, v := range headers {
 		req.Header.Add(k, v)
 	}
 
-	httpClient := c.HTTPClient
-	if httpClient == nil {
-		httpClient = http.DefaultClient
-	}
-
-	resp, err := httpClient.Do(req)
+	resp, err := c.Sender.Send(&c, req)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
 	respToRet := &odataResponse{}
@@ -476,68 +482,155 @@ func (c Client) execInternalJSON(verb, url string, headers map[string]string, bo
 	statusCode := resp.StatusCode
 	if statusCode >= 400 && statusCode <= 505 {
 		var respBody []byte
-		respBody, err = readResponseBody(resp)
+		respBody, err = readAndCloseBody(resp.Body)
 		if err != nil {
-			return nil, err
+			return nil, nil, nil, err
 		}
 
+		requestID, date, version := getDebugHeaders(resp.Header)
 		if len(respBody) == 0 {
-			// no error in response body
-			err = fmt.Errorf("storage: service returned without a response body (%d)", resp.StatusCode)
-			return respToRet, err
+			// no error in response body, might happen in HEAD requests
+			err = serviceErrFromStatusCode(resp.StatusCode, resp.Status, requestID, date, version)
+			return respToRet, req, resp, err
 		}
 		// try unmarshal as odata.error json
 		err = json.Unmarshal(respBody, &respToRet.odata)
-		return respToRet, err
+	}
+
+	return respToRet, req, resp, err
+}
+
+func (c Client) execInternalJSON(verb, url string, headers map[string]string, body io.Reader, auth authentication) (*odataResponse, error) {
+	respToRet, _, _, err := c.execInternalJSONCommon(verb, url, headers, body, auth)
+	return respToRet, err
+}
+
+func (c Client) execBatchOperationJSON(verb, url string, headers map[string]string, body io.Reader, auth authentication) (*odataResponse, error) {
+	// execute common query, get back generated request, response etc... for more processing.
+	respToRet, req, resp, err := c.execInternalJSONCommon(verb, url, headers, body, auth)
+	if err != nil {
+		return nil, err
+	}
+
+	// return the OData in the case of executing batch commands.
+	// In this case we need to read the outer batch boundary and contents.
+	// Then we read the changeset information within the batch
+	var respBody []byte
+	respBody, err = readAndCloseBody(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// outer multipart body
+	_, batchHeader, err := mime.ParseMediaType(resp.Header["Content-Type"][0])
+	if err != nil {
+		return nil, err
+	}
+
+	// batch details.
+	batchBoundary := batchHeader["boundary"]
+	batchPartBuf, changesetBoundary, err := genBatchReader(batchBoundary, respBody)
+	if err != nil {
+		return nil, err
+	}
+
+	// changeset details.
+	err = genChangesetReader(req, respToRet, batchPartBuf, changesetBoundary)
+	if err != nil {
+		return nil, err
 	}
 
 	return respToRet, nil
 }
 
-func (c Client) createSharedKeyLite(url string, headers map[string]string) (string, error) {
-	can, err := c.buildCanonicalizedResourceTable(url)
-
+func genChangesetReader(req *http.Request, respToRet *odataResponse, batchPartBuf io.Reader, changesetBoundary string) error {
+	changesetMultiReader := multipart.NewReader(batchPartBuf, changesetBoundary)
+	changesetPart, err := changesetMultiReader.NextPart()
 	if err != nil {
-		return "", err
-	}
-	strToSign := headers["x-ms-date"] + "\n" + can
-
-	hmac := c.computeHmac256(strToSign)
-	return fmt.Sprintf("SharedKeyLite %s:%s", c.accountName, hmac), nil
-}
-
-func (c Client) execTable(verb, url string, headers map[string]string, body io.Reader) (*odataResponse, error) {
-	var err error
-	headers["Authorization"], err = c.createSharedKeyLite(url, headers)
-	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return c.execInternalJSON(verb, url, headers, body)
+	changesetPartBufioReader := bufio.NewReader(changesetPart)
+	changesetResp, err := http.ReadResponse(changesetPartBufioReader, req)
+	if err != nil {
+		return err
+	}
+
+	if changesetResp.StatusCode != http.StatusNoContent {
+		changesetBody, err := readAndCloseBody(changesetResp.Body)
+		err = json.Unmarshal(changesetBody, &respToRet.odata)
+		if err != nil {
+			return err
+		}
+		respToRet.statusCode = changesetResp.StatusCode
+	}
+
+	return nil
 }
 
-func readResponseBody(resp *http.Response) ([]byte, error) {
-	defer resp.Body.Close()
-	out, err := ioutil.ReadAll(resp.Body)
+func genBatchReader(batchBoundary string, respBody []byte) (io.Reader, string, error) {
+	respBodyString := string(respBody)
+	respBodyReader := strings.NewReader(respBodyString)
+
+	// reading batchresponse
+	batchMultiReader := multipart.NewReader(respBodyReader, batchBoundary)
+	batchPart, err := batchMultiReader.NextPart()
+	if err != nil {
+		return nil, "", err
+	}
+	batchPartBufioReader := bufio.NewReader(batchPart)
+
+	_, changesetHeader, err := mime.ParseMediaType(batchPart.Header.Get("Content-Type"))
+	if err != nil {
+		return nil, "", err
+	}
+	changesetBoundary := changesetHeader["boundary"]
+	return batchPartBufioReader, changesetBoundary, nil
+}
+
+func readAndCloseBody(body io.ReadCloser) ([]byte, error) {
+	defer body.Close()
+	out, err := ioutil.ReadAll(body)
 	if err == io.EOF {
 		err = nil
 	}
 	return out, err
 }
 
-func serviceErrFromXML(body []byte, statusCode int, requestID string) (AzureStorageServiceError, error) {
-	var storageErr AzureStorageServiceError
-	if err := xml.Unmarshal(body, &storageErr); err != nil {
-		return storageErr, err
+func serviceErrFromXML(body []byte, storageErr *AzureStorageServiceError) error {
+	if err := xml.Unmarshal(body, storageErr); err != nil {
+		storageErr.Message = fmt.Sprintf("Response body could no be unmarshaled: %v. Body: %v.", err, string(body))
+		return err
 	}
-	storageErr.StatusCode = statusCode
-	storageErr.RequestID = requestID
-	return storageErr, nil
+	return nil
+}
+
+func serviceErrFromJSON(body []byte, storageErr *AzureStorageServiceError) error {
+	odataError := odataErrorWrapper{}
+	if err := json.Unmarshal(body, &odataError); err != nil {
+		storageErr.Message = fmt.Sprintf("Response body could no be unmarshaled: %v. Body: %v.", err, string(body))
+		return err
+	}
+	storageErr.Code = odataError.Err.Code
+	storageErr.Message = odataError.Err.Message.Value
+	storageErr.Lang = odataError.Err.Message.Lang
+	return nil
+}
+
+func serviceErrFromStatusCode(code int, status string, requestID, date, version string) AzureStorageServiceError {
+	return AzureStorageServiceError{
+		StatusCode: code,
+		Code:       status,
+		RequestID:  requestID,
+		Date:       date,
+		APIVersion: version,
+		Message:    "no response body was available for error status code",
+	}
 }
 
 func (e AzureStorageServiceError) Error() string {
-	return fmt.Sprintf("storage: service returned error: StatusCode=%d, ErrorCode=%s, ErrorMessage=%s, RequestId=%s, QueryParameterName=%s, QueryParameterValue=%s",
-		e.StatusCode, e.Code, e.Message, e.RequestID, e.QueryParameterName, e.QueryParameterValue)
+	return fmt.Sprintf("storage: service returned error: StatusCode=%d, ErrorCode=%s, ErrorMessage=%s, RequestInitiated=%s, RequestId=%s, API Version=%s, QueryParameterName=%s, QueryParameterValue=%s",
+		e.StatusCode, e.Code, e.Message, e.Date, e.RequestID, e.APIVersion, e.QueryParameterName, e.QueryParameterValue)
 }
 
 // checkRespCode returns UnexpectedStatusError if the given response code is not
@@ -549,4 +642,19 @@ func checkRespCode(respCode int, allowed []int) error {
 		}
 	}
 	return UnexpectedStatusCodeError{allowed, respCode}
+}
+
+func (c Client) addMetadataToHeaders(h map[string]string, metadata map[string]string) map[string]string {
+	metadata = c.protectUserAgent(metadata)
+	for k, v := range metadata {
+		h[userDefinedMetadataHeaderPrefix+k] = v
+	}
+	return h
+}
+
+func getDebugHeaders(h http.Header) (requestID, date, version string) {
+	requestID = h.Get("x-ms-request-id")
+	version = h.Get("x-ms-version")
+	date = h.Get("Date")
+	return
 }

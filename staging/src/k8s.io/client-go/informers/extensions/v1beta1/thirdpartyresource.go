@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
+	extensions_v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1beta1 "k8s.io/client-go/listers/extensions/v1beta1"
-	extensions_v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
 	time "time"
 )
@@ -41,8 +41,11 @@ type thirdPartyResourceInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newThirdPartyResourceInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewThirdPartyResourceInformer constructs a new informer for ThirdPartyResource type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewThirdPartyResourceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return client.ExtensionsV1beta1().ThirdPartyResources().List(options)
@@ -53,14 +56,16 @@ func newThirdPartyResourceInformer(client kubernetes.Interface, resyncPeriod tim
 		},
 		&extensions_v1beta1.ThirdPartyResource{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultThirdPartyResourceInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewThirdPartyResourceInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *thirdPartyResourceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&extensions_v1beta1.ThirdPartyResource{}, newThirdPartyResourceInformer)
+	return f.factory.InformerFor(&extensions_v1beta1.ThirdPartyResource{}, defaultThirdPartyResourceInformer)
 }
 
 func (f *thirdPartyResourceInformer) Lister() v1beta1.ThirdPartyResourceLister {

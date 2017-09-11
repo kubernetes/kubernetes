@@ -37,6 +37,8 @@ KUBE_TIMEOUT="-timeout 600s"
 KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
 LOG_LEVEL=${LOG_LEVEL:-2}
 KUBE_TEST_ARGS=${KUBE_TEST_ARGS:-}
+# Default glog module settings.
+KUBE_TEST_VMODULE=${KUBE_TEST_VMODULE:-"garbagecollector*=6,graph_builder*=6"}
 
 kube::test::find_integration_test_dirs() {
   (
@@ -44,7 +46,7 @@ kube::test::find_integration_test_dirs() {
     find test/integration/ -name '*_test.go' -print0 \
       | xargs -0n1 dirname | sed "s|^|${KUBE_GO_PACKAGE}/|" \
       | LC_ALL=C sort -u
-    find vendor/k8s.io/kube-apiextensions-server/test/integration/ -name '*_test.go' -print0 \
+    find vendor/k8s.io/apiextensions-apiserver/test/integration/ -name '*_test.go' -print0 \
       | xargs -0n1 dirname | sed "s|^|${KUBE_GO_PACKAGE}/|" \
       | LC_ALL=C sort -u
   )
@@ -67,12 +69,11 @@ runTests() {
   kube::etcd::start
   kube::log::status "Running integration test cases"
 
-  # TODO: Re-enable race detection when we switch to a thread-safe etcd client
-  # KUBE_RACE="-race"
+  KUBE_RACE="-race"
   make -C "${KUBE_ROOT}" test \
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
-      KUBE_GOFLAGS="${KUBE_GOFLAGS:-}" \
-      KUBE_TEST_ARGS="${KUBE_TEST_ARGS:-} ${SHORT:--short=true} --vmodule=garbage*collector*=6 --alsologtostderr=true" \
+      GOFLAGS="${GOFLAGS:-}" \
+      KUBE_TEST_ARGS="${KUBE_TEST_ARGS:-} ${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} --alsologtostderr=true" \
       KUBE_RACE="" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
       KUBE_TEST_API_VERSIONS="$1"
@@ -84,7 +85,8 @@ checkEtcdOnPath() {
   kube::log::status "Checking etcd is on PATH"
   which etcd && return
   kube::log::status "Cannot find etcd, cannot run integration tests."
-  kube::log::status "Please see docs/devel/testing.md for instructions."
+  kube::log::status "Please see https://github.com/kubernetes/community/blob/master/contributors/devel/testing.md#install-etcd-dependency for instructions."
+  kube::log::usage "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
   return 1
 }
 

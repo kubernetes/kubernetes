@@ -17,9 +17,12 @@ limitations under the License.
 package kubectl
 
 import (
+	"fmt"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 )
@@ -231,6 +234,163 @@ func TestDaemonSetStatusViewerStatus(t *testing.T) {
 	}
 }
 
+func TestStatefulSetStatusViewerStatus(t *testing.T) {
+	tests := []struct {
+		name       string
+		generation int64
+		strategy   apps.StatefulSetUpdateStrategy
+		status     apps.StatefulSetStatus
+		msg        string
+		done       bool
+		err        bool
+	}{
+		{
+			name:       "on delete returns an error",
+			generation: 1,
+			strategy:   apps.StatefulSetUpdateStrategy{Type: apps.OnDeleteStatefulSetStrategyType},
+			status: apps.StatefulSetStatus{
+				ObservedGeneration: func() *int64 {
+					generation := int64(1)
+					return &generation
+				}(),
+				Replicas:        0,
+				ReadyReplicas:   1,
+				CurrentReplicas: 0,
+				UpdatedReplicas: 0,
+			},
+
+			msg:  "",
+			done: true,
+			err:  true,
+		},
+		{
+			name:       "unobserved update is not complete",
+			generation: 2,
+			strategy:   apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			status: apps.StatefulSetStatus{
+				ObservedGeneration: func() *int64 {
+					generation := int64(1)
+					return &generation
+				}(),
+				Replicas:        3,
+				ReadyReplicas:   3,
+				CurrentReplicas: 3,
+				UpdatedReplicas: 0,
+			},
+
+			msg:  "Waiting for statefulset spec update to be observed...\n",
+			done: false,
+			err:  false,
+		},
+		{
+			name:       "if all pods are not ready the update is not complete",
+			generation: 1,
+			strategy:   apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			status: apps.StatefulSetStatus{
+				ObservedGeneration: func() *int64 {
+					generation := int64(2)
+					return &generation
+				}(),
+				Replicas:        3,
+				ReadyReplicas:   2,
+				CurrentReplicas: 3,
+				UpdatedReplicas: 0,
+			},
+
+			msg:  fmt.Sprintf("Waiting for %d pods to be ready...\n", 1),
+			done: false,
+			err:  false,
+		},
+		{
+			name:       "partition update completes when all replicas above the partition are updated",
+			generation: 1,
+			strategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
+					return &apps.RollingUpdateStatefulSetStrategy{Partition: 2}
+				}()},
+			status: apps.StatefulSetStatus{
+				ObservedGeneration: func() *int64 {
+					generation := int64(2)
+					return &generation
+				}(),
+				Replicas:        3,
+				ReadyReplicas:   3,
+				CurrentReplicas: 2,
+				UpdatedReplicas: 1,
+			},
+
+			msg:  fmt.Sprintf("partitioned roll out complete: %d new pods have been updated...\n", 1),
+			done: true,
+			err:  false,
+		},
+		{
+			name:       "partition update is in progress if all pods above the partition have not been updated",
+			generation: 1,
+			strategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: func() *apps.RollingUpdateStatefulSetStrategy {
+					return &apps.RollingUpdateStatefulSetStrategy{Partition: 2}
+				}()},
+			status: apps.StatefulSetStatus{
+				ObservedGeneration: func() *int64 {
+					generation := int64(2)
+					return &generation
+				}(),
+				Replicas:        3,
+				ReadyReplicas:   3,
+				CurrentReplicas: 3,
+				UpdatedReplicas: 0,
+			},
+
+			msg:  fmt.Sprintf("Waiting for partitioned roll out to finish: %d out of %d new pods have been updated...\n", 0, 1),
+			done: true,
+			err:  false,
+		},
+		{
+			name:       "update completes when all replicas are current",
+			generation: 1,
+			strategy:   apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+			status: apps.StatefulSetStatus{
+				ObservedGeneration: func() *int64 {
+					generation := int64(2)
+					return &generation
+				}(),
+				Replicas:        3,
+				ReadyReplicas:   3,
+				CurrentReplicas: 3,
+				UpdatedReplicas: 3,
+				CurrentRevision: "foo",
+				UpdateRevision:  "foo",
+			},
+
+			msg:  fmt.Sprintf("statefulset rolling update complete %d pods at revision %s...\n", 3, "foo"),
+			done: true,
+			err:  false,
+		},
+	}
+	for i := range tests {
+		test := tests[i]
+		s := newStatefulSet(3)
+		s.Status = test.status
+		s.Spec.UpdateStrategy = test.strategy
+		s.Generation = test.generation
+		client := fake.NewSimpleClientset(s).Apps()
+		dsv := &StatefulSetStatusViewer{c: client}
+		msg, done, err := dsv.Status(s.Namespace, s.Name, 0)
+		if test.err && err == nil {
+			t.Fatalf("%s: expected error", test.name)
+		}
+		if !test.err && err != nil {
+			t.Fatalf("%s: %s", test.name, err)
+		}
+		if done && !test.done {
+			t.Errorf("%s: want done %v got %v", test.name, done, test.done)
+		}
+		if msg != test.msg {
+			t.Errorf("%s: want message %s got %s", test.name, test.msg, msg)
+		}
+	}
+}
+
 func TestDaemonSetStatusViewerStatusWithWrongUpdateStrategyType(t *testing.T) {
 	d := &extensions.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -250,5 +410,38 @@ func TestDaemonSetStatusViewerStatusWithWrongUpdateStrategyType(t *testing.T) {
 	errMsg := "Status is available only for RollingUpdate strategy type"
 	if err == nil || err.Error() != errMsg {
 		t.Errorf("Status for daemon sets with UpdateStrategy type different than RollingUpdate should return error. Instead got: msg: %s\ndone: %t\n err: %v", msg, done, err)
+	}
+}
+
+func newStatefulSet(replicas int32) *apps.StatefulSet {
+	return &apps.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo",
+			Namespace: metav1.NamespaceDefault,
+			Labels:    map[string]string{"a": "b"},
+		},
+		Spec: apps.StatefulSetSpec{
+			PodManagementPolicy: apps.OrderedReadyPodManagement,
+			Selector:            &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+			Template: api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:            "test",
+							Image:           "test_image",
+							ImagePullPolicy: api.PullIfNotPresent,
+						},
+					},
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+				},
+			},
+			Replicas:       replicas,
+			UpdateStrategy: apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
+		},
+		Status: apps.StatefulSetStatus{},
 	}
 }

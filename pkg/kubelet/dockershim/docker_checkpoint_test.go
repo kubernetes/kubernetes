@@ -48,18 +48,22 @@ func TestPersistentCheckpointHandler(t *testing.T) {
 			&port443,
 		},
 	}
+	checkpoint1.Data.HostNetwork = true
 
 	checkpoints := []struct {
-		podSandboxID string
-		checkpoint   *PodSandboxCheckpoint
+		podSandboxID      string
+		checkpoint        *PodSandboxCheckpoint
+		expectHostNetwork bool
 	}{
 		{
 			"id1",
 			checkpoint1,
+			true,
 		},
 		{
 			"id2",
 			NewPodSandboxCheckpoint("ns2", "sandbox2"),
+			false,
 		},
 	}
 
@@ -72,6 +76,7 @@ func TestPersistentCheckpointHandler(t *testing.T) {
 		checkpoint, err := handler.GetCheckpoint(tc.podSandboxID)
 		assert.NoError(t, err)
 		assert.Equal(t, *checkpoint, *tc.checkpoint)
+		assert.Equal(t, checkpoint.Data.HostNetwork, tc.expectHostNetwork)
 	}
 	// Test ListCheckpoints
 	keys, err := handler.ListCheckpoints()

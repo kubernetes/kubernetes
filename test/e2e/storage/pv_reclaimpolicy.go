@@ -22,15 +22,15 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = framework.KubeDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
+var _ = SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 	f := framework.NewDefaultFramework("persistentvolumereclaim")
 	var (
 		c          clientset.Interface
@@ -46,7 +46,7 @@ var _ = framework.KubeDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 	})
 
-	framework.KubeDescribe("persistentvolumereclaim:vsphere", func() {
+	SIGDescribe("persistentvolumereclaim:vsphere", func() {
 		BeforeEach(func() {
 			framework.SkipUnlessProviderIs("vsphere")
 			pv = nil

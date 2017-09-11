@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv0001
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: fast
+  storageos:
+    # This volume must already exist within StorageOS
+    volumeName: pv0001
+    # volumeNamespace is optional, and specifies the volume scope within
+    # StorageOS.  Set to `default` or leave blank if you are not using
+    # namespaces.
+    #volumeNamespace: default
+    # The filesystem type to create on the volume, if required.
+    fsType: ext4
+    # The secret name for API credentials
+    secretName: storageos-secret

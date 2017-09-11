@@ -90,6 +90,13 @@ func (s *GenericAPIServer) AddPostStartHook(name string, hook PostStartHookFunc)
 	return nil
 }
 
+// AddPostStartHookOrDie allows you to add a PostStartHook, but dies on failure
+func (s *GenericAPIServer) AddPostStartHookOrDie(name string, hook PostStartHookFunc) {
+	if err := s.AddPostStartHook(name, hook); err != nil {
+		glog.Fatalf("Error registering PostStartHook %q: %v", name, err)
+	}
+}
+
 // RunPostStartHooks runs the PostStartHooks for the server
 func (s *GenericAPIServer) RunPostStartHooks(stopCh <-chan struct{}) {
 	s.postStartHookLock.Lock()
@@ -106,6 +113,14 @@ func (s *GenericAPIServer) RunPostStartHooks(stopCh <-chan struct{}) {
 	}
 }
 
+// isHookRegistered checks whether a given hook is registered
+func (s *GenericAPIServer) isHookRegistered(name string) bool {
+	s.postStartHookLock.Lock()
+	defer s.postStartHookLock.Unlock()
+	_, exists := s.postStartHooks[name]
+	return exists
+}
+
 func runPostStartHook(name string, entry postStartHookEntry, context PostStartHookContext) {
 	var err error
 	func() {
@@ -117,7 +132,6 @@ func runPostStartHook(name string, entry postStartHookEntry, context PostStartHo
 	if err != nil {
 		glog.Fatalf("PostStartHook %q failed: %v", name, err)
 	}
-
 	close(entry.done)
 }
 

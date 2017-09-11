@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"time"
 
+	batch "k8s.io/api/batch/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api/v1"
-	batch "k8s.io/kubernetes/pkg/apis/batch/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -43,7 +43,7 @@ const (
 // first time it is run and succeeds subsequently. name is the Name of the Job. RestartPolicy indicates the restart
 // policy of the containers in which the Pod is running. Parallelism is the Job's parallelism, and completions is the
 // Job's required number of completions.
-func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, completions int32) *batch.Job {
+func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, completions int32, activeDeadlineSeconds *int64, backoffLimit int32) *batch.Job {
 	job := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -52,9 +52,11 @@ func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 			Kind: "Job",
 		},
 		Spec: batch.JobSpec{
-			Parallelism:    &parallelism,
-			Completions:    &completions,
-			ManualSelector: newBool(false),
+			ActiveDeadlineSeconds: activeDeadlineSeconds,
+			Parallelism:           &parallelism,
+			Completions:           &completions,
+			BackoffLimit:          &backoffLimit,
+			ManualSelector:        newBool(false),
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{JobSelectorKey: name},
@@ -72,7 +74,7 @@ func NewTestJob(behavior, name string, rPol v1.RestartPolicy, parallelism, compl
 					Containers: []v1.Container{
 						{
 							Name:    "c",
-							Image:   "gcr.io/google_containers/busybox:1.24",
+							Image:   BusyBoxImage,
 							Command: []string{},
 							VolumeMounts: []v1.VolumeMount{
 								{
@@ -191,7 +193,7 @@ func WaitForJobFinish(c clientset.Interface, ns, jobName string, completions int
 }
 
 // WaitForJobFailure uses c to wait for up to timeout for the Job named jobName in namespace ns to fail.
-func WaitForJobFailure(c clientset.Interface, ns, jobName string, timeout time.Duration) error {
+func WaitForJobFailure(c clientset.Interface, ns, jobName string, timeout time.Duration, reason string) error {
 	return wait.Poll(Poll, timeout, func() (bool, error) {
 		curr, err := c.Batch().Jobs(ns).Get(jobName, metav1.GetOptions{})
 		if err != nil {
@@ -199,7 +201,9 @@ func WaitForJobFailure(c clientset.Interface, ns, jobName string, timeout time.D
 		}
 		for _, c := range curr.Status.Conditions {
 			if c.Type == batch.JobFailed && c.Status == v1.ConditionTrue {
-				return true, nil
+				if reason == "" || reason == c.Reason {
+					return true, nil
+				}
 			}
 		}
 		return false, nil
@@ -228,4 +232,28 @@ func newBool(val bool) *bool {
 	p := new(bool)
 	*p = val
 	return p
+}
+
+type updateJobFunc func(*batch.Job)
+
+func UpdateJobWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateJobFunc) (job *batch.Job, err error) {
+	jobs := c.Batch().Jobs(namespace)
+	var updateErr error
+	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
+		if job, err = jobs.Get(name, metav1.GetOptions{}); err != nil {
+			return false, err
+		}
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(job)
+		if job, err = jobs.Update(job); err == nil {
+			Logf("Updating job %s", name)
+			return true, nil
+		}
+		updateErr = err
+		return false, nil
+	})
+	if pollErr == wait.ErrWaitTimeout {
+		pollErr = fmt.Errorf("couldn't apply the provided updated to job %q: %v", name, updateErr)
+	}
+	return job, pollErr
 }

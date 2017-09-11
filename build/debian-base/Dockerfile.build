@@ -32,7 +32,7 @@ RUN apt-get update \
     && apt-get dist-upgrade -y
 
 # Hold required packages to avoid breaking the installation of packages
-RUN apt-mark hold apt gnupg adduser passwd libsemanage1
+RUN apt-mark hold apt gnupg adduser passwd libsemanage1 libcap2
 
 # Remove unnecessary packages.
 # This list was generated manually by listing the installed packages (`apt list --installed`),

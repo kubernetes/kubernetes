@@ -1,0 +1,44 @@
+{
+  "kind": "ReplicationController",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "nettest-controller",
+    "labels": {
+      "name": "nettest"
+    }
+  },
+  "spec": {
+    "replicas": 2,
+    "selector": {
+      "name": "nettest"
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "name": "nettest"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "webserver",
+            "image": "gcr.io/kubernetes-e2e-test-images/nettest-amd64:1.0",
+            "imagePullPolicy": "Always",
+            "args": [
+              "-service=nettest",
+              "-port=8080",
+              "-namespace=default",
+              "-peers=2"
+            ],
+            "ports": [
+              {
+                "containerPort": 8080,
+                "protocol": "TCP"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

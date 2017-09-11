@@ -22,7 +22,6 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/limitrange"
 )
 
@@ -30,22 +29,20 @@ type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against horizontal pod autoscalers.
+// NewREST returns a RESTStorage object that will work against limitranges.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &api.LimitRange{} },
-		NewListFunc:       func() runtime.Object { return &api.LimitRangeList{} },
-		PredicateFunc:     limitrange.MatchLimitRange,
-		QualifiedResource: api.Resource("limitranges"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("limitranges"),
+		Copier:                   api.Scheme,
+		NewFunc:                  func() runtime.Object { return &api.LimitRange{} },
+		NewListFunc:              func() runtime.Object { return &api.LimitRangeList{} },
+		DefaultQualifiedResource: api.Resource("limitranges"),
 
 		CreateStrategy: limitrange.Strategy,
 		UpdateStrategy: limitrange.Strategy,
 		DeleteStrategy: limitrange.Strategy,
 		ExportStrategy: limitrange.Strategy,
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: limitrange.GetAttrs}
+	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}

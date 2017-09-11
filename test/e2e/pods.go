@@ -24,17 +24,18 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var _ = framework.KubeDescribe("Pods Extended", func() {
@@ -62,7 +63,7 @@ var _ = framework.KubeDescribe("Pods Extended", func() {
 					Containers: []v1.Container{
 						{
 							Name:  "nginx",
-							Image: "gcr.io/google_containers/nginx-slim:0.7",
+							Image: imageutils.GetE2EImage(imageutils.NginxSlim),
 						},
 					},
 				},
@@ -98,7 +99,7 @@ var _ = framework.KubeDescribe("Pods Extended", func() {
 					framework.Failf("Failed to observe pod creation: %v", event)
 				}
 			case <-time.After(framework.PodStartTimeout):
-				Fail("Timeout while waiting for pod creation")
+				framework.Failf("Timeout while waiting for pod creation")
 			}
 
 			// We need to wait for the pod to be running, otherwise the deletion
@@ -178,7 +179,7 @@ var _ = framework.KubeDescribe("Pods Extended", func() {
 				}
 			}
 			if !deleted {
-				Fail("Failed to observe pod deletion")
+				framework.Failf("Failed to observe pod deletion")
 			}
 
 			Expect(lastPod.DeletionTimestamp).ToNot(BeNil())
@@ -212,15 +213,15 @@ var _ = framework.KubeDescribe("Pods Extended", func() {
 					Containers: []v1.Container{
 						{
 							Name:  "nginx",
-							Image: "gcr.io/google_containers/nginx-slim:0.7",
+							Image: imageutils.GetE2EImage(imageutils.NginxSlim),
 							Resources: v1.ResourceRequirements{
 								Limits: v1.ResourceList{
-									"cpu":    resource.MustParse("100m"),
-									"memory": resource.MustParse("100Mi"),
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
 								},
 								Requests: v1.ResourceList{
-									"cpu":    resource.MustParse("100m"),
-									"memory": resource.MustParse("100Mi"),
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("100Mi"),
 								},
 							},
 						},

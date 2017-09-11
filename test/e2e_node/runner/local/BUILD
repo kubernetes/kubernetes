@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_binary",
@@ -11,13 +9,11 @@ load(
 go_binary(
     name = "local",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["run_local.go"],
-    tags = ["automanaged"],
     deps = [
         "//test/e2e_node/builder:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

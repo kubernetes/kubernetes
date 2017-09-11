@@ -56,7 +56,7 @@ func (s *storage) ListNodes(ctx genericapirequest.Context, options *metainternal
 }
 
 func (s *storage) CreateNode(ctx genericapirequest.Context, node *api.Node) error {
-	_, err := s.Create(ctx, node)
+	_, err := s.Create(ctx, node, false)
 	return err
 }
 

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	dockertypes "github.com/docker/engine-api/types"
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/stretchr/testify/assert"
 )
 

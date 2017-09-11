@@ -17,12 +17,12 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	scheme "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/scheme"
-	v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 // IngressesGetter has a method to return a IngressInterface.
@@ -59,6 +59,41 @@ func newIngresses(c *ExtensionsV1beta1Client, namespace string) *ingresses {
 	}
 }
 
+// Get takes name of the ingress, and returns the corresponding ingress object, and an error if there is any.
+func (c *ingresses) Get(name string, options v1.GetOptions) (result *v1beta1.Ingress, err error) {
+	result = &v1beta1.Ingress{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("ingresses").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of Ingresses that match those selectors.
+func (c *ingresses) List(opts v1.ListOptions) (result *v1beta1.IngressList, err error) {
+	result = &v1beta1.IngressList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("ingresses").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested ingresses.
+func (c *ingresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("ingresses").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.
 func (c *ingresses) Create(ingress *v1beta1.Ingress) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
@@ -85,7 +120,7 @@ func (c *ingresses) Update(ingress *v1beta1.Ingress) (result *v1beta1.Ingress, e
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *ingresses) UpdateStatus(ingress *v1beta1.Ingress) (result *v1beta1.Ingress, err error) {
 	result = &v1beta1.Ingress{}
@@ -120,41 +155,6 @@ func (c *ingresses) DeleteCollection(options *v1.DeleteOptions, listOptions v1.L
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the ingress, and returns the corresponding ingress object, and an error if there is any.
-func (c *ingresses) Get(name string, options v1.GetOptions) (result *v1beta1.Ingress, err error) {
-	result = &v1beta1.Ingress{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("ingresses").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Ingresses that match those selectors.
-func (c *ingresses) List(opts v1.ListOptions) (result *v1beta1.IngressList, err error) {
-	result = &v1beta1.IngressList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("ingresses").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested ingresses.
-func (c *ingresses) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("ingresses").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched ingress.

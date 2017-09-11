@@ -3,6 +3,8 @@ kind: Pod
 metadata:
   name: etcd-empty-dir-cleanup
   namespace: kube-system
+  annotations:
+    scheduler.alpha.kubernetes.io/critical-pod: ''
   labels:
     k8s-app: etcd-empty-dir-cleanup
 spec:

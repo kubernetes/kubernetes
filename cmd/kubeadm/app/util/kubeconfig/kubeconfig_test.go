@@ -21,10 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"testing"
-
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 const (
@@ -144,12 +141,6 @@ func TestWriteKubeconfigToDisk(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	// set up tmp GlobalEnvParams values for testing
-	oldEnv := kubeadmapi.GlobalEnvParams
-	kubeadmapi.GlobalEnvParams = kubeadmapi.SetEnvParams()
-	kubeadmapi.GlobalEnvParams.KubernetesDir = fmt.Sprintf("%s/etc/kubernetes", tmpdir)
-	defer func() { kubeadmapi.GlobalEnvParams = oldEnv }()
-
 	var writeConfig = []struct {
 		name        string
 		cc          configClient
@@ -168,7 +159,7 @@ func TestWriteKubeconfigToDisk(t *testing.T) {
 			rt.cc.caCert,
 			rt.ccWithToken.token,
 		)
-		configPath := filepath.Join(kubeadmapi.GlobalEnvParams.KubernetesDir, fmt.Sprintf("%s.conf", rt.name))
+		configPath := fmt.Sprintf("%s/etc/kubernetes/%s.conf", tmpdir, rt.name)
 		err := WriteToDisk(configPath, c)
 		if err != rt.expected {
 			t.Errorf(

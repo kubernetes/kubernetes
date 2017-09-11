@@ -227,37 +227,22 @@ func saveChain(chain *fakeChain, data *bytes.Buffer) {
 	}
 }
 
-func (f *fakeIPTables) Save(tableName utiliptables.Table) ([]byte, error) {
+func (f *fakeIPTables) SaveInto(tableName utiliptables.Table, buffer *bytes.Buffer) error {
 	table, err := f.getTable(tableName)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	data := bytes.NewBuffer(nil)
-	data.WriteString(fmt.Sprintf("*%s\n", table.name))
+	buffer.WriteString(fmt.Sprintf("*%s\n", table.name))
 
 	rules := bytes.NewBuffer(nil)
 	for _, chain := range table.chains {
-		data.WriteString(fmt.Sprintf(":%s - [0:0]\n", string(chain.name)))
+		buffer.WriteString(fmt.Sprintf(":%s - [0:0]\n", string(chain.name)))
 		saveChain(chain, rules)
 	}
-	data.Write(rules.Bytes())
-	data.WriteString("COMMIT\n")
-	return data.Bytes(), nil
-}
-
-func (f *fakeIPTables) SaveAll() ([]byte, error) {
-	data := bytes.NewBuffer(nil)
-	for _, table := range f.tables {
-		tableData, err := f.Save(table.name)
-		if err != nil {
-			return nil, err
-		}
-		if _, err = data.Write(tableData); err != nil {
-			return nil, err
-		}
-	}
-	return data.Bytes(), nil
+	buffer.Write(rules.Bytes())
+	buffer.WriteString("COMMIT\n")
+	return nil
 }
 
 func (f *fakeIPTables) restore(restoreTableName utiliptables.Table, data []byte, flush utiliptables.FlushFlag) error {

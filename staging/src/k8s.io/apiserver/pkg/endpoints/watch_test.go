@@ -272,7 +272,6 @@ func TestWatchRead(t *testing.T) {
 		// TODO: yaml stream serialization requires that RawExtension.MarshalJSON
 		// be able to understand nested encoding (since yaml calls json.Marshal
 		// rather than yaml.Marshal, which results in the raw bytes being in yaml).
-		// Same problem as thirdparty object.
 		/*{
 			Accept:              "application/yaml",
 			ExpectedContentType: "application/yaml;stream=watch",

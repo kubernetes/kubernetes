@@ -21,7 +21,7 @@ import (
 )
 
 // GetResourceUtilizationRatio takes in a set of metrics, a set of matching requests,
-// and a target utilization percentage, and calcuates the the ratio of
+// and a target utilization percentage, and calculates the the ratio of
 // desired to actual utilization (returning that, the actual utilization, and the raw average value)
 func GetResourceUtilizationRatio(metrics PodMetricsInfo, requests map[string]int64, targetUtilization int32) (utilizationRatio float64, currentUtilization int32, rawAverageValue int64, err error) {
 	metricsTotal := int64(0)

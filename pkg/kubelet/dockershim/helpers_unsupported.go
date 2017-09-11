@@ -18,6 +18,32 @@ limitations under the License.
 
 package dockershim
 
+import (
+	"github.com/blang/semver"
+	dockertypes "github.com/docker/docker/api/types"
+	"github.com/golang/glog"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+)
+
 func DefaultMemorySwap() int64 {
 	return -1
+}
+
+func (ds *dockerService) getSecurityOpts(seccompProfile string, separator rune) ([]string, error) {
+	glog.Warningf("getSecurityOpts is unsupported in this build")
+	return nil, nil
+}
+
+func (ds *dockerService) updateCreateConfig(
+	createConfig *dockertypes.ContainerCreateConfig,
+	config *runtimeapi.ContainerConfig,
+	sandboxConfig *runtimeapi.PodSandboxConfig,
+	podSandboxID string, securityOptSep rune, apiVersion *semver.Version) error {
+	glog.Warningf("updateCreateConfig is unsupported in this build")
+	return nil
+}
+
+func (ds *dockerService) determinePodIPBySandboxID(uid string) string {
+	glog.Warningf("determinePodIPBySandboxID is unsupported in this build")
+	return ""
 }

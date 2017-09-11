@@ -63,6 +63,10 @@ func (p *JSONPrinter) HandledResources() []string {
 	return []string{}
 }
 
+func (p *JSONPrinter) IsGeneric() bool {
+	return true
+}
+
 // YAMLPrinter is an implementation of ResourcePrinter which outputs an object as YAML.
 // The input object is assumed to be in the internal version of an API and is converted
 // to the given version first.
@@ -98,4 +102,8 @@ func (p *YAMLPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 // TODO: implement HandledResources()
 func (p *YAMLPrinter) HandledResources() []string {
 	return []string{}
+}
+
+func (p *YAMLPrinter) IsGeneric() bool {
+	return true
 }

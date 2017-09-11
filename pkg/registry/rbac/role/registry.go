@@ -57,7 +57,7 @@ func (s *storage) ListRoles(ctx genericapirequest.Context, options *metainternal
 }
 
 func (s *storage) CreateRole(ctx genericapirequest.Context, role *rbac.Role) error {
-	_, err := s.Create(ctx, role)
+	_, err := s.Create(ctx, role, false)
 	return err
 }
 

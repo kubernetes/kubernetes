@@ -172,6 +172,10 @@ func (c *cache) Index(indexName string, obj interface{}) ([]interface{}, error) 
 	return c.cacheStorage.Index(indexName, obj)
 }
 
+func (c *cache) IndexKeys(indexName, indexKey string) ([]string, error) {
+	return c.cacheStorage.IndexKeys(indexName, indexKey)
+}
+
 // ListIndexFuncValues returns the list of generated values of an Index func
 func (c *cache) ListIndexFuncValues(indexName string) []string {
 	return c.cacheStorage.ListIndexFuncValues(indexName)

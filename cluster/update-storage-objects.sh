@@ -19,7 +19,7 @@
 # they are written using the latest API version.
 #
 # Steps to use this script to upgrade the cluster to a new version:
-# https://github.com/kubernetes/kubernetes/blob/master/docs/cluster_management.md#updgrading-to-a-different-api-version
+# https://kubernetes.io/docs/tasks/administer-cluster/cluster-management/#upgrading-to-a-different-api-version
 
 set -o errexit
 set -o nounset
@@ -48,6 +48,7 @@ declare -a resources=(
     "services"
     "jobs"
     "horizontalpodautoscalers"
+    "storageclasses"
 )
 
 # Find all the namespaces.

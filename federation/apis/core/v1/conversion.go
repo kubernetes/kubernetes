@@ -17,8 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	"fmt"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
@@ -59,24 +57,6 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		return err
 	}
 
-	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
-	for _, kind := range []string{
-		"Service",
-	} {
-		err = scheme.AddFieldLabelConversionFunc("v1", kind,
-			func(label, value string) (string, string, error) {
-				switch label {
-				case "metadata.namespace",
-					"metadata.name":
-					return label, value, nil
-				default:
-					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
-				}
-			})
-		if err != nil {
-			return err
-		}
-	}
 	if err := v1.AddFieldLabelConversionsForEvent(scheme); err != nil {
 		return nil
 	}

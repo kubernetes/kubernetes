@@ -21,13 +21,53 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/helper"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
+
+// IsExtendedResourceName returns true if the resource name is not in the
+// default namespace, or it has the opaque integer resource prefix.
+func IsExtendedResourceName(name v1.ResourceName) bool {
+	// TODO: Remove OIR part following deprecation.
+	return !IsDefaultNamespaceResource(name) || IsOpaqueIntResourceName(name)
+}
+
+// IsDefaultNamespaceResource returns true if the resource name is in the
+// *kubernetes.io/ namespace. Partially-qualified (unprefixed) names are
+// implicitly in the kubernetes.io/ namespace.
+func IsDefaultNamespaceResource(name v1.ResourceName) bool {
+	return !strings.Contains(string(name), "/") ||
+		strings.Contains(string(name), v1.ResourceDefaultNamespacePrefix)
+
+}
+
+// IsHugePageResourceName returns true if the resource name has the huge page
+// resource prefix.
+func IsHugePageResourceName(name v1.ResourceName) bool {
+	return strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
+}
+
+// HugePageResourceName returns a ResourceName with the canonical hugepage
+// prefix prepended for the specified page size.  The page size is converted
+// to its canonical representation.
+func HugePageResourceName(pageSize resource.Quantity) v1.ResourceName {
+	return v1.ResourceName(fmt.Sprintf("%s%s", v1.ResourceHugePagesPrefix, pageSize.String()))
+}
+
+// HugePageSizeFromResourceName returns the page size for the specified huge page
+// resource name.  If the specified input is not a valid huge page resource name
+// an error is returned.
+func HugePageSizeFromResourceName(name v1.ResourceName) (resource.Quantity, error) {
+	if !IsHugePageResourceName(name) {
+		return resource.Quantity{}, fmt.Errorf("resource name: %s is not valid hugepage name", name)
+	}
+	pageSize := strings.TrimPrefix(string(name), v1.ResourceHugePagesPrefix)
+	return resource.ParseQuantity(pageSize)
+}
 
 // IsOpaqueIntResourceName returns true if the resource name has the opaque
 // integer resource prefix.
@@ -43,6 +83,15 @@ func OpaqueIntResourceName(name string) v1.ResourceName {
 		return v1.ResourceName(name)
 	}
 	return v1.ResourceName(fmt.Sprintf("%s%s", v1.ResourceOpaqueIntPrefix, name))
+}
+
+var overcommitBlacklist = sets.NewString(string(v1.ResourceNvidiaGPU))
+
+// IsOvercommitAllowed returns true if the resource is in the default
+// namespace and not blacklisted.
+func IsOvercommitAllowed(name v1.ResourceName) bool {
+	return IsDefaultNamespaceResource(name) &&
+		!overcommitBlacklist.Has(string(name))
 }
 
 // this function aims to check if the service's ClusterIP is set or not
@@ -269,34 +318,6 @@ func TolerationsTolerateTaintsWithFilter(tolerations []v1.Toleration, taints []v
 	return true
 }
 
-// DeleteTaintsByKey removes all the taints that have the same key to given taintKey
-func DeleteTaintsByKey(taints []v1.Taint, taintKey string) ([]v1.Taint, bool) {
-	newTaints := []v1.Taint{}
-	deleted := false
-	for i := range taints {
-		if taintKey == taints[i].Key {
-			deleted = true
-			continue
-		}
-		newTaints = append(newTaints, taints[i])
-	}
-	return newTaints, deleted
-}
-
-// DeleteTaint removes all the the taints that have the same key and effect to given taintToDelete.
-func DeleteTaint(taints []v1.Taint, taintToDelete *v1.Taint) ([]v1.Taint, bool) {
-	newTaints := []v1.Taint{}
-	deleted := false
-	for i := range taints {
-		if taintToDelete.MatchTaint(&taints[i]) {
-			deleted = true
-			continue
-		}
-		newTaints = append(newTaints, taints[i])
-	}
-	return newTaints, deleted
-}
-
 // Returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
 func GetMatchingTolerations(taints []v1.Taint, tolerations []v1.Toleration) (bool, []v1.Toleration) {
 	if len(taints) == 0 {
@@ -381,85 +402,6 @@ func PodAnnotationsFromSysctls(sysctls []v1.Sysctl) string {
 	return strings.Join(kvs, ",")
 }
 
-// Tries to add a taint to annotations list. Returns a new copy of updated Node and true if something was updated
-// false otherwise.
-func AddOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
-	objCopy, err := api.Scheme.DeepCopy(node)
-	if err != nil {
-		return nil, false, err
-	}
-	newNode := objCopy.(*v1.Node)
-	nodeTaints := newNode.Spec.Taints
-
-	var newTaints []v1.Taint
-	updated := false
-	for i := range nodeTaints {
-		if taint.MatchTaint(&nodeTaints[i]) {
-			if helper.Semantic.DeepEqual(taint, nodeTaints[i]) {
-				return newNode, false, nil
-			}
-			newTaints = append(newTaints, *taint)
-			updated = true
-			continue
-		}
-
-		newTaints = append(newTaints, nodeTaints[i])
-	}
-
-	if !updated {
-		newTaints = append(newTaints, *taint)
-	}
-
-	newNode.Spec.Taints = newTaints
-	return newNode, true, nil
-}
-
-func TaintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
-	for _, taint := range taints {
-		if taint.MatchTaint(taintToFind) {
-			return true
-		}
-	}
-	return false
-}
-
-// Tries to remove a taint from annotations list. Returns a new copy of updated Node and true if something was updated
-// false otherwise.
-func RemoveTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
-	objCopy, err := api.Scheme.DeepCopy(node)
-	if err != nil {
-		return nil, false, err
-	}
-	newNode := objCopy.(*v1.Node)
-	nodeTaints := newNode.Spec.Taints
-	if len(nodeTaints) == 0 {
-		return newNode, false, nil
-	}
-
-	if !TaintExists(nodeTaints, taint) {
-		return newNode, false, nil
-	}
-
-	newTaints, _ := DeleteTaint(nodeTaints, taint)
-	newNode.Spec.Taints = newTaints
-	return newNode, true, nil
-}
-
-// GetAffinityFromPodAnnotations gets the json serialized affinity data from Pod.Annotations
-// and converts it to the Affinity type in api.
-// TODO: remove when alpha support for affinity is removed
-func GetAffinityFromPodAnnotations(annotations map[string]string) (*v1.Affinity, error) {
-	if len(annotations) > 0 && annotations[v1.AffinityAnnotationKey] != "" {
-		var affinity v1.Affinity
-		err := json.Unmarshal([]byte(annotations[v1.AffinityAnnotationKey]), &affinity)
-		if err != nil {
-			return nil, err
-		}
-		return &affinity, nil
-	}
-	return nil, nil
-}
-
 // GetPersistentVolumeClass returns StorageClassName.
 func GetPersistentVolumeClass(volume *v1.PersistentVolume) string {
 	// Use beta annotation first
@@ -497,4 +439,34 @@ func PersistentVolumeClaimHasClass(claim *v1.PersistentVolumeClaim) bool {
 	}
 
 	return false
+}
+
+// GetStorageNodeAffinityFromAnnotation gets the json serialized data from PersistentVolume.Annotations
+// and converts it to the NodeAffinity type in api.
+// TODO: update when storage node affinity graduates to beta
+func GetStorageNodeAffinityFromAnnotation(annotations map[string]string) (*v1.NodeAffinity, error) {
+	if len(annotations) > 0 && annotations[v1.AlphaStorageNodeAffinityAnnotation] != "" {
+		var affinity v1.NodeAffinity
+		err := json.Unmarshal([]byte(annotations[v1.AlphaStorageNodeAffinityAnnotation]), &affinity)
+		if err != nil {
+			return nil, err
+		}
+		return &affinity, nil
+	}
+	return nil, nil
+}
+
+// Converts NodeAffinity type to Alpha annotation for use in PersistentVolumes
+// TODO: update when storage node affinity graduates to beta
+func StorageNodeAffinityToAlphaAnnotation(annotations map[string]string, affinity *v1.NodeAffinity) error {
+	if affinity == nil {
+		return nil
+	}
+
+	json, err := json.Marshal(*affinity)
+	if err != nil {
+		return err
+	}
+	annotations[v1.AlphaStorageNodeAffinityAnnotation] = string(json)
+	return nil
 }

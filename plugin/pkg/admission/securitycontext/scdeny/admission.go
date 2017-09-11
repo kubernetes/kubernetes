@@ -23,11 +23,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
-func init() {
-	kubeapiserveradmission.Plugins.Register("SecurityContextDeny", func(config io.Reader) (admission.Interface, error) {
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("SecurityContextDeny", func(config io.Reader) (admission.Interface, error) {
 		return NewSecurityContextDeny(), nil
 	})
 }

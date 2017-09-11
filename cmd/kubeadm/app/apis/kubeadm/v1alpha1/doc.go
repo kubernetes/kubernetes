@@ -16,4 +16,6 @@ limitations under the License.
 
 // +k8s:defaulter-gen=TypeMeta
 // +groupName=kubeadm.k8s.io
+// +k8s:deepcopy-gen=package
+// +k8s:conversion-gen=k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm
 package v1alpha1 // import "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"

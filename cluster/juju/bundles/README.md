@@ -59,7 +59,7 @@ Now you should have a running Kubernetes. Run `juju status
 
 For further reading on [Juju Quickstart](https://pypi.python.org/pypi/juju-quickstart)
 
-Go to the [Getting started with Juju guide](https://github.com/kubernetes/kubernetes/blob/master/docs/getting-started-guides/juju.md)
+Go to the [Getting started with Juju guide](https://kubernetes.io/docs/getting-started-guides/ubuntu/installation/#setting-up-kubernetes-with-juju)
 for more information about deploying a development Kubernetes cluster.
 
 ### Using the Kubernetes Client
@@ -178,7 +178,7 @@ github.
 
     git clone https://github.com/kubernetes/kubernetes.git
 
-Go to the [Getting started with Juju guide](https://github.com/kubernetes/kubernetes/blob/master/docs/getting-started-guides/juju.md)
+Go to the [Getting started with Juju guide](https://kubernetes.io/docs/getting-started-guides/ubuntu/installation/#setting-up-kubernetes-with-juju)
 for more information about the bundle or charms.
 
 ## How to contribute

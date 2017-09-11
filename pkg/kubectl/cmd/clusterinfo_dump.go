@@ -28,8 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
-	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 // NewCmdCreateSecret groups subcommands to create various types of secrets
@@ -91,7 +91,7 @@ func setupOutputWriter(cmd *cobra.Command, defaultWriter io.Writer, filename str
 func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, out io.Writer) error {
 	timeout, err := cmdutil.GetPodRunningTimeoutFlag(cmd)
 	if err != nil {
-		return cmdutil.UsageError(cmd, err.Error())
+		return cmdutil.UsageErrorf(cmd, err.Error())
 	}
 
 	clientset, err := f.ClientSet()
@@ -224,10 +224,10 @@ func dumpClusterInfo(f cmdutil.Factory, cmd *cobra.Command, out io.Writer) error
 	}
 	dir := cmdutil.GetFlagString(cmd, "output-directory")
 	if len(dir) == 0 {
-		dir = "."
+		dir = "standard output"
 	}
 	if dir != "-" {
-		fmt.Fprintf(out, "Cluster info dumped to %s", dir)
+		fmt.Fprintf(out, "Cluster info dumped to %s\n", dir)
 	}
 	return nil
 }

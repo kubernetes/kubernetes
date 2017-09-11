@@ -24,16 +24,15 @@ import (
 
 	"github.com/golang/glog"
 
+	authorization "k8s.io/api/authorization/v1beta1"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/cache"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/util/cache"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/kubernetes/scheme"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
-	authorization "k8s.io/client-go/pkg/apis/authorization/v1beta1"
-
-	_ "k8s.io/client-go/pkg/apis/authorization/install"
 )
 
 var (
@@ -146,6 +145,7 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 	if user := attr.GetUser(); user != nil {
 		r.Spec = authorization.SubjectAccessReviewSpec{
 			User:   user.GetName(),
+			UID:    user.GetUID(),
 			Groups: user.GetGroups(),
 			Extra:  convertToSARExtra(user.GetExtra()),
 		}
@@ -195,6 +195,16 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 		}
 	}
 	return r.Status.Allowed, r.Status.Reason, nil
+}
+
+//TODO: need to finish the method to get the rules when using webhook mode
+func (w *WebhookAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+	var (
+		resourceRules    []authorizer.ResourceRuleInfo
+		nonResourceRules []authorizer.NonResourceRuleInfo
+	)
+	incomplete := true
+	return resourceRules, nonResourceRules, incomplete, fmt.Errorf("webhook authorizer does not support user rule resolution")
 }
 
 func convertToSARExtra(extra map[string][]string) map[string]authorization.ExtraValue {

@@ -25,16 +25,14 @@ import (
 
 // Config holds the information needed to build connect to remote kubernetes clusters as a given user
 // IMPORTANT if you add fields to this struct, please update IsConfigEmpty()
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type Config struct {
 	// Legacy field from pkg/api/types.go TypeMeta.
 	// TODO(jlowdermilk): remove this after eliminating downstream dependencies.
 	// +optional
 	Kind string `json:"kind,omitempty"`
-	// DEPRECATED: APIVersion is the preferred api version for communicating with the kubernetes cluster (v1, v2, etc).
-	// Because a cluster can run multiple API groups and potentially multiple versions of each, it no longer makes sense to specify
-	// a single value for the cluster version.
-	// This field isn't really needed anyway, so we are deprecating it without replacement.
-	// It will be ignored if it is present.
+	// Legacy field from pkg/api/types.go TypeMeta.
+	// TODO(jlowdermilk): remove this after eliminating downstream dependencies.
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty"`
 	// Preferences holds general information to be use for cli interactions
@@ -67,9 +65,6 @@ type Cluster struct {
 	LocationOfOrigin string
 	// Server is the address of the kubernetes cluster (https://hostname:port).
 	Server string `json:"server"`
-	// APIVersion is the preferred api version for communicating with the kubernetes cluster (v1, v2, etc).
-	// +optional
-	APIVersion string `json:"api-version,omitempty"`
 	// InsecureSkipTLSVerify skips the validity check for the server's certificate. This will make your HTTPS connections insecure.
 	// +optional
 	InsecureSkipTLSVerify bool `json:"insecure-skip-tls-verify,omitempty"`
@@ -109,6 +104,12 @@ type AuthInfo struct {
 	// Impersonate is the username to act-as.
 	// +optional
 	Impersonate string `json:"act-as,omitempty"`
+	// ImpersonateGroups is the groups to imperonate.
+	// +optional
+	ImpersonateGroups []string `json:"act-as-groups,omitempty"`
+	// ImpersonateUserExtra contains additional information for impersonated user.
+	// +optional
+	ImpersonateUserExtra map[string][]string `json:"act-as-user-extra,omitempty"`
 	// Username is the username for basic authentication to the kubernetes cluster.
 	// +optional
 	Username string `json:"username,omitempty"`
@@ -172,7 +173,10 @@ func NewCluster() *Cluster {
 // NewAuthInfo is a convenience function that returns a new AuthInfo
 // object with non-nil maps
 func NewAuthInfo() *AuthInfo {
-	return &AuthInfo{Extensions: make(map[string]runtime.Object)}
+	return &AuthInfo{
+		Extensions:           make(map[string]runtime.Object),
+		ImpersonateUserExtra: make(map[string][]string),
+	}
 }
 
 // NewPreferences is a convenience function that returns a new

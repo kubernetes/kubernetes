@@ -20,10 +20,9 @@ import (
 	"errors"
 
 	"github.com/golang/glog"
+	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	api "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/keymutex"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -35,7 +34,6 @@ const (
 
 type sioPlugin struct {
 	host      volume.VolumeHost
-	mounter   mount.Interface
 	volumeMtx keymutex.KeyMutex
 }
 
@@ -53,7 +51,6 @@ var _ volume.VolumePlugin = &sioPlugin{}
 
 func (p *sioPlugin) Init(host volume.VolumeHost) error {
 	p.host = host
-	p.mounter = host.GetMounter()
 	p.volumeMtx = keymutex.NewKeyMutex()
 	return nil
 }
@@ -149,6 +146,7 @@ var _ volume.PersistentVolumePlugin = &sioPlugin{}
 func (p *sioPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 	return []api.PersistentVolumeAccessMode{
 		api.ReadWriteOnce,
+		api.ReadOnlyMany,
 	}
 }
 

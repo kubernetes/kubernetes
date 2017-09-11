@@ -138,12 +138,12 @@ func (namespaceFinalizeStrategy) PrepareForUpdate(ctx genericapirequest.Context,
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	namespaceObj, ok := obj.(*api.Namespace)
 	if !ok {
-		return nil, nil, fmt.Errorf("not a namespace")
+		return nil, nil, false, fmt.Errorf("not a namespace")
 	}
-	return labels.Set(namespaceObj.Labels), NamespaceToSelectableFields(namespaceObj), nil
+	return labels.Set(namespaceObj.Labels), NamespaceToSelectableFields(namespaceObj), namespaceObj.Initializers != nil, nil
 }
 
 // MatchNamespace returns a generic matcher for a given label and field selector.

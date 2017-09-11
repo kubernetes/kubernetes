@@ -21,13 +21,13 @@ import (
 	"math"
 	"time"
 
+	autoscaling "k8s.io/api/autoscaling/v2beta1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/v1"
+	v1coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling/v2alpha1"
-	v1coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 )
 
@@ -250,9 +250,6 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 
 	// re-run the utilization calculation with our new numbers
 	newUsageRatio, _ := metricsclient.GetMetricUtilizationRatio(metrics, targetUtilization)
-	if err != nil {
-		return 0, utilization, err
-	}
 
 	if math.Abs(1.0-newUsageRatio) <= tolerance || (usageRatio < 1.0 && newUsageRatio > 1.0) || (usageRatio > 1.0 && newUsageRatio < 1.0) {
 		// return the current replicas if the change would be too small,

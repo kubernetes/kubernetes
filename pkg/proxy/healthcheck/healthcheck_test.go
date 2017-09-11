@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/util/clock"
 
 	"github.com/davecgh/go-spew/spew"
 )
@@ -368,7 +368,7 @@ func TestHealthzServer(t *testing.T) {
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := clock.NewFakeClock(time.Now())
 
-	hs := newHealthzServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second)
+	hs := newHealthzServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nil, nil)
 	server := hs.httpFactory.New(hs.addr, healthzHandler{hs: hs})
 
 	// Should return 200 "OK" by default.

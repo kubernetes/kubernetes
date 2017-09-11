@@ -21,9 +21,9 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
@@ -73,7 +73,11 @@ func (dc *DeploymentController) rollback(d *extensions.Deployment, rsList []*ext
 // cleans up the rollback spec so subsequent requeues of the deployment won't end up in here.
 func (dc *DeploymentController) rollbackToTemplate(d *extensions.Deployment, rs *extensions.ReplicaSet) (bool, error) {
 	performedRollback := false
-	if !deploymentutil.EqualIgnoreHash(d.Spec.Template, rs.Spec.Template) {
+	isEqual, err := deploymentutil.EqualIgnoreHash(&d.Spec.Template, &rs.Spec.Template)
+	if err != nil {
+		return false, err
+	}
+	if !isEqual {
 		glog.V(4).Infof("Rolling back deployment %q to template spec %+v", d.Name, rs.Spec.Template.Spec)
 		deploymentutil.SetFromReplicaSetTemplate(d, rs.Spec.Template)
 		// set RS (the old RS we'll rolling back to) annotations back to the deployment;

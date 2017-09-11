@@ -21,19 +21,18 @@ import (
 	"reflect"
 	"testing"
 
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	apitesting "k8s.io/apimachinery/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	kapitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"github.com/google/gofuzz"
 
+	"k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
 	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
-
-	"github.com/google/gofuzz"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 )
 
 func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
@@ -45,7 +44,7 @@ func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
 		t.Fatalf("Couldn't create internal object %v: %v", kind, err)
 	}
 	seed := rand.Int63()
-	apitesting.FuzzerFor(kapitesting.FuzzerFuncs(t, api.Codecs), rand.NewSource(seed)).
+	fuzzer.FuzzerFor(kapitesting.FuzzerFuncs, rand.NewSource(seed), api.Codecs).
 		// We are explicitly overwriting custom fuzzing functions, to ensure
 		// that InitContainers and their statuses are not generated. This is
 		// because in thise test we are simply doing json operations, in which
@@ -97,8 +96,7 @@ func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
 		return
 	}
 
-	newUnstr := make(map[string]interface{})
-	err = unstructured.DefaultConverter.ToUnstructured(item, &newUnstr)
+	newUnstr, err := unstructured.DefaultConverter.ToUnstructured(item)
 	if err != nil {
 		t.Errorf("ToUnstructured failed: %v", err)
 		return
@@ -138,8 +136,8 @@ func BenchmarkToFromUnstructured(b *testing.B) {
 	size := len(items)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		unstr := map[string]interface{}{}
-		if err := unstructured.DefaultConverter.ToUnstructured(&items[i%size], &unstr); err != nil {
+		unstr, err := unstructured.DefaultConverter.ToUnstructured(&items[i%size])
+		if err != nil {
 			b.Fatalf("unexpected error: %v", err)
 		}
 		obj := v1.Pod{}

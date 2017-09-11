@@ -305,6 +305,9 @@ func (scaler *ReplicaSetScaler) Scale(namespace, name string, newSize uint, prec
 		if err != nil {
 			return err
 		}
+		if rs.Initializers != nil {
+			return nil
+		}
 		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.ReplicaSetHasDesiredReplicas(scaler.c, rs))
 
 		if err == wait.ErrWaitTimeout {
@@ -372,6 +375,9 @@ func (scaler *StatefulSetScaler) Scale(namespace, name string, newSize uint, pre
 		job, err := scaler.c.StatefulSets(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			return err
+		}
+		if job.Initializers != nil {
+			return nil
 		}
 		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.StatefulSetHasDesiredReplicas(scaler.c, job))
 		if err == wait.ErrWaitTimeout {

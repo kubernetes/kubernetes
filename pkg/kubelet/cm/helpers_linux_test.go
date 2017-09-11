@@ -22,8 +22,8 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // getResourceList returns a ResourceList with the
@@ -48,7 +48,7 @@ func getResourceRequirements(requests, limits v1.ResourceList) v1.ResourceRequir
 }
 
 func TestResourceConfigForPod(t *testing.T) {
-	minShares := int64(MinShares)
+	minShares := uint64(MinShares)
 	burstableShares := MilliCPUToShares(100)
 	memoryQuantity := resource.MustParse("200Mi")
 	burstableMemory := memoryQuantity.Value()
@@ -147,47 +147,47 @@ func TestMilliCPUToQuota(t *testing.T) {
 	testCases := []struct {
 		input  int64
 		quota  int64
-		period int64
+		period uint64
 	}{
 		{
 			input:  int64(0),
 			quota:  int64(0),
-			period: int64(0),
+			period: uint64(0),
 		},
 		{
 			input:  int64(5),
 			quota:  int64(1000),
-			period: int64(100000),
+			period: uint64(100000),
 		},
 		{
 			input:  int64(9),
 			quota:  int64(1000),
-			period: int64(100000),
+			period: uint64(100000),
 		},
 		{
 			input:  int64(10),
 			quota:  int64(1000),
-			period: int64(100000),
+			period: uint64(100000),
 		},
 		{
 			input:  int64(200),
 			quota:  int64(20000),
-			period: int64(100000),
+			period: uint64(100000),
 		},
 		{
 			input:  int64(500),
 			quota:  int64(50000),
-			period: int64(100000),
+			period: uint64(100000),
 		},
 		{
 			input:  int64(1000),
 			quota:  int64(100000),
-			period: int64(100000),
+			period: uint64(100000),
 		},
 		{
 			input:  int64(1500),
 			quota:  int64(150000),
-			period: int64(100000),
+			period: uint64(100000),
 		},
 	}
 	for _, testCase := range testCases {

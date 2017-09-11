@@ -21,14 +21,14 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
+	"k8s.io/kubernetes/pkg/api/testapi"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
@@ -73,14 +73,15 @@ func fakePodWithVol(namespace string) *v1.Pod {
 	return fakePod
 }
 
+type podCountFunc func(int) bool
+
 // Via integration test we can verify that if pod delete
 // event is somehow missed by AttachDetach controller - it still
 // gets cleaned up by Desired State of World populator.
 func TestPodDeletionWithDswp(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(nil)
+	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
 	defer closeFn()
 	namespaceName := "test-pod-deletion"
-
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-sandbox",
@@ -94,7 +95,6 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	defer framework.DeleteTestingNamespace(ns, server, t)
 
 	testClient, ctrl, informers := createAdClients(ns, t, server, defaultSyncPeriod)
-
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
@@ -130,7 +130,6 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	}
 
 	waitForPodsInDSWP(t, ctrl.GetDesiredStateOfWorld())
-
 	// let's stop pod events from getting triggered
 	close(podStopCh)
 	err = podInformer.GetStore().Delete(podInformerObj)
@@ -140,17 +139,12 @@ func TestPodDeletionWithDswp(t *testing.T) {
 
 	waitToObservePods(t, podInformer, 0)
 	// the populator loop turns every 1 minute
-	time.Sleep(80 * time.Second)
-	podsToAdd := ctrl.GetDesiredStateOfWorld().GetPodToAdd()
-	if len(podsToAdd) != 0 {
-		t.Fatalf("All pods should have been removed")
-	}
-
+	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 80*time.Second, "expected 0 pods in dsw after pod delete", 0)
 	close(stopCh)
 }
 
 func TestPodUpdateWithWithADC(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(nil)
+	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
 	defer closeFn()
 	namespaceName := "test-pod-update"
 
@@ -210,18 +204,14 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 		t.Errorf("Failed to update pod : %v", err)
 	}
 
-	time.Sleep(20 * time.Second)
-	podsToAdd := ctrl.GetDesiredStateOfWorld().GetPodToAdd()
-	if len(podsToAdd) != 0 {
-		t.Fatalf("All pods should have been removed")
-	}
+	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 20*time.Second, "expected 0 pods in dsw after pod completion", 0)
 
 	close(podStopCh)
 	close(stopCh)
 }
 
 func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(nil)
+	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
 	defer closeFn()
 	namespaceName := "test-pod-update"
 
@@ -282,11 +272,7 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 		t.Errorf("Failed to update pod : %v", err)
 	}
 
-	time.Sleep(20 * time.Second)
-	podsToAdd := ctrl.GetDesiredStateOfWorld().GetPodToAdd()
-	if len(podsToAdd) == 0 {
-		t.Fatalf("The pod should not be removed if KeepTerminatedPodVolumesAnnotation is set")
-	}
+	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 20*time.Second, "expected non-zero pods in dsw if KeepTerminatedPodVolumesAnnotation is set", 1)
 
 	close(podStopCh)
 	close(stopCh)
@@ -296,7 +282,7 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 // running the RC manager to prevent the rc manager from creating new pods
 // rather than adopting the existing ones.
 func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podNum int) {
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(100*time.Millisecond, 60*time.Second, func() (bool, error) {
 		objects := podInformer.GetIndexer().List()
 		if len(objects) == podNum {
 			return true, nil
@@ -321,10 +307,23 @@ func waitForPodsInDSWP(t *testing.T, dswp volumecache.DesiredStateOfWorld) {
 	}
 }
 
+// wait for pods to be observed in desired state of world
+func waitForPodFuncInDSWP(t *testing.T, dswp volumecache.DesiredStateOfWorld, checkTimeout time.Duration, failMessage string, podCount int) {
+	if err := wait.Poll(time.Millisecond*500, checkTimeout, func() (bool, error) {
+		pods := dswp.GetPodToAdd()
+		if len(pods) == podCount {
+			return true, nil
+		}
+		return false, nil
+	}); err != nil {
+		t.Fatalf("%s but got error %v", failMessage, err)
+	}
+}
+
 func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, syncPeriod time.Duration) (*clientset.Clientset, attachdetach.AttachDetachController, informers.SharedInformerFactory) {
 	config := restclient.Config{
 		Host:          server.URL,
-		ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(v1.GroupName).GroupVersion},
+		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()},
 		QPS:           1000000,
 		Burst:         1000000,
 	}
@@ -347,6 +346,12 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 	plugins := []volume.VolumePlugin{plugin}
 	cloud := &fakecloud.FakeCloud{}
 	informers := informers.NewSharedInformerFactory(testClient, resyncPeriod)
+	timers := attachdetach.TimerConfig{
+		ReconcilerLoopPeriod:                              100 * time.Millisecond,
+		ReconcilerMaxWaitForUnmountDuration:               6 * time.Second,
+		DesiredStateOfWorldPopulatorLoopSleepPeriod:       1 * time.Second,
+		DesiredStateOfWorldPopulatorListPodsRetryDuration: 3 * time.Second,
+	}
 	ctrl, err := attachdetach.NewAttachDetachController(
 		testClient,
 		informers.Core().V1().Pods(),
@@ -355,8 +360,10 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 		informers.Core().V1().PersistentVolumes(),
 		cloud,
 		plugins,
+		nil, /* prober */
 		false,
-		time.Second*5)
+		5*time.Second,
+		timers)
 
 	if err != nil {
 		t.Fatalf("Error creating AttachDetach : %v", err)
@@ -368,7 +375,7 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 // event is somehow missed by AttachDetach controller - it still
 // gets added by Desired State of World populator.
 func TestPodAddedByDswp(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(nil)
+	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
 	defer closeFn()
 	namespaceName := "test-pod-deletion"
 
@@ -424,14 +431,7 @@ func TestPodAddedByDswp(t *testing.T) {
 
 	// let's stop pod events from getting triggered
 	close(podStopCh)
-	podObj, err := api.Scheme.DeepCopy(pod)
-	if err != nil {
-		t.Fatalf("Error copying pod : %v", err)
-	}
-	podNew, ok := podObj.(*v1.Pod)
-	if !ok {
-		t.Fatalf("Error converting pod : %v", err)
-	}
+	podNew := pod.DeepCopy()
 	newPodName := "newFakepod"
 	podNew.SetName(newPodName)
 	err = podInformer.GetStore().Add(podNew)
@@ -440,12 +440,9 @@ func TestPodAddedByDswp(t *testing.T) {
 	}
 
 	waitToObservePods(t, podInformer, 2)
+
 	// the findAndAddActivePods loop turns every 3 minute
-	time.Sleep(200 * time.Second)
-	podsToAdd := ctrl.GetDesiredStateOfWorld().GetPodToAdd()
-	if len(podsToAdd) != 2 {
-		t.Fatalf("DSW should have two pods")
-	}
+	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 200*time.Second, "expected 2 pods in dsw after pod addition", 2)
 
 	close(stopCh)
 }

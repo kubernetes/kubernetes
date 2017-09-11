@@ -22,41 +22,52 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
-const globalTimeout = time.Minute
-
 var errConnKilled = fmt.Errorf("kill connection/stream")
 
-// WithTimeoutForNonLongRunningRequests times out non-long-running requests after the time given by globalTimeout.
-func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMapper apirequest.RequestContextMapper, longRunning LongRunningRequestCheck) http.Handler {
+// WithTimeoutForNonLongRunningRequests times out non-long-running requests after the time given by timeout.
+func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMapper apirequest.RequestContextMapper, longRunning apirequest.LongRunningRequestCheck, timeout time.Duration) http.Handler {
 	if longRunning == nil {
 		return handler
 	}
-	timeoutFunc := func(req *http.Request) (<-chan time.Time, *apierrors.StatusError) {
+	timeoutFunc := func(req *http.Request) (<-chan time.Time, func(), *apierrors.StatusError) {
 		// TODO unify this with apiserver.MaxInFlightLimit
 		ctx, ok := requestContextMapper.Get(req)
 		if !ok {
 			// if this happens, the handler chain isn't setup correctly because there is no context mapper
-			return time.After(globalTimeout), apierrors.NewInternalError(fmt.Errorf("no context found for request during timeout"))
+			return time.After(timeout), func() {}, apierrors.NewInternalError(fmt.Errorf("no context found for request during timeout"))
 		}
 
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
 		if !ok {
 			// if this happens, the handler chain isn't setup correctly because there is no request info
-			return time.After(globalTimeout), apierrors.NewInternalError(fmt.Errorf("no request info found for request during timeout"))
+			return time.After(timeout), func() {}, apierrors.NewInternalError(fmt.Errorf("no request info found for request during timeout"))
 		}
 
 		if longRunning(req, requestInfo) {
-			return nil, nil
+			return nil, nil, nil
 		}
-		return time.After(globalTimeout), apierrors.NewServerTimeout(schema.GroupResource{Group: requestInfo.APIGroup, Resource: requestInfo.Resource}, requestInfo.Verb, 0)
+		now := time.Now()
+		metricFn := func() {
+			scope := "cluster"
+			if requestInfo.Namespace != "" {
+				scope = "namespace"
+			}
+			if requestInfo.IsResourceRequest {
+				metrics.MonitorRequest(req, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, "", scope, http.StatusGatewayTimeout, 0, now)
+			} else {
+				metrics.MonitorRequest(req, strings.ToUpper(requestInfo.Verb), "", requestInfo.Path, "", scope, http.StatusGatewayTimeout, 0, now)
+			}
+		}
+		return time.After(timeout), metricFn, apierrors.NewTimeoutError(fmt.Sprintf("request did not complete within %s", timeout), 0)
 	}
 	return WithTimeout(handler, timeoutFunc)
 }
@@ -64,22 +75,23 @@ func WithTimeoutForNonLongRunningRequests(handler http.Handler, requestContextMa
 // WithTimeout returns an http.Handler that runs h with a timeout
 // determined by timeoutFunc. The new http.Handler calls h.ServeHTTP to handle
 // each request, but if a call runs for longer than its time limit, the
-// handler responds with a 503 Service Unavailable error and the message
+// handler responds with a 504 Gateway Timeout error and the message
 // provided. (If msg is empty, a suitable default message will be sent.) After
 // the handler times out, writes by h to its http.ResponseWriter will return
 // http.ErrHandlerTimeout. If timeoutFunc returns a nil timeout channel, no
-// timeout will be enforced.
-func WithTimeout(h http.Handler, timeoutFunc func(*http.Request) (timeout <-chan time.Time, err *apierrors.StatusError)) http.Handler {
+// timeout will be enforced. recordFn is a function that will be invoked whenever
+// a timeout happens.
+func WithTimeout(h http.Handler, timeoutFunc func(*http.Request) (timeout <-chan time.Time, recordFn func(), err *apierrors.StatusError)) http.Handler {
 	return &timeoutHandler{h, timeoutFunc}
 }
 
 type timeoutHandler struct {
 	handler http.Handler
-	timeout func(*http.Request) (<-chan time.Time, *apierrors.StatusError)
+	timeout func(*http.Request) (<-chan time.Time, func(), *apierrors.StatusError)
 }
 
 func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	after, err := t.timeout(r)
+	after, recordFn, err := t.timeout(r)
 	if after == nil {
 		t.handler.ServeHTTP(w, r)
 		return
@@ -95,6 +107,7 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case <-done:
 		return
 	case <-after:
+		recordFn()
 		tw.timeout(err)
 	}
 }

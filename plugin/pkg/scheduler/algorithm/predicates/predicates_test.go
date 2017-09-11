@@ -21,14 +21,15 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/api/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	schedulertesting "k8s.io/kubernetes/plugin/pkg/scheduler/testing"
+	schedutil "k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
 
 type FakeNodeInfo v1.Node
@@ -72,29 +73,34 @@ func (pvs FakePersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*v1.Pe
 }
 
 var (
-	opaqueResourceA = v1helper.OpaqueIntResourceName("AAA")
-	opaqueResourceB = v1helper.OpaqueIntResourceName("BBB")
+	opaqueResourceA   = v1helper.OpaqueIntResourceName("AAA")
+	opaqueResourceB   = v1helper.OpaqueIntResourceName("BBB")
+	hugePageResourceA = v1helper.HugePageResourceName(resource.MustParse("2Mi"))
 )
 
-func makeResources(milliCPU, memory, nvidiaGPUs, pods, opaqueA int64) v1.NodeResources {
+func makeResources(milliCPU, memory, nvidiaGPUs, pods, opaqueA, storage, hugePageA int64) v1.NodeResources {
 	return v1.NodeResources{
 		Capacity: v1.ResourceList{
-			v1.ResourceCPU:       *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-			v1.ResourceMemory:    *resource.NewQuantity(memory, resource.BinarySI),
-			v1.ResourcePods:      *resource.NewQuantity(pods, resource.DecimalSI),
-			v1.ResourceNvidiaGPU: *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
-			opaqueResourceA:      *resource.NewQuantity(opaqueA, resource.DecimalSI),
+			v1.ResourceCPU:              *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+			v1.ResourceMemory:           *resource.NewQuantity(memory, resource.BinarySI),
+			v1.ResourcePods:             *resource.NewQuantity(pods, resource.DecimalSI),
+			v1.ResourceNvidiaGPU:        *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
+			opaqueResourceA:             *resource.NewQuantity(opaqueA, resource.DecimalSI),
+			v1.ResourceEphemeralStorage: *resource.NewQuantity(storage, resource.BinarySI),
+			hugePageResourceA:           *resource.NewQuantity(hugePageA, resource.BinarySI),
 		},
 	}
 }
 
-func makeAllocatableResources(milliCPU, memory, nvidiaGPUs, pods, opaqueA int64) v1.ResourceList {
+func makeAllocatableResources(milliCPU, memory, nvidiaGPUs, pods, opaqueA, storage, hugePageA int64) v1.ResourceList {
 	return v1.ResourceList{
-		v1.ResourceCPU:       *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-		v1.ResourceMemory:    *resource.NewQuantity(memory, resource.BinarySI),
-		v1.ResourcePods:      *resource.NewQuantity(pods, resource.DecimalSI),
-		v1.ResourceNvidiaGPU: *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
-		opaqueResourceA:      *resource.NewQuantity(opaqueA, resource.DecimalSI),
+		v1.ResourceCPU:              *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+		v1.ResourceMemory:           *resource.NewQuantity(memory, resource.BinarySI),
+		v1.ResourcePods:             *resource.NewQuantity(pods, resource.DecimalSI),
+		v1.ResourceNvidiaGPU:        *resource.NewQuantity(nvidiaGPUs, resource.DecimalSI),
+		opaqueResourceA:             *resource.NewQuantity(opaqueA, resource.DecimalSI),
+		v1.ResourceEphemeralStorage: *resource.NewQuantity(storage, resource.BinarySI),
+		hugePageResourceA:           *resource.NewQuantity(hugePageA, resource.BinarySI),
 	}
 }
 
@@ -112,12 +118,31 @@ func newResourcePod(usage ...schedulercache.Resource) *v1.Pod {
 	}
 }
 
+func addStorageLimit(pod *v1.Pod, sizeLimit int64, medium v1.StorageMedium) *v1.Pod {
+	return &v1.Pod{
+		Spec: v1.PodSpec{
+			Containers: pod.Spec.Containers,
+			Volumes: []v1.Volume{
+				{
+					Name: "emptyDirVolumeName",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							SizeLimit: resource.NewQuantity(sizeLimit, resource.BinarySI),
+							Medium:    medium,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func newResourceInitPod(pod *v1.Pod, usage ...schedulercache.Resource) *v1.Pod {
 	pod.Spec.InitContainers = newResourcePod(usage...).Spec.Containers
 	return pod
 }
 
-func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulercache.NodeInfo) interface{} {
+func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulercache.NodeInfo) algorithm.PredicateMetadata {
 	pm := PredicateMetadataFactory{schedulertesting.FakePodLister{p}}
 	return pm.GetMetadata(p, nodeInfo)
 }
@@ -232,85 +257,85 @@ func TestPodFitsResources(t *testing.T) {
 			test: "equal edge case for init container",
 		},
 		{
-			pod:      newResourcePod(schedulercache.Resource{OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 1}}),
+			pod:      newResourcePod(schedulercache.Resource{ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 1}}),
 			nodeInfo: schedulercache.NewNodeInfo(newResourcePod(schedulercache.Resource{})),
 			fits:     true,
 			test:     "opaque resource fits",
 		},
 		{
-			pod:      newResourceInitPod(newResourcePod(schedulercache.Resource{}), schedulercache.Resource{OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 1}}),
+			pod:      newResourceInitPod(newResourcePod(schedulercache.Resource{}), schedulercache.Resource{ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 1}}),
 			nodeInfo: schedulercache.NewNodeInfo(newResourcePod(schedulercache.Resource{})),
 			fits:     true,
 			test:     "opaque resource fits for init container",
 		},
 		{
 			pod: newResourcePod(
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 10}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 10}}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 0}})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 0}})),
 			fits:    false,
 			test:    "opaque resource capacity enforced",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 10, 0, 5)},
 		},
 		{
 			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 10}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 10}}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 0}})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 0}})),
 			fits:    false,
 			test:    "opaque resource capacity enforced for init container",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 10, 0, 5)},
 		},
 		{
 			pod: newResourcePod(
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 1}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 1}}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 5}})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 5}})),
 			fits:    false,
 			test:    "opaque resource allocatable enforced",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 1, 5, 5)},
 		},
 		{
 			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 1}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 1}}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 5}})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 5}})),
 			fits:    false,
 			test:    "opaque resource allocatable enforced for init container",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 1, 5, 5)},
 		},
 		{
 			pod: newResourcePod(
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 3}},
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 3}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 3}},
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 3}}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 2}})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 2}})),
 			fits:    false,
 			test:    "opaque resource allocatable enforced for multiple containers",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 6, 2, 5)},
 		},
 		{
 			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 3}},
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 3}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 3}},
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 3}}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 2}})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 2}})),
 			fits: true,
 			test: "opaque resource allocatable admits multiple init containers",
 		},
 		{
 			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 6}},
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 3}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 6}},
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 3}}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceA: 2}})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 2}})),
 			fits:    false,
 			test:    "opaque resource allocatable enforced for multiple init containers",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 6, 2, 5)},
 		},
 		{
 			pod: newResourcePod(
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceB: 1}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceB: 1}}),
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
 			fits:    false,
@@ -319,17 +344,45 @@ func TestPodFitsResources(t *testing.T) {
 		},
 		{
 			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[v1.ResourceName]int64{opaqueResourceB: 1}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceB: 1}}),
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
 			fits:    false,
 			test:    "opaque resource allocatable enforced for unknown resource for init container",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceB, 1, 0, 0)},
 		},
+		{
+			pod: newResourcePod(
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
+			fits:    false,
+			test:    "hugepages resource capacity enforced",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(hugePageResourceA, 10, 0, 5)},
+		},
+		{
+			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
+			fits:    false,
+			test:    "hugepages resource capacity enforced for init container",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(hugePageResourceA, 10, 0, 5)},
+		},
+		{
+			pod: newResourcePod(
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 3}},
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 3}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 2}})),
+			fits:    false,
+			test:    "hugepages resource allocatable enforced for multiple containers",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(hugePageResourceA, 6, 2, 5)},
+		},
 	}
 
 	for _, test := range enoughPodsTests {
-		node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 5)}}
+		node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 5, 20, 5)}}
 		test.nodeInfo.SetNode(&node)
 		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
@@ -384,7 +437,7 @@ func TestPodFitsResources(t *testing.T) {
 		},
 	}
 	for _, test := range notEnoughPodsTests {
-		node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 0, 1, 0)}}
+		node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 0, 1, 0, 0, 0)}}
 		test.nodeInfo.SetNode(&node)
 		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
@@ -397,6 +450,65 @@ func TestPodFitsResources(t *testing.T) {
 			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
 		}
 	}
+
+	storagePodsTests := []struct {
+		pod      *v1.Pod
+		nodeInfo *schedulercache.NodeInfo
+		fits     bool
+		test     string
+		reasons  []algorithm.PredicateFailureReason
+	}{
+		{
+			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 10, Memory: 10})),
+			fits: false,
+			test: "due to container scratch disk",
+			reasons: []algorithm.PredicateFailureReason{
+				NewInsufficientResourceError(v1.ResourceCPU, 1, 10, 10),
+			},
+		},
+		{
+			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 2, Memory: 10})),
+			fits: true,
+			test: "pod fit",
+		},
+		{
+			pod: newResourcePod(schedulercache.Resource{EphemeralStorage: 25}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 2, Memory: 2})),
+			fits: false,
+			test: "storage ephemeral local storage request exceeds allocatable",
+			reasons: []algorithm.PredicateFailureReason{
+				NewInsufficientResourceError(v1.ResourceEphemeralStorage, 25, 0, 20),
+			},
+		},
+		{
+			pod: newResourcePod(schedulercache.Resource{EphemeralStorage: 10}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 2, Memory: 2})),
+			fits: true,
+			test: "pod fits",
+		},
+	}
+
+	for _, test := range storagePodsTests {
+		node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 5, 20, 5)}}
+		test.nodeInfo.SetNode(&node)
+		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.test, err)
+		}
+		if !fits && !reflect.DeepEqual(reasons, test.reasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, test.reasons)
+		}
+		if fits != test.fits {
+			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
+		}
+	}
+
 }
 
 func TestPodFitsHost(t *testing.T) {
@@ -563,7 +675,7 @@ func TestGetUsedPorts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ports := GetUsedPorts(test.pods...)
+		ports := schedutil.GetUsedPorts(test.pods...)
 		if !reflect.DeepEqual(test.ports, ports) {
 			t.Errorf("%s: expected %v, got %v", "test get used ports", test.ports, ports)
 		}
@@ -794,6 +906,7 @@ func TestISCSIDiskConflicts(t *testing.T) {
 	}
 }
 
+// TODO: Add test case for RequiredDuringSchedulingRequiredDuringExecution after it's implemented.
 func TestPodFitsSelector(t *testing.T) {
 	tests := []struct {
 		pod    *v1.Pod
@@ -1182,42 +1295,6 @@ func TestPodFitsSelector(t *testing.T) {
 			fits: true,
 			test: "Pod with multiple NodeSelectorTerms ORed in affinity, matches the node's labels and will schedule onto the node",
 		},
-		// TODO: Uncomment this test when implement RequiredDuringSchedulingRequiredDuringExecution
-		//		{
-		//			pod: &v1.Pod{
-		//				ObjectMeta: metav1.ObjectMeta{
-		//					Annotations: map[string]string{
-		//						v1.AffinityAnnotationKey: `
-		//						{"nodeAffinity": {
-		//							"requiredDuringSchedulingRequiredDuringExecution": {
-		//								"nodeSelectorTerms": [{
-		//									"matchExpressions": [{
-		//										"key": "foo",
-		//										"operator": "In",
-		//										"values": ["bar", "value2"]
-		//									}]
-		//								}]
-		//							},
-		//							"requiredDuringSchedulingIgnoredDuringExecution": {
-		//								"nodeSelectorTerms": [{
-		//									"matchExpressions": [{
-		//										"key": "foo",
-		//										"operator": "NotIn",
-		//										"values": ["bar", "value2"]
-		//									}]
-		//								}]
-		//							}
-		//						}}`,
-		//					},
-		//				},
-		//			},
-		//			labels: map[string]string{
-		//				"foo": "bar",
-		//			},
-		//			fits: false,
-		//			test: "Pod with an Affinity both requiredDuringSchedulingRequiredDuringExecution and " +
-		//				"requiredDuringSchedulingIgnoredDuringExecution indicated that don't match node's labels and won't schedule onto the node",
-		//		},
 		{
 			pod: &v1.Pod{
 				Spec: v1.PodSpec{
@@ -1288,7 +1365,7 @@ func TestPodFitsSelector(t *testing.T) {
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(&node)
 
-		fits, reasons, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
+		fits, reasons, err := PodMatchNodeSelector(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
@@ -1504,7 +1581,7 @@ func TestServiceAffinity(t *testing.T) {
 			// Reimplementing the logic that the scheduler implements: Any time it makes a predicate, it registers any precomputations.
 			predicate, precompute := NewServiceAffinityPredicate(schedulertesting.FakePodLister(test.pods), schedulertesting.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels)
 			// Register a precomputation or Rewrite the precomputation to a no-op, depending on the state we want to test.
-			RegisterPredicatePrecomputation("checkServiceAffinity-unitTestPredicate", func(pm *predicateMetadata) {
+			RegisterPredicateMetadataProducer("ServiceAffinityMetaProducer", func(pm *predicateMetadata) {
 				if !skipPrecompute {
 					precompute(pm)
 				}
@@ -1843,7 +1920,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0)},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0, 0)},
 			},
 			fits: true,
 			wErr: nil,
@@ -1855,7 +1932,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0)},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0, 0)},
 			},
 			fits: false,
 			wErr: nil,
@@ -1869,7 +1946,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			pod: &v1.Pod{},
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
-			node: &v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0)}},
+			node: &v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0, 0, 0)}},
 			fits: true,
 			wErr: nil,
 			test: "no resources/port/host requested always fits on GPU machine",
@@ -1878,7 +1955,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			pod: newResourcePod(schedulercache.Resource{MilliCPU: 3, Memory: 1, NvidiaGPU: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 10, NvidiaGPU: 1})),
-			node:    &v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0)}},
+			node:    &v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0, 0, 0)}},
 			fits:    false,
 			wErr:    nil,
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(v1.ResourceNvidiaGPU, 1, 1, 1)},
@@ -1888,7 +1965,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			pod: newResourcePod(schedulercache.Resource{MilliCPU: 3, Memory: 1, NvidiaGPU: 1}),
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 10, NvidiaGPU: 0})),
-			node: &v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0)}},
+			node: &v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 1, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32, 0, 0, 0)}},
 			fits: true,
 			wErr: nil,
 			test: "enough GPU resource",
@@ -1902,7 +1979,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			nodeInfo: schedulercache.NewNodeInfo(),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0)},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0, 0)},
 			},
 			fits:    false,
 			wErr:    nil,
@@ -1914,7 +1991,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			nodeInfo: schedulercache.NewNodeInfo(newPodWithPort(123)),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
-				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0)},
+				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 0, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 0, 32, 0, 0, 0)},
 			},
 			fits:    false,
 			wErr:    nil,
@@ -1937,6 +2014,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 	}
 }
 
+// TODO: Add test case for RequiredDuringSchedulingRequiredDuringExecution after it's implemented.
 func TestInterPodAffinity(t *testing.T) {
 	podLabel := map[string]string{"service": "securityscan"}
 	labels1 := map[string]string{
@@ -2224,50 +2302,6 @@ func TestInterPodAffinity(t *testing.T) {
 			fits: true,
 			test: "satisfies the PodAffinity and PodAntiAffinity with the existing pod",
 		},
-		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		//{
-		//	 pod: &v1.Pod{
-		//		ObjectMeta: metav1.ObjectMeta{
-		//			Labels: podLabel2,
-		//			Annotations: map[string]string{
-		//				v1.AffinityAnnotationKey: `
-		//				{"podAffinity": {
-		//					"requiredDuringSchedulingRequiredDuringExecution": [
-		//						{
-		//							"labelSelector": {
-		//								"matchExpressions": [{
-		//									"key": "service",
-		//									"operator": "Exists"
-		//								}, {
-		//									"key": "wrongkey",
-		//									"operator": "DoesNotExist"
-		//								}]
-		//							},
-		//							"topologyKey": "region"
-		//						}, {
-		//							"labelSelector": {
-		//								"matchExpressions": [{
-		//									"key": "service",
-		//									"operator": "In",
-		//									"values": ["securityscan"]
-		//								}, {
-		//									"key": "service",
-		//									"operator": "NotIn",
-		//									"values": ["WrongValue"]
-		//								}]
-		//							},
-		//							"topologyKey": "region"
-		//						}
-		//					]
-		//				}}`,
-		//			},
-		//		},
-		//	},
-		//	pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podlabel}}},
-		//	node: &node1,
-		//	fits: true,
-		//	test: "satisfies the PodAffinity with different Label Operators in multiple RequiredDuringSchedulingRequiredDuringExecution ",
-		//},
 		{
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -2981,7 +3015,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			nodeInfo.SetNode(&node)
 			nodeInfoMap := map[string]*schedulercache.NodeInfo{node.Name: nodeInfo}
 
-			var meta interface{} = nil
+			var meta algorithm.PredicateMetadata = nil
 
 			if !test.nometa {
 				meta = PredicateMetadata(test.pod, nodeInfoMap)
@@ -2999,7 +3033,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				nodeInfo := schedulercache.NewNodeInfo()
 				nodeInfo.SetNode(&node)
 				nodeInfoMap := map[string]*schedulercache.NodeInfo{node.Name: nodeInfo}
-				fits2, reasons, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
+				fits2, reasons, err := PodMatchNodeSelector(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
 				if err != nil {
 					t.Errorf("%s: unexpected error: %v", test.test, err)
 				}
@@ -3249,7 +3283,7 @@ func TestPodSchedulesOnNodeWithMemoryPressureCondition(t *testing.T) {
 					ImagePullPolicy: "Always",
 					// at least one requirement -> burstable pod
 					Resources: v1.ResourceRequirements{
-						Requests: makeAllocatableResources(100, 100, 100, 100, 0),
+						Requests: makeAllocatableResources(100, 100, 100, 100, 0, 0, 0),
 					},
 				},
 			},
@@ -3399,6 +3433,78 @@ func TestPodSchedulesOnNodeWithDiskPressureCondition(t *testing.T) {
 	}
 }
 
+func TestNodeConditionPredicate(t *testing.T) {
+	tests := []struct {
+		node        *v1.Node
+		schedulable bool
+	}{
+		// node1 considered
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}}}},
+			schedulable: true,
+		},
+		// node2 ignored - node not Ready
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node2"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}}}},
+			schedulable: false,
+		},
+		// node3 ignored - node out of disk
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node3"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
+			schedulable: false,
+		},
+
+		// node4 considered
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node4"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
+			schedulable: true,
+		},
+		// node5 ignored - node out of disk
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node5"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
+			schedulable: false,
+		},
+		// node6 considered
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node6"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
+			schedulable: true,
+		},
+		// node7 ignored - node out of disk, node not Ready
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node7"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}}}},
+			schedulable: false,
+		},
+		// node8 ignored - node not Ready
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node8"}, Status: v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}, {Type: v1.NodeOutOfDisk, Status: v1.ConditionFalse}}}},
+			schedulable: false,
+		},
+		// node9 ignored - node unschedulable
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node9"}, Spec: v1.NodeSpec{Unschedulable: true}},
+			schedulable: false,
+		},
+		// node10 considered
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node10"}, Spec: v1.NodeSpec{Unschedulable: false}},
+			schedulable: true,
+		},
+		// node11 considered
+		{
+			node:        &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node11"}},
+			schedulable: true,
+		},
+	}
+
+	for _, test := range tests {
+		nodeInfo := makeEmptyNodeInfo(test.node)
+		if fit, reasons, err := CheckNodeConditionPredicate(nil, nil, nodeInfo); fit != test.schedulable {
+			t.Errorf("%s: expected: %t, got %t; %+v, %v",
+				test.node.Name, test.schedulable, fit, reasons, err)
+		}
+	}
+}
+
 func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: pod, Namespace: "default"},
@@ -3420,13 +3526,13 @@ func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
 func TestVolumeZonePredicate(t *testing.T) {
 	pvInfo := FakePersistentVolumeInfo{
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{metav1.LabelZoneFailureDomain: "zone_1"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{metav1.LabelZoneRegion: "zone_2", "uselessLabel": "none"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{kubeletapis.LabelZoneRegion: "us-west1-b", "uselessLabel": "none"}},
 		},
 		{
-			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{metav1.LabelZoneRegion: "zone_3"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{kubeletapis.LabelZoneRegion: "us-west1-c"}},
 		},
 	}
 
@@ -3463,7 +3569,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{metav1.LabelZoneFailureDomain: "zone_1"},
+					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a"},
 				},
 			},
 			Fits: true,
@@ -3484,7 +3590,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{metav1.LabelZoneFailureDomain: "zone_1", "uselessLabel": "none"},
+					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a", "uselessLabel": "none"},
 				},
 			},
 			Fits: true,
@@ -3495,7 +3601,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{metav1.LabelZoneRegion: "zone_2", "uselessLabel": "none"},
+					Labels: map[string]string{kubeletapis.LabelZoneRegion: "us-west1-b", "uselessLabel": "none"},
 				},
 			},
 			Fits: true,
@@ -3506,7 +3612,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{metav1.LabelZoneRegion: "no_zone_2", "uselessLabel": "none"},
+					Labels: map[string]string{kubeletapis.LabelZoneRegion: "no_us-west1-b", "uselessLabel": "none"},
 				},
 			},
 			Fits: false,
@@ -3517,7 +3623,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 			Node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "host1",
-					Labels: map[string]string{metav1.LabelZoneFailureDomain: "no_zone_1", "uselessLabel": "none"},
+					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "no_us-west1-a", "uselessLabel": "none"},
 				},
 			},
 			Fits: false,
@@ -3545,1241 +3651,95 @@ func TestVolumeZonePredicate(t *testing.T) {
 	}
 }
 
-// TODO: remove when alpha support for affinity is removed
-func TestPodAnnotationFitsSelector(t *testing.T) {
-	utilfeature.DefaultFeatureGate.Set("AffinityInAnnotations=true")
-	tests := []struct {
-		pod    *v1.Pod
-		labels map[string]string
-		fits   bool
-		test   string
-	}{
+func TestVolumeZonePredicateMultiZone(t *testing.T) {
+	pvInfo := FakePersistentVolumeInfo{
 		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-									"operator": "In",
-									"values": ["bar", "value2"]
-								}]
-							}]
-						}}}`,
-					},
-				},
-			},
-			labels: map[string]string{
-				"foo": "bar",
-			},
-			fits: true,
-			test: "Pod with matchExpressions using In operator that matches the existing node",
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a"}},
 		},
 		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "kernel-version",
-									"operator": "Gt",
-									"values": ["0204"]
-								}]
-							}]
-						}}}`,
-					},
-				},
-			},
-			labels: map[string]string{
-				// We use two digit to denote major version and two digit for minor version.
-				"kernel-version": "0206",
-			},
-			fits: true,
-			test: "Pod with matchExpressions using Gt operator that matches the existing node",
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_2", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-b", "uselessLabel": "none"}},
 		},
 		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "mem-type",
-									"operator": "NotIn",
-									"values": ["DDR", "DDR2"]
-								}]
-							}]
-						}}}`,
-					},
-				},
-			},
-			labels: map[string]string{
-				"mem-type": "DDR3",
-			},
-			fits: true,
-			test: "Pod with matchExpressions using NotIn operator that matches the existing node",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "GPU",
-									"operator": "Exists"
-								}]
-							}]
-						}}}`,
-					},
-				},
-			},
-			labels: map[string]string{
-				"GPU": "NVIDIA-GRID-K1",
-			},
-			fits: true,
-			test: "Pod with matchExpressions using Exists operator that matches the existing node",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-									"operator": "In",
-									"values": ["value1", "value2"]
-								}]
-							}]
-						}}}`,
-					},
-				},
-			},
-			labels: map[string]string{
-				"foo": "bar",
-			},
-			fits: false,
-			test: "Pod with affinity that don't match node's labels won't schedule onto the node",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": null
-						}}}`,
-					},
-				},
-			},
-			labels: map[string]string{
-				"foo": "bar",
-			},
-			fits: false,
-			test: "Pod with a nil []NodeSelectorTerm in affinity, can't match the node's labels and won't schedule onto the node",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": []
-						}}}`,
-					},
-				},
-			},
-			labels: map[string]string{
-				"foo": "bar",
-			},
-			fits: false,
-			test: "Pod with an empty []NodeSelectorTerm in affinity, can't match the node's labels and won't schedule onto the node",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{}, {}]
-						}}}`,
-					},
-				},
-			},
-			labels: map[string]string{
-				"foo": "bar",
-			},
-			fits: false,
-			test: "Pod with invalid NodeSelectTerms in affinity will match no objects and won't schedule onto the node",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{"matchExpressions": [{}]}]
-						}}}`,
-					},
-				},
-			},
-			labels: map[string]string{
-				"foo": "bar",
-			},
-			fits: false,
-			test: "Pod with empty MatchExpressions is not a valid value will match no objects and won't schedule onto the node",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						"some-key": "some-value",
-					},
-				},
-			},
-			labels: map[string]string{
-				"foo": "bar",
-			},
-			fits: true,
-			test: "Pod with no Affinity will schedule onto a node",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": null
-						}}`,
-					},
-				},
-			},
-			labels: map[string]string{
-				"foo": "bar",
-			},
-			fits: true,
-			test: "Pod with Affinity but nil NodeSelector will schedule onto a node",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "GPU",
-									"operator": "Exists"
-								}, {
-									"key": "GPU",
-									"operator": "NotIn",
-									"values": ["AMD", "INTER"]
-								}]
-							}]
-						}}}`,
-					},
-				},
-			},
-			labels: map[string]string{
-				"GPU": "NVIDIA-GRID-K1",
-			},
-			fits: true,
-			test: "Pod with multiple matchExpressions ANDed that matches the existing node",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "GPU",
-									"operator": "Exists"
-								}, {
-									"key": "GPU",
-									"operator": "In",
-									"values": ["AMD", "INTER"]
-								}]
-							}]
-						}}}`,
-					},
-				},
-			},
-			labels: map[string]string{
-				"GPU": "NVIDIA-GRID-K1",
-			},
-			fits: false,
-			test: "Pod with multiple matchExpressions ANDed that doesn't match the existing node",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [
-								{
-									"matchExpressions": [{
-										"key": "foo",
-										"operator": "In",
-										"values": ["bar", "value2"]
-									}]
-								},
-								{
-									"matchExpressions": [{
-										"key": "diffkey",
-										"operator": "In",
-										"values": ["wrong", "value2"]
-									}]
-								}
-							]
-						}}}`,
-					},
-				},
-			},
-			labels: map[string]string{
-				"foo": "bar",
-			},
-			fits: true,
-			test: "Pod with multiple NodeSelectorTerms ORed in affinity, matches the node's labels and will schedule onto the node",
-		},
-		// TODO: Uncomment this test when implement RequiredDuringSchedulingRequiredDuringExecution
-		//		{
-		//			pod: &v1.Pod{
-		//				ObjectMeta: metav1.ObjectMeta{
-		//					Annotations: map[string]string{
-		//						v1.AffinityAnnotationKey: `
-		//						{"nodeAffinity": {
-		//							"requiredDuringSchedulingRequiredDuringExecution": {
-		//								"nodeSelectorTerms": [{
-		//									"matchExpressions": [{
-		//										"key": "foo",
-		//										"operator": "In",
-		//										"values": ["bar", "value2"]
-		//									}]
-		//								}]
-		//							},
-		//							"requiredDuringSchedulingIgnoredDuringExecution": {
-		//								"nodeSelectorTerms": [{
-		//									"matchExpressions": [{
-		//										"key": "foo",
-		//										"operator": "NotIn",
-		//										"values": ["bar", "value2"]
-		//									}]
-		//								}]
-		//							}
-		//						}}`,
-		//					},
-		//				},
-		//			},
-		//			labels: map[string]string{
-		//				"foo": "bar",
-		//			},
-		//			fits: false,
-		//			test: "Pod with an Affinity both requiredDuringSchedulingRequiredDuringExecution and " +
-		//				"requiredDuringSchedulingIgnoredDuringExecution indicated that don't match node's labels and won't schedule onto the node",
-		//		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-									"operator": "Exists"
-								}]
-							}]
-						}}}`,
-					},
-				},
-				Spec: v1.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-					},
-				},
-			},
-			labels: map[string]string{
-				"foo": "bar",
-			},
-			fits: true,
-			test: "Pod with an Affinity and a PodSpec.NodeSelector(the old thing that we are deprecating) " +
-				"both are satisfied, will schedule onto the node",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
-							"nodeSelectorTerms": [{
-								"matchExpressions": [{
-									"key": "foo",
-									"operator": "Exists"
-								}]
-							}]
-						}}}`,
-					},
-				},
-				Spec: v1.PodSpec{
-					NodeSelector: map[string]string{
-						"foo": "bar",
-					},
-				},
-			},
-			labels: map[string]string{
-				"foo": "barrrrrr",
-			},
-			fits: false,
-			test: "Pod with an Affinity matches node's labels but the PodSpec.NodeSelector(the old thing that we are deprecating) " +
-				"is not satisfied, won't schedule onto the node",
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_3", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-c__us-west1-a"}},
 		},
 	}
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeSelectorNotMatch}
+
+	pvcInfo := FakePersistentVolumeClaimInfo{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_2", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_2"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_3", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_3"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_4", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_not_exist"},
+		},
+	}
+
+	tests := []struct {
+		Name string
+		Pod  *v1.Pod
+		Fits bool
+		Node *v1.Node
+	}{
+		{
+			Name: "node without labels",
+			Pod:  createPodWithVolume("pod_1", "Vol_3", "PVC_3"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "host1",
+				},
+			},
+			Fits: true,
+		},
+		{
+			Name: "label zone failure domain matched",
+			Pod:  createPodWithVolume("pod_1", "Vol_3", "PVC_3"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a", "uselessLabel": "none"},
+				},
+			},
+			Fits: true,
+		},
+		{
+			Name: "label zone failure domain failed match",
+			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_1"),
+			Node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "host1",
+					Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-b", "uselessLabel": "none"},
+				},
+			},
+			Fits: false,
+		},
+	}
+
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrVolumeZoneConflict}
 
 	for _, test := range tests {
-		node := v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.labels}}
-		nodeInfo := schedulercache.NewNodeInfo()
-		nodeInfo.SetNode(&node)
+		fit := NewVolumeZonePredicate(pvInfo, pvcInfo)
+		node := &schedulercache.NodeInfo{}
+		node.SetNode(test.Node)
 
-		fits, reasons, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
+		fits, reasons, err := fit(test.Pod, nil, node)
 		if err != nil {
-			t.Errorf("%s: unexpected error: %v", test.test, err)
+			t.Errorf("%s: unexpected error: %v", test.Name, err)
 		}
 		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.Name, reasons, expectedFailureReasons)
 		}
-		if fits != test.fits {
-			t.Errorf("%s: expected: %v got %v", test.test, test.fits, fits)
-		}
-	}
-}
-
-// TODO: remove when alpha support for affinity is removed
-func TestInterPodAffinityAnnotations(t *testing.T) {
-	utilfeature.DefaultFeatureGate.Set("AffinityInAnnotations=true")
-	podLabel := map[string]string{"service": "securityscan"}
-	labels1 := map[string]string{
-		"region": "r1",
-		"zone":   "z11",
-	}
-	podLabel2 := map[string]string{"security": "S1"}
-	node1 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labels1}}
-	tests := []struct {
-		pod  *v1.Pod
-		pods []*v1.Pod
-		node *v1.Node
-		fits bool
-		test string
-	}{
-		{
-			pod:  new(v1.Pod),
-			node: &node1,
-			fits: true,
-			test: "A pod that has no required pod affinity scheduling rules can schedule onto a node with no existing pods",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: podLabel2,
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"podAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [{
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "service",
-										"operator": "In",
-										"values": ["securityscan", "value2"]
-										}]
-									},
-								"topologyKey": "region"
-							}]
-						}}`,
-					},
-				},
-			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
-			node: &node1,
-			fits: true,
-			test: "satisfies with requiredDuringSchedulingIgnoredDuringExecution in PodAffinity using In operator that matches the existing pod",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: podLabel2,
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `{"podAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [{
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "service",
-										"operator": "NotIn",
-										"values": ["securityscan3", "value3"]
-									}]
-								},
-								"topologyKey": "region"
-							}]
-						}}`,
-					},
-				},
-			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
-			node: &node1,
-			fits: true,
-			test: "satisfies the pod with requiredDuringSchedulingIgnoredDuringExecution in PodAffinity using not in operator in labelSelector that matches the existing pod",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: podLabel2,
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"podAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [{
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "service",
-										"operator": "In",
-										"values": ["securityscan", "value2"]
-									}]
-								},
-								"namespaces":["DiffNameSpace"]
-							}]
-						}}`,
-					},
-				},
-			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel, Namespace: "ns"}}},
-			node: &node1,
-			fits: false,
-			test: "Does not satisfy the PodAffinity with labelSelector because of diff Namespace",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: podLabel,
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"podAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [{
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "service",
-										"operator": "In",
-										"values": ["antivirusscan", "value2"]
-									}]
-								}
-							}]
-						}}`,
-					},
-				},
-			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
-			node: &node1,
-			fits: false,
-			test: "Doesn't satisfy the PodAffinity because of unmatching labelSelector with the existing pod",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: podLabel2,
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"podAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [
-								{
-									"labelSelector": {
-										"matchExpressions": [{
-											"key": "service",
-											"operator": "Exists"
-										}, {
-											"key": "wrongkey",
-											"operator": "DoesNotExist"
-										}]
-									},
-									"topologyKey": "region"
-								}, {
-									"labelSelector": {
-										"matchExpressions": [{
-											"key": "service",
-											"operator": "In",
-											"values": ["securityscan"]
-										}, {
-											"key": "service",
-											"operator": "NotIn",
-											"values": ["WrongValue"]
-										}]
-									},
-									"topologyKey": "region"
-								}
-							]
-						}}`,
-					},
-				},
-			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
-			node: &node1,
-			fits: true,
-			test: "satisfies the PodAffinity with different label Operators in multiple RequiredDuringSchedulingIgnoredDuringExecution ",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: podLabel2,
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"podAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [
-								{
-									"labelSelector": {
-										"matchExpressions": [{
-											"key": "service",
-											"operator": "Exists"
-										}, {
-											"key": "wrongkey",
-											"operator": "DoesNotExist"
-										}]
-									},
-									"topologyKey": "region"
-								}, {
-									"labelSelector": {
-										"matchExpressions": [{
-											"key": "service",
-											"operator": "In",
-											"values": ["securityscan2"]
-										}, {
-											"key": "service",
-											"operator": "NotIn",
-											"values": ["WrongValue"]
-										}]
-									},
-									"topologyKey": "region"
-								}
-							]
-						}}`,
-					},
-				},
-			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
-			node: &node1,
-			fits: false,
-			test: "The labelSelector requirements(items of matchExpressions) are ANDed, the pod cannot schedule onto the node because one of the matchExpression item don't match.",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: podLabel2,
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"podAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [{
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "service",
-										"operator": "In",
-										"values": ["securityscan", "value2"]
-									}]
-								},
-								"topologyKey": "region"
-							}]
-						},
-						"podAntiAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [{
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "service",
-										"operator": "In",
-										"values": ["antivirusscan", "value2"]
-									}]
-								},
-								"topologyKey": "node"
-							}]
-						}}`,
-					},
-				},
-			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
-			node: &node1,
-			fits: true,
-			test: "satisfies the PodAffinity and PodAntiAffinity with the existing pod",
-		},
-		// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
-		//{
-		//	 pod: &v1.Pod{
-		//		ObjectMeta: metav1.ObjectMeta{
-		//			Labels: podLabel2,
-		//			Annotations: map[string]string{
-		//				v1.AffinityAnnotationKey: `
-		//				{"podAffinity": {
-		//					"requiredDuringSchedulingRequiredDuringExecution": [
-		//						{
-		//							"labelSelector": {
-		//								"matchExpressions": [{
-		//									"key": "service",
-		//									"operator": "Exists"
-		//								}, {
-		//									"key": "wrongkey",
-		//									"operator": "DoesNotExist"
-		//								}]
-		//							},
-		//							"topologyKey": "region"
-		//						}, {
-		//							"labelSelector": {
-		//								"matchExpressions": [{
-		//									"key": "service",
-		//									"operator": "In",
-		//									"values": ["securityscan"]
-		//								}, {
-		//									"key": "service",
-		//									"operator": "NotIn",
-		//									"values": ["WrongValue"]
-		//								}]
-		//							},
-		//							"topologyKey": "region"
-		//						}
-		//					]
-		//				}}`,
-		//			},
-		//		},
-		//	},
-		//	pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podlabel}}},
-		//	node: &node1,
-		//	fits: true,
-		//	test: "satisfies the PodAffinity with different Label Operators in multiple RequiredDuringSchedulingRequiredDuringExecution ",
-		//},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: podLabel2,
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"podAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [{
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "service",
-										"operator": "In",
-										"values": ["securityscan", "value2"]
-									}]
-								},
-								"topologyKey": "region"
-							}]
-						},
-						"podAntiAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [{
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "service",
-										"operator": "In",
-										"values": ["antivirusscan", "value2"]
-									}]
-								},
-								"topologyKey": "node"
-							}]
-						}}`,
-					},
-				},
-			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"},
-				ObjectMeta: metav1.ObjectMeta{Labels: podLabel,
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"PodAntiAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [{
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "service",
-										"operator": "In",
-										"values": ["antivirusscan", "value2"]
-									}]
-								},
-								"topologyKey": "node"
-							}]
-						}}`,
-					}},
-			}},
-			node: &node1,
-			fits: true,
-			test: "satisfies the PodAffinity and PodAntiAffinity and PodAntiAffinity symmetry with the existing pod",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: podLabel2,
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"podAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [{
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "service",
-										"operator": "In",
-										"values": ["securityscan", "value2"]
-									}]
-								},
-								"topologyKey": "region"
-							}]
-						},
-						"podAntiAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [{
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "service",
-										"operator": "In",
-										"values": ["securityscan", "value2"]
-									}]
-								},
-								"topologyKey": "zone"
-							}]
-						}}`,
-					},
-				},
-			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
-			node: &node1,
-			fits: false,
-			test: "satisfies the PodAffinity but doesn't satisfies the PodAntiAffinity with the existing pod",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: podLabel,
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"podAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [{
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "service",
-										"operator": "In",
-										"values": ["securityscan", "value2"]
-									}]
-								},
-								"topologyKey": "region"
-							}]
-						},
-						"podAntiAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [{
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "service",
-										"operator": "In",
-										"values": ["antivirusscan", "value2"]
-									}]
-								},
-								"topologyKey": "node"
-							}]
-						}}`,
-					},
-				},
-			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"},
-				ObjectMeta: metav1.ObjectMeta{Labels: podLabel,
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"PodAntiAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [{
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "service",
-										"operator": "In",
-										"values": ["securityscan", "value2"]
-									}]
-								},
-								"topologyKey": "zone"
-							}]
-						}}`,
-					}},
-			}},
-			node: &node1,
-			fits: false,
-			test: "satisfies the PodAffinity and PodAntiAffinity but doesn't satisfies PodAntiAffinity symmetry with the existing pod",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: podLabel,
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"podAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [{
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "service",
-										"operator": "NotIn",
-										"values": ["securityscan", "value2"]
-									}]
-								},
-								"topologyKey": "region"
-							}]
-						}}`,
-					},
-				},
-			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabel}}},
-			node: &node1,
-			fits: false,
-			test: "pod matches its own Label in PodAffinity and that matches the existing pod Labels",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: podLabel,
-				},
-			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"},
-				ObjectMeta: metav1.ObjectMeta{Labels: podLabel,
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"PodAntiAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [{
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "service",
-										"operator": "In",
-										"values": ["securityscan", "value2"]
-									}]
-								},
-								"topologyKey": "zone"
-							}]
-						}}`,
-					}},
-			}},
-			node: &node1,
-			fits: false,
-			test: "verify that PodAntiAffinity from existing pod is respected when pod has no AntiAffinity constraints. doesn't satisfy PodAntiAffinity symmetry with the existing pod",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: podLabel,
-				},
-			},
-			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"},
-				ObjectMeta: metav1.ObjectMeta{Labels: podLabel,
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-                        {"PodAntiAffinity": {
-                            "requiredDuringSchedulingIgnoredDuringExecution": [{
-                                "labelSelector": {
-                                    "matchExpressions": [{
-                                        "key": "service",
-                                        "operator": "NotIn",
-                                        "values": ["securityscan", "value2"]
-                                    }]
-                                },
-                                "topologyKey": "zone"
-                            }]
-                        }}`,
-					}},
-			}},
-			node: &node1,
-			fits: true,
-			test: "verify that PodAntiAffinity from existing pod is respected when pod has no AntiAffinity constraints. satisfy PodAntiAffinity symmetry with the existing pod",
-		},
-	}
-	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrPodAffinityNotMatch}
-
-	for _, test := range tests {
-		node := test.node
-		var podsOnNode []*v1.Pod
-		for _, pod := range test.pods {
-			if pod.Spec.NodeName == node.Name {
-				podsOnNode = append(podsOnNode, pod)
-			}
+		if fits != test.Fits {
+			t.Errorf("%s: expected %v got %v", test.Name, test.Fits, fits)
 		}
 
-		fit := PodAffinityChecker{
-			info:      FakeNodeInfo(*node),
-			podLister: schedulertesting.FakePodLister(test.pods),
-		}
-		nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
-		nodeInfo.SetNode(test.node)
-		nodeInfoMap := map[string]*schedulercache.NodeInfo{test.node.Name: nodeInfo}
-		fits, reasons, err := fit.InterPodAffinityMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
-		if err != nil {
-			t.Errorf("%s: unexpected error %v", test.test, err)
-		}
-		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
-			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
-		}
-		if fits != test.fits {
-			t.Errorf("%s: expected %v got %v", test.test, test.fits, fits)
-		}
-	}
-}
-
-// TODO: remove when alpha support for affinity is removed
-func TestInterPodAffinityAnnotationsWithMultipleNodes(t *testing.T) {
-	utilfeature.DefaultFeatureGate.Set("AffinityInAnnotations=true")
-	podLabelA := map[string]string{
-		"foo": "bar",
-	}
-	labelRgChina := map[string]string{
-		"region": "China",
-	}
-	labelRgChinaAzAz1 := map[string]string{
-		"region": "China",
-		"az":     "az1",
-	}
-	labelRgIndia := map[string]string{
-		"region": "India",
-	}
-	tests := []struct {
-		pod   *v1.Pod
-		pods  []*v1.Pod
-		nodes []v1.Node
-		fits  map[string]bool
-		test  string
-	}{
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"podAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [{
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "foo",
-										"operator": "In",
-										"values": ["bar"]
-									}]
-								},
-								"topologyKey": "region"
-							}]
-						}}`,
-					},
-				},
-			},
-			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelA}},
-			},
-			nodes: []v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChinaAzAz1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelRgIndia}},
-			},
-			fits: map[string]bool{
-				"machine1": true,
-				"machine2": true,
-				"machine3": false,
-			},
-			test: "A pod can be scheduled onto all the nodes that have the same topology key & label value with one of them has an existing pod that match the affinity rules",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{
-							"nodeAffinity": {
-								"requiredDuringSchedulingIgnoredDuringExecution": {
-									"nodeSelectorTerms": [{
-										"matchExpressions": [{
-											"key": "hostname",
-											"operator": "NotIn",
-											"values": ["h1"]
-										}]
-									}]
-								}
-							},
-							"podAffinity": {
-								"requiredDuringSchedulingIgnoredDuringExecution": [{
-									"labelSelector": {
-										"matchExpressions": [{
-											"key": "foo",
-											"operator": "In",
-											"values": ["abc"]
-										}]
-									},
-									"topologyKey": "region"
-								}]
-							}
-						}`,
-					},
-				},
-			},
-			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "abc"}}},
-				{Spec: v1.PodSpec{NodeName: "nodeB"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "def"}}},
-			},
-			nodes: []v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "hostname": "h1"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "hostname": "h2"}}},
-			},
-			fits: map[string]bool{
-				"nodeA": false,
-				"nodeB": true,
-			},
-			test: "NodeA and nodeB have same topologyKey and label value. NodeA does not satisfy node affinity rule, but has an existing pod that match the inter pod affinity rule. The pod can be scheduled onto nodeB.",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"foo": "bar",
-					},
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{"podAffinity": {
-							"requiredDuringSchedulingIgnoredDuringExecution": [{
-								"labelSelector": {
-									"matchExpressions": [{
-										"key": "foo",
-										"operator": "In",
-										"values": ["bar"]
-									}]
-								},
-								"topologyKey": "zone"
-							}]
-						}}`,
-					},
-				},
-			},
-			pods: []*v1.Pod{},
-			nodes: []v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"zone": "az1", "hostname": "h1"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"zone": "az2", "hostname": "h2"}}},
-			},
-			fits: map[string]bool{
-				"nodeA": true,
-				"nodeB": true,
-			},
-			test: "The affinity rule is to schedule all of the pods of this collection to the same zone. The first pod of the collection " +
-				"should not be blocked from being scheduled onto any node, even there's no existing pod that match the rule anywhere.",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{
-							"podAntiAffinity": {
-								"requiredDuringSchedulingIgnoredDuringExecution": [{
-									"labelSelector": {
-										"matchExpressions": [{
-											"key": "foo",
-											"operator": "In",
-											"values": ["abc"]
-										}]
-									},
-									"topologyKey": "region"
-								}]
-							}
-						}`,
-					},
-				},
-			},
-			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "abc"}}},
-			},
-			nodes: []v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "hostname": "nodeA"}}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "hostname": "nodeB"}}},
-			},
-			fits: map[string]bool{
-				"nodeA": false,
-				"nodeB": false,
-			},
-			test: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB.",
-		},
-		{
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.AffinityAnnotationKey: `
-						{
-							"podAntiAffinity": {
-								"requiredDuringSchedulingIgnoredDuringExecution": [{
-									"labelSelector": {
-										"matchExpressions": [{
-											"key": "foo",
-											"operator": "In",
-											"values": ["abc"]
-										}]
-									},
-									"topologyKey": "region"
-								}]
-							}
-						}`,
-					},
-				},
-			},
-			pods: []*v1.Pod{
-				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "abc"}}},
-			},
-			nodes: []v1.Node{
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: labelRgChina}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
-			},
-			fits: map[string]bool{
-				"nodeA": false,
-				"nodeB": false,
-				"nodeC": true,
-			},
-			test: "NodeA and nodeB have same topologyKey and label value. NodeA has an existing pod that match the inter pod affinity rule. The pod can not be scheduled onto nodeA and nodeB but can be schedulerd onto nodeC",
-		},
-	}
-	affinityExpectedFailureReasons := []algorithm.PredicateFailureReason{ErrPodAffinityNotMatch}
-	selectorExpectedFailureReasons := []algorithm.PredicateFailureReason{ErrNodeSelectorNotMatch}
-
-	for _, test := range tests {
-		nodeListInfo := FakeNodeListInfo(test.nodes)
-		for _, node := range test.nodes {
-			var podsOnNode []*v1.Pod
-			for _, pod := range test.pods {
-				if pod.Spec.NodeName == node.Name {
-					podsOnNode = append(podsOnNode, pod)
-				}
-			}
-
-			testFit := PodAffinityChecker{
-				info:      nodeListInfo,
-				podLister: schedulertesting.FakePodLister(test.pods),
-			}
-			nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
-			nodeInfo.SetNode(&node)
-			nodeInfoMap := map[string]*schedulercache.NodeInfo{node.Name: nodeInfo}
-			fits, reasons, err := testFit.InterPodAffinityMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
-			if err != nil {
-				t.Errorf("%s: unexpected error %v", test.test, err)
-			}
-			if !fits && !reflect.DeepEqual(reasons, affinityExpectedFailureReasons) {
-				t.Errorf("%s: unexpected failure reasons: %v", test.test, reasons)
-			}
-			affinity, err := v1helper.GetAffinityFromPodAnnotations(test.pod.ObjectMeta.Annotations)
-			if err != nil {
-				t.Errorf("%s: unexpected error: %v", test.test, err)
-			}
-			if affinity != nil && affinity.NodeAffinity != nil {
-				nodeInfo := schedulercache.NewNodeInfo()
-				nodeInfo.SetNode(&node)
-				nodeInfoMap := map[string]*schedulercache.NodeInfo{node.Name: nodeInfo}
-				fits2, reasons, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
-				if err != nil {
-					t.Errorf("%s: unexpected error: %v", test.test, err)
-				}
-				if !fits2 && !reflect.DeepEqual(reasons, selectorExpectedFailureReasons) {
-					t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, selectorExpectedFailureReasons)
-				}
-				fits = fits && fits2
-			}
-
-			if fits != test.fits[node.Name] {
-				t.Errorf("%s: expected %v for %s got %v", test.test, test.fits[node.Name], node.Name, fits)
-			}
-		}
 	}
 }

@@ -27,8 +27,50 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubectl"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
+
+func Test_generatorFromName(t *testing.T) {
+	const (
+		nonsenseName   = "not-a-real-generator-name"
+		basicName      = cmdutil.DeploymentBasicV1Beta1GeneratorName
+		basicAppsName  = cmdutil.DeploymentBasicAppsV1Beta1GeneratorName
+		deploymentName = "deployment-name"
+	)
+	imageNames := []string{"image-1", "image-2"}
+
+	generator, ok := generatorFromName(nonsenseName, imageNames, deploymentName)
+	assert.Nil(t, generator)
+	assert.False(t, ok)
+
+	generator, ok = generatorFromName(basicName, imageNames, deploymentName)
+	assert.True(t, ok)
+
+	{
+		expectedGenerator := &kubectl.DeploymentBasicGeneratorV1{
+			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
+				Name:   deploymentName,
+				Images: imageNames,
+			},
+		}
+		assert.Equal(t, expectedGenerator, generator)
+	}
+
+	generator, ok = generatorFromName(basicAppsName, imageNames, deploymentName)
+	assert.True(t, ok)
+
+	{
+		expectedGenerator := &kubectl.DeploymentBasicAppsGeneratorV1{
+			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
+				Name:   deploymentName,
+				Images: imageNames,
+			},
+		}
+		assert.Equal(t, expectedGenerator, generator)
+	}
+}
 
 func TestCreateDeployment(t *testing.T) {
 	depName := "jonny-dep"
@@ -39,7 +81,7 @@ func TestCreateDeployment(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       ioutil.NopCloser(&bytes.Buffer{}),
+				Body:       ioutil.NopCloser(bytes.NewBuffer([]byte("{}"))),
 			}, nil
 		}),
 	}
@@ -80,6 +122,6 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 	cmd := NewCmdCreateDeployment(f, buf, buf)
 	cmd.Flags().Set("dry-run", "true")
 	cmd.Flags().Set("output", "name")
-	err := CreateDeployment(f, buf, buf, cmd, []string{depName})
+	err := createDeployment(f, buf, buf, cmd, []string{depName})
 	assert.Error(t, err, "at least one image must be specified")
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package aws
 
 import (
+	"fmt"
 	"io"
 	"reflect"
 	"strings"
@@ -25,16 +26,18 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
+	"github.com/aws/aws-sdk-go/service/kms"
 
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/v1"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"k8s.io/apimachinery/pkg/types"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 )
 
 const TestClusterId = "clusterid.test"
@@ -111,16 +114,18 @@ func TestReadAWSCloudConfig(t *testing.T) {
 }
 
 type FakeAWSServices struct {
-	region                  string
-	instances               []*ec2.Instance
-	selfInstance            *ec2.Instance
-	networkInterfacesMacs   []string
-	networkInterfacesVpcIDs []string
+	region                      string
+	instances                   []*ec2.Instance
+	selfInstance                *ec2.Instance
+	networkInterfacesMacs       []string
+	networkInterfacesPrivateIPs [][]string
+	networkInterfacesVpcIDs     []string
 
 	ec2      *FakeEC2
 	elb      *FakeELB
 	asg      *FakeASG
 	metadata *FakeMetadata
+	kms      *FakeKMS
 }
 
 func NewFakeAWSServices() *FakeAWSServices {
@@ -130,6 +135,7 @@ func NewFakeAWSServices() *FakeAWSServices {
 	s.elb = &FakeELB{aws: s}
 	s.asg = &FakeASG{aws: s}
 	s.metadata = &FakeMetadata{aws: s}
+	s.kms = &FakeKMS{aws: s}
 
 	s.networkInterfacesMacs = []string{"aa:bb:cc:dd:ee:00", "aa:bb:cc:dd:ee:01"}
 	s.networkInterfacesVpcIDs = []string{"vpc-mac0", "vpc-mac1"}
@@ -175,6 +181,10 @@ func (s *FakeAWSServices) Autoscaling(region string) (ASG, error) {
 
 func (s *FakeAWSServices) Metadata() (EC2Metadata, error) {
 	return s.metadata, nil
+}
+
+func (s *FakeAWSServices) KeyManagement(region string) (KMS, error) {
+	return s.kms, nil
 }
 
 func TestNewAWSCloud(t *testing.T) {
@@ -357,6 +367,13 @@ func (self *FakeMetadata) GetMetadata(key string) (string, error) {
 					}
 				}
 			}
+			if len(keySplit) == 5 && keySplit[4] == "local-ipv4s" {
+				for i, macElem := range self.aws.networkInterfacesMacs {
+					if macParam == macElem {
+						return strings.Join(self.aws.networkInterfacesPrivateIPs[i], "/\n"), nil
+					}
+				}
+			}
 			return "", nil
 		}
 	} else {
@@ -385,8 +402,9 @@ func (ec2 *FakeEC2) DeleteVolume(request *ec2.DeleteVolumeInput) (resp *ec2.Dele
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error) {
-	panic("Not implemented")
+func (e *FakeEC2) DescribeSecurityGroups(request *ec2.DescribeSecurityGroupsInput) ([]*ec2.SecurityGroup, error) {
+	args := e.Called(request)
+	return args.Get(0).([]*ec2.SecurityGroup), nil
 }
 
 func (ec2 *FakeEC2) CreateSecurityGroup(*ec2.CreateSecurityGroupInput) (*ec2.CreateSecurityGroupOutput, error) {
@@ -508,6 +526,15 @@ func (a *FakeASG) DescribeAutoScalingGroups(*autoscaling.DescribeAutoScalingGrou
 	panic("Not implemented")
 }
 
+type FakeKMS struct {
+	aws *FakeAWSServices
+	mock.Mock
+}
+
+func (kms *FakeKMS) DescribeKey(*kms.DescribeKeyInput) (*kms.DescribeKeyOutput, error) {
+	panic("Not implemented")
+}
+
 func mockInstancesResp(selfInstance *ec2.Instance, instances []*ec2.Instance) (*Cloud, *FakeAWSServices) {
 	awsServices := NewFakeAWSServices()
 	awsServices.instances = instances
@@ -550,6 +577,16 @@ func TestNodeAddresses(t *testing.T) {
 	instance0.PrivateIpAddress = aws.String("192.168.0.1")
 	instance0.PublicDnsName = aws.String("instance-same.ec2.external")
 	instance0.PublicIpAddress = aws.String("1.2.3.4")
+	instance0.NetworkInterfaces = []*ec2.InstanceNetworkInterface{
+		{
+			Status: aws.String(ec2.NetworkInterfaceStatusInUse),
+			PrivateIpAddresses: []*ec2.InstancePrivateIpAddress{
+				{
+					PrivateIpAddress: aws.String("192.168.0.1"),
+				},
+			},
+		},
+	}
 	instance0.InstanceType = aws.String("c3.large")
 	instance0.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
 	state0 := ec2.InstanceState{
@@ -595,6 +632,8 @@ func TestNodeAddresses(t *testing.T) {
 	}
 
 	aws3, _ := mockInstancesResp(&instance0, instances[0:1])
+	// change node name so it uses the instance instead of metadata
+	aws3.selfAWSInstance.nodeName = "foo"
 	addrs3, err3 := aws3.NodeAddresses("instance-same.ec2.internal")
 	if err3 != nil {
 		t.Errorf("Should not error when instance found")
@@ -606,18 +645,34 @@ func TestNodeAddresses(t *testing.T) {
 	testHasNodeAddress(t, addrs3, v1.NodeExternalIP, "1.2.3.4")
 	testHasNodeAddress(t, addrs3, v1.NodeExternalDNS, "instance-same.ec2.external")
 	testHasNodeAddress(t, addrs3, v1.NodeInternalDNS, "instance-same.ec2.internal")
+}
 
-	// Fetch from metadata
-	aws4, fakeServices := mockInstancesResp(&instance0, []*ec2.Instance{&instance0})
-	fakeServices.selfInstance.PublicIpAddress = aws.String("2.3.4.5")
-	fakeServices.selfInstance.PrivateIpAddress = aws.String("192.168.0.2")
+func TestNodeAddressesWithMetadata(t *testing.T) {
+	var instance ec2.Instance
 
-	addrs4, err4 := aws4.NodeAddresses(mapInstanceToNodeName(&instance0))
-	if err4 != nil {
-		t.Errorf("unexpected error: %v", err4)
+	instanceName := "instance.ec2.internal"
+	instance.InstanceId = aws.String("i-0")
+	instance.PrivateDnsName = &instanceName
+	instance.PublicIpAddress = aws.String("2.3.4.5")
+	instance.InstanceType = aws.String("c3.large")
+	instance.Placement = &ec2.Placement{AvailabilityZone: aws.String("us-east-1a")}
+	state := ec2.InstanceState{
+		Name: aws.String("running"),
 	}
-	testHasNodeAddress(t, addrs4, v1.NodeInternalIP, "192.168.0.2")
-	testHasNodeAddress(t, addrs4, v1.NodeExternalIP, "2.3.4.5")
+	instance.State = &state
+
+	instances := []*ec2.Instance{&instance}
+	awsCloud, awsServices := mockInstancesResp(&instance, instances)
+
+	awsServices.networkInterfacesMacs = []string{"0a:26:89:f3:9c:f6", "0a:77:64:c4:6a:48"}
+	awsServices.networkInterfacesPrivateIPs = [][]string{{"192.168.0.1"}, {"192.168.0.2"}}
+	addrs, err := awsCloud.NodeAddresses("")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	testHasNodeAddress(t, addrs, v1.NodeInternalIP, "192.168.0.1")
+	testHasNodeAddress(t, addrs, v1.NodeInternalIP, "192.168.0.2")
+	testHasNodeAddress(t, addrs, v1.NodeExternalIP, "2.3.4.5")
 }
 
 func TestGetRegion(t *testing.T) {
@@ -789,12 +844,18 @@ func TestSubnetIDsinVPC(t *testing.T) {
 		}
 	}
 
-	// test with 4 subnets from 3 different AZs
-	// add duplicate az subnet
+	// Test with 5 subnets from 3 different AZs.
+	// Add 2 duplicate AZ subnets lexicographically chosen one is the middle element in array to
+	// check that we both choose the correct entry when it comes after and before another element
+	// in the same AZ.
 	subnets[3] = make(map[string]string)
-	subnets[3]["id"] = "subnet-c0000002"
+	subnets[3]["id"] = "subnet-c0000000"
 	subnets[3]["az"] = "af-south-1c"
+	subnets[4] = make(map[string]string)
+	subnets[4]["id"] = "subnet-c0000002"
+	subnets[4]["az"] = "af-south-1c"
 	awsServices.ec2.Subnets = constructSubnets(subnets)
+	routeTables["subnet-c0000000"] = true
 	routeTables["subnet-c0000002"] = true
 	awsServices.ec2.RouteTables = constructRouteTables(routeTables)
 
@@ -808,6 +869,16 @@ func TestSubnetIDsinVPC(t *testing.T) {
 		t.Errorf("Expected 3 subnets but got %d", len(result))
 		return
 	}
+
+	expected := []*string{aws.String("subnet-a0000001"), aws.String("subnet-b0000001"), aws.String("subnet-c0000000")}
+	for _, s := range result {
+		if !contains(expected, s) {
+			t.Errorf("Unexpected subnet '%s' found", s)
+			return
+		}
+	}
+
+	delete(routeTables, "subnet-c0000002")
 
 	// test with 6 subnets from 3 different AZs
 	// with 3 private subnets
@@ -822,7 +893,7 @@ func TestSubnetIDsinVPC(t *testing.T) {
 	routeTables["subnet-a0000001"] = false
 	routeTables["subnet-b0000001"] = false
 	routeTables["subnet-c0000001"] = false
-	routeTables["subnet-c0000002"] = true
+	routeTables["subnet-c0000000"] = true
 	routeTables["subnet-d0000001"] = true
 	routeTables["subnet-d0000002"] = true
 	awsServices.ec2.RouteTables = constructRouteTables(routeTables)
@@ -837,7 +908,7 @@ func TestSubnetIDsinVPC(t *testing.T) {
 		return
 	}
 
-	expected := []*string{aws.String("subnet-c0000002"), aws.String("subnet-d0000001"), aws.String("subnet-d0000002")}
+	expected = []*string{aws.String("subnet-c0000000"), aws.String("subnet-d0000001"), aws.String("subnet-d0000002")}
 	for _, s := range result {
 		if !contains(expected, s) {
 			t.Errorf("Unexpected subnet '%s' found", s)
@@ -873,6 +944,18 @@ func TestIpPermissionExistsHandlesMultipleGroupIds(t *testing.T) {
 	}
 
 	equals = ipPermissionExists(&newIpPermission, &oldIpPermission, false)
+	if equals {
+		t.Errorf("Should have not been considered equal since first is not in the second array of groups")
+	}
+
+	// The first pair matches, but the second does not
+	newIpPermission2 := ec2.IpPermission{
+		UserIdGroupPairs: []*ec2.UserIdGroupPair{
+			{GroupId: aws.String("firstGroupId")},
+			{GroupId: aws.String("fourthGroupId")},
+		},
+	}
+	equals = ipPermissionExists(&newIpPermission2, &oldIpPermission, false)
 	if equals {
 		t.Errorf("Should have not been considered equal since first is not in the second array of groups")
 	}
@@ -1010,60 +1093,31 @@ func TestFindInstanceByNodeNameExcludesTerminatedInstances(t *testing.T) {
 	}
 }
 
-func TestFindInstancesByNodeNameCached(t *testing.T) {
+func TestGetInstanceByNodeNameBatching(t *testing.T) {
 	awsServices := NewFakeAWSServices()
-
-	nodeNameOne := "my-dns.internal"
-	nodeNameTwo := "my-dns-two.internal"
-
+	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
+	assert.Nil(t, err, "Error building aws cloud: %v", err)
 	var tag ec2.Tag
 	tag.Key = aws.String(TagNameKubernetesClusterPrefix + TestClusterId)
 	tag.Value = aws.String("")
 	tags := []*ec2.Tag{&tag}
+	nodeNames := []string{}
+	for i := 0; i < 200; i++ {
+		nodeName := fmt.Sprintf("ip-171-20-42-%d.ec2.internal", i)
+		nodeNames = append(nodeNames, nodeName)
+		ec2Instance := &ec2.Instance{}
+		instanceId := fmt.Sprintf("i-abcedf%d", i)
+		ec2Instance.InstanceId = aws.String(instanceId)
+		ec2Instance.PrivateDnsName = aws.String(nodeName)
+		ec2Instance.State = &ec2.InstanceState{Code: aws.Int64(48), Name: aws.String("running")}
+		ec2Instance.Tags = tags
+		awsServices.instances = append(awsServices.instances, ec2Instance)
 
-	var runningInstance ec2.Instance
-	runningInstance.InstanceId = aws.String("i-running")
-	runningInstance.PrivateDnsName = aws.String(nodeNameOne)
-	runningInstance.State = &ec2.InstanceState{Code: aws.Int64(16), Name: aws.String("running")}
-	runningInstance.Tags = tags
-
-	var secondInstance ec2.Instance
-
-	secondInstance.InstanceId = aws.String("i-running")
-	secondInstance.PrivateDnsName = aws.String(nodeNameTwo)
-	secondInstance.State = &ec2.InstanceState{Code: aws.Int64(48), Name: aws.String("running")}
-	secondInstance.Tags = tags
-
-	var terminatedInstance ec2.Instance
-	terminatedInstance.InstanceId = aws.String("i-terminated")
-	terminatedInstance.PrivateDnsName = aws.String(nodeNameOne)
-	terminatedInstance.State = &ec2.InstanceState{Code: aws.Int64(48), Name: aws.String("terminated")}
-	terminatedInstance.Tags = tags
-
-	instances := []*ec2.Instance{&secondInstance, &runningInstance, &terminatedInstance}
-	awsServices.instances = append(awsServices.instances, instances...)
-
-	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
-	if err != nil {
-		t.Errorf("Error building aws cloud: %v", err)
-		return
 	}
 
-	nodeNames := sets.NewString(nodeNameOne)
-	returnedInstances, errr := c.getInstancesByNodeNamesCached(nodeNames)
-
-	if errr != nil {
-		t.Errorf("Failed to find instance: %v", err)
-		return
-	}
-
-	if len(returnedInstances) != 1 {
-		t.Errorf("Expected a single isntance but found: %v", returnedInstances)
-	}
-
-	if *returnedInstances[0].PrivateDnsName != nodeNameOne {
-		t.Errorf("Expected node name %v but got %v", nodeNameOne, returnedInstances[0].PrivateDnsName)
-	}
+	instances, err := c.getInstancesByNodeNames(nodeNames)
+	assert.NotEmpty(t, instances)
+	assert.Equal(t, 200, len(instances), "Expected 200 but got less")
 }
 
 func TestGetVolumeLabels(t *testing.T) {
@@ -1083,8 +1137,8 @@ func TestGetVolumeLabels(t *testing.T) {
 
 	assert.Nil(t, err, "Error creating Volume %v", err)
 	assert.Equal(t, map[string]string{
-		metav1.LabelZoneFailureDomain: "us-east-1a",
-		metav1.LabelZoneRegion:        "us-east-1"}, labels)
+		kubeletapis.LabelZoneFailureDomain: "us-east-1a",
+		kubeletapis.LabelZoneRegion:        "us-east-1"}, labels)
 	awsServices.ec2.AssertExpectations(t)
 }
 
@@ -1092,6 +1146,18 @@ func (self *FakeELB) expectDescribeLoadBalancers(loadBalancerName string) {
 	self.On("DescribeLoadBalancers", &elb.DescribeLoadBalancersInput{LoadBalancerNames: []*string{aws.String(loadBalancerName)}}).Return(&elb.DescribeLoadBalancersOutput{
 		LoadBalancerDescriptions: []*elb.LoadBalancerDescription{{}},
 	})
+}
+
+func (self *FakeEC2) expectDescribeSecurityGroups(groupName, clusterID string) {
+	tags := []*ec2.Tag{
+		{Key: aws.String(TagNameKubernetesClusterLegacy), Value: aws.String(TestClusterId)},
+		{Key: aws.String(fmt.Sprintf("%s%s", TagNameKubernetesClusterPrefix, TestClusterId)), Value: aws.String(ResourceLifecycleOwned)},
+	}
+
+	self.On("DescribeSecurityGroups", &ec2.DescribeSecurityGroupsInput{Filters: []*ec2.Filter{
+		newEc2Filter("group-name", groupName),
+		newEc2Filter("vpc-id", ""),
+	}}).Return([]*ec2.SecurityGroup{{Tags: tags}})
 }
 
 func TestDescribeLoadBalancerOnDelete(t *testing.T) {
@@ -1283,4 +1349,103 @@ func TestProxyProtocolEnabled(t *testing.T) {
 	}
 	result = proxyProtocolEnabled(fakeBackend)
 	assert.False(t, result, "did not expect to find %s in %s", ProxyProtocolPolicyName, policies)
+}
+
+func TestGetLoadBalancerAdditionalTags(t *testing.T) {
+	tagTests := []struct {
+		Annotations map[string]string
+		Tags        map[string]string
+	}{
+		{
+			Annotations: map[string]string{
+				ServiceAnnotationLoadBalancerAdditionalTags: "Key=Val",
+			},
+			Tags: map[string]string{
+				"Key": "Val",
+			},
+		},
+		{
+			Annotations: map[string]string{
+				ServiceAnnotationLoadBalancerAdditionalTags: "Key1=Val1, Key2=Val2",
+			},
+			Tags: map[string]string{
+				"Key1": "Val1",
+				"Key2": "Val2",
+			},
+		},
+		{
+			Annotations: map[string]string{
+				ServiceAnnotationLoadBalancerAdditionalTags: "Key1=, Key2=Val2",
+				"anotherKey":                                "anotherValue",
+			},
+			Tags: map[string]string{
+				"Key1": "",
+				"Key2": "Val2",
+			},
+		},
+		{
+			Annotations: map[string]string{
+				"Nothing": "Key1=, Key2=Val2, Key3",
+			},
+			Tags: map[string]string{},
+		},
+		{
+			Annotations: map[string]string{
+				ServiceAnnotationLoadBalancerAdditionalTags: "K=V K1=V2,Key1========, =====, ======Val, =Val, , 234,",
+			},
+			Tags: map[string]string{
+				"K":    "V K1",
+				"Key1": "",
+				"234":  "",
+			},
+		},
+	}
+
+	for _, tagTest := range tagTests {
+		result := getLoadBalancerAdditionalTags(tagTest.Annotations)
+		for k, v := range result {
+			if len(result) != len(tagTest.Tags) {
+				t.Errorf("incorrect expected length: %v != %v", result, tagTest.Tags)
+				continue
+			}
+			if tagTest.Tags[k] != v {
+				t.Errorf("%s != %s", tagTest.Tags[k], v)
+				continue
+			}
+		}
+	}
+}
+
+func TestLBExtraSecurityGroupsAnnotation(t *testing.T) {
+	awsServices := NewFakeAWSServices()
+	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
+
+	sg1 := "sg-000001"
+	sg2 := "sg-000002"
+
+	tests := []struct {
+		name string
+
+		extraSGsAnnotation string
+		expectedSGs        []string
+	}{
+		{"No extra SG annotation", "", []string{}},
+		{"Empty extra SGs specified", ", ,,", []string{}},
+		{"SG specified", sg1, []string{sg1}},
+		{"Multiple SGs specified", fmt.Sprintf("%s, %s", sg1, sg2), []string{sg1, sg2}},
+	}
+
+	awsServices.ec2.expectDescribeSecurityGroups("k8s-elb-aid", "cluster.test")
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			serviceName := types.NamespacedName{Namespace: "default", Name: "myservice"}
+
+			sgList, err := c.buildELBSecurityGroupList(serviceName, "aid", test.extraSGsAnnotation)
+			assert.NoError(t, err, "buildELBSecurityGroupList failed")
+			extraSGs := sgList[1:]
+			assert.True(t, sets.NewString(test.expectedSGs...).Equal(sets.NewString(extraSGs...)),
+				"Security Groups expected=%q , returned=%q", test.expectedSGs, extraSGs)
+		})
+	}
 }

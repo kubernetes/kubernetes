@@ -22,17 +22,19 @@ import (
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
-	etcHostsImageName          = "gcr.io/google_containers/netexec:1.7"
 	etcHostsPodName            = "test-pod"
 	etcHostsHostNetworkPodName = "test-host-network-pod"
 	etcHostsPartialContent     = "# Kubernetes-managed hosts file."
 )
+
+var etcHostsImageName = imageutils.GetE2EImage(imageutils.Netexec)
 
 type KubeletManagedHostConfig struct {
 	hostNetworkPod *v1.Pod
@@ -130,6 +132,8 @@ func (config *KubeletManagedHostConfig) getEtcHostsContent(podName, containerNam
 }
 
 func (config *KubeletManagedHostConfig) createPodSpec(podName string) *v1.Pod {
+	hostPathType := new(v1.HostPathType)
+	*hostPathType = v1.HostPathType(string(v1.HostPathFileOrCreate))
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: podName,
@@ -176,6 +180,7 @@ func (config *KubeletManagedHostConfig) createPodSpec(podName string) *v1.Pod {
 					VolumeSource: v1.VolumeSource{
 						HostPath: &v1.HostPathVolumeSource{
 							Path: "/etc/hosts",
+							Type: hostPathType,
 						},
 					},
 				},

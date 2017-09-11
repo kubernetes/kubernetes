@@ -31,8 +31,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api/latest"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
-	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 type ViewOptions struct {
@@ -81,7 +81,7 @@ func NewCmdConfigView(out, errOut io.Writer, ConfigAccess clientcmd.ConfigAccess
 				cmd.Flags().Set("output", defaultOutputFormat)
 			}
 
-			printer, _, err := cmdutil.PrinterForCommand(cmd, meta.NewDefaultRESTMapper(nil, nil), latest.Scheme, []runtime.Decoder{latest.Codec})
+			printer, err := cmdutil.PrinterForCommand(cmd, nil, meta.NewDefaultRESTMapper(nil, nil), latest.Scheme, nil, []runtime.Decoder{latest.Codec}, printers.PrintOptions{})
 			cmdutil.CheckErr(err)
 			printer = printers.NewVersionedPrinter(printer, latest.Scheme, latest.ExternalVersion)
 
@@ -93,11 +93,11 @@ func NewCmdConfigView(out, errOut io.Writer, ConfigAccess clientcmd.ConfigAccess
 	cmd.Flags().Set("output", defaultOutputFormat)
 
 	options.Merge.Default(true)
-	f := cmd.Flags().VarPF(&options.Merge, "merge", "", "merge the full hierarchy of kubeconfig files")
+	f := cmd.Flags().VarPF(&options.Merge, "merge", "", "Merge the full hierarchy of kubeconfig files")
 	f.NoOptDefVal = "true"
-	cmd.Flags().BoolVar(&options.RawByteData, "raw", false, "display raw byte data")
-	cmd.Flags().BoolVar(&options.Flatten, "flatten", false, "flatten the resulting kubeconfig file into self-contained output (useful for creating portable kubeconfig files)")
-	cmd.Flags().BoolVar(&options.Minify, "minify", false, "remove all information not used by current-context from the output")
+	cmd.Flags().BoolVar(&options.RawByteData, "raw", false, "Display raw byte data")
+	cmd.Flags().BoolVar(&options.Flatten, "flatten", false, "Flatten the resulting kubeconfig file into self-contained output (useful for creating portable kubeconfig files)")
+	cmd.Flags().BoolVar(&options.Minify, "minify", false, "Remove all information not used by current-context from the output")
 	return cmd
 }
 

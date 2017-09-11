@@ -725,3 +725,35 @@ func (v VirtualMachine) QueryConfigTarget(ctx context.Context) (*types.ConfigTar
 
 	return res.Returnval, nil
 }
+
+func (v VirtualMachine) MountToolsInstaller(ctx context.Context) error {
+	req := types.MountToolsInstaller{
+		This: v.Reference(),
+	}
+
+	_, err := methods.MountToolsInstaller(ctx, v.Client(), &req)
+	return err
+}
+
+func (v VirtualMachine) UnmountToolsInstaller(ctx context.Context) error {
+	req := types.UnmountToolsInstaller{
+		This: v.Reference(),
+	}
+
+	_, err := methods.UnmountToolsInstaller(ctx, v.Client(), &req)
+	return err
+}
+
+func (v VirtualMachine) UpgradeTools(ctx context.Context, options string) (*Task, error) {
+	req := types.UpgradeTools_Task{
+		This:             v.Reference(),
+		InstallerOptions: options,
+	}
+
+	res, err := methods.UpgradeTools_Task(ctx, v.Client(), &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewTask(v.c, res.Returnval), nil
+}

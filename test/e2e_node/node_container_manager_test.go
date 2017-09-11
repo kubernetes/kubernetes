@@ -26,26 +26,25 @@ import (
 	"strconv"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 )
 
-func setDesiredConfiguration(initialConfig *componentconfig.KubeletConfiguration) {
+func setDesiredConfiguration(initialConfig *kubeletconfig.KubeletConfiguration) {
 	initialConfig.EnforceNodeAllocatable = []string{"pods", "kube-reserved", "system-reserved"}
-	initialConfig.SystemReserved = componentconfig.ConfigurationMap{
-		"cpu":    "100m",
-		"memory": "100Mi",
+	initialConfig.SystemReserved = kubeletconfig.ConfigurationMap{
+		string(v1.ResourceCPU):    "100m",
+		string(v1.ResourceMemory): "100Mi",
 	}
-	initialConfig.KubeReserved = componentconfig.ConfigurationMap{
-		"cpu":    "100m",
-		"memory": "100Mi",
+	initialConfig.KubeReserved = kubeletconfig.ConfigurationMap{
+		string(v1.ResourceCPU):    "100m",
+		string(v1.ResourceMemory): "100Mi",
 	}
 	initialConfig.EvictionHard = "memory.available<100Mi"
 	// Necessary for allocatable cgroup creation.
@@ -138,7 +137,7 @@ func destroyTemporaryCgroupsForReservation(cgroupManager cm.CgroupManager) error
 }
 
 func runTest(f *framework.Framework) error {
-	var oldCfg *componentconfig.KubeletConfiguration
+	var oldCfg *kubeletconfig.KubeletConfiguration
 	subsystems, err := cm.GetCgroupSubsystems()
 	if err != nil {
 		return err
@@ -161,11 +160,7 @@ func runTest(f *framework.Framework) error {
 	if err := createTemporaryCgroupsForReservation(cgroupManager); err != nil {
 		return err
 	}
-	clone, err := api.Scheme.DeepCopy(oldCfg)
-	if err != nil {
-		return err
-	}
-	newCfg := clone.(*componentconfig.KubeletConfiguration)
+	newCfg := oldCfg.DeepCopy()
 	// Change existing kubelet configuration
 	setDesiredConfiguration(newCfg)
 	// Set the new kubelet configuration.
@@ -193,7 +188,7 @@ func runTest(f *framework.Framework) error {
 	allocatableCPU, allocatableMemory := getAllocatableLimits("200m", "200Mi", capacity)
 	// Total Memory reservation is 200Mi excluding eviction thresholds.
 	// Expect CPU shares on node allocatable cgroup to equal allocatable.
-	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], "kubepods", "cpu.shares"), cm.MilliCPUToShares(allocatableCPU.MilliValue()), 10); err != nil {
+	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], "kubepods", "cpu.shares"), int64(cm.MilliCPUToShares(allocatableCPU.MilliValue())), 10); err != nil {
 		return err
 	}
 	// Expect Memory limit on node allocatable cgroup to equal allocatable.
@@ -210,23 +205,23 @@ func runTest(f *framework.Framework) error {
 		return fmt.Errorf("Expected all resources in capacity to be found in allocatable")
 	}
 	// CPU based evictions are not supported.
-	if allocatableCPU.Cmp(schedulerAllocatable["cpu"]) != 0 {
-		return fmt.Errorf("Unexpected cpu allocatable value exposed by the node. Expected: %v, got: %v, capacity: %v", allocatableCPU, schedulerAllocatable["cpu"], capacity["cpu"])
+	if allocatableCPU.Cmp(schedulerAllocatable[v1.ResourceCPU]) != 0 {
+		return fmt.Errorf("Unexpected cpu allocatable value exposed by the node. Expected: %v, got: %v, capacity: %v", allocatableCPU, schedulerAllocatable[v1.ResourceCPU], capacity[v1.ResourceCPU])
 	}
-	if allocatableMemory.Cmp(schedulerAllocatable["memory"]) != 0 {
-		return fmt.Errorf("Unexpected cpu allocatable value exposed by the node. Expected: %v, got: %v, capacity: %v", allocatableCPU, schedulerAllocatable["cpu"], capacity["memory"])
+	if allocatableMemory.Cmp(schedulerAllocatable[v1.ResourceMemory]) != 0 {
+		return fmt.Errorf("Unexpected cpu allocatable value exposed by the node. Expected: %v, got: %v, capacity: %v", allocatableCPU, schedulerAllocatable[v1.ResourceCPU], capacity[v1.ResourceMemory])
 	}
 
 	if !cgroupManager.Exists(cm.CgroupName(kubeReservedCgroup)) {
 		return fmt.Errorf("Expected kube reserved cgroup Does not exist")
 	}
 	// Expect CPU shares on kube reserved cgroup to equal it's reservation which is `100m`.
-	kubeReservedCPU := resource.MustParse(currentConfig.KubeReserved["cpu"])
-	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], kubeReservedCgroup, "cpu.shares"), cm.MilliCPUToShares(kubeReservedCPU.MilliValue()), 10); err != nil {
+	kubeReservedCPU := resource.MustParse(currentConfig.KubeReserved[string(v1.ResourceCPU)])
+	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], kubeReservedCgroup, "cpu.shares"), int64(cm.MilliCPUToShares(kubeReservedCPU.MilliValue())), 10); err != nil {
 		return err
 	}
 	// Expect Memory limit kube reserved cgroup to equal configured value `100Mi`.
-	kubeReservedMemory := resource.MustParse(currentConfig.KubeReserved["memory"])
+	kubeReservedMemory := resource.MustParse(currentConfig.KubeReserved[string(v1.ResourceMemory)])
 	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["memory"], kubeReservedCgroup, "memory.limit_in_bytes"), kubeReservedMemory.Value(), 0); err != nil {
 		return err
 	}
@@ -234,12 +229,12 @@ func runTest(f *framework.Framework) error {
 		return fmt.Errorf("Expected system reserved cgroup Does not exist")
 	}
 	// Expect CPU shares on system reserved cgroup to equal it's reservation which is `100m`.
-	systemReservedCPU := resource.MustParse(currentConfig.SystemReserved["cpu"])
-	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], systemReservedCgroup, "cpu.shares"), cm.MilliCPUToShares(systemReservedCPU.MilliValue()), 10); err != nil {
+	systemReservedCPU := resource.MustParse(currentConfig.SystemReserved[string(v1.ResourceCPU)])
+	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["cpu"], systemReservedCgroup, "cpu.shares"), int64(cm.MilliCPUToShares(systemReservedCPU.MilliValue())), 10); err != nil {
 		return err
 	}
 	// Expect Memory limit on node allocatable cgroup to equal allocatable.
-	systemReservedMemory := resource.MustParse(currentConfig.SystemReserved["memory"])
+	systemReservedMemory := resource.MustParse(currentConfig.SystemReserved[string(v1.ResourceMemory)])
 	if err := expectFileValToEqual(filepath.Join(subsystems.MountPoints["memory"], systemReservedCgroup, "memory.limit_in_bytes"), systemReservedMemory.Value(), 0); err != nil {
 		return err
 	}

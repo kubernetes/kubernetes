@@ -17,9 +17,10 @@ limitations under the License.
 package v1
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
+
+	"k8s.io/api/core/v1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -35,80 +36,80 @@ import (
 func addFastPathConversionFuncs(scheme *runtime.Scheme) error {
 	scheme.AddGenericConversionFunc(func(objA, objB interface{}, s conversion.Scope) (bool, error) {
 		switch a := objA.(type) {
-		case *Pod:
+		case *v1.Pod:
 			switch b := objB.(type) {
 			case *api.Pod:
 				return true, Convert_v1_Pod_To_api_Pod(a, b, s)
 			}
 		case *api.Pod:
 			switch b := objB.(type) {
-			case *Pod:
+			case *v1.Pod:
 				return true, Convert_api_Pod_To_v1_Pod(a, b, s)
 			}
 
-		case *Event:
+		case *v1.Event:
 			switch b := objB.(type) {
 			case *api.Event:
 				return true, Convert_v1_Event_To_api_Event(a, b, s)
 			}
 		case *api.Event:
 			switch b := objB.(type) {
-			case *Event:
+			case *v1.Event:
 				return true, Convert_api_Event_To_v1_Event(a, b, s)
 			}
 
-		case *ReplicationController:
+		case *v1.ReplicationController:
 			switch b := objB.(type) {
 			case *api.ReplicationController:
 				return true, Convert_v1_ReplicationController_To_api_ReplicationController(a, b, s)
 			}
 		case *api.ReplicationController:
 			switch b := objB.(type) {
-			case *ReplicationController:
+			case *v1.ReplicationController:
 				return true, Convert_api_ReplicationController_To_v1_ReplicationController(a, b, s)
 			}
 
-		case *Node:
+		case *v1.Node:
 			switch b := objB.(type) {
 			case *api.Node:
 				return true, Convert_v1_Node_To_api_Node(a, b, s)
 			}
 		case *api.Node:
 			switch b := objB.(type) {
-			case *Node:
+			case *v1.Node:
 				return true, Convert_api_Node_To_v1_Node(a, b, s)
 			}
 
-		case *Namespace:
+		case *v1.Namespace:
 			switch b := objB.(type) {
 			case *api.Namespace:
 				return true, Convert_v1_Namespace_To_api_Namespace(a, b, s)
 			}
 		case *api.Namespace:
 			switch b := objB.(type) {
-			case *Namespace:
+			case *v1.Namespace:
 				return true, Convert_api_Namespace_To_v1_Namespace(a, b, s)
 			}
 
-		case *Service:
+		case *v1.Service:
 			switch b := objB.(type) {
 			case *api.Service:
 				return true, Convert_v1_Service_To_api_Service(a, b, s)
 			}
 		case *api.Service:
 			switch b := objB.(type) {
-			case *Service:
+			case *v1.Service:
 				return true, Convert_api_Service_To_v1_Service(a, b, s)
 			}
 
-		case *Endpoints:
+		case *v1.Endpoints:
 			switch b := objB.(type) {
 			case *api.Endpoints:
 				return true, Convert_v1_Endpoints_To_api_Endpoints(a, b, s)
 			}
 		case *api.Endpoints:
 			switch b := objB.(type) {
-			case *Endpoints:
+			case *v1.Endpoints:
 				return true, Convert_api_Endpoints_To_v1_Endpoints(a, b, s)
 			}
 
@@ -152,32 +153,6 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		return err
 	}
 
-	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
-	for _, k := range []string{
-		"Endpoints",
-		"ResourceQuota",
-		"PersistentVolumeClaim",
-		"Service",
-		"ServiceAccount",
-		"ConfigMap",
-	} {
-		kind := k // don't close over range variables
-		err = scheme.AddFieldLabelConversionFunc("v1", kind,
-			func(label, value string) (string, string, error) {
-				switch label {
-				case "metadata.namespace",
-					"metadata.name":
-					return label, value, nil
-				default:
-					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
-				}
-			},
-		)
-		if err != nil {
-			return err
-		}
-	}
-
 	// Add field conversion funcs.
 	err = scheme.AddFieldLabelConversionFunc("v1", "Pod",
 		func(label, value string) (string, string, error) {
@@ -186,9 +161,11 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				"metadata.labels",
 				"metadata.name",
 				"metadata.namespace",
+				"metadata.uid",
 				"spec.nodeName",
 				"spec.restartPolicy",
 				"spec.serviceAccountName",
+				"spec.schedulerName",
 				"status.phase",
 				"status.hostIP",
 				"status.podIP":
@@ -233,19 +210,6 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	if err != nil {
 		return err
 	}
-	err = scheme.AddFieldLabelConversionFunc("v1", "PersistentVolume",
-		func(label, value string) (string, string, error) {
-			switch label {
-			case "metadata.name":
-				return label, value, nil
-			default:
-				return "", "", fmt.Errorf("field label not supported: %s", label)
-			}
-		},
-	)
-	if err != nil {
-		return err
-	}
 	if err := AddFieldLabelConversionsForEvent(scheme); err != nil {
 		return err
 	}
@@ -258,7 +222,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	return nil
 }
 
-func Convert_v1_ReplicationController_to_extensions_ReplicaSet(in *ReplicationController, out *extensions.ReplicaSet, s conversion.Scope) error {
+func Convert_v1_ReplicationController_to_extensions_ReplicaSet(in *v1.ReplicationController, out *extensions.ReplicaSet, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_v1_ReplicationControllerSpec_to_extensions_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -269,7 +233,7 @@ func Convert_v1_ReplicationController_to_extensions_ReplicaSet(in *ReplicationCo
 	return nil
 }
 
-func Convert_v1_ReplicationControllerSpec_to_extensions_ReplicaSetSpec(in *ReplicationControllerSpec, out *extensions.ReplicaSetSpec, s conversion.Scope) error {
+func Convert_v1_ReplicationControllerSpec_to_extensions_ReplicaSetSpec(in *v1.ReplicationControllerSpec, out *extensions.ReplicaSetSpec, s conversion.Scope) error {
 	out.Replicas = *in.Replicas
 	if in.Selector != nil {
 		metav1.Convert_map_to_unversioned_LabelSelector(&in.Selector, out.Selector, s)
@@ -282,7 +246,7 @@ func Convert_v1_ReplicationControllerSpec_to_extensions_ReplicaSetSpec(in *Repli
 	return nil
 }
 
-func Convert_v1_ReplicationControllerStatus_to_extensions_ReplicaSetStatus(in *ReplicationControllerStatus, out *extensions.ReplicaSetStatus, s conversion.Scope) error {
+func Convert_v1_ReplicationControllerStatus_to_extensions_ReplicaSetStatus(in *v1.ReplicationControllerStatus, out *extensions.ReplicaSetStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ReadyReplicas = in.ReadyReplicas
@@ -291,7 +255,7 @@ func Convert_v1_ReplicationControllerStatus_to_extensions_ReplicaSetStatus(in *R
 	return nil
 }
 
-func Convert_extensions_ReplicaSet_to_v1_ReplicationController(in *extensions.ReplicaSet, out *ReplicationController, s conversion.Scope) error {
+func Convert_extensions_ReplicaSet_to_v1_ReplicationController(in *extensions.ReplicaSet, out *v1.ReplicationController, s conversion.Scope) error {
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_extensions_ReplicaSetSpec_to_v1_ReplicationControllerSpec(&in.Spec, &out.Spec, s); err != nil {
 		fieldErr, ok := err.(*field.Error)
@@ -301,7 +265,7 @@ func Convert_extensions_ReplicaSet_to_v1_ReplicationController(in *extensions.Re
 		if out.Annotations == nil {
 			out.Annotations = make(map[string]string)
 		}
-		out.Annotations[api.NonConvertibleAnnotationPrefix+"/"+fieldErr.Field] = reflect.ValueOf(fieldErr.BadValue).String()
+		out.Annotations[v1.NonConvertibleAnnotationPrefix+"/"+fieldErr.Field] = reflect.ValueOf(fieldErr.BadValue).String()
 	}
 	if err := Convert_extensions_ReplicaSetStatus_to_v1_ReplicationControllerStatus(&in.Status, &out.Status, s); err != nil {
 		return err
@@ -309,7 +273,7 @@ func Convert_extensions_ReplicaSet_to_v1_ReplicationController(in *extensions.Re
 	return nil
 }
 
-func Convert_extensions_ReplicaSetSpec_to_v1_ReplicationControllerSpec(in *extensions.ReplicaSetSpec, out *ReplicationControllerSpec, s conversion.Scope) error {
+func Convert_extensions_ReplicaSetSpec_to_v1_ReplicationControllerSpec(in *extensions.ReplicaSetSpec, out *v1.ReplicationControllerSpec, s conversion.Scope) error {
 	out.Replicas = new(int32)
 	*out.Replicas = in.Replicas
 	out.MinReadySeconds = in.MinReadySeconds
@@ -317,14 +281,14 @@ func Convert_extensions_ReplicaSetSpec_to_v1_ReplicationControllerSpec(in *exten
 	if in.Selector != nil {
 		invalidErr = metav1.Convert_unversioned_LabelSelector_to_map(in.Selector, &out.Selector, s)
 	}
-	out.Template = new(PodTemplateSpec)
+	out.Template = new(v1.PodTemplateSpec)
 	if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, out.Template, s); err != nil {
 		return err
 	}
 	return invalidErr
 }
 
-func Convert_extensions_ReplicaSetStatus_to_v1_ReplicationControllerStatus(in *extensions.ReplicaSetStatus, out *ReplicationControllerStatus, s conversion.Scope) error {
+func Convert_extensions_ReplicaSetStatus_to_v1_ReplicationControllerStatus(in *extensions.ReplicaSetStatus, out *v1.ReplicationControllerStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
 	out.ReadyReplicas = in.ReadyReplicas
@@ -333,12 +297,12 @@ func Convert_extensions_ReplicaSetStatus_to_v1_ReplicationControllerStatus(in *e
 	return nil
 }
 
-func Convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *api.ReplicationControllerSpec, out *ReplicationControllerSpec, s conversion.Scope) error {
+func Convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *api.ReplicationControllerSpec, out *v1.ReplicationControllerSpec, s conversion.Scope) error {
 	out.Replicas = &in.Replicas
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Selector = in.Selector
 	if in.Template != nil {
-		out.Template = new(PodTemplateSpec)
+		out.Template = new(v1.PodTemplateSpec)
 		if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in.Template, out.Template, s); err != nil {
 			return err
 		}
@@ -348,7 +312,7 @@ func Convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *a
 	return nil
 }
 
-func Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *ReplicationControllerSpec, out *api.ReplicationControllerSpec, s conversion.Scope) error {
+func Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *v1.ReplicationControllerSpec, out *api.ReplicationControllerSpec, s conversion.Scope) error {
 	if in.Replicas != nil {
 		out.Replicas = *in.Replicas
 	}
@@ -365,152 +329,25 @@ func Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *R
 	return nil
 }
 
-func Convert_api_PodStatusResult_To_v1_PodStatusResult(in *api.PodStatusResult, out *PodStatusResult, s conversion.Scope) error {
-	if err := autoConvert_api_PodStatusResult_To_v1_PodStatusResult(in, out, s); err != nil {
-		return err
-	}
-
-	if old := out.Annotations; old != nil {
-		out.Annotations = make(map[string]string, len(old))
-		for k, v := range old {
-			out.Annotations[k] = v
-		}
-	}
-	if len(out.Status.InitContainerStatuses) > 0 {
-		if out.Annotations == nil {
-			out.Annotations = make(map[string]string)
-		}
-		value, err := json.Marshal(out.Status.InitContainerStatuses)
-		if err != nil {
-			return err
-		}
-		out.Annotations[PodInitContainerStatusesAnnotationKey] = string(value)
-		out.Annotations[PodInitContainerStatusesBetaAnnotationKey] = string(value)
-	} else {
-		delete(out.Annotations, PodInitContainerStatusesAnnotationKey)
-		delete(out.Annotations, PodInitContainerStatusesBetaAnnotationKey)
-	}
-	return nil
-}
-
-func Convert_v1_PodStatusResult_To_api_PodStatusResult(in *PodStatusResult, out *api.PodStatusResult, s conversion.Scope) error {
-	// TODO: sometime after we move init container to stable, remove these conversions
-	// If there is a beta annotation, copy to alpha key.
-	// See commit log for PR #31026 for why we do this.
-	if valueBeta, okBeta := in.Annotations[PodInitContainerStatusesBetaAnnotationKey]; okBeta {
-		in.Annotations[PodInitContainerStatusesAnnotationKey] = valueBeta
-	}
-	// Move the annotation to the internal repr. field
-	if value, ok := in.Annotations[PodInitContainerStatusesAnnotationKey]; ok {
-		var values []ContainerStatus
-		if err := json.Unmarshal([]byte(value), &values); err != nil {
-			return err
-		}
-		// Conversion from external to internal version exists more to
-		// satisfy the needs of the decoder than it does to be a general
-		// purpose tool. And Decode always creates an intermediate object
-		// to decode to. Thus the caller of UnsafeConvertToVersion is
-		// taking responsibility to ensure mutation of in is not exposed
-		// back to the caller.
-		in.Status.InitContainerStatuses = values
-	}
-
-	if err := autoConvert_v1_PodStatusResult_To_api_PodStatusResult(in, out, s); err != nil {
-		return err
-	}
-	if len(out.Annotations) > 0 {
-		old := out.Annotations
-		out.Annotations = make(map[string]string, len(old))
-		for k, v := range old {
-			out.Annotations[k] = v
-		}
-		delete(out.Annotations, PodInitContainerStatusesAnnotationKey)
-		delete(out.Annotations, PodInitContainerStatusesBetaAnnotationKey)
-	}
-	return nil
-}
-
-func Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in *api.PodTemplateSpec, out *PodTemplateSpec, s conversion.Scope) error {
+func Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in *api.PodTemplateSpec, out *v1.PodTemplateSpec, s conversion.Scope) error {
 	if err := autoConvert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in, out, s); err != nil {
 		return err
 	}
 
-	// TODO: sometime after we move init container to stable, remove these conversions.
-	if old := out.Annotations; old != nil {
-		out.Annotations = make(map[string]string, len(old))
-		for k, v := range old {
-			out.Annotations[k] = v
-		}
-	}
-	if len(out.Spec.InitContainers) > 0 {
-		if out.Annotations == nil {
-			out.Annotations = make(map[string]string)
-		}
-		value, err := json.Marshal(out.Spec.InitContainers)
-		if err != nil {
-			return err
-		}
-		out.Annotations[PodInitContainersAnnotationKey] = string(value)
-		out.Annotations[PodInitContainersBetaAnnotationKey] = string(value)
-	} else {
-		delete(out.Annotations, PodInitContainersAnnotationKey)
-		delete(out.Annotations, PodInitContainersBetaAnnotationKey)
-	}
 	return nil
 }
 
-func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out *api.PodTemplateSpec, s conversion.Scope) error {
-	// TODO: sometime after we move init container to stable, remove these conversions
-	// If there is a beta annotation, copy to alpha key.
-	// See commit log for PR #31026 for why we do this.
-	if valueBeta, okBeta := in.Annotations[PodInitContainersBetaAnnotationKey]; okBeta {
-		in.Annotations[PodInitContainersAnnotationKey] = valueBeta
-	}
-	// Move the annotation to the internal repr. field
-	if value, ok := in.Annotations[PodInitContainersAnnotationKey]; ok {
-		var values []Container
-		if err := json.Unmarshal([]byte(value), &values); err != nil {
-			return err
-		}
-		// Conversion from external to internal version exists more to
-		// satisfy the needs of the decoder than it does to be a general
-		// purpose tool. And Decode always creates an intermediate object
-		// to decode to. Thus the caller of UnsafeConvertToVersion is
-		// taking responsibility to ensure mutation of in is not exposed
-		// back to the caller.
-		in.Spec.InitContainers = values
-
-		// Call defaulters explicitly until annotations are removed
-		tmpPodTemp := &PodTemplate{
-			Template: PodTemplateSpec{
-				Spec: PodSpec{
-					HostNetwork:    in.Spec.HostNetwork,
-					InitContainers: values,
-				},
-			},
-		}
-		SetObjectDefaults_PodTemplate(tmpPodTemp)
-		in.Spec.InitContainers = tmpPodTemp.Template.Spec.InitContainers
-	}
-
+func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *v1.PodTemplateSpec, out *api.PodTemplateSpec, s conversion.Scope) error {
 	if err := autoConvert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in, out, s); err != nil {
 		return err
 	}
-	if len(out.Annotations) > 0 {
-		old := out.Annotations
-		out.Annotations = make(map[string]string, len(old))
-		for k, v := range old {
-			out.Annotations[k] = v
-		}
-		delete(out.Annotations, PodInitContainersAnnotationKey)
-		delete(out.Annotations, PodInitContainersBetaAnnotationKey)
-	}
+
 	return nil
 }
 
-// The following two PodSpec conversions are done here to support ServiceAccount
+// The following two v1.PodSpec conversions are done here to support v1.ServiceAccount
 // as an alias for ServiceAccountName.
-func Convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversion.Scope) error {
+func Convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *v1.PodSpec, s conversion.Scope) error {
 	if err := autoConvert_api_PodSpec_To_v1_PodSpec(in, out, s); err != nil {
 		return err
 	}
@@ -529,7 +366,7 @@ func Convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *PodSpec, s conversi
 	return nil
 }
 
-func Convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversion.Scope) error {
+func Convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s conversion.Scope) error {
 	if err := autoConvert_v1_PodSpec_To_api_PodSpec(in, out, s); err != nil {
 		return err
 	}
@@ -552,110 +389,29 @@ func Convert_v1_PodSpec_To_api_PodSpec(in *PodSpec, out *api.PodSpec, s conversi
 	return nil
 }
 
-func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error {
+func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *v1.Pod, s conversion.Scope) error {
 	if err := autoConvert_api_Pod_To_v1_Pod(in, out, s); err != nil {
 		return err
 	}
 
-	// TODO: sometime after we move init container to stable, remove these conversions
-	if len(out.Spec.InitContainers) > 0 || len(out.Status.InitContainerStatuses) > 0 {
-		old := out.Annotations
-		out.Annotations = make(map[string]string, len(old))
-		for k, v := range old {
-			out.Annotations[k] = v
-		}
-		delete(out.Annotations, PodInitContainersAnnotationKey)
-		delete(out.Annotations, PodInitContainersBetaAnnotationKey)
-		delete(out.Annotations, PodInitContainerStatusesAnnotationKey)
-		delete(out.Annotations, PodInitContainerStatusesBetaAnnotationKey)
-	}
-	if len(out.Spec.InitContainers) > 0 {
-		value, err := json.Marshal(out.Spec.InitContainers)
-		if err != nil {
-			return err
-		}
-		out.Annotations[PodInitContainersAnnotationKey] = string(value)
-		out.Annotations[PodInitContainersBetaAnnotationKey] = string(value)
-	}
-	if len(out.Status.InitContainerStatuses) > 0 {
-		value, err := json.Marshal(out.Status.InitContainerStatuses)
-		if err != nil {
-			return err
-		}
-		out.Annotations[PodInitContainerStatusesAnnotationKey] = string(value)
-		out.Annotations[PodInitContainerStatusesBetaAnnotationKey] = string(value)
-	}
-
-	return nil
-}
-
-func Convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error {
-	// If there is a beta annotation, copy to alpha key.
-	// See commit log for PR #31026 for why we do this.
-	if valueBeta, okBeta := in.Annotations[PodInitContainersBetaAnnotationKey]; okBeta {
-		in.Annotations[PodInitContainersAnnotationKey] = valueBeta
-	}
-	// TODO: sometime after we move init container to stable, remove these conversions
-	// Move the annotation to the internal repr. field
-	if value, ok := in.Annotations[PodInitContainersAnnotationKey]; ok {
-		var values []Container
-		if err := json.Unmarshal([]byte(value), &values); err != nil {
-			return err
-		}
-		// Conversion from external to internal version exists more to
-		// satisfy the needs of the decoder than it does to be a general
-		// purpose tool. And Decode always creates an intermediate object
-		// to decode to. Thus the caller of UnsafeConvertToVersion is
-		// taking responsibility to ensure mutation of in is not exposed
-		// back to the caller.
-		in.Spec.InitContainers = values
-		// Call defaulters explicitly until annotations are removed
-		tmpPod := &Pod{
-			Spec: PodSpec{
-				HostNetwork:    in.Spec.HostNetwork,
-				InitContainers: values,
-			},
-		}
-		SetObjectDefaults_Pod(tmpPod)
-		in.Spec.InitContainers = tmpPod.Spec.InitContainers
-	}
-	// If there is a beta annotation, copy to alpha key.
-	// See commit log for PR #31026 for why we do this.
-	if valueBeta, okBeta := in.Annotations[PodInitContainerStatusesBetaAnnotationKey]; okBeta {
-		in.Annotations[PodInitContainerStatusesAnnotationKey] = valueBeta
-	}
-	if value, ok := in.Annotations[PodInitContainerStatusesAnnotationKey]; ok {
-		var values []ContainerStatus
-		if err := json.Unmarshal([]byte(value), &values); err != nil {
-			return err
-		}
-		// Conversion from external to internal version exists more to
-		// satisfy the needs of the decoder than it does to be a general
-		// purpose tool. And Decode always creates an intermediate object
-		// to decode to. Thus the caller of UnsafeConvertToVersion is
-		// taking responsibility to ensure mutation of in is not exposed
-		// back to the caller.
-		in.Status.InitContainerStatuses = values
-	}
-
-	if err := autoConvert_v1_Pod_To_api_Pod(in, out, s); err != nil {
-		return err
-	}
+	// drop init container annotations so they don't take effect on legacy kubelets.
+	// remove this once the oldest supported kubelet no longer honors the annotations over the field.
 	if len(out.Annotations) > 0 {
 		old := out.Annotations
 		out.Annotations = make(map[string]string, len(old))
 		for k, v := range old {
 			out.Annotations[k] = v
 		}
-		delete(out.Annotations, PodInitContainersAnnotationKey)
-		delete(out.Annotations, PodInitContainersBetaAnnotationKey)
-		delete(out.Annotations, PodInitContainerStatusesAnnotationKey)
-		delete(out.Annotations, PodInitContainerStatusesBetaAnnotationKey)
+		delete(out.Annotations, "pod.beta.kubernetes.io/init-containers")
+		delete(out.Annotations, "pod.alpha.kubernetes.io/init-containers")
+		delete(out.Annotations, "pod.beta.kubernetes.io/init-container-statuses")
+		delete(out.Annotations, "pod.alpha.kubernetes.io/init-container-statuses")
 	}
+
 	return nil
 }
 
-func Convert_v1_Secret_To_api_Secret(in *Secret, out *api.Secret, s conversion.Scope) error {
+func Convert_v1_Secret_To_api_Secret(in *v1.Secret, out *api.Secret, s conversion.Scope) error {
 	if err := autoConvert_v1_Secret_To_api_Secret(in, out, s); err != nil {
 		return err
 	}
@@ -672,11 +428,35 @@ func Convert_v1_Secret_To_api_Secret(in *Secret, out *api.Secret, s conversion.S
 
 	return nil
 }
+func Convert_api_SecurityContext_To_v1_SecurityContext(in *api.SecurityContext, out *v1.SecurityContext, s conversion.Scope) error {
+	if in.Capabilities != nil {
+		out.Capabilities = new(v1.Capabilities)
+		if err := Convert_api_Capabilities_To_v1_Capabilities(in.Capabilities, out.Capabilities, s); err != nil {
+			return err
+		}
+	} else {
+		out.Capabilities = nil
+	}
+	out.Privileged = in.Privileged
+	if in.SELinuxOptions != nil {
+		out.SELinuxOptions = new(v1.SELinuxOptions)
+		if err := Convert_api_SELinuxOptions_To_v1_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
+			return err
+		}
+	} else {
+		out.SELinuxOptions = nil
+	}
+	out.RunAsUser = in.RunAsUser
+	out.RunAsNonRoot = in.RunAsNonRoot
+	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
+	out.AllowPrivilegeEscalation = in.AllowPrivilegeEscalation
+	return nil
+}
 
-func Convert_api_PodSecurityContext_To_v1_PodSecurityContext(in *api.PodSecurityContext, out *PodSecurityContext, s conversion.Scope) error {
+func Convert_api_PodSecurityContext_To_v1_PodSecurityContext(in *api.PodSecurityContext, out *v1.PodSecurityContext, s conversion.Scope) error {
 	out.SupplementalGroups = in.SupplementalGroups
 	if in.SELinuxOptions != nil {
-		out.SELinuxOptions = new(SELinuxOptions)
+		out.SELinuxOptions = new(v1.SELinuxOptions)
 		if err := Convert_api_SELinuxOptions_To_v1_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
 			return err
 		}
@@ -689,7 +469,7 @@ func Convert_api_PodSecurityContext_To_v1_PodSecurityContext(in *api.PodSecurity
 	return nil
 }
 
-func Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in *PodSecurityContext, out *api.PodSecurityContext, s conversion.Scope) error {
+func Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in *v1.PodSecurityContext, out *api.PodSecurityContext, s conversion.Scope) error {
 	out.SupplementalGroups = in.SupplementalGroups
 	if in.SELinuxOptions != nil {
 		out.SELinuxOptions = new(api.SELinuxOptions)
@@ -706,7 +486,7 @@ func Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in *PodSecurityCont
 }
 
 // +k8s:conversion-fn=copy-only
-func Convert_v1_ResourceList_To_api_ResourceList(in *ResourceList, out *api.ResourceList, s conversion.Scope) error {
+func Convert_v1_ResourceList_To_api_ResourceList(in *v1.ResourceList, out *api.ResourceList, s conversion.Scope) error {
 	if *in == nil {
 		return nil
 	}

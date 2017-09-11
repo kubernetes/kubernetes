@@ -21,11 +21,11 @@ import (
 	"os"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/fake"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -39,7 +39,7 @@ func TestCanSupport(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/fc")
 	if err != nil {
@@ -61,7 +61,7 @@ func TestGetAccessModes(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/fc")
 	if err != nil {
@@ -100,18 +100,18 @@ func (fake *fakeDiskManager) Cleanup() {
 func (fake *fakeDiskManager) MakeGlobalPDName(disk fcDisk) string {
 	return fake.tmpDir
 }
-func (fake *fakeDiskManager) AttachDisk(b fcDiskMounter) error {
+func (fake *fakeDiskManager) AttachDisk(b fcDiskMounter) (string, error) {
 	globalPath := b.manager.MakeGlobalPDName(*b.fcDisk)
 	err := os.MkdirAll(globalPath, 0750)
 	if err != nil {
-		return err
+		return "", err
 	}
 	// Simulate the global mount so that the fakeMounter returns the
 	// expected number of mounts for the attached disk.
 	b.mounter.Mount(globalPath, globalPath, b.fsType, nil)
 
 	fake.attachCalled = true
-	return nil
+	return "", nil
 }
 
 func (fake *fakeDiskManager) DetachDisk(c fcDiskUnmounter, mntPath string) error {
@@ -132,7 +132,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	defer os.RemoveAll(tmpDir)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/fc")
 	if err != nil {
@@ -141,7 +141,8 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	fakeManager := NewFakeDiskManager()
 	defer fakeManager.Cleanup()
 	fakeMounter := &mount.FakeMounter{}
-	mounter, err := plug.(*fcPlugin).newMounterInternal(spec, types.UID("poduid"), fakeManager, fakeMounter)
+	fakeExec := mount.NewFakeExec(nil)
+	mounter, err := plug.(*fcPlugin).newMounterInternal(spec, types.UID("poduid"), fakeManager, fakeMounter, fakeExec)
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
@@ -172,9 +173,6 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
-	if !fakeManager.attachCalled {
-		t.Errorf("Attach was not called")
-	}
 
 	fakeManager2 := NewFakeDiskManager()
 	defer fakeManager2.Cleanup()
@@ -194,8 +192,32 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	} else if !os.IsNotExist(err) {
 		t.Errorf("SetUp() failed: %v", err)
 	}
-	if !fakeManager2.detachCalled {
-		t.Errorf("Detach was not called")
+}
+
+func doTestPluginNilMounter(t *testing.T, spec *volume.Spec) {
+	tmpDir, err := utiltesting.MkTmpdir("fc_test")
+	if err != nil {
+		t.Fatalf("error creating temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/fc")
+	if err != nil {
+		t.Errorf("Can't find the plugin by name")
+	}
+	fakeManager := NewFakeDiskManager()
+	defer fakeManager.Cleanup()
+	fakeMounter := &mount.FakeMounter{}
+	fakeExec := mount.NewFakeExec(nil)
+	mounter, err := plug.(*fcPlugin).newMounterInternal(spec, types.UID("poduid"), fakeManager, fakeMounter, fakeExec)
+	if err == nil {
+		t.Errorf("Error failed to make a new Mounter is expected: %v", err)
+	}
+	if mounter != nil {
+		t.Errorf("A nil Mounter is expected: %v", err)
 	}
 }
 
@@ -205,7 +227,7 @@ func TestPluginVolume(t *testing.T) {
 		Name: "vol1",
 		VolumeSource: v1.VolumeSource{
 			FC: &v1.FCVolumeSource{
-				TargetWWNs: []string{"some_wwn"},
+				TargetWWNs: []string{"500a0981891b8dc5"},
 				FSType:     "ext4",
 				Lun:        &lun,
 			},
@@ -223,7 +245,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				FC: &v1.FCVolumeSource{
-					TargetWWNs: []string{"some_wwn"},
+					TargetWWNs: []string{"500a0981891b8dc5"},
 					FSType:     "ext4",
 					Lun:        &lun,
 				},
@@ -231,6 +253,64 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 	}
 	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false))
+}
+
+func TestPluginVolumeWWIDs(t *testing.T) {
+	vol := &v1.Volume{
+		Name: "vol1",
+		VolumeSource: v1.VolumeSource{
+			FC: &v1.FCVolumeSource{
+				WWIDs:  []string{"3600508b400105e210000900000490000"},
+				FSType: "ext4",
+			},
+		},
+	}
+	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+}
+
+func TestPluginPersistentVolumeWWIDs(t *testing.T) {
+	vol := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "vol1",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				FC: &v1.FCVolumeSource{
+					WWIDs:  []string{"3600508b400105e21 000900000490000"},
+					FSType: "ext4",
+				},
+			},
+		},
+	}
+	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false))
+}
+
+func TestPluginVolumeNoDiskInfo(t *testing.T) {
+	vol := &v1.Volume{
+		Name: "vol1",
+		VolumeSource: v1.VolumeSource{
+			FC: &v1.FCVolumeSource{
+				FSType: "ext4",
+			},
+		},
+	}
+	doTestPluginNilMounter(t, volume.NewSpecFromVolume(vol))
+}
+
+func TestPluginPersistentVolumeNoDiskInfo(t *testing.T) {
+	vol := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "vol1",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				FC: &v1.FCVolumeSource{
+					FSType: "ext4",
+				},
+			},
+		},
+	}
+	doTestPluginNilMounter(t, volume.NewSpecFromPersistentVolume(vol, false))
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
@@ -275,13 +355,16 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	client := fake.NewSimpleClientset(pv, claim)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, client, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, client, nil))
 	plug, _ := plugMgr.FindPluginByName(fcPluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
 	spec := volume.NewSpecFromPersistentVolume(pv, true)
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, _ := plug.NewMounter(spec, pod, volume.VolumeOptions{})
+	if mounter == nil {
+		t.Fatalf("Got a nil Mounter")
+	}
 
 	if !mounter.GetAttributes().ReadOnly {
 		t.Errorf("Expected true for mounter.IsReadOnly")

@@ -32,8 +32,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
-	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/client-go/tools/remotecommand"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 )
@@ -101,7 +101,7 @@ var DefaultConfig = Config{
 	SupportedPortForwardProtocols:   portforward.SupportedProtocols,
 }
 
-// TODO(timstclair): Add auth(n/z) interface & handling.
+// TODO(tallclair): Add auth(n/z) interface & handling.
 func NewServer(config Config, runtime Runtime) (Server, error) {
 	s := &server{
 		config:  config,
@@ -141,6 +141,11 @@ func NewServer(config Config, runtime Runtime) (Server, error) {
 	handler := restful.NewContainer()
 	handler.Add(ws)
 	s.handler = handler
+	s.server = &http.Server{
+		Addr:      s.config.Addr,
+		Handler:   s.handler,
+		TLSConfig: s.config.TLSConfig,
+	}
 
 	return s, nil
 }
@@ -150,6 +155,7 @@ type server struct {
 	runtime *criAdapter
 	handler http.Handler
 	cache   *requestCache
+	server  *http.Server
 }
 
 func (s *server) GetExec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
@@ -193,25 +199,19 @@ func (s *server) GetPortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi
 
 func (s *server) Start(stayUp bool) error {
 	if !stayUp {
-		// TODO(timstclair): Implement this.
+		// TODO(tallclair): Implement this.
 		return errors.New("stayUp=false is not yet implemented")
 	}
 
-	server := &http.Server{
-		Addr:      s.config.Addr,
-		Handler:   s.handler,
-		TLSConfig: s.config.TLSConfig,
-	}
 	if s.config.TLSConfig != nil {
-		return server.ListenAndServeTLS("", "") // Use certs from TLSConfig.
+		return s.server.ListenAndServeTLS("", "") // Use certs from TLSConfig.
 	} else {
-		return server.ListenAndServe()
+		return s.server.ListenAndServe()
 	}
 }
 
 func (s *server) Stop() error {
-	// TODO(timstclair): Implement this.
-	return errors.New("not yet implemented")
+	return s.server.Close()
 }
 
 func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {

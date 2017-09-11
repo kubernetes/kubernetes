@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -10,7 +8,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["doc.go"],
-    tags = ["automanaged"],
 )
 
 filegroup(
@@ -24,6 +21,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//plugin/pkg/auth/authorizer/node:all-srcs",
         "//plugin/pkg/auth/authorizer/rbac:all-srcs",
     ],
     tags = ["automanaged"],

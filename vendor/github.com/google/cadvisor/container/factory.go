@@ -48,6 +48,7 @@ const (
 	DiskUsageMetrics       MetricKind = "disk"
 	NetworkUsageMetrics    MetricKind = "network"
 	NetworkTcpUsageMetrics MetricKind = "tcp"
+	NetworkUdpUsageMetrics MetricKind = "udp"
 	AppMetrics             MetricKind = "app"
 )
 

@@ -272,13 +272,15 @@ var (
 func (p *Decoder) typeForElement(val reflect.Value, start *StartElement) reflect.Type {
 	t := ""
 	for i, a := range start.Attr {
-		if a.Name == xmlSchemaInstance {
+		if a.Name == xmlSchemaInstance || a.Name == xsiType {
 			t = a.Value
 			// HACK: ensure xsi:type is last in the list to avoid using that value for
 			// a "type" attribute, such as ManagedObjectReference.Type for example.
 			// Note that xsi:type is already the last attribute in VC/ESX responses.
 			// This is only an issue with govmomi simulator generated responses.
 			// Proper fix will require finding a few needles in this xml package haystack.
+			// Note: govmomi uses xmlSchemaInstance, other clients (e.g. rbvmomi) use xsiType.
+			// They are the same thing to XML parsers, but not to this hack here.
 			x := len(start.Attr) - 1
 			if i != x {
 				start.Attr[i] = start.Attr[x]

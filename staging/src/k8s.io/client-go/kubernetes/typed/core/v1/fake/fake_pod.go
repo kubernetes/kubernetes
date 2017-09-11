@@ -17,12 +17,12 @@ limitations under the License.
 package fake
 
 import (
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	core_v1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	v1 "k8s.io/client-go/pkg/api/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -36,63 +36,21 @@ var podsResource = schema.GroupVersionResource{Group: "", Version: "v1", Resourc
 
 var podsKind = schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}
 
-func (c *FakePods) Create(pod *v1.Pod) (result *v1.Pod, err error) {
+// Get takes name of the pod, and returns the corresponding pod object, and an error if there is any.
+func (c *FakePods) Get(name string, options v1.GetOptions) (result *core_v1.Pod, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(podsResource, c.ns, pod), &v1.Pod{})
+		Invokes(testing.NewGetAction(podsResource, c.ns, name), &core_v1.Pod{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1.Pod), err
+	return obj.(*core_v1.Pod), err
 }
 
-func (c *FakePods) Update(pod *v1.Pod) (result *v1.Pod, err error) {
+// List takes label and field selectors, and returns the list of Pods that match those selectors.
+func (c *FakePods) List(opts v1.ListOptions) (result *core_v1.PodList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(podsResource, c.ns, pod), &v1.Pod{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1.Pod), err
-}
-
-func (c *FakePods) UpdateStatus(pod *v1.Pod) (*v1.Pod, error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(podsResource, "status", c.ns, pod), &v1.Pod{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1.Pod), err
-}
-
-func (c *FakePods) Delete(name string, options *meta_v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(podsResource, c.ns, name), &v1.Pod{})
-
-	return err
-}
-
-func (c *FakePods) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(podsResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &v1.PodList{})
-	return err
-}
-
-func (c *FakePods) Get(name string, options meta_v1.GetOptions) (result *v1.Pod, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(podsResource, c.ns, name), &v1.Pod{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1.Pod), err
-}
-
-func (c *FakePods) List(opts meta_v1.ListOptions) (result *v1.PodList, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewListAction(podsResource, podsKind, c.ns, opts), &v1.PodList{})
+		Invokes(testing.NewListAction(podsResource, podsKind, c.ns, opts), &core_v1.PodList{})
 
 	if obj == nil {
 		return nil, err
@@ -102,8 +60,8 @@ func (c *FakePods) List(opts meta_v1.ListOptions) (result *v1.PodList, err error
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &v1.PodList{}
-	for _, item := range obj.(*v1.PodList).Items {
+	list := &core_v1.PodList{}
+	for _, item := range obj.(*core_v1.PodList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -112,19 +70,69 @@ func (c *FakePods) List(opts meta_v1.ListOptions) (result *v1.PodList, err error
 }
 
 // Watch returns a watch.Interface that watches the requested pods.
-func (c *FakePods) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *FakePods) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(podsResource, c.ns, opts))
 
 }
 
-// Patch applies the patch and returns the patched pod.
-func (c *FakePods) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Pod, err error) {
+// Create takes the representation of a pod and creates it.  Returns the server's representation of the pod, and an error, if there is any.
+func (c *FakePods) Create(pod *core_v1.Pod) (result *core_v1.Pod, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podsResource, c.ns, name, data, subresources...), &v1.Pod{})
+		Invokes(testing.NewCreateAction(podsResource, c.ns, pod), &core_v1.Pod{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*v1.Pod), err
+	return obj.(*core_v1.Pod), err
+}
+
+// Update takes the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
+func (c *FakePods) Update(pod *core_v1.Pod) (result *core_v1.Pod, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(podsResource, c.ns, pod), &core_v1.Pod{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*core_v1.Pod), err
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakePods) UpdateStatus(pod *core_v1.Pod) (*core_v1.Pod, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(podsResource, "status", c.ns, pod), &core_v1.Pod{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*core_v1.Pod), err
+}
+
+// Delete takes name of the pod and deletes it. Returns an error if one occurs.
+func (c *FakePods) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(podsResource, c.ns, name), &core_v1.Pod{})
+
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakePods) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(podsResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &core_v1.PodList{})
+	return err
+}
+
+// Patch applies the patch and returns the patched pod.
+func (c *FakePods) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core_v1.Pod, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(podsResource, c.ns, name, data, subresources...), &core_v1.Pod{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*core_v1.Pod), err
 }

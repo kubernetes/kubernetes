@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 var (
@@ -57,6 +57,7 @@ func NewCmdExplain(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().Bool("recursive", false, "Print the fields of fields (Currently only 1 level deep)")
+	cmd.Flags().String("api-version", "", "Get different explanations for particular API version")
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
 }
@@ -64,11 +65,11 @@ func NewCmdExplain(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 // RunExplain executes the appropriate steps to print a model's documentation
 func RunExplain(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
-		fmt.Fprint(cmdErr, "You must specify the type of resource to explain. ", validResources)
-		return cmdutil.UsageError(cmd, "Required resource not specified.")
+		fmt.Fprintf(cmdErr, "You must specify the type of resource to explain. %s\n", validResources)
+		return cmdutil.UsageErrorf(cmd, "Required resource not specified.")
 	}
 	if len(args) > 1 {
-		return cmdutil.UsageError(cmd, "We accept only this format: explain RESOURCE")
+		return cmdutil.UsageErrorf(cmd, "We accept only this format: explain RESOURCE")
 	}
 
 	recursive := cmdutil.GetFlagBool(cmd, "recursive")

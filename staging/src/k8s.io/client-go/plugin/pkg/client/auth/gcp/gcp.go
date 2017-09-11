@@ -30,6 +30,7 @@ import (
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/jsonpath"
@@ -124,10 +125,7 @@ func newGCPAuthProvider(_ string, gcpConfig map[string]string, persister restcli
 }
 
 func (g *gcpAuthProvider) WrapTransport(rt http.RoundTripper) http.RoundTripper {
-	return &oauth2.Transport{
-		Source: g.tokenSource,
-		Base:   rt,
-	}
+	return &conditionalTransport{&oauth2.Transport{Source: g.tokenSource, Base: rt}, g.persister}
 }
 
 func (g *gcpAuthProvider) Login() error { return nil }
@@ -284,3 +282,32 @@ func parseJSONPath(input interface{}, name, template string) (string, error) {
 	}
 	return buf.String(), nil
 }
+
+type conditionalTransport struct {
+	oauthTransport *oauth2.Transport
+	persister      restclient.AuthProviderConfigPersister
+}
+
+var _ net.RoundTripperWrapper = &conditionalTransport{}
+
+func (t *conditionalTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if len(req.Header.Get("Authorization")) != 0 {
+		return t.oauthTransport.Base.RoundTrip(req)
+	}
+
+	res, err := t.oauthTransport.RoundTrip(req)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if res.StatusCode == 401 {
+		glog.V(4).Infof("The credentials that were supplied are invalid for the target cluster")
+		emptyCache := make(map[string]string)
+		t.persister.Persist(emptyCache)
+	}
+
+	return res, nil
+}
+
+func (t *conditionalTransport) WrappedRoundTripper() http.RoundTripper { return t.oauthTransport.Base }

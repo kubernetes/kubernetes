@@ -5,7 +5,7 @@
 // +build ignore
 
 /*
-Input to cgo -godefs.  See also mkerrors.sh and mkall.sh
+Input to cgo -godefs.  See README.md
 */
 
 // +godefs map struct_in_addr [4]byte /* in_addr */
@@ -21,6 +21,7 @@ package unix
 #include <termios.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <sys/capability.h>
 #include <sys/event.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
@@ -130,7 +131,10 @@ struct if_data8 {
 	u_long  ifi_iqdrops;
 	u_long  ifi_noproto;
 	u_long  ifi_hwassist;
+// FIXME: these are now unions, so maybe need to change definitions?
+#undef ifi_epoch
 	time_t  ifi_epoch;
+#undef ifi_lastchange
 	struct  timeval ifi_lastchange;
 };
 
@@ -351,3 +355,18 @@ type BpfZbufHeader C.struct_bpf_zbuf_header
 // Terminal handling
 
 type Termios C.struct_termios
+
+type Winsize C.struct_winsize
+
+// fchmodat-like syscalls.
+
+const (
+	AT_FDCWD            = C.AT_FDCWD
+	AT_REMOVEDIR        = C.AT_REMOVEDIR
+	AT_SYMLINK_FOLLOW   = C.AT_SYMLINK_FOLLOW
+	AT_SYMLINK_NOFOLLOW = C.AT_SYMLINK_NOFOLLOW
+)
+
+// Capabilities
+
+type CapRights C.struct_cap_rights

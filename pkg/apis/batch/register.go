@@ -51,7 +51,5 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&CronJob{},
 		&CronJobList{},
 	)
-	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("ScheduledJob"), &CronJob{})
-	scheme.AddKnownTypeWithName(SchemeGroupVersion.WithKind("ScheduledJobList"), &CronJobList{})
 	return nil
 }

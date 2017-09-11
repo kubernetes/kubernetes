@@ -1,3 +1,5 @@
+// +build windows
+
 package winio
 
 import (
@@ -11,17 +13,12 @@ import (
 )
 
 //sys connectNamedPipe(pipe syscall.Handle, o *syscall.Overlapped) (err error) = ConnectNamedPipe
-//sys createNamedPipe(name string, flags uint32, pipeMode uint32, maxInstances uint32, outSize uint32, inSize uint32, defaultTimeout uint32, sa *securityAttributes) (handle syscall.Handle, err error)  [failretval==syscall.InvalidHandle] = CreateNamedPipeW
-//sys createFile(name string, access uint32, mode uint32, sa *securityAttributes, createmode uint32, attrs uint32, templatefile syscall.Handle) (handle syscall.Handle, err error) [failretval==syscall.InvalidHandle] = CreateFileW
+//sys createNamedPipe(name string, flags uint32, pipeMode uint32, maxInstances uint32, outSize uint32, inSize uint32, defaultTimeout uint32, sa *syscall.SecurityAttributes) (handle syscall.Handle, err error)  [failretval==syscall.InvalidHandle] = CreateNamedPipeW
+//sys createFile(name string, access uint32, mode uint32, sa *syscall.SecurityAttributes, createmode uint32, attrs uint32, templatefile syscall.Handle) (handle syscall.Handle, err error) [failretval==syscall.InvalidHandle] = CreateFileW
 //sys waitNamedPipe(name string, timeout uint32) (err error) = WaitNamedPipeW
 //sys getNamedPipeInfo(pipe syscall.Handle, flags *uint32, outSize *uint32, inSize *uint32, maxInstances *uint32) (err error) = GetNamedPipeInfo
 //sys getNamedPipeHandleState(pipe syscall.Handle, state *uint32, curInstances *uint32, maxCollectionCount *uint32, collectDataTimeout *uint32, userName *uint16, maxUserNameSize uint32) (err error) = GetNamedPipeHandleStateW
-
-type securityAttributes struct {
-	Length             uint32
-	SecurityDescriptor *byte
-	InheritHandle      uint32
-}
+//sys localAlloc(uFlags uint32, length uint32) (ptr uintptr) = LocalAlloc
 
 const (
 	cERROR_PIPE_BUSY      = syscall.Errno(231)
@@ -85,7 +82,11 @@ func (f *win32MessageBytePipe) CloseWrite() error {
 	if f.writeClosed {
 		return errPipeWriteClosed
 	}
-	_, err := f.win32File.Write(nil)
+	err := f.win32File.Flush()
+	if err != nil {
+		return err
+	}
+	_, err = f.win32File.Write(nil)
 	if err != nil {
 		return err
 	}
@@ -225,12 +226,15 @@ func makeServerPipeHandle(path string, securityDescriptor []byte, c *PipeConfig,
 		mode |= cPIPE_TYPE_MESSAGE
 	}
 
-	var sa securityAttributes
-	sa.Length = uint32(unsafe.Sizeof(sa))
+	sa := &syscall.SecurityAttributes{}
+	sa.Length = uint32(unsafe.Sizeof(*sa))
 	if securityDescriptor != nil {
-		sa.SecurityDescriptor = &securityDescriptor[0]
+		len := uint32(len(securityDescriptor))
+		sa.SecurityDescriptor = localAlloc(0, len)
+		defer localFree(sa.SecurityDescriptor)
+		copy((*[0xffff]byte)(unsafe.Pointer(sa.SecurityDescriptor))[:], securityDescriptor)
 	}
-	h, err := createNamedPipe(path, flags, mode, cPIPE_UNLIMITED_INSTANCES, uint32(c.OutputBufferSize), uint32(c.InputBufferSize), 0, &sa)
+	h, err := createNamedPipe(path, flags, mode, cPIPE_UNLIMITED_INSTANCES, uint32(c.OutputBufferSize), uint32(c.InputBufferSize), 0, sa)
 	if err != nil {
 		return 0, &os.PathError{Op: "open", Path: path, Err: err}
 	}
@@ -356,8 +360,10 @@ func connectPipe(p *win32File) error {
 	if err != nil {
 		return err
 	}
+	defer p.wg.Done()
+
 	err = connectNamedPipe(p.handle, &c.o)
-	_, err = p.asyncIo(c, time.Time{}, 0, err)
+	_, err = p.asyncIo(c, nil, 0, err)
 	if err != nil && err != cERROR_PIPE_CONNECTED {
 		return err
 	}
