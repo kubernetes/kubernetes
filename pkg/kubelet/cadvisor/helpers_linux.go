@@ -40,9 +40,8 @@ func (i *imageFsInfoProvider) ImageFsInfoLabel() (string, error) {
 	case "rkt":
 		return cadvisorfs.LabelRktImages, nil
 	case "remote":
-		// TODO: pending rebase including https://github.com/google/cadvisor/pull/1741
 		if i.runtimeEndpoint == "/var/run/crio.sock" {
-			return "crio-images", nil
+			return cadvisorfs.LabelCrioImages, nil
 		}
 	}
 	return "", fmt.Errorf("no imagefs label for configured runtime")
