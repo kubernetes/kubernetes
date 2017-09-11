@@ -1,12 +1,9 @@
 /*
 Copyright 2015 The Kubernetes Authors.
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
     http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -89,10 +86,10 @@ func UnmountPath(mountPath string, mounter mount.Interface) error {
 // IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
 // IsNotMountPoint is more expensive but properly handles bind mounts.
 func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool) error {
-	isConnectionError := false
+	isStaleConnection := false
 	if pathExists, pathErr := PathExists(mountPath); pathErr != nil {
-		isConnectionError = IsConnectionError(pathErr)
-		if !isConnectionError {
+		isStaleConnection = IsStaleConnection(pathErr)
+		if !isStaleConnection {
 			return fmt.Errorf("Error checking if path exists: %v", pathErr)
 		}
 	} else if !pathExists {
@@ -102,7 +99,7 @@ func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMount
 
 	var notMnt bool
 	var err error
-	if !isConnectionError {
+	if !isStaleConnection {
 		if extensiveMountPointCheck {
 			notMnt, err = mount.IsNotMountPoint(mounter, mountPath)
 		} else {
@@ -142,14 +139,14 @@ func PathExists(path string) (bool, error) {
 		return true, nil
 	} else if os.IsNotExist(err) {
 		return false, nil
-	}else if IsConnectionError(err) {
+	}else if IsStaleConnection(err) {
 		return true, err
 	}else {
 		return false, err
 	}
 }
 
-func IsConnectionError(err error) bool {
+func IsStaleConnection(err error) bool {
 	switch pe := err.(type) {
 	case nil:
 		return false
