@@ -2496,6 +2496,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	invalidSeccompDefault.Annotations = map[string]string{
 		seccomp.DefaultProfileAnnotationKey: "not-good",
 	}
+	invalidSeccompAllowAnyDefault := validPSP()
+	invalidSeccompAllowAnyDefault.Annotations = map[string]string{
+		seccomp.DefaultProfileAnnotationKey: "*",
+	}
 	invalidSeccompAllowed := validPSP()
 	invalidSeccompAllowed.Annotations = map[string]string{
 		seccomp.AllowedProfilesAnnotationKey: "docker/default,not-good",
@@ -2616,6 +2620,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "must be a valid seccomp profile",
 		},
+		"invalid seccomp allow any default profile": {
+			psp:         invalidSeccompAllowAnyDefault,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "must be a valid seccomp profile",
+		},
 		"invalid seccomp allowed profile": {
 			psp:         invalidSeccompAllowed,
 			errorType:   field.ErrorTypeInvalid,
@@ -2707,7 +2716,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	validSeccomp := validPSP()
 	validSeccomp.Annotations = map[string]string{
 		seccomp.DefaultProfileAnnotationKey:  "docker/default",
-		seccomp.AllowedProfilesAnnotationKey: "docker/default,unconfined,localhost/foo",
+		seccomp.AllowedProfilesAnnotationKey: "docker/default,unconfined,localhost/foo,*",
 	}
 
 	validDefaultAllowPrivilegeEscalation := validPSP()
