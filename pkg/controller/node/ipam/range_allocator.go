@@ -39,15 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/node/util"
 )
 
-// TODO: figure out the good setting for those constants.
-const (
-	// controls how many NodeSpec updates NC can process concurrently.
-	cidrUpdateWorkers   = 10
-	cidrUpdateQueueSize = 5000
-	// podCIDRUpdateRetry controls the number of retries of writing Node.Spec.PodCIDR update.
-	podCIDRUpdateRetry = 5
-)
-
 type rangeAllocator struct {
 	client      clientset.Interface
 	cidrs       *cidrset.CidrSet
@@ -227,7 +218,7 @@ func (r *rangeAllocator) updateCIDRAllocation(data nodeAndCIDR) error {
 	var err error
 	var node *v1.Node
 	defer r.removeNodeFromProcessing(data.nodeName)
-	for rep := 0; rep < podCIDRUpdateRetry; rep++ {
+	for rep := 0; rep < cidrUpdateRetries; rep++ {
 		// TODO: change it to using PATCH instead of full Node updates.
 		node, err = r.client.Core().Nodes().Get(data.nodeName, metav1.GetOptions{})
 		if err != nil {
@@ -247,7 +238,7 @@ func (r *rangeAllocator) updateCIDRAllocation(data nodeAndCIDR) error {
 		}
 		node.Spec.PodCIDR = data.cidr.String()
 		if _, err := r.client.Core().Nodes().Update(node); err != nil {
-			glog.Errorf("Failed while updating Node.Spec.PodCIDR (%d retries left): %v", podCIDRUpdateRetry-rep-1, err)
+			glog.Errorf("Failed while updating Node.Spec.PodCIDR (%d retries left): %v", cidrUpdateRetries-rep-1, err)
 		} else {
 			break
 		}
