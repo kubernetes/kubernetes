@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
+	"k8s.io/kubernetes/pkg/master/reconcilers"
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
@@ -75,6 +76,7 @@ func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, informers.SharedI
 			APIResourceConfigSource: DefaultAPIResourceConfigSource(),
 			APIServerServicePort:    443,
 			MasterCount:             1,
+			EndpointReconcilerType:  reconcilers.MasterCountReconcilerType,
 		},
 	}
 

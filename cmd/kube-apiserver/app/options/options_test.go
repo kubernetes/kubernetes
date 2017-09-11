@@ -32,6 +32,7 @@ import (
 	kapi "k8s.io/kubernetes/pkg/api"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
+	"k8s.io/kubernetes/pkg/master/reconcilers"
 )
 
 func TestAddFlags(t *testing.T) {
@@ -44,6 +45,7 @@ func TestAddFlags(t *testing.T) {
 		"--admission-control-config-file=/admission-control-config",
 		"--advertise-address=192.168.10.10",
 		"--allow-privileged=false",
+		"--alpha-endpoint-reconciler-type=" + string(reconcilers.MasterCountReconcilerType),
 		"--anonymous-auth=false",
 		"--apiserver-count=5",
 		"--audit-log-maxage=11",
@@ -88,9 +90,10 @@ func TestAddFlags(t *testing.T) {
 
 	// This is a snapshot of expected options parsed by args.
 	expected := &ServerRunOptions{
-		ServiceNodePortRange: DefaultServiceNodePortRange,
-		MasterCount:          5,
-		AllowPrivileged:      false,
+		ServiceNodePortRange:   DefaultServiceNodePortRange,
+		MasterCount:            5,
+		EndpointReconcilerType: string(reconcilers.MasterCountReconcilerType),
+		AllowPrivileged:        false,
 		GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
 			AdvertiseAddress:            net.ParseIP("192.168.10.10"),
 			CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
