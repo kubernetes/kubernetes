@@ -237,12 +237,12 @@ func (dc *DeploymentController) getDeploymentsForReplicaSet(rs *extensions.Repli
 	// Because all ReplicaSet's belonging to a deployment should have a unique label key,
 	// there should never be more than one deployment returned by the above method.
 	// If that happens we should probably dynamically repair the situation by ultimately
-	// trying to clean up one of the controllers, for now we just return the older one
+	// trying to clean up one of the controllers, for now we just return them all
 	if len(deployments) > 1 {
 		// ControllerRef will ensure we don't do anything crazy, but more than one
 		// item in this list nevertheless constitutes user error.
-		glog.V(4).Infof("user error! more than one deployment is selecting replica set %s/%s with labels: %#v, returning %s/%s",
-			rs.Namespace, rs.Name, rs.Labels, deployments[0].Namespace, deployments[0].Name)
+		glog.V(4).Infof("user error! more than one deployment is selecting replica set %s/%s with labels: %#v, returning all of them",
+			rs.Namespace, rs.Name, rs.Labels)
 	}
 	return deployments
 }
