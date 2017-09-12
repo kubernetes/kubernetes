@@ -11,7 +11,7 @@ go_library(
     srcs = ["options.go"],
     importpath = "k8s.io/kubernetes/cmd/cloud-controller-manager/app/options",
     deps = [
-        "//pkg/apis/componentconfig:go_default_library",
+        "//cmd/controller-manager/app/options:go_default_library",
         "//pkg/client/leaderelectionconfig:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/master/ports:go_default_library",
@@ -40,6 +40,7 @@ go_test(
     importpath = "k8s.io/kubernetes/cmd/cloud-controller-manager/app/options",
     library = ":go_default_library",
     deps = [
+        "//cmd/controller-manager/app/options:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
