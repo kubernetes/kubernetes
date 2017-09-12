@@ -49,6 +49,14 @@ const (
 	MatchInterPodAffinity = "MatchInterPodAffinity"
 )
 
+// IMPORTANT NOTE for predicate developers:
+// We are using cached predicate result for pods belonging to the same equivalence class.
+// So when updating a existing predicate, you should consider whether your change will introduce new
+// dependency to attributes of any API object like Pod, Node, Service etc.
+// If yes, you are expected to invalidate the cached predicate result for related API object change.
+// For example:
+// https://github.com/kubernetes/kubernetes/blob/36a218e/plugin/pkg/scheduler/factory/factory.go#L422
+
 // NodeInfo: Other types for predicate functions...
 type NodeInfo interface {
 	GetNodeInfo(nodeID string) (*v1.Node, error)

@@ -116,7 +116,7 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 			ClientConfig: kubeconfig,
 		}
 		var clientBuilder controller.ControllerClientBuilder
-		if len(s.ServiceAccountKeyFile) > 0 && s.UseServiceAccountCredentials {
+		if s.UseServiceAccountCredentials {
 			clientBuilder = controller.SAControllerClientBuilder{
 				ClientConfig:         restclient.AnonymousClientConfig(kubeconfig),
 				CoreClient:           kubeClient.CoreV1(),
@@ -127,7 +127,7 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 			clientBuilder = rootClientBuilder
 		}
 
-		err := StartControllers(s, kubeconfig, rootClientBuilder, clientBuilder, stop, recorder, cloud)
+		err := StartControllers(s, kubeconfig, clientBuilder, stop, recorder, cloud)
 		glog.Fatalf("error running controllers: %v", err)
 		panic("unreachable")
 	}
@@ -173,10 +173,10 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 }
 
 // StartControllers starts the cloud specific controller loops.
-func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restclient.Config, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}, recorder record.EventRecorder, cloud cloudprovider.Interface) error {
+func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restclient.Config, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}, recorder record.EventRecorder, cloud cloudprovider.Interface) error {
 	// Function to build the kube client object
 	client := func(serviceAccountName string) clientset.Interface {
-		return rootClientBuilder.ClientOrDie(serviceAccountName)
+		return clientBuilder.ClientOrDie(serviceAccountName)
 	}
 
 	if cloud != nil {

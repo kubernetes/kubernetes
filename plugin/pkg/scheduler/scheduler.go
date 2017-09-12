@@ -223,7 +223,7 @@ func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, e
 	return node.Name, err
 }
 
-// assume signals to the cache that a pod is already in the cache, so that binding can be asnychronous.
+// assume signals to the cache that a pod is already in the cache, so that binding can be asynchronous.
 // assume modifies `assumed`.
 func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 	// Optimistically assume that the binding will succeed and send it to apiserver

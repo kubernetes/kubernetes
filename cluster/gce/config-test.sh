@@ -45,7 +45,7 @@ KUBE_DELETE_NODES=${KUBE_DELETE_NODES:-true}
 KUBE_DELETE_NETWORK=${KUBE_DELETE_NETWORK:-true}
 
 MASTER_OS_DISTRIBUTION=${KUBE_MASTER_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
-NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-debian}}
+NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
 if [[ "${MASTER_OS_DISTRIBUTION}" == "coreos" ]]; then
     MASTER_OS_DISTRIBUTION="container-linux"
 fi
@@ -67,13 +67,12 @@ if [[ "${NODE_OS_DISTRIBUTION}" == "debian" ]]; then
 fi
 
 # By default a cluster will be started with the master and nodes
-# on Container-VM, the deprecated OS. Some tests assume container-VM,
-# and only when that is fixed can we use Container-Optimized OS
-# (cos, gci) as we do in config-default.sh.
+# on Container-optimized OS (cos, previously known as gci). If
+# you are updating the os image versions, update this variable.
 # Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
 CVM_VERSION=${CVM_VERSION:-container-vm-v20170627}
-GCI_VERSION=${KUBE_GCI_VERSION:-cos-stable-60-9592-84-0}
+GCI_VERSION=${KUBE_GCI_VERSION:-cos-stable-60-9592-90-0}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
@@ -194,7 +193,7 @@ KUBEPROXY_TEST_ARGS="${KUBEPROXY_TEST_ARGS:-} ${TEST_CLUSTER_API_CONTENT_TYPE}"
 # TODO(piosz): remove this in 1.8
 NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
 
-# To avoid running Calico on a node that is not configured appropriately,
+# To avoid running Calico on a node that is not configured appropriately, 
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.
 if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
 	NODE_LABELS="$NODE_LABELS,projectcalico.org/ds-ready=true"
@@ -371,9 +370,6 @@ ENABLE_PROMETHEUS_TO_SD="${ENABLE_PROMETHEUS_TO_SD:-true}"
 # TODO(#51292): Make kube-proxy Daemonset default and remove the configuration here.
 # Optional: Run kube-proxy as a DaemonSet if set to true, run as static pods otherwise.
 KUBE_PROXY_DAEMONSET="${KUBE_PROXY_DAEMONSET:-false}" # true, false
-
-# Optional: duration of cluster signed certificates.
-CLUSTER_SIGNING_DURATION="${CLUSTER_SIGNING_DURATION:-30m}"
 
 # Optional: enable pod priority
 ENABLE_POD_PRIORITY="${ENABLE_POD_PRIORITY:-}"
