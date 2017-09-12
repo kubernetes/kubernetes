@@ -35,6 +35,7 @@ import (
 
 	clientset "k8s.io/client-go/kubernetes"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	dockermetrics "k8s.io/kubernetes/pkg/kubelet/dockershim/metrics"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -104,7 +105,7 @@ func GetKubeletLatencyMetrics(ms metrics.KubeletMetrics) KubeletLatencyMetrics {
 		kubeletmetrics.PodWorkerStartLatencyKey,
 		kubeletmetrics.PodStartLatencyKey,
 		kubeletmetrics.CgroupManagerOperationsKey,
-		kubeletmetrics.DockerOperationsLatencyKey,
+		dockermetrics.DockerOperationsLatencyKey,
 		kubeletmetrics.PodWorkerStartLatencyKey,
 		kubeletmetrics.PLEGRelistLatencyKey,
 	)
@@ -235,9 +236,9 @@ func getNodeRuntimeOperationErrorRate(c clientset.Interface, node string) (NodeR
 	}
 	// If no corresponding metrics are found, the returned samples will be empty. Then the following
 	// loop will be skipped automatically.
-	allOps := ms[kubeletmetrics.DockerOperationsKey]
-	errOps := ms[kubeletmetrics.DockerOperationsErrorsKey]
-	timeoutOps := ms[kubeletmetrics.DockerOperationsTimeoutKey]
+	allOps := ms[dockermetrics.DockerOperationsKey]
+	errOps := ms[dockermetrics.DockerOperationsErrorsKey]
+	timeoutOps := ms[dockermetrics.DockerOperationsTimeoutKey]
 	for _, sample := range allOps {
 		operation := string(sample.Metric["operation_type"])
 		result[operation] = &RuntimeOperationErrorRate{TotalNumber: float64(sample.Value)}
