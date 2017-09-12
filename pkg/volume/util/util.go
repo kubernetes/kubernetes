@@ -36,6 +36,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"syscall"
 )
 
 const readyFileName = "ready"
@@ -88,8 +89,12 @@ func UnmountPath(mountPath string, mounter mount.Interface) error {
 // IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
 // IsNotMountPoint is more expensive but properly handles bind mounts.
 func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool) error {
+	isStaleConnection := false
 	if pathExists, pathErr := PathExists(mountPath); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		isStaleConnection = IsStaleConnection(pathErr)
+		if !isStaleConnection {
+			return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		}
 	} else if !pathExists {
 		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
 		return nil
@@ -97,20 +102,21 @@ func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMount
 
 	var notMnt bool
 	var err error
+	if !isStaleConnection {
+		if extensiveMountPointCheck {
+			notMnt, err = mount.IsNotMountPoint(mounter, mountPath)
+		} else {
+			notMnt, err = mounter.IsLikelyNotMountPoint(mountPath)
+		}
 
-	if extensiveMountPointCheck {
-		notMnt, err = mount.IsNotMountPoint(mounter, mountPath)
-	} else {
-		notMnt, err = mounter.IsLikelyNotMountPoint(mountPath)
-	}
+		if err != nil {
+			return err
+		}
 
-	if err != nil {
-		return err
-	}
-
-	if notMnt {
-		glog.Warningf("Warning: %q is not a mountpoint, deleting", mountPath)
-		return os.Remove(mountPath)
+		if notMnt {
+			glog.Warningf("Warning: %q is not a mountpoint, deleting", mountPath)
+			return os.Remove(mountPath)
+		}
 	}
 
 	// Unmount the mount path
@@ -120,7 +126,7 @@ func UnmountMountPoint(mountPath string, mounter mount.Interface, extensiveMount
 	}
 	notMnt, mntErr := mounter.IsLikelyNotMountPoint(mountPath)
 	if mntErr != nil {
-		return err
+		return mntErr
 	}
 	if notMnt {
 		glog.V(4).Infof("%q is unmounted, deleting the directory", mountPath)
@@ -136,9 +142,25 @@ func PathExists(path string) (bool, error) {
 		return true, nil
 	} else if os.IsNotExist(err) {
 		return false, nil
-	} else {
+	}else if IsStaleConnection(err) {
+		return true, err
+	}else {
 		return false, err
 	}
+}
+
+func IsStaleConnection(err error) bool {
+	switch pe := err.(type) {
+	case nil:
+		return false
+	case *os.PathError:
+		err = pe.Err
+	case *os.LinkError:
+		err = pe.Err
+	case *os.SyscallError:
+		err = pe.Err
+	}
+	return err == syscall.ENOTCONN || err == syscall.ESTALE
 }
 
 // GetSecretForPod locates secret by name in the pod's namespace and returns secret map
