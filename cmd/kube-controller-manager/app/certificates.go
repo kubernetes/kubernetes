@@ -46,7 +46,7 @@ func startCSRSigningController(ctx ControllerContext) (bool, error) {
 	)
 	if err != nil {
 		glog.Errorf("Failed to start certificate controller: %v", err)
-		return false, nil
+		return false, err
 	}
 	go signer.Run(1, ctx.Stop)
 
