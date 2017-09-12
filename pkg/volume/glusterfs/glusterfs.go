@@ -737,7 +737,8 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 	var clusterIDs []string
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volSizeBytes := capacity.Value()
-	sz := int(volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
+	// Glusterfs creates volumes in units of GBs
+	sz := int(volume.RoundUpSize(volSizeBytes, 1000*1000*1000))
 	glog.V(2).Infof("create volume of size: %d bytes and configuration %+v", volSizeBytes, p.provisionerConfig)
 	if p.url == "" {
 		glog.Errorf("REST server endpoint is empty")
@@ -1080,7 +1081,7 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 
 	// Find out delta size
 	expansionSize := (newSize.Value() - oldSize.Value())
-	expansionSizeGB := int(volume.RoundUpSize(expansionSize, 1024*1024*1024))
+	expansionSizeGB := int(volume.RoundUpSize(expansionSize, 1000*1000*1000))
 
 	// Make volume expansion request
 	volumeExpandReq := &gapi.VolumeExpandRequest{Size: expansionSizeGB}
