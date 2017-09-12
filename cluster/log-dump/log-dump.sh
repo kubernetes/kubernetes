@@ -53,7 +53,9 @@ readonly systemd_services="kubelet docker"
 # file descriptors for large clusters.
 readonly max_scp_processes=25
 
+# TODO: Get rid of all the sourcing of bash dependencies eventually.
 function setup() {
+  KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
   if [[ -z "${use_custom_instance_list}" ]]; then
     echo "Obtaining KUBE_ROOT"
     KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
@@ -64,6 +66,8 @@ function setup() {
     detect-project 2>&1
   elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
     echo "Using 'use_custom_instance_list' with gke, skipping check for LOG_DUMP_SSH_KEY and LOG_DUMP_SSH_USER"
+    # Source the below script for the ssh-to-node utility function.
+    source "${KUBE_ROOT}/cluster/gce/util.sh"
   elif [[ -z "${LOG_DUMP_SSH_KEY:-}" ]]; then
     echo "LOG_DUMP_SSH_KEY not set, but required when using log_dump_custom_get_instances"
     exit 1
@@ -74,7 +78,7 @@ function setup() {
 }
 
 function log-dump-ssh() {
-  if [[ -z "${use_custom_instance_list}" ]]; then
+  if [[ "${gcloud_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
     ssh-to-node "$@"
     return
   fi
