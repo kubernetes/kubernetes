@@ -365,8 +365,8 @@ func TestPodFitsResources(t *testing.T) {
 				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
-			fits:    false,
-			test:    "hugepages resource capacity enforced for init container",
+			fits:    true,
+			test:    "hugepages resource not enforced in BestEffort",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(hugePageResourceA, 10, 0, 5)},
 		},
 		{
