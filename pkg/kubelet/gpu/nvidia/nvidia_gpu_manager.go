@@ -17,6 +17,8 @@ limitations under the License.
 package nvidia
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -24,6 +26,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/golang/glog"
 
@@ -43,8 +46,11 @@ const (
 	// Optional device.
 	nvidiaUVMToolsDevice string = "/dev/nvidia-uvm-tools"
 	devDirectory                = "/dev"
-	nvidiaDeviceRE              = `^nvidia[0-9]*$`
-	nvidiaFullpathRE            = `^/dev/nvidia[0-9]*$`
+	devicesProcFile             = "/proc/bus/pci/devices"
+	// This vendor prefix correlates with the specific ID for the NVIDIA Corp.
+	nvidiaVendorID   = "10de"
+	nvidiaDeviceRE   = `^nvidia[0-9]*$`
+	nvidiaFullpathRE = `^/dev/nvidia[0-9]*$`
 )
 
 type activePodsLister interface {
@@ -98,11 +104,16 @@ func (ngm *nvidiaGPUManager) Start() error {
 	if !os.IsNotExist(err) {
 		ngm.defaultDevices = append(ngm.defaultDevices, nvidiaUVMToolsDevice)
 	}
-
-	if err := ngm.discoverGPUs(); err != nil {
-		return err
-	}
-
+	// retry discoverGPUs indefinitely in case drivers have not been installed
+	go func() {
+		for {
+			if err := ngm.discoverGPUs(devicesProcFile, devDirectory); err == nil {
+				glog.V(4).Infof("Nvidia GPU discovery finished")
+				return
+			}
+			time.Sleep(time.Minute)
+		}
+	}()
 	// We ignore errors when identifying allocated GPUs because it is possible that the runtime interfaces may be not be logically up.
 	return nil
 }
@@ -190,23 +201,61 @@ func (ngm *nvidiaGPUManager) updateAllocatedGPUs() {
 // family name. Need to support NVML in the future. But we do not need NVML until
 // we want more features, features like schedule containers according to GPU family
 // name.
-func (ngm *nvidiaGPUManager) discoverGPUs() error {
-	reg := regexp.MustCompile(nvidiaDeviceRE)
-	files, err := ioutil.ReadDir(devDirectory)
+func (ngm *nvidiaGPUManager) discoverGPUs(devicesFile string, devDir string) error {
+	expected, err := expectedGPUs(devicesFile)
 	if err != nil {
 		return err
 	}
+	if !expected {
+		return nil
+	}
+	reg := regexp.MustCompile(nvidiaDeviceRE)
+	files, err := ioutil.ReadDir(devDir)
+	if err != nil {
+		return err
+	}
+	foundGPUs := sets.NewString()
 	for _, f := range files {
 		if f.IsDir() {
 			continue
 		}
 		if reg.MatchString(f.Name()) {
 			glog.V(2).Infof("Found Nvidia GPU %q", f.Name())
-			ngm.allGPUs.Insert(path.Join(devDirectory, f.Name()))
+			foundGPUs.Insert(f.Name())
 		}
 	}
+	if foundGPUs.Len() == 0 {
+		return fmt.Errorf("expected GPUs, but did not find any under %q", devDir)
+	}
+	for _, gpuToAdd := range foundGPUs.List() {
+		ngm.allGPUs.Insert(path.Join(devDirectory, gpuToAdd))
 
+	}
 	return nil
+}
+
+// expectedGPUs reads the devices procfile and determines if we shuold find GPUs
+// when discoverGPUs is called
+// TODO: This most likely will count dead GPUs and should be refactored if we
+// switch to NVML health-checking
+// related https://github.com/kubernetes/community/pull/414
+func expectedGPUs(procFile string) (bool, error) {
+	contents, err := os.Open(procFile)
+	if err != nil {
+		return false, err
+	}
+	defer contents.Close()
+	scanner := bufio.NewScanner(contents)
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		s := scanner.Bytes()
+		fields := bytes.SplitN(s, []byte{'\t'}, 3)
+		if bytes.HasPrefix(fields[1], []byte(nvidiaVendorID)) {
+			return true, nil
+		}
+
+	}
+	return false, nil
 }
 
 // gpusInUse returns a list of GPUs in use along with the respective pods that are using it.
