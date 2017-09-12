@@ -273,11 +273,14 @@ func (gce *GCECloud) DisksAreAttached(diskNames []string, nodeName types.NodeNam
 // JSON in Description field.
 func (gce *GCECloud) CreateDisk(
 	name string, diskType string, zone string, sizeGb int64, tags map[string]string) error {
-
-	// Do not allow creation of PDs in zones that are not managed. Such PDs
-	// then cannot be deleted by DeleteDisk.
-	if isManaged := gce.verifyZoneIsManaged(zone); !isManaged {
-		return fmt.Errorf("kubernetes does not manage zone %q", zone)
+	// Do not allow creation of PDs in zones that are do not have nodes. Such PDs
+	// are not currently usable.
+	curZones, err := gce.GetAllCurrentZones()
+	if err != nil {
+		return err
+	}
+	if !curZones.Has(zone) {
+		return fmt.Errorf("kubernetes does not have a node in zone %q", zone)
 	}
 
 	tagsStr, err := gce.encodeDiskTags(tags)
@@ -316,17 +319,16 @@ func (gce *GCECloud) CreateDisk(
 func (gce *GCECloud) CreateRegionalDisk(
 	name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string) error {
 
-	// Do not allow creation of PDs in zones that are not managed. Such PDs
-	// then cannot be deleted by DeleteDisk.
-	unmanagedZones := []string{}
-	for _, zone := range replicaZones.UnsortedList() {
-		if isManaged := gce.verifyZoneIsManaged(zone); !isManaged {
-			unmanagedZones = append(unmanagedZones, zone)
-		}
+	// Do not allow creation of PDs in zones that are do not have nodes. Such PDs
+	// are not currently usable. This functionality should be reverted to checking
+	// against managed zones if we want users to be able to create RegionalDisks
+	// in zones where there are no nodes
+	curZones, err := gce.GetAllCurrentZones()
+	if err != nil {
+		return err
 	}
-
-	if len(unmanagedZones) > 0 {
-		return fmt.Errorf("kubernetes does not manage specified zones: %q. Managed Zones: %q", unmanagedZones, gce.managedZones)
+	if !curZones.IsSuperset(replicaZones) {
+		return fmt.Errorf("kubernetes does not have nodes in specified zones: %q. Zones that contain nodes: %q", replicaZones.Difference(curZones), curZones)
 	}
 
 	tagsStr, err := gce.encodeDiskTags(tags)
@@ -357,16 +359,6 @@ func (gce *GCECloud) CreateRegionalDisk(
 		return nil
 	}
 	return err
-}
-
-func (gce *GCECloud) verifyZoneIsManaged(zone string) bool {
-	for _, managedZone := range gce.managedZones {
-		if zone == managedZone {
-			return true
-		}
-	}
-
-	return false
 }
 
 func getDiskType(diskType string) (string, error) {
