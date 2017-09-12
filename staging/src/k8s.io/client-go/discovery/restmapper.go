@@ -49,6 +49,7 @@ func NewRESTMapper(groupResources []*APIGroupResources, versionInterfaces meta.V
 	for _, group := range groupResources {
 		groupPriority = append(groupPriority, group.Group.Name)
 
+		// Make sure the preferred version comes first
 		if len(group.Group.PreferredVersion.Version) != 0 {
 			preferred := group.Group.PreferredVersion.Version
 			if _, ok := group.VersionedResources[preferred]; ok {
@@ -70,6 +71,21 @@ func NewRESTMapper(groupResources []*APIGroupResources, versionInterfaces meta.V
 			resources, ok := group.VersionedResources[discoveryVersion.Version]
 			if !ok {
 				continue
+			}
+
+			// Add non-preferred versions after the preferred version, in case there are resources that only exist in those versions
+			if discoveryVersion.Version != group.Group.PreferredVersion.Version {
+				resourcePriority = append(resourcePriority, schema.GroupVersionResource{
+					Group:    group.Group.Name,
+					Version:  discoveryVersion.Version,
+					Resource: meta.AnyResource,
+				})
+
+				kindPriority = append(kindPriority, schema.GroupVersionKind{
+					Group:   group.Group.Name,
+					Version: discoveryVersion.Version,
+					Kind:    meta.AnyKind,
+				})
 			}
 
 			gv := schema.GroupVersion{Group: group.Group.Name, Version: discoveryVersion.Version}
