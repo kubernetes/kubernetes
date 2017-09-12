@@ -303,7 +303,8 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 // If no tokenSource is specified, uses oauth2.DefaultTokenSource.
 // If managedZones is nil / empty all zones in the region will be managed.
 func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
-	userAgent := fmt.Sprintf("(%s %s) Kubernetes/%s", runtime.GOOS, runtime.GOARCH, version.Get().GitVersion)
+	version := strings.Split(strings.Split(version.Get().GitVersion, "-")[0], "+")[0]
+	userAgent := fmt.Sprintf("(%s %s) Kubernetes/%s", runtime.GOOS, runtime.GOARCH, version)
 
 	client, err := newOauthClient(config.TokenSource)
 	if err != nil {
