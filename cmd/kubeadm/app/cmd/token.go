@@ -213,8 +213,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, token string, tok
 	}
 
 	// adding groups only makes sense for authentication
-	var usagesSet sets.String
-	usagesSet.Insert(usages...)
+	usagesSet := sets.NewString(usages...)
 	if len(extraGroups) > 0 && !usagesSet.Has("authentication") {
 		return fmt.Errorf("--groups cannot be specified unless --usages includes \"authentication\"")
 	}
