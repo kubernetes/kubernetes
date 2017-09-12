@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -149,7 +148,7 @@ func observerUpdate(w watch.Interface, expectedUpdate func(runtime.Object) bool)
 	return
 }
 
-var _ = SIGDescribe("Generated release_1_5 clientset", func() {
+var _ = SIGDescribe("Generated clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 	It("should create pods, set the deletionTimestamp and deletionGracePeriodSeconds of the pod", func() {
 		podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
@@ -261,7 +260,7 @@ func newTestingCronJob(name string, value string) *batchv1beta1.CronJob {
 	}
 }
 
-var _ = SIGDescribe("Generated release_1_5 clientset", func() {
+var _ = SIGDescribe("Generated clientset", func() {
 	f := framework.NewDefaultFramework("clientset")
 
 	BeforeEach(func() {
@@ -324,43 +323,5 @@ var _ = SIGDescribe("Generated release_1_5 clientset", func() {
 			framework.Failf("Failed to list cronJobs to verify deletion: %v", err)
 		}
 		Expect(len(cronJobs.Items)).To(Equal(0))
-	})
-})
-
-var _ = SIGDescribe("Staging client repo client", func() {
-	f := framework.NewDefaultFramework("clientset")
-	It("should create pods, delete pods, watch pods", func() {
-		podClient := f.StagingClient.CoreV1().Pods(f.Namespace.Name)
-		By("constructing the pod")
-		name := "pod" + string(uuid.NewUUID())
-		value := strconv.Itoa(time.Now().Nanosecond())
-		podCopy := stagingClientPod(name, value)
-		pod := &podCopy
-		By("verifying no pod exists before the test")
-		pods, err := podClient.List(metav1.ListOptions{})
-		if err != nil {
-			framework.Failf("Failed to query for pods: %v", err)
-		}
-		Expect(len(pods.Items)).To(Equal(0))
-		By("creating the pod")
-		pod, err = podClient.Create(pod)
-		if err != nil {
-			framework.Failf("Failed to create pod: %v", err)
-		}
-
-		By("verifying the pod is in kubernetes")
-		timeout := 1 * time.Minute
-		if err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
-			pods, err = podClient.List(metav1.ListOptions{})
-			if err != nil {
-				return false, err
-			}
-			if len(pods.Items) == 1 {
-				return true, nil
-			}
-			return false, nil
-		}); err != nil {
-			framework.Failf("Err : %s\n. Failed to wait for 1 pod to be created", err)
-		}
 	})
 })
