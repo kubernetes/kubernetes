@@ -78,6 +78,7 @@ go_test(
     srcs = [
         "allocatable_eviction_test.go",
         "apparmor_test.go",
+        "cpu_manager_test.go",
         "critical_pod_test.go",
         "disk_eviction_test.go",
         "docker_test.go",
@@ -119,6 +120,8 @@ go_test(
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
+        "//pkg/kubelet/cm/cpumanager:go_default_library",
+        "//pkg/kubelet/cm/cpuset:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockershim/libdocker:go_default_library",
         "//pkg/kubelet/images:go_default_library",
@@ -156,6 +159,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//test/e2e/framework/metrics:go_default_library",
