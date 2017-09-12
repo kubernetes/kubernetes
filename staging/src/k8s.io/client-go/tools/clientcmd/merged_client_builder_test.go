@@ -99,9 +99,8 @@ func TestInClusterConfig(t *testing.T) {
 	err1 := fmt.Errorf("unique error")
 
 	testCases := map[string]struct {
-		clientConfig  *testClientConfig
-		icc           *testICC
-		defaultConfig *DirectClientConfig
+		clientConfig *testClientConfig
+		icc          *testICC
 
 		checkedICC bool
 		result     *restclient.Config
@@ -126,31 +125,19 @@ func TestInClusterConfig(t *testing.T) {
 		},
 
 		"in-cluster checked when config is default": {
-			defaultConfig: default1,
-			clientConfig:  &testClientConfig{config: config1},
-			icc:           &testICC{},
+			clientConfig: &testClientConfig{config: config1},
+			icc:          &testICC{},
 
 			checkedICC: true,
 			result:     config1,
 			err:        nil,
 		},
 
-		"in-cluster not checked when default config is invalid": {
-			defaultConfig: defaultInvalid,
-			clientConfig:  &testClientConfig{config: config1},
-			icc:           &testICC{},
+		"in-cluster checked when config is not equal to default": {
+			clientConfig: &testClientConfig{config: config2},
+			icc:          &testICC{},
 
-			checkedICC: false,
-			result:     config1,
-			err:        nil,
-		},
-
-		"in-cluster not checked when config is not equal to default": {
-			defaultConfig: default1,
-			clientConfig:  &testClientConfig{config: config2},
-			icc:           &testICC{},
-
-			checkedICC: false,
+			checkedICC: true,
 			result:     config2,
 			err:        nil,
 		},
@@ -191,21 +178,11 @@ func TestInClusterConfig(t *testing.T) {
 			result:     config2,
 			err:        nil,
 		},
-
-		"in-cluster not checked when standard default is invalid": {
-			defaultConfig: &DefaultClientConfig,
-			clientConfig:  &testClientConfig{config: config2},
-			icc:           &testICC{},
-
-			checkedICC: false,
-			result:     config2,
-			err:        nil,
-		},
 	}
 
 	for name, test := range testCases {
 		c := &DeferredLoadingClientConfig{icc: test.icc}
-		c.loader = &ClientConfigLoadingRules{DefaultClientConfig: test.defaultConfig}
+		c.loader = &ClientConfigLoadingRules{}
 		c.clientConfig = test.clientConfig
 
 		cfg, err := c.ClientConfig()
