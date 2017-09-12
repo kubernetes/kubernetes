@@ -1,6 +1,6 @@
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "f9cc31e9d66dad1154de3c214158916411040e2c2614e4fbc2bab67330e95f82",
+    sha256 = "27a13726ff8621cfa4592fbef116b253043c2b093c8814265dc4489a0e67d229",
     strip_prefix = "rules_go-82483596ec203eb9c1849937636f4cbed83733eb",
     urls = ["https://github.com/bazelbuild/rules_go/archive/82483596ec203eb9c1849937636f4cbed83733eb.tar.gz"],
 )
@@ -27,7 +27,7 @@ new_http_archive(
 # https://bazel-review.googlesource.com/#/c/10390/
 http_archive(
     name = "io_bazel",
-    sha256 = "667d32da016b1e2f63cf345cd3583989ec4a165034df383a01996d93635753a0",
+    sha256 = "892a84aa1e7c1f99fb57bb056cb648745c513077252815324579a012d263defb",
     strip_prefix = "bazel-df2c687c22bdd7c76f3cdcc85f38fefd02f0b844",
     urls = ["https://github.com/ixdy/bazel/archive/df2c687c22bdd7c76f3cdcc85f38fefd02f0b844.tar.gz"],
 )

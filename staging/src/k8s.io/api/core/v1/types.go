@@ -2486,6 +2486,7 @@ const (
 	// Kubelet without going through the scheduler to start.
 	// Enforced by Kubelet and the scheduler.
 	// TaintEffectNoScheduleNoAdmit TaintEffect = "NoScheduleNoAdmit"
+
 	// Evict any already-running pods that do not tolerate the taint.
 	// Currently enforced by NodeController.
 	TaintEffectNoExecute TaintEffect = "NoExecute"
