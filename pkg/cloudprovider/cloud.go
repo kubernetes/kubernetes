@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api/v1"
+	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -45,6 +46,11 @@ type Interface interface {
 	ProviderName() string
 	// ScrubDNS provides an opportunity for cloud-provider-specific code to process DNS settings for pods.
 	ScrubDNS(nameservers, searches []string) (nsOut, srchOut []string)
+}
+
+type InformerUser interface {
+	// SetInformers sets the informer on the cloud object.
+	SetInformers(informerFactory informers.SharedInformerFactory)
 }
 
 // Clusters is an abstract, pluggable interface for clusters of containers.
