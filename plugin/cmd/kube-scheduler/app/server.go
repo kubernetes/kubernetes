@@ -70,6 +70,14 @@ func Run(s *options.SchedulerServer) error {
 	if err != nil {
 		return fmt.Errorf("unable to create kube client: %v", err)
 	}
+	// TODO: Deprecate this when upstream has a better solution.
+	// Use individual client for leader-election, to separate controlling requests e.g. leader election
+	// and data requests e.g. get pods. To avoid the case that when there are lot of data requests,
+	// leader-election get blocked and make scheduler panic.
+	leaderElectionCli, err := createClient(s)
+	if err != nil {
+		return fmt.Errorf("unable to create kube client for leader-election: %v", err)
+	}
 
 	recorder := createRecorder(kubecli, s)
 
@@ -124,7 +132,7 @@ func Run(s *options.SchedulerServer) error {
 	rl, err := resourcelock.New(s.LeaderElection.ResourceLock,
 		s.LockObjectNamespace,
 		s.LockObjectName,
-		kubecli.CoreV1(),
+		leaderElectionCli.CoreV1(),
 		resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: recorder,
