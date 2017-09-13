@@ -114,6 +114,20 @@ func TestTolerationToleratesTaint(t *testing.T) {
 			},
 			expectTolerated: false,
 		},
+		{
+			description: "toleration have an empty key with operator Exists, expect tolerate everything",
+			toleration: Toleration{
+				Key:      "",
+				Operator: TolerationOpExists,
+				Effect:"",
+			},
+			taint: Taint{
+				Key:    "foo",
+				Value:  "bar",
+				Effect: TaintEffectNoSchedule,
+			},
+			expectTolerated: true,
+		},
 	}
 	for _, tc := range testCases {
 		if tolerated := tc.toleration.ToleratesTaint(&tc.taint); tc.expectTolerated != tolerated {
