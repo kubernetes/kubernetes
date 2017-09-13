@@ -664,7 +664,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 			Spec: api.PersistentVolumeSpec{
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{},
+					HostPath: &api.HostPathVolumeSource{Type: new(api.HostPathType)},
 				},
 			},
 		},
