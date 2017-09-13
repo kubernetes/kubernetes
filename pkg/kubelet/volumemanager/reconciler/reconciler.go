@@ -525,13 +525,13 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 			glog.Errorf("Could not add pod to volume information to actual state of world: %v", err)
 			continue
 		}
-		if volume.pluginIsAttachable {
-			err = rc.actualStateOfWorld.MarkDeviceAsMounted(volume.volumeName)
-			if err != nil {
-				glog.Errorf("Could not mark device is mounted to actual state of world: %v", err)
-				continue
-			}
-		}
+		//if volume.pluginIsAttachable {
+		//	err = rc.actualStateOfWorld.MarkDeviceAsMounted(volume.volumeName)
+		//	if err != nil {
+		//		glog.Errorf("Could not mark device is mounted to actual state of world: %v", err)
+		//		continue
+		//	}
+		//}
 		_, err = rc.desiredStateOfWorld.AddPodToVolume(volume.podName,
 			volume.pod,
 			volume.volumeSpec,
