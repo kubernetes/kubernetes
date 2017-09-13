@@ -523,6 +523,7 @@ message LinuxContainerSecurityContext {
     repeated int64 supplemental_groups = 8;
     // AppArmor profile for the container, candidate values are:
     // * runtime/default: equivalent to not specifying a profile.
+    // * unconfined: no profiles are loaded
     // * localhost/<profile_name>: profile loaded on the node
     //    (localhost) by name. The possible profile names are detailed at
     //    http://wiki.apparmor.net/index.php/AppArmor_Core_Policy_Reference
