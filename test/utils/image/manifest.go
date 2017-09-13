@@ -25,6 +25,7 @@ const (
 	e2eRegistry     = "gcr.io/kubernetes-e2e-test-images"
 	gcRegistry      = "gcr.io/google-containers"
 	PrivateRegistry = "gcr.io/k8s-authenticated-test"
+	sampleRegistry  = "gcr.io/google-samples"
 )
 
 type ImageConfig struct {
@@ -51,7 +52,8 @@ var (
 	Dnsutils           = ImageConfig{e2eRegistry, "dnsutils", "1.0"}
 	EntrypointTester   = ImageConfig{e2eRegistry, "entrypoint-tester", "1.0"}
 	Fakegitserver      = ImageConfig{e2eRegistry, "fakegitserver", "1.0"}
-	Frontend           = ImageConfig{e2eRegistry, "frontend", "1.0"}
+	GBFrontend         = ImageConfig{sampleRegistry, "gb-frontend", "v5"}
+	GBRedisSlave       = ImageConfig{sampleRegistry, "gb-redisslave", "v2"}
 	Goproxy            = ImageConfig{e2eRegistry, "goproxy", "1.0"}
 	Hostexec           = ImageConfig{e2eRegistry, "hostexec", "1.0"}
 	Iperf              = ImageConfig{e2eRegistry, "iperf", "1.0"}
@@ -74,7 +76,6 @@ var (
 	Porter             = ImageConfig{e2eRegistry, "porter", "1.0"}
 	PortForwardTester  = ImageConfig{e2eRegistry, "port-forward-tester", "1.0"}
 	Redis              = ImageConfig{e2eRegistry, "redis", "1.0"}
-	Redisslave         = ImageConfig{e2eRegistry, "redis-slave", "1.0"}
 	ResourceConsumer   = ImageConfig{e2eRegistry, "resource-consumer", "1.1"}
 	ResourceController = ImageConfig{e2eRegistry, "resource-consumer/controller", "1.0"}
 	ServeHostname      = ImageConfig{e2eRegistry, "serve-hostname", "1.0"}
