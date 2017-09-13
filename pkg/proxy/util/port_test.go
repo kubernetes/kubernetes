@@ -27,6 +27,33 @@ func (c *fakeClosable) Close() error {
 	return nil
 }
 
+func TestLocalPortString(t *testing.T) {
+	testCases := []struct {
+		description string
+		ip          string
+		port        int
+		protocol    string
+		expectedStr string
+	}{
+		{"IPv4 UDP", "1.2.3.4", 9999, "udp", "\"IPv4 UDP\" (1.2.3.4:9999/udp)"},
+		{"IPv4 TCP", "5.6.7.8", 1053, "tcp", "\"IPv4 TCP\" (5.6.7.8:1053/tcp)"},
+		{"IPv6 TCP", "2001:db8::1", 80, "tcp", "\"IPv6 TCP\" ([2001:db8::1]:80/tcp)"},
+	}
+
+	for _, tc := range testCases {
+		lp := &LocalPort{
+			Description: tc.description,
+			IP:          tc.ip,
+			Port:        tc.port,
+			Protocol:    tc.protocol,
+		}
+		str := lp.String()
+		if str != tc.expectedStr {
+			t.Errorf("Unexpected output for %s, expected: %s, got: %s", tc.description, tc.expectedStr, str)
+		}
+	}
+}
+
 func TestRevertPorts(t *testing.T) {
 	testCases := []struct {
 		replacementPorts []LocalPort
