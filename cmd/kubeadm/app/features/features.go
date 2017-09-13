@@ -30,6 +30,9 @@ const (
 	// HighAvailability is alpha in v1.9
 	HighAvailability = "HighAvailability"
 
+	// CoreDNS is alpha in v1.9
+	CoreDNS = "CoreDNS"
+
 	// SelfHosting is beta in v1.8
 	SelfHosting = "SelfHosting"
 
@@ -48,6 +51,7 @@ var InitFeatureGates = FeatureList{
 	StoreCertsInSecrets:  {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
 	HighAvailability:     {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
 	SupportIPVSProxyMode: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
+	CoreDNS:              {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
 }
 
 // Feature represents a feature being gated

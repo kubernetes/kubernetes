@@ -171,6 +171,11 @@ const (
 
 	// DefaultCIImageRepository points to image registry where CI uploads images from ci-cross build job
 	DefaultCIImageRepository = "gcr.io/kubernetes-ci-images"
+
+	// CoreDNS defines a variable used internally when referring to the CoreDNS addon for a cluster
+	CoreDNS = "CoreDNS"
+	// KubeDNS defines a variable used internally when referring to the kube-dns addon for a cluster
+	KubeDNS = "kube-dns"
 )
 
 var (

@@ -109,6 +109,29 @@ func TestCompileManifests(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			manifest: CoreDNSDeployment,
+			data: struct{ MasterTaintKey, Version string }{
+				MasterTaintKey: "foo",
+				Version:        "foo",
+			},
+			expected: true,
+		},
+		{
+			manifest: KubeDNSService,
+			data: struct{ DNSIP string }{
+				DNSIP: "foo",
+			},
+			expected: true,
+		},
+		{
+			manifest: CoreDNSConfigMap,
+			data: struct{ DNSDomain, ServiceCIDR string }{
+				DNSDomain:   "foo",
+				ServiceCIDR: "foo",
+			},
+			expected: true,
+		},
 	}
 	for _, rt := range tests {
 		_, actual := kubeadmutil.ParseTemplate(rt.manifest, rt.data)

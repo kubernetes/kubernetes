@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/pkg/util/version"
 )
@@ -94,9 +95,10 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 	}
 
 	// Construct a descriptor for the current state of the world
+	// TODO: Make CoreDNS available here.
 	beforeState := ClusterState{
 		KubeVersion:     clusterVersionStr,
-		DNSVersion:      dns.GetKubeDNSVersion(clusterVersion),
+		DNSVersion:      dns.GetDNSVersion(clusterVersion, kubeadmconstants.KubeDNS),
 		KubeadmVersion:  kubeadmVersionStr,
 		KubeletVersions: kubeletVersions,
 	}
@@ -139,7 +141,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 					Before:      beforeState,
 					After: ClusterState{
 						KubeVersion:    patchVersionStr,
-						DNSVersion:     dns.GetKubeDNSVersion(patchVersion),
+						DNSVersion:     dns.GetDNSVersion(patchVersion, kubeadmconstants.KubeDNS),
 						KubeadmVersion: newKubeadmVer,
 						// KubeletVersions is unset here as it is not used anywhere in .After
 					},
@@ -154,7 +156,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 			Before:      beforeState,
 			After: ClusterState{
 				KubeVersion:    stableVersionStr,
-				DNSVersion:     dns.GetKubeDNSVersion(stableVersion),
+				DNSVersion:     dns.GetDNSVersion(stableVersion, kubeadmconstants.KubeDNS),
 				KubeadmVersion: stableVersionStr,
 				// KubeletVersions is unset here as it is not used anywhere in .After
 			},
@@ -198,7 +200,7 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 				Before:      beforeState,
 				After: ClusterState{
 					KubeVersion:    previousBranchLatestVersionStr,
-					DNSVersion:     dns.GetKubeDNSVersion(previousBranchLatestVersion),
+					DNSVersion:     dns.GetDNSVersion(previousBranchLatestVersion, kubeadmconstants.KubeDNS),
 					KubeadmVersion: previousBranchLatestVersionStr,
 					// KubeletVersions is unset here as it is not used anywhere in .After
 				},
@@ -210,12 +212,12 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 
 			// Default to assume that the experimental version to show is the unstable one
 			unstableKubeVersion := latestVersionStr
-			unstableKubeDNSVersion := dns.GetKubeDNSVersion(latestVersion)
+			unstableKubeDNSVersion := dns.GetDNSVersion(latestVersion, kubeadmconstants.KubeDNS)
 
 			// Ẃe should not display alpha.0. The previous branch's beta/rc versions are more relevant due how the kube branching process works.
 			if latestVersion.PreRelease() == "alpha.0" {
 				unstableKubeVersion = previousBranchLatestVersionStr
-				unstableKubeDNSVersion = dns.GetKubeDNSVersion(previousBranchLatestVersion)
+				unstableKubeDNSVersion = dns.GetDNSVersion(previousBranchLatestVersion, kubeadmconstants.KubeDNS)
 			}
 
 			upgrades = append(upgrades, Upgrade{
