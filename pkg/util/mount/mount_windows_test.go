@@ -19,6 +19,8 @@ limitations under the License.
 package mount
 
 import (
+	"fmt"
+	"os/exec"
 	"testing"
 )
 
@@ -67,5 +69,72 @@ func TestValidateDiskNumber(t *testing.T) {
 	diskNum = "100"
 	if err := ValidateDiskNumber(diskNum); err == nil {
 		t.Errorf("TestValidateDiskNumber test failed, disk number : %s", diskNum)
+	}
+}
+
+func makeLink(link, target string) error {
+	if output, err := exec.Command("cmd", "/c", "mklink", "/D", link, target).CombinedOutput(); err != nil {
+		return fmt.Errorf("mklink failed: %v, link(%q) target(%q) output: %q", err, link, target, string(output))
+	}
+	return nil
+}
+
+func removeLink(link string) error {
+	if output, err := exec.Command("cmd", "/c", "rmdir", link).CombinedOutput(); err != nil {
+		return fmt.Errorf("rmdir failed: %v, output: %q", err, string(output))
+	}
+	return nil
+}
+
+func setEquivalent(set1, set2 []string) bool {
+	map1 := make(map[string]bool)
+	map2 := make(map[string]bool)
+	for _, s := range set1 {
+		map1[s] = true
+	}
+	for _, s := range set2 {
+		map2[s] = true
+	}
+
+	for s := range map1 {
+		if !map2[s] {
+			return false
+		}
+	}
+	for s := range map2 {
+		if !map1[s] {
+			return false
+		}
+	}
+	return true
+}
+
+// this func must run in admin mode, otherwise it will fail
+func TestGetMountRefs(t *testing.T) {
+	fm := &FakeMounter{MountPoints: []MountPoint{}}
+	mountPath := `c:\secondmountpath`
+	expectedRefs := []string{`c:\`, `c:\firstmountpath`, mountPath}
+
+	// remove symbolic links first
+	for i := 1; i < len(expectedRefs); i++ {
+		removeLink(expectedRefs[i])
+	}
+
+	// create symbolic links
+	for i := 1; i < len(expectedRefs); i++ {
+		if err := makeLink(expectedRefs[i], expectedRefs[i-1]); err != nil {
+			t.Errorf("makeLink failed: %v", err)
+		}
+	}
+
+	if refs, err := GetMountRefs(fm, mountPath); err != nil || !setEquivalent(expectedRefs, refs) {
+		t.Errorf("getMountRefs(%q) = %v, error: %v; expected %v", mountPath, refs, err, expectedRefs)
+	}
+
+	// remove symbolic links
+	for i := 1; i < len(expectedRefs); i++ {
+		if err := removeLink(expectedRefs[i]); err != nil {
+			t.Errorf("removeLink failed: %v", err)
+		}
 	}
 }
