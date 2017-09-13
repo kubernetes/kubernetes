@@ -984,7 +984,6 @@ func (proxier *Proxier) syncProxyRules() {
 			Scheduler: proxier.ipvsScheduler,
 		}
 		// Set session affinity flag and timeout for IPVS service
-		var flags utilipvs.ServiceFlags
 		if svcInfo.sessionAffinityType == api.ServiceAffinityClientIP {
 			serv.Flags |= utilipvs.FlagPersistent
 			serv.Timeout = uint32(svcInfo.stickyMaxAgeSeconds)
@@ -1062,10 +1061,10 @@ func (proxier *Proxier) syncProxyRules() {
 				Address:   net.ParseIP(externalIP),
 				Port:      uint16(svcInfo.port),
 				Protocol:  string(svcInfo.protocol),
-				Flags:     flags,
 				Scheduler: proxier.ipvsScheduler,
 			}
 			if svcInfo.sessionAffinityType == api.ServiceAffinityClientIP {
+				serv.Flags |= utilipvs.FlagPersistent
 				serv.Timeout = uint32(svcInfo.stickyMaxAgeSeconds)
 			}
 			// There is no need to bind externalIP to dummy interface, so set parameter `bindAddr` to `false`.
@@ -1123,10 +1122,10 @@ func (proxier *Proxier) syncProxyRules() {
 					Address:   net.ParseIP(ingress.IP),
 					Port:      uint16(svcInfo.port),
 					Protocol:  string(svcInfo.protocol),
-					Flags:     flags,
 					Scheduler: proxier.ipvsScheduler,
 				}
 				if svcInfo.sessionAffinityType == api.ServiceAffinityClientIP {
+					serv.Flags |= utilipvs.FlagPersistent
 					serv.Timeout = uint32(svcInfo.stickyMaxAgeSeconds)
 				}
 				// There is no need to bind LB ingress.IP to dummy interface, so set parameter `bindAddr` to `false`.
@@ -1173,10 +1172,10 @@ func (proxier *Proxier) syncProxyRules() {
 						Address:   nodeIP,
 						Port:      uint16(svcInfo.nodePort),
 						Protocol:  string(svcInfo.protocol),
-						Flags:     flags,
 						Scheduler: proxier.ipvsScheduler,
 					}
 					if svcInfo.sessionAffinityType == api.ServiceAffinityClientIP {
+						serv.Flags |= utilipvs.FlagPersistent
 						serv.Timeout = uint32(svcInfo.stickyMaxAgeSeconds)
 					}
 					// There is no need to bind Node IP to dummy interface, so set parameter `bindAddr` to `false`.
