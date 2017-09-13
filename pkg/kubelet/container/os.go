@@ -38,6 +38,8 @@ type OSInterface interface {
 	Pipe() (r *os.File, w *os.File, err error)
 	ReadDir(dirname string) ([]os.FileInfo, error)
 	Glob(pattern string) ([]string, error)
+	Dir(path string) string
+	Readlink(name string) (string, error)
 }
 
 // RealOS is used to dispatch the real system level operations.
@@ -104,4 +106,14 @@ func (RealOS) ReadDir(dirname string) ([]os.FileInfo, error) {
 // pattern.
 func (RealOS) Glob(pattern string) ([]string, error) {
 	return filepath.Glob(pattern)
+}
+
+// // Dir returns all but the last element of path
+func (RealOS) Dir(path string) string {
+	return filepath.Dir(path)
+}
+
+// Readlink returns the destination of the named symbolic link
+func (RealOS) Readlink(name string) (string, error) {
+	return os.Readlink(name)
 }
