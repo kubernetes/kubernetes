@@ -69,6 +69,7 @@ batch/v1beta1 \
 batch/v2alpha1 \
 certificates.k8s.io/v1beta1 \
 extensions/v1beta1 \
+events.k8s.io/v1beta1 \
 imagepolicy.k8s.io/v1alpha1 \
 networking.k8s.io/v1 \
 policy/v1beta1 \
