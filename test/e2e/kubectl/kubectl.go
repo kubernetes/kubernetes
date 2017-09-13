@@ -234,7 +234,7 @@ var _ = SIGDescribe("Kubectl alpha client", func() {
 		})
 
 		AfterEach(func() {
-			framework.RunKubectlOrDie("delete", "cronjob.v2alpha1.batch", cjName, nsFlag)
+			framework.RunKubectlOrDie("delete", "cronjobs", cjName, nsFlag)
 		})
 
 		It("should create a CronJob", func() {
@@ -1380,7 +1380,7 @@ metadata:
 		})
 
 		AfterEach(func() {
-			framework.RunKubectlOrDie("delete", "cronjob.v1beta1.batch", cjName, nsFlag)
+			framework.RunKubectlOrDie("delete", "cronjobs", cjName, nsFlag)
 		})
 
 		It("should create a CronJob", func() {

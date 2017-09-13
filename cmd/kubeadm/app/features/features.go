@@ -63,7 +63,7 @@ func Keys(featureList FeatureList) []string {
 
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
-	SelfHosting:         {Default: false, PreRelease: utilfeature.Beta},
+	SelfHosting:         {Default: false, PreRelease: utilfeature.Alpha},
 	StoreCertsInSecrets: {Default: false, PreRelease: utilfeature.Alpha},
 }
 

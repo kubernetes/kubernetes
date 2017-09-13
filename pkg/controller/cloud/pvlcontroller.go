@@ -19,7 +19,6 @@ package cloud
 import (
 	"encoding/json"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -41,22 +40,13 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	vol "k8s.io/kubernetes/pkg/volume"
 )
 
 const initializerName = "pvlabel.kubernetes.io"
 
 // PersistentVolumeLabelController handles adding labels to persistent volumes when they are created
 type PersistentVolumeLabelController struct {
-	// Control access to cloud volumes
-	mutex            sync.Mutex
-	ebsVolumes       aws.Volumes
-	gceCloudProvider *gce.GCECloud
-
 	cloud         cloudprovider.Interface
 	kubeClient    kubernetes.Interface
 	pvlController cache.Controller
@@ -192,103 +182,20 @@ func (pvlc *PersistentVolumeLabelController) addLabels(key string) error {
 
 func (pvlc *PersistentVolumeLabelController) addLabelsToVolume(vol *v1.PersistentVolume) error {
 	var volumeLabels map[string]string
-
 	// Only add labels if in the list of initializers
 	if needsInitialization(vol.Initializers, initializerName) {
-		if vol.Spec.AWSElasticBlockStore != nil {
-			labels, err := pvlc.findAWSEBSLabels(vol)
+		if labeler, ok := (pvlc.cloud).(cloudprovider.PVLabeler); ok {
+			labels, err := labeler.GetLabelsForVolume(vol)
 			if err != nil {
-				return fmt.Errorf("error querying AWS EBS volume %s: %v", vol.Spec.AWSElasticBlockStore.VolumeID, err)
+				return fmt.Errorf("error querying volume %v: %v", vol.Spec, err)
 			}
 			volumeLabels = labels
-		}
-		if vol.Spec.GCEPersistentDisk != nil {
-			labels, err := pvlc.findGCEPDLabels(vol)
-			if err != nil {
-				return fmt.Errorf("error querying GCE PD volume %s: %v", vol.Spec.GCEPersistentDisk.PDName, err)
-			}
-			volumeLabels = labels
+		} else {
+			glog.V(4).Info("cloud provider does not support PVLabeler")
 		}
 		return pvlc.updateVolume(vol, volumeLabels)
 	}
-
 	return nil
-}
-
-func (pvlc *PersistentVolumeLabelController) findAWSEBSLabels(volume *v1.PersistentVolume) (map[string]string, error) {
-	// Ignore any volumes that are being provisioned
-	if volume.Spec.AWSElasticBlockStore.VolumeID == vol.ProvisionedVolumeName {
-		return nil, nil
-	}
-	ebsVolumes, err := pvlc.getEBSVolumes()
-	if err != nil {
-		return nil, err
-	}
-
-	// TODO: GetVolumeLabels is actually a method on the Volumes interface
-	// If that gets standardized we can refactor to reduce code duplication
-	spec := aws.KubernetesVolumeID(volume.Spec.AWSElasticBlockStore.VolumeID)
-	labels, err := ebsVolumes.GetVolumeLabels(spec)
-	if err != nil {
-		return nil, err
-	}
-
-	return labels, nil
-}
-
-// getEBSVolumes returns the AWS Volumes interface for ebs
-func (pvlc *PersistentVolumeLabelController) getEBSVolumes() (aws.Volumes, error) {
-	pvlc.mutex.Lock()
-	defer pvlc.mutex.Unlock()
-
-	if pvlc.ebsVolumes == nil {
-		awsCloudProvider := pvlc.cloud.(*aws.Cloud)
-		awsCloudProvider, ok := pvlc.cloud.(*aws.Cloud)
-		if !ok {
-			// GetCloudProvider has gone very wrong
-			return nil, fmt.Errorf("error retrieving AWS cloud provider")
-		}
-		pvlc.ebsVolumes = awsCloudProvider
-	}
-	return pvlc.ebsVolumes, nil
-}
-
-func (pvlc *PersistentVolumeLabelController) findGCEPDLabels(volume *v1.PersistentVolume) (map[string]string, error) {
-	// Ignore any volumes that are being provisioned
-	if volume.Spec.GCEPersistentDisk.PDName == vol.ProvisionedVolumeName {
-		return nil, nil
-	}
-
-	provider, err := pvlc.getGCECloudProvider()
-	if err != nil {
-		return nil, err
-	}
-
-	// If the zone is already labeled, honor the hint
-	zone := volume.Labels[kubeletapis.LabelZoneFailureDomain]
-
-	labels, err := provider.GetAutoLabelsForPD(volume.Spec.GCEPersistentDisk.PDName, zone)
-	if err != nil {
-		return nil, err
-	}
-
-	return labels, nil
-}
-
-// getGCECloudProvider returns the GCE cloud provider, for use for querying volume labels
-func (pvlc *PersistentVolumeLabelController) getGCECloudProvider() (*gce.GCECloud, error) {
-	pvlc.mutex.Lock()
-	defer pvlc.mutex.Unlock()
-
-	if pvlc.gceCloudProvider == nil {
-		gceCloudProvider, ok := pvlc.cloud.(*gce.GCECloud)
-		if !ok {
-			// GetCloudProvider has gone very wrong
-			return nil, fmt.Errorf("error retrieving GCE cloud provider")
-		}
-		pvlc.gceCloudProvider = gceCloudProvider
-	}
-	return pvlc.gceCloudProvider, nil
 }
 
 func (pvlc *PersistentVolumeLabelController) createPatch(vol *v1.PersistentVolume, volLabels map[string]string) ([]byte, error) {
