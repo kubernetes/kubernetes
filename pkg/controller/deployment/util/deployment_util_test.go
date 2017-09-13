@@ -762,11 +762,11 @@ func TestNewRSNewReplicas(t *testing.T) {
 			newDeployment.Spec.Strategy = extensions.DeploymentStrategy{Type: test.strategyType}
 			newDeployment.Spec.Strategy.RollingUpdate = &extensions.RollingUpdateDeployment{
 				MaxUnavailable: func(i int) *intstr.IntOrString {
-					x := intstr.FromInt(i)
+					x := intstr.FromInt(int32(i))
 					return &x
 				}(1),
 				MaxSurge: func(i int) *intstr.IntOrString {
-					x := intstr.FromInt(i)
+					x := intstr.FromInt(int32(i))
 					return &x
 				}(test.maxSurge),
 			}
@@ -953,8 +953,8 @@ func TestDeploymentComplete(t *testing.T) {
 				Replicas: &desired,
 				Strategy: extensions.DeploymentStrategy{
 					RollingUpdate: &extensions.RollingUpdateDeployment{
-						MaxUnavailable: func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(maxUnavailable)),
-						MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(maxSurge)),
+						MaxUnavailable: func(i int) *intstr.IntOrString { x := intstr.FromInt(int32(i)); return &x }(int(maxUnavailable)),
+						MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(int32(i)); return &x }(int(maxSurge)),
 					},
 					Type: extensions.RollingUpdateDeploymentStrategyType,
 				},
@@ -1199,7 +1199,7 @@ func TestMaxUnavailable(t *testing.T) {
 				Replicas: func(i int32) *int32 { return &i }(replicas),
 				Strategy: extensions.DeploymentStrategy{
 					RollingUpdate: &extensions.RollingUpdateDeployment{
-						MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(i); return &x }(int(1)),
+						MaxSurge:       func(i int) *intstr.IntOrString { x := intstr.FromInt(int32(i)); return &x }(int(1)),
 						MaxUnavailable: &maxUnavailable,
 					},
 					Type: extensions.RollingUpdateDeploymentStrategyType,

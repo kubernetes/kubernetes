@@ -71,7 +71,7 @@ func ComponentProbe(port int, path string, scheme v1.URIScheme) *v1.Probe {
 				// Host has to be set to "127.0.0.1" here due to that our static Pods are on the host's network
 				Host:   "127.0.0.1",
 				Path:   path,
-				Port:   intstr.FromInt(port),
+				Port:   intstr.FromInt(int32(port)),
 				Scheme: scheme,
 			},
 		},

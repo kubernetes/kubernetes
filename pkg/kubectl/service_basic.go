@@ -90,14 +90,14 @@ func parsePorts(portString string) (int32, intstr.IntOrString, error) {
 		return 0, intstr.FromInt(0), err
 	}
 	if len(portStringSlice) == 1 {
-		return int32(port), intstr.FromInt(int(port)), nil
+		return int32(port), intstr.FromInt(int32(port)), nil
 	}
 
 	var targetPort intstr.IntOrString
 	if portNum, err := strconv.Atoi(portStringSlice[1]); err != nil {
 		targetPort = intstr.FromString(portStringSlice[1])
 	} else {
-		targetPort = intstr.FromInt(portNum)
+		targetPort = intstr.FromInt(int32(portNum))
 	}
 	return int32(port), targetPort, nil
 }

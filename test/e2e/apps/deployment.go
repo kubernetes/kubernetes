@@ -162,7 +162,7 @@ func failureTrap(c clientset.Interface, ns string) {
 }
 
 func intOrStrP(num int) *intstr.IntOrString {
-	intstr := intstr.FromInt(num)
+	intstr := intstr.FromInt(int32(num))
 	return &intstr
 }
 

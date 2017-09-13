@@ -722,7 +722,7 @@ func runDrainTest(f *framework.Framework, migSizes map[string]int, namespace str
 	defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, namespace, "reschedulable-pods")
 
 	By("Create a PodDisruptionBudget")
-	minAvailable := intstr.FromInt(numPods - pdbSize)
+	minAvailable := intstr.FromInt(int32(numPods - pdbSize))
 	pdb := &policy.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test_pdb",
@@ -1432,7 +1432,7 @@ func addKubeSystemPdbs(f *framework.Framework) (func(), error) {
 		By(fmt.Sprintf("Create PodDisruptionBudget for %v", pdbData.label))
 		labelMap := map[string]string{"k8s-app": pdbData.label}
 		pdbName := fmt.Sprintf("test-pdb-for-%v", pdbData.label)
-		minAvailable := intstr.FromInt(pdbData.min_available)
+		minAvailable := intstr.FromInt(int32(pdbData.min_available))
 		pdb := &policy.PodDisruptionBudget{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pdbName,

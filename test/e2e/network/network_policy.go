@@ -382,7 +382,7 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 		servicePorts = append(servicePorts, v1.ServicePort{
 			Name:       fmt.Sprintf("%s-%d", podName, port),
 			Port:       int32(port),
-			TargetPort: intstr.FromInt(port),
+			TargetPort: intstr.FromInt(int32(port)),
 		})
 	}
 
