@@ -29,9 +29,14 @@ type DestroyFunc func()
 // Create creates a storage backend based on given config.
 func Create(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
 	switch c.Type {
-	case storagebackend.StorageTypeETCD2:
+	// Warning: changing the interpretation of the default (StorageTypeUnset)
+	// is a breaking change for users, and is subject to the kubernetes
+	// deprecation policy.  Also note that it's probably a bad idea, because
+	// then we end up with API servers whose default varies depending on when
+	// they were built.  More details in #45457.
+	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD2:
 		return newETCD2Storage(c)
-	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD3:
+	case storagebackend.StorageTypeETCD3:
 		// TODO: We have the following features to implement:
 		// - Support secure connection by using key, cert, and CA files.
 		// - Honor "https" scheme to support secure connection in gRPC.
