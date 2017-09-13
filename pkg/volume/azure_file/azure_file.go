@@ -19,6 +19,7 @@ package azure_file
 import (
 	"fmt"
 	"os"
+	"runtime"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -210,15 +211,24 @@ func (b *azureFileMounter) SetUpAt(dir string, fsGroup *int64) error {
 	if accountName, accountKey, err = b.util.GetAzureCredentials(b.plugin.host, b.secretNamespace, b.secretName); err != nil {
 		return err
 	}
-	os.MkdirAll(dir, 0700)
 
-	source := fmt.Sprintf("//%s.file.%s/%s", accountName, getStorageEndpointSuffix(b.plugin.host.GetCloudProvider()), b.shareName)
-	// parameters suggested by https://azure.microsoft.com/en-us/documentation/articles/storage-how-to-use-files-linux/
-	options := []string{fmt.Sprintf("vers=3.0,username=%s,password=%s,dir_mode=0700,file_mode=0700", accountName, accountKey)}
-	if b.readOnly {
-		options = append(options, "ro")
+	mountOptions := []string{}
+	source := ""
+	osSeparator := string(os.PathSeparator)
+	source = fmt.Sprintf("%s%s%s.file.%s%s%s", osSeparator, osSeparator, accountName, getStorageEndpointSuffix(b.plugin.host.GetCloudProvider()), osSeparator, b.shareName)
+
+	if runtime.GOOS == "windows" {
+		mountOptions = []string{accountName, accountKey}
+	} else {
+		os.MkdirAll(dir, 0700)
+		// parameters suggested by https://azure.microsoft.com/en-us/documentation/articles/storage-how-to-use-files-linux/
+		options := []string{fmt.Sprintf("vers=3.0,username=%s,password=%s,dir_mode=0700,file_mode=0700", accountName, accountKey)}
+		if b.readOnly {
+			options = append(options, "ro")
+		}
+		mountOptions = volume.JoinMountOptions(b.mountOptions, options)
 	}
-	mountOptions := volume.JoinMountOptions(b.mountOptions, options)
+
 	err = b.mounter.Mount(source, dir, "cifs", mountOptions)
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
