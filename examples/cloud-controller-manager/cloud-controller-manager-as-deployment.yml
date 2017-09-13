@@ -1,0 +1,65 @@
+# This is an example of how to setup cloud-controller-manager as a Deployment in your cluster.
+# Note that this Deployment is unlikely to work straight out of the box for your cloud, this is 
+# meant to be a guideline.
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cloud-controller-manager
+  namespace: kube-system
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: system:cloud-controller-manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: cloud-controller-manager
+  namespace: kube-system
+---
+apiVersion: extensions/v1beta1
+kind: Deployment 
+metadata:
+  labels:
+    app: cloud-controller-manager
+  annotations:
+    scheduler.alpha.kubernetes.io/critical-pod: ''
+  name: cloud-controller-manager
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: cloud-controller-manager
+  template:
+    metadata:
+      labels:
+        app: cloud-controller-manager
+    spec:
+      serviceAccountName: cloud-controller-manager
+      containers:
+      - name: cloud-controller-manager
+        image: gcr.io/google_containers/cloud-controller-manager:v1.7.0
+        command:
+        - /usr/local/bin/cloud-controller-manager
+        - --cloud-provider=<YOUR_CLOUD_PROVIDER>   # Add your own cloud provider here!
+        - --leader-elect=true
+        # these flags will vary for every cloud provider
+        - --allocate-node-cidrs=true
+        - --configure-cloud-routes=true
+        - --cluster-cidr=172.17.0.0/16
+        volumeMounts:
+        - name: etcssl
+          mountPath: /etc/ssl
+      tolerations:
+      - key: node.cloudprovider.kubernetes.io/uninitialized
+        value: "true"
+        effect: NoSchedule
+      volumes:
+      - name: etcssl
+        hostPath:
+          path: /etc/ssl
