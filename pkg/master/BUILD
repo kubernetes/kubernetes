@@ -109,6 +109,7 @@ go_test(
         "master_openapi_test.go",
         "master_test.go",
     ],
+    features = ["-race"],
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

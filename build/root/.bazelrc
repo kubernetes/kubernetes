@@ -17,3 +17,6 @@ build --sandbox_fake_username
 # TODO(ixdy): Remove this default once rules_go is bumped.
 # Ref kubernetes/kubernetes#52677
 build --incompatible_comprehension_variables_do_not_leak=false
+
+# Enable go race detection.
+test --features=race

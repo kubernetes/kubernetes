@@ -22,6 +22,7 @@ go_test(
         "store_test.go",
         "undelta_store_test.go",
     ],
+    features = ["-race"],
     library = ":go_default_library",
     deps = [
         "//vendor/github.com/google/gofuzz:go_default_library",
