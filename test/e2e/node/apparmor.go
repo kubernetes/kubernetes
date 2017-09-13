@@ -39,7 +39,11 @@ var _ = SIGDescribe("AppArmor", func() {
 		})
 
 		It("should enforce an AppArmor profile", func() {
-			common.CreateAppArmorTestPod(f, true)
+			common.CreateAppArmorTestPod(f, false, true)
+		})
+
+		It("can disable an AppArmor profile, using unconfined", func() {
+			common.CreateAppArmorTestPod(f, true, true)
 		})
 	})
 })
