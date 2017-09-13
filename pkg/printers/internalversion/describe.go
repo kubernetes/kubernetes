@@ -2225,7 +2225,6 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 		w.Write(LEVEL_0, "Namespace:\t%s\n", serviceAccount.Namespace)
 		printLabelsMultiline(w, "Labels", serviceAccount.Labels)
 		printAnnotationsMultiline(w, "Annotations", serviceAccount.Annotations)
-		w.WriteLine()
 
 		var (
 			emptyHeader = "                   "
@@ -2267,7 +2266,6 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 					prefix = emptyHeader
 				}
 			}
-			w.WriteLine()
 		}
 
 		if events != nil {
