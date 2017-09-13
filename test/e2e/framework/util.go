@@ -3311,7 +3311,7 @@ func RunHostCmdOrDie(ns, name, cmd string) string {
 	return stdout
 }
 
-// RunHostCmdWithRetries calls RunHostCmd and retries errors it thinks may be transient
+// RunHostCmdWithRetries calls RunHostCmd and retries all errors
 // until it succeeds or the specified timeout expires.
 // This can be used with idempotent commands to deflake transient Node issues.
 func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration) (string, error) {
@@ -3323,9 +3323,6 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 		}
 		if elapsed := time.Since(start); elapsed > timeout {
 			return out, fmt.Errorf("RunHostCmd still failed after %v: %v", elapsed, err)
-		}
-		if !strings.Contains(err.Error(), "Error from server") {
-			return out, fmt.Errorf("Non-retryable RunHostCmd error: %v", err)
 		}
 		Logf("Waiting %v to retry failed RunHostCmd: %v", interval, err)
 		time.Sleep(interval)
