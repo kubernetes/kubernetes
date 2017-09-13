@@ -112,7 +112,7 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 	var ret = true
 	if len(pods.Items) != podNum {
 		ret = false
-		t.Logf("expect %d pods, got %d pods", podNum, len(pods.Items))
+		t.Errorf("expect %d pods, got %d pods", podNum, len(pods.Items))
 	}
 	rss, err := rsClient.List(metav1.ListOptions{})
 	if err != nil {
@@ -120,7 +120,7 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 	}
 	if len(rss.Items) != rsNum {
 		ret = false
-		t.Logf("expect %d RSs, got %d RSs", rsNum, len(rss.Items))
+		t.Errorf("expect %d RSs, got %d RSs", rsNum, len(rss.Items))
 	}
 	return ret, nil
 }
