@@ -55,19 +55,26 @@ const (
 )
 
 var (
-	join_long = templates.LongDesc(`
+	joinLong = templates.LongDesc(`
 		Join adds a cluster to a federation.
 
         Current context is assumed to be a federation API
         server. Please use the --context flag otherwise.`)
-	join_example = templates.Examples(`
+
+	joinExample = templates.Examples(`
 		# Join a cluster to a federation by specifying the
 		# cluster name and the context name of the federation
 		# control plane's host cluster. Cluster name must be
 		# a valid RFC 1123 subdomain name. Cluster context
 		# must be specified if the cluster name is different
 		# than the cluster's context in the local kubeconfig.
-		kubefed join foo --host-cluster-context=bar`)
+		
+		# Join cluster foo to a federation hosted on bar context.
+		kubefed join foo --host-cluster-context=bar
+	
+		# Join cluster foo to a federation hosted on bar context
+		# and add region=region-a zone=zone-b labels to foo cluster.
+		kubefed join foo --labels="region=region-a, zone=zone-b" --host-cluster-context=bar`)
 )
 
 type joinFederation struct {
@@ -78,6 +85,7 @@ type joinFederation struct {
 type joinFederationOptions struct {
 	clusterContext string
 	secretName     string
+	labels         string
 	dryRun         bool
 }
 
@@ -85,6 +93,7 @@ func (o *joinFederationOptions) Bind(flags *pflag.FlagSet) {
 	flags.StringVar(&o.clusterContext, "cluster-context", "", "Name of the cluster's context in the local kubeconfig. Defaults to cluster name if unspecified.")
 	flags.StringVar(&o.secretName, "secret-name", "", "Name of the secret where the cluster's credentials will be stored in the host cluster. This name should be a valid RFC 1035 label. Defaults to cluster name if unspecified.")
 	flags.MarkDeprecated("secret-name", "kubefed now generates a secret name, and this flag will be removed in a future release.")
+	flags.StringVar(&o.labels, "labels", "", "Comma separated labels to apply to the cluster.")
 }
 
 // NewCmdJoin defines the `join` command that joins a cluster to a
@@ -95,11 +104,18 @@ func NewCmdJoin(f cmdutil.Factory, cmdOut io.Writer, config util.AdminConfig) *c
 	cmd := &cobra.Command{
 		Use:     "join CLUSTER_NAME --host-cluster-context=HOST_CONTEXT",
 		Short:   "Join a cluster to a federation",
-		Long:    join_long,
-		Example: join_example,
+		Long:    joinLong,
+		Example: joinExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(opts.Complete(cmd, args, config))
-			cmdutil.CheckErr(opts.Run(f, cmdOut, config, cmd))
+			if err := opts.Complete(cmd, args, config); err != nil {
+				cmdutil.CheckErr(err)
+			}
+			if err := opts.Validate(); err != nil {
+				cmdutil.CheckErr(cmdutil.UsageErrorf(cmd, err.Error()))
+			}
+			if err := opts.Run(f, cmdOut, config, cmd); err != nil {
+				cmdutil.CheckErr(opts.Run(f, cmdOut, config, cmd))
+			}
 		},
 	}
 
@@ -122,19 +138,37 @@ func (j *joinFederation) Complete(cmd *cobra.Command, args []string, config util
 		return err
 	}
 
+	j.options.labels = cmdutil.GetFlagString(cmd, "labels")
 	j.options.dryRun = cmdutil.GetDryRunFlag(cmd)
 
 	if j.options.clusterContext == "" {
 		j.options.clusterContext = j.commonOptions.Name
 	}
 
-	glog.V(2).Infof("Args and flags: name %s, host: %s, host-system-namespace: %s, kubeconfig: %s, cluster-context: %s, secret-name: %s, dry-run: %s", j.commonOptions.Name, j.commonOptions.Host, j.commonOptions.FederationSystemNamespace, j.commonOptions.Kubeconfig, j.options.clusterContext, j.options.secretName, j.options.dryRun)
+	glog.V(2).Infof("Args and flags: name %s, host: %s, host-system-namespace: %s, kubeconfig: %s, cluster-context: %s, secret-name: %s, labels: %s, dry-run: %s", j.commonOptions.Name, j.commonOptions.Host, j.commonOptions.FederationSystemNamespace, j.commonOptions.Kubeconfig, j.options.clusterContext, j.options.secretName, j.options.labels, j.options.dryRun)
 
 	glog.V(2).Infof("Performing preflight checks.")
 	err = j.performPreflightChecks(config)
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+// Validate validates all the required options for kubefed Join.
+func (j joinFederation) Validate() error {
+
+	labelSpecs := strings.Split(j.options.labels, ",")
+	for i := range labelSpecs {
+		labelSpec := strings.Split(labelSpecs[i], "=")
+		if len(labelSpec) != 2 {
+			return fmt.Errorf("unexpected label spec: %s", labelSpecs[i])
+		}
+		if len(labelSpec[0]) == 0 {
+			return fmt.Errof("unexpected empty label key")
+		}
+	}
+
 	return nil
 }
 
@@ -182,6 +216,7 @@ func (j *joinFederation) Run(f cmdutil.Factory, cmdOut io.Writer, config util.Ad
 	kubeconfig := j.commonOptions.Kubeconfig
 	joiningClusterName := j.commonOptions.Name
 	secretName := j.options.secretName
+	labels := j.options.labels
 	if secretName == "" {
 		secretName = k8s_api_v1.SimpleNameGenerator.GenerateName(j.commonOptions.Name + "-")
 	}
@@ -434,6 +469,7 @@ func clusterGenerator(clientConfig *clientcmdapi.Config, name, contextName, secr
 		SecretName:         secretName,
 		ServiceAccountName: serviceAccountName,
 		ClusterRoleName:    clusterRoleName,
+		Labels:             labels,
 	}
 	return generator, nil
 }

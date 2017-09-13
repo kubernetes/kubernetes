@@ -57,6 +57,7 @@ const (
 )
 
 func TestJoinFederation(t *testing.T) {
+	// TODO(arthur0): Add/modify tests to labels option
 	cmdErrMsg := ""
 	cmdutil.BehaviorOnFatal(func(str string, code int) {
 		cmdErrMsg = str

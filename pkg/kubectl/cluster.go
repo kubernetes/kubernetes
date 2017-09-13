@@ -53,7 +53,9 @@ type ClusterGeneratorV1Beta1 struct {
 	// is provided, then ServiceAccountName must also be provided
 	// (optional)
 	ClusterRoleName string
-}
+	// Labels is a set of labels that be applied to the cluster
+	// (optional)
+	Labels string
 
 // Ensure it supports the generator pattern that uses parameter
 // injection.
@@ -78,6 +80,15 @@ func (s ClusterGeneratorV1Beta1) Generate(genericParams map[string]interface{}) 
 		}
 		params[key] = strVal
 	}
+	labelsString, found := params["labels"]
+	var labels map[string]string
+	if found && len(labelsString) > 0 {
+		labels, err = ParseLabels(labelsString)
+		if err != nil {
+			return nil, err
+		}
+	}
+	clustergen.Labels = labels
 	clustergen.Name = params["name"]
 	clustergen.ClientCIDR = params["client-cidr"]
 	clustergen.ServerAddress = params["server-address"]
@@ -97,6 +108,7 @@ func (s ClusterGeneratorV1Beta1) ParamNames() []GeneratorParam {
 		{"secret", false},
 		{"service-account-name", false},
 		{"cluster-role-name", false},
+		{"labels", false},
 	}
 }
 
@@ -114,7 +126,8 @@ func (s ClusterGeneratorV1Beta1) StructuredGenerate() (runtime.Object, error) {
 	}
 	cluster := &federationapi.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: s.Name,
+			Name:   s.Name,
+			Labels: s.Labels,
 		},
 		Spec: federationapi.ClusterSpec{
 			ServerAddressByClientCIDRs: []federationapi.ServerAddressByClientCIDR{
