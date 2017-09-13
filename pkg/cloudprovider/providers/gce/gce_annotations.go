@@ -23,27 +23,31 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type LoadBalancerType string
 type NetworkTier string
 
 const (
+	AnnotationTrueValue  = "true"
+	AnnotationFalseValue = "false"
+
 	// ServiceAnnotationLoadBalancerType is annotated on a service with type LoadBalancer
 	// dictates what specific kind of GCP LB should be assembled.
 	// Currently, only "internal" is supported.
-	ServiceAnnotationLoadBalancerType = "cloud.google.com/load-balancer-type"
+	ServiceAnnotationLoadBalancerType         = "cloud.google.com/load-balancer-type"
+	ServiceAnnotationLoadBalancerTypeInternal = "Internal"
+	ServiceAnnotationLoadBalancerTypeExternal = "External"
 
-	LBTypeInternal LoadBalancerType = "Internal"
-	// Deprecating the lowercase spelling of Internal.
-	deprecatedTypeInternalLowerCase LoadBalancerType = "internal"
+	LBTypeInternal LoadBalancerType = ServiceAnnotationLoadBalancerTypeInternal
+	LBTypeExternal LoadBalancerType = ServiceAnnotationLoadBalancerTypeExternal
 
 	// ServiceAnnotationInternalBackendShare is annotated on a service with "true" when users
 	// want to share GCP Backend Services for a set of internal load balancers.
 	// ALPHA feature - this may be removed in a future release.
 	ServiceAnnotationILBBackendShare = "alpha.cloud.google.com/load-balancer-backend-share"
-	// This annotation did not correctly specify "alpha", so both annotations will be checked.
-	deprecatedServiceAnnotationILBBackendShare = "cloud.google.com/load-balancer-backend-share"
 
 	// NetworkTierAnnotationKey is annotated on a Service object to indicate which
 	// network tier a GCP LB should use. The valid values are "Standard" and
@@ -57,61 +61,144 @@ const (
 	NetworkTierDefault  NetworkTier = NetworkTierPremium
 )
 
-// GetLoadBalancerAnnotationType returns the type of GCP load balancer which should be assembled.
-func GetLoadBalancerAnnotationType(service *v1.Service) (LoadBalancerType, bool) {
-	v := LoadBalancerType("")
-	if service.Spec.Type != v1.ServiceTypeLoadBalancer {
-		return v, false
+type lbAnnotation struct {
+	// values includes all valid values for the annotation key.
+	values sets.String
+	// defaultValue is the default value for the annotation key.
+	defaultValue string
+}
+
+var (
+	// allServiceLBAnnotations defines all supported load balancer annoations
+	// for Service.
+	allServiceLBAnnotations = map[string]*lbAnnotation{
+		ServiceAnnotationLoadBalancerType: {
+			values: sets.NewString(
+				ServiceAnnotationLoadBalancerTypeInternal,
+				ServiceAnnotationLoadBalancerTypeExternal,
+				"internal", // The lower-case value has been deprecated.
+			),
+			defaultValue: ServiceAnnotationLoadBalancerTypeExternal,
+		},
+		ServiceAnnotationILBBackendShare: {
+			values:       sets.NewString(AnnotationTrueValue, AnnotationFalseValue),
+			defaultValue: AnnotationFalseValue,
+		},
+		NetworkTierAnnotationKey: {
+			values:       sets.NewString(NetworkTierAnnotationPremium, NetworkTierAnnotationStandard),
+			defaultValue: NetworkTierAnnotationPremium,
+		},
 	}
 
-	l, ok := service.Annotations[ServiceAnnotationLoadBalancerType]
-	v = LoadBalancerType(l)
+	// deprecatedServiceAnnotations maps the deprecated key to its replacement.
+	// The deprecation keys are not defined as constants on purpose to avoid
+	// accidental uses.
+	deprecatedServiceLBAnnotations = map[string]string{
+		// This key did not correctly specify "alpha" and has been deprecated.
+		"cloud.google.com/load-balancer-backend-share": ServiceAnnotationLoadBalancerType,
+	}
+
+	// ILBAnnotationKeys is a set of all supported annotation keys for an
+	// internal load balancer.
+	ILBAnnotationKeys = sets.NewString(ServiceAnnotationILBBackendShare)
+	// ELBAnnotationKeys is a set of all supported annotation keys for an
+	// external load balancer.
+	ELBAnnotationKeys = sets.NewString(NetworkTierAnnotationKey)
+)
+
+// validateServiceLBAnnotations validates LB-related annotations in Service.
+func validateServiceLBAnnotations(svc *v1.Service) error {
+	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
+		return fmt.Errorf("expeceted service type %v, got %v ", v1.ServiceTypeLoadBalancer, svc.Spec.Type)
+	}
+
+	if v, ok := svc.Annotations[ServiceAnnotationLoadBalancerType]; ok {
+		if err := validateLBAnnotation(ServiceAnnotationLoadBalancerType, v); err != nil {
+			return err
+		}
+	}
+
+	var allErrs []error
+	var incompatibleKeys sets.String
+	// Determine incompatible keys based on the LB type.
+	lbType := GetLoadBalancerAnnotationType(svc)
+	if lbType == LBTypeInternal {
+		incompatibleKeys = ELBAnnotationKeys.Difference(ILBAnnotationKeys)
+	} else {
+		incompatibleKeys = ILBAnnotationKeys.Difference(ELBAnnotationKeys)
+	}
+
+	for k, v := range svc.Annotations {
+		if incompatibleKeys.Has(k) {
+			allErrs = append(allErrs, fmt.Errorf("key %q is compatible with LB type %q", k, lbType))
+			continue
+		}
+		err := validateLBAnnotation(k, v)
+		allErrs = append(allErrs, err)
+	}
+	return utilerrors.NewAggregate(allErrs)
+}
+
+func validateLBAnnotation(key, value string) error {
+	// If the key has been deprecated, replace it with the new key.
+	if newKey, ok := deprecatedServiceLBAnnotations[key]; ok {
+		glog.Warning("key %s has been deprecated. Please use %q in the future", key, newKey)
+		key = newKey
+	}
+
+	r, ok := allServiceLBAnnotations[key]
 	if !ok {
-		return v, false
+		// Ignore unknown keys.
+		return nil
 	}
 
-	switch v {
-	case LBTypeInternal, deprecatedTypeInternalLowerCase:
-		return LBTypeInternal, true
-	default:
-		return v, false
+	if !r.values.Has(value) {
+		return fmt.Errorf("invalid value %q for key %q", value, key)
 	}
+
+	return nil
+}
+
+// GetServiceLBAnnotationValue returns the value of the given annotation key if
+// the key exists. If not, it returs the default value. It is the caller's
+// responsibility to ensure that the given key exists in allServiceLBAnnotations.
+func GetServiceLBAnnotationValue(svc *v1.Service, key string) string {
+	if newKey, ok := deprecatedServiceLBAnnotations[key]; ok {
+		key = newKey
+	}
+	if value, ok := svc.Annotations[key]; ok {
+		return value
+	}
+
+	if r, ok := allServiceLBAnnotations[key]; ok {
+		return r.defaultValue
+	}
+	return ""
+}
+
+// GetLoadBalancerAnnotationType returns the type of GCP load balancer which should be assembled.
+func GetLoadBalancerAnnotationType(service *v1.Service) LoadBalancerType {
+	lbType := GetServiceLBAnnotationValue(service, ServiceAnnotationLoadBalancerType)
+	// The lower-case "internal" has been deprecated.
+	if lbType == "internal" {
+		return LBTypeInternal
+	}
+	return LoadBalancerType(lbType)
 }
 
 // GetLoadBalancerAnnotationBackendShare returns whether this service's backend service should be
 // shared with other load balancers. Health checks and the healthcheck firewall will be shared regardless.
 func GetLoadBalancerAnnotationBackendShare(service *v1.Service) bool {
-	if l, exists := service.Annotations[ServiceAnnotationILBBackendShare]; exists && l == "true" {
+	v := GetServiceLBAnnotationValue(service, ServiceAnnotationILBBackendShare)
+	if v == AnnotationTrueValue {
 		return true
 	}
-
-	// Check for deprecated annotation key
-	if l, exists := service.Annotations[deprecatedServiceAnnotationILBBackendShare]; exists && l == "true" {
-		glog.Warningf("Annotation %q is deprecated and replaced with an alpha-specific key: %q", deprecatedServiceAnnotationILBBackendShare, ServiceAnnotationILBBackendShare)
-		return true
-	}
-
 	return false
 }
 
-// GetServiceNetworkTier returns the network tier of GCP load balancer
-// which should be assembled, and an error if the specified tier is not
-// supported.
-func GetServiceNetworkTier(service *v1.Service) (NetworkTier, error) {
-	l, ok := service.Annotations[NetworkTierAnnotationKey]
-	if !ok {
-		return NetworkTierDefault, nil
-	}
-
-	v := NetworkTier(l)
-	switch v {
-	case NetworkTierStandard:
-		fallthrough
-	case NetworkTierPremium:
-		return v, nil
-	default:
-		return NetworkTierDefault, fmt.Errorf("unsupported network tier: %q", v)
-	}
+func GetServiceNetworkTier(service *v1.Service) NetworkTier {
+	v := GetServiceLBAnnotationValue(service, NetworkTierAnnotationKey)
+	return NetworkTier(v)
 }
 
 // ToGCEValue converts NetworkTier to a string that we can populate the

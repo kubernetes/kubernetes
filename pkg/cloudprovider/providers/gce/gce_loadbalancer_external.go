@@ -72,11 +72,7 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 	lbRefStr := fmt.Sprintf("%v(%v)", loadBalancerName, serviceName)
 	// Check the current and the desired network tiers. If they do not match,
 	// tear down the existing resources with the wrong tier.
-	netTier, err := gce.getServiceNetworkTier(apiService)
-	if err != nil {
-		glog.Errorf("EnsureLoadBalancer(%s): failed to get the desired network tier: %v", lbRefStr, err)
-		return nil, err
-	}
+	netTier := gce.getServiceNetworkTier(apiService)
 	glog.V(4).Infof("EnsureLoadBalancer(%s): desired network tier %q ", lbRefStr, netTier)
 	if gce.AlphaFeatureGate.Enabled(AlphaFeatureNetworkTiers) {
 		gce.deleteWrongNetworkTieredResources(loadBalancerName, lbRefStr, netTier)
@@ -995,16 +991,11 @@ func ensureStaticIP(s CloudAddressService, name, serviceName, region, existingIP
 	return addr.Address, existed, nil
 }
 
-func (gce *GCECloud) getServiceNetworkTier(svc *v1.Service) (NetworkTier, error) {
+func (gce *GCECloud) getServiceNetworkTier(svc *v1.Service) NetworkTier {
 	if !gce.AlphaFeatureGate.Enabled(AlphaFeatureNetworkTiers) {
-		return NetworkTierDefault, nil
+		return NetworkTierDefault
 	}
-	tier, err := GetServiceNetworkTier(svc)
-	if err != nil {
-		// Returns an error if the annotation is invalid.
-		return NetworkTier(""), err
-	}
-	return tier, nil
+	return GetServiceNetworkTier(svc)
 }
 
 func (gce *GCECloud) deleteWrongNetworkTieredResources(lbName, lbRef string, desiredNetTier NetworkTier) error {

@@ -78,8 +78,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 			setNetworkTier(svc, gcecloud.NetworkTierAnnotationStandard)
 		})
 		// Verify that service has been updated properly.
-		svcTier, err := gcecloud.GetServiceNetworkTier(svc)
-		Expect(err).NotTo(HaveOccurred())
+		svcTier := gcecloud.GetServiceNetworkTier(svc)
 		Expect(svcTier).To(Equal(gcecloud.NetworkTierStandard))
 		// Record the LB name for test cleanup.
 		serviceLBNames = append(serviceLBNames, cloudprovider.GetLoadBalancerName(svc))
@@ -93,8 +92,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 			clearNetworkTier(svc)
 		})
 		// Verify that service has been updated properly.
-		svcTier, err = gcecloud.GetServiceNetworkTier(svc)
-		Expect(err).NotTo(HaveOccurred())
+		svcTier = gcecloud.GetServiceNetworkTier(svc)
 		Expect(svcTier).To(Equal(gcecloud.NetworkTierDefault))
 
 		// Wait until the ingress IP changes. Each tier has its own pool of
@@ -124,8 +122,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 		})
 		// Verify that service has been updated properly.
 		Expect(svc.Spec.LoadBalancerIP).To(Equal(requestedIP))
-		svcTier, err = gcecloud.GetServiceNetworkTier(svc)
-		Expect(err).NotTo(HaveOccurred())
+		svcTier = gcecloud.GetServiceNetworkTier(svc)
 		Expect(svcTier).To(Equal(gcecloud.NetworkTierStandard))
 
 		// Wait until the ingress IP changes and verifies the LB.
@@ -160,8 +157,7 @@ func waitAndVerifyLBWithTier(jig *framework.ServiceTestJig, ns, svcName, existin
 	jig.TestReachableHTTPWithRetriableErrorCodes(ingressIP, svcPort, []int{http.StatusNotFound}, checkTimeout)
 
 	// Verify the network tier matches the desired.
-	svcNetTier, err := gcecloud.GetServiceNetworkTier(svc)
-	Expect(err).NotTo(HaveOccurred())
+	svcNetTier := gcecloud.GetServiceNetworkTier(svc)
 	netTier, err := getLBNetworkTierByIP(ingressIP)
 	Expect(err).NotTo(HaveOccurred(), "failed to get the network tier of the load balancer")
 	Expect(netTier).To(Equal(svcNetTier))

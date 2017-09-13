@@ -107,12 +107,21 @@ func (gce *GCECloud) GetLoadBalancer(clusterName string, svc *v1.Service) (*v1.L
 
 // EnsureLoadBalancer is an implementation of LoadBalancer.EnsureLoadBalancer.
 func (gce *GCECloud) EnsureLoadBalancer(clusterName string, svc *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-	loadBalancerName := cloudprovider.GetLoadBalancerName(svc)
-	desiredScheme := getSvcScheme(svc)
 	clusterID, err := gce.ClusterID.GetID()
 	if err != nil {
 		return nil, err
 	}
+
+	loadBalancerName := cloudprovider.GetLoadBalancerName(svc)
+	logPrefix := fmt.Sprintf("EnsureLoadBalancer(%v, %v, %v, %v, %v):", clusterName, svc.Namespace, svc.Name, loadBalancerName, gce.region)
+
+	// Validate all the relevant annotations before proceeding.
+	if err := validateServiceLBAnnotations(svc); err != nil {
+		glog.Errorf("%s: %v", logPrefix, err)
+		return nil, fmt.Errorf("service %s/%s has invalid annotations: %v", svc.Namespace, svc.Name)
+	}
+
+	desiredScheme := getSvcScheme(svc)
 
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v): ensure %v loadbalancer", clusterName, svc.Namespace, svc.Name, loadBalancerName, gce.region, desiredScheme)
 
@@ -197,8 +206,10 @@ func (gce *GCECloud) EnsureLoadBalancerDeleted(clusterName string, svc *v1.Servi
 }
 
 func getSvcScheme(svc *v1.Service) lbScheme {
-	if typ, ok := GetLoadBalancerAnnotationType(svc); ok && typ == LBTypeInternal {
+	typ := GetLoadBalancerAnnotationType(svc)
+	if typ == LBTypeInternal {
 		return schemeInternal
 	}
+
 	return schemeExternal
 }
