@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/apiserver/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
@@ -26,6 +27,10 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 )
+
+func init() {
+	healthz.DefaultHealthz()
+}
 
 func main() {
 	s := options.NewSchedulerServer()
