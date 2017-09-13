@@ -68,7 +68,10 @@ function setup() {
   elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
     echo "Using 'use_custom_instance_list' with gke, skipping check for LOG_DUMP_SSH_KEY and LOG_DUMP_SSH_USER"
     # Source the below script for the ssh-to-node utility function.
+    # Hack to save and restore the value of the ZONE env as the script overwrites it.
+    local gke_zone="${ZONE:-}"
     source "${KUBE_ROOT}/cluster/gce/util.sh"
+    ZONE="${gke_zone}"
   elif [[ -z "${LOG_DUMP_SSH_KEY:-}" ]]; then
     echo "LOG_DUMP_SSH_KEY not set, but required when using log_dump_custom_get_instances"
     exit 1
