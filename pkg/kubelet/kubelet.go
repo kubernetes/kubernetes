@@ -26,6 +26,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	goruntime "runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -649,12 +650,30 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 		klet.containerRuntime = runtime
 		klet.runner = runtime
-		klet.StatsProvider = stats.NewCadvisorStatsProvider(
-			klet.cadvisor,
-			klet.resourceAnalyzer,
-			klet.podManager,
-			klet.runtimeCache,
-			klet.containerRuntime)
+
+		// CRI integrations should get container metrics via CRI. Docker
+		// uses the built-in cadvisor to gather such metrics on Linux for
+		// historical reasons.
+		// cri-o relies on cadvisor as a temporary workaround. The code should
+		// be removed. Related issue:
+		// https://github.com/kubernetes/kubernetes/issues/51798
+		if (kubeCfg.ContainerRuntime == kubetypes.DockerContainerRuntime &&
+			goruntime.GOOS == "linux") || kubeCfg.RemoteRuntimeEndpoint == "/var/run/crio.sock" {
+			klet.StatsProvider = stats.NewCadvisorStatsProvider(
+				klet.cadvisor,
+				klet.resourceAnalyzer,
+				klet.podManager,
+				klet.runtimeCache,
+				klet.containerRuntime)
+		} else {
+			klet.StatsProvider = stats.NewCRIStatsProvider(
+				klet.cadvisor,
+				klet.resourceAnalyzer,
+				klet.podManager,
+				klet.runtimeCache,
+				runtimeService,
+				imageService)
+		}
 	} else {
 		// rkt uses the legacy, non-CRI, integration. Configure it the old way.
 		// TODO: Include hairpin mode settings in rkt?
