@@ -29,11 +29,11 @@ subjects:
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  name: event-exporter
+  name: event-exporter-v0.1.7
   namespace: kube-system
   labels:
     k8s-app: event-exporter
-    version: v0.1.5
+    version: v0.1.7
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
@@ -42,13 +42,12 @@ spec:
     metadata:
       labels:
         k8s-app: event-exporter
-        version: v0.1.5
+        version: v0.1.7
     spec:
       serviceAccountName: event-exporter-sa
       containers:
-      # TODO: Add resources in 1.8
       - name: event-exporter
-        image: gcr.io/google-containers/event-exporter:v0.1.5
+        image: gcr.io/google-containers/event-exporter:v0.1.7
         command:
         - '/event-exporter'
       # BEGIN_PROMETHEUS_TO_SD

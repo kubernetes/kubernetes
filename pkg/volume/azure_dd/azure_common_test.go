@@ -19,9 +19,12 @@ package azure_dd
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
+
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 type fakeFileInfo struct {
@@ -116,9 +119,15 @@ func (handler *fakeIOHandler) ReadFile(filename string) ([]byte, error) {
 }
 
 func TestIoHandler(t *testing.T) {
-	disk, err := findDiskByLun(lun, &fakeIOHandler{})
-	// if no disk matches lun, exit
-	if disk != "/dev/"+devName || err != nil {
-		t.Errorf("no data disk found: disk %v err %v", disk, err)
+	disk, err := findDiskByLun(lun, &fakeIOHandler{}, mount.NewOsExec())
+	if runtime.GOOS == "windows" {
+		if err != nil {
+			t.Errorf("no data disk found: disk %v err %v", disk, err)
+		}
+	} else {
+		// if no disk matches lun, exit
+		if disk != "/dev/"+devName || err != nil {
+			t.Errorf("no data disk found: disk %v err %v", disk, err)
+		}
 	}
 }

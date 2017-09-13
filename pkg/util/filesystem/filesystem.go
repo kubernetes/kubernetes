@@ -45,5 +45,6 @@ type File interface {
 	// for now, the only os.File methods used are those below, add more as necessary
 	Name() string
 	Write(b []byte) (n int, err error)
+	Sync() error
 	Close() error
 }

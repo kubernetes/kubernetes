@@ -149,7 +149,7 @@ func NewCmdEnv(f cmdutil.Factory, in io.Reader, out, errout io.Writer) *cobra.Co
 	cmd.Flags().StringP("from", "", "", "The name of a resource from which to inject environment variables")
 	cmd.Flags().StringP("prefix", "", "", "Prefix to append to variable names")
 	cmd.Flags().StringArrayVarP(&options.EnvParams, "env", "e", options.EnvParams, "Specify a key-value pair for an environment variable to set into each container.")
-	cmd.Flags().BoolVar(&options.List, "list", options.List, "If true, display the environment and any changes in the standard format. this flag will removed when we have kubectl view image.")
+	cmd.Flags().BoolVar(&options.List, "list", options.List, "If true, display the environment and any changes in the standard format. this flag will removed when we have kubectl view env.")
 	cmd.Flags().BoolVar(&options.Resolve, "resolve", options.Resolve, "If true, show secret or configmap references when listing variables")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
 	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set image will NOT contact api-server but run locally.")
