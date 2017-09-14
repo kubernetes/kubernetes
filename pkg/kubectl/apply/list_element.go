@@ -22,26 +22,11 @@ type ListElement struct {
 	// FieldMetaImpl contains metadata about the field from openapi
 	FieldMetaImpl
 
-	// Name contains of the field
-	Name string
+	// HasElementData contains whether the field was set
+	HasElementData
 
-	// RecordedSet is true if the field was found in the recorded object
-	RecordedSet bool
-
-	// LocalSet is true if the field was found in the local object
-	LocalSet bool
-
-	// RemoteSet is true if the field was found in the remote object
-	RemoteSet bool
-
-	// Recorded contains the value of the field from the recorded object
-	Recorded []interface{}
-
-	// Local contains the value of the field from the recorded object
-	Local []interface{}
-
-	// Remote contains the value of the field from the recorded object
-	Remote []interface{}
+	// ListElementData contains the value a field was set to
+	ListElementData
 
 	// Values contains the combined recorded-local-remote value of each item in the list
 	// Present for lists that can be merged only.  Contains the items
@@ -55,8 +40,22 @@ func (e ListElement) Accept(v Visitor) (Result, error) {
 	return v.VisitList(e)
 }
 
+var _ Element = &ListElement{}
+
+// ListElementData contains the recorded, local and remote data for a list
+type ListElementData struct {
+	// recorded contains the value of the field from the recorded object
+	Recorded []interface{}
+
+	// Local contains the value of the field from the recorded object
+	Local []interface{}
+
+	// Remote contains the value of the field from the recorded object
+	Remote []interface{}
+}
+
 // GetRecorded implements Element.GetRecorded
-func (e ListElement) GetRecorded() interface{} {
+func (e ListElementData) GetRecorded() interface{} {
 	// https://golang.org/doc/faq#nil_error
 	if e.Recorded == nil {
 		return nil
@@ -65,7 +64,7 @@ func (e ListElement) GetRecorded() interface{} {
 }
 
 // GetLocal implements Element.GetLocal
-func (e ListElement) GetLocal() interface{} {
+func (e ListElementData) GetLocal() interface{} {
 	// https://golang.org/doc/faq#nil_error
 	if e.Local == nil {
 		return nil
@@ -74,27 +73,10 @@ func (e ListElement) GetLocal() interface{} {
 }
 
 // GetRemote implements Element.GetRemote
-func (e ListElement) GetRemote() interface{} {
+func (e ListElementData) GetRemote() interface{} {
 	// https://golang.org/doc/faq#nil_error
 	if e.Remote == nil {
 		return nil
 	}
 	return e.Remote
 }
-
-// HasRecorded implements Element.HasRecorded
-func (e ListElement) HasRecorded() bool {
-	return e.RecordedSet
-}
-
-// HasLocal implements Element.HasLocal
-func (e ListElement) HasLocal() bool {
-	return e.LocalSet
-}
-
-// HasRemote implements Element.HasRemote
-func (e ListElement) HasRemote() bool {
-	return e.RemoteSet
-}
-
-var _ Element = &ListElement{}

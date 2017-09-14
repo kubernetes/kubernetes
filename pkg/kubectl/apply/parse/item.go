@@ -33,13 +33,8 @@ type primitiveItem struct {
 	Name      string
 	Primitive *openapi.Primitive
 
-	RecordedSet bool
-	LocalSet    bool
-	RemoteSet   bool
-
-	Recorded interface{}
-	Local    interface{}
-	Remote   interface{}
+	apply.HasElementData
+	apply.RawElementData
 }
 
 func (i *primitiveItem) Accept(v ItemVisitor) (apply.Element, error) {
@@ -59,13 +54,8 @@ type listItem struct {
 	Name  string
 	Array *openapi.Array
 
-	RecordedSet bool
-	LocalSet    bool
-	RemoteSet   bool
-
-	Recorded []interface{}
-	Local    []interface{}
-	Remote   []interface{}
+	apply.HasElementData
+	apply.ListElementData
 }
 
 func (i *listItem) Accept(v ItemVisitor) (apply.Element, error) {
@@ -85,13 +75,8 @@ type mapItem struct {
 	Name string
 	Map  *openapi.Map
 
-	RecordedSet bool
-	LocalSet    bool
-	RemoteSet   bool
-
-	Recorded map[string]interface{}
-	Local    map[string]interface{}
-	Remote   map[string]interface{}
+	apply.HasElementData
+	apply.MapElementData
 }
 
 func (i *mapItem) Accept(v ItemVisitor) (apply.Element, error) {
@@ -111,13 +96,8 @@ type typeItem struct {
 	Name string
 	Type *openapi.Kind
 
-	RecordedSet bool
-	LocalSet    bool
-	RemoteSet   bool
-
-	Recorded map[string]interface{}
-	Local    map[string]interface{}
-	Remote   map[string]interface{}
+	apply.HasElementData
+	apply.MapElementData
 }
 
 func (i *typeItem) GetMeta() openapi.Schema {

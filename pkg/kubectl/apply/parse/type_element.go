@@ -24,17 +24,13 @@ import (
 // mapElement builds a new mapElement from a MapItem
 func (v ElementBuildingVisitor) typeElement(meta apply.FieldMetaImpl, item *typeItem) (*apply.TypeElement, error) {
 	result := &apply.TypeElement{
-		Name: item.Name,
 		//Schema:   item.MergeType,
-		FieldMetaImpl: meta,
-		RecordedSet:   item.RecordedSet,
-		LocalSet:      item.LocalSet,
-		RemoteSet:     item.RemoteSet,
-		Recorded:      item.Recorded,
-		Local:         item.Local,
-		Remote:        item.Remote,
-		Values:        map[string]apply.Element{},
+		FieldMetaImpl:  meta,
+		HasElementData: item.HasElementData,
+		MapElementData: item.MapElementData,
+		Values:         map[string]apply.Element{},
 	}
+	result.Name = item.Name
 
 	// Collate each key in the type
 	for _, key := range keysUnion(item.Recorded, item.Local, item.Remote) {
@@ -48,7 +44,9 @@ func (v ElementBuildingVisitor) typeElement(meta apply.FieldMetaImpl, item *type
 		remote, remoteSet := nilSafeLookup(key, item.Remote)
 
 		// Create an item for the field
-		field, err := v.getItem(s, key, recorded, local, remote, recordedSet, localSet, remoteSet)
+		field, err := v.getItem(s, key,
+			apply.RawElementData{recorded, local, remote},
+			apply.HasElementData{recordedSet, localSet, remoteSet})
 		if err != nil {
 			return nil, err
 		}

@@ -42,19 +42,14 @@ func (v ElementBuildingVisitor) mergeListElement(meta apply.FieldMetaImpl, item 
 // doPrimitiveList merges 3 lists of primitives together
 // tries to maintain ordering
 func (v ElementBuildingVisitor) doPrimitiveList(meta apply.FieldMetaImpl, item *listItem) (*apply.ListElement, error) {
-	key := []string{}
 	result := &apply.ListElement{
 		FieldMetaImpl: apply.FieldMetaImpl{
 			MergeType: "merge",
+			Name:      item.Name,
 		},
-		RecordedSet: item.RecordedSet,
-		LocalSet:    item.LocalSet,
-		RemoteSet:   item.RemoteSet,
-		Recorded:    item.Recorded,
-		Local:       item.Local,
-		Remote:      item.Remote,
-		Values:      []apply.Element{},
-		Name:        item.Name,
+		HasElementData:  item.HasElementData,
+		ListElementData: item.ListElementData,
+		Values:          []apply.Element{},
 	}
 
 	// Use locally defined order, then add remote, then add recorded.
@@ -63,16 +58,16 @@ func (v ElementBuildingVisitor) doPrimitiveList(meta apply.FieldMetaImpl, item *
 	// Locally defined items come first and retain their order
 	// as defined locally
 	for _, l := range item.Local {
-		orderedKeys.UpsertLocal(key, l)
+		orderedKeys.UpsertLocal(l)
 	}
 	// Mixin remote values, adding any that are not present locally
 	for _, l := range item.Remote {
-		orderedKeys.UpsertRemote(key, l)
+		orderedKeys.UpsertRemote(l)
 	}
 	// Mixin recorded values, adding any that are not present locally
 	// or remotely
 	for _, l := range item.Recorded {
-		orderedKeys.UpsertRecorded(key, l)
+		orderedKeys.UpsertRecorded(l)
 	}
 
 	for i, l := range orderedKeys.Items {
@@ -86,7 +81,8 @@ func (v ElementBuildingVisitor) doPrimitiveList(meta apply.FieldMetaImpl, item *
 		}
 
 		subitem, err := v.getItem(s, fmt.Sprintf("%d", i),
-			l.Recorded, l.Local, l.Remote, recordedSet, localSet, remoteSet)
+			l.RawElementData,
+			apply.HasElementData{recordedSet, localSet, remoteSet})
 
 		if err != nil {
 			return nil, err
@@ -113,15 +109,11 @@ func (v ElementBuildingVisitor) doMapList(meta apply.FieldMetaImpl, item *listIt
 		FieldMetaImpl: apply.FieldMetaImpl{
 			MergeType: "merge",
 			MergeKey:  key,
+			Name:      item.Name,
 		},
-		RecordedSet: item.RecordedSet,
-		LocalSet:    item.LocalSet,
-		RemoteSet:   item.RemoteSet,
-		Recorded:    item.Recorded,
-		Local:       item.Local,
-		Remote:      item.Remote,
-		Values:      []apply.Element{},
-		Name:        item.Name,
+		HasElementData:  item.HasElementData,
+		ListElementData: item.ListElementData,
+		Values:          []apply.Element{},
 	}
 
 	// Use locally defined order, then add remote, then add recorded.
@@ -152,7 +144,8 @@ func (v ElementBuildingVisitor) doMapList(meta apply.FieldMetaImpl, item *listIt
 			s = item.Array.SubType
 		}
 		subitem, err := v.getItem(s, fmt.Sprintf("%d", i),
-			l.Recorded, l.Local, l.Remote, recordedSet, localSet, remoteSet)
+			l.RawElementData,
+			apply.HasElementData{recordedSet, localSet, remoteSet})
 		if err != nil {
 			return nil, err
 		}
@@ -174,16 +167,12 @@ func (v ElementBuildingVisitor) doMapList(meta apply.FieldMetaImpl, item *listIt
 // Uses the "replace" strategy and identify "same" elements across lists by their index
 func (v ElementBuildingVisitor) replaceListElement(meta apply.FieldMetaImpl, item *listItem) (*apply.ListElement, error) {
 	result := &apply.ListElement{
-		Name:          item.Name,
-		FieldMetaImpl: meta,
-		RecordedSet:   item.RecordedSet,
-		LocalSet:      item.LocalSet,
-		RemoteSet:     item.RemoteSet,
-		Recorded:      item.Recorded,
-		Local:         item.Local,
-		Remote:        item.Remote,
-		Values:        []apply.Element{},
+		FieldMetaImpl:   meta,
+		ListElementData: item.ListElementData,
+		HasElementData:  item.HasElementData,
+		Values:          []apply.Element{},
 	}
+	result.Name = item.Name
 
 	// Use the max length to iterate over the slices
 	for i := 0; i < max(len(item.Recorded), len(item.Local), len(item.Remote)); i++ {
@@ -199,7 +188,8 @@ func (v ElementBuildingVisitor) replaceListElement(meta apply.FieldMetaImpl, ite
 			s = item.Array.SubType
 		}
 		subitem, err := v.getItem(s, fmt.Sprintf("%d", i),
-			recorded, local, remote, recordedSet, localSet, remoteSet)
+			apply.RawElementData{recorded, local, remote},
+			apply.HasElementData{recordedSet, localSet, remoteSet})
 		if err != nil {
 			return nil, err
 		}

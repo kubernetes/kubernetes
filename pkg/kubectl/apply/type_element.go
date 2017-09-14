@@ -22,26 +22,11 @@ type TypeElement struct {
 	// FieldMetaImpl contains metadata about the field from openapi
 	FieldMetaImpl
 
-	// Name contains of the field
-	Name string
+	// HasElementData contains whether the field was set
+	HasElementData
 
-	// RecordedSet is true if the field was found in the recorded object
-	RecordedSet bool
-
-	// LocalSet is true if the field was found in the loca object
-	LocalSet bool
-
-	// RemoteSet is true if the field was found in the remote object
-	RemoteSet bool
-
-	// Recorded contains the value of the field from the recorded object
-	Recorded map[string]interface{}
-
-	// Local contains the value of the field from the recorded object
-	Local map[string]interface{}
-
-	// Remote contains the value of the field from the recorded object
-	Remote map[string]interface{}
+	// ListElementData contains the value a field was set to
+	MapElementData
 
 	// Values contains the combined recorded-local-remote value of each field in the type
 	// Values contains the values in mapElement.  Element must contain
@@ -54,51 +39,9 @@ func (e TypeElement) Accept(v Visitor) (Result, error) {
 	return v.VisitType(e)
 }
 
-// GetRecorded implements Element.GetRecorded
-func (e TypeElement) GetRecorded() interface{} {
-	// https://golang.org/doc/faq#nil_error
-	if e.Recorded == nil {
-		return nil
-	}
-	return e.Recorded
-}
-
-// HasRecorded implements Element.HasRecorded
-func (e TypeElement) HasRecorded() bool {
-	return e.RecordedSet
-}
-
-// GetLocal implements Element.GetLocal
-func (e TypeElement) GetLocal() interface{} {
-	// https://golang.org/doc/faq#nil_error
-	if e.Local == nil {
-		return nil
-	}
-	return e.Local
-}
-
-// GetRemote implements Element.GetRemote
-func (e TypeElement) GetRemote() interface{} {
-	// https://golang.org/doc/faq#nil_error
-	if e.Remote == nil {
-		return nil
-	}
-	return e.Remote
-}
-
 // GetValues implements Element.GetValues
 func (e TypeElement) GetValues() map[string]Element {
 	return e.Values
-}
-
-// HasLocal implements Element.HasLocal
-func (e TypeElement) HasLocal() bool {
-	return e.LocalSet
-}
-
-// HasRemote implements Element.HasRemote
-func (e TypeElement) HasRemote() bool {
-	return e.RemoteSet
 }
 
 var _ Element = &TypeElement{}

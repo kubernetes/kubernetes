@@ -26,26 +26,11 @@ type PrimitiveElement struct {
 	// FieldMetaImpl contains metadata about the field from openapi
 	FieldMetaImpl
 
-	// Name contains of the field
-	Name string
+	// HasElementData contains whether the field was set
+	HasElementData
 
-	// RecordedSet is true if the field was found in the recorded object
-	RecordedSet bool
-
-	// LocalSet is true if the field was found in the local object
-	LocalSet bool
-
-	// RemoteSet is true if the field was found in the remote object
-	RemoteSet bool
-
-	// Recorded contains the value of the field from the recorded object
-	Recorded interface{}
-
-	// Local contains the value of the field from the recorded object
-	Local interface{}
-
-	// Remote contains the value of the field from the recorded object
-	Remote interface{}
+	// RawElementData contains the values the field was set to
+	RawElementData
 }
 
 // Accept implements Element.Accept
@@ -58,34 +43,31 @@ func (e PrimitiveElement) String() string {
 	return fmt.Sprintf("name: %s recorded: %v local: %v remote: %v", e.Name, e.Recorded, e.Local, e.Remote)
 }
 
+var _ Element = &PrimitiveElement{}
+
+// RawElementData contains the recorded, local and remote data for a primitive
+type RawElementData struct {
+	// recorded contains the value of the field from the recorded object
+	Recorded interface{}
+
+	// Local contains the value of the field from the recorded object
+	Local interface{}
+
+	// Remote contains the value of the field from the recorded object
+	Remote interface{}
+}
+
 // GetRecorded implements Element.GetRecorded
-func (e PrimitiveElement) GetRecorded() interface{} {
+func (e RawElementData) GetRecorded() interface{} {
 	return e.Recorded
 }
 
 // GetLocal implements Element.GetLocal
-func (e PrimitiveElement) GetLocal() interface{} {
+func (e RawElementData) GetLocal() interface{} {
 	return e.Local
 }
 
 // GetRemote implements Element.GetRemote
-func (e PrimitiveElement) GetRemote() interface{} {
+func (e RawElementData) GetRemote() interface{} {
 	return e.Remote
 }
-
-// HasRecorded implements Element.HasRecorded
-func (e PrimitiveElement) HasRecorded() bool {
-	return e.RecordedSet
-}
-
-// HasLocal implements Element.HasLocal
-func (e PrimitiveElement) HasLocal() bool {
-	return e.LocalSet
-}
-
-// HasRemote implements Element.HasRemote
-func (e PrimitiveElement) HasRemote() bool {
-	return e.RemoteSet
-}
-
-var _ Element = &PrimitiveElement{}
