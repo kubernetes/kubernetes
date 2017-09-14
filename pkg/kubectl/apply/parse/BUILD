@@ -23,24 +23,15 @@ go_library(
 
 go_test(
     name = "go_default_xtest",
-    srcs = [
-        "factory_test.go",
-        "suite_test.go",
-    ],
+    srcs = ["suite_test.go"],
     data = [
-        "//api/openapi-spec:swagger-spec"
+        "//api/openapi-spec:swagger-spec",
     ],
     deps = [
-        ":go_default_library",
-        "//pkg/kubectl/apply:go_default_library",
-        "//pkg/kubectl/cmd/util/openapi:go_default_library",
-        "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
-        "//vendor/github.com/ghodss/yaml:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
     ],
 )
 

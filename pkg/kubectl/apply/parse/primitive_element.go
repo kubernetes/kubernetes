@@ -21,14 +21,10 @@ import "k8s.io/kubernetes/pkg/kubectl/apply"
 // primitiveElement builds a new primitiveElement from a PrimitiveItem
 func (v ElementBuildingVisitor) primitiveElement(item *primitiveItem) (*apply.PrimitiveElement, error) {
 	result := &apply.PrimitiveElement{
-		Name:        item.Name,
-		RecordedSet: item.RecordedSet,
-		LocalSet:    item.LocalSet,
-		RemoteSet:   item.RemoteSet,
-		Recorded:    item.Recorded,
-		Local:       item.Local,
-		Remote:      item.Remote,
+		HasElementData: item.HasElementData,
+		RawElementData: item.RawElementData,
 	}
+	result.Name = item.Name
 
 	return result, nil
 }

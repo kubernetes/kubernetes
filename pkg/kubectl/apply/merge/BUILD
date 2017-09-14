@@ -29,7 +29,7 @@ go_test(
     ],
     data = [
         ":swagger-spec",
-        "//api/openapi-spec:swagger-spec"
+        "//api/openapi-spec:swagger-spec",
     ],
     deps = [
         ":go_default_library",

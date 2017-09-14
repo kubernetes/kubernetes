@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/apply/merge"
 )
 
-var _ = Describe("Merging fields of type list-of-map with openapi", func() {
+var _ = Describe("Merging fields of type list-of-primitive with openapi", func() {
 	Context("where one of the items has been deleted", func() {
 		It("should delete the deleted item", func() {
 			recorded := create(`

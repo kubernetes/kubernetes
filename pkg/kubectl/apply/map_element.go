@@ -22,26 +22,11 @@ type MapElement struct {
 	// FieldMetaImpl contains metadata about the field from openapi
 	FieldMetaImpl
 
-	// Name contains of the field
-	Name string
+	// HasElementData contains whether the field was set
+	HasElementData
 
-	// RecordedSet is true if the field was found in the recorded object
-	RecordedSet bool
-
-	// LocalSet is true if the field was found in the local object
-	LocalSet bool
-
-	// RemoteSet is true if the field was found in the remote object
-	RemoteSet bool
-
-	// Recorded contains the value of the field from the recorded object
-	Recorded map[string]interface{}
-
-	// Local contains the value of the field from the recorded object
-	Local map[string]interface{}
-
-	// Remote contains the value of the field from the recorded object
-	Remote map[string]interface{}
+	// ListElementData contains the value a field was set to
+	MapElementData
 
 	// Values contains the combined recorded-local-remote value of each item in the map
 	// Values contains the values in mapElement.  Element must contain
@@ -54,8 +39,27 @@ func (e MapElement) Accept(v Visitor) (Result, error) {
 	return v.VisitMap(e)
 }
 
+// GetValues implements Element.GetValues
+func (e MapElement) GetValues() map[string]Element {
+	return e.Values
+}
+
+var _ Element = &MapElement{}
+
+// MapElementData contains the recorded, local and remote data for a map or type
+type MapElementData struct {
+	// recorded contains the value of the field from the recorded object
+	Recorded map[string]interface{}
+
+	// Local contains the value of the field from the recorded object
+	Local map[string]interface{}
+
+	// Remote contains the value of the field from the recorded object
+	Remote map[string]interface{}
+}
+
 // GetRecorded implements Element.GetRecorded
-func (e MapElement) GetRecorded() interface{} {
+func (e MapElementData) GetRecorded() interface{} {
 	// https://golang.org/doc/faq#nil_error
 	if e.Recorded == nil {
 		return nil
@@ -64,7 +68,7 @@ func (e MapElement) GetRecorded() interface{} {
 }
 
 // GetLocal implements Element.GetLocal
-func (e MapElement) GetLocal() interface{} {
+func (e MapElementData) GetLocal() interface{} {
 	// https://golang.org/doc/faq#nil_error
 	if e.Local == nil {
 		return nil
@@ -73,32 +77,10 @@ func (e MapElement) GetLocal() interface{} {
 }
 
 // GetRemote implements Element.GetRemote
-func (e MapElement) GetRemote() interface{} {
+func (e MapElementData) GetRemote() interface{} {
 	// https://golang.org/doc/faq#nil_error
 	if e.Remote == nil {
 		return nil
 	}
 	return e.Remote
 }
-
-// GetValues implements Element.GetValues
-func (e MapElement) GetValues() map[string]Element {
-	return e.Values
-}
-
-// HasRecorded implements Element.HasRecorded
-func (e MapElement) HasRecorded() bool {
-	return e.RecordedSet
-}
-
-// HasLocal implements Element.HasLocal
-func (e MapElement) HasLocal() bool {
-	return e.LocalSet
-}
-
-// HasRemote implements Element.HasRemote
-func (e MapElement) HasRemote() bool {
-	return e.RemoteSet
-}
-
-var _ Element = &MapElement{}
