@@ -20,6 +20,47 @@ import (
 	"fmt"
 )
 
+// Element contains the record, local, and remote value for a field in an object
+// and metadata about the field read from openapi.
+// Calling Merge on an element will apply the passed in strategy to Element -
+// e.g. either replacing the whole element with the local copy or merging each
+// of the recorded, local and remote fields of the element.
+type Element interface {
+	// FieldMeta specifies which merge strategy to use for this element
+	FieldMeta
+
+	// Merge merges the recorded, local and remote values in the element using the Strategy
+	// provided as an argument.  Calls the type specific method on the Strategy - following the
+	// "Accept" method from the "Visitor" pattern.
+	// e.g. Merge on a ListElement will call Strategy.MergeList(self)
+	// Returns the Result of the merged elements
+	Merge(Strategy) (Result, error)
+
+	// HasRecorded returns true if the field was explicitly
+	// present in the recorded source.  This is to differentiate between
+	// undefined and set to null
+	HasRecorded() bool
+
+	// GetRecorded returns the field value from the recorded source of the object
+	GetRecorded() interface{}
+
+	// HasLocal returns true if the field was explicitly
+	// present in the recorded source.  This is to differentiate between
+	// undefined and set to null
+	HasLocal() bool
+
+	// GetLocal returns the field value from the local source of the object
+	GetLocal() interface{}
+
+	// HasRemote returns true if the field was explicitly
+	// present in the remote source.  This is to differentiate between
+	// undefined and set to null
+	HasRemote() bool
+
+	// GetRemote returns the field value from the remote source of the object
+	GetRemote() interface{}
+}
+
 // FieldMeta defines the strategy used to apply a Patch for an element
 type FieldMeta interface {
 	// GetFieldMergeType specifies how a field should be merged.  One of
@@ -89,43 +130,6 @@ func (s FieldMetaImpl) GetFieldMergeKey() []string {
 // GetFieldType implements FieldMeta.GetFieldType
 func (s FieldMetaImpl) GetFieldType() string {
 	return s.Type
-}
-
-// Element contains the record, local, and remote value for a field in an object
-// as well as the merge strategy to use
-type Element interface {
-	// FieldMeta specifies which merge strategy to use for this element
-	FieldMeta
-
-	// Accept calls the type specific method on Visitor passing in itself
-	// e.g. Accept on a ListElement will call Visitor.VisitList(self)
-	// Returns the Result of merging the elements using the passed in
-	// strategy
-	Accept(Visitor) (Result, error)
-
-	// HasRecorded returns true if the field was explicitly
-	// present in the recorded source.  This is to differentiate between
-	// undefined and set to null
-	HasRecorded() bool
-
-	// GetRecorded returns the field value from the recorded source of the object
-	GetRecorded() interface{}
-
-	// HasLocal returns true if the field was explicitly
-	// present in the recorded source.  This is to differentiate between
-	// undefined and set to null
-	HasLocal() bool
-
-	// GetLocal returns the field value from the local source of the object
-	GetLocal() interface{}
-
-	// HasRemote returns true if the field was explicitly
-	// present in the remote source.  This is to differentiate between
-	// undefined and set to null
-	HasRemote() bool
-
-	// GetRemote returns the field value from the remote source of the object
-	GetRemote() interface{}
 }
 
 // MergeKeyValue records the value of the mergekey for an item in a list
@@ -332,4 +336,31 @@ func IsDrop(e Element) bool {
 func IsAdd(e Element) bool {
 	// If it isn't already present in the remote value and is present in the local value
 	return e.HasLocal() && !e.HasRemote()
+}
+
+// RawElementData contains the raw recorded, local and remote data
+type RawElementData struct {
+	// recorded contains the value of the field from the recorded object
+	Recorded interface{}
+
+	// Local contains the value of the field from the recorded object
+	Local interface{}
+
+	// Remote contains the value of the field from the recorded object
+	Remote interface{}
+}
+
+// GetRecorded implements Element.GetRecorded
+func (e RawElementData) GetRecorded() interface{} {
+	return e.Recorded
+}
+
+// GetLocal implements Element.GetLocal
+func (e RawElementData) GetLocal() interface{} {
+	return e.Local
+}
+
+// GetRemote implements Element.GetRemote
+func (e RawElementData) GetRemote() interface{} {
+	return e.Remote
 }

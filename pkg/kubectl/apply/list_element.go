@@ -35,9 +35,9 @@ type ListElement struct {
 	Values []Element
 }
 
-// Accept implements Element.Accept
-func (e ListElement) Accept(v Visitor) (Result, error) {
-	return v.VisitList(e)
+// Merge implements Element.Merge
+func (e ListElement) Merge(v Strategy) (Result, error) {
+	return v.MergeList(e)
 }
 
 var _ Element = &ListElement{}

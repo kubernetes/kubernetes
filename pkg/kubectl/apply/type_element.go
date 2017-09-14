@@ -34,9 +34,9 @@ type TypeElement struct {
 	Values map[string]Element
 }
 
-// Accept implements Element.Accept
-func (e TypeElement) Accept(v Visitor) (Result, error) {
-	return v.VisitType(e)
+// Merge implements Element.Merge
+func (e TypeElement) Merge(v Strategy) (Result, error) {
+	return v.MergeType(e)
 }
 
 // GetValues implements Element.GetValues

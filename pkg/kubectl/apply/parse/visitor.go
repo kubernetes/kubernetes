@@ -24,17 +24,17 @@ import (
 // ItemVisitor provides an interface for Items to Accept and call
 // the Visit function that corresponds to its actual type.
 type ItemVisitor interface {
-	// VisitPrimitive builds an Element for a primitiveItem
-	VisitPrimitive(*primitiveItem) (apply.Element, error)
+	// CreatePrimitiveElement builds an Element for a primitiveItem
+	CreatePrimitiveElement(*primitiveItem) (apply.Element, error)
 
-	// VisitList builds an Element for a listItem
-	VisitList(*listItem) (apply.Element, error)
+	// CreateListElement builds an Element for a listItem
+	CreateListElement(*listItem) (apply.Element, error)
 
-	// VisitMap builds an Element for a mapItem
-	VisitMap(*mapItem) (apply.Element, error)
+	// CreateMapElement builds an Element for a mapItem
+	CreateMapElement(*mapItem) (apply.Element, error)
 
-	// VisitType builds an Element for a typeItem
-	VisitType(*typeItem) (apply.Element, error)
+	// CreateTypeElement builds an Element for a typeItem
+	CreateTypeElement(*typeItem) (apply.Element, error)
 }
 
 // ElementBuildingVisitor creates an Elements from Items
@@ -43,13 +43,13 @@ type ElementBuildingVisitor struct {
 	resources openapi.Resources
 }
 
-// VisitPrimitive creates a primitiveElement
-func (v ElementBuildingVisitor) VisitPrimitive(item *primitiveItem) (apply.Element, error) {
+// CreatePrimitiveElement creates a primitiveElement
+func (v ElementBuildingVisitor) CreatePrimitiveElement(item *primitiveItem) (apply.Element, error) {
 	return v.primitiveElement(item)
 }
 
-// VisitList creates a ListElement
-func (v ElementBuildingVisitor) VisitList(item *listItem) (apply.Element, error) {
+// CreateListElement creates a ListElement
+func (v ElementBuildingVisitor) CreateListElement(item *listItem) (apply.Element, error) {
 	meta, err := getFieldMeta(item.GetMeta())
 	if err != nil {
 		return nil, err
@@ -60,8 +60,8 @@ func (v ElementBuildingVisitor) VisitList(item *listItem) (apply.Element, error)
 	return v.replaceListElement(meta, item)
 }
 
-// VisitMap creates a mapElement
-func (v ElementBuildingVisitor) VisitMap(item *mapItem) (apply.Element, error) {
+// CreateMapElement creates a mapElement
+func (v ElementBuildingVisitor) CreateMapElement(item *mapItem) (apply.Element, error) {
 	meta, err := getFieldMeta(item.GetMeta())
 	if err != nil {
 		return nil, err
@@ -69,8 +69,8 @@ func (v ElementBuildingVisitor) VisitMap(item *mapItem) (apply.Element, error) {
 	return v.mapElement(meta, item)
 }
 
-// VisitType creates a typeElement
-func (v ElementBuildingVisitor) VisitType(item *typeItem) (apply.Element, error) {
+// CreateTypeElement creates a typeElement
+func (v ElementBuildingVisitor) CreateTypeElement(item *typeItem) (apply.Element, error) {
 	meta, err := getFieldMeta(item.GetMeta())
 	if err != nil {
 		return nil, err

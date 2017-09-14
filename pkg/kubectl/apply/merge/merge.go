@@ -31,8 +31,8 @@ type Options struct {
 }
 
 // Create returns a new apply.Visitor for merging multiple objects together
-func Create(options Options) apply.Visitor {
-	return createStrategicVisitor(options)
+func Create(options Options) apply.Strategy {
+	return createDelegatingStrategy(options)
 }
 
 // ListOrder allows the caller to controller how ordering is determined when merging

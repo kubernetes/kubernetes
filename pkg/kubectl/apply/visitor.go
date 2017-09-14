@@ -16,23 +16,24 @@ limitations under the License.
 
 package apply
 
-// Visitor implements a strategy for merging recorded, local and remote values contained
+// Strategy implements a strategy for merging recorded, local and remote values contained
 // in an element and returns the merged result.
-type Visitor interface {
-	// VisitList is invoked by ListElements when Accept is called
-	VisitList(ListElement) (Result, error)
+// Follows the visitor pattern
+type Strategy interface {
+	// MergeList is invoked by ListElements when Merge is called
+	MergeList(ListElement) (Result, error)
 
-	// VisitMap is invoked by MapElements when Accept is called
-	VisitMap(MapElement) (Result, error)
+	// MergeMap is invoked by MapElements when Merge is called
+	MergeMap(MapElement) (Result, error)
 
-	// VisitMap is invoked by MapElements when Accept is called
-	VisitType(TypeElement) (Result, error)
-	// VisitPrimitive is invoked by PrimitiveElements when Accept is called
+	// MergeMap is invoked by MapElements when Merge is called
+	MergeType(TypeElement) (Result, error)
 
-	VisitPrimitive(PrimitiveElement) (Result, error)
+	// MergePrimitive is invoked by PrimitiveElements when Merge is called
+	MergePrimitive(PrimitiveElement) (Result, error)
 
-	// VisitEmpty is invoked by EmptyElements when Accept is called
-	VisitEmpty(EmptyElement) (Result, error)
+	// MergeEmpty is invoked by EmptyElements when Merge is called
+	MergeEmpty(EmptyElement) (Result, error)
 }
 
 // Operation records whether a field should be set or dropped

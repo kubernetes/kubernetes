@@ -51,7 +51,7 @@ func (v ElementBuildingVisitor) mapElement(meta apply.FieldMetaImpl, item *mapIt
 		}
 
 		// Build the element for this field
-		element, err := field.Accept(v)
+		element, err := field.CreateElement(v)
 		if err != nil {
 			return nil, err
 		}

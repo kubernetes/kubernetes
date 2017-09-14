@@ -21,50 +21,50 @@ import (
 )
 
 // replaceVisitor creates a patch to replace a remote field value with a local field value
-type replaceVisitor struct {
-	strategic *strategicVisitor
+type replaceStrategy struct {
+	strategic *delegatingStrategy
 	options   Options
 }
 
-func createReplaceVisitor(options Options, strategic *strategicVisitor) replaceVisitor {
-	return replaceVisitor{
+func createReplaceStrategy(options Options, strategic *delegatingStrategy) replaceStrategy {
+	return replaceStrategy{
 		strategic,
 		options,
 	}
 }
 
-// VisitList returns a result by merging the recorded, local and remote values
+// MergeList returns a result by merging the recorded, local and remote values
 // - replacing the remote value with the local value
-func (v replaceVisitor) VisitList(e apply.ListElement) (apply.Result, error) {
+func (v replaceStrategy) MergeList(e apply.ListElement) (apply.Result, error) {
 	return v.doReplace(e)
 }
 
-// VisitMap returns a result by merging the recorded, local and remote values
+// MergeMap returns a result by merging the recorded, local and remote values
 // - replacing the remote value with the local value
-func (v replaceVisitor) VisitMap(e apply.MapElement) (apply.Result, error) {
+func (v replaceStrategy) MergeMap(e apply.MapElement) (apply.Result, error) {
 	return v.doReplace(e)
 }
 
-// VisitType returns a result by merging the recorded, local and remote values
+// MergeType returns a result by merging the recorded, local and remote values
 // - replacing the remote value with the local value
-func (v replaceVisitor) VisitType(e apply.TypeElement) (apply.Result, error) {
+func (v replaceStrategy) MergeType(e apply.TypeElement) (apply.Result, error) {
 	return v.doReplace(e)
 }
 
-// VisitPrimitive returns a result by merging the recorded, local and remote values
+// MergePrimitive returns a result by merging the recorded, local and remote values
 // - replacing the remote value with the local value
-func (v replaceVisitor) VisitPrimitive(e apply.PrimitiveElement) (apply.Result, error) {
+func (v replaceStrategy) MergePrimitive(e apply.PrimitiveElement) (apply.Result, error) {
 	return v.doReplace(e)
 }
 
-// VisitEmpty
-func (v replaceVisitor) VisitEmpty(e apply.EmptyElement) (apply.Result, error) {
+// MergeEmpty
+func (v replaceStrategy) MergeEmpty(e apply.EmptyElement) (apply.Result, error) {
 	return apply.Result{Operation: apply.SET}, nil
 }
 
 // replace returns the local value if specified, otherwise it returns the remote value
 // this works regardless of the approach
-func (v replaceVisitor) doReplace(e apply.Element) (apply.Result, error) {
+func (v replaceStrategy) doReplace(e apply.Element) (apply.Result, error) {
 	// TODO: Check for conflicts
 	if result, done := v.doAddOrDelete(e); done {
 		return result, nil
@@ -84,7 +84,7 @@ func (v replaceVisitor) doReplace(e apply.Element) (apply.Result, error) {
 
 // doAddOrDelete will check if the field should be either added or deleted.  If either is true, it will
 // true the operation and true.  Otherwise it will return false.
-func (v replaceVisitor) doAddOrDelete(e apply.Element) (apply.Result, bool) {
+func (v replaceStrategy) doAddOrDelete(e apply.Element) (apply.Result, bool) {
 	if apply.IsAdd(e) {
 		return apply.Result{Operation: apply.SET, MergedResult: e.GetLocal()}, true
 	}
@@ -97,4 +97,4 @@ func (v replaceVisitor) doAddOrDelete(e apply.Element) (apply.Result, bool) {
 	return apply.Result{}, false
 }
 
-var _ apply.Visitor = &replaceVisitor{}
+var _ apply.Strategy = &replaceStrategy{}

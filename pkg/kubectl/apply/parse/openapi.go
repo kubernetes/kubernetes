@@ -84,13 +84,13 @@ func (v *baseSchemaVisitor) VisitArray(array *openapi.Array) {
 	v.Err = fmt.Errorf("Array type not expected")
 }
 
-// VisitMap implements openapi
+// MergeMap implements openapi
 func (v *baseSchemaVisitor) VisitMap(*openapi.Map) {
 	v.Kind = "map"
 	v.Err = fmt.Errorf("Map type not expected")
 }
 
-// VisitPrimitive implements openapi
+// MergePrimitive implements openapi
 func (v *baseSchemaVisitor) VisitPrimitive(*openapi.Primitive) {
 	v.Kind = "primitive"
 	v.Err = fmt.Errorf("Primitive type not expected")
@@ -129,7 +129,7 @@ type mapSchemaVisitor struct {
 	Result *openapi.Map
 }
 
-// VisitMap implements openapi
+// MergeMap implements openapi
 func (v *mapSchemaVisitor) VisitMap(result *openapi.Map) {
 	v.Result = result
 	v.Kind = "map"
@@ -151,7 +151,7 @@ func (v *arraySchemaVisitor) VisitArray(result *openapi.Array) {
 	v.Kind = "array"
 }
 
-// VisitPrimitive implements openapi
+// MergePrimitive implements openapi
 func (v *arraySchemaVisitor) VisitReference(reference openapi.Reference) {
 	reference.SubSchema().Accept(v)
 }
@@ -161,7 +161,7 @@ type primitiveSchemaVisitor struct {
 	Result *openapi.Primitive
 }
 
-// VisitPrimitive implements openapi
+// MergePrimitive implements openapi
 func (v *primitiveSchemaVisitor) VisitPrimitive(result *openapi.Primitive) {
 	v.Result = result
 	v.Kind = "primitive"

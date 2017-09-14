@@ -18,75 +18,75 @@ package merge
 
 import "k8s.io/kubernetes/pkg/kubectl/apply"
 
-// strategicVisitor delegates merging fields to other visitor implementations
+// delegatingStrategy delegates merging fields to other visitor implementations
 // based on the merge strategy preferred by the field.
-type strategicVisitor struct {
+type delegatingStrategy struct {
 	options Options
-	merge   mergeVisitor
-	replace replaceVisitor
+	merge   mergeStrategy
+	replace replaceStrategy
 }
 
-// createStrategicVisitor returns a new strategicVisitor
-func createStrategicVisitor(options Options) *strategicVisitor {
-	v := &strategicVisitor{
+// createDelegatingStrategy returns a new delegatingStrategy
+func createDelegatingStrategy(options Options) *delegatingStrategy {
+	v := &delegatingStrategy{
 		options: options,
 	}
-	v.replace = createReplaceVisitor(options, v)
-	v.merge = createMergeVisitor(options, v)
+	v.replace = createReplaceStrategy(options, v)
+	v.merge = createMergeStrategy(options, v)
 	return v
 }
 
-// VisitList delegates visiting a list based on the field patch strategy.
+// MergeList delegates visiting a list based on the field patch strategy.
 // Defaults to "replace"
-func (v strategicVisitor) VisitList(diff apply.ListElement) (apply.Result, error) {
+func (v delegatingStrategy) MergeList(diff apply.ListElement) (apply.Result, error) {
 	// TODO: Support retainkeys
 	switch diff.GetFieldMergeType() {
 	case "merge":
-		return v.merge.VisitList(diff)
+		return v.merge.MergeList(diff)
 	case "replace":
-		return v.replace.VisitList(diff)
+		return v.replace.MergeList(diff)
 	default:
-		return v.replace.VisitList(diff)
+		return v.replace.MergeList(diff)
 	}
 }
 
-// VisitMap delegates visiting a map based on the field patch strategy.
+// MergeMap delegates visiting a map based on the field patch strategy.
 // Defaults to "merge"
-func (v strategicVisitor) VisitMap(diff apply.MapElement) (apply.Result, error) {
+func (v delegatingStrategy) MergeMap(diff apply.MapElement) (apply.Result, error) {
 	// TODO: Support retainkeys
 	switch diff.GetFieldMergeType() {
 	case "merge":
-		return v.merge.VisitMap(diff)
+		return v.merge.MergeMap(diff)
 	case "replace":
-		return v.replace.VisitMap(diff)
+		return v.replace.MergeMap(diff)
 	default:
-		return v.merge.VisitMap(diff)
+		return v.merge.MergeMap(diff)
 	}
 }
 
-// VisitType delegates visiting a map based on the field patch strategy.
+// MergeType delegates visiting a map based on the field patch strategy.
 // Defaults to "merge"
-func (v strategicVisitor) VisitType(diff apply.TypeElement) (apply.Result, error) {
+func (v delegatingStrategy) MergeType(diff apply.TypeElement) (apply.Result, error) {
 	// TODO: Support retainkeys
 	switch diff.GetFieldMergeType() {
 	case "merge":
-		return v.merge.VisitType(diff)
+		return v.merge.MergeType(diff)
 	case "replace":
-		return v.replace.VisitType(diff)
+		return v.replace.MergeType(diff)
 	default:
-		return v.merge.VisitType(diff)
+		return v.merge.MergeType(diff)
 	}
 }
 
-// VisitPrimitive delegates visiting a primitive to the ReplaceVisitorSingleton.
-func (v strategicVisitor) VisitPrimitive(diff apply.PrimitiveElement) (apply.Result, error) {
+// MergePrimitive delegates visiting a primitive to the ReplaceVisitorSingleton.
+func (v delegatingStrategy) MergePrimitive(diff apply.PrimitiveElement) (apply.Result, error) {
 	// Always replace primitives
-	return v.replace.VisitPrimitive(diff)
+	return v.replace.MergePrimitive(diff)
 }
 
-// VisitEmpty
-func (v strategicVisitor) VisitEmpty(diff apply.EmptyElement) (apply.Result, error) {
-	return v.merge.VisitEmpty(diff)
+// MergeEmpty
+func (v delegatingStrategy) MergeEmpty(diff apply.EmptyElement) (apply.Result, error) {
+	return v.merge.MergeEmpty(diff)
 }
 
-var _ apply.Visitor = &strategicVisitor{}
+var _ apply.Strategy = &delegatingStrategy{}

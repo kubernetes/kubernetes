@@ -89,7 +89,7 @@ func (v ElementBuildingVisitor) doPrimitiveList(meta apply.FieldMetaImpl, item *
 		}
 
 		// Convert the Item to an Element
-		newelem, err := subitem.Accept(v)
+		newelem, err := subitem.CreateElement(v)
 		if err != nil {
 			return nil, err
 		}
@@ -151,7 +151,7 @@ func (v ElementBuildingVisitor) doMapList(meta apply.FieldMetaImpl, item *listIt
 		}
 
 		// Build the element fully
-		newelem, err := subitem.Accept(v)
+		newelem, err := subitem.CreateElement(v)
 		if err != nil {
 			return nil, err
 		}
@@ -195,7 +195,7 @@ func (v ElementBuildingVisitor) replaceListElement(meta apply.FieldMetaImpl, ite
 		}
 
 		// Build the element
-		newelem, err := subitem.Accept(v)
+		newelem, err := subitem.CreateElement(v)
 		if err != nil {
 			return nil, err
 		}
