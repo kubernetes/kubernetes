@@ -22,21 +22,21 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/apply"
 )
 
-func createMergeVisitor(options Options, strategic *strategicVisitor) mergeVisitor {
-	return mergeVisitor{
+func createMergeStrategy(options Options, strategic *delegatingStrategy) mergeStrategy {
+	return mergeStrategy{
 		strategic,
 		options,
 	}
 }
 
-// mergeVisitor creates a patch to merge a local file value into a remote field value
-type mergeVisitor struct {
-	strategic *strategicVisitor
+// mergeStrategy creates a patch to merge a local file value into a remote field value
+type mergeStrategy struct {
+	strategic *delegatingStrategy
 	options   Options
 }
 
-// VisitList creates a patch to merge a local list field value into a remote list field value
-func (v mergeVisitor) VisitList(e apply.ListElement) (apply.Result, error) {
+// MergeList creates a patch to merge a local list field value into a remote list field value
+func (v mergeStrategy) MergeList(e apply.ListElement) (apply.Result, error) {
 	// No merge logic if adding or deleting a field
 	if result, done := v.doAddOrDelete(e); done {
 		return result, nil
@@ -46,7 +46,7 @@ func (v mergeVisitor) VisitList(e apply.ListElement) (apply.Result, error) {
 	merged := []interface{}{}
 	for _, value := range e.Values {
 		// Recursively merge the list element before adding the value to the list
-		result, err := value.Accept(v.strategic)
+		result, err := value.Merge(v.strategic)
 		if err != nil {
 			return apply.Result{}, err
 		}
@@ -70,18 +70,18 @@ func (v mergeVisitor) VisitList(e apply.ListElement) (apply.Result, error) {
 	return apply.Result{Operation: apply.SET, MergedResult: merged}, nil
 }
 
-// VisitMap creates a patch to merge a local map field into a remote map field
-func (v mergeVisitor) VisitMap(e apply.MapElement) (apply.Result, error) {
+// MergeMap creates a patch to merge a local map field into a remote map field
+func (v mergeStrategy) MergeMap(e apply.MapElement) (apply.Result, error) {
 	return v.doMergeMap(e)
 }
 
-// VisitType creates a patch to merge a local map field into a remote map field
-func (v mergeVisitor) VisitType(e apply.TypeElement) (apply.Result, error) {
+// MergeType creates a patch to merge a local map field into a remote map field
+func (v mergeStrategy) MergeType(e apply.TypeElement) (apply.Result, error) {
 	return v.doMergeMap(e)
 }
 
 // do merges a recorded, local and remote map into a new object
-func (v mergeVisitor) doMergeMap(e apply.MapValuesElement) (apply.Result, error) {
+func (v mergeStrategy) doMergeMap(e apply.MapValuesElement) (apply.Result, error) {
 	// No merge logic if adding or deleting a field
 	if result, done := v.doAddOrDelete(e); done {
 		return result, nil
@@ -91,7 +91,7 @@ func (v mergeVisitor) doMergeMap(e apply.MapValuesElement) (apply.Result, error)
 	merged := map[string]interface{}{}
 	for key, value := range e.GetValues() {
 		// Recursively merge the map element before adding the value to the map
-		result, err := value.Accept(v.strategic)
+		result, err := value.Merge(v.strategic)
 		if err != nil {
 			return apply.Result{}, err
 		}
@@ -116,7 +116,7 @@ func (v mergeVisitor) doMergeMap(e apply.MapValuesElement) (apply.Result, error)
 	return apply.Result{Operation: apply.SET, MergedResult: merged}, nil
 }
 
-func (v mergeVisitor) doAddOrDelete(e apply.Element) (apply.Result, bool) {
+func (v mergeStrategy) doAddOrDelete(e apply.Element) (apply.Result, bool) {
 	if apply.IsAdd(e) {
 		return apply.Result{Operation: apply.SET, MergedResult: e.GetLocal()}, true
 	}
@@ -129,14 +129,14 @@ func (v mergeVisitor) doAddOrDelete(e apply.Element) (apply.Result, bool) {
 	return apply.Result{}, false
 }
 
-// VisitPrimitive returns and error.  Primitive elements can't be merged, only replaced.
-func (v mergeVisitor) VisitPrimitive(diff apply.PrimitiveElement) (apply.Result, error) {
+// MergePrimitive returns and error.  Primitive elements can't be merged, only replaced.
+func (v mergeStrategy) MergePrimitive(diff apply.PrimitiveElement) (apply.Result, error) {
 	return apply.Result{}, fmt.Errorf("Cannot merge primitive element %v", diff.Name)
 }
 
-// VisitEmpty
-func (v mergeVisitor) VisitEmpty(diff apply.EmptyElement) (apply.Result, error) {
+// MergeEmpty
+func (v mergeStrategy) MergeEmpty(diff apply.EmptyElement) (apply.Result, error) {
 	return apply.Result{Operation: apply.SET}, nil
 }
 
-var _ apply.Visitor = &mergeVisitor{}
+var _ apply.Strategy = &mergeStrategy{}

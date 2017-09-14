@@ -20,14 +20,11 @@ package apply
 type EmptyElement struct {
 	// FieldMetaImpl contains metadata about the field from openapi
 	FieldMetaImpl
-
-	// Name of the field
-	Name string
 }
 
-// Accept implements Element.Accept
-func (e EmptyElement) Accept(v Visitor) (Result, error) {
-	return v.VisitEmpty(e)
+// Merge implements Element.Merge
+func (e EmptyElement) Merge(v Strategy) (Result, error) {
+	return v.MergeEmpty(e)
 }
 
 // IsAdd implements Element.IsAdd

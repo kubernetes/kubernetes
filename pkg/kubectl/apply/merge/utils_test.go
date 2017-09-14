@@ -33,12 +33,12 @@ import (
 )
 
 // run parses the openapi and runs the tests
-func run(instance apply.Visitor, recorded, local, remote, expected map[string]interface{}) {
+func run(instance apply.Strategy, recorded, local, remote, expected map[string]interface{}) {
 	runWith(instance, recorded, local, remote, expected,
 		filepath.Join("..", "..", "..", "..", "api", "openapi-spec", "swagger.json"))
 }
 
-func runWith(instance apply.Visitor, recorded, local, remote, expected map[string]interface{}, swaggerPath string) {
+func runWith(instance apply.Strategy, recorded, local, remote, expected map[string]interface{}, swaggerPath string) {
 	fakeSchema := tst.Fake{Path: swaggerPath}
 	s, err := fakeSchema.OpenAPISchema()
 	Expect(err).To(BeNil())
@@ -49,7 +49,7 @@ func runWith(instance apply.Visitor, recorded, local, remote, expected map[strin
 	parsed, err := parseFactory.CreateElement(recorded, local, remote)
 	Expect(err).Should(Not(HaveOccurred()))
 
-	merged, err := parsed.Accept(instance)
+	merged, err := parsed.Merge(instance)
 	Expect(err).ShouldNot(HaveOccurred())
 	Expect(merged.Operation).Should(Equal(apply.SET))
 	Expect(merged.MergedResult).Should(Equal(expected), diff.ObjectDiff(merged.MergedResult, expected))

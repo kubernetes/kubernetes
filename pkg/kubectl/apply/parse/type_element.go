@@ -52,7 +52,7 @@ func (v ElementBuildingVisitor) typeElement(meta apply.FieldMetaImpl, item *type
 		}
 
 		// Build the element for this field
-		element, err := field.Accept(v)
+		element, err := field.CreateElement(v)
 		if err != nil {
 			return nil, err
 		}

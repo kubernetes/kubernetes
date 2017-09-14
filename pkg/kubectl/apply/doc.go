@@ -30,5 +30,5 @@ package apply
 //parsed, err := parseFactory.CreateElement(recorded, local, remote)
 //Expect(err).Should(Not(HaveOccurred()))
 //
-//merged, err := parsed.Accept(merge.Create(merge.Options{}))
+//merged, err := parsed.Merge(merge.Create(merge.Options{}))
 //

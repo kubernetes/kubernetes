@@ -54,14 +54,14 @@ func (b *Factory) CreateElement(recorded, local, remote map[string]interface{}) 
 	hasRemote := remote != nil
 	fieldName := ""
 	item, err := visitor.getItem(oapiKind, fieldName,
-	    apply.RawElementData{recorded, local, remote},
-	    apply.HasElementData{hasRecorded, hasLocal, hasRemote})
+		apply.RawElementData{recorded, local, remote},
+		apply.HasElementData{hasRecorded, hasLocal, hasRemote})
 	if err != nil {
 		return nil, err
 	}
 
 	// Collate each field of the item into a combined Element
-	return item.Accept(visitor)
+	return item.CreateElement(visitor)
 }
 
 // getItem returns the appropriate Item based on the underlying type of the arguments

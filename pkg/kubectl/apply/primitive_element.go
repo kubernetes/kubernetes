@@ -33,9 +33,9 @@ type PrimitiveElement struct {
 	RawElementData
 }
 
-// Accept implements Element.Accept
-func (e PrimitiveElement) Accept(v Visitor) (Result, error) {
-	return v.VisitPrimitive(e)
+// Merge implements Element.Merge
+func (e PrimitiveElement) Merge(v Strategy) (Result, error) {
+	return v.MergePrimitive(e)
 }
 
 // String returns a string representation of the PrimitiveElement
@@ -44,30 +44,3 @@ func (e PrimitiveElement) String() string {
 }
 
 var _ Element = &PrimitiveElement{}
-
-// RawElementData contains the recorded, local and remote data for a primitive
-type RawElementData struct {
-	// recorded contains the value of the field from the recorded object
-	Recorded interface{}
-
-	// Local contains the value of the field from the recorded object
-	Local interface{}
-
-	// Remote contains the value of the field from the recorded object
-	Remote interface{}
-}
-
-// GetRecorded implements Element.GetRecorded
-func (e RawElementData) GetRecorded() interface{} {
-	return e.Recorded
-}
-
-// GetLocal implements Element.GetLocal
-func (e RawElementData) GetLocal() interface{} {
-	return e.Local
-}
-
-// GetRemote implements Element.GetRemote
-func (e RawElementData) GetRemote() interface{} {
-	return e.Remote
-}

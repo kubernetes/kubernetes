@@ -24,8 +24,8 @@ import (
 // Item wraps values from 3 sources (recorded, local, remote).
 // The values are not collated
 type Item interface {
-	// Accept merges the values in the item into a combined Element
-	Accept(ItemVisitor) (apply.Element, error)
+	// CreateElement merges the values in the item into a combined Element
+	CreateElement(ItemVisitor) (apply.Element, error)
 }
 
 // primitiveItem contains a recorded, local, and remote value
@@ -37,8 +37,8 @@ type primitiveItem struct {
 	apply.RawElementData
 }
 
-func (i *primitiveItem) Accept(v ItemVisitor) (apply.Element, error) {
-	return v.VisitPrimitive(i)
+func (i *primitiveItem) CreateElement(v ItemVisitor) (apply.Element, error) {
+	return v.CreatePrimitiveElement(i)
 }
 
 func (i *primitiveItem) GetMeta() openapi.Schema {
@@ -58,8 +58,8 @@ type listItem struct {
 	apply.ListElementData
 }
 
-func (i *listItem) Accept(v ItemVisitor) (apply.Element, error) {
-	return v.VisitList(i)
+func (i *listItem) CreateElement(v ItemVisitor) (apply.Element, error) {
+	return v.CreateListElement(i)
 }
 
 func (i *listItem) GetMeta() openapi.Schema {
@@ -79,8 +79,8 @@ type mapItem struct {
 	apply.MapElementData
 }
 
-func (i *mapItem) Accept(v ItemVisitor) (apply.Element, error) {
-	return v.VisitMap(i)
+func (i *mapItem) CreateElement(v ItemVisitor) (apply.Element, error) {
+	return v.CreateMapElement(i)
 }
 
 func (i *mapItem) GetMeta() openapi.Schema {
@@ -108,8 +108,8 @@ func (i *typeItem) GetMeta() openapi.Schema {
 	return nil
 }
 
-func (i *typeItem) Accept(v ItemVisitor) (apply.Element, error) {
-	return v.VisitType(i)
+func (i *typeItem) CreateElement(v ItemVisitor) (apply.Element, error) {
+	return v.CreateTypeElement(i)
 }
 
 // emptyItem contains no values
@@ -117,8 +117,8 @@ type emptyItem struct {
 	Name string
 }
 
-func (i *emptyItem) Accept(v ItemVisitor) (apply.Element, error) {
-	return &apply.EmptyElement{
-		Name: i.Name,
-	}, nil
+func (i *emptyItem) CreateElement(v ItemVisitor) (apply.Element, error) {
+	e := &apply.EmptyElement{}
+	e.Name = i.Name
+	return e, nil
 }
