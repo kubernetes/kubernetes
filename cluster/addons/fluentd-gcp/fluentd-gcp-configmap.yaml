@@ -345,6 +345,18 @@ data:
       </metric>
     </filter>
 
+    # TODO(instrumentation): Reconsider this workaround later.
+    # Trim the entries which exceed slightly less than 100KB, to avoid
+    # dropping them. It is a necessity, because Stackdriver only supports
+    # entries that are up to 100KB in size.
+    <filter kubernetes.**>
+      @type record_transformer
+      enable_ruby true
+      <record>
+        log ${record['log'].length > 100000 ? "[Trimmed]#{record['log'][0..100000]}..." : record['log']}
+      </record>
+    </filter>
+
     # We use 2 output stanzas - one to handle the container logs and one to handle
     # the node daemon logs, the latter of which explicitly sends its logs to the
     # compute.googleapis.com service rather than container.googleapis.com to keep
@@ -396,7 +408,7 @@ data:
       num_threads 2
     </match>
 metadata:
-  name: fluentd-gcp-config-v1.1.2
+  name: fluentd-gcp-config-v1.2.0
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile

@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 
 	appsapiv1beta1 "k8s.io/api/apps/v1beta1"
@@ -369,4 +370,13 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	assert.NoError(decodeResponse(resp, &resourceList))
 	assert.Equal(resourceList.APIVersion, "v1")
 
+}
+
+func TestNoAlphaVersionsEnabledByDefault(t *testing.T) {
+	config := DefaultAPIResourceConfigSource()
+	for gv, gvConfig := range config.GroupVersionResourceConfigs {
+		if gvConfig.Enable && strings.Contains(gv.Version, "alpha") {
+			t.Errorf("Alpha API version %s enabled by default", gv.String())
+		}
+	}
 }

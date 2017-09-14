@@ -102,6 +102,10 @@ func Test_AttachDetachControllerStateOfWolrdPopulators_Positive(t *testing.T) {
 
 	// Test the ActualStateOfWorld contains all the node volumes
 	nodes, err := adc.nodeLister.List(labels.Everything())
+	if err != nil {
+		t.Fatalf("Failed to list nodes in indexer. Expected: <no error> Actual: %v", err)
+	}
+
 	for _, node := range nodes {
 		nodeName := types.NodeName(node.Name)
 		for _, attachedVolume := range node.Status.VolumesAttached {
