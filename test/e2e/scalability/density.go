@@ -58,6 +58,9 @@ const (
 // Maximum container failures this test tolerates before failing.
 var MaxContainerFailures = 0
 
+// Maximum no. of missing measurements related to pod-startup that the test tolerates.
+var MaxMissingPodStartupMeasurements = 0
+
 type DensityTestConfig struct {
 	Configs            []testutils.RunObjectConfig
 	ClientSets         []clientset.Interface
@@ -310,6 +313,7 @@ var _ = SIGDescribe("Density", func() {
 	var masters sets.String
 
 	testCaseBaseName := "density"
+	missingMeasurements := 0
 
 	// Gathers data prior to framework namespace teardown
 	AfterEach(func() {
@@ -345,6 +349,9 @@ var _ = SIGDescribe("Density", func() {
 		}
 
 		framework.PrintSummaries(summaries, testCaseBaseName)
+
+		// Fail if more than the allowed threshold of measurements were missing in the latencyTest.
+		Expect(missingMeasurements <= MaxMissingPodStartupMeasurements).To(Equal(true))
 	})
 
 	options := framework.FrameworkOptions{
@@ -717,23 +724,23 @@ var _ = SIGDescribe("Density", func() {
 					sched, ok := scheduleTimes[name]
 					if !ok {
 						framework.Logf("Failed to find schedule time for %v", name)
+						missingMeasurements++
 					}
-					Expect(ok).To(Equal(true))
 					run, ok := runTimes[name]
 					if !ok {
 						framework.Logf("Failed to find run time for %v", name)
+						missingMeasurements++
 					}
-					Expect(ok).To(Equal(true))
 					watch, ok := watchTimes[name]
 					if !ok {
 						framework.Logf("Failed to find watch time for %v", name)
+						missingMeasurements++
 					}
-					Expect(ok).To(Equal(true))
 					node, ok := nodeNames[name]
 					if !ok {
 						framework.Logf("Failed to find node for %v", name)
+						missingMeasurements++
 					}
-					Expect(ok).To(Equal(true))
 
 					scheduleLag = append(scheduleLag, framework.PodLatencyData{Name: name, Node: node, Latency: sched.Time.Sub(create.Time)})
 					startupLag = append(startupLag, framework.PodLatencyData{Name: name, Node: node, Latency: run.Time.Sub(sched.Time)})
