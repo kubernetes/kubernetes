@@ -457,8 +457,16 @@ func CreateControllerContext(s *options.CMServer, rootClientBuilder, clientBuild
 func StartControllers(ctx ControllerContext, startSATokenController InitFunc, controllers map[string]InitFunc) error {
 	// Always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
 	// If this fails, just return here and fail since other controllers won't be able to get credentials.
-	if _, err := startSATokenController(ctx); err != nil {
+	started, err := startSATokenController(ctx)
+	if err != nil {
+		glog.Errorf("Error starting %q", saTokenControllerName)
 		return err
+	}
+
+	if !started {
+		glog.Warningf("Skipping %q", saTokenControllerName)
+	} else {
+		glog.Infof("Started %q first", saTokenControllerName)
 	}
 
 	for controllerName, initFn := range controllers {

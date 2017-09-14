@@ -167,17 +167,19 @@ func (e *TokensController) Run(workers int, stopCh <-chan struct{}) {
 	defer e.syncServiceAccountQueue.ShutDown()
 	defer e.syncSecretQueue.ShutDown()
 
+	glog.Info("Starting serviceaccount-token controller")
+	defer glog.Info("Shutting down serviceaccount-token controller")
+
 	if !controller.WaitForCacheSync("tokens", stopCh, e.serviceAccountSynced, e.secretSynced) {
 		return
 	}
 
-	glog.V(5).Infof("Starting workers")
+	glog.V(5).Infof("Starting workers serviceaccount-token controller")
 	for i := 0; i < workers; i++ {
 		go wait.Until(e.syncServiceAccount, 0, stopCh)
 		go wait.Until(e.syncSecret, 0, stopCh)
 	}
 	<-stopCh
-	glog.V(1).Infof("Shutting down")
 }
 
 func (e *TokensController) queueServiceAccountSync(obj interface{}) {
