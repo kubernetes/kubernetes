@@ -2861,55 +2861,55 @@
 		},
 		{
 			"ImportPath": "google.golang.org/api/cloudkms/v1",
-			"Rev": "98825bb0065da4054e5da6db34f5fc598e50bc24"
+			"Rev": "654f863362977d69086620b5f72f13e911da2410"
 		},
 		{
 			"ImportPath": "google.golang.org/api/cloudmonitoring/v2beta2",
-			"Rev": "98825bb0065da4054e5da6db34f5fc598e50bc24"
+			"Rev": "654f863362977d69086620b5f72f13e911da2410"
 		},
 		{
 			"ImportPath": "google.golang.org/api/compute/v0.alpha",
-			"Rev": "98825bb0065da4054e5da6db34f5fc598e50bc24"
+			"Rev": "654f863362977d69086620b5f72f13e911da2410"
 		},
 		{
 			"ImportPath": "google.golang.org/api/compute/v0.beta",
-			"Rev": "98825bb0065da4054e5da6db34f5fc598e50bc24"
+			"Rev": "654f863362977d69086620b5f72f13e911da2410"
 		},
 		{
 			"ImportPath": "google.golang.org/api/compute/v1",
-			"Rev": "98825bb0065da4054e5da6db34f5fc598e50bc24"
+			"Rev": "654f863362977d69086620b5f72f13e911da2410"
 		},
 		{
 			"ImportPath": "google.golang.org/api/container/v1",
-			"Rev": "98825bb0065da4054e5da6db34f5fc598e50bc24"
+			"Rev": "654f863362977d69086620b5f72f13e911da2410"
 		},
 		{
 			"ImportPath": "google.golang.org/api/dns/v1",
-			"Rev": "98825bb0065da4054e5da6db34f5fc598e50bc24"
+			"Rev": "654f863362977d69086620b5f72f13e911da2410"
 		},
 		{
 			"ImportPath": "google.golang.org/api/gensupport",
-			"Rev": "98825bb0065da4054e5da6db34f5fc598e50bc24"
+			"Rev": "654f863362977d69086620b5f72f13e911da2410"
 		},
 		{
 			"ImportPath": "google.golang.org/api/googleapi",
-			"Rev": "98825bb0065da4054e5da6db34f5fc598e50bc24"
+			"Rev": "654f863362977d69086620b5f72f13e911da2410"
 		},
 		{
 			"ImportPath": "google.golang.org/api/googleapi/internal/uritemplates",
-			"Rev": "98825bb0065da4054e5da6db34f5fc598e50bc24"
+			"Rev": "654f863362977d69086620b5f72f13e911da2410"
 		},
 		{
 			"ImportPath": "google.golang.org/api/logging/v2beta1",
-			"Rev": "98825bb0065da4054e5da6db34f5fc598e50bc24"
+			"Rev": "654f863362977d69086620b5f72f13e911da2410"
 		},
 		{
 			"ImportPath": "google.golang.org/api/monitoring/v3",
-			"Rev": "98825bb0065da4054e5da6db34f5fc598e50bc24"
+			"Rev": "654f863362977d69086620b5f72f13e911da2410"
 		},
 		{
 			"ImportPath": "google.golang.org/api/pubsub/v1",
-			"Rev": "98825bb0065da4054e5da6db34f5fc598e50bc24"
+			"Rev": "654f863362977d69086620b5f72f13e911da2410"
 		},
 		{
 			"ImportPath": "google.golang.org/genproto/googleapis/rpc/status",
