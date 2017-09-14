@@ -91,7 +91,7 @@ var expectedPolicy = &audit.Policy{
 }
 
 func TestParserV1alpha1(t *testing.T) {
-	f, err := writePolicy(policyDefV1alpha1, t)
+	f, err := writePolicy(t, policyDefV1alpha1)
 	require.NoError(t, err)
 	defer os.Remove(f)
 
@@ -105,7 +105,7 @@ func TestParserV1alpha1(t *testing.T) {
 }
 
 func TestParserV1beta1(t *testing.T) {
-	f, err := writePolicy(policyDefV1beta1, t)
+	f, err := writePolicy(t, policyDefV1beta1)
 	require.NoError(t, err)
 	defer os.Remove(f)
 
@@ -119,7 +119,6 @@ func TestParserV1beta1(t *testing.T) {
 }
 
 func TestPolicyCntCheck(t *testing.T) {
-	//a set of testCases
 	var testCases = []struct {
 		caseName, policy string
 	}{
@@ -132,7 +131,7 @@ kind: Policy`,
 	}
 
 	for _, tc := range testCases {
-		f, err := writePolicy(tc.policy, t)
+		f, err := writePolicy(t, tc.policy)
 		require.NoError(t, err)
 		defer os.Remove(f)
 
@@ -141,7 +140,7 @@ kind: Policy`,
 	}
 }
 
-func writePolicy(policy string, t *testing.T) (string, error) {
+func writePolicy(t *testing.T, policy string) (string, error) {
 	f, err := ioutil.TempFile("", "policy.yaml")
 	require.NoError(t, err)
 
