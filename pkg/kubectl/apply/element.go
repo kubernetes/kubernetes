@@ -106,10 +106,13 @@ func (e HasElementData) HasRemote() bool {
 type FieldMetaImpl struct {
 	// The type of merge strategy to use for this field
 	// maybe "merge", "replace" or "retainkeys"
-	// TODO: There maybe multiple strategies, so this may need to be a slice, map, or multiple fields
+	// TODO: There maybe multiple strategies, so this may need to be a slice, map, or struct
+	// Address this in a follow up in the PR to introduce retainkeys strategy
 	MergeType string
+
 	// The merge key to use when the MergeType is "merge" and underlying type is a list
 	MergeKey []string
+
 	// The openapi type of the field - "list", "primitive", "map"
 	Type string
 
@@ -155,11 +158,11 @@ func (v MergeKeyValue) Equal(o MergeKeyValue) bool {
 func GetMergeKeyValue(mergekey []string, i interface{}) (MergeKeyValue, error) {
 	result := MergeKeyValue{}
 	if len(mergekey) <= 0 {
-		return result, fmt.Errorf("Merge key must have at least 1 value to merge.")
+		return result, fmt.Errorf("merge key must have at least 1 value to merge.")
 	}
 	m, ok := i.(map[string]interface{})
 	if !ok {
-		return result, fmt.Errorf("Cannot use mergekey %v for primitive item in list %v", mergekey, i)
+		return result, fmt.Errorf("cannot use mergekey %v for primitive item in list %v", mergekey, i)
 	}
 	for _, field := range mergekey {
 		if value, found := m[field]; !found {
