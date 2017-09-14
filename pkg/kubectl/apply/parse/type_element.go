@@ -21,44 +21,27 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
-// mapElement builds a new mapElement from a MapItem
+// typeElement builds a new mapElement from a typeItem
 func (v ElementBuildingVisitor) typeElement(meta apply.FieldMetaImpl, item *typeItem) (*apply.TypeElement, error) {
-	result := &apply.TypeElement{
-		//Schema:   item.MergeType,
+	// Function to get the schema of a field from its key
+	var fn schemaFn = func(key string) openapi.Schema {
+		if item.Type != nil && item.Type.Fields != nil {
+			return item.Type.Fields[key]
+		}
+		return nil
+	}
+
+	// Collect same fields from multiple maps into a map of elements
+	values, err := v.createMapValues(fn, meta, item.HasElementData, item.MapElementData)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return the result
+	return &apply.TypeElement{
 		FieldMetaImpl:  meta,
 		HasElementData: item.HasElementData,
 		MapElementData: item.MapElementData,
-		Values:         map[string]apply.Element{},
-	}
-	result.Name = item.Name
-
-	// Collate each key in the type
-	for _, key := range keysUnion(item.Recorded, item.Local, item.Remote) {
-		var s openapi.Schema
-		if item.Type != nil && item.Type.Fields != nil {
-			s = item.Type.Fields[key]
-		}
-
-		recorded, recordedSet := nilSafeLookup(key, item.Recorded)
-		local, localSet := nilSafeLookup(key, item.Local)
-		remote, remoteSet := nilSafeLookup(key, item.Remote)
-
-		// Create an item for the field
-		field, err := v.getItem(s, key,
-			apply.RawElementData{recorded, local, remote},
-			apply.HasElementData{recordedSet, localSet, remoteSet})
-		if err != nil {
-			return nil, err
-		}
-
-		// Build the element for this field
-		element, err := field.CreateElement(v)
-		if err != nil {
-			return nil, err
-		}
-
-		// Add the field element to the map
-		result.Values[key] = element
-	}
-	return result, nil
+		Values:         values,
+	}, nil
 }
