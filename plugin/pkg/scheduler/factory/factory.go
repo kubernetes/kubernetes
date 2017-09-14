@@ -901,17 +901,9 @@ func (f *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 }
 
 func (f *configFactory) getNextPod() *v1.Pod {
-	for {
-		pod := cache.Pop(f.podQueue).(*v1.Pod)
-		if f.ResponsibleForPod(pod) {
-			glog.V(4).Infof("About to try and schedule pod %v", pod.Name)
-			return pod
-		}
-	}
-}
-
-func (f *configFactory) ResponsibleForPod(pod *v1.Pod) bool {
-	return f.schedulerName == pod.Spec.SchedulerName
+	pod := cache.Pop(f.podQueue).(*v1.Pod)
+	glog.V(4).Infof("About to try and schedule pod %v", pod.Name)
+	return pod
 }
 
 // unassignedNonTerminatedPod selects pods that are unassigned and non-terminal.
@@ -1008,8 +1000,11 @@ func (i *podInformer) Lister() corelisters.PodLister {
 }
 
 // NewPodInformer creates a shared index informer that returns only non-terminal pods.
-func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) coreinformers.PodInformer {
-	selector := fields.ParseSelectorOrDie("status.phase!=" + string(v1.PodSucceeded) + ",status.phase!=" + string(v1.PodFailed))
+func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration, schedulerName string) coreinformers.PodInformer {
+	selector := fields.ParseSelectorOrDie(
+		"spec.schedulerName=" + schedulerName +
+			",status.phase!=" + string(v1.PodSucceeded) +
+			",status.phase!=" + string(v1.PodFailed))
 	lw := cache.NewListWatchFromClient(client.CoreV1().RESTClient(), string(v1.ResourcePods), metav1.NamespaceAll, selector)
 	return &podInformer{
 		informer: cache.NewSharedIndexInformer(lw, &v1.Pod{}, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}),

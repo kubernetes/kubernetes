@@ -464,6 +464,7 @@ func TestMultiScheduler(t *testing.T) {
 	context.clientSet.CoreV1().Nodes().Create(node)
 
 	// 3. create 3 pods for testing
+	t.Logf("create 3 pods for testing")
 	testPod, err := createPausePodWithResource(context.clientSet, "pod-without-scheduler-name", context.ns.Name, nil)
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
@@ -484,6 +485,7 @@ func TestMultiScheduler(t *testing.T) {
 	// 4. **check point-1**:
 	//		- testPod, testPodFitsDefault should be scheduled
 	//		- testPodFitsFoo should NOT be scheduled
+	t.Logf("wait for pods scheduled")
 	if err := waitForPodToSchedule(context.clientSet, testPod); err != nil {
 		t.Errorf("Test MultiScheduler: %s Pod not scheduled: %v", testPod.Name, err)
 	} else {
@@ -505,12 +507,13 @@ func TestMultiScheduler(t *testing.T) {
 	// 5. create and start a scheduler with name "foo-scheduler"
 	clientSet2 := clientset.NewForConfigOrDie(&restclient.Config{Host: context.httpServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
 	informerFactory2 := informers.NewSharedInformerFactory(context.clientSet, 0)
+	podInformer2 := factory.NewPodInformer(context.clientSet, 0, fooScheduler)
 
 	schedulerConfigFactory2 := factory.NewConfigFactory(
 		fooScheduler,
 		clientSet2,
 		informerFactory2.Core().V1().Nodes(),
-		informerFactory2.Core().V1().Pods(),
+		podInformer2,
 		informerFactory2.Core().V1().PersistentVolumes(),
 		informerFactory2.Core().V1().PersistentVolumeClaims(),
 		informerFactory2.Core().V1().ReplicationControllers(),
@@ -528,6 +531,7 @@ func TestMultiScheduler(t *testing.T) {
 	eventBroadcaster2 := record.NewBroadcaster()
 	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: fooScheduler})
 	eventBroadcaster2.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet2.CoreV1().RESTClient()).Events("")})
+	go podInformer2.Informer().Run(schedulerConfig2.StopEverything)
 	informerFactory2.Start(schedulerConfig2.StopEverything)
 
 	sched2, _ := scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{Config: schedulerConfig2}, nil...)
