@@ -1562,6 +1562,10 @@ function start-kube-controller-manager {
   if [[ -n "${VOLUME_PLUGIN_DIR:-}" ]]; then
     params+=" --flex-volume-plugin-dir=${VOLUME_PLUGIN_DIR}"
   fi
+  if [[ -n "${CLUSTER_SIGNING_DURATION:-}" ]]; then
+    params+=" --experimental-cluster-signing-duration=$CLUSTER_SIGNING_DURATION"
+  fi
+
   local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
   local container_env=""
   if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
