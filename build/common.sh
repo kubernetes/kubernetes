@@ -291,7 +291,7 @@ function kube::build::ensure_tar() {
       TAR=gtar
   else
       if which gnutar &>/dev/null; then
-	  TAR=gnutar
+        TAR=gnutar
       fi
   fi
   if ! "${TAR}" --version | grep -q GNU; then

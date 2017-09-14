@@ -17,11 +17,11 @@
 # A library of helper functions and constant for debian os distro
 
 function get-node-instance-metadata {
-	local metadata=""
-	metadata+="startup-script=${KUBE_TEMP}/configure-vm.sh,"
-	metadata+="kube-env=${KUBE_TEMP}/node-kube-env.yaml,"
-	metadata+="cluster-name=${KUBE_TEMP}/cluster-name.txt"
-	echo "${metadata}"
+  local metadata=""
+  metadata+="startup-script=${KUBE_TEMP}/configure-vm.sh,"
+  metadata+="kube-env=${KUBE_TEMP}/node-kube-env.yaml,"
+  metadata+="cluster-name=${KUBE_TEMP}/cluster-name.txt"
+  echo "${metadata}"
 }
 
 # $1: template name (required)

@@ -32,18 +32,18 @@ function create-master-instance-with-resources {
     ${GCLOUD_COMMON_ARGS} \
     --type "${MASTER_DISK_TYPE}" \
     --size "${MASTER_DISK_SIZE}"
-  
+
   if [ "${EVENT_PD:-false}" == "true" ]; then
     run-gcloud-compute-with-retries disks create "${MASTER_NAME}-event-pd" \
       ${GCLOUD_COMMON_ARGS} \
       --type "${MASTER_DISK_TYPE}" \
       --size "${MASTER_DISK_SIZE}"
   fi
-  
+
   run-gcloud-compute-with-retries addresses create "${MASTER_NAME}-ip" \
     --project "${PROJECT}" \
     --region "${REGION}" -q
-  
+
   MASTER_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
     --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
 
@@ -69,7 +69,7 @@ function create-master-instance-with-resources {
   run-gcloud-compute-with-retries instances add-metadata "${MASTER_NAME}" \
     ${GCLOUD_COMMON_ARGS} \
     --metadata-from-file startup-script="${KUBE_ROOT}/test/kubemark/resources/start-kubemark-master.sh"
-  
+
   if [ "${EVENT_PD:-false}" == "true" ]; then
     echo "Attaching ${MASTER_NAME}-event-pd to ${MASTER_NAME}"
     run-gcloud-compute-with-retries instances attach-disk "${MASTER_NAME}" \
@@ -77,7 +77,7 @@ function create-master-instance-with-resources {
     --disk "${MASTER_NAME}-event-pd" \
     --device-name="master-event-pd"
   fi
-  
+
   run-gcloud-compute-with-retries firewall-rules create "${MASTER_NAME}-https" \
     --project "${PROJECT}" \
     --network "${NETWORK}" \
@@ -93,7 +93,7 @@ function execute-cmd-on-master-with-retries() {
 }
 
 function copy-files() {
-	run-gcloud-compute-with-retries scp --recurse --zone="${ZONE}" --project="${PROJECT}" $@
+    run-gcloud-compute-with-retries scp --recurse --zone="${ZONE}" --project="${PROJECT}" $@
 }
 
 function delete-master-instance-and-resources {
@@ -101,27 +101,27 @@ function delete-master-instance-and-resources {
 
   gcloud compute instances delete "${MASTER_NAME}" \
       ${GCLOUD_COMMON_ARGS} || true
-  
+
   gcloud compute disks delete "${MASTER_NAME}-pd" \
       ${GCLOUD_COMMON_ARGS} || true
-  
+
   gcloud compute disks delete "${MASTER_NAME}-event-pd" \
       ${GCLOUD_COMMON_ARGS} &> /dev/null || true
-  
+
   gcloud compute addresses delete "${MASTER_NAME}-ip" \
       --project "${PROJECT}" \
       --region "${REGION}" \
       --quiet || true
-  
+
   gcloud compute firewall-rules delete "${MASTER_NAME}-https" \
-	  --project "${PROJECT}" \
-	  --quiet || true
-  
+      --project "${PROJECT}" \
+      --quiet || true
+
   if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
-	  gcloud compute instances delete "${EVENT_STORE_NAME}" \
-    	  ${GCLOUD_COMMON_ARGS} || true
-  
-	  gcloud compute disks delete "${EVENT_STORE_NAME}-pd" \
-    	  ${GCLOUD_COMMON_ARGS} || true
+      gcloud compute instances delete "${EVENT_STORE_NAME}" \
+          ${GCLOUD_COMMON_ARGS} || true
+
+      gcloud compute disks delete "${EVENT_STORE_NAME}-pd" \
+          ${GCLOUD_COMMON_ARGS} || true
   fi
 }

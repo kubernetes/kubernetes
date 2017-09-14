@@ -24,7 +24,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 BINS=(
-	cmd/clicheck
+    cmd/clicheck
 )
 make -C "${KUBE_ROOT}" WHAT="${BINS[*]}"
 
@@ -32,12 +32,12 @@ clicheck=$(kube::util::find-binary "clicheck")
 
 if ! output=`$clicheck 2>&1`
 then
-	echo "$output"
-	echo
-	echo "FAILURE: CLI is not following one or more required conventions."
-	exit 1
+    echo "$output"
+    echo
+    echo "FAILURE: CLI is not following one or more required conventions."
+    exit 1
 else
-	echo "$output"
-	echo
+    echo "$output"
+    echo
   echo "SUCCESS: CLI is following all tested conventions."
 fi

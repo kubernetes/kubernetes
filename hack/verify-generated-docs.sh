@@ -24,11 +24,11 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 BINS=(
-	cmd/gendocs
-	cmd/genkubedocs
-	cmd/genman
-	cmd/genyaml
-	federation/cmd/genfeddocs
+    cmd/gendocs
+    cmd/genkubedocs
+    cmd/genman
+    cmd/genyaml
+    federation/cmd/genfeddocs
 )
 make -C "${KUBE_ROOT}" WHAT="${BINS[*]}"
 

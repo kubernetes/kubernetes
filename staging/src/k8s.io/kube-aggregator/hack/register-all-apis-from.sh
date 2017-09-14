@@ -54,37 +54,37 @@ caBundle=$(base64 /var/run/kubernetes/server-ca.crt | awk 'BEGIN{ORS="";} {print
 
 # if we have a /api endpoint, then we need to register that
 if kubectl --kubeconfig=${FROM_KUBECONFIG} get --raw / | grep -q /api/v1; then
-	group=""
-	version="v1"
-	resourceName=${version}.${group}
-	resourceFileName=${dir}/${resourceName}.yaml
-	cp ${scriptDir}/apiservice-template.yaml ${resourceFileName}
-	${SED} -i "s/RESOURCE_NAME/${resourceName}/" ${resourceFileName}
-	${SED} -i "s/API_GROUP/${group}/" ${resourceFileName}
-	${SED} -i "s/API_VERSION/${version}/" ${resourceFileName}
-	${SED} -i "s/SERVICE_NAMESPACE/${SERVICE_NAMESPACE}/" ${resourceFileName}
-	${SED} -i "s/SERVICE_NAME/${SERVICE_NAME}/" ${resourceFileName}
-	${SED} -i "s/CA_BUNDLE/${caBundle}/" ${resourceFileName}
-	echo "registering ${resourceName} using ${resourceFileName}"
+  group=""
+  version="v1"
+  resourceName=${version}.${group}
+  resourceFileName=${dir}/${resourceName}.yaml
+  cp ${scriptDir}/apiservice-template.yaml ${resourceFileName}
+  ${SED} -i "s/RESOURCE_NAME/${resourceName}/" ${resourceFileName}
+  ${SED} -i "s/API_GROUP/${group}/" ${resourceFileName}
+  ${SED} -i "s/API_VERSION/${version}/" ${resourceFileName}
+  ${SED} -i "s/SERVICE_NAMESPACE/${SERVICE_NAMESPACE}/" ${resourceFileName}
+  ${SED} -i "s/SERVICE_NAME/${SERVICE_NAME}/" ${resourceFileName}
+  ${SED} -i "s/CA_BUNDLE/${caBundle}/" ${resourceFileName}
+  echo "registering ${resourceName} using ${resourceFileName}"
 
-	kubectl --kubeconfig=${AGG_KUBECONFIG} create -f ${resourceFileName}
+  kubectl --kubeconfig=${AGG_KUBECONFIG} create -f ${resourceFileName}
 fi
 
 groupVersions=( $(kubectl --kubeconfig=${FROM_KUBECONFIG} get --raw / | grep /apis/ | sed 's/",.*//' | sed 's|.*"/apis/||' | grep '/') )
 
 for groupVersion in "${groupVersions[@]}"; do
-	group=$(echo $groupVersion | awk -F/ '{print $1}')
-	version=$(echo $groupVersion | awk -F/ '{print $2}')
-	resourceName=${version}.${group}
-	resourceFileName=${dir}/${resourceName}.yaml
-	cp ${scriptDir}/apiservice-template.yaml ${resourceFileName}
-	${SED} -i "s/RESOURCE_NAME/${resourceName}/" ${resourceFileName}
-	${SED} -i "s/API_GROUP/${group}/" ${resourceFileName}
-	${SED} -i "s/API_VERSION/${version}/" ${resourceFileName}
-	${SED} -i "s/SERVICE_NAMESPACE/${SERVICE_NAMESPACE}/" ${resourceFileName}
-	${SED} -i "s/SERVICE_NAME/${SERVICE_NAME}/" ${resourceFileName}
-	${SED} -i "s/CA_BUNDLE/${caBundle}/" ${resourceFileName}
-	echo "registering ${resourceName} using ${resourceFileName}"
+  group=$(echo $groupVersion | awk -F/ '{print $1}')
+  version=$(echo $groupVersion | awk -F/ '{print $2}')
+  resourceName=${version}.${group}
+  resourceFileName=${dir}/${resourceName}.yaml
+  cp ${scriptDir}/apiservice-template.yaml ${resourceFileName}
+  ${SED} -i "s/RESOURCE_NAME/${resourceName}/" ${resourceFileName}
+  ${SED} -i "s/API_GROUP/${group}/" ${resourceFileName}
+  ${SED} -i "s/API_VERSION/${version}/" ${resourceFileName}
+  ${SED} -i "s/SERVICE_NAMESPACE/${SERVICE_NAMESPACE}/" ${resourceFileName}
+  ${SED} -i "s/SERVICE_NAME/${SERVICE_NAME}/" ${resourceFileName}
+  ${SED} -i "s/CA_BUNDLE/${caBundle}/" ${resourceFileName}
+  echo "registering ${resourceName} using ${resourceFileName}"
 
-	kubectl --kubeconfig=${AGG_KUBECONFIG} create -f ${resourceFileName}
+  kubectl --kubeconfig=${AGG_KUBECONFIG} create -f ${resourceFileName}
 done

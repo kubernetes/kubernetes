@@ -681,13 +681,13 @@ function start_kubelet {
         ${container_runtime_endpoint_args} \
         ${image_service_endpoint_args} \
         --port="$KUBELET_PORT" \
-	${KUBELET_FLAGS} >"${KUBELET_LOG}" 2>&1 &
+      ${KUBELET_FLAGS} >"${KUBELET_LOG}" 2>&1 &
       KUBELET_PID=$!
       # Quick check that kubelet is running.
       if ps -p $KUBELET_PID > /dev/null ; then
-	echo "kubelet ( $KUBELET_PID ) is running."
+        echo "kubelet ( $KUBELET_PID ) is running."
       else
-	cat ${KUBELET_LOG} ; exit 1
+        cat ${KUBELET_LOG} ; exit 1
       fi
     else
       # Docker won't run a container with a cidfile (container id file)

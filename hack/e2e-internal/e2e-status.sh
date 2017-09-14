@@ -36,11 +36,11 @@ if [[ "${FEDERATION:-}" == "true" ]];then
     # In the future, we will want to loop through the all the federated contexts,
     # select each one and call federated-up
     for zone in ${E2E_ZONES};do
-	(
-	    set-federation-zone-vars "$zone"
-	    printf "\n\tChecking version for $OVERRIDE_CONTEXT\n"
-	    ${KUBECTL} --context="$OVERRIDE_CONTEXT" version
-	)
+    (
+        set-federation-zone-vars "$zone"
+        printf "\n\tChecking version for $OVERRIDE_CONTEXT\n"
+        ${KUBECTL} --context="$OVERRIDE_CONTEXT" version
+    )
     done
 else
     ${KUBECTL} version

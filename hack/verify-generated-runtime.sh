@@ -25,7 +25,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 
 function cleanup {
-	rm -rf ${KUBE_REMOTE_RUNTIME_ROOT}/_tmp/
+    rm -rf ${KUBE_REMOTE_RUNTIME_ROOT}/_tmp/
 }
 
 trap cleanup EXIT

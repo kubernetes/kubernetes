@@ -143,13 +143,13 @@ NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
 # To avoid running Calico on a node that is not configured appropriately,
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.
 if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
-	NODE_LABELS="${NODE_LABELS},projectcalico.org/ds-ready=true"
+  NODE_LABELS="${NODE_LABELS},projectcalico.org/ds-ready=true"
 fi
 
 # Turn the simple metadata proxy on by default.
 ENABLE_METADATA_PROXY="${ENABLE_METADATA_PROXY:-simple}"
 if [[ ${ENABLE_METADATA_PROXY} != "false" ]]; then
-        NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
+  NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
 fi
 
 # Optional: Enable node logging.
@@ -172,7 +172,7 @@ RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
 
 if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
-    FEATURE_GATES="${FEATURE_GATES},Accelerators=true"
+  FEATURE_GATES="${FEATURE_GATES},Accelerators=true"
 fi
 
 # Optional: Install cluster DNS.
@@ -317,5 +317,5 @@ KUBE_PROXY_DAEMONSET="${KUBE_PROXY_DAEMONSET:-false}" # true, false
 # Optional: enable pod priority
 ENABLE_POD_PRIORITY="${ENABLE_POD_PRIORITY:-}"
 if [[ "${ENABLE_POD_PRIORITY}" == "true" ]]; then
-    FEATURE_GATES="${FEATURE_GATES},PodPriority=true"
+  FEATURE_GATES="${FEATURE_GATES},PodPriority=true"
 fi

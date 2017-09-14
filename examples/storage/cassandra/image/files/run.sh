@@ -101,7 +101,7 @@ for rackdc in dc rack; do
   var="CASSANDRA_${rackdc^^}"
   val="${!var}"
   if [ "$val" ]; then
-	sed -ri 's/^('"$rackdc"'=).*/\1 '"$val"'/' "$CASSANDRA_CONF_DIR/cassandra-rackdc.properties"
+    sed -ri 's/^('"$rackdc"'=).*/\1 '"$val"'/' "$CASSANDRA_CONF_DIR/cassandra-rackdc.properties"
   fi
 done
 

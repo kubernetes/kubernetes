@@ -155,10 +155,10 @@ else
   test_args='--kubelet-flags="--container-runtime='$runtime'" '$test_args
   if [[ $runtime == "remote" ]] ; then
       if [[ ! -z $container_runtime_endpoint ]] ; then
-	      test_args='--kubelet-flags="--container-runtime-endpoint='$container_runtime_endpoint'" '$test_args
+        test_args='--kubelet-flags="--container-runtime-endpoint='$container_runtime_endpoint'" '$test_args
       fi
       if [[ ! -z $image_service_endpoint ]] ; then
-	      test_args='--kubelet-flags="--image-service-endpoint='$image_service_endpoint'" '$test_args
+        test_args='--kubelet-flags="--image-service-endpoint='$image_service_endpoint'" '$test_args
       fi
   fi
 

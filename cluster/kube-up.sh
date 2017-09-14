@@ -87,9 +87,9 @@ echo "... calling validate-cluster" >&2
 # - 2: weak error - something went wrong, but cluster probably will be working correctly
 # We just print an error message in case 2).
 if [[ "${validate_result}" == "1" ]]; then
-	exit 1
+  exit 1
 elif [[ "${validate_result}" == "2" ]]; then
-	echo "...ignoring non-fatal errors in validate-cluster" >&2
+  echo "...ignoring non-fatal errors in validate-cluster" >&2
 fi
 
 if [[ "${ENABLE_PROXY:-}" == "true" ]]; then

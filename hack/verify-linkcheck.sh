@@ -30,7 +30,7 @@ linkcheck=$(kube::util::find-binary "linkcheck")
 kube::util::ensure-temp-dir
 OUTPUT="${KUBE_TEMP}"/linkcheck-output
 cleanup() {
-	rm -rf "${OUTPUT}"
+  rm -rf "${OUTPUT}"
 }
 trap "cleanup" EXIT SIGINT
 mkdir -p "$OUTPUT"
