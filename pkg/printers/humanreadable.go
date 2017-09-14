@@ -211,7 +211,7 @@ func (h *HumanReadablePrinter) DefaultTableHandler(columnDefinitions []metav1alp
 //  func printFunc(object ObjectType, options PrintOptions) ([]metav1alpha1.TableRow, error)
 // where ObjectType is the type of the object that will be printed, and the first
 // return value is an array of rows, with each row containing a number of cells that
-// match the number of coulmns defined for that printer function.
+// match the number of columns defined for that printer function.
 func ValidateRowPrintHandlerFunc(printFunc reflect.Value) error {
 	if printFunc.Kind() != reflect.Func {
 		return fmt.Errorf("invalid print handler. %#v is not a function", printFunc)
