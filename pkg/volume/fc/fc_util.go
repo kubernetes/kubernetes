@@ -220,6 +220,9 @@ func (util *FCUtil) AttachDisk(b fcDiskMounter) (string, error) {
 	// mount it
 	globalPDPath := util.MakeGlobalPDName(*b.fcDisk)
 	noMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
+	if err != nil {
+		return devicePath, fmt.Errorf("Heuristic determination of mount point failed:%v", err)
+	}
 	if !noMnt {
 		glog.Infof("fc: %s already mounted", globalPDPath)
 		return devicePath, nil

@@ -116,7 +116,7 @@ func (plugin *azureDataDiskPlugin) GetAccessModes() []v1.PersistentVolumeAccessM
 func (plugin *azureDataDiskPlugin) NewAttacher() (volume.Attacher, error) {
 	azure, err := getCloud(plugin.host)
 	if err != nil {
-		glog.V(4).Infof("failed to get azure cloud in NewAttacher, plugin.host : %s", plugin.host.GetHostName())
+		glog.Errorf("failed to get azure cloud in NewAttacher, plugin.host : %s, err:%v", plugin.host.GetHostName(), err)
 		return nil, err
 	}
 

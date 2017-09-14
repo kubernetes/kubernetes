@@ -480,6 +480,12 @@ EOF
 # Write the config for the audit policy.
 function create-master-audit-policy {
   local -r path="${1}"
+  local -r policy="${2:-}"
+
+  if [[ -n "${policy}" ]]; then
+    echo "${policy}" > "${path}"
+    return
+  fi
 
   # Known api groups
   local -r known_apis='
@@ -499,7 +505,7 @@ function create-master-audit-policy {
       - group: "storage.k8s.io"'
 
   cat <<EOF >"${path}"
-apiVersion: audit.k8s.io/v1alpha1
+apiVersion: audit.k8s.io/v1beta1
 kind: Policy
 rules:
   # The following requests were manually identified as high-volume and low-risk,
@@ -509,7 +515,7 @@ rules:
     verbs: ["watch"]
     resources:
       - group: "" # core
-        resources: ["endpoints", "services"]
+        resources: ["endpoints", "services", "services/status"]
   - level: None
     # Ingress controller reads `configmaps/ingress-uid` through the unsecured port.
     # TODO(#46983): Change this to the ingress controller service account.
@@ -524,13 +530,13 @@ rules:
     verbs: ["get"]
     resources:
       - group: "" # core
-        resources: ["nodes"]
+        resources: ["nodes", "nodes/status"]
   - level: None
     userGroups: ["system:nodes"]
     verbs: ["get"]
     resources:
       - group: "" # core
-        resources: ["nodes"]
+        resources: ["nodes", "nodes/status"]
   - level: None
     users:
       - system:kube-controller-manager
@@ -546,7 +552,7 @@ rules:
     verbs: ["get"]
     resources:
       - group: "" # core
-        resources: ["namespaces"]
+        resources: ["namespaces", "namespaces/status", "namespaces/finalize"]
 
   # Don't log these read-only URLs.
   - level: None
@@ -569,15 +575,23 @@ rules:
         resources: ["secrets", "configmaps"]
       - group: authentication.k8s.io
         resources: ["tokenreviews"]
+    omitStages:
+      - "RequestReceived"
   # Get repsonses can be large; skip them.
   - level: Request
     verbs: ["get", "list", "watch"]
     resources: ${known_apis}
+    omitStages:
+      - "RequestReceived"
   # Default level for known APIs
   - level: RequestResponse
     resources: ${known_apis}
+    omitStages:
+      - "RequestReceived"
   # Default level for all other requests.
   - level: Metadata
+    omitStages:
+      - "RequestReceived"
 EOF
 }
 
@@ -1317,7 +1331,7 @@ function start-kube-apiserver {
     local -r audit_policy_file="/etc/audit_policy.config"
     params+=" --audit-policy-file=${audit_policy_file}"
     # Create the audit policy file, and mount it into the apiserver pod.
-    create-master-audit-policy "${audit_policy_file}"
+    create-master-audit-policy "${audit_policy_file}" "${ADVANCED_AUDIT_POLICY:-}"
     audit_policy_config_mount="{\"name\": \"auditpolicyconfigmount\",\"mountPath\": \"${audit_policy_file}\", \"readOnly\": true},"
     audit_policy_config_volume="{\"name\": \"auditpolicyconfigmount\",\"hostPath\": {\"path\": \"${audit_policy_file}\", \"type\": \"FileOrCreate\"}},"
 

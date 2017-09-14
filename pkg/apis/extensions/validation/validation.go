@@ -698,6 +698,9 @@ func ValidatePodSecurityPolicySpecificAnnotations(annotations map[string]string,
 	}
 	if allowed := annotations[seccomp.AllowedProfilesAnnotationKey]; allowed != "" {
 		for _, p := range strings.Split(allowed, ",") {
+			if p == seccomp.AllowAny {
+				continue
+			}
 			allErrs = append(allErrs, apivalidation.ValidateSeccompProfile(p, fldPath.Key(seccomp.AllowedProfilesAnnotationKey))...)
 		}
 	}

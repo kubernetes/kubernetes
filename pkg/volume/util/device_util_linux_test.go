@@ -116,10 +116,16 @@ func TestFindDeviceForPath(t *testing.T) {
 	io := &mockOsIOHandler{}
 
 	disk, err := findDeviceForPath("/dev/sde", io)
+	if err != nil {
+		t.Fatalf("error finding device for path /dev/sde:%v", err)
+	}
 	if disk != "sde" {
 		t.Fatalf("disk [%s] didn't match expected sde", disk)
 	}
 	disk, err = findDeviceForPath("/returns/a/dev", io)
+	if err != nil {
+		t.Fatalf("error finding device for path /returns/a/dev:%v", err)
+	}
 	if disk != "sde" {
 		t.Fatalf("disk [%s] didn't match expected sde", disk)
 	}

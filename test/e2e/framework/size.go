@@ -66,6 +66,7 @@ func GetGroupNodes(group string) ([]string, error) {
 			"list-instances", group, "--project="+TestContext.CloudConfig.ProjectID,
 			"--zone="+TestContext.CloudConfig.Zone).CombinedOutput()
 		if err != nil {
+			Logf("Failed to get nodes in instance group: %v", string(output))
 			return nil, err
 		}
 		re := regexp.MustCompile(".*RUNNING")

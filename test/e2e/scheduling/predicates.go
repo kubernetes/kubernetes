@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -39,6 +40,8 @@ import (
 
 const maxNumberOfPods int64 = 10
 const minPodCPURequest int64 = 500
+
+var localStorageVersion = utilversion.MustParseSemantic("v1.8.0-beta.0")
 
 // variable set in BeforeEach, never modified afterwards
 var masterNodes sets.String
@@ -153,6 +156,9 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	// It assumes that cluster add-on pods stay stable and cannot be run in parallel with any other test that touches Nodes or Pods.
 	// It is so because we need to have precise control on what's running in the cluster.
 	It("validates local ephemeral storage resource limits of pods that are allowed to run [Feature:LocalStorageCapacityIsolation]", func() {
+
+		framework.SkipUnlessServerVersionGTE(localStorageVersion, f.ClientSet.Discovery())
+
 		nodeMaxAllocatable := int64(0)
 
 		nodeToAllocatableMap := make(map[string]int64)
