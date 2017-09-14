@@ -50,7 +50,7 @@ func (v ElementBuildingVisitor) CreatePrimitiveElement(item *primitiveItem) (app
 
 // CreateListElement creates a ListElement
 func (v ElementBuildingVisitor) CreateListElement(item *listItem) (apply.Element, error) {
-	meta, err := getFieldMeta(item.GetMeta())
+	meta, err := getFieldMeta(item.GetMeta(), item.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func (v ElementBuildingVisitor) CreateListElement(item *listItem) (apply.Element
 
 // CreateMapElement creates a mapElement
 func (v ElementBuildingVisitor) CreateMapElement(item *mapItem) (apply.Element, error) {
-	meta, err := getFieldMeta(item.GetMeta())
+	meta, err := getFieldMeta(item.GetMeta(), item.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (v ElementBuildingVisitor) CreateMapElement(item *mapItem) (apply.Element, 
 
 // CreateTypeElement creates a typeElement
 func (v ElementBuildingVisitor) CreateTypeElement(item *typeItem) (apply.Element, error) {
-	meta, err := getFieldMeta(item.GetMeta())
+	meta, err := getFieldMeta(item.GetMeta(), item.Name)
 	if err != nil {
 		return nil, err
 	}

@@ -112,7 +112,7 @@ func mapCast(i interface{}) map[string]interface{} {
 }
 
 // getFieldMeta parses the metadata about the field from the openapi spec
-func getFieldMeta(s openapi.Schema) (apply.FieldMetaImpl, error) {
+func getFieldMeta(s openapi.Schema, name string) (apply.FieldMetaImpl, error) {
 	m := apply.FieldMetaImpl{}
 	if s != nil {
 		ext := s.GetExtensions()
@@ -132,6 +132,7 @@ func getFieldMeta(s openapi.Schema) (apply.FieldMetaImpl, error) {
 			m.MergeKey = strings.Split(key, ",")
 		}
 	}
+	m.Name = name
 	return m, nil
 }
 

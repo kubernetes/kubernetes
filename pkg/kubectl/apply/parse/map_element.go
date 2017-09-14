@@ -23,27 +23,50 @@ import (
 
 // mapElement builds a new mapElement from a mapItem
 func (v ElementBuildingVisitor) mapElement(meta apply.FieldMetaImpl, item *mapItem) (*apply.MapElement, error) {
-	result := &apply.MapElement{
+	// Function to return schema type of the map values
+	var fn schemaFn = func(string) openapi.Schema {
+		// All map values share the same schema
+		if item.Map != nil && item.Map.SubType != nil {
+			return item.Map.SubType
+		}
+		return nil
+	}
+
+	// Collect same fields from multiple maps into a map of elements
+	values, err := v.createMapValues(fn, meta, item.HasElementData, item.MapElementData)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return the result
+	return &apply.MapElement{
 		FieldMetaImpl:  meta,
 		HasElementData: item.HasElementData,
 		MapElementData: item.MapElementData,
-		Values:         map[string]apply.Element{},
-	}
-	result.Name = item.Name
+		Values:         values,
+	}, nil
+}
+
+// schemaFn returns the schema for a field or map value based on its name or key
+type schemaFn func(key string) openapi.Schema
+
+// createMapValues combines the recorded, local and remote values from
+// data into a map of elements.
+func (v ElementBuildingVisitor) createMapValues(
+	schemaFn schemaFn,
+	meta apply.FieldMetaImpl,
+	hasData apply.HasElementData,
+	data apply.MapElementData) (map[string]apply.Element, error) {
 
 	// Collate each key in the map
-	for _, key := range keysUnion(item.Recorded, item.Local, item.Remote) {
-		var s openapi.Schema
-		if item.Map != nil && item.Map.SubType != nil {
-			s = item.Map.SubType
-		}
-
-		recorded, recordedSet := nilSafeLookup(key, item.Recorded)
-		local, localSet := nilSafeLookup(key, item.Local)
-		remote, remoteSet := nilSafeLookup(key, item.Remote)
+	values := map[string]apply.Element{}
+	for _, key := range keysUnion(data.Recorded, data.Local, data.Remote) {
+		recorded, recordedSet := nilSafeLookup(key, data.Recorded)
+		local, localSet := nilSafeLookup(key, data.Local)
+		remote, remoteSet := nilSafeLookup(key, data.Remote)
 
 		// Create an item for the field
-		field, err := v.getItem(s, key,
+		field, err := v.getItem(schemaFn(key), key,
 			apply.RawElementData{recorded, local, remote},
 			apply.HasElementData{recordedSet, localSet, remoteSet})
 		if err != nil {
@@ -57,7 +80,7 @@ func (v ElementBuildingVisitor) mapElement(meta apply.FieldMetaImpl, item *mapIt
 		}
 
 		// Add the field element to the map
-		result.Values[key] = element
+		values[key] = element
 	}
-	return result, nil
+	return values, nil
 }
