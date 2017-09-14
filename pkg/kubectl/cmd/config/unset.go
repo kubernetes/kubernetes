@@ -77,18 +77,13 @@ func (o unsetOptions) run() error {
 		return err
 	}
 
-	if err := clientcmd.ModifyConfig(o.configAccess, *config, false); err != nil {
-		return err
-	}
-
-	return nil
+	return clientcmd.ModifyConfig(o.configAccess, *config, false)
 }
 
 func (o *unsetOptions) complete(cmd *cobra.Command) error {
 	endingArgs := cmd.Flags().Args()
 	if len(endingArgs) != 1 {
-		cmd.Help()
-		return fmt.Errorf("Unexpected args: %v", endingArgs)
+		return helpErrorf(cmd, "Unexpected args: %v", endingArgs)
 	}
 
 	o.propertyName = endingArgs[0]
