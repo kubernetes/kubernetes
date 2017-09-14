@@ -39,7 +39,7 @@
 "containers":[
     {
     "name": "etcd-container",
-    "image": "gcr.io/google_containers/etcd:{{ pillar.get('etcd_docker_tag', '3.1.10') }}",
+    "image": "{{ pillar.get('etcd_docker_repository', 'gcr.io/google_containers/etcd') }}:{{ pillar.get('etcd_docker_tag', '3.1.10') }}",
     "resources": {
       "requests": {
         "cpu": {{ cpulimit }}
