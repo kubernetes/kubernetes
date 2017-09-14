@@ -25,10 +25,10 @@ package apply
 //Expect(err).To(BeNil())
 //resources, err := openapi.NewOpenAPIData(s)
 //Expect(err).To(BeNil())
-//parseFactory := parse.Factory{resources}
+//elementParser := parse.Factory{resources}
 //
-//parsed, err := parseFactory.CreateElement(recorded, local, remote)
+//obj, err := parser.CreateElement(recorded, local, remote)
 //Expect(err).Should(Not(HaveOccurred()))
 //
-//merged, err := parsed.Merge(merge.Create(merge.Options{}))
+//merged, err := obj.Merge(strategy.Create(merge.Options{}))
 //

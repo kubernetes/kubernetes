@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package merge_test
+package strategy_test
 
 import (
 	. "github.com/onsi/ginkgo"
 
-	"k8s.io/kubernetes/pkg/kubectl/apply/merge"
+	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
 )
 
 var _ = Describe("Replacing fields of type list with openapi", func() {
@@ -70,7 +70,7 @@ spec:
       containers:
       - name: container
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 
 		It("should delete the field if missing in recorded and set to null in local.", func() {
@@ -117,7 +117,7 @@ spec:
       containers:
       - name: container
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -163,7 +163,7 @@ spec:
         - b
         - c
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 
 		It("should add the field when even when present in recorded", func() {
@@ -213,7 +213,7 @@ spec:
         - b
         - c
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 
 		It("should add the field when the parent field is missing as well", func() {
@@ -253,7 +253,7 @@ spec:
         - b
         - c
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -314,7 +314,7 @@ spec:
         - e
         - f
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 
 		It("should replace the field even if recorded matches", func() {
@@ -373,7 +373,7 @@ spec:
         - e
         - f
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 
 		It("should replace the field even if the only change is ordering", func() {
@@ -430,7 +430,7 @@ spec:
         - e
         - f
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 })
@@ -521,7 +521,7 @@ spec:
         - f
         - g
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 })
@@ -580,7 +580,7 @@ spec:
     - z
     - "y"
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -636,7 +636,7 @@ spec:
     - q
     - w
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -717,7 +717,7 @@ spec:
     - "t"
     - u
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 })

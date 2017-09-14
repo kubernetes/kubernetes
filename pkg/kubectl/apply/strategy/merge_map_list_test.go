@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package merge_test
+package strategy_test
 
 import (
 	. "github.com/onsi/ginkgo"
 
-	"k8s.io/kubernetes/pkg/kubectl/apply/merge"
+	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
 )
 
 var _ = Describe("Merging fields of type list-of-map with openapi", func() {
@@ -62,7 +62,7 @@ spec:
   template:
     spec:
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -112,7 +112,7 @@ spec:
       - name: item-keep
         image: image-keep
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -160,7 +160,7 @@ spec:
         - name: item
           image: image
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -204,7 +204,7 @@ spec:
         - name: item
           image: image:2
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -250,7 +250,7 @@ spec:
         - name: item
           image: image:2
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -294,7 +294,7 @@ spec:
         - name: item
           image: image:2
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -337,7 +337,7 @@ spec:
         - name: item
           image: image:2
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -425,7 +425,7 @@ spec:
           image: remote:a
           imagePullPolicy: Always
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 })
@@ -492,7 +492,7 @@ spec:
           protocol: TCP
           hostPort: 2020
 `)
-			runWith(merge.Create(merge.Options{}), recorded, local, remote, expected, "test_swagger.json")
+			runWith(strategy.Create(strategy.Options{}), recorded, local, remote, expected, "test_swagger.json")
 		})
 	})
 
@@ -564,7 +564,7 @@ spec:
           hostPort: 2022
           hostIP: "127.0.0.1"
 `)
-			runWith(merge.Create(merge.Options{}), recorded, local, remote, expected, "test_swagger.json")
+			runWith(strategy.Create(strategy.Options{}), recorded, local, remote, expected, "test_swagger.json")
 		})
 	})
 
@@ -630,7 +630,7 @@ spec:
           protocol: UDP
           hostPort: 2022
 `)
-			runWith(merge.Create(merge.Options{}), recorded, local, remote, expected, "test_swagger.json")
+			runWith(strategy.Create(strategy.Options{}), recorded, local, remote, expected, "test_swagger.json")
 		})
 	})
 })

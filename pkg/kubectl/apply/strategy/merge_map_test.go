@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package merge_test
+package strategy_test
 
 import (
 	. "github.com/onsi/ginkgo"
 
-	"k8s.io/kubernetes/pkg/kubectl/apply/merge"
+	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
 )
 
 var _ = Describe("Merging fields of type map with openapi for some fields", func() {
@@ -65,7 +65,7 @@ spec:
     bar: "baz3"
     image: "3"
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -108,7 +108,7 @@ spec:
     bar: "baz2"
     image: "2"
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -158,7 +158,7 @@ spec:
     bar: "baz2-1"
     image: "2-1"
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 })

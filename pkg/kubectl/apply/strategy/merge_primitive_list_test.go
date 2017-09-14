@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package merge_test
+package strategy_test
 
 import (
 	. "github.com/onsi/ginkgo"
 
-	"k8s.io/kubernetes/pkg/kubectl/apply/merge"
+	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
 )
 
 var _ = Describe("Merging fields of type list-of-primitive with openapi", func() {
@@ -59,7 +59,7 @@ metadata:
   - "a"
   - "c"
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -99,7 +99,7 @@ metadata:
   - "b"
   - "c"
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -138,7 +138,7 @@ metadata:
   - "a"
   - "b"
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -183,7 +183,7 @@ metadata:
   - "d"
   - "e"
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 })

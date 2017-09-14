@@ -26,8 +26,8 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/kubectl/apply/merge:all-srcs",
         "//pkg/kubectl/apply/parse:all-srcs",
+        "//pkg/kubectl/apply/strategy:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

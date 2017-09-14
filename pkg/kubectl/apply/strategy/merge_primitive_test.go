@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package merge_test
+package strategy_test
 
 import (
 	. "github.com/onsi/ginkgo"
 
-	"k8s.io/kubernetes/pkg/kubectl/apply/merge"
+	"k8s.io/kubernetes/pkg/kubectl/apply/strategy"
 )
 
 var _ = Describe("Merging fields of type map with openapi", func() {
@@ -55,7 +55,7 @@ apiVersion: apps/v1beta1
 kind: Deployment
 spec:
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 
 		It("should delete the field when there are other fields in the map", func() {
@@ -93,7 +93,7 @@ kind: Deployment
 spec:
   revisionHistoryLimit: 1
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -130,7 +130,7 @@ spec:
   paused: true
   progressDeadlineSeconds: 2
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -170,7 +170,7 @@ spec:
   paused: true
   progressDeadlineSeconds: 2
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 
 		It("should update the field", func() {
@@ -199,7 +199,7 @@ kind: Deployment
 spec:
   replicas: 3
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 })
@@ -237,7 +237,7 @@ apiVersion: apps/v1beta1
 kind: Foo
 spec:
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 
 		It("should delete the field when there are other fields in the map", func() {
@@ -275,7 +275,7 @@ kind: Foo
 spec:
   revisionHistoryLimit: 1
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -312,7 +312,7 @@ spec:
   paused: true
   progressDeadlineSeconds: 2
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -352,7 +352,7 @@ spec:
   paused: true
   progressDeadlineSeconds: 2
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 
 		It("should update the field", func() {
@@ -381,7 +381,7 @@ kind: Foo
 spec:
   replicas: 3
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 })
@@ -419,7 +419,7 @@ apiVersion: apps/v1beta1
 kind: Deployment
 spec:
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 
 		It("should delete the field when there are other fields in the map", func() {
@@ -457,7 +457,7 @@ kind: Deployment
 spec:
   biz: 1
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -494,7 +494,7 @@ spec:
   foo: true
   biz: 2
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 
@@ -534,7 +534,7 @@ spec:
   foo: true
   baz: 2
 `)
-			run(merge.Create(merge.Options{}), recorded, local, remote, expected)
+			run(strategy.Create(strategy.Options{}), recorded, local, remote, expected)
 		})
 	})
 })
