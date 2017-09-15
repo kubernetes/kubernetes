@@ -73,6 +73,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -87,6 +88,7 @@ import (
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
 	nodectlr "k8s.io/kubernetes/pkg/controller/node"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -316,6 +318,12 @@ func SkipUnlessAtLeast(value int, minValue int, message string) {
 func SkipIfProviderIs(unsupportedProviders ...string) {
 	if ProviderIs(unsupportedProviders...) {
 		Skipf("Not supported for providers %v (found %s)", unsupportedProviders, TestContext.Provider)
+	}
+}
+
+func SkipUnlessLocalEphemeralStorageEnabled() {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+		Skipf("Only supported when %v feature is enabled", features.LocalStorageCapacityIsolation)
 	}
 }
 
