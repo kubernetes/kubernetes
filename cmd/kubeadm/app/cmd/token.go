@@ -110,12 +110,6 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			client, err := getClientset(kubeConfigFile, dryRun)
 			kubeadmutil.CheckErr(err)
 
-			// TODO: remove this warning in 1.9
-			if !tokenCmd.Flags().Lookup("ttl").Changed {
-				// sending this output to stderr s
-				fmt.Fprintln(errW, "[kubeadm] WARNING: starting in 1.8, tokens expire after 24 hours by default (if you require a non-expiring token use --ttl 0)")
-			}
-
 			err = RunCreateToken(out, client, token, tokenDuration, usages, extraGroups, description)
 			kubeadmutil.CheckErr(err)
 		},
