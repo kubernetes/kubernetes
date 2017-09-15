@@ -124,6 +124,32 @@ func Add(a api.ResourceList, b api.ResourceList) api.ResourceList {
 	return result
 }
 
+// SubtractWithNonNegativeResult - substracts and returns result of a - b but
+// makes sure we don't return negative values to prevent negative resource usage.
+func SubtractWithNonNegativeResult(a api.ResourceList, b api.ResourceList) api.ResourceList {
+	zero := resource.MustParse("0")
+
+	result := api.ResourceList{}
+	for key, value := range a {
+		quantity := *value.Copy()
+		if other, found := b[key]; found {
+			quantity.Sub(other)
+		}
+		if quantity.Cmp(zero) > 0 {
+			result[key] = quantity
+		} else {
+			result[key] = zero
+		}
+	}
+
+	for key := range b {
+		if _, found := result[key]; !found {
+			result[key] = zero
+		}
+	}
+	return result
+}
+
 // Subtract returns the result of a - b for each named resource
 func Subtract(a api.ResourceList, b api.ResourceList) api.ResourceList {
 	result := api.ResourceList{}
