@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/quota"
@@ -33,39 +34,62 @@ func TestPodConstraintsFunc(t *testing.T) {
 	}{
 		"init container resource invalid": {
 			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
 				Spec: api.PodSpec{
 					InitContainers: []api.Container{{
+						Name:                     "ctr",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("2m")},
 							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
 						},
 					}},
+					Containers:    []api.Container{{Name: "ctr1", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 			err: `spec.initContainers[0].resources.requests: Invalid value: "2m": must be less than or equal to cpu limit`,
 		},
 		"container resource invalid": {
 			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{{
+						Name:                     "ctr",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("2m")},
 							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
 						},
 					}},
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 			err: `spec.containers[0].resources.requests: Invalid value: "2m": must be less than or equal to cpu limit`,
 		},
 		"init container resource missing": {
 			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
 				Spec: api.PodSpec{
 					InitContainers: []api.Container{{
+						Name:                     "ctr",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
 							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("2m")},
 						},
 					}},
+					Containers:    []api.Container{{Name: "ctr1", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}},
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 			required: []api.ResourceName{api.ResourceMemory},
@@ -73,13 +97,20 @@ func TestPodConstraintsFunc(t *testing.T) {
 		},
 		"container resource missing": {
 			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: "ns"},
 				Spec: api.PodSpec{
 					Containers: []api.Container{{
+						Name:                     "ctr",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
 						Resources: api.ResourceRequirements{
 							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("1m")},
 							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("2m")},
 						},
 					}},
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
 				},
 			},
 			required: []api.ResourceName{api.ResourceMemory},
