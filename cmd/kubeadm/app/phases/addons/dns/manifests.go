@@ -19,7 +19,7 @@ package dns
 const (
 	// v170AndAboveKubeDNSDeployment is the kube-dns Deployment manifest for the kube-dns manifest for v1.7+
 	v170AndAboveKubeDNSDeployment = `
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
   name: kube-dns
