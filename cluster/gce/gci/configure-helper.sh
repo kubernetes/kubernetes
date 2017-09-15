@@ -491,6 +491,8 @@ function create-master-audit-policy {
   local -r known_apis='
       - group: "" # core
       - group: "admissionregistration.k8s.io"
+      - group: "apiextensions.k8s.io"
+      - group: "apiregistration.k8s.io"
       - group: "apps"
       - group: "authentication.k8s.io"
       - group: "authorization.k8s.io"
@@ -498,6 +500,7 @@ function create-master-audit-policy {
       - group: "batch"
       - group: "certificates.k8s.io"
       - group: "extensions"
+      - group: "metrics"
       - group: "networking.k8s.io"
       - group: "policy"
       - group: "rbac.authorization.k8s.io"
@@ -553,6 +556,13 @@ rules:
     resources:
       - group: "" # core
         resources: ["namespaces", "namespaces/status", "namespaces/finalize"]
+  # Don't log HPA fetching metrics.
+  - level: None
+    users:
+      - system:kube-controller-manager
+    verbs: ["get", "list"]
+    resources:
+      - group: "metrics"
 
   # Don't log these read-only URLs.
   - level: None
