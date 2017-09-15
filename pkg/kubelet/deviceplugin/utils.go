@@ -46,10 +46,10 @@ func copyDevices(devs map[string]*pluginapi.Device) []*pluginapi.Device {
 // extended resource name.
 func IsResourceNameValid(resourceName string) error {
 	if resourceName == "" {
-		return fmt.Errorf(errEmptyResourceName)
+		return fmt.Errorf(ErrEmptyResourceName)
 	}
 	if !IsDeviceName(v1.ResourceName(resourceName)) {
-		return fmt.Errorf(errInvalidResourceName)
+		return fmt.Errorf(ErrInvalidResourceName)
 	}
 	return nil
 }
