@@ -26,7 +26,7 @@ type Strategy interface {
 	// MergeMap is invoked by MapElements when Merge is called
 	MergeMap(MapElement) (Result, error)
 
-	// MergeMap is invoked by MapElements when Merge is called
+	// MergeType is invoked by TypeElements when Merge is called
 	MergeType(TypeElement) (Result, error)
 
 	// MergePrimitive is invoked by PrimitiveElements when Merge is called

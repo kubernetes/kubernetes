@@ -25,7 +25,7 @@ type MapElement struct {
 	// HasElementData contains whether the field was set
 	HasElementData
 
-	// ListElementData contains the value a field was set to
+	// MapElementData contains the value a field was set to
 	MapElementData
 
 	// Values contains the combined recorded-local-remote value of each item in the map

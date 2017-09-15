@@ -63,12 +63,13 @@ type Element interface {
 
 // FieldMeta defines the strategy used to apply a Patch for an element
 type FieldMeta interface {
-	// GetFieldMergeType specifies how a field should be merged.  One of
-	// replace, merge, retainkeys
+	// GetFieldMergeType returns the type of merge strategy to use for this field
+	// maybe "merge", "replace" or "retainkeys"
+	// TODO: There maybe multiple strategies, so this may need to be a slice, map, or struct
+	// Address this in a follow up in the PR to introduce retainkeys strategy
 	GetFieldMergeType() string
 
-	// GetFieldMergeKey specifies which fields to use in order to merge items
-	// in lists
+	// GetFieldMergeKey returns the merge key to use when the MergeType is "merge" and underlying type is a list
 	GetFieldMergeKey() []string
 
 	// GetFieldType returns the openapi field type - e.g. primitive, array, map, type, reference
@@ -158,7 +159,7 @@ func (v MergeKeyValue) Equal(o MergeKeyValue) bool {
 func GetMergeKeyValue(mergekey []string, i interface{}) (MergeKeyValue, error) {
 	result := MergeKeyValue{}
 	if len(mergekey) <= 0 {
-		return result, fmt.Errorf("merge key must have at least 1 value to merge.")
+		return result, fmt.Errorf("merge key must have at least 1 value to merge")
 	}
 	m, ok := i.(map[string]interface{})
 	if !ok {
