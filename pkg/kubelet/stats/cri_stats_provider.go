@@ -258,7 +258,7 @@ func (p *criStatsProvider) makeContainerStats(
 			result.Rootfs.InodesUsed = &stats.WritableLayer.InodesUsed.Value
 		}
 	}
-	storageID := stats.WritableLayer.StorageId
+	storageID := stats.GetWritableLayer().GetStorageId()
 	if storageID != nil {
 		imageFsInfo, found := uuidToFsInfo[*storageID]
 		if !found {
