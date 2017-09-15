@@ -411,6 +411,7 @@ func AddHandlers(h printers.PrintHandler) {
 	storageClassColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Provisioner", Type: "string", Description: storagev1.StorageClass{}.SwaggerDoc()["provisioner"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 
 	h.TableHandler(storageClassColumnDefinitions, printStorageClass)
@@ -1707,7 +1708,7 @@ func printStorageClass(obj *storage.StorageClass, options printers.PrintOptions)
 		name += " (default)"
 	}
 	provtype := obj.Provisioner
-	row.Cells = append(row.Cells, name, provtype)
+	row.Cells = append(row.Cells, name, provtype, translateTimestamp(obj.CreationTimestamp))
 
 	return []metav1alpha1.TableRow{row}, nil
 }
