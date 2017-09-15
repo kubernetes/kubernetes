@@ -22,6 +22,10 @@ const (
 	// when node is not ready, and removed when node becomes ready.
 	TaintNodeNotReady = "node.kubernetes.io/not-ready"
 
+	// DeprecatedTaintNodeNotReady is the deprecated version of TaintNodeNotReady.
+	// It is deprecated since 1.9
+	DeprecatedTaintNodeNotReady = "node.alpha.kubernetes.io/notReady"
+
 	// When feature-gate for TaintBasedEvictions=true flag is enabled,
 	// TaintNodeUnreachable would be automatically added by node controller
 	// when node becomes unreachable (corresponding to NodeReady status ConditionUnknown)
