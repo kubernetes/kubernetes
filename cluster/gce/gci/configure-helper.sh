@@ -1476,6 +1476,11 @@ function start-kube-apiserver {
     params+=" --experimental-encryption-provider-config=${encryption_provider_config_path}"
   fi
 
+  # disable using HPA metrics REST clients if metrics-server isn't enabled
+  if [[ "${ENABLE_METRICS_SERVER:-}" != "true" ]]; then
+    params+=" --horizontal-pod-autoscaler-use-rest-clients=false"
+  fi
+
   src_file="${src_dir}/kube-apiserver.manifest"
   remove-salt-config-comments "${src_file}"
   # Evaluate variables.
