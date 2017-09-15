@@ -88,9 +88,11 @@ func listPersistentVolumeClaimsByNamespaceFuncUsingClient(kubeClient clientset.I
 // NewPersistentVolumeClaimEvaluator returns an evaluator that can evaluate persistent volume claims
 // if the specified shared informer factory is not nil, evaluator may use it to support listing functions.
 func NewPersistentVolumeClaimEvaluator(kubeClient clientset.Interface, f informers.SharedInformerFactory) quota.Evaluator {
-	listFuncByNamespace := listPersistentVolumeClaimsByNamespaceFuncUsingClient(kubeClient)
+	var listFuncByNamespace generic.ListFuncByNamespace
 	if f != nil {
 		listFuncByNamespace = generic.ListResourceUsingInformerFunc(f, v1.SchemeGroupVersion.WithResource("persistentvolumeclaims"))
+	} else {
+		listFuncByNamespace = listPersistentVolumeClaimsByNamespaceFuncUsingClient(kubeClient)
 	}
 	return &pvcEvaluator{
 		listFuncByNamespace: listFuncByNamespace,
