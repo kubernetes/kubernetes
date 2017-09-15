@@ -199,9 +199,8 @@ if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
 	NODE_LABELS="$NODE_LABELS,projectcalico.org/ds-ready=true"
 fi
 
-# Turn the simple metadata proxy on by default.
-ENABLE_METADATA_PROXY="${ENABLE_METADATA_PROXY:-simple}"
-if [[ ${ENABLE_METADATA_PROXY} != "false" ]]; then
+# Apply the right node label if metadata proxy is on.
+if [[ ${ENABLE_METADATA_PROXY:-} == "simple" ]]; then
         NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
 fi
 
