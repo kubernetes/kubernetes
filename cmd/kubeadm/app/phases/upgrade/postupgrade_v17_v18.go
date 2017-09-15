@@ -45,7 +45,7 @@ func deleteOldApprovalClusterRoleBindingIfExists(client clientset.Interface, k8s
 	// Gate this upgrade behavior for new clusters above v1.9.0-alpha.3 where this change took place
 	if k8sVersion.AtLeast(constants.MinimumCSRAutoApprovalClusterRolesVersion) {
 
-		err := client.RbacV1beta1().ClusterRoleBindings().Delete(nodebootstraptoken.NodeAutoApproveBootstrapClusterRoleBinding, &metav1.DeleteOptions{})
+		err := client.RbacV1().ClusterRoleBindings().Delete(nodebootstraptoken.NodeAutoApproveBootstrapClusterRoleBinding, &metav1.DeleteOptions{})
 		// If the binding was not found, happily continue
 		if apierrors.IsNotFound(err) {
 			return nil
@@ -80,7 +80,7 @@ func deleteWronglyNamedClusterInfoRBACRules(client clientset.Interface, k8sVersi
 }
 
 func removeOldRole(client clientset.Interface) error {
-	err := client.RbacV1beta1().Roles(metav1.NamespacePublic).Delete(oldClusterInfoRole, &metav1.DeleteOptions{})
+	err := client.RbacV1().Roles(metav1.NamespacePublic).Delete(oldClusterInfoRole, &metav1.DeleteOptions{})
 	// If the binding was not found, happily continue
 	if apierrors.IsNotFound(err) {
 		return nil
@@ -94,7 +94,7 @@ func removeOldRole(client clientset.Interface) error {
 }
 
 func removeOldRoleBinding(client clientset.Interface) error {
-	err := client.RbacV1beta1().RoleBindings(metav1.NamespacePublic).Delete(clusterinfo.BootstrapSignerClusterRoleName, &metav1.DeleteOptions{})
+	err := client.RbacV1().RoleBindings(metav1.NamespacePublic).Delete(clusterinfo.BootstrapSignerClusterRoleName, &metav1.DeleteOptions{})
 	// If the binding was not found, happily continue
 	if apierrors.IsNotFound(err) {
 		return nil

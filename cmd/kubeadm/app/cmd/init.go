@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	dnsaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
-	apiconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
 	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -390,10 +389,6 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// PHASE 6: Install and deploy all addons, and configure things as necessary
-
-	if err := apiconfigphase.CreateRBACRules(client, k8sVersion); err != nil {
-		return err
-	}
 
 	if err := dnsaddonphase.EnsureDNSAddon(i.cfg, client); err != nil {
 		return err
