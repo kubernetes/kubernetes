@@ -412,8 +412,8 @@ func (vs *VSphere) InstanceID(nodeName k8stypes.NodeName) (string, error) {
 	if isActive {
 		return "/" + vm.InventoryPath, nil
 	}
-
-	return "", fmt.Errorf("The node %q is not active", nodeNameToVMName(nodeName))
+	glog.Warningf("The VM: %s is not in %s state", nodeNameToVMName(nodeName), vclib.ActivePowerState)
+	return "", cloudprovider.InstanceNotFound
 }
 
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
