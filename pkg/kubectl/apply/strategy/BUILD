@@ -32,8 +32,8 @@ go_test(
         "//api/openapi-spec:swagger-spec",
     ],
     deps = [
+        ":go_default_library",
         "//pkg/kubectl/apply:go_default_library",
-        "//pkg/kubectl/apply/strategy:go_default_library",
         "//pkg/kubectl/apply/parse:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",
