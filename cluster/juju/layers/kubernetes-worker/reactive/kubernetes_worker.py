@@ -179,7 +179,8 @@ def install_cni_plugins():
 
     # Get the resource via resource_get
     try:
-        archive = hookenv.resource_get('cni')
+        resource_name = 'cni-{}'.format(arch())
+        archive = hookenv.resource_get(resource_name)
     except Exception:
         message = 'Error fetching the cni resource.'
         hookenv.log(message)

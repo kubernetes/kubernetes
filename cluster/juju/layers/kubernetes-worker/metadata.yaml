@@ -33,10 +33,14 @@ provides:
     interface: kubernetes-cni
     scope: container
 resources:
-  cni:
+  cni-amd64:
     type: file
     filename: cni.tgz
-    description: CNI plugins
+    description: CNI plugins for amd64
+  cni-s390x:
+    type: file
+    filename: cni.tgz
+    description: CNI plugins for s390x
   kubectl:
     type: file
     filename: kubectl.snap
