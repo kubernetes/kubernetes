@@ -575,6 +575,83 @@ func TestGetListComponentStatus(t *testing.T) {
 	}
 }
 
+func TestGetMixedGenericObjects(t *testing.T) {
+	initTestErrorHandler(t)
+
+	// ensure that a runtime.Object without
+	// an ObjectMeta field is handled properly
+	structuredObj := &metav1.Status{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Status",
+			APIVersion: "v1",
+		},
+		Status:  "Success",
+		Message: "",
+		Reason:  "",
+		Code:    0,
+	}
+
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	tf.Printer = &testPrinter{GenericPrinter: true}
+	tf.UnstructuredClient = &fake.RESTClient{
+		APIRegistry:          api.Registry,
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case "/namespaces/test/pods":
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, structuredObj)}, nil
+			default:
+				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &api.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdGet(f, buf, errBuf)
+	cmd.SetOutput(buf)
+	cmd.Flags().Set("output", "json")
+	cmd.Run(cmd, []string{"pods"})
+
+	if len(buf.String()) == 0 {
+		t.Error("unexpected empty output")
+	}
+
+	actual := tf.Printer.(*testPrinter).Objects
+	fn := func(obj runtime.Object) unstructured.Unstructured {
+		data, err := runtime.Encode(api.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), obj)
+		if err != nil {
+			panic(err)
+		}
+		out := &unstructured.Unstructured{Object: make(map[string]interface{})}
+		if err := encjson.Unmarshal(data, &out.Object); err != nil {
+			panic(err)
+		}
+		return *out
+	}
+
+	expected := &unstructured.UnstructuredList{
+		Object: map[string]interface{}{"kind": "List", "apiVersion": "v1", "metadata": map[string]interface{}{"selfLink": "", "resourceVersion": ""}},
+		Items: []unstructured.Unstructured{
+			fn(structuredObj),
+		},
+	}
+	actualBytes, err := encjson.Marshal(actual[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedBytes, err := encjson.Marshal(expected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(actualBytes) != string(expectedBytes) {
+		t.Errorf("expectedBytes: %s,but actualBytes: %s", expectedBytes, actualBytes)
+	}
+}
+
 func TestGetMultipleTypeObjects(t *testing.T) {
 	pods, svc, _ := testData()
 
@@ -649,11 +726,11 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	fn := func(obj runtime.Object) unstructured.Unstructured {
 		data, err := runtime.Encode(api.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), obj)
 		if err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 		out := &unstructured.Unstructured{Object: make(map[string]interface{})}
 		if err := encjson.Unmarshal(data, &out.Object); err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 		return *out
 	}
