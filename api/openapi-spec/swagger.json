@@ -63113,7 +63113,7 @@
       "type": "string"
      },
      "failedJobsHistoryLimit": {
-      "description": "The number of failed finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified.",
+      "description": "The number of failed finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
       "type": "integer",
       "format": "int32"
      },
@@ -63131,7 +63131,7 @@
       "format": "int64"
      },
      "successfulJobsHistoryLimit": {
-      "description": "The number of successful finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified.",
+      "description": "The number of successful finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified. Defaults to 3.",
       "type": "integer",
       "format": "int32"
      },
