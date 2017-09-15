@@ -28,10 +28,13 @@ import (
 	dockernat "github.com/docker/go-connections/nat"
 	"github.com/golang/glog"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/credentialprovider"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
 const (
@@ -330,9 +333,36 @@ func ensureSandboxImageExists(client dockertools.DockerInterface, image string) 
 	if !dockertools.IsImageNotFoundError(err) {
 		return fmt.Errorf("failed to inspect sandbox image %q: %v", image, err)
 	}
-	err = client.PullImage(image, dockertypes.AuthConfig{}, dockertypes.ImagePullOptions{})
+
+	repoToPull, _, _, err := parsers.ParseImageName(image)
 	if err != nil {
-		return fmt.Errorf("unable to pull sandbox image %q: %v", image, err)
+		return err
 	}
-	return nil
+
+	keyring := credentialprovider.NewDockerKeyring()
+	creds, withCredentials := keyring.Lookup(repoToPull)
+	if !withCredentials {
+		glog.V(3).Infof("Pulling image %q without credentials", image)
+
+		err := client.PullImage(image, dockertypes.AuthConfig{}, dockertypes.ImagePullOptions{})
+		if err != nil {
+			return fmt.Errorf("failed pulling image %q: %v", image, err)
+		}
+
+		return nil
+	}
+
+	var pullErrs []error
+	for _, currentCreds := range creds {
+		authConfig := credentialprovider.LazyProvide(currentCreds)
+		err := client.PullImage(image, authConfig, dockertypes.ImagePullOptions{})
+		// If there was no error, return success
+		if err == nil {
+			return nil
+		}
+
+		pullErrs = append(pullErrs, err)
+	}
+
+	return utilerrors.NewAggregate(pullErrs)
 }
