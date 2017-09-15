@@ -21,10 +21,10 @@ import (
 )
 
 type Interface interface {
-	Add(item interface{})
+	Add(item t)
 	Len() int
-	Get() (item interface{}, shutdown bool)
-	Done(item interface{})
+	Get() (item t, shutdown bool)
+	Done(item t)
 	ShutDown()
 	ShuttingDown() bool
 }
@@ -84,7 +84,7 @@ func (s set) delete(item t) {
 }
 
 // Add marks item as needing processing.
-func (q *Type) Add(item interface{}) {
+func (q *Type) Add(item t) {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 	if q.shuttingDown {
@@ -117,7 +117,7 @@ func (q *Type) Len() int {
 // Get blocks until it can return an item to be processed. If shutdown = true,
 // the caller should end their goroutine. You must call Done with item when you
 // have finished processing it.
-func (q *Type) Get() (item interface{}, shutdown bool) {
+func (q *Type) Get() (item t, shutdown bool) {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 	for len(q.queue) == 0 && !q.shuttingDown {
@@ -141,7 +141,7 @@ func (q *Type) Get() (item interface{}, shutdown bool) {
 // Done marks item as done processing, and if it has been marked as dirty again
 // while it was being processed, it will be re-added to the queue for
 // re-processing.
-func (q *Type) Done(item interface{}) {
+func (q *Type) Done(item t) {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
 
