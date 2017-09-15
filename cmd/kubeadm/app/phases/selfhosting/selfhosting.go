@@ -22,8 +22,8 @@ import (
 	"os"
 	"time"
 
+	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
@@ -129,28 +129,28 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 }
 
 // BuildDaemonSet is responsible for mutating the PodSpec and return a DaemonSet which is suitable for the self-hosting purporse
-func BuildDaemonSet(name string, podSpec *v1.PodSpec, mutators map[string][]PodSpecMutatorFunc) *extensions.DaemonSet {
+func BuildDaemonSet(name string, podSpec *v1.PodSpec, mutators map[string][]PodSpecMutatorFunc) *apps.DaemonSet {
 
 	// Mutate the PodSpec so it's suitable for self-hosting
 	mutatePodSpec(mutators, name, podSpec)
 
 	// Return a DaemonSet based on that Spec
-	return &extensions.DaemonSet{
+	return &apps.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.AddSelfHostedPrefix(name),
 			Namespace: metav1.NamespaceSystem,
 			Labels:    BuildSelfhostedComponentLabels(name),
 		},
-		Spec: extensions.DaemonSetSpec{
+		Spec: apps.DaemonSetSpec{
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: BuildSelfhostedComponentLabels(name),
 				},
 				Spec: *podSpec,
 			},
-			UpdateStrategy: extensions.DaemonSetUpdateStrategy{
+			UpdateStrategy: apps.DaemonSetUpdateStrategy{
 				// Make the DaemonSet utilize the RollingUpdate rollout strategy
-				Type: extensions.RollingUpdateDaemonSetStrategyType,
+				Type: apps.RollingUpdateDaemonSetStrategyType,
 			},
 		},
 	}

@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"runtime"
 
+	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	rbac "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
@@ -116,7 +116,7 @@ func createKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client clientse
 		return err
 	}
 
-	kubeproxyDaemonSet := &extensions.DaemonSet{}
+	kubeproxyDaemonSet := &apps.DaemonSet{}
 	if err := kuberuntime.DecodeInto(api.Codecs.UniversalDecoder(), daemonSetbytes, kubeproxyDaemonSet); err != nil {
 		return fmt.Errorf("unable to decode kube-proxy daemonset %v", err)
 	}

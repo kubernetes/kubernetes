@@ -50,7 +50,7 @@ data:
 
 	// KubeProxyDaemonSet is the proxy DaemonSet manifest
 	KubeProxyDaemonSet = `
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1beta2
 kind: DaemonSet
 metadata:
   labels:

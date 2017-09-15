@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"time"
 
+	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -49,7 +49,7 @@ const (
 // controlPlaneComponentResources holds the relevant Pod and DaemonSet associated with a control plane component
 type controlPlaneComponentResources struct {
 	pod       *v1.Pod
-	daemonSet *extensions.DaemonSet
+	daemonSet *apps.DaemonSet
 }
 
 // SelfHostedControlPlane upgrades a self-hosted control plane
@@ -119,7 +119,7 @@ func SelfHostedControlPlane(client clientset.Interface, waiter apiclient.Waiter,
 		// During this upgrade; the temporary/backup component will take over
 		if err := apiclient.TryRunCommand(func() error {
 
-			if _, err := client.ExtensionsV1beta1().DaemonSets(newDS.ObjectMeta.Namespace).Update(newDS); err != nil {
+			if _, err := client.AppsV1beta2().DaemonSets(newDS.ObjectMeta.Namespace).Update(newDS); err != nil {
 				return fmt.Errorf("couldn't update self-hosted component's DaemonSet: %v", err)
 			}
 			return nil
@@ -158,13 +158,13 @@ func SelfHostedControlPlane(client clientset.Interface, waiter apiclient.Waiter,
 }
 
 // BuildUpgradedDaemonSetsFromConfig takes a config object and the current version and returns the DaemonSet objects to post to the master
-func BuildUpgradedDaemonSetsFromConfig(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version) map[string]*extensions.DaemonSet {
+func BuildUpgradedDaemonSetsFromConfig(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version) map[string]*apps.DaemonSet {
 	// Here the map of different mutators to use for the control plane's podspec is stored
 	mutators := selfhosting.GetMutatorsFromFeatureGates(cfg.FeatureGates)
 	// Get the new PodSpecs to use
 	controlPlanePods := controlplane.GetStaticPodSpecs(cfg, k8sVersion)
 	// Store the created DaemonSets in this map
-	controlPlaneDaemonSets := map[string]*extensions.DaemonSet{}
+	controlPlaneDaemonSets := map[string]*apps.DaemonSet{}
 
 	for _, component := range constants.MasterComponents {
 		podSpec := controlPlanePods[component].Spec
@@ -196,7 +196,7 @@ func buildTempUpgradeDSLabelQuery(component string) string {
 
 // mutateTempDaemonSet mutates the specified self-hosted DaemonSet for the specified component
 // in a way that makes it possible to post a nearly identical, temporary DaemonSet as a backup
-func mutateTempDaemonSet(tempDS *extensions.DaemonSet, component string) {
+func mutateTempDaemonSet(tempDS *apps.DaemonSet, component string) {
 	// Prefix the name of the temporary DaemonSet with upgradeTempDSPrefix
 	tempDS.ObjectMeta.Name = addTempUpgradeDSPrefix(tempDS.ObjectMeta.Name)
 	// Set .Labels to something else than the "real" self-hosted components have
@@ -206,7 +206,7 @@ func mutateTempDaemonSet(tempDS *extensions.DaemonSet, component string) {
 	// Clean all unnecessary ObjectMeta fields
 	tempDS.ObjectMeta = extractRelevantObjectMeta(tempDS.ObjectMeta)
 	// Reset .Status as we're posting a new object
-	tempDS.Status = extensions.DaemonSetStatus{}
+	tempDS.Status = apps.DaemonSetStatus{}
 }
 
 // extractRelevantObjectMeta returns only the relevant parts of ObjectMeta required when creating
@@ -234,7 +234,7 @@ func getCurrentControlPlaneComponentResources(client clientset.Interface) (map[s
 
 	for _, component := range constants.MasterComponents {
 		var podList *v1.PodList
-		var currentDS *extensions.DaemonSet
+		var currentDS *apps.DaemonSet
 
 		// Get the self-hosted pod associated with the component
 		podLabelSelector := selfhosting.BuildSelfHostedComponentLabelQuery(component)
@@ -256,7 +256,7 @@ func getCurrentControlPlaneComponentResources(client clientset.Interface) (map[s
 		if err := apiclient.TryRunCommand(func() error {
 			var tryrunerr error
 			// Try to get the current self-hosted component
-			currentDS, tryrunerr = client.ExtensionsV1beta1().DaemonSets(metav1.NamespaceSystem).Get(dsName, metav1.GetOptions{})
+			currentDS, tryrunerr = client.AppsV1beta2().DaemonSets(metav1.NamespaceSystem).Get(dsName, metav1.GetOptions{})
 			return tryrunerr // note that tryrunerr is most likely nil here (in successful cases)
 		}, selfHostingFailureThreshold); err != nil {
 			return nil, err
