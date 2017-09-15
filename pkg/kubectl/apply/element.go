@@ -69,8 +69,8 @@ type FieldMeta interface {
 	// Address this in a follow up in the PR to introduce retainkeys strategy
 	GetFieldMergeType() string
 
-	// GetFieldMergeKey returns the merge key to use when the MergeType is "merge" and underlying type is a list
-	GetFieldMergeKey() []string
+	// GetFieldMergeKeys returns the merge key to use when the MergeType is "merge" and underlying type is a list
+	GetFieldMergeKeys() MergeKeys
 
 	// GetFieldType returns the openapi field type - e.g. primitive, array, map, type, reference
 	GetFieldType() string
@@ -112,7 +112,7 @@ type FieldMetaImpl struct {
 	MergeType string
 
 	// The merge key to use when the MergeType is "merge" and underlying type is a list
-	MergeKey []string
+	MergeKeys MergeKeys
 
 	// The openapi type of the field - "list", "primitive", "map"
 	Type string
@@ -126,9 +126,9 @@ func (s FieldMetaImpl) GetFieldMergeType() string {
 	return s.MergeType
 }
 
-// GetFieldMergeKey implements FieldMeta.GetFieldMergeKey
-func (s FieldMetaImpl) GetFieldMergeKey() []string {
-	return s.MergeKey
+// GetFieldMergeKeys implements FieldMeta.GetFieldMergeKeys
+func (s FieldMetaImpl) GetFieldMergeKeys() MergeKeys {
+	return s.MergeKeys
 }
 
 // GetFieldType implements FieldMeta.GetFieldType
@@ -155,24 +155,29 @@ func (v MergeKeyValue) Equal(o MergeKeyValue) bool {
 	return true
 }
 
+// MergeKeys is the set of fields on an object that uniquely identify
+// and is used when merging lists to identify the "same" object
+// independent of the ordering of the objects
+type MergeKeys []string
+
 // GetMergeKeyValue parses the MergeKeyValue from an item in a list
-func GetMergeKeyValue(mergekey []string, i interface{}) (MergeKeyValue, error) {
-	result := MergeKeyValue{}
-	if len(mergekey) <= 0 {
-		return result, fmt.Errorf("merge key must have at least 1 value to merge")
-	}
-	m, ok := i.(map[string]interface{})
-	if !ok {
-		return result, fmt.Errorf("cannot use mergekey %v for primitive item in list %v", mergekey, i)
-	}
-	for _, field := range mergekey {
-		if value, found := m[field]; !found {
-			result[field] = ""
-		} else {
-			result[field] = fmt.Sprintf("%v", value)
-		}
-	}
-	return result, nil
+func (mk MergeKeys) GetMergeKeyValue(i interface{}) (MergeKeyValue, error) {
+    result := MergeKeyValue{}
+    if len(mk) <= 0 {
+        return result, fmt.Errorf("merge key must have at least 1 value to merge")
+    }
+    m, ok := i.(map[string]interface{})
+    if !ok {
+        return result, fmt.Errorf("cannot use mergekey %v for primitive item in list %v", mk, i)
+    }
+    for _, field := range mk {
+        if value, found := m[field]; !found {
+            result[field] = ""
+        } else {
+            result[field] = fmt.Sprintf("%v", value)
+        }
+    }
+    return result, nil
 }
 
 type source int
@@ -274,8 +279,8 @@ func (s *CombinedMapSlice) lookup(v MergeKeyValue) *ListItem {
 	return nil
 }
 
-func (s *CombinedMapSlice) upsert(key []string, l interface{}, source source) error {
-	val, err := GetMergeKeyValue(key, l)
+func (s *CombinedMapSlice) upsert(key MergeKeys, l interface{}, source source) error {
+	val, err := key.GetMergeKeyValue(l)
 	if err != nil {
 		return err
 	}
@@ -306,21 +311,21 @@ func (s *CombinedMapSlice) upsert(key []string, l interface{}, source source) er
 // UpsertRecorded adds l to the slice.  If there is already a value of l sharing
 // l's merge key in the slice for either the local or remote, set l the recorded value
 // Otherwise append a new item to the list with the recorded value.
-func (s *CombinedMapSlice) UpsertRecorded(key []string, l interface{}) error {
+func (s *CombinedMapSlice) UpsertRecorded(key MergeKeys, l interface{}) error {
 	return s.upsert(key, l, recorded)
 }
 
 // UpsertLocal adds l to the slice.  If there is already a value of l sharing
 // l's merge key in the slice for either the recorded or remote, set l the local value
 // Otherwise append a new item to the list with the local value.
-func (s *CombinedMapSlice) UpsertLocal(key []string, l interface{}) error {
+func (s *CombinedMapSlice) UpsertLocal(key MergeKeys, l interface{}) error {
 	return s.upsert(key, l, local)
 }
 
 // UpsertRemote adds l to the slice.  If there is already a value of l sharing
 // l's merge key in the slice for either the recorded or local, set l the remote value
 // Otherwise append a new item to the list with the remote value.
-func (s *CombinedMapSlice) UpsertRemote(key []string, l interface{}) error {
+func (s *CombinedMapSlice) UpsertRemote(key MergeKeys, l interface{}) error {
 	return s.upsert(key, l, remote)
 }
 

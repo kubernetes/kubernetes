@@ -129,7 +129,7 @@ func getFieldMeta(s openapi.Schema, name string) (apply.FieldMetaImpl, error) {
 			if !ok {
 				return apply.FieldMetaImpl{}, fmt.Errorf("Expected string for x-kubernetes-patch-merge-key by got %T", k)
 			}
-			m.MergeKey = strings.Split(key, ",")
+			m.MergeKeys = apply.MergeKeys(strings.Split(key, ","))
 		}
 	}
 	m.Name = name

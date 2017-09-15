@@ -104,11 +104,11 @@ func (v ElementBuildingVisitor) doPrimitiveList(meta apply.FieldMetaImpl, item *
 // doMapList merges 3 lists of maps together by collating their values.
 // tries to retain ordering
 func (v ElementBuildingVisitor) doMapList(meta apply.FieldMetaImpl, item *listItem) (*apply.ListElement, error) {
-	key := meta.GetFieldMergeKey()
+	key := meta.GetFieldMergeKeys()
 	result := &apply.ListElement{
 		FieldMetaImpl: apply.FieldMetaImpl{
 			MergeType: "merge",
-			MergeKey:  key,
+			MergeKeys: key,
 			Name:      item.Name,
 		},
 		HasElementData:  item.HasElementData,
