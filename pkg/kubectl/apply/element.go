@@ -162,22 +162,22 @@ type MergeKeys []string
 
 // GetMergeKeyValue parses the MergeKeyValue from an item in a list
 func (mk MergeKeys) GetMergeKeyValue(i interface{}) (MergeKeyValue, error) {
-    result := MergeKeyValue{}
-    if len(mk) <= 0 {
-        return result, fmt.Errorf("merge key must have at least 1 value to merge")
-    }
-    m, ok := i.(map[string]interface{})
-    if !ok {
-        return result, fmt.Errorf("cannot use mergekey %v for primitive item in list %v", mk, i)
-    }
-    for _, field := range mk {
-        if value, found := m[field]; !found {
-            result[field] = ""
-        } else {
-            result[field] = fmt.Sprintf("%v", value)
-        }
-    }
-    return result, nil
+	result := MergeKeyValue{}
+	if len(mk) <= 0 {
+		return result, fmt.Errorf("merge key must have at least 1 value to merge")
+	}
+	m, ok := i.(map[string]interface{})
+	if !ok {
+		return result, fmt.Errorf("cannot use mergekey %v for primitive item in list %v", mk, i)
+	}
+	for _, field := range mk {
+		if value, found := m[field]; !found {
+			result[field] = ""
+		} else {
+			result[field] = fmt.Sprintf("%v", value)
+		}
+	}
+	return result, nil
 }
 
 type source int
