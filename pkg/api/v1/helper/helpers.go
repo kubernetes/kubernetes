@@ -88,9 +88,10 @@ func OpaqueIntResourceName(name string) v1.ResourceName {
 var overcommitBlacklist = sets.NewString(string(v1.ResourceNvidiaGPU))
 
 // IsOvercommitAllowed returns true if the resource is in the default
-// namespace and not blacklisted.
+// namespace and not blacklisted and is not hugepages.
 func IsOvercommitAllowed(name v1.ResourceName) bool {
 	return IsDefaultNamespaceResource(name) &&
+		!IsHugePageResourceName(name) &&
 		!overcommitBlacklist.Has(string(name))
 }
 
