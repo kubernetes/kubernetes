@@ -13,18 +13,14 @@ go_library(
     srcs = [
         "device_plugin_stub.go",
         "endpoint.go",
-        "manager.go",
         "types.go",
-        "utils.go",
     ],
     tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1/helper:go_default_library",
         "//pkg/kubelet/apis/deviceplugin/v1alpha1:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
     ],
 )
 
@@ -43,11 +39,7 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "endpoint_test.go",
-        "manager_test.go",
-        "utils_test.go",
-    ],
+    srcs = ["endpoint_test.go"],
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/deviceplugin/v1alpha1:go_default_library",
