@@ -18,12 +18,17 @@ package etcd3
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
 	"sync"
 	"testing"
 
+	"github.com/coreos/etcd/integration"
+	"golang.org/x/net/context"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -37,9 +42,6 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storagetests "k8s.io/apiserver/pkg/storage/tests"
 	"k8s.io/apiserver/pkg/storage/value"
-
-	"github.com/coreos/etcd/integration"
-	"golang.org/x/net/context"
 )
 
 var scheme = runtime.NewScheme()
@@ -539,6 +541,53 @@ func TestGuaranteedUpdateWithConflict(t *testing.T) {
 
 	if updateCount != 2 {
 		t.Errorf("Should have conflict and called update func twice")
+	}
+}
+
+func TestGuaranteedUpdateWithSuggestionAndConflict(t *testing.T) {
+	ctx, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
+	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+
+	// First, update without a suggestion so originalPod is outdated
+	updatedPod := &example.Pod{}
+	err := store.GuaranteedUpdate(ctx, key, updatedPod, false, nil,
+		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+			pod := obj.(*example.Pod)
+			pod.Name = "foo-2"
+			return pod, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Second, update using the outdated originalPod as the suggestion. Return a conflict error when
+	// passed originalPod, and make sure that SimpleUpdate is called a second time after a live lookup
+	// with the value of updatedPod.
+	sawConflict := false
+	updatedPod2 := &example.Pod{}
+	err = store.GuaranteedUpdate(ctx, key, updatedPod2, false, nil,
+		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+			pod := obj.(*example.Pod)
+			if pod.Name != "foo-2" {
+				if sawConflict {
+					t.Fatalf("unexpected second conflict")
+				}
+				sawConflict = true
+				// simulated stale object - return a conflict
+				return nil, apierrors.NewConflict(example.SchemeGroupVersion.WithResource("pods").GroupResource(), "name", errors.New("foo"))
+			}
+			pod.Name = "foo-3"
+			return pod, nil
+		}),
+		originalPod,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if updatedPod2.Name != "foo-3" {
+		t.Errorf("unexpected pod name: %q", updatedPod2.Name)
 	}
 }
 
