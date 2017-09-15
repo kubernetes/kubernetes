@@ -53,6 +53,9 @@ func TestProxyTransport(t *testing.T) {
 		Host:        "foo.com",
 		PathPrepend: "/proxy/node/node1:10250",
 	}
+	emptyHostAndSchemeTransport := &Transport{
+		PathPrepend: "/proxy/node/node1:10250",
+	}
 	type Item struct {
 		input        string
 		sourceURL    string
@@ -62,6 +65,7 @@ func TestProxyTransport(t *testing.T) {
 		forwardedURI string
 		redirect     string
 		redirectWant string
+		reqHost      string
 	}
 
 	table := map[string]Item{
@@ -158,6 +162,14 @@ func TestProxyTransport(t *testing.T) {
 			redirectWant: "http://example.com/redirected/target/",
 			forwardedURI: "/proxy/node/node1:10250/redirect",
 		},
+		"redirect abs use reqHost no host no scheme": {
+			sourceURL:    "http://mynode.com/redirect",
+			transport:    emptyHostAndSchemeTransport,
+			redirect:     "http://10.0.0.1:8001/redirected/target/",
+			redirectWant: "http://10.0.0.1:8001/proxy/node/node1:10250/redirected/target/",
+			forwardedURI: "/proxy/node/node1:10250/redirect",
+			reqHost:      "10.0.0.1:8001",
+		},
 		"source contains the redirect already": {
 			input:        `<pre><a href="kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/node/node1:10250/google.log">google.log</a></pre>`,
 			sourceURL:    "http://foo.com/logs/log.log",
@@ -232,6 +244,9 @@ func TestProxyTransport(t *testing.T) {
 		if err != nil {
 			t.Errorf("%v: Unexpected error: %v", name, err)
 			return
+		}
+		if item.reqHost != "" {
+			req.Host = item.reqHost
 		}
 		resp, err := item.transport.RoundTrip(req)
 		if err != nil {
