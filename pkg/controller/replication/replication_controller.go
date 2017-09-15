@@ -401,7 +401,6 @@ func (rm *ReplicationManager) enqueueControllerAfter(obj interface{}, after time
 func (rm *ReplicationManager) worker() {
 	for rm.processNextWorkItem() {
 	}
-	glog.Infof("replication controller worker shutting down")
 }
 
 func (rm *ReplicationManager) processNextWorkItem() bool {

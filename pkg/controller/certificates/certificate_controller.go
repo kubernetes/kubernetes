@@ -45,6 +45,8 @@ type CertificateController struct {
 	csrsSynced cache.InformerSynced
 
 	handler func(*certificates.CertificateSigningRequest) error
+	// To allow injection of syncFunc for testing.
+	syncHandler func(key string) error
 
 	queue workqueue.RateLimitingInterface
 }
@@ -98,6 +100,7 @@ func NewCertificateController(
 	cc.csrLister = csrInformer.Lister()
 	cc.csrsSynced = csrInformer.Informer().HasSynced
 	cc.handler = handler
+	cc.syncHandler = cc.syncFunc
 	return cc
 }
 
@@ -134,7 +137,7 @@ func (cc *CertificateController) processNextWorkItem() bool {
 	}
 	defer cc.queue.Done(cKey)
 
-	if err := cc.syncFunc(cKey.(string)); err != nil {
+	if err := cc.syncHandler(cKey.(string)); err != nil {
 		cc.queue.AddRateLimited(cKey)
 		utilruntime.HandleError(fmt.Errorf("Sync %v failed with : %v", cKey, err))
 		return true

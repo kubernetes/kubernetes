@@ -58,7 +58,7 @@ func newController() (*ServiceController, *fakecloud.FakeCloud, *fake.Clientset)
 	serviceInformer := informerFactory.Core().V1().Services()
 	nodeInformer := informerFactory.Core().V1().Nodes()
 
-	controller, _ := New(cloud, client, serviceInformer, nodeInformer, "test-cluster")
+	controller, _ := NewServiceController(cloud, client, serviceInformer, nodeInformer, "test-cluster")
 	controller.nodeListerSynced = alwaysReady
 	controller.serviceListerSynced = alwaysReady
 	controller.eventRecorder = record.NewFakeRecorder(100)
@@ -472,7 +472,7 @@ func TestSyncService(t *testing.T) {
 	for _, tc := range testCases {
 
 		tc.updateFn()
-		obtainedErr := controller.syncService(tc.key)
+		obtainedErr := controller.syncHandler(tc.key)
 
 		//expected matches obtained ??.
 		if exp := tc.expectedFn(obtainedErr); exp != nil {

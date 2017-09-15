@@ -58,6 +58,8 @@ type NamespaceController struct {
 	queue workqueue.RateLimitingInterface
 	// helper to delete all resources in the namespace when the namespace is deleted.
 	namespacedResourcesDeleter deletion.NamespacedResourcesDeleterInterface
+	// To allow injection of syncNamespaceFrom for testing.
+	syncHandler func(key string) error
 }
 
 // NewNamespaceController creates a new NamespaceController
@@ -70,7 +72,7 @@ func NewNamespaceController(
 	finalizerToken v1.FinalizerName) *NamespaceController {
 
 	// create the controller so we can inject the enqueue function
-	namespaceController := &NamespaceController{
+	nsc := &NamespaceController{
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
 		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(kubeClient.Core().Namespaces(), clientPool, kubeClient.Core(), discoverResourcesFn, finalizerToken, true),
 	}
@@ -84,19 +86,19 @@ func NewNamespaceController(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				namespace := obj.(*v1.Namespace)
-				namespaceController.enqueueNamespace(namespace)
+				nsc.enqueueNamespace(namespace)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				namespace := newObj.(*v1.Namespace)
-				namespaceController.enqueueNamespace(namespace)
+				nsc.enqueueNamespace(namespace)
 			},
 		},
 		resyncPeriod,
 	)
-	namespaceController.lister = namespaceInformer.Lister()
-	namespaceController.listerSynced = namespaceInformer.Informer().HasSynced
-
-	return namespaceController
+	nsc.lister = namespaceInformer.Lister()
+	nsc.listerSynced = namespaceInformer.Informer().HasSynced
+	nsc.syncHandler = nsc.syncNamespaceFromKey
+	return nsc
 }
 
 // enqueueNamespace adds an object to the controller work queue
@@ -119,43 +121,40 @@ func (nm *NamespaceController) enqueueNamespace(obj interface{}) {
 	nm.queue.AddAfter(key, namespaceDeletionGracePeriod)
 }
 
+func (nm *NamespaceController) processNextWorkItem() bool {
+
+	key, quit := nm.queue.Get()
+	if quit {
+		return true
+	}
+	defer nm.queue.Done(key)
+
+	err := nm.syncHandler(key.(string))
+	if err == nil {
+		// no error, forget this entry and return
+		nm.queue.Forget(key)
+		return false
+	}
+
+	if estimate, ok := err.(*deletion.ResourcesRemainingError); ok {
+		t := estimate.Estimate/2 + 1
+		glog.V(4).Infof("Content remaining in namespace %s, waiting %d seconds", key, t)
+		nm.queue.AddAfter(key, time.Duration(t)*time.Second)
+	} else {
+		// rather than wait for a full resync, re-add the namespace to the queue to be processed
+		nm.queue.AddRateLimited(key)
+		utilruntime.HandleError(err)
+	}
+	return false
+}
+
 // worker processes the queue of namespace objects.
 // Each namespace can be in the queue at most once.
 // The system ensures that no two workers can process
 // the same namespace at the same time.
 func (nm *NamespaceController) worker() {
-	workFunc := func() bool {
-		key, quit := nm.queue.Get()
-		if quit {
-			return true
-		}
-		defer nm.queue.Done(key)
 
-		err := nm.syncNamespaceFromKey(key.(string))
-		if err == nil {
-			// no error, forget this entry and return
-			nm.queue.Forget(key)
-			return false
-		}
-
-		if estimate, ok := err.(*deletion.ResourcesRemainingError); ok {
-			t := estimate.Estimate/2 + 1
-			glog.V(4).Infof("Content remaining in namespace %s, waiting %d seconds", key, t)
-			nm.queue.AddAfter(key, time.Duration(t)*time.Second)
-		} else {
-			// rather than wait for a full resync, re-add the namespace to the queue to be processed
-			nm.queue.AddRateLimited(key)
-			utilruntime.HandleError(err)
-		}
-		return false
-	}
-
-	for {
-		quit := workFunc()
-
-		if quit {
-			return
-		}
+	for nm.processNextWorkItem() {
 	}
 }
 

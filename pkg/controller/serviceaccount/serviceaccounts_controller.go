@@ -118,7 +118,7 @@ func (c *ServiceAccountsController) Run(workers int, stopCh <-chan struct{}) {
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(c.runWorker, time.Second, stopCh)
+		go wait.Until(c.worker, time.Second, stopCh)
 	}
 
 	<-stopCh
@@ -154,7 +154,7 @@ func (c *ServiceAccountsController) namespaceUpdated(oldObj interface{}, newObj 
 	c.queue.Add(newNamespace.Name)
 }
 
-func (c *ServiceAccountsController) runWorker() {
+func (c *ServiceAccountsController) worker() {
 	for c.processNextWorkItem() {
 	}
 }

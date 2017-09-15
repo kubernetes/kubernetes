@@ -204,7 +204,7 @@ func StartControllers(s *options.CloudControllerManagerServer, kubeconfig *restc
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	// Start the service controller
-	serviceController, err := servicecontroller.New(
+	serviceController, err := servicecontroller.NewServiceController(
 		cloud,
 		client("service-controller"),
 		sharedInformers.Core().V1().Services(),
