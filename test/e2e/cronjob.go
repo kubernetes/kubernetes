@@ -46,9 +46,10 @@ const (
 )
 
 var (
-	CronJobGroupVersionResource      = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "cronjobs"}
-	ScheduledJobGroupVersionResource = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "scheduledjobs"}
-	removedScheduledJobsVersion      = utilversion.MustParseSemantic("v1.8.0")
+	CronJobGroupVersionResource                = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "cronjobs"}
+	ScheduledJobGroupVersionResource           = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "scheduledjobs"}
+	removedScheduledJobsVersion                = utilversion.MustParseSemantic("v1.8.0")
+	skippedAdoptionWithoutControllerRefVersion = utilversion.MustParseSemantic("v1.8.0-alpha.0")
 )
 
 var _ = framework.KubeDescribe("CronJob", func() {
@@ -282,6 +283,7 @@ var _ = framework.KubeDescribe("CronJob", func() {
 	// Adopt Jobs it owns that don't have ControllerRef yet.
 	// That is, the Jobs were created by a pre-v1.6.0 master.
 	It("should adopt Jobs it owns that don't have ControllerRef yet", func() {
+		framework.SkipUnlessServerVersionLT(skippedAdoptionWithoutControllerRefVersion, f.ClientSet.Discovery())
 		By("Creating a cronjob")
 		cronJob := newTestCronJob("adopt", "*/1 * * * ?", batchv2alpha1.ForbidConcurrent,
 			sleepCommand, nil)
