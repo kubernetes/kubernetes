@@ -230,11 +230,9 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		glog.Infof("Not enabling cluster autoscaler for the node pool (on purpose).")
 
 		By("Get memory available on new node, so we can account for it when creating RC")
-		nodes, err := framework.GetGroupNodes(extraPoolName)
-		framework.ExpectNoError(err)
+		nodes := getPoolNodes(f, extraPoolName)
 		Expect(len(nodes)).Should(Equal(1))
-		node, err := f.ClientSet.Core().Nodes().Get(nodes[0], metav1.GetOptions{})
-		extraMem := node.Status.Capacity[v1.ResourceMemory]
+		extraMem := nodes[0].Status.Capacity[v1.ResourceMemory]
 		extraMemMb := int((&extraMem).Value() / 1024 / 1024)
 
 		ReserveMemory(f, "memory-reservation", 100, nodeCount*memCapacityMb+extraMemMb, false, defaultTimeout)
@@ -888,6 +886,17 @@ func deleteNodePool(name string) {
 		glog.Infof("Error: %v", err)
 	}
 	glog.Infof("Node-pool deletion output: %s", output)
+}
+
+func getPoolNodes(f *framework.Framework, poolName string) []*v1.Node {
+	nodes := make([]*v1.Node, 0, 1)
+	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+	for _, node := range nodeList.Items {
+		if poolLabel := node.Labels["cloud.google.com/gke-nodepool"]; poolLabel == poolName {
+			nodes = append(nodes, &node)
+		}
+	}
+	return nodes
 }
 
 func doPut(url, content string) (string, error) {
