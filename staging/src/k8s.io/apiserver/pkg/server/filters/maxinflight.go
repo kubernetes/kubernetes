@@ -112,6 +112,9 @@ func WithMaxInFlightLimit(
 				if requestInfo.Namespace != "" {
 					scope = "namespace"
 				}
+				if requestInfo.Name != "" {
+					scope = "resource"
+				}
 				if requestInfo.IsResourceRequest {
 					metrics.MonitorRequest(r, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, "", scope, http.StatusTooManyRequests, 0, time.Now())
 				} else {
