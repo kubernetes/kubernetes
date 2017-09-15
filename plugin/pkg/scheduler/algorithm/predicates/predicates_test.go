@@ -257,85 +257,85 @@ func TestPodFitsResources(t *testing.T) {
 			test: "equal edge case for init container",
 		},
 		{
-			pod:      newResourcePod(schedulercache.Resource{ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 1}}),
+			pod:      newResourcePod(schedulercache.Resource{ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 1}}),
 			nodeInfo: schedulercache.NewNodeInfo(newResourcePod(schedulercache.Resource{})),
 			fits:     true,
 			test:     "opaque resource fits",
 		},
 		{
-			pod:      newResourceInitPod(newResourcePod(schedulercache.Resource{}), schedulercache.Resource{ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 1}}),
+			pod:      newResourceInitPod(newResourcePod(schedulercache.Resource{}), schedulercache.Resource{ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 1}}),
 			nodeInfo: schedulercache.NewNodeInfo(newResourcePod(schedulercache.Resource{})),
 			fits:     true,
 			test:     "opaque resource fits for init container",
 		},
 		{
 			pod: newResourcePod(
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 10}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 10}}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 0}})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 0}})),
 			fits:    false,
 			test:    "opaque resource capacity enforced",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 10, 0, 5)},
 		},
 		{
 			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 10}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 10}}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 0}})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 0}})),
 			fits:    false,
 			test:    "opaque resource capacity enforced for init container",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 10, 0, 5)},
 		},
 		{
 			pod: newResourcePod(
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 1}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 1}}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 5}})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 5}})),
 			fits:    false,
 			test:    "opaque resource allocatable enforced",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 1, 5, 5)},
 		},
 		{
 			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 1}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 1}}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 5}})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 5}})),
 			fits:    false,
 			test:    "opaque resource allocatable enforced for init container",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 1, 5, 5)},
 		},
 		{
 			pod: newResourcePod(
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 3}},
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 3}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 3}},
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 3}}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 2}})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 2}})),
 			fits:    false,
 			test:    "opaque resource allocatable enforced for multiple containers",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 6, 2, 5)},
 		},
 		{
 			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 3}},
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 3}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 3}},
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 3}}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 2}})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 2}})),
 			fits: true,
 			test: "opaque resource allocatable admits multiple init containers",
 		},
 		{
 			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 6}},
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 3}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 6}},
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 3}}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceA: 2}})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{opaqueResourceA: 2}})),
 			fits:    false,
 			test:    "opaque resource allocatable enforced for multiple init containers",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 6, 2, 5)},
 		},
 		{
 			pod: newResourcePod(
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceB: 1}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{opaqueResourceB: 1}}),
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
 			fits:    false,
@@ -344,7 +344,7 @@ func TestPodFitsResources(t *testing.T) {
 		},
 		{
 			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, ExtendedResources: map[v1.ResourceName]int64{opaqueResourceB: 1}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{opaqueResourceB: 1}}),
 			nodeInfo: schedulercache.NewNodeInfo(
 				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0})),
 			fits:    false,
@@ -353,28 +353,28 @@ func TestPodFitsResources(t *testing.T) {
 		},
 		{
 			pod: newResourcePod(
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
 			fits:    false,
 			test:    "hugepages resource capacity enforced",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(hugePageResourceA, 10, 0, 5)},
 		},
 		{
 			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{}),
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 10}}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 0}})),
 			fits:    false,
 			test:    "hugepages resource capacity enforced for init container",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(hugePageResourceA, 10, 0, 5)},
 		},
 		{
 			pod: newResourcePod(
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 3}},
-				schedulercache.Resource{MilliCPU: 1, Memory: 1, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 3}}),
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 3}},
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 3}}),
 			nodeInfo: schedulercache.NewNodeInfo(
-				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, HugePages: map[v1.ResourceName]int64{hugePageResourceA: 2}})),
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, ScalarResources: map[v1.ResourceName]int64{hugePageResourceA: 2}})),
 			fits:    false,
 			test:    "hugepages resource allocatable enforced for multiple containers",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(hugePageResourceA, 6, 2, 5)},

@@ -95,6 +95,11 @@ func IsOvercommitAllowed(name v1.ResourceName) bool {
 		!overcommitBlacklist.Has(string(name))
 }
 
+// Extended and Hugepages resources
+func IsScalarResourceName(name v1.ResourceName) bool {
+	return IsExtendedResourceName(name) || IsHugePageResourceName(name)
+}
+
 // this function aims to check if the service's ClusterIP is set or not
 // the objective is not to perform validation here
 func IsServiceIPSet(service *v1.Service) bool {
