@@ -364,6 +364,8 @@ data:
     <match kubernetes.**>
       @type google_cloud
 
+      # Try to detect JSON formatted log entries.
+      detect_json true
       # Collect metrics in Prometheus registry about plugin activity.
       enable_monitoring true
       monitoring_type prometheus
@@ -373,11 +375,11 @@ data:
       # Set queue_full action to block because we want to pause gracefully
       # in case of the off-the-limits load instead of throwing an exception
       buffer_queue_full_action block
-      # Set the chunk limit conservatively to avoid exceeding the GCL limit
-      # of 10MiB per write request.
-      buffer_chunk_limit 2M
+      # Set the chunk limit conservatively to avoid exceeding the recommended
+      # chunk size of 5MB per write request.
+      buffer_chunk_limit 1M
       # Cap the combined memory usage of this buffer and the one below to
-      # 2MiB/chunk * (6 + 2) chunks = 16 MiB
+      # 1MiB/chunk * (6 + 2) chunks = 8 MiB
       buffer_queue_limit 6
       # Never wait more than 5 seconds before flushing logs in the non-error case.
       flush_interval 5s
@@ -394,13 +396,14 @@ data:
     <match **>
       @type google_cloud
 
+      detect_json true
       enable_monitoring true
       monitoring_type prometheus
       detect_subservice false
       buffer_type file
       buffer_path /var/log/fluentd-buffers/kubernetes.system.buffer
       buffer_queue_full_action block
-      buffer_chunk_limit 2M
+      buffer_chunk_limit 1M
       buffer_queue_limit 2
       flush_interval 5s
       max_retry_wait 30
@@ -408,7 +411,7 @@ data:
       num_threads 2
     </match>
 metadata:
-  name: fluentd-gcp-config-v1.2.0
+  name: fluentd-gcp-config-v1.2.2
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile
