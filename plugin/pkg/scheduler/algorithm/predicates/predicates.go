@@ -515,16 +515,10 @@ func GetResourceRequest(pod *v1.Pod) *schedulercache.Resource {
 					result.NvidiaGPU = gpu
 				}
 			default:
-				if v1helper.IsExtendedResourceName(rName) {
+				if v1helper.IsScalarResourceName(rName) {
 					value := rQuantity.Value()
-					if value > result.ExtendedResources[rName] {
-						result.SetExtended(rName, value)
-					}
-				}
-				if v1helper.IsHugePageResourceName(rName) {
-					value := rQuantity.Value()
-					if value > result.HugePages[rName] {
-						result.SetHugePages(rName, value)
+					if value > result.ScalarResources[rName] {
+						result.SetScalar(rName, value)
 					}
 				}
 			}
@@ -564,8 +558,7 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 		podRequest.Memory == 0 &&
 		podRequest.NvidiaGPU == 0 &&
 		podRequest.EphemeralStorage == 0 &&
-		len(podRequest.ExtendedResources) == 0 &&
-		len(podRequest.HugePages) == 0 {
+		len(podRequest.ScalarResources) == 0 {
 		return len(predicateFails) == 0, predicateFails, nil
 	}
 
@@ -584,15 +577,9 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 		predicateFails = append(predicateFails, NewInsufficientResourceError(v1.ResourceEphemeralStorage, podRequest.EphemeralStorage, nodeInfo.RequestedResource().EphemeralStorage, allocatable.EphemeralStorage))
 	}
 
-	for rName, rQuant := range podRequest.ExtendedResources {
-		if allocatable.ExtendedResources[rName] < rQuant+nodeInfo.RequestedResource().ExtendedResources[rName] {
-			predicateFails = append(predicateFails, NewInsufficientResourceError(rName, podRequest.ExtendedResources[rName], nodeInfo.RequestedResource().ExtendedResources[rName], allocatable.ExtendedResources[rName]))
-		}
-	}
-
-	for rName, rQuant := range podRequest.HugePages {
-		if allocatable.HugePages[rName] < rQuant+nodeInfo.RequestedResource().HugePages[rName] {
-			predicateFails = append(predicateFails, NewInsufficientResourceError(rName, podRequest.HugePages[rName], nodeInfo.RequestedResource().HugePages[rName], allocatable.HugePages[rName]))
+	for rName, rQuant := range podRequest.ScalarResources {
+		if allocatable.ScalarResources[rName] < rQuant+nodeInfo.RequestedResource().ScalarResources[rName] {
+			predicateFails = append(predicateFails, NewInsufficientResourceError(rName, podRequest.ScalarResources[rName], nodeInfo.RequestedResource().ScalarResources[rName], allocatable.ScalarResources[rName]))
 		}
 	}
 
