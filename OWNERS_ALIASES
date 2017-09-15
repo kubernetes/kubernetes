@@ -1,17 +1,18 @@
 aliases:
   sig-scheduling-maintainers:
-    - davidopp
-    - timothysc
-    - wojtek-t
-    - k82cn
-  sig-scheduling:
-    - davidopp
     - bsalamat
+    - davidopp
+    - k82cn
     - timothysc
     - wojtek-t
-    - k82cn
+  sig-scheduling:
+    - bsalamat
+    - davidopp
     - jayunit100
+    - k82cn
     - resouer
+    - timothysc
+    - wojtek-t
   sig-cli-maintainers:
     - adohe
     - brendandburns
