@@ -1,13 +1,13 @@
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
-  name: fluentd-gcp-v2.0
+  name: fluentd-gcp-v2.0.9
   namespace: kube-system
   labels:
     k8s-app: fluentd-gcp
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
-    version: v2.0
+    version: v2.0.9
 spec:
   updateStrategy:
     type: RollingUpdate
@@ -16,7 +16,7 @@ spec:
       labels:
         k8s-app: fluentd-gcp
         kubernetes.io/cluster-service: "true"
-        version: v2.0
+        version: v2.0.9
       # This annotation ensures that fluentd does not get evicted if the node
       # supports critical pod annotation based priority scheme.
       # Note that this does not guarantee admission on the nodes (#40573).
@@ -27,16 +27,7 @@ spec:
       hostNetwork: true
       containers:
       - name: fluentd-gcp
-        image: gcr.io/google-containers/fluentd-gcp:2.0.8
-        # If fluentd consumes its own logs, the following situation may happen:
-        # fluentd fails to send a chunk to the server => writes it to the log =>
-        # tries to send this message to the server => fails to send a chunk and so on.
-        # Writing to a file, which is not exported to the back-end prevents it.
-        # It also allows to increase the fluentd verbosity by default.
-        command:
-          - '/bin/sh'
-          - '-c'
-          - '/run.sh $FLUENTD_ARGS'
+        image: gcr.io/google-containers/fluentd-gcp:2.0.9
         env:
         - name: FLUENTD_ARGS
           value: --no-supervisor -q
@@ -123,7 +114,7 @@ spec:
           path: /usr/lib64
       - name: config-volume
         configMap:
-          name: fluentd-gcp-config-v1.1.2
+          name: fluentd-gcp-config-v1.1.3
       - name: ssl-certs
         hostPath:
           path: /etc/ssl/certs
