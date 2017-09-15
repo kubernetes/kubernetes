@@ -641,7 +641,14 @@ func (gce *GCECloud) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []
 
 // HasClusterID returns true if the cluster has a clusterID
 func (gce *GCECloud) HasClusterID() bool {
-	return true
+	if id, err := gce.ClusterID.GetID(); err != nil && id != "" {
+		return true
+	} else {
+		if err != nil {
+			glog.Warningf("Unable to retrieve ClusterID: %v", err)
+		}
+		return false
+	}
 }
 
 // Project IDs cannot have a digit for the first characeter. If the id contains a digit,
