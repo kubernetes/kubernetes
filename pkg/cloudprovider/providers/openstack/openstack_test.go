@@ -362,6 +362,11 @@ func configFromEnv() (cfg Config, ok bool) {
 		cfg.Global.TenantName = os.Getenv("OS_TENANT_NAME")
 	}
 
+	cfg.Global.ProjectId = os.Getenv("OS_PROJECT_ID")
+	if cfg.Global.ProjectId == "" {
+		cfg.Global.ProjectName = os.Getenv("OS_PROJECT_NAME")
+	}
+
 	cfg.Global.Username = os.Getenv("OS_USERNAME")
 	cfg.Global.Password = os.Getenv("OS_PASSWORD")
 	cfg.Global.Region = os.Getenv("OS_REGION_NAME")

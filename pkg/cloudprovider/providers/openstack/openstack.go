@@ -113,17 +113,19 @@ type OpenStack struct {
 
 type Config struct {
 	Global struct {
-		AuthUrl    string `gcfg:"auth-url"`
-		Username   string
-		UserId     string `gcfg:"user-id"`
-		Password   string
-		TenantId   string `gcfg:"tenant-id"`
-		TenantName string `gcfg:"tenant-name"`
-		TrustId    string `gcfg:"trust-id"`
-		DomainId   string `gcfg:"domain-id"`
-		DomainName string `gcfg:"domain-name"`
-		Region     string
-		CAFile     string `gcfg:"ca-file"`
+		AuthUrl     string `gcfg:"auth-url"`
+		Username    string
+		UserId      string `gcfg:"user-id"`
+		Password    string
+		TenantId    string `gcfg:"tenant-id"`
+		TenantName  string `gcfg:"tenant-name"`
+		ProjectId   string `gcfg:"project-id"`
+		ProjectName string `gcfg:"project-name"`
+		TrustId     string `gcfg:"trust-id"`
+		DomainId    string `gcfg:"domain-id"`
+		DomainName  string `gcfg:"domain-name"`
+		Region      string
+		CAFile      string `gcfg:"ca-file"`
 	}
 	LoadBalancer LoadBalancerOpts
 	BlockStorage BlockStorageOpts
@@ -143,7 +145,7 @@ func init() {
 }
 
 func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
-	return gophercloud.AuthOptions{
+	options := gophercloud.AuthOptions{
 		IdentityEndpoint: cfg.Global.AuthUrl,
 		Username:         cfg.Global.Username,
 		UserID:           cfg.Global.UserId,
@@ -156,6 +158,16 @@ func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
 		// Persistent service, so we need to be able to renew tokens.
 		AllowReauth: true,
 	}
+
+	options.TenantID = cfg.Global.TenantId
+	options.TenantName = cfg.Global.TenantName
+	if cfg.Global.ProjectId != "" {
+		options.TenantID = cfg.Global.ProjectId
+	}
+	if cfg.Global.ProjectName != "" {
+		options.TenantName = cfg.Global.ProjectName
+	}
+	return options
 }
 
 func (cfg Config) toAuth3Options() tokens3.AuthOptions {
