@@ -22,6 +22,8 @@ import (
 	_ "net/http/pprof"
 	"strings"
 
+	"github.com/spf13/pflag"
+
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flag"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
@@ -32,8 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
-
-	"github.com/spf13/pflag"
 )
 
 const (

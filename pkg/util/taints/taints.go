@@ -76,6 +76,10 @@ type taintsVar struct {
 }
 
 func (t taintsVar) Set(s string) error {
+	if len(s) == 0 {
+		*t.ptr = nil
+		return nil
+	}
 	sts := strings.Split(s, ",")
 	var taints []api.Taint
 	for _, st := range sts {
@@ -91,7 +95,7 @@ func (t taintsVar) Set(s string) error {
 
 func (t taintsVar) String() string {
 	if len(*t.ptr) == 0 {
-		return "<nil>"
+		return ""
 	}
 	var taints []string
 	for _, taint := range *t.ptr {
