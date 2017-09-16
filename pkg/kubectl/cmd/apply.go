@@ -64,6 +64,7 @@ type ApplyOptions struct {
 	Overwrite       bool
 	OpenApiPatch    bool
 	PruneWhitelist  []string
+	errorUnchanged  bool
 }
 
 const (
@@ -145,6 +146,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, out, errOut io.Writer) *cob
 	cmd.Flags().BoolVar(&options.All, "all", options.All, "Select all resources in the namespace of the specified resource types.")
 	cmd.Flags().StringArrayVar(&options.PruneWhitelist, "prune-whitelist", options.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmd.Flags().BoolVar(&options.OpenApiPatch, "openapi-patch", options.OpenApiPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
+	cmd.Flags().BoolVar(&options.errorUnchanged, "error-unchanged", false, "if set to true the exit code will be 3 on no differences found")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddPrinterFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
@@ -352,6 +354,8 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 				return cmdutil.AddSourceToErr(fmt.Sprintf("applying patch:\n%s\nto:\n%v\nfor:", patchBytes, info), info.Source, err)
 			}
 
+			cmdutil.IdempotentOperationObjectCheck(options.errorUnchanged, info.Object, patchedObject)
+
 			info.Refresh(patchedObject, true)
 
 			if uid, err := info.Mapping.UID(info.Object); err != nil {
@@ -382,7 +386,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 	}
 
 	if !options.Prune {
-		return nil
+		return cmdutil.IdempotentOperationErrorReturn(options.errorUnchanged, dryRun)
 	}
 
 	p := pruner{
@@ -418,7 +422,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		}
 	}
 
-	return nil
+	return cmdutil.IdempotentOperationErrorReturn(options.errorUnchanged, dryRun)
 }
 
 type pruneResource struct {
