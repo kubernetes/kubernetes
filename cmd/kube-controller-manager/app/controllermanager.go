@@ -416,6 +416,9 @@ func GetAvailableResources(clientBuilder controller.ControllerClientBuilder) (ma
 	return allResources, nil
 }
 
+// CreateControllerContext creates a context struct containing references to resources needed by the
+// controllers such as the cloud provider and clientBuilder. rootClientBuilder is only used for
+// the shared-informers client and token controller.
 func CreateControllerContext(s *options.CMServer, rootClientBuilder, clientBuilder controller.ControllerClientBuilder, stop <-chan struct{}) (ControllerContext, error) {
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
@@ -429,16 +432,12 @@ func CreateControllerContext(s *options.CMServer, rootClientBuilder, clientBuild
 	if err != nil {
 		return ControllerContext{}, fmt.Errorf("cloud provider could not be initialized: %v", err)
 	}
-	if cloud != nil {
-		// Initialize the cloud provider with a reference to the clientBuilder
-		cloud.Initialize(rootClientBuilder)
 
-		if cloud.HasClusterID() == false {
-			if s.AllowUntaggedCloud == true {
-				glog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
-			} else {
-				return ControllerContext{}, fmt.Errorf("no ClusterID Found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
-			}
+	if cloud != nil && cloud.HasClusterID() == false {
+		if s.AllowUntaggedCloud == true {
+			glog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
+		} else {
+			return ControllerContext{}, fmt.Errorf("no ClusterID Found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
 		}
 	}
 
@@ -459,6 +458,12 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 	// If this fails, just return here and fail since other controllers won't be able to get credentials.
 	if _, err := startSATokenController(ctx); err != nil {
 		return err
+	}
+
+	// Initialize the cloud provider with a reference to the clientBuilder only after token controller
+	// has started in case the cloud provider uses the client builder.
+	if ctx.Cloud != nil {
+		ctx.Cloud.Initialize(ctx.ClientBuilder)
 	}
 
 	for controllerName, initFn := range controllers {

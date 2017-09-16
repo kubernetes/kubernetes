@@ -193,15 +193,14 @@ KUBEPROXY_TEST_ARGS="${KUBEPROXY_TEST_ARGS:-} ${TEST_CLUSTER_API_CONTENT_TYPE}"
 # TODO(piosz): remove this in 1.8
 NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
 
-# To avoid running Calico on a node that is not configured appropriately, 
+# To avoid running Calico on a node that is not configured appropriately,
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.
 if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
 	NODE_LABELS="$NODE_LABELS,projectcalico.org/ds-ready=true"
 fi
 
-# Turn the simple metadata proxy on by default.
-ENABLE_METADATA_PROXY="${ENABLE_METADATA_PROXY:-simple}"
-if [[ ${ENABLE_METADATA_PROXY} != "false" ]]; then
+# Apply the right node label if metadata proxy is on.
+if [[ ${ENABLE_METADATA_PROXY:-} == "simple" ]]; then
         NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
 fi
 
@@ -376,3 +375,6 @@ ENABLE_POD_PRIORITY="${ENABLE_POD_PRIORITY:-}"
 if [[ "${ENABLE_POD_PRIORITY}" == "true" ]]; then
     FEATURE_GATES="${FEATURE_GATES},PodPriority=true"
 fi
+
+# Optional: enable certificate rotation of the kubelet certificates.
+ROTATE_CERTIFICATES="${ROTATE_CERTIFICATES:-}"

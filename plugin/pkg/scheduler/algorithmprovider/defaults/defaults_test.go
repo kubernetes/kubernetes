@@ -17,6 +17,8 @@ limitations under the License.
 package defaults
 
 import (
+	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"os"
 	"testing"
 )
@@ -58,5 +60,97 @@ func TestGetMaxVols(t *testing.T) {
 	os.Unsetenv(KubeMaxPDVols)
 	if previousValue != "" {
 		os.Setenv(KubeMaxPDVols, previousValue)
+	}
+}
+
+func TestCopyAndReplace(t *testing.T) {
+	testCases := []struct {
+		set         sets.String
+		replaceWhat string
+		replaceWith string
+		expected    sets.String
+	}{
+		{
+			set:         sets.String{"A": sets.Empty{}, "B": sets.Empty{}},
+			replaceWhat: "A",
+			replaceWith: "C",
+			expected:    sets.String{"B": sets.Empty{}, "C": sets.Empty{}},
+		},
+		{
+			set:         sets.String{"A": sets.Empty{}, "B": sets.Empty{}},
+			replaceWhat: "D",
+			replaceWith: "C",
+			expected:    sets.String{"A": sets.Empty{}, "B": sets.Empty{}},
+		},
+	}
+	for _, testCase := range testCases {
+		result := copyAndReplace(testCase.set, testCase.replaceWhat, testCase.replaceWith)
+		if !result.Equal(testCase.expected) {
+			t.Errorf("expected %v got %v", testCase.expected, result)
+		}
+	}
+}
+
+func TestDefaultPriorities(t *testing.T) {
+	result := sets.NewString(
+		"SelectorSpreadPriority",
+		"InterPodAffinityPriority",
+		"LeastRequestedPriority",
+		"BalancedResourceAllocation",
+		"NodePreferAvoidPodsPriority",
+		"NodeAffinityPriority",
+		"TaintTolerationPriority")
+	if expected := defaultPriorities(); !result.Equal(expected) {
+		t.Errorf("expected %v got %v", expected, result)
+	}
+}
+
+func TestDefaultPredicates(t *testing.T) {
+	testCases := []struct {
+		actionFunc  func(value string) error
+		actionParam string
+		expected    sets.String
+	}{
+		{
+			actionFunc:  utilfeature.DefaultFeatureGate.Set,
+			actionParam: "TaintNodesByCondition=true",
+			expected: sets.NewString(
+				"NoVolumeZoneConflict",
+				"MaxEBSVolumeCount",
+				"MaxGCEPDVolumeCount",
+				"MaxAzureDiskVolumeCount",
+				"MatchInterPodAffinity",
+				"NoDiskConflict",
+				"GeneralPredicates",
+				"CheckNodeMemoryPressure",
+				"CheckNodeDiskPressure",
+				"NoVolumeNodeConflict",
+				"PodToleratesNodeTaints",
+			),
+		},
+		{
+			actionFunc:  utilfeature.DefaultFeatureGate.Set,
+			actionParam: "TaintNodesByCondition=false",
+			expected: sets.NewString(
+				"NoVolumeZoneConflict",
+				"MaxEBSVolumeCount",
+				"MaxGCEPDVolumeCount",
+				"MaxAzureDiskVolumeCount",
+				"MatchInterPodAffinity",
+				"NoDiskConflict",
+				"GeneralPredicates",
+				"CheckNodeMemoryPressure",
+				"CheckNodeDiskPressure",
+				"NoVolumeNodeConflict",
+				"CheckNodeCondition",
+				"PodToleratesNodeTaints",
+			),
+		},
+	}
+	for _, testCase := range testCases {
+		testCase.actionFunc(testCase.actionParam)
+		if result := defaultPredicates(); !result.Equal(testCase.expected) {
+			t.Errorf("expected %v got %v", testCase.expected, result)
+		}
 	}
 }

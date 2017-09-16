@@ -752,9 +752,24 @@ EOF
 ENABLE_CUSTOM_METRICS: $(yaml-quote ${ENABLE_CUSTOM_METRICS})
 EOF
   fi
+  if [ -n "${ENABLE_METADATA_PROXY:-}" ]; then
+    cat >>$file <<EOF
+ENABLE_METADATA_PROXY: $(yaml-quote ${ENABLE_METADATA_PROXY})
+EOF
+  fi
+  if [ -n "${KUBE_FIREWALL_METADATA_SERVER:-}" ]; then
+    cat >>$file <<EOF
+KUBE_FIREWALL_METADATA_SERVER: $(yaml-quote ${KUBE_FIREWALL_METADATA_SERVER})
+EOF
+  fi
   if [ -n "${FEATURE_GATES:-}" ]; then
     cat >>$file <<EOF
 FEATURE_GATES: $(yaml-quote ${FEATURE_GATES})
+EOF
+  fi
+  if [ -n "${ROTATE_CERTIFICATES:-}" ]; then
+    cat >>$file <<EOF
+ROTATE_CERTIFICATES: $(yaml-quote ${ROTATE_CERTIFICATES})
 EOF
   fi
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] ||
