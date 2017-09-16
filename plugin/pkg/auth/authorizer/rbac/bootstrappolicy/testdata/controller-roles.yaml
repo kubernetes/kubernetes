@@ -483,6 +483,18 @@ items:
     verbs:
     - get
   - apiGroups:
+    - metrics.k8s.io
+    resources:
+    - pods
+    verbs:
+    - list
+  - apiGroups:
+    - custom.metrics.k8s.io
+    resources:
+    - '*'
+    verbs:
+    - list
+  - apiGroups:
     - ""
     resources:
     - events
