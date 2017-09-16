@@ -4836,6 +4836,54 @@ func TestValidatePodUpdate(t *testing.T) {
 			false,
 			"added invalid new toleration to existing tolerations in pod spec updates",
 		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec:       api.PodSpec{Hostname: "bar"},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec:       api.PodSpec{Hostname: ""},
+			},
+			true,
+			"update empty hostname",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec:       api.PodSpec{Subdomain: "bar"},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec:       api.PodSpec{Subdomain: ""},
+			},
+			true,
+			"update empty subdomain",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec:       api.PodSpec{Hostname: "bar"},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec:       api.PodSpec{Hostname: "baz"},
+			},
+			false,
+			"update hostname",
+		},
+		{
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec:       api.PodSpec{Subdomain: "bar"},
+			},
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
+				Spec:       api.PodSpec{Subdomain: "baz"},
+			},
+			false,
+			"update subdomain",
+		},
 	}
 
 	for _, test := range tests {

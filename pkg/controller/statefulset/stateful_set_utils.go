@@ -207,6 +207,12 @@ func updateStorage(set *apps.StatefulSet, pod *v1.Pod) {
 func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
 	pod.Name = getPodName(set, getOrdinal(pod))
 	pod.Namespace = set.Namespace
+	if pod.Spec.Hostname == "" {
+		pod.Spec.Hostname = pod.Name
+	}
+	if pod.Spec.Subdomain == "" {
+		pod.Spec.Subdomain = set.Spec.ServiceName
+	}
 	if pod.Annotations == nil {
 		pod.Annotations = make(map[string]string)
 	}
