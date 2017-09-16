@@ -360,7 +360,7 @@ func (i *Init) Run(out io.Writer) error {
 	// Note: This is done right in the beginning of cluster initialization; as we might want to make other phases
 	// depend on centralized information from this source in the future
 	if err := uploadconfigphase.UploadConfiguration(i.cfg, client); err != nil {
-		fmt.Errorf("error uploading configuration:%v", err)
+		return fmt.Errorf("error uploading configuration:%v", err)
 	}
 
 	// PHASE 4: Mark the master with the right label/taint
@@ -402,7 +402,7 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	if err := dnsaddonphase.EnsureDNSAddon(i.cfg, client); err != nil {
-		return fmt.Errorf("error ensuring dns addon", err)
+		return fmt.Errorf("error ensuring dns addon:%v", err)
 	}
 
 	if err := proxyaddonphase.EnsureProxyAddon(i.cfg, client); err != nil {
