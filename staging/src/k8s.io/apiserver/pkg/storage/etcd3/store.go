@@ -32,6 +32,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -271,6 +272,14 @@ func (s *store) GuaranteedUpdate(
 	}
 	key = path.Join(s.pathPrefix, key)
 
+	getCurrentState := func() (*objState, error) {
+		getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
+		if err != nil {
+			return nil, err
+		}
+		return s.getState(getResp, key, v, ignoreNotFound)
+	}
+
 	var origState *objState
 	var mustCheckData bool
 	if len(suggestion) == 1 && suggestion[0] != nil {
@@ -280,11 +289,7 @@ func (s *store) GuaranteedUpdate(
 		}
 		mustCheckData = true
 	} else {
-		getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
-		if err != nil {
-			return err
-		}
-		origState, err = s.getState(getResp, key, v, ignoreNotFound)
+		origState, err = getCurrentState()
 		if err != nil {
 			return err
 		}
@@ -299,6 +304,18 @@ func (s *store) GuaranteedUpdate(
 
 		ret, ttl, err := s.updateState(origState, tryUpdate)
 		if err != nil {
+			// It's possible we were working with stale data
+			if mustCheckData && apierrors.IsConflict(err) {
+				// Actually fetch
+				origState, err = getCurrentState()
+				if err != nil {
+					return err
+				}
+				mustCheckData = false
+				// Retry
+				continue
+			}
+
 			return err
 		}
 
@@ -311,11 +328,7 @@ func (s *store) GuaranteedUpdate(
 			// etcd in order to be sure the data in the store is equivalent to
 			// our desired serialization
 			if mustCheckData {
-				getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
-				if err != nil {
-					return err
-				}
-				origState, err = s.getState(getResp, key, v, ignoreNotFound)
+				origState, err = getCurrentState()
 				if err != nil {
 					return err
 				}
