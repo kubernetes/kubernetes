@@ -124,7 +124,9 @@ func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager
 	// Write the updated static Pod manifests into the temporary directory
 	fmt.Printf("[upgrade/staticpods] Writing upgraded Static Pod manifests to %q\n", pathMgr.TempManifestDir())
 	err = controlplane.CreateInitStaticPodManifestFiles(pathMgr.TempManifestDir(), cfg)
-
+	if err != nil {
+		return fmt.Errorf("error creating init static pod manifest files: %v", err)
+	}
 	for _, component := range constants.MasterComponents {
 		// The old manifest is here; in the /etc/kubernetes/manifests/
 		currentManifestPath := pathMgr.RealManifestPath(component)
