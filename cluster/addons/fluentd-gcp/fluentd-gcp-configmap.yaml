@@ -375,10 +375,10 @@ data:
       buffer_queue_full_action block
       # Set the chunk limit conservatively to avoid exceeding the GCL limit
       # of 10MiB per write request.
-      buffer_chunk_limit 2M
+      buffer_chunk_limit 256k
       # Cap the combined memory usage of this buffer and the one below to
-      # 2MiB/chunk * (6 + 2) chunks = 16 MiB
-      buffer_queue_limit 6
+      # 256KiB/chunk * (48 + 16) chunks = 16 MiB
+      buffer_queue_limit 48
       # Never wait more than 5 seconds before flushing logs in the non-error case.
       flush_interval 5s
       # Never wait longer than 30 seconds between retries.
@@ -386,7 +386,7 @@ data:
       # Disable the limit on the number of retries (retry forever).
       disable_retry_limit
       # Use multiple threads for processing.
-      num_threads 2
+      num_threads 16
     </match>
 
     # Keep a smaller buffer here since these logs are less important than the user's
@@ -400,12 +400,12 @@ data:
       buffer_type file
       buffer_path /var/log/fluentd-buffers/kubernetes.system.buffer
       buffer_queue_full_action block
-      buffer_chunk_limit 2M
-      buffer_queue_limit 2
+      buffer_chunk_limit 256k
+      buffer_queue_limit 16
       flush_interval 5s
       max_retry_wait 30
       disable_retry_limit
-      num_threads 2
+      num_threads 16
     </match>
 metadata:
   name: fluentd-gcp-config-v1.2.0
