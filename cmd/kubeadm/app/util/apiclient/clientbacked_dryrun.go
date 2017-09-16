@@ -75,6 +75,9 @@ func (clg *ClientBackedDryRunGetter) HandleGetAction(action core.GetAction) (boo
 	}
 
 	unversionedObj, err := rc.Get(action.GetName(), metav1.GetOptions{})
+	if err != nil {
+		return true, nil, err
+	}
 	// If the unversioned object does not have .apiVersion; the inner object is probably nil
 	if len(unversionedObj.GetAPIVersion()) == 0 {
 		return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), action.GetName())
@@ -100,6 +103,9 @@ func (clg *ClientBackedDryRunGetter) HandleListAction(action core.ListAction) (b
 	}
 
 	unversionedList, err := rc.List(listOpts)
+	if err != nil {
+		return true, nil, err
+	}
 	// If the runtime.Object here is nil, we should return successfully with no result
 	if unversionedList == nil {
 		return true, unversionedList, nil
