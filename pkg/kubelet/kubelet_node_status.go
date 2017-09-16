@@ -598,11 +598,21 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 			}
 		}
 
-		initialCapacity := kl.containerManager.GetCapacity()
-		if initialCapacity != nil {
-			for k, v := range initialCapacity {
+		currentCapacity := kl.containerManager.GetCapacity()
+		if currentCapacity != nil {
+			for k, v := range currentCapacity {
 				if v1helper.IsExtendedResourceName(k) {
+					glog.V(2).Infof("Update capacity for %s to %d", k, v.Value())
 					node.Status.Capacity[k] = v
+				}
+			}
+			// Remove stale extended resources.
+			for k := range node.Status.Capacity {
+				if v1helper.IsExtendedResourceName(k) {
+					if _, ok := currentCapacity[k]; !ok {
+						glog.V(2).Infof("delete capacity for %s", k)
+						delete(node.Status.Capacity, k)
+					}
 				}
 			}
 		}

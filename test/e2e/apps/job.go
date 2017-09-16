@@ -181,7 +181,7 @@ var _ = SIGDescribe("Job", func() {
 		Expect(err).NotTo(HaveOccurred())
 		By("Ensuring job exceed backofflimit")
 
-		err = framework.WaitForJobFailure(f.ClientSet, f.Namespace.Name, job.Name, time.Duration(30)*time.Second, "BackoffLimitExceeded")
+		err = framework.WaitForJobFailure(f.ClientSet, f.Namespace.Name, job.Name, framework.JobTimeout, "BackoffLimitExceeded")
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Checking that only one pod created and status is failed")

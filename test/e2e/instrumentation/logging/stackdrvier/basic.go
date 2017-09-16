@@ -44,7 +44,6 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 	})
 
 	ginkgo.It("should ingest logs", func() {
-
 		withLogProviderForScope(f, podsScope, func(p *sdLogProvider) {
 			ginkgo.By("Checking ingesting text logs", func() {
 				pod, err := utils.StartAndReturnSelf(utils.NewRepeatingLoggingPod("synthlogger-1", "hey"), f)
@@ -108,13 +107,17 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 				err = utils.WaitForLogs(c, ingestionInterval, ingestionTimeout)
 				framework.ExpectNoError(err)
 			})
+		})
+	})
 
+	ginkgo.It("should ingest logs [Feature:StackdriverLogging]", func() {
+		withLogProviderForScope(f, podsScope, func(p *sdLogProvider) {
 			ginkgo.By("Checking that too long lines are trimmed", func() {
 				originalLength := 100001
 				cmd := []string{
 					"/bin/sh",
 					"-c",
-					fmt.Sprintf("while :; do printf '%%*s' %d | tr ' ' 'A'; echo; sleep 1; done", originalLength),
+					fmt.Sprintf("while :; do printf '%%*s' %d | tr ' ' 'A'; echo; sleep 60; done", originalLength),
 				}
 				trimPrefix := "[Trimmed]"
 
@@ -174,7 +177,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 		})
 	})
 
-	ginkgo.It("should ingest system logs from all nodes", func() {
+	ginkgo.It("should ingest system logs from all nodes [Feature:StackdriverLogging]", func() {
 		withLogProviderForScope(f, systemScope, func(p *sdLogProvider) {
 			ginkgo.By("Waiting for some kubelet logs to be ingested from each node", func() {
 				nodeIds := utils.GetNodeIds(f.ClientSet)

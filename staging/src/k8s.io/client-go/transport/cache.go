@@ -63,16 +63,20 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		return http.DefaultTransport, nil
 	}
 
+	dial := config.Dial
+	if dial == nil {
+		dial = (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).Dial
+	}
 	// Cache a single transport for these options
 	c.transports[key] = utilnet.SetTransportDefaults(&http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
 		TLSHandshakeTimeout: 10 * time.Second,
 		TLSClientConfig:     tlsConfig,
 		MaxIdleConnsPerHost: idleConnsPerHost,
-		Dial: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).Dial,
+		Dial:                dial,
 	})
 	return c.transports[key], nil
 }

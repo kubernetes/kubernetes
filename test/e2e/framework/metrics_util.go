@@ -230,6 +230,7 @@ type APICall struct {
 	Resource    string        `json:"resource"`
 	Subresource string        `json:"subresource"`
 	Verb        string        `json:"verb"`
+	Scope       string        `json:"scope"`
 	Latency     LatencyMetric `json:"latency"`
 	Count       int           `json:"count"`
 }
@@ -261,14 +262,14 @@ func (a *APIResponsiveness) Less(i, j int) bool {
 // Set request latency for a particular quantile in the APICall metric entry (creating one if necessary).
 // 0 <= quantile <=1 (e.g. 0.95 is 95%tile, 0.5 is median)
 // Only 0.5, 0.9 and 0.99 quantiles are supported.
-func (a *APIResponsiveness) addMetricRequestLatency(resource, subresource, verb string, quantile float64, latency time.Duration) {
+func (a *APIResponsiveness) addMetricRequestLatency(resource, subresource, verb, scope string, quantile float64, latency time.Duration) {
 	for i, apicall := range a.APICalls {
-		if apicall.Resource == resource && apicall.Subresource == subresource && apicall.Verb == verb {
+		if apicall.Resource == resource && apicall.Subresource == subresource && apicall.Verb == verb && apicall.Scope == scope {
 			a.APICalls[i] = setQuantileAPICall(apicall, quantile, latency)
 			return
 		}
 	}
-	apicall := setQuantileAPICall(APICall{Resource: resource, Subresource: subresource, Verb: verb}, quantile, latency)
+	apicall := setQuantileAPICall(APICall{Resource: resource, Subresource: subresource, Verb: verb, Scope: scope}, quantile, latency)
 	a.APICalls = append(a.APICalls, apicall)
 }
 
@@ -292,14 +293,14 @@ func setQuantile(metric *LatencyMetric, quantile float64, latency time.Duration)
 }
 
 // Add request count to the APICall metric entry (creating one if necessary).
-func (a *APIResponsiveness) addMetricRequestCount(resource, subresource, verb string, count int) {
+func (a *APIResponsiveness) addMetricRequestCount(resource, subresource, verb, scope string, count int) {
 	for i, apicall := range a.APICalls {
-		if apicall.Resource == resource && apicall.Subresource == subresource && apicall.Verb == verb {
+		if apicall.Resource == resource && apicall.Subresource == subresource && apicall.Verb == verb && apicall.Scope == scope {
 			a.APICalls[i].Count += count
 			return
 		}
 	}
-	apicall := APICall{Resource: resource, Subresource: subresource, Verb: verb, Count: count}
+	apicall := APICall{Resource: resource, Subresource: subresource, Verb: verb, Count: count, Scope: scope}
 	a.APICalls = append(a.APICalls, apicall)
 }
 
@@ -332,6 +333,7 @@ func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 		resource := string(sample.Metric["resource"])
 		subresource := string(sample.Metric["subresource"])
 		verb := string(sample.Metric["verb"])
+		scope := string(sample.Metric["scope"])
 		if ignoredResources.Has(resource) || ignoredVerbs.Has(verb) {
 			continue
 		}
@@ -343,10 +345,10 @@ func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 			if err != nil {
 				return nil, err
 			}
-			a.addMetricRequestLatency(resource, subresource, verb, quantile, time.Duration(int64(latency))*time.Microsecond)
+			a.addMetricRequestLatency(resource, subresource, verb, scope, quantile, time.Duration(int64(latency))*time.Microsecond)
 		case "apiserver_request_count":
 			count := sample.Value
-			a.addMetricRequestCount(resource, subresource, verb, int(count))
+			a.addMetricRequestCount(resource, subresource, verb, scope, int(count))
 
 		}
 	}

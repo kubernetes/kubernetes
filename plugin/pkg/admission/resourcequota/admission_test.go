@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
@@ -340,6 +341,9 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 	decimatedActions := removeListWatch(kubeClient.Actions())
 	lastActionIndex := len(decimatedActions) - 1
 	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*api.ResourceQuota)
+
+	// Verify service usage. Since we don't add negative values, the api.ResourceServicesLoadBalancers
+	// will remain on last reported value
 	expectedUsage := api.ResourceQuota{
 		Status: api.ResourceQuotaStatus{
 			Hard: api.ResourceList{
@@ -349,7 +353,7 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 			},
 			Used: api.ResourceList{
 				api.ResourceServices:              resource.MustParse("1"),
-				api.ResourceServicesLoadBalancers: resource.MustParse("0"),
+				api.ResourceServicesLoadBalancers: resource.MustParse("1"),
 				api.ResourceServicesNodePorts:     resource.MustParse("1"),
 			},
 		},
@@ -362,6 +366,176 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 			t.Errorf("Usage Used: Key: %v, Expected: %v, Actual: %v", k, expectedValue, actualValue)
 		}
 	}
+}
+
+func TestAdmitHandlesNegativePVCUpdates(t *testing.T) {
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				api.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+			},
+			Used: api.ResourceList{
+				api.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				api.ResourceRequestsStorage:        resource.MustParse("10Gi"),
+			},
+		},
+	}
+
+	// start up quota system
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for LocalPersistentVolumes: %v", err)
+		return
+	}
+
+	defer func() {
+		utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=false")
+	}()
+
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	config := &resourcequotaapi.Configuration{}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+
+	handler := &quotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+
+	oldPVC := &api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "pvc-to-update", Namespace: "test", ResourceVersion: "1"},
+		Spec: api.PersistentVolumeClaimSpec{
+			Resources: getResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("10Gi")}, api.ResourceList{}),
+		},
+	}
+
+	newPVC := &api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "pvc-to-update", Namespace: "test"},
+		Spec: api.PersistentVolumeClaimSpec{
+			Resources: getResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("5Gi")}, api.ResourceList{}),
+		},
+	}
+
+	err = handler.Admit(admission.NewAttributesRecord(newPVC, oldPVC, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPVC.Namespace, newPVC.Name, api.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Update, nil))
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if len(kubeClient.Actions()) != 0 {
+		t.Errorf("No client action should be taken in case of negative updates")
+	}
+}
+
+func TestAdmitHandlesPVCUpdates(t *testing.T) {
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				api.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+			},
+			Used: api.ResourceList{
+				api.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				api.ResourceRequestsStorage:        resource.MustParse("10Gi"),
+			},
+		},
+	}
+
+	err := utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=true")
+	if err != nil {
+		t.Errorf("Failed to enable feature gate for LocalPersistentVolumes: %v", err)
+		return
+	}
+
+	defer func() {
+		utilfeature.DefaultFeatureGate.Set("ExpandPersistentVolumes=false")
+	}()
+
+	// start up quota system
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+	quotaAccessor, _ := newQuotaAccessor()
+	quotaAccessor.client = kubeClient
+	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
+	config := &resourcequotaapi.Configuration{}
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+
+	handler := &quotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	informerFactory.Core().InternalVersion().ResourceQuotas().Informer().GetIndexer().Add(resourceQuota)
+
+	oldPVC := &api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "pvc-to-update", Namespace: "test", ResourceVersion: "1"},
+		Spec: api.PersistentVolumeClaimSpec{
+			Resources: getResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("10Gi")}, api.ResourceList{}),
+		},
+	}
+
+	newPVC := &api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{Name: "pvc-to-update", Namespace: "test"},
+		Spec: api.PersistentVolumeClaimSpec{
+			Resources: getResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("15Gi")}, api.ResourceList{}),
+		},
+	}
+
+	err = handler.Admit(admission.NewAttributesRecord(newPVC, oldPVC, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPVC.Namespace, newPVC.Name, api.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Update, nil))
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if len(kubeClient.Actions()) == 0 {
+		t.Errorf("Expected a client action")
+	}
+
+	// the only action should have been to update the quota (since we should not have fetched the previous item)
+	expectedActionSet := sets.NewString(
+		strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+	)
+	actionSet := sets.NewString()
+	for _, action := range kubeClient.Actions() {
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
+	}
+	if !actionSet.HasAll(expectedActionSet.List()...) {
+		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
+	}
+
+	decimatedActions := removeListWatch(kubeClient.Actions())
+	lastActionIndex := len(decimatedActions) - 1
+	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*api.ResourceQuota)
+	expectedUsage := api.ResourceQuota{
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				api.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+			},
+			Used: api.ResourceList{
+				api.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				api.ResourceRequestsStorage:        resource.MustParse("15Gi"),
+			},
+		},
+	}
+	for k, v := range expectedUsage.Status.Used {
+		actual := usage.Status.Used[k]
+		actualValue := actual.String()
+		expectedValue := v.String()
+		if expectedValue != actualValue {
+			t.Errorf("Usage Used: Key: %v, Expected: %v, Actual: %v", k, expectedValue, actualValue)
+		}
+	}
+
 }
 
 // TestAdmitHandlesCreatingUpdates verifies that admit handles updates which behave as creates

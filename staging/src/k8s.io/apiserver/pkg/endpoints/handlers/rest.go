@@ -968,6 +968,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 					return
 				}
 
+				trace.Step("About to record audit event")
 				ae := request.AuditEventFrom(ctx)
 				audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 			} else {
@@ -982,6 +983,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		}
 
 		if admit != nil && admit.Handles(admission.Delete) {
+			trace.Step("About to check admission control")
 			userInfo, _ := request.UserFrom(ctx)
 
 			err = admit.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo))
