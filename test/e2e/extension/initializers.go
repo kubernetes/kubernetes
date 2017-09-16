@@ -214,7 +214,7 @@ var _ = framework.KubeDescribe("Initializers", func() {
 func newUninitializedPod(podName string) *v1.Pod {
 	pod := newPod(podName)
 	pod.Initializers = &metav1.Initializers{
-		Pending: []metav1.Initializer{{Name: "Test"}},
+		Pending: []metav1.Initializer{{Name: "test.k8s.io"}},
 	}
 	return pod
 }
