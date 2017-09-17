@@ -22,6 +22,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/golang/glog"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -58,6 +59,11 @@ var _ kubeapiserveradmission.WantsCloudConfig = &persistentVolumeLabel{}
 //
 // As a side effect, the cloud provider may block invalid or non-existent volumes.
 func NewPersistentVolumeLabel() *persistentVolumeLabel {
+	// DEPRECATED: cloud-controller-manager will now start NewPersistentVolumeLabelController
+	// which does exactly what this admission controller used to do. So once GCE and AWS can
+	// run externally, we can remove this admission controller.
+	glog.Warning("PersistentVolumeLabel admission controller is deprecated. " +
+		"Please remove this controller from your configuration files and scripts.")
 	return &persistentVolumeLabel{
 		Handler: admission.NewHandler(admission.Create),
 	}
