@@ -258,21 +258,23 @@ func (p *criStatsProvider) makeContainerStats(
 			result.Rootfs.InodesUsed = &stats.WritableLayer.InodesUsed.Value
 		}
 	}
-	storageID := stats.WritableLayer.StorageId
-	imageFsInfo, found := uuidToFsInfo[*storageID]
-	if !found {
-		imageFsInfo = p.getFsInfo(storageID)
-		uuidToFsInfo[*storageID] = imageFsInfo
-	}
-	if imageFsInfo != nil {
-		// The image filesystem UUID is unknown to the local node or there's an
-		// error on retrieving the stats. In these cases, we omit those stats
-		// and return the best-effort partial result. See
-		// https://github.com/kubernetes/heapster/issues/1793.
-		result.Rootfs.AvailableBytes = &imageFsInfo.Available
-		result.Rootfs.CapacityBytes = &imageFsInfo.Capacity
-		result.Rootfs.InodesFree = imageFsInfo.InodesFree
-		result.Rootfs.Inodes = imageFsInfo.Inodes
+	storageID := stats.GetWritableLayer().GetStorageId()
+	if storageID != nil {
+		imageFsInfo, found := uuidToFsInfo[*storageID]
+		if !found {
+			imageFsInfo = p.getFsInfo(storageID)
+			uuidToFsInfo[*storageID] = imageFsInfo
+		}
+		if imageFsInfo != nil {
+			// The image filesystem UUID is unknown to the local node or there's an
+			// error on retrieving the stats. In these cases, we omit those stats
+			// and return the best-effort partial result. See
+			// https://github.com/kubernetes/heapster/issues/1793.
+			result.Rootfs.AvailableBytes = &imageFsInfo.Available
+			result.Rootfs.CapacityBytes = &imageFsInfo.Capacity
+			result.Rootfs.InodesFree = imageFsInfo.InodesFree
+			result.Rootfs.Inodes = imageFsInfo.Inodes
+		}
 	}
 
 	return result

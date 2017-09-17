@@ -10,28 +10,31 @@ metadata:
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: metrics-server
+  name: metrics-server-v0.2.0
   namespace: kube-system
   labels:
     k8s-app: metrics-server
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
+    version: v0.2.0
 spec:
   selector:
     matchLabels:
       k8s-app: metrics-server
+      version: v0.2.0
   template:
     metadata:
       name: metrics-server
       labels:
         k8s-app: metrics-server
+        version: v0.2.0
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       serviceAccountName: metrics-server
       containers:
       - name: metrics-server
-        image: gcr.io/google_containers/metrics-server-amd64:dev
+        image: gcr.io/google_containers/metrics-server-amd64:v0.2.0
         imagePullPolicy: Always
         # TODO(piosz): revisit resources
         resources:

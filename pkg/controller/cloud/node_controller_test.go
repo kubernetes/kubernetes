@@ -227,7 +227,7 @@ func TestNodeDeleted(t *testing.T) {
 			Err:                nil,
 		},
 		nodeMonitorPeriod:         1 * time.Second,
-		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-controller-manager"}),
+		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 		nodeStatusUpdateFrequency: 1 * time.Second,
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -307,7 +307,7 @@ func TestNodeInitialized(t *testing.T) {
 		nodeInformer:              factory.Core().V1().Nodes(),
 		cloud:                     fakeCloud,
 		nodeMonitorPeriod:         1 * time.Second,
-		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-controller-manager"}),
+		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 		nodeStatusUpdateFrequency: 1 * time.Second,
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -378,7 +378,7 @@ func TestNodeIgnored(t *testing.T) {
 		nodeInformer:      factory.Core().V1().Nodes(),
 		cloud:             fakeCloud,
 		nodeMonitorPeriod: 5 * time.Second,
-		recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-controller-manager"}),
+		recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 
@@ -455,7 +455,7 @@ func TestGCECondition(t *testing.T) {
 		nodeInformer:      factory.Core().V1().Nodes(),
 		cloud:             fakeCloud,
 		nodeMonitorPeriod: 1 * time.Second,
-		recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-controller-manager"}),
+		recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 
@@ -551,7 +551,7 @@ func TestZoneInitialized(t *testing.T) {
 		nodeInformer:      factory.Core().V1().Nodes(),
 		cloud:             fakeCloud,
 		nodeMonitorPeriod: 5 * time.Second,
-		recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-controller-manager"}),
+		recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 
@@ -649,7 +649,7 @@ func TestNodeAddresses(t *testing.T) {
 		cloud:                     fakeCloud,
 		nodeMonitorPeriod:         5 * time.Second,
 		nodeStatusUpdateFrequency: 1 * time.Second,
-		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-controller-manager"}),
+		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 
@@ -769,7 +769,7 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 		cloud:                     fakeCloud,
 		nodeMonitorPeriod:         5 * time.Second,
 		nodeStatusUpdateFrequency: 1 * time.Second,
-		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-controller-manager"}),
+		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 
@@ -997,7 +997,7 @@ func TestNodeProviderID(t *testing.T) {
 		cloud:                     fakeCloud,
 		nodeMonitorPeriod:         5 * time.Second,
 		nodeStatusUpdateFrequency: 1 * time.Second,
-		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-controller-manager"}),
+		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 
@@ -1085,7 +1085,7 @@ func TestNodeProviderIDAlreadySet(t *testing.T) {
 		cloud:                     fakeCloud,
 		nodeMonitorPeriod:         5 * time.Second,
 		nodeStatusUpdateFrequency: 1 * time.Second,
-		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-controller-manager"}),
+		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
 	}
 	eventBroadcaster.StartLogging(glog.Infof)
 

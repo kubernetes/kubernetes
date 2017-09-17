@@ -158,6 +158,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		ContainerManager:    nil,
 		DockerClient:        dockerClient,
 		KubeClient:          nil,
+		HeartbeatClient:     nil,
 		ExternalKubeClient:  nil,
 		EventClient:         nil,
 		Mounter:             mounter,
@@ -319,11 +320,13 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		kubeDeps.KubeClient = nil
 		kubeDeps.ExternalKubeClient = nil
 		kubeDeps.EventClient = nil
+		kubeDeps.HeartbeatClient = nil
 		glog.Warningf("standalone mode, no API client")
-	} else if kubeDeps.KubeClient == nil || kubeDeps.ExternalKubeClient == nil || kubeDeps.EventClient == nil {
+	} else if kubeDeps.KubeClient == nil || kubeDeps.ExternalKubeClient == nil || kubeDeps.EventClient == nil || kubeDeps.HeartbeatClient == nil {
 		// initialize clients if not standalone mode and any of the clients are not provided
 		var kubeClient clientset.Interface
 		var eventClient v1core.EventsGetter
+		var heartbeatClient v1core.CoreV1Interface
 		var externalKubeClient clientgoclientset.Interface
 
 		clientConfig, err := CreateAPIServerClientConfig(s)
@@ -352,16 +355,24 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 			if err != nil {
 				glog.Warningf("New kubeClient from clientConfig error: %v", err)
 			}
+
 			// make a separate client for events
 			eventClientConfig := *clientConfig
 			eventClientConfig.QPS = float32(s.EventRecordQPS)
 			eventClientConfig.Burst = int(s.EventBurst)
-			tmpClient, err := clientgoclientset.NewForConfig(&eventClientConfig)
+			eventClient, err = v1core.NewForConfig(&eventClientConfig)
 			if err != nil {
 				glog.Warningf("Failed to create API Server client for Events: %v", err)
 			}
-			eventClient = tmpClient.CoreV1()
 
+			// make a separate client for heartbeat with throttling disabled and a timeout attached
+			heartbeatClientConfig := *clientConfig
+			heartbeatClientConfig.Timeout = s.KubeletConfiguration.NodeStatusUpdateFrequency.Duration
+			heartbeatClientConfig.QPS = float32(-1)
+			heartbeatClient, err = v1core.NewForConfig(&heartbeatClientConfig)
+			if err != nil {
+				glog.Warningf("Failed to create API Server client for heartbeat: %v", err)
+			}
 		} else {
 			switch {
 			case s.RequireKubeConfig:
@@ -373,6 +384,9 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 
 		kubeDeps.KubeClient = kubeClient
 		kubeDeps.ExternalKubeClient = externalKubeClient
+		if heartbeatClient != nil {
+			kubeDeps.HeartbeatClient = heartbeatClient
+		}
 		if eventClient != nil {
 			kubeDeps.EventClient = eventClient
 		}
