@@ -830,7 +830,7 @@ func (manager *GCEServiceManager) CreateRegionalDisk(
 			manager.gce.projectID, manager.gce.region, diskToCreateAlpha).Do()
 	}
 
-	return nil, fmt.Errorf("The regional PD feature is only available via the GCE Alpha API. Enable \"GCEDiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
+	return nil, fmt.Errorf("The regional PD feature is only available via the GCE Alpha API. Enable \"DiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
 }
 
 func (manager *GCEServiceManager) AttachDisk(
@@ -977,7 +977,7 @@ func (manager *GCEServiceManager) GetRegionalDisk(
 		}, nil
 	}
 
-	return nil, fmt.Errorf("The regional PD feature is only available via the GCE Alpha API. Enable \"GCEDiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
+	return nil, fmt.Errorf("The regional PD feature is only available via the GCE Alpha API. Enable \"DiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
 }
 
 func (manager *GCEServiceManager) DeleteDisk(
@@ -1000,7 +1000,7 @@ func (manager *GCEServiceManager) DeleteRegionalDisk(
 			manager.gce.projectID, manager.gce.region, diskName).Do()
 	}
 
-	return nil, fmt.Errorf("DeleteRegionalDisk is a regional PD feature and is only available via the GCE Alpha API. Enable \"GCEDiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
+	return nil, fmt.Errorf("DeleteRegionalDisk is a regional PD feature and is only available via the GCE Alpha API. Enable \"DiskAlphaAPI\" in the list of \"alpha-features\" in \"gce.conf\" to use the feature.")
 }
 
 func (manager *GCEServiceManager) WaitForZoneOp(
