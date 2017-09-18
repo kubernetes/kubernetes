@@ -41,7 +41,6 @@ import (
 )
 
 const (
-	syncPeriod                  = 1 * time.Hour
 	certificateManagerSubsystem = "certificate_manager"
 	certificateExpirationKey    = "expiration_seconds"
 )
