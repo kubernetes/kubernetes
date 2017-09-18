@@ -181,6 +181,8 @@ func newFakeServiceInfo(service proxy.ServicePortName, ip net.IP, port int, prot
 	return &serviceInfo{
 		sessionAffinityType:    api.ServiceAffinityNone,                        // default
 		stickyMaxAgeSeconds:    int(api.DefaultClientIPServiceAffinitySeconds), // default
+		sessionAffinityType:    api.ServiceAffinityNone, // default
+		stickyMaxAgeMinutes:    180,                     // TODO: parameterize this in the API.
 		clusterIP:              ip,
 		port:                   port,
 		protocol:               protocol,
