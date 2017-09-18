@@ -17,9 +17,11 @@
 
 : "${KUBE_ROOT?Must set KUBE_ROOT env var}"
 
-# Provides the $KUBERNETES_PROVIDER, kubeconfig-federation-context()
-# and detect-project function
+# Provides the kubeconfig-federation-context() function
 source "${KUBE_ROOT}/cluster/kube-util.sh"
+
+# For `kube::log::status` function
+source "${KUBE_ROOT}/cluster/lib/logging.sh"
 
 # kubefed configuration
 FEDERATION_NAME="${FEDERATION_NAME:-e2e-federation}"
@@ -64,8 +66,6 @@ function federation_cluster_contexts() {
   echo ${federation_contexts[@]:-}
 }
 
-
-source "${KUBE_ROOT}/cluster/common.sh"
 
 host_kubectl="${KUBE_ROOT}/cluster/kubectl.sh --namespace=${FEDERATION_NAMESPACE}"
 
