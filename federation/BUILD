@@ -37,7 +37,6 @@ pkg_tar(
     name = "release",
     files = glob([
         "deploy/**",
-        "manifests/**",
     ]) + ["//federation/cluster:all-srcs"],
     package_dir = "federation",
 )
