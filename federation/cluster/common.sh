@@ -52,7 +52,7 @@ function federation_cluster_contexts() {
   federation_contexts=()
   for context in ${contexts}; do
     # Skip federation context
-    if [[ "${context}" == "${FEDERATION_NAME}" ]]; then
+    if [[ "${context}" == "${FEDERATION_KUBE_CONTEXT}" ]]; then
       continue
     fi
     # Skip contexts not beginning with "federation"
@@ -61,7 +61,7 @@ function federation_cluster_contexts() {
     fi
     federation_contexts+=("${context}")
   done
-  echo ${federation_contexts[@]}
+  echo ${federation_contexts[@]:-}
 }
 
 
