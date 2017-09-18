@@ -24,6 +24,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -117,7 +119,7 @@ func (d *defaultCacheMutationDetector) CompareObjects() {
 	altered := false
 	for i, obj := range d.cachedObjs {
 		if !reflect.DeepEqual(obj.cached, obj.copied) {
-			fmt.Printf("CACHE %s[%d] ALTERED!\n%v\n", d.name, i, diff.ObjectDiff(obj.cached, obj.copied))
+			glog.Infof("CACHE %s[%d] ALTERED!\n%v\n", d.name, i, diff.ObjectDiff(obj.cached, obj.copied))
 			altered = true
 		}
 	}
