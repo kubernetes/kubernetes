@@ -252,8 +252,6 @@ type KubeletConfiguration struct {
 	SerializeImagePulls bool
 	// nodeLabels to add when registering the node in the cluster.
 	NodeLabels map[string]string
-	// enable gathering custom metrics.
-	EnableCustomMetrics bool
 	// Comma-delimited list of hard eviction expressions.  For example, 'memory.available<300Mi'.
 	// +optional
 	EvictionHard string
