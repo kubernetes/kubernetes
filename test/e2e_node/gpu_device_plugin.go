@@ -17,8 +17,8 @@ limitations under the License.
 package e2e_node
 
 import (
-	"fmt"
 	"os/exec"
+	"regexp"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -35,30 +35,31 @@ import (
 const (
 	devicePluginFeatureGate = "DevicePlugins=true"
 	testPodNamePrefix       = "nvidia-gpu-"
-	sleepTimeout            = 30
 )
 
 // Serial because the test restarts Kubelet
 var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("device-plugin-gpus-errors")
 
-	Context("", func() {
+	Context("DevicePlugin", func() {
+		By("Enabling support for Device Plugin")
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.FeatureGates += "," + devicePluginFeatureGate
+		})
+
 		BeforeEach(func() {
 			By("Ensuring that Nvidia GPUs exists on the node")
 			if !checkIfNvidiaGPUsExistOnNode() {
 				Skip("Nvidia GPUs do not exist on the node. Skipping test.")
 			}
 
-			By("Enabling support for Device Plugin")
-			tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-				initialConfig.FeatureGates += "," + devicePluginFeatureGate
-			})
-
 			By("Creating the Google Device Plugin pod for NVIDIA GPU in GKE")
 			f.PodClient().CreateSync(framework.NVIDIADevicePlugin(f.Namespace.Name))
 
 			By("Waiting for GPUs to become available on the local node")
-			Eventually(framework.NumberOfNVIDIAGPUs(getLocalNode(f)) != 0, time.Minute, time.Second).Should(BeTrue())
+			Eventually(func() bool {
+				return framework.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
+			}, 10*time.Second, time.Second).Should(BeTrue())
 
 			if framework.NumberOfNVIDIAGPUs(getLocalNode(f)) < 2 {
 				Skip("Not enough GPUs to execute this test (at least two needed)")
@@ -79,34 +80,26 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 		})
 
 		It("checks that when Kubelet restarts exclusive GPU assignation to pods is kept.", func() {
-			n := getLocalNode(f)
-
 			By("Creating one GPU pod on a node with at least two GPUs")
 			p1 := f.PodClient().CreateSync(makeCudaPauseImage())
-			cmd := fmt.Sprintf("exec %s %s nvidia-smi -L", n.Name, p1.Spec.Containers[0].Name)
-			uuid1, _ := framework.RunKubectl(cmd)
+			devId1 := getDeviceId(f, p1.Name, p1.Name, 1)
+			p1, err := f.PodClient().Get(p1.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
 
 			By("Restarting Kubelet and waiting for the current running pod to restart")
 			restartKubelet(f)
-			Eventually(func() bool {
-				p, err := f.PodClient().Get(p1.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
-
-				return p.Status.ContainerStatuses[0].RestartCount != p1.Status.ContainerStatuses[0].RestartCount
-			}, 2*sleepTimeout)
 
 			By("Confirming that after a kubelet and pod restart, GPU assignement is kept")
-			uuid1Restart, _ := framework.RunKubectl(cmd)
-			Expect(uuid1Restart).To(Equal(uuid1))
+			devIdRestart := getDeviceId(f, p1.Name, p1.Name, 2)
+			Expect(devIdRestart).To(Equal(devId1))
 
 			By("Restarting Kubelet and creating another pod")
 			restartKubelet(f)
 			p2 := f.PodClient().CreateSync(makeCudaPauseImage())
 
 			By("Checking that pods got a different GPU")
-			cmd = fmt.Sprintf("exec %s %s nvidia-smi -L", n.Name, p2.Spec.Containers[0].Name)
-			uuid2, _ := framework.RunKubectl(cmd)
-			Expect(uuid1).To(Not(Equal(uuid2)))
+			devId2 := getDeviceId(f, p2.Name, p2.Name, 1)
+			Expect(devId1).To(Not(Equal(devId2)))
 
 			// Cleanup
 			f.PodClient().DeleteSync(p1.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
@@ -123,9 +116,12 @@ func makeCudaPauseImage() *v1.Pod {
 		Spec: v1.PodSpec{
 			RestartPolicy: v1.RestartPolicyAlways,
 			Containers: []v1.Container{{
-				Name:    "cuda-pause",
-				Image:   "nvidia/cuda",
-				Command: []string{"sleep", string(sleepTimeout)},
+				Image: busyboxImage,
+				Name:  podName,
+				// Retrieves the gpu devices created in the user pod.
+				// Note the nvidia device plugin implementation doesn't do device id remapping currently.
+				// Will probably need to use nvidia-smi if that changes.
+				Command: []string{"sh", "-c", "devs=$(ls /dev/ | egrep '^nvidia[0-9]+$') && echo gpu devices: $devs"},
 
 				Resources: v1.ResourceRequirements{
 					Limits:   newDecimalResourceList(framework.NVIDIAGPUResourceName, 1),
@@ -142,23 +138,36 @@ func newDecimalResourceList(name v1.ResourceName, quantity int64) v1.ResourceLis
 
 // TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
 func restartKubelet(f *framework.Framework) {
-	stdout1, err1 := exec.Command("sudo", "systemctl", "restart", "kubelet").CombinedOutput()
-	if err1 == nil {
+	stdout, err := exec.Command("sudo", "systemctl", "list-units", "kubelet*", "--state=running").CombinedOutput()
+	framework.ExpectNoError(err)
+	regex := regexp.MustCompile("(kubelet-[0-9]+)")
+	matches := regex.FindStringSubmatch(string(stdout))
+	Expect(len(matches)).NotTo(BeZero())
+	kube := matches[0]
+	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kube)
+	stdout, err = exec.Command("sudo", "systemctl", "restart", kube).CombinedOutput()
+	if err == nil {
 		return
 	}
+	framework.Failf("Failed to restart kubelet with systemctl: %v, %v", err, stdout)
+}
 
-	stdout2, err2 := exec.Command("sudo", "/etc/init.d/kubelet", "restart").CombinedOutput()
-	if err2 == nil {
-		return
+func getDeviceId(f *framework.Framework, podName string, contName string, restartCount int32) string {
+	// Wait till pod has been restarted at least restartCount times.
+	Eventually(func() bool {
+		p, err := f.PodClient().Get(podName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		return p.Status.ContainerStatuses[0].RestartCount >= restartCount
+	}, time.Minute, time.Second).Should(BeTrue())
+	logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, contName)
+	if err != nil {
+		framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
 	}
-
-	stdout3, err3 := exec.Command("sudo", "service", "kubelet", "restart").CombinedOutput()
-	if err3 == nil {
-		return
+	framework.Logf("got pod logs: %v", logs)
+	regex := regexp.MustCompile("gpu devices: (nvidia[0-9]+)")
+	matches := regex.FindStringSubmatch(logs)
+	if len(matches) < 2 {
+		return ""
 	}
-
-	framework.Failf("Failed to trigger kubelet restart with systemctl/initctl/service operations:"+
-		"\nsystemclt: %v, %v"+
-		"\ninitctl:   %v, %v"+
-		"\nservice:   %v, %v", err1, stdout1, err2, stdout2, err3, stdout3)
+	return matches[1]
 }

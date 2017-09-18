@@ -5018,7 +5018,7 @@ func IsRetryableAPIError(err error) bool {
 }
 
 // DsFromManifest reads a .json/yaml file and returns the daemonset in it.
-func DsFromManifest(url string) *extensions.DaemonSet {
+func DsFromManifest(url string) (*extensions.DaemonSet, error) {
 	var controller extensions.DaemonSet
 	Logf("Parsing ds from %v", url)
 
@@ -5033,16 +5033,27 @@ func DsFromManifest(url string) *extensions.DaemonSet {
 		time.Sleep(time.Duration(i) * time.Second)
 	}
 
-	Expect(err).NotTo(HaveOccurred())
-	Expect(response.StatusCode).To(Equal(200))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get url: %v", err)
+	}
+	if response.StatusCode != 200 {
+		return nil, fmt.Errorf("invalid http response status: %v", response.StatusCode)
+	}
 	defer response.Body.Close()
 
 	data, err := ioutil.ReadAll(response.Body)
-	Expect(err).NotTo(HaveOccurred())
+	if err != nil {
+		return nil, fmt.Errorf("failed to read html response body: %v", err)
+	}
 
 	json, err := utilyaml.ToJSON(data)
-	Expect(err).NotTo(HaveOccurred())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse data to json: %v", err)
+	}
 
-	Expect(runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &controller)).NotTo(HaveOccurred())
-	return &controller
+	err = runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &controller)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode DaemonSet spec: %v", err)
+	}
+	return &controller, nil
 }
