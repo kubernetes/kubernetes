@@ -23,10 +23,10 @@ import (
 )
 
 // DockerService does not implement container stats.
-func (ds *dockerService) ContainerStats(*runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
+func (ds *dockerService) ContainerStats(string) (*runtimeapi.ContainerStats, error) {
 	return nil, fmt.Errorf("Not implemented")
 }
 
-func (ds *dockerService) ListContainerStats(*runtimeapi.ListContainerStatsRequest) (*runtimeapi.ListContainerStatsResponse, error) {
+func (ds *dockerService) ListContainerStats(*runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
 	return nil, fmt.Errorf("Not implemented")
 }

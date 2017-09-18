@@ -166,7 +166,7 @@ func (r *RemoteRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilte
 		Filter: filter,
 	})
 	if err != nil {
-		glog.Errorf("ListPodSandbox with filter %q from runtime service failed: %v", filter, err)
+		glog.Errorf("ListPodSandbox with filter %+v from runtime service failed: %v", filter, err)
 		return nil, err
 	}
 
@@ -259,7 +259,7 @@ func (r *RemoteRuntimeService) ListContainers(filter *runtimeapi.ContainerFilter
 		Filter: filter,
 	})
 	if err != nil {
-		glog.Errorf("ListContainers with filter %q from runtime service failed: %v", filter, err)
+		glog.Errorf("ListContainers with filter %+v from runtime service failed: %v", filter, err)
 		return nil, err
 	}
 
@@ -444,10 +444,35 @@ func (r *RemoteRuntimeService) Status() (*runtimeapi.RuntimeStatus, error) {
 	return resp.Status, nil
 }
 
-func (r *RemoteRuntimeService) ContainerStats(req *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
-	return nil, fmt.Errorf("Not implemented")
+// ContainerStats returns the stats of the container.
+func (r *RemoteRuntimeService) ContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	resp, err := r.runtimeClient.ContainerStats(ctx, &runtimeapi.ContainerStatsRequest{
+		ContainerId: containerID,
+	})
+	if err != nil {
+		glog.Errorf("ContainerStatus %q from runtime service failed: %v", containerID, err)
+		return nil, err
+	}
+
+	return resp.GetStats(), nil
 }
 
-func (r *RemoteRuntimeService) ListContainerStats(req *runtimeapi.ListContainerStatsRequest) (*runtimeapi.ListContainerStatsResponse, error) {
-	return nil, fmt.Errorf("Not implemented")
+func (r *RemoteRuntimeService) ListContainerStats(filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
+	// Do not set timeout, because writable layer stats collection takes time.
+	// TODO(random-liu): Should we assume runtime should cache the result, and set timeout here?
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+
+	resp, err := r.runtimeClient.ListContainerStats(ctx, &runtimeapi.ListContainerStatsRequest{
+		Filter: filter,
+	})
+	if err != nil {
+		glog.Errorf("ListContainerStats with filter %+v from runtime service failed: %v", filter, err)
+		return nil, err
+	}
+
+	return resp.GetStats(), nil
 }
