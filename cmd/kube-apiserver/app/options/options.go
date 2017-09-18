@@ -157,7 +157,8 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 		"If non-empty, use secure SSH proxy to the nodes, using this user name")
 
 	fs.StringVar(&s.SSHKeyfile, "ssh-keyfile", s.SSHKeyfile,
-		"If non-empty, use secure SSH proxy to the nodes, using this user keyfile")
+		"If non-empty, use secure SSH proxy to the nodes, using this user keyfile. If a pem-encoded public key with the suffix '.pub' "+
+			"is found, it will be automatically installed on all worker nodes if the cloud-provider supports it. If no public key exists, a key will be generated.")
 
 	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", s.MaxConnectionBytesPerSec, ""+
 		"If non-zero, throttle each user connection to this number of bytes/sec. "+

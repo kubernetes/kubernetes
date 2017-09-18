@@ -28,6 +28,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/ssh"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
 
@@ -43,8 +44,7 @@ type Tunneler interface {
 	Run(AddressFunc)
 	Stop()
 	Dial(net, addr string) (net.Conn, error)
-	SecondsSinceSync() int64
-	SecondsSinceSSHKeySync() int64
+	Healthy() error
 }
 
 // TunnelSyncHealthChecker returns a health func that indicates if a tunneler is healthy.
@@ -54,15 +54,7 @@ func TunnelSyncHealthChecker(tunneler Tunneler) func(req *http.Request) error {
 		if tunneler == nil {
 			return nil
 		}
-		lag := tunneler.SecondsSinceSync()
-		if lag > 600 {
-			return fmt.Errorf("Tunnel sync is taking too long: %d", lag)
-		}
-		sshKeyLag := tunneler.SecondsSinceSSHKeySync()
-		if sshKeyLag > 600 {
-			return fmt.Errorf("SSHKey sync is taking too long: %d", sshKeyLag)
-		}
-		return nil
+		return tunneler.Healthy()
 	}
 }
 
@@ -97,6 +89,11 @@ func New(sshUser, sshKeyfile string, healthCheckURL *url.URL, installSSHKey Inst
 
 // Run establishes tunnel loops and returns
 func (c *SSHTunneler) Run(getAddresses AddressFunc) {
+	prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		Name: "apiserver_proxy_tunnel_sync_latency_secs",
+		Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
+	}, func() float64 { return float64(c.secondsSinceSync()) })
+
 	if c.stopChan != nil {
 		return
 	}
@@ -147,13 +144,13 @@ func (c *SSHTunneler) Dial(net, addr string) (net.Conn, error) {
 	return c.tunnels.Dial(net, addr)
 }
 
-func (c *SSHTunneler) SecondsSinceSync() int64 {
+func (c *SSHTunneler) secondsSinceSync() int64 {
 	now := c.clock.Now().Unix()
 	then := atomic.LoadInt64(&c.lastSync)
 	return now - then
 }
 
-func (c *SSHTunneler) SecondsSinceSSHKeySync() int64 {
+func (c *SSHTunneler) secondsSinceSSHKeySync() int64 {
 	now := c.clock.Now().Unix()
 	then := atomic.LoadInt64(&c.lastSSHKeySync)
 	return now - then
@@ -162,7 +159,7 @@ func (c *SSHTunneler) SecondsSinceSSHKeySync() int64 {
 func (c *SSHTunneler) installSSHKeySyncLoop(user, publicKeyfile string) {
 	go wait.Until(func() {
 		if c.InstallSSHKey == nil {
-			glog.Error("Won't attempt to install ssh key: InstallSSHKey function is nil")
+			glog.Info("Won't attempt to install ssh key: InstallSSHKey function is nil")
 			return
 		}
 		key, err := ssh.ParsePublicKeyFromFile(publicKeyfile)
@@ -175,7 +172,7 @@ func (c *SSHTunneler) installSSHKeySyncLoop(user, publicKeyfile string) {
 			glog.Errorf("Failed to encode public key: %v", err)
 			return
 		}
-		if err := c.InstallSSHKey(user, keyData); err != nil {
+		if err := c.InstallSSHKey(user, keyData); err != nil && err != cloudprovider.NotImplemented {
 			glog.Errorf("Failed to install ssh key: %v", err)
 			return
 		}
@@ -196,6 +193,20 @@ func (c *SSHTunneler) nodesSyncLoop() {
 		c.tunnels.Update(addrs)
 		atomic.StoreInt64(&c.lastSync, c.clock.Now().Unix())
 	}, 15*time.Second, c.stopChan)
+}
+
+func (c *SSHTunneler) Healthy() error {
+	if lag := c.secondsSinceSync(); lag > 600 {
+		return fmt.Errorf("tunnel sync is taking too long: %d", lag)
+	}
+	if c.InstallSSHKey != nil {
+		sshKeyLag := c.secondsSinceSSHKeySync()
+		if sshKeyLag > 600 {
+			return fmt.Errorf("sshkey sync is taking too long: %d", sshKeyLag)
+		}
+	}
+
+	return nil
 }
 
 func generateSSHKey(privateKeyfile, publicKeyfile string) error {
