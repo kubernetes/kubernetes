@@ -25,6 +25,7 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 FEDERATION_NAME="${FEDERATION_NAME:-e2e-federation}"
 FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation-system}
 FEDERATION_KUBE_CONTEXT="${FEDERATION_KUBE_CONTEXT:-${FEDERATION_NAME}}"
+FEDERATION_USE_PV_FOR_ETCD=${FEDERATION_USE_PV_FOR_ETCD:-false}
 HOST_CLUSTER_ZONE="${FEDERATION_HOST_CLUSTER_ZONE:-}"
 # If $HOST_CLUSTER_ZONE isn't specified, arbitrarily choose
 # last zone as the host cluster zone.
