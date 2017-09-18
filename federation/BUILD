@@ -29,6 +29,8 @@ filegroup(
         "//federation/pkg/kubefed:all-srcs",
         "//federation/plugin/pkg/admission/schedulingpolicy:all-srcs",
         "//federation/registry/cluster:all-srcs",
+        "//federation/test/e2e:all-srcs",
+        "//federation/test/integration:all-srcs",
     ],
     tags = ["automanaged"],
 )
