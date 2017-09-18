@@ -30,7 +30,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -73,7 +72,10 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 		}
 	}
 
-	cfg.NodeName = node.GetHostname(cfg.NodeName)
+	cfg.NodeName, err = kubeadmutil.GetDefaultNodeName(cfg.NodeName)
+	if err != nil {
+		return fmt.Errorf("unable to find a default node name: %v", err)
+	}
 
 	return nil
 }

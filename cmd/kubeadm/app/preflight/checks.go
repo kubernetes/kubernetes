@@ -270,24 +270,17 @@ func (ipc InPathCheck) Check() (warnings, errors []error) {
 	return nil, nil
 }
 
-// HostnameCheck checks if hostname match dns sub domain regex.
-// If hostname doesn't match this regex, kubelet will not launch static pods like kube-apiserver/kube-controller-manager and so on.
-type HostnameCheck struct {
+// NodenameCheck checks if NodeName match dns sub domain regex.
+// If nodename doesn't match this regex, kubelet will not launch static pods like kube-apiserver/kube-controller-manager and so on.
+type NodenameCheck struct {
 	nodeName string
 }
 
-func (hc HostnameCheck) Check() (warnings, errors []error) {
+func (hc NodenameCheck) Check() (warnings, errors []error) {
 	errors = []error{}
 	warnings = []error{}
 	for _, msg := range validation.ValidateNodeName(hc.nodeName, false) {
-		errors = append(errors, fmt.Errorf("hostname \"%s\" %s", hc.nodeName, msg))
-	}
-	addr, err := net.LookupHost(hc.nodeName)
-	if addr == nil {
-		warnings = append(warnings, fmt.Errorf("hostname \"%s\" could not be reached", hc.nodeName))
-	}
-	if err != nil {
-		warnings = append(warnings, fmt.Errorf("hostname \"%s\" %s", hc.nodeName, err))
+		errors = append(errors, fmt.Errorf("node-name \"%s\" %s", hc.nodeName, msg))
 	}
 	return warnings, errors
 }
@@ -600,7 +593,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
 		SystemVerificationCheck{},
 		IsRootCheck{},
-		HostnameCheck{nodeName: cfg.NodeName},
+		NodenameCheck{nodeName: cfg.NodeName},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		ServiceCheck{Service: "docker", CheckIfActive: true},
 		FirewalldCheck{ports: []int{int(cfg.API.BindPort), 10250}},
@@ -664,7 +657,7 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 	checks := []Checker{
 		SystemVerificationCheck{},
 		IsRootCheck{},
-		HostnameCheck{cfg.NodeName},
+		NodenameCheck{cfg.NodeName},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		ServiceCheck{Service: "docker", CheckIfActive: true},
 		PortOpenCheck{port: 10250},

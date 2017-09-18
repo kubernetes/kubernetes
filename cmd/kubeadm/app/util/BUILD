@@ -12,12 +12,15 @@ go_library(
         "arguments.go",
         "endpoint.go",
         "error.go",
+        "node.go",
         "template.go",
         "version.go",
     ],
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
+        "//pkg/util/node:go_default_library",
+        "//vendor/github.com/coreos/go-systemd/util:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
     ],
 )

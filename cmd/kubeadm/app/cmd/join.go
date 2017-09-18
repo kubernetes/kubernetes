@@ -39,7 +39,6 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/pkg/api"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 var (
@@ -162,7 +161,11 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 	fmt.Println("[kubeadm] WARNING: kubeadm is in beta, please do not use it for production clusters.")
 
 	if cfg.NodeName == "" {
-		cfg.NodeName = nodeutil.GetHostname("")
+		var err error
+		cfg.NodeName, err = kubeadmutil.GetDefaultNodeName("")
+		if err != nil {
+			return nil, fmt.Errorf("unable to find a default node name, try explict --node-name [%v]", err)
+		}
 	}
 
 	if cfgPath != "" {
@@ -222,7 +225,7 @@ func (j *Join) Run(out io.Writer) error {
 	// Otherwise, just assume v1.8
 	// TODO: In the beginning of the v1.9 cycle, we can remove the logic as we then don't support v1.7 anymore
 	if err == nil && strings.HasPrefix(string(kubeletVersionBytes), "Kubernetes v1.7") {
-		hostname := nodeutil.GetHostname(j.cfg.NodeName)
+		hostname := j.cfg.NodeName
 		if err := kubeadmnode.PerformTLSBootstrap(cfg, hostname); err != nil {
 			return err
 		}
