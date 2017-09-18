@@ -63172,6 +63172,10 @@
    },
    "io.k8s.api.batch.v2alpha1.CronJob": {
     "description": "CronJob represents the configuration of a single cron job.",
+    "required": [
+     "metadata",
+     "spec"
+    ],
     "properties": {
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
