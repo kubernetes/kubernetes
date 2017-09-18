@@ -85,7 +85,7 @@ func (plugin *vsphereVolumePlugin) SupportsMountOption() bool {
 }
 
 func (plugin *vsphereVolumePlugin) SupportsBulkVolumeVerification() bool {
-	return false
+	return true
 }
 
 func (plugin *vsphereVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {

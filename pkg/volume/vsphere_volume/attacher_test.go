@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -308,7 +309,7 @@ func (testcase *testcase) DiskIsAttached(diskName string, nodeName types.NodeNam
 	return expected.isAttached, expected.ret
 }
 
-func (testcase *testcase) DisksAreAttached(diskNames []string, nodeName types.NodeName) (map[string]bool, error) {
+func (testcase *testcase) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) (map[k8stypes.NodeName]map[string]bool, error) {
 	return nil, errors.New("Not implemented")
 }
 
