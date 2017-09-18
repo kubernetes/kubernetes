@@ -206,9 +206,11 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 		glog.Errorf("Failed to dial device plugin with request %v: %v", r, err)
 		return
 	}
+
 	stream, err := e.list()
 	if err != nil {
 		glog.Errorf("Failed to List devices for plugin %v: %v", r.ResourceName, err)
+		e.stop()
 		return
 	}
 
@@ -219,12 +221,14 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 	m.endpoints[r.ResourceName] = e
 	m.mutex.Unlock()
 	glog.V(2).Infof("Registered endpoint %v", e)
+
 	if ok && old != nil {
 		old.stop()
 	}
 
 	go func() {
 		e.listAndWatch(stream)
+		e.stop()
 
 		m.mutex.Lock()
 		if old, ok := m.endpoints[r.ResourceName]; ok && old == e {
@@ -233,6 +237,7 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 			// Issues callback to delete all of devices.
 			e.callback(e.resourceName, []*pluginapi.Device{}, []*pluginapi.Device{}, e.getDevices())
 		}
+
 		glog.V(2).Infof("Unregistered endpoint %v", e)
 		m.mutex.Unlock()
 	}()
