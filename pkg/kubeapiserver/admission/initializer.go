@@ -188,9 +188,6 @@ func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 	}
 
 	if wants, ok := plugin.(WantsServiceResolver); ok {
-		if i.serviceResolver == nil {
-			panic("An admission plugin wants the service resolver, but it was not provided.")
-		}
 		wants.SetServiceResolver(i.serviceResolver)
 	}
 

@@ -97,6 +97,7 @@ func NewGenericAdmissionWebhook() (*GenericAdmissionWebhook, error) {
 		negotiatedSerializer: serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{
 			Serializer: api.Codecs.LegacyCodec(admissionv1alpha1.SchemeGroupVersion),
 		}),
+		serviceResolver: defaultServiceResolver{},
 	}, nil
 }
 
@@ -121,8 +122,12 @@ func (a *GenericAdmissionWebhook) SetProxyTransport(pt *http.Transport) {
 	a.proxyTransport = pt
 }
 
+// SetServiceResolver sets a service resolver for the webhook admission plugin.
+// Passing a nil resolver does not have an effect, instead a default one will be used.
 func (a *GenericAdmissionWebhook) SetServiceResolver(sr admissioninit.ServiceResolver) {
-	a.serviceResolver = sr
+	if sr != nil {
+		a.serviceResolver = sr
+	}
 }
 
 func (a *GenericAdmissionWebhook) SetClientCert(cert, key []byte) {
