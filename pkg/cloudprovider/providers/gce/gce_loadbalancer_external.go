@@ -487,8 +487,9 @@ func (gce *GCECloud) createTargetPool(name, serviceName, ipAddress, region strin
 			}
 		}
 		var err error
+		hcRequestPath, hcPort := hc.RequestPath, hc.Port
 		if hc, err = gce.ensureHttpHealthCheck(hc.Name, hc.RequestPath, int32(hc.Port)); err != nil || hc == nil {
-			return fmt.Errorf("Failed to ensure health check for %v port %d path %v: %v", name, hc.Port, hc.RequestPath, err)
+			return fmt.Errorf("Failed to ensure health check for %v port %d path %v: %v", name, hcPort, hcRequestPath, err)
 		}
 		hcLinks = append(hcLinks, hc.SelfLink)
 	}
