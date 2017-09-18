@@ -21,7 +21,9 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
+	"path/filepath"
 	"testing"
 )
 
@@ -178,4 +180,115 @@ func TestTarUntar(t *testing.T) {
 			t.Errorf("expected: %s, saw: %s", file.data, string(buff.Bytes()))
 		}
 	}
+}
+
+// TestCopyToLocalFileOrDir tests untarAll in two cases :
+// 1: copy pod file to local file
+// 2: copy pod file into local directory
+func TestCopyToLocalFileOrDir(t *testing.T) {
+	dir, err := ioutil.TempDir(os.TempDir(), "input")
+	dir2, err2 := ioutil.TempDir(os.TempDir(), "output")
+	if err != nil || err2 != nil {
+		t.Errorf("unexpected error: %v | %v", err, err2)
+		t.FailNow()
+	}
+	defer func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Errorf("Unexpected error cleaning up: %v", err)
+		}
+		if err := os.RemoveAll(dir2); err != nil {
+			t.Errorf("Unexpected error cleaning up: %v", err)
+		}
+	}()
+
+	files := []struct {
+		name          string
+		data          string
+		dest          string
+		destDirExists bool
+	}{
+		{
+			name:          "foo",
+			data:          "foobarbaz",
+			dest:          "path/to/dest",
+			destDirExists: false,
+		},
+		{
+			name:          "dir/blah",
+			data:          "bazblahfoo",
+			dest:          "dest/file/path",
+			destDirExists: true,
+		},
+	}
+
+	for _, file := range files {
+		func() {
+			// setup
+			srcFilePath := filepath.Join(dir, file.name)
+			destPath := filepath.Join(dir2, file.dest)
+			if err := os.MkdirAll(filepath.Dir(srcFilePath), 0755); err != nil {
+				t.Errorf("unexpected error: %v", err)
+				t.FailNow()
+			}
+			srcFile, err := os.Create(srcFilePath)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				t.FailNow()
+			}
+			defer srcFile.Close()
+
+			if _, err := io.Copy(srcFile, bytes.NewBuffer([]byte(file.data))); err != nil {
+				t.Errorf("unexpected error: %v", err)
+				t.FailNow()
+			}
+			if file.destDirExists {
+				if err := os.MkdirAll(destPath, 0755); err != nil {
+					t.Errorf("unexpected error: %v", err)
+					t.FailNow()
+				}
+			}
+
+			// start tests
+			srcTarFilePath := filepath.Join(dir, file.name+".tar")
+			// here use tar command to create tar file instead of calling makeTar func
+			// because makeTar func can not generate correct header name
+			err = exec.Command("tar", "cf", srcTarFilePath, srcFilePath).Run()
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				t.FailNow()
+			}
+			srcTarFile, err := os.Open(srcTarFilePath)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				t.FailNow()
+			}
+			defer srcTarFile.Close()
+
+			if err := untarAll(srcTarFile, destPath, getPrefix(srcFilePath)); err != nil {
+				t.Errorf("unexpected error: %v", err)
+				t.FailNow()
+			}
+
+			actualDestFilePath := destPath
+			if file.destDirExists {
+				actualDestFilePath = filepath.Join(destPath, filepath.Base(srcFilePath))
+			}
+			_, err = os.Stat(actualDestFilePath)
+			if err != nil && os.IsNotExist(err) {
+				t.Errorf("expecting %s exists, but actually it's missing", actualDestFilePath)
+			}
+			destFile, err := os.Open(actualDestFilePath)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				t.FailNow()
+			}
+			defer destFile.Close()
+			buff := &bytes.Buffer{}
+			io.Copy(buff, destFile)
+			if file.data != string(buff.Bytes()) {
+				t.Errorf("expected: %s, actual: %s", file.data, string(buff.Bytes()))
+			}
+		}()
+	}
+
 }
