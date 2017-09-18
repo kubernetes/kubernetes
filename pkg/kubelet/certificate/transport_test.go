@@ -22,6 +22,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -91,6 +92,7 @@ uC6Jo2eLcSV1sSdzTjaaWdM6XeYj6yHOAm8ZBIQs7m6V
 
 type fakeManager struct {
 	cert atomic.Value // Always a *tls.Certificate
+	cond *sync.Cond
 }
 
 func (f *fakeManager) SetCertificateSigningRequestClient(certificatesclient.CertificateSigningRequestInterface) error {
@@ -104,6 +106,11 @@ func (f *fakeManager) Current() *tls.Certificate {
 		return val.(*tls.Certificate)
 	}
 	return nil
+}
+
+// RotateCond returns manager's rotate condition variable.
+func (f *fakeManager) RotateCond() *sync.Cond {
+	return f.cond
 }
 
 func (f *fakeManager) setCurrent(cert *tls.Certificate) {
@@ -120,6 +127,7 @@ func TestRotateShutsDownConnections(t *testing.T) {
 
 	m := new(fakeManager)
 	m.setCurrent(client1CertData.certificate)
+	m.cond = sync.NewCond(&sync.Mutex{})
 
 	// The last certificate we've seen.
 	lastSeenLeafCert := new(atomic.Value) // Always *x509.Certificate
@@ -159,8 +167,7 @@ func TestRotateShutsDownConnections(t *testing.T) {
 		},
 	}
 
-	// Check for a new cert every 10 milliseconds
-	if err := updateTransport(stop, 10*time.Millisecond, c, m); err != nil {
+	if err := updateTransport(stop, c, m); err != nil {
 		t.Fatal(err)
 	}
 
@@ -177,6 +184,9 @@ func TestRotateShutsDownConnections(t *testing.T) {
 	// Change the manager's certificate. This should cause the client to shut down
 	// its connections to the server.
 	m.setCurrent(client2CertData.certificate)
+	m.cond.L.Lock()
+	m.cond.Signal()
+	m.cond.L.Unlock()
 
 	for i := 0; i < 5; i++ {
 		time.Sleep(time.Millisecond * 10)

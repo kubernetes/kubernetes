@@ -59,6 +59,8 @@ type Manager interface {
 	// certificate manager, as well as the associated certificate and key data
 	// in PEM format.
 	Current() *tls.Certificate
+	// RotateCond returns the certificate rotate condition variable.
+	RotateCond() *sync.Cond
 }
 
 // Config is the set of configuration parameters available for a new Manager.
@@ -104,6 +106,10 @@ type Config struct {
 	// initialized using a generic, multi-use cert/key pair which will be
 	// quickly replaced with a unique cert/key pair.
 	BootstrapKeyPEM []byte
+	// RotateCond is the condition variable used by kubelet client certificate manager.
+	// When client certificate rotates, notify the client transport to close all
+	// connections and reconnect with new ones.
+	RotateCond *sync.Cond
 }
 
 // Store is responsible for getting and updating the current certificate.
@@ -137,6 +143,7 @@ type manager struct {
 	rotationDeadline         time.Time
 	forceRotation            bool
 	certificateExpiration    prometheus.Gauge
+	cond                     *sync.Cond
 }
 
 // NewManager returns a new certificate manager. A certificate manager is
@@ -171,6 +178,7 @@ func NewManager(config *Config) (Manager, error) {
 		template:                 config.Template,
 		usages:                   config.Usages,
 		certStore:                config.CertificateStore,
+		cond:                     config.RotateCond,
 		cert:                     cert,
 		forceRotation:            forceRotation,
 		certificateExpiration:    certificateExpiration,
@@ -245,6 +253,11 @@ func (m *manager) Start() {
 	}, 0)
 }
 
+// RotateCond returns manager's rotate condition variable.
+func (m *manager) RotateCond() *sync.Cond {
+	return m.cond
+}
+
 func getCurrentCertificateOrBootstrap(
 	store Store,
 	bootstrapCertificatePEM []byte,
@@ -317,6 +330,14 @@ func (m *manager) rotateCerts() (bool, error) {
 	}
 
 	m.updateCached(cert)
+
+	// Only kubelet client certificate rotation needs notification.
+	if m.cond != nil {
+		m.cond.L.Lock()
+		m.cond.Signal()
+		m.cond.L.Unlock()
+	}
+
 	m.setRotationDeadline()
 	m.forceRotation = false
 	return true, nil
