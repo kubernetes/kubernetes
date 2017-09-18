@@ -142,6 +142,19 @@ items:
     - update
     - watch
   - apiGroups:
+    - policy
+    resources:
+    - poddisruptionbudgets
+    verbs:
+    - create
+    - delete
+    - deletecollection
+    - get
+    - list
+    - patch
+    - update
+    - watch
+  - apiGroups:
     - authorization.k8s.io
     resources:
     - localsubjectaccessreviews
@@ -313,6 +326,19 @@ items:
     - replicasets
     - replicasets/scale
     - replicationcontrollers/scale
+    verbs:
+    - create
+    - delete
+    - deletecollection
+    - get
+    - list
+    - patch
+    - update
+    - watch
+  - apiGroups:
+    - policy
+    resources:
+    - poddisruptionbudgets
     verbs:
     - create
     - delete
@@ -977,6 +1003,14 @@ items:
     - replicasets
     - replicasets/scale
     - replicationcontrollers/scale
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - policy
+    resources:
+    - poddisruptionbudgets
     verbs:
     - get
     - list
