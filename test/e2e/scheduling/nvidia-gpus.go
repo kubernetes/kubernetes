@@ -174,9 +174,10 @@ func testNvidiaGPUsOnCOS(f *framework.Framework) {
 	// GPU drivers might have already been installed.
 	if !areGPUsAvailableOnAllSchedulableNodes(f) {
 		// Install Nvidia Drivers.
-		ds := framework.DsFromManifest(dsYamlUrl)
+		ds, err := framework.DsFromManifest(dsYamlUrl)
+		Expect(err).NotTo(HaveOccurred())
 		ds.Namespace = f.Namespace.Name
-		_, err := f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).Create(ds)
+		_, err = f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).Create(ds)
 		framework.ExpectNoError(err, "failed to create daemonset")
 		framework.Logf("Successfully created daemonset to install Nvidia drivers. Waiting for drivers to be installed and GPUs to be available in Node Capacity...")
 		// Wait for Nvidia GPUs to be available on nodes
@@ -213,9 +214,10 @@ var _ = SIGDescribe("[Feature:GPUDevicePlugin]", func() {
 
 		// 2. Verifies that when the device plugin DaemonSet is removed, resource capacity drops to zero.
 		By("Deleting device plugin daemonset")
-		ds := framework.DsFromManifest(dsYamlUrl)
+		ds, err := framework.DsFromManifest(dsYamlUrl)
+		Expect(err).NotTo(HaveOccurred())
 		falseVar := false
-		err := f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).Delete(ds.Name, &metav1.DeleteOptions{OrphanDependents: &falseVar})
+		err = f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).Delete(ds.Name, &metav1.DeleteOptions{OrphanDependents: &falseVar})
 		framework.ExpectNoError(err, "failed to delete daemonset")
 		framework.Logf("Successfully deleted device plugin daemonset. Wait for resource to be removed.")
 		// Wait for Nvidia GPUs to be not available on nodes

@@ -20,6 +20,8 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+
+	. "github.com/onsi/gomega"
 )
 
 const (
@@ -49,7 +51,8 @@ func NumberOfNVIDIAGPUs(node *v1.Node) int64 {
 
 // NVIDIADevicePlugin returns the official Google Device Plugin pod for NVIDIA GPU in GKE
 func NVIDIADevicePlugin(ns string) *v1.Pod {
-	ds := DsFromManifest(GPUDevicePluginDSYAML)
+	ds, err := DsFromManifest(GPUDevicePluginDSYAML)
+	Expect(err).NotTo(HaveOccurred())
 	p := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "device-plugin-nvidia-gpu-" + string(uuid.NewUUID()),
@@ -58,9 +61,16 @@ func NVIDIADevicePlugin(ns string) *v1.Pod {
 
 		Spec: ds.Spec.Template.Spec,
 	}
-
 	// Remove NVIDIA drivers installation
 	p.Spec.InitContainers = []v1.Container{}
 
 	return p
+}
+
+func GetGPUDevicePluginImage() string {
+	ds, err := DsFromManifest(GPUDevicePluginDSYAML)
+	if err != nil || ds == nil || len(ds.Spec.Template.Spec.Containers) < 1 {
+		return ""
+	}
+	return ds.Spec.Template.Spec.Containers[0].Image
 }
