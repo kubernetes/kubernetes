@@ -29,21 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 )
 
-const (
-	DefaultRootDir = "/var/lib/kubelet"
-
-	AutoDetectCloudProvider = "auto-detect"
-
-	defaultIPTablesMasqueradeBit = 14
-	defaultIPTablesDropBit       = 15
-)
-
-var (
-	zeroDuration = metav1.Duration{}
-	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node-allocatable.md) doc for more information.
-	defaultNodeAllocatableEnforcement = []string{"pods"}
-)
-
 func addDefaultingFuncs(scheme *kruntime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
