@@ -1,15 +1,15 @@
 http_archive(
     name = "io_bazel_rules_go",
-    sha256 = "27a13726ff8621cfa4592fbef116b253043c2b093c8814265dc4489a0e67d229",
-    strip_prefix = "rules_go-82483596ec203eb9c1849937636f4cbed83733eb",
-    urls = ["https://github.com/bazelbuild/rules_go/archive/82483596ec203eb9c1849937636f4cbed83733eb.tar.gz"],
+    sha256 = "a4ea00b71a6fc3bd381cbbf6eb83ec91fe8b32b1c622c048f1e6f0d965bb1a2d",
+    strip_prefix = "rules_go-a280fbac1a0a4c67b0eee660b4fd1b3db7c9f058",
+    urls = ["https://github.com/bazelbuild/rules_go/archive/a280fbac1a0a4c67b0eee660b4fd1b3db7c9f058.tar.gz"],
 )
 
 http_archive(
     name = "io_kubernetes_build",
-    sha256 = "ca8fa1ee0928220d77fcaa6bcf40a26c57800c024e21b08c8dd9cc8fbf910236",
-    strip_prefix = "repo-infra-0aafaab9e158d3628804242c6a9c4dd3eb8bce1f",
-    urls = ["https://github.com/kubernetes/repo-infra/archive/0aafaab9e158d3628804242c6a9c4dd3eb8bce1f.tar.gz"],
+    sha256 = "8e49ac066fbaadd475bd63762caa90f81cd1880eba4cc25faa93355ef5fa2739",
+    strip_prefix = "repo-infra-e26fc85d14a1d3dc25569831acc06919673c545a",
+    urls = ["https://github.com/kubernetes/repo-infra/archive/e26fc85d14a1d3dc25569831acc06919673c545a.tar.gz"],
 )
 
 ETCD_VERSION = "3.1.10"
@@ -34,15 +34,21 @@ http_archive(
 
 http_archive(
     name = "io_bazel_rules_docker",
-    sha256 = "e86b8764fccc62dddf6e08382ba692b16479a2af478080b1ece4d9add8abbb9a",
-    strip_prefix = "rules_docker-28d492bc1dc1275e2c6ff74e51adc864e59ddc76",
-    urls = ["https://github.com/bazelbuild/rules_docker/archive/28d492bc1dc1275e2c6ff74e51adc864e59ddc76.tar.gz"],
+    sha256 = "c440717ee9b1b2f4a1e9bf5622539feb5aef9db83fc1fa1517818f13c041b0be",
+    strip_prefix = "rules_docker-8bbe2a8abd382641e65ff7127a3700a8530f02ce",
+    urls = ["https://github.com/bazelbuild/rules_docker/archive/8bbe2a8abd382641e65ff7127a3700a8530f02ce.tar.gz"],
 )
 
-load("@io_bazel_rules_go//go:def.bzl", "go_repositories")
+load("@io_kubernetes_build//defs:bazel_version.bzl", "check_version")
+
+check_version("0.6.0")
+
+load("@io_bazel_rules_go//go:def.bzl", "go_rules_dependencies", "go_register_toolchains")
 load("@io_bazel_rules_docker//docker:docker.bzl", "docker_repositories", "docker_pull")
 
-go_repositories(
+go_rules_dependencies()
+
+go_register_toolchains(
     go_version = "1.8.3",
 )
 
