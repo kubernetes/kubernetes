@@ -18,7 +18,7 @@ limitations under the License.
 // features before, during, and after different types of upgrades.
 package upgrades
 
-import fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
+import fedframework "k8s.io/kubernetes/federation/test/e2e/framework"
 
 // FederationUpgradeType represents different types of federation upgrades.
 type FederationUpgradeType int

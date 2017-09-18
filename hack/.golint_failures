@@ -59,6 +59,9 @@ federation/pkg/kubefed/testing
 federation/pkg/kubefed/util
 federation/registry/cluster
 federation/registry/cluster/etcd
+federation/test/e2e
+federation/test/e2e/framework
+federation/test/e2e/upgrades
 pkg/api/endpoints
 pkg/api/helper
 pkg/api/helper/qos
@@ -791,9 +794,6 @@ test/e2e/storage
 test/e2e/upgrades
 test/e2e/upgrades/apps
 test/e2e/upgrades/storage
-test/e2e_federation
-test/e2e_federation/framework
-test/e2e_federation/upgrades
 test/e2e_node
 test/e2e_node/builder
 test/e2e_node/environment

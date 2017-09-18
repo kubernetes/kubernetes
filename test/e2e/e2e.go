@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
+	federationtest "k8s.io/kubernetes/federation/test/e2e"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/kubectl/util/logs"
@@ -42,7 +43,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/manifest"
-	federationtest "k8s.io/kubernetes/test/e2e_federation"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
