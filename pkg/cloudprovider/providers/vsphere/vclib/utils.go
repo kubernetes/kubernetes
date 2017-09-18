@@ -22,6 +22,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/golang/glog"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/types"
@@ -129,4 +130,45 @@ func RemoveClusterFromVDiskPath(vDiskPath string) string {
 		vDiskPath = strings.Replace(vDiskPath, datastore, filepath.Base(datastore), 1)
 	}
 	return vDiskPath
+}
+
+// GetPathFromVMDiskPath retrieves the path from VM Disk Path.
+// Example: For vmDiskPath - [vsanDatastore] kubevols/volume.vmdk, the path is kubevols/volume.vmdk
+func GetPathFromVMDiskPath(vmDiskPath string) string {
+	datastorePathObj := new(object.DatastorePath)
+	isSuccess := datastorePathObj.FromString(vmDiskPath)
+	if !isSuccess {
+		glog.Errorf("Failed to parse vmDiskPath: %s", vmDiskPath)
+		return ""
+	}
+	return datastorePathObj.Path
+}
+
+// GetDatastoreFromVMDiskPath retrieves the path from VM Disk Path.
+// Example: For vmDiskPath - [vsanDatastore] kubevols/volume.vmdk, the path is vsanDatastore
+func GetDatastoreFromVMDiskPath(vmDiskPath string) string {
+	datastorePathObj := new(object.DatastorePath)
+	isSuccess := datastorePathObj.FromString(vmDiskPath)
+	if !isSuccess {
+		glog.Errorf("Failed to parse vmDiskPath: %s", vmDiskPath)
+		return ""
+	}
+	return datastorePathObj.Datastore
+}
+
+//GetDatastorePathObjFromVMDiskPath gets the datastorePathObj from VM disk path.
+func GetDatastorePathObjFromVMDiskPath(vmDiskPath string) (*object.DatastorePath, error) {
+	datastorePathObj := new(object.DatastorePath)
+	isSuccess := datastorePathObj.FromString(vmDiskPath)
+	if !isSuccess {
+		glog.Errorf("Failed to parse volPath: %s", vmDiskPath)
+		return nil, fmt.Errorf("Failed to parse volPath: %s", vmDiskPath)
+	}
+	return datastorePathObj, nil
+}
+
+//IsValidUUID checks if the string is a valid UUID.
+func IsValidUUID(uuid string) bool {
+	r := regexp.MustCompile("^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
+	return r.MatchString(uuid)
 }

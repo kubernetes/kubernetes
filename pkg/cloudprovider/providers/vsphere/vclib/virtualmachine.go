@@ -19,7 +19,6 @@ package vclib
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"time"
 
 	"github.com/golang/glog"
@@ -44,23 +43,6 @@ func (vm *VirtualMachine) IsDiskAttached(ctx context.Context, diskPath string) (
 		return true, nil
 	}
 	return false, nil
-}
-
-// GetVirtualDiskPage83Data gets the virtual disk UUID by diskPath
-func (vm *VirtualMachine) GetVirtualDiskPage83Data(ctx context.Context, diskPath string) (string, error) {
-	if len(diskPath) > 0 && filepath.Ext(diskPath) != ".vmdk" {
-		diskPath += ".vmdk"
-	}
-	vdm := object.NewVirtualDiskManager(vm.Client())
-	// Returns uuid of vmdk virtual disk
-	diskUUID, err := vdm.QueryVirtualDiskUuid(ctx, diskPath, vm.Datacenter.Datacenter)
-
-	if err != nil {
-		glog.Errorf("QueryVirtualDiskUuid failed for diskPath: %q on VM: %q. err: %+v", diskPath, vm.InventoryPath, err)
-		return "", ErrNoDiskUUIDFound
-	}
-	diskUUID = formatVirtualDiskUUID(diskUUID)
-	return diskUUID, nil
 }
 
 // DeleteVM deletes the VM.
@@ -89,7 +71,7 @@ func (vm *VirtualMachine) AttachDisk(ctx context.Context, vmDiskPath string, vol
 	}
 	// If disk is already attached, return the disk UUID
 	if attached {
-		diskUUID, _ := vm.GetVirtualDiskPage83Data(ctx, vmDiskPath)
+		diskUUID, _ := vm.Datacenter.GetVirtualDiskPage83Data(ctx, vmDiskPath)
 		return diskUUID, nil
 	}
 
@@ -143,7 +125,7 @@ func (vm *VirtualMachine) AttachDisk(ctx context.Context, vmDiskPath string, vol
 	}
 
 	// Once disk is attached, get the disk UUID.
-	diskUUID, err := vm.GetVirtualDiskPage83Data(ctx, vmDiskPath)
+	diskUUID, err := vm.Datacenter.GetVirtualDiskPage83Data(ctx, vmDiskPath)
 	if err != nil {
 		glog.Errorf("Error occurred while getting Disk Info from VM: %q. err: %v", vm.InventoryPath, err)
 		vm.DetachDisk(ctx, vmDiskPath)
@@ -285,6 +267,25 @@ func (vm *VirtualMachine) CreateDiskSpec(ctx context.Context, diskPath string, d
 	return disk, newSCSIController, nil
 }
 
+// GetVirtualDiskPath gets the first available virtual disk devicePath from the VM
+func (vm *VirtualMachine) GetVirtualDiskPath(ctx context.Context) (string, error) {
+	vmDevices, err := vm.Device(ctx)
+	if err != nil {
+		glog.Errorf("Failed to get the devices for VM: %q. err: %+v", vm.InventoryPath, err)
+		return "", err
+	}
+	// filter vm devices to retrieve device for the given vmdk file identified by disk path
+	for _, device := range vmDevices {
+		if vmDevices.TypeName(device) == "VirtualDisk" {
+			virtualDevice := device.GetVirtualDevice()
+			if backing, ok := virtualDevice.Backing.(*types.VirtualDiskFlatVer2BackingInfo); ok {
+				return backing.FileName, nil
+			}
+		}
+	}
+	return "", nil
+}
+
 // createAndAttachSCSIController creates and attachs the SCSI controller to the VM.
 func (vm *VirtualMachine) createAndAttachSCSIController(ctx context.Context, diskControllerType string) (types.BaseVirtualDevice, error) {
 	// Get VM device list
@@ -322,15 +323,9 @@ func (vm *VirtualMachine) createAndAttachSCSIController(ctx context.Context, dis
 
 // getVirtualDeviceByPath gets the virtual device by path
 func (vm *VirtualMachine) getVirtualDeviceByPath(ctx context.Context, diskPath string) (types.BaseVirtualDevice, error) {
-	var diskUUID string
 	vmDevices, err := vm.Device(ctx)
 	if err != nil {
 		glog.Errorf("Failed to get the devices for VM: %q. err: %+v", vm.InventoryPath, err)
-		return nil, err
-	}
-	volumeUUID, err := vm.GetVirtualDiskPage83Data(ctx, diskPath)
-	if err != nil {
-		glog.Errorf("Failed to get disk UUID for path: %q on VM: %q. err: %+v", diskPath, vm.InventoryPath, err)
 		return nil, err
 	}
 	// filter vm devices to retrieve device for the given vmdk file identified by disk path
@@ -338,8 +333,7 @@ func (vm *VirtualMachine) getVirtualDeviceByPath(ctx context.Context, diskPath s
 		if vmDevices.TypeName(device) == "VirtualDisk" {
 			virtualDevice := device.GetVirtualDevice()
 			if backing, ok := virtualDevice.Backing.(*types.VirtualDiskFlatVer2BackingInfo); ok {
-				diskUUID = formatVirtualDiskUUID(backing.Uuid)
-				if diskUUID == volumeUUID {
+				if backing.FileName == diskPath {
 					return device, nil
 				}
 			}

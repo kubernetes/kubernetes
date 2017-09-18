@@ -35,7 +35,7 @@ type virtualDiskManager struct {
 
 // Create implements Disk's Create interface
 // Contains implementation of virtualDiskManager based Provisioning
-func (diskManager virtualDiskManager) Create(ctx context.Context, datastore *vclib.Datastore) (err error) {
+func (diskManager virtualDiskManager) Create(ctx context.Context, datastore *vclib.Datastore) (canonicalDiskPath string, err error) {
 	if diskManager.volumeOptions.SCSIControllerType == "" {
 		diskManager.volumeOptions.SCSIControllerType = vclib.LSILogicControllerType
 	}
@@ -57,15 +57,16 @@ func (diskManager virtualDiskManager) Create(ctx context.Context, datastore *vcl
 	if err != nil {
 		vclib.RecordvSphereMetric(vclib.APICreateVolume, requestTime, err)
 		glog.Errorf("Failed to create virtual disk: %s. err: %+v", diskManager.diskPath, err)
-		return err
+		return "", err
 	}
-	err = task.Wait(ctx)
+	taskInfo, err := task.WaitForResult(ctx, nil)
 	vclib.RecordvSphereMetric(vclib.APICreateVolume, requestTime, err)
 	if err != nil {
-		glog.Errorf("Failed to create virtual disk: %s. err: %+v", diskManager.diskPath, err)
-		return err
+		glog.Errorf("Failed to complete virtual disk creation: %s. err: %+v", diskManager.diskPath, err)
+		return "", err
 	}
-	return nil
+	canonicalDiskPath = taskInfo.Result.(string)
+	return canonicalDiskPath, nil
 }
 
 // Delete implements Disk's Delete interface
