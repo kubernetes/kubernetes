@@ -75,7 +75,8 @@ func NewServerRunOptions() *ServerRunOptions {
 }
 
 // AddFlags adds flags for ServerRunOptions fields to be specified via FlagSet.
-func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
+func (s *ServerRunOptions) AddFlags(untypedfs interface{}) {
+	fs := untypedfs.(*pflag.FlagSet)
 	// Add the generic flags.
 	s.GenericServerRunOptions.AddUniversalFlags(fs)
 	s.Etcd.AddFlags(fs)

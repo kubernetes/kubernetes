@@ -69,7 +69,7 @@ const (
 )
 
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
-func NewControllerManagerCommand() *cobra.Command {
+func NewControllerManagerCommand() interface{} {
 	s := options.NewCMServer()
 	s.AddFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
