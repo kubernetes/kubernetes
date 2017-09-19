@@ -825,7 +825,7 @@ func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeou
 		}
 		// log now so that current pod info is reported before calling `condition()`
 		Logf("Pod %q: Phase=%q, Reason=%q, readiness=%t. Elapsed: %v",
-			podName, pod.Status.Phase, pod.Status.Reason, testutil.PodReady(pod), time.Since(start))
+			podName, pod.Status.Phase, pod.Status.Reason, podutil.IsPodReady(pod), time.Since(start))
 		if done, err := condition(pod); done {
 			if err == nil {
 				Logf("Pod %q satisfied condition %q", podName, desc)
