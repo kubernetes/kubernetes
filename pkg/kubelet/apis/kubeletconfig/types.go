@@ -353,7 +353,7 @@ type KubeletConfiguration struct {
 	SystemReserved ConfigurationMap
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
 	// that describe resources reserved for kubernetes system components.
-	// Currently cpu, memory and local storage for root file system are supported. [default=none]
+	// Currently cpu, memory and local ephemeral storage for root file system are supported. [default=none]
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	KubeReserved ConfigurationMap
 	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.
