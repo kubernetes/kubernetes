@@ -37,6 +37,8 @@ type staticPolicyTest struct {
 	expErr          error
 	expCPUAlloc     bool
 	expCSet         cpuset.CPUSet
+	keepPrevPolicy  bool
+	keepPrevState   bool
 }
 
 func TestStaticPolicyName(t *testing.T) {
@@ -432,6 +434,86 @@ func TestStaticPolicyRemove(t *testing.T) {
 		if _, found := st.assignments[testCase.containerID]; found {
 			t.Errorf("StaticPolicy RemoveContainer() error (%v). expected containerID %v not be in assignments %v",
 				testCase.description, testCase.containerID, st.assignments)
+		}
+	}
+}
+
+func TestStaticPolicyMultipleAdd(t *testing.T) {
+	testCases := []staticPolicyTest{
+		{
+			description:     "GuPodSingleCore, SingleSocketHT, Add",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 1,
+			containerID:     "fakeID2",
+			stAssignments:   map[string]cpuset.CPUSet{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
+			pod:             makePod("3000m", "3000m"),
+			expCPUAlloc:     true,
+			expCSet:         cpuset.NewCPUSet(1, 4, 5),
+		},
+		{
+			description:     "GuPodSingleCore, SingleSocketHT, AddAgainTheSameContainer",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 1,
+			containerID:     "fakeID2",
+			stAssignments:   map[string]cpuset.CPUSet{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
+			pod:             makePod("3000m", "3000m"),
+			expCPUAlloc:     true,
+			expCSet:         cpuset.NewCPUSet(1, 4, 5),
+			keepPrevPolicy:  true,
+			keepPrevState:   true,
+		},
+	}
+
+	var policy Policy
+	var st *mockState
+
+	for _, testCase := range testCases {
+
+		if !testCase.keepPrevPolicy {
+			policy = NewStaticPolicy(testCase.topo, testCase.numReservedCPUs)
+		}
+
+		if !testCase.keepPrevState {
+			st = &mockState{
+				assignments:   testCase.stAssignments,
+				defaultCPUSet: testCase.stDefaultCPUSet,
+			}
+		}
+
+		container := &testCase.pod.Spec.Containers[0]
+		err := policy.AddContainer(st, testCase.pod, container, testCase.containerID)
+
+		if !reflect.DeepEqual(err, testCase.expErr) {
+			t.Errorf("StaticPolicy AddContainer() error (%v). expected add error: %v but got: %v",
+				testCase.description, testCase.expErr, err)
+		}
+
+		if testCase.expCPUAlloc {
+			cset, found := st.assignments[testCase.containerID]
+			if !found {
+				t.Errorf("StaticPolicy AddContainer() error (%v). expected container id %v to be present in assignments %v",
+					testCase.description, testCase.containerID, st.assignments)
+			}
+
+			if !reflect.DeepEqual(cset, testCase.expCSet) {
+				t.Errorf("StaticPolicy AddContainer() error (%v). expected cpuset %v but got %v",
+					testCase.description, testCase.expCSet, cset)
+			}
+
+			if !cset.Intersection(st.defaultCPUSet).IsEmpty() {
+				t.Errorf("StaticPolicy AddContainer() error (%v). expected cpuset %v to be disoint from the shared cpuset %v",
+					testCase.description, cset, st.defaultCPUSet)
+			}
+		}
+
+		if !testCase.expCPUAlloc {
+			_, found := st.assignments[testCase.containerID]
+			if found {
+				t.Errorf("StaticPolicy AddContainer() error (%v). Did not expect container id %v to be present in assignments %v",
+					testCase.description, testCase.containerID, st.assignments)
+			}
 		}
 	}
 }
