@@ -97,7 +97,3 @@ func TestOpenAPIDelegationChainPlumbing(t *testing.T) {
 		t.Errorf("missing path: %q", registrationPrefix)
 	}
 }
-
-func TestBazelFails(t *testing.T) {
-	t.Error("expecting this to fail")
-}
