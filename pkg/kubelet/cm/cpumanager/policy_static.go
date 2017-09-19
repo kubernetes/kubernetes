@@ -123,6 +123,12 @@ func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Co
 	glog.Infof("[cpumanager] static policy: AddContainer (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
 	if numCPUs := guaranteedCPUs(pod, container); numCPUs != 0 {
 		// container belongs in an exclusively allocated pool
+
+		if _, ok := s.GetCPUSet(containerID); ok {
+			glog.Infof("[cpumanager] static policy: container: %s, container id: %s already present in state, skipping", container.Name, containerID)
+			return nil
+		}
+
 		cpuset, err := p.allocateCPUs(s, numCPUs)
 		if err != nil {
 			glog.Errorf("[cpumanager] unable to allocate %d CPUs (container id: %s, error: %v)", numCPUs, containerID, err)

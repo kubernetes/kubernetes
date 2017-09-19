@@ -228,6 +228,12 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 				continue
 			}
 
+			// Check whether container is present in state, there may be 2 reasons why it's not present
+			// either container is Be/Bu or kubelet just restarted
+			if _, ok := m.state.GetCPUSet(containerID); !ok {
+				m.AddContainer(pod, &container, containerID)
+			}
+
 			cset := m.state.GetCPUSetOrDefault(containerID)
 			if cset.IsEmpty() {
 				// NOTE: This should not happen outside of tests.
