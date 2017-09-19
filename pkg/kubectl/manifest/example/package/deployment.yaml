@@ -1,0 +1,21 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: mungebot
+  labels:
+    app: mungebot
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: mungebot
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        env:
+        - name: foo
+          value: bar
+        ports:
+        - containerPort: 80

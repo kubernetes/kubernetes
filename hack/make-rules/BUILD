@@ -103,7 +103,7 @@ sh_library(
     srcs = [
         "test-cmd-util.sh",
     ],
-    data = ["//pkg/kubectl/validation:testdata/v1/validPod.yaml"],
+    data = ["//pkg/kubectl/manifest:testdata"],
 )
 
 filegroup(
