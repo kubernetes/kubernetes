@@ -430,7 +430,7 @@ func (c *sioClient) WaitForAttachedDevice(token string) (string, error) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	timer := time.NewTimer(30 * time.Second)
-	defer ticker.Stop()
+	defer timer.Stop()
 
 	for {
 		select {
@@ -464,7 +464,7 @@ func (c *sioClient) WaitForDetachedDevice(token string) error {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	timer := time.NewTimer(30 * time.Second)
-	defer ticker.Stop()
+	defer timer.Stop()
 
 	for {
 		select {
