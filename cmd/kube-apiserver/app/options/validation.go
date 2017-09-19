@@ -23,12 +23,11 @@ import (
 // TODO: Longer term we should read this from some config store, rather than a flag.
 func validateClusterIPFlags(options *ServerRunOptions) []error {
 	errors := []error{}
-	if options.ServiceClusterIPRange.IP == nil {
-		errors = append(errors, fmt.Errorf("no --service-cluster-ip-range specified"))
-	}
-	var ones, bits = options.ServiceClusterIPRange.Mask.Size()
-	if bits-ones > 20 {
-		errors = append(errors, fmt.Errorf("specified --service-cluster-ip-range is too large"))
+	if options.ServiceClusterIPRange.IP != nil {
+		var ones, bits = options.ServiceClusterIPRange.Mask.Size()
+		if bits-ones > 20 {
+			errors = append(errors, fmt.Errorf("specified --service-cluster-ip-range is too large"))
+		}
 	}
 	return errors
 }
