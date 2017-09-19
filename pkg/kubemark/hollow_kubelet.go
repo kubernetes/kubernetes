@@ -145,7 +145,6 @@ func GetHollowKubeletConfig(
 	c.CPUCFSQuota = true
 	c.RuntimeCgroups = ""
 	c.EnableControllerAttachDetach = false
-	c.EnableCustomMetrics = false
 	c.EnableDebuggingHandlers = true
 	c.EnableServer = true
 	c.CgroupsPerQOS = false

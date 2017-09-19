@@ -358,7 +358,6 @@ func AddKubeletConfigFlags(fs *pflag.FlagSet, c *kubeletconfig.KubeletConfigurat
 	fs.Int32Var(&c.KubeAPIBurst, "kube-api-burst", c.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.BoolVar(&c.SerializeImagePulls, "serialize-image-pulls", c.SerializeImagePulls, "Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details.")
 
-	fs.BoolVar(&c.EnableCustomMetrics, "enable-custom-metrics", c.EnableCustomMetrics, "Support for gathering custom metrics.")
 	fs.StringVar(&c.RuntimeCgroups, "runtime-cgroups", c.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
 	fs.StringVar(&c.EvictionHard, "eviction-hard", c.EvictionHard, "A set of eviction thresholds (e.g. memory.available<1Gi) that if met would trigger a pod eviction.")
 	fs.StringVar(&c.EvictionSoft, "eviction-soft", c.EvictionSoft, "A set of eviction thresholds (e.g. memory.available<1.5Gi) that if met over a corresponding grace period would trigger a pod eviction.")
