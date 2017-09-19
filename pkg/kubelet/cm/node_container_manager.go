@@ -55,7 +55,7 @@ func (cm *containerManagerImpl) createNodeAllocatableCgroups() error {
 	return nil
 }
 
-// Enforce Node Allocatable Cgroup settings.
+// enforceNodeAllocatableCgroups enforce Node Allocatable Cgroup settings.
 func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	nc := cm.NodeConfig.NodeAllocatableConfig
 
@@ -139,7 +139,7 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName string, rl v1.Reso
 	return nil
 }
 
-// Returns a ResourceConfig object that can be used to create or update cgroups via CgroupManager interface.
+// getCgroupConfig returns a ResourceConfig object that can be used to create or update cgroups via CgroupManager interface.
 func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
 	// TODO(vishh): Set CPU Quota if necessary.
 	if rl == nil {
@@ -186,7 +186,7 @@ func (cm *containerManagerImpl) getNodeAllocatableAbsolute() v1.ResourceList {
 
 }
 
-// GetNodeAllocatable returns amount of compute or storage resource that have to be reserved on this node from scheduling.
+// GetNodeAllocatableReservation returns amount of compute or storage resource that have to be reserved on this node from scheduling.
 func (cm *containerManagerImpl) GetNodeAllocatableReservation() v1.ResourceList {
 	evictionReservation := hardEvictionReservation(cm.HardEvictionThresholds, cm.capacity)
 	result := make(v1.ResourceList)

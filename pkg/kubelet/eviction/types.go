@@ -72,7 +72,7 @@ type DiskInfoProvider interface {
 type CapacityProvider interface {
 	// GetCapacity returns the amount of compute resources tracked by container manager available on the node.
 	GetCapacity() v1.ResourceList
-	// GetNodeAllocatable returns the amount of compute resources that have to be reserved from scheduling.
+	// GetNodeAllocatableReservation returns the amount of compute resources that have to be reserved from scheduling.
 	GetNodeAllocatableReservation() v1.ResourceList
 }
 
