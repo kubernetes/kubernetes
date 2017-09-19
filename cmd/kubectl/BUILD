@@ -19,9 +19,7 @@ go_binary(
         ],
     }),
     library = ":go_default_library",
-    visibility = [
-        "//build/visible_to:COMMON_release",
-    ],
+    visibility = ["//visibility:public"],
     x_defs = version_x_defs(),
 )
 
