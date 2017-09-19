@@ -520,6 +520,22 @@ func TestValidateCronJob(t *testing.T) {
 				},
 			},
 		},
+		"metadata.name: must be no more than 52 characters": {
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "10000000002000000000300000000040000000005000000000123",
+				Namespace: metav1.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.CronJobSpec{
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
 		"spec.jobTemplate.spec.manualSelector: Unsupported value": {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "mycronjob",
