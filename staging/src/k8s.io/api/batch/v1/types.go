@@ -107,7 +107,7 @@ type JobSpec struct {
 	// and other jobs to not function correctly.  However, You may see
 	// `manualSelector=true` in jobs that were created with the old `extensions/v1beta1`
 	// API.
-	// More info: https://git.k8s.io/community/contributors/design-proposals/selector-generation.md
+	// More info: https://git.k8s.io/community/contributors/design-proposals/apps/selector-generation.md
 	// +optional
 	ManualSelector *bool `json:"manualSelector,omitempty" protobuf:"varint,5,opt,name=manualSelector"`
 
