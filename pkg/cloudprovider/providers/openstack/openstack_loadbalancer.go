@@ -536,7 +536,17 @@ func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *v1.Service) (
 	}
 
 	status := &v1.LoadBalancerStatus{}
-	status.Ingress = []v1.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
+
+	portID := loadbalancer.VipPortID
+	if portID != "" {
+		floatIP, err := getFloatingIPByPortID(lbaas.network, portID)
+		if err != nil {
+			return nil, false, fmt.Errorf("Error getting floating ip for port %s: %v", portID, err)
+		}
+		status.Ingress = []v1.LoadBalancerIngress{{IP: floatIP.FloatingIP}}
+	} else {
+		status.Ingress = []v1.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
+	}
 
 	return status, true, err
 }
@@ -1287,7 +1297,16 @@ func (lb *LbaasV1) GetLoadBalancer(clusterName string, service *v1.Service) (*v1
 	}
 
 	status := &v1.LoadBalancerStatus{}
-	status.Ingress = []v1.LoadBalancerIngress{{IP: vip.Address}}
+
+	if vip.PortID != "" {
+		floatingIP, err := getFloatingIPByPortID(lb.network, vip.PortID)
+		if err != nil {
+			return nil, false, fmt.Errorf("Error getting floating ip for port %s: %v", vip.PortID, err)
+		}
+		status.Ingress = []v1.LoadBalancerIngress{{IP: floatingIP.FloatingIP}}
+	} else {
+		status.Ingress = []v1.LoadBalancerIngress{{IP: vip.Address}}
+	}
 
 	return status, true, err
 }
