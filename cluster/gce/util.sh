@@ -1345,7 +1345,7 @@ function create-heapster-node() {
   local network=$(make-gcloud-network-argument \
       "${NETWORK_PROJECT}" \
       "${REGION}" \
-      "${NETWORK}"
+      "${NETWORK}" \
       "${SUBNETWORK:-}" \
       "" \
       "${ENABLE_IP_ALIASES:-}" \
