@@ -97,6 +97,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 				},
 				Status: api.PersistentVolumeClaimStatus{
 					Capacity: getResourceList("1Gi"),
+					Phase:    api.ClaimBound,
 				},
 			},
 			newObj: &api.PersistentVolumeClaim{
@@ -109,6 +110,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 				},
 				Status: api.PersistentVolumeClaimStatus{
 					Capacity: getResourceList("2Gi"),
+					Phase:    api.ClaimBound,
 				},
 			},
 			checkError: expectNoError,
@@ -126,6 +128,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 				},
 				Status: api.PersistentVolumeClaimStatus{
 					Capacity: getResourceList("1Gi"),
+					Phase:    api.ClaimBound,
 				},
 			},
 			newObj: &api.PersistentVolumeClaim{
@@ -138,6 +141,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 				},
 				Status: api.PersistentVolumeClaimStatus{
 					Capacity: getResourceList("2Gi"),
+					Phase:    api.ClaimBound,
 				},
 			},
 			checkError: expectVolumePluginError,
@@ -154,6 +158,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 				},
 				Status: api.PersistentVolumeClaimStatus{
 					Capacity: getResourceList("1Gi"),
+					Phase:    api.ClaimBound,
 				},
 			},
 			newObj: &api.PersistentVolumeClaim{
@@ -165,6 +170,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 				},
 				Status: api.PersistentVolumeClaimStatus{
 					Capacity: getResourceList("2Gi"),
+					Phase:    api.ClaimBound,
 				},
 			},
 			checkError: expectDynamicallyProvisionedError,
@@ -182,6 +188,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 				},
 				Status: api.PersistentVolumeClaimStatus{
 					Capacity: getResourceList("1Gi"),
+					Phase:    api.ClaimBound,
 				},
 			},
 			newObj: &api.PersistentVolumeClaim{
@@ -194,9 +201,71 @@ func TestPVCResizeAdmission(t *testing.T) {
 				},
 				Status: api.PersistentVolumeClaimStatus{
 					Capacity: getResourceList("2Gi"),
+					Phase:    api.ClaimBound,
 				},
 			},
 			checkError: expectDynamicallyProvisionedError,
+		},
+		{
+			name:     "PVC update with no change in size",
+			resource: api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
+			oldObj: &api.PersistentVolumeClaim{
+				Spec: api.PersistentVolumeClaimSpec{
+					Resources: api.ResourceRequirements{
+						Requests: getResourceList("1Gi"),
+					},
+					StorageClassName: &silverClassName,
+				},
+				Status: api.PersistentVolumeClaimStatus{
+					Capacity: getResourceList("0Gi"),
+					Phase:    api.ClaimPending,
+				},
+			},
+			newObj: &api.PersistentVolumeClaim{
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName: "volume4",
+					Resources: api.ResourceRequirements{
+						Requests: getResourceList("1Gi"),
+					},
+					StorageClassName: &silverClassName,
+				},
+				Status: api.PersistentVolumeClaimStatus{
+					Capacity: getResourceList("1Gi"),
+					Phase:    api.ClaimBound,
+				},
+			},
+			checkError: expectNoError,
+		},
+		{
+			name:     "expand pvc in pending state",
+			resource: api.SchemeGroupVersion.WithResource("persistentvolumeclaims"),
+			oldObj: &api.PersistentVolumeClaim{
+				Spec: api.PersistentVolumeClaimSpec{
+					Resources: api.ResourceRequirements{
+						Requests: getResourceList("1Gi"),
+					},
+					StorageClassName: &silverClassName,
+				},
+				Status: api.PersistentVolumeClaimStatus{
+					Capacity: getResourceList("0Gi"),
+					Phase:    api.ClaimPending,
+				},
+			},
+			newObj: &api.PersistentVolumeClaim{
+				Spec: api.PersistentVolumeClaimSpec{
+					Resources: api.ResourceRequirements{
+						Requests: getResourceList("2Gi"),
+					},
+					StorageClassName: &silverClassName,
+				},
+				Status: api.PersistentVolumeClaimStatus{
+					Capacity: getResourceList("0Gi"),
+					Phase:    api.ClaimPending,
+				},
+			},
+			checkError: func(err error) bool {
+				return strings.Contains(err.Error(), "Only bound persistent volume claims can be expanded")
+			},
 		},
 	}
 
