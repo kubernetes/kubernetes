@@ -142,6 +142,10 @@ func PrinterForCommand(cmd *cobra.Command, outputOpts *printers.OutputOptions, m
 // object passed is non-generic, it attempts to print the object using a HumanReadablePrinter.
 // Requires that printer flags have been added to cmd (see AddPrinterFlags).
 func PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, f Factory, out io.Writer) error {
+	return PrintResourceObjectForCommand(cmd, info.Object, f, out)
+}
+
+func PrintResourceObjectForCommand(cmd *cobra.Command, obj runtime.Object, f Factory, out io.Writer) error {
 	printer, err := f.PrinterForCommand(cmd, false, nil, printers.PrintOptions{})
 	if err != nil {
 		return err
@@ -152,7 +156,7 @@ func PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, f Fact
 			return err
 		}
 	}
-	return printer.PrintObj(info.Object, out)
+	return printer.PrintObj(obj, out)
 }
 
 // extractOutputOptions parses printer specific commandline args and returns
