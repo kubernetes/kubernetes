@@ -1,0 +1,16 @@
+language: go
+go:
+- 1.8
+install:
+- go get -u github.com/stretchr/testify
+- go get -u github.com/go-openapi/analysis
+- go get -u github.com/go-openapi/spec
+- go get -u github.com/go-openapi/swag
+- go get -u gopkg.in/yaml.v2
+script:
+- ./hack/coverage
+after_success:
+- bash <(curl -s https://codecov.io/bash)
+notifications:
+  slack:
+    secure: OxkPwVp35qBTUilgWC8xykSj+sGMcj0h8IIOKD+Rflx2schZVlFfdYdyVBM+s9OqeOfvtuvnR9v1Ye2rPKAvcjWdC4LpRGUsgmItZaI6Um8Aj6+K9udCw5qrtZVfOVmRu8LieH//XznWWKdOultUuniW0MLqw5+II87Gd00RWbCGi0hk0PykHe7uK+PDA2BEbqyZ2WKKYCvfB3j+0nrFOHScXqnh0V05l2E83J4+Sgy1fsPy+1WdX58ZlNBG333ibaC1FS79XvKSmTgKRkx3+YBo97u6ZtUmJa5WZjf2OdLG3KIckGWAv6R5xgxeU31N0Ng8L332w/Edpp2O/M2bZwdnKJ8hJQikXIAQbICbr+lTDzsoNzMdEIYcHpJ5hjPbiUl3Bmd+Jnsjf5McgAZDiWIfpCKZ29tPCEkVwRsOCqkyPRMNMzHHmoja495P5jR+ODS7+J8RFg5xgcnOgpP9D4Wlhztlf5WyZMpkLxTUD+bZq2SRf50HfHFXTkfq22zPl3d1eq0yrLwh/Z/fWKkfb6SyysROL8y6s8u3dpFX1YHSg0BR6i913h4aoZw9B2BG27cafLLTwKYsp2dFo1PWl4O6u9giFJIeqwloZHLKKrwh0cBFhB7RH0I58asxkZpCH6uWjJierahmHe7iS+E6i+9oCHkOZ59hmCYNimIs3hM=
