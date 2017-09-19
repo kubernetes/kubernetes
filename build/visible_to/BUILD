@@ -35,15 +35,6 @@ package_group(
 )
 
 package_group(
-    name = "COMMON_release",
-    packages = [
-        "//build",
-        "//build/debs",
-        "//build/rpms",
-    ],
-)
-
-package_group(
     name = "COMMON_testing",
     packages = [
         "//hack",
@@ -395,5 +386,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
-    visibility = ["//build/visible_to:COMMON_release"],
+    visibility = ["//visibility:public"],
 )
