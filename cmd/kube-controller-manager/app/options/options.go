@@ -192,8 +192,10 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabled
 	fs.BoolVar(&s.EnableContentionProfiling, "contention-profiling", false, "Enable lock contention profiling, if profiling is enabled")
 	fs.StringVar(&s.ClusterName, "cluster-name", s.ClusterName, "The instance prefix for the cluster")
 	fs.StringVar(&s.ClusterCIDR, "cluster-cidr", s.ClusterCIDR, "CIDR Range for Pods in cluster.")
+	fs.StringSliceVar(&s.ClusterCIDRs, "cluster-cidrs", s.ClusterCIDRs, "list of CIDR Ranges for Pods in cluster.")
 	fs.StringVar(&s.ServiceCIDR, "service-cluster-ip-range", s.ServiceCIDR, "CIDR Range for Services in cluster.")
 	fs.Int32Var(&s.NodeCIDRMaskSize, "node-cidr-mask-size", s.NodeCIDRMaskSize, "Mask size for node cidr in cluster.")
+	fs.IntSliceVar(&s.NodeCIDRMaskSizes, "node-cidr-mask-sizes", s.NodeCIDRMaskSizes, "Mask sizes for node cidrs in cluster.")
 	fs.BoolVar(&s.AllocateNodeCIDRs, "allocate-node-cidrs", false,
 		"Should CIDRs for Pods be allocated and set on the cloud provider.")
 	fs.StringVar(&s.CIDRAllocatorType, "cidr-allocator-type", "RangeAllocator",

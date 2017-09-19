@@ -387,12 +387,16 @@ type KubeControllerManagerConfiguration struct {
 	EnableContentionProfiling bool
 	// clusterName is the instance prefix for the cluster.
 	ClusterName string
-	// clusterCIDR is CIDR Range for Pods in cluster.
+	// (will be) DEPRECATED: // clusterCIDR is CIDR Range for Pods in cluster.
 	ClusterCIDR string
+	// clusterCIDRs is a CIDR Range list for Pods in cluster.
+	ClusterCIDRs []string
 	// serviceCIDR is CIDR Range for Services in cluster.
 	ServiceCIDR string
-	// NodeCIDRMaskSize is the mask size for node cidr in cluster.
+	// (will be) DEPRECATED: // NodeCIDRMaskSize is the mask size for node cidr in cluster.
 	NodeCIDRMaskSize int32
+	// NodeCIDRMaskSize is the mask size for node cidr in cluster.
+	NodeCIDRMaskSizes []int
 	// AllocateNodeCIDRs enables CIDRs for Pods to be allocated and, if
 	// ConfigureCloudRoutes is true, to be set on the cloud provider.
 	AllocateNodeCIDRs bool
