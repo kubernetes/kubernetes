@@ -77,6 +77,75 @@ func TestModifyContext(t *testing.T) {
 	test.run(t)
 }
 
+func TestInheritCurrentContext(t *testing.T) {
+	conf := clientcmdapi.Config{
+		Contexts: map[string]*clientcmdapi.Context{
+			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+		},
+		CurrentContext: "shaker-context",
+	}
+	test := createContextTest{
+		description: "Testing for modify a already exist context",
+		config:      conf,
+		args:        []string{"inherit-shaker-context"},
+		flags: []string{
+			"--inherit=true",
+		},
+		expected: `Context "inherit-shaker-context" created.` + "\n",
+		expectedConfig: clientcmdapi.Config{
+			Contexts: map[string]*clientcmdapi.Context{
+				"shaker-context":         {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+				"inherit-shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}},
+	}
+	test.run(t)
+}
+
+func TestInheritCurrentContextWithNamespace(t *testing.T) {
+	conf := clientcmdapi.Config{
+		Contexts: map[string]*clientcmdapi.Context{
+			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+		},
+		CurrentContext: "shaker-context",
+	}
+	test := createContextTest{
+		description: "Testing for modify a already exist context",
+		config:      conf,
+		args:        []string{"inherit-shaker-context"},
+		flags: []string{
+			"--namespace=my-namespace",
+			"--inherit=true",
+		},
+		expected: `Context "inherit-shaker-context" created.` + "\n",
+		expectedConfig: clientcmdapi.Config{
+			Contexts: map[string]*clientcmdapi.Context{
+				"shaker-context":         {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+				"inherit-shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "my-namespace"}}},
+	}
+	test.run(t)
+}
+
+func TestInheritNullCurrentContext(t *testing.T) {
+	conf := clientcmdapi.Config{
+		Contexts: map[string]*clientcmdapi.Context{
+			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+		},
+	}
+	test := createContextTest{
+		description: "Testing for modify a already exist context",
+		config:      conf,
+		args:        []string{"inherit-shaker-context"},
+		flags: []string{
+			"--inherit=true",
+		},
+		expected: `Context "inherit-shaker-context" created.` + "\n",
+		expectedConfig: clientcmdapi.Config{
+			Contexts: map[string]*clientcmdapi.Context{
+				"shaker-context":         {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+				"inherit-shaker-context": {AuthInfo: "", Cluster: "", Namespace: ""}}},
+	}
+	test.run(t)
+}
+
 func (test createContextTest) run(t *testing.T) {
 	fakeKubeFile, err := ioutil.TempFile(os.TempDir(), "")
 	if err != nil {

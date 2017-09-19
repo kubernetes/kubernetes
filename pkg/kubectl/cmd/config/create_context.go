@@ -37,6 +37,7 @@ type createContextOptions struct {
 	cluster      flag.StringFlag
 	authInfo     flag.StringFlag
 	namespace    flag.StringFlag
+	inherit      bool
 }
 
 var (
@@ -73,6 +74,7 @@ func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	cmd.Flags().Var(&options.cluster, clientcmd.FlagClusterName, clientcmd.FlagClusterName+" for the context entry in kubeconfig")
 	cmd.Flags().Var(&options.authInfo, clientcmd.FlagAuthInfoName, clientcmd.FlagAuthInfoName+" for the context entry in kubeconfig")
 	cmd.Flags().Var(&options.namespace, clientcmd.FlagNamespace, clientcmd.FlagNamespace+" for the context entry in kubeconfig")
+	cmd.Flags().BoolVar(&options.inherit, "inherit", false, "If true, set-context will inherit current-context configuration in kubeconfig")
 
 	return cmd
 }
@@ -92,6 +94,9 @@ func (o createContextOptions) run() (bool, error) {
 	if !exists {
 		startingStanza = clientcmdapi.NewContext()
 	}
+	if o.inherit {
+		o.inheritCurrentContext(config, startingStanza)
+	}
 	context := o.modifyContext(*startingStanza)
 	config.Contexts[o.name] = &context
 
@@ -100,6 +105,18 @@ func (o createContextOptions) run() (bool, error) {
 	}
 
 	return exists, nil
+}
+
+func (o *createContextOptions) inheritCurrentContext(config *clientcmdapi.Config, context *clientcmdapi.Context) {
+	if config.CurrentContext == "" {
+		return
+	}
+	if currentContext, ok := config.Contexts[config.CurrentContext]; ok {
+		context.Cluster = currentContext.Cluster
+		context.AuthInfo = currentContext.AuthInfo
+		context.Namespace = currentContext.Namespace
+	}
+	return
 }
 
 func (o *createContextOptions) modifyContext(existingContext clientcmdapi.Context) clientcmdapi.Context {
