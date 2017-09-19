@@ -43,7 +43,6 @@ filegroup(
         "//test/integration/federation:all-srcs",
         "//test/integration/framework:all-srcs",
         "//test/integration/garbagecollector:all-srcs",
-        "//test/integration/kubectl:all-srcs",
         "//test/integration/master:all-srcs",
         "//test/integration/metrics:all-srcs",
         "//test/integration/objectmeta:all-srcs",
