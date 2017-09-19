@@ -54,7 +54,7 @@ var NodeImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.NginxSlim),
 	imageutils.GetE2EImage(imageutils.ServeHostname),
 	imageutils.GetE2EImage(imageutils.Netexec),
-	"gcr.io/google_containers/nonewprivs:1.2",
+	imageutils.GetE2EImage(imageutils.Nonewprivs),
 	framework.GetPauseImageNameForHostArch(),
 )
 

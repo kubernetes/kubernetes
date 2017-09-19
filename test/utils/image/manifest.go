@@ -69,6 +69,7 @@ var (
 	Nettest            = ImageConfig{e2eRegistry, "nettest", "1.0"}
 	NginxSlim          = ImageConfig{gcRegistry, "nginx-slim", "0.20"}
 	NginxSlimNew       = ImageConfig{gcRegistry, "nginx-slim", "0.21"}
+	Nonewprivs         = ImageConfig{e2eRegistry, "nonewprivs", "1.0"}
 	NoSnatTest         = ImageConfig{e2eRegistry, "no-snat-test", "1.0"}
 	NoSnatTestProxy    = ImageConfig{e2eRegistry, "no-snat-test-proxy", "1.0"}
 	NWayHTTP           = ImageConfig{e2eRegistry, "n-way-http", "1.0"}

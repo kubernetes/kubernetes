@@ -384,7 +384,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image: "gcr.io/google_containers/nonewprivs:1.2",
+							Image: imageutils.GetE2EImage(imageutils.Nonewprivs),
 							Name:  podName,
 							SecurityContext: &v1.SecurityContext{
 								AllowPrivilegeEscalation: allowPrivilegeEscalation,
