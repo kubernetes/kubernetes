@@ -78,7 +78,8 @@ func TestEmpty(t *testing.T) {
 func TestErrors(t *testing.T) {
 	_, storage, _, _, destroyFunc := newStorage(t)
 	defer destroyFunc()
-	if err := storage.Allocate(net.ParseIP("192.168.0.0")); err != ipallocator.ErrNotInRange {
+	err := storage.Allocate(net.ParseIP("192.168.0.0"))
+	if _, ok := err.(*ipallocator.ErrNotInRange); !ok {
 		t.Fatal(err)
 	}
 }
