@@ -23,10 +23,6 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 type TestType struct {
 	metav1.TypeMeta `json:",inline"`
-	// ---
-	// the next tag removes the field from openapi spec. Adding unversioned objectMeta bring in a whole set of
-	// unversioned objects in the generate file that is not used anywhere other than this test type.
-	// +k8s:openapi-gen=false
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 	// +optional

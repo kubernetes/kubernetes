@@ -22,8 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/code-generator/test/apis/testgroup"
-	"k8s.io/code-generator/test/apis/testgroup/v1"
+	"k8s.io/code-generator/_test/apis/testgroup"
+	"k8s.io/code-generator/_test/apis/testgroup/v1"
 )
 
 // Install registers the API group and adds types to a scheme
