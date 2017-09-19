@@ -98,6 +98,17 @@ func (pvcr *persistentVolumeClaimResize) Admit(a admission.Attributes) error {
 		return nil
 	}
 
+	oldSize := oldPvc.Spec.Resources.Requests[api.ResourceStorage]
+	newSize := pvc.Spec.Resources.Requests[api.ResourceStorage]
+
+	if newSize.Cmp(oldSize) <= 0 {
+		return nil
+	}
+
+	if oldPvc.Status.Phase != api.ClaimBound {
+		return admission.NewForbidden(a, fmt.Errorf("Only bound persistent volume claims can be expanded"))
+	}
+
 	// Growing Persistent volumes is only allowed for PVCs for which their StorageClass
 	// explicitly allows it
 	if !pvcr.allowResize(pvc, oldPvc) {
@@ -108,13 +119,12 @@ func (pvcr *persistentVolumeClaimResize) Admit(a admission.Attributes) error {
 	// volume plugin must support resize
 	pv, err := pvcr.pvLister.Get(pvc.Spec.VolumeName)
 	if err != nil {
-		return nil
+		return admission.NewForbidden(a, fmt.Errorf("Error updating persistent volume claim because fetching associated persistent volume failed"))
 	}
 
 	if !pvcr.checkVolumePlugin(pv) {
 		return admission.NewForbidden(a, fmt.Errorf("volume plugin does not support resize"))
 	}
-
 	return nil
 }
 
