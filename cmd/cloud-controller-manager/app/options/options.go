@@ -45,6 +45,8 @@ type CloudControllerManagerServer struct {
 // NewCloudControllerManagerServer creates a new ExternalCMServer with a default config.
 func NewCloudControllerManagerServer() *CloudControllerManagerServer {
 	s := CloudControllerManagerServer{
+		// Part of these default values also present in 'cmd/kube-controller-manager/app/options/options.go'.
+		// Please keep them in sync when doing update.
 		KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
 			Port:                      ports.CloudControllerManagerPort,
 			Address:                   "0.0.0.0",
