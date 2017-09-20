@@ -66,7 +66,7 @@ const (
 	// The value of 250 is chosen b/c values that are too high can cause registry DoS issues
 	BurstReplicas = 250
 
-	// If sending a status upate to API server fails, we retry a finite number of times.
+	// If sending a status update to API server fails, we retry a finite number of times.
 	StatusUpdateRetries = 1
 
 	// Reasons for DaemonSet events
