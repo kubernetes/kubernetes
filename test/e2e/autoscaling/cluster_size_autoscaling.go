@@ -1404,7 +1404,7 @@ func waitForScaleUpStatus(c clientset.Interface, expected string, timeout time.D
 }
 
 // This is a temporary fix to allow CA to migrate some kube-system pods
-// TODO: Remove this when the PDB is added for those components
+// TODO: Remove this when the PDB is added for some of those components
 func addKubeSystemPdbs(f *framework.Framework) (func(), error) {
 	By("Create PodDisruptionBudgets for kube-system components, so they can be migrated if required")
 
@@ -1420,10 +1420,12 @@ func addKubeSystemPdbs(f *framework.Framework) (func(), error) {
 		min_available int
 	}
 	pdbsToAdd := []pdbInfo{
-		{label: "kube-dns-autoscaler", min_available: 1},
 		{label: "kube-dns", min_available: 1},
-		{label: "event-exporter", min_available: 0},
+		{label: "kube-dns-autoscaler", min_available: 0},
+		{label: "metrics-server", min_available: 0},
 		{label: "kubernetes-dashboard", min_available: 0},
+		{label: "l7-default-backend", min_available: 0},
+		{label: "heapster", min_available: 0},
 	}
 	for _, pdbData := range pdbsToAdd {
 		By(fmt.Sprintf("Create PodDisruptionBudget for %v", pdbData.label))
