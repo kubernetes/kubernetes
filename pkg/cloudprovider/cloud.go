@@ -140,16 +140,13 @@ type Instances interface {
 	// CurrentNodeName returns the name of the node we are currently running on
 	// On most clouds (e.g. GCE) this is the hostname, so we provide the hostname
 	CurrentNodeName(hostname string) (types.NodeName, error)
-<<<<<<< HEAD
 	// InstanceExistsByProviderID returns true if the instance for the given provider id still is running.
 	// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 	InstanceExistsByProviderID(providerID string) (bool, error)
-=======
 	// Notification to the cloud provider when node is registered
 	NodeRegistered(nodes *v1.Node)
 	// Notification to the cloud provider when node is unregistered
 	NodeUnregistered(nodes *v1.Node)
->>>>>>>   Below changes are made
 }
 
 // Route is a representation of an advanced routing rule.

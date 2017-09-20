@@ -70,8 +70,8 @@ func getVSphereConfig() *VSphereConfig {
 	cfg.Global.VCenterPort = os.Getenv("VSPHERE_VCENTER_PORT")
 	cfg.Global.User = os.Getenv("VSPHERE_USER")
 	cfg.Global.Password = os.Getenv("VSPHERE_PASSWORD")
-	cfg.Global.Datacenter = os.Getenv("VSPHERE_DATACENTER")
-	cfg.Global.Datastore = os.Getenv("VSPHERE_DATASTORE")
+	cfg.Global.Datacenters = os.Getenv("VSPHERE_DATACENTER")
+	cfg.Global.DeafultDatastore = os.Getenv("VSPHERE_DATASTORE")
 	cfg.Global.WorkingDir = os.Getenv("VSPHERE_WORKING_DIR")
 	cfg.Global.VMName = os.Getenv("VSPHERE_VM_NAME")
 	cfg.Global.InsecureFlag = false
@@ -276,9 +276,9 @@ func (vs *VSphere) cleanUpDummyVMs(dummyVMPrefix string) {
 			glog.V(4).Infof("Failed to connect to VC with err: %+v. Retrying again...", err)
 			continue
 		}
-		dc, err := vclib.GetDatacenter(ctx, vs.conn, vs.cfg.Global.Datacenter)
+		dc, err := vclib.GetDatacenter(ctx, vs.conn, vs.cfg.Global.Datacenters)
 		if err != nil {
-			glog.V(4).Infof("Failed to get the datacenter: %s from VC. err: %+v", vs.cfg.Global.Datacenter, err)
+			glog.V(4).Infof("Failed to get the datacenter: %s from VC. err: %+v", vs.cfg.Global.Datacenters, err)
 			continue
 		}
 		// Get the folder reference for global working directory where the dummy VM needs to be created.
