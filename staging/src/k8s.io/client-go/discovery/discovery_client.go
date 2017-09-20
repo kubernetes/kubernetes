@@ -200,8 +200,7 @@ func (d *DiscoveryClient) serverResources() ([]*metav1.APIResourceList, error) {
 		for _, version := range apiGroup.Versions {
 			gv := schema.GroupVersion{Group: apiGroup.Name, Version: version.Version}
 			resources, err := d.ServerResourcesForGroupVersion(version.GroupVersion)
-			if err != nil {
-				// TODO: maybe restrict this to NotFound errors
+			if err != nil && !errors.IsNotFound(err) {
 				failedGroups[gv] = err
 				continue
 			}
@@ -263,8 +262,7 @@ func (d *DiscoveryClient) serverPreferredResources() ([]*metav1.APIResourceList,
 		for _, version := range apiGroup.Versions {
 			groupVersion := schema.GroupVersion{Group: apiGroup.Name, Version: version.Version}
 			apiResourceList, err := d.ServerResourcesForGroupVersion(version.GroupVersion)
-			if err != nil {
-				// TODO: maybe restrict this to NotFound errors
+			if err != nil && !errors.IsNotFound(err) {
 				failedGroups[groupVersion] = err
 				continue
 			}
