@@ -301,6 +301,7 @@ pkg/proxy
 pkg/proxy/iptables
 pkg/proxy/userspace
 pkg/proxy/util
+pkg/proxy/winkernel
 pkg/proxy/winuserspace
 pkg/quota/evaluator/core
 pkg/quota/generic

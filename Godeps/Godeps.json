@@ -101,8 +101,13 @@
 		},
 		{
 			"ImportPath": "github.com/Microsoft/go-winio",
-			"Comment": "v0.4.2",
-			"Rev": "f533f7a102197536779ea3a8cb881d639e21ec5a"
+			"Comment": "v0.4.5",
+			"Rev": "78439966b38d69bf38227fbf57ac8a6fee70f69a"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim",
+			"Comment": "V0.6.3",
+			"Rev": "6ea7fe54f719d95721e7d9b26ac0add224c9b923"
 		},
 		{
 			"ImportPath": "github.com/NYTimes/gziphandler",

@@ -23,6 +23,7 @@ filegroup(
         "//vendor/github.com/Azure/go-autorest/autorest:all-srcs",
         "//vendor/github.com/MakeNowJust/heredoc:all-srcs",
         "//vendor/github.com/Microsoft/go-winio:all-srcs",
+        "//vendor/github.com/Microsoft/hcsshim:all-srcs",
         "//vendor/github.com/NYTimes/gziphandler:all-srcs",
         "//vendor/github.com/Nvveen/Gotty:all-srcs",
         "//vendor/github.com/PuerkitoBio/purell:all-srcs",
