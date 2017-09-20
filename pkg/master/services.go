@@ -27,7 +27,6 @@ import (
 
 // DefaultServiceIPRange takes a the serviceIPRange flag and returns the defaulted service ip range (if  needed),
 // api server service IP, and an error
-// TODO move this out of the genericapiserver package
 func DefaultServiceIPRange(passedServiceClusterIPRange net.IPNet) (net.IPNet, net.IP, error) {
 	serviceClusterIPRange := passedServiceClusterIPRange
 	if passedServiceClusterIPRange.IP == nil {
@@ -40,7 +39,7 @@ func DefaultServiceIPRange(passedServiceClusterIPRange net.IPNet) (net.IPNet, ne
 		serviceClusterIPRange = *defaultServiceClusterIPRange
 	}
 	if size := ipallocator.RangeSize(&serviceClusterIPRange); size < 8 {
-		return net.IPNet{}, net.IP{}, fmt.Errorf("The service cluster IP range must be at least %d IP addresses", 8)
+		return net.IPNet{}, net.IP{}, fmt.Errorf("the service cluster IP range must be at least %d IP addresses", 8)
 	}
 
 	// Select the first valid IP from ServiceClusterIPRange to use as the GenericAPIServer service IP.

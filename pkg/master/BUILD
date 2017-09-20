@@ -114,6 +114,7 @@ go_test(
         "import_known_versions_test.go",
         "master_openapi_test.go",
         "master_test.go",
+        "services_test.go",
     ],
     features = ["-race"],
     importpath = "k8s.io/kubernetes/pkg/master",
