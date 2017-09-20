@@ -200,7 +200,7 @@ var _ = SIGDescribe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
 	})
 })
 
-var _ = Describe("[sig-apps] stateful Upgrade [Feature:ClusterUpgrade]", func() {
+var _ = Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]", func() {
 	f := framework.NewDefaultFramework("stateful-upgrade")
 
 	// Create the frameworks here because we can only create them

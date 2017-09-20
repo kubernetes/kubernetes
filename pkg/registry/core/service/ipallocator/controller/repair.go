@@ -154,7 +154,7 @@ func (c *Repair) runOnce() error {
 			// TODO: send event
 			// cluster IP is duplicate
 			runtime.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s was assigned to multiple services; please recreate", ip, svc.Name, svc.Namespace))
-		case ipallocator.ErrNotInRange:
+		case err.(*ipallocator.ErrNotInRange):
 			// TODO: send event
 			// cluster IP is out of range
 			runtime.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not within the service CIDR %s; please recreate", ip, svc.Name, svc.Namespace, c.network))

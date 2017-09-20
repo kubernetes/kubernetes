@@ -17,6 +17,7 @@ limitations under the License.
 package deviceplugin
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -40,7 +41,8 @@ func TestNewManagerImpl(t *testing.T) {
 }
 
 func TestNewManagerImplStart(t *testing.T) {
-	setup(t, []*pluginapi.Device{}, func(n string, a, u, r []*pluginapi.Device) {})
+	m, p := setup(t, []*pluginapi.Device{}, func(n string, a, u, r []*pluginapi.Device) {})
+	cleanup(t, m, p)
 }
 
 // Tests that the device plugin manager correctly handles registration and re-registration by
@@ -54,9 +56,11 @@ func TestDevicePluginReRegistration(t *testing.T) {
 
 	callbackCount := 0
 	callbackChan := make(chan int)
+	var stopping int32
+	stopping = 0
 	callback := func(n string, a, u, r []*pluginapi.Device) {
-		// Should be called twice, one for each plugin.
-		if callbackCount > 1 {
+		// Should be called twice, one for each plugin registration, till we are stopping.
+		if callbackCount > 1 && atomic.LoadInt32(&stopping) <= 0 {
 			t.FailNow()
 		}
 		callbackCount++
@@ -80,6 +84,10 @@ func TestDevicePluginReRegistration(t *testing.T) {
 	require.Equal(t, 2, len(devices2[testResourceName]), "Devices shouldn't change.")
 	// Wait long enough to catch unexpected callbacks.
 	time.Sleep(5 * time.Second)
+
+	atomic.StoreInt32(&stopping, 1)
+	cleanup(t, m, p1)
+	p2.Stop()
 }
 
 func setup(t *testing.T, devs []*pluginapi.Device, callback MonitorCallback) (Manager, *Stub) {

@@ -898,6 +898,7 @@ type PodSecurityPolicySpec struct {
 	// AllowedCapabilities is a list of capabilities that can be requested to add to the container.
 	// Capabilities in this field may be added at the pod author's discretion.
 	// You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.
+	// To allow all capabilities you may use '*'.
 	// +optional
 	AllowedCapabilities []api.Capability
 	// Volumes is a white list of allowed volume plugins.  Empty indicates that all plugins
@@ -965,6 +966,10 @@ type HostPortRange struct {
 	// Max is the end of the range, inclusive.
 	Max int
 }
+
+// AllowAllCapabilities can be used as a value for the PodSecurityPolicy.AllowAllCapabilities
+// field and means that any capabilities are allowed to be requested.
+var AllowAllCapabilities api.Capability = "*"
 
 // FSType gives strong typing to different file systems that are used by volumes.
 type FSType string

@@ -80,12 +80,12 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				// Calculate the CPU request of the service.
 				// This test expects that 8 pods will not fit in 'nodesNum' nodes, but will fit in >='nodesNum'+1 nodes.
 				// Make it so that 'nodesNum' pods fit perfectly per node (in practice other things take space, so less than that will fit).
-				nodeCpus := nodes.Items[0].Status.Capacity[v1.ResourceCPU]
+				nodeCpus := nodes.Items[0].Status.Allocatable[v1.ResourceCPU]
 				nodeCpuMillis := (&nodeCpus).MilliValue()
 				cpuRequestMillis := int64(nodeCpuMillis / nodesNum)
 
 				// Start the service we want to scale and wait for it to be up and running.
-				nodeMemoryBytes := nodes.Items[0].Status.Capacity[v1.ResourceMemory]
+				nodeMemoryBytes := nodes.Items[0].Status.Allocatable[v1.ResourceMemory]
 				nodeMemoryMB := (&nodeMemoryBytes).Value() / 1024 / 1024
 				memRequestMB := nodeMemoryMB / 10 // Ensure each pod takes not more than 10% of node's total memory.
 				replicas := 1
