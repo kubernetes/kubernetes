@@ -589,7 +589,7 @@ func (f *ring0Factory) CanBeExposed(kind schema.GroupKind) error {
 func (f *ring0Factory) CanBeAutoscaled(kind schema.GroupKind) error {
 	switch kind {
 	case api.Kind("ReplicationController"), extensions.Kind("ReplicaSet"),
-		extensions.Kind("Deployment"), apps.Kind("Deployment"):
+		apps.Kind("ReplicaSet"), extensions.Kind("Deployment"), apps.Kind("Deployment"):
 		// nothing to do here
 	default:
 		return fmt.Errorf("cannot autoscale a %v", kind)
