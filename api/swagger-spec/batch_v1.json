@@ -2718,8 +2718,7 @@
     "id": "v1.Container",
     "description": "A single application container that you want to run within a pod.",
     "required": [
-     "name",
-     "image"
+     "name"
     ],
     "properties": {
      "name": {
@@ -2728,7 +2727,7 @@
      },
      "image": {
       "type": "string",
-      "description": "Docker image name. More info: https://kubernetes.io/docs/concepts/containers/images"
+      "description": "Docker image name. More info: https://kubernetes.io/docs/concepts/containers/images This field is optional to allow higher level config management to default or override container images in workload controllers like Deployments and StatefulSets."
      },
      "command": {
       "type": "array",

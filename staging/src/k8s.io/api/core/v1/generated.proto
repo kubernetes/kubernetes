@@ -441,6 +441,9 @@ message Container {
 
   // Docker image name.
   // More info: https://kubernetes.io/docs/concepts/containers/images
+  // This field is optional to allow higher level config management to default or override
+  // container images in workload controllers like Deployments and StatefulSets.
+  // +optional
   optional string image = 2;
 
   // Entrypoint array. Not executed within a shell.
