@@ -60,6 +60,7 @@ var _ volume.VolumePlugin = &glusterfsPlugin{}
 var _ volume.PersistentVolumePlugin = &glusterfsPlugin{}
 var _ volume.DeletableVolumePlugin = &glusterfsPlugin{}
 var _ volume.ProvisionableVolumePlugin = &glusterfsPlugin{}
+var _ volume.ExpandableVolumePlugin = &glusterfsPlugin{}
 var _ volume.Provisioner = &glusterfsVolumeProvisioner{}
 var _ volume.Deleter = &glusterfsVolumeDeleter{}
 
