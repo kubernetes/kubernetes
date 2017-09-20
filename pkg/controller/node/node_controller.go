@@ -298,6 +298,7 @@ func NewNodeController(
 		zoneStates:                  make(map[string]ZoneState),
 		runTaintManager:             runTaintManager,
 		useTaintBasedEvictions:      useTaintBasedEvictions && runTaintManager,
+		taintNodeByCondition:        taintNodeByCondition,
 	}
 	if useTaintBasedEvictions {
 		glog.Infof("Controller is using taint based evictions.")
