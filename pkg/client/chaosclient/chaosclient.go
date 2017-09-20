@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"reflect"
 	"runtime"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/net"
 )
@@ -129,17 +130,25 @@ func (c pIntercept) String() string {
 	return fmt.Sprintf("P{%f %s}", c.p, c.Chaos)
 }
 
-// ErrSimulatedConnectionResetByPeer emulates the golang net error when a connection
-// is reset by a peer.
-// TODO: make this more accurate
-// TODO: add other error types
-// TODO: add a helper for returning multiple errors randomly.
-var ErrSimulatedConnectionResetByPeer = Error{errors.New("connection reset by peer")}
-
 // Error returns the nested error when C() is invoked.
 type Error struct {
 	error
 }
+
+// createSimulatedErr emulates the golang net error
+// TODO: make this more accurate
+func createSimulatedErr() Error {
+	randomErrArray := []Error{
+		{errors.New("connection reset by peer")},
+		{errors.New("address already in use")},
+		{errors.New("connection refused")},
+	}
+	rand.Seed(time.Now().UnixNano())
+	num := rand.Intn(2)
+	return randomErrArray[num]
+}
+
+var RandomSimulatedErr = createSimulatedErr()
 
 // C returns the nested error
 func (e Error) Intercept(_ *http.Request) (bool, *http.Response, error) {

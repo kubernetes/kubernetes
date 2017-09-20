@@ -635,7 +635,7 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 			seed := chaosclient.NewSeed(1)
 			// TODO: introduce a standard chaos package with more tunables - this is just a proof of concept
 			// TODO: introduce random latency and stalls
-			return chaosclient.NewChaosRoundTripper(rt, chaosclient.LogChaos, seed.P(s.ChaosChance, chaosclient.ErrSimulatedConnectionResetByPeer))
+			return chaosclient.NewChaosRoundTripper(rt, chaosclient.LogChaos, seed.P(s.ChaosChance, chaosclient.RandomSimulatedErr))
 		}
 	}
 }
