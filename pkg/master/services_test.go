@@ -71,6 +71,7 @@ func TestDefaultServiceIPRange(t *testing.T) {
 	for _, testCase := range testCases {
 		ipNet, ip, err := DefaultServiceIPRange(testCase.ipNet)
 
+<<<<<<< HEAD
 		if testCase.stopError != nil && err != nil && testCase.stopError.Error() == err.Error() {
 			continue
 		}
