@@ -27,11 +27,8 @@ import (
 	"github.com/kardianos/osext"
 	"github.com/xanzy/go-cloudstack/cloudstack"
 	"gopkg.in/gcfg.v1"
-<<<<<<< HEAD
 	"k8s.io/apimachinery/pkg/types"
-=======
 	"k8s.io/api/core/v1"
->>>>>>>   Below changes are made
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 )

@@ -301,7 +301,7 @@ func getLocalIP() ([]v1.NodeAddress, error) {
 
 // Get the VM Managed Object instance by from the node
 func (vs *VSphere) getVMByName(ctx context.Context, nodeName k8stypes.NodeName) (*vclib.VirtualMachine, error) {
-	dc, err := vclib.GetDatacenter(ctx, vs.conn, vs.cfg.Global.Datacenter)
+	dc, err := vclib.GetDatacenter(ctx, vs.conn, vs.cfg.Global.Datacenters)
 	if err != nil {
 		return nil, err
 	}
@@ -633,7 +633,7 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (volumePath 
 		var datastore string
 		// Default datastore is the datastore in the vSphere config file that is used to initialize vSphere cloud provider.
 		if volumeOptions.Datastore == "" {
-			datastore = vs.cfg.Global.Datastore
+			datastore = vs.cfg.Global.DeafultDatastore
 		} else {
 			datastore = volumeOptions.Datastore
 		}
@@ -645,7 +645,7 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (volumePath 
 		if err != nil {
 			return "", err
 		}
-		dc, err := vclib.GetDatacenter(ctx, vs.conn, vs.cfg.Global.Datacenter)
+		dc, err := vclib.GetDatacenter(ctx, vs.conn, vs.cfg.Global.Datacenters)
 		if err != nil {
 			return "", err
 		}
@@ -722,11 +722,11 @@ func (vs *VSphere) DeleteVolume(vmDiskPath string) error {
 		if err != nil {
 			return err
 		}
-		dc, err := vclib.GetDatacenter(ctx, vs.conn, vs.cfg.Global.Datacenter)
+		dc, err := vclib.GetDatacenter(ctx, vs.conn, vs.cfg.Global.Datacenters)
 		if err != nil {
 			return err
 		}
-		ds, err := dc.GetDatastoreByName(ctx, vs.cfg.Global.Datastore)
+		ds, err := dc.GetDatastoreByName(ctx, vs.cfg.Global.DeafultDatastore)
 		if err != nil {
 			return err
 		}
