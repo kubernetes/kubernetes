@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "autoscale_test.go",
         "cluster_test.go",
         "configmap_test.go",
         "delete_test.go",
@@ -38,6 +39,7 @@ go_test(
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/apis/apps:go_default_library",
+        "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/rbac:go_default_library",
