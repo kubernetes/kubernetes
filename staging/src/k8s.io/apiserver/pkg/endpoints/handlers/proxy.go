@@ -54,7 +54,6 @@ type ProxyHandler struct {
 
 func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	reqStart := time.Now()
-	proxyHandlerTraceID := rand.Int63()
 
 	var httpCode int
 	var requestInfo *request.RequestInfo
@@ -62,6 +61,9 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		responseLength := 0
 		if rw, ok := w.(*metrics.ResponseWriterDelegator); ok {
 			responseLength = rw.ContentLength()
+			if httpCode == 0 {
+				httpCode = rw.Status()
+			}
 		}
 		metrics.Record(req, requestInfo, w.Header().Get("Content-Type"), httpCode, responseLength, time.Now().Sub(reqStart))
 	}()
@@ -79,18 +81,26 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		httpCode = http.StatusInternalServerError
 		return
 	}
+
+	metrics.RecordLongRunning(req, requestInfo, func() {
+		httpCode = r.serveHTTP(w, req, ctx, requestInfo)
+	})
+}
+
+// serveHTTP performs proxy handling and returns the status code of the operation.
+func (r *ProxyHandler) serveHTTP(w http.ResponseWriter, req *http.Request, ctx request.Context, requestInfo *request.RequestInfo) int {
+	proxyHandlerTraceID := rand.Int63()
+
 	if !requestInfo.IsResourceRequest {
 		responsewriters.NotFound(w, req)
-		httpCode = http.StatusNotFound
-		return
+		return http.StatusNotFound
 	}
 	namespace, resource, parts := requestInfo.Namespace, requestInfo.Resource, requestInfo.Parts
 
 	ctx = request.WithNamespace(ctx, namespace)
 	if len(parts) < 2 {
 		responsewriters.NotFound(w, req)
-		httpCode = http.StatusNotFound
-		return
+		return http.StatusNotFound
 	}
 	id := parts[1]
 	remainder := ""
@@ -108,8 +118,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if !ok {
 		httplog.LogOf(req, w).Addf("'%v' has no storage object", resource)
 		responsewriters.NotFound(w, req)
-		httpCode = http.StatusNotFound
-		return
+		return http.StatusNotFound
 	}
 
 	gv := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
@@ -117,21 +126,18 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	redirector, ok := storage.(rest.Redirector)
 	if !ok {
 		httplog.LogOf(req, w).Addf("'%v' is not a redirector", resource)
-		httpCode = responsewriters.ErrorNegotiated(ctx, apierrors.NewMethodNotSupported(schema.GroupResource{Resource: resource}, "proxy"), r.Serializer, gv, w, req)
-		return
+		return responsewriters.ErrorNegotiated(ctx, apierrors.NewMethodNotSupported(schema.GroupResource{Resource: resource}, "proxy"), r.Serializer, gv, w, req)
 	}
 
 	location, roundTripper, err := redirector.ResourceLocation(ctx, id)
 	if err != nil {
 		httplog.LogOf(req, w).Addf("Error getting ResourceLocation: %v", err)
-		httpCode = responsewriters.ErrorNegotiated(ctx, err, r.Serializer, gv, w, req)
-		return
+		return responsewriters.ErrorNegotiated(ctx, err, r.Serializer, gv, w, req)
 	}
 	if location == nil {
 		httplog.LogOf(req, w).Addf("ResourceLocation for %v returned nil", id)
 		responsewriters.NotFound(w, req)
-		httpCode = http.StatusNotFound
-		return
+		return http.StatusNotFound
 	}
 
 	if roundTripper != nil {
@@ -164,7 +170,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// https://github.com/openshift/origin/blob/master/pkg/util/httpproxy/upgradeawareproxy.go.
 	// That proxy needs to be modified to support multiple backends, not just 1.
 	if r.tryUpgrade(ctx, w, req, newReq, location, roundTripper, gv) {
-		return
+		return http.StatusSwitchingProtocols
 	}
 
 	// Redirect requests of the form "/{resource}/{name}" to "/{resource}/{name}/"
@@ -177,7 +183,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		w.Header().Set("Location", req.URL.Path+"/"+queryPart)
 		w.WriteHeader(http.StatusMovedPermanently)
-		return
+		return http.StatusMovedPermanently
 	}
 
 	start := time.Now()
@@ -209,6 +215,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	proxy.Transport = roundTripper
 	proxy.FlushInterval = 200 * time.Millisecond
 	proxy.ServeHTTP(w, newReq)
+	return 0
 }
 
 // tryUpgrade returns true if the request was handled.

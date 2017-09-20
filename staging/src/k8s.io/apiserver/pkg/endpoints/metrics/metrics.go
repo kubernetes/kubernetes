@@ -43,6 +43,13 @@ var (
 		},
 		[]string{"verb", "resource", "subresource", "scope", "client", "contentType", "code"},
 	)
+	longRunningRequestGauge = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "apiserver_longrunning_gauge",
+			Help: "Gauge of all active long-running apiserver requests broken out by verb, API resource, and scope. Not all requests are tracked this way.",
+		},
+		[]string{"verb", "resource", "subresource", "scope"},
+	)
 	requestLatencies = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "apiserver_request_latencies",
@@ -77,6 +84,7 @@ var (
 // Register all metrics.
 func Register() {
 	prometheus.MustRegister(requestCounter)
+	prometheus.MustRegister(longRunningRequestGauge)
 	prometheus.MustRegister(requestLatencies)
 	prometheus.MustRegister(requestLatenciesSummary)
 	prometheus.MustRegister(responseSizes)
@@ -86,13 +94,10 @@ func Register() {
 // processing. All API paths should use InstrumentRouteFunc implicitly. Use this instead of MonitorRequest if
 // you already have a RequestInfo object.
 func Record(req *http.Request, requestInfo *request.RequestInfo, contentType string, code int, responseSizeInBytes int, elapsed time.Duration) {
-	scope := "cluster"
-	if requestInfo.Namespace != "" {
-		scope = "namespace"
+	if requestInfo == nil {
+		requestInfo = &request.RequestInfo{Verb: req.Method, Path: req.URL.Path}
 	}
-	if requestInfo.Name != "" {
-		scope = "resource"
-	}
+	scope := cleanScope(requestInfo)
 	if requestInfo.IsResourceRequest {
 		MonitorRequest(req, strings.ToUpper(requestInfo.Verb), requestInfo.Resource, requestInfo.Subresource, contentType, scope, code, responseSizeInBytes, elapsed)
 	} else {
@@ -100,24 +105,30 @@ func Record(req *http.Request, requestInfo *request.RequestInfo, contentType str
 	}
 }
 
+// RecordLongRunning tracks the execution of a long running request against the API server. It provides an accurate count
+// of the total number of open long running requests. requestInfo may be nil if the caller is not in the normal request flow.
+func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, fn func()) {
+	if requestInfo == nil {
+		requestInfo = &request.RequestInfo{Verb: req.Method, Path: req.URL.Path}
+	}
+	var g prometheus.Gauge
+	scope := cleanScope(requestInfo)
+	reportedVerb := cleanVerb(strings.ToUpper(requestInfo.Verb), req)
+	if requestInfo.IsResourceRequest {
+		g = longRunningRequestGauge.WithLabelValues(reportedVerb, requestInfo.Resource, requestInfo.Subresource, scope)
+	} else {
+		g = longRunningRequestGauge.WithLabelValues(reportedVerb, "", requestInfo.Path, scope)
+	}
+	g.Inc()
+	defer g.Dec()
+	fn()
+}
+
 // MonitorRequest handles standard transformations for client and the reported verb and then invokes Monitor to record
 // a request. verb must be uppercase to be backwards compatible with existing monitoring tooling.
-func MonitorRequest(request *http.Request, verb, resource, subresource, scope, contentType string, httpCode, respSize int, elapsed time.Duration) {
-	reportedVerb := verb
-	if verb == "LIST" {
-		// see apimachinery/pkg/runtime/conversion.go Convert_Slice_string_To_bool
-		if values := request.URL.Query()["watch"]; len(values) > 0 {
-			if value := strings.ToLower(values[0]); value != "0" && value != "false" {
-				reportedVerb = "WATCH"
-			}
-		}
-	}
-	// normalize the legacy WATCHLIST to WATCH to ensure users aren't surprised by metrics
-	if verb == "WATCHLIST" {
-		reportedVerb = "WATCH"
-	}
-
-	client := cleanUserAgent(utilnet.GetHTTPClient(request))
+func MonitorRequest(req *http.Request, verb, resource, subresource, scope, contentType string, httpCode, respSize int, elapsed time.Duration) {
+	reportedVerb := cleanVerb(verb, req)
+	client := cleanUserAgent(utilnet.GetHTTPClient(req))
 	elapsedMicroseconds := float64(elapsed / time.Microsecond)
 	requestCounter.WithLabelValues(reportedVerb, resource, subresource, scope, client, contentType, codeToString(httpCode)).Inc()
 	requestLatencies.WithLabelValues(reportedVerb, resource, subresource, scope).Observe(elapsedMicroseconds)
@@ -158,6 +169,37 @@ func InstrumentRouteFunc(verb, resource, subresource, scope string, routeFunc re
 
 		MonitorRequest(request.Request, verb, resource, subresource, scope, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Now().Sub(now))
 	})
+}
+
+func cleanScope(requestInfo *request.RequestInfo) string {
+	if requestInfo.Namespace != "" {
+		return "namespace"
+	}
+	if requestInfo.Name != "" {
+		return "resource"
+	}
+	if requestInfo.IsResourceRequest {
+		return "cluster"
+	}
+	// this is the empty scope
+	return ""
+}
+
+func cleanVerb(verb string, request *http.Request) string {
+	reportedVerb := verb
+	if verb == "LIST" {
+		// see apimachinery/pkg/runtime/conversion.go Convert_Slice_string_To_bool
+		if values := request.URL.Query()["watch"]; len(values) > 0 {
+			if value := strings.ToLower(values[0]); value != "0" && value != "false" {
+				reportedVerb = "WATCH"
+			}
+		}
+	}
+	// normalize the legacy WATCHLIST to WATCH to ensure users aren't surprised by metrics
+	if verb == "WATCHLIST" {
+		reportedVerb = "WATCH"
+	}
+	return reportedVerb
 }
 
 func cleanUserAgent(ua string) string {
