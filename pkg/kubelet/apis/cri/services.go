@@ -79,9 +79,9 @@ type PodSandboxManager interface {
 type ContainerStatsManager interface {
 	// ContainerStats returns stats of the container. If the container does not
 	// exist, the call returns an error.
-	ContainerStats(req *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error)
+	ContainerStats(containerID string) (*runtimeapi.ContainerStats, error)
 	// ListContainerStats returns stats of all running containers.
-	ListContainerStats(req *runtimeapi.ListContainerStatsRequest) (*runtimeapi.ListContainerStatsResponse, error)
+	ListContainerStats(filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error)
 }
 
 // RuntimeService interface should be implemented by a container runtime.
@@ -111,5 +111,5 @@ type ImageManagerService interface {
 	// RemoveImage removes the image.
 	RemoveImage(image *runtimeapi.ImageSpec) error
 	// ImageFsInfo returns information of the filesystem that is used to store images.
-	ImageFsInfo(req *runtimeapi.ImageFsInfoRequest) (*runtimeapi.ImageFsInfoResponse, error)
+	ImageFsInfo() ([]*runtimeapi.FilesystemUsage, error)
 }
