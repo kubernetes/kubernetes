@@ -38,22 +38,28 @@ func TestSetDefaultCronJob(t *testing.T) {
 			original: &batchv1beta1.CronJob{},
 			expected: &batchv1beta1.CronJob{
 				Spec: batchv1beta1.CronJobSpec{
-					ConcurrencyPolicy: batchv1beta1.AllowConcurrent,
-					Suspend:           newBool(false),
+					ConcurrencyPolicy:          batchv1beta1.AllowConcurrent,
+					Suspend:                    newBool(false),
+					SuccessfulJobsHistoryLimit: newInt32(3),
+					FailedJobsHistoryLimit:     newInt32(1),
 				},
 			},
 		},
 		"set fields should not be defaulted": {
 			original: &batchv1beta1.CronJob{
 				Spec: batchv1beta1.CronJobSpec{
-					ConcurrencyPolicy: batchv1beta1.ForbidConcurrent,
-					Suspend:           newBool(true),
+					ConcurrencyPolicy:          batchv1beta1.ForbidConcurrent,
+					Suspend:                    newBool(true),
+					SuccessfulJobsHistoryLimit: newInt32(5),
+					FailedJobsHistoryLimit:     newInt32(5),
 				},
 			},
 			expected: &batchv1beta1.CronJob{
 				Spec: batchv1beta1.CronJobSpec{
-					ConcurrencyPolicy: batchv1beta1.ForbidConcurrent,
-					Suspend:           newBool(true),
+					ConcurrencyPolicy:          batchv1beta1.ForbidConcurrent,
+					Suspend:                    newBool(true),
+					SuccessfulJobsHistoryLimit: newInt32(5),
+					FailedJobsHistoryLimit:     newInt32(5),
 				},
 			},
 		},
@@ -73,6 +79,12 @@ func TestSetDefaultCronJob(t *testing.T) {
 		}
 		if *actual.Spec.Suspend != *expected.Spec.Suspend {
 			t.Errorf("%s: got different suspend than expected: %v %v", name, *actual.Spec.Suspend, *expected.Spec.Suspend)
+		}
+		if *actual.Spec.SuccessfulJobsHistoryLimit != *expected.Spec.SuccessfulJobsHistoryLimit {
+			t.Errorf("%s: got different successfulJobsHistoryLimit than expected: %v %v", name, *actual.Spec.SuccessfulJobsHistoryLimit, *expected.Spec.SuccessfulJobsHistoryLimit)
+		}
+		if *actual.Spec.FailedJobsHistoryLimit != *expected.Spec.FailedJobsHistoryLimit {
+			t.Errorf("%s: got different failedJobsHistoryLimit than expected: %v %v", name, *actual.Spec.FailedJobsHistoryLimit, *expected.Spec.FailedJobsHistoryLimit)
 		}
 	}
 }
@@ -99,6 +111,12 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 
 func newBool(val bool) *bool {
 	p := new(bool)
+	*p = val
+	return p
+}
+
+func newInt32(val int32) *int32 {
+	p := new(int32)
 	*p = val
 	return p
 }

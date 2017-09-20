@@ -53,14 +53,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			sds := int64(c.RandUint64())
 			sj.StartingDeadlineSeconds = &sds
 			sj.Schedule = c.RandString()
-			if hasSuccessLimit := c.RandBool(); hasSuccessLimit {
-				successfulJobsHistoryLimit := int32(c.Rand.Int31())
-				sj.SuccessfulJobsHistoryLimit = &successfulJobsHistoryLimit
-			}
-			if hasFailedLimit := c.RandBool(); hasFailedLimit {
-				failedJobsHistoryLimit := int32(c.Rand.Int31())
-				sj.FailedJobsHistoryLimit = &failedJobsHistoryLimit
-			}
+			successfulJobsHistoryLimit := int32(c.Rand.Int31())
+			sj.SuccessfulJobsHistoryLimit = &successfulJobsHistoryLimit
+			failedJobsHistoryLimit := int32(c.Rand.Int31())
+			sj.FailedJobsHistoryLimit = &failedJobsHistoryLimit
 		},
 		func(cp *batch.ConcurrencyPolicy, c fuzz.Continue) {
 			policies := []batch.ConcurrencyPolicy{batch.AllowConcurrent, batch.ForbidConcurrent, batch.ReplaceConcurrent}

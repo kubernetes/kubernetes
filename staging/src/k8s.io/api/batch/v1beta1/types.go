@@ -114,11 +114,13 @@ type CronJobSpec struct {
 
 	// The number of successful finished jobs to retain.
 	// This is a pointer to distinguish between explicit zero and not specified.
+	// Defaults to 3.
 	// +optional
 	SuccessfulJobsHistoryLimit *int32 `json:"successfulJobsHistoryLimit,omitempty" protobuf:"varint,6,opt,name=successfulJobsHistoryLimit"`
 
 	// The number of failed finished jobs to retain.
 	// This is a pointer to distinguish between explicit zero and not specified.
+	// Defaults to 1.
 	// +optional
 	FailedJobsHistoryLimit *int32 `json:"failedJobsHistoryLimit,omitempty" protobuf:"varint,7,opt,name=failedJobsHistoryLimit"`
 }
