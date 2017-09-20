@@ -44,14 +44,16 @@ import (
 )
 
 const (
+	// ChangeCauseAnnotation change-cause annotation.
 	ChangeCauseAnnotation = "kubernetes.io/change-cause"
 )
 
-// HistoryViewer provides an interface for resources have historical information.
+// HistoryViewer provides an interface for resources that have historical information.
 type HistoryViewer interface {
 	ViewHistory(namespace, name string, revision int64) (string, error)
 }
 
+// HistoryViewerFor returns a HistoryViewer for a resource specified by kind.
 func HistoryViewerFor(kind schema.GroupKind, c clientset.Interface) (HistoryViewer, error) {
 	switch kind {
 	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
@@ -64,11 +66,12 @@ func HistoryViewerFor(kind schema.GroupKind, c clientset.Interface) (HistoryView
 	return nil, fmt.Errorf("no history viewer has been implemented for %q", kind)
 }
 
+// DeploymentHistoryViewer implements the HistoryViewer interface.
 type DeploymentHistoryViewer struct {
 	c clientset.Interface
 }
 
-// ViewHistory returns a revision-to-replicaset map as the revision history of a deployment
+// ViewHistory returns a revision-to-replicaset map as the revision history of a deployment.
 // TODO: this should be a describer
 func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
 	versionedExtensionsClient := versionedExtensionsClientV1beta1(h.c)
@@ -146,11 +149,12 @@ func printTemplate(template *v1.PodTemplateSpec) (string, error) {
 	return buf.String(), nil
 }
 
+// DaemonSetHistoryViewer implements the HistoryViewer interface.
 type DaemonSetHistoryViewer struct {
 	c clientset.Interface
 }
 
-// ViewHistory returns a revision-to-history map as the revision history of a deployment
+// ViewHistory returns a revision-to-history map as the revision history of a deployment.
 // TODO: this should be a describer
 func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
 	versionedAppsClient := versionedAppsClientV1beta1(h.c)
@@ -210,6 +214,7 @@ func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision in
 	})
 }
 
+// StatefulSetHistoryViewer implements the HistoryViewer interface.
 type StatefulSetHistoryViewer struct {
 	c clientset.Interface
 }
@@ -225,7 +230,7 @@ func getOwner(revision apps.ControllerRevision) *metav1.OwnerReference {
 	return nil
 }
 
-// ViewHistory returns a list of the revision history of a statefulset
+// ViewHistory returns a revision-to-history map as the revision history of a deployment.
 // TODO: this should be a describer
 // TODO: needs to implement detailed revision view
 func (h *StatefulSetHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
@@ -262,7 +267,7 @@ func (h *StatefulSetHistoryViewer) ViewHistory(namespace, name string, revision 
 	})
 }
 
-// controlledHistories returns all ControllerRevisions controlled by the given API object
+// controlledHistories returns all ControllerRevisions controlled by the given API object.
 func controlledHistories(apps clientappsv1beta1.AppsV1beta1Interface, extensions clientextensionsv1beta1.ExtensionsV1beta1Interface, namespace, name, kind string) (runtime.Object, []*appsv1beta1.ControllerRevision, error) {
 	var obj runtime.Object
 	var labelSelector *metav1.LabelSelector
@@ -309,7 +314,7 @@ func controlledHistories(apps clientappsv1beta1.AppsV1beta1Interface, extensions
 	return obj, result, nil
 }
 
-// applyHistory returns a specific revision of DaemonSet by applying the given history to a copy of the given DaemonSet
+// applyHistory returns a specific revision of DaemonSet by applying the given history to a copy of the given DaemonSet.
 func applyHistory(ds *extensionsv1beta1.DaemonSet, history *appsv1beta1.ControllerRevision) (*extensionsv1beta1.DaemonSet, error) {
 	obj, err := api.Scheme.New(ds.GroupVersionKind())
 	if err != nil {
@@ -347,7 +352,7 @@ func tabbedString(f func(io.Writer) error) (string, error) {
 	return str, nil
 }
 
-// getChangeCause returns the change-cause annotation of the input object
+// getChangeCause returns the change-cause annotation of the input object.
 func getChangeCause(obj runtime.Object) string {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
