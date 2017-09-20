@@ -17,10 +17,12 @@ limitations under the License.
 package app
 
 import (
+	"net/http"
 	"os"
 
 	"github.com/spf13/pflag"
 
+	netutil "k8s.io/apimachinery/pkg/util/net"
 	_ "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/install"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 )
@@ -30,6 +32,10 @@ func Run() error {
 	// We do not want these flags to show up in --help
 	pflag.CommandLine.MarkHidden("google-json-key")
 	pflag.CommandLine.MarkHidden("log-flush-frequency")
+
+	// We want to use for HTTP DefaultTransport better implmentation
+	// of ProxyFromEnvironment that supports CIDR notation in NO_PROXY.
+	http.DefaultTransport.(*http.Transport).Proxy = netutil.NewProxierWithNoProxyCIDR(http.ProxyFromEnvironment)
 
 	cmd := cmd.NewKubeadmCommand(os.Stdin, os.Stdout, os.Stderr)
 	return cmd.Execute()
