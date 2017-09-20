@@ -315,7 +315,7 @@ func (plugin *cniNetworkPlugin) deleteFromNetwork(network *cniNetwork, podName s
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
 	glog.V(4).Infof("About to del CNI network %v (type=%v)", netConf.Name, netConf.Plugins[0].Network.Type)
 	err = cniNet.DelNetworkList(netConf, rt)
-	if err != nil {
+	if err != nil && podNetnsPath != "" {
 		glog.Errorf("Error deleting network: %v", err)
 		return err
 	}
