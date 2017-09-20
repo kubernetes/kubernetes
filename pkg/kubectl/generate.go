@@ -51,6 +51,7 @@ type StructuredGenerator interface {
 	StructuredGenerate() (runtime.Object, error)
 }
 
+// IsZero returns true if i is nil or the zero value for its type.
 func IsZero(i interface{}) bool {
 	if i == nil {
 		return true
@@ -98,7 +99,7 @@ func AnnotateFlags(cmd *cobra.Command, generators map[string]Generator) {
 	}
 }
 
-//  EnsureFlagsValid ensures that no invalid flags are being used against a generator.
+// EnsureFlagsValid ensures that no invalid flags are being used against a generator.
 func EnsureFlagsValid(cmd *cobra.Command, generators map[string]Generator, generatorInUse string) error {
 	AnnotateFlags(cmd, generators)
 
@@ -136,6 +137,7 @@ func MakeParams(cmd *cobra.Command, params []GeneratorParam) map[string]interfac
 	return result
 }
 
+// MakeProtocols flattens protocols map into form "key1/val1,key2/val2, ..."
 func MakeProtocols(protocols map[string]string) string {
 	out := []string{}
 	for key, value := range protocols {
@@ -144,6 +146,8 @@ func MakeProtocols(protocols map[string]string) string {
 	return strings.Join(out, ",")
 }
 
+// ParseProtocols builds a map out of protocols.
+// protocols is of form "port1/protocol1,port2/protocol2, ..."
 func ParseProtocols(protocols interface{}) (map[string]string, error) {
 	protocolsString, isString := protocols.(string)
 	if !isString {
@@ -170,6 +174,7 @@ func ParseProtocols(protocols interface{}) (map[string]string, error) {
 	return portProtocolMap, nil
 }
 
+// MakeLabels flattens labels map into form "key1=val1,key2=val2, ..."
 func MakeLabels(labels map[string]string) string {
 	out := []string{}
 	for key, value := range labels {
@@ -202,10 +207,11 @@ func ParseLabels(labelSpec interface{}) (map[string]string, error) {
 	return labels, nil
 }
 
+// GetBool returns the boolean value represented by the string in params map for key.
+// If key is not in map, returns defValue.
 func GetBool(params map[string]string, key string, defValue bool) (bool, error) {
 	if val, found := params[key]; !found {
 		return defValue, nil
-	} else {
-		return strconv.ParseBool(val)
 	}
+	return strconv.ParseBool(val)
 }
