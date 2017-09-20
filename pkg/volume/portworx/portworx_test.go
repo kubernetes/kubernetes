@@ -97,7 +97,7 @@ type fakePortworxManager struct {
 	mountCalled  bool
 }
 
-func (fake *fakePortworxManager) AttachVolume(b *portworxVolumeMounter) (string, error) {
+func (fake *fakePortworxManager) AttachVolume(b *portworxVolumeMounter, attachOptions map[string]string) (string, error) {
 	fake.attachCalled = true
 	return "", nil
 }
