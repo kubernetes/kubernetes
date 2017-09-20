@@ -855,7 +855,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet, hash string) e
 			if len(daemonPodsRunning) > 1 {
 				sort.Sort(podByCreationTimestamp(daemonPodsRunning))
 				for i := 1; i < len(daemonPodsRunning); i++ {
-					podsToDelete = append(podsToDelete, daemonPods[i].Name)
+					podsToDelete = append(podsToDelete, daemonPodsRunning[i].Name)
 				}
 			}
 		case !shouldContinueRunning && exists:
