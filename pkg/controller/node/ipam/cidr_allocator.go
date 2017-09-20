@@ -54,9 +54,21 @@ const (
 	// IPAMFromCloudAllocatorType uses the ipam controller sync'ing the node
 	// CIDR range allocations from the cloud to the cluster.
 	IPAMFromCloudAllocatorType = "IPAMFromCloud"
+)
 
+// TODO: figure out the good setting for those constants.
+const (
 	// The amount of time the nodecontroller polls on the list nodes endpoint.
 	apiserverStartupGracePeriod = 10 * time.Minute
+
+	// The no. of NodeSpec updates NC can process concurrently.
+	cidrUpdateWorkers = 30
+
+	// The max no. of NodeSpec updates that can be enqueued.
+	cidrUpdateQueueSize = 5000
+
+	// cidrUpdateRetries is the no. of times a NodeSpec update will be retried before dropping it.
+	cidrUpdateRetries = 10
 )
 
 // CIDRAllocator is an interface implemented by things that know how
