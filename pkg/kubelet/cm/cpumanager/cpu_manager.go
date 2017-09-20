@@ -231,7 +231,18 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 			// Check whether container is present in state, there may be 2 reasons why it's not present
 			// either container is Be/Bu or kubelet just restarted
 			if _, ok := m.state.GetCPUSet(containerID); !ok {
-				m.AddContainer(pod, &container, containerID)
+				if status.Phase == v1.PodRunning && pod.DeletionTimestamp == nil {
+					//if DeletionTimestamp is set, pod has already been removed from state
+					glog.Infof("[cpumanager] reconcileState: found (pod: %s, container: %s, container id: %s) that is not present in state", pod.Name, container.Name, containerID)
+					err := m.AddContainer(pod, &container, containerID)
+					if err != nil {
+						glog.Errorf("[cpumanager] reconcileState: failed to add orphaned container (pod: %s, container: %s, container id: %s, error: %v)", pod.Name, container.Name, containerID, err)
+						failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
+					}
+				} else {
+					// skip the pods since it's not running and may be deleted soon
+					continue
+				}
 			}
 
 			cset := m.state.GetCPUSetOrDefault(containerID)
