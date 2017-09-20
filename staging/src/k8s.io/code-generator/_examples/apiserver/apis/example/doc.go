@@ -15,5 +15,5 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package,register
-// +groupName=testgroup.k8s.io
-package testgroup // import "k8s.io/code-generator/_test/apis/testgroup"
+// +groupName=example.apiserver.code-generator.k8s.io
+package example // import "k8s.io/code-generator/_examples/apiserver/apis/example"

@@ -22,17 +22,17 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/code-generator/_examples/apis/testgroup"
-	"k8s.io/code-generator/_examples/apis/testgroup/v1"
+	"k8s.io/code-generator/_examples/apiserver/apis/example"
+	"k8s.io/code-generator/_examples/apiserver/apis/example/v1"
 )
 
 // Install registers the API group and adds types to a scheme
 func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *registered.APIRegistrationManager, scheme *runtime.Scheme) {
 	if err := announced.NewGroupMetaFactory(
 		&announced.GroupMetaFactoryArgs{
-			GroupName:                  testgroup.SchemeGroupVersion.Group,
+			GroupName:                  example.SchemeGroupVersion.Group,
 			VersionPreferenceOrder:     []string{v1.SchemeGroupVersion.Version},
-			AddInternalObjectsToScheme: testgroup.AddToScheme,
+			AddInternalObjectsToScheme: example.AddToScheme,
 		},
 		announced.VersionToSchemeFunc{
 			v1.SchemeGroupVersion.Version: v1.AddToScheme,
