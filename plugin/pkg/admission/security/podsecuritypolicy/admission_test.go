@@ -272,6 +272,10 @@ func TestAdmitCaps(t *testing.T) {
 	requiresFooToBeDropped.Name = "requireDrop"
 	requiresFooToBeDropped.Spec.RequiredDropCapabilities = []kapi.Capability{"foo"}
 
+	allowAllInAllowed := restrictivePSP()
+	allowAllInAllowed.Name = "allowAllCapsInAllowed"
+	allowAllInAllowed.Spec.AllowedCapabilities = []kapi.Capability{extensions.AllowAllCapabilities}
+
 	tc := map[string]struct {
 		pod                  *kapi.Pod
 		psps                 []*extensions.PodSecurityPolicy
@@ -336,6 +340,13 @@ func TestAdmitCaps(t *testing.T) {
 				Drop: []kapi.Capability{"foo"},
 			},
 			expectedPSP: requiresFooToBeDropped.Name,
+		},
+		// UC 8: using '*' in allowed caps
+		"should accept cap add when all caps are allowed": {
+			pod:         createPodWithCaps(&kapi.Capabilities{Add: []kapi.Capability{"foo"}}),
+			psps:        []*extensions.PodSecurityPolicy{restricted, allowAllInAllowed},
+			shouldPass:  true,
+			expectedPSP: allowAllInAllowed.Name,
 		},
 	}
 
@@ -1360,7 +1371,7 @@ func testPSPAdmit(testCaseName string, psps []*extensions.PodSecurityPolicy, pod
 
 	if shouldPass && err == nil {
 		if pod.Annotations[psputil.ValidatedPSPAnnotation] != expectedPSP {
-			t.Errorf("%s: expected to validate under %s but found %s", testCaseName, expectedPSP, pod.Annotations[psputil.ValidatedPSPAnnotation])
+			t.Errorf("%s: expected to validate under %q PSP but found %q", testCaseName, expectedPSP, pod.Annotations[psputil.ValidatedPSPAnnotation])
 		}
 	}
 
