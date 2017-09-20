@@ -26,8 +26,8 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/sample-apiserver/pkg/admission/wardleinitializer"
 	"k8s.io/sample-apiserver/pkg/apis/wardle"
-	informers "k8s.io/sample-apiserver/pkg/client/informers_generated/internalversion"
-	listers "k8s.io/sample-apiserver/pkg/client/listers_generated/wardle/internalversion"
+	informers "k8s.io/sample-apiserver/pkg/client/informers/internalversion"
+	listers "k8s.io/sample-apiserver/pkg/client/listers/wardle/internalversion"
 )
 
 // Register registers a plugin
