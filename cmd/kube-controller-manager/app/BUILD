@@ -151,5 +151,8 @@ go_test(
     name = "go_default_test",
     srcs = ["controller_manager_test.go"],
     library = ":go_default_library",
-    deps = ["//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library"],
+    deps = [
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+    ],
 )
