@@ -74,7 +74,11 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 			return nil
 		}
 
-		// currently only SMB mount is supported
+		// currently only cifs mount is supported
+		if strings.ToLower(fstype) != "cifs" {
+			return fmt.Errorf("azureMount: only cifs mount is supported now, fstype: %q, mounting source (%q), target (%q), with options (%q)", fstype, source, target, options)
+		}
+
 		cmdLine := fmt.Sprintf(`$User = "%s";$PWord = ConvertTo-SecureString -String "%s" -AsPlainText -Force;`+
 			`$Credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $User, $PWord`,
 			options[0], options[1])
