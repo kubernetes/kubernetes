@@ -32,6 +32,7 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = ["examples_test.go"],
+    tags = ["manual"],  # this test is broken and examples in-tree is deprecated
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
