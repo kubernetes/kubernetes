@@ -55,8 +55,8 @@ var map_CronJobSpec = map[string]string{
 	"concurrencyPolicy":          "Specifies how to treat concurrent executions of a Job. Defaults to Allow.",
 	"suspend":                    "This flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
 	"jobTemplate":                "Specifies the job that will be created when executing a CronJob.",
-	"successfulJobsHistoryLimit": "The number of successful finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified.",
-	"failedJobsHistoryLimit":     "The number of failed finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified.",
+	"successfulJobsHistoryLimit": "The number of successful finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified. Defaults to 3.",
+	"failedJobsHistoryLimit":     "The number of failed finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
 }
 
 func (CronJobSpec) SwaggerDoc() map[string]string {

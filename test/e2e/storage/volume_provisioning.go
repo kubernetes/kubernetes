@@ -114,6 +114,7 @@ func testDynamicProvisioning(t storageClassTest, client clientset.Interface, cla
 	Expect(pv.Spec.AccessModes).To(Equal(expectedAccessModes))
 	Expect(pv.Spec.ClaimRef.Name).To(Equal(claim.ObjectMeta.Name))
 	Expect(pv.Spec.ClaimRef.Namespace).To(Equal(claim.ObjectMeta.Namespace))
+	Expect(pv.Spec.MountOptions).To(Equal(class.MountOptions))
 
 	// Run the checker
 	if t.pvCheck != nil {
@@ -126,8 +127,15 @@ func testDynamicProvisioning(t storageClassTest, client clientset.Interface, cla
 	// - The second one runs grep 'hello world' on /mnt/test.
 	// If both succeed, Kubernetes actually allocated something that is
 	// persistent across pods.
-	By("checking the created volume is writable")
-	runInPodWithVolume(client, claim.Namespace, claim.Name, "echo 'hello world' > /mnt/test/data")
+	By("checking the created volume is writable and has the PV's mount options")
+	command := "echo 'hello world' > /mnt/test/data"
+	// We give the first pod the secondary responsibility of checking the volume has
+	// been mounted with the PV's mount options, if the PV was provisioned with any
+	for _, option := range pv.Spec.MountOptions {
+		// Get entry, get mount options at 6th word, replace brackets with commas
+		command += fmt.Sprintf(" && ( mount | grep 'on /mnt/test' | awk '{print $6}' | sed 's/^(/,/; s/)$/,/' | grep -q ,%s, )", option)
+	}
+	runInPodWithVolume(client, claim.Namespace, claim.Name, command)
 
 	By("checking the created volume is readable and retains data")
 	runInPodWithVolume(client, claim.Namespace, claim.Name, "grep 'hello world' /mnt/test/data")
@@ -446,6 +454,29 @@ var _ = SIGDescribe("Dynamic Provisioning", func() {
 			By(fmt.Sprintf("deleting the PV %q", pv.Name))
 			framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
 			framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(c, pv.Name, 1*time.Second, 30*time.Second))
+		})
+
+		It("should provision storage with mount options", func() {
+			framework.SkipUnlessProviderIs("gce", "gke")
+
+			test := storageClassTest{
+				"HDD PD on GCE/GKE",
+				[]string{"gce", "gke"},
+				"kubernetes.io/gce-pd",
+				map[string]string{
+					"type": "pd-standard",
+				},
+				"1Gi",
+				"1Gi",
+				func(volume *v1.PersistentVolume) error {
+					return checkGCEPD(volume, "pd-standard")
+				},
+			}
+			class := newStorageClass(test, ns, "mountoptions")
+			class.MountOptions = []string{"debug", "nouid32"}
+			claim := newClaim(test, ns, "mountoptions")
+			claim.Spec.StorageClassName = &class.Name
+			testDynamicProvisioning(test, c, claim, class)
 		})
 
 		// NOTE: Slow!  The test will wait up to 5 minutes (framework.ClaimProvisionTimeout)

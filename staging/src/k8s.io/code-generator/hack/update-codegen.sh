@@ -37,10 +37,10 @@ trap cleanup EXIT
 function generate_group() {
   local GROUP_NAME=$1
   local VERSION=$2
-  local CLIENT_PKG=${SCRIPT_PACKAGE}/test/clientset
-  local LISTERS_PKG=${SCRIPT_PACKAGE}/test/listers
-  local INFORMERS_PKG=${SCRIPT_PACKAGE}/test/informers
-  local APIS_PKG=${SCRIPT_PACKAGE}/test/apis
+  local CLIENT_PKG=${SCRIPT_PACKAGE}/_test/clientset
+  local LISTERS_PKG=${SCRIPT_PACKAGE}/_test/listers
+  local INFORMERS_PKG=${SCRIPT_PACKAGE}/_test/informers
+  local APIS_PKG=${SCRIPT_PACKAGE}/_test/apis
   local INPUT_APIS=(
     ${GROUP_NAME}/
     ${GROUP_NAME}/${VERSION}
@@ -52,7 +52,7 @@ function generate_group() {
   echo "generating clientset for group ${GROUP_NAME} and version ${VERSION} at ${SCRIPT_BASE}/${CLIENT_PKG}"
   ${clientgen} --clientset-name="internal" --input-base ${APIS_PKG} --input ${INPUT_APIS[@]} --clientset-path ${CLIENT_PKG} --output-base=${SCRIPT_BASE}
   ${clientgen} --clientset-name="versioned" --input-base ${APIS_PKG} --input ${GROUP_NAME}/${VERSION} --clientset-path ${CLIENT_PKG} --output-base=${SCRIPT_BASE}
-  
+
   echo "Building lister-gen"
   go build -o "${listergen}" ${CODEGEN_PKG}/cmd/lister-gen
 

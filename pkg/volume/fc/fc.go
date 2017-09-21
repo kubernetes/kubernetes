@@ -61,9 +61,12 @@ func (plugin *fcPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 		return "", err
 	}
 
-	if len(volumeSource.TargetWWNs) != 0 {
+	// API server validates these parameters beforehand but attach/detach
+	// controller creates volumespec without validation. They may be nil
+	// or zero length. We should check again to avoid unexpected conditions.
+	if len(volumeSource.TargetWWNs) != 0 && volumeSource.Lun != nil {
 		// TargetWWNs are the FibreChannel target worldwide names
-		return fmt.Sprintf("%v", volumeSource.TargetWWNs), nil
+		return fmt.Sprintf("%v:%v", volumeSource.TargetWWNs, *volumeSource.Lun), nil
 	} else if len(volumeSource.WWIDs) != 0 {
 		// WWIDs are the FibreChannel World Wide Identifiers
 		return fmt.Sprintf("%v", volumeSource.WWIDs), nil
