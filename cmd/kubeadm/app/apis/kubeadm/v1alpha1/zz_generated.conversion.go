@@ -173,6 +173,7 @@ func autoConvert_v1alpha1_Networking_To_kubeadm_Networking(in *Networking, out *
 	out.ServiceSubnet = in.ServiceSubnet
 	out.PodSubnet = in.PodSubnet
 	out.DNSDomain = in.DNSDomain
+	out.DNSIP = in.DNSIP
 	return nil
 }
 
@@ -185,6 +186,7 @@ func autoConvert_kubeadm_Networking_To_v1alpha1_Networking(in *kubeadm.Networkin
 	out.ServiceSubnet = in.ServiceSubnet
 	out.PodSubnet = in.PodSubnet
 	out.DNSDomain = in.DNSDomain
+	out.DNSIP = in.DNSIP
 	return nil
 }
 

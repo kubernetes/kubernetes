@@ -65,9 +65,14 @@ func EnsureDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interf
 		return fmt.Errorf("error when parsing kube-dns deployment template: %v", err)
 	}
 
-	dnsip, err := getDNSIP(client)
-	if err != nil {
-		return err
+	var dnsip net.IP
+	if cfg.Networking.DNSIP != "" {
+		dnsip = net.ParseIP(cfg.Networking.DNSIP)
+	} else {
+		dnsip, err = getDNSIP(client)
+		if err != nil {
+			return err
+		}
 	}
 
 	dnsServiceBytes, err := kubeadmutil.ParseTemplate(KubeDNSService, struct{ DNSIP string }{
@@ -127,7 +132,7 @@ func createKubeDNSAddon(deploymentBytes, serviceBytes []byte, client clientset.I
 	return nil
 }
 
-// getDNSIP fetches the kubernetes service's ClusterIP and appends a "0" to it in order to get the DNS IP
+// getDNSIP checks local config or fetches the kubernetes service's ClusterIP and appends a "0" to it in order to get the DNS IP
 func getDNSIP(client clientset.Interface) (net.IP, error) {
 	k8ssvc, err := client.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
 	if err != nil {

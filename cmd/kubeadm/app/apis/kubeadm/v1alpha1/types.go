@@ -76,6 +76,7 @@ type Networking struct {
 	ServiceSubnet string `json:"serviceSubnet"`
 	PodSubnet     string `json:"podSubnet"`
 	DNSDomain     string `json:"dnsDomain"`
+	DNSIP         string `json:"dnsip"`
 }
 
 // Etcd contains elements describing Etcd configuration
