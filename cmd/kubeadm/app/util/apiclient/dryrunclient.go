@@ -27,8 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
-	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 // DryRunGetter is an interface that must be supplied to the NewDryRunClient function in order to contstruct a fully functional fake dryrun clientset
@@ -42,14 +42,7 @@ type MarshalFunc func(runtime.Object, schema.GroupVersion) ([]byte, error)
 
 // DefaultMarshalFunc is the default MarshalFunc used; uses YAML to print objects to the user
 func DefaultMarshalFunc(obj runtime.Object, gv schema.GroupVersion) ([]byte, error) {
-	mediaType := "application/yaml"
-	info, ok := runtime.SerializerInfoForMediaType(clientsetscheme.Codecs.SupportedMediaTypes(), mediaType)
-	if !ok {
-		return []byte{}, fmt.Errorf("unsupported media type %q", mediaType)
-	}
-
-	encoder := clientsetscheme.Codecs.EncoderForVersion(info.Serializer, gv)
-	return runtime.Encode(encoder, obj)
+	return kubeadmutil.MarshalToYaml(obj, gv)
 }
 
 // DryRunClientOptions specifies options to pass to NewDryRunClientWithOpts in order to get a dryrun clientset
