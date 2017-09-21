@@ -112,7 +112,7 @@ go_test(
         "//conditions:default": [],
     }),
     library = ":go_default_library",
-    tags = ["integration"],
+    tags = ["e2e"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1/node:go_default_library",
