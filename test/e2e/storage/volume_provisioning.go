@@ -109,12 +109,16 @@ func testDynamicProvisioning(t storageClassTest, client clientset.Interface, cla
 
 	// Check PV properties
 	By("checking the PV")
-	Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(Equal(*class.ReclaimPolicy))
 	expectedAccessModes := []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
 	Expect(pv.Spec.AccessModes).To(Equal(expectedAccessModes))
 	Expect(pv.Spec.ClaimRef.Name).To(Equal(claim.ObjectMeta.Name))
 	Expect(pv.Spec.ClaimRef.Namespace).To(Equal(claim.ObjectMeta.Namespace))
-	Expect(pv.Spec.MountOptions).To(Equal(class.MountOptions))
+	if class == nil {
+		Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(Equal(v1.PersistentVolumeReclaimDelete))
+	} else {
+		Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(Equal(*class.ReclaimPolicy))
+		Expect(pv.Spec.MountOptions).To(Equal(class.MountOptions))
+	}
 
 	// Run the checker
 	if t.pvCheck != nil {
