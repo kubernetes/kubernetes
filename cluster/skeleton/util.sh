@@ -93,3 +93,7 @@ function test-teardown {
 function prepare-e2e {
 	echo "Skeleton Provider: prepare-e2e not implemented" 1>&2
 }
+
+function detect-project {
+	echo "Skeleton Provider: detect-project not implemented" 1>&2
+}
