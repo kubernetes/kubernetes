@@ -1410,8 +1410,18 @@ func addKubeSystemPdbs(f *framework.Framework) (func(), error) {
 
 	newPdbs := make([]string, 0)
 	cleanup := func() {
+		var finalErr error
 		for _, newPdbName := range newPdbs {
-			f.ClientSet.Policy().PodDisruptionBudgets("kube-system").Delete(newPdbName, &metav1.DeleteOptions{})
+			By(fmt.Sprintf("Delete PodDisruptionBudget %v", newPdbName))
+			err := f.ClientSet.Policy().PodDisruptionBudgets("kube-system").Delete(newPdbName, &metav1.DeleteOptions{})
+			if err != nil {
+				// log error, but attempt to remove other pdbs
+				glog.Errorf("Failed to delete PodDisruptionBudget %v, err: %v", newPdbName, err)
+				finalErr = err
+			}
+		}
+		if finalErr != nil {
+			framework.Failf("Error during PodDisruptionBudget cleanup: %v", finalErr)
 		}
 	}
 
