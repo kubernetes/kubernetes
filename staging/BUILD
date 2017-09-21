@@ -6,17 +6,6 @@ load(
     "go_library",
 )
 
-go_binary(
-    name = "staging",
-    library = ":go_default_library",
-)
-
-go_library(
-    name = "go_default_library",
-    srcs = ["godeps-json-updater.go"],
-    deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
-)
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
