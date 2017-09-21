@@ -63,6 +63,14 @@ docker_pull(
 )
 
 docker_pull(
+    name = "debian-hyperkube-base-amd64",
+    digest = "sha256:e45d35f9f967ef7d49496d1d2e6f9ad378a29012b0c90f78b5d59a254f3135e6",
+    registry = "gcr.io",
+    repository = "google-containers/debian-hyperkube-base-amd64",
+    tag = "0.3",  # ignored, but kept here for documentation
+)
+
+docker_pull(
     name = "official_busybox",
     digest = "sha256:be3c11fdba7cfe299214e46edc642e09514dbb9bbefcd0d3836c05a1e0cd0642",
     registry = "index.docker.io",
