@@ -52,9 +52,11 @@ const (
 	apiCallLatencyThreshold time.Duration = 1 * time.Second
 
 	// We use a higher threshold for list apicalls if the cluster is big (i.e having > 500 nodes)
-	// as list response sizes are bigger in general for big clusters.
-	apiListCallLatencyThreshold  time.Duration = 5 * time.Second
-	bigClusterNodeCountThreshold               = 500
+	// as list response sizes are bigger in general for big clusters. We also use a higher threshold
+	// for list calls at cluster scope (this includes non-namespaced and all-namespaced calls).
+	apiListCallLatencyThreshold      time.Duration = 5 * time.Second
+	apiClusterScopeListCallThreshold time.Duration = 10 * time.Second
+	bigClusterNodeCountThreshold                   = 500
 
 	// Cluster Autoscaler metrics names
 	caFunctionMetric      = "cluster_autoscaler_function_duration_seconds_bucket"
@@ -371,12 +373,18 @@ func HighLatencyRequests(c clientset.Interface, nodeCount int) (int, *APIRespons
 	for i := range metrics.APICalls {
 		latency := metrics.APICalls[i].Latency.Perc99
 		isListCall := (metrics.APICalls[i].Verb == "LIST")
+		isClusterScopedCall := (metrics.APICalls[i].Scope == "cluster")
 		isBad := false
-		if latency > apiCallLatencyThreshold {
-			if !isListCall || !isBigCluster || (latency > apiListCallLatencyThreshold) {
-				isBad = true
-				badMetrics++
+		latencyThreshold := apiCallLatencyThreshold
+		if isListCall && isBigCluster {
+			latencyThreshold = apiListCallLatencyThreshold
+			if isClusterScopedCall {
+				latencyThreshold = apiClusterScopeListCallThreshold
 			}
+		}
+		if latency > latencyThreshold {
+			isBad = true
+			badMetrics++
 		}
 		if top > 0 || isBad {
 			top--
