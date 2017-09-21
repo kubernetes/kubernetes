@@ -75,6 +75,8 @@ const (
 	ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/openstack-internal-load-balancer"
 )
 
+// Deprecated; Since LBaaS v1 is deprecated in the OpenStack Liberty release, Kubernetes deprecated it at V1.8.
+// TODO(FengyunPan): remove LBaaS v1 after kubernetes V1.9.
 // LoadBalancer implementation for LBaaS v1
 type LbaasV1 struct {
 	LoadBalancer

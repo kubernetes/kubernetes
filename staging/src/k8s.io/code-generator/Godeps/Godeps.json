@@ -205,6 +205,54 @@
 		{
 			"ImportPath": "golang.org/x/text/width",
 			"Rev": "b19bf474d317b857955b12035d2c5acb57ce8b01"
+		},
+		{
+			"ImportPath": "k8s.io/gengo/args",
+			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+		},
+		{
+			"ImportPath": "k8s.io/gengo/examples/deepcopy-gen/generators",
+			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+		},
+		{
+			"ImportPath": "k8s.io/gengo/examples/defaulter-gen/generators",
+			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+		},
+		{
+			"ImportPath": "k8s.io/gengo/examples/import-boss/generators",
+			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+		},
+		{
+			"ImportPath": "k8s.io/gengo/examples/set-gen/generators",
+			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+		},
+		{
+			"ImportPath": "k8s.io/gengo/examples/set-gen/sets",
+			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+		},
+		{
+			"ImportPath": "k8s.io/gengo/generator",
+			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+		},
+		{
+			"ImportPath": "k8s.io/gengo/namer",
+			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+		},
+		{
+			"ImportPath": "k8s.io/gengo/parser",
+			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+		},
+		{
+			"ImportPath": "k8s.io/gengo/types",
+			"Rev": "9e661e9308f078838e266cca1c673922088c0ea4"
+		},
+		{
+			"ImportPath": "k8s.io/kube-openapi/pkg/common",
+			"Rev": "868f2f29720b192240e18284659231b440f9cda5"
+		},
+		{
+			"ImportPath": "k8s.io/kube-openapi/pkg/generators",
+			"Rev": "868f2f29720b192240e18284659231b440f9cda5"
 		}
 	]
 }
