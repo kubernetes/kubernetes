@@ -309,6 +309,25 @@ clean:
 else
 clean: clean_meta
 	build/make-clean.sh
+	rm -rf Godeps/_workspace # Just until we are sure its gone
+	# TODO(thockin): Remove this when we call clean_generated.
+	rm -f pkg/generated/openapi/zz_generated.openapi.go
+endif
+
+define CLEAN_ALL_HELP_INFO
+# Remove all build artifacts and gitignored files.
+#
+# Example:
+#   make clean_all
+#
+# TODO(thockin): call clean_generated when we stop committing generated code.
+endef
+.PHONY: clean_all
+ifeq ($(PRINT_HELP),y)
+clean_all:
+	@echo "$$CLEAN_HELP_INFO"
+else
+clean_all: clean
 	git clean -Xdf
 endif
 

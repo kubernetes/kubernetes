@@ -43,7 +43,7 @@ export KUBE_RELEASE_RUN_TESTS
 # Clean stuff out. Assume the last build left the tree in an odd
 # state.
 rm -rf ~/.kube*
-make clean
+make clean_all
 
 # Uncomment if you want to purge the Docker cache completely each
 # build. It costs about 150s each build to pull the golang image and
