@@ -130,7 +130,7 @@ func validateServiceLBAnnotations(svc *v1.Service) error {
 
 	for k, v := range svc.Annotations {
 		if incompatibleKeys.Has(k) {
-			allErrs = append(allErrs, fmt.Errorf("key %q is compatible with LB type %q", k, lbType))
+			allErrs = append(allErrs, fmt.Errorf("key %q is incompatible with LB type %q", k, lbType))
 			continue
 		}
 		err := validateLBAnnotation(k, v)

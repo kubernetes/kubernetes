@@ -118,7 +118,7 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, svc *v1.Service, nod
 	// Validate all the relevant annotations before proceeding.
 	if err := validateServiceLBAnnotations(svc); err != nil {
 		glog.Errorf("%s: %v", logPrefix, err)
-		return nil, fmt.Errorf("service %s/%s has invalid annotations: %v", svc.Namespace, svc.Name)
+		return nil, fmt.Errorf("service %s/%s has invalid annotations: %v", svc.Namespace, svc.Name, err)
 	}
 
 	desiredScheme := getSvcScheme(svc)
