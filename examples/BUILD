@@ -17,13 +17,6 @@ filegroup(
     ],
 )
 
-filegroup(
-    name = "sources",
-    srcs = glob([
-        "**/*",
-    ]),
-)
-
 go_library(
     name = "go_default_library",
     srcs = ["doc.go"],
