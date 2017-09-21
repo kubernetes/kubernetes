@@ -17,11 +17,16 @@ limitations under the License.
 package storage
 
 import (
+	"fmt"
+	"time"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 )
@@ -51,7 +56,7 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 
 		pvc = newClaim(test, ns, "default")
 		var err error
-		metricsGrabber, err = metrics.NewMetricsGrabber(c, nil, false, false, true, false, false)
+		metricsGrabber, err = metrics.NewMetricsGrabber(c, nil, true, false, true, false, false)
 
 		if err != nil {
 			framework.Failf("Error creating metrics grabber : %v", err)
@@ -95,6 +100,53 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 			verifyMetricCount(storageOpMetrics, updatedStorageMetrics, volumeOp)
 		}
 	})
+
+	It("should create prometheus metrics for volume summary stats", func() {
+		var err error
+		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(pvc).ToNot(Equal(nil))
+		defer func() {
+			framework.Logf("Deleting claim %q/%q", pvc.Namespace, pvc.Name)
+			framework.ExpectNoError(c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, nil))
+		}()
+
+		claims := []*v1.PersistentVolumeClaim{pvc}
+		pod := framework.MakePod(ns, claims, false, "")
+		pod, err = c.CoreV1().Pods(ns).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		err = framework.WaitForPodRunningInNamespace(c, pod)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod), "Error starting pod ", pod.Name)
+
+		pod, err = c.CoreV1().Pods(ns).Get(pod.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		// Wait for `VolumeStatsAggPeriod' to grab metrics
+		time.Sleep(1 * time.Minute)
+
+		// Grab kubelet metrics from the node the pod was scheduled on
+		kubeMetrics, err := metricsGrabber.GrabFromKubelet(pod.Spec.NodeName)
+		Expect(err).NotTo(HaveOccurred(), "Error getting kubelet metrics : %v", err)
+
+		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
+		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
+
+		// Verify volume stat metrics were collected for the referenced PVC
+		volumeStatKeys := []string{
+			kubeletmetrics.VolumeStatsUsedBytesKey,
+			kubeletmetrics.VolumeStatsCapacityBytesKey,
+			kubeletmetrics.VolumeStatsAvailableBytesKey,
+			kubeletmetrics.VolumeStatsUsedBytesKey,
+			kubeletmetrics.VolumeStatsInodesFreeKey,
+			kubeletmetrics.VolumeStatsInodesUsedKey,
+		}
+
+		for _, key := range volumeStatKeys {
+			kubeletKeyName := fmt.Sprintf("%s_%s", kubeletmetrics.KubeletSubsystem, key)
+			verifyVolumeStatMetric(kubeletKeyName, pvc.Namespace, pvc.Name, kubeMetrics)
+		}
+	})
 })
 
 func verifyMetricCount(oldMetrics map[string]int64, newMetrics map[string]int64, metricName string) {
@@ -122,4 +174,23 @@ func getControllerStorageMetrics(ms metrics.ControllerManagerMetrics) map[string
 		}
 	}
 	return result
+}
+
+// Verifies the specified metrics are in `kubeletMetrics`
+func verifyVolumeStatMetric(metricKeyName string, namespace string, pvcName string, kubeletMetrics metrics.KubeletMetrics) {
+	found := false
+	if samples, ok := kubeletMetrics[metricKeyName]; ok {
+		for _, sample := range samples {
+			samplePVC, ok := sample.Metric["persistentvolumeclaim"]
+			Expect(ok).To(BeTrue(), "Error getting pvc for %s", metricKeyName)
+			sampleNS, ok := sample.Metric["namespace"]
+			Expect(ok).To(BeTrue(), "Error getting namespace for %s", metricKeyName)
+
+			if string(samplePVC) == pvcName && string(sampleNS) == namespace {
+				found = true
+				break
+			}
+		}
+	}
+	Expect(found).To(BeTrue(), "PVC %s, Namespace %s not found for %s", pvcName, namespace, metricKeyName)
 }
