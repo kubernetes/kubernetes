@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/go-openapi/validate:go_default_library",

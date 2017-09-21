@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["pager.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

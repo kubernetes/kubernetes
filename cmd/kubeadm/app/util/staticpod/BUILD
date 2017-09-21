@@ -12,7 +12,6 @@ go_test(
     name = "go_default_test",
     srcs = ["utils_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -23,7 +22,6 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["utils.go"],
-    tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
         "//pkg/kubelet/types:go_default_library",

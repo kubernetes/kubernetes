@@ -11,13 +11,11 @@ load(
 go_binary(
     name = "peer-finder",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["peer-finder.go"],
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library"],
 )
 

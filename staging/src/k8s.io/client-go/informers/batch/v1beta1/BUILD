@@ -13,7 +13,6 @@ go_library(
         "cronjob.go",
         "interface.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/api/batch/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

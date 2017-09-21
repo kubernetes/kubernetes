@@ -15,7 +15,6 @@ go_test(
         "cache_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//plugin/pkg/admission/eventratelimit/apis/eventratelimit:go_default_library",
@@ -39,7 +38,6 @@ go_library(
         "doc.go",
         "limitenforcer.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//plugin/pkg/admission/eventratelimit/apis/eventratelimit:go_default_library",

@@ -16,7 +16,6 @@ go_library(
         "node_authz.go",
         "service_accounts.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/util/version:go_default_library",
         "//plugin/pkg/admission/serviceaccount:go_default_library",

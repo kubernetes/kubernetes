@@ -13,7 +13,6 @@ go_library(
         "api.pb.go",
         "constants.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",

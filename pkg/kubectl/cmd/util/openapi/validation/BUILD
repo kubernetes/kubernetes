@@ -15,7 +15,6 @@ go_library(
         "types.go",
         "validation.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/util:go_default_library",
@@ -34,7 +33,6 @@ go_test(
         "validation_test.go",
     ],
     data = ["//api/openapi-spec:swagger-spec"],
-    tags = ["automanaged"],
     deps = [
         ":go_default_library",
         "//pkg/api/testapi:go_default_library",

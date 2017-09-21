@@ -66,7 +66,6 @@ go_test(
     name = "go_default_test",
     srcs = ["taints_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//test/e2e/framework:go_default_library",
         "//test/utils:go_default_library",

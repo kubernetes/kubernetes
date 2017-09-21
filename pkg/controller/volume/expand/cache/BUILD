@@ -11,7 +11,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["volume_resize_map.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/controller/volume/expand/util:go_default_library",
         "//pkg/util/strings:go_default_library",

@@ -14,7 +14,6 @@ go_library(
         "pvc_populator.go",
         "sync_volume_resize.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",

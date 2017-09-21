@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["fake.go"],
-    tags = ["automanaged"],
     deps = ["//pkg/util/ipvs:go_default_library"],
 )
 

@@ -10,7 +10,6 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["openapi.go"],
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/github.com/googleapis/gnostic/compiler:go_default_library",

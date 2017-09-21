@@ -12,7 +12,6 @@ go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/storage:go_default_library",
@@ -29,7 +28,6 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["admission.go"],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/helper:go_default_library",

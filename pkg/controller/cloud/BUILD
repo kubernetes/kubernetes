@@ -12,7 +12,6 @@ go_library(
         "node_controller.go",
         "pvlcontroller.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/api/v1/node:go_default_library",
         "//pkg/cloudprovider:go_default_library",
