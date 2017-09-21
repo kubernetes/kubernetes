@@ -19,7 +19,7 @@
 
 REGISTRY?=gcr.io/google-containers
 IMAGE?=debian-hyperkube-base
-TAG=0.2
+TAG=0.3
 ARCH?=amd64
 CACHEBUST?=1
 

@@ -31,6 +31,11 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
+const (
+	attachContextKey = "context"
+	attachHostKey    = "host"
+)
+
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
 	return []volume.VolumePlugin{&portworxVolumePlugin{nil, nil}}
@@ -205,7 +210,7 @@ type portworxManager interface {
 	// Deletes a volume
 	DeleteVolume(deleter *portworxVolumeDeleter) error
 	// Attach a volume
-	AttachVolume(mounter *portworxVolumeMounter) (string, error)
+	AttachVolume(mounter *portworxVolumeMounter, attachOptions map[string]string) (string, error)
 	// Detach a volume
 	DetachVolume(unmounter *portworxVolumeUnmounter) error
 	// Mount a volume
@@ -274,7 +279,10 @@ func (b *portworxVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return nil
 	}
 
-	if _, err := b.manager.AttachVolume(b); err != nil {
+	attachOptions := make(map[string]string)
+	attachOptions[attachContextKey] = dir
+	attachOptions[attachHostKey] = b.plugin.host.GetHostName()
+	if _, err := b.manager.AttachVolume(b, attachOptions); err != nil {
 		return err
 	}
 

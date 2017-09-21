@@ -40,7 +40,6 @@ func ConvertToOpenAPITypes(in *apiextensions.CustomResourceDefinition, out *spec
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -84,9 +83,6 @@ func convertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema)
 		out.Enum[k] = v
 	}
 
-	if err := convertJSONSchemaPropsOrArray(in.Items, out.Items); err != nil {
-		return err
-	}
 	if err := convertSliceOfJSONSchemaProps(&in.AllOf, &out.AllOf); err != nil {
 		return err
 	}
@@ -96,8 +92,13 @@ func convertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema)
 	if err := convertSliceOfJSONSchemaProps(&in.AnyOf, &out.AnyOf); err != nil {
 		return err
 	}
-	if err := convertJSONSchemaProps(in.Not, out.Not); err != nil {
-		return err
+
+	if in.Not != nil {
+		in, out := &in.Not, &out.Not
+		*out = new(spec.Schema)
+		if err := convertJSONSchemaProps(*in, *out); err != nil {
+			return err
+		}
 	}
 
 	var err error
@@ -111,6 +112,11 @@ func convertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema)
 		return err
 	}
 
+	out.Definitions, err = convertMapOfJSONSchemaProps(in.Definitions)
+	if err != nil {
+		return err
+	}
+
 	if in.Ref != nil {
 		out.Ref, err = spec.NewRef(*in.Ref)
 		if err != nil {
@@ -118,21 +124,40 @@ func convertJSONSchemaProps(in *apiextensions.JSONSchemaProps, out *spec.Schema)
 		}
 	}
 
-	if err := convertJSONSchemaPropsorBool(in.AdditionalProperties, out.AdditionalProperties); err != nil {
-		return err
+	if in.AdditionalProperties != nil {
+		in, out := &in.AdditionalProperties, &out.AdditionalProperties
+		*out = new(spec.SchemaOrBool)
+		if err := convertJSONSchemaPropsorBool(*in, *out); err != nil {
+			return err
+		}
 	}
 
-	if err := convertJSONSchemaPropsorBool(in.AdditionalItems, out.AdditionalItems); err != nil {
-		return err
+	if in.AdditionalItems != nil {
+		in, out := &in.AdditionalItems, &out.AdditionalItems
+		*out = new(spec.SchemaOrBool)
+		if err := convertJSONSchemaPropsorBool(*in, *out); err != nil {
+			return err
+		}
 	}
 
-	if err := convertJSONSchemaDependencies(in.Dependencies, out.Dependencies); err != nil {
-		return err
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = new(spec.SchemaOrArray)
+		if err := convertJSONSchemaPropsOrArray(*in, *out); err != nil {
+			return err
+		}
 	}
 
-	out.Definitions, err = convertMapOfJSONSchemaProps(in.Definitions)
-	if err != nil {
-		return err
+	if in.Dependencies != nil {
+		in, out := &in.Dependencies, &out.Dependencies
+		*out = make(spec.Dependencies, len(*in))
+		for key, val := range *in {
+			newVal := new(spec.SchemaOrStringArray)
+			if err := convertJSONSchemaPropsOrStringArray(&val, newVal); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
 	}
 
 	if in.ExternalDocs != nil {
@@ -172,21 +197,31 @@ func convertMapOfJSONSchemaProps(in map[string]apiextensions.JSONSchemaProps) (m
 }
 
 func convertJSONSchemaPropsOrArray(in *apiextensions.JSONSchemaPropsOrArray, out *spec.SchemaOrArray) error {
-	if in != nil {
-		out.Schema = &spec.Schema{}
-		if err := convertJSONSchemaProps(in.Schema, out.Schema); err != nil {
+	if in.Schema != nil {
+		in, out := &in.Schema, &out.Schema
+		*out = new(spec.Schema)
+		if err := convertJSONSchemaProps(*in, *out); err != nil {
 			return err
+		}
+	}
+	if in.JSONSchemas != nil {
+		in, out := &in.JSONSchemas, &out.Schemas
+		*out = make([]spec.Schema, len(*in))
+		for i := range *in {
+			if err := convertJSONSchemaProps(&(*in)[i], &(*out)[i]); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
 func convertJSONSchemaPropsorBool(in *apiextensions.JSONSchemaPropsOrBool, out *spec.SchemaOrBool) error {
-	if in != nil {
-		out = &spec.SchemaOrBool{}
-		out.Allows = in.Allows
-		out.Schema = &spec.Schema{}
-		if err := convertJSONSchemaProps(in.Schema, out.Schema); err != nil {
+	out.Allows = in.Allows
+	if in.Schema != nil {
+		in, out := &in.Schema, &out.Schema
+		*out = new(spec.Schema)
+		if err := convertJSONSchemaProps(*in, *out); err != nil {
 			return err
 		}
 	}
@@ -194,24 +229,12 @@ func convertJSONSchemaPropsorBool(in *apiextensions.JSONSchemaPropsOrBool, out *
 }
 
 func convertJSONSchemaPropsOrStringArray(in *apiextensions.JSONSchemaPropsOrStringArray, out *spec.SchemaOrStringArray) error {
-	if in != nil {
-		out.Property = in.Property
-		out.Schema = &spec.Schema{}
-		if err := convertJSONSchemaProps(in.Schema, out.Schema); err != nil {
+	out.Property = in.Property
+	if in.Schema != nil {
+		in, out := &in.Schema, &out.Schema
+		*out = new(spec.Schema)
+		if err := convertJSONSchemaProps(*in, *out); err != nil {
 			return err
-		}
-	}
-	return nil
-}
-
-func convertJSONSchemaDependencies(in apiextensions.JSONSchemaDependencies, out spec.Dependencies) error {
-	if in != nil {
-		for k, v := range in {
-			schemaOrArray := spec.SchemaOrStringArray{}
-			if err := convertJSONSchemaPropsOrStringArray(&v, &schemaOrArray); err != nil {
-				return err
-			}
-			out[k] = schemaOrArray
 		}
 	}
 	return nil

@@ -101,8 +101,13 @@
 		},
 		{
 			"ImportPath": "github.com/Microsoft/go-winio",
-			"Comment": "v0.4.2",
-			"Rev": "f533f7a102197536779ea3a8cb881d639e21ec5a"
+			"Comment": "v0.4.5",
+			"Rev": "78439966b38d69bf38227fbf57ac8a6fee70f69a"
+		},
+		{
+			"ImportPath": "github.com/Microsoft/hcsshim",
+			"Comment": "V0.6.3",
+			"Rev": "6ea7fe54f719d95721e7d9b26ac0add224c9b923"
 		},
 		{
 			"ImportPath": "github.com/NYTimes/gziphandler",
@@ -1925,27 +1930,31 @@
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/api",
-			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/api/client",
-			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/api/client/volume",
-			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/api/spec",
-			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
+		},
+		{
+			"ImportPath": "github.com/libopenstorage/openstorage/pkg/parser",
+			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/pkg/units",
-			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
 			"ImportPath": "github.com/libopenstorage/openstorage/volume",
-			"Rev": "6e787003b91ddba85f108b8aede075b1af0d3606"
+			"Rev": "093a0c3888753c2056e7373183693d670c6bba01"
 		},
 		{
 			"ImportPath": "github.com/lpabon/godbc",
@@ -1994,6 +2003,10 @@
 		{
 			"ImportPath": "github.com/mitchellh/mapstructure",
 			"Rev": "53818660ed4955e899c0bcafa97299a388bd7c8e"
+		},
+		{
+			"ImportPath": "github.com/mohae/deepcopy",
+			"Rev": "491d3605edfb866af34a48075bd4355ac1bf46ca"
 		},
 		{
 			"ImportPath": "github.com/mreiferson/go-httpclient",
@@ -2743,10 +2756,6 @@
 			"ImportPath": "github.com/xyproto/simpleredis",
 			"Comment": "v1.0-13-g5292687",
 			"Rev": "5292687f5379e01054407da44d7c4590a61fd3de"
-		},
-		{
-			"ImportPath": "go.pedge.io/pb/go/google/protobuf",
-			"Rev": "f3c84f58974dc53d460d0855337cad85843bf0df"
 		},
 		{
 			"ImportPath": "go4.org/errorutil",
