@@ -295,7 +295,6 @@ filegroup(
         "//vendor/github.com/prometheus/common/model:all-srcs",
         "//vendor/github.com/prometheus/procfs:all-srcs",
         "//vendor/github.com/quobyte/api:all-srcs",
-        "//vendor/github.com/rackspace/gophercloud:all-srcs",
         "//vendor/github.com/rancher/go-rancher/client:all-srcs",
         "//vendor/github.com/renstrom/dedent:all-srcs",
         "//vendor/github.com/robfig/cron:all-srcs",

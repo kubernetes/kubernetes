@@ -153,7 +153,6 @@ pkg/cloudprovider/providers/gce
 pkg/cloudprovider/providers/openstack
 pkg/cloudprovider/providers/ovirt
 pkg/cloudprovider/providers/photon
-pkg/cloudprovider/providers/rackspace
 pkg/cloudprovider/providers/vsphere
 pkg/controller
 pkg/controller/bootstrap

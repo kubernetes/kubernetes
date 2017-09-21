@@ -25,6 +25,5 @@ import (
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/photon"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/rackspace"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 )
