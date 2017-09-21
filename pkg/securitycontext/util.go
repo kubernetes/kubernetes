@@ -242,30 +242,10 @@ func internalSecurityContextFromPodSecurityContext(pod *api.Pod) *api.SecurityCo
 	return synthesized
 }
 
-// AddNoNewPrivileges returns if we should add the no_new_privs option. This will return true if:
-// 1) the container is not privileged
-// 2) CAP_SYS_ADMIN is not being added
-// 3) if podSecurityPolicy.DefaultAllowPrivilegeEscalation is:
-//		- nil, then return false
-//		- true, then return false
-//		- false, then return true
+// AddNoNewPrivileges returns if we should add the no_new_privs option.
 func AddNoNewPrivileges(sc *v1.SecurityContext) bool {
 	if sc == nil {
 		return false
-	}
-
-	// handle the case where the container is privileged
-	if sc.Privileged != nil && *sc.Privileged {
-		return false
-	}
-
-	// handle the case where we are adding CAP_SYS_ADMIN
-	if sc.Capabilities != nil {
-		for _, cap := range sc.Capabilities.Add {
-			if string(cap) == "CAP_SYS_ADMIN" {
-				return false
-			}
-		}
 	}
 
 	// handle the case where the user did not set the default and did not explicitly set allowPrivilegeEscalation
