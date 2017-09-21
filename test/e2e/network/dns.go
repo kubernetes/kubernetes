@@ -449,7 +449,6 @@ var _ = SIGDescribe("DNS", func() {
 		By("changing the service to type=ClusterIP")
 		_, err = framework.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeClusterIP
-			s.Spec.ClusterIP = "10.0.0.123"
 			s.Spec.Ports = []v1.ServicePort{
 				{Port: 80, Name: "http", Protocol: "TCP"},
 			}
@@ -464,6 +463,9 @@ var _ = SIGDescribe("DNS", func() {
 		By("creating a third pod to probe DNS")
 		pod3 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
 
-		validateTargetedProbeOutput(f, pod3, []string{wheezyFileName, jessieFileName}, "10.0.0.123")
+		svc, err := f.ClientSet.Core().Services(f.Namespace.Name).Get(externalNameService.Name, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+
+		validateTargetedProbeOutput(f, pod3, []string{wheezyFileName, jessieFileName}, svc.Spec.ClusterIP)
 	})
 })
