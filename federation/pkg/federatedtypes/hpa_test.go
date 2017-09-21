@@ -69,7 +69,7 @@ func TestGetHpaScheduleState(t *testing.T) {
 		"Cluster needing max replicas gets it if there is another cluster to offer max": {
 			localHpas: func() map[string]pkgruntime.Object {
 				hpa1 := newHpaWithReplicas(NewInt32(1), NewInt32(70), 7)
-				hpa1 = updateHpaStatus(hpa1, NewInt32(50), 5, 5, true)
+				hpa1 = updateHpaStatus(hpa1, NewInt32(80), 5, 5, true)
 				hpa2 := newHpaWithReplicas(NewInt32(1), NewInt32(70), 1)
 				hpa2 = updateHpaStatus(hpa2, NewInt32(70), 1, 1, true)
 				// include third object to ensure, it does not break the test

@@ -21,6 +21,7 @@ go_library(
         "//federation/pkg/federation-controller/util:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/validation:go_default_library",
+        "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",

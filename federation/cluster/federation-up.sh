@@ -117,7 +117,7 @@ function init() {
       --apiserver-enable-basic-auth=true \
       --apiserver-enable-token-auth=true \
       --apiserver-arg-overrides="--runtime-config=api/all=true,--v=4" \
-      --controllermanager-arg-overrides="--v=4" \
+      --controllermanager-arg-overrides="--hpa-scale-forbidden-window=30s,--v=4" \
       --v=4
 }
 

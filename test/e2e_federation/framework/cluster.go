@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -43,8 +44,34 @@ type ClusterSlice []*Cluster
 
 // Cluster keeps track of the name and client of a cluster in the federation
 type Cluster struct {
-	Name string
+	Name              string
+	InternalClientSet *internalclientset.Clientset
 	*kubeclientset.Clientset
+}
+
+func (c *Cluster) GetNewFramework(fwBaseName, namespace string) *framework.Framework {
+	options := framework.FrameworkOptions{
+		ClientQPS:   20,
+		ClientBurst: 50,
+	}
+	f := &framework.Framework{
+		BaseName:                 fwBaseName,
+		AddonResourceConstraints: make(map[string]framework.ResourceConstraint),
+		Options:                  options,
+		ClientSet:                c.Clientset,
+		InternalClientset:        c.InternalClientSet,
+		Namespace: &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespace,
+			},
+		},
+	}
+	f.SkipNamespaceCreation = true
+
+	BeforeEach(f.BeforeEach)
+	AfterEach(f.AfterEach)
+
+	return f
 }
 
 // registeredClustersFromConfig configures clientsets for registered clusters from the e2e kubeconfig
@@ -67,8 +94,9 @@ func registeredClustersFromConfig(f *Framework) ClusterSlice {
 		Expect(framework.TestContext.KubeConfig).ToNot(Equal(""), "KubeConfig must be specified to load clusters' client config")
 		config := restConfigFromContext(c, i)
 		clusters = append(clusters, &Cluster{
-			Name:      c.Name,
-			Clientset: clientsetFromConfig(f, config, c.Spec.ServerAddressByClientCIDRs[0].ServerAddress),
+			Name:              c.Name,
+			InternalClientSet: internalClientsetFromConfig(f, config, c.Spec.ServerAddressByClientCIDRs[0].ServerAddress),
+			Clientset:         clientsetFromConfig(f, config, c.Spec.ServerAddressByClientCIDRs[0].ServerAddress),
 		})
 
 	}
@@ -112,6 +140,13 @@ func clientsetFromConfig(f *Framework, cfg *restclient.Config, host string) *kub
 	cfg.QPS = f.Framework.Options.ClientQPS
 	cfg.Burst = f.Framework.Options.ClientBurst
 	return kubeclientset.NewForConfigOrDie(restclient.AddUserAgent(cfg, "federation-e2e"))
+}
+
+func internalClientsetFromConfig(f *Framework, cfg *restclient.Config, host string) *internalclientset.Clientset {
+	cfg.Host = host
+	cfg.QPS = f.Framework.Options.ClientQPS
+	cfg.Burst = f.Framework.Options.ClientBurst
+	return internalclientset.NewForConfigOrDie(restclient.AddUserAgent(cfg, "federation-e2e"))
 }
 
 // waitForNamespaceInFederatedClusters waits for the federated namespace to be created in federated clusters
