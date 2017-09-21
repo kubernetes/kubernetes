@@ -146,6 +146,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
+	if in.ManifestURLHeader != nil {
+		in, out := &in.ManifestURLHeader, &out.ManifestURLHeader
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.EnableServer != nil {
 		in, out := &in.EnableServer, &out.EnableServer
 		if *in == nil {
