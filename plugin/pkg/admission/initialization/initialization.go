@@ -208,6 +208,13 @@ func (i *initializer) Admit(a admission.Attributes) (err error) {
 		}
 		updated := accessor.GetInitializers()
 
+		// controllers deployed with an empty initializers.pending have their initializers set to nil
+		// but should be able to update without changing their manifest
+		if updated != nil && len(updated.Pending) == 0 && updated.Result == nil {
+			accessor.SetInitializers(nil)
+			updated = nil
+		}
+
 		existingAccessor, err := meta.Accessor(a.GetOldObject())
 		if err != nil {
 			// if the old object does not have an accessor, but the new one does, error out
@@ -222,9 +229,6 @@ func (i *initializer) Admit(a admission.Attributes) (err error) {
 
 		glog.V(5).Infof("Modifying uninitialized resource %s", a.GetResource())
 
-		if updated != nil && len(updated.Pending) == 0 && updated.Result == nil {
-			accessor.SetInitializers(nil)
-		}
 		// because we are called before validation, we need to ensure the update transition is valid.
 		if errs := validation.ValidateInitializersUpdate(updated, existing, initializerFieldPath); len(errs) > 0 {
 			return errors.NewInvalid(a.GetKind().GroupKind(), a.GetName(), errs)
