@@ -220,16 +220,14 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		volumeName = util.GetUniqueVolumeNameForNonAttachableVolume(podName, volumePlugin, volumeSpec)
 	}
 
-	volumeObj, volumeExists := dsw.volumesToMount[volumeName]
-	if !volumeExists {
-		volumeObj = volumeToMount{
+	if _, volumeExists := dsw.volumesToMount[volumeName]; !volumeExists {
+		dsw.volumesToMount[volumeName] = volumeToMount{
 			volumeName:         volumeName,
 			podsToMount:        make(map[types.UniquePodName]podToMount),
 			pluginIsAttachable: attachable,
 			volumeGidValue:     volumeGidValue,
 			reportedInUse:      false,
 		}
-		dsw.volumesToMount[volumeName] = volumeObj
 	}
 
 	// Create new podToMount object. If it already exists, it is refreshed with
