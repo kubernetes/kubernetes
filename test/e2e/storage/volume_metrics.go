@@ -64,9 +64,7 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 	})
 
 	AfterEach(func() {
-		defer func() {
-			framework.DeletePersistentVolumeClaim(c, pvc.Name, pvc.Namespace)
-		}()
+		framework.DeletePersistentVolumeClaim(c, pvc.Name, pvc.Namespace)
 	})
 
 	It("should create prometheus metrics for volume provisioning and attach/detach", func() {
@@ -177,18 +175,18 @@ func getControllerStorageMetrics(ms metrics.ControllerManagerMetrics) map[string
 // Verifies the specified metrics are in `kubeletMetrics`
 func verifyVolumeStatMetric(metricKeyName string, namespace string, pvcName string, kubeletMetrics metrics.KubeletMetrics) {
 	found := false
-	invalidSamples := []string{}
+	errCount := 0
 	if samples, ok := kubeletMetrics[metricKeyName]; ok {
 		for _, sample := range samples {
 			samplePVC, ok := sample.Metric["persistentvolumeclaim"]
 			if !ok {
 				framework.Logf("Error getting pvc for metric %s, sample %s", metricKeyName, sample.String())
-				invalidSamples = append(invalidSamples, sample.String())
+				errCount++
 			}
 			sampleNS, ok := sample.Metric["namespace"]
 			if !ok {
 				framework.Logf("Error getting namespace for metric %s, sample %s", metricKeyName, sample.String())
-				invalidSamples = append(invalidSamples, sample.String())
+				errCount++
 			}
 
 			if string(samplePVC) == pvcName && string(sampleNS) == namespace {
@@ -197,6 +195,6 @@ func verifyVolumeStatMetric(metricKeyName string, namespace string, pvcName stri
 			}
 		}
 	}
-	Expect(invalidSamples).To(HaveLen(0), "Found %d invalid samples", len(invalidSamples))
+	Expect(errCount).To(Equal(0), "Found invalid samples")
 	Expect(found).To(BeTrue(), "PVC %s, Namespace %s not found for %s", pvcName, namespace, metricKeyName)
 }
