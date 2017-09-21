@@ -400,7 +400,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(buf.String(), "labeled") {
+	if !strings.Contains(buf.String(), "labels updated") {
 		t.Errorf("did not set labels: %s", buf.String())
 	}
 }
@@ -433,7 +433,7 @@ func TestLabelLocal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(buf.String(), "labeled") {
+	if !strings.Contains(buf.String(), "labels updated") {
 		t.Errorf("did not set labels: %s", buf.String())
 	}
 }
@@ -488,7 +488,7 @@ func TestLabelMultipleObjects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if strings.Count(buf.String(), "labeled") != len(pods.Items) {
+	if strings.Count(buf.String(), "labels updated") != len(pods.Items) {
 		t.Errorf("not all labels are set: %s", buf.String())
 	}
 }
