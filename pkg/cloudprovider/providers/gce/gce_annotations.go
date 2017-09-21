@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/golang/glog"
-
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -66,6 +64,8 @@ type lbAnnotation struct {
 	values sets.String
 	// defaultValue is the default value for the annotation key.
 	defaultValue string
+
+	alphaFeature string
 }
 
 var (
@@ -87,6 +87,7 @@ var (
 		NetworkTierAnnotationKey: {
 			values:       sets.NewString(NetworkTierAnnotationPremium, NetworkTierAnnotationStandard),
 			defaultValue: NetworkTierAnnotationPremium,
+			alphaFeature: AlphaFeatureNetworkTiers,
 		},
 	}
 
@@ -140,12 +141,6 @@ func validateServiceLBAnnotations(svc *v1.Service) error {
 }
 
 func validateLBAnnotation(key, value string) error {
-	// If the key has been deprecated, replace it with the new key.
-	if newKey, ok := deprecatedServiceLBAnnotations[key]; ok {
-		glog.Warning("key %s has been deprecated. Please use %q in the future", key, newKey)
-		key = newKey
-	}
-
 	r, ok := allServiceLBAnnotations[key]
 	if !ok {
 		// Ignore unknown keys.
@@ -163,9 +158,6 @@ func validateLBAnnotation(key, value string) error {
 // the key exists. If not, it returs the default value. It is the caller's
 // responsibility to ensure that the given key exists in allServiceLBAnnotations.
 func GetServiceLBAnnotationValue(svc *v1.Service, key string) string {
-	if newKey, ok := deprecatedServiceLBAnnotations[key]; ok {
-		key = newKey
-	}
 	if value, ok := svc.Annotations[key]; ok {
 		return value
 	}

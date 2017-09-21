@@ -568,7 +568,7 @@ func (gce *GCECloud) Initialize(clientBuilder controller.ControllerClientBuilder
 
 // LoadBalancer returns an implementation of LoadBalancer for Google Compute Engine.
 func (gce *GCECloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
-	return gce, true
+	return newWrappedLoadBalancer(gce), true
 }
 
 // Instances returns an implementation of Instances for Google Compute Engine.
