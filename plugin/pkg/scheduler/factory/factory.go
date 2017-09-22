@@ -26,6 +26,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -52,6 +53,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
 
+	"encoding/json"
 	"github.com/golang/glog"
 )
 
@@ -1001,7 +1003,6 @@ func (p *podPreemptor) DeletePod(pod *v1.Pod) error {
 	return p.Client.CoreV1().Pods(pod.Namespace).Delete(pod.Name, &metav1.DeleteOptions{})
 }
 
-//TODO(bsalamat): change this to patch PodStatus to avoid overwriting potential pending status updates.
 func (p *podPreemptor) UpdatePodAnnotations(pod *v1.Pod, annotations map[string]string) error {
 	podCopy := pod.DeepCopy()
 	if podCopy.Annotations == nil {
@@ -1010,6 +1011,12 @@ func (p *podPreemptor) UpdatePodAnnotations(pod *v1.Pod, annotations map[string]
 	for k, v := range annotations {
 		podCopy.Annotations[k] = v
 	}
-	_, err := p.Client.CoreV1().Pods(podCopy.Namespace).UpdateStatus(podCopy)
-	return err
+	ret := &unstructured.Unstructured{}
+	ret.SetAnnotations(podCopy.Annotations)
+	patchData, err := json.Marshal(ret)
+	if err != nil {
+		return err
+	}
+	_, error := p.Client.CoreV1().Pods(podCopy.Namespace).Patch(podCopy.Name, types.MergePatchType, patchData)
+	return error
 }
