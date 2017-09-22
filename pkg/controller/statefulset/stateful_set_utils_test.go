@@ -79,16 +79,14 @@ func TestIdentityMatches(t *testing.T) {
 		t.Error("identity matches for a Pod with the wrong namespace")
 	}
 	pod = newStatefulSetPod(set, 1)
-	delete(pod.Annotations, podapi.PodHostnameAnnotation)
 	pod.Spec.Hostname = ""
 	if identityMatches(set, pod) {
-		t.Error("identity matches for a Pod with no hostname")
+		t.Error("identity matches for a Pod with no hostname field")
 	}
 	pod = newStatefulSetPod(set, 1)
-	delete(pod.Annotations, podapi.PodSubdomainAnnotation)
 	pod.Spec.Subdomain = ""
 	if identityMatches(set, pod) {
-		t.Error("identity matches for a Pod with no subdomain")
+		t.Error("identity matches for a Pod with no subdomain field")
 	}
 }
 

@@ -401,8 +401,8 @@ func TestStatefulPodControlUpdatePodConflictFailure(t *testing.T) {
 	fakeClient := &fake.Clientset{}
 	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	updatedPod := newStatefulSetPod(set, 0)
-	updatedPod.Annotations[podapi.PodHostnameAnnotation] = "wrong"
-	updatedPod.Spec.Hostname = "wrong"
+	updatedPod.Annotations[podapi.PodHostnameAnnotation] = ""
+	updatedPod.Spec.Hostname = ""
 	indexer.Add(updatedPod)
 	podLister := corelisters.NewPodLister(indexer)
 	control := NewRealStatefulPodControl(fakeClient, nil, podLister, nil, recorder)

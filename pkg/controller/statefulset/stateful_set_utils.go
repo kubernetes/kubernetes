@@ -101,41 +101,20 @@ func isMemberOf(set *apps.StatefulSet, pod *v1.Pod) bool {
 	return getParentName(pod) == set.Name
 }
 
-// getHostname is copied from the endpoints controller.
-// We need to handle Pods that only set the field,
-// in case they were created by 1.7.x before a master rollback.
-func getHostname(pod *v1.Pod) string {
-	if len(pod.Spec.Hostname) > 0 {
-		return pod.Spec.Hostname
-	}
-	if pod.Annotations != nil {
-		return pod.Annotations[podapi.PodHostnameAnnotation]
-	}
-	return ""
-}
-
-// getSubdomain is copied from the endpoints controller.
-// We need to handle Pods that only set the field,
-// in case they were created by 1.7.x before a master rollback.
-func getSubdomain(pod *v1.Pod) string {
-	if len(pod.Spec.Subdomain) > 0 {
-		return pod.Spec.Subdomain
-	}
-	if pod.Annotations != nil {
-		return pod.Annotations[podapi.PodSubdomainAnnotation]
-	}
-	return ""
-}
-
 // identityMatches returns true if pod has a valid identity and network identity for a member of set.
 func identityMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 	parent, ordinal := getParentNameAndOrdinal(pod)
+	// Note that we only require Hostname and Subdomain to be non-empty.
+	// If they are filled in but don't match the Pod name or StatefulSet ServiceName
+	// (e.g. we adopted a Pod from a previous StatefulSet with a different ServiceName)
+	// we can't fix that anyway because the fields are only mutable when empty.
+	// If we required the values to match too, we would spam errors from failed Pod updates.
 	return ordinal >= 0 &&
 		set.Name == parent &&
 		pod.Name == getPodName(set, ordinal) &&
 		pod.Namespace == set.Namespace &&
-		getHostname(pod) == pod.Name &&
-		getSubdomain(pod) == set.Spec.ServiceName
+		pod.Spec.Hostname != "" &&
+		pod.Spec.Subdomain != ""
 }
 
 // storageMatches returns true if pod's Volumes cover the set of PersistentVolumeClaims
