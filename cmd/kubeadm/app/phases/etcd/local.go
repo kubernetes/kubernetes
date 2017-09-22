@@ -64,7 +64,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.MasterConfiguration) (v1.Pod, error) {
 		Command: etcdCommand,
 		Image:   images.GetCoreImage(kubeadmconstants.Etcd, cfg.ImageRepository, "", cfg.Etcd.Image),
 		// Mount the etcd datadir path read-write so etcd can store data in a more persistent manner
-		VolumeMounts:  []v1.VolumeMount{
+		VolumeMounts: []v1.VolumeMount{
 			staticpodutil.NewVolumeMount(etcdVolumeName, cfg.Etcd.DataDir, false),
 			certsVolumeMount(),
 			k8sVolumeMount(),
