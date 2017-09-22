@@ -110,29 +110,66 @@ type Manifest struct {
 
 // ConfigMap contains the metadata of how to generate a configmap.
 type ConfigMap struct {
-	// The type of the configmap. e.g. `env` and `file`.
+	// The type of the configmap. e.g. `env`, `file`, `literal`.
 	Type string `json:"type,omitempty" yaml:"type,omitempty"`
 
 	// Name prefix of the configmap.
 	// The full name should be Manifest.NamePrefix + Configmap.NamePrefix + hash(content of configmap).
 	NamePrefix string `json:"namePrefix,omitempty" yaml:"namePrefix,omitempty"`
 
-	// Configuration source file name.
-	File string `json:"file,omitempty" yaml:"file,omitempty"`
+	// Generic source for configmap, it could of one of `env`, `file`, `literal`
+	Generic `json:",inline,omitempty" yaml:",inline,omitempty"`
 }
 
 // Secret contains the metadata of how to generate a secret.
+// Only one of source or tls can be set.
 type Secret struct {
-	// The type of the secret. e.g. `tls`.
+	// The type of the secret. e.g. `generic` and `tls`.
 	Type string `json:"type,omitempty" yaml:"type,omitempty"`
 
 	// Name prefix of the secret.
 	// The full name should be Manifest.NamePrefix + Secret.NamePrefix + hash(content of secret).
 	NamePrefix string `json:"namePrefix,omitempty" yaml:"namePrefix,omitempty"`
 
-	// Cert file for the secret.
+	// Generic source for secret, it could of one of `env`, `file`, `literal`
+	Generic `json:",inline,omitempty" yaml:",inline,omitempty"`
+
+	// TLS secret.
+	TLS TLS `json:"tls,omitempty" yaml:"tls,omitempty"`
+
+	// DockerRegistry DockerRegistry `json:"dockerRegistry,omitempty" yaml:"dockerRegistry,omitempty"`
+}
+
+// Generic contains some generic sources for configmap or secret.
+// Only one field can be set.
+type Generic struct {
+	// Literal format should be a key and literal value, e.g. `somekey=somevalue`
+	// It will be similar to kubectl create configmap|secret --from-literal
+	Literal string `json:"literal,omitempty" yaml:"literal,omitempty"`
+
+	// File format can be specified using its file path, in which case file basename will be used as configmap key,
+	// or optionally with a key and file path, in which case the given key will be used.
+	// Specifying a directory will iterate each named file in the directory whose basename is a valid configmap key.
+	// It will be similar to kubectl create configmap|secret --from-file
+	File string `json:"file,omitempty" yaml:"file,omitempty"`
+
+	// EnvFile format should be a path to a file to read lines of key=val pairs to create a configmap.
+	// i.e. a Docker .env file or a .ini file.
+	EnvFile string `json:"envFile,omitempty" yaml:"envFile,omitempty"`
+}
+
+// TLS contains cert and key paths.
+type TLS struct {
+	// Path to PEM encoded public key certificate.
 	CertFile string `json:"certFile,omitempty" yaml:"certFile,omitempty"`
 
-	// Key file for the secret.
+	// Path to private key associated with given certificate.
 	KeyFile string `json:"keyFile,omitempty" yaml:"keyFile,omitempty"`
 }
+
+//type DockerRegistry struct {
+//	Username string
+//	Email string
+//	Password string
+//	Server string
+//}
