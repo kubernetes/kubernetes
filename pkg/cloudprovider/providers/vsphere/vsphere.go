@@ -406,9 +406,12 @@ func (vs *VSphere) InstanceID(nodeName k8stypes.NodeName) (string, error) {
 	// TODO: Need to see what to do if nodename and localNodeName are not matching.
 	// return "", cloudprovider.InstanceNotFound
 
-	if vs.localInstanceID == nodeNameToVMName(nodeName) {
-		return vs.cfg.Global.WorkingDir + "/" + vs.localInstanceID, nil
-	}
+
+	// TODO: Below logic is the existing logic.
+	//if vs.localInstanceID == nodeNameToVMName(nodeName) {
+	//	return vs.cfg.Global.WorkingDir + "/" + vs.localInstanceID, nil
+	//}
+
 	// Create context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
