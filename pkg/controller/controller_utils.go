@@ -88,6 +88,8 @@ var UpdateTaintBackoff = wait.Backoff{
 	Jitter:   1.0,
 }
 
+var podPhaseRankings = map[v1.PodPhase]int{v1.PodRunning: 0, v1.PodUnknown: 1, v1.PodPending: 2}
+
 var (
 	KeyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
 )
@@ -719,9 +721,8 @@ func (s ByLogging) Less(i, j int) bool {
 		return len(s[i].Spec.NodeName) > 0
 	}
 	// 2. PodRunning < PodUnknown < PodPending
-	m := map[v1.PodPhase]int{v1.PodRunning: 0, v1.PodUnknown: 1, v1.PodPending: 2}
-	if m[s[i].Status.Phase] != m[s[j].Status.Phase] {
-		return m[s[i].Status.Phase] < m[s[j].Status.Phase]
+	if podPhaseRankings[s[i].Status.Phase] != podPhaseRankings[s[j].Status.Phase] {
+		return podPhaseRankings[s[i].Status.Phase] < podPhaseRankings[s[j].Status.Phase]
 	}
 	// 3. ready < not ready
 	if podutil.IsPodReady(s[i]) != podutil.IsPodReady(s[j]) {
@@ -757,9 +758,8 @@ func (s ActivePods) Less(i, j int) bool {
 		return len(s[i].Spec.NodeName) == 0
 	}
 	// 2. PodPending < PodUnknown < PodRunning
-	m := map[v1.PodPhase]int{v1.PodPending: 0, v1.PodUnknown: 1, v1.PodRunning: 2}
-	if m[s[i].Status.Phase] != m[s[j].Status.Phase] {
-		return m[s[i].Status.Phase] < m[s[j].Status.Phase]
+	if podPhaseRankings[s[i].Status.Phase] != podPhaseRankings[s[j].Status.Phase] {
+		return podPhaseRankings[s[i].Status.Phase] < podPhaseRankings[s[j].Status.Phase]
 	}
 	// 3. Not ready < ready
 	// If only one of the pods is not ready, the not ready one is smaller
