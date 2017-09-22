@@ -1480,8 +1480,7 @@ func addKubeSystemPdbs(f *framework.Framework) (func(), error) {
 		{label: "kube-dns-autoscaler", min_available: 0},
 		{label: "metrics-server", min_available: 0},
 		{label: "kubernetes-dashboard", min_available: 0},
-		{label: "l7-default-backend", min_available: 0},
-		{label: "heapster", min_available: 0},
+		{label: "glbc", min_available: 0},
 	}
 	for _, pdbData := range pdbsToAdd {
 		By(fmt.Sprintf("Create PodDisruptionBudget for %v", pdbData.label))
