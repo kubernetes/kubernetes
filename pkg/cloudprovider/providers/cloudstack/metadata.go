@@ -209,3 +209,13 @@ func findDHCPServer() (string, error) {
 
 	return "", errors.New("no server found")
 }
+
+// Notification handler when node is registered.
+func (m *metadata) NodeRegistered(node *v1.Node) {
+
+}
+
+// Notification handler when node is unregistered.
+func (m *metadata) NodeUnregistered(node *v1.Node) {
+
+}
