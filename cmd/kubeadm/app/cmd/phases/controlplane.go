@@ -36,14 +36,22 @@ func NewCmdControlplane() *cobra.Command {
 	}
 
 	manifestPath := kubeadmconstants.GetStaticPodDirectory()
-	cmd.AddCommand(getControlPlaneSubCommands(manifestPath)...)
+	cmd.AddCommand(getControlPlaneSubCommands(manifestPath, "")...)
 	return cmd
 }
 
 // getControlPlaneSubCommands returns sub commands for Controlplane phase
-func getControlPlaneSubCommands(outDir string) []*cobra.Command {
+func getControlPlaneSubCommands(outDir, defaultKubernetesVersion string) []*cobra.Command {
 
 	cfg := &kubeadmapiext.MasterConfiguration{}
+
+	// This is used for unit testing only...
+	// If we wouldn't set this to something, the code would dynamically look up the version from the internet
+	// By setting this explicitely for tests workarounds that
+	if defaultKubernetesVersion != "" {
+		cfg.KubernetesVersion = defaultKubernetesVersion
+	}
+
 	// Default values for the cobra help text
 	api.Scheme.Default(cfg)
 
