@@ -400,10 +400,6 @@ var _ = SIGDescribe("DNS", func() {
 	})
 
 	It("should provide DNS for ExternalName services", func() {
-		// TODO(xiangpengzhao): allow AWS when pull-kubernetes-e2e-kops-aws and pull-kubernetes-e2e-gce-etcd3
-		// have the same "service-cluster-ip-range". See: https://github.com/kubernetes/kubernetes/issues/47224
-		framework.SkipUnlessProviderIs("gce")
-
 		// Create a test ExternalName service.
 		By("Creating a test externalName service")
 		serviceName := "dns-test-service-3"
