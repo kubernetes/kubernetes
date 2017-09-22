@@ -38,14 +38,22 @@ func NewCmdKubeConfig(out io.Writer) *cobra.Command {
 		RunE:  cmdutil.SubCmdRunE("kubeconfig"),
 	}
 
-	cmd.AddCommand(getKubeConfigSubCommands(out, kubeadmconstants.KubernetesDir)...)
+	cmd.AddCommand(getKubeConfigSubCommands(out, kubeadmconstants.KubernetesDir, "")...)
 	return cmd
 }
 
 // getKubeConfigSubCommands returns sub commands for kubeconfig phase
-func getKubeConfigSubCommands(out io.Writer, outDir string) []*cobra.Command {
+func getKubeConfigSubCommands(out io.Writer, outDir, defaultKubernetesVersion string) []*cobra.Command {
 
 	cfg := &kubeadmapiext.MasterConfiguration{}
+
+	// This is used for unit testing only...
+	// If we wouldn't set this to something, the code would dynamically look up the version from the internet
+	// By setting this explicitely for tests workarounds that
+	if defaultKubernetesVersion != "" {
+		cfg.KubernetesVersion = defaultKubernetesVersion
+	}
+
 	// Default values for the cobra help text
 	api.Scheme.Default(cfg)
 
