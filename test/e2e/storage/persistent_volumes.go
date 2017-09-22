@@ -86,7 +86,6 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 }
 
 var _ = SIGDescribe("PersistentVolumes", func() {
-
 	// global vars for the Context()s and It()'s below
 	f := framework.NewDefaultFramework("pv")
 	var (
@@ -203,10 +202,6 @@ var _ = SIGDescribe("PersistentVolumes", func() {
 		//   a) pre-binding, b) create pvcs before pvs, c) create pvcs and pods
 		//   in different namespaces.
 		Context("with multiple PVs and PVCs all in same ns", func() {
-
-			// define the maximum number of PVs and PVCs supported by these tests
-			const maxNumPVs = 10
-			const maxNumPVCs = 10
 			// scope the pv and pvc maps to be available in the AfterEach
 			// note: these maps are created fresh in CreatePVsPVCs()
 			var pvols framework.PVMap
