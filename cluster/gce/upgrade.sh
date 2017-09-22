@@ -253,6 +253,11 @@ function setup-base-image() {
   if [[ "${env_os_distro}" == "false" ]]; then
     echo "== Ensuring that new Node base OS image matched the existing Node base OS image"
     NODE_OS_DISTRIBUTION=$(get-node-os "${NODE_NAMES[0]}")
+
+    if [[ "${NODE_OS_DISTRIBUTION}" == "cos" ]]; then
+        NODE_OS_DISTRIBUTION="gci"
+    fi
+    
     source "${KUBE_ROOT}/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
     # Reset the node image based on current os distro
     set-node-image
