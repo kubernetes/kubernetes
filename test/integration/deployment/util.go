@@ -249,6 +249,10 @@ func (d *deploymentTester) expectNewReplicaSet() (*v1beta1.ReplicaSet, error) {
 	return rs, nil
 }
 
+func (d *deploymentTester) updateReplicaSet(name string, applyUpdate testutil.UpdateReplicaSetFunc) (*v1beta1.ReplicaSet, error) {
+	return testutil.UpdateReplicaSetWithRetries(d.c, d.deployment.Namespace, name, applyUpdate, d.t.Logf)
+}
+
 func pauseFn() func(update *v1beta1.Deployment) {
 	return func(update *v1beta1.Deployment) {
 		update.Spec.Paused = true
