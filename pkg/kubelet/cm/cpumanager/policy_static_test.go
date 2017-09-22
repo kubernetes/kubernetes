@@ -37,8 +37,9 @@ type staticPolicyTest struct {
 	expErr          error
 	expCPUAlloc     bool
 	expCSet         cpuset.CPUSet
-	keepPrevPolicy  bool
-	keepPrevState   bool
+	// Flags to control whether to keep policy and state from previous testCase
+	keepPrevPolicy bool
+	keepPrevState  bool
 }
 
 func TestStaticPolicyName(t *testing.T) {

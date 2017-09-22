@@ -125,7 +125,7 @@ func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Co
 		// container belongs in an exclusively allocated pool
 
 		if _, ok := s.GetCPUSet(containerID); ok {
-			glog.Infof("[cpumanager] static policy: container: %s, container id: %s already present in state, skipping", container.Name, containerID)
+			glog.Infof("[cpumanager] static policy: container already present in state, skipping (container: %s, container id: %s)", container.Name, containerID)
 			return nil
 		}
 
