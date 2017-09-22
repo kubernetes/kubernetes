@@ -188,6 +188,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/kubectl/apis/manifest/v1alpha1:all-srcs",
         "//pkg/kubectl/apps:all-srcs",
         "//pkg/kubectl/cmd:all-srcs",
         "//pkg/kubectl/metricsutil:all-srcs",
