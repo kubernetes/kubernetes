@@ -37,7 +37,10 @@ func TestGetEtcdPodSpec(t *testing.T) {
 	}
 
 	// Executes GetEtcdPodSpec
-	spec := GetEtcdPodSpec(cfg)
+	spec, err := GetEtcdPodSpec(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Assert each specs refers to the right pod
 	if spec.Spec.Containers[0].Name != kubeadmconstants.Etcd {
@@ -115,7 +118,7 @@ func TestGetEtcdCommand(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := getEtcdCommand(rt.cfg)
+		actual, _ := getEtcdCommand(rt.cfg)
 		sort.Strings(actual)
 		sort.Strings(rt.expected)
 		if !reflect.DeepEqual(actual, rt.expected) {

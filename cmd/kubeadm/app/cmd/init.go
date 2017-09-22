@@ -150,6 +150,17 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 		&cfg.API.AdvertiseAddress, "apiserver-advertise-address", cfg.API.AdvertiseAddress,
 		"The IP address the API Server will advertise it's listening on. 0.0.0.0 means the default network interface's address.",
 	)
+	flagSet.StringVar(
+		&cfg.PublicAddress, "public-address", cfg.PublicAddress,
+		"The PublicAddress address e.g. LoadBalancer",
+	)
+	flagSet.IntVar(
+		&cfg.Count, "master-count", cfg.Count,
+		"Master count",
+	)
+	flagSet.StringVar(
+		&cfg.ClusterName, "cluster-name", cfg.ClusterName,
+		"Cluster name. Used for tagging cloud provider resources")
 	flagSet.Int32Var(
 		&cfg.API.BindPort, "apiserver-bind-port", cfg.API.BindPort,
 		"Port for the API Server to bind to",
@@ -303,7 +314,8 @@ func (i *Init) Run(out io.Writer) error {
 		}
 
 		// PHASE 2: Generate kubeconfig files for the admin and the kubelet
-		if err := kubeconfigphase.CreateInitKubeConfigFiles(kubeConfigDir, i.cfg); err != nil {
+		err = kubeconfigphase.CreateInitKubeConfigFiles(kubeConfigDir, i.cfg)
+		if err != nil {
 			return err
 		}
 

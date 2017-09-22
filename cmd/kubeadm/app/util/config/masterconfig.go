@@ -18,8 +18,10 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
+	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	netutil "k8s.io/apimachinery/pkg/util/net"
@@ -27,9 +29,12 @@ import (
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/version"
 )
@@ -44,6 +49,9 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	}
 	cfg.API.AdvertiseAddress = ip.String()
 
+	if cfg.PublicAddress == "" {
+		cfg.PublicAddress = cfg.API.AdvertiseAddress
+	}
 	// Requested version is automatic CI build, thus use KubernetesCI Image Repository for core images
 	if kubeadmutil.KubernetesIsCIVersion(cfg.KubernetesVersion) {
 		cfg.CIImageRepository = kubeadmconstants.DefaultCIImageRepository
@@ -71,6 +79,38 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 		if err != nil {
 			return fmt.Errorf("couldn't generate random token: %v", err)
 		}
+	}
+
+	if cfg.NodeName == "" && cfg.CloudProvider != "" && cloudprovider.IsCloudProvider(cfg.CloudProvider) {
+		// If need to pass cloud config.
+		var config io.Reader = nil
+		if _, err = os.Stat(controlplane.DefaultCloudConfigPath); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("[init] %v", err)
+		}
+		config, err = os.Open(controlplane.DefaultCloudConfigPath)
+		// Return error only if specified file exists and error relates to read.
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("[init] %v", err)
+		}
+		cloudSupport, err := cloudprovider.GetCloudProvider(cfg.CloudProvider, config)
+		if err != nil {
+			fmt.Printf("[init] WARNING: Failed to get support for cloudprovider '%s': %v\n", cfg.CloudProvider, err)
+		} else {
+			if instances, ok := cloudSupport.Instances(); ok {
+				if name, err := instances.CurrentNodeName(node.GetHostname("")); err != nil {
+					fmt.Printf("[init] WARNING: Failed to get node name for cloud provider '%s': %v\n",
+						cfg.CloudProvider, err)
+				} else {
+					cfg.NodeName = string(name)
+					fmt.Printf("[init] Using Kubernetes nodename %s for cloud provider: %s\n",
+						cfg.NodeName, cfg.CloudProvider)
+				}
+			}
+		}
+	}
+
+	if cfg.Etcd.DataDir == "" && len(cfg.Etcd.Endpoints) == 0 {
+		cfg.Etcd.DataDir = "/var/lib/etcd"
 	}
 
 	cfg.NodeName = node.GetHostname(cfg.NodeName)

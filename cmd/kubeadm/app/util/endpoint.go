@@ -21,6 +21,7 @@ import (
 	"net"
 	"strconv"
 
+	"k8s.io/apimachinery/pkg/util/validation"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
@@ -37,15 +38,20 @@ func GetMasterEndpoint(cfg *kubeadmapi.MasterConfiguration) (string, error) {
 // GetMasterHostPort returns a properly formatted Master IP/port pair or error
 // if the IP address can not be parsed or port is outside the valid TCP range.
 func GetMasterHostPort(cfg *kubeadmapi.MasterConfiguration) (string, error) {
-	masterIP := net.ParseIP(cfg.API.AdvertiseAddress)
-	if masterIP == nil {
-		return "", fmt.Errorf("error parsing address %s", cfg.API.AdvertiseAddress)
+	var masterIP string
+
+	if IP := net.ParseIP(cfg.PublicAddress); IP == nil {
+		if len(validation.IsDNS1123Subdomain(cfg.PublicAddress)) == 0 {
+			masterIP = cfg.PublicAddress
+		} else {
+			return "", fmt.Errorf("error parsing address %s", cfg.PublicAddress)
+		}
 	}
 
 	if cfg.API.BindPort < 0 || cfg.API.BindPort > 65535 {
 		return "", fmt.Errorf("api server port must be between 0 and 65535")
 	}
 
-	hostPort := net.JoinHostPort(masterIP.String(), strconv.Itoa(int(cfg.API.BindPort)))
+	hostPort := net.JoinHostPort(masterIP, strconv.Itoa(int(cfg.API.BindPort)))
 	return hostPort, nil
 }

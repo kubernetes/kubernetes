@@ -57,6 +57,15 @@ type MasterConfiguration struct {
 
 	// FeatureGates enabled by the user
 	FeatureGates map[string]bool
+
+	MasterCertificates *MasterCertificates
+	// Public Addr or DNS
+	PublicAddress string
+	//Masters Count
+	Count int
+
+	//required for cloud providers. To make right tag for resources
+	ClusterName string
 }
 
 type API struct {
@@ -86,7 +95,8 @@ type Etcd struct {
 	DataDir   string
 	ExtraArgs map[string]string
 	// Image specifies which container image to use for running etcd. If empty, automatically populated by kubeadm using the image repository and default etcd version
-	Image string
+	Image     string
+	Discovery string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -117,6 +127,21 @@ type NodeConfiguration struct {
 	// without CA verification via DiscoveryTokenCACertHashes. This can weaken
 	// the security of kubeadm since other nodes can impersonate the master.
 	DiscoveryTokenUnsafeSkipCAVerification bool
+	CloudProvider                          string
+}
+
+type MasterCertificates struct {
+	CAKeyPem                string
+	CACertPem               string
+	APIServerKeyPem         string
+	APIServerCertPem        string
+	APIClientServerKeyPem   string
+	APIClientServerCertPem  string
+	SAKeyPem                string
+	FrontProxyKeyPem        string
+	FrontProxyCertPem       string
+	FrontProxyClientKeyPem  string
+	FrontProxyClientCertPem string
 }
 
 // GetControlPlaneImageRepository returns name of image repository

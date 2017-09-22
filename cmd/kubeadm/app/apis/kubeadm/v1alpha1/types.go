@@ -52,6 +52,15 @@ type MasterConfiguration struct {
 
 	// FeatureGates enabled by the user
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
+
+	MasterCertificates *MasterCertificates `json:"masterCertificates"`
+	// Public Addr or DNS
+	PublicAddress string `json:"publicAddress"`
+	//Masters Count
+	Count int `json:"count"`
+
+	//required for cloud providers. To make right tag for resources
+	ClusterName string `json:"clusterName"`
 }
 
 type API struct {
@@ -82,6 +91,8 @@ type Etcd struct {
 	ExtraArgs map[string]string `json:"extraArgs,omitempty"`
 	// Image specifies which container image to use for running etcd. If empty, automatically populated by kubeadm using the image repository and default etcd version
 	Image string `json:"image"`
+	//Discovery URL for etcd cluster
+	Discovery string `json:"discovery"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -110,5 +121,20 @@ type NodeConfiguration struct {
 	// DiscoveryTokenUnsafeSkipCAVerification allows token-based discovery
 	// without CA verification via DiscoveryTokenCACertHashes. This can weaken
 	// the security of kubeadm since other nodes can impersonate the master.
-	DiscoveryTokenUnsafeSkipCAVerification bool `json:"discoveryTokenUnsafeSkipCAVerification"`
+	DiscoveryTokenUnsafeSkipCAVerification bool   `json:"discoveryTokenUnsafeSkipCAVerification"`
+	CloudProvider                          string `json:"cloudProvider"`
+}
+
+type MasterCertificates struct {
+	CAKeyPem                string `json:"caKeyPem"`
+	CACertPem               string `json:"caCertPem"`
+	APIServerKeyPem         string `json:"apiServerKeyPem"`
+	APIServerCertPem        string `json:"apiServerCertPem"`
+	APIClientServerKeyPem   string `json:"apiClientServerKeyPem"`
+	APIClientServerCertPem  string `json:"apiClientServerCertPem"`
+	SAKeyPem                string `json:"saKeyPem"`
+	FrontProxyKeyPem        string `json:"frontProxyKeyPem"`
+	FrontProxyCertPem       string `json:"frontProxyCertPem"`
+	FrontProxyClientKeyPem  string `json:"frontProxyClientKeyPem"`
+	FrontProxyClientCertPem string `json:"frontProxyClientCertPem"`
 }

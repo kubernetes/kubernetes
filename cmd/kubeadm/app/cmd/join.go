@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -35,10 +36,13 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
 	kubeadmnode "k8s.io/kubernetes/cmd/kubeadm/app/node"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/cloudprovider"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -223,6 +227,11 @@ func (j *Join) Run(out io.Writer) error {
 	// TODO: In the beginning of the v1.9 cycle, we can remove the logic as we then don't support v1.7 anymore
 	if err == nil && strings.HasPrefix(string(kubeletVersionBytes), "Kubernetes v1.7") {
 		hostname := nodeutil.GetHostname(j.cfg.NodeName)
+
+		hostname, err := j.determineCloudProviderNodeName(hostname)
+		if err != nil {
+			return err
+		}
 		if err := kubeadmnode.PerformTLSBootstrap(cfg, hostname); err != nil {
 			return err
 		}
@@ -244,4 +253,36 @@ func (j *Join) Run(out io.Writer) error {
 
 	fmt.Fprintf(out, joinDoneMsgf)
 	return nil
+}
+
+func (j *Join) determineCloudProviderNodeName(currentNodeName string) (string, error) {
+	var kubeNode = currentNodeName
+	if j.cfg.CloudProvider != "" && cloudprovider.IsCloudProvider(j.cfg.CloudProvider) {
+		// If need to pass cloud config.
+		var config io.Reader = nil
+		if _, err := os.Stat(controlplane.DefaultCloudConfigPath); err != nil && !os.IsNotExist(err) {
+			return "", fmt.Errorf("[join]: %v", err)
+		}
+		config, err := os.Open(controlplane.DefaultCloudConfigPath)
+		// Return error only if specified file exists and error relates to read.
+		if err != nil && !os.IsNotExist(err) {
+			return "", fmt.Errorf("[join]: %v", err)
+		}
+		cloudSupport, err := cloudprovider.GetCloudProvider(j.cfg.CloudProvider, config)
+		if err != nil {
+			fmt.Printf("[join] WARNING: Failed to get support for cloudprovider '%s': %v\n", j.cfg.CloudProvider, err)
+		} else {
+			if instances, ok := cloudSupport.Instances(); ok {
+				if name, err := instances.CurrentNodeName(currentNodeName); err != nil {
+					fmt.Printf("[join] WARNING: Failed to get node name for cloud provider '%s': %v\n",
+						j.cfg.CloudProvider, err)
+				} else {
+					kubeNode = string(name)
+					fmt.Printf("[join] Using Kubernetes nodename %s for cloud provider: %s\n",
+						name, j.cfg.CloudProvider)
+				}
+			}
+		}
+	}
+	return kubeNode, nil
 }
