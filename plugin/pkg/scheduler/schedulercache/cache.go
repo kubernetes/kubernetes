@@ -112,6 +112,22 @@ func (cache *schedulerCache) FilteredList(podFilter PodFilter, selector labels.S
 	return pods, nil
 }
 
+func (cache *schedulerCache) IsAssumedPod(pod *v1.Pod) (bool, error) {
+	key, err := getPodKey(pod)
+	if err != nil {
+		return false, err
+	}
+
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	b, found := cache.assumedPods[key]
+	if !found {
+		return false, nil
+	}
+	return b, nil
+}
+
 func (cache *schedulerCache) AssumePod(pod *v1.Pod) error {
 	key, err := getPodKey(pod)
 	if err != nil {

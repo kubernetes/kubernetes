@@ -298,6 +298,18 @@ func (sched *Scheduler) scheduleOne() {
 		return
 	}
 
+	// Skip already assumed pod
+	// (https://github.com/kubernetes/kubernetes/issues/52914).
+	isAssumed, err := sched.config.SchedulerCache.IsAssumedPod(pod)
+	if err != nil {
+		glog.Errorf("Failed to check whether pod %v/%v is assumed: %v.", pod.Namespace, pod.Name, err)
+		return
+	}
+	if isAssumed {
+		glog.V(3).Infof("Skip already assumed pod: %v/%v.", pod.Namespace, pod.Name)
+		return
+	}
+
 	glog.V(3).Infof("Attempting to schedule pod: %v/%v", pod.Namespace, pod.Name)
 
 	// Synchronously attempt to find a fit for the pod.
