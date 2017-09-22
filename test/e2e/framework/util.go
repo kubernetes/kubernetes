@@ -2351,7 +2351,7 @@ func DumpNodeDebugInfo(c clientset.Interface, nodeNames []string, logFunc func(f
 		logFunc("\nLogging pods the kubelet thinks is on node %v", n)
 		podList, err := GetKubeletPods(c, n)
 		if err != nil {
-			logFunc("Unable to retrieve kubelet pods for node %v", n)
+			logFunc("Unable to retrieve kubelet pods for node %v: %v", n, err)
 			continue
 		}
 		for _, p := range podList.Items {

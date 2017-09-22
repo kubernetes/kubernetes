@@ -1365,12 +1365,12 @@ func getStatusTimestamp(status string) (time.Time, error) {
 		return time.Time{}, err
 	}
 
-	timestampMatches := timestampMatcher.FindAllStringSubmatch(status, -1)
-	if len(timestampMatches) < 1 {
+	timestampMatch := timestampMatcher.FindStringSubmatch(status)
+	if len(timestampMatch) < 2 {
 		return time.Time{}, fmt.Errorf("Failed to parse CA status timestamp, raw status: %v", status)
 	}
 
-	timestamp, err := time.Parse(timestampFormat, timestampMatches[0][1])
+	timestamp, err := time.Parse(timestampFormat, timestampMatch[1])
 	if err != nil {
 		return time.Time{}, err
 	}
