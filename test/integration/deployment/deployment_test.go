@@ -173,7 +173,7 @@ func TestPausedDeployment(t *testing.T) {
 	}
 
 	// Resume the deployment
-	tester.deployment, err = tester.updateDeployment(resumeFn())
+	tester.deployment, err = tester.updateDeployment(resumeFn)
 	if err != nil {
 		t.Fatalf("failed to resume deployment %s: %v", tester.deployment.Name, err)
 	}
@@ -200,7 +200,7 @@ func TestPausedDeployment(t *testing.T) {
 
 	// Pause the deployment.
 	// The paused deployment shouldn't trigger a new rollout.
-	tester.deployment, err = tester.updateDeployment(pauseFn())
+	tester.deployment, err = tester.updateDeployment(pauseFn)
 	if err != nil {
 		t.Fatalf("failed to pause deployment %s: %v", tester.deployment.Name, err)
 	}
@@ -283,7 +283,7 @@ func TestScalePausedDeployment(t *testing.T) {
 	}
 
 	// Pause the deployment.
-	tester.deployment, err = tester.updateDeployment(pauseFn())
+	tester.deployment, err = tester.updateDeployment(pauseFn)
 	if err != nil {
 		t.Fatalf("failed to pause deployment %s: %v", tester.deployment.Name, err)
 	}

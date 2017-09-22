@@ -45,6 +45,14 @@ const (
 	fakeImage     = "fakeimage"
 )
 
+var pauseFn = func(update *v1beta1.Deployment) {
+	update.Spec.Paused = true
+}
+
+var resumeFn = func(update *v1beta1.Deployment) {
+	update.Spec.Paused = false
+}
+
 type deploymentTester struct {
 	t          *testing.T
 	c          clientset.Interface
@@ -251,16 +259,4 @@ func (d *deploymentTester) expectNewReplicaSet() (*v1beta1.ReplicaSet, error) {
 
 func (d *deploymentTester) updateReplicaSet(name string, applyUpdate testutil.UpdateReplicaSetFunc) (*v1beta1.ReplicaSet, error) {
 	return testutil.UpdateReplicaSetWithRetries(d.c, d.deployment.Namespace, name, applyUpdate, d.t.Logf)
-}
-
-func pauseFn() func(update *v1beta1.Deployment) {
-	return func(update *v1beta1.Deployment) {
-		update.Spec.Paused = true
-	}
-}
-
-func resumeFn() func(update *v1beta1.Deployment) {
-	return func(update *v1beta1.Deployment) {
-		update.Spec.Paused = false
-	}
 }
