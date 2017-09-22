@@ -218,7 +218,7 @@ func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
 	for {
 		select {
 		case <-stopCh:
-			break
+			return
 		case nodeUpdate := <-tc.nodeUpdateChannel:
 			tc.handleNodeUpdate(nodeUpdate)
 		case podUpdate := <-tc.podUpdateChannel:
