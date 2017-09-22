@@ -37,6 +37,7 @@ go_library(
         "//pkg/cloudprovider/providers/vsphere:go_default_library",
         "//pkg/cloudprovider/providers/vsphere/vclib:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
+        "//pkg/kubelet/metrics:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
