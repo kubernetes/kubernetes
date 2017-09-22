@@ -106,7 +106,7 @@ func (c *BlobDiskController) CreateVolume(name, storageAccount string, storageAc
 		return "", "", 0, err
 	}
 
-	client, err := azstorage.NewBasicClient(storageAccount, key)
+	client, err := azstorage.NewClient(storageAccount, key, c.common.storageEndpointSuffix, azstorage.DefaultAPIVersion, useHTTPSForBlobBasedDisk)
 	if err != nil {
 		return "", "", 0, err
 	}
@@ -223,7 +223,7 @@ func (c *BlobDiskController) createVHDBlobDisk(blobClient azstorage.BlobStorageC
 
 // delete a vhd blob
 func (c *BlobDiskController) deleteVhdBlob(accountName, accountKey, blobName string) error {
-	client, err := azstorage.NewBasicClient(accountName, accountKey)
+	client, err := azstorage.NewClient(accountName, accountKey, c.common.storageEndpointSuffix, azstorage.DefaultAPIVersion, useHTTPSForBlobBasedDisk)
 	if err != nil {
 		return err
 	}
@@ -416,7 +416,7 @@ func (c *BlobDiskController) getBlobSvcClient(SAName string) (azstorage.BlobStor
 		return blobSvc, err
 	}
 
-	if client, err = azstorage.NewBasicClient(SAName, key); err != nil {
+	if client, err = azstorage.NewClient(SAName, key, c.common.storageEndpointSuffix, azstorage.DefaultAPIVersion, useHTTPSForBlobBasedDisk); err != nil {
 		return blobSvc, err
 	}
 
