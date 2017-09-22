@@ -20,6 +20,7 @@ go_library(
         "//pkg/kubeapiserver/admission:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/volume:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
     ],
 )

@@ -271,13 +271,6 @@ spec:
 					Field: "name",
 				},
 			},
-			validation.ValidationError{
-				Path: "Pod.spec.containers[0]",
-				Err: validation.MissingRequiredFieldError{
-					Path:  "io.k8s.api.core.v1.Container",
-					Field: "image",
-				},
-			},
 		})))
 	})
 
@@ -301,13 +294,6 @@ spec:
 				Err: validation.MissingRequiredFieldError{
 					Path:  "io.k8s.api.core.v1.Container",
 					Field: "name",
-				},
-			},
-			validation.ValidationError{
-				Path: "Pod.spec.containers[0]",
-				Err: validation.MissingRequiredFieldError{
-					Path:  "io.k8s.api.core.v1.Container",
-					Field: "image",
 				},
 			},
 		})))
@@ -347,15 +333,6 @@ items:
       - name: name
 `))
 
-		Expect(err).To(Equal(utilerrors.NewAggregate([]error{
-			validation.ValidationError{
-				Path: "Pod.spec.containers[0]",
-				Err: validation.MissingRequiredFieldError{
-					Path:  "io.k8s.api.core.v1.Container",
-					Field: "image",
-				},
-			},
-		})))
+		Expect(err).To(BeNil())
 	})
-
 })
