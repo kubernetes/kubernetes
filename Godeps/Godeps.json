@@ -1961,6 +1961,10 @@
 			"Rev": "9577782540c1398b710ddae1b86268ba03a19b0c"
 		},
 		{
+			"ImportPath": "github.com/lxn/win",
+			"Rev": "712da405e3eb60e148bf5086991cd1e9eb570001"
+		},
+		{
 			"ImportPath": "github.com/magiconair/properties",
 			"Comment": "v1.7.0-4-g61b492c",
 			"Rev": "61b492c03cf472e0c6419be5899b8e0dc28b1b88"
