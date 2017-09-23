@@ -30,6 +30,7 @@ import (
 
 	"github.com/ghodss/yaml"
 
+	admissionregistrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -3013,6 +3014,64 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 			fmt.Println(buf.String())
 			fmt.Println(test.expect)
 			t.Fatalf("Expected: %s, but got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func TestPrintInitializerConfiguration(t *testing.T) {
+	tests := []struct {
+		ic     admissionregistrationv1alpha1.InitializerConfiguration
+		expect string
+	}{
+		{
+			ic: admissionregistrationv1alpha1.InitializerConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+			},
+			expect: "test1\t0\t0s\n",
+		},
+		{
+			ic: admissionregistrationv1alpha1.InitializerConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Initializers: []admissionregistrationv1alpha1.Initializer{
+					{
+						Name: "test1",
+					},
+					{
+						Name: "test2",
+					},
+				},
+			},
+			expect: "test1\t2\t0s\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.ic, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+
+		table, err = printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.ic, printers.PrintOptions{Wide: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true, Wide: true}); err != nil {
+			t.Fatal(err)
 		}
 		buf.Reset()
 	}

@@ -217,6 +217,7 @@ __custom_func() {
     * events (aka 'ev')
     * horizontalpodautoscalers (aka 'hpa')
     * ingresses (aka 'ing')
+    * initializerconfiguration (aka 'ic')
     * jobs
     * limitranges (aka 'limits')
     * namespaces (aka 'ns')
