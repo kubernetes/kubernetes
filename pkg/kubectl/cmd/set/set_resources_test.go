@@ -60,7 +60,7 @@ func TestResourcesLocal(t *testing.T) {
 		Requests:          "cpu=200m,memory=512Mi",
 		ContainerSelector: "*"}
 
-	err := opts.Complete(f, cmd, []string{""})
+	err := opts.Complete(f, cmd, []string{})
 	if err == nil {
 		err = opts.Validate()
 	}

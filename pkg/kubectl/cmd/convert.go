@@ -126,14 +126,17 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 	}
 
 	// build the builder
-	o.builder = f.NewBuilder(!o.local)
+	o.builder = f.NewBuilder()
 	if !o.local {
 		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagBool(cmd, "openapi-validation"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 		if err != nil {
 			return err
 		}
 		o.builder = o.builder.Schema(schema)
+	} else {
+		o.builder = o.builder.Local(f.ClientForMapping)
 	}
+
 	cmdNamespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
