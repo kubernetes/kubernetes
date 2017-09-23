@@ -41,7 +41,7 @@ func TestGetEtcdPodSpec(t *testing.T) {
 
 	// Assert each specs refers to the right pod
 	if spec.Spec.Containers[0].Name != kubeadmconstants.Etcd {
-		t.Errorf("getKubeConfigSpecs spec for etcd contains pod %s, expectes %s", spec.Spec.Containers[0].Name, kubeadmconstants.Etcd)
+		t.Errorf("getKubeConfigSpecs spec for etcd contains pod %s, expects %s", spec.Spec.Containers[0].Name, kubeadmconstants.Etcd)
 	}
 }
 

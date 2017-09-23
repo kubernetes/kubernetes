@@ -402,7 +402,7 @@ func (s *ServiceController) isSynced() bool {
 // This function is called on service Addition/Deletion/Update either in federated cluster or in federation.
 func (s *ServiceController) reconcileService(key string) reconciliationStatus {
 	if !s.isSynced() {
-		glog.V(4).Infof("Data store not synced, delaying reconcilation: %v", key)
+		glog.V(4).Infof("Data store not synced, delaying reconciliation: %v", key)
 		return statusNotSynced
 	}
 

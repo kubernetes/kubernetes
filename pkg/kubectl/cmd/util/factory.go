@@ -113,7 +113,7 @@ type ClientAccessFactory interface {
 	BareClientConfig() (*restclient.Config, error)
 
 	// TODO this should probably be removed and collapsed into whatever we want to use long term
-	// probably returning a restclient for a version and leaving contruction up to someone else
+	// probably returning a restclient for a version and leaving construction up to someone else
 	FederationClientSetForVersion(version *schema.GroupVersion) (fedclientset.Interface, error)
 	// TODO remove this should be rolled into restclient with the right version
 	FederationClientForVersion(version *schema.GroupVersion) (*restclient.RESTClient, error)
