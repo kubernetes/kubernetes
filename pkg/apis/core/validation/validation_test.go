@@ -1283,6 +1283,24 @@ func TestValidateVolumes(t *testing.T) {
 			},
 		},
 		{
+			name: "valid storage medium default",
+			vol: api.Volume{
+				Name: "abc",
+				VolumeSource: api.VolumeSource{
+					EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumDefault},
+				},
+			},
+		},
+		{
+			name: "valid storage medium Memory",
+			vol: api.Volume{
+				Name: "abc",
+				VolumeSource: api.VolumeSource{
+					EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory},
+				},
+			},
+		},
+		{
 			name: "zero-length name",
 			vol: core.Volume{
 				Name:         "",
@@ -1310,6 +1328,16 @@ func TestValidateVolumes(t *testing.T) {
 			errtype:   field.ErrorTypeInvalid,
 			errfield:  "name",
 			errdetail: dnsLabelErrMsg,
+		},
+		{
+			name: "invalid storage medium",
+			vol: api.Volume{
+				Name:         "abc",
+				VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: "foo"}},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "medium",
+			errdetail: "invalid storage medium for EmptyDir volumes",
 		},
 		// More than one source field specified.
 		{
@@ -2841,7 +2869,6 @@ func TestValidateVolumes(t *testing.T) {
 	if errs := validateVolumeSource(&hugePagesCase, field.NewPath("field").Index(0), "failing"); len(errs) == 0 {
 		t.Errorf("Expected error when HugePages feature is disabled got nothing.")
 	}
-
 }
 
 func TestAlphaHugePagesIsolation(t *testing.T) {
@@ -2945,7 +2972,6 @@ func TestAlphaHugePagesIsolation(t *testing.T) {
 }
 
 func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
-
 	testCases := []core.VolumeSource{
 		{EmptyDir: &core.EmptyDirVolumeSource{SizeLimit: resource.NewQuantity(int64(5), resource.BinarySI)}},
 	}
@@ -2997,7 +3023,6 @@ func TestAlphaLocalStorageCapacityIsolation(t *testing.T) {
 	if errs := ValidateResourceRequirements(&containerLimitCase, field.NewPath("resources")); len(errs) == 0 {
 		t.Errorf("expected failure: %v", errs)
 	}
-
 }
 
 func TestValidateResourceQuotaWithAlphaLocalStorageCapacityIsolation(t *testing.T) {

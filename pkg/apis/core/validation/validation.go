@@ -395,6 +395,10 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field must be a valid resource quantity"))
 			}
 		}
+		if !core.ValidStorageMedia.Has(string(source.EmptyDir.Medium)) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("emptyDir").Child("medium"), source.EmptyDir.Medium, "invalid storage medium for EmptyDir volumes"))
+
+		}
 		if !utilfeature.DefaultFeatureGate.Enabled(features.HugePages) && source.EmptyDir.Medium == core.StorageMediumHugePages {
 			allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("medium"), "HugePages medium is disabled by feature-gate for EmptyDir volumes"))
 		}
