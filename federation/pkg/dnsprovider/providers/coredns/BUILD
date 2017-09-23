@@ -22,10 +22,12 @@ go_library(
         "//federation/pkg/dnsprovider/providers/coredns/stubs:go_default_library",
         "//federation/pkg/dnsprovider/rrstype:go_default_library",
         "//vendor/github.com/coreos/etcd/client:go_default_library",
+        "//vendor/github.com/coreos/etcd/pkg/transport:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/miekg/coredns/middleware/etcd/msg:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
     ],
 )
 
