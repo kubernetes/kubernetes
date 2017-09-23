@@ -212,7 +212,20 @@ func getRequestOptions(req *http.Request, scope RequestScope, into runtime.Objec
 		if isSubresource {
 			startingIndex = 3
 		}
-		newQuery[subpathKey] = []string{strings.Join(requestInfo.Parts[startingIndex:], "/")}
+
+		p := strings.Join(requestInfo.Parts[startingIndex:], "/")
+
+		// ensure non-empty subpaths correctly reflect a leading slash
+		if len(p) > 0 && !strings.HasPrefix(p, "/") {
+			p = "/" + p
+		}
+
+		// ensure subpaths correctly reflect the presence of a trailing slash on the original request
+		if strings.HasSuffix(requestInfo.Path, "/") && !strings.HasSuffix(p, "/") {
+			p += "/"
+		}
+
+		newQuery[subpathKey] = []string{p}
 		query = newQuery
 	}
 	return scope.ParameterCodec.DecodeParameters(query, scope.Kind.GroupVersion(), into)

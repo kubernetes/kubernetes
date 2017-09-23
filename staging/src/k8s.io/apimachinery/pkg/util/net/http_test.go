@@ -20,6 +20,7 @@ package net
 
 import (
 	"crypto/tls"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -216,5 +217,42 @@ func TestTLSClientConfigHolder(t *testing.T) {
 
 	if !rt.called {
 		t.Errorf("didn't find tls config")
+	}
+}
+
+func TestJoinPreservingTrailingSlash(t *testing.T) {
+	tests := []struct {
+		a    string
+		b    string
+		want string
+	}{
+		// All empty
+		{"", "", ""},
+
+		// Empty a
+		{"", "/", "/"},
+		{"", "foo", "foo"},
+		{"", "/foo", "/foo"},
+		{"", "/foo/", "/foo/"},
+
+		// Empty b
+		{"/", "", "/"},
+		{"foo", "", "foo"},
+		{"/foo", "", "/foo"},
+		{"/foo/", "", "/foo/"},
+
+		// Both populated
+		{"/", "/", "/"},
+		{"foo", "foo", "foo/foo"},
+		{"/foo", "/foo", "/foo/foo"},
+		{"/foo/", "/foo/", "/foo/foo/"},
+	}
+	for _, tt := range tests {
+		name := fmt.Sprintf("%q+%q=%q", tt.a, tt.b, tt.want)
+		t.Run(name, func(t *testing.T) {
+			if got := JoinPreservingTrailingSlash(tt.a, tt.b); got != tt.want {
+				t.Errorf("JoinPreservingTrailingSlash() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
