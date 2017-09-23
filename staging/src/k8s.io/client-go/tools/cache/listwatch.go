@@ -51,8 +51,7 @@ type WatchFunc func(options metav1.ListOptions) (watch.Interface, error)
 type ListWatch struct {
 	ListFunc  ListFunc
 	WatchFunc WatchFunc
-	// DisableChunking requests no chunking for this list watcher. It has no effect in Kubernetes 1.8, but in
-	// 1.9 will allow a controller to opt out of chunking.
+	// DisableChunking requests no chunking for this list watcher.
 	DisableChunking bool
 }
 
@@ -93,9 +92,7 @@ func timeoutFromListOptions(options metav1.ListOptions) time.Duration {
 
 // List a set of apiserver resources
 func (lw *ListWatch) List(options metav1.ListOptions) (runtime.Object, error) {
-	// chunking will become the default for list watchers starting in Kubernetes 1.9, unless
-	// otherwise disabled.
-	if false && !lw.DisableChunking {
+	if !lw.DisableChunking {
 		return pager.New(pager.SimplePageFunc(lw.ListFunc)).List(context.TODO(), options)
 	}
 	return lw.ListFunc(options)
