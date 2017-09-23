@@ -19,8 +19,8 @@ package apiclient
 import (
 	"fmt"
 
+	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	rbac "k8s.io/api/rbac/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,13 +71,13 @@ func CreateOrUpdateServiceAccount(client clientset.Interface, sa *v1.ServiceAcco
 }
 
 // CreateOrUpdateDeployment creates a Deployment if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
-func CreateOrUpdateDeployment(client clientset.Interface, deploy *extensions.Deployment) error {
-	if _, err := client.ExtensionsV1beta1().Deployments(deploy.ObjectMeta.Namespace).Create(deploy); err != nil {
+func CreateOrUpdateDeployment(client clientset.Interface, deploy *apps.Deployment) error {
+	if _, err := client.AppsV1beta2().Deployments(deploy.ObjectMeta.Namespace).Create(deploy); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			return fmt.Errorf("unable to create deployment: %v", err)
 		}
 
-		if _, err := client.ExtensionsV1beta1().Deployments(deploy.ObjectMeta.Namespace).Update(deploy); err != nil {
+		if _, err := client.AppsV1beta2().Deployments(deploy.ObjectMeta.Namespace).Update(deploy); err != nil {
 			return fmt.Errorf("unable to update deployment: %v", err)
 		}
 	}
@@ -85,13 +85,13 @@ func CreateOrUpdateDeployment(client clientset.Interface, deploy *extensions.Dep
 }
 
 // CreateOrUpdateDaemonSet creates a DaemonSet if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
-func CreateOrUpdateDaemonSet(client clientset.Interface, ds *extensions.DaemonSet) error {
-	if _, err := client.ExtensionsV1beta1().DaemonSets(ds.ObjectMeta.Namespace).Create(ds); err != nil {
+func CreateOrUpdateDaemonSet(client clientset.Interface, ds *apps.DaemonSet) error {
+	if _, err := client.AppsV1beta2().DaemonSets(ds.ObjectMeta.Namespace).Create(ds); err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			return fmt.Errorf("unable to create daemonset: %v", err)
 		}
 
-		if _, err := client.ExtensionsV1beta1().DaemonSets(ds.ObjectMeta.Namespace).Update(ds); err != nil {
+		if _, err := client.AppsV1beta2().DaemonSets(ds.ObjectMeta.Namespace).Update(ds); err != nil {
 			return fmt.Errorf("unable to update daemonset: %v", err)
 		}
 	}
@@ -104,7 +104,7 @@ func DeleteDaemonSetForeground(client clientset.Interface, namespace, name strin
 	deleteOptions := &metav1.DeleteOptions{
 		PropagationPolicy: &foregroundDelete,
 	}
-	return client.ExtensionsV1beta1().DaemonSets(namespace).Delete(name, deleteOptions)
+	return client.AppsV1beta2().DaemonSets(namespace).Delete(name, deleteOptions)
 }
 
 // CreateOrUpdateRole creates a Role if the target resource doesn't exist. If the resource exists already, this function will update the resource instead.
