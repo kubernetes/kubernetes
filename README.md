@@ -1,6 +1,6 @@
 # Kubernetes
 
-[![Submit Queue Widget]][Submit Queue] [![GoDoc Widget]][GoDoc]
+[![Submit Queue Widget]][Submit Queue] [![GoDoc Widget]][GoDoc] [![GoReportCard Widget]][GoReportCard Status]
 
 <img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="100">
 
@@ -82,5 +82,7 @@ That said, if you have questions, reach out to us
 [Submit Queue]: http://submit-queue.k8s.io/#/ci
 [Submit Queue Widget]: http://submit-queue.k8s.io/health.svg?v=1
 [troubleshooting guide]: https://kubernetes.io/docs/tasks/debug-application-cluster/troubleshooting/ 
+[GoReportCard Widget]: https://goreportcard.com/badge/github.com/kubernetes/kubernetes
+[GoReportCard Status]: https://goreportcard.com/report/github.com/kubernetes/kubernetes
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/README.md?pixel)]()
