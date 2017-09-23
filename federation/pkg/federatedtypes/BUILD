@@ -32,6 +32,7 @@ go_library(
         "daemonset.go",
         "deployment.go",
         "hpa.go",
+        "job.go",
         "namespace.go",
         "qualifiedname.go",
         "registry.go",
