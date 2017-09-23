@@ -128,12 +128,6 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 			i, err := NewInit(cfgPath, internalcfg, skipPreFlight, skipTokenPrint, dryRun)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(i.Validate(cmd))
-
-			// TODO: remove this warning in 1.9
-			if !cmd.Flags().Lookup("token-ttl").Changed {
-				fmt.Println("[kubeadm] WARNING: starting in 1.8, tokens expire after 24 hours by default (if you require a non-expiring token use --token-ttl 0)")
-			}
-
 			kubeadmutil.CheckErr(i.Run(out))
 		},
 	}
