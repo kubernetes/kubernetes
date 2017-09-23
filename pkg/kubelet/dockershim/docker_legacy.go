@@ -82,7 +82,7 @@ func convertLegacyNameAndLabels(names []string, labels map[string]string) ([]str
 		kubePrefix,                         // 0
 		m.ContainerName,                    // 1: container name
 		sandboxName,                        // 2: sandbox name
-		sandboxNamespace,                   // 3: sandbox namesapce
+		sandboxNamespace,                   // 3: sandbox namespace
 		string(m.PodUID),                   // 4: sandbox uid
 		labels[containerRestartCountLabel], // 5
 	}, nameDelimiter)}

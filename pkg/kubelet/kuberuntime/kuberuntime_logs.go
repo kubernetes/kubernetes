@@ -164,7 +164,7 @@ func (m *kubeGenericRuntimeManager) ReadLogs(path, containerID string, apiOpts *
 				return fmt.Errorf("failed to reset seek in log file %q: %v", path, err)
 			}
 			if watcher == nil {
-				// Intialize the watcher if it has not been initialized yet.
+				// Initialize the watcher if it has not been initialized yet.
 				if watcher, err = fsnotify.NewWatcher(); err != nil {
 					return fmt.Errorf("failed to create fsnotify watcher: %v", err)
 				}
@@ -180,7 +180,7 @@ func (m *kubeGenericRuntimeManager) ReadLogs(path, containerID string, apiOpts *
 			continue
 		}
 		if parse == nil {
-			// Intialize the log parsing function.
+			// Initialize the log parsing function.
 			parse, err = getParseFunc(l)
 			if err != nil {
 				return fmt.Errorf("failed to get parse function: %v", err)

@@ -30,7 +30,7 @@ import (
 )
 
 // This file contains functions used in the non-CRI integration (< 1.6). They
-// are currently used for recoginzing containers created by pre-1.6 kubelets.
+// are currently used for recognizing containers created by pre-1.6 kubelets.
 // TODO: Remove this file for kubernetes 1.8+.
 
 // Creates a name which can be reversed to identify both full pod name and container name.
