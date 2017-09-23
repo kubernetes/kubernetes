@@ -211,7 +211,7 @@ func (h *HumanReadablePrinter) DefaultTableHandler(columnDefinitions []metav1alp
 //  func printFunc(object ObjectType, options PrintOptions) ([]metav1alpha1.TableRow, error)
 // where ObjectType is the type of the object that will be printed, and the first
 // return value is an array of rows, with each row containing a number of cells that
-// match the number of coulmns defined for that printer function.
+// match the number of columns defined for that printer function.
 func ValidateRowPrintHandlerFunc(printFunc reflect.Value) error {
 	if printFunc.Kind() != reflect.Func {
 		return fmt.Errorf("invalid print handler. %#v is not a function", printFunc)
@@ -310,8 +310,8 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 		return PrintTable(table, output, h.options)
 	}
 
-	// check if the object is unstructured.  If so, let's attempt to convert it to a type we can understand before
-	// trying to print, since the printers are keyed by type.  This is extremely expensive.
+	// check if the object is unstructured. If so, let's attempt to convert it to a type we can understand before
+	// trying to print, since the printers are keyed by type. This is extremely expensive.
 	if h.encoder != nil && h.decoder != nil {
 		obj, _ = decodeUnknownObject(obj, h.encoder, h.decoder)
 	}
@@ -351,7 +351,7 @@ func hasCondition(conditions []metav1alpha1.TableRowCondition, t metav1alpha1.Ro
 }
 
 // PrintTable prints a table to the provided output respecting the filtering rules for options
-// for wide columns and filetred rows. It filters out rows that are Completed. You should call
+// for wide columns and filtered rows. It filters out rows that are Completed. You should call
 // DecorateTable if you receive a table from a remote server before calling PrintTable.
 func PrintTable(table *metav1alpha1.Table, output io.Writer, options PrintOptions) error {
 	if !options.NoHeaders {
