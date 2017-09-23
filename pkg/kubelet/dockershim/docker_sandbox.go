@@ -373,17 +373,6 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeapi.PodS
 	}
 	hostNetwork := sharesHostNetwork(r)
 
-	// If the sandbox has no containerTypeLabelKey label, treat it as a legacy sandbox.
-	if _, ok := r.Config.Labels[containerTypeLabelKey]; !ok {
-		names, labels, err := convertLegacyNameAndLabels([]string{r.Name}, r.Config.Labels)
-		if err != nil {
-			return nil, err
-		}
-		r.Name, r.Config.Labels = names[0], labels
-		// Forcibly trigger infra container restart.
-		hostNetwork = !hostNetwork
-	}
-
 	metadata, err := parseSandboxName(r.Name)
 	if err != nil {
 		return nil, err
@@ -503,15 +492,6 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]
 		result = append(result, checkpointToRuntimeAPISandbox(id, checkpoint))
 	}
 
-	// Include legacy sandboxes if there are still legacy sandboxes not cleaned up yet.
-	if !ds.legacyCleanup.Done() {
-		legacySandboxes, err := ds.ListLegacyPodSandbox(filter)
-		if err != nil {
-			return nil, err
-		}
-		// Legacy sandboxes are always older, so we can safely append them to the end.
-		result = append(result, legacySandboxes...)
-	}
 	return result, nil
 }
 
