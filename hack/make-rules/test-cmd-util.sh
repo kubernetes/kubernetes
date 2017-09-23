@@ -4188,7 +4188,7 @@ run_plugins_tests() {
   kube::test::if_has_string "${output_message}" 'no plugins installed'
 
   # single plugins path
-  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin 2>&1)
+  output_message=$(! KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin 2>&1)
   kube::test::if_has_string "${output_message}" 'echo\s\+Echoes for test-cmd'
   kube::test::if_has_string "${output_message}" 'get\s\+The wonderful new plugin-based get!'
   kube::test::if_has_string "${output_message}" 'error\s\+The tremendous plugin that always fails!'
@@ -4225,7 +4225,7 @@ run_plugins_tests() {
   kube::test::if_has_string "${output_message}" 'error: exit status 1'
 
   # plugin tree
-  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin tree 2>&1)
+  output_message=$(! KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin tree 2>&1)
   kube::test::if_has_string "${output_message}" 'Plugin with a tree of commands'
   kube::test::if_has_string "${output_message}" 'child1\s\+The first child of a tree'
   kube::test::if_has_string "${output_message}" 'child2\s\+The second child of a tree'

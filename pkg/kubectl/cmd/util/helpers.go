@@ -778,6 +778,7 @@ func DefaultSubCommandRun(out io.Writer) func(c *cobra.Command, args []string) {
 		c.SetOutput(out)
 		RequireNoArguments(c, args)
 		c.Help()
+		CheckErr(ErrExit)
 	}
 }
 
