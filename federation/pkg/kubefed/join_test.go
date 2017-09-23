@@ -26,7 +26,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	k8srbacv1beta1 "k8s.io/kubernetes/pkg/apis/rbac/v1beta1"
+	k8srbacv1 "k8s.io/kubernetes/pkg/apis/rbac/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -477,7 +477,7 @@ func fakeJoinTargetClusterFactory(clusterName, clusterCtx, dnsProvider, tmpDirPa
 	}
 
 	roleName := util.ClusterRoleName(testFederationName, saName)
-	clusterRole := rbacv1beta1.ClusterRole{
+	clusterRole := rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      roleName,
 			Namespace: util.DefaultFederationSystemNamespace,
@@ -486,12 +486,12 @@ func fakeJoinTargetClusterFactory(clusterName, clusterCtx, dnsProvider, tmpDirPa
 				federation.ClusterNameAnnotation:    clusterName,
 			},
 		},
-		Rules: []rbacv1beta1.PolicyRule{
-			k8srbacv1beta1.NewRule(rbacv1beta1.VerbAll).Groups(rbacv1beta1.APIGroupAll).Resources(rbacv1beta1.ResourceAll).RuleOrDie(),
+		Rules: []rbacv1.PolicyRule{
+			k8srbacv1.NewRule(rbacv1.VerbAll).Groups(rbacv1.APIGroupAll).Resources(rbacv1.ResourceAll).RuleOrDie(),
 		},
 	}
 
-	clusterRoleBinding, err := k8srbacv1beta1.NewClusterBinding(roleName).SAs(util.DefaultFederationSystemNamespace, saName).Binding()
+	clusterRoleBinding, err := k8srbacv1.NewClusterBinding(roleName).SAs(util.DefaultFederationSystemNamespace, saName).Binding()
 	if err != nil {
 		return nil, err
 	}
@@ -509,11 +509,11 @@ func fakeJoinTargetClusterFactory(clusterName, clusterCtx, dnsProvider, tmpDirPa
 	apiGroupList.Groups = append(apiGroupList.Groups, testGroup)
 	if isRBACAPIAvailable {
 		rbacGroup := metav1.APIGroup{
-			Name: rbacv1beta1.GroupName,
+			Name: rbacv1.GroupName,
 			Versions: []metav1.GroupVersionForDiscovery{
 				{
-					GroupVersion: rbacv1beta1.GroupName + "/v1beta1",
-					Version:      "v1beta1",
+					GroupVersion: rbacv1.GroupName + "/v1",
+					Version:      "v1",
 				},
 			},
 		}
@@ -544,9 +544,9 @@ func fakeJoinTargetClusterFactory(clusterName, clusterCtx, dnsProvider, tmpDirPa
 			case p == "/api/v1/namespaces/federation-system/serviceaccounts" && m == http.MethodPost && r:
 				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(defaultCodec, &serviceAccount)}, nil
 
-			case p == "/apis/rbac.authorization.k8s.io/v1beta1/clusterroles" && m == http.MethodPost && r:
+			case p == "/apis/rbac.authorization.k8s.io/v1/clusterroles" && m == http.MethodPost && r:
 				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(rbacCodec, &clusterRole)}, nil
-			case p == "/apis/rbac.authorization.k8s.io/v1beta1/clusterrolebindings" && m == http.MethodPost && r:
+			case p == "/apis/rbac.authorization.k8s.io/v1/clusterrolebindings" && m == http.MethodPost && r:
 				return &http.Response{StatusCode: http.StatusOK, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(rbacCodec, &clusterRoleBinding)}, nil
 
 			case p == "/api/v1/namespaces/federation-system/secrets/serviceaccountsecret" && m == http.MethodGet && r:
