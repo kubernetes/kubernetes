@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	kubectltesting "k8s.io/kubernetes/pkg/kubectl/testing"
 	"k8s.io/kubernetes/pkg/printers"
 )
@@ -3013,6 +3014,119 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 			fmt.Println(buf.String())
 			fmt.Println(test.expect)
 			t.Fatalf("Expected: %s, but got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func TestPrintCronJob(t *testing.T) {
+	suspend := false
+	tests := []struct {
+		cronjob batch.CronJob
+		expect  string
+	}{
+		{
+			batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "cronjob1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: batch.CronJobSpec{
+					Schedule: "0/5 * * * ?",
+					Suspend:  &suspend,
+				},
+				Status: batch.CronJobStatus{
+					LastScheduleTime: &metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+			},
+			"cronjob1\t0/5 * * * ?\tFalse\t0\t0s\t0s\n",
+		},
+		{
+			batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "cronjob2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: batch.CronJobSpec{
+					Schedule: "0/5 * * * ?",
+					Suspend:  &suspend,
+				},
+				Status: batch.CronJobStatus{
+					LastScheduleTime: &metav1.Time{Time: time.Now().Add(-3e10)},
+				},
+			},
+			"cronjob2\t0/5 * * * ?\tFalse\t0\t30s\t5m\n",
+		},
+		{
+			batch.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "cronjob3",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Spec: batch.CronJobSpec{
+					Schedule: "0/5 * * * ?",
+					Suspend:  &suspend,
+				},
+				Status: batch.CronJobStatus{},
+			},
+			"cronjob3\t0/5 * * * ?\tFalse\t0\t<none>\t5m\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.cronjob, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func TestPrintStorageClass(t *testing.T) {
+	tests := []struct {
+		sc     storage.StorageClass
+		expect string
+	}{
+		{
+			storage.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "sc1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Provisioner: "kubernetes.io/glusterfs",
+			},
+			"sc1\tkubernetes.io/glusterfs\t0s\n",
+		},
+		{
+			storage.StorageClass{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "sc2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Provisioner: "kubernetes.io/nfs",
+			},
+			"sc2\tkubernetes.io/nfs\t5m\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		table, err := printers.NewTablePrinter().With(AddHandlers).PrintTable(&test.sc, printers.PrintOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := printers.PrintTable(table, buf, printers.PrintOptions{NoHeaders: true}); err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != test.expect {
+			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
 	}
