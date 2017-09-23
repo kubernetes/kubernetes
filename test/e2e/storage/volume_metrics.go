@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -61,6 +62,10 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 		if err != nil {
 			framework.Failf("Error creating metrics grabber : %v", err)
 		}
+
+		if !metricsGrabber.HasRegisteredMaster() {
+			framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
+		}
 	})
 
 	AfterEach(func() {
@@ -71,6 +76,7 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 		var err error
 
 		controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
+
 		Expect(err).NotTo(HaveOccurred(), "Error getting c-m metrics : %v", err)
 
 		storageOpMetrics := getControllerStorageMetrics(controllerMetrics)
@@ -91,9 +97,30 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
 		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
 
-		updatedMetrics, err := metricsGrabber.GrabFromControllerManager()
-		Expect(err).NotTo(HaveOccurred(), "Error getting c-m metrics : %v", err)
-		updatedStorageMetrics := getControllerStorageMetrics(updatedMetrics)
+		backoff := wait.Backoff{
+			Duration: 10 * time.Second,
+			Factor:   1.2,
+			Steps:    3,
+		}
+
+		updatedStorageMetrics := make(map[string]int64)
+
+		waitErr := wait.ExponentialBackoff(backoff, func() (bool, error) {
+			updatedMetrics, err := metricsGrabber.GrabFromControllerManager()
+
+			if err != nil {
+				framework.Logf("Error fetching controller-manager metrics")
+				return false, err
+			}
+			updatedStorageMetrics = getControllerStorageMetrics(updatedMetrics)
+			if len(updatedStorageMetrics) == 0 {
+				framework.Logf("Volume metrics not collected yet, going to retry")
+				return false, nil
+			}
+			return true, nil
+		})
+		Expect(waitErr).NotTo(HaveOccurred(), "Error fetching storage c-m metrics : %v", waitErr)
+
 		volumeOperations := []string{"volume_provision", "volume_detach", "volume_attach"}
 
 		for _, volumeOp := range volumeOperations {
@@ -147,7 +174,10 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 
 func verifyMetricCount(oldMetrics map[string]int64, newMetrics map[string]int64, metricName string) {
 	oldCount, ok := oldMetrics[metricName]
-	Expect(ok).To(BeTrue(), "Error getting metrics for %s", metricName)
+	// if metric does not exist in oldMap, it probably hasn't been emitted yet.
+	if !ok {
+		oldCount = 0
+	}
 
 	newCount, ok := newMetrics[metricName]
 	Expect(ok).To(BeTrue(), "Error getting updated metrics for %s", metricName)
