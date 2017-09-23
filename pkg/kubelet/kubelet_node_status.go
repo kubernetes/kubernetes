@@ -452,6 +452,9 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 	}
 
 	if kl.externalCloudProvider {
+		if kl.nodeIP != nil {
+			node.ObjectMeta.Annotations[kubeletapis.AnnotationProvidedIPAddr] = kl.nodeIP.String()
+		}
 		// We rely on the external cloud provider to supply the addresses.
 		return nil
 	}
@@ -509,7 +512,6 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 		// 4) Try to get the IP from the network interface used as default gateway
 		if kl.nodeIP != nil {
 			ipAddr = kl.nodeIP
-			node.ObjectMeta.Annotations[kubeletapis.AnnotationProvidedIPAddr] = kl.nodeIP.String()
 		} else if addr := net.ParseIP(kl.hostname); addr != nil {
 			ipAddr = addr
 		} else {
