@@ -195,8 +195,11 @@ func getBackendPoolName(clusterName string) string {
 	return clusterName
 }
 
-func getLoadBalancerRuleName(service *v1.Service, port v1.ServicePort) string {
-	return fmt.Sprintf("%s-%s-%d", getRulePrefix(service), port.Protocol, port.Port)
+func getLoadBalancerRuleName(service *v1.Service, port v1.ServicePort, subnetName *string) string {
+	if subnetName == nil {
+		return fmt.Sprintf("%s-%s-%d", getRulePrefix(service), port.Protocol, port.Port)
+	}
+	return fmt.Sprintf("%s-%s-%s-%d", getRulePrefix(service), *subnetName, port.Protocol, port.Port)
 }
 
 func getSecurityRuleName(service *v1.Service, port v1.ServicePort, sourceAddrPrefix string) string {
@@ -224,8 +227,17 @@ func serviceOwnsRule(service *v1.Service, rule string) bool {
 	return strings.HasPrefix(strings.ToUpper(rule), strings.ToUpper(prefix))
 }
 
-func getFrontendIPConfigName(service *v1.Service) string {
-	return cloudprovider.GetLoadBalancerName(service)
+func serviceOwnsFrontendIP(fip network.FrontendIPConfiguration, service *v1.Service) bool {
+	baseName := cloudprovider.GetLoadBalancerName(service)
+	return strings.HasPrefix(*fip.Name, baseName)
+}
+
+func getFrontendIPConfigName(service *v1.Service, subnetName *string) string {
+	baseName := cloudprovider.GetLoadBalancerName(service)
+	if subnetName != nil {
+		return fmt.Sprintf("%s-%s", baseName, *subnetName)
+	}
+	return baseName
 }
 
 // This returns the next available rule priority level for a given set of security rules.
