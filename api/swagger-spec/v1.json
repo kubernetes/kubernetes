@@ -10214,6 +10214,22 @@
        },
        {
         "type": "string",
+        "paramType": "query",
+        "name": "name",
+        "description": "Name is the name of the Debug Container. Its presence will cause exec to create a Debug Container rather than performing a runtime exec.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "image",
+        "description": "Image is an optional container image name that will be used to for the Debug Container in the specified Pod with Command as ENTRYPOINT. If omitted a default image will be used.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
         "paramType": "path",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
@@ -10287,6 +10303,22 @@
         "paramType": "query",
         "name": "command",
         "description": "Command is the remote command to execute. argv array. Not executed within a shell.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "name",
+        "description": "Name is the name of the Debug Container. Its presence will cause exec to create a Debug Container rather than performing a runtime exec.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "image",
+        "description": "Image is an optional container image name that will be used to for the Debug Container in the specified Pod with Command as ENTRYPOINT. If omitted a default image will be used.",
         "required": false,
         "allowMultiple": false
        },

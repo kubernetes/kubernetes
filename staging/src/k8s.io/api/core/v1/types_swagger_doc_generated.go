@@ -1330,6 +1330,8 @@ var map_PodExecOptions = map[string]string{
 	"tty":       "TTY if true indicates that a tty will be allocated for the exec call. Defaults to false.",
 	"container": "Container in which to execute the command. Defaults to only container if there is only one container in the pod.",
 	"command":   "Command is the remote command to execute. argv array. Not executed within a shell.",
+	"name":      "Name is the name of the Debug Container. Its presence will cause exec to create a Debug Container rather than performing a runtime exec.",
+	"image":     "Image is an optional container image name that will be used to for the Debug Container in the specified Pod with Command as ENTRYPOINT. If omitted a default image will be used.",
 }
 
 func (PodExecOptions) SwaggerDoc() map[string]string {

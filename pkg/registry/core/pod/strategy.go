@@ -36,7 +36,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/helper/qos"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 )
 
@@ -100,7 +101,7 @@ func (podStrategy) AllowCreateOnUpdate() bool {
 }
 
 func isUpdatingUninitializedPod(old runtime.Object) (bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
+	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.Initializers) {
 		return false, nil
 	}
 	oldMeta, err := meta.Accessor(old)
@@ -416,6 +417,12 @@ func streamParams(params url.Values, opts runtime.Object) error {
 		for _, c := range opts.Command {
 			params.Add("command", c)
 		}
+		if opts.AlphaName != "" {
+			params.Add(api.ExecDebugNameParam, opts.AlphaName)
+		}
+		if opts.AlphaImage != "" {
+			params.Add(api.ExecImageParam, opts.AlphaImage)
+		}
 	case *api.PodAttachOptions:
 		if opts.Stdin {
 			params.Add(api.ExecStdinParam, "1")
@@ -464,7 +471,18 @@ func ExecLocation(
 	name string,
 	opts *api.PodExecOptions,
 ) (*url.URL, http.RoundTripper, error) {
-	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, "exec")
+	kubeletPath := "exec"
+	if opts.AlphaName != "" || opts.AlphaImage != "" {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.DebugContainers) {
+			return nil, nil, errors.NewBadRequest("debug containers feature disabled")
+		}
+		if opts.AlphaName == "" {
+			// TODO(verb): consider allowing either and defaulting/generating the other
+			return nil, nil, errors.NewBadRequest("Name required when Image specified")
+		}
+		kubeletPath = "podDebug"
+	}
+	return streamLocation(getter, connInfo, ctx, name, opts, opts.Container, kubeletPath)
 }
 
 func streamLocation(
@@ -490,6 +508,8 @@ func streamLocation(
 		case 0:
 			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
 		default:
+			// TODO(verb): It will be valid to omit a target container name when using a Debug Container when the entire pod
+			// shares a PID namespace, but we won't be able to check that here until PID sharing is specified in the pod spec.
 			containerNames := getContainerNames(pod.Spec.Containers)
 			initContainerNames := getContainerNames(pod.Spec.InitContainers)
 			err := fmt.Sprintf("a container name must be specified for pod %s, choose one of: [%s]", name, containerNames)
