@@ -30,7 +30,7 @@ import (
 
 func TestControlPlaneSubCommandsHasFlags(t *testing.T) {
 
-	subCmds := getControlPlaneSubCommands("")
+	subCmds := getControlPlaneSubCommands("", phaseTestK8sVersion)
 
 	commonFlags := []string{
 		"cert-dir",
@@ -137,7 +137,7 @@ func TestControlPlaneCreateFilesWithFlags(t *testing.T) {
 		defer os.RemoveAll(tmpdir)
 
 		// Get subcommands working in the temporary directory
-		subCmds := getControlPlaneSubCommands(tmpdir)
+		subCmds := getControlPlaneSubCommands(tmpdir, phaseTestK8sVersion)
 
 		// Execute the subcommand
 		certDirFlag := fmt.Sprintf("--cert-dir=%s", tmpdir)
