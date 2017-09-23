@@ -27,6 +27,7 @@ import (
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -106,6 +107,96 @@ var _ = SIGDescribe("PersistentVolumes[Disruptive][Flaky]", func() {
 
 	AfterEach(func() {
 		framework.DeletePodWithWait(f, c, nfsServerPod)
+	})
+
+	Context("when kube-controller-manager restarts", func() {
+		var (
+			diskName1, diskName2 string
+			err                  error
+			pvConfig1, pvConfig2 framework.PersistentVolumeConfig
+			pv1, pv2             *v1.PersistentVolume
+			pvSource1, pvSource2 *v1.PersistentVolumeSource
+			pvc1, pvc2           *v1.PersistentVolumeClaim
+			clientPod            *v1.Pod
+		)
+
+		BeforeEach(func() {
+			framework.SkipUnlessProviderIs("gce")
+			framework.SkipUnlessSSHKeyPresent()
+
+			By("Initializing first PD with PVPVC binding")
+			pvSource1, diskName1 = framework.CreateGCEVolume()
+			Expect(err).NotTo(HaveOccurred())
+			pvConfig1 = framework.PersistentVolumeConfig{
+				NamePrefix: "gce-",
+				Labels:     volLabel,
+				PVSource:   *pvSource1,
+				Prebind:    nil,
+			}
+			pv1, pvc1, err = framework.CreatePVPVC(c, pvConfig1, pvcConfig, ns, false)
+			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv1, pvc1))
+
+			By("Initializing second PD with PVPVC binding")
+			pvSource2, diskName2 = framework.CreateGCEVolume()
+			Expect(err).NotTo(HaveOccurred())
+			pvConfig2 = framework.PersistentVolumeConfig{
+				NamePrefix: "gce-",
+				Labels:     volLabel,
+				PVSource:   *pvSource2,
+				Prebind:    nil,
+			}
+			pv2, pvc2, err = framework.CreatePVPVC(c, pvConfig2, pvcConfig, ns, false)
+			Expect(err).NotTo(HaveOccurred())
+			framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv2, pvc2))
+
+			By("Attaching both PVC's to a single pod")
+			clientPod, err = framework.CreatePod(c, ns, []*v1.PersistentVolumeClaim{pvc1, pvc2}, true, "")
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			// Delete client/user pod first
+			framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod))
+
+			// Delete PV and PVCs
+			if errs := framework.PVPVCCleanup(c, ns, pv1, pvc1); len(errs) > 0 {
+				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+			}
+			pv1, pvc1 = nil, nil
+			if errs := framework.PVPVCCleanup(c, ns, pv2, pvc2); len(errs) > 0 {
+				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+			}
+			pv2, pvc2 = nil, nil
+
+			// Delete the actual disks
+			if diskName1 != "" {
+				framework.ExpectNoError(framework.DeletePDWithRetry(diskName1))
+			}
+			if diskName2 != "" {
+				framework.ExpectNoError(framework.DeletePDWithRetry(diskName2))
+			}
+		})
+
+		It("should delete a bound PVC from a clientPod, restart the kube-control-manager, and ensure the kube-controller-manager does not crash", func() {
+			By("Deleting PVC for volume 2")
+			err = framework.DeletePersistentVolumeClaim(c, pvc2.Name, ns)
+			Expect(err).NotTo(HaveOccurred())
+			pvc2 = nil
+
+			By("Restarting the kube-controller-manager")
+			err = framework.RestartControllerManager()
+			Expect(err).NotTo(HaveOccurred())
+			err = framework.WaitForControllerManagerUp()
+			Expect(err).NotTo(HaveOccurred())
+			framework.Logf("kube-controller-manager restarted")
+
+			By("Observing the kube-controller-manager healthy for at least 2 minutes")
+			// Continue checking for 2 minutes to make sure kube-controller-manager is healthy
+			err = framework.CheckForControllerManagerHealthy(2 * time.Minute)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 	})
 
 	Context("when kubelet restarts", func() {
