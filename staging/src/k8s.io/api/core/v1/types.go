@@ -2469,7 +2469,7 @@ type Taint struct {
 	// TimeAdded represents the time at which the taint was added.
 	// It is only written for NoExecute taints.
 	// +optional
-	TimeAdded metav1.Time `json:"timeAdded,omitempty" protobuf:"bytes,4,opt,name=timeAdded"`
+	TimeAdded *metav1.Time `json:"timeAdded,omitempty" protobuf:"bytes,4,opt,name=timeAdded"`
 }
 
 type TaintEffect string
