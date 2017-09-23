@@ -122,10 +122,7 @@ func (dc *DeploymentController) getAllReplicaSetsAndSyncRevision(d *extensions.D
 	if err != nil {
 		return nil, nil, fmt.Errorf("error labeling replica sets and pods with pod-template-hash: %v", err)
 	}
-	_, allOldRSs, err := deploymentutil.FindOldReplicaSets(d, rsList)
-	if err != nil {
-		return nil, nil, err
-	}
+	_, allOldRSs := deploymentutil.FindOldReplicaSets(d, rsList)
 
 	// Get new replica set with the updated revision number
 	newRS, err := dc.getNewReplicaSet(d, rsList, allOldRSs, createIfNotExisted)
@@ -235,10 +232,7 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet,
 // 3. If there's no existing new RS and createIfNotExisted is true, create one with appropriate revision number (maxOldRevision + 1) and replicas.
 // Note that the pod-template-hash will be added to adopted RSes and pods.
 func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsList, oldRSs []*extensions.ReplicaSet, createIfNotExisted bool) (*extensions.ReplicaSet, error) {
-	existingNewRS, err := deploymentutil.FindNewReplicaSet(d, rsList)
-	if err != nil {
-		return nil, err
-	}
+	existingNewRS := deploymentutil.FindNewReplicaSet(d, rsList)
 
 	// Calculate the max revision number among all old RSes
 	maxOldRevision := deploymentutil.MaxRevision(oldRSs)
@@ -274,6 +268,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 		}
 
 		if needsUpdate {
+			var err error
 			if d, err = dc.client.Extensions().Deployments(d.Namespace).UpdateStatus(d); err != nil {
 				return nil, err
 			}
@@ -333,13 +328,9 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 		if rsErr != nil {
 			return nil, rsErr
 		}
-		isEqual, equalErr := deploymentutil.EqualIgnoreHash(&d.Spec.Template, &rs.Spec.Template)
-		if equalErr != nil {
-			return nil, equalErr
-		}
 		// Matching ReplicaSet is not equal - increment the collisionCount in the DeploymentStatus
 		// and requeue the Deployment.
-		if !isEqual {
+		if !deploymentutil.EqualIgnoreHash(&d.Spec.Template, &rs.Spec.Template) {
 			if d.Status.CollisionCount == nil {
 				d.Status.CollisionCount = new(int32)
 			}
