@@ -31,6 +31,9 @@ const (
 
 	// StoreCertsInSecrets is alpha in v1.8
 	StoreCertsInSecrets utilfeature.Feature = "StoreCertsInSecrets"
+
+	// PersistentLocalVolumes is alpha in v1.8
+	PersistentLocalVolumes utilfeature.Feature = "PersistentLocalVolumes"
 )
 
 // FeatureList represents a list of feature gates
@@ -63,8 +66,9 @@ func Keys(featureList FeatureList) []string {
 
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
-	SelfHosting:         {Default: false, PreRelease: utilfeature.Alpha},
-	StoreCertsInSecrets: {Default: false, PreRelease: utilfeature.Alpha},
+	SelfHosting:            {Default: false, PreRelease: utilfeature.Alpha},
+	StoreCertsInSecrets:    {Default: false, PreRelease: utilfeature.Alpha},
+	PersistentLocalVolumes: {Default: false, PreRelease: utilfeature.Alpha},
 }
 
 // KnownFeatures returns a slice of strings describing the FeatureList features.
