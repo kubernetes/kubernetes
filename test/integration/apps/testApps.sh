@@ -246,6 +246,11 @@ process-args "$@"
 #Remove binaries if needed
 remove-binaries
 
+#Remove the temp directories created
+kube::log::status "Deleteing tmp dirctory ${PWD}/data/nodes/"
+rm -rf ${PWD}/data/nodes/*
+kube::log::status "Deleteing tmp dirctory ${PWD}/logs/"
+rm -rf ${PWD}/logs/*
 
 # below trap is equivalent to "defer cleanup()" in go
 trap cleanup EXIT
@@ -263,9 +268,7 @@ export SCHED_PID
 export CM_PID
 export KUBE_ROOT
 
-#Remove the temp directories created
-kube::log::status "Deleteing tmp dirctory ${PWD}/data/nodes/"
-rm -rf ${PWD}/data/nodes/*
+
 
 #Run the actual Command 
 TIME="Took %E" time go test -ldflags "-X k8s.io/kubernetes/test/integration/apps.RunBySuite=True" -v -stderrthreshold=FATAL -log_dir=${PWD}/logs/ .

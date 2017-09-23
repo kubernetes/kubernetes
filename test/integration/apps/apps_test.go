@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/test/integration/apps/podcontrollers"
 	"k8s.io/kubernetes/test/integration/apps/upgrades"
 	"k8s.io/kubernetes/test/integration/framework"
-	"time"
+	//"time"
 )
 
 //RunBySuite Below flag will be set to 'True' if run the by the script via go test -ldflags
@@ -73,6 +73,7 @@ func TestApps(t *testing.T) {
 		t.Run(tst.Name, tst.F)
 	}
 
-	time.Sleep(time.Hour)
+	//TODO: Remove this unnessary wait for an hour as the clusters
+	//time.Sleep(time.Second)
 
 }

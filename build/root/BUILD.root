@@ -5,7 +5,7 @@
 
 package(default_visibility = ["//visibility:public"])
 
-load("@io_bazel_rules_go//go:def.bzl", "go_prefix")
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_prefix")
 load("@io_kubernetes_build//defs:build.bzl", "gcs_upload")
 
 go_prefix("k8s.io/kubernetes")
@@ -79,4 +79,14 @@ genrule(
     outs = ["version"],
     cmd = "grep ^STABLE_BUILD_SCM_REVISION bazel-out/stable-status.txt | awk '{print $$2}' >$@",
     stamp = 1,
+)
+
+go_library(
+    name = "go_default_library",
+    srcs = ["curusr.go"],
+)
+
+go_binary(
+    name = "kubernetes",
+    library = ":go_default_library",
 )

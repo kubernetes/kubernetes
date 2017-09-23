@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	//"k8s.io/api/core/v1"
+	dockertypes "github.com/docker/docker/api/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
@@ -50,7 +52,8 @@ const (
 	//MasterPort Known master node
 	MasterPort = "8585"
 	//NameSpace Default Namespace used by majority of the tests
-	NameSpace = "AppIntegrationTest"
+	//NameSpace = "AppIntegrationTest"
+	NameSpace = "default"
 	//NodeName Name of the hollow node
 	NodeName = "hollow"
 	//ConfigFile kubelet's clientset
@@ -98,6 +101,32 @@ type HollowNode struct {
 
 }
 
+func createCli(t *testing.T) *clientset.Clientset {
+
+	basePath := Cfg.RootDir + AppTestDir + DataDir
+	configFile := basePath + ConfigFile
+	clientConfig, err := clientcmd.LoadFromFile(configFile)
+	if err != nil {
+		t.Errorf("error while loading kubeconfig from file %v: %v", configFile, err)
+	}
+
+	config, err := clientcmd.NewDefaultClientConfig(*clientConfig, &clientcmd.ConfigOverrides{}).ClientConfig()
+	if err != nil {
+		t.Errorf("error while creating kubeconfig: %v", err)
+	}
+	config.ContentType = "application/vnd.kubernetes.protobuf"
+	config.QPS = 10
+	config.Burst = 20
+
+	Cli, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Errorf("Failed to create a ClientSet: %v. Exiting.\n", err)
+	}
+
+	return Cli
+
+}
+
 //NewHollowNode creates a Hollow node structure
 func NewHollowNode(t *testing.T, index int) *HollowNode {
 	var hn *HollowNode
@@ -108,22 +137,7 @@ func NewHollowNode(t *testing.T, index int) *HollowNode {
 
 	hn.ConfigFile = basePath + ConfigFile
 
-	clientConfig, err := clientcmd.LoadFromFile(hn.ConfigFile)
-	if err != nil {
-		t.Errorf("error while loading kubeconfig from file %v: %v", hn.ConfigFile, err)
-	}
-	config, err := clientcmd.NewDefaultClientConfig(*clientConfig, &clientcmd.ConfigOverrides{}).ClientConfig()
-	if err != nil {
-		t.Errorf("error while creating kubeconfig: %v", err)
-	}
-	config.ContentType = "application/vnd.kubernetes.protobuf"
-	config.QPS = 10
-	config.Burst = 20
-
-	hn.Cli, err = clientset.NewForConfig(config)
-	if err != nil {
-		t.Errorf("Failed to create a ClientSet: %v. Exiting.\n", err)
-	}
+	hn.Cli = createCli(t)
 
 	hn.CadvisorMgr = &cadvisortest.Fake{
 		NodeName: "testing-node1",
@@ -204,6 +218,23 @@ func (hns *HollowNodes) Add(hn *HollowNode) {
 	hns.N[hn.Name] = hn
 }
 
+// ListContainers ListContainers prints all the containers from the fake Docker client from all the nodes
+func (hns *HollowNodes) ListContainers() []string {
+
+	var result []string
+	var opt dockertypes.ContainerListOptions
+	opt.All = true
+
+	for _, n := range hns.N {
+		containers, _ := n.DockerCli.ListContainers(opt)
+		for _, c := range containers {
+			result = append(result, n.Name+":"+c.ID)
+		}
+	}
+
+	return result
+}
+
 // Initialize Initalize test suite to do the following
 // 1) Create NumNodes * Hollow-Nodes
 // 2) Monitor Kube-system processes such as ApiServer, Controller Manager and Scheduler
@@ -214,7 +245,15 @@ func Initialize(t *testing.T) error {
 	Cfg.Master = fmt.Sprintf("http://localhost:%s", MasterPort)
 	Cfg.NameSpace = NameSpace
 	Cfg.Nodes = &HollowNodes{N: make(map[string]*HollowNode)}
-
+	Cfg.Cli = createCli(t)
+	/*
+		var ns v1.Namespace
+		ns.ObjectMeta.Name = Cfg.NameSpace
+		_, err := Cfg.Cli.Core().Namespaces().Create(&ns)
+		if err != nil {
+			t.Errorf("Error creating namespaces err=%v", err)
+		}
+	*/
 	fmt.Printf("Creating %d Hollow-nodes...\n", NumNodes)
 
 	for i := 0; i < NumNodes; i++ {
@@ -262,6 +301,13 @@ func waitForPID(name string, env string) error {
 			os.Exit(1)
 		}
 		time.Sleep(time.Second)
+	}
+}
+
+// CheckErrors CheckErrors will mark the test as fail if there err value is not null.
+func CheckErrors(t *testing.T, err error, format string, args ...interface{}) {
+	if err != nil {
+		t.Errorf("Error Occured err=%v msg=%s", err, fmt.Sprintf(format, args...))
 	}
 }
 

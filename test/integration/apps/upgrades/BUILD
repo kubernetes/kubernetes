@@ -4,6 +4,12 @@ go_library(
     name = "go_default_library",
     srcs = ["upgrades.go"],
     visibility = ["//visibility:public"],
+    deps = [
+        "//test/e2e/framework:go_default_library",
+        "//test/integration/apps/common_types:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+    ],
 )
 
 filegroup(
