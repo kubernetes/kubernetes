@@ -338,13 +338,40 @@ func (g *GenericPLEG) updateCache(pod *kubecontainer.Pod, pid types.UID) error {
 		return nil
 	}
 	timestamp := g.clock.Now()
+	status, err := g.getPodStatus(pod)
+
+	glog.V(4).Infof("PLEG: Write status for %s/%s: %#v (err: %v)", pod.Name, pod.Namespace, status, err)
+	g.cache.Set(pod.ID, status, err, timestamp)
+	return err
+}
+
+func (g *GenericPLEG) getPodStatus(pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
 	// TODO: Consider adding a new runtime method
 	// GetPodStatus(pod *kubecontainer.Pod) so that Docker can avoid listing
 	// all containers again.
 	status, err := g.runtime.GetPodStatus(pod.ID, pod.Name, pod.Namespace)
-	glog.V(4).Infof("PLEG: Write status for %s/%s: %#v (err: %v)", pod.Name, pod.Namespace, status, err)
-	g.cache.Set(pod.ID, status, err, timestamp)
-	return err
+	oldStatus, err := g.cache.Get(pod.ID)
+
+	// For those died containers removed by GC or user, need to keep the last
+	// `Exited` status object, so that in next syncPod round, the container
+	// can be restarted according to pod's restart policy. Otherwise, the status
+	// object will be removed from the status and the container will be always
+	// restarted in the next syncPod round.
+	for _, ocs := range oldStatus.ContainerStatuses {
+		removed := true
+		for _, cs := range status.ContainerStatuses {
+			if cs.ID == ocs.ID {
+				removed = false
+				break
+			}
+		}
+
+		if removed && convertState(ocs.State) == plegContainerExited {
+			status.ContainerStatuses = append(status.ContainerStatuses, ocs)
+		}
+	}
+
+	return status, err
 }
 
 func updateEvents(eventsByPodID map[types.UID][]*PodLifecycleEvent, e *PodLifecycleEvent) {
