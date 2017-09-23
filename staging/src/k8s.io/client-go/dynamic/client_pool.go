@@ -26,7 +26,7 @@ import (
 
 // ClientPool manages a pool of dynamic clients.
 type ClientPool interface {
-	// ClientForGroupVersionKind returns a client configured for the specified groupVersionResource.
+	// ClientForGroupVersionResource returns a client configured for the specified groupVersionResource.
 	// Resource may be empty.
 	ClientForGroupVersionResource(resource schema.GroupVersionResource) (Interface, error)
 	// ClientForGroupVersionKind returns a client configured for the specified groupVersionKind.
