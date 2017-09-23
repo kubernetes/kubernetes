@@ -34,6 +34,7 @@ import (
 	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/client-go/util/flowcontrol"
 )
 
 const (
@@ -61,6 +62,9 @@ const (
 	defaultBatchBufferSize = 1000        // Buffer up to 1000 events before blocking.
 	defaultBatchMaxSize    = 100         // Only send 100 events at a time.
 	defaultBatchMaxWait    = time.Minute // Send events at least once a minute.
+
+	defaultBatchThrottleQPS   = 50  // Send routine at 50 qps.
+	defaultBatchThrottleBurst = 100 // Send routine burst is 100.
 )
 
 // The plugin name reported in error metrics.
@@ -151,6 +155,7 @@ func newBatchWebhook(configFile string, groupVersion schema.GroupVersion) (*batc
 		maxBatchSize: defaultBatchMaxSize,
 		maxBatchWait: defaultBatchMaxWait,
 		shutdownCh:   make(chan struct{}),
+		throttle:     flowcontrol.NewTokenBucketRateLimiter(defaultBatchThrottleQPS, defaultBatchThrottleBurst),
 	}, nil
 }
 
@@ -178,6 +183,9 @@ type batchBackend struct {
 	// all requests have been completed and no new will be spawned, since the
 	// sending routine is not running anymore.
 	reqMutex sync.RWMutex
+
+	// RateLimiter of the sending routine number.
+	throttle flowcontrol.RateLimiter
 }
 
 func (b *batchBackend) Run(stopCh <-chan struct{}) error {
@@ -302,6 +310,10 @@ func (b *batchBackend) sendBatchEvents(events []auditinternal.Event) {
 	}
 
 	list := auditinternal.EventList{Items: events}
+
+	if b.throttle != nil {
+		b.throttle.Accept()
+	}
 
 	// Locking reqMutex for read will guarantee that the shutdown process will
 	// block until the goroutine started below is finished. At the same time, it
