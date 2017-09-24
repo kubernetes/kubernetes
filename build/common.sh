@@ -199,9 +199,21 @@ function kube::build::verify_prereqs() {
 # ---------------------------------------------------------------------------
 # Utility functions
 
+
+function kube::build::check_for_docker_for_macos_under_utilizing_memory() {
+  local docker_memory_gb=$(docker info | grep 'Total Memory' | grep -Eo '[0-9]+' | head -n1 2>/dev/null)
+  local available_memory_bytes=$(sysctl -n hw.memsize 2>/dev/null)
+  local available_memory_gb=$(( ${available_memory_bytes} / 1073741824 ))
+
+  if [[ $(( ${docker_memory_gb} * 2)) -lt ${available_memory_gb} ]]; then
+    kube::log::info "Docker allocated only ${docker_memory_gb}G, which is less than 50% of available ${available_memory_gb}G of memory. Consider increasing Docker's memory."
+  fi
+}
+
 function kube::build::docker_available_on_osx() {
   if [[ -z "${DOCKER_HOST}" ]]; then
     if [[ -S "/var/run/docker.sock" ]]; then
+      kube::build::check_for_docker_for_macos_under_utilizing_memory
       kube::log::status "Using Docker for MacOS"
       return 0
     fi
