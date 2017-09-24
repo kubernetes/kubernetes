@@ -396,11 +396,11 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 	if err != nil {
 		return storage.NewInternalError(err.Error())
 	}
-	elems := []*elemForDecode{{
-		data: data,
-		rev:  uint64(getResp.Kvs[0].ModRevision),
-	}}
-	if err := decodeList(elems, storage.SimpleFilter(pred), listPtr, s.codec, s.versioner); err != nil {
+	v, err := conversion.EnforcePtr(listPtr)
+	if err != nil || v.Kind() != reflect.Slice {
+		panic("need ptr to slice")
+	}
+	if err := appendListItem(v, data, uint64(getResp.Kvs[0].ModRevision), storage.SimpleFilter(pred), s.codec, s.versioner); err != nil {
 		return err
 	}
 	// update version with cluster level revision
@@ -472,7 +472,14 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 	if err != nil {
 		return err
 	}
-	key = path.Join(s.pathPrefix, key)
+	v, err := conversion.EnforcePtr(listPtr)
+	if err != nil || v.Kind() != reflect.Slice {
+		panic("need ptr to slice")
+	}
+
+	if s.pathPrefix != "" {
+		key = path.Join(s.pathPrefix, key)
+	}
 	// We need to make sure the key ended with "/" so that we only get children "directories".
 	// e.g. if we have key "/a", "/a/b", "/ab", getting keys with prefix "/a" will return all three,
 	// while with prefix "/a/" will return only "/a/b" which is the correct answer.
@@ -481,81 +488,127 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 	}
 	keyPrefix := key
 
+	filter := storage.SimpleFilter(pred)
+
 	// set the appropriate clientv3 options to filter the returned data set
+	var paging bool
 	options := make([]clientv3.OpOption, 0, 4)
 	if s.pagingEnabled && pred.Limit > 0 {
+		paging = true
 		options = append(options, clientv3.WithLimit(pred.Limit))
 	}
+
 	var returnedRV int64
 	switch {
 	case s.pagingEnabled && len(pred.Continue) > 0:
 		continueKey, continueRV, err := decodeContinue(pred.Continue, keyPrefix)
 		if err != nil {
-			return err
+			return apierrors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
 		}
 
-		options = append(options, clientv3.WithRange(clientv3.GetPrefixRangeEnd(key)))
+		if len(resourceVersion) > 0 && resourceVersion != "0" {
+			return apierrors.NewBadRequest("specifying resource version is not allowed when using continue")
+		}
+
+		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
+		options = append(options, clientv3.WithRange(rangeEnd))
 		key = continueKey
 
 		options = append(options, clientv3.WithRev(continueRV))
 		returnedRV = continueRV
 
-	case len(resourceVersion) > 0:
-		fromRV, err := strconv.ParseInt(resourceVersion, 10, 64)
-		if err != nil {
-			return fmt.Errorf("invalid resource version: %v", err)
+	case s.pagingEnabled && pred.Limit > 0:
+		if len(resourceVersion) > 0 {
+			fromRV, err := strconv.ParseInt(resourceVersion, 10, 64)
+			if err != nil {
+				return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
+			}
+			if fromRV > 0 {
+				options = append(options, clientv3.WithRev(fromRV))
+			}
+			returnedRV = fromRV
 		}
 
-		options = append(options, clientv3.WithPrefix(), clientv3.WithRev(fromRV))
-		returnedRV = fromRV
+		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
+		options = append(options, clientv3.WithRange(rangeEnd))
 
 	default:
+		if len(resourceVersion) > 0 {
+			fromRV, err := strconv.ParseInt(resourceVersion, 10, 64)
+			if err != nil {
+				return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
+			}
+			if fromRV > 0 {
+				options = append(options, clientv3.WithRev(fromRV))
+			}
+			returnedRV = fromRV
+		}
+
 		options = append(options, clientv3.WithPrefix())
 	}
 
-	getResp, err := s.client.KV.Get(ctx, key, options...)
-	if err != nil {
-		return interpretListError(err, len(pred.Continue) > 0)
-	}
-
-	elems := make([]*elemForDecode, 0, len(getResp.Kvs))
-	for _, kv := range getResp.Kvs {
-		data, _, err := s.transformer.TransformFromStorage(kv.Value, authenticatedDataString(kv.Key))
+	// loop until we have filled the requested limit from etcd or there are no more results
+	var lastKey []byte
+	var hasMore bool
+	for {
+		getResp, err := s.client.KV.Get(ctx, key, options...)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unable to transform key %q: %v", kv.Key, err))
-			continue
+			return interpretListError(err, len(pred.Continue) > 0)
+		}
+		hasMore = getResp.More
+
+		if len(getResp.Kvs) == 0 && getResp.More {
+			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
 		}
 
-		elems = append(elems, &elemForDecode{
-			data: data,
-			rev:  uint64(kv.ModRevision),
-		})
+		// take items from the response until the bucket is full, filtering as we go
+		for _, kv := range getResp.Kvs {
+			if paging && int64(v.Len()) >= pred.Limit {
+				hasMore = true
+				break
+			}
+			lastKey = kv.Key
+
+			data, _, err := s.transformer.TransformFromStorage(kv.Value, authenticatedDataString(kv.Key))
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("unable to transform key %q: %v", kv.Key, err))
+				continue
+			}
+
+			if err := appendListItem(v, data, uint64(kv.ModRevision), filter, s.codec, s.versioner); err != nil {
+				return err
+			}
+		}
+
+		// indicate to the client which resource version was returned
+		if returnedRV == 0 {
+			returnedRV = getResp.Header.Revision
+		}
+
+		// no more results remain or we didn't request paging
+		if !hasMore || !paging {
+			break
+		}
+		// we're paging but we have filled our bucket
+		if int64(v.Len()) >= pred.Limit {
+			break
+		}
+		key = string(lastKey) + "\x00"
 	}
 
-	if err := decodeList(elems, storage.SimpleFilter(pred), listPtr, s.codec, s.versioner); err != nil {
-		return err
-	}
-
-	// indicate to the client which resource version was returned
-	if returnedRV == 0 {
-		returnedRV = getResp.Header.Revision
-	}
-	switch {
-	case !getResp.More:
-		// no continuation
-		return s.versioner.UpdateList(listObj, uint64(returnedRV), "")
-	case len(getResp.Kvs) == 0:
-		return fmt.Errorf("no results were found, but etcd indicated there were more values")
-	default:
+	// instruct the client to begin querying from immediately after the last key we returned
+	// we never return a key that the client wouldn't be allowed to see
+	if hasMore {
 		// we want to start immediately after the last key
-		// TODO: this reveals info about certain keys
-		key := string(getResp.Kvs[len(getResp.Kvs)-1].Key)
-		next, err := encodeContinue(key+"\x00", keyPrefix, returnedRV)
+		next, err := encodeContinue(string(lastKey)+"\x00", keyPrefix, returnedRV)
 		if err != nil {
 			return err
 		}
 		return s.versioner.UpdateList(listObj, uint64(returnedRV), next)
 	}
+
+	// no continuation
+	return s.versioner.UpdateList(listObj, uint64(returnedRV), "")
 }
 
 // Watch implements storage.Interface.Watch.
@@ -677,23 +730,16 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 	return nil
 }
 
-// decodeList decodes a list of values into a list of objects, with resource version set to corresponding rev.
-// On success, ListPtr would be set to the list of objects.
-func decodeList(elems []*elemForDecode, filter storage.FilterFunc, listPtr interface{}, codec runtime.Codec, versioner storage.Versioner) error {
-	v, err := conversion.EnforcePtr(listPtr)
-	if err != nil || v.Kind() != reflect.Slice {
-		panic("need ptr to slice")
+// appendListItem decodes and appends the object (if it passes filter) to v, which must be a slice.
+func appendListItem(v reflect.Value, data []byte, rev uint64, filter storage.FilterFunc, codec runtime.Codec, versioner storage.Versioner) error {
+	obj, _, err := codec.Decode(data, nil, reflect.New(v.Type().Elem()).Interface().(runtime.Object))
+	if err != nil {
+		return err
 	}
-	for _, elem := range elems {
-		obj, _, err := codec.Decode(elem.data, nil, reflect.New(v.Type().Elem()).Interface().(runtime.Object))
-		if err != nil {
-			return err
-		}
-		// being unable to set the version does not prevent the object from being extracted
-		versioner.UpdateObject(obj, elem.rev)
-		if filter(obj) {
-			v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
-		}
+	// being unable to set the version does not prevent the object from being extracted
+	versioner.UpdateObject(obj, rev)
+	if filter(obj) {
+		v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 	}
 	return nil
 }
