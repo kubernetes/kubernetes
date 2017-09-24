@@ -548,13 +548,6 @@ func RsListFromClient(c extensionsv1beta1.ExtensionsV1beta1Interface) RsListFunc
 	}
 }
 
-// podListFromClient returns a podListFunc that wraps the given client.
-func podListFromClient(c clientset.Interface) podListFunc {
-	return func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
-		return c.Core().Pods(namespace).List(options)
-	}
-}
-
 // TODO: switch this to full namespacers
 type RsListFunc func(string, metav1.ListOptions) ([]*extensions.ReplicaSet, error)
 type podListFunc func(string, metav1.ListOptions) (*v1.PodList, error)

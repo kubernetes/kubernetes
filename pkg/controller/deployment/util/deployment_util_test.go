@@ -85,64 +85,6 @@ func addUpdatePodsReactor(fakeClient *fake.Clientset) *fake.Clientset {
 	return fakeClient
 }
 
-func newPod(now time.Time, ready bool, beforeSec int) v1.Pod {
-	conditionStatus := v1.ConditionFalse
-	if ready {
-		conditionStatus = v1.ConditionTrue
-	}
-	return v1.Pod{
-		Status: v1.PodStatus{
-			Conditions: []v1.PodCondition{
-				{
-					Type:               v1.PodReady,
-					LastTransitionTime: metav1.NewTime(now.Add(-1 * time.Duration(beforeSec) * time.Second)),
-					Status:             conditionStatus,
-				},
-			},
-		},
-	}
-}
-
-func newRSControllerRef(rs *extensions.ReplicaSet) *metav1.OwnerReference {
-	isController := true
-	return &metav1.OwnerReference{
-		APIVersion: "extensions/v1beta1",
-		Kind:       "ReplicaSet",
-		Name:       rs.GetName(),
-		UID:        rs.GetUID(),
-		Controller: &isController,
-	}
-}
-
-// generatePodFromRS creates a pod, with the input ReplicaSet's selector and its template
-func generatePodFromRS(rs extensions.ReplicaSet) v1.Pod {
-	return v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:          rs.Labels,
-			OwnerReferences: []metav1.OwnerReference{*newRSControllerRef(&rs)},
-		},
-		Spec: rs.Spec.Template.Spec,
-	}
-}
-
-func generatePod(labels map[string]string, image string) v1.Pod {
-	return v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: labels,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:                   image,
-					Image:                  image,
-					ImagePullPolicy:        v1.PullAlways,
-					TerminationMessagePath: v1.TerminationMessagePathDefault,
-				},
-			},
-		},
-	}
-}
-
 func generateRSWithLabel(labels map[string]string, image string) extensions.ReplicaSet {
 	return extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -820,10 +762,8 @@ func TestGetCondition(t *testing.T) {
 	tests := []struct {
 		name string
 
-		status     extensions.DeploymentStatus
-		condType   extensions.DeploymentConditionType
-		condStatus v1.ConditionStatus
-		condReason string
+		status   extensions.DeploymentStatus
+		condType extensions.DeploymentConditionType
 
 		expected bool
 	}{
