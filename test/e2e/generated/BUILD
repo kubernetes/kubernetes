@@ -20,10 +20,10 @@ go_library(
 genrule(
     name = "bindata",
     srcs = [
-        "//examples:sources",
-        "//test/images:sources",
-        "//test/fixtures:sources",
-        "//test/e2e/testing-manifests:sources",
+        "//examples:all-srcs",
+        "//test/images:all-srcs",
+        "//test/fixtures:all-srcs",
+        "//test/e2e/testing-manifests:all-srcs",
     ],
     outs = ["bindata.go"],
     cmd = """

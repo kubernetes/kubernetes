@@ -1,5 +1,3 @@
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -34,7 +32,6 @@ go_test(
         "//api/swagger-spec",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
@@ -51,7 +48,6 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["schema.go"],
-    tags = ["automanaged"],
     visibility = ["//build/visible_to:pkg_kubectl_validation_CONSUMERS"],
     deps = [
         "//pkg/api/util:go_default_library",

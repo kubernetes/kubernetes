@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,7 +12,6 @@ go_library(
         "pvc_populator.go",
         "sync_volume_resize.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",

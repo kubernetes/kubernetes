@@ -14,6 +14,7 @@ go_test(
         "main_test.go",
     ],
     library = ":go_default_library",
+    tags = ["integration"],
     deps = [
         "//pkg/controller/deployment/util:go_default_library",
         "//test/integration/framework:go_default_library",
