@@ -265,6 +265,11 @@ func IsIntegerResourceName(str string) bool {
 	return integerResources.Has(str) || IsExtendedResourceName(api.ResourceName(str))
 }
 
+// Extended and HugePages resources
+func IsScalarResourceName(name api.ResourceName) bool {
+	return IsExtendedResourceName(name) || IsHugePageResourceName(name)
+}
+
 // this function aims to check if the service's ClusterIP is set or not
 // the objective is not to perform validation here
 func IsServiceIPSet(service *api.Service) bool {
