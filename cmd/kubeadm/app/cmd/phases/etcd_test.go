@@ -30,7 +30,7 @@ import (
 
 func TestEtcdSubCommandsHasFlags(t *testing.T) {
 
-	subCmds := getEtcdSubCommands("")
+	subCmds := getEtcdSubCommands("", phaseTestK8sVersion)
 
 	commonFlags := []string{
 		"cert-dir",
@@ -73,7 +73,7 @@ func TestEtcdCreateFilesWithFlags(t *testing.T) {
 		defer os.RemoveAll(tmpdir)
 
 		// Get subcommands working in the temporary directory
-		subCmds := getEtcdSubCommands(tmpdir)
+		subCmds := getEtcdSubCommands(tmpdir, phaseTestK8sVersion)
 
 		// Execute the subcommand
 		certDirFlag := fmt.Sprintf("--cert-dir=%s", tmpdir)

@@ -29,7 +29,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -484,21 +483,9 @@ func (f *FakeFactory) PrinterForMapping(cmd *cobra.Command, isLocal bool, output
 	return f.tf.Printer, f.tf.Err
 }
 
-func (f *FakeFactory) NewBuilder(allowRemoteCalls bool) *resource.Builder {
-	return nil
-}
-
-func (f *FakeFactory) NewUnstructuredBuilder(allowRemoteCalls bool) (*resource.Builder, error) {
-	if !allowRemoteCalls {
-		return f.NewBuilder(allowRemoteCalls), nil
-	}
-
-	mapper, typer, err := f.UnstructuredObject()
-	if err != nil {
-		return nil, err
-	}
-
-	return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme), nil
+func (f *FakeFactory) NewBuilder() *resource.Builder {
+	mapper, typer := f.Object()
+	return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
 }
 
 func (f *FakeFactory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions {
@@ -769,23 +756,9 @@ func (f *fakeAPIFactory) PrinterForMapping(cmd *cobra.Command, isLocal bool, out
 	return f.tf.Printer, f.tf.Err
 }
 
-func (f *fakeAPIFactory) NewBuilder(allowRemoteCalls bool) *resource.Builder {
+func (f *fakeAPIFactory) NewBuilder() *resource.Builder {
 	mapper, typer := f.Object()
-
 	return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
-}
-
-func (f *fakeAPIFactory) NewUnstructuredBuilder(allowRemoteCalls bool) (*resource.Builder, error) {
-	if !allowRemoteCalls {
-		return f.NewBuilder(allowRemoteCalls), nil
-	}
-
-	mapper, typer, err := f.UnstructuredObject()
-	if err != nil {
-		return nil, err
-	}
-
-	return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme), nil
 }
 
 func (f *fakeAPIFactory) SuggestedPodTemplateResources() []schema.GroupResource {

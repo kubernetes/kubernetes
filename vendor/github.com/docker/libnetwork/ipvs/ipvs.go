@@ -116,6 +116,13 @@ func (i *Handle) DelService(s *Service) error {
 	return i.doCmd(s, nil, ipvsCmdDelService)
 }
 
+// Flush deletes all existing services in the passed
+// handle.
+func (i *Handle) Flush() error {
+	_, err := i.doCmdWithoutAttr(ipvsCmdFlush)
+	return err
+}
+
 // NewDestination creates a new real server in the passed ipvs
 // service which should already be existing in the passed handle.
 func (i *Handle) NewDestination(s *Service, d *Destination) error {

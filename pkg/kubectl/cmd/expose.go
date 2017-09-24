@@ -126,7 +126,7 @@ func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	}
 
 	mapper, typer := f.Object()
-	r := f.NewBuilder(true).
+	r := f.NewBuilder().
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).

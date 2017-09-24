@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
@@ -165,6 +166,13 @@ func ValidateCronJob(scheduledJob *batch.CronJob) field.ErrorList {
 	// CronJobs and rcs have the same name validation
 	allErrs := apivalidation.ValidateObjectMeta(&scheduledJob.ObjectMeta, true, apivalidation.ValidateReplicationControllerName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateCronJobSpec(&scheduledJob.Spec, field.NewPath("spec"))...)
+	if len(scheduledJob.ObjectMeta.Name) > apimachineryvalidation.DNS1035LabelMaxLength-11 {
+		// The cronjob controller appends a 11-character suffix to the cronjob (`-$TIMESTAMP`) when
+		// creating a job. The job name length limit is 63 characters.
+		// Therefore cronjob names must have length <= 63-11=52. If we don't validate this here,
+		// then job creation will fail later.
+		allErrs = append(allErrs, field.Invalid(field.NewPath("metadata").Child("name"), scheduledJob.ObjectMeta.Name, "must be no more than 52 characters"))
+	}
 	return allErrs
 }
 

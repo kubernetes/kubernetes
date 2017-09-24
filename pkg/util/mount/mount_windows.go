@@ -74,8 +74,28 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 			return nil
 		}
 
-		// empty implementation for mounting azure file
-		return os.MkdirAll(target, 0755)
+		// currently only cifs mount is supported
+		if strings.ToLower(fstype) != "cifs" {
+			return fmt.Errorf("azureMount: only cifs mount is supported now, fstype: %q, mounting source (%q), target (%q), with options (%q)", fstype, source, target, options)
+		}
+
+		cmdLine := fmt.Sprintf(`$User = "%s";$PWord = ConvertTo-SecureString -String "%s" -AsPlainText -Force;`+
+			`$Credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $User, $PWord`,
+			options[0], options[1])
+
+		driverLetter, err := getAvailableDriveLetter()
+		if err != nil {
+			return err
+		}
+		bindSource = driverLetter + ":"
+		cmdLine += fmt.Sprintf(";New-SmbGlobalMapping -LocalPath %s -RemotePath %s -Credential $Credential", bindSource, source)
+
+		if output, err := exec.Command("powershell", "/c", cmdLine).CombinedOutput(); err != nil {
+			// we don't return error here, even though New-SmbGlobalMapping failed, we still make it successful,
+			// will return error when Windows 2016 RS3 is ready on azure
+			glog.Errorf("azureMount: SmbGlobalMapping failed: %v, only SMB mount is supported now, output: %q", err, string(output))
+			return os.MkdirAll(target, 0755)
+		}
 	}
 
 	if output, err := exec.Command("cmd", "/c", "mklink", "/D", target, bindSource).CombinedOutput(); err != nil {
@@ -176,6 +196,20 @@ func normalizeWindowsPath(path string) string {
 		normalizedPath = "c:" + normalizedPath
 	}
 	return normalizedPath
+}
+
+func getAvailableDriveLetter() (string, error) {
+	cmd := "$used = Get-PSDrive | Select-Object -Expand Name | Where-Object { $_.Length -eq 1 }"
+	cmd += ";$drive = 67..90 | ForEach-Object { [string][char]$_ } | Where-Object { $used -notcontains $_ } | Select-Object -First 1;$drive"
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("getAvailableDriveLetter failed: %v, output: %q", err, string(output))
+	}
+
+	if len(output) == 0 {
+		return "", fmt.Errorf("azureMount: there is no available drive letter now")
+	}
+	return string(output)[:1], nil
 }
 
 // ValidateDiskNumber : disk number should be a number in [0, 99]

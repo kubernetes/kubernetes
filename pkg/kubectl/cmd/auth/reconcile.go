@@ -92,7 +92,7 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 	if err != nil {
 		return err
 	}
-	o.ResourceBuilder = f.NewBuilder(true).
+	o.ResourceBuilder = f.NewBuilder().
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).

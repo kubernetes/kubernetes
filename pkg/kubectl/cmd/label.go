@@ -49,6 +49,7 @@ type LabelOptions struct {
 
 	// Common user flags
 	overwrite       bool
+	list            bool
 	local           bool
 	dryrun          bool
 	all             bool
@@ -127,6 +128,7 @@ func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().Bool("overwrite", false, "If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.")
+	cmd.Flags().BoolVar(&options.list, "list", options.list, "If true, display the labels for a given resource.")
 	cmd.Flags().Bool("local", false, "If true, label will NOT contact api-server but run locally.")
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")
 	cmd.Flags().Bool("all", false, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
@@ -144,6 +146,7 @@ func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
 // Complete adapts from the command line args and factory to the data required.
 func (o *LabelOptions) Complete(out io.Writer, cmd *cobra.Command, args []string) (err error) {
 	o.out = out
+	o.list = cmdutil.GetFlagBool(cmd, "list")
 	o.local = cmdutil.GetFlagBool(cmd, "local")
 	o.overwrite = cmdutil.GetFlagBool(cmd, "overwrite")
 	o.all = cmdutil.GetFlagBool(cmd, "all")
@@ -158,6 +161,11 @@ func (o *LabelOptions) Complete(out io.Writer, cmd *cobra.Command, args []string
 	}
 	o.resources = resources
 	o.newLabels, o.removeLabels, err = parseLabels(labelArgs)
+
+	if o.list && len(o.outputFormat) > 0 {
+		return cmdutil.UsageErrorf(cmd, "--list and --output may not be specified together")
+	}
+
 	return err
 }
 
@@ -166,7 +174,7 @@ func (o *LabelOptions) Validate() error {
 	if len(o.resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames) {
 		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
-	if len(o.newLabels) < 1 && len(o.removeLabels) < 1 {
+	if len(o.newLabels) < 1 && len(o.removeLabels) < 1 && !o.list {
 		return fmt.Errorf("at least one label update is required")
 	}
 	return nil
@@ -181,13 +189,8 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 
 	changeCause := f.Command(cmd, false)
 
-	builder, err := f.NewUnstructuredBuilder(!o.local)
-	if err != nil {
-		return err
-	}
-
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
-	b := builder.
+	b := f.NewBuilder().
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
@@ -195,10 +198,22 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 		Flatten()
 
 	if !o.local {
+		// call this method here, as it requires an api call
+		// and will cause the command to fail when there is
+		// no connection to a server
+		mapper, typer, err := f.UnstructuredObject()
+		if err != nil {
+			return err
+		}
+
 		b = b.SelectorParam(o.selector).
+			Unstructured(f.UnstructuredClientForMapping, mapper, typer).
 			ResourceTypeOrNameArgs(o.all, o.resources...).
 			Latest()
+	} else {
+		b = b.Local(f.ClientForMapping)
 	}
+
 	one := false
 	r := b.Do().IntoSingleItemImplied(&one)
 	if err := r.Err(); err != nil {
@@ -218,7 +233,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 
 		var outputObj runtime.Object
 		dataChangeMsg := "not labeled"
-		if o.dryrun || o.local {
+		if o.dryrun || o.local || o.list {
 			err = labelFunc(info.Object, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
 			if err != nil {
 				return err
@@ -278,6 +293,19 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			if err != nil {
 				return err
 			}
+		}
+
+		if o.list {
+			accessor, err := meta.Accessor(outputObj)
+			if err != nil {
+				return err
+			}
+
+			for k, v := range accessor.GetLabels() {
+				fmt.Fprintf(o.out, "%s=%s\n", k, v)
+			}
+
+			return nil
 		}
 
 		var mapper meta.RESTMapper

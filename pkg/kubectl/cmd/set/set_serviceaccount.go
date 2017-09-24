@@ -126,7 +126,7 @@ func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 	saConfig.serviceAccountName = args[len(args)-1]
 	resources := args[:len(args)-1]
 	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
-	builder := f.NewBuilder(!saConfig.local).ContinueOnError().
+	builder := f.NewBuilder().ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &saConfig.fileNameOptions).
 		IncludeUninitialized(includeUninitialized).
@@ -134,6 +134,8 @@ func (saConfig *serviceAccountConfig) Complete(f cmdutil.Factory, cmd *cobra.Com
 	if !saConfig.local {
 		builder.ResourceTypeOrNameArgs(saConfig.all, resources...).
 			Latest()
+	} else {
+		builder = builder.Local(f.ClientForMapping)
 	}
 	saConfig.infos, err = builder.Do().Infos()
 	if err != nil {

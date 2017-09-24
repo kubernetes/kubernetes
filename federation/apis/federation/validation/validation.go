@@ -17,6 +17,9 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
+	"net"
+
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -27,6 +30,15 @@ func ValidateClusterSpec(spec *federation.ClusterSpec, fieldPath *field.Path) fi
 	// address is required.
 	if len(spec.ServerAddressByClientCIDRs) == 0 {
 		allErrs = append(allErrs, field.Required(fieldPath.Child("serverAddressByClientCIDRs"), ""))
+	} else {
+		for i, address := range spec.ServerAddressByClientCIDRs {
+			idxPath := fieldPath.Child("serverAddressByClientCIDRs").Index(i)
+			if len(address.ClientCIDR) > 0 {
+				if _, _, err := net.ParseCIDR(address.ClientCIDR); err != nil {
+					allErrs = append(allErrs, field.Invalid(idxPath.Child("clientCIDR"), address.ClientCIDR, fmt.Sprintf("must be a valid CIDR: %v", err)))
+				}
+			}
+		}
 	}
 	return allErrs
 }

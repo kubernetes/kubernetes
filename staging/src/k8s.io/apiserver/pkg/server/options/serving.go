@@ -116,7 +116,7 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"File containing the default x509 Certificate for HTTPS. (CA cert, if any, concatenated "+
 		"after server cert). If HTTPS serving is enabled, and --tls-cert-file and "+
 		"--tls-private-key-file are not provided, a self-signed certificate and key "+
-		"are generated for the public address and saved to /var/run/kubernetes.")
+		"are generated for the public address and saved to the directory specified by --cert-dir.")
 
 	fs.StringVar(&s.ServerCert.CertKey.KeyFile, "tls-private-key-file", s.ServerCert.CertKey.KeyFile,
 		"File containing the default x509 private key matching --tls-cert-file.")

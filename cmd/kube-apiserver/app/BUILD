@@ -33,6 +33,7 @@ go_library(
         "//pkg/kubeapiserver/server:go_default_library",
         "//pkg/master:go_default_library",
         "//pkg/master/controller/crdregistration:go_default_library",
+        "//pkg/master/reconcilers:go_default_library",
         "//pkg/master/tunneler:go_default_library",
         "//pkg/quota/install:go_default_library",
         "//pkg/registry/cachesize:go_default_library",

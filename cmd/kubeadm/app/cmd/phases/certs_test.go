@@ -33,9 +33,12 @@ import (
 	cmdtestutil "k8s.io/kubernetes/cmd/kubeadm/test/cmd"
 )
 
+// phaseTestK8sVersion is a fake kubernetes version to use when testing
+const phaseTestK8sVersion = "v1.8.0"
+
 func TestCertsSubCommandsHasFlags(t *testing.T) {
 
-	subCmds := getCertsSubCommands()
+	subCmds := getCertsSubCommands(phaseTestK8sVersion)
 
 	commonFlags := []string{
 		"cert-dir",
@@ -89,7 +92,7 @@ func TestCertsSubCommandsHasFlags(t *testing.T) {
 
 func TestSubCmdCertsCreateFilesWithFlags(t *testing.T) {
 
-	subCmds := getCertsSubCommands()
+	subCmds := getCertsSubCommands(phaseTestK8sVersion)
 
 	var tests = []struct {
 		subCmds       []string
@@ -138,7 +141,7 @@ func TestSubCmdCertsCreateFilesWithFlags(t *testing.T) {
 
 func TestSubCmdCertsApiServerForwardsFlags(t *testing.T) {
 
-	subCmds := getCertsSubCommands()
+	subCmds := getCertsSubCommands(phaseTestK8sVersion)
 
 	// Create temp folder for the test case
 	tmpdir := testutil.SetupTempDir(t)
@@ -180,7 +183,7 @@ func TestSubCmdCertsApiServerForwardsFlags(t *testing.T) {
 
 func TestSubCmdCertsCreateFilesWithConfigFile(t *testing.T) {
 
-	subCmds := getCertsSubCommands()
+	subCmds := getCertsSubCommands(phaseTestK8sVersion)
 
 	var tests = []struct {
 		subCmds       []string

@@ -28,7 +28,7 @@ import (
 const (
 	DefaultServiceDNSDomain   = "cluster.local"
 	DefaultServicesSubnet     = "10.96.0.0/12"
-	DefaultKubernetesVersion  = "stable-1.7"
+	DefaultKubernetesVersion  = "stable-1.8"
 	DefaultAPIBindPort        = 6443
 	DefaultAuthorizationModes = "Node,RBAC"
 	DefaultCACertPath         = "/etc/kubernetes/pki/ca.crt"

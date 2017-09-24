@@ -368,20 +368,22 @@ func makeUID() string {
 // getTerminationMessage looks on the filesystem for the provided termination message path, returning a limited
 // amount of those bytes, or returns true if the logs should be checked.
 func getTerminationMessage(status *runtimeapi.ContainerStatus, terminationMessagePath string, fallbackToLogs bool) (string, bool) {
-	if len(terminationMessagePath) != 0 {
-		for _, mount := range status.Mounts {
-			if mount.ContainerPath != terminationMessagePath {
-				continue
-			}
-			path := mount.HostPath
-			data, _, err := tail.ReadAtMost(path, kubecontainer.MaxContainerTerminationMessageLength)
-			if err != nil {
-				return fmt.Sprintf("Error on reading termination log %s: %v", path, err), false
-			}
-			if !fallbackToLogs || len(data) != 0 {
-				return string(data), false
-			}
+	if len(terminationMessagePath) == 0 {
+		return "", fallbackToLogs
+	}
+	for _, mount := range status.Mounts {
+		if mount.ContainerPath != terminationMessagePath {
+			continue
 		}
+		path := mount.HostPath
+		data, _, err := tail.ReadAtMost(path, kubecontainer.MaxContainerTerminationMessageLength)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return "", fallbackToLogs
+			}
+			return fmt.Sprintf("Error on reading termination log %s: %v", path, err), false
+		}
+		return string(data), (fallbackToLogs && len(data) == 0)
 	}
 	return "", fallbackToLogs
 }

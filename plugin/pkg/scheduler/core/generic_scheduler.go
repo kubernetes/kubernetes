@@ -177,7 +177,7 @@ func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList
 // before the pod that triggered the preemption(s) has a chance to schedule
 // there, thereby preventing the pod that triggered the preemption(s) from
 // scheduling. Solution is given at:
-// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/pod-preemption.md#preemption-mechanics
+// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/scheduling/pod-preemption.md#preemption-mechanics
 func (g *genericScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister, scheduleErr error) (*v1.Node, []*v1.Pod, error) {
 	// Scheduler may return various types of errors. Consider preemption only if
 	// the error is of type FitError.

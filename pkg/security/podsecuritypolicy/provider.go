@@ -334,7 +334,7 @@ func (s *simpleProvider) ValidateContainerSecurityContext(pod *api.Pod, containe
 	return allErrs
 }
 
-// hasHostPort checks the port definitions on the container for HostPort > 0.
+// hasInvalidHostPort checks whether the port definitions on the container fall outside of the ranges allowed by the PSP.
 func (s *simpleProvider) hasInvalidHostPort(container *api.Container, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, cp := range container.Ports {

@@ -46,6 +46,9 @@ go_library(
             "//vendor/github.com/google/cadvisor/utils/sysfs:go_default_library",
             "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "//pkg/kubelet/winstats:go_default_library",
+        ],
         "//conditions:default": [],
     }),
 )

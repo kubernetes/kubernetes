@@ -120,17 +120,13 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		return fmt.Errorf("--timeout must have --force specified")
 	}
 
-	mapper, _, err := f.UnstructuredObject()
+	mapper, typer, err := f.UnstructuredObject()
 	if err != nil {
 		return err
 	}
 
-	builder, err := f.NewUnstructuredBuilder(true)
-	if err != nil {
-		return err
-	}
-
-	r := builder.
+	r := f.NewBuilder().
+		Unstructured(f.UnstructuredClientForMapping, mapper, typer).
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -250,12 +246,8 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		})
 	})
 
-	builder, err := f.NewUnstructuredBuilder(true)
-	if err != nil {
-		return err
-	}
-
-	r = builder.
+	r = f.NewBuilder().
+		Unstructured(f.UnstructuredClientForMapping, mapper, typer).
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().

@@ -63,6 +63,8 @@ type ServiceFlags uint32
 const (
 	// FlagPersistent specify IPVS service session affinity
 	FlagPersistent = 0x1
+	// FlagHashed specify IPVS service hash flag
+	FlagHashed = 0x2
 )
 
 // Equal check the equality of virtual server.

@@ -770,8 +770,14 @@ func describeVolumes(volumes []api.Volume, w PrefixWriter, space string) {
 }
 
 func printHostPathVolumeSource(hostPath *api.HostPathVolumeSource, w PrefixWriter) {
+	hostPathType := "<none>"
+	if hostPath.Type != nil {
+		hostPathType = string(*hostPath.Type)
+	}
 	w.Write(LEVEL_2, "Type:\tHostPath (bare host directory volume)\n"+
-		"    Path:\t%v\n", hostPath.Path)
+		"    Path:\t%v\n"+
+		"    HostPathType:\t%v\n",
+		hostPath.Path, hostPathType)
 }
 
 func printEmptyDirVolumeSource(emptyDir *api.EmptyDirVolumeSource, w PrefixWriter) {
@@ -3128,6 +3134,9 @@ func describeStorageClass(sc *storage.StorageClass, events *api.EventList) (stri
 		w.Write(LEVEL_0, "Annotations:\t%s\n", labels.FormatLabels(sc.Annotations))
 		w.Write(LEVEL_0, "Provisioner:\t%s\n", sc.Provisioner)
 		w.Write(LEVEL_0, "Parameters:\t%s\n", labels.FormatLabels(sc.Parameters))
+		if sc.ReclaimPolicy != nil {
+			w.Write(LEVEL_0, "ReclaimPolicy:\t%s\n", *sc.ReclaimPolicy)
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}
