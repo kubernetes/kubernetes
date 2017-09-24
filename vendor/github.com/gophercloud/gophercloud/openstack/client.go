@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"regexp"
+	"strings"
 
 	"github.com/gophercloud/gophercloud"
 	tokens2 "github.com/gophercloud/gophercloud/openstack/identity/v2/tokens"
@@ -12,8 +14,13 @@ import (
 )
 
 const (
-	v20 = "v2.0"
-	v30 = "v3.0"
+	// v2 represents Keystone v2.
+	// It should never increase beyond 2.0.
+	v2 = "v2.0"
+
+	// v3 represents Keystone v3.
+	// The version can be anything from v3 to v3.x.
+	v3 = "v3"
 )
 
 /*
@@ -35,24 +42,25 @@ func NewClient(endpoint string) (*gophercloud.ProviderClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	hadPath := u.Path != ""
-	u.Path, u.RawQuery, u.Fragment = "", "", ""
-	base := u.String()
+
+	u.RawQuery, u.Fragment = "", ""
+
+	var base string
+	versionRe := regexp.MustCompile("v[0-9.]+/?")
+	if version := versionRe.FindString(u.Path); version != "" {
+		base = strings.Replace(u.String(), version, "", -1)
+	} else {
+		base = u.String()
+	}
 
 	endpoint = gophercloud.NormalizeURL(endpoint)
 	base = gophercloud.NormalizeURL(base)
 
-	if hadPath {
-		return &gophercloud.ProviderClient{
-			IdentityBase:     base,
-			IdentityEndpoint: endpoint,
-		}, nil
-	}
-
 	return &gophercloud.ProviderClient{
 		IdentityBase:     base,
-		IdentityEndpoint: "",
+		IdentityEndpoint: endpoint,
 	}, nil
+
 }
 
 /*
@@ -92,8 +100,8 @@ func AuthenticatedClient(options gophercloud.AuthOptions) (*gophercloud.Provider
 // supported at the provided endpoint.
 func Authenticate(client *gophercloud.ProviderClient, options gophercloud.AuthOptions) error {
 	versions := []*utils.Version{
-		{ID: v20, Priority: 20, Suffix: "/v2.0/"},
-		{ID: v30, Priority: 30, Suffix: "/v3/"},
+		{ID: v2, Priority: 20, Suffix: "/v2.0/"},
+		{ID: v3, Priority: 30, Suffix: "/v3/"},
 	}
 
 	chosen, endpoint, err := utils.ChooseVersion(client, versions)
@@ -102,9 +110,9 @@ func Authenticate(client *gophercloud.ProviderClient, options gophercloud.AuthOp
 	}
 
 	switch chosen.ID {
-	case v20:
+	case v2:
 		return v2auth(client, endpoint, options, gophercloud.EndpointOpts{})
-	case v30:
+	case v3:
 		return v3auth(client, endpoint, &options, gophercloud.EndpointOpts{})
 	default:
 		// The switch statement must be out of date from the versions list.
@@ -239,6 +247,13 @@ func NewIdentityV3(client *gophercloud.ProviderClient, eo gophercloud.EndpointOp
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	// Ensure endpoint still has a suffix of v3.
+	// This is because EndpointLocator might have found a versionless
+	// endpoint and requests will fail unless targeted at /v3.
+	if !strings.HasSuffix(endpoint, "v3/") {
+		endpoint = endpoint + "v3/"
 	}
 
 	return &gophercloud.ServiceClient{
