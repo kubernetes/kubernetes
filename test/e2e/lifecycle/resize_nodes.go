@@ -56,7 +56,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 		systemPods, err := framework.GetPodsInNamespace(c, ns, ignoreLabels)
 		Expect(err).NotTo(HaveOccurred())
 		systemPodsNo = int32(len(systemPods))
-		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
+		if strings.Contains(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") {
 			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
 		} else {
 			group = framework.TestContext.CloudConfig.NodeInstanceGroup
