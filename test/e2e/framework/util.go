@@ -4802,7 +4802,7 @@ func CleanupGCEResources(c clientset.Interface, loadBalancerName, zone string) (
 	if err != nil {
 		return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
 	}
-	if err := gceCloud.DeleteFirewall(loadBalancerName); err != nil &&
+	if err := gceCloud.DeleteFirewall(gcecloud.MakeFirewallName(loadBalancerName)); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = err
 	}
@@ -4815,7 +4815,12 @@ func CleanupGCEResources(c clientset.Interface, loadBalancerName, zone string) (
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, err)
 	}
-	var hcNames []string
+	clusterID, err := GetClusterID(c)
+	if err != nil {
+		retErr = fmt.Errorf("%v\n%v", retErr, err)
+		return
+	}
+	hcNames := []string{gcecloud.MakeNodesHealthCheckName(clusterID)}
 	hc, getErr := gceCloud.GetHttpHealthCheck(loadBalancerName)
 	if getErr != nil && !IsGoogleAPIHTTPErrorCode(getErr, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, getErr)
@@ -4823,11 +4828,6 @@ func CleanupGCEResources(c clientset.Interface, loadBalancerName, zone string) (
 	}
 	if hc != nil {
 		hcNames = append(hcNames, hc.Name)
-	}
-	clusterID, err := GetClusterID(c)
-	if err != nil {
-		retErr = fmt.Errorf("%v\n%v", retErr, err)
-		return
 	}
 	if err := gceCloud.DeleteExternalTargetPoolAndChecks(nil, loadBalancerName, region, clusterID, hcNames...); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
