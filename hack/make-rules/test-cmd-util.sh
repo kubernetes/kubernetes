@@ -4689,7 +4689,7 @@ runTests() {
     kube::test::if_has_string "${output_message}" "yes"
 
     output_message=$(! kubectl auth can-i get /logs/ --subresource=log 2>&1 "${kube_flags[@]}")
-    kube::test::if_has_string "${output_message}" "subresource can not be used with nonResourceURL"
+    kube::test::if_has_string "${output_message}" "subresource can not be used with NonResourceURL"
 
     output_message=$(kubectl auth can-i list jobs.batch/bar -n foo --quiet 2>&1 "${kube_flags[@]}")
     kube::test::if_empty_string "${output_message}"
