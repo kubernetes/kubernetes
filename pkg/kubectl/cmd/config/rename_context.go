@@ -83,8 +83,7 @@ func NewCmdConfigRenameContext(out io.Writer, configAccess clientcmd.ConfigAcces
 // Complete assigns RenameContextOptions from the args.
 func (o *RenameContextOptions) Complete(cmd *cobra.Command, args []string, out io.Writer) error {
 	if len(args) != 2 {
-		cmd.Help()
-		return fmt.Errorf("Unexpected args: %v", args)
+		return helpErrorf(cmd, "Unexpected args: %v", args)
 	}
 
 	o.contextName = args[0]
