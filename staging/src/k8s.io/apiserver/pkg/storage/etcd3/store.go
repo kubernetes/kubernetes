@@ -429,25 +429,26 @@ func decodeContinue(continueValue, keyPrefix string) (fromKey string, rv int64, 
 		return "", 0, fmt.Errorf("continue key is not valid: %v", err)
 	}
 	switch c.APIVersion {
-	case "v1alpha1":
+	case "meta.k8s.io/v1":
 		if c.ResourceVersion == 0 {
-			return "", 0, fmt.Errorf("continue key is not valid: incorrect encoded start resourceVersion (version v1alpha1)")
+			return "", 0, fmt.Errorf("continue key is not valid: incorrect encoded start resourceVersion (version meta.k8s.io/v1)")
 		}
 		if len(c.StartKey) == 0 {
-			return "", 0, fmt.Errorf("continue key is not valid: encoded start key empty (version v1alpha1)")
+			return "", 0, fmt.Errorf("continue key is not valid: encoded start key empty (version meta.k8s.io/v1)")
 		}
 		// defend against path traversal attacks by clients - path.Clean will ensure that startKey cannot
 		// be at a higher level of the hierarchy, and so when we append the key prefix we will end up with
 		// continue start key that is fully qualified and cannot range over anything less specific than
 		// keyPrefix.
-		cleaned := path.Clean(c.StartKey)
-		if cleaned != c.StartKey || cleaned == "." || cleaned == "/" {
-			return "", 0, fmt.Errorf("continue key is not valid: %s", cleaned)
+		key := c.StartKey
+		if !strings.HasPrefix(key, "/") {
+			key = "/" + key
 		}
-		if len(cleaned) == 0 {
-			return "", 0, fmt.Errorf("continue key is not valid: encoded start key empty (version 0)")
+		cleaned := path.Clean(key)
+		if cleaned != key {
+			return "", 0, fmt.Errorf("continue key is not valid: %s", c.StartKey)
 		}
-		return keyPrefix + cleaned, c.ResourceVersion, nil
+		return keyPrefix + cleaned[1:], c.ResourceVersion, nil
 	default:
 		return "", 0, fmt.Errorf("continue key is not valid: server does not recognize this encoded version %q", c.APIVersion)
 	}
@@ -459,7 +460,7 @@ func encodeContinue(key, keyPrefix string, resourceVersion int64) (string, error
 	if nextKey == key {
 		return "", fmt.Errorf("unable to encode next field: the key and key prefix do not match")
 	}
-	out, err := json.Marshal(&continueToken{APIVersion: "v1alpha1", ResourceVersion: resourceVersion, StartKey: nextKey})
+	out, err := json.Marshal(&continueToken{APIVersion: "meta.k8s.io/v1", ResourceVersion: resourceVersion, StartKey: nextKey})
 	if err != nil {
 		return "", err
 	}
