@@ -182,6 +182,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 
 		if !options.Local {
 			dataChangedMsg := "not patched"
+			didPatch := false
 			helper := resource.NewHelper(client, mapping)
 			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes)
 			if err != nil {
@@ -212,6 +213,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 				return err
 			}
 			if !reflect.DeepEqual(oldData, newData) {
+				didPatch = true
 				dataChangedMsg = "patched"
 			}
 
@@ -228,6 +230,12 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 				return err
 			}
 			cmdutil.PrintSuccess(mapper, options.OutputFormat == "name", out, info.Mapping.Resource, info.Name, false, dataChangedMsg)
+
+			// if object was not successfully patched, exit with error code 1
+			if !didPatch {
+				return cmdutil.ErrExit
+			}
+
 			return nil
 		}
 
