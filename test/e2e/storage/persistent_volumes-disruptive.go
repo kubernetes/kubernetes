@@ -347,34 +347,90 @@ func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, 
 // - If `service` also returns stderr "command not found", the test is aborted.
 // Allowed kubeletOps are `kStart`, `kStop`, and `kRestart`
 func kubeletCommand(kOp kubeletOpt, c clientset.Interface, pod *v1.Pod) {
+	command := ""
+	sudoPresent := false
+	systemctlPresent := false
+	kubeletPid := ""
+
 	nodeIP, err := framework.GetHostExternalAddress(c, pod)
 	Expect(err).NotTo(HaveOccurred())
 	nodeIP = nodeIP + ":22"
-	systemctlCmd := fmt.Sprintf("sudo systemctl %s kubelet", string(kOp))
-	framework.Logf("Attempting `%s`", systemctlCmd)
-	sshResult, err := framework.SSH(systemctlCmd, nodeIP, framework.TestContext.Provider)
+
+	framework.Logf("Checking if sudo command is present")
+	sshResult, err := framework.SSH("sudo --version", nodeIP, framework.TestContext.Provider)
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
+	if !strings.Contains(sshResult.Stderr, "command not found") {
+		sudoPresent = true
+	}
+
+	framework.Logf("Checking if systemctl command is present")
+	sshResult, err = framework.SSH("systemctl --version", nodeIP, framework.TestContext.Provider)
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
+	if !strings.Contains(sshResult.Stderr, "command not found") {
+		command = fmt.Sprintf("systemctl %s kubelet", string(kOp))
+		systemctlPresent = true
+	} else {
+		command = fmt.Sprintf("service kubelet %s", string(kOp))
+	}
+	if sudoPresent {
+		command = fmt.Sprintf("sudo %s", command)
+	}
+
+	if kOp == kRestart {
+		kubeletPid = getKubeletMainPid(nodeIP, sudoPresent, systemctlPresent)
+	}
+
+	framework.Logf("Attempting `%s`", command)
+	sshResult, err = framework.SSH(command, nodeIP, framework.TestContext.Provider)
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
 	framework.LogSSHResult(sshResult)
-	if strings.Contains(sshResult.Stderr, "command not found") {
-		serviceCmd := fmt.Sprintf("sudo service kubelet %s", string(kOp))
-		framework.Logf("Attempting `%s`", serviceCmd)
-		sshResult, err = framework.SSH(serviceCmd, nodeIP, framework.TestContext.Provider)
-		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
-		framework.LogSSHResult(sshResult)
-	}
 	Expect(sshResult.Code).To(BeZero(), "Failed to [%s] kubelet:\n%#v", string(kOp), sshResult)
-	// On restart, waiting for node NotReady prevents a race condition where the node takes a few moments to leave the
-	// Ready state which in turn short circuits WaitForNodeToBeReady()
-	if kOp == kStop || kOp == kRestart {
+
+	if kOp == kStop {
 		if ok := framework.WaitForNodeToBeNotReady(c, pod.Spec.NodeName, NodeStateTimeout); !ok {
 			framework.Failf("Node %s failed to enter NotReady state", pod.Spec.NodeName)
 		}
 	}
+	if kOp == kRestart {
+		// Wait for a minute to check if kubelet Pid is getting changed
+		isPidChanged := false
+		for start := time.Now(); time.Since(start) < 1*time.Minute; time.Sleep(2 * time.Second) {
+			kubeletPidAfterRestart := getKubeletMainPid(nodeIP, sudoPresent, systemctlPresent)
+			if kubeletPid != kubeletPidAfterRestart {
+				isPidChanged = true
+				break
+			}
+		}
+		Expect(isPidChanged).To(BeTrue(), "Kubelet PID remained unchanged after restarting Kubelet")
+		framework.Logf("Noticed that kubelet PID is changed. Waiting for 30 Seconds for Kubelet to come back")
+		time.Sleep(30 * time.Second)
+	}
 	if kOp == kStart || kOp == kRestart {
+		// For kubelet start and restart operations, Wait until Node becomes Ready
 		if ok := framework.WaitForNodeToBeReady(c, pod.Spec.NodeName, NodeStateTimeout); !ok {
 			framework.Failf("Node %s failed to enter Ready state", pod.Spec.NodeName)
 		}
 	}
+}
+
+// return the Main PID of the Kubelet Process
+func getKubeletMainPid(nodeIP string, sudoPresent bool, systemctlPresent bool) string {
+	command := ""
+	if systemctlPresent {
+		command = "systemctl status kubelet | grep 'Main PID'"
+	} else {
+		command = "service kubelet status | grep 'Main PID'"
+	}
+	if sudoPresent {
+		command = fmt.Sprintf("sudo %s", command)
+	}
+	framework.Logf("Attempting `%s`", command)
+	sshResult, err := framework.SSH(command, nodeIP, framework.TestContext.Provider)
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("SSH to Node %q errored.", nodeIP))
+	framework.LogSSHResult(sshResult)
+	Expect(sshResult.Code).To(BeZero(), "Failed to get kubelet PID")
+	Expect(sshResult.Stdout).NotTo(BeEmpty(), "Kubelet Main PID should not be Empty")
+	return sshResult.Stdout
 }
 
 // podExec wraps RunKubectl to execute a bash cmd in target pod
