@@ -45,19 +45,22 @@ type CloudControllerManagerServer struct {
 // NewCloudControllerManagerServer creates a new ExternalCMServer with a default config.
 func NewCloudControllerManagerServer() *CloudControllerManagerServer {
 	s := CloudControllerManagerServer{
+		// Part of these default values also present in 'cmd/kube-controller-manager/app/options/options.go'.
+		// Please keep them in sync when doing update.
 		KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
-			Port:                    ports.CloudControllerManagerPort,
-			Address:                 "0.0.0.0",
-			ConcurrentServiceSyncs:  1,
-			MinResyncPeriod:         metav1.Duration{Duration: 12 * time.Hour},
-			NodeMonitorPeriod:       metav1.Duration{Duration: 5 * time.Second},
-			ClusterName:             "kubernetes",
-			ConfigureCloudRoutes:    true,
-			ContentType:             "application/vnd.kubernetes.protobuf",
-			KubeAPIQPS:              20.0,
-			KubeAPIBurst:            30,
-			LeaderElection:          leaderelectionconfig.DefaultLeaderElectionConfiguration(),
-			ControllerStartInterval: metav1.Duration{Duration: 0 * time.Second},
+			Port:                      ports.CloudControllerManagerPort,
+			Address:                   "0.0.0.0",
+			ConcurrentServiceSyncs:    1,
+			MinResyncPeriod:           metav1.Duration{Duration: 12 * time.Hour},
+			NodeMonitorPeriod:         metav1.Duration{Duration: 5 * time.Second},
+			ClusterName:               "kubernetes",
+			ConfigureCloudRoutes:      true,
+			ContentType:               "application/vnd.kubernetes.protobuf",
+			KubeAPIQPS:                20.0,
+			KubeAPIBurst:              30,
+			LeaderElection:            leaderelectionconfig.DefaultLeaderElectionConfiguration(),
+			ControllerStartInterval:   metav1.Duration{Duration: 0 * time.Second},
+			RouteReconciliationPeriod: metav1.Duration{Duration: 10 * time.Second},
 		},
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 5 * time.Minute},
 	}
