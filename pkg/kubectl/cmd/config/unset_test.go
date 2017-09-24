@@ -28,9 +28,10 @@ import (
 
 type unsetConfigTest struct {
 	description string
-	config      clientcmdapi.Config //initiate kubectl config
-	args        []string            //kubectl config unset args
-	expected    string              //expect out
+	config      clientcmdapi.Config
+	args        []string
+	expected    string
+	expectedErr string
 }
 
 func TestUnsetConfigString(t *testing.T) {
@@ -79,6 +80,31 @@ func TestUnsetConfigMap(t *testing.T) {
 	test.run(t)
 }
 
+func TestUnsetUnexistConfig(t *testing.T) {
+	conf := clientcmdapi.Config{
+		Kind:       "Config",
+		APIVersion: "v1",
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"minikube":   {Server: "https://192.168.99.100:8443"},
+			"my-cluster": {Server: "https://192.168.0.1:3434"},
+		},
+		Contexts: map[string]*clientcmdapi.Context{
+			"minikube":   {AuthInfo: "minikube", Cluster: "minikube"},
+			"my-cluster": {AuthInfo: "mu-cluster", Cluster: "my-cluster"},
+		},
+		CurrentContext: "minikube",
+	}
+
+	test := unsetConfigTest{
+		description: "Testing for kubectl config unset a unexist map key",
+		config:      conf,
+		args:        []string{"contexts.foo.namespace"},
+		expectedErr: "current map key `foo` is invalid",
+	}
+	test.run(t)
+
+}
+
 func (test unsetConfigTest) run(t *testing.T) {
 	fakeKubeFile, err := ioutil.TempFile(os.TempDir(), "")
 	if err != nil {
@@ -94,13 +120,18 @@ func (test unsetConfigTest) run(t *testing.T) {
 	pathOptions.EnvVar = ""
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdConfigUnset(buf, pathOptions)
-	cmd.SetArgs(test.args)
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error executing command: %v,kubectl unset args: %v", err, test.args)
+	opts := &unsetOptions{configAccess: pathOptions}
+	err = opts.complete(cmd, test.args)
+	if err == nil {
+		err = opts.run(buf)
 	}
 	config, err := clientcmd.LoadFromFile(fakeKubeFile.Name())
 	if err != nil {
 		t.Fatalf("unexpected error loading kubeconfig file: %v", err)
+	}
+
+	if err != nil && err.Error() != test.expectedErr {
+		t.Fatalf("expected error:\n %v\nbut got error:\n%v", test.expectedErr, err)
 	}
 	if len(test.expected) != 0 {
 		if buf.String() != test.expected {
