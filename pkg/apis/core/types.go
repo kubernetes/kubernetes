@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // Common string formats
@@ -685,12 +684,6 @@ const (
 	StorageMediumDefault   StorageMedium = ""          // use whatever the default is for the node
 	StorageMediumMemory    StorageMedium = "Memory"    // use memory (tmpfs)
 	StorageMediumHugePages StorageMedium = "HugePages" // use hugepages
-)
-
-var ValidStorageMedia = sets.NewString(
-	string(StorageMediumDefault),
-	string(StorageMediumMemory),
-	string(StorageMediumHugePages),
 )
 
 // Protocol defines network protocols supported for things like container ports.

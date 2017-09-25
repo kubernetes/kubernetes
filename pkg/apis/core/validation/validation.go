@@ -381,6 +381,12 @@ func ValidateVolumes(volumes []core.Volume, fldPath *field.Path) (sets.String, f
 	return allNames, allErrs
 }
 
+var validStorageMedia = sets.NewString(
+	string(core.StorageMediumDefault),
+	string(core.StorageMediumMemory),
+	string(core.StorageMediumHugePages),
+)
+
 func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volName string) field.ErrorList {
 	numVolumes := 0
 	allErrs := field.ErrorList{}
@@ -395,7 +401,7 @@ func validateVolumeSource(source *core.VolumeSource, fldPath *field.Path, volNam
 				allErrs = append(allErrs, field.Forbidden(fldPath.Child("emptyDir").Child("sizeLimit"), "SizeLimit field must be a valid resource quantity"))
 			}
 		}
-		if !core.ValidStorageMedia.Has(string(source.EmptyDir.Medium)) {
+		if !validStorageMedia.Has(string(source.EmptyDir.Medium)) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("emptyDir").Child("medium"), source.EmptyDir.Medium, "invalid storage medium for EmptyDir volumes"))
 
 		}
