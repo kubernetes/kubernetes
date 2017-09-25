@@ -211,6 +211,7 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 	)
 }
 
+// NewInit validates given arguments and instantiates Init struct with provided information.
 func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight, skipTokenPrint, dryRun bool) (*Init, error) {
 
 	fmt.Println("[kubeadm] WARNING: kubeadm is in beta, please do not use it for production clusters.")
@@ -256,6 +257,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight,
 	return &Init{cfg: cfg, skipTokenPrint: skipTokenPrint, dryRun: dryRun}, nil
 }
 
+// Init defines struct used by "kubeadm init" command
 type Init struct {
 	cfg            *kubeadmapi.MasterConfiguration
 	skipTokenPrint bool

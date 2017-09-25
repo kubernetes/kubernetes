@@ -110,7 +110,7 @@ func NewSubCmdNodeBootstrapTokenPostCSRs(kubeConfigFile *string) *cobra.Command 
 	return cmd
 }
 
-// NewSubCmdNodeBootstrapToken returns the Cobra command for running the allow-auto-approve sub-phase
+// NewSubCmdNodeBootstrapTokenAutoApprove returns the Cobra command for running the allow-auto-approve sub-phase
 func NewSubCmdNodeBootstrapTokenAutoApprove(kubeConfigFile *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "allow-auto-approve",

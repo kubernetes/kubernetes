@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 )
 
+// NewCmdPreFlight calls cobra.Command for preflight checks
 func NewCmdPreFlight() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "preflight",
@@ -36,6 +37,7 @@ func NewCmdPreFlight() *cobra.Command {
 	return cmd
 }
 
+// NewCmdPreFlightMaster calls cobra.Command for master preflight checks
 func NewCmdPreFlightMaster() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "master",
@@ -49,6 +51,7 @@ func NewCmdPreFlightMaster() *cobra.Command {
 	return cmd
 }
 
+// NewCmdPreFlightNode calls cobra.Command for node preflight checks
 func NewCmdPreFlightNode() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "node",

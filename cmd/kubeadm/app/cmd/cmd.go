@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/upgrade"
 )
 
+// NewKubeadmCommand return cobra.Command to run kubeadm command
 func NewKubeadmCommand(_ io.Reader, out, err io.Writer) *cobra.Command {
 	cmds := &cobra.Command{
 		Use:   "kubeadm",
