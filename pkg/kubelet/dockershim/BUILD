@@ -57,7 +57,6 @@ go_library(
         "//pkg/security/apparmor:go_default_library",
         "//pkg/util/hash:go_default_library",
         "//pkg/util/parsers:go_default_library",
-        "//pkg/util/term:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/docker/docker/api/types:go_default_library",
         "//vendor/github.com/docker/docker/api/types/container:go_default_library",
@@ -70,7 +69,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
-        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 
