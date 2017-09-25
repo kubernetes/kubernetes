@@ -63,7 +63,7 @@ type qosContainerManagerImpl struct {
 func NewQOSContainerManager(subsystems *CgroupSubsystems, cgroupRoot string, nodeConfig NodeConfig) (QOSContainerManager, error) {
 	if !nodeConfig.CgroupsPerQOS {
 		return &qosContainerManagerNoop{
-			cgroupRoot: CgroupName(nodeConfig.CgroupRoot),
+			cgroupRoot: CgroupName(cgroupRoot),
 		}, nil
 	}
 
