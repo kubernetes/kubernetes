@@ -24,9 +24,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/explain"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -80,7 +80,7 @@ func RunExplain(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, ar
 	// TODO: After we figured out the new syntax to separate group and resource, allow
 	// the users to use it in explain (kubectl explain <group><syntax><resource>).
 	// Refer to issue #16039 for why we do this. Refer to PR #15808 that used "/" syntax.
-	inModel, fieldsPath, err := kubectl.SplitAndParseResourceRequest(args[0], mapper)
+	inModel, fieldsPath, err := explain.SplitAndParseResourceRequest(args[0], mapper)
 	if err != nil {
 		return err
 	}
@@ -108,14 +108,20 @@ func RunExplain(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, ar
 	} else {
 		apiVersion, err = schema.ParseGroupVersion(apiVersionString)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
+	gvk = apiVersion.WithKind(gvk.Kind)
 
-	schema, err := f.SwaggerSchema(apiVersion.WithKind(gvk.Kind))
+	resources, err := f.OpenAPISchema()
 	if err != nil {
 		return err
 	}
 
-	return kubectl.PrintModelDescription(inModel, fieldsPath, out, schema, recursive)
+	schema := resources.LookupResource(gvk)
+	if schema == nil {
+		return fmt.Errorf("Couldn't find resource for %q", gvk)
+	}
+
+	return explain.PrintModelDescription(fieldsPath, out, schema, recursive)
 }
