@@ -36,7 +36,7 @@ import (
 )
 
 func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate testutils.UpdateDeploymentFunc) (*extensions.Deployment, error) {
-	return testutils.UpdateDeploymentWithRetries(c, namespace, name, applyUpdate, Logf)
+	return testutils.UpdateDeploymentWithRetries(c, namespace, name, applyUpdate, Logf, Poll, pollShortTimeout)
 }
 
 // Waits for the deployment to clean up old rcs.

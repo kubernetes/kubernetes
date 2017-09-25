@@ -20,7 +20,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
@@ -367,7 +366,7 @@ func TestDeploymentHashCollision(t *testing.T) {
 	}
 
 	// Expect deployment collision counter to increment
-	if err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		d, err := c.ExtensionsV1beta1().Deployments(ns.Name).Get(tester.deployment.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, nil

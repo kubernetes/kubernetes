@@ -35,7 +35,7 @@ import (
 type updateRsFunc func(d *extensions.ReplicaSet)
 
 func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate testutils.UpdateReplicaSetFunc) (*extensions.ReplicaSet, error) {
-	return testutils.UpdateReplicaSetWithRetries(c, namespace, name, applyUpdate, Logf)
+	return testutils.UpdateReplicaSetWithRetries(c, namespace, name, applyUpdate, Logf, Poll, pollShortTimeout)
 }
 
 // CheckNewRSAnnotations check if the new RS's annotation is as expected

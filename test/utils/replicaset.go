@@ -28,10 +28,10 @@ import (
 
 type UpdateReplicaSetFunc func(d *extensions.ReplicaSet)
 
-func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate UpdateReplicaSetFunc, logf LogfFn) (*extensions.ReplicaSet, error) {
+func UpdateReplicaSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate UpdateReplicaSetFunc, logf LogfFn, pollInterval, pollTimeout time.Duration) (*extensions.ReplicaSet, error) {
 	var rs *extensions.ReplicaSet
 	var updateErr error
-	pollErr := wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+	pollErr := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		var err error
 		if rs, err = c.Extensions().ReplicaSets(namespace).Get(name, metav1.GetOptions{}); err != nil {
 			return false, err

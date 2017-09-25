@@ -216,10 +216,10 @@ func containsImage(containers []v1.Container, imageName string) bool {
 
 type UpdateDeploymentFunc func(d *extensions.Deployment)
 
-func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate UpdateDeploymentFunc, logf LogfFn) (*extensions.Deployment, error) {
+func UpdateDeploymentWithRetries(c clientset.Interface, namespace, name string, applyUpdate UpdateDeploymentFunc, logf LogfFn, pollInterval, pollTimeout time.Duration) (*extensions.Deployment, error) {
 	var deployment *extensions.Deployment
 	var updateErr error
-	pollErr := wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
+	pollErr := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		var err error
 		if deployment, err = c.Extensions().Deployments(namespace).Get(name, metav1.GetOptions{}); err != nil {
 			return false, err
