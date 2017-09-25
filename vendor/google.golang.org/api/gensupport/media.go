@@ -174,26 +174,126 @@ func typeHeader(contentType string) textproto.MIMEHeader {
 // PrepareUpload determines whether the data in the supplied reader should be
 // uploaded in a single request, or in sequential chunks.
 // chunkSize is the size of the chunk that media should be split into.
-// If chunkSize is non-zero and the contents of media do not fit in a single
-// chunk (or there is an error reading media), then media will be returned as a
-// MediaBuffer.  Otherwise, media will be returned as a Reader.
+//
+// If chunkSize is zero, media is returned as the first value, and the other
+// two return values are nil, true.
+//
+// Otherwise, a MediaBuffer is returned, along with a bool indicating whether the
+// contents of media fit in a single chunk.
 //
 // After PrepareUpload has been called, media should no longer be used: the
 // media content should be accessed via one of the return values.
-func PrepareUpload(media io.Reader, chunkSize int) (io.Reader, *MediaBuffer) {
+func PrepareUpload(media io.Reader, chunkSize int) (r io.Reader, mb *MediaBuffer, singleChunk bool) {
 	if chunkSize == 0 { // do not chunk
-		return media, nil
+		return media, nil, true
 	}
+	mb = NewMediaBuffer(media, chunkSize)
+	_, _, _, err := mb.Chunk()
+	// If err is io.EOF, we can upload this in a single request. Otherwise, err is
+	// either nil or a non-EOF error. If it is the latter, then the next call to
+	// mb.Chunk will return the same error. Returning a MediaBuffer ensures that this
+	// error will be handled at some point.
+	return nil, mb, err == io.EOF
+}
 
-	mb := NewMediaBuffer(media, chunkSize)
-	rdr, _, _, err := mb.Chunk()
+// MediaInfo holds information for media uploads. It is intended for use by generated
+// code only.
+type MediaInfo struct {
+	// At most one of Media and MediaBuffer will be set.
+	media           io.Reader
+	buffer          *MediaBuffer
+	singleChunk     bool
+	mType           string
+	size            int64 // mediaSize, if known.  Used only for calls to progressUpdater_.
+	progressUpdater googleapi.ProgressUpdater
+}
 
-	if err == io.EOF { // we can upload this in a single request
-		return rdr, nil
+// NewInfoFromMedia should be invoked from the Media method of a call. It returns a
+// MediaInfo populated with chunk size and content type, and a reader or MediaBuffer
+// if needed.
+func NewInfoFromMedia(r io.Reader, options []googleapi.MediaOption) *MediaInfo {
+	mi := &MediaInfo{}
+	opts := googleapi.ProcessMediaOptions(options)
+	if !opts.ForceEmptyContentType {
+		r, mi.mType = DetermineContentType(r, opts.ContentType)
 	}
-	// err might be a non-EOF error. If it is, the next call to mb.Chunk will
-	// return the same error. Returning a MediaBuffer ensures that this error
-	// will be handled at some point.
+	mi.media, mi.buffer, mi.singleChunk = PrepareUpload(r, opts.ChunkSize)
+	return mi
+}
 
-	return nil, mb
+// NewInfoFromResumableMedia should be invoked from the ResumableMedia method of a
+// call. It returns a MediaInfo using the given reader, size and media type.
+func NewInfoFromResumableMedia(r io.ReaderAt, size int64, mediaType string) *MediaInfo {
+	rdr := ReaderAtToReader(r, size)
+	rdr, mType := DetermineContentType(rdr, mediaType)
+	return &MediaInfo{
+		size:        size,
+		mType:       mType,
+		buffer:      NewMediaBuffer(rdr, googleapi.DefaultUploadChunkSize),
+		media:       nil,
+		singleChunk: false,
+	}
+}
+
+func (mi *MediaInfo) SetProgressUpdater(pu googleapi.ProgressUpdater) {
+	if mi != nil {
+		mi.progressUpdater = pu
+	}
+}
+
+// UploadType determines the type of upload: a single request, or a resumable
+// series of requests.
+func (mi *MediaInfo) UploadType() string {
+	if mi.singleChunk {
+		return "multipart"
+	}
+	return "resumable"
+}
+
+// UploadRequest sets up an HTTP request for media upload. It adds headers
+// as necessary, and returns a replacement for the body.
+func (mi *MediaInfo) UploadRequest(reqHeaders http.Header, body io.Reader) (newBody io.Reader, cleanup func()) {
+	cleanup = func() {}
+	if mi == nil {
+		return body, cleanup
+	}
+	var media io.Reader
+	if mi.media != nil {
+		// This only happens when the caller has turned off chunking. In that
+		// case, we write all of media in a single non-retryable request.
+		media = mi.media
+	} else if mi.singleChunk {
+		// The data fits in a single chunk, which has now been read into the MediaBuffer.
+		// We obtain that chunk so we can write it in a single request. The request can
+		// be retried because the data is stored in the MediaBuffer.
+		media, _, _, _ = mi.buffer.Chunk()
+	}
+	if media != nil {
+		combined, ctype := CombineBodyMedia(body, "application/json", media, mi.mType)
+		cleanup = func() { combined.Close() }
+		reqHeaders.Set("Content-Type", ctype)
+		body = combined
+	}
+	if mi.buffer != nil && mi.mType != "" && !mi.singleChunk {
+		reqHeaders.Set("X-Upload-Content-Type", mi.mType)
+	}
+	return body, cleanup
+}
+
+// ResumableUpload returns an appropriately configured ResumableUpload value if the
+// upload is resumable, or nil otherwise.
+func (mi *MediaInfo) ResumableUpload(locURI string) *ResumableUpload {
+	if mi == nil || mi.singleChunk {
+		return nil
+	}
+	return &ResumableUpload{
+		URI:       locURI,
+		Media:     mi.buffer,
+		MediaType: mi.mType,
+		Callback: func(curr int64) {
+			if mi.progressUpdater != nil {
+				mi.progressUpdater(curr, mi.size)
+			}
+		},
+	}
 }

@@ -19,11 +19,16 @@ package gce
 import (
 	"net/http"
 
+	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
 )
 
 func newBackendServiceMetricContext(request, region string) *metricContext {
-	return newGenericMetricContext("backendservice", request, region, unusedMetricLabel, computeV1Version)
+	return newBackendServiceMetricContextWithVersion(request, region, computeV1Version)
+}
+
+func newBackendServiceMetricContextWithVersion(request, region, version string) *metricContext {
+	return newGenericMetricContext("backendservice", request, region, unusedMetricLabel, version)
 }
 
 // GetGlobalBackendService retrieves a backend by name.
@@ -37,6 +42,17 @@ func (gce *GCECloud) GetGlobalBackendService(name string) (*compute.BackendServi
 func (gce *GCECloud) UpdateGlobalBackendService(bg *compute.BackendService) error {
 	mc := newBackendServiceMetricContext("update", "")
 	op, err := gce.service.BackendServices.Update(gce.projectID, bg.Name, bg).Do()
+	if err != nil {
+		return mc.Observe(err)
+	}
+
+	return gce.waitForGlobalOp(op, mc)
+}
+
+// UpdateAlphaGlobalBackendService applies the given alpha BackendService as an update to an existing service.
+func (gce *GCECloud) UpdateAlphaGlobalBackendService(bg *computealpha.BackendService) error {
+	mc := newBackendServiceMetricContextWithVersion("update", "", computeAlphaVersion)
+	op, err := gce.serviceAlpha.BackendServices.Update(gce.projectID, bg.Name, bg).Do()
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -62,6 +78,17 @@ func (gce *GCECloud) DeleteGlobalBackendService(name string) error {
 func (gce *GCECloud) CreateGlobalBackendService(bg *compute.BackendService) error {
 	mc := newBackendServiceMetricContext("create", "")
 	op, err := gce.service.BackendServices.Insert(gce.projectID, bg).Do()
+	if err != nil {
+		return mc.Observe(err)
+	}
+
+	return gce.waitForGlobalOp(op, mc)
+}
+
+// CreateAlphaGlobalBackendService creates the given alpha BackendService.
+func (gce *GCECloud) CreateAlphaGlobalBackendService(bg *computealpha.BackendService) error {
+	mc := newBackendServiceMetricContextWithVersion("create", "", computeAlphaVersion)
+	op, err := gce.serviceAlpha.BackendServices.Insert(gce.projectID, bg).Do()
 	if err != nil {
 		return mc.Observe(err)
 	}

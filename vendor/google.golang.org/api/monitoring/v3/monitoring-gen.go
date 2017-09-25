@@ -268,6 +268,45 @@ func (s *CollectdPayload) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// CollectdPayloadError: Describes the error status for payloads that
+// were not written.
+type CollectdPayloadError struct {
+	// Error: Records the error status for the payload. If this field is
+	// present, the partial errors for nested values won't be populated.
+	Error *Status `json:"error,omitempty"`
+
+	// Index: The zero-based index in
+	// CreateCollectdTimeSeriesRequest.collectd_payloads.
+	Index int64 `json:"index,omitempty"`
+
+	// ValueErrors: Records the error status for values that were not
+	// written due to an error.Failed payloads for which nothing is written
+	// will not include partial value errors.
+	ValueErrors []*CollectdValueError `json:"valueErrors,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Error") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Error") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *CollectdPayloadError) MarshalJSON() ([]byte, error) {
+	type noMethod CollectdPayloadError
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // CollectdValue: A single data point from a collectd-based plugin.
 type CollectdValue struct {
 	// DataSourceName: The data source for the collectd value. For example
@@ -317,6 +356,39 @@ func (s *CollectdValue) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// CollectdValueError: Describes the error status for values that were
+// not written.
+type CollectdValueError struct {
+	// Error: Records the error status for the value.
+	Error *Status `json:"error,omitempty"`
+
+	// Index: The zero-based index in CollectdPayload.values within the
+	// parent CreateCollectdTimeSeriesRequest.collectd_payloads.
+	Index int64 `json:"index,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Error") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Error") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *CollectdValueError) MarshalJSON() ([]byte, error) {
+	type noMethod CollectdValueError
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // CreateCollectdTimeSeriesRequest: The CreateCollectdTimeSeries
 // request.
 type CreateCollectdTimeSeriesRequest struct {
@@ -353,6 +425,41 @@ type CreateCollectdTimeSeriesRequest struct {
 
 func (s *CreateCollectdTimeSeriesRequest) MarshalJSON() ([]byte, error) {
 	type noMethod CreateCollectdTimeSeriesRequest
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
+// CreateCollectdTimeSeriesResponse: The CreateCollectdTimeSeries
+// response.
+type CreateCollectdTimeSeriesResponse struct {
+	// PayloadErrors: Records the error status for points that were not
+	// written due to an error.Failed requests for which nothing is written
+	// will return an error response instead.
+	PayloadErrors []*CollectdPayloadError `json:"payloadErrors,omitempty"`
+
+	// ServerResponse contains the HTTP response code and headers from the
+	// server.
+	googleapi.ServerResponse `json:"-"`
+
+	// ForceSendFields is a list of field names (e.g. "PayloadErrors") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "PayloadErrors") to include
+	// in API requests with the JSON null value. By default, fields with
+	// empty values are omitted from API requests. However, any field with
+	// an empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *CreateCollectdTimeSeriesResponse) MarshalJSON() ([]byte, error) {
+	type noMethod CreateCollectdTimeSeriesResponse
 	raw := noMethod(*s)
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
@@ -1492,6 +1599,82 @@ func (s *SourceContext) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// Status: The Status type defines a logical error model that is
+// suitable for different programming environments, including REST APIs
+// and RPC APIs. It is used by gRPC (https://github.com/grpc). The error
+// model is designed to be:
+// Simple to use and understand for most users
+// Flexible enough to meet unexpected needsOverviewThe Status message
+// contains three pieces of data: error code, error message, and error
+// details. The error code should be an enum value of google.rpc.Code,
+// but it may accept additional error codes if needed. The error message
+// should be a developer-facing English message that helps developers
+// understand and resolve the error. If a localized user-facing error
+// message is needed, put the localized message in the error details or
+// localize it in the client. The optional error details may contain
+// arbitrary information about the error. There is a predefined set of
+// error detail types in the package google.rpc that can be used for
+// common error conditions.Language mappingThe Status message is the
+// logical representation of the error model, but it is not necessarily
+// the actual wire format. When the Status message is exposed in
+// different client libraries and different wire protocols, it can be
+// mapped differently. For example, it will likely be mapped to some
+// exceptions in Java, but more likely mapped to some error codes in
+// C.Other usesThe error model and the Status message can be used in a
+// variety of environments, either with or without APIs, to provide a
+// consistent developer experience across different environments.Example
+// uses of this error model include:
+// Partial errors. If a service needs to return partial errors to the
+// client, it may embed the Status in the normal response to indicate
+// the partial errors.
+// Workflow errors. A typical workflow has multiple steps. Each step may
+// have a Status message for error reporting.
+// Batch operations. If a client uses batch request and batch response,
+// the Status message should be used directly inside batch response, one
+// for each error sub-response.
+// Asynchronous operations. If an API call embeds asynchronous operation
+// results in its response, the status of those operations should be
+// represented directly using the Status message.
+// Logging. If some API errors are stored in logs, the message Status
+// could be used directly after any stripping needed for
+// security/privacy reasons.
+type Status struct {
+	// Code: The status code, which should be an enum value of
+	// google.rpc.Code.
+	Code int64 `json:"code,omitempty"`
+
+	// Details: A list of messages that carry the error details. There is a
+	// common set of message types for APIs to use.
+	Details []googleapi.RawMessage `json:"details,omitempty"`
+
+	// Message: A developer-facing error message, which should be in
+	// English. Any user-facing error message should be localized and sent
+	// in the google.rpc.Status.details field, or localized by the client.
+	Message string `json:"message,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "Code") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "Code") to include in API
+	// requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *Status) MarshalJSON() ([]byte, error) {
+	type noMethod Status
+	raw := noMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // TimeInterval: A time interval extending just after a start time
 // through an end time. If the start time is the same as the end time,
 // then the interval represents a single point in time.
@@ -1789,13 +1972,13 @@ func (c *ProjectsCollectdTimeSeriesCreateCall) doRequest(alt string) (*http.Resp
 }
 
 // Do executes the "monitoring.projects.collectdTimeSeries.create" call.
-// Exactly one of *Empty or error will be non-nil. Any non-2xx status
-// code is an error. Response headers are in either
-// *Empty.ServerResponse.Header or (if a response was returned at all)
-// in error.(*googleapi.Error).Header. Use googleapi.IsNotModified to
-// check whether the returned error was because http.StatusNotModified
-// was returned.
-func (c *ProjectsCollectdTimeSeriesCreateCall) Do(opts ...googleapi.CallOption) (*Empty, error) {
+// Exactly one of *CreateCollectdTimeSeriesResponse or error will be
+// non-nil. Any non-2xx status code is an error. Response headers are in
+// either *CreateCollectdTimeSeriesResponse.ServerResponse.Header or (if
+// a response was returned at all) in error.(*googleapi.Error).Header.
+// Use googleapi.IsNotModified to check whether the returned error was
+// because http.StatusNotModified was returned.
+func (c *ProjectsCollectdTimeSeriesCreateCall) Do(opts ...googleapi.CallOption) (*CreateCollectdTimeSeriesResponse, error) {
 	gensupport.SetOptions(c.urlParams_, opts...)
 	res, err := c.doRequest("json")
 	if res != nil && res.StatusCode == http.StatusNotModified {
@@ -1814,7 +1997,7 @@ func (c *ProjectsCollectdTimeSeriesCreateCall) Do(opts ...googleapi.CallOption) 
 	if err := googleapi.CheckResponse(res); err != nil {
 		return nil, err
 	}
-	ret := &Empty{
+	ret := &CreateCollectdTimeSeriesResponse{
 		ServerResponse: googleapi.ServerResponse{
 			Header:         res.Header,
 			HTTPStatusCode: res.StatusCode,
@@ -1847,7 +2030,7 @@ func (c *ProjectsCollectdTimeSeriesCreateCall) Do(opts ...googleapi.CallOption) 
 	//     "$ref": "CreateCollectdTimeSeriesRequest"
 	//   },
 	//   "response": {
-	//     "$ref": "Empty"
+	//     "$ref": "CreateCollectdTimeSeriesResponse"
 	//   },
 	//   "scopes": [
 	//     "https://www.googleapis.com/auth/cloud-platform",

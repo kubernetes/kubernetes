@@ -22,6 +22,7 @@ import (
 	utilversion "k8s.io/kubernetes/pkg/util/version"
 
 	"github.com/golang/glog"
+	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
 )
 
@@ -43,7 +44,11 @@ func init() {
 }
 
 func newHealthcheckMetricContext(request string) *metricContext {
-	return newGenericMetricContext("healthcheck", request, unusedMetricLabel, unusedMetricLabel, computeV1Version)
+	return newHealthcheckMetricContextWithVersion(request, computeV1Version)
+}
+
+func newHealthcheckMetricContextWithVersion(request, version string) *metricContext {
+	return newGenericMetricContext("healthcheck", request, unusedMetricLabel, unusedMetricLabel, version)
 }
 
 // GetHttpHealthCheck returns the given HttpHealthCheck by name.
@@ -155,10 +160,28 @@ func (gce *GCECloud) GetHealthCheck(name string) (*compute.HealthCheck, error) {
 	return v, mc.Observe(err)
 }
 
+// GetAlphaHealthCheck returns the given alpha HealthCheck by name.
+func (gce *GCECloud) GetAlphaHealthCheck(name string) (*computealpha.HealthCheck, error) {
+	mc := newHealthcheckMetricContextWithVersion("get", computeAlphaVersion)
+	v, err := gce.serviceAlpha.HealthChecks.Get(gce.projectID, name).Do()
+	return v, mc.Observe(err)
+}
+
 // UpdateHealthCheck applies the given HealthCheck as an update.
 func (gce *GCECloud) UpdateHealthCheck(hc *compute.HealthCheck) error {
 	mc := newHealthcheckMetricContext("update")
 	op, err := gce.service.HealthChecks.Update(gce.projectID, hc.Name, hc).Do()
+	if err != nil {
+		return mc.Observe(err)
+	}
+
+	return gce.waitForGlobalOp(op, mc)
+}
+
+// UpdateAlphaHealthCheck applies the given alpha HealthCheck as an update.
+func (gce *GCECloud) UpdateAlphaHealthCheck(hc *computealpha.HealthCheck) error {
+	mc := newHealthcheckMetricContextWithVersion("update", computeAlphaVersion)
+	op, err := gce.serviceAlpha.HealthChecks.Update(gce.projectID, hc.Name, hc).Do()
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -181,6 +204,17 @@ func (gce *GCECloud) DeleteHealthCheck(name string) error {
 func (gce *GCECloud) CreateHealthCheck(hc *compute.HealthCheck) error {
 	mc := newHealthcheckMetricContext("create")
 	op, err := gce.service.HealthChecks.Insert(gce.projectID, hc).Do()
+	if err != nil {
+		return mc.Observe(err)
+	}
+
+	return gce.waitForGlobalOp(op, mc)
+}
+
+// CreateAlphaHealthCheck creates the given alpha HealthCheck.
+func (gce *GCECloud) CreateAlphaHealthCheck(hc *computealpha.HealthCheck) error {
+	mc := newHealthcheckMetricContextWithVersion("create", computeAlphaVersion)
+	op, err := gce.serviceAlpha.HealthChecks.Insert(gce.projectID, hc).Do()
 	if err != nil {
 		return mc.Observe(err)
 	}

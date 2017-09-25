@@ -119,7 +119,7 @@ func (manager *gceServiceManager) CreateDiskOnCloudProvider(
 		return nil, err
 	}
 
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
 		diskToCreateAlpha := &computealpha.Disk{
 			Name:        name,
 			SizeGb:      sizeGb,
@@ -157,7 +157,7 @@ func (manager *gceServiceManager) CreateRegionalDiskOnCloudProvider(
 		fullyQualifiedReplicaZones = append(
 			fullyQualifiedReplicaZones, manager.getReplicaZoneURI(replicaZone))
 	}
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
 		diskToCreateAlpha := &computealpha.Disk{
 			Name:         name,
 			SizeGb:       sizeGb,
@@ -182,7 +182,7 @@ func (manager *gceServiceManager) AttachDiskOnCloudProvider(
 		return nil, err
 	}
 
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
 		attachedDiskAlpha := &computealpha.AttachedDisk{
 			DeviceName: disk.Name,
 			Kind:       disk.Kind,
@@ -209,7 +209,7 @@ func (manager *gceServiceManager) DetachDiskOnCloudProvider(
 	instanceZone string,
 	instanceName string,
 	devicePath string) (gceObject, error) {
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
 		manager.gce.serviceAlpha.Instances.DetachDisk(
 			manager.gce.projectID, instanceZone, instanceName, devicePath).Do()
 	}
@@ -229,7 +229,7 @@ func (manager *gceServiceManager) GetDiskFromCloudProvider(
 		return nil, fmt.Errorf("Can not fetch disk. Zone is specified (%q). But disk name is empty.", zone)
 	}
 
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
 		diskAlpha, err := manager.gce.serviceAlpha.Disks.Get(
 			manager.gce.projectID, zone, diskName).Do()
 		if err != nil {
@@ -295,7 +295,7 @@ func (manager *gceServiceManager) GetDiskFromCloudProvider(
 func (manager *gceServiceManager) GetRegionalDiskFromCloudProvider(
 	diskName string) (*GCEDisk, error) {
 
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
 		diskAlpha, err := manager.gce.serviceAlpha.RegionDisks.Get(
 			manager.gce.projectID, manager.gce.region, diskName).Do()
 		if err != nil {
@@ -323,7 +323,7 @@ func (manager *gceServiceManager) DeleteDiskOnCloudProvider(
 	zone string,
 	diskName string) (gceObject, error) {
 
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
 		return manager.gce.serviceAlpha.Disks.Delete(
 			manager.gce.projectID, zone, diskName).Do()
 	}
@@ -334,7 +334,7 @@ func (manager *gceServiceManager) DeleteDiskOnCloudProvider(
 
 func (manager *gceServiceManager) DeleteRegionalDiskOnCloudProvider(
 	diskName string) (gceObject, error) {
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
 		return manager.gce.serviceAlpha.RegionDisks.Delete(
 			manager.gce.projectID, manager.gce.region, diskName).Do()
 	}
@@ -354,7 +354,7 @@ func (manager *gceServiceManager) WaitForRegionalOp(
 
 func (manager *gceServiceManager) getDiskSourceURI(disk *GCEDisk) (string, error) {
 	getProjectsAPIEndpoint := manager.getProjectsAPIEndpoint()
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
 		getProjectsAPIEndpoint = manager.getProjectsAPIEndpointAlpha()
 	}
 
@@ -392,7 +392,7 @@ func (manager *gceServiceManager) getDiskSourceURI(disk *GCEDisk) (string, error
 func (manager *gceServiceManager) getDiskTypeURI(
 	diskRegion string, diskZoneInfo zoneType, diskType string) (string, error) {
 	getProjectsAPIEndpoint := manager.getProjectsAPIEndpoint()
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
 		getProjectsAPIEndpoint = manager.getProjectsAPIEndpointAlpha()
 	}
 
@@ -425,7 +425,7 @@ func (manager *gceServiceManager) getDiskTypeURI(
 
 func (manager *gceServiceManager) getReplicaZoneURI(zone string) string {
 	getProjectsAPIEndpoint := manager.getProjectsAPIEndpoint()
-	if manager.gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+	if manager.gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
 		getProjectsAPIEndpoint = manager.getProjectsAPIEndpointAlpha()
 	}
 
@@ -569,7 +569,7 @@ func (gce *GCECloud) AttachDisk(diskName string, nodeName types.NodeName, readOn
 	// Try fetching as regional PD
 	var disk *GCEDisk
 	var mc *metricContext
-	if gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+	if gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
 		disk, err = gce.getRegionalDiskByName(diskName)
 		if err != nil {
 			glog.V(5).Infof("Could not find regional PD named %q to Attach. Will look for a zonal PD", diskName)
@@ -932,7 +932,7 @@ func (gce *GCECloud) getRegionalDiskByName(diskName string) (*GCEDisk, error) {
 // Prefer getDiskByName, if the zone can be established
 // Return cloudprovider.DiskNotFound if the given disk cannot be found in any zone
 func (gce *GCECloud) GetDiskByNameUnknownZone(diskName string) (*GCEDisk, error) {
-	if gce.AlphaFeatureGate.Enabled(GCEDiskAlphaFeatureGate) {
+	if gce.AlphaFeatureGate.Enabled(AlphaFeatureGCEDisk) {
 		regionalDisk, err := gce.getRegionalDiskByName(diskName)
 		if err == nil {
 			return regionalDisk, err
