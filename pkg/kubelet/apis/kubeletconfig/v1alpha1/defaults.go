@@ -275,6 +275,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 			obj.RemoteRuntimeEndpoint = "tcp://localhost:3735"
 		}
 	}
+	if obj.FeatureGates == nil {
+		obj.FeatureGates = make(map[string]bool)
+	}
 }
 
 func boolVar(b bool) *bool {
