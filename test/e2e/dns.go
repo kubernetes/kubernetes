@@ -487,6 +487,8 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		validateTargetedProbeOutput(f, pod2, []string{wheezyFileName, jessieFileName}, "bar.example.com.")
 
+		/* Below test case is disabled for v1.6 due to https://github.com/kubernetes/kubernetes/issues/35354.
+		   It is enabled for v1.8+ where the fix is in place.
 		// Test changing type from ExternalName to ClusterIP
 		By("changing the service to type=ClusterIP")
 		_, err = framework.UpdateService(f.ClientSet, f.Namespace.Name, serviceName, func(s *v1.Service) {
@@ -507,5 +509,6 @@ var _ = framework.KubeDescribe("DNS", func() {
 		pod3 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, false)
 
 		validateTargetedProbeOutput(f, pod3, []string{wheezyFileName, jessieFileName}, "127.1.2.3")
+		*/
 	})
 })
