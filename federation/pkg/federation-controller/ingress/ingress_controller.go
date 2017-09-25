@@ -311,23 +311,23 @@ func (ic *IngressController) updateIngress(obj pkgruntime.Object) (pkgruntime.Ob
 }
 
 func (ic *IngressController) Run(stopChan <-chan struct{}) {
-	glog.Infof("Starting Ingress Controller")
+	glog.Info("Starting Ingress Controller")
 	go ic.ingressInformerController.Run(stopChan)
-	glog.Infof("... Starting Ingress Federated Informer")
+	glog.Info("... Starting Ingress Federated Informer")
 	ic.ingressFederatedInformer.Start()
-	glog.Infof("... Starting ConfigMap Federated Informer")
+	glog.Info("... Starting ConfigMap Federated Informer")
 	ic.configMapFederatedInformer.Start()
 	go func() {
 		<-stopChan
-		glog.Infof("Stopping Ingress Federated Informer")
+		glog.Info("Stopping Ingress Federated Informer")
 		ic.ingressFederatedInformer.Stop()
-		glog.Infof("Stopping ConfigMap Federated Informer")
+		glog.Info("Stopping ConfigMap Federated Informer")
 		ic.configMapFederatedInformer.Stop()
-		glog.Infof("Stopping ingress deliverer")
+		glog.Info("Stopping ingress deliverer")
 		ic.ingressDeliverer.Stop()
-		glog.Infof("Stopping configmap deliverer")
+		glog.Info("Stopping configmap deliverer")
 		ic.configMapDeliverer.Stop()
-		glog.Infof("Stopping cluster deliverer")
+		glog.Info("Stopping cluster deliverer")
 		ic.clusterDeliverer.Stop()
 	}()
 	ic.ingressDeliverer.StartWithHandler(func(item *util.DelayingDelivererItem) {

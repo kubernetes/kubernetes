@@ -17,6 +17,7 @@ limitations under the License.
 package dns
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -128,7 +129,7 @@ func (s *ServiceDNSController) DNSControllerRun(workers int, stopCh <-chan struc
 	defer runtime.HandleCrash()
 	defer s.workQueue.ShutDown()
 
-	glog.Infof("Starting federation service dns controller")
+	glog.Info("Starting federation service dns controller")
 
 	s.objectDeliverer.StartWithHandler(func(item *util.DelayingDelivererItem) {
 		s.workQueue.Add(item.Value.(*v1.Service))
@@ -143,7 +144,7 @@ func (s *ServiceDNSController) DNSControllerRun(workers int, stopCh <-chan struc
 	}
 
 	<-stopCh
-	glog.Infof("Stopping federation service dns controller")
+	glog.Info("Stopping federation service dns controller")
 }
 
 // Adds backoff to delay if this delivery is related to some failure. Resets backoff if there was no failure.
@@ -192,7 +193,7 @@ func (s *ServiceDNSController) workerFunction() bool {
 func (s *ServiceDNSController) worker() {
 	for {
 		if quit := s.workerFunction(); quit {
-			glog.Infof("service dns controller worker queue shutting down")
+			glog.Info("service dns controller worker queue shutting down")
 			return
 		}
 	}
@@ -203,20 +204,20 @@ func (s *ServiceDNSController) validateConfig() error {
 		return fmt.Errorf("DNSController should not be run without federationName")
 	}
 	if s.zoneName == "" && s.zoneID == "" {
-		return fmt.Errorf("DNSController must be run with either zoneName or zoneID")
+		return errors.New("DNSController must be run with either zoneName or zoneID")
 	}
 	if s.serviceDNSSuffix == "" {
 		if s.zoneName == "" {
-			return fmt.Errorf("DNSController must be run with zoneName, if serviceDnsSuffix is not set")
+			return errors.New("DNSController must be run with zoneName, if serviceDnsSuffix is not set")
 		}
 		s.serviceDNSSuffix = s.zoneName
 	}
 	if s.dns == nil {
-		return fmt.Errorf("DNSController should not be run without a dnsprovider")
+		return errors.New("DNSController should not be run without a dnsprovider")
 	}
 	zones, ok := s.dns.Zones()
 	if !ok {
-		return fmt.Errorf("the dns provider does not support zone enumeration, which is required for creating dns records")
+		return errors.New("the dns provider does not support zone enumeration, which is required for creating dns records")
 	}
 	s.dnsZones = zones
 	return nil
@@ -230,7 +231,7 @@ func (s *ServiceDNSController) retrieveOrCreateDNSZone() error {
 	switch len(matchingZones) {
 	case 0: // No matching zones for s.zoneName, so create one
 		if s.zoneName == "" {
-			return fmt.Errorf("DNSController must be run with zoneName to create zone automatically")
+			return errors.New("DNSController must be run with zoneName to create zone automatically")
 		}
 		glog.Infof("DNS zone %q not found.  Creating DNS zone %q.", s.zoneName, s.zoneName)
 		managedZone, err := s.dnsZones.New(s.zoneName)
@@ -524,7 +525,7 @@ func (s *ServiceDNSController) ensureDNSRecords(clusterName string, service *v1.
 		return err
 	}
 	if zoneNames == nil {
-		return fmt.Errorf("failed to get cluster zone names")
+		return errors.New("failed to get cluster zone names")
 	}
 	commonPrefix := serviceName + "." + namespaceName + "." + s.federationName + ".svc"
 	// dnsNames is the path up the DNS search tree, starting at the leaf

@@ -216,7 +216,7 @@ func (fjc *FederationJobController) Run(workers int, stopCh <-chan struct{}) {
 	fedutil.StartBackoffGC(fjc.jobBackoff, stopCh)
 
 	<-stopCh
-	glog.Infof("Shutting down FederationJobController")
+	glog.Info("Shutting down FederationJobController")
 	fjc.jobDeliverer.Stop()
 	fjc.clusterDeliverer.Stop()
 	fjc.jobWorkQueue.ShutDown()
