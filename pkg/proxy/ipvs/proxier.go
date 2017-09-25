@@ -649,10 +649,19 @@ func (em proxyEndpointsMap) unmerge(other proxyEndpointsMap) {
 }
 
 // CanUseIPVSProxier returns true if we can use the ipvs Proxier.
-// This is determined by checking if all the required kernel modules are loaded. It may
+// This is determined by checking if all the required kernel modules can be loaded. It may
 // return an error if it fails to get the kernel modules information without error, in which
 // case it will also return false.
 func CanUseIPVSProxier() (bool, error) {
+	// Try to load IPVS required kernel modules using modprobe
+	for _, kmod := range ipvsModules {
+		err := utilexec.New().Command("modprobe", "--", kmod).Run()
+		if err != nil {
+			glog.Warningf("Failed to load kernel module %v with modprobe. "+
+				"You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", kmod)
+		}
+	}
+
 	// Find out loaded kernel modules
 	out, err := utilexec.New().Command("cut", "-f1", "-d", " ", "/proc/modules").CombinedOutput()
 	if err != nil {
@@ -666,7 +675,7 @@ func CanUseIPVSProxier() (bool, error) {
 	loadModules.Insert(mods...)
 	modules := wantModules.Difference(loadModules).List()
 	if len(modules) != 0 {
-		return false, fmt.Errorf("Failed to load kernel modules: %v", modules)
+		return false, fmt.Errorf("IPVS proxier will not be used because the following required kernel modules are not loaded: %v", modules)
 	}
 	return true, nil
 }
