@@ -200,7 +200,7 @@ func (tc *legacyTestCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		}
 
 		// and... convert to autoscaling v1 to return the right type
-		objv1, err := UnsafeConvertToVersionVia(obj, autoscalingv1.SchemeGroupVersion)
+		objv1, err := unsafeConvertToVersionVia(obj, autoscalingv1.SchemeGroupVersion)
 		if err != nil {
 			return true, nil, err
 		}
