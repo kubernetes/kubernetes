@@ -100,17 +100,14 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ini
 	BeforeEach(func() {
 		configEnabled, err := isKubeletConfigEnabled(f)
 		framework.ExpectNoError(err)
-		if configEnabled {
-			oldCfg, err = getCurrentKubeletConfig()
-			framework.ExpectNoError(err)
-			newCfg := oldCfg.DeepCopy()
-			updateFunction(newCfg)
-			framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
-		} else {
-			framework.Logf("The Dynamic Kubelet Configuration feature is not enabled.\n" +
-				"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet to enable this feature.\n" +
-				"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`.")
-		}
+		Expect(configEnabled).To(BeTrue(), "The Dynamic Kubelet Configuration feature is not enabled.\n"+
+			"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet to enable this feature.\n"+
+			"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`.")
+		oldCfg, err = getCurrentKubeletConfig()
+		framework.ExpectNoError(err)
+		newCfg := oldCfg.DeepCopy()
+		updateFunction(newCfg)
+		framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
 	})
 	AfterEach(func() {
 		if oldCfg != nil {
