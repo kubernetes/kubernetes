@@ -380,7 +380,7 @@ func (fjc *FederationJobController) reconcileJob(key string) (reconciliationStat
 
 	glog.V(4).Infof("Start reconcile job %q", key)
 	startTime := time.Now()
-	defer glog.V(4).Infof("Finished reconcile job %q (%v)", key, time.Now().Sub(startTime))
+	defer glog.V(4).Infof("Finished reconcile job %q (%v)", key, time.Since(startTime))
 
 	objFromStore, exists, err := fjc.jobStore.GetByKey(key)
 	if err != nil {

@@ -93,12 +93,12 @@ func DeleteReplicaSet(clientset clientset.Interface, internalClientset internalc
 		Logf("ReplicaSet %s was already deleted: %v", name, err)
 		return nil
 	}
-	deleteRSTime := time.Now().Sub(startTime)
+	deleteRSTime := time.Since(startTime)
 	Logf("Deleting RS %s took: %v", name, deleteRSTime)
 	if err == nil {
 		err = waitForReplicaSetPodsGone(clientset, rs)
 	}
-	terminatePodTime := time.Now().Sub(startTime) - deleteRSTime
+	terminatePodTime := time.Since(startTime) - deleteRSTime
 	Logf("Terminating ReplicaSet %s pods took: %v", name, terminatePodTime)
 	return err
 }

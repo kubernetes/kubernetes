@@ -45,7 +45,7 @@ func main() {
 	duration := time.Duration(*durationSec) * time.Second
 	start := time.Now()
 	first := systemstat.GetProcCPUSample()
-	for time.Now().Sub(start) < duration {
+	for time.Since(start) < duration {
 		cpu := systemstat.GetProcCPUAverage(first, systemstat.GetProcCPUSample(), systemstat.GetUptime().Uptime)
 		if cpu.TotalPct < millicoresPct {
 			doSomething()
