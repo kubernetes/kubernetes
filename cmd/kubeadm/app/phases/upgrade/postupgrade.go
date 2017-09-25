@@ -22,7 +22,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptoken "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
@@ -74,11 +73,6 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 	//}
 	// Create/update RBAC rules that makes the cluster-info ConfigMap reachable
 	if err := clusterinfo.CreateClusterInfoRBACRules(client); err != nil {
-		errs = append(errs, err)
-	}
-
-	// TODO: This call is deprecated
-	if err := apiconfig.CreateRBACRules(client, k8sVersion); err != nil {
 		errs = append(errs, err)
 	}
 
