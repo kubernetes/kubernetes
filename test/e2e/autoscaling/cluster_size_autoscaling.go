@@ -619,8 +619,20 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 	})
 
-	It("Should be able to scale a node group down to 0[Feature:ClusterSizeAutoscalingScaleDown]", func() {
-		framework.SkipUnlessAtLeast(len(originalSizes), 2, "At least 2 node groups are needed for scale-to-0 tests")
+	It("Should be able to scale a node group down to 0[Feature:ClusterSizeAutoscalingXScaleDown]", func() {
+		// Determine whether we want to run & adjust the setup if necessary
+		if len(originalSizes) < 2 {
+			if framework.ProviderIs("gke") {
+				const extraPoolName = "extra-pool"
+				addNodePool(extraPoolName, "n1-standard-4", 1)
+				defer deleteNodePool(extraPoolName)
+				err := enableAutoscaler(extraPoolName, 0, 1)
+				framework.ExpectNoError(err)
+			} else {
+				framework.Skipf("At least 2 node groups are needed for scale-to-0 tests")
+			}
+		}
+
 		By("Find smallest node group and manually scale it to a single node")
 		minMig := ""
 		minSize := nodeCount
