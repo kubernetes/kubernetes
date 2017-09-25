@@ -10,7 +10,6 @@ go_test(
     name = "go_default_test",
     srcs = ["proxy_test.go"],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//cmd/kubeadm/app/util:go_default_library",
         "//pkg/api:go_default_library",

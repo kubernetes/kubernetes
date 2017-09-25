@@ -38,6 +38,7 @@ go_test(
         "package_validator_test.go",
     ],
     library = ":go_default_library",
+    tags = ["e2e"],
     deps = [
         "//vendor/github.com/docker/docker/api/types:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

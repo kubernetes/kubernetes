@@ -293,7 +293,7 @@ func TestValidateStatefulSet(t *testing.T) {
 				field != "metadata.labels" &&
 				field != "status.replicas" &&
 				field != "spec.updateStrategy" &&
-				field != "spec.updateStrategy.rollingUpate" &&
+				field != "spec.updateStrategy.rollingUpdate" &&
 				field != "spec.updateStrategy.rollingUpdate.partition" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}

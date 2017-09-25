@@ -26,7 +26,6 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -38,12 +37,7 @@ import (
 const dnsTestPodHostName = "dns-querier-1"
 const dnsTestServiceName = "dns-test-service"
 
-var dnsServiceLabelSelector = labels.Set{
-	"k8s-app":                       "kube-dns",
-	"kubernetes.io/cluster-service": "true",
-}.AsSelector()
-
-func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string, useAnnotation bool) *v1.Pod {
+func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string) *v1.Pod {
 	dnsPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -312,7 +306,7 @@ var _ = SIGDescribe("DNS", func() {
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
-		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd)
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
@@ -358,13 +352,13 @@ var _ = SIGDescribe("DNS", func() {
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
-		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, false)
+		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd)
 		pod.ObjectMeta.Labels = testServiceSelector
 
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
-	It("should provide DNS for pods for Hostname and Subdomain Annotation", func() {
+	It("should provide DNS for pods for Hostname and Subdomain", func() {
 		// Create a test headless service.
 		By("Creating a test headless service")
 		testServiceSelector := map[string]string{
@@ -391,7 +385,7 @@ var _ = SIGDescribe("DNS", func() {
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
-		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd)
 		pod1.ObjectMeta.Labels = testServiceSelector
 		pod1.Spec.Hostname = podHostname
 		pod1.Spec.Subdomain = serviceName
@@ -400,10 +394,6 @@ var _ = SIGDescribe("DNS", func() {
 	})
 
 	It("should provide DNS for ExternalName services", func() {
-		// TODO(xiangpengzhao): allow AWS when pull-kubernetes-e2e-kops-aws and pull-kubernetes-e2e-gce-etcd3
-		// have the same "service-cluster-ip-range". See: https://github.com/kubernetes/kubernetes/issues/47224
-		framework.SkipUnlessProviderIs("gce")
-
 		// Create a test ExternalName service.
 		By("Creating a test externalName service")
 		serviceName := "dns-test-service-3"
@@ -424,7 +414,7 @@ var _ = SIGDescribe("DNS", func() {
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
-		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd)
 
 		validateTargetedProbeOutput(f, pod1, []string{wheezyFileName, jessieFileName}, "foo.example.com.")
 
@@ -441,7 +431,7 @@ var _ = SIGDescribe("DNS", func() {
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a second pod to probe DNS")
-		pod2 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod2 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd)
 
 		validateTargetedProbeOutput(f, pod2, []string{wheezyFileName, jessieFileName}, "bar.example.com.")
 
@@ -461,7 +451,7 @@ var _ = SIGDescribe("DNS", func() {
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a third pod to probe DNS")
-		pod3 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod3 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd)
 
 		svc, err := f.ClientSet.Core().Services(f.Namespace.Name).Get(externalNameService.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())

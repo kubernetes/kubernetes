@@ -227,7 +227,9 @@ func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
 	// since it is stopped. With empty network namespcae, CNI bridge plugin will conduct best
 	// effort clean up and will not return error.
 	errList := []error{}
-	if !hostNetwork {
+	ready, ok := ds.getNetworkReady(podSandboxID)
+	if !hostNetwork && (ready || !ok) {
+		// Only tear down the pod network if we haven't done so already
 		cID := kubecontainer.BuildContainerID(runtimeName, podSandboxID)
 		err := ds.network.TearDownPod(namespace, name, cID)
 		if err == nil {
@@ -270,11 +272,14 @@ func (ds *dockerService) RemovePodSandbox(podSandboxID string) error {
 	}
 
 	// Remove the sandbox container.
-	if err := ds.client.RemoveContainer(podSandboxID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true, Force: true}); err != nil && !libdocker.IsContainerNotFoundError(err) {
+	err = ds.client.RemoveContainer(podSandboxID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true, Force: true})
+	if err == nil || libdocker.IsContainerNotFoundError(err) {
+		// Only clear network ready when the sandbox has actually been
+		// removed from docker or doesn't exist
+		ds.clearNetworkReady(podSandboxID)
+	} else {
 		errs = append(errs, err)
 	}
-
-	ds.clearNetworkReady(podSandboxID)
 
 	// Remove the checkpoint of the sandbox.
 	if err := ds.checkpointHandler.RemoveCheckpoint(podSandboxID); err != nil {

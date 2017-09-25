@@ -484,7 +484,6 @@ func (os *OpenStack) HasClusterID() bool {
 func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 	glog.V(4).Info("openstack.LoadBalancer() called")
 
-	// TODO: Search for and support Rackspace loadbalancer API, and others.
 	network, err := os.NewNetworkV2()
 	if err != nil {
 		return nil, false

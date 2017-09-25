@@ -49,7 +49,6 @@ var cloudproviders = []string{
 	"openstack",
 	"ovirt",
 	"photon",
-	"rackspace",
 	"vsphere",
 }
 

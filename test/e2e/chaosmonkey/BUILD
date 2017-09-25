@@ -16,6 +16,7 @@ go_test(
     name = "go_default_test",
     srcs = ["chaosmonkey_test.go"],
     library = ":go_default_library",
+    tags = ["e2e"],
 )
 
 filegroup(
