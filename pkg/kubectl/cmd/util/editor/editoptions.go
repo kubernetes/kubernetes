@@ -111,10 +111,7 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 		return err
 	}
 
-	b, err := f.NewUnstructuredBuilder(true)
-	if err != nil {
-		return err
-	}
+	b := f.NewBuilder().Unstructured(f.UnstructuredClientForMapping, mapper, typer)
 	if o.EditMode == NormalEditMode || o.EditMode == ApplyEditMode {
 		// when do normal edit or apply edit we need to always retrieve the latest resource from server
 		b = b.ResourceTypeOrNameArgs(true, args...).Latest()

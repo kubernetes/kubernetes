@@ -101,6 +101,11 @@ func (file *defaultFile) Write(b []byte) (n int, err error) {
 	return file.file.Write(b)
 }
 
+// Sync via os.File.Sync
+func (file *defaultFile) Sync() error {
+	return file.file.Sync()
+}
+
 // Close via os.File.Close
 func (file *defaultFile) Close() error {
 	return file.file.Close()

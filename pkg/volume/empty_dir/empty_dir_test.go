@@ -323,7 +323,7 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 				},
 			},
 			shouldFail:     false,
-			expectedResult: "pageSize=2Mi",
+			expectedResult: "pagesize=2Mi",
 		},
 		"testWithProperValuesAndDifferentPageSize": {
 			pod: &v1.Pod{
@@ -347,7 +347,7 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 				},
 			},
 			shouldFail:     false,
-			expectedResult: "pageSize=1Gi",
+			expectedResult: "pagesize=1Gi",
 		},
 		"InitContainerAndContainerHasProperValues": {
 			pod: &v1.Pod{
@@ -371,7 +371,7 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 				},
 			},
 			shouldFail:     false,
-			expectedResult: "pageSize=1Gi",
+			expectedResult: "pagesize=1Gi",
 		},
 		"InitContainerAndContainerHasDifferentPageSizes": {
 			pod: &v1.Pod{

@@ -97,7 +97,7 @@ type fakePortworxManager struct {
 	mountCalled  bool
 }
 
-func (fake *fakePortworxManager) AttachVolume(b *portworxVolumeMounter) (string, error) {
+func (fake *fakePortworxManager) AttachVolume(b *portworxVolumeMounter, attachOptions map[string]string) (string, error) {
 	fake.attachCalled = true
 	return "", nil
 }
@@ -205,6 +205,9 @@ func TestPlugin(t *testing.T) {
 	}
 
 	provisioner, err := plug.(*portworxVolumePlugin).newProvisionerInternal(options, &fakePortworxManager{})
+	if err != nil {
+		t.Errorf("Error creating a new provisioner:%v", err)
+	}
 	persistentSpec, err := provisioner.Provision()
 	if err != nil {
 		t.Errorf("Provision() failed: %v", err)
@@ -228,6 +231,9 @@ func TestPlugin(t *testing.T) {
 		PersistentVolume: persistentSpec,
 	}
 	deleter, err := plug.(*portworxVolumePlugin).newDeleterInternal(volSpec, &fakePortworxManager{})
+	if err != nil {
+		t.Errorf("Error creating a new Deleter:%v", err)
+	}
 	err = deleter.Delete()
 	if err != nil {
 		t.Errorf("Deleter() failed: %v", err)

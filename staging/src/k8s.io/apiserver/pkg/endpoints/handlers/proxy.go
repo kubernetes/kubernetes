@@ -96,6 +96,9 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if namespace != "" {
 		scope = "namespace"
 	}
+	if requestInfo.Name != "" {
+		scope = "resource"
+	}
 
 	ctx = request.WithNamespace(ctx, namespace)
 	if len(parts) < 2 {

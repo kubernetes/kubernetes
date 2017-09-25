@@ -18,6 +18,8 @@ package util
 
 import (
 	"fmt"
+	"net"
+	"strconv"
 
 	"github.com/golang/glog"
 )
@@ -37,7 +39,8 @@ type LocalPort struct {
 }
 
 func (lp *LocalPort) String() string {
-	return fmt.Sprintf("%q (%s:%d/%s)", lp.Description, lp.IP, lp.Port, lp.Protocol)
+	ipPort := net.JoinHostPort(lp.IP, strconv.Itoa(lp.Port))
+	return fmt.Sprintf("%q (%s/%s)", lp.Description, ipPort, lp.Protocol)
 }
 
 // Closeable is an interface around closing an port.

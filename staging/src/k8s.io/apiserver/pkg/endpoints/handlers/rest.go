@@ -212,7 +212,20 @@ func getRequestOptions(req *http.Request, scope RequestScope, into runtime.Objec
 		if isSubresource {
 			startingIndex = 3
 		}
-		newQuery[subpathKey] = []string{strings.Join(requestInfo.Parts[startingIndex:], "/")}
+
+		p := strings.Join(requestInfo.Parts[startingIndex:], "/")
+
+		// ensure non-empty subpaths correctly reflect a leading slash
+		if len(p) > 0 && !strings.HasPrefix(p, "/") {
+			p = "/" + p
+		}
+
+		// ensure subpaths correctly reflect the presence of a trailing slash on the original request
+		if strings.HasSuffix(requestInfo.Path, "/") && !strings.HasSuffix(p, "/") {
+			p += "/"
+		}
+
+		newQuery[subpathKey] = []string{p}
 		query = newQuery
 	}
 	return scope.ParameterCodec.DecodeParameters(query, scope.Kind.GroupVersion(), into)
@@ -968,6 +981,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 					return
 				}
 
+				trace.Step("About to record audit event")
 				ae := request.AuditEventFrom(ctx)
 				audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 			} else {
@@ -982,6 +996,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		}
 
 		if admit != nil && admit.Handles(admission.Delete) {
+			trace.Step("About to check admission control")
 			userInfo, _ := request.UserFrom(ctx)
 
 			err = admit.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo))

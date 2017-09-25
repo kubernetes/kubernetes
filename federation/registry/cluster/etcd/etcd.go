@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/federation/registry/cluster"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 )
 
 type REST struct {
@@ -53,7 +52,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		NewListFunc:              func() runtime.Object { return &federation.ClusterList{} },
 		PredicateFunc:            cluster.MatchCluster,
 		DefaultQualifiedResource: federation.Resource("clusters"),
-		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("clusters"),
 
 		CreateStrategy:      cluster.Strategy,
 		UpdateStrategy:      cluster.Strategy,

@@ -116,13 +116,13 @@ func TestAggregatedAPIServer(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			kubeAPIServerConfig, sharedInformers, _, _, _, err := app.CreateKubeAPIServerConfig(kubeAPIServerOptions, tunneler, proxyTransport)
+			kubeAPIServerConfig, sharedInformers, versionedInformers, _, _, err := app.CreateKubeAPIServerConfig(kubeAPIServerOptions, tunneler, proxyTransport)
 			if err != nil {
 				t.Fatal(err)
 			}
 			kubeClientConfigValue.Store(kubeAPIServerConfig.GenericConfig.LoopbackClientConfig)
 
-			kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.EmptyDelegate, sharedInformers)
+			kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.EmptyDelegate, sharedInformers, versionedInformers)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -192,6 +192,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 				"--authorization-kubeconfig", kubeconfigFile.Name(),
 				"--etcd-servers", framework.GetEtcdURL(),
 				"--cert-dir", wardleCertDir,
+				"--kubeconfig", kubeconfigFile.Name(),
 			})
 			if err := wardleCmd.Execute(); err != nil {
 				t.Log(err)
@@ -263,7 +264,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 				"--requestheader-username-headers", "",
 				"--proxy-client-cert-file", proxyClientCertFile.Name(),
 				"--proxy-client-key-file", proxyClientKeyFile.Name(),
-				"--core-kubeconfig", kubeconfigFile.Name(),
+				"--kubeconfig", kubeconfigFile.Name(),
 				"--authentication-kubeconfig", kubeconfigFile.Name(),
 				"--authorization-kubeconfig", kubeconfigFile.Name(),
 				"--etcd-servers", framework.GetEtcdURL(),

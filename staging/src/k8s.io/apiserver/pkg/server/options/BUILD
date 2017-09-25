@@ -31,6 +31,7 @@ go_library(
         "audit.go",
         "authentication.go",
         "authorization.go",
+        "coreapi.go",
         "doc.go",
         "etcd.go",
         "feature.go",

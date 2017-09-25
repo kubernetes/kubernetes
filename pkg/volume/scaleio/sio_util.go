@@ -47,7 +47,8 @@ var (
 		readOnly,
 		username,
 		password,
-		namespace string
+		namespace,
+		sdcGuid string
 	}{
 		gateway:          "gateway",
 		sslEnabled:       "sslEnabled",
@@ -64,9 +65,10 @@ var (
 		username:         "username",
 		password:         "password",
 		namespace:        "namespace",
+		sdcGuid:          "sdcGuid",
 	}
-	nsSep       = "%"
-	sdcRootPath = "/opt/emc/scaleio/sdc/bin"
+	sdcGuidLabelName = "scaleio.sdcGuid"
+	sdcRootPath      = "/opt/emc/scaleio/sdc/bin"
 
 	secretNotFoundErr              = errors.New("secret not found")
 	configMapNotFoundErr           = errors.New("configMap not found")
@@ -213,6 +215,33 @@ func attachSecret(plug *sioPlugin, namespace string, configData map[string]strin
 	}
 
 	return nil
+}
+
+// attachSdcGuid injects the sdc guid node label value into config
+func attachSdcGuid(plug *sioPlugin, conf map[string]string) error {
+	guid, err := getSdcGuidLabel(plug)
+	if err != nil {
+		return err
+	}
+	conf[confKey.sdcGuid] = guid
+	return nil
+}
+
+// getSdcGuidLabel fetches the scaleio.sdcGuid node label
+// associated with the node executing this code.
+func getSdcGuidLabel(plug *sioPlugin) (string, error) {
+	nodeLabels, err := plug.host.GetNodeLabels()
+	if err != nil {
+		return "", err
+	}
+	label, ok := nodeLabels[sdcGuidLabelName]
+	if !ok {
+		glog.V(4).Info(log("node label %s not found", sdcGuidLabelName))
+		return "", nil
+	}
+
+	glog.V(4).Info(log("found node label %s=%s", sdcGuidLabelName, label))
+	return label, nil
 }
 
 // getVolumeSourceFromSpec safely extracts ScaleIOVolumeSource from spec

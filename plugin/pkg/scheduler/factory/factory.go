@@ -208,48 +208,44 @@ func NewConfigFactory(
 	c.scheduledPodLister = assignedPodLister{podInformer.Lister()}
 
 	// Only nodes in the "Ready" condition with status == "True" are schedulable
-	nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
+	nodeInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.addNodeToCache,
 			UpdateFunc: c.updateNodeInCache,
 			DeleteFunc: c.deleteNodeFromCache,
 		},
-		0,
 	)
 	c.nodeLister = nodeInformer.Lister()
 
 	// On add and delete of PVs, it will affect equivalence cache items
 	// related to persistent volume
-	pvInformer.Informer().AddEventHandlerWithResyncPeriod(
+	pvInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			// MaxPDVolumeCountPredicate: since it relies on the counts of PV.
 			AddFunc:    c.onPvAdd,
 			DeleteFunc: c.onPvDelete,
 		},
-		0,
 	)
 	c.pVLister = pvInformer.Lister()
 
 	// This is for MaxPDVolumeCountPredicate: add/delete PVC will affect counts of PV when it is bound.
-	pvcInformer.Informer().AddEventHandlerWithResyncPeriod(
+	pvcInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.onPvcAdd,
 			DeleteFunc: c.onPvcDelete,
 		},
-		0,
 	)
 	c.pVCLister = pvcInformer.Lister()
 
 	// This is for ServiceAffinity: affected by the selector of the service is updated.
 	// Also, if new service is added, equivalence cache will also become invalid since
 	// existing pods may be "captured" by this service and change this predicate result.
-	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
+	serviceInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.onServiceAdd,
 			UpdateFunc: c.onServiceUpdate,
 			DeleteFunc: c.onServiceDelete,
 		},
-		0,
 	)
 	c.serviceLister = serviceInformer.Lister()
 
@@ -716,6 +712,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		Algorithm:           algo,
 		Binder:              f.getBinder(extenders),
 		PodConditionUpdater: &podConditionUpdater{f.client},
+		PodPreemptor:        &podPreemptor{f.client},
 		WaitForCacheSync: func() bool {
 			return cache.WaitForCacheSync(f.StopEverything, f.scheduledPodsHasSynced)
 		},
@@ -753,7 +750,7 @@ func (f *ConfigFactory) GetPriorityMetadataProducer() (algorithm.MetadataProduce
 	return getPriorityMetadataProducer(*pluginArgs)
 }
 
-func (f *ConfigFactory) GetPredicateMetadataProducer() (algorithm.MetadataProducer, error) {
+func (f *ConfigFactory) GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error) {
 	pluginArgs, err := f.getPluginArgs()
 	if err != nil {
 		return nil, err
@@ -990,4 +987,29 @@ func (p *podConditionUpdater) Update(pod *v1.Pod, condition *v1.PodCondition) er
 		return err
 	}
 	return nil
+}
+
+type podPreemptor struct {
+	Client clientset.Interface
+}
+
+func (p *podPreemptor) GetUpdatedPod(pod *v1.Pod) (*v1.Pod, error) {
+	return p.Client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+}
+
+func (p *podPreemptor) DeletePod(pod *v1.Pod) error {
+	return p.Client.CoreV1().Pods(pod.Namespace).Delete(pod.Name, &metav1.DeleteOptions{})
+}
+
+//TODO(bsalamat): change this to patch PodStatus to avoid overwriting potential pending status updates.
+func (p *podPreemptor) UpdatePodAnnotations(pod *v1.Pod, annotations map[string]string) error {
+	podCopy := pod.DeepCopy()
+	if podCopy.Annotations == nil {
+		podCopy.Annotations = map[string]string{}
+	}
+	for k, v := range annotations {
+		podCopy.Annotations[k] = v
+	}
+	_, err := p.Client.CoreV1().Pods(podCopy.Namespace).UpdateStatus(podCopy)
+	return err
 }

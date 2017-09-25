@@ -68,11 +68,6 @@ func ChooseVersion(client *gophercloud.ProviderClient, recognized []*Version) (*
 		return nil, "", err
 	}
 
-	byID := make(map[string]*Version)
-	for _, version := range recognized {
-		byID[version.ID] = version
-	}
-
 	var highest *Version
 	var endpoint string
 
@@ -84,20 +79,22 @@ func ChooseVersion(client *gophercloud.ProviderClient, recognized []*Version) (*
 			}
 		}
 
-		if matching, ok := byID[value.ID]; ok {
-			// Prefer a version that exactly matches the provided endpoint.
-			if href == identityEndpoint {
-				if href == "" {
-					return nil, "", fmt.Errorf("Endpoint missing in version %s response from %s", value.ID, client.IdentityBase)
+		for _, version := range recognized {
+			if strings.Contains(value.ID, version.ID) {
+				// Prefer a version that exactly matches the provided endpoint.
+				if href == identityEndpoint {
+					if href == "" {
+						return nil, "", fmt.Errorf("Endpoint missing in version %s response from %s", value.ID, client.IdentityBase)
+					}
+					return version, href, nil
 				}
-				return matching, href, nil
-			}
 
-			// Otherwise, find the highest-priority version with a whitelisted status.
-			if goodStatus[strings.ToLower(value.Status)] {
-				if highest == nil || matching.Priority > highest.Priority {
-					highest = matching
-					endpoint = href
+				// Otherwise, find the highest-priority version with a whitelisted status.
+				if goodStatus[strings.ToLower(value.Status)] {
+					if highest == nil || version.Priority > highest.Priority {
+						highest = version
+						endpoint = href
+					}
 				}
 			}
 		}

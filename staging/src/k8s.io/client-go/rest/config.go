@@ -114,6 +114,9 @@ type Config struct {
 	// The maximum length of time to wait before giving up on a server request. A value of zero means no timeout.
 	Timeout time.Duration
 
+	// Dial specifies the dial function for creating unencrypted TCP connections.
+	Dial func(network, addr string) (net.Conn, error)
+
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string

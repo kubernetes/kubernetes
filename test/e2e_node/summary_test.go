@@ -92,14 +92,8 @@ var _ = framework.KubeDescribe("Summary API", func() {
 						"AvailableBytes":  BeNil(),
 						"UsageBytes":      bounded(1*framework.Mb, 10*framework.Gb),
 						"WorkingSetBytes": bounded(1*framework.Mb, 10*framework.Gb),
-						// today, this returns the value reported
-						// in /sys/fs/cgroup/memory.stat for rss
-						// this value should really return /sys/fs/cgroup/memory.stat total_rss
-						// as we really want the hierarchical value not the usage local to / cgroup.
-						// for now, i am updating the bounding box to the value as coded, but the
-						// value reported needs to change.
-						// rss only makes sense if you are leaf cgroup
-						"RSSBytes":        bounded(0, 1*framework.Gb),
+						// this now returns /sys/fs/cgroup/memory.stat total_rss
+						"RSSBytes":        bounded(1*framework.Mb, 1*framework.Gb),
 						"PageFaults":      bounded(1000, 1E9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),
@@ -210,14 +204,8 @@ var _ = framework.KubeDescribe("Summary API", func() {
 						"AvailableBytes":  bounded(100*framework.Mb, 100*framework.Gb),
 						"UsageBytes":      bounded(10*framework.Mb, 10*framework.Gb),
 						"WorkingSetBytes": bounded(10*framework.Mb, 10*framework.Gb),
-						// today, this returns the value reported
-						// in /sys/fs/cgroup/memory.stat for rss
-						// this value should really return /sys/fs/cgroup/memory.stat total_rss
-						// as we really want the hierarchical value not the usage local to / cgroup.
-						// for now, i am updating the bounding box to the value as coded, but the
-						// value reported needs to change.
-						// rss only makes sense if you are leaf cgroup
-						"RSSBytes":        bounded(0, 1*framework.Gb),
+						// this now returns /sys/fs/cgroup/memory.stat total_rss
+						"RSSBytes":        bounded(1*framework.Kb, 1*framework.Gb),
 						"PageFaults":      bounded(1000, 1E9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),

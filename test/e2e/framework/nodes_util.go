@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -46,6 +47,8 @@ func MasterUpgrade(v string) error {
 		return masterUpgradeGCE(v, false)
 	case "gke":
 		return masterUpgradeGKE(v)
+	case "kubernetes-anywhere":
+		return masterUpgradeKubernetesAnywhere(v)
 	default:
 		return fmt.Errorf("MasterUpgrade() is not implemented for provider %s", TestContext.Provider)
 	}
@@ -103,6 +106,46 @@ func masterUpgradeGKE(v string) error {
 	return nil
 }
 
+func masterUpgradeKubernetesAnywhere(v string) error {
+	Logf("Upgrading master to %q", v)
+
+	kaPath := TestContext.KubernetesAnywherePath
+	originalConfigPath := filepath.Join(kaPath, ".config")
+	backupConfigPath := filepath.Join(kaPath, ".config.bak")
+	updatedConfigPath := filepath.Join(kaPath, fmt.Sprintf(".config-%s", v))
+
+	// backup .config to .config.bak
+	if err := os.Rename(originalConfigPath, backupConfigPath); err != nil {
+		return err
+	}
+	defer func() {
+		// revert .config.bak to .config
+		if err := os.Rename(backupConfigPath, originalConfigPath); err != nil {
+			Logf("Could not rename %s back to %s", backupConfigPath, originalConfigPath)
+		}
+	}()
+
+	// modify config with specified k8s version
+	if _, _, err := RunCmd("sed",
+		fmt.Sprintf(`s/kubernetes_version=.*$/kubernetes_version=%s/`, v),
+		backupConfigPath, ">", originalConfigPath); err != nil {
+		return err
+	}
+
+	// invoke ka upgrade
+	if _, _, err := RunCmd("make", "-C", TestContext.KubernetesAnywherePath,
+		"WAIT_FOR_KUBECONFIG=y", "upgrade-master"); err != nil {
+		return err
+	}
+
+	// move .config to .config.<version>
+	if err := os.Rename(originalConfigPath, updatedConfigPath); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func NodeUpgrade(f *Framework, v string, img string) error {
 	// Perform the upgrade.
 	var err error
@@ -130,9 +173,9 @@ func NodeUpgrade(f *Framework, v string, img string) error {
 }
 
 // TODO(mrhohn): Remove this function when kube-proxy is run as a DaemonSet by default.
-func NodeUpgradeGCEWithKubeProxyDaemonSet(f *Framework, v string, enableKubeProxyDaemonSet bool) error {
+func NodeUpgradeGCEWithKubeProxyDaemonSet(f *Framework, v string, img string, enableKubeProxyDaemonSet bool) error {
 	// Perform the upgrade.
-	if err := nodeUpgradeGCE(v, "", enableKubeProxyDaemonSet); err != nil {
+	if err := nodeUpgradeGCE(v, img, enableKubeProxyDaemonSet); err != nil {
 		return err
 	}
 	// Wait for it to complete and validate nodes are healthy.

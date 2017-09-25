@@ -28,10 +28,12 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+// PluginDescriptorFilename is the default file name for plugin descriptions.
 const PluginDescriptorFilename = "plugin.yaml"
 
 // PluginLoader is capable of loading a list of plugin descriptions.
 type PluginLoader interface {
+	// Load loads the plugin descriptions.
 	Load() (Plugins, error)
 }
 
@@ -107,7 +109,7 @@ func (l *DirectoryPluginLoader) Load() (Plugins, error) {
 	return list, err
 }
 
-// UserDirPluginLoader is a PluginLoader that loads plugins from the
+// UserDirPluginLoader returns a PluginLoader that loads plugins from the
 // "plugins" directory under the user's kubeconfig dir (usually "~/.kube/plugins/").
 func UserDirPluginLoader() PluginLoader {
 	dir := filepath.Join(clientcmd.RecommendedConfigDir, "plugins")
@@ -116,7 +118,7 @@ func UserDirPluginLoader() PluginLoader {
 	}
 }
 
-// PathFromEnvVarPluginLoader is a PluginLoader that loads plugins from one or more
+// PathFromEnvVarPluginLoader returns a PluginLoader that loads plugins from one or more
 // directories specified by the provided env var name. In case the env var is not
 // set, the PluginLoader just loads nothing. A list of subdirectories can be provided,
 // which will be appended to each path specified by the env var.
@@ -135,17 +137,17 @@ func PathFromEnvVarPluginLoader(envVarName string, subdirs ...string) PluginLoad
 	return loader
 }
 
-// PluginsEnvVarPluginLoader is a PluginLoader that loads plugins from one or more
+// KubectlPluginsPathPluginLoader returns a PluginLoader that loads plugins from one or more
 // directories specified by the KUBECTL_PLUGINS_PATH env var.
-func PluginsEnvVarPluginLoader() PluginLoader {
+func KubectlPluginsPathPluginLoader() PluginLoader {
 	return PathFromEnvVarPluginLoader("KUBECTL_PLUGINS_PATH")
 }
 
-// XDGDataPluginLoader is a PluginLoader that loads plugins from one or more
+// XDGDataDirsPluginLoader returns a PluginLoader that loads plugins from one or more
 // directories specified by the XDG system directory structure spec in the
 // XDG_DATA_DIRS env var, plus the "kubectl/plugins/" suffix. According to the
 // spec, if XDG_DATA_DIRS is not set it defaults to "/usr/local/share:/usr/share".
-func XDGDataPluginLoader() PluginLoader {
+func XDGDataDirsPluginLoader() PluginLoader {
 	envVarName := "XDG_DATA_DIRS"
 	if len(os.Getenv(envVarName)) > 0 {
 		return PathFromEnvVarPluginLoader(envVarName, "kubectl", "plugins")
@@ -164,6 +166,7 @@ func XDGDataPluginLoader() PluginLoader {
 // a successful loading means every encapsulated loader was able to load without errors.
 type MultiPluginLoader []PluginLoader
 
+// Load calls Load() for each of the encapsulated Loaders.
 func (l MultiPluginLoader) Load() (Plugins, error) {
 	plugins := Plugins{}
 	for _, loader := range l {
@@ -180,6 +183,7 @@ func (l MultiPluginLoader) Load() (Plugins, error) {
 // but is tolerant to errors while loading from them.
 type TolerantMultiPluginLoader []PluginLoader
 
+// Load calls Load() for each of the encapsulated Loaders.
 func (l TolerantMultiPluginLoader) Load() (Plugins, error) {
 	plugins := Plugins{}
 	for _, loader := range l {
@@ -191,9 +195,10 @@ func (l TolerantMultiPluginLoader) Load() (Plugins, error) {
 	return plugins, nil
 }
 
-// DummyPluginLoader loads nothing.
+// DummyPluginLoader is a noop PluginLoader.
 type DummyPluginLoader struct{}
 
+// Load loads nothing.
 func (l *DummyPluginLoader) Load() (Plugins, error) {
 	return Plugins{}, nil
 }

@@ -2229,7 +2229,7 @@ type Taint struct {
 	// TimeAdded represents the time at which the taint was added.
 	// It is only written for NoExecute taints.
 	// +optional
-	TimeAdded metav1.Time
+	TimeAdded *metav1.Time
 }
 
 type TaintEffect string
@@ -2249,6 +2249,7 @@ const (
 	// Kubelet without going through the scheduler to start.
 	// Enforced by Kubelet and the scheduler.
 	// TaintEffectNoScheduleNoAdmit TaintEffect = "NoScheduleNoAdmit"
+
 	// Evict any already-running pods that do not tolerate the taint.
 	// Currently enforced by NodeController.
 	TaintEffectNoExecute TaintEffect = "NoExecute"
@@ -3275,6 +3276,8 @@ const (
 	NodeDiskPressure NodeConditionType = "DiskPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
+	// NodeConfigOK indicates whether the kubelet is correctly configured
+	NodeConfigOK NodeConditionType = "ConfigOK"
 )
 
 type NodeCondition struct {

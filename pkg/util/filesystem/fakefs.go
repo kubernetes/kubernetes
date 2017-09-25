@@ -107,6 +107,11 @@ func (file *fakeFile) Write(b []byte) (n int, err error) {
 	return file.file.Write(b)
 }
 
+// Sync via afero.File.Sync
+func (file *fakeFile) Sync() error {
+	return file.file.Sync()
+}
+
 // Close via afero.File.Close
 func (file *fakeFile) Close() error {
 	return file.file.Close()

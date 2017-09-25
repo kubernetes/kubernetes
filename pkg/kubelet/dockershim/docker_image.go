@@ -134,7 +134,7 @@ func getImageRef(client libdocker.Interface, image string) (string, error) {
 }
 
 // ImageFsInfo returns information of the filesystem that is used to store images.
-func (ds *dockerService) ImageFsInfo(req *runtimeapi.ImageFsInfoRequest) (*runtimeapi.ImageFsInfoResponse, error) {
+func (ds *dockerService) ImageFsInfo() ([]*runtimeapi.FilesystemUsage, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 

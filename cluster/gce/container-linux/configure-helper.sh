@@ -1261,12 +1261,12 @@ function start-kube-addons {
     setup-addon-manifests "addons" "cluster-monitoring"
     setup-addon-manifests "addons" "${file_dir}"
     # Replace the salt configurations with variable values.
-    base_metrics_memory="140Mi"
+    base_metrics_memory="${HEAPSTER_GCP_BASE_MEMORY:-140Mi}"
     base_eventer_memory="190Mi"
-    base_metrics_cpu="80m"
+    base_metrics_cpu="${HEAPSTER_GCP_BASE_CPU:-80m}"
     nanny_memory="90Mi"
-    local -r metrics_memory_per_node="4"
-    local -r metrics_cpu_per_node="0.5"
+    local -r metrics_memory_per_node="${HEAPSTER_GCP_MEMORY_PER_NODE:-4}"
+    local -r metrics_cpu_per_node="${HEAPSTER_GCP_CPU_PER_NODE:-0.5}"
     local -r eventer_memory_per_node="500"
     local -r nanny_memory_per_node="200"
     if [[ -n "${NUM_NODES:-}" && "${NUM_NODES}" -ge 1 ]]; then

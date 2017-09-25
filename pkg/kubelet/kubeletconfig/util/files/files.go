@@ -83,6 +83,10 @@ func ReplaceFile(fs utilfs.Filesystem, path string, data []byte) error {
 	if _, err := tmpFile.Write(data); err != nil {
 		return err
 	}
+	// sync file, to ensure it's written in case a hard reset happens
+	if err := tmpFile.Sync(); err != nil {
+		return err
+	}
 	if err := tmpFile.Close(); err != nil {
 		return err
 	}

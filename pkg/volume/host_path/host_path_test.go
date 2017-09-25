@@ -158,7 +158,9 @@ func TestProvisioner(t *testing.T) {
 	tempPath := fmt.Sprintf("/tmp/hostpath/%s", uuid.NewUUID())
 	defer os.RemoveAll(tempPath)
 	err := os.MkdirAll(tempPath, 0750)
-
+	if err != nil {
+		t.Errorf("Failed to create tempPath %s error:%v", tempPath, err)
+	}
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{ProvisioningEnabled: true}),
 		nil,

@@ -41,6 +41,7 @@ go_library(
         "//pkg/api:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
+        "//pkg/kubelet/kubeletconfig/status:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/codec:go_default_library",
         "//pkg/kubelet/kubeletconfig/util/log:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

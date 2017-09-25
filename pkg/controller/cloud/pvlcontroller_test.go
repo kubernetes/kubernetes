@@ -18,7 +18,6 @@ package cloud
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -26,53 +25,12 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
 )
-
-type mockVolumes struct {
-	volumeLabels      map[string]string
-	volumeLabelsError error
-}
-
-var _ aws.Volumes = &mockVolumes{}
-
-func (v *mockVolumes) AttachDisk(diskName aws.KubernetesVolumeID, nodeName types.NodeName, readOnly bool) (string, error) {
-	return "", fmt.Errorf("not implemented")
-}
-
-func (v *mockVolumes) DetachDisk(diskName aws.KubernetesVolumeID, nodeName types.NodeName) (string, error) {
-	return "", fmt.Errorf("not implemented")
-}
-
-func (v *mockVolumes) CreateDisk(volumeOptions *aws.VolumeOptions) (volumeName aws.KubernetesVolumeID, err error) {
-	return "", fmt.Errorf("not implemented")
-}
-
-func (v *mockVolumes) DeleteDisk(volumeName aws.KubernetesVolumeID) (bool, error) {
-	return false, fmt.Errorf("not implemented")
-}
-
-func (v *mockVolumes) GetVolumeLabels(volumeName aws.KubernetesVolumeID) (map[string]string, error) {
-	return v.volumeLabels, v.volumeLabelsError
-}
-
-func (c *mockVolumes) GetDiskPath(volumeName aws.KubernetesVolumeID) (string, error) {
-	return "", fmt.Errorf("not implemented")
-}
-
-func (c *mockVolumes) DiskIsAttached(volumeName aws.KubernetesVolumeID, nodeName types.NodeName) (bool, error) {
-	return false, fmt.Errorf("not implemented")
-}
-
-func (c *mockVolumes) DisksAreAttached(nodeDisks map[types.NodeName][]aws.KubernetesVolumeID) (map[types.NodeName]map[aws.KubernetesVolumeID]bool, error) {
-	return nil, fmt.Errorf("not implemented")
-}
 
 func TestCreatePatch(t *testing.T) {
 	ignoredPV := v1.PersistentVolume{
@@ -208,7 +166,11 @@ func TestAddLabelsToVolume(t *testing.T) {
 			labeledCh <- true
 			return true, nil, nil
 		})
-		pvlController := &PersistentVolumeLabelController{kubeClient: client, ebsVolumes: &mockVolumes{volumeLabels: map[string]string{"a": "1"}}}
+
+		fakeCloud := &fakecloud.FakeCloud{
+			VolumeLabelMap: map[string]map[string]string{"awsPV": {"a": "1"}},
+		}
+		pvlController := &PersistentVolumeLabelController{kubeClient: client, cloud: fakeCloud}
 		tc.vol.ObjectMeta.Initializers = tc.initializers
 		pvlController.addLabelsToVolume(&tc.vol)
 

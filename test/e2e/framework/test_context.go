@@ -59,7 +59,6 @@ type TestContextType struct {
 	EtcdUpgradeVersion       string
 	UpgradeImage             string
 	GCEUpgradeScript         string
-	PrometheusPushGateway    string
 	ContainerRuntime         string
 	ContainerRuntimeEndpoint string
 	ImageServiceEndpoint     string
@@ -105,6 +104,9 @@ type TestContextType struct {
 	FederationUpgradeTarget string
 	// Whether configuration for accessing federation member clusters should be sourced from the host cluster
 	FederationConfigFromCluster bool
+
+	// Indicates what path the kubernetes-anywhere is installed on
+	KubernetesAnywherePath string
 
 	// Viper-only parameters.  These will in time replace all flags.
 
@@ -201,6 +203,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.ContainerRuntimeEndpoint, "container-runtime-endpoint", "", "The container runtime endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
 	flag.StringVar(&TestContext.DockershimCheckpointDir, "dockershim-checkpoint-dir", "/var/lib/dockershim/sandbox", "The directory for dockershim to store sandbox checkpoints.")
+	flag.StringVar(&TestContext.KubernetesAnywherePath, "kubernetes-anywhere-path", "/workspace/kubernetes-anywhere", "Which directory kubernetes-anywhere is installed to.")
 }
 
 // Register flags specific to the cluster e2e test suite.
@@ -250,7 +253,6 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.UpgradeImage, "upgrade-image", "", "Image to upgrade to (e.g. 'container_vm' or 'gci') if doing an upgrade test.")
 	flag.StringVar(&TestContext.GCEUpgradeScript, "gce-upgrade-script", "", "Script to use to upgrade a GCE cluster.")
 	flag.StringVar(&TestContext.FederationUpgradeTarget, "federation-upgrade-target", "ci/latest", "Version to upgrade to (e.g. 'release/stable', 'release/latest', 'ci/latest', '0.19.1', '0.19.1-669-gabac8c8') if doing an federation upgrade test.")
-	flag.StringVar(&TestContext.PrometheusPushGateway, "prom-push-gateway", "", "The URL to prometheus gateway, so that metrics can be pushed during e2es and scraped by prometheus. Typically something like 127.0.0.1:9091.")
 	flag.BoolVar(&TestContext.CleanStart, "clean-start", false, "If true, purge all namespaces except default and system before running tests. This serves to Cleanup test namespaces from failed/interrupted e2e runs in a long-lived cluster.")
 	flag.BoolVar(&TestContext.GarbageCollectorEnabled, "garbage-collector-enabled", true, "Set to true if the garbage collector is enabled in the kube-apiserver and kube-controller-manager, then some tests will rely on the garbage collector to delete dependent resources.")
 }

@@ -76,7 +76,10 @@ func writeFileAndSync(filename string, data []byte, perm os.FileMode) error {
 	if err == nil && n < len(data) {
 		err = io.ErrShortWrite
 	}
-	f.Sync()
+	if err == nil {
+		// Only sync if the Write completed successfully.
+		err = f.Sync()
+	}
 	if err1 := f.Close(); err == nil {
 		err = err1
 	}

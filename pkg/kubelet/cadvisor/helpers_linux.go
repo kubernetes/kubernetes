@@ -40,9 +40,11 @@ func (i *imageFsInfoProvider) ImageFsInfoLabel() (string, error) {
 	case "rkt":
 		return cadvisorfs.LabelRktImages, nil
 	case "remote":
-		// TODO: pending rebase including https://github.com/google/cadvisor/pull/1741
+		// This is a temporary workaround to get stats for cri-o from cadvisor
+		// and should be removed.
+		// Related to https://github.com/kubernetes/kubernetes/issues/51798
 		if i.runtimeEndpoint == "/var/run/crio.sock" {
-			return "crio-images", nil
+			return cadvisorfs.LabelCrioImages, nil
 		}
 	}
 	return "", fmt.Errorf("no imagefs label for configured runtime")

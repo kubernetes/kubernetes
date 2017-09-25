@@ -25,24 +25,32 @@ import (
 var (
 	// The predicateName tries to be consistent as the predicate name used in DefaultAlgorithmProvider defined in
 	// defaults.go (which tend to be stable for backward compatibility)
-	ErrDiskConflict              = newPredicateFailureError("NoDiskConflict")
-	ErrVolumeZoneConflict        = newPredicateFailureError("NoVolumeZoneConflict")
-	ErrNodeSelectorNotMatch      = newPredicateFailureError("MatchNodeSelector")
-	ErrPodAffinityNotMatch       = newPredicateFailureError("MatchInterPodAffinity")
-	ErrTaintsTolerationsNotMatch = newPredicateFailureError("PodToleratesNodeTaints")
-	ErrPodNotMatchHostName       = newPredicateFailureError("HostName")
-	ErrPodNotFitsHostPorts       = newPredicateFailureError("PodFitsHostPorts")
-	ErrNodeLabelPresenceViolated = newPredicateFailureError("CheckNodeLabelPresence")
-	ErrServiceAffinityViolated   = newPredicateFailureError("CheckServiceAffinity")
-	ErrMaxVolumeCountExceeded    = newPredicateFailureError("MaxVolumeCount")
-	ErrNodeUnderMemoryPressure   = newPredicateFailureError("NodeUnderMemoryPressure")
-	ErrNodeUnderDiskPressure     = newPredicateFailureError("NodeUnderDiskPressure")
-	ErrNodeOutOfDisk             = newPredicateFailureError("NodeOutOfDisk")
-	ErrNodeNotReady              = newPredicateFailureError("NodeNotReady")
-	ErrNodeNetworkUnavailable    = newPredicateFailureError("NodeNetworkUnavailable")
-	ErrNodeUnschedulable         = newPredicateFailureError("NodeUnschedulable")
-	ErrNodeUnknownCondition      = newPredicateFailureError("NodeUnknownCondition")
-	ErrVolumeNodeConflict        = newPredicateFailureError("NoVolumeNodeConflict")
+
+	// NOTE: If you add a new predicate failure error for a predicate that can never
+	// be made to pass by removing pods, or you change an existing predicate so that
+	// it can never be made to pass by removing pods, you need to add the predicate
+	// failure error in nodesWherePreemptionMightHelp() in scheduler/core/generic_scheduler.go
+	ErrDiskConflict                          = newPredicateFailureError("NoDiskConflict")
+	ErrVolumeZoneConflict                    = newPredicateFailureError("NoVolumeZoneConflict")
+	ErrNodeSelectorNotMatch                  = newPredicateFailureError("MatchNodeSelector")
+	ErrPodAffinityNotMatch                   = newPredicateFailureError("MatchInterPodAffinity")
+	ErrPodAffinityRulesNotMatch              = newPredicateFailureError("PodAffinityRulesNotMatch")
+	ErrPodAntiAffinityRulesNotMatch          = newPredicateFailureError("PodAntiAffinityRulesNotMatch")
+	ErrExistingPodsAntiAffinityRulesNotMatch = newPredicateFailureError("ExistingPodsAntiAffinityRulesNotMatch")
+	ErrTaintsTolerationsNotMatch             = newPredicateFailureError("PodToleratesNodeTaints")
+	ErrPodNotMatchHostName                   = newPredicateFailureError("HostName")
+	ErrPodNotFitsHostPorts                   = newPredicateFailureError("PodFitsHostPorts")
+	ErrNodeLabelPresenceViolated             = newPredicateFailureError("CheckNodeLabelPresence")
+	ErrServiceAffinityViolated               = newPredicateFailureError("CheckServiceAffinity")
+	ErrMaxVolumeCountExceeded                = newPredicateFailureError("MaxVolumeCount")
+	ErrNodeUnderMemoryPressure               = newPredicateFailureError("NodeUnderMemoryPressure")
+	ErrNodeUnderDiskPressure                 = newPredicateFailureError("NodeUnderDiskPressure")
+	ErrNodeOutOfDisk                         = newPredicateFailureError("NodeOutOfDisk")
+	ErrNodeNotReady                          = newPredicateFailureError("NodeNotReady")
+	ErrNodeNetworkUnavailable                = newPredicateFailureError("NodeNetworkUnavailable")
+	ErrNodeUnschedulable                     = newPredicateFailureError("NodeUnschedulable")
+	ErrNodeUnknownCondition                  = newPredicateFailureError("NodeUnknownCondition")
+	ErrVolumeNodeConflict                    = newPredicateFailureError("NoVolumeNodeConflict")
 	// ErrFakePredicate is used for test only. The fake predicates returning false also returns error
 	// as ErrFakePredicate.
 	ErrFakePredicate = newPredicateFailureError("FakePredicateError")

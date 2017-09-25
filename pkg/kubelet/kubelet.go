@@ -26,6 +26,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	goruntime "runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -236,6 +237,7 @@ type Dependencies struct {
 	ContainerManager        cm.ContainerManager
 	DockerClient            libdocker.Interface
 	EventClient             v1core.EventsGetter
+	HeartbeatClient         v1core.CoreV1Interface
 	KubeClient              clientset.Interface
 	ExternalKubeClient      clientgoclientset.Interface
 	Mounter                 mount.Interface
@@ -451,6 +453,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		hostname:                       hostname,
 		nodeName:                       nodeName,
 		kubeClient:                     kubeDeps.KubeClient,
+		heartbeatClient:                kubeDeps.HeartbeatClient,
 		rootDirectory:                  rootDirectory,
 		resyncInterval:                 kubeCfg.SyncFrequency.Duration,
 		sourcesReady:                   config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
@@ -649,12 +652,30 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 		klet.containerRuntime = runtime
 		klet.runner = runtime
-		klet.StatsProvider = stats.NewCadvisorStatsProvider(
-			klet.cadvisor,
-			klet.resourceAnalyzer,
-			klet.podManager,
-			klet.runtimeCache,
-			klet.containerRuntime)
+
+		// CRI integrations should get container metrics via CRI. Docker
+		// uses the built-in cadvisor to gather such metrics on Linux for
+		// historical reasons.
+		// cri-o relies on cadvisor as a temporary workaround. The code should
+		// be removed. Related issue:
+		// https://github.com/kubernetes/kubernetes/issues/51798
+		if (kubeCfg.ContainerRuntime == kubetypes.DockerContainerRuntime &&
+			goruntime.GOOS == "linux") || kubeCfg.RemoteRuntimeEndpoint == "/var/run/crio.sock" {
+			klet.StatsProvider = stats.NewCadvisorStatsProvider(
+				klet.cadvisor,
+				klet.resourceAnalyzer,
+				klet.podManager,
+				klet.runtimeCache,
+				klet.containerRuntime)
+		} else {
+			klet.StatsProvider = stats.NewCRIStatsProvider(
+				klet.cadvisor,
+				klet.resourceAnalyzer,
+				klet.podManager,
+				klet.runtimeCache,
+				runtimeService,
+				imageService)
+		}
 	} else {
 		// rkt uses the legacy, non-CRI, integration. Configure it the old way.
 		// TODO: Include hairpin mode settings in rkt?
@@ -866,12 +887,13 @@ type serviceLister interface {
 type Kubelet struct {
 	kubeletConfiguration kubeletconfiginternal.KubeletConfiguration
 
-	hostname      string
-	nodeName      types.NodeName
-	runtimeCache  kubecontainer.RuntimeCache
-	kubeClient    clientset.Interface
-	iptClient     utilipt.Interface
-	rootDirectory string
+	hostname        string
+	nodeName        types.NodeName
+	runtimeCache    kubecontainer.RuntimeCache
+	kubeClient      clientset.Interface
+	heartbeatClient v1core.CoreV1Interface
+	iptClient       utilipt.Interface
+	rootDirectory   string
 
 	// podWorkers handle syncing Pods in response to events.
 	podWorkers PodWorkers

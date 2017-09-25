@@ -35,7 +35,7 @@ const (
 	UNTAINTED = "untainted"
 )
 
-// parseTaint parses a taint from a string. Taint must be off the format '<key>=<value>:<effect>'.
+// parseTaint parses a taint from a string. Taint must be of the format '<key>=<value>:<effect>'.
 func parseTaint(st string) (v1.Taint, error) {
 	var taint v1.Taint
 	parts := strings.Split(st, "=")
@@ -76,6 +76,10 @@ type taintsVar struct {
 }
 
 func (t taintsVar) Set(s string) error {
+	if len(s) == 0 {
+		*t.ptr = nil
+		return nil
+	}
 	sts := strings.Split(s, ",")
 	var taints []api.Taint
 	for _, st := range sts {
@@ -91,7 +95,7 @@ func (t taintsVar) Set(s string) error {
 
 func (t taintsVar) String() string {
 	if len(*t.ptr) == 0 {
-		return "<nil>"
+		return ""
 	}
 	var taints []string
 	for _, taint := range *t.ptr {

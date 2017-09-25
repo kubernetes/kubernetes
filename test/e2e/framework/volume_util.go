@@ -492,3 +492,15 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 	err = WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Namespace)
 	Expect(err).NotTo(HaveOccurred())
 }
+
+func CreateGCEVolume() (*v1.PersistentVolumeSource, string) {
+	diskName, err := CreatePDWithRetry()
+	ExpectNoError(err)
+	return &v1.PersistentVolumeSource{
+		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+			PDName:   diskName,
+			FSType:   "ext3",
+			ReadOnly: false,
+		},
+	}, diskName
+}

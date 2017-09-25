@@ -386,8 +386,8 @@ func TestDeleteDisk_SameDiskMultiZone(t *testing.T) {
 	}
 
 	/* Act */
-	// DeleteDisk will call FakeServiceManager.GetDisk() with all zones,
-	// and FakeServiceManager.GetDisk() always returns a disk,
+	// DeleteDisk will call FakeServiceManager.GetDiskFromCloudProvider() with all zones,
+	// and FakeServiceManager.GetDiskFromCloudProvider() always returns a disk,
 	// so DeleteDisk thinks a disk with diskName exists in all zones.
 	err := gce.DeleteDisk(diskName)
 
@@ -662,7 +662,7 @@ func newFakeManager(gceProjectID string, gceRegion string) *FakeServiceManager {
  * Upon disk creation, disk info is stored in FakeServiceManager
  * to be used by other tested methods.
  */
-func (manager *FakeServiceManager) CreateDisk(
+func (manager *FakeServiceManager) CreateDiskOnCloudProvider(
 	name string,
 	sizeGb int64,
 	tagsStr string,
@@ -716,7 +716,7 @@ func (manager *FakeServiceManager) CreateDisk(
  * Upon disk creation, disk info is stored in FakeServiceManager
  * to be used by other tested methods.
  */
-func (manager *FakeServiceManager) CreateRegionalDisk(
+func (manager *FakeServiceManager) CreateRegionalDiskOnCloudProvider(
 	name string,
 	sizeGb int64,
 	tagsStr string,
@@ -746,7 +746,7 @@ func (manager *FakeServiceManager) CreateRegionalDisk(
 	}
 }
 
-func (manager *FakeServiceManager) AttachDisk(
+func (manager *FakeServiceManager) AttachDiskOnCloudProvider(
 	disk *GCEDisk,
 	readWrite string,
 	instanceZone string,
@@ -767,7 +767,7 @@ func (manager *FakeServiceManager) AttachDisk(
 	}
 }
 
-func (manager *FakeServiceManager) DetachDisk(
+func (manager *FakeServiceManager) DetachDiskOnCloudProvider(
 	instanceZone string,
 	instanceName string,
 	devicePath string) (gceObject, error) {
@@ -789,7 +789,7 @@ func (manager *FakeServiceManager) DetachDisk(
 /**
  * Gets disk info stored in the FakeServiceManager.
  */
-func (manager *FakeServiceManager) GetDisk(
+func (manager *FakeServiceManager) GetDiskFromCloudProvider(
 	zone string, diskName string) (*GCEDisk, error) {
 
 	if manager.zonalDisks[zone] == "" {
@@ -814,7 +814,7 @@ func (manager *FakeServiceManager) GetDisk(
 /**
  * Gets disk info stored in the FakeServiceManager.
  */
-func (manager *FakeServiceManager) GetRegionalDisk(
+func (manager *FakeServiceManager) GetRegionalDiskFromCloudProvider(
 	diskName string) (*GCEDisk, error) {
 
 	if _, ok := manager.regionalDisks[diskName]; !ok {
@@ -839,7 +839,7 @@ func (manager *FakeServiceManager) GetRegionalDisk(
 /**
  * Disk info is removed from the FakeServiceManager.
  */
-func (manager *FakeServiceManager) DeleteDisk(
+func (manager *FakeServiceManager) DeleteDiskOnCloudProvider(
 	zone string,
 	disk string) (gceObject, error) {
 
@@ -861,7 +861,7 @@ func (manager *FakeServiceManager) DeleteDisk(
 	}
 }
 
-func (manager *FakeServiceManager) DeleteRegionalDisk(
+func (manager *FakeServiceManager) DeleteRegionalDiskOnCloudProvider(
 	disk string) (gceObject, error) {
 
 	manager.deleteDiskCalled = true

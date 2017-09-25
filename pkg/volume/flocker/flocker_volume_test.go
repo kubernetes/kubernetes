@@ -41,7 +41,7 @@ func newTestableProvisioner(assert *assert.Assertions, options volume.VolumeOpti
 	assert.NoError(err, "Can't find the plugin by name")
 
 	provisioner, err := plug.(*flockerPlugin).newProvisionerInternal(options, &fakeFlockerUtil{})
-
+	assert.NoError(err, fmt.Sprintf("Can't create new provisioner:%v", err))
 	return tmpDir, provisioner
 }
 

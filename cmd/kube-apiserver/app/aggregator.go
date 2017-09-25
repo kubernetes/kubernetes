@@ -76,12 +76,16 @@ func createAggregatorConfig(kubeAPIServerConfig genericapiserver.Config, command
 	}
 
 	aggregatorConfig := &aggregatorapiserver.Config{
-		GenericConfig:     &genericConfig,
-		CoreKubeInformers: externalInformers,
-		ProxyClientCert:   certBytes,
-		ProxyClientKey:    keyBytes,
-		ServiceResolver:   serviceResolver,
-		ProxyTransport:    proxyTransport,
+		GenericConfig: &genericapiserver.RecommendedConfig{
+			Config:                genericConfig,
+			SharedInformerFactory: externalInformers,
+		},
+		ExtraConfig: aggregatorapiserver.ExtraConfig{
+			ProxyClientCert: certBytes,
+			ProxyClientKey:  keyBytes,
+			ServiceResolver: serviceResolver,
+			ProxyTransport:  proxyTransport,
+		},
 	}
 
 	return aggregatorConfig, nil

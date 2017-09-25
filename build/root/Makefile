@@ -521,8 +521,9 @@ endef
 bazel-build:
 	@echo "$$BAZEL_BUILD_HELP_INFO"
 else
+# Some things in vendor don't build due to empty target lists for cross-platform rules.
 bazel-build:
-	bazel build //cmd/... //hack/... //pkg/... //federation/... //plugin/... //third_party/... //examples/... //test/... //vendor/k8s.io/...
+	bazel build -- //... -//vendor/...
 endif
 
 
@@ -536,8 +537,15 @@ endef
 bazel-test:
 	@echo "$$BAZEL_TEST_HELP_INFO"
 else
+# //hack:verify-all is a manual target.
+# We don't want to build any of the release artifacts when running tests.
+# Some things in vendor don't build due to empty target lists for cross-platform rules.
 bazel-test:
-	bazel test --test_tag_filters=-integration --flaky_test_attempts=3 //cmd/... //pkg/... //federation/... //plugin/... //third_party/... //hack/... //hack:verify-all //vendor/k8s.io/...
+	bazel test --build_tag_filters=-e2e,-integration --test_tag_filters=-e2e,-integration --flaky_test_attempts=3 -- \
+	  //... \
+	  //hack:verify-all \
+	  -//build/... \
+	  -//vendor/...
 endif
 
 ifeq ($(PRINT_HELP),y)

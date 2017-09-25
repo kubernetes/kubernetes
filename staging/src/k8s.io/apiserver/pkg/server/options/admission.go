@@ -24,6 +24,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/server"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -63,17 +64,17 @@ func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
 //  genericconfig.LoopbackClientConfig
 //  genericconfig.SharedInformerFactory
 //  genericconfig.Authorizer
-func (a *AdmissionOptions) ApplyTo(serverCfg *server.Config, pluginInitializers ...admission.PluginInitializer) error {
+func (a *AdmissionOptions) ApplyTo(c *server.Config, informers informers.SharedInformerFactory, pluginInitializers ...admission.PluginInitializer) error {
 	pluginsConfigProvider, err := admission.ReadAdmissionConfiguration(a.PluginNames, a.ConfigFile)
 	if err != nil {
 		return fmt.Errorf("failed to read plugin config: %v", err)
 	}
 
-	clientset, err := kubernetes.NewForConfig(serverCfg.LoopbackClientConfig)
+	clientset, err := kubernetes.NewForConfig(c.LoopbackClientConfig)
 	if err != nil {
 		return err
 	}
-	genericInitializer, err := initializer.New(clientset, serverCfg.SharedInformerFactory, serverCfg.Authorizer)
+	genericInitializer, err := initializer.New(clientset, informers, c.Authorizer)
 	if err != nil {
 		return err
 	}
@@ -86,7 +87,7 @@ func (a *AdmissionOptions) ApplyTo(serverCfg *server.Config, pluginInitializers 
 		return err
 	}
 
-	serverCfg.AdmissionControl = admissionChain
+	c.AdmissionControl = admissionChain
 	return nil
 }
 

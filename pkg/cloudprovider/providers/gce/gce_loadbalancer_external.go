@@ -181,13 +181,13 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 		// without needing to be deleted and recreated.
 		if firewallExists {
 			glog.Infof("EnsureLoadBalancer(%v(%v)): updating firewall", loadBalancerName, serviceName)
-			if err := gce.updateFirewall(apiService, makeFirewallName(loadBalancerName), gce.region, desc, sourceRanges, ports, hosts); err != nil {
+			if err := gce.updateFirewall(apiService, MakeFirewallName(loadBalancerName), gce.region, desc, sourceRanges, ports, hosts); err != nil {
 				return nil, err
 			}
 			glog.Infof("EnsureLoadBalancer(%v(%v)): updated firewall", loadBalancerName, serviceName)
 		} else {
 			glog.Infof("EnsureLoadBalancer(%v(%v)): creating firewall", loadBalancerName, serviceName)
-			if err := gce.createFirewall(apiService, makeFirewallName(loadBalancerName), gce.region, desc, sourceRanges, ports, hosts); err != nil {
+			if err := gce.createFirewall(apiService, MakeFirewallName(loadBalancerName), gce.region, desc, sourceRanges, ports, hosts); err != nil {
 				return nil, err
 			}
 			glog.Infof("EnsureLoadBalancer(%v(%v)): created firewall", loadBalancerName, serviceName)
@@ -217,7 +217,7 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 			// target pool to use local traffic health check.
 			glog.V(2).Infof("Updating from nodes health checks to local traffic health checks for service %v LB %v", apiService.Name, loadBalancerName)
 			if supportsNodesHealthCheck {
-				hcToDelete = makeHttpHealthCheck(makeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
+				hcToDelete = makeHttpHealthCheck(MakeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
 			}
 			tpNeedsUpdate = true
 		}
@@ -233,7 +233,7 @@ func (gce *GCECloud) ensureExternalLoadBalancer(clusterName, clusterID string, a
 			tpNeedsUpdate = true
 		}
 		if supportsNodesHealthCheck {
-			hcToCreate = makeHttpHealthCheck(makeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
+			hcToCreate = makeHttpHealthCheck(MakeNodesHealthCheckName(clusterID), GetNodesHealthCheckPath(), GetNodesHealthCheckPort())
 		}
 	}
 	// Now we get to some slightly more interesting logic.
@@ -351,12 +351,12 @@ func (gce *GCECloud) ensureExternalLoadBalancerDeleted(clusterName, clusterID st
 		// using local traffic health check or nodes health check. Attempt to delete
 		// both to prevent leaking.
 		hcNames = append(hcNames, loadBalancerName)
-		hcNames = append(hcNames, makeNodesHealthCheckName(clusterID))
+		hcNames = append(hcNames, MakeNodesHealthCheckName(clusterID))
 	}
 
 	errs := utilerrors.AggregateGoroutines(
 		func() error {
-			fwName := makeFirewallName(loadBalancerName)
+			fwName := MakeFirewallName(loadBalancerName)
 			err := ignoreNotFound(gce.DeleteFirewall(fwName))
 			if isForbidden(err) && gce.OnXPN() {
 				glog.V(4).Infof("ensureExternalLoadBalancerDeleted(%v): do not have permission to delete firewall rule (on XPN). Raising event.", loadBalancerName)
@@ -514,8 +514,9 @@ func (gce *GCECloud) createTargetPool(svc *v1.Service, name, serviceName, ipAddr
 			return err
 		}
 		var err error
+		hcRequestPath, hcPort := hc.RequestPath, hc.Port
 		if hc, err = gce.ensureHttpHealthCheck(hc.Name, hc.RequestPath, int32(hc.Port)); err != nil || hc == nil {
-			return fmt.Errorf("Failed to ensure health check for %v port %d path %v: %v", name, hc.Port, hc.RequestPath, err)
+			return fmt.Errorf("Failed to ensure health check for %v port %d path %v: %v", name, hcPort, hcRequestPath, err)
 		}
 		hcLinks = append(hcLinks, hc.SelfLink)
 	}
@@ -760,7 +761,7 @@ func translateAffinityType(affinityType v1.ServiceAffinity) string {
 }
 
 func (gce *GCECloud) firewallNeedsUpdate(name, serviceName, region, ipAddress string, ports []v1.ServicePort, sourceRanges netsets.IPNet) (exists bool, needsUpdate bool, err error) {
-	fw, err := gce.service.Firewalls.Get(gce.NetworkProjectID(), makeFirewallName(name)).Do()
+	fw, err := gce.service.Firewalls.Get(gce.NetworkProjectID(), MakeFirewallName(name)).Do()
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
 			return false, true, nil

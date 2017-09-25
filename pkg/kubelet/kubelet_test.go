@@ -159,6 +159,7 @@ func newTestKubeletWithImageList(
 	kubelet := &Kubelet{}
 	kubelet.recorder = fakeRecorder
 	kubelet.kubeClient = fakeKubeClient
+	kubelet.heartbeatClient = fakeKubeClient.CoreV1()
 	kubelet.os = &containertest.FakeOS{}
 	kubelet.mounter = &mount.FakeMounter{}
 

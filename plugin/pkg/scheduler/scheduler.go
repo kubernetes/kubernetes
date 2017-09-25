@@ -23,10 +23,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/core"
@@ -48,6 +50,14 @@ type PodConditionUpdater interface {
 	Update(pod *v1.Pod, podCondition *v1.PodCondition) error
 }
 
+// PodPreemptor has methods needed to delete a pod and to update
+// annotations of the preemptor pod.
+type PodPreemptor interface {
+	GetUpdatedPod(pod *v1.Pod) (*v1.Pod, error)
+	DeletePod(pod *v1.Pod) error
+	UpdatePodAnnotations(pod *v1.Pod, annots map[string]string) error
+}
+
 // Scheduler watches for new unscheduled pods. It attempts to find
 // nodes that they fit on and writes bindings back to the api server.
 type Scheduler struct {
@@ -66,7 +76,7 @@ func (sched *Scheduler) StopEverything() {
 type Configurator interface {
 	GetPriorityFunctionConfigs(priorityKeys sets.String) ([]algorithm.PriorityConfig, error)
 	GetPriorityMetadataProducer() (algorithm.MetadataProducer, error)
-	GetPredicateMetadataProducer() (algorithm.MetadataProducer, error)
+	GetPredicateMetadataProducer() (algorithm.PredicateMetadataProducer, error)
 	GetPredicates(predicateKeys sets.String) (map[string]algorithm.FitPredicate, error)
 	GetHardPodAffinitySymmetricWeight() int
 	GetSchedulerName() string
@@ -102,6 +112,8 @@ type Config struct {
 	// with scheduling, PodScheduled condition will be updated in apiserver in /bind
 	// handler so that binding and setting PodCondition it is atomic.
 	PodConditionUpdater PodConditionUpdater
+	// PodPreemptor is used to evict pods and update pod annotations.
+	PodPreemptor PodPreemptor
 
 	// NextPod should be a function that blocks until the next pod
 	// is available. We don't use a channel for this, because scheduling
@@ -176,7 +188,42 @@ func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
 	return host, err
 }
 
-// assume signals to the cache that a pod is already in the cache, so that binding can be asnychronous.
+func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
+		glog.V(3).Infof("Pod priority feature is not enabled. No preemption is performed.")
+		return "", nil
+	}
+	preemptor, err := sched.config.PodPreemptor.GetUpdatedPod(preemptor)
+	if err != nil {
+		glog.Errorf("Error getting the updated preemptor pod object: %v", err)
+		return "", err
+	}
+	node, victims, err := sched.config.Algorithm.Preempt(preemptor, sched.config.NodeLister, scheduleErr)
+	if err != nil {
+		glog.Errorf("Error preempting victims to make room for %v/%v.", preemptor.Namespace, preemptor.Name)
+		return "", err
+	}
+	if node == nil {
+		return "", err
+	}
+	glog.Infof("Preempting %d pod(s) on node %v to make room for %v/%v.", len(victims), node.Name, preemptor.Namespace, preemptor.Name)
+	annotations := map[string]string{core.NominatedNodeAnnotationKey: node.Name}
+	err = sched.config.PodPreemptor.UpdatePodAnnotations(preemptor, annotations)
+	if err != nil {
+		glog.Errorf("Error in preemption process. Cannot update pod %v annotations: %v", preemptor.Name, err)
+		return "", err
+	}
+	for _, victim := range victims {
+		if err := sched.config.PodPreemptor.DeletePod(victim); err != nil {
+			glog.Errorf("Error preempting pod %v/%v: %v", victim.Namespace, victim.Name, err)
+			return "", err
+		}
+		sched.config.Recorder.Eventf(victim, v1.EventTypeNormal, "Preempted", "by %v/%v on node %v", preemptor.Namespace, preemptor.Name, node.Name)
+	}
+	return node.Name, err
+}
+
+// assume signals to the cache that a pod is already in the cache, so that binding can be asynchronous.
 // assume modifies `assumed`.
 func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 	// Optimistically assume that the binding will succeed and send it to apiserver
@@ -258,6 +305,13 @@ func (sched *Scheduler) scheduleOne() {
 	suggestedHost, err := sched.schedule(pod)
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
 	if err != nil {
+		// schedule() may have failed because the pod would not fit on any host, so we try to
+		// preempt, with the expectation that the next time the pod is tried for scheduling it
+		// will fit due to the preemption. It is also possible that a different pod will schedule
+		// into the resources that were preempted, but this is harmless.
+		if fitError, ok := err.(*core.FitError); ok {
+			sched.preempt(pod, fitError)
+		}
 		return
 	}
 

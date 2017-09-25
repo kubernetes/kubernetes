@@ -548,13 +548,6 @@ func RsListFromClient(c extensionsv1beta1.ExtensionsV1beta1Interface) RsListFunc
 	}
 }
 
-// podListFromClient returns a podListFunc that wraps the given client.
-func podListFromClient(c clientset.Interface) podListFunc {
-	return func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
-		return c.Core().Pods(namespace).List(options)
-	}
-}
-
 // TODO: switch this to full namespacers
 type RsListFunc func(string, metav1.ListOptions) ([]*extensions.ReplicaSet, error)
 type podListFunc func(string, metav1.ListOptions) (*v1.PodList, error)
@@ -859,6 +852,20 @@ func DeploymentTimedOut(deployment *extensions.Deployment, newStatus *extensions
 	// again.
 	condition := GetDeploymentCondition(*newStatus, extensions.DeploymentProgressing)
 	if condition == nil {
+		return false
+	}
+	// If the previous condition has been a successful rollout then we shouldn't try to
+	// estimate any progress. Scenario:
+	//
+	// * progressDeadlineSeconds is smaller than the difference between now and the time
+	//   the last rollout finished in the past.
+	// * the creation of a new ReplicaSet triggers a resync of the Deployment prior to the
+	//   cached copy of the Deployment getting updated with the status.condition that indicates
+	//   the creation of the new ReplicaSet.
+	//
+	// The Deployment will be resynced and eventually its Progressing condition will catch
+	// up with the state of the world.
+	if condition.Reason == NewRSAvailableReason {
 		return false
 	}
 	if condition.Reason == TimedOutReason {

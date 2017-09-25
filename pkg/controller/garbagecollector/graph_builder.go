@@ -92,9 +92,6 @@ type GraphBuilder struct {
 	// metaOnlyClientPool uses a special codec, which removes fields except for
 	// apiVersion, kind, and metadata during decoding.
 	metaOnlyClientPool dynamic.ClientPool
-	// used to register exactly once the rate limiters of the clients used by
-	// the `monitors`.
-	registeredRateLimiterForControllers *RegisteredRateLimiter
 	// monitors are the producer of the graphChanges queue, graphBuilder alters
 	// the in-memory graph according to the changes.
 	graphChanges workqueue.RateLimitingInterface
@@ -204,8 +201,6 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 	if err != nil {
 		return nil, err
 	}
-	// TODO: since the gv is never unregistered, isn't this a memory leak?
-	gb.registeredRateLimiterForControllers.registerIfNotPresent(resource.GroupVersion(), client, "garbage_collector_monitoring")
 	_, monitor := cache.NewInformer(
 		listWatcher(client, resource),
 		nil,

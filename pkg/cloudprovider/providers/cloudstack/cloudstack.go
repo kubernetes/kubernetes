@@ -20,11 +20,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/golang/glog"
+	"github.com/kardianos/osext"
 	"github.com/xanzy/go-cloudstack/cloudstack"
 	"gopkg.in/gcfg.v1"
-
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
@@ -48,6 +50,7 @@ type CSConfig struct {
 // CSCloud is an implementation of Interface for CloudStack.
 type CSCloud struct {
 	client    *cloudstack.CloudStackClient
+	metadata  *metadata
 	projectID string // If non-"", all resources will be created within this project
 	zone      string
 }
@@ -64,15 +67,14 @@ func init() {
 }
 
 func readConfig(config io.Reader) (*CSConfig, error) {
+	cfg := &CSConfig{}
+
 	if config == nil {
-		err := fmt.Errorf("no cloud provider config given")
-		return nil, err
+		return cfg, nil
 	}
 
-	cfg := &CSConfig{}
 	if err := gcfg.ReadInto(cfg, config); err != nil {
-		glog.Errorf("Couldn't parse config: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("could not parse cloud provider config: %v", err)
 	}
 
 	return cfg, nil
@@ -80,9 +82,42 @@ func readConfig(config io.Reader) (*CSConfig, error) {
 
 // newCSCloud creates a new instance of CSCloud.
 func newCSCloud(cfg *CSConfig) (*CSCloud, error) {
-	client := cloudstack.NewAsyncClient(cfg.Global.APIURL, cfg.Global.APIKey, cfg.Global.SecretKey, !cfg.Global.SSLNoVerify)
+	cs := &CSCloud{
+		projectID: cfg.Global.ProjectID,
+		zone:      cfg.Global.Zone,
+	}
 
-	return &CSCloud{client, cfg.Global.ProjectID, cfg.Global.Zone}, nil
+	exe, err := osext.Executable()
+	if err != nil {
+		return nil, fmt.Errorf("cloud not find the service executable: %v", err)
+	}
+
+	// When running the kubelet service it's fine to not specify a config file (or only a
+	// partial config file) as all needed info can be retrieved anonymously using metadata.
+	if filepath.Base(exe) == "kubelet" || filepath.Base(exe) == "kubelet.exe" {
+		// In CloudStack your metadata is always served by the DHCP server.
+		dhcpServer, err := findDHCPServer()
+		if err == nil {
+			glog.V(4).Infof("Found metadata server: %v", dhcpServer)
+			cs.metadata = &metadata{dhcpServer: dhcpServer, zone: cs.zone}
+		} else {
+			glog.Errorf("Error searching metadata server: %v", err)
+		}
+	}
+
+	if cfg.Global.APIURL != "" && cfg.Global.APIKey != "" && cfg.Global.SecretKey != "" {
+		cs.client = cloudstack.NewAsyncClient(cfg.Global.APIURL, cfg.Global.APIKey, cfg.Global.SecretKey, !cfg.Global.SSLNoVerify)
+	}
+
+	if cs.client == nil {
+		if cs.metadata != nil {
+			glog.V(2).Infof("No API URL, key and secret are provided, so only using metadata!")
+		} else {
+			return nil, errors.New("no cloud provider config given")
+		}
+	}
+
+	return cs, nil
 }
 
 // Initialize passes a Kubernetes clientBuilder interface to the cloud provider
@@ -90,26 +125,54 @@ func (cs *CSCloud) Initialize(clientBuilder controller.ControllerClientBuilder) 
 
 // LoadBalancer returns an implementation of LoadBalancer for CloudStack.
 func (cs *CSCloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
+	if cs.client == nil {
+		return nil, false
+	}
+
 	return cs, true
 }
 
 // Instances returns an implementation of Instances for CloudStack.
 func (cs *CSCloud) Instances() (cloudprovider.Instances, bool) {
-	return nil, false
+	if cs.metadata != nil {
+		return cs.metadata, true
+	}
+
+	if cs.client == nil {
+		return nil, false
+	}
+
+	return cs, true
 }
 
 // Zones returns an implementation of Zones for CloudStack.
 func (cs *CSCloud) Zones() (cloudprovider.Zones, bool) {
+	if cs.metadata != nil {
+		return cs.metadata, true
+	}
+
+	if cs.client == nil {
+		return nil, false
+	}
+
 	return cs, true
 }
 
 // Clusters returns an implementation of Clusters for CloudStack.
 func (cs *CSCloud) Clusters() (cloudprovider.Clusters, bool) {
+	if cs.client == nil {
+		return nil, false
+	}
+
 	return nil, false
 }
 
 // Routes returns an implementation of Routes for CloudStack.
 func (cs *CSCloud) Routes() (cloudprovider.Routes, bool) {
+	if cs.client == nil {
+		return nil, false
+	}
+
 	return nil, false
 }
 
@@ -130,20 +193,72 @@ func (cs *CSCloud) HasClusterID() bool {
 
 // GetZone returns the Zone containing the region that the program is running in.
 func (cs *CSCloud) GetZone() (cloudprovider.Zone, error) {
+	zone := cloudprovider.Zone{}
+
+	if cs.zone == "" {
+		hostname, err := os.Hostname()
+		if err != nil {
+			return zone, fmt.Errorf("failed to get hostname for retrieving the zone: %v", err)
+		}
+
+		instance, count, err := cs.client.VirtualMachine.GetVirtualMachineByName(hostname)
+		if err != nil {
+			if count == 0 {
+				return zone, fmt.Errorf("could not find instance for retrieving the zone: %v", err)
+			}
+			return zone, fmt.Errorf("error getting instance for retrieving the zone: %v", err)
+		}
+
+		cs.zone = instance.Zonename
+	}
+
 	glog.V(2).Infof("Current zone is %v", cs.zone)
-	return cloudprovider.Zone{Region: cs.zone}, nil
+	zone.FailureDomain = cs.zone
+	zone.Region = cs.zone
+
+	return zone, nil
 }
 
-// GetZoneByProviderID implements Zones.GetZoneByProviderID
-// This is particularly useful in external cloud providers where the kubelet
-// does not initialize node data.
+// GetZoneByProviderID returns the Zone, found by using the provider ID.
 func (cs *CSCloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{}, errors.New("GetZoneByProviderID not implemented")
+	zone := cloudprovider.Zone{}
+
+	instance, count, err := cs.client.VirtualMachine.GetVirtualMachineByID(
+		providerID,
+		cloudstack.WithProject(cs.projectID),
+	)
+	if err != nil {
+		if count == 0 {
+			return zone, fmt.Errorf("could not find node by ID: %v", providerID)
+		}
+		return zone, fmt.Errorf("error retrieving zone: %v", err)
+	}
+
+	glog.V(2).Infof("Current zone is %v", cs.zone)
+	zone.FailureDomain = instance.Zonename
+	zone.Region = instance.Zonename
+
+	return zone, nil
 }
 
-// GetZoneByNodeName implements Zones.GetZoneByNodeName
-// This is particularly useful in external cloud providers where the kubelet
-// does not initialize node data.
+// GetZoneByNodeName returns the Zone, found by using the node name.
 func (cs *CSCloud) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Zone, error) {
-	return cloudprovider.Zone{}, errors.New("GetZoneByNodeName not imeplemented")
+	zone := cloudprovider.Zone{}
+
+	instance, count, err := cs.client.VirtualMachine.GetVirtualMachineByName(
+		string(nodeName),
+		cloudstack.WithProject(cs.projectID),
+	)
+	if err != nil {
+		if count == 0 {
+			return zone, fmt.Errorf("could not find node: %v", nodeName)
+		}
+		return zone, fmt.Errorf("error retrieving zone: %v", err)
+	}
+
+	glog.V(2).Infof("Current zone is %v", cs.zone)
+	zone.FailureDomain = instance.Zonename
+	zone.Region = instance.Zonename
+
+	return zone, nil
 }

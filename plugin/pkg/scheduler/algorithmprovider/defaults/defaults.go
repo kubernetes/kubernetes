@@ -52,7 +52,7 @@ const (
 func init() {
 	// Register functions that extract metadata used by predicates and priorities computations.
 	factory.RegisterPredicateMetadataProducerFactory(
-		func(args factory.PluginFactoryArgs) algorithm.MetadataProducer {
+		func(args factory.PluginFactoryArgs) algorithm.PredicateMetadataProducer {
 			return predicates.NewPredicateMetadataFactory(args.PodLister)
 		})
 	factory.RegisterPriorityMetadataProducerFactory(
@@ -66,6 +66,14 @@ func init() {
 	// Cluster autoscaler friendly scheduling algorithm.
 	factory.RegisterAlgorithmProvider(ClusterAutoscalerProvider, defaultPredicates(),
 		copyAndReplace(defaultPriorities(), "LeastRequestedPriority", "MostRequestedPriority"))
+
+	// IMPORTANT NOTES for predicate developers:
+	// We are using cached predicate result for pods belonging to the same equivalence class.
+	// So when implementing a new predicate, you are expected to check whether the result
+	// of your predicate function can be affected by related API object change (ADD/DELETE/UPDATE).
+	// If yes, you are expected to invalidate the cached predicate result for related API object change.
+	// For example:
+	// https://github.com/kubernetes/kubernetes/blob/36a218e/plugin/pkg/scheduler/factory/factory.go#L422
 
 	// Registers predicates and priorities that are not enabled by default, but user can pick when creating his
 	// own set of priorities/predicates.
@@ -155,7 +163,7 @@ func defaultPredicates() sets.String {
 		),
 		// Fit is determined by inter-pod affinity.
 		factory.RegisterFitPredicateFactory(
-			"MatchInterPodAffinity",
+			predicates.MatchInterPodAffinity,
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
 				return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister)
 			},

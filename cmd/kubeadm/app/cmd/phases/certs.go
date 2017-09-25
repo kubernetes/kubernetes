@@ -38,14 +38,22 @@ func NewCmdCerts() *cobra.Command {
 		RunE:    cmdutil.SubCmdRunE("certs"),
 	}
 
-	cmd.AddCommand(getCertsSubCommands()...)
+	cmd.AddCommand(getCertsSubCommands("")...)
 	return cmd
 }
 
 // getCertsSubCommands returns sub commands for certs phase
-func getCertsSubCommands() []*cobra.Command {
+func getCertsSubCommands(defaultKubernetesVersion string) []*cobra.Command {
 
 	cfg := &kubeadmapiext.MasterConfiguration{}
+
+	// This is used for unit testing only...
+	// If we wouldn't set this to something, the code would dynamically look up the version from the internet
+	// By setting this explicitely for tests workarounds that
+	if defaultKubernetesVersion != "" {
+		cfg.KubernetesVersion = defaultKubernetesVersion
+	}
+
 	// Default values for the cobra help text
 	api.Scheme.Default(cfg)
 

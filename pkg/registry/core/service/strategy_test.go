@@ -81,7 +81,7 @@ func TestExportService(t *testing.T) {
 					Namespace: "bar",
 				},
 				Spec: api.ServiceSpec{
-					ClusterIP: "<unknown>",
+					ClusterIP: "",
 				},
 			},
 		},

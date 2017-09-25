@@ -1,13 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
 filegroup(
-    name = "sources",
-    srcs = glob([
-        "**/*",
-    ]),
-)
-
-filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
@@ -32,6 +25,7 @@ filegroup(
         "//test/images/no-snat-test:all-srcs",
         "//test/images/no-snat-test-proxy:all-srcs",
         "//test/images/nonewprivs:all-srcs",
+        "//test/images/pets/peer-finder:all-srcs",
         "//test/images/port-forward-tester:all-srcs",
         "//test/images/porter:all-srcs",
         "//test/images/resource-consumer:all-srcs",

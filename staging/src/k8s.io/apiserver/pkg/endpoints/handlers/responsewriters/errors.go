@@ -49,7 +49,7 @@ func Forbidden(ctx request.Context, attributes authorizer.Attributes, w http.Res
 	if len(reason) == 0 {
 		errMsg = fmt.Sprintf("%s", msg)
 	} else {
-		errMsg = fmt.Sprintf("%s: %q", msg, reason)
+		errMsg = fmt.Sprintf("%s: %s", msg, reason)
 	}
 	gv := schema.GroupVersion{Group: attributes.GetAPIGroup(), Version: attributes.GetAPIVersion()}
 	gr := schema.GroupResource{Group: attributes.GetAPIGroup(), Resource: attributes.GetResource()}
@@ -63,7 +63,7 @@ func forbiddenMessage(attributes authorizer.Attributes) string {
 	}
 
 	if !attributes.IsResourceRequest() {
-		return fmt.Sprintf("User %q cannot %s path %q.", username, attributes.GetVerb(), attributes.GetPath())
+		return fmt.Sprintf("User %q cannot %s path %q", username, attributes.GetVerb(), attributes.GetPath())
 	}
 
 	resource := attributes.GetResource()
@@ -75,10 +75,10 @@ func forbiddenMessage(attributes authorizer.Attributes) string {
 	}
 
 	if ns := attributes.GetNamespace(); len(ns) > 0 {
-		return fmt.Sprintf("User %q cannot %s %s in the namespace %q.", username, attributes.GetVerb(), resource, ns)
+		return fmt.Sprintf("User %q cannot %s %s in the namespace %q", username, attributes.GetVerb(), resource, ns)
 	}
 
-	return fmt.Sprintf("User %q cannot %s %s at the cluster scope.", username, attributes.GetVerb(), resource)
+	return fmt.Sprintf("User %q cannot %s %s at the cluster scope", username, attributes.GetVerb(), resource)
 }
 
 // InternalError renders a simple internal error

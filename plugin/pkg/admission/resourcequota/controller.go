@@ -443,7 +443,6 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 			accessor.SetNamespace(namespace)
 		}
 	}
-
 	// there is at least one quota that definitely matches our object
 	// as a result, we need to measure the usage of this object for quota
 	// on updates, we need to subtract the previous measured usage
@@ -472,9 +471,10 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 			if innerErr != nil {
 				return quotas, innerErr
 			}
-			deltaUsage = quota.Subtract(deltaUsage, prevUsage)
+			deltaUsage = quota.SubtractWithNonNegativeResult(deltaUsage, prevUsage)
 		}
 	}
+
 	if quota.IsZero(deltaUsage) {
 		return quotas, nil
 	}

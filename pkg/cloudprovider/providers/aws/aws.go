@@ -201,6 +201,9 @@ const DefaultMaxEBSVolumes = 39
 // Used to call RecognizeWellKnownRegions just once
 var once sync.Once
 
+// AWS implements PVLabeler.
+var _ cloudprovider.PVLabeler = (*Cloud)(nil)
+
 // Services is an abstraction over AWS, to allow mocking/other implementations
 type Services interface {
 	Compute(region string) (EC2, error)
@@ -1922,6 +1925,21 @@ func (c *Cloud) DeleteDisk(volumeName KubernetesVolumeID) (bool, error) {
 	return awsDisk.deleteVolume()
 }
 
+func (c *Cloud) GetLabelsForVolume(pv *v1.PersistentVolume) (map[string]string, error) {
+	// Ignore any volumes that are being provisioned
+	if pv.Spec.AWSElasticBlockStore.VolumeID == volume.ProvisionedVolumeName {
+		return nil, nil
+	}
+
+	spec := KubernetesVolumeID(pv.Spec.AWSElasticBlockStore.VolumeID)
+	labels, err := c.GetVolumeLabels(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	return labels, nil
+}
+
 // GetVolumeLabels implements Volumes.GetVolumeLabels
 func (c *Cloud) GetVolumeLabels(volumeName KubernetesVolumeID) (map[string]string, error) {
 	awsDisk, err := newAWSDisk(c, volumeName)
@@ -2764,8 +2782,8 @@ func buildListener(port v1.ServicePort, annotations map[string]string, sslPorts 
 // EnsureLoadBalancer implements LoadBalancer.EnsureLoadBalancer
 func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	annotations := apiService.Annotations
-	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v, %v)",
-		clusterName, apiService.Namespace, apiService.Name, c.region, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodes, annotations)
+	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)",
+		clusterName, apiService.Namespace, apiService.Name, c.region, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, annotations)
 
 	if apiService.Spec.SessionAffinity != v1.ServiceAffinityNone {
 		// ELB supports sticky sessions, but only when configured for HTTP/HTTPS

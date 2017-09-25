@@ -664,7 +664,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 			Spec: api.PersistentVolumeSpec{
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{},
+					HostPath: &api.HostPathVolumeSource{Type: new(api.HostPathType)},
 				},
 			},
 		},
@@ -819,6 +819,7 @@ func TestDescribeCluster(t *testing.T) {
 }
 
 func TestDescribeStorageClass(t *testing.T) {
+	reclaimPolicy := api.PersistentVolumeReclaimRetain
 	f := fake.NewSimpleClientset(&storage.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -832,6 +833,7 @@ func TestDescribeStorageClass(t *testing.T) {
 			"param1": "value1",
 			"param2": "value2",
 		},
+		ReclaimPolicy: &reclaimPolicy,
 	})
 	s := StorageClassDescriber{f}
 	out, err := s.Describe("", "foo", printers.DescriberSettings{ShowEvents: true})

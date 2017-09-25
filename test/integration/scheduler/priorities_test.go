@@ -51,7 +51,7 @@ func TestNodeAffinity(t *testing.T) {
 	}
 	// Create a pod with node affinity.
 	podName := "pod-with-node-affinity"
-	pod, err := runPausePod(context.clientSet, &pausePodConfig{
+	pod, err := runPausePod(context.clientSet, initPausePod(context.clientSet, &pausePodConfig{
 		Name:      podName,
 		Namespace: context.ns.Name,
 		Affinity: &v1.Affinity{
@@ -72,7 +72,7 @@ func TestNodeAffinity(t *testing.T) {
 				},
 			},
 		},
-	})
+	}))
 	if err != nil {
 		t.Fatalf("Error running pause pod: %v", err)
 	}
@@ -110,11 +110,11 @@ func TestPodAffinity(t *testing.T) {
 	// Add a pod with a label and wait for it to schedule.
 	labelKey := "service"
 	labelValue := "S1"
-	_, err = runPausePod(context.clientSet, &pausePodConfig{
+	_, err = runPausePod(context.clientSet, initPausePod(context.clientSet, &pausePodConfig{
 		Name:      "attractor-pod",
 		Namespace: context.ns.Name,
 		Labels:    map[string]string{labelKey: labelValue},
-	})
+	}))
 	if err != nil {
 		t.Fatalf("Error running the attractor pod: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestPodAffinity(t *testing.T) {
 	}
 	// Add a new pod with affinity to the attractor pod.
 	podName := "pod-with-podaffinity"
-	pod, err := runPausePod(context.clientSet, &pausePodConfig{
+	pod, err := runPausePod(context.clientSet, initPausePod(context.clientSet, &pausePodConfig{
 		Name:      podName,
 		Namespace: context.ns.Name,
 		Affinity: &v1.Affinity{
@@ -158,7 +158,7 @@ func TestPodAffinity(t *testing.T) {
 				},
 			},
 		},
-	})
+	}))
 	if err != nil {
 		t.Fatalf("Error running pause pod: %v", err)
 	}

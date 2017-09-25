@@ -17,9 +17,12 @@ limitations under the License.
 package apimachinery
 
 import (
+	"crypto/rand"
 	"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"strings"
 	"time"
@@ -160,6 +163,7 @@ func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
 	By("Registering the sample API server.")
 	cleanTest(f, true)
 	client := f.ClientSet
+	restClient := client.Discovery().RESTClient()
 	iclient := f.InternalClientset
 	aggrclient := f.AggregatorClient
 
@@ -384,7 +388,7 @@ func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
 
 	// We seem to need to do additional waiting until the extension api service is actually up.
 	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-		request := client.Discovery().RESTClient().Get().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders")
+		request := restClient.Get().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders")
 		request.SetHeader("Accept", "application/json")
 		_, err := request.DoRaw()
 		if err != nil {
@@ -401,11 +405,13 @@ func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
 	})
 	framework.ExpectNoError(err, "gave up waiting for apiservice wardle to come up successfully")
 
+	flunderName := generateFlunderName("rest-flunder")
+
 	// kubectl create -f flunders-1.yaml -v 9
 	// curl -k -v -XPOST https://localhost/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
 	// Request Body: {"apiVersion":"wardle.k8s.io/v1alpha1","kind":"Flunder","metadata":{"labels":{"sample-label":"true"},"name":"test-flunder","namespace":"default"}}
-	flunder := `{"apiVersion":"wardle.k8s.io/v1alpha1","kind":"Flunder","metadata":{"labels":{"sample-label":"true"},"name":"test-flunder","namespace":"default"}}`
-	result := client.Discovery().RESTClient().Post().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders").Body([]byte(flunder)).Do()
+	flunder := `{"apiVersion":"wardle.k8s.io/v1alpha1","kind":"Flunder","metadata":{"labels":{"sample-label":"true"},"name":"` + flunderName + `","namespace":"default"}}`
+	result := restClient.Post().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders").Body([]byte(flunder)).Do()
 	framework.ExpectNoError(result.Error(), "creating a new flunders resource")
 	var statusCode int
 	result.StatusCode(&statusCode)
@@ -413,31 +419,36 @@ func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
 		framework.Failf("Flunders client creation response was status %d, not 201", statusCode)
 	}
 
+	pods, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
+	framework.ExpectNoError(result.Error(), "getting pods for flunders service")
+
 	// kubectl get flunders -v 9
 	// curl -k -v -XGET https://localhost/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
-	contents, err := client.Discovery().RESTClient().Get().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders").SetHeader("Accept", "application/json").DoRaw()
+	contents, err := restClient.Get().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders").SetHeader("Accept", "application/json").DoRaw()
 	framework.ExpectNoError(err, "attempting to get a newly created flunders resource")
 	var flundersList samplev1alpha1.FlunderList
 	err = json.Unmarshal(contents, &flundersList)
-	framework.ExpectNoError(err, "Error in unmarshalling %T response from server %s", contents, "/apis/wardle.k8s.io/v1alpha1")
+	validateErrorWithDebugInfo(f, err, pods, "Error in unmarshalling %T response from server %s", contents, "/apis/wardle.k8s.io/v1alpha1")
 	if len(flundersList.Items) != 1 {
 		framework.Failf("failed to get back the correct flunders list %v", flundersList)
 	}
 
 	// kubectl delete flunder test-flunder -v 9
 	// curl -k -v -XDELETE  https://35.193.112.40/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders/test-flunder
-	_, err = client.Discovery().RESTClient().Delete().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders/test-flunder").DoRaw()
-	framework.ExpectNoError(err, "attempting to delete a newly created flunders resource")
+	_, err = restClient.Delete().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders/" + flunderName).DoRaw()
+	validateErrorWithDebugInfo(f, err, pods, "attempting to delete a newly created flunders(%v) resource", flundersList.Items)
 
 	// kubectl get flunders -v 9
 	// curl -k -v -XGET https://localhost/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders
-	contents, err = client.Discovery().RESTClient().Get().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders").SetHeader("Accept", "application/json").DoRaw()
+	contents, err = restClient.Get().AbsPath("/apis/wardle.k8s.io/v1alpha1/namespaces/default/flunders").SetHeader("Accept", "application/json").DoRaw()
 	framework.ExpectNoError(err, "confirming delete of a newly created flunders resource")
 	err = json.Unmarshal(contents, &flundersList)
-	framework.ExpectNoError(err, "Error in unmarshalling %T response from server %s", contents, "/apis/wardle.k8s.io/v1alpha1")
+	validateErrorWithDebugInfo(f, err, pods, "Error in unmarshalling %T response from server %s", contents, "/apis/wardle.k8s.io/v1alpha1")
 	if len(flundersList.Items) != 0 {
 		framework.Failf("failed to get back the correct deleted flunders list %v", flundersList)
 	}
+
+	flunderName = generateFlunderName("dynamic-flunder")
 
 	// Rerun the Create/List/Delete tests using the Dynamic client.
 	resources, err := client.Discovery().ServerPreferredNamespacedResources()
@@ -461,7 +472,7 @@ func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
 			Kind:       "Flunder",
 			APIVersion: "wardle.k8s.io/v1alpha1",
 		},
-		ObjectMeta: metav1.ObjectMeta{Name: "test-flunder"},
+		ObjectMeta: metav1.ObjectMeta{Name: flunderName},
 		Spec:       samplev1alpha1.FlunderSpec{},
 	}
 	jsonFlunder, err := json.Marshal(testFlunder)
@@ -476,23 +487,51 @@ func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
 	obj, err := dynamicClient.Resource(&apiResource, namespace).List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 	unstructuredList, ok := obj.(*unstructuredv1.UnstructuredList)
-	framework.ExpectNoError(err, "casting flunders list(%T) as unstructuredList using dynamic client", obj)
+	validateErrorWithDebugInfo(f, err, pods, "casting flunders list(%T) as unstructuredList using dynamic client", obj)
 	if len(unstructuredList.Items) != 1 {
 		framework.Failf("failed to get back the correct flunders list %v from the dynamic client", unstructuredList)
 	}
 
 	// kubectl delete flunder test-flunder
-	err = dynamicClient.Resource(&apiResource, namespace).Delete("test-flunder", &metav1.DeleteOptions{})
-	framework.ExpectNoError(err, "deleting flunders using dynamic client")
+	err = dynamicClient.Resource(&apiResource, namespace).Delete(flunderName, &metav1.DeleteOptions{})
+	validateErrorWithDebugInfo(f, err, pods, "deleting flunders(%v) using dynamic client", unstructuredList.Items)
 
 	// kubectl get flunders
 	obj, err = dynamicClient.Resource(&apiResource, namespace).List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "listing flunders using dynamic client")
 	unstructuredList, ok = obj.(*unstructuredv1.UnstructuredList)
-	framework.ExpectNoError(err, "casting flunders list(%T) as unstructuredList using dynamic client", obj)
+	validateErrorWithDebugInfo(f, err, pods, "casting flunders list(%T) as unstructuredList using dynamic client", obj)
 	if len(unstructuredList.Items) != 0 {
 		framework.Failf("failed to get back the correct deleted flunders list %v from the dynamic client", unstructuredList)
 	}
 
 	cleanTest(f, true)
+}
+
+func validateErrorWithDebugInfo(f *framework.Framework, err error, pods *v1.PodList, msg string, fields ...interface{}) {
+	if err != nil {
+		namespace := "sample-system"
+		msg := fmt.Sprintf(msg, fields...)
+		msg += fmt.Sprintf(" but received unexpected error:\n%v", err)
+		client := f.ClientSet
+		ep, err := client.CoreV1().Endpoints(namespace).Get("sample-api", metav1.GetOptions{})
+		if err == nil {
+			msg += fmt.Sprintf("\nFound endpoints for sample-api:\n%v", ep)
+		}
+		pds, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
+		if err == nil {
+			msg += fmt.Sprintf("\nFound pods in sample-system:\n%v", pds)
+			msg += fmt.Sprintf("\nOriginal pods in sample-system:\n%v", pods)
+		}
+
+		framework.Failf(msg)
+	}
+}
+
+func generateFlunderName(base string) string {
+	id, err := rand.Int(rand.Reader, big.NewInt(2147483647))
+	if err != nil {
+		return base
+	}
+	return fmt.Sprintf("%s-%d", base, id)
 }

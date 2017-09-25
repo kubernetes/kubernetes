@@ -27,7 +27,7 @@ func CreateNodeNameToInfoMap(pods []*v1.Pod, nodes []*v1.Node) map[string]*NodeI
 		if _, ok := nodeNameToInfo[nodeName]; !ok {
 			nodeNameToInfo[nodeName] = NewNodeInfo()
 		}
-		nodeNameToInfo[nodeName].addPod(pod)
+		nodeNameToInfo[nodeName].AddPod(pod)
 	}
 	for _, node := range nodes {
 		if _, ok := nodeNameToInfo[node.Name]; !ok {

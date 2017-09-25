@@ -1,17 +1,18 @@
 aliases:
   sig-scheduling-maintainers:
-    - davidopp
-    - timothysc
-    - wojtek-t
-    - k82cn
-  sig-scheduling:
-    - davidopp
     - bsalamat
+    - davidopp
+    - k82cn
     - timothysc
     - wojtek-t
-    - k82cn
+  sig-scheduling:
+    - bsalamat
+    - davidopp
     - jayunit100
+    - k82cn
     - resouer
+    - timothysc
+    - wojtek-t
   sig-cli-maintainers:
     - adohe
     - brendandburns
@@ -91,12 +92,12 @@ aliases:
     - erictune
     - foxish
     - janetkuo
-    - kargakis
     - kow3ns
     - lukaszo
     - mfojtik
     - smarterclayton
     - soltysh
+    - tnozicka
   sig-apps-api-approvers:
     - erictune
     - smarterclayton
@@ -173,4 +174,5 @@ aliases:
     - steveperry-53
     - radhikpac
     - jpbetz
+    - cmluciano
 

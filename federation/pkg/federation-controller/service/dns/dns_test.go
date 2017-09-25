@@ -18,13 +18,13 @@ package dns
 
 import (
 	"fmt"
-	"reflect"
 	"sort"
 	"testing"
 	"time"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns" // Only for unit testing purposes.
@@ -54,7 +54,7 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 	tests := []struct {
 		name     string
 		service  v1.Service
-		expected []string
+		expected sets.String
 	}{
 		{
 			name: "ServiceWithSingleLBIngress",
@@ -66,13 +66,13 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 						String()},
 				},
 			},
-			expected: []string{
-				"example.com:" + globalDNSName + ":A:180:[198.51.100.1]",
-				"example.com:" + fooRegionDNSName + ":A:180:[198.51.100.1]",
-				"example.com:" + fooZoneDNSName + ":A:180:[198.51.100.1]",
-				"example.com:" + barRegionDNSName + ":CNAME:180:[" + globalDNSName + "]",
-				"example.com:" + barZoneDNSName + ":CNAME:180:[" + barRegionDNSName + "]",
-			},
+			expected: sets.NewString(
+				"example.com:"+globalDNSName+":A:180:[198.51.100.1]",
+				"example.com:"+fooRegionDNSName+":A:180:[198.51.100.1]",
+				"example.com:"+fooZoneDNSName+":A:180:[198.51.100.1]",
+				"example.com:"+barRegionDNSName+":CNAME:180:["+globalDNSName+"]",
+				"example.com:"+barZoneDNSName+":CNAME:180:["+barRegionDNSName+"]",
+			),
 		},
 		/*
 			TODO: getResolvedEndpoints preforms DNS lookup.
@@ -99,12 +99,12 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 						String()},
 				},
 			},
-			expected: []string{
-				"example.com:" + fooRegionDNSName + ":CNAME:180:[" + globalDNSName + "]",
-				"example.com:" + fooZoneDNSName + ":CNAME:180:[" + fooRegionDNSName + "]",
-				"example.com:" + barRegionDNSName + ":CNAME:180:[" + globalDNSName + "]",
-				"example.com:" + barZoneDNSName + ":CNAME:180:[" + barRegionDNSName + "]",
-			},
+			expected: sets.NewString(
+				"example.com:"+fooRegionDNSName+":CNAME:180:["+globalDNSName+"]",
+				"example.com:"+fooZoneDNSName+":CNAME:180:["+fooRegionDNSName+"]",
+				"example.com:"+barRegionDNSName+":CNAME:180:["+globalDNSName+"]",
+				"example.com:"+barZoneDNSName+":CNAME:180:["+barRegionDNSName+"]",
+			),
 		},
 		{
 			name: "ServiceWithMultipleLBIngress",
@@ -116,13 +116,13 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 						String()},
 				},
 			},
-			expected: []string{
-				"example.com:" + globalDNSName + ":A:180:[198.51.100.1 198.51.200.1]",
-				"example.com:" + fooRegionDNSName + ":A:180:[198.51.100.1]",
-				"example.com:" + fooZoneDNSName + ":A:180:[198.51.100.1]",
-				"example.com:" + barRegionDNSName + ":A:180:[198.51.200.1]",
-				"example.com:" + barZoneDNSName + ":A:180:[198.51.200.1]",
-			},
+			expected: sets.NewString(
+				"example.com:"+globalDNSName+":A:180:[198.51.100.1 198.51.200.1]",
+				"example.com:"+fooRegionDNSName+":A:180:[198.51.100.1]",
+				"example.com:"+fooZoneDNSName+":A:180:[198.51.100.1]",
+				"example.com:"+barRegionDNSName+":A:180:[198.51.200.1]",
+				"example.com:"+barZoneDNSName+":A:180:[198.51.200.1]",
+			),
 		},
 		{
 			name: "ServiceWithLBIngressAndServiceDeleted",
@@ -135,13 +135,13 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 					DeletionTimestamp: &metav1.Time{Time: time.Now()},
 				},
 			},
-			expected: []string{
+			expected: sets.NewString(
 				// TODO: Ideally we should expect that there are no DNS records when federated service is deleted. Need to remove these leaks in future
-				"example.com:" + fooRegionDNSName + ":CNAME:180:[" + globalDNSName + "]",
-				"example.com:" + fooZoneDNSName + ":CNAME:180:[" + fooRegionDNSName + "]",
-				"example.com:" + barRegionDNSName + ":CNAME:180:[" + globalDNSName + "]",
-				"example.com:" + barZoneDNSName + ":CNAME:180:[" + barRegionDNSName + "]",
-			},
+				"example.com:"+fooRegionDNSName+":CNAME:180:["+globalDNSName+"]",
+				"example.com:"+fooZoneDNSName+":CNAME:180:["+fooRegionDNSName+"]",
+				"example.com:"+barRegionDNSName+":CNAME:180:["+globalDNSName+"]",
+				"example.com:"+barZoneDNSName+":CNAME:180:["+barRegionDNSName+"]",
+			),
 		},
 		{
 			name: "ServiceWithMultipleLBIngressAndOneLBIngressGettingRemoved",
@@ -154,13 +154,13 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 						String()},
 				},
 			},
-			expected: []string{
-				"example.com:" + globalDNSName + ":A:180:[198.51.100.1]",
-				"example.com:" + fooRegionDNSName + ":A:180:[198.51.100.1]",
-				"example.com:" + fooZoneDNSName + ":A:180:[198.51.100.1]",
-				"example.com:" + barRegionDNSName + ":CNAME:180:[" + globalDNSName + "]",
-				"example.com:" + barZoneDNSName + ":CNAME:180:[" + barRegionDNSName + "]",
-			},
+			expected: sets.NewString(
+				"example.com:"+globalDNSName+":A:180:[198.51.100.1]",
+				"example.com:"+fooRegionDNSName+":A:180:[198.51.100.1]",
+				"example.com:"+fooZoneDNSName+":A:180:[198.51.100.1]",
+				"example.com:"+barRegionDNSName+":CNAME:180:["+globalDNSName+"]",
+				"example.com:"+barZoneDNSName+":CNAME:180:["+barRegionDNSName+"]",
+			),
 		},
 		{
 			name: "ServiceWithMultipleLBIngressAndAllLBIngressGettingRemoved",
@@ -174,12 +174,12 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 						String()},
 				},
 			},
-			expected: []string{
-				"example.com:" + fooRegionDNSName + ":CNAME:180:[" + globalDNSName + "]",
-				"example.com:" + fooZoneDNSName + ":CNAME:180:[" + fooRegionDNSName + "]",
-				"example.com:" + barRegionDNSName + ":CNAME:180:[" + globalDNSName + "]",
-				"example.com:" + barZoneDNSName + ":CNAME:180:[" + barRegionDNSName + "]",
-			},
+			expected: sets.NewString(
+				"example.com:"+fooRegionDNSName+":CNAME:180:["+globalDNSName+"]",
+				"example.com:"+fooZoneDNSName+":CNAME:180:["+fooRegionDNSName+"]",
+				"example.com:"+barRegionDNSName+":CNAME:180:["+globalDNSName+"]",
+				"example.com:"+barZoneDNSName+":CNAME:180:["+barRegionDNSName+"]",
+			),
 		},
 	}
 	for _, test := range tests {
@@ -222,7 +222,7 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 		}
 
 		// Dump every record to a testable-by-string-comparison form
-		records := []string{}
+		records := sets.NewString()
 		for _, z := range zones {
 			zoneName := z.Name()
 
@@ -240,17 +240,12 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 
 				// Put in consistent (testable-by-string-comparison) order
 				sort.Strings(rrdatas)
-				records = append(records, fmt.Sprintf("%s:%s:%s:%d:%s", zoneName, rr.Name(), rr.Type(), rr.Ttl(), rrdatas))
+				records.Insert(fmt.Sprintf("%s:%s:%s:%d:%s", zoneName, rr.Name(), rr.Type(), rr.Ttl(), rrdatas))
 			}
 		}
 
-		// Ignore order of records
-		sort.Strings(records)
-		sort.Strings(test.expected)
-
-		if !reflect.DeepEqual(records, test.expected) {
+		if !records.Equal(test.expected) {
 			t.Errorf("Test %q failed.  Actual=%v, Expected=%v", test.name, records, test.expected)
 		}
-
 	}
 }

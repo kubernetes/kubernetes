@@ -60,6 +60,7 @@ var _ volume.VolumePlugin = &glusterfsPlugin{}
 var _ volume.PersistentVolumePlugin = &glusterfsPlugin{}
 var _ volume.DeletableVolumePlugin = &glusterfsPlugin{}
 var _ volume.ProvisionableVolumePlugin = &glusterfsPlugin{}
+var _ volume.ExpandableVolumePlugin = &glusterfsPlugin{}
 var _ volume.Provisioner = &glusterfsVolumeProvisioner{}
 var _ volume.Deleter = &glusterfsVolumeDeleter{}
 
@@ -346,8 +347,8 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 			return nil
 		}
 
-		const invalidOption = "Invalid option auto_unmount"
-		if dstrings.Contains(errs.Error(), invalidOption) {
+		if dstrings.Contains(errs.Error(), "Invalid option auto_unmount") ||
+			dstrings.Contains(errs.Error(), "Invalid argument") {
 			// Give a try without `auto_unmount` mount option, because
 			// it could be that gluster fuse client is older version and
 			// mount.glusterfs is unaware of `auto_unmount`.
@@ -737,7 +738,8 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 	var clusterIDs []string
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volSizeBytes := capacity.Value()
-	sz := int(volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
+	// Glusterfs creates volumes in units of GBs
+	sz := int(volume.RoundUpSize(volSizeBytes, 1000*1000*1000))
 	glog.V(2).Infof("create volume of size: %d bytes and configuration %+v", volSizeBytes, p.provisionerConfig)
 	if p.url == "" {
 		glog.Errorf("REST server endpoint is empty")
@@ -1080,7 +1082,7 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 
 	// Find out delta size
 	expansionSize := (newSize.Value() - oldSize.Value())
-	expansionSizeGB := int(volume.RoundUpSize(expansionSize, 1024*1024*1024))
+	expansionSizeGB := int(volume.RoundUpSize(expansionSize, 1000*1000*1000))
 
 	// Make volume expansion request
 	volumeExpandReq := &gapi.VolumeExpandRequest{Size: expansionSizeGB}

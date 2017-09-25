@@ -39,7 +39,7 @@ const (
 
 // VirtualDiskProvider defines interfaces for creating disk
 type VirtualDiskProvider interface {
-	Create(ctx context.Context, datastore *vclib.Datastore) error
+	Create(ctx context.Context, datastore *vclib.Datastore) (string, error)
 	Delete(ctx context.Context, datastore *vclib.Datastore) error
 }
 
@@ -60,16 +60,16 @@ func getDiskManager(disk *VirtualDisk, diskOperation string) VirtualDiskProvider
 }
 
 // Create gets appropriate disk manager and calls respective create method
-func (virtualDisk *VirtualDisk) Create(ctx context.Context, datastore *vclib.Datastore) error {
+func (virtualDisk *VirtualDisk) Create(ctx context.Context, datastore *vclib.Datastore) (string, error) {
 	if virtualDisk.VolumeOptions.DiskFormat == "" {
 		virtualDisk.VolumeOptions.DiskFormat = vclib.ThinDiskType
 	}
 	if !virtualDisk.VolumeOptions.VerifyVolumeOptions() {
 		glog.Error("VolumeOptions verification failed. volumeOptions: ", virtualDisk.VolumeOptions)
-		return vclib.ErrInvalidVolumeOptions
+		return "", vclib.ErrInvalidVolumeOptions
 	}
 	if virtualDisk.VolumeOptions.StoragePolicyID != "" && virtualDisk.VolumeOptions.StoragePolicyName != "" {
-		return fmt.Errorf("Storage Policy ID and Storage Policy Name both set, Please set only one parameter")
+		return "", fmt.Errorf("Storage Policy ID and Storage Policy Name both set, Please set only one parameter")
 	}
 	return getDiskManager(virtualDisk, VirtualDiskCreateOperation).Create(ctx, datastore)
 }

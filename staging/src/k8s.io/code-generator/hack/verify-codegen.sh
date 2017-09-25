@@ -21,8 +21,8 @@ set -o pipefail
 SCRIPT_ROOT=$(dirname "${BASH_SOURCE}")/..
 SCRIPT_BASE=${SCRIPT_ROOT}/../..
 
-DIFFROOT="${SCRIPT_ROOT}/test"
-TMP_DIFFROOT="${SCRIPT_ROOT}/_tmp/test"
+DIFFROOT="${SCRIPT_ROOT}/_test"
+TMP_DIFFROOT="${SCRIPT_ROOT}/_tmp/_test"
 _tmp="${SCRIPT_ROOT}/_tmp"
 
 cleanup() {

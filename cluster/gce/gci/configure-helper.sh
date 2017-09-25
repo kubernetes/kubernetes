@@ -480,11 +480,19 @@ EOF
 # Write the config for the audit policy.
 function create-master-audit-policy {
   local -r path="${1}"
+  local -r policy="${2:-}"
+
+  if [[ -n "${policy}" ]]; then
+    echo "${policy}" > "${path}"
+    return
+  fi
 
   # Known api groups
   local -r known_apis='
       - group: "" # core
       - group: "admissionregistration.k8s.io"
+      - group: "apiextensions.k8s.io"
+      - group: "apiregistration.k8s.io"
       - group: "apps"
       - group: "authentication.k8s.io"
       - group: "authorization.k8s.io"
@@ -492,6 +500,7 @@ function create-master-audit-policy {
       - group: "batch"
       - group: "certificates.k8s.io"
       - group: "extensions"
+      - group: "metrics"
       - group: "networking.k8s.io"
       - group: "policy"
       - group: "rbac.authorization.k8s.io"
@@ -499,7 +508,7 @@ function create-master-audit-policy {
       - group: "storage.k8s.io"'
 
   cat <<EOF >"${path}"
-apiVersion: audit.k8s.io/v1alpha1
+apiVersion: audit.k8s.io/v1beta1
 kind: Policy
 rules:
   # The following requests were manually identified as high-volume and low-risk,
@@ -509,7 +518,7 @@ rules:
     verbs: ["watch"]
     resources:
       - group: "" # core
-        resources: ["endpoints", "services"]
+        resources: ["endpoints", "services", "services/status"]
   - level: None
     # Ingress controller reads `configmaps/ingress-uid` through the unsecured port.
     # TODO(#46983): Change this to the ingress controller service account.
@@ -524,13 +533,13 @@ rules:
     verbs: ["get"]
     resources:
       - group: "" # core
-        resources: ["nodes"]
+        resources: ["nodes", "nodes/status"]
   - level: None
     userGroups: ["system:nodes"]
     verbs: ["get"]
     resources:
       - group: "" # core
-        resources: ["nodes"]
+        resources: ["nodes", "nodes/status"]
   - level: None
     users:
       - system:kube-controller-manager
@@ -546,7 +555,14 @@ rules:
     verbs: ["get"]
     resources:
       - group: "" # core
-        resources: ["namespaces"]
+        resources: ["namespaces", "namespaces/status", "namespaces/finalize"]
+  # Don't log HPA fetching metrics.
+  - level: None
+    users:
+      - system:kube-controller-manager
+    verbs: ["get", "list"]
+    resources:
+      - group: "metrics"
 
   # Don't log these read-only URLs.
   - level: None
@@ -569,15 +585,23 @@ rules:
         resources: ["secrets", "configmaps"]
       - group: authentication.k8s.io
         resources: ["tokenreviews"]
+    omitStages:
+      - "RequestReceived"
   # Get repsonses can be large; skip them.
   - level: Request
     verbs: ["get", "list", "watch"]
     resources: ${known_apis}
+    omitStages:
+      - "RequestReceived"
   # Default level for known APIs
   - level: RequestResponse
     resources: ${known_apis}
+    omitStages:
+      - "RequestReceived"
   # Default level for all other requests.
   - level: Metadata
+    omitStages:
+      - "RequestReceived"
 EOF
 }
 
@@ -946,6 +970,9 @@ function start-kubelet {
   fi
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     flags+=" --feature-gates=${FEATURE_GATES}"
+  fi
+  if [[ -n "${ROTATE_CERTIFICATES:-}" ]]; then
+    flags+=" --rotate-certificates=true"
   fi
 
   local -r kubelet_env_file="/etc/default/kubelet"
@@ -1317,7 +1344,7 @@ function start-kube-apiserver {
     local -r audit_policy_file="/etc/audit_policy.config"
     params+=" --audit-policy-file=${audit_policy_file}"
     # Create the audit policy file, and mount it into the apiserver pod.
-    create-master-audit-policy "${audit_policy_file}"
+    create-master-audit-policy "${audit_policy_file}" "${ADVANCED_AUDIT_POLICY:-}"
     audit_policy_config_mount="{\"name\": \"auditpolicyconfigmount\",\"mountPath\": \"${audit_policy_file}\", \"readOnly\": true},"
     audit_policy_config_volume="{\"name\": \"auditpolicyconfigmount\",\"hostPath\": {\"path\": \"${audit_policy_file}\", \"type\": \"FileOrCreate\"}},"
 
@@ -1535,6 +1562,10 @@ function start-kube-controller-manager {
   if [[ -n "${VOLUME_PLUGIN_DIR:-}" ]]; then
     params+=" --flex-volume-plugin-dir=${VOLUME_PLUGIN_DIR}"
   fi
+  if [[ -n "${CLUSTER_SIGNING_DURATION:-}" ]]; then
+    params+=" --experimental-cluster-signing-duration=$CLUSTER_SIGNING_DURATION"
+  fi
+
   local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
   local container_env=""
   if [[ -n "${ENABLE_CACHE_MUTATION_DETECTOR:-}" ]]; then
@@ -1698,12 +1729,12 @@ function start-kube-addons {
     setup-addon-manifests "addons" "cluster-monitoring"
     setup-addon-manifests "addons" "${file_dir}"
     # Replace the salt configurations with variable values.
-    base_metrics_memory="140Mi"
+    base_metrics_memory="${HEAPSTER_GCP_BASE_MEMORY:-140Mi}"
     base_eventer_memory="190Mi"
-    base_metrics_cpu="80m"
+    base_metrics_cpu="${HEAPSTER_GCP_BASE_CPU:-80m}"
     nanny_memory="90Mi"
-    local -r metrics_memory_per_node="4"
-    local -r metrics_cpu_per_node="0.5"
+    local -r metrics_memory_per_node="${HEAPSTER_GCP_MEMORY_PER_NODE:-4}"
+    local -r metrics_cpu_per_node="${HEAPSTER_GCP_CPU_PER_NODE:-0.5}"
     local -r eventer_memory_per_node="500"
     local -r nanny_memory_per_node="200"
     if [[ -n "${NUM_NODES:-}" && "${NUM_NODES}" -ge 1 ]]; then

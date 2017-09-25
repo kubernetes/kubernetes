@@ -202,3 +202,8 @@ type Zones interface {
 	// outside the kubelets.
 	GetZoneByNodeName(nodeName types.NodeName) (Zone, error)
 }
+
+// PVLabeler is an abstract, pluggable interface for fetching labels for volumes
+type PVLabeler interface {
+	GetLabelsForVolume(pv *v1.PersistentVolume) (map[string]string, error)
+}

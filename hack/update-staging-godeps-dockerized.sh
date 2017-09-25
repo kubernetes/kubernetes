@@ -75,8 +75,26 @@ function updateGodepManifest() {
     rm -rf Godeps # remove the current Godeps.json so we always rebuild it
     GOPATH="${TMP_GOPATH}:${GOPATH}:${GOPATH}/src/k8s.io/kubernetes/staging" godep save ${GODEP_OPTS} ./... 2>&1 | sed 's/^/  /'
 
-    # Rewriting Godeps.json to remove commits that don't really exist because we haven't pushed the prereqs yet
-    go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${TMP_GOPATH}/src/k8s.io/${repo}/Godeps/Godeps.json" --override-import-path="k8s.io/${repo}"
+    # Rewriting Godeps.json to cross-out commits that don't really exist because we haven't pushed the prereqs yet
+    local repo
+    for repo in $(ls -1 ${KUBE_ROOT}/staging/src/k8s.io); do
+      # remove staging prefix
+      jq '.Deps |= map(.ImportPath |= ltrimstr("k8s.io/kubernetes/staging/src/"))' Godeps/Godeps.json |
+
+        # x-out staging repo revisions. They will only be known when the publisher bot has created the final export.
+        # We keep the staging dependencies in here though to give the publisher bot a way to detect when the staging
+        # dependencies changed. If they have changed, the bot will run a complete godep restore+save. If they didn't
+        # it will avoid that step, which takes quite some time.
+        jq '.Deps |= map((select(.ImportPath | (startswith("k8s.io/'${repo}'/") or . == "k8s.io/'${repo}'")) | .Rev |= "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx") // .)' |
+
+        # remove comments
+        jq 'del(.Deps[].Comment)' |
+
+        # format with tabs
+        unexpand --first-only --tabs=2 > Godeps/Godeps.json.out
+
+      mv Godeps/Godeps.json.out Godeps/Godeps.json
+    done
 
     # commit so that following repos do not see this repo as dirty
     git add vendor >/dev/null

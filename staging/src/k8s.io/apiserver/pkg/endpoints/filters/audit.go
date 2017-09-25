@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -147,6 +148,7 @@ func processAuditEvent(sink audit.Sink, ev *auditinternal.Event, omitStages []au
 			return
 		}
 	}
+	ev.CreationTimestamp = metav1.NewTime(time.Now())
 	audit.ObserveEvent()
 	sink.ProcessEvents(ev)
 }

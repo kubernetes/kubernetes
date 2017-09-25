@@ -52,7 +52,6 @@ go_library(
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
         "//pkg/printers/storage:go_default_library",
-        "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/core/pod:go_default_library",
         "//pkg/registry/core/pod/rest:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

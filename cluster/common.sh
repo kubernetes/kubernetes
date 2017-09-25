@@ -672,6 +672,7 @@ ENABLE_APISERVER_BASIC_AUDIT: $(yaml-quote ${ENABLE_APISERVER_BASIC_AUDIT:-})
 ENABLE_APISERVER_ADVANCED_AUDIT: $(yaml-quote ${ENABLE_APISERVER_ADVANCED_AUDIT:-})
 ENABLE_CACHE_MUTATION_DETECTOR: $(yaml-quote ${ENABLE_CACHE_MUTATION_DETECTOR:-false})
 ENABLE_PATCH_CONVERSION_DETECTOR: $(yaml-quote ${ENABLE_PATCH_CONVERSION_DETECTOR:-false})
+ADVANCED_AUDIT_POLICY: $(yaml-quote ${ADVANCED_AUDIT_POLICY:-})
 ADVANCED_AUDIT_BACKEND: $(yaml-quote ${ADVANCED_AUDIT_BACKEND:-log})
 GCE_API_ENDPOINT: $(yaml-quote ${GCE_API_ENDPOINT:-})
 PROMETHEUS_TO_SD_ENDPOINT: $(yaml-quote ${PROMETHEUS_TO_SD_ENDPOINT:-})
@@ -751,9 +752,24 @@ EOF
 ENABLE_CUSTOM_METRICS: $(yaml-quote ${ENABLE_CUSTOM_METRICS})
 EOF
   fi
+  if [ -n "${ENABLE_METADATA_PROXY:-}" ]; then
+    cat >>$file <<EOF
+ENABLE_METADATA_PROXY: $(yaml-quote ${ENABLE_METADATA_PROXY})
+EOF
+  fi
+  if [ -n "${KUBE_FIREWALL_METADATA_SERVER:-}" ]; then
+    cat >>$file <<EOF
+KUBE_FIREWALL_METADATA_SERVER: $(yaml-quote ${KUBE_FIREWALL_METADATA_SERVER})
+EOF
+  fi
   if [ -n "${FEATURE_GATES:-}" ]; then
     cat >>$file <<EOF
 FEATURE_GATES: $(yaml-quote ${FEATURE_GATES})
+EOF
+  fi
+  if [ -n "${ROTATE_CERTIFICATES:-}" ]; then
+    cat >>$file <<EOF
+ROTATE_CERTIFICATES: $(yaml-quote ${ROTATE_CERTIFICATES})
 EOF
   fi
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "gci" ]] ||
@@ -865,6 +881,11 @@ EOF
     if [ -n "${ETCD_QUORUM_READ:-}" ]; then
       cat >>$file <<EOF
 ETCD_QUORUM_READ: $(yaml-quote ${ETCD_QUORUM_READ})
+EOF
+    fi
+    if [ -n "${CLUSTER_SIGNING_DURATION:-}" ]; then
+      cat >>$file <<EOF
+CLUSTER_SIGNING_DURATION: $(yaml-quote ${CLUSTER_SIGNING_DURATION})
 EOF
     fi
 
@@ -1284,6 +1305,7 @@ function parse-master-env() {
   REQUESTHEADER_CA_CERT_BASE64=$(get-env-val "${master_env}" "REQUESTHEADER_CA_CERT")
   PROXY_CLIENT_CERT_BASE64=$(get-env-val "${master_env}" "PROXY_CLIENT_CERT")
   PROXY_CLIENT_KEY_BASE64=$(get-env-val "${master_env}" "PROXY_CLIENT_KEY")
+  ENABLE_LEGACY_ABAC=$(get-env-val "${master_env}" "ENABLE_LEGACY_ABAC")
 }
 
 # Update or verify required gcloud components are installed

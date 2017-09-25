@@ -256,7 +256,8 @@ func RecordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, newSta
 // otherwise.
 func SwapNodeControllerTaint(kubeClient clientset.Interface, taintsToAdd, taintsToRemove []*v1.Taint, node *v1.Node) bool {
 	for _, taintToAdd := range taintsToAdd {
-		taintToAdd.TimeAdded = metav1.Now()
+		now := metav1.Now()
+		taintToAdd.TimeAdded = &now
 	}
 
 	err := controller.AddOrUpdateTaintOnNode(kubeClient, node.Name, taintsToAdd...)

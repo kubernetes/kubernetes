@@ -685,7 +685,8 @@ $(foreach dir, $(CONVERSION_DIRS),  \
     $(META_DIR)/$(dir)/$(CONVERSIONS_META)):
 	TAGS=$$(grep --color=never -h '^// *+k8s:conversion-gen=' $</*.go   \
 	    | cut -f2- -d=                                                  \
-	    | sed 's|$(PRJ_SRC_PATH)/||');                                  \
+	    | sed 's|$(PRJ_SRC_PATH)/||'                                    \
+	    | sed 's|^k8s.io/|vendor/k8s.io/|');                            \
 	mkdir -p $(@D);                                                     \
 	echo "conversions__$< := $$(echo $${TAGS})" >$@.tmp;                \
 	if ! cmp -s $@.tmp $@; then                                         \

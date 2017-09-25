@@ -54,7 +54,8 @@ type emptyDirPlugin struct {
 var _ volume.VolumePlugin = &emptyDirPlugin{}
 
 const (
-	emptyDirPluginName = "kubernetes.io/empty-dir"
+	emptyDirPluginName           = "kubernetes.io/empty-dir"
+	hugePagesPageSizeMountOption = "pagesize"
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
@@ -321,7 +322,7 @@ func getPageSizeMountOptionFromPod(pod *v1.Pod) (string, error) {
 		return "", fmt.Errorf("hugePages storage requested, but there is no resource request for huge pages.")
 	}
 
-	return fmt.Sprintf("pageSize=%s", pageSize.String()), nil
+	return fmt.Sprintf("%s=%s", hugePagesPageSizeMountOption, pageSize.String()), nil
 
 }
 

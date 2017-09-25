@@ -18,14 +18,21 @@ limitations under the License.
 package coredns
 
 import (
+	"crypto/tls"
 	"fmt"
-	etcdc "github.com/coreos/etcd/client"
-	"github.com/golang/glog"
-	"gopkg.in/gcfg.v1"
 	"io"
-	"k8s.io/kubernetes/federation/pkg/dnsprovider"
+	"net"
+	"net/http"
 	"strconv"
 	"strings"
+	"time"
+
+	etcdc "github.com/coreos/etcd/client"
+	"github.com/coreos/etcd/pkg/transport"
+	"github.com/golang/glog"
+	"gopkg.in/gcfg.v1"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 )
 
 // "coredns" should be used to use this DNS provider
@@ -37,6 +44,9 @@ const (
 type Config struct {
 	Global struct {
 		EtcdEndpoints    string `gcfg:"etcd-endpoints"`
+		CertFile         string `gcfg:"etcd-cert-file"`
+		KeyFile          string `gcfg:"etcd-key-file"`
+		CAFile           string `gcfg:"etcd-ca-file"`
 		DNSZones         string `gcfg:"zones"`
 		CoreDNSEndpoints string `gcfg:"coredns-endpoints"`
 	}
@@ -48,11 +58,42 @@ func init() {
 	})
 }
 
+func newTransportForETCD2(certFile, keyFile, caFile string) (*http.Transport, error) {
+	var cfg *tls.Config
+	if len(certFile) == 0 && len(keyFile) == 0 && len(caFile) == 0 {
+		cfg = nil
+	} else {
+		info := transport.TLSInfo{
+			CertFile: certFile,
+			KeyFile:  keyFile,
+			CAFile:   caFile,
+		}
+		var err error
+		cfg, err = info.ClientConfig()
+		if err != nil {
+			return nil, fmt.Errorf("error creating tls config: %v", err)
+		}
+	}
+	// Copied from etcd.DefaultTransport declaration.
+	// TODO: Determine if transport needs optimization
+	tr := utilnet.SetTransportDefaults(&http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		Dial: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).Dial,
+		TLSHandshakeTimeout: 10 * time.Second,
+		TLSClientConfig:     cfg,
+	})
+	return tr, nil
+}
+
 // newCoreDnsProviderInterface creates a new instance of an CoreDNS DNS Interface.
 func newCoreDNSProviderInterface(config io.Reader) (*Interface, error) {
 	etcdEndpoints := "http://federation-dns-server-etcd:2379"
 	etcdPathPrefix := "skydns"
 	dnsZones := ""
+	var certFile, keyFile, caFile string
 
 	// Possibly override defaults with config below
 	if config != nil {
@@ -63,16 +104,24 @@ func newCoreDNSProviderInterface(config io.Reader) (*Interface, error) {
 		}
 		etcdEndpoints = cfg.Global.EtcdEndpoints
 		dnsZones = cfg.Global.DNSZones
+		certFile = cfg.Global.CertFile
+		caFile = cfg.Global.CAFile
+		keyFile = cfg.Global.KeyFile
 	}
 	glog.Infof("Using CoreDNS DNS provider")
 
 	if dnsZones == "" {
 		return nil, fmt.Errorf("Need to provide at least one DNS Zone")
 	}
+	glog.Infof("Creating etcd transport with %s, %s, %s", certFile, keyFile, caFile)
+	etcdTransport, err := newTransportForETCD2(certFile, keyFile, caFile)
+	if err != nil {
+		return nil, fmt.Errorf("error creating transport for etcd: %v", err)
+	}
 
 	etcdCfg := etcdc.Config{
 		Endpoints: strings.Split(etcdEndpoints, ","),
-		Transport: etcdc.DefaultTransport,
+		Transport: etcdTransport,
 	}
 
 	c, err := etcdc.New(etcdCfg)

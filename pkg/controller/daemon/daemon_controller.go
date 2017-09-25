@@ -66,7 +66,7 @@ const (
 	// The value of 250 is chosen b/c values that are too high can cause registry DoS issues
 	BurstReplicas = 250
 
-	// If sending a status upate to API server fails, we retry a finite number of times.
+	// If sending a status update to API server fails, we retry a finite number of times.
 	StatusUpdateRetries = 1
 
 	// Reasons for DaemonSet events
@@ -840,7 +840,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet, hash string) e
 					continue
 				}
 				if pod.Status.Phase == v1.PodFailed {
-					msg := fmt.Sprintf("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, node.Name, pod.Name)
+					msg := fmt.Sprintf("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, pod.Name, node.Name)
 					glog.V(2).Infof(msg)
 					// Emit an event so that it's discoverable to users.
 					dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedDaemonPodReason, msg)
@@ -855,7 +855,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet, hash string) e
 			if len(daemonPodsRunning) > 1 {
 				sort.Sort(podByCreationTimestamp(daemonPodsRunning))
 				for i := 1; i < len(daemonPodsRunning); i++ {
-					podsToDelete = append(podsToDelete, daemonPods[i].Name)
+					podsToDelete = append(podsToDelete, daemonPodsRunning[i].Name)
 				}
 			}
 		case !shouldContinueRunning && exists:

@@ -19,7 +19,6 @@ package storage
 import (
 	"fmt"
 	mathrand "math/rand"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -450,16 +449,18 @@ var _ = SIGDescribe("Pod Disks", func() {
 		// Verify that disk shows up in node 0's volumeInUse list
 		framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* should exist*/))
 
-		output, err := exec.Command("gcloud", "compute", "instances", "list", "--project="+framework.TestContext.CloudConfig.ProjectID).CombinedOutput()
+		gceCloud, err := framework.GetGCECloud()
+		framework.ExpectNoError(err, fmt.Sprintf("Unable to create gcloud client err=%v", err))
+
+		output, err := gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
 		framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
 		Expect(true, strings.Contains(string(output), string(host0Name)))
 
 		By("deleting host0")
+		resp, err := gceCloud.DeleteInstance(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone, string(host0Name))
+		framework.ExpectNoError(err, fmt.Sprintf("Failed to delete host0pod: err=%v response=%#v", err, resp))
 
-		output, err = exec.Command("gcloud", "compute", "instances", "delete", string(host0Name), "--project="+framework.TestContext.CloudConfig.ProjectID, "--zone="+framework.TestContext.CloudConfig.Zone).CombinedOutput()
-		framework.ExpectNoError(err, fmt.Sprintf("Failed to delete host0pod: err=%v output=%s", err, output))
-
-		output, err = exec.Command("gcloud", "compute", "instances", "list", "--project="+framework.TestContext.CloudConfig.ProjectID).CombinedOutput()
+		output, err = gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
 		framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
 		Expect(false, strings.Contains(string(output), string(host0Name)))
 

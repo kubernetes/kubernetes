@@ -1,4 +1,4 @@
-// +build !linux
+// +build !linux,!windows
 
 /*
 Copyright 2014 The Kubernetes Authors.
@@ -73,8 +73,4 @@ func (mounter *Mounter) MakeRShared(path string) error {
 
 func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
 	return nil
-}
-
-func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
-	return true, nil
 }

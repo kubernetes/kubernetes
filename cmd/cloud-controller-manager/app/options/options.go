@@ -45,19 +45,22 @@ type CloudControllerManagerServer struct {
 // NewCloudControllerManagerServer creates a new ExternalCMServer with a default config.
 func NewCloudControllerManagerServer() *CloudControllerManagerServer {
 	s := CloudControllerManagerServer{
+		// Part of these default values also present in 'cmd/kube-controller-manager/app/options/options.go'.
+		// Please keep them in sync when doing update.
 		KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
-			Port:                    ports.CloudControllerManagerPort,
-			Address:                 "0.0.0.0",
-			ConcurrentServiceSyncs:  1,
-			MinResyncPeriod:         metav1.Duration{Duration: 12 * time.Hour},
-			NodeMonitorPeriod:       metav1.Duration{Duration: 5 * time.Second},
-			ClusterName:             "kubernetes",
-			ConfigureCloudRoutes:    true,
-			ContentType:             "application/vnd.kubernetes.protobuf",
-			KubeAPIQPS:              20.0,
-			KubeAPIBurst:            30,
-			LeaderElection:          leaderelectionconfig.DefaultLeaderElectionConfiguration(),
-			ControllerStartInterval: metav1.Duration{Duration: 0 * time.Second},
+			Port:                      ports.CloudControllerManagerPort,
+			Address:                   "0.0.0.0",
+			ConcurrentServiceSyncs:    1,
+			MinResyncPeriod:           metav1.Duration{Duration: 12 * time.Hour},
+			NodeMonitorPeriod:         metav1.Duration{Duration: 5 * time.Second},
+			ClusterName:               "kubernetes",
+			ConfigureCloudRoutes:      true,
+			ContentType:               "application/vnd.kubernetes.protobuf",
+			KubeAPIQPS:                20.0,
+			KubeAPIBurst:              30,
+			LeaderElection:            leaderelectionconfig.DefaultLeaderElectionConfiguration(),
+			ControllerStartInterval:   metav1.Duration{Duration: 0 * time.Second},
+			RouteReconciliationPeriod: metav1.Duration{Duration: 10 * time.Second},
 		},
 		NodeStatusUpdateFrequency: metav1.Duration{Duration: 5 * time.Minute},
 	}
@@ -77,13 +80,16 @@ func (s *CloudControllerManagerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.NodeMonitorPeriod.Duration, "node-monitor-period", s.NodeMonitorPeriod.Duration,
 		"The period for syncing NodeStatus in NodeController.")
 	fs.DurationVar(&s.NodeStatusUpdateFrequency.Duration, "node-status-update-frequency", s.NodeStatusUpdateFrequency.Duration, "Specifies how often the controller updates nodes' status.")
+	// TODO: remove --service-account-private-key-file 6 months after 1.8 is released (~1.10)
 	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-private-key-file", s.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA or ECDSA key used to sign service account tokens.")
+	fs.MarkDeprecated("service-account-private-key-file", "This flag is currently no-op and will be deleted.")
 	fs.BoolVar(&s.UseServiceAccountCredentials, "use-service-account-credentials", s.UseServiceAccountCredentials, "If true, use individual service account credentials for each controller.")
 	fs.DurationVar(&s.RouteReconciliationPeriod.Duration, "route-reconciliation-period", s.RouteReconciliationPeriod.Duration, "The period for reconciling routes created for Nodes by cloud provider.")
 	fs.BoolVar(&s.ConfigureCloudRoutes, "configure-cloud-routes", true, "Should CIDRs allocated by allocate-node-cidrs be configured on the cloud provider.")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/.")
 	fs.BoolVar(&s.EnableContentionProfiling, "contention-profiling", false, "Enable lock contention profiling, if profiling is enabled.")
 	fs.StringVar(&s.ClusterCIDR, "cluster-cidr", s.ClusterCIDR, "CIDR Range for Pods in cluster.")
+	fs.StringVar(&s.ClusterName, "cluster-name", s.ClusterName, "The instance prefix for the cluster.")
 	fs.BoolVar(&s.AllocateNodeCIDRs, "allocate-node-cidrs", false, "Should CIDRs for Pods be allocated and set on the cloud provider.")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig).")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")

@@ -102,11 +102,11 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 	// sandboxIDToPodStats is a temporary map from sandbox ID to its pod stats.
 	sandboxIDToPodStats := make(map[string]*statsapi.PodStats)
 
-	resp, err := p.runtimeService.ListContainerStats(&runtimeapi.ListContainerStatsRequest{})
+	resp, err := p.runtimeService.ListContainerStats(&runtimeapi.ContainerStatsFilter{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list all container stats: %v", err)
 	}
-	for _, stats := range resp.Stats {
+	for _, stats := range resp {
 		containerID := stats.Attributes.Id
 		container, found := containerMap[containerID]
 		if !found {
@@ -140,7 +140,7 @@ func (p *criStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 
 // ImageFsStats returns the stats of the image filesystem.
 func (p *criStatsProvider) ImageFsStats() (*statsapi.FsStats, error) {
-	resp, err := p.imageService.ImageFsInfo(&runtimeapi.ImageFsInfoRequest{})
+	resp, err := p.imageService.ImageFsInfo()
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (p *criStatsProvider) ImageFsStats() (*statsapi.FsStats, error) {
 	// return the first one.
 	//
 	// TODO(yguo0905): Support returning stats of multiple image filesystems.
-	for _, fs := range resp.ImageFilesystems {
+	for _, fs := range resp {
 		s := &statsapi.FsStats{
 			Time:       metav1.NewTime(time.Unix(0, fs.Timestamp)),
 			UsedBytes:  &fs.UsedBytes.Value,
@@ -258,21 +258,23 @@ func (p *criStatsProvider) makeContainerStats(
 			result.Rootfs.InodesUsed = &stats.WritableLayer.InodesUsed.Value
 		}
 	}
-	storageID := stats.WritableLayer.StorageId
-	imageFsInfo, found := uuidToFsInfo[*storageID]
-	if !found {
-		imageFsInfo = p.getFsInfo(storageID)
-		uuidToFsInfo[*storageID] = imageFsInfo
-	}
-	if imageFsInfo != nil {
-		// The image filesystem UUID is unknown to the local node or there's an
-		// error on retrieving the stats. In these cases, we omit those stats
-		// and return the best-effort partial result. See
-		// https://github.com/kubernetes/heapster/issues/1793.
-		result.Rootfs.AvailableBytes = &imageFsInfo.Available
-		result.Rootfs.CapacityBytes = &imageFsInfo.Capacity
-		result.Rootfs.InodesFree = imageFsInfo.InodesFree
-		result.Rootfs.Inodes = imageFsInfo.Inodes
+	storageID := stats.GetWritableLayer().GetStorageId()
+	if storageID != nil {
+		imageFsInfo, found := uuidToFsInfo[*storageID]
+		if !found {
+			imageFsInfo = p.getFsInfo(storageID)
+			uuidToFsInfo[*storageID] = imageFsInfo
+		}
+		if imageFsInfo != nil {
+			// The image filesystem UUID is unknown to the local node or there's an
+			// error on retrieving the stats. In these cases, we omit those stats
+			// and return the best-effort partial result. See
+			// https://github.com/kubernetes/heapster/issues/1793.
+			result.Rootfs.AvailableBytes = &imageFsInfo.Available
+			result.Rootfs.CapacityBytes = &imageFsInfo.Capacity
+			result.Rootfs.InodesFree = imageFsInfo.InodesFree
+			result.Rootfs.Inodes = imageFsInfo.Inodes
+		}
 	}
 
 	return result

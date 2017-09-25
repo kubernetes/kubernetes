@@ -49,7 +49,7 @@ func TestMarkMaster(t *testing.T) {
 			"master label and taint missing",
 			"",
 			nil,
-			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}},\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\",\"timeAdded\":null}]}}",
+			"{\"metadata\":{\"labels\":{\"node-role.kubernetes.io/master\":\"\"}},\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\"}]}}",
 		},
 		{
 			"master label missing",
@@ -61,7 +61,7 @@ func TestMarkMaster(t *testing.T) {
 			"master taint missing",
 			kubeadmconstants.LabelNodeRoleMaster,
 			nil,
-			"{\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\",\"timeAdded\":null}]}}",
+			"{\"spec\":{\"taints\":[{\"effect\":\"NoSchedule\",\"key\":\"node-role.kubernetes.io/master\"}]}}",
 		},
 		{
 			"nothing missing",

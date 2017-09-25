@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -30,10 +29,6 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/filters"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	kubeinformers "k8s.io/client-go/informers"
-	kubeclientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	"k8s.io/kube-aggregator/pkg/apiserver"
 )
@@ -47,10 +42,6 @@ type AggregatorOptions struct {
 	// this to confirm the proxy's identity
 	ProxyClientCertFile string
 	ProxyClientKeyFile  string
-
-	// CoreAPIKubeconfig is a filename for a kubeconfig file to contact the core API server with
-	// If it is not set, the in cluster config is used
-	CoreAPIKubeconfig string
 
 	StdOut io.Writer
 	StdErr io.Writer
@@ -86,9 +77,6 @@ func (o *AggregatorOptions) AddFlags(fs *pflag.FlagSet) {
 	o.RecommendedOptions.AddFlags(fs)
 	fs.StringVar(&o.ProxyClientCertFile, "proxy-client-cert-file", o.ProxyClientCertFile, "client certificate used identify the proxy to the API server")
 	fs.StringVar(&o.ProxyClientKeyFile, "proxy-client-key-file", o.ProxyClientKeyFile, "client certificate key used identify the proxy to the API server")
-	fs.StringVar(&o.CoreAPIKubeconfig, "core-kubeconfig", o.CoreAPIKubeconfig, ""+
-		"kubeconfig file pointing at the 'core' kubernetes server with enough rights to get,list,watch "+
-		" services,endpoints.  If not set, the in-cluster config is used")
 }
 
 // NewDefaultOptions builds a "normal" set of options.  You wouldn't normally expose this, but hyperkube isn't cobra compatible
@@ -99,6 +87,7 @@ func NewDefaultOptions(out, err io.Writer) *AggregatorOptions {
 		StdOut: out,
 		StdErr: err,
 	}
+
 	return o
 }
 
@@ -118,7 +107,7 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
-	serverConfig := genericapiserver.NewConfig(apiserver.Codecs)
+	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
 
 	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
 		return err
@@ -128,39 +117,21 @@ func (o AggregatorOptions) RunAggregator(stopCh <-chan struct{}) error {
 		sets.NewString("attach", "exec", "proxy", "log", "portforward"),
 	)
 
-	var kubeconfig *rest.Config
-	var err error
-	if len(o.CoreAPIKubeconfig) > 0 {
-		loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: o.CoreAPIKubeconfig}
-		loader := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
-
-		kubeconfig, err = loader.ClientConfig()
-
-	} else {
-		kubeconfig, err = rest.InClusterConfig()
-	}
-	if err != nil {
-		return err
-	}
-
-	coreAPIServerClient, err := kubeclientset.NewForConfig(kubeconfig)
-	if err != nil {
-		return err
-	}
-	kubeInformers := kubeinformers.NewSharedInformerFactory(coreAPIServerClient, 5*time.Minute)
-	serviceResolver := apiserver.NewClusterIPServiceResolver(kubeInformers.Core().V1().Services().Lister())
+	serviceResolver := apiserver.NewClusterIPServiceResolver(serverConfig.SharedInformerFactory.Core().V1().Services().Lister())
 
 	config := apiserver.Config{
-		GenericConfig:     serverConfig,
-		CoreKubeInformers: kubeInformers,
-		ServiceResolver:   serviceResolver,
+		GenericConfig: serverConfig,
+		ExtraConfig: apiserver.ExtraConfig{
+			ServiceResolver: serviceResolver,
+		},
 	}
 
-	config.ProxyClientCert, err = ioutil.ReadFile(o.ProxyClientCertFile)
+	var err error
+	config.ExtraConfig.ProxyClientCert, err = ioutil.ReadFile(o.ProxyClientCertFile)
 	if err != nil {
 		return err
 	}
-	config.ProxyClientKey, err = ioutil.ReadFile(o.ProxyClientKeyFile)
+	config.ExtraConfig.ProxyClientKey, err = ioutil.ReadFile(o.ProxyClientKeyFile)
 	if err != nil {
 		return err
 	}

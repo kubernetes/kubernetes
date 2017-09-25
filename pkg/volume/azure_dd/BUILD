@@ -11,10 +11,19 @@ go_library(
     srcs = [
         "attacher.go",
         "azure_common.go",
+        "azure_common_unsupported.go",
         "azure_dd.go",
         "azure_mounter.go",
         "azure_provision.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "azure_common_linux.go",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "azure_common_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/cloudprovider:go_default_library",
@@ -58,6 +67,7 @@ go_test(
     ],
     library = ":go_default_library",
     deps = [
+        "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

@@ -32,7 +32,7 @@ import (
 )
 
 const policyDefV1alpha1 = `
-apiVersion: audit.k8s.io/v1beta1
+apiVersion: audit.k8s.io/v1alpha1
 kind: Policy
 rules:
   - level: None
@@ -91,16 +91,11 @@ var expectedPolicy = &audit.Policy{
 }
 
 func TestParserV1alpha1(t *testing.T) {
-	// Create a policy file.
-	f, err := ioutil.TempFile("", "policy.yaml")
+	f, err := writePolicy(t, policyDefV1alpha1)
 	require.NoError(t, err)
-	defer os.Remove(f.Name())
+	defer os.Remove(f)
 
-	_, err = f.WriteString(policyDefV1alpha1)
-	require.NoError(t, err)
-	require.NoError(t, f.Close())
-
-	policy, err := LoadPolicyFromFile(f.Name())
+	policy, err := LoadPolicyFromFile(f)
 	require.NoError(t, err)
 
 	assert.Len(t, policy.Rules, 3) // Sanity check.
@@ -110,20 +105,48 @@ func TestParserV1alpha1(t *testing.T) {
 }
 
 func TestParserV1beta1(t *testing.T) {
-	// Create a policy file.
-	f, err := ioutil.TempFile("", "policy.yaml")
+	f, err := writePolicy(t, policyDefV1beta1)
 	require.NoError(t, err)
-	defer os.Remove(f.Name())
+	defer os.Remove(f)
 
-	_, err = f.WriteString(policyDefV1beta1)
-	require.NoError(t, err)
-	require.NoError(t, f.Close())
-
-	policy, err := LoadPolicyFromFile(f.Name())
+	policy, err := LoadPolicyFromFile(f)
 	require.NoError(t, err)
 
 	assert.Len(t, policy.Rules, 3) // Sanity check.
 	if !reflect.DeepEqual(policy, expectedPolicy) {
 		t.Errorf("Unexpected policy! Diff:\n%s", diff.ObjectDiff(policy, expectedPolicy))
 	}
+}
+
+func TestPolicyCntCheck(t *testing.T) {
+	var testCases = []struct {
+		caseName, policy string
+	}{
+		{
+			"policyWithNoRule",
+			`apiVersion: audit.k8s.io/v1beta1
+kind: Policy`,
+		},
+		{"emptyPolicyFile", ""},
+	}
+
+	for _, tc := range testCases {
+		f, err := writePolicy(t, tc.policy)
+		require.NoError(t, err)
+		defer os.Remove(f)
+
+		_, err = LoadPolicyFromFile(f)
+		assert.Errorf(t, err, "loaded illegal policy with 0 rules from testCase %s", tc.caseName)
+	}
+}
+
+func writePolicy(t *testing.T, policy string) (string, error) {
+	f, err := ioutil.TempFile("", "policy.yaml")
+	require.NoError(t, err)
+
+	_, err = f.WriteString(policy)
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+
+	return f.Name(), nil
 }

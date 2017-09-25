@@ -142,18 +142,7 @@ func (runner *runner) GetVirtualServers() ([]*VirtualServer, error) {
 
 // Flush is part of Interface.  Currently we delete IPVS services one by one
 func (runner *runner) Flush() error {
-	vss, err := runner.GetVirtualServers()
-	if err != nil {
-		return err
-	}
-	for _, vs := range vss {
-		err := runner.DeleteVirtualServer(vs)
-		// TODO: aggregate errors?
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return runner.ipvsHandle.Flush()
 }
 
 // AddRealServer is part of Interface.
@@ -214,9 +203,16 @@ func toVirtualServer(svc *ipvs.Service) (*VirtualServer, error) {
 		Port:      svc.Port,
 		Scheduler: svc.SchedName,
 		Protocol:  protocolNumbeToString(ProtoType(svc.Protocol)),
-		Flags:     ServiceFlags(svc.Flags),
 		Timeout:   svc.Timeout,
 	}
+
+	// Test Flags >= 0x2, valid Flags ranges [0x2, 0x3]
+	if svc.Flags&FlagHashed == 0 {
+		return nil, fmt.Errorf("Flags of successfully created IPVS service should be >= %d since every service is hashed into the service table", FlagHashed)
+	}
+	// Sub Flags to 0x2
+	// 011 -> 001, 010 -> 000
+	vs.Flags = ServiceFlags(svc.Flags &^ uint32(FlagHashed))
 
 	if vs.Address == nil {
 		if svc.AddressFamily == syscall.AF_INET {

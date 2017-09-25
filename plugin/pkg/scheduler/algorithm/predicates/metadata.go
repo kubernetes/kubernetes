@@ -40,8 +40,8 @@ type matchingPodAntiAffinityTerm struct {
 	node *v1.Node
 }
 
-// NOTE: When new fields are added/removed or logic is changed, please make sure
-// that RemovePod and AddPod functions are updated to work with the new changes.
+// NOTE: When new fields are added/removed or logic is changed, please make sure that
+// RemovePod, AddPod, and ShallowCopy functions are updated to work with the new changes.
 type predicateMetadata struct {
 	pod           *v1.Pod
 	podBestEffort bool
@@ -53,6 +53,9 @@ type predicateMetadata struct {
 	serviceAffinityMatchingPodList     []*v1.Pod
 	serviceAffinityMatchingPodServices []*v1.Service
 }
+
+// Ensure that predicateMetadata implements algorithm.PredicateMetadata.
+var _ algorithm.PredicateMetadata = &predicateMetadata{}
 
 // PredicateMetadataProducer: Helper types/variables...
 type PredicateMetadataProducer func(pm *predicateMetadata)
@@ -66,7 +69,7 @@ func RegisterPredicateMetadataProducer(predicateName string, precomp PredicateMe
 	predicateMetadataProducers[predicateName] = precomp
 }
 
-func NewPredicateMetadataFactory(podLister algorithm.PodLister) algorithm.MetadataProducer {
+func NewPredicateMetadataFactory(podLister algorithm.PodLister) algorithm.PredicateMetadataProducer {
 	factory := &PredicateMetadataFactory{
 		podLister,
 	}
@@ -74,7 +77,7 @@ func NewPredicateMetadataFactory(podLister algorithm.PodLister) algorithm.Metada
 }
 
 // GetMetadata returns the predicateMetadata used which will be used by various predicates.
-func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInfoMap map[string]*schedulercache.NodeInfo) interface{} {
+func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInfoMap map[string]*schedulercache.NodeInfo) algorithm.PredicateMetadata {
 	// If we cannot compute metadata, just return nil
 	if pod == nil {
 		return nil
@@ -158,4 +161,28 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulercache
 		}
 	}
 	return nil
+}
+
+// ShallowCopy copies a metadata struct into a new struct and creates a copy of
+// its maps and slices, but it does not copy the contents of pointer values.
+func (meta *predicateMetadata) ShallowCopy() algorithm.PredicateMetadata {
+	newPredMeta := &predicateMetadata{
+		pod:                  meta.pod,
+		podBestEffort:        meta.podBestEffort,
+		podRequest:           meta.podRequest,
+		serviceAffinityInUse: meta.serviceAffinityInUse,
+	}
+	newPredMeta.podPorts = map[int]bool{}
+	for k, v := range meta.podPorts {
+		newPredMeta.podPorts[k] = v
+	}
+	newPredMeta.matchingAntiAffinityTerms = map[string][]matchingPodAntiAffinityTerm{}
+	for k, v := range meta.matchingAntiAffinityTerms {
+		newPredMeta.matchingAntiAffinityTerms[k] = append([]matchingPodAntiAffinityTerm(nil), v...)
+	}
+	newPredMeta.serviceAffinityMatchingPodServices = append([]*v1.Service(nil),
+		meta.serviceAffinityMatchingPodServices...)
+	newPredMeta.serviceAffinityMatchingPodList = append([]*v1.Pod(nil),
+		meta.serviceAffinityMatchingPodList...)
+	return (algorithm.PredicateMetadata)(newPredMeta)
 }

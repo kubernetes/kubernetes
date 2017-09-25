@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -162,15 +164,17 @@ func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 		return "", err
 	}
 
+	exec := a.plugin.host.GetExec(a.plugin.GetPluginName())
+
 	io := &osIOHandler{}
-	scsiHostRescan(io)
+	scsiHostRescan(io, exec)
 
 	diskName := volumeSource.DiskName
 	nodeName := a.plugin.host.GetHostName()
 	newDevicePath := ""
 
 	err = wait.Poll(1*time.Second, timeout, func() (bool, error) {
-		if newDevicePath, err = findDiskByLun(lun, io); err != nil {
+		if newDevicePath, err = findDiskByLun(lun, io, exec); err != nil {
 			return false, fmt.Errorf("azureDisk - WaitForAttach ticker failed node (%s) disk (%s) lun(%v) err(%s)", nodeName, diskName, lun, err)
 		}
 
@@ -179,7 +183,7 @@ func (a *azureDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath string, 
 			// the curent sequence k8s uses for unformated disk (check-disk, mount, fail, mkfs.extX) hangs on
 			// Azure Managed disk scsi interface. this is a hack and will be replaced once we identify and solve
 			// the root case on Azure.
-			formatIfNotFormatted(newDevicePath, *volumeSource.FSType, a.plugin.host.GetExec(a.plugin.GetPluginName()))
+			formatIfNotFormatted(newDevicePath, *volumeSource.FSType, exec)
 			return true, nil
 		}
 
@@ -214,7 +218,12 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
+			dir := deviceMountPath
+			if runtime.GOOS == "windows" {
+				// in windows, as we use mklink, only need to MkdirAll for parent directory
+				dir = filepath.Dir(deviceMountPath)
+			}
+			if err := os.MkdirAll(dir, 0750); err != nil {
 				return fmt.Errorf("azureDisk - mountDevice:CreateDirectory failed with %s", err)
 			}
 			notMnt = true

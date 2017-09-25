@@ -30,7 +30,6 @@ go_library(
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
         "//pkg/printers/storage:go_default_library",
-        "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/core/podtemplate:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",

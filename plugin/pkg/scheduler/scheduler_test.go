@@ -103,6 +103,10 @@ func (es mockScheduler) Prioritizers() []algorithm.PriorityConfig {
 	return nil
 }
 
+func (es mockScheduler) Preempt(pod *v1.Pod, nodeLister algorithm.NodeLister, scheduleErr error) (*v1.Node, []*v1.Pod, error) {
+	return nil, nil, nil
+}
+
 func TestScheduler(t *testing.T) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(t.Logf).Stop()
@@ -500,7 +504,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 		scache,
 		nil,
 		predicateMap,
-		algorithm.EmptyMetadataProducer,
+		algorithm.EmptyPredicateMetadataProducer,
 		[]algorithm.PriorityConfig{},
 		algorithm.EmptyMetadataProducer,
 		[]algorithm.SchedulerExtender{})
@@ -536,7 +540,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		scache,
 		nil,
 		predicateMap,
-		algorithm.EmptyMetadataProducer,
+		algorithm.EmptyPredicateMetadataProducer,
 		[]algorithm.PriorityConfig{},
 		algorithm.EmptyMetadataProducer,
 		[]algorithm.SchedulerExtender{})

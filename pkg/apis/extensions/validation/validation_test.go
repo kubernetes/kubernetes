@@ -2472,6 +2472,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		{Min: 1, Max: -10},
 	}
 
+	wildcardAllowedCapAndRequiredDrop := validPSP()
+	wildcardAllowedCapAndRequiredDrop.Spec.RequiredDropCapabilities = []api.Capability{"foo"}
+	wildcardAllowedCapAndRequiredDrop.Spec.AllowedCapabilities = []api.Capability{extensions.AllowAllCapabilities}
+
 	requiredCapAddAndDrop := validPSP()
 	requiredCapAddAndDrop.Spec.DefaultAddCapabilities = []api.Capability{"foo"}
 	requiredCapAddAndDrop.Spec.RequiredDropCapabilities = []api.Capability{"foo"}
@@ -2495,6 +2499,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	invalidSeccompDefault := validPSP()
 	invalidSeccompDefault.Annotations = map[string]string{
 		seccomp.DefaultProfileAnnotationKey: "not-good",
+	}
+	invalidSeccompAllowAnyDefault := validPSP()
+	invalidSeccompAllowAnyDefault.Annotations = map[string]string{
+		seccomp.DefaultProfileAnnotationKey: "*",
 	}
 	invalidSeccompAllowed := validPSP()
 	invalidSeccompAllowed.Annotations = map[string]string{
@@ -2586,6 +2594,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "max cannot be negative",
 		},
+		"non-empty required drops and all caps are allowed by a wildcard": {
+			psp:         wildcardAllowedCapAndRequiredDrop,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "must be empty when all capabilities are allowed by a wildcard",
+		},
 		"invalid required caps": {
 			psp:         requiredCapAddAndDrop,
 			errorType:   field.ErrorTypeInvalid,
@@ -2613,6 +2626,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		},
 		"invalid seccomp default profile": {
 			psp:         invalidSeccompDefault,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "must be a valid seccomp profile",
+		},
+		"invalid seccomp allow any default profile": {
+			psp:         invalidSeccompAllowAnyDefault,
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "must be a valid seccomp profile",
 		},
@@ -2707,7 +2725,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	validSeccomp := validPSP()
 	validSeccomp.Annotations = map[string]string{
 		seccomp.DefaultProfileAnnotationKey:  "docker/default",
-		seccomp.AllowedProfilesAnnotationKey: "docker/default,unconfined,localhost/foo",
+		seccomp.AllowedProfilesAnnotationKey: "docker/default,unconfined,localhost/foo,*",
 	}
 
 	validDefaultAllowPrivilegeEscalation := validPSP()

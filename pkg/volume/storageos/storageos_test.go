@@ -363,7 +363,9 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	fakeConfig := &fakeConfig{}
 	apiCfg := fakeConfig.GetAPIConfig()
 	mounter, err := plug.(*storageosPlugin).newMounterInternal(spec, pod, apiCfg, fakeManager, &mount.FakeMounter{}, mount.NewFakeExec(nil))
-
+	if err != nil {
+		t.Fatalf("error creating a new internal mounter:%v", err)
+	}
 	if !mounter.GetAttributes().ReadOnly {
 		t.Errorf("Expected true for mounter.IsReadOnly")
 	}

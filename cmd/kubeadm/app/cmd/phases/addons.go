@@ -99,7 +99,7 @@ func getAddonsSubCommands() []*cobra.Command {
 		cmd := &cobra.Command{
 			Use:   properties.use,
 			Short: properties.short,
-			Run:   runAddonsCmdFunc(properties.cmdFunc, cfg, cfgPath),
+			Run:   runAddonsCmdFunc(properties.cmdFunc, cfg, &kubeConfigFile, &cfgPath),
 		}
 
 		// Add flags to the command
@@ -124,7 +124,7 @@ func getAddonsSubCommands() []*cobra.Command {
 }
 
 // runAddonsCmdFunc creates a cobra.Command Run function, by composing the call to the given cmdFunc with necessary additional steps (e.g preparation of input parameters)
-func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error, cfg *kubeadmapiext.MasterConfiguration, cfgPath string) func(cmd *cobra.Command, args []string) {
+func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error, cfg *kubeadmapiext.MasterConfiguration, kubeConfigFile *string, cfgPath *string) func(cmd *cobra.Command, args []string) {
 
 	// the following statement build a clousure that wraps a call to a cmdFunc, binding
 	// the function itself with the specific parameters of each sub command.
@@ -136,12 +136,11 @@ func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration, client c
 			kubeadmutil.CheckErr(err)
 		}
 
-		var kubeConfigFile string
 		internalcfg := &kubeadmapi.MasterConfiguration{}
 		api.Scheme.Convert(cfg, internalcfg, nil)
-		client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
+		client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 		kubeadmutil.CheckErr(err)
-		internalcfg, err = configutil.ConfigFileAndDefaultsToInternalConfig(cfgPath, cfg)
+		internalcfg, err = configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)
 		kubeadmutil.CheckErr(err)
 
 		// Execute the cmdFunc

@@ -274,10 +274,6 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	}
 	debugLogThresholdsWithObservation("thresholds - reclaim not satisfied", thresholds, observations)
 
-	// determine the set of thresholds whose stats have been updated since the last sync
-	thresholds = thresholdsUpdatedStats(thresholds, observations, m.lastObservations)
-	debugLogThresholdsWithObservation("thresholds - updated stats", thresholds, observations)
-
 	// track when a threshold was first observed
 	now := m.clock.Now()
 	thresholdsFirstObservedAt := thresholdsFirstObservedAt(thresholds, m.thresholdsFirstObservedAt, now)
@@ -307,6 +303,11 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	m.thresholdsFirstObservedAt = thresholdsFirstObservedAt
 	m.nodeConditionsLastObservedAt = nodeConditionsLastObservedAt
 	m.thresholdsMet = thresholds
+
+	// determine the set of thresholds whose stats have been updated since the last sync
+	thresholds = thresholdsUpdatedStats(thresholds, observations, m.lastObservations)
+	debugLogThresholdsWithObservation("thresholds - updated stats", thresholds, observations)
+
 	m.lastObservations = observations
 	m.Unlock()
 
@@ -435,14 +436,14 @@ func (m *managerImpl) reclaimNodeLevelResources(resourceToReclaim v1.ResourceNam
 		}
 		// update our local observations based on the amount reported to have been reclaimed.
 		// note: this is optimistic, other things could have been still consuming the pressured resource in the interim.
-		signal := resourceToSignal[resourceToReclaim]
-		value, ok := observations[signal]
-		if !ok {
-			glog.Errorf("eviction manager: unable to find value associated with signal %v", signal)
-			continue
+		for _, signal := range resourceClaimToSignal[resourceToReclaim] {
+			value, ok := observations[signal]
+			if !ok {
+				glog.Errorf("eviction manager: unable to find value associated with signal %v", signal)
+				continue
+			}
+			value.available.Add(*reclaimed)
 		}
-		value.available.Add(*reclaimed)
-
 		// evaluate all current thresholds to see if with adjusted observations, we think we have met min reclaim goals
 		if len(thresholdsMet(m.thresholdsMet, observations, true)) == 0 {
 			return true

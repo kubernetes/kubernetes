@@ -70,9 +70,9 @@ type Resource struct {
 	EphemeralStorage int64
 	// We store allowedPodNumber (which is Node.Status.Allocatable.Pods().Value())
 	// explicitly as int, to avoid conversions and improve performance.
-	AllowedPodNumber  int
-	ExtendedResources map[v1.ResourceName]int64
-	HugePages         map[v1.ResourceName]int64
+	AllowedPodNumber int
+	// ScalarResources
+	ScalarResources map[v1.ResourceName]int64
 }
 
 // New creates a Resource from ResourceList
@@ -101,11 +101,8 @@ func (r *Resource) Add(rl v1.ResourceList) {
 		case v1.ResourceEphemeralStorage:
 			r.EphemeralStorage += rQuant.Value()
 		default:
-			if v1helper.IsExtendedResourceName(rName) {
-				r.AddExtended(rName, rQuant.Value())
-			}
-			if v1helper.IsHugePageResourceName(rName) {
-				r.AddHugePages(rName, rQuant.Value())
+			if v1helper.IsScalarResourceName(rName) {
+				r.AddScalar(rName, rQuant.Value())
 			}
 		}
 	}
@@ -119,11 +116,12 @@ func (r *Resource) ResourceList() v1.ResourceList {
 		v1.ResourcePods:             *resource.NewQuantity(int64(r.AllowedPodNumber), resource.BinarySI),
 		v1.ResourceEphemeralStorage: *resource.NewQuantity(r.EphemeralStorage, resource.BinarySI),
 	}
-	for rName, rQuant := range r.ExtendedResources {
-		result[rName] = *resource.NewQuantity(rQuant, resource.DecimalSI)
-	}
-	for rName, rQuant := range r.HugePages {
-		result[rName] = *resource.NewQuantity(rQuant, resource.BinarySI)
+	for rName, rQuant := range r.ScalarResources {
+		if v1helper.IsHugePageResourceName(rName) {
+			result[rName] = *resource.NewQuantity(rQuant, resource.BinarySI)
+		} else {
+			result[rName] = *resource.NewQuantity(rQuant, resource.DecimalSI)
+		}
 	}
 	return result
 }
@@ -136,43 +134,25 @@ func (r *Resource) Clone() *Resource {
 		AllowedPodNumber: r.AllowedPodNumber,
 		EphemeralStorage: r.EphemeralStorage,
 	}
-	if r.ExtendedResources != nil {
-		res.ExtendedResources = make(map[v1.ResourceName]int64, len(r.ExtendedResources))
-		for k, v := range r.ExtendedResources {
-			res.ExtendedResources[k] = v
-		}
-	}
-	if r.HugePages != nil {
-		res.HugePages = make(map[v1.ResourceName]int64, len(r.HugePages))
-		for k, v := range r.HugePages {
-			res.HugePages[k] = v
+	if r.ScalarResources != nil {
+    res.ScalarResources = make(map[v1.ResourceName]int64, len(r.ScalarResources))
+		for k, v := range r.ScalarResources {
+			res.ScalarResources[k] = v
 		}
 	}
 	return res
 }
 
-func (r *Resource) AddExtended(name v1.ResourceName, quantity int64) {
-	r.SetExtended(name, r.ExtendedResources[name]+quantity)
+func (r *Resource) AddScalar(name v1.ResourceName, quantity int64) {
+	r.SetScalar(name, r.ScalarResources[name]+quantity)
 }
 
-func (r *Resource) SetExtended(name v1.ResourceName, quantity int64) {
-	// Lazily allocate opaque integer resource map.
-	if r.ExtendedResources == nil {
-		r.ExtendedResources = map[v1.ResourceName]int64{}
+func (r *Resource) SetScalar(name v1.ResourceName, quantity int64) {
+	// Lazily allocate scalar resource map.
+	if r.ScalarResources == nil {
+		r.ScalarResources = map[v1.ResourceName]int64{}
 	}
-	r.ExtendedResources[name] = quantity
-}
-
-func (r *Resource) AddHugePages(name v1.ResourceName, quantity int64) {
-	r.SetHugePages(name, r.HugePages[name]+quantity)
-}
-
-func (r *Resource) SetHugePages(name v1.ResourceName, quantity int64) {
-	// Lazily allocate hugepages resource map.
-	if r.HugePages == nil {
-		r.HugePages = map[v1.ResourceName]int64{}
-	}
-	r.HugePages[name] = quantity
+	r.ScalarResources[name] = quantity
 }
 
 // NewNodeInfo returns a ready to use empty NodeInfo object.
@@ -187,7 +167,7 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		usedPorts:           make(map[int]bool),
 	}
 	for _, pod := range pods {
-		ni.addPod(pod)
+		ni.AddPod(pod)
 	}
 	return ni
 }
@@ -319,24 +299,18 @@ func hasPodAffinityConstraints(pod *v1.Pod) bool {
 	return affinity != nil && (affinity.PodAffinity != nil || affinity.PodAntiAffinity != nil)
 }
 
-// addPod adds pod information to this NodeInfo.
-func (n *NodeInfo) addPod(pod *v1.Pod) {
+// AddPod adds pod information to this NodeInfo.
+func (n *NodeInfo) AddPod(pod *v1.Pod) {
 	res, non0_cpu, non0_mem := calculateResource(pod)
 	n.requestedResource.MilliCPU += res.MilliCPU
 	n.requestedResource.Memory += res.Memory
 	n.requestedResource.NvidiaGPU += res.NvidiaGPU
 	n.requestedResource.EphemeralStorage += res.EphemeralStorage
-	if n.requestedResource.ExtendedResources == nil && len(res.ExtendedResources) > 0 {
-		n.requestedResource.ExtendedResources = map[v1.ResourceName]int64{}
+	if n.requestedResource.ScalarResources == nil && len(res.ScalarResources) > 0 {
+		n.requestedResource.ScalarResources = map[v1.ResourceName]int64{}
 	}
-	for rName, rQuant := range res.ExtendedResources {
-		n.requestedResource.ExtendedResources[rName] += rQuant
-	}
-	if n.requestedResource.HugePages == nil && len(res.HugePages) > 0 {
-		n.requestedResource.HugePages = map[v1.ResourceName]int64{}
-	}
-	for rName, rQuant := range res.HugePages {
-		n.requestedResource.HugePages[rName] += rQuant
+	for rName, rQuant := range res.ScalarResources {
+		n.requestedResource.ScalarResources[rName] += rQuant
 	}
 	n.nonzeroRequest.MilliCPU += non0_cpu
 	n.nonzeroRequest.Memory += non0_mem
@@ -351,8 +325,8 @@ func (n *NodeInfo) addPod(pod *v1.Pod) {
 	n.generation++
 }
 
-// removePod subtracts pod information to this NodeInfo.
-func (n *NodeInfo) removePod(pod *v1.Pod) error {
+// RemovePod subtracts pod information from this NodeInfo.
+func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 	k1, err := getPodKey(pod)
 	if err != nil {
 		return err
@@ -387,17 +361,11 @@ func (n *NodeInfo) removePod(pod *v1.Pod) error {
 			n.requestedResource.MilliCPU -= res.MilliCPU
 			n.requestedResource.Memory -= res.Memory
 			n.requestedResource.NvidiaGPU -= res.NvidiaGPU
-			if len(res.ExtendedResources) > 0 && n.requestedResource.ExtendedResources == nil {
-				n.requestedResource.ExtendedResources = map[v1.ResourceName]int64{}
+			if len(res.ScalarResources) > 0 && n.requestedResource.ScalarResources == nil {
+				n.requestedResource.ScalarResources = map[v1.ResourceName]int64{}
 			}
-			for rName, rQuant := range res.ExtendedResources {
-				n.requestedResource.ExtendedResources[rName] -= rQuant
-			}
-			if len(res.HugePages) > 0 && n.requestedResource.HugePages == nil {
-				n.requestedResource.HugePages = map[v1.ResourceName]int64{}
-			}
-			for rName, rQuant := range res.HugePages {
-				n.requestedResource.HugePages[rName] -= rQuant
+			for rName, rQuant := range res.ScalarResources {
+				n.requestedResource.ScalarResources[rName] -= rQuant
 			}
 			n.nonzeroRequest.MilliCPU -= non0_cpu
 			n.nonzeroRequest.Memory -= non0_mem
@@ -476,6 +444,37 @@ func (n *NodeInfo) RemoveNode(node *v1.Node) error {
 	n.diskPressureCondition = v1.ConditionUnknown
 	n.generation++
 	return nil
+}
+
+// FilterOutPods receives a list of pods and filters out those whose node names
+// are equal to the node of this NodeInfo, but are not found in the pods of this NodeInfo.
+//
+// Preemption logic simulates removal of pods on a node by removing them from the
+// corresponding NodeInfo. In order for the simulation to work, we call this method
+// on the pods returned from SchedulerCache, so that predicate functions see
+// only the pods that are not removed from the NodeInfo.
+func (n *NodeInfo) FilterOutPods(pods []*v1.Pod) []*v1.Pod {
+	node := n.Node()
+	if node == nil {
+		return pods
+	}
+	filtered := make([]*v1.Pod, 0, len(pods))
+	for _, p := range pods {
+		if p.Spec.NodeName == node.Name {
+			// If pod is on the given node, add it to 'filtered' only if it is present in nodeInfo.
+			podKey, _ := getPodKey(p)
+			for _, np := range n.Pods() {
+				npodkey, _ := getPodKey(np)
+				if npodkey == podKey {
+					filtered = append(filtered, p)
+					break
+				}
+			}
+		} else {
+			filtered = append(filtered, p)
+		}
+	}
+	return filtered
 }
 
 // getPodKey returns the string key of a pod.

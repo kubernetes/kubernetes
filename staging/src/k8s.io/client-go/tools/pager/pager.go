@@ -52,7 +52,8 @@ type ListPager struct {
 }
 
 // New creates a new pager from the provided pager function using the default
-// options.
+// options. It will fall back to a full list if an expiration error is encountered
+// as a last resort.
 func New(fn ListPageFunc) *ListPager {
 	return &ListPager{
 		PageSize:          defaultPageSize,
@@ -61,9 +62,12 @@ func New(fn ListPageFunc) *ListPager {
 	}
 }
 
+// TODO: introduce other types of paging functions - such as those that retrieve from a list
+// of namespaces.
+
 // List returns a single list object, but attempts to retrieve smaller chunks from the
 // server to reduce the impact on the server. If the chunk attempt fails, it will load
-// the full list instead.
+// the full list instead. The Limit field on options, if unset, will default to the page size.
 func (p *ListPager) List(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
 	if options.Limit == 0 {
 		options.Limit = p.PageSize

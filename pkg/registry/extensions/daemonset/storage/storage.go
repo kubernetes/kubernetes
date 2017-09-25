@@ -28,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/extensions/daemonset"
 )
 
@@ -44,7 +43,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		NewFunc:                  func() runtime.Object { return &extensions.DaemonSet{} },
 		NewListFunc:              func() runtime.Object { return &extensions.DaemonSetList{} },
 		DefaultQualifiedResource: extensions.Resource("daemonsets"),
-		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("daemonsets"),
 
 		CreateStrategy: daemonset.Strategy,
 		UpdateStrategy: daemonset.Strategy,

@@ -89,33 +89,3 @@ func diskSetUp(manager diskManager, b fcDiskMounter, volPath string, mounter mou
 
 	return nil
 }
-
-// utility to tear down a disk based filesystem
-func diskTearDown(manager diskManager, c fcDiskUnmounter, volPath string, mounter mount.Interface) error {
-	noMnt, err := mounter.IsLikelyNotMountPoint(volPath)
-	if err != nil {
-		glog.Errorf("cannot validate mountpoint %s", volPath)
-		return err
-	}
-	if noMnt {
-		return os.Remove(volPath)
-	}
-
-	if err := mounter.Unmount(volPath); err != nil {
-		glog.Errorf("failed to unmount %s", volPath)
-		return err
-	}
-
-	noMnt, mntErr := mounter.IsLikelyNotMountPoint(volPath)
-	if mntErr != nil {
-		glog.Errorf("isMountpoint check failed: %v", mntErr)
-		return err
-	}
-	if noMnt {
-		if err := os.Remove(volPath); err != nil {
-			return err
-		}
-	}
-	return nil
-
-}

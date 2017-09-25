@@ -34,6 +34,7 @@ const (
 	ContainerTypeDocker
 	ContainerTypeRkt
 	ContainerTypeSystemd
+	ContainerTypeCrio
 )
 
 // Interface for container operation handlers.

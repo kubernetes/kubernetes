@@ -35,7 +35,6 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/apps/statefulset"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 )
 
 // StatefulSetStorage includes dummy storage for StatefulSets, and their Status and Scale subresource.
@@ -68,7 +67,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		NewFunc:                  func() runtime.Object { return &apps.StatefulSet{} },
 		NewListFunc:              func() runtime.Object { return &apps.StatefulSetList{} },
 		DefaultQualifiedResource: apps.Resource("statefulsets"),
-		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("statefulsets"),
 
 		CreateStrategy: statefulset.Strategy,
 		UpdateStrategy: statefulset.Strategy,
