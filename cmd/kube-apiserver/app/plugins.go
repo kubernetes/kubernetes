@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/plugin/pkg/admission/storageclass/setdefault"
 	"k8s.io/kubernetes/plugin/pkg/admission/webhook"
+	"k8s.io/kubernetes/plugin/pkg/admission/decorategpupod"
 )
 
 // registerAllAdmissionPlugins registers all admission plugins
@@ -77,4 +78,5 @@ func registerAllAdmissionPlugins(plugins *admission.Plugins) {
 	serviceaccount.Register(plugins)
 	setdefault.Register(plugins)
 	webhook.Register(plugins)
+	decorategpupod.Register(plugins)
 }
