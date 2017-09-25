@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestServiceNetworkTierAnnotationKey(t *testing.T) {
+func TestGetServiceNetworkTier(t *testing.T) {
 	createTestService := func() *v1.Service {
 		return &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -39,7 +39,6 @@ func TestServiceNetworkTierAnnotationKey(t *testing.T) {
 	for testName, testCase := range map[string]struct {
 		annotations  map[string]string
 		expectedTier NetworkTier
-		expectErr    bool
 	}{
 		"Use the default when the annotation does not exist": {
 			annotations:  nil,
@@ -53,18 +52,64 @@ func TestServiceNetworkTierAnnotationKey(t *testing.T) {
 			annotations:  map[string]string{NetworkTierAnnotationKey: "Premium"},
 			expectedTier: NetworkTierPremium,
 		},
-		"Report an error on invalid network tier value": {
-			annotations:  map[string]string{NetworkTierAnnotationKey: "Unknown-tier"},
-			expectedTier: NetworkTierPremium,
-			expectErr:    true,
+	} {
+		t.Run(testName, func(t *testing.T) {
+			svc := createTestService()
+			svc.Annotations = testCase.annotations
+			actualTier := GetServiceNetworkTier(svc)
+			assert.Equal(t, testCase.expectedTier, actualTier)
+		})
+	}
+}
+
+func TestAllKnownServiceLBAnnoationsAreValid(t *testing.T) {
+	for k, v := range allServiceLBAnnotations {
+		t.Logf("Verifying annotation %q", k)
+		assert.NotEqual(t, 0, v.values.Len(), "annotation must have at least one valid value")
+		assert.True(t, v.values.Has(v.defaultValue), "default value must be a valid value")
+		assert.NotEqual(t, 0, len(v.defaultValue), "default value must be non-empty")
+	}
+}
+
+func TestVerifySericeAnnotations(t *testing.T) {
+	createTestService := func() *v1.Service {
+		return &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       "randome-uid",
+				Name:      "test-svc",
+				Namespace: "test-ns",
+			},
+			Spec: v1.ServiceSpec{
+				Type: v1.ServiceTypeLoadBalancer,
+			},
+		}
+	}
+
+	for testName, testCase := range map[string]struct {
+		annotations map[string]string
+	}{
+		"Unknown network tiers": {
+			annotations: map[string]string{
+				NetworkTierAnnotationKey: "foobar",
+			},
+		},
+		"Network tiers is incompatible with ILB": {
+			annotations: map[string]string{
+				NetworkTierAnnotationKey:          "Premium",
+				ServiceAnnotationLoadBalancerType: "Internal",
+			},
+		},
+		"Shared backends is incompatible with ELB (default)": {
+			annotations: map[string]string{
+				ServiceAnnotationILBBackendShare: "true",
+			},
 		},
 	} {
 		t.Run(testName, func(t *testing.T) {
 			svc := createTestService()
 			svc.Annotations = testCase.annotations
-			actualTier, err := GetServiceNetworkTier(svc)
-			assert.Equal(t, testCase.expectedTier, actualTier)
-			assert.Equal(t, testCase.expectErr, err != nil)
+			err := validateServiceLBAnnotations(svc)
+			assert.True(t, err != nil)
 		})
 	}
 }
