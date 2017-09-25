@@ -212,47 +212,39 @@ func (s *CombinedPrimitiveSlice) lookup(l interface{}) *PrimitiveListItem {
 	return nil
 }
 
-func (s *CombinedPrimitiveSlice) upsert(l interface{}, source source) {
-	item := s.lookup(l)
-
-	// Append an item to the list if we didn't find it
-	if item == nil {
-		item = &PrimitiveListItem{
-			Value: l,
-		}
-		s.Items = append(s.Items, item)
+func (s *CombinedPrimitiveSlice) upsert(l interface{}) *PrimitiveListItem {
+	// Return the item if it exists
+	if item := s.lookup(l); item != nil {
+		return item
 	}
 
-	// Update the appropriate value
-	switch source {
-	case recorded:
-		item.Recorded = l
-	case local:
-		item.Local = l
-	case remote:
-		item.Remote = l
+	// Otherwise create a new item and append to the list
+	item := &PrimitiveListItem{
+		Value: l,
 	}
+	s.Items = append(s.Items, item)
+	return item
 }
 
 // UpsertRecorded adds l to the slice.  If there is already a value of l in the
 // slice for either the local or remote, set on that value as the recorded value
 // Otherwise append a new item to the list with the recorded value.
 func (s *CombinedPrimitiveSlice) UpsertRecorded(l interface{}) {
-	s.upsert(l, recorded)
+	s.upsert(l).Recorded = l
 }
 
 // UpsertLocal adds l to the slice.  If there is already a value of l in the
 // slice for either the recorded or remote, set on that value as the local value
 // Otherwise append a new item to the list with the local value.
 func (s *CombinedPrimitiveSlice) UpsertLocal(l interface{}) {
-	s.upsert(l, local)
+	s.upsert(l).Local = l
 }
 
 // UpsertRemote adds l to the slice.  If there is already a value of l in the
 // slice for either the local or recorded, set on that value as the remote value
 // Otherwise append a new item to the list with the remote value.
 func (s *CombinedPrimitiveSlice) UpsertRemote(l interface{}) {
-	s.upsert(l, remote)
+	s.upsert(l).Recorded = l
 }
 
 // ListItem represents a single value in a slice of maps or types
@@ -279,54 +271,60 @@ func (s *CombinedMapSlice) lookup(v MergeKeyValue) *ListItem {
 	return nil
 }
 
-func (s *CombinedMapSlice) upsert(key MergeKeys, l interface{}, source source) error {
+func (s *CombinedMapSlice) upsert(key MergeKeys, l interface{}) (*ListItem, error) {
+	// Get the identity of the item
 	val, err := key.GetMergeKeyValue(l)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	item := s.lookup(val)
-
-	// Append an item to the list if we didn't find it
-	if item == nil {
-		item = &ListItem{
-			KeyValue: val,
-		}
-		s.Items = append(s.Items, item)
+	// Return the item if it exists
+	if item := s.lookup(val); item != nil {
+		return item, nil
 	}
 
-	// Update the correct source
-	switch source {
-	case recorded:
-		item.Recorded = l
-	case local:
-		item.Local = l
-	case remote:
-		item.Remote = l
+	// Otherwise create a new item and append to the list
+	item := &ListItem{
+		KeyValue: val,
 	}
-
-	return nil
+	s.Items = append(s.Items, item)
+	return item, nil
 }
 
 // UpsertRecorded adds l to the slice.  If there is already a value of l sharing
 // l's merge key in the slice for either the local or remote, set l the recorded value
 // Otherwise append a new item to the list with the recorded value.
 func (s *CombinedMapSlice) UpsertRecorded(key MergeKeys, l interface{}) error {
-	return s.upsert(key, l, recorded)
+	item, err := s.upsert(key, l)
+	if err != nil {
+		return err
+	}
+	item.Recorded = l
+	return nil
 }
 
 // UpsertLocal adds l to the slice.  If there is already a value of l sharing
 // l's merge key in the slice for either the recorded or remote, set l the local value
 // Otherwise append a new item to the list with the local value.
 func (s *CombinedMapSlice) UpsertLocal(key MergeKeys, l interface{}) error {
-	return s.upsert(key, l, local)
+	item, err := s.upsert(key, l)
+	if err != nil {
+		return err
+	}
+	item.Local = l
+	return nil
 }
 
 // UpsertRemote adds l to the slice.  If there is already a value of l sharing
 // l's merge key in the slice for either the recorded or local, set l the remote value
 // Otherwise append a new item to the list with the remote value.
 func (s *CombinedMapSlice) UpsertRemote(key MergeKeys, l interface{}) error {
-	return s.upsert(key, l, remote)
+	item, err := s.upsert(key, l)
+	if err != nil {
+		return err
+	}
+	item.Remote = l
+	return nil
 }
 
 // IsDrop returns true if the field represented by e should be dropped from the merged object

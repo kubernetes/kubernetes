@@ -30,5 +30,5 @@ package apply
 //obj, err := parser.CreateElement(recorded, local, remote)
 //Expect(err).Should(Not(HaveOccurred()))
 //
-//merged, err := obj.Merge(strategy.Create(merge.Options{}))
+//merged, err := obj.Merge(strategy.Create(strategy.Options{}))
 //
