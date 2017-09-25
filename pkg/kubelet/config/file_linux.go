@@ -22,6 +22,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/golang/glog"
@@ -81,7 +82,7 @@ func (s *sourceFile) watch() error {
 
 func (s *sourceFile) processEvent(e *inotify.Event) error {
 	// Ignore file start with dots
-	if strings.HasPrefix(e.Name, ".") {
+	if strings.HasPrefix(filepath.Base(e.Name), ".") {
 		glog.V(4).Infof("Ignored pod manifest: %s, because it starts with dots", e.Name)
 		return nil
 	}
