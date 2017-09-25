@@ -973,7 +973,8 @@ def configure_apiserver():
         admission_control.remove('Initializers')
     api_opts.add('admission-control', ','.join(admission_control), strict=True)
 
-    # Add operator-provided arguments, this allows operators to override defaults
+    # Add operator-provided arguments, this allows operators
+    # to override defaults
     for arg in to_add:
         hookenv.log('Adding option: {} {}'.format(arg[0], arg[1]))
         # Make sure old value is gone
