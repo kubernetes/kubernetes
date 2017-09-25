@@ -3450,6 +3450,11 @@ func GetSigner(provider string) (ssh.Signer, error) {
 		if len(keyfile) == 0 {
 			keyfile = "id_rsa"
 		}
+	case "skeleton":
+		keyfile = os.Getenv("KUBE_SSH_KEY")
+		if len(keyfile) == 0 {
+			keyfile = "id_rsa"
+		}
 	default:
 		return nil, fmt.Errorf("GetSigner(...) not implemented for %s", provider)
 	}
