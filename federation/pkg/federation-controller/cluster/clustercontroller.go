@@ -60,7 +60,7 @@ func StartClusterController(config *restclient.Config, stopChan <-chan struct{},
 	restclient.AddUserAgent(config, "cluster-controller")
 	client := federationclientset.NewForConfigOrDie(config)
 	controller := newClusterController(client, clusterMonitorPeriod)
-	glog.Infof("Starting cluster controller")
+	glog.Info("Starting cluster controller.")
 	controller.Run(stopChan)
 }
 

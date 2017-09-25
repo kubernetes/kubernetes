@@ -108,7 +108,7 @@ func newCoreDNSProviderInterface(config io.Reader) (*Interface, error) {
 		caFile = cfg.Global.CAFile
 		keyFile = cfg.Global.KeyFile
 	}
-	glog.Infof("Using CoreDNS DNS provider")
+	glog.Info("Using CoreDNS DNS provider.")
 
 	if dnsZones == "" {
 		return nil, fmt.Errorf("Need to provide at least one DNS Zone")

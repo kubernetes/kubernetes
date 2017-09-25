@@ -186,7 +186,7 @@ func TestIngressController(t *testing.T) {
 	t.Log("Checking that IP address gets transferred from cluster ingress to federated ingress")
 	cluster1Ingress.Status.LoadBalancer.Ingress = append(cluster1Ingress.Status.LoadBalancer.Ingress,
 		apiv1.LoadBalancerIngress{IP: "1.2.3.4"})
-	glog.Infof("Setting artificial IP address for cluster1 ingress")
+	glog.Info("Setting artificial IP address for cluster1 ingress")
 
 	for trial := 0; trial < maxTrials; trial++ {
 		cluster1IngressWatch.Modify(&cluster1Ingress)
