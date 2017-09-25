@@ -17,6 +17,8 @@ limitations under the License.
 package deviceplugin
 
 import (
+	"io/ioutil"
+	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -27,12 +29,20 @@ import (
 )
 
 const (
-	socketName       = "/tmp/device_plugin/server.sock"
-	pluginSocketName = "/tmp/device_plugin/device-plugin.sock"
 	testResourceName = "fake-domain/resource"
 )
 
+func tmpSocketDir(t *testing.T) string {
+	tmpDir, err := ioutil.TempDir("/tmp", "device-plugin")
+	require.NoError(t, err)
+	return tmpDir
+}
+
 func TestNewManagerImpl(t *testing.T) {
+	tmpDir := tmpSocketDir(t)
+	defer os.RemoveAll(tmpDir)
+	socketName := tmpSocketFile(t, tmpDir)
+
 	_, err := NewManagerImpl("", func(n string, a, u, r []pluginapi.Device) {})
 	require.Error(t, err)
 
@@ -41,7 +51,12 @@ func TestNewManagerImpl(t *testing.T) {
 }
 
 func TestNewManagerImplStart(t *testing.T) {
-	m, p := setup(t, []*pluginapi.Device{}, func(n string, a, u, r []pluginapi.Device) {})
+	tmpDir := tmpSocketDir(t)
+	defer os.RemoveAll(tmpDir)
+	socketName := tmpSocketFile(t, tmpDir)
+	pluginSocketName := tmpSocketFile(t, tmpDir)
+
+	m, p := setup(t, socketName, pluginSocketName, []*pluginapi.Device{}, func(n string, a, u, r []pluginapi.Device) {})
 	cleanup(t, m, p)
 }
 
@@ -49,6 +64,12 @@ func TestNewManagerImplStart(t *testing.T) {
 // making sure that after registration, devices are correctly updated and if a re-registration
 // happens, we will NOT delete devices.
 func TestDevicePluginReRegistration(t *testing.T) {
+	tmpDir := tmpSocketDir(t)
+	defer os.RemoveAll(tmpDir)
+	socketName := tmpSocketFile(t, tmpDir)
+	pluginSocketName := tmpSocketFile(t, tmpDir)
+	newPluginSocketName := tmpSocketFile(t, tmpDir)
+
 	devs := []*pluginapi.Device{
 		{ID: "Dev1", Health: pluginapi.Healthy},
 		{ID: "Dev2", Health: pluginapi.Healthy},
@@ -66,26 +87,31 @@ func TestDevicePluginReRegistration(t *testing.T) {
 		callbackCount++
 		callbackChan <- callbackCount
 	}
-	m, p1 := setup(t, devs, callback)
+	m, p1 := setup(t, socketName, pluginSocketName, devs, callback)
+	defer cleanup(t, m, p1)
+
 	p1.Register(socketName, testResourceName)
 	// Wait for the first callback to be issued.
-	<-callbackChan
-	// Wait till the endpoint is added to the manager.
-	for i := 0; i < 20; i++ {
-		if len(m.Devices()) > 0 {
-			break
-		}
-		time.Sleep(1)
+	select {
+	case <-callbackChan:
+	case <-time.After(5 * time.Second):
+		t.FailNow()
 	}
 	devices := m.Devices()
 	require.Equal(t, 2, len(devices[testResourceName]), "Devices are not updated.")
 
-	p2 := NewDevicePluginStub(devs, pluginSocketName+".new")
+	p2 := NewDevicePluginStub(devs, newPluginSocketName)
 	err := p2.Start()
 	require.NoError(t, err)
+	defer p2.Stop()
+
 	p2.Register(socketName, testResourceName)
 	// Wait for the second callback to be issued.
-	<-callbackChan
+	select {
+	case <-callbackChan:
+	case <-time.After(5 * time.Second):
+		t.FailNow()
+	}
 
 	devices2 := m.Devices()
 	require.Equal(t, 2, len(devices2[testResourceName]), "Devices shouldn't change.")
@@ -93,11 +119,9 @@ func TestDevicePluginReRegistration(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	atomic.StoreInt32(&stopping, 1)
-	cleanup(t, m, p1)
-	p2.Stop()
 }
 
-func setup(t *testing.T, devs []*pluginapi.Device, callback MonitorCallback) (Manager, *Stub) {
+func setup(t *testing.T, socketName, pluginSocketName string, devs []*pluginapi.Device, callback MonitorCallback) (Manager, *Stub) {
 	m, err := NewManagerImpl(socketName, callback)
 	require.NoError(t, err)
 	err = m.Start()
