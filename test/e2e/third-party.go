@@ -72,7 +72,7 @@ var _ = Describe("ThirdParty resources [Flaky] [Disruptive]", func() {
 	}
 
 	Context("Simple Third Party", func() {
-		It("creating/deleting thirdparty objects works [Conformance]", func() {
+		It("creating/deleting thirdparty objects works", func() {
 			defer func() {
 				if err := f.ClientSet.Extensions().ThirdPartyResources().Delete(rsrc.Name, nil); err != nil {
 					framework.Failf("failed to delete third party resource: %v", err)
