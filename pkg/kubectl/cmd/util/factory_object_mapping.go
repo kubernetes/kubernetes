@@ -296,7 +296,7 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout tim
 	}
 
 	sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
-	pod, numPods, err := GetFirstPod(clientset.Core(), namespace, selector, timeout, sortBy)
+	pod, numPods, err := GetFirstPod(clientset.Core(), namespace, selector.String(), timeout, sortBy)
 	if err != nil {
 		return nil, err
 	}
@@ -405,7 +405,7 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout tim
 	}
 
 	sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
-	pod, _, err := GetFirstPod(clientset.Core(), namespace, selector, timeout, sortBy)
+	pod, _, err := GetFirstPod(clientset.Core(), namespace, selector.String(), timeout, sortBy)
 	return pod, err
 }
 
