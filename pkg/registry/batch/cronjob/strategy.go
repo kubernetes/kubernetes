@@ -87,7 +87,7 @@ func (cronJobStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (cronJobStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateCronJob(obj.(*batch.CronJob))
+	return validation.ValidateCronJobUpdate(obj.(*batch.CronJob), old.(*batch.CronJob))
 }
 
 type cronJobStatusStrategy struct {
