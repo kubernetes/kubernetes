@@ -132,7 +132,7 @@ func createKubeDNSAddon(deploymentBytes, serviceBytes []byte, client clientset.I
 	return nil
 }
 
-// getDNSIP checks local config or fetches the kubernetes service's ClusterIP and appends a "0" to it in order to get the DNS IP
+// getDNSIP fetches the kubernetes service's ClusterIP and appends a "0" to it in order to get the DNS IP
 func getDNSIP(client clientset.Interface) (net.IP, error) {
 	k8ssvc, err := client.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
 	if err != nil {
