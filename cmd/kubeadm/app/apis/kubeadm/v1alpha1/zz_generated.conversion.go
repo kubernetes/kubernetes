@@ -117,6 +117,8 @@ func autoConvert_v1alpha1_MasterConfiguration_To_kubeadm_MasterConfiguration(in 
 	out.KubernetesVersion = in.KubernetesVersion
 	out.CloudProvider = in.CloudProvider
 	out.NodeName = in.NodeName
+	out.ClusterName = in.ClusterName
+	out.AdminUserName = in.AdminUserName
 	out.AuthorizationModes = *(*[]string)(unsafe.Pointer(&in.AuthorizationModes))
 	out.Token = in.Token
 	out.TokenTTL = in.TokenTTL
@@ -149,6 +151,8 @@ func autoConvert_kubeadm_MasterConfiguration_To_v1alpha1_MasterConfiguration(in 
 	out.KubernetesVersion = in.KubernetesVersion
 	out.CloudProvider = in.CloudProvider
 	out.NodeName = in.NodeName
+	out.ClusterName = in.ClusterName
+	out.AdminUserName = in.AdminUserName
 	out.AuthorizationModes = *(*[]string)(unsafe.Pointer(&in.AuthorizationModes))
 	out.Token = in.Token
 	out.TokenTTL = in.TokenTTL
@@ -199,6 +203,7 @@ func autoConvert_v1alpha1_NodeConfiguration_To_kubeadm_NodeConfiguration(in *Nod
 	out.DiscoveryToken = in.DiscoveryToken
 	out.DiscoveryTokenAPIServers = *(*[]string)(unsafe.Pointer(&in.DiscoveryTokenAPIServers))
 	out.NodeName = in.NodeName
+	out.ClusterName = in.ClusterName
 	out.TLSBootstrapToken = in.TLSBootstrapToken
 	out.Token = in.Token
 	out.DiscoveryTokenCACertHashes = *(*[]string)(unsafe.Pointer(&in.DiscoveryTokenCACertHashes))
@@ -217,6 +222,7 @@ func autoConvert_kubeadm_NodeConfiguration_To_v1alpha1_NodeConfiguration(in *kub
 	out.DiscoveryToken = in.DiscoveryToken
 	out.DiscoveryTokenAPIServers = *(*[]string)(unsafe.Pointer(&in.DiscoveryTokenAPIServers))
 	out.NodeName = in.NodeName
+	out.ClusterName = in.ClusterName
 	out.TLSBootstrapToken = in.TLSBootstrapToken
 	out.Token = in.Token
 	out.DiscoveryTokenCACertHashes = *(*[]string)(unsafe.Pointer(&in.DiscoveryTokenCACertHashes))

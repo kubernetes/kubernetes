@@ -133,6 +133,9 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		&cfg.NodeName, "node-name", "",
 		"Specify the node name")
 	cmd.PersistentFlags().StringVar(
+		&cfg.ClusterName, "cluster-name", "",
+		"Specify the cluster name")
+	cmd.PersistentFlags().StringVar(
 		&cfg.TLSBootstrapToken, "tls-bootstrap-token", "",
 		"A token used for TLS bootstrapping")
 	cmd.PersistentFlags().StringSliceVar(

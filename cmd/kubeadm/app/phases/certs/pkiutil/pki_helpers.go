@@ -27,14 +27,14 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 )
 
-func NewCertificateAuthority() (*x509.Certificate, *rsa.PrivateKey, error) {
+func NewCertificateAuthority(clustername string) (*x509.Certificate, *rsa.PrivateKey, error) {
 	key, err := certutil.NewPrivateKey()
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create private key [%v]", err)
 	}
 
 	config := certutil.Config{
-		CommonName: "kubernetes",
+		CommonName: clustername,
 	}
 	cert, err := certutil.NewSelfSignedCACert(config, key)
 	if err != nil {

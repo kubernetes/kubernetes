@@ -43,6 +43,8 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.CIImageRepository = ""
 			obj.UnifiedControlPlaneImage = "foo"
 			obj.FeatureGates = map[string]bool{}
+			obj.ClusterName = "kubernetes"
+			obj.AdminUserName = "kubernetes-admin"
 		},
 		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
@@ -53,6 +55,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.DiscoveryTokenAPIServers = []string{"foo"}
 			obj.TLSBootstrapToken = "foo"
 			obj.Token = "foo"
+			obj.ClusterName = "kubernetes"
 		},
 	}
 }

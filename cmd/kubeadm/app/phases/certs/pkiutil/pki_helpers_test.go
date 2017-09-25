@@ -28,7 +28,7 @@ import (
 )
 
 func TestNewCertificateAuthority(t *testing.T) {
-	cert, key, err := NewCertificateAuthority()
+	cert, key, err := NewCertificateAuthority("kubernetes")
 
 	if cert == nil {
 		t.Errorf(
@@ -88,7 +88,7 @@ func TestNewCertAndKey(t *testing.T) {
 }
 
 func TestHasServerAuth(t *testing.T) {
-	caCert, caKey, _ := NewCertificateAuthority()
+	caCert, caKey, _ := NewCertificateAuthority("kubernetes")
 
 	var tests = []struct {
 		config   certutil.Config
@@ -259,7 +259,7 @@ func TestTryLoadCertAndKeyFromDisk(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	caCert, caKey, err := NewCertificateAuthority()
+	caCert, caKey, err := NewCertificateAuthority("kubernetes")
 	if err != nil {
 		t.Errorf(
 			"failed to create cert and key with an error: %v",
@@ -309,7 +309,7 @@ func TestTryLoadCertFromDisk(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	caCert, _, err := NewCertificateAuthority()
+	caCert, _, err := NewCertificateAuthority("kubernetes")
 	if err != nil {
 		t.Errorf(
 			"failed to create cert and key with an error: %v",
@@ -359,7 +359,7 @@ func TestTryLoadKeyFromDisk(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	_, caKey, err := NewCertificateAuthority()
+	_, caKey, err := NewCertificateAuthority("kubernetes")
 	if err != nil {
 		t.Errorf(
 			"failed to create cert and key with an error: %v",

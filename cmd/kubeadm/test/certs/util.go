@@ -28,7 +28,7 @@ import (
 // SetupCertificateAuthorithy is a utility function for kubeadm testing that creates a
 // CertificateAuthorithy cert/key pair
 func SetupCertificateAuthorithy(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) {
-	caCert, caKey, err := pkiutil.NewCertificateAuthority()
+	caCert, caKey, err := pkiutil.NewCertificateAuthority("kubernetes")
 	if err != nil {
 		t.Fatalf("failure while generating CA certificate and key: %v", err)
 	}

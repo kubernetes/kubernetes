@@ -61,7 +61,7 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 // If the CA certificate and key files already exists in the target folder, they are used only if evaluated equal; otherwise an error is returned.
 func CreateCACertAndKeyfiles(cfg *kubeadmapi.MasterConfiguration) error {
 
-	caCert, caKey, err := NewCACertAndKey()
+	caCert, caKey, err := NewCACertAndKey(cfg.ClusterName)
 	if err != nil {
 		return err
 	}
@@ -145,7 +145,7 @@ func CreateServiceAccountKeyAndPublicKeyFiles(cfg *kubeadmapi.MasterConfiguratio
 // If the front proxy CA certificate and key files already exists in the target folder, they are used only if evaluated equals; otherwise an error is returned.
 func CreateFrontProxyCACertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
 
-	frontProxyCACert, frontProxyCAKey, err := NewFrontProxyCACertAndKey()
+	frontProxyCACert, frontProxyCAKey, err := NewFrontProxyCACertAndKey(cfg.ClusterName)
 	if err != nil {
 		return err
 	}
@@ -183,9 +183,9 @@ func CreateFrontProxyClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) 
 }
 
 // NewCACertAndKey will generate a self signed CA.
-func NewCACertAndKey() (*x509.Certificate, *rsa.PrivateKey, error) {
+func NewCACertAndKey(clustername string) (*x509.Certificate, *rsa.PrivateKey, error) {
 
-	caCert, caKey, err := pkiutil.NewCertificateAuthority()
+	caCert, caKey, err := pkiutil.NewCertificateAuthority(clustername)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failure while generating CA certificate and key: %v", err)
 	}
@@ -243,9 +243,9 @@ func NewServiceAccountSigningKey() (*rsa.PrivateKey, error) {
 }
 
 // NewFrontProxyCACertAndKey generate a self signed front proxy CA.
-func NewFrontProxyCACertAndKey() (*x509.Certificate, *rsa.PrivateKey, error) {
+func NewFrontProxyCACertAndKey(clustername string) (*x509.Certificate, *rsa.PrivateKey, error) {
 
-	frontProxyCACert, frontProxyCAKey, err := pkiutil.NewCertificateAuthority()
+	frontProxyCACert, frontProxyCAKey, err := pkiutil.NewCertificateAuthority(clustername)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failure while generating front-proxy CA certificate and key: %v", err)
 	}

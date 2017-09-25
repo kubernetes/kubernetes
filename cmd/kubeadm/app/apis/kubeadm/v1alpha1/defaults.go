@@ -35,6 +35,8 @@ const (
 	DefaultCertificatesDir    = "/etc/kubernetes/pki"
 	DefaultEtcdDataDir        = "/var/lib/etcd"
 	DefaultImageRepository    = "gcr.io/google_containers"
+	DefaultClusterName        = "kubernetes"
+	DefaultAdminUserName      = "kubernetes-admin"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -79,11 +81,22 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 	if obj.Etcd.DataDir == "" {
 		obj.Etcd.DataDir = DefaultEtcdDataDir
 	}
+
+	if obj.ClusterName == "" {
+		obj.ClusterName = DefaultClusterName
+	}
+
+	if obj.AdminUserName == "" {
+		obj.AdminUserName = DefaultAdminUserName
+	}
 }
 
 func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 	if obj.CACertPath == "" {
 		obj.CACertPath = DefaultCACertPath
+	}
+	if obj.ClusterName == "" {
+		obj.ClusterName = DefaultClusterName
 	}
 	if len(obj.TLSBootstrapToken) == 0 {
 		obj.TLSBootstrapToken = obj.Token

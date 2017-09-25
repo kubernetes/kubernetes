@@ -31,6 +31,8 @@ type MasterConfiguration struct {
 	KubernetesVersion  string     `json:"kubernetesVersion"`
 	CloudProvider      string     `json:"cloudProvider"`
 	NodeName           string     `json:"nodeName"`
+	ClusterName        string     `json:"clusterName"`
+	AdminUserName      string     `json:"adminUserName"`
 	AuthorizationModes []string   `json:"authorizationModes,omitempty"`
 
 	Token    string          `json:"token"`
@@ -94,6 +96,7 @@ type NodeConfiguration struct {
 	DiscoveryToken           string   `json:"discoveryToken"`
 	DiscoveryTokenAPIServers []string `json:"discoveryTokenAPIServers,omitempty"`
 	NodeName                 string   `json:"nodeName"`
+	ClusterName              string   `json:"clusterName"`
 	TLSBootstrapToken        string   `json:"tlsBootstrapToken"`
 	Token                    string   `json:"token"`
 

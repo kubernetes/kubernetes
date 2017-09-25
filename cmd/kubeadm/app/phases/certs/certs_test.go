@@ -34,8 +34,8 @@ import (
 
 func TestWriteCertificateAuthorithyFilesIfNotExist(t *testing.T) {
 
-	setupCert, setupKey, _ := NewCACertAndKey()
-	caCert, caKey, _ := NewCACertAndKey()
+	setupCert, setupKey, _ := NewCACertAndKey("kubernetes")
+	caCert, caKey, _ := NewCACertAndKey("kubernetes")
 
 	var tests = []struct {
 		setupFunc     func(pkiDir string) error
@@ -110,7 +110,7 @@ func TestWriteCertificateAuthorithyFilesIfNotExist(t *testing.T) {
 
 func TestWriteCertificateFilesIfNotExist(t *testing.T) {
 
-	caCert, caKey, _ := NewFrontProxyCACertAndKey()
+	caCert, caKey, _ := NewFrontProxyCACertAndKey("kubernetes")
 	setupCert, setupKey, _ := NewFrontProxyClientCertAndKey(caCert, caKey)
 	cert, key, _ := NewFrontProxyClientCertAndKey(caCert, caKey)
 
@@ -137,7 +137,7 @@ func TestWriteCertificateFilesIfNotExist(t *testing.T) {
 		},
 		{ // cert exists, is signed by another ca > err
 			setupFunc: func(pkiDir string) error {
-				anotherCaCert, anotherCaKey, _ := NewFrontProxyCACertAndKey()
+				anotherCaCert, anotherCaKey, _ := NewFrontProxyCACertAndKey("kubernetes")
 				anotherCert, anotherKey, _ := NewFrontProxyClientCertAndKey(anotherCaCert, anotherCaKey)
 
 				return writeCertificateFilesIfNotExist(pkiDir, "dummy", anotherCaCert, anotherCert, anotherKey)
@@ -304,7 +304,7 @@ func TestGetAltNames(t *testing.T) {
 }
 
 func TestNewCACertAndKey(t *testing.T) {
-	caCert, _, err := NewCACertAndKey()
+	caCert, _, err := NewCACertAndKey("kubernetes")
 	if err != nil {
 		t.Fatalf("failed call NewCACertAndKey: %v", err)
 	}
@@ -322,7 +322,7 @@ func TestNewAPIServerCertAndKey(t *testing.T) {
 			Networking: kubeadmapi.Networking{ServiceSubnet: "10.96.0.0/12", DNSDomain: "cluster.local"},
 			NodeName:   "valid-hostname",
 		}
-		caCert, caKey, err := NewCACertAndKey()
+		caCert, caKey, err := NewCACertAndKey("kubernetes")
 
 		apiServerCert, _, err := NewAPIServerCertAndKey(cfg, caCert, caKey)
 		if err != nil {
@@ -337,7 +337,7 @@ func TestNewAPIServerCertAndKey(t *testing.T) {
 }
 
 func TestNewAPIServerKubeletClientCertAndKey(t *testing.T) {
-	caCert, caKey, err := NewCACertAndKey()
+	caCert, caKey, err := NewCACertAndKey("kubernetes")
 
 	apiClientCert, _, err := NewAPIServerKubeletClientCertAndKey(caCert, caKey)
 	if err != nil {
@@ -362,7 +362,7 @@ func TestNewNewServiceAccountSigningKey(t *testing.T) {
 }
 
 func TestNewFrontProxyCACertAndKey(t *testing.T) {
-	frontProxyCACert, _, err := NewFrontProxyCACertAndKey()
+	frontProxyCACert, _, err := NewFrontProxyCACertAndKey("kubernetes")
 	if err != nil {
 		t.Fatalf("failed creation of cert and key: %v", err)
 	}
@@ -371,7 +371,7 @@ func TestNewFrontProxyCACertAndKey(t *testing.T) {
 }
 
 func TestNewFrontProxyClientCertAndKey(t *testing.T) {
-	frontProxyCACert, frontProxyCAKey, err := NewFrontProxyCACertAndKey()
+	frontProxyCACert, frontProxyCAKey, err := NewFrontProxyCACertAndKey("kubernetes")
 
 	frontProxyClientCert, _, err := NewFrontProxyClientCertAndKey(frontProxyCACert, frontProxyCAKey)
 	if err != nil {
