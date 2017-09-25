@@ -92,12 +92,12 @@ aliases:
     - erictune
     - foxish
     - janetkuo
-    - kargakis
     - kow3ns
     - lukaszo
     - mfojtik
     - smarterclayton
     - soltysh
+    - tnozicka
   sig-apps-api-approvers:
     - erictune
     - smarterclayton
@@ -174,4 +174,5 @@ aliases:
     - steveperry-53
     - radhikpac
     - jpbetz
+    - cmluciano
 

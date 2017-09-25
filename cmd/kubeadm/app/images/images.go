@@ -24,6 +24,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
+// GetCoreImage generates and returns the image for the core Kubernetes components or returns overrideImage if specified
 func GetCoreImage(image, repoPrefix, k8sVersion, overrideImage string) string {
 	if overrideImage != "" {
 		return overrideImage

@@ -19,6 +19,7 @@ limitations under the License.
 package ipvs
 
 import (
+	"fmt"
 	"net"
 	"reflect"
 	"syscall"
@@ -117,18 +118,36 @@ func TestUnbindVirtualServerAddress(t *testing.T) {
 	}
 }
 
-func Test_toFrontendService(t *testing.T) {
+func Test_toVirtualServer(t *testing.T) {
 	Tests := []struct {
 		ipvsService   ipvs.Service
 		virtualServer VirtualServer
+		expectError   bool
+		reason        string
 	}{
+		{
+			ipvs.Service{
+				Flags: 0x0,
+			},
+			VirtualServer{},
+			true,
+			fmt.Sprintf("IPVS Service Flags should be >= %d, got 0x0", FlagHashed),
+		},
+		{
+			ipvs.Service{
+				Flags: 0x1,
+			},
+			VirtualServer{},
+			true,
+			fmt.Sprintf("IPVS Service Flags should be >= %d, got 0x1", FlagHashed),
+		},
 		{
 			ipvs.Service{
 				Protocol:      syscall.IPPROTO_TCP,
 				Port:          80,
 				FWMark:        0,
 				SchedName:     "",
-				Flags:         0,
+				Flags:         uint32(FlagPersistent + FlagHashed),
 				Timeout:       0,
 				Netmask:       0xffffffff,
 				AddressFamily: syscall.AF_INET,
@@ -140,9 +159,11 @@ func Test_toFrontendService(t *testing.T) {
 				Protocol:  "TCP",
 				Port:      80,
 				Scheduler: "",
-				Flags:     0,
+				Flags:     ServiceFlags(FlagPersistent),
 				Timeout:   0,
 			},
+			false,
+			"",
 		},
 		{
 			ipvs.Service{
@@ -150,7 +171,7 @@ func Test_toFrontendService(t *testing.T) {
 				Port:          33434,
 				FWMark:        0,
 				SchedName:     "wlc",
-				Flags:         1234,
+				Flags:         uint32(0 + FlagHashed),
 				Timeout:       100,
 				Netmask:       128,
 				AddressFamily: syscall.AF_INET6,
@@ -162,9 +183,11 @@ func Test_toFrontendService(t *testing.T) {
 				Protocol:  "UDP",
 				Port:      33434,
 				Scheduler: "wlc",
-				Flags:     1234,
+				Flags:     ServiceFlags(0),
 				Timeout:   100,
 			},
+			false,
+			"",
 		},
 		{
 			ipvs.Service{
@@ -172,7 +195,7 @@ func Test_toFrontendService(t *testing.T) {
 				Port:          0,
 				FWMark:        0,
 				SchedName:     "lc",
-				Flags:         0,
+				Flags:         uint32(0 + FlagHashed),
 				Timeout:       0,
 				Netmask:       0xffffffff,
 				AddressFamily: syscall.AF_INET,
@@ -184,9 +207,11 @@ func Test_toFrontendService(t *testing.T) {
 				Protocol:  "",
 				Port:      0,
 				Scheduler: "lc",
-				Flags:     0,
+				Flags:     ServiceFlags(0),
 				Timeout:   0,
 			},
+			false,
+			"",
 		},
 		{
 			ipvs.Service{
@@ -194,7 +219,7 @@ func Test_toFrontendService(t *testing.T) {
 				Port:          0,
 				FWMark:        0,
 				SchedName:     "wrr",
-				Flags:         0,
+				Flags:         uint32(FlagPersistent + FlagHashed),
 				Timeout:       0,
 				Netmask:       128,
 				AddressFamily: syscall.AF_INET6,
@@ -206,19 +231,26 @@ func Test_toFrontendService(t *testing.T) {
 				Protocol:  "",
 				Port:      0,
 				Scheduler: "wrr",
-				Flags:     0,
+				Flags:     ServiceFlags(FlagPersistent),
 				Timeout:   0,
 			},
+			false,
+			"",
 		},
 	}
 
 	for i := range Tests {
 		got, err := toVirtualServer(&Tests[i].ipvsService)
-		if err != nil {
+		if Tests[i].expectError && err == nil {
+			t.Errorf("case: %d, expected error: %s, got nil", i, Tests[i].reason)
+		}
+		if !Tests[i].expectError && err != nil {
 			t.Errorf("case: %d, unexpected error: %v", i, err)
 		}
-		if !reflect.DeepEqual(*got, Tests[i].virtualServer) {
-			t.Errorf("case: %d, got %#v, want %#v", i, *got, Tests[i].virtualServer)
+		if got != nil && &Tests[i].virtualServer != nil {
+			if !reflect.DeepEqual(*got, Tests[i].virtualServer) {
+				t.Errorf("case: %d, got %#v, want %#v", i, *got, Tests[i].virtualServer)
+			}
 		}
 	}
 }

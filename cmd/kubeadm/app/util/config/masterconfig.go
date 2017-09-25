@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
+// SetInitDynamicDefaults checks and sets conifugration values for Master node
 func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 
 	// Choose the right address for the API Server to advertise. If the advertise address is localhost or 0.0.0.0, the default interface's IP address is used
@@ -48,7 +49,6 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	if kubeadmutil.KubernetesIsCIVersion(cfg.KubernetesVersion) {
 		cfg.CIImageRepository = kubeadmconstants.DefaultCIImageRepository
 	}
-
 	// Validate version argument
 	ver, err := kubeadmutil.KubernetesReleaseVersion(cfg.KubernetesVersion)
 	if err != nil {
@@ -112,7 +112,6 @@ func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *
 	// static default values to cfg only for values not provided with flags
 	api.Scheme.Default(defaultversionedcfg)
 	api.Scheme.Convert(defaultversionedcfg, internalcfg, nil)
-
 	// Applies dynamic defaults to settings not provided with flags
 	if err := SetInitDynamicDefaults(internalcfg); err != nil {
 		return nil, err

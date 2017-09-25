@@ -26,21 +26,31 @@ import (
 )
 
 const (
-	DefaultServiceDNSDomain   = "cluster.local"
-	DefaultServicesSubnet     = "10.96.0.0/12"
-	DefaultKubernetesVersion  = "stable-1.7"
-	DefaultAPIBindPort        = 6443
+	// DefaultServiceDNSDomain defines default cluster-internal domain name for Services and Pods
+	DefaultServiceDNSDomain = "cluster.local"
+	// DefaultServicesSubnet defines default service subnet range
+	DefaultServicesSubnet = "10.96.0.0/12"
+	// DefaultKubernetesVersion defines default kubernetes version
+	DefaultKubernetesVersion = "stable-1.8"
+	// DefaultAPIBindPort defines default API port
+	DefaultAPIBindPort = 6443
+	// DefaultAuthorizationModes defines default authorization modes
 	DefaultAuthorizationModes = "Node,RBAC"
-	DefaultCACertPath         = "/etc/kubernetes/pki/ca.crt"
-	DefaultCertificatesDir    = "/etc/kubernetes/pki"
-	DefaultEtcdDataDir        = "/var/lib/etcd"
-	DefaultImageRepository    = "gcr.io/google_containers"
+	// DefaultCACertPath defines default location of CA certificate
+	DefaultCACertPath = "/etc/kubernetes/pki/ca.crt"
+	// DefaultCertificatesDir defines default certificate directory
+	DefaultCertificatesDir = "/etc/kubernetes/pki"
+	// DefaultEtcdDataDir defines default location of etcd
+	DefaultEtcdDataDir = "/var/lib/etcd"
+	// DefaultImageRepository defines default image registry
+	DefaultImageRepository = "gcr.io/google_containers"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
+// SetDefaults_MasterConfiguration assigns default values to Master node
 func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 	if obj.KubernetesVersion == "" {
 		obj.KubernetesVersion = DefaultKubernetesVersion
@@ -81,6 +91,7 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 	}
 }
 
+// SetDefaults_NodeConfiguration assigns default values to a regular node
 func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 	if obj.CACertPath == "" {
 		obj.CACertPath = DefaultCACertPath

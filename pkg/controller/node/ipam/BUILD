@@ -37,7 +37,6 @@ go_library(
         "timeout.go",
     ],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
         "//pkg/controller/node/ipam/cidrset:go_default_library",

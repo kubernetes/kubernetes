@@ -27,6 +27,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 )
 
+// NewCertificateAuthority creates new certificate and private key for the certificate authority
 func NewCertificateAuthority() (*x509.Certificate, *rsa.PrivateKey, error) {
 	key, err := certutil.NewPrivateKey()
 	if err != nil {
@@ -44,6 +45,7 @@ func NewCertificateAuthority() (*x509.Certificate, *rsa.PrivateKey, error) {
 	return cert, key, nil
 }
 
+// NewCertAndKey creates new certificate and key by passing the certificate authority certificate and key
 func NewCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey, config certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error) {
 	key, err := certutil.NewPrivateKey()
 	if err != nil {
@@ -68,6 +70,7 @@ func HasServerAuth(cert *x509.Certificate) bool {
 	return false
 }
 
+// WriteCertAndKey stores certificate and key at the specified location
 func WriteCertAndKey(pkiPath string, name string, cert *x509.Certificate, key *rsa.PrivateKey) error {
 	if err := WriteKey(pkiPath, name, key); err != nil {
 		return err
@@ -80,6 +83,7 @@ func WriteCertAndKey(pkiPath string, name string, cert *x509.Certificate, key *r
 	return nil
 }
 
+// WriteCert stores the given certificate at the given location
 func WriteCert(pkiPath, name string, cert *x509.Certificate) error {
 	if cert == nil {
 		return fmt.Errorf("certificate cannot be nil when writing to file")
@@ -93,6 +97,7 @@ func WriteCert(pkiPath, name string, cert *x509.Certificate) error {
 	return nil
 }
 
+// WriteKey stores the given key at the given location
 func WriteKey(pkiPath, name string, key *rsa.PrivateKey) error {
 	if key == nil {
 		return fmt.Errorf("private key cannot be nil when writing to file")
@@ -106,6 +111,7 @@ func WriteKey(pkiPath, name string, key *rsa.PrivateKey) error {
 	return nil
 }
 
+// WritePublicKey stores the given public key at the given location
 func WritePublicKey(pkiPath, name string, key *rsa.PublicKey) error {
 	if key == nil {
 		return fmt.Errorf("public key cannot be nil when writing to file")

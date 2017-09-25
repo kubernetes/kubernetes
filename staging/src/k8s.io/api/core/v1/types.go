@@ -1887,7 +1887,10 @@ type Container struct {
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// Docker image name.
 	// More info: https://kubernetes.io/docs/concepts/containers/images
-	Image string `json:"image" protobuf:"bytes,2,opt,name=image"`
+	// This field is optional to allow higher level config management to default or override
+	// container images in workload controllers like Deployments and StatefulSets.
+	// +optional
+	Image string `json:"image,omitempty" protobuf:"bytes,2,opt,name=image"`
 	// Entrypoint array. Not executed within a shell.
 	// The docker image's ENTRYPOINT is used if this is not provided.
 	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
@@ -2466,7 +2469,7 @@ type Taint struct {
 	// TimeAdded represents the time at which the taint was added.
 	// It is only written for NoExecute taints.
 	// +optional
-	TimeAdded metav1.Time `json:"timeAdded,omitempty" protobuf:"bytes,4,opt,name=timeAdded"`
+	TimeAdded *metav1.Time `json:"timeAdded,omitempty" protobuf:"bytes,4,opt,name=timeAdded"`
 }
 
 type TaintEffect string

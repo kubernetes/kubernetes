@@ -28,6 +28,7 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
+// TokenUser defines token user
 const TokenUser = "tls-bootstrap-token-user"
 
 // For returns a KubeConfig object that can be used for doing the TLS Bootstrap with the right credentials
@@ -60,7 +61,7 @@ func GetValidatedClusterInfoObject(cfg *kubeadmapi.NodeConfiguration) (*clientcm
 	case len(cfg.DiscoveryToken) != 0:
 		return token.RetrieveValidatedClusterInfo(cfg.DiscoveryToken, cfg.DiscoveryTokenAPIServers, cfg.DiscoveryTokenCACertHashes)
 	default:
-		return nil, fmt.Errorf("couldn't find a valid discovery configuration.")
+		return nil, fmt.Errorf("couldn't find a valid discovery configuration")
 	}
 }
 

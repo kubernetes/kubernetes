@@ -272,6 +272,18 @@ function kube::build::update_dockerfile() {
   sed "${sed_opts[@]}" "s/KUBE_BUILD_IMAGE_CROSS_TAG/${KUBE_BUILD_IMAGE_CROSS_TAG}/" "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
 }
 
+function  kube::build::set_proxy() {
+  if [[ -n "${KUBERNETES_HTTPS_PROXY:-}" ]]; then
+    echo "ENV https_proxy $KUBERNETES_HTTPS_PROXY" >> "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+  fi
+  if [[ -n "${KUBERNETES_HTTP_PROXY:-}" ]]; then
+    echo "ENV http_proxy $KUBERNETES_HTTP_PROXY" >> "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+  fi
+  if [[ -n "${KUBERNETES_NO_PROXY:-}" ]]; then
+    echo "ENV no_proxy $KUBERNETES_NO_PROXY" >> "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+  fi
+}
+
 function kube::build::ensure_docker_in_path() {
   if [[ -z "$(which docker)" ]]; then
     kube::log::error "Can't find 'docker' in PATH, please fix and retry."
@@ -429,6 +441,7 @@ function kube::build::build_image() {
   chmod go= "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
 
   kube::build::update_dockerfile
+  kube::build::set_proxy
   kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false'
 
   # Clean up old versions of everything

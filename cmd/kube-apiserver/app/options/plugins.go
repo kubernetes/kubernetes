@@ -71,7 +71,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	autoprovision.Register(plugins)
 	exists.Register(plugins)
 	noderestriction.Register(plugins)
-	label.Register(plugins)
+	label.Register(plugins) // DEPRECATED in favor of NewPersistentVolumeLabelController in CCM
 	podnodeselector.Register(plugins)
 	podpreset.Register(plugins)
 	podtolerationrestriction.Register(plugins)

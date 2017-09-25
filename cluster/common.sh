@@ -883,6 +883,11 @@ EOF
 ETCD_QUORUM_READ: $(yaml-quote ${ETCD_QUORUM_READ})
 EOF
     fi
+    if [ -n "${CLUSTER_SIGNING_DURATION:-}" ]; then
+      cat >>$file <<EOF
+CLUSTER_SIGNING_DURATION: $(yaml-quote ${CLUSTER_SIGNING_DURATION})
+EOF
+    fi
 
   else
     # Node-only env vars.
@@ -1300,6 +1305,7 @@ function parse-master-env() {
   REQUESTHEADER_CA_CERT_BASE64=$(get-env-val "${master_env}" "REQUESTHEADER_CA_CERT")
   PROXY_CLIENT_CERT_BASE64=$(get-env-val "${master_env}" "PROXY_CLIENT_CERT")
   PROXY_CLIENT_KEY_BASE64=$(get-env-val "${master_env}" "PROXY_CLIENT_KEY")
+  ENABLE_LEGACY_ABAC=$(get-env-val "${master_env}" "ENABLE_LEGACY_ABAC")
 }
 
 # Update or verify required gcloud components are installed

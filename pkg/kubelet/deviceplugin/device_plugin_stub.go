@@ -70,7 +70,7 @@ func (m *Stub) Start() error {
 	// Wait till grpc server is ready.
 	for i := 0; i < 10; i++ {
 		services := m.server.GetServiceInfo()
-		if len(services) > 0 {
+		if len(services) > 1 {
 			break
 		}
 		time.Sleep(1 * time.Second)
@@ -83,6 +83,7 @@ func (m *Stub) Start() error {
 // Stop stops the gRPC server
 func (m *Stub) Stop() error {
 	m.server.Stop()
+	close(m.stop)
 
 	return m.cleanup()
 }

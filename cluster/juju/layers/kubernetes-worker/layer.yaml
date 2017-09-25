@@ -8,6 +8,7 @@ includes:
   - 'layer:nagios'
   - 'layer:tls-client'
   - 'layer:nvidia-cuda'
+  - 'layer:cdk-service-kicker'
   - 'interface:http'
   - 'interface:kubernetes-cni'
   - 'interface:kube-dns'
@@ -29,3 +30,7 @@ options:
     server_key_path: '/root/cdk/server.key'
     client_certificate_path: '/root/cdk/client.crt'
     client_key_path: '/root/cdk/client.key'
+  cdk-service-kicker:
+    services:
+      - 'snap.kubelet.daemon'
+      - 'snap.kube-proxy.daemon'

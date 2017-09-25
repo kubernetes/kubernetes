@@ -411,6 +411,7 @@ func AddHandlers(h printers.PrintHandler) {
 	storageClassColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Provisioner", Type: "string", Description: storagev1.StorageClass{}.SwaggerDoc()["provisioner"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 	}
 
 	h.TableHandler(storageClassColumnDefinitions, printStorageClass)
@@ -817,10 +818,10 @@ func printCronJob(obj *batch.CronJob, options printers.PrintOptions) ([]metav1al
 
 	lastScheduleTime := "<none>"
 	if obj.Status.LastScheduleTime != nil {
-		lastScheduleTime = obj.Status.LastScheduleTime.Time.Format(time.RFC1123Z)
+		lastScheduleTime = translateTimestamp(*obj.Status.LastScheduleTime)
 	}
 
-	row.Cells = append(row.Cells, obj.Name, obj.Spec.Schedule, printBoolPtr(obj.Spec.Suspend), len(obj.Status.Active), lastScheduleTime)
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.Schedule, printBoolPtr(obj.Spec.Suspend), len(obj.Status.Active), lastScheduleTime, translateTimestamp(obj.CreationTimestamp))
 	if options.Wide {
 		names, images := layoutContainerCells(obj.Spec.JobTemplate.Spec.Template.Spec.Containers)
 		row.Cells = append(row.Cells, names, images, metav1.FormatLabelSelector(obj.Spec.JobTemplate.Spec.Selector))
@@ -1707,7 +1708,7 @@ func printStorageClass(obj *storage.StorageClass, options printers.PrintOptions)
 		name += " (default)"
 	}
 	provtype := obj.Provisioner
-	row.Cells = append(row.Cells, name, provtype)
+	row.Cells = append(row.Cells, name, provtype, translateTimestamp(obj.CreationTimestamp))
 
 	return []metav1alpha1.TableRow{row}, nil
 }

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
@@ -177,7 +178,7 @@ func (g *GenericPLEG) updateRelisTime(timestamp time.Time) {
 }
 
 // relist queries the container runtime for list of pods/containers, compare
-// with the internal pods/containers, and generats events accordingly.
+// with the internal pods/containers, and generates events accordingly.
 func (g *GenericPLEG) relist() {
 	glog.V(5).Infof("GenericPLEG: Relisting")
 
@@ -329,6 +330,41 @@ func (g *GenericPLEG) cacheEnabled() bool {
 	return g.cache != nil
 }
 
+// Preserve an older cached status' pod IP if the new status has no pod IP
+// and its sandboxes have exited
+func (g *GenericPLEG) getPodIP(pid types.UID, status *kubecontainer.PodStatus) string {
+	if status.IP != "" {
+		return status.IP
+	}
+
+	oldStatus, err := g.cache.Get(pid)
+	if err != nil || oldStatus.IP == "" {
+		return ""
+	}
+
+	for _, sandboxStatus := range status.SandboxStatuses {
+		// If at least one sandbox is ready, then use this status update's pod IP
+		if sandboxStatus.State == runtimeapi.PodSandboxState_SANDBOX_READY {
+			return status.IP
+		}
+	}
+
+	if len(status.SandboxStatuses) == 0 {
+		// Without sandboxes (which built-in runtimes like rkt don't report)
+		// look at all the container statuses, and if any containers are
+		// running then use the new pod IP
+		for _, containerStatus := range status.ContainerStatuses {
+			if containerStatus.State == kubecontainer.ContainerStateCreated || containerStatus.State == kubecontainer.ContainerStateRunning {
+				return status.IP
+			}
+		}
+	}
+
+	// For pods with no ready containers or sandboxes (like exited pods)
+	// use the old status' pod IP
+	return oldStatus.IP
+}
+
 func (g *GenericPLEG) updateCache(pod *kubecontainer.Pod, pid types.UID) error {
 	if pod == nil {
 		// The pod is missing in the current relist. This means that
@@ -343,6 +379,14 @@ func (g *GenericPLEG) updateCache(pod *kubecontainer.Pod, pid types.UID) error {
 	// all containers again.
 	status, err := g.runtime.GetPodStatus(pod.ID, pod.Name, pod.Namespace)
 	glog.V(4).Infof("PLEG: Write status for %s/%s: %#v (err: %v)", pod.Name, pod.Namespace, status, err)
+	if err == nil {
+		// Preserve the pod IP across cache updates if the new IP is empty.
+		// When a pod is torn down, kubelet may race with PLEG and retrieve
+		// a pod status after network teardown, but the kubernetes API expects
+		// the completed pod's IP to be available after the pod is dead.
+		status.IP = g.getPodIP(pid, status)
+	}
+
 	g.cache.Set(pod.ID, status, err, timestamp)
 	return err
 }

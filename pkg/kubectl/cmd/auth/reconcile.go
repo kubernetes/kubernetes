@@ -92,7 +92,7 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 	if err != nil {
 		return err
 	}
-	o.ResourceBuilder = f.NewBuilder(true).
+	o.ResourceBuilder = f.NewBuilder().
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
@@ -157,7 +157,6 @@ func (o *ReconcileOptions) RunReconcile() error {
 			}
 			shallowInfoCopy.Object = result.Role.GetObject()
 			o.Print(&shallowInfoCopy)
-			return nil
 
 		case *rbac.ClusterRole:
 			reconcileOptions := reconciliation.ReconcileRoleOptions{
@@ -174,7 +173,6 @@ func (o *ReconcileOptions) RunReconcile() error {
 			}
 			shallowInfoCopy.Object = result.Role.GetObject()
 			o.Print(&shallowInfoCopy)
-			return nil
 
 		case *rbac.RoleBinding:
 			reconcileOptions := reconciliation.ReconcileRoleBindingOptions{
@@ -192,7 +190,6 @@ func (o *ReconcileOptions) RunReconcile() error {
 			}
 			shallowInfoCopy.Object = result.RoleBinding.GetObject()
 			o.Print(&shallowInfoCopy)
-			return nil
 
 		case *rbac.ClusterRoleBinding:
 			reconcileOptions := reconciliation.ReconcileRoleBindingOptions{
@@ -209,7 +206,6 @@ func (o *ReconcileOptions) RunReconcile() error {
 			}
 			shallowInfoCopy.Object = result.RoleBinding.GetObject()
 			o.Print(&shallowInfoCopy)
-			return nil
 
 		default:
 			glog.V(1).Infof("skipping %#v", info.Object.GetObjectKind())

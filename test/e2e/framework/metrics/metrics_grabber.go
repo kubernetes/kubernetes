@@ -95,6 +95,11 @@ func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, kubelets b
 	}, nil
 }
 
+// HasRegisteredMaster returns if metrics grabber was able to find a master node
+func (g *MetricsGrabber) HasRegisteredMaster() bool {
+	return g.registeredMaster
+}
+
 func (g *MetricsGrabber) GrabFromKubelet(nodeName string) (KubeletMetrics, error) {
 	nodes, err := g.client.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{api.ObjectNameField: nodeName}.AsSelector().String()})
 	if err != nil {

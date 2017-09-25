@@ -396,6 +396,12 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *ku
 		return true, sandboxStatus.Metadata.Attempt + 1, ""
 	}
 
+	// Needs to create a new sandbox when the sandbox does not have an IP address.
+	if !kubecontainer.IsHostNetworkPod(pod) && sandboxStatus.Network.Ip == "" {
+		glog.V(2).Infof("Sandbox for pod %q has no IP address.  Need to start a new one", format.Pod(pod))
+		return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
+	}
+
 	return false, sandboxStatus.Metadata.Attempt, sandboxStatus.Id
 }
 

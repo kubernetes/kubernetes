@@ -55,6 +55,8 @@ func NewCMServer() *CMServer {
 	}
 
 	s := CMServer{
+		// Part of these default values also present in 'cmd/cloud-controller-manager/app/options/options.go'.
+		// Please keep them in sync when doing update.
 		KubeControllerManagerConfiguration: componentconfig.KubeControllerManagerConfiguration{
 			Controllers:                                     []string{"*"},
 			Port:                                            ports.ControllerManagerPort,

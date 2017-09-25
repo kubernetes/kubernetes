@@ -61,9 +61,12 @@ func (plugin *fcPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 		return "", err
 	}
 
-	if len(volumeSource.TargetWWNs) != 0 {
+	// API server validates these parameters beforehand but attach/detach
+	// controller creates volumespec without validation. They may be nil
+	// or zero length. We should check again to avoid unexpected conditions.
+	if len(volumeSource.TargetWWNs) != 0 && volumeSource.Lun != nil {
 		// TargetWWNs are the FibreChannel target worldwide names
-		return fmt.Sprintf("%v", volumeSource.TargetWWNs), nil
+		return fmt.Sprintf("%v:%v", volumeSource.TargetWWNs, *volumeSource.Lun), nil
 	} else if len(volumeSource.WWIDs) != 0 {
 		// WWIDs are the FibreChannel World Wide Identifiers
 		return fmt.Sprintf("%v", volumeSource.WWIDs), nil
@@ -240,13 +243,7 @@ func (c *fcDiskUnmounter) TearDown() error {
 }
 
 func (c *fcDiskUnmounter) TearDownAt(dir string) error {
-	if pathExists, pathErr := util.PathExists(dir); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
-	} else if !pathExists {
-		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
-		return nil
-	}
-	return diskTearDown(c.manager, *c, dir, c.mounter)
+	return util.UnmountPath(dir, c.mounter)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.FCVolumeSource, bool, error) {

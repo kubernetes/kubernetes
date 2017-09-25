@@ -50,7 +50,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			for i := 0; i < tobj.NumField(); i++ {
 				field := tobj.Field(i)
 				switch field.Name {
-				case "Default", "Enum", "Example":
+				case "Default", "Enum", "Example", "Ref":
 					continue
 				default:
 					isValue := true
@@ -73,6 +73,10 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			if c.RandBool() {
 				validJSON := apiextensions.JSON(`"foobarbaz"`)
 				obj.Example = &validJSON
+			}
+			if c.RandBool() {
+				validRef := "validRef"
+				obj.Ref = &validRef
 			}
 		},
 		func(obj *apiextensions.JSONSchemaPropsOrBool, c fuzz.Continue) {

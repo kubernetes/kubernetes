@@ -11,15 +11,11 @@ go_test(
     srcs = [
         "helpers_test.go",
         "kube_docker_client_test.go",
-        "legacy_test.go",
     ],
     library = ":go_default_library",
     deps = [
-        "//pkg/util/hash:go_default_library",
         "//vendor/github.com/docker/docker/api/types:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
     ],
 )
 
@@ -31,10 +27,8 @@ go_library(
         "helpers.go",
         "instrumented_client.go",
         "kube_docker_client.go",
-        "legacy.go",
     ],
     deps = [
-        "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//vendor/github.com/docker/distribution/reference:go_default_library",
         "//vendor/github.com/docker/docker/api/types:go_default_library",
@@ -47,7 +41,6 @@ go_library(
         "//vendor/github.com/opencontainers/go-digest:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
     ],
 )

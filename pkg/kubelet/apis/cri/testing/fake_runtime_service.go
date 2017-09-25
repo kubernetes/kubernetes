@@ -418,20 +418,20 @@ func (r *FakeRuntimeService) SetFakeContainerStats(containerStats []*runtimeapi.
 	}
 }
 
-func (r *FakeRuntimeService) ContainerStats(req *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
+func (r *FakeRuntimeService) ContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
 	r.Lock()
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "ContainerStats")
 
-	s, found := r.FakeContainerStats[req.ContainerId]
+	s, found := r.FakeContainerStats[containerID]
 	if !found {
-		return nil, fmt.Errorf("no stats for container %q", req.ContainerId)
+		return nil, fmt.Errorf("no stats for container %q", containerID)
 	}
-	return &runtimeapi.ContainerStatsResponse{Stats: s}, nil
+	return s, nil
 }
 
-func (r *FakeRuntimeService) ListContainerStats(req *runtimeapi.ListContainerStatsRequest) (*runtimeapi.ListContainerStatsResponse, error) {
+func (r *FakeRuntimeService) ListContainerStats(filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -439,14 +439,14 @@ func (r *FakeRuntimeService) ListContainerStats(req *runtimeapi.ListContainerSta
 
 	var result []*runtimeapi.ContainerStats
 	for _, c := range r.Containers {
-		if req.Filter != nil {
-			if req.Filter.Id != "" && req.Filter.Id != c.Id {
+		if filter != nil {
+			if filter.Id != "" && filter.Id != c.Id {
 				continue
 			}
-			if req.Filter.PodSandboxId != "" && req.Filter.PodSandboxId != c.SandboxID {
+			if filter.PodSandboxId != "" && filter.PodSandboxId != c.SandboxID {
 				continue
 			}
-			if req.Filter.LabelSelector != nil && !filterInLabels(req.Filter.LabelSelector, c.GetLabels()) {
+			if filter.LabelSelector != nil && !filterInLabels(filter.LabelSelector, c.GetLabels()) {
 				continue
 			}
 		}
@@ -457,5 +457,5 @@ func (r *FakeRuntimeService) ListContainerStats(req *runtimeapi.ListContainerSta
 		result = append(result, s)
 	}
 
-	return &runtimeapi.ListContainerStatsResponse{Stats: result}, nil
+	return result, nil
 }

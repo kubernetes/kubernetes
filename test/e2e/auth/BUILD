@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -16,7 +14,6 @@ go_library(
         "node_authz.go",
         "service_accounts.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//pkg/util/version:go_default_library",
         "//plugin/pkg/admission/serviceaccount:go_default_library",

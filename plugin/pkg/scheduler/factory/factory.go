@@ -208,48 +208,44 @@ func NewConfigFactory(
 	c.scheduledPodLister = assignedPodLister{podInformer.Lister()}
 
 	// Only nodes in the "Ready" condition with status == "True" are schedulable
-	nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
+	nodeInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.addNodeToCache,
 			UpdateFunc: c.updateNodeInCache,
 			DeleteFunc: c.deleteNodeFromCache,
 		},
-		0,
 	)
 	c.nodeLister = nodeInformer.Lister()
 
 	// On add and delete of PVs, it will affect equivalence cache items
 	// related to persistent volume
-	pvInformer.Informer().AddEventHandlerWithResyncPeriod(
+	pvInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			// MaxPDVolumeCountPredicate: since it relies on the counts of PV.
 			AddFunc:    c.onPvAdd,
 			DeleteFunc: c.onPvDelete,
 		},
-		0,
 	)
 	c.pVLister = pvInformer.Lister()
 
 	// This is for MaxPDVolumeCountPredicate: add/delete PVC will affect counts of PV when it is bound.
-	pvcInformer.Informer().AddEventHandlerWithResyncPeriod(
+	pvcInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.onPvcAdd,
 			DeleteFunc: c.onPvcDelete,
 		},
-		0,
 	)
 	c.pVCLister = pvcInformer.Lister()
 
 	// This is for ServiceAffinity: affected by the selector of the service is updated.
 	// Also, if new service is added, equivalence cache will also become invalid since
 	// existing pods may be "captured" by this service and change this predicate result.
-	serviceInformer.Informer().AddEventHandlerWithResyncPeriod(
+	serviceInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.onServiceAdd,
 			UpdateFunc: c.onServiceUpdate,
 			DeleteFunc: c.onServiceDelete,
 		},
-		0,
 	)
 	c.serviceLister = serviceInformer.Lister()
 

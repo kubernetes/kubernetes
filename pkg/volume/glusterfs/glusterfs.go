@@ -60,6 +60,7 @@ var _ volume.VolumePlugin = &glusterfsPlugin{}
 var _ volume.PersistentVolumePlugin = &glusterfsPlugin{}
 var _ volume.DeletableVolumePlugin = &glusterfsPlugin{}
 var _ volume.ProvisionableVolumePlugin = &glusterfsPlugin{}
+var _ volume.ExpandableVolumePlugin = &glusterfsPlugin{}
 var _ volume.Provisioner = &glusterfsVolumeProvisioner{}
 var _ volume.Deleter = &glusterfsVolumeDeleter{}
 
@@ -346,8 +347,8 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 			return nil
 		}
 
-		const invalidOption = "Invalid option auto_unmount"
-		if dstrings.Contains(errs.Error(), invalidOption) {
+		if dstrings.Contains(errs.Error(), "Invalid option auto_unmount") ||
+			dstrings.Contains(errs.Error(), "Invalid argument") {
 			// Give a try without `auto_unmount` mount option, because
 			// it could be that gluster fuse client is older version and
 			// mount.glusterfs is unaware of `auto_unmount`.

@@ -106,8 +106,14 @@ func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, opts vo
 	}
 
 	path := hostPathVolumeSource.Path
+	pathType := new(v1.HostPathType)
+	if hostPathVolumeSource.Type == nil {
+		*pathType = v1.HostPathUnset
+	} else {
+		pathType = hostPathVolumeSource.Type
+	}
 	return &hostPathMounter{
-		hostPath: &hostPath{path: path, pathType: hostPathVolumeSource.Type, containerized: opts.Containerized},
+		hostPath: &hostPath{path: path, pathType: pathType, containerized: opts.Containerized},
 		readOnly: readOnly,
 	}, nil
 }

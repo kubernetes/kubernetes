@@ -86,34 +86,57 @@ func (attacher *vsphereVMDKAttacher) Attach(spec *volume.Spec, nodeName types.No
 }
 
 func (attacher *vsphereVMDKAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
-	volumesAttachedCheck := make(map[*volume.Spec]bool)
-	volumeSpecMap := make(map[string]*volume.Spec)
-	volumePathList := []string{}
-	for _, spec := range specs {
-		volumeSource, _, err := getVolumeSource(spec)
-		if err != nil {
-			glog.Errorf("Error getting volume (%q) source : %v", spec.Name(), err)
-			continue
-		}
-		volumePathList = append(volumePathList, volumeSource.VolumePath)
-		volumeSpecMap[volumeSource.VolumePath] = spec
+	glog.Warningf("Attacher.VolumesAreAttached called for node %q - Please use BulkVerifyVolumes for vSphere", nodeName)
+	volumeNodeMap := map[types.NodeName][]*volume.Spec{
+		nodeName: specs,
 	}
-	attachedResult, err := attacher.vsphereVolumes.DisksAreAttached(volumePathList, nodeName)
+	nodeVolumesResult := make(map[*volume.Spec]bool)
+	nodesVerificationMap, err := attacher.BulkVerifyVolumes(volumeNodeMap)
 	if err != nil {
-		glog.Errorf(
-			"Error checking if volumes (%v) are attached to current node (%q). err=%v",
-			volumePathList, nodeName, err)
-		return nil, err
+		glog.Errorf("Attacher.VolumesAreAttached - error checking volumes for node %q with %v", nodeName, err)
+		return nodeVolumesResult, err
+	}
+	if result, ok := nodesVerificationMap[nodeName]; ok {
+		return result, nil
+	}
+	return nodeVolumesResult, nil
+}
+
+func (attacher *vsphereVMDKAttacher) BulkVerifyVolumes(volumesByNode map[types.NodeName][]*volume.Spec) (map[types.NodeName]map[*volume.Spec]bool, error) {
+	volumesAttachedCheck := make(map[types.NodeName]map[*volume.Spec]bool)
+	volumePathsByNode := make(map[types.NodeName][]string)
+	volumeSpecMap := make(map[string]*volume.Spec)
+
+	for nodeName, volumeSpecs := range volumesByNode {
+		for _, volumeSpec := range volumeSpecs {
+			volumeSource, _, err := getVolumeSource(volumeSpec)
+			if err != nil {
+				glog.Errorf("Error getting volume (%q) source : %v", volumeSpec.Name(), err)
+				continue
+			}
+			volPath := volumeSource.VolumePath
+			volumePathsByNode[nodeName] = append(volumePathsByNode[nodeName], volPath)
+			nodeVolume, nodeVolumeExists := volumesAttachedCheck[nodeName]
+			if !nodeVolumeExists {
+				nodeVolume = make(map[*volume.Spec]bool)
+			}
+			nodeVolume[volumeSpec] = true
+			volumeSpecMap[volPath] = volumeSpec
+			volumesAttachedCheck[nodeName] = nodeVolume
+		}
+	}
+	attachedResult, err := attacher.vsphereVolumes.DisksAreAttached(volumePathsByNode)
+	if err != nil {
+		glog.Errorf("Error checking if volumes are attached to nodes: %+v. err: %v", volumePathsByNode, err)
+		return volumesAttachedCheck, err
 	}
 
-	for volumePath, attached := range attachedResult {
-		spec := volumeSpecMap[volumePath]
-		if !attached {
-			volumesAttachedCheck[spec] = false
-			glog.V(2).Infof("VolumesAreAttached: volume %q (specName: %q) is no longer attached", volumePath, spec.Name())
-		} else {
-			volumesAttachedCheck[spec] = true
-			glog.V(2).Infof("VolumesAreAttached: volume %q (specName: %q) is attached", volumePath, spec.Name())
+	for nodeName, nodeVolumes := range attachedResult {
+		for volumePath, attached := range nodeVolumes {
+			if !attached {
+				spec := volumeSpecMap[volumePath]
+				setNodeVolume(volumesAttachedCheck, spec, nodeName, false)
+			}
 		}
 	}
 	return volumesAttachedCheck, nil
@@ -256,4 +279,18 @@ func (detacher *vsphereVMDKDetacher) Detach(deviceMountPath string, nodeName typ
 
 func (detacher *vsphereVMDKDetacher) UnmountDevice(deviceMountPath string) error {
 	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
+}
+
+func setNodeVolume(
+	nodeVolumeMap map[types.NodeName]map[*volume.Spec]bool,
+	volumeSpec *volume.Spec,
+	nodeName types.NodeName,
+	check bool) {
+
+	volumeMap := nodeVolumeMap[nodeName]
+	if volumeMap == nil {
+		volumeMap = make(map[*volume.Spec]bool)
+		nodeVolumeMap[nodeName] = volumeMap
+	}
+	volumeMap[volumeSpec] = check
 }

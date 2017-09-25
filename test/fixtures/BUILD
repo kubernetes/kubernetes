@@ -10,13 +10,6 @@ filegroup(
 )
 
 filegroup(
-    name = "sources",
-    srcs = glob([
-        "**/*",
-    ]),
-)
-
-filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],

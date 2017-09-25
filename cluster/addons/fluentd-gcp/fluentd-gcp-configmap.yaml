@@ -171,28 +171,6 @@ data:
     </source>
 
     # Example:
-    # 2017-02-09T00:15:57.992775796Z AUDIT: id="90c73c7c-97d6-4b65-9461-f94606ff825f" ip="104.132.1.72" method="GET" user="kubecfg" as="<self>" asgroups="<lookup>" namespace="default" uri="/api/v1/namespaces/default/pods"
-    # 2017-02-09T00:15:57.993528822Z AUDIT: id="90c73c7c-97d6-4b65-9461-f94606ff825f" response="200"
-    <source>
-      type tail
-      format multiline
-      multiline_flush_interval 5s
-      format_firstline /^\S+\s+AUDIT:/
-      # Fields must be explicitly captured by name to be parsed into the record.
-      # Fields may not always be present, and order may change, so this just looks
-      # for a list of key="\"quoted\" value" pairs separated by spaces.
-      # Unknown fields are ignored.
-      # Note: We can't separate query/response lines as format1/format2 because
-      #       they don't always come one after the other for a given query.
-      # TODO: Maybe add a JSON output mode to audit log so we can get rid of this?
-      format1 /^(?<time>\S+) AUDIT:(?: (?:id="(?<id>(?:[^"\\]|\\.)*)"|ip="(?<ip>(?:[^"\\]|\\.)*)"|method="(?<method>(?:[^"\\]|\\.)*)"|user="(?<user>(?:[^"\\]|\\.)*)"|groups="(?<groups>(?:[^"\\]|\\.)*)"|as="(?<as>(?:[^"\\]|\\.)*)"|asgroups="(?<asgroups>(?:[^"\\]|\\.)*)"|namespace="(?<namespace>(?:[^"\\]|\\.)*)"|uri="(?<uri>(?:[^"\\]|\\.)*)"|response="(?<response>(?:[^"\\]|\\.)*)"|\w+="(?:[^"\\]|\\.)*"))*/
-      time_format %FT%T.%L%Z
-      path /var/log/kube-apiserver-audit.log
-      pos_file /var/log/gcp-kube-apiserver-audit.log.pos
-      tag kube-apiserver-audit
-    </source>
-
-    # Example:
     # I0204 06:55:31.872680       5 servicecontroller.go:277] LB already exists and doesn't need update for service kube-system/kube-ui
     <source>
       type tail
@@ -364,6 +342,8 @@ data:
     <match kubernetes.**>
       @type google_cloud
 
+      # Try to detect JSON formatted log entries.
+      detect_json true
       # Collect metrics in Prometheus registry about plugin activity.
       enable_monitoring true
       monitoring_type prometheus
@@ -373,11 +353,11 @@ data:
       # Set queue_full action to block because we want to pause gracefully
       # in case of the off-the-limits load instead of throwing an exception
       buffer_queue_full_action block
-      # Set the chunk limit conservatively to avoid exceeding the GCL limit
-      # of 10MiB per write request.
-      buffer_chunk_limit 2M
+      # Set the chunk limit conservatively to avoid exceeding the recommended
+      # chunk size of 5MB per write request.
+      buffer_chunk_limit 1M
       # Cap the combined memory usage of this buffer and the one below to
-      # 2MiB/chunk * (6 + 2) chunks = 16 MiB
+      # 1MiB/chunk * (6 + 2) chunks = 8 MiB
       buffer_queue_limit 6
       # Never wait more than 5 seconds before flushing logs in the non-error case.
       flush_interval 5s
@@ -394,13 +374,14 @@ data:
     <match **>
       @type google_cloud
 
+      detect_json true
       enable_monitoring true
       monitoring_type prometheus
       detect_subservice false
       buffer_type file
       buffer_path /var/log/fluentd-buffers/kubernetes.system.buffer
       buffer_queue_full_action block
-      buffer_chunk_limit 2M
+      buffer_chunk_limit 1M
       buffer_queue_limit 2
       flush_interval 5s
       max_retry_wait 30
@@ -408,7 +389,7 @@ data:
       num_threads 2
     </match>
 metadata:
-  name: fluentd-gcp-config-v1.2.0
+  name: fluentd-gcp-config-v1.2.2
   namespace: kube-system
   labels:
     addonmanager.kubernetes.io/mode: Reconcile

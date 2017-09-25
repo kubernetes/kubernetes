@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	dnsaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
-	apiconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
 	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -128,12 +127,6 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 			i, err := NewInit(cfgPath, internalcfg, skipPreFlight, skipTokenPrint, dryRun)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(i.Validate(cmd))
-
-			// TODO: remove this warning in 1.9
-			if !cmd.Flags().Lookup("token-ttl").Changed {
-				fmt.Println("[kubeadm] WARNING: starting in 1.8, tokens expire after 24 hours by default (if you require a non-expiring token use --token-ttl 0)")
-			}
-
 			kubeadmutil.CheckErr(i.Run(out))
 		},
 	}
@@ -217,6 +210,7 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 	)
 }
 
+// NewInit validates given arguments and instantiates Init struct with provided information.
 func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight, skipTokenPrint, dryRun bool) (*Init, error) {
 
 	fmt.Println("[kubeadm] WARNING: kubeadm is in beta, please do not use it for production clusters.")
@@ -262,6 +256,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight,
 	return &Init{cfg: cfg, skipTokenPrint: skipTokenPrint, dryRun: dryRun}, nil
 }
 
+// Init defines struct used by "kubeadm init" command
 type Init struct {
 	cfg            *kubeadmapi.MasterConfiguration
 	skipTokenPrint bool

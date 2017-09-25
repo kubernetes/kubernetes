@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -15,7 +13,6 @@ go_test(
         "cached_token_authenticator_test.go",
     ],
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",
@@ -31,7 +28,6 @@ go_library(
         "cache_striped.go",
         "cached_token_authenticator.go",
     ],
-    tags = ["automanaged"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/util/cache:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/clock:go_default_library",

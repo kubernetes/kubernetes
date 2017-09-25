@@ -38,7 +38,7 @@ import (
 
 func TestKubeConfigCSubCommandsHasFlags(t *testing.T) {
 
-	subCmds := getKubeConfigSubCommands(nil, "")
+	subCmds := getKubeConfigSubCommands(nil, "", phaseTestK8sVersion)
 
 	commonFlags := []string{
 		"cert-dir",
@@ -174,7 +174,7 @@ func TestKubeConfigSubCommandsThatCreateFilesWithFlags(t *testing.T) {
 		}
 
 		// Get subcommands working in the temporary directory
-		subCmds := getKubeConfigSubCommands(nil, tmpdir)
+		subCmds := getKubeConfigSubCommands(nil, tmpdir, phaseTestK8sVersion)
 
 		// Execute the subcommand
 		certDirFlag := fmt.Sprintf("--cert-dir=%s", pkidir)
@@ -282,7 +282,7 @@ func TestKubeConfigSubCommandsThatCreateFilesWithConfigFile(t *testing.T) {
 		cfgPath := testutil.SetupMasterConfigurationFile(t, tmpdir, cfg)
 
 		// Get subcommands working in the temporary directory
-		subCmds := getKubeConfigSubCommands(nil, tmpdir)
+		subCmds := getKubeConfigSubCommands(nil, tmpdir, phaseTestK8sVersion)
 
 		// Execute the subcommand
 		configFlag := fmt.Sprintf("--config=%s", cfgPath)
@@ -354,7 +354,7 @@ func TestKubeConfigSubCommandsThatWritesToOut(t *testing.T) {
 		buf := new(bytes.Buffer)
 
 		// Get subcommands working in the temporary directory
-		subCmds := getKubeConfigSubCommands(buf, tmpdir)
+		subCmds := getKubeConfigSubCommands(buf, tmpdir, phaseTestK8sVersion)
 
 		// Execute the subcommand
 		allFlags := append(commonFlags, test.additionalFlags...)

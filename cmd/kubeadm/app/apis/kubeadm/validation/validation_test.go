@@ -410,7 +410,6 @@ func TestValidateMixedArguments(t *testing.T) {
 	}
 
 	var cfgPath string
-
 	for _, rt := range tests {
 		f := pflag.NewFlagSet("test", pflag.ContinueOnError)
 		if f.Parsed() {

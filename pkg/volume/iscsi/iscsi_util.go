@@ -293,6 +293,9 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 		glog.Errorf("iscsi: failed to get any path for iscsi disk, last err seen:\n%v", lastErr)
 		return "", fmt.Errorf("failed to get any path for iscsi disk, last err seen:\n%v", lastErr)
 	}
+	if lastErr != nil {
+		glog.Errorf("iscsi: last error occurred during iscsi init:\n%v", lastErr)
+	}
 
 	//Make sure we use a valid devicepath to find mpio device.
 	devicePath = devicePaths[0]

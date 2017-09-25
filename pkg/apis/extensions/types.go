@@ -226,10 +226,10 @@ type DeploymentSpec struct {
 	// The maximum time in seconds for a deployment to make progress before it
 	// is considered to be failed. The deployment controller will continue to
 	// process failed deployments and a condition with a ProgressDeadlineExceeded
-	// reason will be surfaced in the deployment status. Once autoRollback is
-	// implemented, the deployment controller will automatically rollback failed
-	// deployments. Note that progress will not be estimated during the time a
-	// deployment is paused. This is not set by default.
+	// reason will be surfaced in the deployment status. Note that progress will
+	// not be estimated during the time a deployment is paused. This is not set
+	// by default.
+	// +optional
 	ProgressDeadlineSeconds *int32
 }
 
@@ -898,6 +898,7 @@ type PodSecurityPolicySpec struct {
 	// AllowedCapabilities is a list of capabilities that can be requested to add to the container.
 	// Capabilities in this field may be added at the pod author's discretion.
 	// You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.
+	// To allow all capabilities you may use '*'.
 	// +optional
 	AllowedCapabilities []api.Capability
 	// Volumes is a white list of allowed volume plugins.  Empty indicates that all plugins
@@ -965,6 +966,10 @@ type HostPortRange struct {
 	// Max is the end of the range, inclusive.
 	Max int
 }
+
+// AllowAllCapabilities can be used as a value for the PodSecurityPolicy.AllowAllCapabilities
+// field and means that any capabilities are allowed to be requested.
+var AllowAllCapabilities api.Capability = "*"
 
 // FSType gives strong typing to different file systems that are used by volumes.
 type FSType string

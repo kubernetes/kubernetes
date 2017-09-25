@@ -82,7 +82,7 @@ func RunStatus(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []stri
 		return err
 	}
 
-	r := f.NewBuilder(true).
+	r := f.NewBuilder().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options).
 		ResourceTypeOrNameArgs(true, args...).

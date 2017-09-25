@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	rbac "k8s.io/api/rbac/v1beta1"
+	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	core "k8s.io/client-go/testing"
@@ -41,7 +41,7 @@ func TestLogDryRunAction(t *testing.T) {
 		},
 		{
 			action: core.NewRootGetAction(schema.GroupVersionResource{Group: rbac.GroupName, Version: rbac.SchemeGroupVersion.Version, Resource: "clusterrolebindings"}, "system:node"),
-			expectedBytes: []byte(`[dryrun] Would perform action GET on resource "clusterrolebindings" in API group "rbac.authorization.k8s.io/v1beta1"
+			expectedBytes: []byte(`[dryrun] Would perform action GET on resource "clusterrolebindings" in API group "rbac.authorization.k8s.io/v1"
 [dryrun] Resource name: "system:node"
 `),
 		},

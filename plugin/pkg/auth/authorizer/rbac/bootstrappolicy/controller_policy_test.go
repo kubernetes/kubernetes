@@ -31,11 +31,13 @@ var rolesWithAllowStar = sets.NewString(
 	saRolePrefix+"namespace-controller",
 	saRolePrefix+"generic-garbage-collector",
 	saRolePrefix+"resourcequota-controller",
+	saRolePrefix+"horizontal-pod-autoscaler",
 )
 
 // TestNoStarsForControllers confirms that no controller role has star verbs, groups,
-// or resources.  There are two known exceptions, namespace lifecycle and GC which have to
-// delete anything
+// or resources.  There are three known exceptions: namespace lifecycle and GC which have to
+// delete anything, and HPA, which has the power to read metrics associated
+// with any object.
 func TestNoStarsForControllers(t *testing.T) {
 	for _, role := range ControllerRoles() {
 		if rolesWithAllowStar.Has(role.Name) {

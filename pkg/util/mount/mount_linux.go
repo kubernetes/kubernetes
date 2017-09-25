@@ -42,9 +42,6 @@ const (
 	procMountsPath = "/proc/mounts"
 	// Location of the mountinfo file
 	procMountInfoPath = "/proc/self/mountinfo"
-)
-
-const (
 	// 'fsck' found errors and corrected them
 	fsckErrorsCorrected = 1
 	// 'fsck' found errors but exited without correcting them
@@ -71,12 +68,12 @@ func New(mounterPath string) Interface {
 
 // Mount mounts source to target as fstype with given options. 'source' and 'fstype' must
 // be an emtpy string in case it's not required, e.g. for remount, or for auto filesystem
-// type, where kernel handles fs type for you. The mount 'options' is a list of options,
+// type, where kernel handles fstype for you. The mount 'options' is a list of options,
 // currently come from mount(8), e.g. "ro", "remount", "bind", etc. If no more option is
 // required, call Mount with an empty string list or nil.
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
 	// Path to mounter binary if containerized mounter is needed. Otherwise, it is set to empty.
-	// All Linux distros are expected to be shipped with a mount utility that an support bind mounts.
+	// All Linux distros are expected to be shipped with a mount utility that a support bind mounts.
 	mounterPath := ""
 	bind, bindRemountOpts := isBind(options)
 	if bind {
@@ -424,7 +421,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	return mountErr
 }
 
-// diskLooksUnformatted uses 'lsblk' to see if the given disk is unformated
+// getDiskFormat uses 'lsblk' to see if the given disk is unformated
 func (mounter *SafeFormatAndMount) getDiskFormat(disk string) (string, error) {
 	args := []string{"-n", "-o", "FSTYPE", disk}
 	glog.V(4).Infof("Attempting to determine if disk %q is formatted using lsblk with args: (%v)", disk, args)

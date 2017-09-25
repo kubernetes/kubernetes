@@ -20,9 +20,122 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 )
+
+func TestValidateClusterSpec(t *testing.T) {
+	type validateClusterSpecTest struct {
+		testName string
+		spec     *federation.ClusterSpec
+		path     *field.Path
+	}
+
+	successCases := []validateClusterSpecTest{
+		{
+			testName: "normal CIDR",
+			spec: &federation.ClusterSpec{
+				ServerAddressByClientCIDRs: []federation.ServerAddressByClientCIDR{
+					{
+						ClientCIDR:    "0.0.0.0/0",
+						ServerAddress: "localhost:8888",
+					},
+				},
+			},
+			path: field.NewPath("spec"),
+		},
+		{
+			testName: "missing CIDR",
+			spec: &federation.ClusterSpec{
+				ServerAddressByClientCIDRs: []federation.ServerAddressByClientCIDR{
+					{
+						ClientCIDR:    "",
+						ServerAddress: "localhost:8888",
+					},
+				},
+			},
+			path: field.NewPath("spec"),
+		},
+		{
+			testName: "no host in CIDR",
+			spec: &federation.ClusterSpec{
+				ServerAddressByClientCIDRs: []federation.ServerAddressByClientCIDR{
+					{
+						ClientCIDR:    "0.0.0.0/32",
+						ServerAddress: "localhost:8888",
+					},
+				},
+			},
+			path: field.NewPath("spec"),
+		},
+	}
+	for _, successCase := range successCases {
+		errs := ValidateClusterSpec(successCase.spec, successCase.path)
+		if len(errs) != 0 {
+			t.Errorf("expect success for testname: %q  but got: %v", successCase.testName, errs)
+		}
+	}
+
+	errorCases := []validateClusterSpecTest{
+		{
+			testName: "invalid CIDR : network missing",
+			spec: &federation.ClusterSpec{
+				ServerAddressByClientCIDRs: []federation.ServerAddressByClientCIDR{
+					{
+						ClientCIDR:    "0.0.0.0",
+						ServerAddress: "localhost:8888",
+					},
+				},
+			},
+			path: field.NewPath("spec"),
+		},
+		{
+			testName: "invalid CIDR : invalid address value",
+			spec: &federation.ClusterSpec{
+				ServerAddressByClientCIDRs: []federation.ServerAddressByClientCIDR{
+					{
+						ClientCIDR:    "256.0.0.0/16",
+						ServerAddress: "localhost:8888",
+					},
+				},
+			},
+			path: field.NewPath("spec"),
+		},
+		{
+			testName: "invalid CIDR : invalid address formation",
+			spec: &federation.ClusterSpec{
+				ServerAddressByClientCIDRs: []federation.ServerAddressByClientCIDR{
+					{
+						ClientCIDR:    "0.0.0/16",
+						ServerAddress: "localhost:8888",
+					},
+				},
+			},
+			path: field.NewPath("spec"),
+		},
+		{
+			testName: "invalid CIDR : invalid network num",
+			spec: &federation.ClusterSpec{
+				ServerAddressByClientCIDRs: []federation.ServerAddressByClientCIDR{
+					{
+						ClientCIDR:    "0.0.0.0/33",
+						ServerAddress: "localhost:8888",
+					},
+				},
+			},
+			path: field.NewPath("spec"),
+		},
+	}
+
+	for _, errorCase := range errorCases {
+		errs := ValidateClusterSpec(errorCase.spec, errorCase.path)
+		if len(errs) == 0 {
+			t.Errorf("expect failure for testname : %q", errorCase.testName)
+		}
+	}
+
+}
 
 func TestValidateCluster(t *testing.T) {
 	successCases := []federation.Cluster{

@@ -694,6 +694,10 @@ run_pod_tests() {
   ## Patch can modify a local object
   kubectl patch --local -f pkg/kubectl/validation/testdata/v1/validPod.yaml --patch='{"spec": {"restartPolicy":"Never"}}' -o jsonpath='{.spec.restartPolicy}' | grep -q "Never"
 
+  ## Patch fails with error message "not patched" and exit code 1
+  output_message=$(! kubectl patch "${kube_flags[@]}" pod valid-pod -p='{"spec":{"replicas":7}}' 2>&1)
+  kube::test::if_has_string "${output_message}" 'not patched'
+
   ## Patch pod can change image
   # Command
   kubectl patch "${kube_flags[@]}" pod valid-pod --record -p='{"spec":{"containers":[{"name": "kubernetes-serve-hostname", "image": "nginx"}]}}'
@@ -4188,7 +4192,7 @@ run_plugins_tests() {
   kube::test::if_has_string "${output_message}" 'no plugins installed'
 
   # single plugins path
-  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin 2>&1)
+  output_message=$(! KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin 2>&1)
   kube::test::if_has_string "${output_message}" 'echo\s\+Echoes for test-cmd'
   kube::test::if_has_string "${output_message}" 'get\s\+The wonderful new plugin-based get!'
   kube::test::if_has_string "${output_message}" 'error\s\+The tremendous plugin that always fails!'
@@ -4225,7 +4229,7 @@ run_plugins_tests() {
   kube::test::if_has_string "${output_message}" 'error: exit status 1'
 
   # plugin tree
-  output_message=$(KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin tree 2>&1)
+  output_message=$(! KUBECTL_PLUGINS_PATH=test/fixtures/pkg/kubectl/plugins kubectl plugin tree 2>&1)
   kube::test::if_has_string "${output_message}" 'Plugin with a tree of commands'
   kube::test::if_has_string "${output_message}" 'child1\s\+The first child of a tree'
   kube::test::if_has_string "${output_message}" 'child2\s\+The second child of a tree'
@@ -4685,7 +4689,7 @@ runTests() {
     kube::test::if_has_string "${output_message}" "yes"
 
     output_message=$(! kubectl auth can-i get /logs/ --subresource=log 2>&1 "${kube_flags[@]}")
-    kube::test::if_has_string "${output_message}" "subresource can not be used with nonResourceURL"
+    kube::test::if_has_string "${output_message}" "subresource can not be used with NonResourceURL"
 
     output_message=$(kubectl auth can-i list jobs.batch/bar -n foo --quiet 2>&1 "${kube_flags[@]}")
     kube::test::if_empty_string "${output_message}"

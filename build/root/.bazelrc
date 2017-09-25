@@ -11,3 +11,12 @@ build --sandbox_tmpfs_path=/tmp
 # Ensure that Bazel never runs as root, which can cause unit tests to fail.
 # This flag requires Bazel 0.5.0+
 build --sandbox_fake_username
+
+# rules_go@82483596ec203eb9c1849937636f4cbed83733eb has a typo that
+# inadvertently relies on comprehension variables leaking.
+# TODO(ixdy): Remove this default once rules_go is bumped.
+# Ref kubernetes/kubernetes#52677
+build --incompatible_comprehension_variables_do_not_leak=false
+
+# Enable go race detection.
+test --features=race

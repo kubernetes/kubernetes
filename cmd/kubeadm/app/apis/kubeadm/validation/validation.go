@@ -49,7 +49,6 @@ var cloudproviders = []string{
 	"openstack",
 	"ovirt",
 	"photon",
-	"rackspace",
 	"vsphere",
 }
 
@@ -59,6 +58,7 @@ var requiredAuthzModes = []string{
 	authzmodes.ModeNode,
 }
 
+// ValidateMasterConfiguration validates master configuration and collects all encountered errors
 func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateCloudProvider(c.CloudProvider, field.NewPath("cloudprovider"))...)
@@ -73,6 +73,7 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	return allErrs
 }
 
+// ValidateNodeConfiguration validates node configuration and collects all encountered errors
 func ValidateNodeConfiguration(c *kubeadm.NodeConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateDiscovery(c, field.NewPath("discovery"))...)
@@ -83,10 +84,10 @@ func ValidateNodeConfiguration(c *kubeadm.NodeConfiguration) field.ErrorList {
 	return allErrs
 }
 
+// ValidateAuthorizationModes  validates authorization modes and collects all encountered errors
 func ValidateAuthorizationModes(authzModes []string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	found := map[string]bool{}
-
 	for _, authzMode := range authzModes {
 		if !authzmodes.IsValidAuthorizationMode(authzMode) {
 			allErrs = append(allErrs, field.Invalid(fldPath, authzMode, "invalid authorization mode"))
@@ -106,6 +107,7 @@ func ValidateAuthorizationModes(authzModes []string, fldPath *field.Path) field.
 	return allErrs
 }
 
+// ValidateDiscovery validates discovery related configuration and collects all encountered errors
 func ValidateDiscovery(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(c.DiscoveryToken) != 0 {
@@ -124,10 +126,10 @@ func ValidateDiscovery(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.
 	if len(c.DiscoveryFile) != 0 {
 		allErrs = append(allErrs, ValidateDiscoveryFile(c.DiscoveryFile, fldPath)...)
 	}
-
 	return allErrs
 }
 
+// ValidateArgSelection validates discovery related configuration and collects all encountered errors
 func ValidateArgSelection(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(cfg.DiscoveryToken) != 0 && len(cfg.DiscoveryFile) != 0 {
@@ -157,6 +159,7 @@ func ValidateArgSelection(cfg *kubeadm.NodeConfiguration, fldPath *field.Path) f
 	return allErrs
 }
 
+// ValidateJoinDiscoveryTokenAPIServer validates discovery token for API server
 func ValidateJoinDiscoveryTokenAPIServer(c *kubeadm.NodeConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, m := range c.DiscoveryTokenAPIServers {
@@ -168,6 +171,7 @@ func ValidateJoinDiscoveryTokenAPIServer(c *kubeadm.NodeConfiguration, fldPath *
 	return allErrs
 }
 
+// ValidateDiscoveryFile validates location of a discovery file
 func ValidateDiscoveryFile(discoveryFile string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	u, err := url.Parse(discoveryFile)
@@ -190,6 +194,7 @@ func ValidateDiscoveryFile(discoveryFile string, fldPath *field.Path) field.Erro
 	return allErrs
 }
 
+// ValidateToken validates token
 func ValidateToken(t string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -204,6 +209,7 @@ func ValidateToken(t string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// ValidateAPIServerCertSANs validates alternative names
 func ValidateAPIServerCertSANs(altnames []string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, altname := range altnames {
@@ -214,6 +220,7 @@ func ValidateAPIServerCertSANs(altnames []string, fldPath *field.Path) field.Err
 	return allErrs
 }
 
+// ValidateIPFromString validates ip address
 func ValidateIPFromString(ipaddr string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if net.ParseIP(ipaddr) == nil {
@@ -222,6 +229,7 @@ func ValidateIPFromString(ipaddr string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// ValidateIPNetFromString validates network portion of ip address
 func ValidateIPNetFromString(subnet string, minAddrs int64, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	_, svcSubnet, err := net.ParseCIDR(subnet)
@@ -236,6 +244,7 @@ func ValidateIPNetFromString(subnet string, minAddrs int64, fldPath *field.Path)
 	return allErrs
 }
 
+// ValidateNetworking validates networking configuration
 func ValidateNetworking(c *kubeadm.Networking, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateDNS1123Subdomain(c.DNSDomain, field.NewPath("dns-domain"))...)
@@ -246,6 +255,7 @@ func ValidateNetworking(c *kubeadm.Networking, fldPath *field.Path) field.ErrorL
 	return allErrs
 }
 
+// ValidateAbsolutePath validates whether provided path is absolute or not
 func ValidateAbsolutePath(path string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if !filepath.IsAbs(path) {
@@ -254,6 +264,7 @@ func ValidateAbsolutePath(path string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// ValidateNodeName validates the name of a node
 func ValidateNodeName(nodename string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if node.GetHostname(nodename) != nodename {
@@ -262,6 +273,7 @@ func ValidateNodeName(nodename string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// ValidateCloudProvider validates if cloud provider is supported
 func ValidateCloudProvider(provider string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(provider) == 0 {
@@ -276,6 +288,7 @@ func ValidateCloudProvider(provider string, fldPath *field.Path) field.ErrorList
 	return allErrs
 }
 
+// ValidateMixedArguments validates passed arguments
 func ValidateMixedArguments(flag *pflag.FlagSet) error {
 	// If --config isn't set, we have nothing to validate
 	if !flag.Changed("config") {
@@ -297,6 +310,7 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 	return nil
 }
 
+// ValidateFeatureGates validates provided feature gates
 func ValidateFeatureGates(featureGates map[string]bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	validFeatures := features.Keys(features.InitFeatureGates)
@@ -312,6 +326,7 @@ func ValidateFeatureGates(featureGates map[string]bool, fldPath *field.Path) fie
 	return allErrs
 }
 
+// ValidateAPIEndpoint validates API server's endpoint
 func ValidateAPIEndpoint(c *kubeadm.MasterConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 

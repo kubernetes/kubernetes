@@ -2351,7 +2351,7 @@ func DumpNodeDebugInfo(c clientset.Interface, nodeNames []string, logFunc func(f
 		logFunc("\nLogging pods the kubelet thinks is on node %v", n)
 		podList, err := GetKubeletPods(c, n)
 		if err != nil {
-			logFunc("Unable to retrieve kubelet pods for node %v", n)
+			logFunc("Unable to retrieve kubelet pods for node %v: %v", n, err)
 			continue
 		}
 		for _, p := range podList.Items {
@@ -3917,6 +3917,33 @@ func WaitForControllerManagerUp() error {
 	return fmt.Errorf("waiting for controller-manager timed out")
 }
 
+// CheckForControllerManagerHealthy checks that the controller manager does not crash within "duration"
+func CheckForControllerManagerHealthy(duration time.Duration) error {
+	var PID string
+	cmd := "sudo docker ps | grep k8s_kube-controller-manager | cut -d ' ' -f 1"
+	for start := time.Now(); time.Since(start) < duration; time.Sleep(5 * time.Second) {
+		result, err := SSH(cmd, GetMasterHost()+":22", TestContext.Provider)
+		if err != nil {
+			// We don't necessarily know that it crashed, pipe could just be broken
+			LogSSHResult(result)
+			return fmt.Errorf("master unreachable after %v", time.Since(start))
+		} else if result.Code != 0 {
+			LogSSHResult(result)
+			return fmt.Errorf("SSH result code not 0. actually: %v after %v", result.Code, time.Since(start))
+		} else if result.Stdout != PID {
+			if PID == "" {
+				PID = result.Stdout
+			} else {
+				//its dead
+				return fmt.Errorf("controller manager crashed, old PID: %s, new PID: %s", PID, result.Stdout)
+			}
+		} else {
+			Logf("kube-controller-manager still healthy after %v", time.Since(start))
+		}
+	}
+	return nil
+}
+
 // Returns number of ready Nodes excluding Master Node.
 func NumberOfReadyNodes(c clientset.Interface) (int, error) {
 	nodes, err := c.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
@@ -4775,7 +4802,7 @@ func CleanupGCEResources(c clientset.Interface, loadBalancerName, zone string) (
 	if err != nil {
 		return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
 	}
-	if err := gceCloud.DeleteFirewall(loadBalancerName); err != nil &&
+	if err := gceCloud.DeleteFirewall(gcecloud.MakeFirewallName(loadBalancerName)); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = err
 	}
@@ -4788,7 +4815,12 @@ func CleanupGCEResources(c clientset.Interface, loadBalancerName, zone string) (
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, err)
 	}
-	var hcNames []string
+	clusterID, err := GetClusterID(c)
+	if err != nil {
+		retErr = fmt.Errorf("%v\n%v", retErr, err)
+		return
+	}
+	hcNames := []string{gcecloud.MakeNodesHealthCheckName(clusterID)}
 	hc, getErr := gceCloud.GetHttpHealthCheck(loadBalancerName)
 	if getErr != nil && !IsGoogleAPIHTTPErrorCode(getErr, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, getErr)
@@ -4796,11 +4828,6 @@ func CleanupGCEResources(c clientset.Interface, loadBalancerName, zone string) (
 	}
 	if hc != nil {
 		hcNames = append(hcNames, hc.Name)
-	}
-	clusterID, err := GetClusterID(c)
-	if err != nil {
-		retErr = fmt.Errorf("%v\n%v", retErr, err)
-		return
 	}
 	if err := gceCloud.DeleteExternalTargetPoolAndChecks(nil, loadBalancerName, region, clusterID, hcNames...); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {

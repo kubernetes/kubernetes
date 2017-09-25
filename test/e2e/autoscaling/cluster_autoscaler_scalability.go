@@ -131,7 +131,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 			}
 			break
 		}
-		glog.Infof("Made nodes schedulable again in %v", time.Now().Sub(s).String())
+		glog.Infof("Made nodes schedulable again in %v", time.Since(s).String())
 	})
 
 	It("should scale up at all [Feature:ClusterAutoscalerScalability1]", func() {

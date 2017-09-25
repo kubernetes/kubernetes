@@ -12,6 +12,7 @@ go_test(
         "admission_test.go",
         "certs_test.go",
         "rules_test.go",
+        "serviceresolver_test.go",
     ],
     library = ":go_default_library",
     deps = [
@@ -32,6 +33,7 @@ go_library(
         "admission.go",
         "doc.go",
         "rules.go",
+        "serviceresolver.go",
     ],
     deps = [
         "//pkg/api:go_default_library",

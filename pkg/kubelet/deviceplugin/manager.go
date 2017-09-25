@@ -189,9 +189,12 @@ func (m *ManagerImpl) Register(ctx context.Context,
 
 // Stop is the function that can stop the gRPC server.
 func (m *ManagerImpl) Stop() error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 	for _, e := range m.endpoints {
 		e.stop()
 	}
+
 	m.server.Stop()
 	return nil
 }

@@ -152,6 +152,22 @@ func TestAdmitUpdate(t *testing.T) {
 			newInitializers: &metav1.Initializers{Pending: []metav1.Initializer{{Name: "init.k8s.io"}}},
 			err:             "field is immutable once initialization has completed",
 		},
+		{
+			name:            "empty initializer list is treated as nil initializer",
+			oldInitializers: nil,
+			newInitializers: &metav1.Initializers{},
+			verifyUpdatedObj: func(obj runtime.Object) (bool, string) {
+				accessor, err := meta.Accessor(obj)
+				if err != nil {
+					return false, "cannot get accessor"
+				}
+				if accessor.GetInitializers() != nil {
+					return false, "expect nil initializers"
+				}
+				return true, ""
+			},
+			err: "",
+		},
 	}
 
 	plugin := initializer{

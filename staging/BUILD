@@ -6,17 +6,6 @@ load(
     "go_library",
 )
 
-go_binary(
-    name = "staging",
-    library = ":go_default_library",
-)
-
-go_library(
-    name = "go_default_library",
-    srcs = ["godeps-json-updater.go"],
-    deps = ["//vendor/github.com/spf13/pflag:go_default_library"],
-)
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -208,13 +197,6 @@ filegroup(
         "//staging/src/k8s.io/code-generator/cmd/lister-gen:all-srcs",
         "//staging/src/k8s.io/code-generator/cmd/openapi-gen:all-srcs",
         "//staging/src/k8s.io/code-generator/cmd/set-gen:all-srcs",
-        "//staging/src/k8s.io/code-generator/test/apis/testgroup:all-srcs",
-        "//staging/src/k8s.io/code-generator/test/clientset/internal:all-srcs",
-        "//staging/src/k8s.io/code-generator/test/clientset/versioned:all-srcs",
-        "//staging/src/k8s.io/code-generator/test/informers/externalversions:all-srcs",
-        "//staging/src/k8s.io/code-generator/test/informers/internalversion:all-srcs",
-        "//staging/src/k8s.io/code-generator/test/listers/testgroup/internalversion:all-srcs",
-        "//staging/src/k8s.io/code-generator/test/listers/testgroup/v1:all-srcs",
         "//staging/src/k8s.io/code-generator/third_party/forked/golang/reflect:all-srcs",
         "//staging/src/k8s.io/kube-aggregator:all-srcs",
         "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics:all-srcs",

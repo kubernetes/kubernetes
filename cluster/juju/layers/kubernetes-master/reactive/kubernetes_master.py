@@ -37,7 +37,7 @@ from charms.reactive import hook
 from charms.reactive import remove_state
 from charms.reactive import set_state
 from charms.reactive import is_state
-from charms.reactive import when, when_any, when_not
+from charms.reactive import when, when_any, when_not, when_all
 from charms.reactive.helpers import data_changed, any_file_changed
 from charms.kubernetes.common import get_version
 from charms.kubernetes.common import retry
@@ -360,19 +360,17 @@ def start_master(etcd):
         # the master unit disconnects from etcd and is ready to terminate.
         # No point in trying to start master services and fail. Just return.
         return
-    handle_etcd_relation(etcd)
-    configure_master_services()
-    hookenv.status_set('maintenance',
-                       'Starting the Kubernetes master services.')
 
-    services = ['kube-apiserver',
-                'kube-controller-manager',
-                'kube-scheduler']
-    for service in services:
-        host.service_restart('snap.%s.daemon' % service)
+    # TODO: Make sure below relation is handled on change
+    # https://github.com/kubernetes/kubernetes/issues/43461
+    handle_etcd_relation(etcd)
+
+    # Add CLI options to all components
+    configure_apiserver()
+    configure_controller_manager()
+    configure_scheduler()
 
     hookenv.open_port(6443)
-    set_state('kubernetes-master.components.started')
 
 
 @when('etcd.available')
@@ -675,6 +673,12 @@ def on_config_allow_privileged_change():
     remove_state('config.changed.allow-privileged')
 
 
+@when('config.changed.api-extra-args')
+@when('kubernetes-master.components.started')
+def on_config_api_extra_args_change():
+    configure_apiserver()
+
+
 @when('kube-control.gpu.available')
 @when('kubernetes-master.components.started')
 @when_not('kubernetes-master.gpu.enabled')
@@ -714,6 +718,44 @@ def shutdown():
     service_stop('snap.kube-apiserver.daemon')
     service_stop('snap.kube-controller-manager.daemon')
     service_stop('snap.kube-scheduler.daemon')
+
+
+@when('kube-apiserver.do-restart')
+def restart_apiserver():
+    prev_state, prev_msg = hookenv.status_get()
+    hookenv.status_set('maintenance', 'Restarting kube-apiserver')
+    host.service_restart('snap.kube-apiserver.daemon')
+    hookenv.status_set(prev_state, prev_msg)
+    remove_state('kube-apiserver.do-restart')
+    set_state('kube-apiserver.started')
+
+
+@when('kube-controller-manager.do-restart')
+def restart_controller_manager():
+    prev_state, prev_msg = hookenv.status_get()
+    hookenv.status_set('maintenance', 'Restarting kube-controller-manager')
+    host.service_restart('snap.kube-controller-manager.daemon')
+    hookenv.status_set(prev_state, prev_msg)
+    remove_state('kube-controller-manager.do-restart')
+    set_state('kube-controller-manager.started')
+
+
+@when('kube-scheduler.do-restart')
+def restart_scheduler():
+    prev_state, prev_msg = hookenv.status_get()
+    hookenv.status_set('maintenance', 'Restarting kube-scheduler')
+    host.service_restart('snap.kube-scheduler.daemon')
+    hookenv.status_set(prev_state, prev_msg)
+    remove_state('kube-scheduler.do-restart')
+    set_state('kube-scheduler.started')
+
+
+@when_all('kube-apiserver.started',
+          'kube-controller-manager.started',
+          'kube-scheduler.started')
+@when_not('kubernetes-master.components.started')
+def componenets_started():
+    set_state('kubernetes-master.components.started')
 
 
 def arch():
@@ -840,14 +882,50 @@ def handle_etcd_relation(reldata):
     api_opts.add('etcd-servers', connection_string, strict=True)
 
 
-def configure_master_services():
-    ''' Add remaining flags for the master services and configure snaps to use
-    them '''
+def get_config_args():
+    db = unitdata.kv()
+    old_config_args = db.get('api-extra-args', [])
+    # We have to convert them to tuples becuase we use sets
+    old_config_args = [tuple(i) for i in old_config_args]
+    new_config_args = []
+    new_config_arg_names = []
+    for arg in hookenv.config().get('api-extra-args', '').split():
+        new_config_arg_names.append(arg.split('=', 1)[0])
+        if len(arg.split('=', 1)) == 1:  # handle flags ie. --profiling
+            new_config_args.append(tuple([arg, 'true']))
+        else:
+            new_config_args.append(tuple(arg.split('=', 1)))
+
+    hookenv.log('Handling "api-extra-args" option.')
+    hookenv.log('Old arguments: {}'.format(old_config_args))
+    hookenv.log('New arguments: {}'.format(new_config_args))
+    if set(new_config_args) == set(old_config_args):
+        return (new_config_args, [])
+    # Store new args
+    db.set('api-extra-args', new_config_args)
+    to_add = set(new_config_args)
+    to_remove = set(old_config_args) - set(new_config_args)
+    # Extract option names only
+    to_remove = [i[0] for i in to_remove if i[0] not in new_config_arg_names]
+    return (to_add, to_remove)
+
+
+def configure_apiserver():
+    # TODO: investigate if it's possible to use config file to store args
+    # https://github.com/juju-solutions/bundle-canonical-kubernetes/issues/315
+    # Handle api-extra-args config option
+    to_add, to_remove = get_config_args()
 
     api_opts = FlagManager('kube-apiserver')
-    controller_opts = FlagManager('kube-controller-manager')
-    scheduler_opts = FlagManager('kube-scheduler')
-    scheduler_opts.add('v', '2')
+
+    # Remove arguments that are no longer provided as config option
+    # this allows them to be reverted to charm defaults
+    for arg in to_remove:
+        hookenv.log('Removing option: {}'.format(arg))
+        api_opts.destroy(arg)
+        # We need to "unset" options by settig their value to "null" string
+        cmd = ['snap', 'set', 'kube-apiserver', '{}=null'.format(arg)]
+        check_call(cmd)
 
     # Get the tls paths from the layer data.
     layer_options = layer.options('tls-client')
@@ -877,6 +955,7 @@ def configure_master_services():
     api_opts.add('insecure-bind-address', '127.0.0.1')
     api_opts.add('insecure-port', '8080')
     api_opts.add('storage-backend', 'etcd2')  # FIXME: add etcd3 support
+
     admission_control = [
         'Initializers',
         'NamespaceLifecycle',
@@ -894,6 +973,26 @@ def configure_master_services():
         admission_control.remove('Initializers')
     api_opts.add('admission-control', ','.join(admission_control), strict=True)
 
+    # Add operator-provided arguments, this allows operators
+    # to override defaults
+    for arg in to_add:
+        hookenv.log('Adding option: {} {}'.format(arg[0], arg[1]))
+        # Make sure old value is gone
+        api_opts.destroy(arg[0])
+        api_opts.add(arg[0], arg[1])
+
+    cmd = ['snap', 'set', 'kube-apiserver'] + api_opts.to_s().split(' ')
+    check_call(cmd)
+    set_state('kube-apiserver.do-restart')
+
+
+def configure_controller_manager():
+    controller_opts = FlagManager('kube-controller-manager')
+
+    # Get the tls paths from the layer data.
+    layer_options = layer.options('tls-client')
+    ca_cert_path = layer_options.get('ca_certificate_path')
+
     # Default to 3 minute resync. TODO: Make this configureable?
     controller_opts.add('min-resync-period', '3m')
     controller_opts.add('v', '2')
@@ -901,20 +1000,24 @@ def configure_master_services():
     controller_opts.add('logtostderr', 'true')
     controller_opts.add('master', 'http://127.0.0.1:8080')
 
-    scheduler_opts.add('v', '2')
-    scheduler_opts.add('logtostderr', 'true')
-    scheduler_opts.add('master', 'http://127.0.0.1:8080')
-
-    cmd = ['snap', 'set', 'kube-apiserver'] + api_opts.to_s().split(' ')
-    check_call(cmd)
-
     cmd = (
         ['snap', 'set', 'kube-controller-manager'] +
         controller_opts.to_s().split(' ')
     )
     check_call(cmd)
+    set_state('kube-controller-manager.do-restart')
+
+
+def configure_scheduler():
+    scheduler_opts = FlagManager('kube-scheduler')
+
+    scheduler_opts.add('v', '2')
+    scheduler_opts.add('logtostderr', 'true')
+    scheduler_opts.add('master', 'http://127.0.0.1:8080')
+
     cmd = ['snap', 'set', 'kube-scheduler'] + scheduler_opts.to_s().split(' ')
     check_call(cmd)
+    set_state('kube-scheduler.do-restart')
 
 
 def setup_basic_auth(password=None, username='admin', uid='admin'):

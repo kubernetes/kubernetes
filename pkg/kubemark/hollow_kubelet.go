@@ -67,6 +67,7 @@ func NewHollowKubelet(
 	volumePlugins = append(volumePlugins, secret.ProbeVolumePlugins()...)
 	d := &kubelet.Dependencies{
 		KubeClient:        client,
+		HeartbeatClient:   client.CoreV1(),
 		DockerClient:      dockerClient,
 		CAdvisorInterface: cadvisorInterface,
 		Cloud:             nil,

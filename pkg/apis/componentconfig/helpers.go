@@ -35,6 +35,10 @@ type IPVar struct {
 }
 
 func (v IPVar) Set(s string) error {
+	if len(s) == 0 {
+		v.Val = nil
+		return nil
+	}
 	if net.ParseIP(s) == nil {
 		return fmt.Errorf("%q is not a valid IP address", s)
 	}

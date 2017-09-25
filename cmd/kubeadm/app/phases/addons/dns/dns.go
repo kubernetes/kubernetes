@@ -21,8 +21,8 @@ import (
 	"net"
 	"runtime"
 
+	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
@@ -96,7 +96,7 @@ func CreateServiceAccount(client clientset.Interface) error {
 }
 
 func createKubeDNSAddon(deploymentBytes, serviceBytes []byte, client clientset.Interface) error {
-	kubednsDeployment := &extensions.Deployment{}
+	kubednsDeployment := &apps.Deployment{}
 	if err := kuberuntime.DecodeInto(api.Codecs.UniversalDecoder(), deploymentBytes, kubednsDeployment); err != nil {
 		return fmt.Errorf("unable to decode kube-dns deployment %v", err)
 	}

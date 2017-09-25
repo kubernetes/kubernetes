@@ -150,14 +150,13 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		return fmt.Errorf("unable to parse %q: %v", patch, err)
 	}
 
-	// TODO: fix --local to work with customresources without making use of the discovery client.
-	// https://github.com/kubernetes/kubernetes/issues/46722
-	builder, err := f.NewUnstructuredBuilder(true)
+	mapper, typer, err := f.UnstructuredObject()
 	if err != nil {
 		return err
 	}
 
-	r := builder.
+	r := f.NewBuilder().
+		Unstructured(f.UnstructuredClientForMapping, mapper, typer).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
@@ -183,6 +182,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 
 		if !options.Local {
 			dataChangedMsg := "not patched"
+			didPatch := false
 			helper := resource.NewHelper(client, mapping)
 			patchedObj, err := helper.Patch(namespace, name, patchType, patchBytes)
 			if err != nil {
@@ -213,6 +213,7 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 				return err
 			}
 			if !reflect.DeepEqual(oldData, newData) {
+				didPatch = true
 				dataChangedMsg = "patched"
 			}
 
@@ -229,6 +230,12 @@ func RunPatch(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 				return err
 			}
 			cmdutil.PrintSuccess(mapper, options.OutputFormat == "name", out, info.Mapping.Resource, info.Name, false, dataChangedMsg)
+
+			// if object was not successfully patched, exit with error code 1
+			if !didPatch {
+				return cmdutil.ErrExit
+			}
+
 			return nil
 		}
 
