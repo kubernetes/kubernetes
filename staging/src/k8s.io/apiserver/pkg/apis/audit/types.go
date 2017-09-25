@@ -79,12 +79,15 @@ type Event struct {
 	metav1.TypeMeta
 	// ObjectMeta is included for interoperability with API infrastructure.
 	// +optional
+	// DEPRECATED: Use StageTimestamp which supports micro second instead of ObjectMeta.CreateTimestamp
+	// and the rest of the object is not used.
 	metav1.ObjectMeta
 
 	// AuditLevel at which event was generated
 	Level Level
 
 	// Time the request reached the apiserver.
+	// DEPRECATED: Use RequestReceivedTimestamp which supports micro second instead.
 	Timestamp metav1.Time
 	// Unique audit ID, generated for each request.
 	AuditID types.UID
@@ -121,10 +124,15 @@ type Event struct {
 	// +optional
 	RequestObject *runtime.Unknown
 	// API object returned in the response, in JSON. The ResponseObject is recorded after conversion
-	// to the external type, and serialized as JSON.  Omitted for non-resource requests.  Only logged
+	// to the external type, and serialized as JSON. Omitted for non-resource requests.  Only logged
 	// at Response Level.
 	// +optional
 	ResponseObject *runtime.Unknown
+
+	// Time the request reached the apiserver.
+	RequestReceivedTimestamp metav1.MicroTime
+	// Time the request reached current audit stage.
+	StageTimestamp metav1.MicroTime
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

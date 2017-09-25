@@ -73,12 +73,15 @@ type Event struct {
 	metav1.TypeMeta `json:",inline"`
 	// ObjectMeta is included for interoperability with API infrastructure.
 	// +optional
+	// DEPRECATED: Use StageTimestamp which supports micro second instead of ObjectMeta.CreateTimestamp
+	// and the rest of the object is not used
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// AuditLevel at which event was generated
 	Level Level `json:"level" protobuf:"bytes,2,opt,name=level,casttype=Level"`
 
 	// Time the request reached the apiserver.
+	// DEPRECATED: Use RequestReceivedTimestamp which supports micro second instead.
 	Timestamp metav1.Time `json:"timestamp" protobuf:"bytes,3,opt,name=timestamp"`
 	// Unique audit ID, generated for each request.
 	AuditID types.UID `json:"auditID" protobuf:"bytes,4,opt,name=auditID,casttype=k8s.io/apimachinery/pkg/types.UID"`
@@ -119,6 +122,12 @@ type Event struct {
 	// at Response Level.
 	// +optional
 	ResponseObject *runtime.Unknown `json:"responseObject,omitempty" protobuf:"bytes,14,opt,name=responseObject"`
+	// Time the request reached the apiserver.
+	// +optional
+	RequestReceivedTimestamp metav1.MicroTime `json:"requestReceivedTimestamp" protobuf:"bytes,15,opt,name=requestReceivedTimestamp"`
+	// Time the request reached current audit stage.
+	// +optional
+	StageTimestamp metav1.MicroTime `json:"stageTimestamp" protobuf:"bytes,16,opt,name=stageTimestamp"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -133,10 +133,12 @@ func TestLogEventsJson(t *testing.T) {
 			// When encoding to json format, the nanosecond part of timestamp is
 			// lost and it will become zero when we decode event back, so we rounding
 			// timestamp down to a multiple of second.
-			Timestamp: metav1.NewTime(time.Now().Truncate(time.Second)),
-			AuditID:   types.UID(uuid.NewRandom().String()),
-			Stage:     auditinternal.StageRequestReceived,
-			Verb:      "get",
+			Timestamp:                metav1.NewTime(time.Now().Truncate(time.Second)),
+			RequestReceivedTimestamp: metav1.NewMicroTime(time.Now().Truncate(time.Microsecond)),
+			StageTimestamp:           metav1.NewMicroTime(time.Now().Truncate(time.Microsecond)),
+			AuditID:                  types.UID(uuid.NewRandom().String()),
+			Stage:                    auditinternal.StageRequestReceived,
+			Verb:                     "get",
 			User: auditinternal.UserInfo{
 				Username: "admin",
 				Groups: []string{

@@ -148,7 +148,15 @@ func processAuditEvent(sink audit.Sink, ev *auditinternal.Event, omitStages []au
 			return
 		}
 	}
-	ev.CreationTimestamp = metav1.NewTime(time.Now())
+	now := time.Now()
+	// TODO(audit): depercate CreationTimestamp
+	ev.CreationTimestamp = metav1.NewTime(now)
+
+	if ev.Stage == auditinternal.StageRequestReceived {
+		ev.StageTimestamp = metav1.NewMicroTime(ev.Timestamp.Time)
+	} else {
+		ev.StageTimestamp = metav1.NewMicroTime(now)
+	}
 	audit.ObserveEvent()
 	sink.ProcessEvents(ev)
 }
