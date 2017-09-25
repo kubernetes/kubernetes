@@ -82,12 +82,12 @@ func testStackdriverMonitoring(f *framework.Framework, pods, allPodsCPU int, per
 	// $ gcloud auth application-default login
 	// and uncomment following lines (comment out the two lines above): (DON'T set the env var below)
 	/*
-	ts, err := google.DefaultTokenSource(oauth2.NoContext)
-	framework.Logf("Couldn't get application default credentials, %v", err)
-	if err != nil {
-		framework.Failf("Error accessing application default credentials, %v", err)
-	}
-	client := oauth2.NewClient(oauth2.NoContext, ts)
+		ts, err := google.DefaultTokenSource(oauth2.NoContext)
+		framework.Logf("Couldn't get application default credentials, %v", err)
+		if err != nil {
+			framework.Failf("Error accessing application default credentials, %v", err)
+		}
+		client := oauth2.NewClient(oauth2.NoContext, ts)
 	*/
 
 	gcmService, err := gcm.New(client)
