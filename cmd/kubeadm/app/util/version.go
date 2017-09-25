@@ -49,17 +49,22 @@ var (
 //  latest-1    (latest release in 1.x, including alpha/beta)
 //  latest-1.0  (and similarly 1.1, 1.2, 1.3, ...)
 func KubernetesReleaseVersion(version string) (string, error) {
-	if kubeReleaseRegex.MatchString(version) {
-		if strings.HasPrefix(version, "v") {
-			return version, nil
-		}
-		return "v" + version, nil
+	ver := normalizedBuildVersion(version)
+	if len(ver) != 0 {
+		return ver, nil
 	}
 
 	bucketURL, versionLabel, err := splitVersion(version)
 	if err != nil {
 		return "", err
 	}
+
+	// revalidate, if exact build from e.g. CI bucket requested.
+	ver = normalizedBuildVersion(versionLabel)
+	if len(ver) != 0 {
+		return ver, nil
+	}
+
 	if kubeReleaseLabelRegex.MatchString(versionLabel) {
 		url := fmt.Sprintf("%s/%s.txt", bucketURL, versionLabel)
 		body, err := fetchFromURL(url)
@@ -90,6 +95,18 @@ func KubernetesIsCIVersion(version string) bool {
 		return true
 	}
 	return false
+}
+
+// Internal helper: returns normalized build version (with "v" prefix if needed)
+// If input doesn't match known version pattern, returns empty string.
+func normalizedBuildVersion(version string) string {
+	if kubeReleaseRegex.MatchString(version) {
+		if strings.HasPrefix(version, "v") {
+			return version
+		}
+		return "v" + version
+	}
+	return ""
 }
 
 // Internal helper: split version parts,

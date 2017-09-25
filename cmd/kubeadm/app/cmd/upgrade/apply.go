@@ -19,7 +19,6 @@ package upgrade
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/version"
@@ -123,6 +123,19 @@ func RunApply(flags *applyFlags) error {
 	internalcfg := &kubeadmapi.MasterConfiguration{}
 	api.Scheme.Convert(upgradeVars.cfg, internalcfg, nil)
 
+	// Validate requested and validate actual version
+	if err := configutil.NormalizeKubernetesVersion(internalcfg); err != nil {
+		return err
+	}
+
+	// Use normalized version string in all following code.
+	flags.newK8sVersionStr = internalcfg.KubernetesVersion
+	k8sVer, err := version.ParseSemantic(flags.newK8sVersionStr)
+	if err != nil {
+		return fmt.Errorf("unable to parse normalized version %q as a semantic version", flags.newK8sVersionStr)
+	}
+	flags.newK8sVersion = k8sVer
+
 	// Enforce the version skew policies
 	if err := EnforceVersionPolicies(flags, upgradeVars.versionGetter); err != nil {
 		return fmt.Errorf("[upgrade/version] FATAL: %v", err)
@@ -170,15 +183,8 @@ func SetImplicitFlags(flags *applyFlags) error {
 		flags.nonInteractiveMode = true
 	}
 
-	k8sVer, err := version.ParseSemantic(flags.newK8sVersionStr)
-	if err != nil {
-		return fmt.Errorf("couldn't parse version %q as a semantic version", flags.newK8sVersionStr)
-	}
-	flags.newK8sVersion = k8sVer
-
-	// Automatically add the "v" prefix to the string representation in case it doesn't exist
-	if !strings.HasPrefix(flags.newK8sVersionStr, "v") {
-		flags.newK8sVersionStr = fmt.Sprintf("v%s", flags.newK8sVersionStr)
+	if len(flags.newK8sVersionStr) == 0 {
+		return fmt.Errorf("version string can't be empty")
 	}
 
 	return nil
