@@ -619,7 +619,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(waitForAllCaPodsReadyInNamespace(f, c))
 	})
 
-	It("Should be able to scale a node group down to 0[Feature:ClusterSizeAutoscalingXScaleDown]", func() {
+	It("Should be able to scale a node group down to 0[Feature:ClusterSizeAutoscalingScaleDown]", func() {
 		// Determine whether we want to run & adjust the setup if necessary
 		if len(originalSizes) < 2 {
 			if framework.ProviderIs("gke") {
