@@ -30,10 +30,6 @@ const (
 	PodWorkerLatencyKey          = "pod_worker_latency_microseconds"
 	PodStartLatencyKey           = "pod_start_latency_microseconds"
 	CgroupManagerOperationsKey   = "cgroup_manager_latency_microseconds"
-	DockerOperationsLatencyKey   = "docker_operations_latency_microseconds"
-	DockerOperationsKey          = "docker_operations"
-	DockerOperationsErrorsKey    = "docker_operations_errors"
-	DockerOperationsTimeoutKey   = "docker_operations_timeout"
 	PodWorkerStartLatencyKey     = "pod_worker_start_latency_microseconds"
 	PLEGRelistLatencyKey         = "pleg_relist_latency_microseconds"
 	PLEGRelistIntervalKey        = "pleg_relist_interval_microseconds"
@@ -87,39 +83,6 @@ var (
 			Name:      PodWorkerStartLatencyKey,
 			Help:      "Latency in microseconds from seeing a pod to starting a worker.",
 		},
-	)
-	// TODO(random-liu): Move the following docker metrics into shim once dockertools is deprecated.
-	DockerOperationsLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DockerOperationsLatencyKey,
-			Help:      "Latency in microseconds of Docker operations. Broken down by operation type.",
-		},
-		[]string{"operation_type"},
-	)
-	DockerOperations = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DockerOperationsKey,
-			Help:      "Cumulative number of Docker operations by operation type.",
-		},
-		[]string{"operation_type"},
-	)
-	DockerOperationsErrors = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DockerOperationsErrorsKey,
-			Help:      "Cumulative number of Docker operation errors by operation type.",
-		},
-		[]string{"operation_type"},
-	)
-	DockerOperationsTimeout = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DockerOperationsTimeoutKey,
-			Help:      "Cumulative number of Docker operation timeout by operation type.",
-		},
-		[]string{"operation_type"},
 	)
 	PLEGRelistLatency = prometheus.NewSummary(
 		prometheus.SummaryOpts{
@@ -226,13 +189,9 @@ func Register(containerCache kubecontainer.RuntimeCache) {
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(PodWorkerLatency)
 		prometheus.MustRegister(PodStartLatency)
-		prometheus.MustRegister(DockerOperationsLatency)
 		prometheus.MustRegister(CgroupManagerLatency)
 		prometheus.MustRegister(PodWorkerStartLatency)
 		prometheus.MustRegister(ContainersPerPodCount)
-		prometheus.MustRegister(DockerOperations)
-		prometheus.MustRegister(DockerOperationsErrors)
-		prometheus.MustRegister(DockerOperationsTimeout)
 		prometheus.MustRegister(newPodAndContainerCollector(containerCache))
 		prometheus.MustRegister(PLEGRelistLatency)
 		prometheus.MustRegister(PLEGRelistInterval)

@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/metrics"
 )
 
 const (
@@ -219,6 +220,10 @@ func NewDockerService(client libdocker.Interface, podSandboxImage string, stream
 		},
 		versionCacheTTL,
 	)
+
+	// Register prometheus metrics.
+	metrics.Register()
+
 	return ds, nil
 }
 
