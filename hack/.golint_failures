@@ -62,6 +62,7 @@ federation/registry/cluster/etcd
 federation/test/e2e
 federation/test/e2e/framework
 federation/test/e2e/upgrades
+federation/test/integration/framework
 pkg/api/endpoints
 pkg/api/helper
 pkg/api/helper/qos
@@ -812,7 +813,6 @@ test/images/resource-consumer/controller
 test/integration
 test/integration/auth
 test/integration/evictions
-test/integration/federation/framework
 test/integration/framework
 test/integration/master
 test/integration/replicaset

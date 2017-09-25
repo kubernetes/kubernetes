@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package federation
+package integration
 
 import (
 	"encoding/json"
@@ -32,7 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	fed_v1b1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	"k8s.io/kubernetes/test/integration/federation/framework"
+	"k8s.io/kubernetes/federation/test/integration/framework"
 )
 
 // List of group versions that are enabled by default.

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package federation
+package integration
 
 import (
 	"fmt"
@@ -26,7 +26,7 @@ import (
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes/crudtester"
-	"k8s.io/kubernetes/test/integration/federation/framework"
+	"k8s.io/kubernetes/federation/test/integration/framework"
 )
 
 // TestFederationCRUD validates create/read/update/delete operations for federated resource types.
