@@ -34,10 +34,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	clientretry "k8s.io/client-go/util/retry"
-	nodeutilv1 "k8s.io/kubernetes/pkg/api/v1/node"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	nodeutilv1 "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
