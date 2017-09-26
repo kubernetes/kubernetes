@@ -184,11 +184,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 		return err
 	}
 	out.EnableContentionProfiling = in.EnableContentionProfiling
-	out.MinimumGCAge = in.MinimumGCAge
-	out.MaxPerPodContainerCount = in.MaxPerPodContainerCount
-	if err := v1.Convert_Pointer_int32_To_int32(&in.MaxContainerCount, &out.MaxContainerCount, s); err != nil {
-		return err
-	}
 	if err := v1.Convert_Pointer_int32_To_int32(&in.CAdvisorPort, &out.CAdvisorPort, s); err != nil {
 		return err
 	}
@@ -203,7 +198,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 		return err
 	}
 	out.ClusterDomain = in.ClusterDomain
-	out.MasterServiceNamespace = in.MasterServiceNamespace
 	out.ClusterDNS = *(*[]string)(unsafe.Pointer(&in.ClusterDNS))
 	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
@@ -225,12 +219,9 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 	}
 	out.CgroupDriver = in.CgroupDriver
 	out.ContainerRuntime = in.ContainerRuntime
-	out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
-	out.RemoteImageEndpoint = in.RemoteImageEndpoint
 	out.CPUManagerPolicy = in.CPUManagerPolicy
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
-	out.ExperimentalMounterPath = in.ExperimentalMounterPath
 	if err := v1.Convert_Pointer_string_To_string(&in.LockFilePath, &out.LockFilePath, s); err != nil {
 		return err
 	}
@@ -242,13 +233,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 	if err := v1.Convert_Pointer_bool_To_bool(&in.CPUCFSQuota, &out.CPUCFSQuota, s); err != nil {
 		return err
 	}
-	if err := v1.Convert_Pointer_bool_To_bool(&in.Containerized, &out.Containerized, s); err != nil {
-		return err
-	}
 	out.MaxOpenFiles = in.MaxOpenFiles
-	if err := v1.Convert_Pointer_bool_To_bool(&in.RegisterSchedulable, &out.RegisterSchedulable, s); err != nil {
-		return err
-	}
 	out.RegisterWithTaints = *(*[]api.Taint)(unsafe.Pointer(&in.RegisterWithTaints))
 	out.ContentType = in.ContentType
 	if err := v1.Convert_Pointer_int32_To_int32(&in.KubeAPIQPS, &out.KubeAPIQPS, s); err != nil {
@@ -259,7 +244,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 		return err
 	}
 	out.NodeLabels = *(*map[string]string)(unsafe.Pointer(&in.NodeLabels))
-	out.NonMasqueradeCIDR = in.NonMasqueradeCIDR
 	out.EnableCustomMetrics = in.EnableCustomMetrics
 	if err := v1.Convert_Pointer_string_To_string(&in.EvictionHard, &out.EvictionHard, s); err != nil {
 		return err
@@ -269,14 +253,10 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 	out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
 	out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
 	out.EvictionMinimumReclaim = in.EvictionMinimumReclaim
-	if err := v1.Convert_Pointer_bool_To_bool(&in.ExperimentalKernelMemcgNotification, &out.ExperimentalKernelMemcgNotification, s); err != nil {
-		return err
-	}
 	out.PodsPerCore = in.PodsPerCore
 	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach, s); err != nil {
 		return err
 	}
-	out.ExperimentalQOSReserved = *(*kubeletconfig.ConfigurationMap)(unsafe.Pointer(&in.ExperimentalQOSReserved))
 	out.ProtectKernelDefaults = in.ProtectKernelDefaults
 	if err := v1.Convert_Pointer_bool_To_bool(&in.MakeIPTablesUtilChains, &out.MakeIPTablesUtilChains, s); err != nil {
 		return err
@@ -287,17 +267,13 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 	if err := v1.Convert_Pointer_int32_To_int32(&in.IPTablesDropBit, &out.IPTablesDropBit, s); err != nil {
 		return err
 	}
-	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.FailSwapOn = in.FailSwapOn
-	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
-	out.KeepTerminatedPodVolumes = in.KeepTerminatedPodVolumes
 	out.SystemReserved = *(*kubeletconfig.ConfigurationMap)(unsafe.Pointer(&in.SystemReserved))
 	out.KubeReserved = *(*kubeletconfig.ConfigurationMap)(unsafe.Pointer(&in.KubeReserved))
 	out.SystemReservedCgroup = in.SystemReservedCgroup
 	out.KubeReservedCgroup = in.KubeReservedCgroup
 	out.EnforceNodeAllocatable = *(*[]string)(unsafe.Pointer(&in.EnforceNodeAllocatable))
-	out.ExperimentalNodeAllocatableIgnoreEvictionThreshold = in.ExperimentalNodeAllocatableIgnoreEvictionThreshold
 	return nil
 }
 
@@ -349,11 +325,6 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 		return err
 	}
 	out.EnableContentionProfiling = in.EnableContentionProfiling
-	out.MinimumGCAge = in.MinimumGCAge
-	out.MaxPerPodContainerCount = in.MaxPerPodContainerCount
-	if err := v1.Convert_int32_To_Pointer_int32(&in.MaxContainerCount, &out.MaxContainerCount, s); err != nil {
-		return err
-	}
 	if err := v1.Convert_int32_To_Pointer_int32(&in.CAdvisorPort, &out.CAdvisorPort, s); err != nil {
 		return err
 	}
@@ -368,7 +339,6 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 		return err
 	}
 	out.ClusterDomain = in.ClusterDomain
-	out.MasterServiceNamespace = in.MasterServiceNamespace
 	out.ClusterDNS = *(*[]string)(unsafe.Pointer(&in.ClusterDNS))
 	out.StreamingConnectionIdleTimeout = in.StreamingConnectionIdleTimeout
 	out.NodeStatusUpdateFrequency = in.NodeStatusUpdateFrequency
@@ -390,12 +360,9 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	out.SystemCgroups = in.SystemCgroups
 	out.CgroupRoot = in.CgroupRoot
 	out.ContainerRuntime = in.ContainerRuntime
-	out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
-	out.RemoteImageEndpoint = in.RemoteImageEndpoint
 	out.CPUManagerPolicy = in.CPUManagerPolicy
 	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
-	out.ExperimentalMounterPath = in.ExperimentalMounterPath
 	if err := v1.Convert_string_To_Pointer_string(&in.LockFilePath, &out.LockFilePath, s); err != nil {
 		return err
 	}
@@ -407,13 +374,7 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	if err := v1.Convert_bool_To_Pointer_bool(&in.CPUCFSQuota, &out.CPUCFSQuota, s); err != nil {
 		return err
 	}
-	if err := v1.Convert_bool_To_Pointer_bool(&in.Containerized, &out.Containerized, s); err != nil {
-		return err
-	}
 	out.MaxOpenFiles = in.MaxOpenFiles
-	if err := v1.Convert_bool_To_Pointer_bool(&in.RegisterSchedulable, &out.RegisterSchedulable, s); err != nil {
-		return err
-	}
 	out.RegisterWithTaints = *(*[]core_v1.Taint)(unsafe.Pointer(&in.RegisterWithTaints))
 	out.ContentType = in.ContentType
 	if err := v1.Convert_int32_To_Pointer_int32(&in.KubeAPIQPS, &out.KubeAPIQPS, s); err != nil {
@@ -424,7 +385,6 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 		return err
 	}
 	out.NodeLabels = *(*map[string]string)(unsafe.Pointer(&in.NodeLabels))
-	out.NonMasqueradeCIDR = in.NonMasqueradeCIDR
 	out.EnableCustomMetrics = in.EnableCustomMetrics
 	if err := v1.Convert_string_To_Pointer_string(&in.EvictionHard, &out.EvictionHard, s); err != nil {
 		return err
@@ -434,14 +394,10 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
 	out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
 	out.EvictionMinimumReclaim = in.EvictionMinimumReclaim
-	if err := v1.Convert_bool_To_Pointer_bool(&in.ExperimentalKernelMemcgNotification, &out.ExperimentalKernelMemcgNotification, s); err != nil {
-		return err
-	}
 	out.PodsPerCore = in.PodsPerCore
 	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach, s); err != nil {
 		return err
 	}
-	out.ExperimentalQOSReserved = *(*map[string]string)(unsafe.Pointer(&in.ExperimentalQOSReserved))
 	out.ProtectKernelDefaults = in.ProtectKernelDefaults
 	if err := v1.Convert_bool_To_Pointer_bool(&in.MakeIPTablesUtilChains, &out.MakeIPTablesUtilChains, s); err != nil {
 		return err
@@ -452,17 +408,13 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 	if err := v1.Convert_int32_To_Pointer_int32(&in.IPTablesDropBit, &out.IPTablesDropBit, s); err != nil {
 		return err
 	}
-	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.FailSwapOn = in.FailSwapOn
-	out.ExperimentalCheckNodeCapabilitiesBeforeMount = in.ExperimentalCheckNodeCapabilitiesBeforeMount
-	out.KeepTerminatedPodVolumes = in.KeepTerminatedPodVolumes
 	out.SystemReserved = *(*map[string]string)(unsafe.Pointer(&in.SystemReserved))
 	out.KubeReserved = *(*map[string]string)(unsafe.Pointer(&in.KubeReserved))
 	out.SystemReservedCgroup = in.SystemReservedCgroup
 	out.KubeReservedCgroup = in.KubeReservedCgroup
 	out.EnforceNodeAllocatable = *(*[]string)(unsafe.Pointer(&in.EnforceNodeAllocatable))
-	out.ExperimentalNodeAllocatableIgnoreEvictionThreshold = in.ExperimentalNodeAllocatableIgnoreEvictionThreshold
 	return nil
 }
 
