@@ -133,6 +133,9 @@ func (r *Reset) Run(out io.Writer) error {
 	}
 
 	// Remove contents from the config and pki directories
+	if r.certsDir != kubeadmapiext.DefaultCertificatesDir {
+		fmt.Printf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", r.certsDir)
+	}
 	resetConfigDir(kubeadmconstants.KubernetesDir, r.certsDir)
 
 	return nil
