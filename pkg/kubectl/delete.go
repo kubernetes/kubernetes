@@ -72,7 +72,7 @@ func ReaperFor(kind schema.GroupKind, c internalclientset.Interface) (Reaper, er
 	case api.Kind("ReplicationController"):
 		return &ReplicationControllerReaper{c.Core(), Interval, Timeout}, nil
 
-	case extensions.Kind("ReplicaSet"):
+	case extensions.Kind("ReplicaSet"), apps.Kind("ReplicaSet"):
 		return &ReplicaSetReaper{c.Extensions(), Interval, Timeout}, nil
 
 	case extensions.Kind("DaemonSet"), apps.Kind("DaemonSet"):
