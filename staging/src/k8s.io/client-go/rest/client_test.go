@@ -85,6 +85,35 @@ func TestDoRequestSuccess(t *testing.T) {
 	validate(testParam, t, body, fakeHandler)
 }
 
+func TestRESTClientRequestTimeout(t *testing.T) {
+	testServer, _, _ := testServerEnv(t, 200)
+	defer testServer.Close()
+
+	c, err := RESTClientFor(&Config{
+		Host: testServer.URL,
+		ContentConfig: ContentConfig{
+			GroupVersion:         &v1.SchemeGroupVersion,
+			NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+		},
+		Username: "user",
+		Password: "pass",
+		Timeout:  10 * time.Second,
+	})
+	// check timeout is not set in http client
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	} else {
+		if c.Client.Timeout != 0 {
+			t.Errorf("config should set per-request context timeout instead of client timeout")
+		}
+	}
+	// check timeout is set in per request context
+	deadline, ok := c.Get().GetContextDeadline()
+	if ok != true || deadline.Before(time.Now()) {
+		t.Errorf("unexpected per-request timeout not-set")
+	}
+}
+
 func TestDoRequestFailed(t *testing.T) {
 	status := &metav1.Status{
 		Code:    http.StatusNotFound,

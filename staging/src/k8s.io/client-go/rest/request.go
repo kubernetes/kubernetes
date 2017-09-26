@@ -112,7 +112,7 @@ type Request struct {
 }
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
-func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPath string, content ContentConfig, serializers Serializers, backoff BackoffManager, throttle flowcontrol.RateLimiter) *Request {
+func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPath string, content ContentConfig, serializers Serializers, backoff BackoffManager, throttle flowcontrol.RateLimiter, timeout time.Duration) *Request {
 	if backoff == nil {
 		glog.V(2).Infof("Not implementing request backoff strategy.")
 		backoff = &NoBackoff{}
@@ -121,6 +121,12 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPa
 	pathPrefix := "/"
 	if baseURL != nil {
 		pathPrefix = path.Join(pathPrefix, baseURL.Path)
+	}
+	var c context.Context
+	if timeout > 0 {
+		c, _ = context.WithTimeout(context.Background(), timeout)
+	} else {
+		c = context.Background()
 	}
 	r := &Request{
 		client:      client,
@@ -131,6 +137,7 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPa
 		serializers: serializers,
 		backoffMgr:  backoff,
 		throttle:    throttle,
+		ctx:         c,
 	}
 	switch {
 	case len(content.AcceptContentTypes) > 0:
@@ -393,6 +400,10 @@ func (r *Request) Body(obj interface{}) *Request {
 func (r *Request) Context(ctx context.Context) *Request {
 	r.ctx = ctx
 	return r
+}
+
+func (r *Request) GetContextDeadline() (deadline time.Time, ok bool) {
+	return r.ctx.Deadline()
 }
 
 // URL returns the current working URL.

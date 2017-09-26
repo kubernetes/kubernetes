@@ -210,14 +210,15 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 	}
 
 	var httpClient *http.Client
+	var clientTimeout time.Duration
 	if transport != http.DefaultTransport {
 		httpClient = &http.Client{Transport: transport}
 		if config.Timeout > 0 {
-			httpClient.Timeout = config.Timeout
+			clientTimeout = config.Timeout
 		}
 	}
 
-	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient)
+	return NewRESTClient(baseURL, versionedAPIPath, config.ContentConfig, qps, burst, config.RateLimiter, httpClient, clientTimeout)
 }
 
 // UnversionedRESTClientFor is the same as RESTClientFor, except that it allows
@@ -238,10 +239,11 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 	}
 
 	var httpClient *http.Client
+	var clientTimeout time.Duration
 	if transport != http.DefaultTransport {
 		httpClient = &http.Client{Transport: transport}
 		if config.Timeout > 0 {
-			httpClient.Timeout = config.Timeout
+			clientTimeout = config.Timeout
 		}
 	}
 
@@ -251,7 +253,7 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		versionConfig.GroupVersion = &v
 	}
 
-	return NewRESTClient(baseURL, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient)
+	return NewRESTClient(baseURL, versionedAPIPath, versionConfig, config.QPS, config.Burst, config.RateLimiter, httpClient, clientTimeout)
 }
 
 // SetKubernetesDefaults sets default values on the provided client config for accessing the
