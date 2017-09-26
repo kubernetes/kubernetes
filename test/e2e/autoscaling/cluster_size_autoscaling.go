@@ -623,11 +623,12 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		// Determine whether we want to run & adjust the setup if necessary
 		if len(originalSizes) < 2 {
 			if framework.ProviderIs("gke") {
+				By("Adding a new node pool")
 				const extraPoolName = "extra-pool"
 				addNodePool(extraPoolName, "n1-standard-4", 1)
 				defer deleteNodePool(extraPoolName)
-				err := enableAutoscaler(extraPoolName, 0, 1)
-				framework.ExpectNoError(err)
+				framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+1, resizeTimeout))
+				framework.ExpectNoError(enableAutoscaler(extraPoolName, 0, 1))
 			} else {
 				framework.Skipf("At least 2 node groups are needed for scale-to-0 tests")
 			}
@@ -831,12 +832,15 @@ func enableAutoscaler(nodePool string, minCount, maxCount int) error {
 		glog.Infof("Config update result: %s", putResult)
 	}
 
+	var finalErr error
 	for startTime := time.Now(); startTime.Add(gkeUpdateTimeout).After(time.Now()); time.Sleep(30 * time.Second) {
-		if val, err := isAutoscalerEnabled(minCount); err == nil && val {
+		val, err := isAutoscalerEnabled(minCount)
+		if err == nil && val {
 			return nil
 		}
+		finalErr = err
 	}
-	return fmt.Errorf("autoscaler not enabled")
+	return fmt.Errorf("autoscaler not enabled, last error: %v", finalErr)
 }
 
 func disableAutoscaler(nodePool string, minCount, maxCount int) error {
