@@ -99,9 +99,8 @@ func (m *DevicePluginManagerTestStub) Allocate(resourceName string, devIds []str
 	for _, id := range devIds {
 		key := resourceName + id
 		fmt.Printf("Alloc device %q for resource %q\n", id, resourceName)
-		devRuntime := new(pluginapi.DeviceRuntimeSpec)
 		for _, dev := range m.devRuntimeDevices[key] {
-			devRuntime.Devices = append(devRuntime.Devices, &pluginapi.DeviceSpec{
+			resp.Devices = append(resp.Devices, &pluginapi.DeviceSpec{
 				ContainerPath: dev.value1,
 				HostPath:      dev.value2,
 				Permissions:   "mrw",
@@ -109,17 +108,16 @@ func (m *DevicePluginManagerTestStub) Allocate(resourceName string, devIds []str
 		}
 		for _, mount := range m.devRuntimeMounts[key] {
 			fmt.Printf("Add mount %q %q\n", mount.value1, mount.value2)
-			devRuntime.Mounts = append(devRuntime.Mounts, &pluginapi.Mount{
+			resp.Mounts = append(resp.Mounts, &pluginapi.Mount{
 				ContainerPath: mount.value1,
 				HostPath:      mount.value2,
 				ReadOnly:      true,
 			})
 		}
-		devRuntime.Envs = make(map[string]string)
+		resp.Envs = make(map[string]string)
 		for _, env := range m.devRuntimeEnvs[key] {
-			devRuntime.Envs[env.value1] = env.value2
+			resp.Envs[env.value1] = env.value2
 		}
-		resp.Spec = append(resp.Spec, devRuntime)
 	}
 	return resp, nil
 }
