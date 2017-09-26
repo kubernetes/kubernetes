@@ -85,6 +85,8 @@ type bulkConnectionImpl struct {
 
 	// map 'watch-id' -> single watch state
 	watches map[string]singleWatch
+
+	proxyPool proxyConnectionsPool
 }
 
 func (h *watchHTTPHandler) responseError(err error, w http.ResponseWriter, req *http.Request) {
@@ -141,6 +143,7 @@ func (h watchHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		responses: make(chan *bulkapi.BulkResponse, 10),
 		quit:      make(chan struct{}),
 	}
+	wh.proxyPool = h.newProxyConnectionsPool(wh)
 
 	handler := websocket.Handler(wh.HandleWS)
 	websocket.Server{Handler: handler}.ServeHTTP(w, req)
@@ -247,6 +250,9 @@ func (s *bulkConnectionImpl) handleStopWatch(r *bulkapi.BulkRequest) error {
 		w.StopWatch(r)
 		return nil
 	}
+	if proxy, ok := s.proxyPool.FindConnectionByWatch(wid); ok {
+		return proxy.ForwardRequest(r)
+	}
 	return fmt.Errorf("watch not found")
 }
 
@@ -259,6 +265,10 @@ func (s *bulkConnectionImpl) handleNewWatch(r *bulkapi.BulkRequest) error {
 	groupInfo, err := s.findGroupInfo(rs)
 	if err != nil {
 		return err
+	}
+	if groupInfo.Proxied != nil {
+		// Route to proxy.
+		return s.forwardRequest(r, groupInfo.Proxied)
 	}
 
 	watchID := r.Watch.WatchID
@@ -309,7 +319,17 @@ func (s *bulkConnectionImpl) normalizeSelector(rs *bulkapi.ResourceSelector) {
 	}
 }
 
-func (s *bulkWatchHandler) stopAndRemoveWatch(w *singleWatchState) {
+func (s *bulkConnectionImpl) forwardRequest(r *bulkapi.BulkRequest, proxyInfo *ProxiedAPIGroupInfo) error {
+	proxy, err := s.proxyPool.SpawnProxyConnection(proxyInfo)
+	if err != nil {
+		return fmt.Errorf("unable to open proxy connection to %s: %v", proxyInfo.GroupVersion, err)
+	}
+	// Just route request without additional process (authorization etc)
+	// all responses automatically routed directly into current websocket.
+	return proxy.ForwardRequest(r)
+}
+
+func (s *bulkConnectionImpl) stopAndRemoveWatch(w singleWatch) {
 	s.Lock()
 	defer s.Unlock()
 	w.StopWatch(nil)
