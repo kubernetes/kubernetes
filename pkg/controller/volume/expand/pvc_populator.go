@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package reconciler implements interfaces that attempt to reconcile the
-// desired state of the with the actual state of the world by triggering
-// actions.
-
 package expand
 
 import (
@@ -25,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -75,11 +72,15 @@ func (populator *pvcPopulator) Sync() {
 
 	for _, pvc := range pvcs {
 		pv, err := getPersistentVolume(pvc, populator.pvLister)
-
 		if err != nil {
 			glog.V(5).Infof("Error getting persistent volume for pvc %q : %v", pvc.UID, err)
 			continue
 		}
-		populator.resizeMap.AddPVCUpdate(pvc, pv)
+
+		newSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
+		pvSize := pv.Spec.Capacity[v1.ResourceStorage]
+		if newSize.Cmp(pvSize) > 0 {
+			populator.resizeMap.AddPVCUpdate(pvc, pv)
+		}
 	}
 }
