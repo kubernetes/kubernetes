@@ -38,12 +38,20 @@ import (
 )
 
 const (
-	pollInterval = 1 * time.Second
+	pollInterval = 100 * time.Millisecond
 	pollTimeout  = 60 * time.Second
 
 	fakeImageName = "fake-name"
 	fakeImage     = "fakeimage"
 )
+
+var pauseFn = func(update *v1beta1.Deployment) {
+	update.Spec.Paused = true
+}
+
+var resumeFn = func(update *v1beta1.Deployment) {
+	update.Spec.Paused = false
+}
 
 type deploymentTester struct {
 	t          *testing.T
@@ -160,7 +168,7 @@ func (d *deploymentTester) markAllPodsReady() {
 		d.t.Fatalf("failed to parse Deployment selector: %v", err)
 	}
 	var readyPods int32
-	err = wait.Poll(100*time.Millisecond, pollTimeout, func() (bool, error) {
+	err = wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		readyPods = 0
 		pods, err := d.c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
@@ -209,7 +217,7 @@ func (d *deploymentTester) waitForDeploymentStatusValidAndMarkPodsReady() error 
 }
 
 func (d *deploymentTester) updateDeployment(applyUpdate testutil.UpdateDeploymentFunc) (*v1beta1.Deployment, error) {
-	return testutil.UpdateDeploymentWithRetries(d.c, d.deployment.Namespace, d.deployment.Name, applyUpdate, d.t.Logf)
+	return testutil.UpdateDeploymentWithRetries(d.c, d.deployment.Namespace, d.deployment.Name, applyUpdate, d.t.Logf, pollInterval, pollTimeout)
 }
 
 func (d *deploymentTester) waitForObservedDeployment(desiredGeneration int64) error {
@@ -249,14 +257,6 @@ func (d *deploymentTester) expectNewReplicaSet() (*v1beta1.ReplicaSet, error) {
 	return rs, nil
 }
 
-func pauseFn() func(update *v1beta1.Deployment) {
-	return func(update *v1beta1.Deployment) {
-		update.Spec.Paused = true
-	}
-}
-
-func resumeFn() func(update *v1beta1.Deployment) {
-	return func(update *v1beta1.Deployment) {
-		update.Spec.Paused = false
-	}
+func (d *deploymentTester) updateReplicaSet(name string, applyUpdate testutil.UpdateReplicaSetFunc) (*v1beta1.ReplicaSet, error) {
+	return testutil.UpdateReplicaSetWithRetries(d.c, d.deployment.Namespace, name, applyUpdate, d.t.Logf, pollInterval, pollTimeout)
 }

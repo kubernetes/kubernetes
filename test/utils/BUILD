@@ -12,6 +12,7 @@ go_library(
         "density_utils.go",
         "deployment.go",
         "pod_store.go",
+        "replicaset.go",
         "runners.go",
         "tmpdir.go",
     ],
