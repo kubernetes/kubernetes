@@ -200,7 +200,8 @@ func defaultContainerResourceRequirements(limitRange *api.LimitRange) api.Resour
 }
 
 // mergeContainerResources handles defaulting all of the resources on a container.
-func mergeContainerResources(container *api.Container, defaultRequirements *api.ResourceRequirements, annotationPrefix string, annotations []string) []string {
+func mergeContainerResources(container *api.Container, defaultRequirements *api.ResourceRequirements, annotationPrefix string, annotations []string) ([]string, []error) {
+	var errs []error
 	setRequests := []string{}
 	setLimits := []string{}
 	if container.Resources.Limits == nil {
@@ -212,6 +213,12 @@ func mergeContainerResources(container *api.Container, defaultRequirements *api.
 	for k, v := range defaultRequirements.Limits {
 		_, found := container.Resources.Limits[k]
 		if !found {
+			request, found := container.Resources.Requests[k]
+			if found && v.Cmp(request) < 0 {
+				errs = append(errs, fmt.Errorf("container(%s) request.%s: %s larger than default.limit: %s",
+					container.Name, k, v, request))
+				continue
+			}
 			container.Resources.Limits[k] = *v.Copy()
 			setLimits = append(setLimits, string(k))
 		}
@@ -233,20 +240,24 @@ func mergeContainerResources(container *api.Container, defaultRequirements *api.
 		a := strings.Join(setLimits, ", ") + fmt.Sprintf(" limit for %s %s", annotationPrefix, container.Name)
 		annotations = append(annotations, a)
 	}
-	return annotations
+	return annotations, errs
 }
 
 // mergePodResourceRequirements merges enumerated requirements with default requirements
 // it annotates the pod with information about what requirements were modified
-func mergePodResourceRequirements(pod *api.Pod, defaultRequirements *api.ResourceRequirements) {
+func mergePodResourceRequirements(pod *api.Pod, defaultRequirements *api.ResourceRequirements) []error {
+	subErrs := []error{}
+	errs := []error{}
 	annotations := []string{}
 
 	for i := range pod.Spec.Containers {
-		annotations = mergeContainerResources(&pod.Spec.Containers[i], defaultRequirements, "container", annotations)
+		annotations, subErrs = mergeContainerResources(&pod.Spec.Containers[i], defaultRequirements, "container", annotations)
+		errs = append(errs, subErrs...)
 	}
 
 	for i := range pod.Spec.InitContainers {
-		annotations = mergeContainerResources(&pod.Spec.InitContainers[i], defaultRequirements, "init container", annotations)
+		annotations, subErrs = mergeContainerResources(&pod.Spec.InitContainers[i], defaultRequirements, "init container", annotations)
+		errs = append(errs, subErrs...)
 	}
 
 	if len(annotations) > 0 {
@@ -256,6 +267,7 @@ func mergePodResourceRequirements(pod *api.Pod, defaultRequirements *api.Resourc
 		val := "LimitRanger plugin set: " + strings.Join(annotations, "; ")
 		pod.ObjectMeta.Annotations[limitRangerAnnotation] = val
 	}
+	return errs
 }
 
 // requestLimitEnforcedValues returns the specified values at a common precision to support comparability
@@ -456,11 +468,16 @@ func PersistentVolumeClaimLimitFunc(limitRange *api.LimitRange, pvc *api.Persist
 // the specified LimitRange.  The pod may be modified to apply default resource
 // requirements if not specified, and enumerated on the LimitRange
 func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
-	var errs []error
+	errs := []error{}
+	subErrs := applyDefaultResourcePolicy(limitRange, pod)
+	errs = append(errs, subErrs...)
+	subErrs = applyMinMaxResourcePolicy(limitRange, pod)
+	errs = append(errs, subErrs...)
+	return utilerrors.NewAggregate(errs)
+}
 
-	defaultResources := defaultContainerResourceRequirements(limitRange)
-	mergePodResourceRequirements(pod, &defaultResources)
-
+func applyMinMaxResourcePolicy(limitRange *api.LimitRange, pod *api.Pod) []error {
+	errs := []error{}
 	for i := range limitRange.Spec.Limits {
 		limit := limitRange.Spec.Limits[i]
 		limitType := limit.Type
@@ -553,5 +570,10 @@ func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 			}
 		}
 	}
-	return utilerrors.NewAggregate(errs)
+	return errs
+}
+
+func applyDefaultResourcePolicy(limitRange *api.LimitRange, pod *api.Pod) []error {
+	defaultResources := defaultContainerResourceRequirements(limitRange)
+	return mergePodResourceRequirements(pod, &defaultResources)
 }
