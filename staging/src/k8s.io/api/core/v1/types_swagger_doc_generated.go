@@ -76,7 +76,7 @@ var map_AzureDiskVolumeSource = map[string]string{
 	"cachingMode": "Host Caching mode: None, Read Only, Read Write.",
 	"fsType":      "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
 	"readOnly":    "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
-	"kind":        "Expected values Shared: mulitple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared",
+	"kind":        "Expected values Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared",
 }
 
 func (AzureDiskVolumeSource) SwaggerDoc() map[string]string {
