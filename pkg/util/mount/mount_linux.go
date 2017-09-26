@@ -198,7 +198,19 @@ func (mounter *Mounter) Unmount(target string) error {
 	command := exec.Command("umount", target)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Unmount failed: %v\nUnmounting arguments: %s\nOutput: %s\n", err, target, string(output))
+		glog.Errorf("Unmount failed: %v\nUnmounting arguments: %s\nOutput: %s\n", err, target, string(output))
+		return LazyUnmount(target)
+	}
+	return nil
+}
+
+// Unmount unmounts the target with lazy option.
+func LazyUnmount(target string) error {
+	glog.V(4).Infof("Unmounting %s", target)
+	command := exec.Command("umount", "-l", target)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Unmount failed: %v\nUnmounting arguments: -l %s\nOutput: %s\n", err, target, string(output))
 	}
 	return nil
 }
