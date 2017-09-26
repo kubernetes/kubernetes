@@ -340,16 +340,16 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 	}
 	glog.V(4).Info("Credentials secret successfully created")
 
-	glog.V(4).Info("Creating a persistent volume and a claim to store the federation API server's state, including etcd data")
 	var pvc *api.PersistentVolumeClaim
 	if i.options.etcdPersistentStorage {
+		glog.V(4).Info("Creating a persistent volume and a claim to store the federation API server's state, including etcd data")
 		pvc, err = createPVC(hostClientset, i.commonOptions.FederationSystemNamespace, svc.Name, i.commonOptions.Name, i.options.etcdPVCapacity, i.options.etcdPVStorageClass, i.options.dryRun)
 		if err != nil {
 			return err
 		}
+		glog.V(4).Info("Persistent volume and claim created")
+		fmt.Fprintln(cmdOut, " done")
 	}
-	glog.V(4).Info("Persistent volume and claim created")
-	fmt.Fprintln(cmdOut, " done")
 
 	// Since only one IP address can be specified as advertise address,
 	// we arbitrarily pick the first available IP address
