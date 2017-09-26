@@ -34,11 +34,12 @@ func BenchmarkListener(b *testing.B) {
 	var swg sync.WaitGroup
 	swg.Add(b.N)
 	b.SetParallelism(concurrencyLevel)
+	// Preallocate enough space so that benchmark does not run out of it
 	pl := newProcessListener(&ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			swg.Done()
 		},
-	}, 0, 0, time.Now())
+	}, 0, 0, time.Now(), 1024*1024)
 	var wg wait.Group
 	defer wg.Wait()       // Wait for .run and .pop to stop
 	defer close(pl.addCh) // Tell .run and .pop to stop

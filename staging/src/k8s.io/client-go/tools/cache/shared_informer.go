@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/buffer"
 
 	"github.com/golang/glog"
 )
@@ -92,8 +93,13 @@ func NewSharedIndexInformer(lw ListerWatcher, objType runtime.Object, defaultEve
 // InformerSynced is a function that can be used to determine if an informer has synced.  This is useful for determining if caches have synced.
 type InformerSynced func() bool
 
-// syncedPollPeriod controls how often you look at the status of your sync funcs
-const syncedPollPeriod = 100 * time.Millisecond
+const (
+	// syncedPollPeriod controls how often you look at the status of your sync funcs
+	syncedPollPeriod = 100 * time.Millisecond
+
+	// initialBufferSize is the initial number of event notifications that can be buffered.
+	initialBufferSize = 1024
+)
 
 // WaitForCacheSync waits for caches to populate.  It returns true if it was successful, false
 // if the controller should shutdown
@@ -313,7 +319,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEv
 		}
 	}
 
-	listener := newProcessListener(handler, resyncPeriod, determineResyncPeriod(resyncPeriod, s.resyncCheckPeriod), s.clock.Now())
+	listener := newProcessListener(handler, resyncPeriod, determineResyncPeriod(resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize)
 
 	if !s.started {
 		s.processor.addListener(listener)
@@ -465,6 +471,13 @@ type processorListener struct {
 
 	handler ResourceEventHandler
 
+	// pendingNotifications is an unbounded ring buffer that holds all notifications not yet distributed.
+	// There is one per listener, but a failing/stalled listener will have infinite pendingNotifications
+	// added until we OOM.
+	// TODO: This is no worse than before, since reflectors were backed by unbounded DeltaFIFOs, but
+	// we should try to do something better.
+	pendingNotifications buffer.RingGrowing
+
 	// requestedResyncPeriod is how frequently the listener wants a full resync from the shared informer
 	requestedResyncPeriod time.Duration
 	// resyncPeriod is how frequently the listener wants a full resync from the shared informer. This
@@ -477,11 +490,12 @@ type processorListener struct {
 	resyncLock sync.Mutex
 }
 
-func newProcessListener(handler ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time) *processorListener {
+func newProcessListener(handler ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int) *processorListener {
 	ret := &processorListener{
 		nextCh:                make(chan interface{}),
 		addCh:                 make(chan interface{}),
 		handler:               handler,
+		pendingNotifications:  *buffer.NewRingGrowing(bufferSize),
 		requestedResyncPeriod: requestedResyncPeriod,
 		resyncPeriod:          resyncPeriod,
 	}
@@ -499,25 +513,16 @@ func (p *processorListener) pop() {
 	defer utilruntime.HandleCrash()
 	defer close(p.nextCh) // Tell .run() to stop
 
-	// pendingNotifications is an unbounded slice that holds all notifications not yet distributed
-	// there is one per listener, but a failing/stalled listener will have infinite pendingNotifications
-	// added until we OOM.
-	// TODO This is no worse than before, since reflectors were backed by unbounded DeltaFIFOs, but
-	// we should try to do something better
-	var pendingNotifications []interface{}
 	var nextCh chan<- interface{}
 	var notification interface{}
 	for {
 		select {
 		case nextCh <- notification:
 			// Notification dispatched
-			if len(pendingNotifications) == 0 { // Nothing to pop
+			var ok bool
+			notification, ok = p.pendingNotifications.ReadOne()
+			if !ok { // Nothing to pop
 				nextCh = nil // Disable this select case
-				notification = nil
-			} else {
-				notification = pendingNotifications[0]
-				pendingNotifications[0] = nil
-				pendingNotifications = pendingNotifications[1:]
 			}
 		case notificationToAdd, ok := <-p.addCh:
 			if !ok {
@@ -528,7 +533,7 @@ func (p *processorListener) pop() {
 				notification = notificationToAdd
 				nextCh = p.nextCh
 			} else { // There is already a notification waiting to be dispatched
-				pendingNotifications = append(pendingNotifications, notificationToAdd)
+				p.pendingNotifications.WriteOne(notificationToAdd)
 			}
 		}
 	}
