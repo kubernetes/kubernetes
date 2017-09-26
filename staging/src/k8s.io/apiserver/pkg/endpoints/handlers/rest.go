@@ -46,6 +46,7 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
@@ -261,12 +262,15 @@ func ConnectResource(connecter rest.Connecter, scope RequestScope, admit admissi
 				return
 			}
 		}
-		handler, err := connecter.Connect(ctx, name, opts, &responder{scope: scope, req: req, w: w})
-		if err != nil {
-			scope.err(err, w, req)
-			return
-		}
-		handler.ServeHTTP(w, req)
+		requestInfo, _ := request.RequestInfoFrom(ctx)
+		metrics.RecordLongRunning(req, requestInfo, func() {
+			handler, err := connecter.Connect(ctx, name, opts, &responder{scope: scope, req: req, w: w})
+			if err != nil {
+				scope.err(err, w, req)
+				return
+			}
+			handler.ServeHTTP(w, req)
+		})
 	}
 }
 
@@ -366,7 +370,10 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 				scope.err(err, w, req)
 				return
 			}
-			serveWatch(watcher, scope, req, w, timeout)
+			requestInfo, _ := request.RequestInfoFrom(ctx)
+			metrics.RecordLongRunning(req, requestInfo, func() {
+				serveWatch(watcher, scope, req, w, timeout)
+			})
 			return
 		}
 
