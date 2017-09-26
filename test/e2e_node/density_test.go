@@ -524,7 +524,7 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 	return controller
 }
 
-// createBatchPodSequential creats pods back-to-back in sequence.
+// createBatchPodSequential creates pods back-to-back in sequence.
 func createBatchPodSequential(f *framework.Framework, pods []*v1.Pod) (time.Duration, []framework.PodLatencyData) {
 	batchStartTime := metav1.Now()
 	e2eLags := make([]framework.PodLatencyData, 0)
@@ -570,7 +570,7 @@ func logPodCreateThroughput(batchLag time.Duration, e2eLags []framework.PodLaten
 	logPerfData(getThroughputPerfData(batchLag, e2eLags, podsNr, testInfo), "throughput")
 }
 
-// increaseKubeletAPIQPSLimit sets Kubelet API QPS via ConfigMap. Kubelet will restart with the new QPS.
+// setKubeletAPIQPSLimit sets Kubelet API QPS via ConfigMap. Kubelet will restart with the new QPS.
 func setKubeletAPIQPSLimit(f *framework.Framework, newAPIQPS int32) {
 	const restartGap = 40 * time.Second
 
