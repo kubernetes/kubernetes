@@ -92,6 +92,11 @@ func (fs *fakeFs) RemoveAll(path string) error {
 	return fs.a.RemoveAll(path)
 }
 
+// Remove via afero.RemoveAll
+func (fs *fakeFs) Remove(name string) error {
+	return fs.a.Remove(name)
+}
+
 // fakeFile implements File; for use with fakeFs
 type fakeFile struct {
 	file afero.File
