@@ -252,7 +252,8 @@ func (s *ServiceDNSController) retrieveOrCreateDNSZone() error {
 }
 
 // getHealthyEndpoints returns the hostnames and/or IP addresses of healthy endpoints for the service, at a zone, region and global level (or an error)
-func (s *ServiceDNSController) getHealthyEndpoints(clusterName string, service *v1.Service) (zoneEndpoints, regionEndpoints, globalEndpoints []string, err error) {
+func (s *ServiceDNSController) getHealthyEndpoints(clusterName string, service *v1.Service) (zoneEndpoints map[string][]string, regionEndpoints, globalEndpoints []string, err error) {
+	zoneEndpoints = make(map[string][]string)
 	var (
 		zoneNames  []string
 		regionName string
@@ -292,7 +293,13 @@ func (s *ServiceDNSController) getHealthyEndpoints(clusterName string, service *
 			for _, lbZoneName := range lbZoneNames {
 				for _, zoneName := range zoneNames {
 					if lbZoneName == zoneName {
-						zoneEndpoints = append(zoneEndpoints, address)
+						// add address to the list
+						if zoneAddresses, ok := zoneEndpoints[zoneName]; ok {
+							zoneAddresses = append(zoneAddresses, address)
+							zoneEndpoints[zoneName] = zoneAddresses
+						} else {
+							zoneEndpoints[zoneName] = []string{address}
+						}
 					}
 				}
 			}
@@ -504,7 +511,9 @@ func (s *ServiceDNSController) ensureDNSRecords(clusterName string, service *v1.
 	// See https://github.com/kubernetes/kubernetes/pull/25107#issuecomment-218026648
 	// For each service we need the following DNS names:
 	// mysvc.myns.myfed.svc.z1.r1.mydomain.com  (for zone z1 in region r1)
-	//         - an A record to IP address of specific shard in that zone (if that shard exists and has healthy endpoints)
+	// mysvc.myns.myfed.svc.z2.r1.mydomain.com  (for zone z2 in region r1)
+	// mysvc.myns.myfed.svc.z3.r1.mydomain.com  (for zone z3 in region r1)
+	//         - each record is an A record to IP address of specific shard in that zone (if that shard exists and has healthy endpoints)
 	//         - OR a CNAME record to the next level up, i.e. mysvc.myns.myfed.svc.r1.mydomain.com  (if a healthy shard does not exist in zone z1)
 	// mysvc.myns.myfed.svc.r1.mydomain.com
 	//         - a set of A records to IP addresses of all healthy shards in region r1, if one or more of these exist
@@ -527,29 +536,56 @@ func (s *ServiceDNSController) ensureDNSRecords(clusterName string, service *v1.
 		return fmt.Errorf("failed to get cluster zone names")
 	}
 	commonPrefix := serviceName + "." + namespaceName + "." + s.federationName + ".svc"
-	// dnsNames is the path up the DNS search tree, starting at the leaf
-	var dnsNames [][]string
+
+	var dnsNames []string
 	for _, zoneName := range zoneNames {
-		zoneDNSNames := []string{
-			strings.Join([]string{commonPrefix, zoneName, regionName, s.serviceDNSSuffix}, "."), // zone level - TODO might need other zone names for multi-zone clusters
-			strings.Join([]string{commonPrefix, regionName, s.serviceDNSSuffix}, "."),           // region level, one up from zone level
-			strings.Join([]string{commonPrefix, s.serviceDNSSuffix}, "."),                       // global level, one up from region level
-			"", // nowhere to go up from global level
-		}
-		dnsNames = append(dnsNames, zoneDNSNames)
+		zoneDNS := strings.Join([]string{commonPrefix, zoneName, regionName, s.serviceDNSSuffix}, ".")
+		dnsNames = append(dnsNames, zoneDNS)
 	}
+	dnsNames = append(
+		dnsNames, // all zone level DNS names
+		strings.Join([]string{commonPrefix, regionName, s.serviceDNSSuffix}, "."), // region level, one up from zone level
+		strings.Join([]string{commonPrefix, s.serviceDNSSuffix}, "."),             // global level, one up from region level
+		"", // nowhere to go up from global level
+	)
 
 	zoneEndpoints, regionEndpoints, globalEndpoints, err := s.getHealthyEndpoints(clusterName, service)
 	if err != nil {
 		return err
 	}
-	endpoints := [][]string{zoneEndpoints, regionEndpoints, globalEndpoints}
-	for _, dnsName := range dnsNames {
-		for i, endpoint := range endpoints {
-			if err = s.ensureDNSRrsets(s.dnsZone, dnsName[i], endpoint, dnsName[i+1]); err != nil {
+
+	zoneCount := len(zoneNames)
+
+	for ii, dnsName := range dnsNames {
+		if ii < zoneCount {
+			// this dnsName is a zone level DNS
+			// we skip all other zone level DNS, and find region level DNS and above
+			zoneName := getZoneNameFromZoneDNS(dnsName)
+			// for each DNS path we first check if there is any healthy endpoints for that zone
+			healthyZoneEndpoints := zoneEndpoints[zoneName]
+			// for zone DNS, one level up is region DNS whose index is `zoneCount`
+			if err = s.ensureDNSRrsets(s.dnsZone, dnsName, healthyZoneEndpoints, dnsNames[zoneCount]); err != nil {
 				return err
+			}
+		} else {
+			// this dnsName is region DNS or above
+			for i, endpoint := range [][]string{regionEndpoints, globalEndpoints} {
+				// in dnsNames, region DNS or above index starts at `zoneCount`
+				if err = s.ensureDNSRrsets(s.dnsZone, dnsNames[i+zoneCount], endpoint, dnsNames[i+zoneCount+1]); err != nil {
+					return err
+				}
 			}
 		}
 	}
 	return nil
+}
+
+// getZoneNameFromZoneDNS returns the name of the zone, for example z1,
+// given a zone DNS like mysvc.myns.myfed.svc.z1.r1.mydomain.com
+func getZoneNameFromZoneDNS(zoneDNS string) (zone string) {
+	parts := strings.Split(zoneDNS, ".")
+	if len(parts) > 4 {
+		zone = parts[4]
+	}
+	return
 }
