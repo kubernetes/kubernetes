@@ -58,6 +58,7 @@ go_library(
         "//pkg/kubectl:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
+        "//pkg/kubelet/dockershim/metrics:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",

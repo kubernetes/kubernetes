@@ -67,6 +67,12 @@ func (mc *metricContext) Observe(err error) error {
 }
 
 func newGenericMetricContext(prefix, request, region, zone, version string) *metricContext {
+	if len(zone) == 0 {
+		zone = unusedMetricLabel
+	}
+	if len(region) == 0 {
+		region = unusedMetricLabel
+	}
 	return &metricContext{
 		start:      time.Now(),
 		attributes: []string{prefix + "_" + request, region, zone, version},

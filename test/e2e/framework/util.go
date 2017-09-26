@@ -2351,7 +2351,7 @@ func DumpNodeDebugInfo(c clientset.Interface, nodeNames []string, logFunc func(f
 		logFunc("\nLogging pods the kubelet thinks is on node %v", n)
 		podList, err := GetKubeletPods(c, n)
 		if err != nil {
-			logFunc("Unable to retrieve kubelet pods for node %v", n)
+			logFunc("Unable to retrieve kubelet pods for node %v: %v", n, err)
 			continue
 		}
 		for _, p := range podList.Items {
@@ -3447,6 +3447,11 @@ func GetSigner(provider string) (ssh.Signer, error) {
 		return nil, fmt.Errorf("VAGRANT_SSH_KEY env variable should be provided")
 	case "local", "vsphere":
 		keyfile = os.Getenv("LOCAL_SSH_KEY") // maybe?
+		if len(keyfile) == 0 {
+			keyfile = "id_rsa"
+		}
+	case "skeleton":
+		keyfile = os.Getenv("KUBE_SSH_KEY")
 		if len(keyfile) == 0 {
 			keyfile = "id_rsa"
 		}

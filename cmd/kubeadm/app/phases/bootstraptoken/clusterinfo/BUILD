@@ -24,10 +24,10 @@ go_library(
     srcs = ["clusterinfo.go"],
     deps = [
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
-        "//pkg/apis/rbac/v1beta1:go_default_library",
+        "//pkg/apis/rbac/v1:go_default_library",
         "//pkg/bootstrap/api:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/api/rbac/v1beta1:go_default_library",
+        "//vendor/k8s.io/api/rbac/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",

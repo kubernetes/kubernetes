@@ -188,18 +188,6 @@ func TestAddNoNewPrivileges(t *testing.T) {
 		expect bool
 	}{
 		"allowPrivilegeEscalation nil security context nil": {},
-		"allowPrivilegeEscalation nil capAddSysadmin": {
-			sc: v1.SecurityContext{
-				Capabilities: &v1.Capabilities{
-					Add: []v1.Capability{"CAP_SYS_ADMIN"},
-				},
-			},
-		},
-		"allowPrivilegeEscalation nil privileged": {
-			sc: v1.SecurityContext{
-				Privileged: &ptrue,
-			},
-		},
 		"allowPrivilegeEscalation nil nonRoot": {
 			sc: v1.SecurityContext{
 				RunAsUser: &nonRoot,
@@ -208,20 +196,6 @@ func TestAddNoNewPrivileges(t *testing.T) {
 		"allowPrivilegeEscalation nil root": {
 			sc: v1.SecurityContext{
 				RunAsUser: &root,
-			},
-		},
-		"allowPrivilegeEscalation false capAddSysadmin": {
-			sc: v1.SecurityContext{
-				Capabilities: &v1.Capabilities{
-					Add: []v1.Capability{"CAP_SYS_ADMIN"},
-				},
-				AllowPrivilegeEscalation: &pfalse,
-			},
-		},
-		"allowPrivilegeEscalation false privileged": {
-			sc: v1.SecurityContext{
-				Privileged:               &ptrue,
-				AllowPrivilegeEscalation: &pfalse,
 			},
 		},
 		"allowPrivilegeEscalation false nonRoot": {
@@ -237,20 +211,6 @@ func TestAddNoNewPrivileges(t *testing.T) {
 				AllowPrivilegeEscalation: &pfalse,
 			},
 			expect: true,
-		},
-		"allowPrivilegeEscalation true capAddSysadmin": {
-			sc: v1.SecurityContext{
-				Capabilities: &v1.Capabilities{
-					Add: []v1.Capability{"CAP_SYS_ADMIN"},
-				},
-				AllowPrivilegeEscalation: &ptrue,
-			},
-		},
-		"allowPrivilegeEscalation true privileged": {
-			sc: v1.SecurityContext{
-				Privileged:               &ptrue,
-				AllowPrivilegeEscalation: &ptrue,
-			},
 		},
 		"allowPrivilegeEscalation true nonRoot": {
 			sc: v1.SecurityContext{

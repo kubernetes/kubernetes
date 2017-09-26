@@ -29,7 +29,7 @@ go_library(
         "kube_docker_client.go",
     ],
     deps = [
-        "//pkg/kubelet/metrics:go_default_library",
+        "//pkg/kubelet/dockershim/metrics:go_default_library",
         "//vendor/github.com/docker/distribution/reference:go_default_library",
         "//vendor/github.com/docker/docker/api/types:go_default_library",
         "//vendor/github.com/docker/docker/api/types/container:go_default_library",

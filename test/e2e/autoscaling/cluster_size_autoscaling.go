@@ -620,7 +620,19 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	It("Should be able to scale a node group down to 0[Feature:ClusterSizeAutoscalingScaleDown]", func() {
-		framework.SkipUnlessAtLeast(len(originalSizes), 2, "At least 2 node groups are needed for scale-to-0 tests")
+		// Determine whether we want to run & adjust the setup if necessary
+		if len(originalSizes) < 2 {
+			if framework.ProviderIs("gke") {
+				const extraPoolName = "extra-pool"
+				addNodePool(extraPoolName, "n1-standard-4", 1)
+				defer deleteNodePool(extraPoolName)
+				err := enableAutoscaler(extraPoolName, 0, 1)
+				framework.ExpectNoError(err)
+			} else {
+				framework.Skipf("At least 2 node groups are needed for scale-to-0 tests")
+			}
+		}
+
 		By("Find smallest node group and manually scale it to a single node")
 		minMig := ""
 		minSize := nodeCount
@@ -1365,12 +1377,12 @@ func getStatusTimestamp(status string) (time.Time, error) {
 		return time.Time{}, err
 	}
 
-	timestampMatches := timestampMatcher.FindAllStringSubmatch(status, -1)
-	if len(timestampMatches) < 1 {
+	timestampMatch := timestampMatcher.FindStringSubmatch(status)
+	if len(timestampMatch) < 2 {
 		return time.Time{}, fmt.Errorf("Failed to parse CA status timestamp, raw status: %v", status)
 	}
 
-	timestamp, err := time.Parse(timestampFormat, timestampMatches[0][1])
+	timestamp, err := time.Parse(timestampFormat, timestampMatch[1])
 	if err != nil {
 		return time.Time{}, err
 	}

@@ -4704,6 +4704,38 @@ func TestValidatePodSpec(t *testing.T) {
 			DNSPolicy:         api.DNSClusterFirst,
 			PriorityClassName: "InvalidName",
 		},
+		"with privileged and allowPrivilegeEscalation false": {
+			Containers: []api.Container{
+				{
+					Name:            "ctr",
+					Image:           "image",
+					ImagePullPolicy: "IfNotPresent",
+					Ports: []api.ContainerPort{
+						{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"}},
+					SecurityContext: &api.SecurityContext{
+						Privileged:               boolPtr(true),
+						AllowPrivilegeEscalation: boolPtr(false),
+					},
+				},
+			},
+		},
+		"with CAP_SYS_ADMIN and allowPrivilegeEscalation false": {
+			Containers: []api.Container{
+				{
+					Name:            "ctr",
+					Image:           "image",
+					ImagePullPolicy: "IfNotPresent",
+					Ports: []api.ContainerPort{
+						{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"}},
+					SecurityContext: &api.SecurityContext{
+						Capabilities: &api.Capabilities{
+							Add: []api.Capability{"CAP_SYS_ADMIN"},
+						},
+						AllowPrivilegeEscalation: boolPtr(false),
+					},
+				},
+			},
+		},
 	}
 	for k, v := range failureCases {
 		if errs := ValidatePodSpec(&v, field.NewPath("field")); len(errs) == 0 {
@@ -11081,4 +11113,8 @@ func TestValidateOrSetClientIPAffinityConfig(t *testing.T) {
 			t.Errorf("case: %v, expected failures: %v", name, errs)
 		}
 	}
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }

@@ -59,10 +59,12 @@ func NewCmdReset(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+// Reset defines struct used for kubeadm reset command
 type Reset struct {
 	certsDir string
 }
 
+// NewReset instantiate Reset struct
 func NewReset(skipPreFlight bool, certsDir string) (*Reset, error) {
 	if !skipPreFlight {
 		fmt.Println("[preflight] Running pre-flight checks")

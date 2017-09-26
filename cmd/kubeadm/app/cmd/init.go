@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	dnsaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddonphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
-	apiconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
 	clusterinfophase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/clusterinfo"
 	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -211,6 +210,7 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 	)
 }
 
+// NewInit validates given arguments and instantiates Init struct with provided information.
 func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight, skipTokenPrint, dryRun bool) (*Init, error) {
 
 	fmt.Println("[kubeadm] WARNING: kubeadm is in beta, please do not use it for production clusters.")
@@ -256,6 +256,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight,
 	return &Init{cfg: cfg, skipTokenPrint: skipTokenPrint, dryRun: dryRun}, nil
 }
 
+// Init defines struct used by "kubeadm init" command
 type Init struct {
 	cfg            *kubeadmapi.MasterConfiguration
 	skipTokenPrint bool
@@ -390,10 +391,6 @@ func (i *Init) Run(out io.Writer) error {
 	}
 
 	// PHASE 6: Install and deploy all addons, and configure things as necessary
-
-	if err := apiconfigphase.CreateRBACRules(client, k8sVersion); err != nil {
-		return err
-	}
 
 	if err := dnsaddonphase.EnsureDNSAddon(i.cfg, client); err != nil {
 		return err
