@@ -68,7 +68,7 @@ var _ = SIGDescribe("Aggregator", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 
 		// Testing a 1.7 version of the sample-apiserver
-		TestSampleAPIServer(f, "gcr.io/kubernetes-e2e-test-images/k8s-aggregator-sample-apiserver-amd64:1.7", "sample-system")
+		TestSampleAPIServer(f, "gcr.io/kubernetes-e2e-test-images/k8s-aggregator-sample-apiserver-amd64:1.7v2", "sample-system")
 	})
 })
 
