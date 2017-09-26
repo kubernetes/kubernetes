@@ -230,6 +230,11 @@ func (o *ImageOptions) Run() error {
 		return nil, err
 	})
 
+	if len(patches) == 0 {
+		fmt.Fprintf(o.Out, "same image specified, no need to change\n")
+		return utilerrors.NewAggregate(allErrs)
+	}
+
 	for _, patch := range patches {
 		info := patch.Info
 		if patch.Err != nil {
