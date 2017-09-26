@@ -203,5 +203,17 @@ func ensureCompatible(new, orig *certificates.CertificateSigningRequest, private
 	if err := newCsr.CheckSignature(); err != nil {
 		return fmt.Errorf("error validating signature new CSR against old key: %v", err)
 	}
+	if len(new.Status.Certificate) > 0 {
+		certs, err := certutil.ParseCertsPEM(new.Status.Certificate)
+		if err != nil {
+			return fmt.Errorf("error parsing signed certificate for CSR: %v", err)
+		}
+		now := time.Now()
+		for _, cert := range certs {
+			if now.After(cert.NotAfter) {
+				return fmt.Errorf("one of the certificates for the CSR has expired: %s", cert.NotAfter)
+			}
+		}
+	}
 	return nil
 }
