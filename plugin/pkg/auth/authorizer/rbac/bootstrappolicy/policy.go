@@ -186,7 +186,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets",
-					"deployments", "deployments/scale", "deployments/rollback", "ingresses",
+					"deployments", "deployments/scale", "deployments/rollback", "ingresses", "networkpolicies",
 					"replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
 
 				// additional admin powers
@@ -218,7 +218,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule(ReadWrite...).Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
 
 				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets",
-					"deployments", "deployments/scale", "deployments/rollback", "ingresses",
+					"deployments", "deployments/scale", "deployments/rollback", "ingresses", "networkpolicies",
 					"replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
 			},
 		},
@@ -242,7 +242,7 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule(Read...).Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
 
 				rbac.NewRule(Read...).Groups(extensionsGroup).Resources("daemonsets", "deployments", "deployments/scale",
-					"ingresses", "replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
+					"ingresses", "networkpolicies", "replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
 			},
 		},
 		{

@@ -129,6 +129,7 @@ items:
     - deployments/rollback
     - deployments/scale
     - ingresses
+    - networkpolicies
     - replicasets
     - replicasets/scale
     - replicationcontrollers/scale
@@ -310,6 +311,7 @@ items:
     - deployments/rollback
     - deployments/scale
     - ingresses
+    - networkpolicies
     - replicasets
     - replicasets/scale
     - replicationcontrollers/scale
@@ -974,6 +976,7 @@ items:
     - deployments
     - deployments/scale
     - ingresses
+    - networkpolicies
     - replicasets
     - replicasets/scale
     - replicationcontrollers/scale
