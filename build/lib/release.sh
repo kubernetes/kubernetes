@@ -503,10 +503,9 @@ EOF
   mkdir -p "${release_stage}/third_party"
   cp -R "${KUBE_ROOT}/third_party/htpasswd" "${release_stage}/third_party/htpasswd"
 
-  # Include only federation/cluster, federation/manifests and federation/deploy
+  # Include only federation/cluster and federation/deploy
   mkdir "${release_stage}/federation"
   cp -R "${KUBE_ROOT}/federation/cluster" "${release_stage}/federation/"
-  cp -R "${KUBE_ROOT}/federation/manifests" "${release_stage}/federation/"
   cp -R "${KUBE_ROOT}/federation/deploy" "${release_stage}/federation/"
 
   # Include hack/lib as a dependency for the cluster/ scripts
