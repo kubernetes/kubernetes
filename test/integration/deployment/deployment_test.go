@@ -24,6 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -171,7 +172,7 @@ func TestPausedDeployment(t *testing.T) {
 	}
 
 	// Resume the deployment
-	tester.deployment, err = tester.updateDeployment(resumeFn())
+	tester.deployment, err = tester.updateDeployment(resumeFn)
 	if err != nil {
 		t.Fatalf("failed to resume deployment %s: %v", tester.deployment.Name, err)
 	}
@@ -198,7 +199,7 @@ func TestPausedDeployment(t *testing.T) {
 
 	// Pause the deployment.
 	// The paused deployment shouldn't trigger a new rollout.
-	tester.deployment, err = tester.updateDeployment(pauseFn())
+	tester.deployment, err = tester.updateDeployment(pauseFn)
 	if err != nil {
 		t.Fatalf("failed to pause deployment %s: %v", tester.deployment.Name, err)
 	}
@@ -281,7 +282,7 @@ func TestScalePausedDeployment(t *testing.T) {
 	}
 
 	// Pause the deployment.
-	tester.deployment, err = tester.updateDeployment(pauseFn())
+	tester.deployment, err = tester.updateDeployment(pauseFn)
 	if err != nil {
 		t.Fatalf("failed to pause deployment %s: %v", tester.deployment.Name, err)
 	}
@@ -316,6 +317,67 @@ func TestScalePausedDeployment(t *testing.T) {
 
 	// Make sure the Deployment status becomes valid while manually marking Deployment pods as ready at the same time
 	if err := tester.waitForDeploymentStatusValidAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Deployment rollout shouldn't be blocked on hash collisions
+func TestDeploymentHashCollision(t *testing.T) {
+	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	defer closeFn()
+	name := "test-hash-collision-deployment"
+	ns := framework.CreateTestingNamespace(name, s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	replicas := int32(1)
+	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
+
+	var err error
+	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	if err != nil {
+		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
+	}
+
+	// Start informer and controllers
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go rm.Run(5, stopCh)
+	go dc.Run(5, stopCh)
+
+	// Wait for the Deployment to be updated to revision 1
+	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
+		t.Fatal(err)
+	}
+
+	// Mock a hash collision
+	newRS, err := deploymentutil.GetNewReplicaSet(tester.deployment, c.ExtensionsV1beta1())
+	if err != nil {
+		t.Fatalf("failed getting new replicaset of deployment %s: %v", tester.deployment.Name, err)
+	}
+	if newRS == nil {
+		t.Fatalf("unable to find new replicaset of deployment %s", tester.deployment.Name)
+	}
+	_, err = tester.updateReplicaSet(newRS.Name, func(update *v1beta1.ReplicaSet) {
+		*update.Spec.Template.Spec.TerminationGracePeriodSeconds = int64(5)
+	})
+	if err != nil {
+		t.Fatalf("failed updating replicaset %s template: %v", newRS.Name, err)
+	}
+
+	// Expect deployment collision counter to increment
+	if err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+		d, err := c.ExtensionsV1beta1().Deployments(ns.Name).Get(tester.deployment.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		return d.Status.CollisionCount != nil && *d.Status.CollisionCount == int32(1), nil
+	}); err != nil {
+		t.Fatalf("Failed to increment collision counter for deployment %q: %v", tester.deployment.Name, err)
+	}
+
+	// Expect a new ReplicaSet to be created
+	if err := tester.waitForDeploymentRevisionAndImage("2", fakeImage); err != nil {
 		t.Fatal(err)
 	}
 }

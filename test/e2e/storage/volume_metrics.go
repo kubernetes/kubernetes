@@ -62,10 +62,6 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 		if err != nil {
 			framework.Failf("Error creating metrics grabber : %v", err)
 		}
-
-		if !metricsGrabber.HasRegisteredMaster() {
-			framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
-		}
 	})
 
 	AfterEach(func() {
@@ -74,6 +70,10 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 
 	It("should create prometheus metrics for volume provisioning and attach/detach", func() {
 		var err error
+
+		if !metricsGrabber.HasRegisteredMaster() {
+			framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
+		}
 
 		controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
 

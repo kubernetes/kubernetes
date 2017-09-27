@@ -68,7 +68,7 @@ type ActualStateOfWorld interface {
 	// returned.
 	// If no node with the name nodeName exists in list of attached nodes for
 	// the specified volume, an error is returned.
-	SetVolumeMountedByNode(volumeName v1.UniqueVolumeName, nodeName types.NodeName, mounted bool, forceUnmount bool) error
+	SetVolumeMountedByNode(volumeName v1.UniqueVolumeName, nodeName types.NodeName, mounted bool) error
 
 	// SetNodeStatusUpdateNeeded sets statusUpdateNeeded for the specified
 	// node to true indicating the AttachedVolume field in the Node's Status
@@ -331,7 +331,7 @@ func (asw *actualStateOfWorld) AddVolumeNode(
 }
 
 func (asw *actualStateOfWorld) SetVolumeMountedByNode(
-	volumeName v1.UniqueVolumeName, nodeName types.NodeName, mounted bool, forceUnmount bool) error {
+	volumeName v1.UniqueVolumeName, nodeName types.NodeName, mounted bool) error {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -343,11 +343,6 @@ func (asw *actualStateOfWorld) SetVolumeMountedByNode(
 	if mounted {
 		// Increment set count
 		nodeObj.mountedByNodeSetCount = nodeObj.mountedByNodeSetCount + 1
-	} else {
-		// Do not allow value to be reset unless it has been set at least once
-		if nodeObj.mountedByNodeSetCount == 0 && !forceUnmount {
-			return nil
-		}
 	}
 
 	nodeObj.mountedByNode = mounted

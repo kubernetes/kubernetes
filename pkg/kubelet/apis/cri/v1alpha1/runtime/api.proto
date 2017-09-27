@@ -827,7 +827,17 @@ message ExecRequest {
     // Whether to exec the command in a TTY.
     bool tty = 3;
     // Whether to stream stdin.
+    // One of `stdin`, `stdout`, and `stderr` MUST be true.
     bool stdin = 4;
+    // Whether to stream stdout.
+    // One of `stdin`, `stdout`, and `stderr` MUST be true.
+    bool stdout = 5;
+    // Whether to stream stderr.
+    // One of `stdin`, `stdout`, and `stderr` MUST be true.
+    // If `tty` is true, `stderr` MUST be false. Multiplexing is not supported
+    // in this case. The output of stdout and stderr will be combined to a
+    // single stream.
+    bool stderr = 6;
 }
 
 message ExecResponse {
@@ -839,10 +849,20 @@ message AttachRequest {
     // ID of the container to which to attach.
     string container_id = 1;
     // Whether to stream stdin.
+    // One of `stdin`, `stdout`, and `stderr` MUST be true.
     bool stdin = 2;
     // Whether the process being attached is running in a TTY.
     // This must match the TTY setting in the ContainerConfig.
     bool tty = 3;
+    // Whether to stream stdout.
+    // One of `stdin`, `stdout`, and `stderr` MUST be true.
+    bool stdout = 4;
+    // Whether to stream stderr.
+    // One of `stdin`, `stdout`, and `stderr` MUST be true.
+    // If `tty` is true, `stderr` MUST be false. Multiplexing is not supported
+    // in this case. The output of stdout and stderr will be combined to a
+    // single stream.
+    bool stderr = 5;
 }
 
 message AttachResponse {
