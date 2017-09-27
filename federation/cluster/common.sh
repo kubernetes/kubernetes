@@ -17,14 +17,17 @@
 
 : "${KUBE_ROOT?Must set KUBE_ROOT env var}"
 
-# Provides the $KUBERNETES_PROVIDER, kubeconfig-federation-context()
-# and detect-project function
+# Provides the kubeconfig-federation-context() function
 source "${KUBE_ROOT}/cluster/kube-util.sh"
+
+# For `kube::log::status` function
+source "${KUBE_ROOT}/cluster/lib/logging.sh"
 
 # kubefed configuration
 FEDERATION_NAME="${FEDERATION_NAME:-e2e-federation}"
 FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation-system}
 FEDERATION_KUBE_CONTEXT="${FEDERATION_KUBE_CONTEXT:-${FEDERATION_NAME}}"
+FEDERATION_USE_PV_FOR_ETCD=${FEDERATION_USE_PV_FOR_ETCD:-false}
 HOST_CLUSTER_ZONE="${FEDERATION_HOST_CLUSTER_ZONE:-}"
 # If $HOST_CLUSTER_ZONE isn't specified, arbitrarily choose
 # last zone as the host cluster zone.
@@ -51,7 +54,7 @@ function federation_cluster_contexts() {
   federation_contexts=()
   for context in ${contexts}; do
     # Skip federation context
-    if [[ "${context}" == "${FEDERATION_NAME}" ]]; then
+    if [[ "${context}" == "${FEDERATION_KUBE_CONTEXT}" ]]; then
       continue
     fi
     # Skip contexts not beginning with "federation"
@@ -60,11 +63,9 @@ function federation_cluster_contexts() {
     fi
     federation_contexts+=("${context}")
   done
-  echo ${federation_contexts[@]}
+  echo ${federation_contexts[@]:-}
 }
 
-
-source "${KUBE_ROOT}/cluster/common.sh"
 
 host_kubectl="${KUBE_ROOT}/cluster/kubectl.sh --namespace=${FEDERATION_NAMESPACE}"
 

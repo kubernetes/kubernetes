@@ -26,11 +26,8 @@ set -o pipefail
 
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-# For `kube::log::status` function since it already sources
-# "${KUBE_ROOT}/cluster/lib/logging.sh" and DEFAULT_KUBECONFIG
-source "${KUBE_ROOT}/cluster/common.sh"
 # For $FEDERATION_NAME, $FEDERATION_NAMESPACE, $FEDERATION_KUBE_CONTEXT,
-# and $HOST_CLUSTER_CONTEXT.
+# $HOST_CLUSTER_CONTEXT and $FEDERATION_USE_PV_FOR_ETCD.
 source "${KUBE_ROOT}/federation/cluster/common.sh"
 
 DNS_ZONE_NAME="${FEDERATION_DNS_ZONE_NAME:-}"
@@ -118,6 +115,7 @@ function init() {
       --apiserver-enable-token-auth=true \
       --apiserver-arg-overrides="--runtime-config=api/all=true,--v=4" \
       --controllermanager-arg-overrides="--v=4" \
+      --etcd-persistent-storage=${FEDERATION_USE_PV_FOR_ETCD} \
       --v=4
 }
 
