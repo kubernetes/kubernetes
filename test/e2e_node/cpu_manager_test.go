@@ -19,6 +19,8 @@ package e2e_node
 import (
 	"fmt"
 	"os/exec"
+	"strconv"
+	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -115,11 +117,13 @@ func waitForContainerRemoval(ctnPartName string) {
 }
 
 func isHTEnabled() bool {
-	err := exec.Command("/bin/sh", "-c", "if [[ $(lscpu | grep \"Thread(s) per core:\" | cut -c24) != \"2\" ]]; then exit 1; fi").Run()
-	if err != nil {
-		return false
-	}
-	return true
+	outData, err := exec.Command("/bin/sh", "-c", "lscpu | grep \"Thread(s) per core:\" | cut -d \":\" -f 2").Output()
+	framework.ExpectNoError(err)
+
+	threadsPerCore, err := strconv.Atoi(strings.TrimSpace(string(outData)))
+	framework.ExpectNoError(err)
+
+	return threadsPerCore > 1
 }
 
 func getCPUSiblingList(cpuRes int64) string {
