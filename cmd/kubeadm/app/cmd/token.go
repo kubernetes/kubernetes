@@ -178,7 +178,7 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 			This command will print out a randomly-generated bootstrap token that can be used with
 			the "init" and "join" commands.
 
-			You don't have to use this command in order to generate a token, you can do so
+			You don't have to use this command in order to generate a token. You can do so
 			yourself as long as it's in the format "[a-z0-9]{6}.[a-z0-9]{16}". This
 			command is provided for convenience to generate tokens in that format.
 
