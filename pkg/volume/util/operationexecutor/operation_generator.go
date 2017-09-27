@@ -763,19 +763,21 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 				og.recorder.Eventf(pvcWithResizeRequest.PVC, v1.EventTypeWarning, kevents.VolumeResizeFailed, updateErr.Error())
 				return updateErr
 			}
-		}
 
-		// No Cloudprovider resize needed, lets mark resizing as done
-		if !volumePlugin.RequiresFSResize() {
-			glog.V(4).Infof("Controller resizing done for PVC %s", pvcWithResizeRequest.QualifiedName())
-			err := resizeMap.MarkAsResized(pvcWithResizeRequest, newSize)
-
-			if err != nil {
-				glog.Errorf("Error marking pvc %s as resized : %v", pvcWithResizeRequest.QualifiedName(), err)
-				og.recorder.Eventf(pvcWithResizeRequest.PVC, v1.EventTypeWarning, kevents.VolumeResizeFailed, err.Error())
-				return err
+			// No filesystem resize needed, lets mark resizing as done
+			if !volumePlugin.RequiresFSResize() {
+				glog.V(4).Infof("Controller resizing done for PVC %s", pvcWithResizeRequest.QualifiedName())
+				err := resizeMap.MarkAsResized(pvcWithResizeRequest, newSize)
+				if err != nil {
+					glog.Errorf("Error marking pvc %s as resized : %v", pvcWithResizeRequest.QualifiedName(), err)
+					og.recorder.Eventf(pvcWithResizeRequest.PVC, v1.EventTypeWarning, kevents.VolumeResizeFailed, err.Error())
+					return err
+				}
 			}
+		} else {
+			glog.V(4).Infof("Resize should not be executed because PV size %v is greater or equal than requested size %v", pvSize, newSize)
 		}
+
 		return nil
 
 	}

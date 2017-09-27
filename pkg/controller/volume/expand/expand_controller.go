@@ -159,7 +159,6 @@ func (expc *expandController) Run(stopCh <-chan struct{}) {
 
 func (expc *expandController) deletePVC(obj interface{}) {
 	pvc, ok := obj.(*v1.PersistentVolumeClaim)
-
 	if pvc == nil || !ok {
 		return
 	}
@@ -169,16 +168,15 @@ func (expc *expandController) deletePVC(obj interface{}) {
 
 func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
 	oldPvc, ok := oldObj.(*v1.PersistentVolumeClaim)
-
 	if oldPvc == nil || !ok {
 		return
 	}
 
 	newPVC, ok := newObj.(*v1.PersistentVolumeClaim)
-
 	if newPVC == nil || !ok {
 		return
 	}
+
 	pv, err := getPersistentVolume(newPVC, expc.pvLister)
 	if err != nil {
 		glog.V(5).Infof("Error getting Persistent Volume for pvc %q : %v", newPVC.UID, err)
@@ -190,7 +188,6 @@ func (expc *expandController) pvcUpdate(oldObj, newObj interface{}) {
 func getPersistentVolume(pvc *v1.PersistentVolumeClaim, pvLister corelisters.PersistentVolumeLister) (*v1.PersistentVolume, error) {
 	volumeName := pvc.Spec.VolumeName
 	pv, err := pvLister.Get(volumeName)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to find PV %q in PV informer cache with error : %v", volumeName, err)
 	}
