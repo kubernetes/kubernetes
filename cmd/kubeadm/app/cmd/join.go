@@ -20,9 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -220,11 +218,11 @@ func (j *Join) Run(out io.Writer) error {
 	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)
 
 	// Depending on the kubelet version, we might perform the TLS bootstrap or not
-	kubeletVersionBytes, err := exec.Command("sh", "-c", "kubelet --version").Output()
+	kubeletVersion, err := preflight.GetKubeletVersion()
 	// In case the command executed successfully and returned v1.7-something, we'll perform TLS Bootstrapping
 	// Otherwise, just assume v1.8
 	// TODO: In the beginning of the v1.9 cycle, we can remove the logic as we then don't support v1.7 anymore
-	if err == nil && strings.HasPrefix(string(kubeletVersionBytes), "Kubernetes v1.7") {
+	if err == nil && kubeletVersion.Major() == 1 && kubeletVersion.Minor() == 7 {
 		hostname := nodeutil.GetHostname(j.cfg.NodeName)
 		if err := kubeadmnode.PerformTLSBootstrap(cfg, hostname); err != nil {
 			return err

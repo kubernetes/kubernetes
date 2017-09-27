@@ -449,6 +449,21 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errors []error) {
 	return nil, nil
 }
 
+// KubeletVersionCheck validates installed kubelet version
+type KubeletVersionCheck struct{}
+
+// Check validates kubelet version. It should be not less than minimal supported version
+func (kubever KubeletVersionCheck) Check() (warnings, errors []error) {
+	kubeletVersion, err := GetKubeletVersion()
+	if err != nil {
+		return nil, []error{fmt.Errorf("couldn't get kubelet version: %v", err)}
+	}
+	if kubeletVersion.LessThan(kubeadmconstants.MinimumKubeletVersion) {
+		return nil, []error{fmt.Errorf("Kubelet version %q is lower than kubadm can support. Please upgrade kubelet", kubeletVersion)}
+	}
+	return nil, []error{}
+}
+
 // SwapCheck warns if swap is enabled
 type SwapCheck struct{}
 
@@ -625,6 +640,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		SystemVerificationCheck{},
 		IsRootCheck{},
 		HostnameCheck{nodeName: cfg.NodeName},
+		KubeletVersionCheck{},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		ServiceCheck{Service: "docker", CheckIfActive: true},
 		FirewalldCheck{ports: []int{int(cfg.API.BindPort), 10250}},
@@ -690,6 +706,7 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		SystemVerificationCheck{},
 		IsRootCheck{},
 		HostnameCheck{cfg.NodeName},
+		KubeletVersionCheck{},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		ServiceCheck{Service: "docker", CheckIfActive: true},
 		PortOpenCheck{port: 10250},
