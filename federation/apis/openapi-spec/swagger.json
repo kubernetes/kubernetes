@@ -9715,7 +9715,14 @@
        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.GroupVersionForDiscovery"
       }
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "",
+      "version": "v1",
+      "kind": "APIGroup"
+     }
+    ]
    },
    "io.k8s.apimachinery.pkg.apis.meta.v1.APIGroupList": {
     "description": "APIGroupList is a list of APIGroup, to allow clients to discover the API at /apis.",
@@ -9738,7 +9745,14 @@
       "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
       "type": "string"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "",
+      "version": "v1",
+      "kind": "APIGroupList"
+     }
+    ]
    },
    "io.k8s.apimachinery.pkg.apis.meta.v1.APIResource": {
     "description": "APIResource specifies the name of a resource and whether it is namespaced.",
@@ -9815,7 +9829,14 @@
        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
       }
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "",
+      "version": "v1",
+      "kind": "APIResourceList"
+     }
+    ]
    },
    "io.k8s.apimachinery.pkg.apis.meta.v1.APIVersions": {
     "description": "APIVersions lists the versions that are available, to allow clients to discover the API at /api, which is the root path of the legacy v1 API.",
@@ -9846,7 +9867,14 @@
        "type": "string"
       }
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "",
+      "version": "v1",
+      "kind": "APIVersions"
+     }
+    ]
    },
    "io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions": {
     "description": "DeleteOptions may be provided when deleting an API object.",
@@ -9876,7 +9904,124 @@
       "description": "Whether and how garbage collection will be performed. Either this field or OrphanDependents may be set, but not both. The default policy is decided by the existing finalizer set in the metadata.finalizers and the resource-specific default policy.",
       "type": "string"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "",
+      "version": "v1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "admission.k8s.io",
+      "version": "v1alpha1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "admissionregistration.k8s.io",
+      "version": "v1alpha1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "apps",
+      "version": "v1beta1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "authentication.k8s.io",
+      "version": "v1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "authentication.k8s.io",
+      "version": "v1beta1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "authorization.k8s.io",
+      "version": "v1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "authorization.k8s.io",
+      "version": "v1beta1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "autoscaling",
+      "version": "v1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "autoscaling",
+      "version": "v2alpha1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "batch",
+      "version": "v1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "batch",
+      "version": "v2alpha1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "certificates.k8s.io",
+      "version": "v1beta1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "federation",
+      "version": "v1beta1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "imagepolicy.k8s.io",
+      "version": "v1alpha1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "networking.k8s.io",
+      "version": "v1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "policy",
+      "version": "v1beta1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "rbac.authorization.k8s.io",
+      "version": "v1alpha1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "rbac.authorization.k8s.io",
+      "version": "v1beta1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "settings.k8s.io",
+      "version": "v1alpha1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "storage.k8s.io",
+      "version": "v1",
+      "kind": "DeleteOptions"
+     },
+     {
+      "group": "storage.k8s.io",
+      "version": "v1beta1",
+      "kind": "DeleteOptions"
+     }
+    ]
    },
    "io.k8s.apimachinery.pkg.apis.meta.v1.GroupVersionForDiscovery": {
     "description": "GroupVersion contains the \"group/version\" and \"version\" string of a version. It is made a struct to keep extensibility.",
@@ -10170,7 +10315,14 @@
       "description": "Status of the operation. One of: \"Success\" or \"Failure\". More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status",
       "type": "string"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "",
+      "version": "v1",
+      "kind": "Status"
+     }
+    ]
    },
    "io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause": {
     "description": "StatusCause provides more information about an api.Status failure, including cases when multiple errors are encountered.",
@@ -10240,7 +10392,124 @@
      "type": {
       "type": "string"
      }
-    }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "",
+      "version": "v1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "admission.k8s.io",
+      "version": "v1alpha1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "admissionregistration.k8s.io",
+      "version": "v1alpha1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "apps",
+      "version": "v1beta1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "authentication.k8s.io",
+      "version": "v1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "authentication.k8s.io",
+      "version": "v1beta1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "authorization.k8s.io",
+      "version": "v1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "authorization.k8s.io",
+      "version": "v1beta1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "autoscaling",
+      "version": "v1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "autoscaling",
+      "version": "v2alpha1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "batch",
+      "version": "v1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "batch",
+      "version": "v2alpha1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "certificates.k8s.io",
+      "version": "v1beta1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "extensions",
+      "version": "v1beta1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "federation",
+      "version": "v1beta1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "imagepolicy.k8s.io",
+      "version": "v1alpha1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "networking.k8s.io",
+      "version": "v1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "policy",
+      "version": "v1beta1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "rbac.authorization.k8s.io",
+      "version": "v1alpha1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "rbac.authorization.k8s.io",
+      "version": "v1beta1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "settings.k8s.io",
+      "version": "v1alpha1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "storage.k8s.io",
+      "version": "v1",
+      "kind": "WatchEvent"
+     },
+     {
+      "group": "storage.k8s.io",
+      "version": "v1beta1",
+      "kind": "WatchEvent"
+     }
+    ]
    },
    "io.k8s.apimachinery.pkg.runtime.RawExtension": {
     "description": "RawExtension is used to hold extensions in external versions.\n\nTo use this, make a field which has RawExtension as its type in your external, versioned struct, and Object in your internal struct. You also need to register your various plugin types.\n\n// Internal package: type MyAPIObject struct {\n\truntime.TypeMeta `json:\",inline\"`\n\tMyPlugin runtime.Object `json:\"myPlugin\"`\n} type PluginA struct {\n\tAOption string `json:\"aOption\"`\n}\n\n// External package: type MyAPIObject struct {\n\truntime.TypeMeta `json:\",inline\"`\n\tMyPlugin runtime.RawExtension `json:\"myPlugin\"`\n} type PluginA struct {\n\tAOption string `json:\"aOption\"`\n}\n\n// On the wire, the JSON will look something like this: {\n\t\"kind\":\"MyAPIObject\",\n\t\"apiVersion\":\"v1\",\n\t\"myPlugin\": {\n\t\t\"kind\":\"PluginA\",\n\t\t\"aOption\":\"foo\",\n\t},\n}\n\nSo what happens? Decode first uses json or yaml to unmarshal the serialized data into your external MyAPIObject. That causes the raw JSON to be stored, but not unpacked. The next step is to copy (using pkg/conversion) into the internal struct. The runtime package's DefaultScheme has conversion functions installed which will unpack the JSON stored in RawExtension, turning it into the correct object type, and storing it in the Object. (TODO: In the case where the object is of an unknown type, a runtime.Unknown object will be created and stored.)",
