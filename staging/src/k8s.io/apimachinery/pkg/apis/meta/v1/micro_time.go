@@ -175,10 +175,10 @@ func (t *MicroTime) Fuzz(c fuzz.Continue) {
 	if t == nil {
 		return
 	}
-	// Allow for about 1000 years of randomness.  Leave off nanoseconds
-	// because JSON doesn't represent them so they can't round-trip
-	// properly.
-	t.Time = time.Unix(c.Rand.Int63n(1000*365*24*60*60*1000*1000), 0)
+	// Allow for about 1000 years of randomness. Accurate to a tenth of
+	// micro second. Leave off nanoseconds because JSON doesn't
+	// represent them so they can't round-trip properly.
+	t.Time = time.Unix(c.Rand.Int63n(1000*365*24*60*60), 1000*c.Rand.Int63n(1000000))
 }
 
 var _ fuzz.Interface = &MicroTime{}
