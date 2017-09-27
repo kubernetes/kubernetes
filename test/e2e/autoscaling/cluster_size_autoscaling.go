@@ -153,7 +153,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
 
 		By("Waiting for scale up hoping it won't happen")
-		// Verfiy, that the appropreate event was generated.
+		// Verify that the appropriate event was generated
 		eventFound := false
 	EventsLoop:
 		for start := time.Now(); time.Since(start) < scaleUpTimeout; time.Sleep(20 * time.Second) {
@@ -793,7 +793,6 @@ func isAutoscalerEnabled(expectedMinNodeCountInTargetPool int) (bool, error) {
 }
 
 func enableAutoscaler(nodePool string, minCount, maxCount int) error {
-
 	if nodePool == "default-pool" {
 		glog.Infof("Using gcloud to enable autoscaling for pool %s", nodePool)
 
@@ -803,13 +802,13 @@ func enableAutoscaler(nodePool string, minCount, maxCount int) error {
 			"--max-nodes="+strconv.Itoa(maxCount),
 			"--node-pool="+nodePool,
 			"--project="+framework.TestContext.CloudConfig.ProjectID,
-			"--zone="+framework.TestContext.CloudConfig.Zone).Output()
+			"--zone="+framework.TestContext.CloudConfig.Zone).CombinedOutput()
 
 		if err != nil {
+			glog.Errorf("Failed config update result: %s", output)
 			return fmt.Errorf("Failed to enable autoscaling: %v", err)
 		}
 		glog.Infof("Config update result: %s", output)
-
 	} else {
 		glog.Infof("Using direct api access to enable autoscaling for pool %s", nodePool)
 		updateRequest := "{" +
@@ -852,10 +851,11 @@ func disableAutoscaler(nodePool string, minCount, maxCount int) error {
 			"--no-enable-autoscaling",
 			"--node-pool="+nodePool,
 			"--project="+framework.TestContext.CloudConfig.ProjectID,
-			"--zone="+framework.TestContext.CloudConfig.Zone).Output()
+			"--zone="+framework.TestContext.CloudConfig.Zone).CombinedOutput()
 
 		if err != nil {
-			return fmt.Errorf("Failed to enable autoscaling: %v", err)
+			glog.Errorf("Failed config update result: %s", output)
+			return fmt.Errorf("Failed to disable autoscaling: %v", err)
 		}
 		glog.Infof("Config update result: %s", output)
 
@@ -923,6 +923,9 @@ func getPoolNodes(f *framework.Framework, poolName string) []*v1.Node {
 
 func doPut(url, content string) (string, error) {
 	req, err := http.NewRequest("PUT", url, bytes.NewBuffer([]byte(content)))
+	if err != nil {
+		return "", err
+	}
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
 	resp, err := client.Do(req)
