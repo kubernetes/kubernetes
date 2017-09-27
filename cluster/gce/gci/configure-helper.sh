@@ -1786,6 +1786,12 @@ function start-kube-addons {
   if [[ "${ENABLE_METRICS_SERVER:-}" == "true" ]]; then
     setup-addon-manifests "addons" "metrics-server"
   fi
+  if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "influxdb" ]]; then
+    pv_yaml="${dst_dir}/${file_dir}/influxdb-pv.yaml"
+    pd_name="${INSTANCE_PREFIX}-influxdb-pd"
+    remove-salt-config-comments "${pv_yaml}"
+    sed -i -e "s@{{ *pd_name *}}@${pd_name}@g" "${pv_yaml}"
+  fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns"
     local -r dns_controller_file="${dst_dir}/dns/kubedns-controller.yaml"
