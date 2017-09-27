@@ -80,12 +80,12 @@ func TestPrintAvailableUpgrades(t *testing.T) {
 							"v1.7.1": 1,
 						},
 						KubeadmVersion: "v1.7.2",
-						DNSVersion:     "1.14.4",
+						DNSVersion:     "1.14.5",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.7.3",
 						KubeadmVersion: "v1.7.3",
-						DNSVersion:     "1.14.4",
+						DNSVersion:     "1.14.5",
 					},
 				},
 			},
@@ -100,7 +100,7 @@ API Server           v1.7.1    v1.7.3
 Controller Manager   v1.7.1    v1.7.3
 Scheduler            v1.7.1    v1.7.3
 Kube Proxy           v1.7.1    v1.7.3
-Kube DNS             1.14.4    1.14.4
+Kube DNS             1.14.5    1.14.5
 
 You can now apply the upgrade by executing the following command:
 
@@ -122,12 +122,12 @@ _____________________________________________________________________
 							"v1.7.3": 1,
 						},
 						KubeadmVersion: "v1.8.0",
-						DNSVersion:     "1.14.4",
+						DNSVersion:     "1.14.5",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.8.0",
 						KubeadmVersion: "v1.8.0",
-						DNSVersion:     "1.14.4",
+						DNSVersion:     "1.14.5",
 					},
 				},
 			},
@@ -142,7 +142,7 @@ API Server           v1.7.3    v1.8.0
 Controller Manager   v1.7.3    v1.8.0
 Scheduler            v1.7.3    v1.8.0
 Kube Proxy           v1.7.3    v1.8.0
-Kube DNS             1.14.4    1.14.4
+Kube DNS             1.14.5    1.14.5
 
 You can now apply the upgrade by executing the following command:
 
@@ -162,12 +162,12 @@ _____________________________________________________________________
 							"v1.7.3": 1,
 						},
 						KubeadmVersion: "v1.8.1",
-						DNSVersion:     "1.14.4",
+						DNSVersion:     "1.14.5",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.7.5",
 						KubeadmVersion: "v1.8.1",
-						DNSVersion:     "1.14.4",
+						DNSVersion:     "1.14.5",
 					},
 				},
 				{
@@ -178,12 +178,12 @@ _____________________________________________________________________
 							"v1.7.3": 1,
 						},
 						KubeadmVersion: "v1.8.1",
-						DNSVersion:     "1.14.4",
+						DNSVersion:     "1.14.5",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.8.2",
 						KubeadmVersion: "v1.8.2",
-						DNSVersion:     "1.14.4",
+						DNSVersion:     "1.14.5",
 					},
 				},
 			},
@@ -198,7 +198,7 @@ API Server           v1.7.3    v1.7.5
 Controller Manager   v1.7.3    v1.7.5
 Scheduler            v1.7.3    v1.7.5
 Kube Proxy           v1.7.3    v1.7.5
-Kube DNS             1.14.4    1.14.4
+Kube DNS             1.14.5    1.14.5
 
 You can now apply the upgrade by executing the following command:
 
@@ -217,7 +217,7 @@ API Server           v1.7.3    v1.8.2
 Controller Manager   v1.7.3    v1.8.2
 Scheduler            v1.7.3    v1.8.2
 Kube Proxy           v1.7.3    v1.8.2
-Kube DNS             1.14.4    1.14.4
+Kube DNS             1.14.5    1.14.5
 
 You can now apply the upgrade by executing the following command:
 
@@ -239,12 +239,12 @@ _____________________________________________________________________
 							"v1.7.5": 1,
 						},
 						KubeadmVersion: "v1.7.5",
-						DNSVersion:     "1.14.4",
+						DNSVersion:     "1.14.5",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.8.0-beta.1",
 						KubeadmVersion: "v1.8.0-beta.1",
-						DNSVersion:     "1.14.4",
+						DNSVersion:     "1.14.5",
 					},
 				},
 			},
@@ -259,7 +259,7 @@ API Server           v1.7.5    v1.8.0-beta.1
 Controller Manager   v1.7.5    v1.8.0-beta.1
 Scheduler            v1.7.5    v1.8.0-beta.1
 Kube Proxy           v1.7.5    v1.8.0-beta.1
-Kube DNS             1.14.4    1.14.4
+Kube DNS             1.14.5    1.14.5
 
 You can now apply the upgrade by executing the following command:
 
@@ -281,12 +281,12 @@ _____________________________________________________________________
 							"v1.7.5": 1,
 						},
 						KubeadmVersion: "v1.7.5",
-						DNSVersion:     "1.14.4",
+						DNSVersion:     "1.14.5",
 					},
 					After: upgrade.ClusterState{
 						KubeVersion:    "v1.8.0-rc.1",
 						KubeadmVersion: "v1.8.0-rc.1",
-						DNSVersion:     "1.14.4",
+						DNSVersion:     "1.14.5",
 					},
 				},
 			},
@@ -301,7 +301,7 @@ API Server           v1.7.5    v1.8.0-rc.1
 Controller Manager   v1.7.5    v1.8.0-rc.1
 Scheduler            v1.7.5    v1.8.0-rc.1
 Kube Proxy           v1.7.5    v1.8.0-rc.1
-Kube DNS             1.14.4    1.14.4
+Kube DNS             1.14.5    1.14.5
 
 You can now apply the upgrade by executing the following command:
 
