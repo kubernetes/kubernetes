@@ -56,6 +56,7 @@ var NodeImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.Netexec),
 	imageutils.GetE2EImage(imageutils.Nonewprivs),
 	framework.GetPauseImageNameForHostArch(),
+	framework.GetGPUDevicePluginImage(),
 )
 
 func init() {

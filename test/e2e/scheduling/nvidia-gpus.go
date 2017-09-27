@@ -17,19 +17,13 @@ limitations under the License.
 package scheduling
 
 import (
-	"io/ioutil"
-	"net/http"
 	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -168,8 +162,8 @@ func testNvidiaGPUsOnCOS(f *framework.Framework) {
 	framework.Logf("Cluster is running on COS. Proceeding with test")
 
 	if f.BaseName == "device-plugin-gpus" {
-		dsYamlUrl = "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/device-plugin-daemonset.yaml"
-		gpuResourceName = "nvidia.com/gpu"
+		dsYamlUrl = framework.GPUDevicePluginDSYAML
+		gpuResourceName = framework.NVIDIAGPUResourceName
 		podCreationFunc = makeCudaAdditionDevicePluginTestPod
 	} else {
 		dsYamlUrl = "https://raw.githubusercontent.com/ContainerEngine/accelerators/master/cos-nvidia-gpu-installer/daemonset.yaml"
@@ -180,9 +174,10 @@ func testNvidiaGPUsOnCOS(f *framework.Framework) {
 	// GPU drivers might have already been installed.
 	if !areGPUsAvailableOnAllSchedulableNodes(f) {
 		// Install Nvidia Drivers.
-		ds := dsFromManifest(dsYamlUrl)
+		ds, err := framework.DsFromManifest(dsYamlUrl)
+		Expect(err).NotTo(HaveOccurred())
 		ds.Namespace = f.Namespace.Name
-		_, err := f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).Create(ds)
+		_, err = f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).Create(ds)
 		framework.ExpectNoError(err, "failed to create daemonset")
 		framework.Logf("Successfully created daemonset to install Nvidia drivers. Waiting for drivers to be installed and GPUs to be available in Node Capacity...")
 		// Wait for Nvidia GPUs to be available on nodes
@@ -202,34 +197,6 @@ func testNvidiaGPUsOnCOS(f *framework.Framework) {
 	}
 }
 
-// dsFromManifest reads a .json/yaml file and returns the daemonset in it.
-func dsFromManifest(url string) *extensions.DaemonSet {
-	var controller extensions.DaemonSet
-	framework.Logf("Parsing ds from %v", url)
-
-	var response *http.Response
-	var err error
-	for i := 1; i <= 5; i++ {
-		response, err = http.Get(url)
-		if err == nil && response.StatusCode == 200 {
-			break
-		}
-		time.Sleep(time.Duration(i) * time.Second)
-	}
-	Expect(err).NotTo(HaveOccurred())
-	Expect(response.StatusCode).To(Equal(200))
-	defer response.Body.Close()
-
-	data, err := ioutil.ReadAll(response.Body)
-	Expect(err).NotTo(HaveOccurred())
-
-	json, err := utilyaml.ToJSON(data)
-	Expect(err).NotTo(HaveOccurred())
-
-	Expect(runtime.DecodeInto(api.Codecs.UniversalDecoder(), json, &controller)).NotTo(HaveOccurred())
-	return &controller
-}
-
 var _ = SIGDescribe("[Feature:GPU]", func() {
 	f := framework.NewDefaultFramework("gpus")
 	It("run Nvidia GPU tests on Container Optimized OS only", func() {
@@ -247,9 +214,10 @@ var _ = SIGDescribe("[Feature:GPUDevicePlugin]", func() {
 
 		// 2. Verifies that when the device plugin DaemonSet is removed, resource capacity drops to zero.
 		By("Deleting device plugin daemonset")
-		ds := dsFromManifest(dsYamlUrl)
+		ds, err := framework.DsFromManifest(dsYamlUrl)
+		Expect(err).NotTo(HaveOccurred())
 		falseVar := false
-		err := f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).Delete(ds.Name, &metav1.DeleteOptions{OrphanDependents: &falseVar})
+		err = f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).Delete(ds.Name, &metav1.DeleteOptions{OrphanDependents: &falseVar})
 		framework.ExpectNoError(err, "failed to delete daemonset")
 		framework.Logf("Successfully deleted device plugin daemonset. Wait for resource to be removed.")
 		// Wait for Nvidia GPUs to be not available on nodes
