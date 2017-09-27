@@ -27,14 +27,21 @@ type pluginInitializer struct {
 	externalClient    kubernetes.Interface
 	externalInformers informers.SharedInformerFactory
 	authorizer        authorizer.Authorizer
+	// serverIdentifyingClientCert used to provide identity when calling out to admission plugins
+	serverIdentifyingClientCert []byte
+	// serverIdentifyingClientKey private key for the client certificate used when calling out to admission plugins
+	serverIdentifyingClientKey []byte
 }
 
 // New creates an instance of admission plugins initializer.
-func New(extClientset kubernetes.Interface, extInformers informers.SharedInformerFactory, authz authorizer.Authorizer) (pluginInitializer, error) {
+// TODO(p0lyn0mial): make the parameters public, this construction seems to be redundant.
+func New(extClientset kubernetes.Interface, extInformers informers.SharedInformerFactory, authz authorizer.Authorizer, serverIdentifyingClientCert, serverIdentifyingClientKey []byte) (pluginInitializer, error) {
 	return pluginInitializer{
-		externalClient:    extClientset,
-		externalInformers: extInformers,
-		authorizer:        authz,
+		externalClient:              extClientset,
+		externalInformers:           extInformers,
+		authorizer:                  authz,
+		serverIdentifyingClientCert: serverIdentifyingClientCert,
+		serverIdentifyingClientKey:  serverIdentifyingClientKey,
 	}, nil
 }
 
@@ -51,6 +58,10 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 
 	if wants, ok := plugin.(WantsAuthorizer); ok {
 		wants.SetAuthorizer(i.authorizer)
+	}
+
+	if wants, ok := plugin.(WantsClientCert); ok {
+		wants.SetClientCert(i.serverIdentifyingClientCert, i.serverIdentifyingClientKey)
 	}
 }
 

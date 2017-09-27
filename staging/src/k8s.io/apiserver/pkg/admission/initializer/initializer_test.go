@@ -31,7 +31,7 @@ import (
 // TestWantsAuthorizer ensures that the authorizer is injected
 // when the WantsAuthorizer interface is implemented by a plugin.
 func TestWantsAuthorizer(t *testing.T) {
-	target, err := initializer.New(nil, nil, &TestAuthorizer{})
+	target, err := initializer.New(nil, nil, &TestAuthorizer{}, nil, nil)
 	if err != nil {
 		t.Fatalf("expected to create an instance of initializer but got an error = %s", err.Error())
 	}
@@ -46,7 +46,7 @@ func TestWantsAuthorizer(t *testing.T) {
 // when the WantsExternalKubeClientSet interface is implemented by a plugin.
 func TestWantsExternalKubeClientSet(t *testing.T) {
 	cs := &fake.Clientset{}
-	target, err := initializer.New(cs, nil, &TestAuthorizer{})
+	target, err := initializer.New(cs, nil, &TestAuthorizer{}, nil, nil)
 	if err != nil {
 		t.Fatalf("expected to create an instance of initializer but got an error = %s", err.Error())
 	}
@@ -62,7 +62,7 @@ func TestWantsExternalKubeClientSet(t *testing.T) {
 func TestWantsExternalKubeInformerFactory(t *testing.T) {
 	cs := &fake.Clientset{}
 	sf := informers.NewSharedInformerFactory(cs, time.Duration(1)*time.Second)
-	target, err := initializer.New(cs, sf, &TestAuthorizer{})
+	target, err := initializer.New(cs, sf, &TestAuthorizer{}, nil, nil)
 	if err != nil {
 		t.Fatalf("expected to create an instance of initializer but got an error = %s", err.Error())
 	}
@@ -70,6 +70,20 @@ func TestWantsExternalKubeInformerFactory(t *testing.T) {
 	target.Initialize(wantExternalKubeInformerFactory)
 	if wantExternalKubeInformerFactory.sf != sf {
 		t.Errorf("expected informer factory to be initialized")
+	}
+}
+
+// TestWantsClientCert ensures that the client certificate and key are injected
+// when the WantsClientCert interface is implemented by a plugin.
+func TestWantsClientCert(t *testing.T) {
+	target, err := initializer.New(nil, nil, nil, []byte("cert"), []byte("key"))
+	if err != nil {
+		t.Fatalf("expected to create an instance of initializer but got an error = %s", err.Error())
+	}
+	wantClientCert := &clientCertWanter{}
+	target.Initialize(wantClientCert)
+	if string(wantClientCert.gotCert) != "cert" || string(wantClientCert.gotKey) != "key" {
+		t.Errorf("expected client cert to be initialized, clientCert = %v, clientKey = %v", wantClientCert.gotCert, wantClientCert.gotKey)
 	}
 }
 
@@ -114,9 +128,19 @@ func (self *WantAuthorizerAdmission) Validate() error                       { re
 var _ admission.Interface = &WantAuthorizerAdmission{}
 var _ initializer.WantsAuthorizer = &WantAuthorizerAdmission{}
 
-// TestAuthorizer is a test stub for testing that fulfills the authorizer interface.
+// TestAuthorizer is a test stub that fulfills the WantsAuthorizer interface.
 type TestAuthorizer struct{}
 
 func (t *TestAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
 	return false, "", nil
 }
+
+// wantClientCert is a test stub for testing that fulfulls the WantsClientCert interface.
+type clientCertWanter struct {
+	gotCert, gotKey []byte
+}
+
+func (s *clientCertWanter) SetClientCert(cert, key []byte)     { s.gotCert, s.gotKey = cert, key }
+func (s *clientCertWanter) Admit(a admission.Attributes) error { return nil }
+func (s *clientCertWanter) Handles(o admission.Operation) bool { return false }
+func (s *clientCertWanter) Validate() error                    { return nil }

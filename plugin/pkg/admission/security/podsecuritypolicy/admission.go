@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
+	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/api"
@@ -82,7 +83,7 @@ func (plugin *podSecurityPolicyPlugin) Validate() error {
 }
 
 var _ admission.Interface = &podSecurityPolicyPlugin{}
-var _ kubeapiserveradmission.WantsAuthorizer = &podSecurityPolicyPlugin{}
+var _ genericadmissioninit.WantsAuthorizer = &podSecurityPolicyPlugin{}
 var _ kubeapiserveradmission.WantsInternalKubeInformerFactory = &podSecurityPolicyPlugin{}
 
 // NewPlugin creates a new PSP admission plugin.

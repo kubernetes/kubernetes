@@ -40,3 +40,10 @@ type WantsAuthorizer interface {
 	SetAuthorizer(authorizer.Authorizer)
 	admission.Validator
 }
+
+// WantsClientCert defines a fuction that accepts a cert & key for admission
+// plugins that need to make calls and prove their identity.
+type WantsClientCert interface {
+	SetClientCert(cert, key []byte)
+	admission.Validator
+}
