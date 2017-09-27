@@ -139,6 +139,24 @@ func areGPUsAvailableOnAllSchedulableNodes(f *framework.Framework) bool {
 	return true
 }
 
+func areGPUsAvailableOnAnySchedulableNodes(f *framework.Framework) bool {
+	framework.Logf("Getting list of Nodes from API server")
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+	framework.ExpectNoError(err, "getting node list")
+	for _, node := range nodeList.Items {
+		if node.Spec.Unschedulable {
+			continue
+		}
+		framework.Logf("gpuResourceName %s", gpuResourceName)
+		if val, ok := node.Status.Capacity[gpuResourceName]; ok && val.Value() > 0 {
+			framework.Logf("Nvidia GPUs available on Node: %q", node.Name)
+			return true
+		}
+	}
+	framework.Logf("Nvidia GPUs don't exist on all schedulable nodes")
+	return false
+}
+
 func getGPUsAvailable(f *framework.Framework) int64 {
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "getting node list")
@@ -220,10 +238,10 @@ var _ = SIGDescribe("[Feature:GPUDevicePlugin]", func() {
 		err = f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).Delete(ds.Name, &metav1.DeleteOptions{OrphanDependents: &falseVar})
 		framework.ExpectNoError(err, "failed to delete daemonset")
 		framework.Logf("Successfully deleted device plugin daemonset. Wait for resource to be removed.")
-		// Wait for Nvidia GPUs to be not available on nodes
+		// Wait for Nvidia GPUs to be unavailable on all nodes.
 		Eventually(func() bool {
-			return !areGPUsAvailableOnAllSchedulableNodes(f)
-		}, 5*time.Minute, time.Second).Should(BeTrue())
+			return !areGPUsAvailableOnAnySchedulableNodes(f)
+		}, 10*time.Minute, time.Second).Should(BeTrue())
 
 		// 3. Restarts the device plugin DaemonSet. Verifies GPU resource is successfully advertised
 		// on the nodes and we can run pods using GPUs.
