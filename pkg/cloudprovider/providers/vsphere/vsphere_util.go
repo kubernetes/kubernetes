@@ -55,10 +55,27 @@ func GetVSphere() (*VSphere, error) {
 		return nil, err
 	}
 	vSphereConn.GoVmomiClient = client
+	vsphereIns := &VSphereInstance{
+		conn: vSphereConn,
+		cfg: &VirtualCenterConfig{
+			User:              cfg.Global.User,
+			Password:          cfg.Global.Password,
+			VCenterPort:       cfg.Global.VCenterPort,
+			Datacenters:       cfg.Global.Datacenters,
+			RoundTripperCount: cfg.Global.RoundTripperCount,
+			InsecureFlag:      cfg.Global.InsecureFlag,
+		},
+	}
+	vsphereInsMap := make(map[string]*VSphereInstance)
+	vsphereInsMap[""] = vsphereIns
+	// TODO: Initialize nodeManager and set it in VSphere.
 	vs := &VSphere{
-		conn:     vSphereConn,
-		cfg:      cfg,
-		hostName: "",
+		vsphereInstanceMap: vsphereInsMap,
+		hostName:           "",
+		cfg:                cfg,
+		nodeManager: &NodeManager{
+			vsphereInstanceMap: vsphereInsMap,
+		},
 	}
 	runtime.SetFinalizer(vs, logout)
 	return vs, nil
@@ -71,7 +88,7 @@ func getVSphereConfig() *VSphereConfig {
 	cfg.Global.User = os.Getenv("VSPHERE_USER")
 	cfg.Global.Password = os.Getenv("VSPHERE_PASSWORD")
 	cfg.Global.Datacenters = os.Getenv("VSPHERE_DATACENTER")
-	cfg.Global.DeafultDatastore = os.Getenv("VSPHERE_DATASTORE")
+	cfg.Global.DefaultDatastore = os.Getenv("VSPHERE_DATASTORE")
 	cfg.Global.WorkingDir = os.Getenv("VSPHERE_WORKING_DIR")
 	cfg.Global.VMName = os.Getenv("VSPHERE_VM_NAME")
 	cfg.Global.InsecureFlag = false
@@ -246,11 +263,11 @@ func getPbmCompatibleDatastore(ctx context.Context, client *vim25.Client, storag
 
 func (vs *VSphere) setVMOptions(ctx context.Context, dc *vclib.Datacenter) (*vclib.VMOptions, error) {
 	var vmOptions vclib.VMOptions
-	vm, err := dc.GetVMByPath(ctx, vs.cfg.Global.WorkingDir+"/"+vs.hostName)
+	nodeInfo, err := vs.nodeManager.getNodeInfo(convertToK8sType(vs.hostName))
 	if err != nil {
 		return nil, err
 	}
-	resourcePool, err := vm.GetResourcePool(ctx)
+	resourcePool, err := nodeInfo.vm.GetResourcePool(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -270,15 +287,20 @@ func (vs *VSphere) cleanUpDummyVMs(dummyVMPrefix string) {
 	defer cancel()
 	for {
 		time.Sleep(CleanUpDummyVMRoutineInterval * time.Minute)
+		vsi, err := vs.getVSphereInstance(convertToK8sType(vs.hostName))
+		if err != nil {
+			glog.V(4).Infof("Failed to get VSphere instance with err: %+v. Retrying again...", err)
+			continue
+		}
 		// Ensure client is logged in and session is valid
-		err := vs.conn.Connect(ctx)
+		err = vsi.conn.Connect(ctx)
 		if err != nil {
 			glog.V(4).Infof("Failed to connect to VC with err: %+v. Retrying again...", err)
 			continue
 		}
-		dc, err := vclib.GetDatacenter(ctx, vs.conn, vs.cfg.Global.Datacenters)
+		dc, err := vclib.GetDatacenter(ctx, vsi.conn, vs.cfg.Global.Datacenter)
 		if err != nil {
-			glog.V(4).Infof("Failed to get the datacenter: %s from VC. err: %+v", vs.cfg.Global.Datacenters, err)
+			glog.V(4).Infof("Failed to get the datacenter: %s from VC. err: %+v", vs.cfg.Global.Datacenter, err)
 			continue
 		}
 		// Get the folder reference for global working directory where the dummy VM needs to be created.
