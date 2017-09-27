@@ -153,6 +153,7 @@ func describerMap(c clientset.Interface) map[schema.GroupKind]printers.Describer
 		apps.Kind("StatefulSet"):                       &StatefulSetDescriber{c},
 		apps.Kind("Deployment"):                        &DeploymentDescriber{c, versionedExtensionsClientV1beta1(c)},
 		apps.Kind("DaemonSet"):                         &DaemonSetDescriber{c},
+		apps.Kind("ReplicaSet"):                        &ReplicaSetDescriber{c},
 		certificates.Kind("CertificateSigningRequest"): &CertificateSigningRequestDescriber{c},
 		storage.Kind("StorageClass"):                   &StorageClassDescriber{c},
 		policy.Kind("PodDisruptionBudget"):             &PodDisruptionBudgetDescriber{c},
