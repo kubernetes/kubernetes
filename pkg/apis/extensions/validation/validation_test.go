@@ -2450,6 +2450,13 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	pe := true
 	invalidDefaultAllowPrivilegeEscalation.Spec.DefaultAllowPrivilegeEscalation = &pe
 
+	emptyFlexDriver := validPSP()
+	emptyFlexDriver.Spec.Volumes = []extensions.FSType{extensions.FlexVolume}
+	emptyFlexDriver.Spec.AllowedFlexVolumes = []extensions.AllowedFlexVolume{{}}
+
+	nonEmptyFlexVolumes := validPSP()
+	nonEmptyFlexVolumes.Spec.AllowedFlexVolumes = []extensions.AllowedFlexVolume{{Driver: "example/driver"}}
+
 	type testCase struct {
 		psp         *extensions.PodSecurityPolicy
 		errorType   field.ErrorType
@@ -2581,6 +2588,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "must not contain '..'",
 		},
+		"empty flex volume driver": {
+			psp:         emptyFlexDriver,
+			errorType:   field.ErrorTypeRequired,
+			errorDetail: "must specify a driver",
+		},
 	}
 
 	for k, v := range errorCases {
@@ -2660,6 +2672,17 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	validDefaultAllowPrivilegeEscalation.Spec.DefaultAllowPrivilegeEscalation = &pe
 	validDefaultAllowPrivilegeEscalation.Spec.AllowPrivilegeEscalation = true
 
+	flexvolumeWhenFlexVolumesAllowed := validPSP()
+	flexvolumeWhenFlexVolumesAllowed.Spec.Volumes = []extensions.FSType{extensions.FlexVolume}
+	flexvolumeWhenFlexVolumesAllowed.Spec.AllowedFlexVolumes = []extensions.AllowedFlexVolume{
+		{Driver: "example/driver1"},
+	}
+
+	flexvolumeWhenAllVolumesAllowed := validPSP()
+	flexvolumeWhenAllVolumesAllowed.Spec.Volumes = []extensions.FSType{extensions.All}
+	flexvolumeWhenAllVolumesAllowed.Spec.AllowedFlexVolumes = []extensions.AllowedFlexVolume{
+		{Driver: "example/driver2"},
+	}
 	successCases := map[string]struct {
 		psp *extensions.PodSecurityPolicy
 	}{
@@ -2689,6 +2712,12 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		},
 		"valid defaultAllowPrivilegeEscalation as true": {
 			psp: validDefaultAllowPrivilegeEscalation,
+		},
+		"allow white-listed flexVolume when flex volumes are allowed": {
+			psp: flexvolumeWhenFlexVolumesAllowed,
+		},
+		"allow white-listed flexVolume when all volumes are allowed": {
+			psp: flexvolumeWhenAllVolumesAllowed,
 		},
 	}
 
