@@ -170,6 +170,9 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 	} else {
 		defaultArguments["experimental-bootstrap-token-auth"] = "true"
 	}
+	if cfg.Count > 0 {
+		defaultArguments["apiserver-count"] = fmt.Sprintf("%d", cfg.Count)
+	}
 
 	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.APIServerExtraArgs)...)
 	command = append(command, getAuthzParameters(cfg.AuthorizationModes)...)

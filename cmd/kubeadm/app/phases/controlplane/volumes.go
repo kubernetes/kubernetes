@@ -31,6 +31,7 @@ import (
 
 const (
 	caCertsVolumeName       = "ca-certs"
+	k8sVolumeName           = "k8s"
 	caCertsVolumePath       = "/etc/ssl/certs"
 	caCertsPkiVolumeName    = "ca-certs-etc-pki"
 	flexvolumeDirVolumeName = "flexvolume-dir"
@@ -54,6 +55,7 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.MasterConfiguration) c
 	mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeCertificatesVolumeName, cfg.CertificatesDir, cfg.CertificatesDir, true, &hostPathDirectoryOrCreate)
 	// Read-only mount for the ca certs (/etc/ssl/certs) directory
 	mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, caCertsVolumeName, caCertsVolumePath, caCertsVolumePath, true, &hostPathDirectoryOrCreate)
+	mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, k8sVolumeName, kubeadmconstants.KubernetesDir, kubeadmconstants.KubernetesDir, true, &hostPathDirectoryOrCreate)
 
 	// If external etcd is specified, mount the directories needed for accessing the CA/serving certs and the private key
 	if len(cfg.Etcd.Endpoints) != 0 {
@@ -73,6 +75,7 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.MasterConfiguration) c
 	// Mount for the flexvolume directory (/usr/libexec/kubernetes/kubelet-plugins/volume/exec) directory
 	// Flexvolume dir must NOT be readonly as it is used for third-party plugins to integrate with their storage backends via unix domain socket.
 	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, flexvolumeDirVolumeName, flexvolumeDirVolumePath, flexvolumeDirVolumePath, false, &hostPathDirectoryOrCreate)
+	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, k8sVolumeName, kubeadmconstants.KubernetesDir, kubeadmconstants.KubernetesDir, true, &hostPathDirectoryOrCreate)
 
 	// HostPath volumes for the scheduler
 	// Read-only mount for the scheduler kubeconfig file
