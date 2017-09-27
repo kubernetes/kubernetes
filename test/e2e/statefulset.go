@@ -92,6 +92,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 		})
 
 		It("should provide basic identity", func() {
+			framework.SkipUnlessServerVersionLT(version.MustParseSemantic("v1.8.0-alpha.0"), f.ClientSet.Discovery())
 			By("Creating statefulset " + ssName + " in namespace " + ns)
 			*(ss.Spec.Replicas) = 3
 			framework.SetStatefulSetInitializedAnnotation(ss, "false")
@@ -214,6 +215,7 @@ var _ = framework.KubeDescribe("StatefulSet", func() {
 		})
 
 		It("should not deadlock when a pod's predecessor fails", func() {
+			framework.SkipUnlessServerVersionLT(version.MustParseSemantic("v1.8.0-alpha.0"), f.ClientSet.Discovery())
 			By("Creating statefulset " + ssName + " in namespace " + ns)
 			*(ss.Spec.Replicas) = 2
 			framework.SetStatefulSetInitializedAnnotation(ss, "false")
