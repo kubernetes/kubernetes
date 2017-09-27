@@ -238,8 +238,9 @@ func TestReplicationControllerConversion(t *testing.T) {
 			Namespace: "namespace",
 		},
 		Spec: v1.ReplicationControllerSpec{
-			Replicas: &replicas,
-			Selector: map[string]string{"foo": "bar", "bar": "foo"},
+			Replicas:        &replicas,
+			MinReadySeconds: 32,
+			Selector:        map[string]string{"foo": "bar", "bar": "foo"},
 			Template: &v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"foo": "bar", "bar": "foo"},
