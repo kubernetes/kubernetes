@@ -206,36 +206,35 @@ func (tc *replicaCalcTestCase) prepareTestClient(t *testing.T) (*fake.Clientset,
 			}
 
 			return true, &metrics, nil
-		} else {
-			name := getForAction.GetName()
-			mapper := api.Registry.RESTMapper()
-			metrics := &cmapi.MetricValueList{}
-			assert.NotNil(t, tc.metric.singleObject, "should have only requested a single-object metric when calling GetObjectMetricReplicas")
-			gk := schema.FromAPIVersionAndKind(tc.metric.singleObject.APIVersion, tc.metric.singleObject.Kind).GroupKind()
-			mapping, err := mapper.RESTMapping(gk)
-			if err != nil {
-				return true, nil, fmt.Errorf("unable to get mapping for %s: %v", gk.String(), err)
-			}
-			groupResource := schema.GroupResource{Group: mapping.GroupVersionKind.Group, Resource: mapping.Resource}
-
-			assert.Equal(t, groupResource.String(), getForAction.GetResource().Resource, "should have requested metrics for the resource matching the GroupKind passed in")
-			assert.Equal(t, tc.metric.singleObject.Name, name, "should have requested metrics for the object matching the name passed in")
-
-			metrics.Items = []cmapi.MetricValue{
-				{
-					DescribedObject: v1.ObjectReference{
-						Kind:       tc.metric.singleObject.Kind,
-						APIVersion: tc.metric.singleObject.APIVersion,
-						Name:       name,
-					},
-					Timestamp:  metav1.Time{Time: tc.timestamp},
-					MetricName: tc.metric.name,
-					Value:      *resource.NewMilliQuantity(int64(tc.metric.levels[0]), resource.DecimalSI),
-				},
-			}
-
-			return true, metrics, nil
 		}
+		name := getForAction.GetName()
+		mapper := api.Registry.RESTMapper()
+		metrics := &cmapi.MetricValueList{}
+		assert.NotNil(t, tc.metric.singleObject, "should have only requested a single-object metric when calling GetObjectMetricReplicas")
+		gk := schema.FromAPIVersionAndKind(tc.metric.singleObject.APIVersion, tc.metric.singleObject.Kind).GroupKind()
+		mapping, err := mapper.RESTMapping(gk)
+		if err != nil {
+			return true, nil, fmt.Errorf("unable to get mapping for %s: %v", gk.String(), err)
+		}
+		groupResource := schema.GroupResource{Group: mapping.GroupVersionKind.Group, Resource: mapping.Resource}
+
+		assert.Equal(t, groupResource.String(), getForAction.GetResource().Resource, "should have requested metrics for the resource matching the GroupKind passed in")
+		assert.Equal(t, tc.metric.singleObject.Name, name, "should have requested metrics for the object matching the name passed in")
+
+		metrics.Items = []cmapi.MetricValue{
+			{
+				DescribedObject: v1.ObjectReference{
+					Kind:       tc.metric.singleObject.Kind,
+					APIVersion: tc.metric.singleObject.APIVersion,
+					Name:       name,
+				},
+				Timestamp:  metav1.Time{Time: tc.timestamp},
+				MetricName: tc.metric.name,
+				Value:      *resource.NewMilliQuantity(int64(tc.metric.levels[0]), resource.DecimalSI),
+			},
+		}
+
+		return true, metrics, nil
 	})
 
 	return fakeClient, fakeMetricsClient, fakeCMClient
@@ -729,7 +728,7 @@ func TestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 
 	// Force a minimal scaling event by satisfying  (tolerance < 1 - resourcesUsedRatio).
 	target := math.Abs(1/(requestedToUsed*(1-tolerance))) + .01
-	finalCpuPercentTarget := int32(target * 100)
+	finalCPUPercentTarget := int32(target * 100)
 	resourcesUsedRatio := float64(totalUsedCPUOfAllPods) / float64(float64(totalRequestedCPUOfAllPods)*target)
 
 	// i.e. .60 * 20 -> scaled down expectation.
@@ -766,7 +765,7 @@ func TestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 				resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
 			},
 
-			targetUtilization:   finalCpuPercentTarget,
+			targetUtilization:   finalCPUPercentTarget,
 			expectedUtilization: int32(totalUsedCPUOfAllPods*100) / totalRequestedCPUOfAllPods,
 			expectedValue:       numContainersPerPod * totalUsedCPUOfAllPods / 10,
 		},
@@ -777,8 +776,8 @@ func TestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 	// Reuse the data structure above, now testing "unscaling".
 	// Now, we test that no scaling happens if we are in a very close margin to the tolerance
 	target = math.Abs(1/(requestedToUsed*(1-tolerance))) + .004
-	finalCpuPercentTarget = int32(target * 100)
-	tc.resource.targetUtilization = finalCpuPercentTarget
+	finalCPUPercentTarget = int32(target * 100)
+	tc.resource.targetUtilization = finalCPUPercentTarget
 	tc.currentReplicas = startPods
 	tc.expectedReplicas = startPods
 	tc.runTest(t)
