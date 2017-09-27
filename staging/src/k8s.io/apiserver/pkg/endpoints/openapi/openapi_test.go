@@ -60,8 +60,11 @@ func assertEqual(t *testing.T, expected, actual interface{}) {
 
 func TestGetDefinitionName(t *testing.T) {
 	testType := TestType{}
-	typePkgName := "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/openapi.TestType"
-	typeFriendlyName := "io.k8s.kubernetes.vendor.k8s.io.apiserver.pkg.endpoints.openapi.TestType"
+	// in production, the name is stripped of ".*vendor/" prefix before passed
+	// to GetDefinitionName, so here typePkgName does not have the
+	// "k8s.io/kubernetes/vendor" prefix.
+	typePkgName := "k8s.io/apiserver/pkg/endpoints/openapi.TestType"
+	typeFriendlyName := "io.k8s.apiserver.pkg.endpoints.openapi.TestType"
 	if strings.HasSuffix(reflect.TypeOf(testType).PkgPath(), "go_default_test") {
 		// the test is running inside bazel where the package name is changed and
 		// "go_default_test" will add to package path.
