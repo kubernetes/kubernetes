@@ -126,7 +126,9 @@ type patchFn func(*resource.Info) ([]byte, error)
 // the changes in the object. Encoder must be able to encode the info into the appropriate destination type.
 // This function returns whether the mutation function made any change in the original object.
 func CalculatePatch(patch *Patch, encoder runtime.Encoder, mutateFn patchFn) bool {
-	patch.Before, patch.Err = runtime.Encode(encoder, patch.Info.Object)
+	versionedEncoder := api.Codecs.EncoderForVersion(encoder, patch.Info.Mapping.GroupVersionKind.GroupVersion())
+
+	patch.Before, patch.Err = runtime.Encode(versionedEncoder, patch.Info.Object)
 
 	patch.After, patch.Err = mutateFn(patch.Info)
 	if patch.Err != nil {
