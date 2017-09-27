@@ -60,6 +60,38 @@ func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
 			// hostname or not, we only check for the suffix match.
 			if strings.HasSuffix(image, tag) || strings.HasSuffix(tag, image) {
 				return true
+			} else {
+				// TODO: We need to remove this hack when project atomic based
+				// docker distro(s) like centos/fedora/rhel image fix problems on
+				// their end.
+				// Say the tag is "docker.io/busybox:latest"
+				// and the image is "docker.io/library/busybox:latest"
+				t, err := dockerref.ParseNormalizedNamed(tag)
+				if err != nil {
+					continue
+				}
+				// the parsed/normalized tag will look like
+				// reference.taggedReference {
+				// 	 namedRepository: reference.repository {
+				// 	   domain: "docker.io",
+				// 	   path: "library/busybox"
+				//	},
+				// 	tag: "latest"
+				// }
+				// If it does not have tags then we bail out
+				t2, ok := t.(dockerref.Tagged)
+				if !ok {
+					continue
+				}
+				// normalized tag would look like "docker.io/library/busybox:latest"
+				// note the library get added in the string
+				normalizedTag := t2.String()
+				if normalizedTag == "" {
+					continue
+				}
+				if strings.HasSuffix(image, normalizedTag) || strings.HasSuffix(normalizedTag, image) {
+					return true
+				}
 			}
 		}
 	}
