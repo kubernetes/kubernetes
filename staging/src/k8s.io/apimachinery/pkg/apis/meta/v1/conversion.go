@@ -252,7 +252,6 @@ func Convert_map_to_unversioned_LabelSelector(in *map[string]string, out *LabelS
 	if in == nil {
 		return nil
 	}
-	out = new(LabelSelector)
 	for labelKey, labelValue := range *in {
 		AddLabelToSelector(out, labelKey, labelValue)
 	}

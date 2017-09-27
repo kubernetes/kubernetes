@@ -17,6 +17,7 @@ limitations under the License.
 package v1_test
 
 import (
+	"encoding/json"
 	"net/url"
 	"reflect"
 	"testing"
@@ -31,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 
 	// enforce that all types are installed
 	_ "k8s.io/kubernetes/pkg/api/testapi"
@@ -224,5 +226,55 @@ func TestResourceListConversion(t *testing.T) {
 		if !apiequality.Semantic.DeepEqual(test.expected, output) {
 			t.Errorf("unexpected conversion for case %d: Expected\n%+v;\nGot\n%+v", i, test.expected, output)
 		}
+	}
+}
+
+func TestReplicationControllerConversion(t *testing.T) {
+	// If we start with a RC, we should always have round-trip fidelity.
+	replicas := int32(1)
+	in := &v1.ReplicationController{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "name",
+			Namespace: "namespace",
+		},
+		Spec: v1.ReplicationControllerSpec{
+			Replicas: &replicas,
+			Selector: map[string]string{"foo": "bar", "bar": "foo"},
+			Template: &v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"foo": "bar", "bar": "foo"},
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "container",
+							Image: "image",
+						},
+					},
+				},
+			},
+		},
+		Status: v1.ReplicationControllerStatus{
+			Replicas:             1,
+			FullyLabeledReplicas: 2,
+			ReadyReplicas:        3,
+			AvailableReplicas:    4,
+			ObservedGeneration:   5,
+			Conditions:           []v1.ReplicationControllerCondition{},
+		},
+	}
+	in = roundTrip(t, in).(*v1.ReplicationController)
+	rs := &extensions.ReplicaSet{}
+	if err := k8s_api_v1.Convert_v1_ReplicationController_to_extensions_ReplicaSet(in, rs, nil); err != nil {
+		t.Fatalf("can't convert RC to RS: %v", err)
+	}
+	out := &v1.ReplicationController{}
+	if err := k8s_api_v1.Convert_extensions_ReplicaSet_to_v1_ReplicationController(rs, out, nil); err != nil {
+		t.Fatalf("can't convert RS to RC: %v", err)
+	}
+	if !apiequality.Semantic.DeepEqual(in, out) {
+		instr, _ := json.MarshalIndent(in, "", "  ")
+		outstr, _ := json.MarshalIndent(out, "", "  ")
+		t.Errorf("RC-RS conversion round-trip failed:\nin:\n%s\nout:\n%s", instr, outstr)
 	}
 }

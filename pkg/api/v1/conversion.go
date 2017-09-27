@@ -236,6 +236,7 @@ func Convert_v1_ReplicationController_to_extensions_ReplicaSet(in *v1.Replicatio
 func Convert_v1_ReplicationControllerSpec_to_extensions_ReplicaSetSpec(in *v1.ReplicationControllerSpec, out *extensions.ReplicaSetSpec, s conversion.Scope) error {
 	out.Replicas = *in.Replicas
 	if in.Selector != nil {
+		out.Selector = new(metav1.LabelSelector)
 		metav1.Convert_map_to_unversioned_LabelSelector(&in.Selector, out.Selector, s)
 	}
 	if in.Template != nil {
