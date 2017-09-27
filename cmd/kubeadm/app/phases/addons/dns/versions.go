@@ -21,12 +21,12 @@ import (
 )
 
 const (
-	kubeDNSv170AndAboveVersion = "1.14.4"
+	kubeDNSv170AndAboveVersion = "1.14.5"
 )
 
 // GetKubeDNSVersion returns the right kube-dns version for a specific k8s version
 func GetKubeDNSVersion(kubeVersion *version.Version) string {
-	// v1.7.0+ uses 1.14.4, just return that here
+	// v1.7.0+ uses 1.14.5, just return that here
 	// In the future when the kube-dns version is bumped at HEAD; add conditional logic to return the right versions
 	// Also, the version might be bumped for different k8s releases on the same branch
 	return kubeDNSv170AndAboveVersion
