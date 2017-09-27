@@ -102,6 +102,14 @@ func TestMatchImageTagOrSHA(t *testing.T) {
 			Output: true,
 		},
 		{
+			Inspected: dockertypes.ImageInspect{
+				ID:       "sha256:9bbdf247c91345f0789c10f50a57e36a667af1189687ad1de88a6243d05a2227",
+				RepoTags: []string{"docker.io/busybox:latest"},
+			},
+			Image:  "docker.io/library/busybox:latest",
+			Output: true,
+		},
+		{
 			// RepoDigest match is is required
 			Inspected: dockertypes.ImageInspect{
 				ID:          "",
