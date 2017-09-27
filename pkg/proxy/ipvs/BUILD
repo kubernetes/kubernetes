@@ -8,32 +8,24 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "proxier_test.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = ["proxier_test.go"],
     library = ":go_default_library",
-    deps = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "//pkg/api:go_default_library",
-            "//pkg/proxy:go_default_library",
-            "//pkg/proxy/util:go_default_library",
-            "//pkg/util/iptables:go_default_library",
-            "//pkg/util/iptables/testing:go_default_library",
-            "//pkg/util/ipvs:go_default_library",
-            "//pkg/util/ipvs/testing:go_default_library",
-            "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
-            "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-            "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-            "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
-            "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
-            "//vendor/k8s.io/utils/exec:go_default_library",
-            "//vendor/k8s.io/utils/exec/testing:go_default_library",
-        ],
-        "//conditions:default": [],
-    }),
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/proxy:go_default_library",
+        "//pkg/proxy/util:go_default_library",
+        "//pkg/util/iptables:go_default_library",
+        "//pkg/util/iptables/testing:go_default_library",
+        "//pkg/util/ipvs:go_default_library",
+        "//pkg/util/ipvs/testing:go_default_library",
+        "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
+        "//vendor/k8s.io/utils/exec/testing:go_default_library",
+    ],
 )
 
 go_library(
