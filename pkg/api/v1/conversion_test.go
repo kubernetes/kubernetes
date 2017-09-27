@@ -261,7 +261,15 @@ func TestReplicationControllerConversion(t *testing.T) {
 			ReadyReplicas:        3,
 			AvailableReplicas:    4,
 			ObservedGeneration:   5,
-			Conditions:           []v1.ReplicationControllerCondition{},
+			Conditions: []v1.ReplicationControllerCondition{
+				{
+					Type:               v1.ReplicationControllerReplicaFailure,
+					Status:             v1.ConditionTrue,
+					LastTransitionTime: metav1.NewTime(time.Unix(123456789, 0)),
+					Reason:             "Reason",
+					Message:            "Message",
+				},
+			},
 		},
 	}
 	in = roundTrip(t, in).(*v1.ReplicationController)
