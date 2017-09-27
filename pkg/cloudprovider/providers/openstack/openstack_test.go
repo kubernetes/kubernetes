@@ -101,7 +101,8 @@ func TestReadConfig(t *testing.T) {
  [BlockStorage]
  bs-version = auto
  trust-device-path = yes
-
+ [Metadata]
+ search-order = configDrive, metadataService
  `))
 	if err != nil {
 		t.Fatalf("Should succeed when a valid config is provided: %s", err)
@@ -127,6 +128,9 @@ func TestReadConfig(t *testing.T) {
 	}
 	if cfg.BlockStorage.BSVersion != "auto" {
 		t.Errorf("incorrect bs.bs-version: %v", cfg.BlockStorage.BSVersion)
+	}
+	if cfg.Metadata.SearchOrder != "configDrive, metadataService" {
+		t.Errorf("incorrect md.search-order: %v", cfg.Metadata.SearchOrder)
 	}
 }
 
@@ -169,6 +173,9 @@ func TestCheckOpenStackOpts(t *testing.T) {
 					ManageSecurityGroups: true,
 					NodeSecurityGroupID:  "b41d28c2-d02f-4e1e-8ffb-23b8e4f5c144",
 				},
+				metadataOpts: MetadataOpts{
+					SearchOrder: configDriveID,
+				},
 			},
 			expectedError: nil,
 		},
@@ -187,6 +194,9 @@ func TestCheckOpenStackOpts(t *testing.T) {
 					ManageSecurityGroups: true,
 					NodeSecurityGroupID:  "b41d28c2-d02f-4e1e-8ffb-23b8e4f5c144",
 				},
+				metadataOpts: MetadataOpts{
+					SearchOrder: configDriveID,
+				},
 			},
 			expectedError: nil,
 		},
@@ -202,6 +212,9 @@ func TestCheckOpenStackOpts(t *testing.T) {
 					CreateMonitor:        true,
 					ManageSecurityGroups: true,
 					NodeSecurityGroupID:  "b41d28c2-d02f-4e1e-8ffb-23b8e4f5c144",
+				},
+				metadataOpts: MetadataOpts{
+					SearchOrder: configDriveID,
 				},
 			},
 			expectedError: fmt.Errorf("monitor-delay not set in cloud provider config"),
@@ -221,8 +234,42 @@ func TestCheckOpenStackOpts(t *testing.T) {
 					MonitorMaxRetries:    uint(3),
 					ManageSecurityGroups: true,
 				},
+				metadataOpts: MetadataOpts{
+					SearchOrder: configDriveID,
+				},
 			},
 			expectedError: fmt.Errorf("node-security-group not set in cloud provider config"),
+		},
+		{
+			name: "test5",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				metadataOpts: MetadataOpts{
+					SearchOrder: "",
+				},
+			},
+			expectedError: fmt.Errorf("Invalid value in section [Metadata] with key `search-order`. Value cannot be empty"),
+		},
+		{
+			name: "test6",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				metadataOpts: MetadataOpts{
+					SearchOrder: "value1,value2,value3",
+				},
+			},
+			expectedError: fmt.Errorf("Invalid value in section [Metadata] with key `search-order`. Value cannot contain more than 2 elements"),
+		},
+		{
+			name: "test7",
+			openstackOpts: &OpenStack{
+				provider: nil,
+				metadataOpts: MetadataOpts{
+					SearchOrder: "value1",
+				},
+			},
+			expectedError: fmt.Errorf("Invalid element '%s' found in section [Metadata] with key `search-order`."+
+				"Supported elements include '%s' and '%s'", "value1", configDriveID, metadataID),
 		},
 	}
 
@@ -373,6 +420,8 @@ func configFromEnv() (cfg Config, ok bool) {
 		cfg.Global.Password != "" &&
 		(cfg.Global.TenantId != "" || cfg.Global.TenantName != "" ||
 			cfg.Global.DomainId != "" || cfg.Global.DomainName != ""))
+
+	cfg.Metadata.SearchOrder = fmt.Sprintf("%s,%s", configDriveID, metadataID)
 
 	return
 }

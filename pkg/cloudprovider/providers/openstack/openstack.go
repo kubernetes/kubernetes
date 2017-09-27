@@ -253,6 +253,10 @@ func checkOpenStackOpts(openstackOpts *OpenStack) error {
 		}
 	}
 
+	if err := checkMetadataSearchOrder(openstackOpts.metadataOpts.SearchOrder); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -281,8 +285,6 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 	} else {
 		err = openstack.Authenticate(provider, cfg.toAuthOptions())
 	}
-
-	err = validateMetadataSearchOrder(cfg.Metadata.SearchOrder)
 
 	if err != nil {
 		return nil, err
@@ -753,7 +755,7 @@ func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
 	}
 }
 
-func validateMetadataSearchOrder(order string) error {
+func checkMetadataSearchOrder(order string) error {
 	if order == "" {
 		return errors.New("Invalid value in section [Metadata] with key `search-order`. Value cannot be empty")
 	}
@@ -763,14 +765,15 @@ func validateMetadataSearchOrder(order string) error {
 		return errors.New("Invalid value in section [Metadata] with key `search-order`. Value cannot contain more than 2 elements")
 	}
 
-	for _, o := range elements {
-		switch o {
+	for _, id := range elements {
+		id = strings.TrimSpace(id)
+		switch id {
 		case configDriveID:
 		case metadataID:
 		default:
 			errTxt := "Invalid element '%s' found in section [Metadata] with key `search-order`." +
 				"Supported elements include '%s' and '%s'"
-			return fmt.Errorf(errTxt, o, configDriveID, metadataID)
+			return fmt.Errorf(errTxt, id, configDriveID, metadataID)
 		}
 	}
 

@@ -156,6 +156,7 @@ func getMetadata(order string) (*Metadata, error) {
 
 		elements := strings.Split(order, ",")
 		for _, id := range elements {
+			id = strings.TrimSpace(id)
 			switch id {
 			case configDriveID:
 				md, err = getMetadataFromConfigDrive()
