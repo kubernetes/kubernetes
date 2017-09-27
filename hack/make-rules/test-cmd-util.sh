@@ -3043,6 +3043,17 @@ run_rs_tests() {
     kubectl delete rs frontend "${kube_flags[@]}"
   fi
 
+  ### Set image of a ReplcaSet 
+  # Pre-condition: no replica set exists
+  kube::test::get_object_assert rs "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Create a ReplicaSet 
+  kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}"
+  # Set the ReplicaSet's image 
+  kubectl set image -f hack/testdata/frontend-replicaset.yaml php-redis="${IMAGE_PERL}"  "${kube_flags[@]}"
+  kube::test::get_object_assert replicaset "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_PERL}:"
+  # Clean up
+  kubectl delete rs frontend "${kube_flags[@]}"
+
   set +o nounset
   set +o errexit
 }
@@ -3116,6 +3127,17 @@ run_daemonset_history_tests() {
   kube::test::get_object_assert daemonset "{{range.items}}{{$container_len}}{{end}}" "2"
   # Clean up
   kubectl delete -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]}"
+
+  ### Set image of a DaemonSet 
+  # Pre-condition: no daemon set exists
+  kube::test::get_object_assert ds "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Create a DaemonSet 
+  kubectl create -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]}"
+  # Set the DaemonSet's image 
+  kubectl set image -f hack/testdata/rollingupdate-daemonset.yaml kubernetes-pause="${IMAGE_PERL}"  "${kube_flags[@]}"
+  kube::test::get_object_assert ds "{{range.items}}{{$image_field0}}:{{end}}" "${IMAGE_PERL}:"
+  # Clean up
+  kubectl delete ds bind "${kube_flags[@]}"
 
   set +o nounset
   set +o errexit
