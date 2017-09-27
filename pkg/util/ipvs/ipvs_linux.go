@@ -53,7 +53,7 @@ func New(exec utilexec.Interface) Interface {
 
 // EnsureVirtualServerAddressBind is part of Interface.
 func (runner *runner) EnsureVirtualServerAddressBind(vs *VirtualServer, dummyDev string) (exist bool, err error) {
-	addr := vs.Address.String() + "/32"
+	addr := vs.Address.String()
 	args := []string{"addr", "add", addr, "dev", dummyDev}
 	out, err := runner.exec.Command(cmdIP, args...).CombinedOutput()
 	if err != nil {
@@ -70,7 +70,7 @@ func (runner *runner) EnsureVirtualServerAddressBind(vs *VirtualServer, dummyDev
 
 // UnbindVirtualServerAddress is part of Interface.
 func (runner *runner) UnbindVirtualServerAddress(vs *VirtualServer, dummyDev string) error {
-	addr := vs.Address.String() + "/32"
+	addr := vs.Address.String()
 	args := []string{"addr", "del", addr, "dev", dummyDev}
 	out, err := runner.exec.Command(cmdIP, args...).CombinedOutput()
 	if err != nil {

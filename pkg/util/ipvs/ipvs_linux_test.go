@@ -35,86 +35,116 @@ import (
 const dummyDevice = "kube-ipvs0"
 
 func TestEnsureVirtualServerAddressBind(t *testing.T) {
-	vs := &VirtualServer{
-		Address:  net.ParseIP("10.20.30.40"),
-		Port:     uint16(1234),
-		Protocol: string("TCP"),
-	}
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			// Success.
-			func() ([]byte, error) { return []byte{}, nil },
-			// Exists.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 2} },
+	tests := []VirtualServer{
+		{
+			Address:  net.ParseIP("10.20.30.40"),
+			Port:     uint16(1234),
+			Protocol: string("TCP"),
+		},
+		{
+			Address:  net.ParseIP("2012::beef"),
+			Port:     uint16(5678),
+			Protocol: string("UDP"),
 		},
 	}
-	fexec := fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-	}
-	runner := New(&fexec)
-	// Success.
-	exists, err := runner.EnsureVirtualServerAddressBind(vs, dummyDevice)
-	if err != nil {
-		t.Errorf("expected success, got %v", err)
-	}
-	if exists {
-		t.Errorf("expected exists = false")
-	}
-	if fcmd.CombinedOutputCalls != 1 {
-		t.Errorf("expected 1 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
-	}
-	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ip", "addr", "add", "10.20.30.40/32", "dev", "kube-ipvs0") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
-	}
-	// Exists.
-	exists, err = runner.EnsureVirtualServerAddressBind(vs, dummyDevice)
-	if err != nil {
-		t.Errorf("expected success, got %v", err)
-	}
-	if !exists {
-		t.Errorf("expected exists = true")
+	for i := range tests {
+		vs := &tests[i]
+		fcmd := fakeexec.FakeCmd{
+			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+				// Success.
+				func() ([]byte, error) { return []byte{}, nil },
+				// Exists.
+				func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 2} },
+			},
+		}
+		fexec := fakeexec.FakeExec{
+			CommandScript: []fakeexec.FakeCommandAction{
+				func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+				func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			},
+		}
+		runner := New(&fexec)
+		// Success.
+		exists, err := runner.EnsureVirtualServerAddressBind(vs, dummyDevice)
+		if err != nil {
+			t.Errorf("expected success, got %v", err)
+		}
+		if exists {
+			t.Errorf("expected exists = false")
+		}
+		if fcmd.CombinedOutputCalls != 1 {
+			t.Errorf("expected 1 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+		}
+		IP := tests[i].Address.String()
+		if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ip", "addr", "add", IP, "dev", dummyDevice) {
+			t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
+		}
+		// Exists.
+		exists, err = runner.EnsureVirtualServerAddressBind(vs, dummyDevice)
+		if err != nil {
+			t.Errorf("expected success, got %v", err)
+		}
+		if !exists {
+			t.Errorf("expected exists = true")
+		}
 	}
 }
 
 func TestUnbindVirtualServerAddress(t *testing.T) {
-	svc := &VirtualServer{
-		Address:  net.ParseIP("10.20.30.41"),
-		Port:     uint16(80),
-		Protocol: string("TCP"),
-	}
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			// Success.
-			func() ([]byte, error) { return []byte{}, nil },
-			// Failure.
-			func() ([]byte, error) { return nil, &fakeexec.FakeExitError{Status: 2} },
+	tests := []VirtualServer{
+		{
+			Address:  net.ParseIP("2012::beef"),
+			Port:     uint16(5678),
+			Protocol: string("UDP"),
+		},
+		{
+			Address:  net.ParseIP("10.20.30.40"),
+			Port:     uint16(1234),
+			Protocol: string("TCP"),
 		},
 	}
-	fexec := fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-	}
-	runner := New(&fexec)
-	// Success.
-	err := runner.UnbindVirtualServerAddress(svc, dummyDevice)
-	if err != nil {
-		t.Errorf("expected success, got %v", err)
-	}
-	if fcmd.CombinedOutputCalls != 1 {
-		t.Errorf("expected 1 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
-	}
-	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ip", "addr", "del", "10.20.30.41/32", "dev", "kube-ipvs0") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
-	}
-	// Failure.
-	err = runner.UnbindVirtualServerAddress(svc, dummyDevice)
-	if err == nil {
-		t.Errorf("expected failure")
+	for i := range tests {
+		vs := &tests[i]
+		fcmd := fakeexec.FakeCmd{
+			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
+				// Success.
+				func() ([]byte, error) {
+					return []byte{}, nil
+				},
+				// Failure.
+				func() ([]byte, error) {
+					return nil, &fakeexec.FakeExitError{Status: 2}
+				},
+			},
+		}
+		fexec := fakeexec.FakeExec{
+			CommandScript: []fakeexec.FakeCommandAction{
+				func(cmd string, args ...string) exec.Cmd {
+					return fakeexec.InitFakeCmd(&fcmd, cmd, args...)
+				},
+				func(cmd string, args ...string) exec.Cmd {
+					return fakeexec.InitFakeCmd(&fcmd, cmd, args...)
+				},
+			},
+		}
+		runner := New(&fexec)
+		// Success.
+		err := runner.UnbindVirtualServerAddress(vs, dummyDevice)
+		if err != nil {
+			t.Errorf("expected success, got %v", err)
+		}
+		if fcmd.CombinedOutputCalls != 1 {
+			t.Errorf("expected 1 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+		}
+		IP := tests[i].Address.String()
+		if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ip", "addr", "del", IP, "dev", dummyDevice) {
+			t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
+		}
+		// Failure.
+		err = runner.UnbindVirtualServerAddress(vs, dummyDevice)
+		if err == nil {
+			t.Errorf("expected failure")
+		}
 	}
 }
 
