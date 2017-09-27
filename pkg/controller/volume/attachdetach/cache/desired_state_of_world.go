@@ -101,6 +101,10 @@ type DesiredStateOfWorld interface {
 	// GetKeepTerminatedPodVolumesForNode determines if node wants volumes to be
 	// mounted and attached for terminated pods
 	GetKeepTerminatedPodVolumesForNode(k8stypes.NodeName) bool
+
+	// MarkvolumeAsReported marks the volume as being required by a pod and needed to
+	// be really attached
+	MarkVolumeAsReportedInUse(nodeName k8stypes.NodeName, volumeName v1.UniqueVolumeName) error
 }
 
 // VolumeToAttach represents a volume that should be attached to a node.
@@ -175,6 +179,8 @@ type volumeToAttach struct {
 	// the name of the pod and the value is a pod object containing more
 	// information about the pod.
 	scheduledPods map[types.UniquePodName]pod
+
+	reportedInUse bool
 }
 
 // The pod represents a pod that references the underlying volume and is
@@ -239,6 +245,7 @@ func (dsw *desiredStateOfWorld) AddPod(
 			volumeName:               volumeName,
 			spec:                     volumeSpec,
 			scheduledPods:            make(map[types.UniquePodName]pod),
+			reportedInUse:            false,
 		}
 		dsw.nodesManaged[nodeName].volumesToAttach[volumeName] = volumeObj
 	}
@@ -351,15 +358,20 @@ func (dsw *desiredStateOfWorld) GetVolumesToAttach() []VolumeToAttach {
 	volumesToAttach := make([]VolumeToAttach, 0 /* len */, len(dsw.nodesManaged) /* cap */)
 	for nodeName, nodeObj := range dsw.nodesManaged {
 		for volumeName, volumeObj := range nodeObj.volumesToAttach {
-			volumesToAttach = append(volumesToAttach,
-				VolumeToAttach{
-					VolumeToAttach: operationexecutor.VolumeToAttach{
-						MultiAttachErrorReported: volumeObj.multiAttachErrorReported,
-						VolumeName:               volumeName,
-						VolumeSpec:               volumeObj.spec,
-						NodeName:                 nodeName,
-						ScheduledPods:            getPodsFromMap(volumeObj.scheduledPods),
-					}})
+			// Wait for kubelet to realize the volume is to be attached to the node first. This way
+			// the controller would not miss potential deletion of the volume from the VolumesInUse
+			// and be able to detach it without waiting for the time-out.
+			if volumeObj.reportedInUse {
+				volumesToAttach = append(volumesToAttach,
+					VolumeToAttach{
+						VolumeToAttach: operationexecutor.VolumeToAttach{
+							MultiAttachErrorReported: volumeObj.multiAttachErrorReported,
+							VolumeName:               volumeName,
+							VolumeSpec:               volumeObj.spec,
+							NodeName:                 nodeName,
+							ScheduledPods:            getPodsFromMap(volumeObj.scheduledPods),
+						}})
+			}
 		}
 	}
 
@@ -392,4 +404,24 @@ func (dsw *desiredStateOfWorld) GetPodToAdd() map[types.UniquePodName]PodToAdd {
 		}
 	}
 	return pods
+}
+
+func (dsw *desiredStateOfWorld) MarkVolumeAsReportedInUse(nodeName k8stypes.NodeName, volumeName v1.UniqueVolumeName) error {
+	dsw.Lock()
+	defer dsw.Unlock()
+
+	node, nodeExists := dsw.nodesManaged[nodeName]
+
+	if !nodeExists {
+		return fmt.Errorf("failed to mark volume as safe to attach; node %s does not exist in the desired state of world", nodeName)
+	}
+
+	volume, volumeExists := node.volumesToAttach[volumeName]
+	if !volumeExists {
+		return fmt.Errorf("failed to mark volume as safe to attach; volume %s does not exist on node %s the desired state of world", volumeName, nodeName)
+	}
+
+	volume.reportedInUse = true
+	dsw.nodesManaged[nodeName].volumesToAttach[volumeName] = volume
+	return nil
 }
