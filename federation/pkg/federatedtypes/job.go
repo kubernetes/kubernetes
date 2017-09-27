@@ -72,7 +72,7 @@ func (a *JobAdapter) Copy(obj pkgruntime.Object) pkgruntime.Object {
 	job := obj.(*batchv1.Job)
 	return &batchv1.Job{
 		ObjectMeta: fedutil.DeepCopyRelevantObjectMeta(job.ObjectMeta),
-		Spec:       *fedutil.DeepCopyApiTypeOrPanic(&job.Spec).(*batchv1.JobSpec),
+		Spec:       *job.Spec.DeepCopy(),
 	}
 }
 
