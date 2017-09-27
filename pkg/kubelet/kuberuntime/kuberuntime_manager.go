@@ -725,7 +725,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 func (m *kubeGenericRuntimeManager) doBackOff(pod *v1.Pod, container *v1.Container, podStatus *kubecontainer.PodStatus, backOff *flowcontrol.Backoff) (bool, string, error) {
 	var cStatus *kubecontainer.ContainerStatus
 	for _, c := range podStatus.ContainerStatuses {
-		if c.Name == container.Name && c.State == kubecontainer.ContainerStateExited {
+		if c.Name == container.Name && c.State == kubecontainer.ContainerStateExited && c.ExitCode != 0 {
 			cStatus = c
 			break
 		}
