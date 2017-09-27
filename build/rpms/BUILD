@@ -45,7 +45,7 @@ pkg_rpm(
         "@kubernetes_cni//file",
     ],
     spec_file = "kubernetes-cni.spec",
-    version_file = "//build:os_package_version",
+    version_file = "//build:cni_package_version",
 )
 
 filegroup(

@@ -2,15 +2,15 @@ Name: kubeadm
 Version: OVERRIDE_THIS
 Release: 00
 License: ASL 2.0
-Summary: Container Cluster Manager
-Requires: kubelet >= %{version}
-Requires: kubectl >= %{version}
-Requires: kubernetes-cni
+Summary: Container Cluster Manager - Kubernetes Cluster Bootstrapping Tool
+Requires: kubelet >= 1.8.0
+Requires: kubectl >= 1.8.0
+Requires: kubernetes-cni >= 0.5.1
 
 URL: https://kubernetes.io
 
 %description
-Command-line utility for administering a Kubernetes cluster.
+Command-line utility for deploying a Kubernetes cluster.
 
 %install
 install -m 755 -d %{buildroot}%{_bindir}
