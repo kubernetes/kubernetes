@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 The Kubernetes Authors.
+# Copyright 2017 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,55 +17,70 @@
 # Call this to dump all master and node logs into the folder specified in $1
 # (defaults to _artifacts). Only works if the provider supports SSH.
 
+# TODO(shyamjvs): This script should be moved to test/e2e which is where it ideally belongs.
 set -o errexit
 set -o nounset
 set -o pipefail
 
 readonly report_dir="${1:-_artifacts}"
-# Enable LOG_DUMP_USE_KUBECTL to dump logs from a running cluster. In
-# this mode, this script is standalone and doesn't use any of the bash
-# provider infrastructure. Instead, the cluster is expected to have
-# one node with the `kube-apiserver` image that we assume to be the
-# master, and the LOG_DUMP_SSH_KEY and LOG_DUMP_SSH_USER variables
-# must be set for auth.
-readonly use_kubectl="${LOG_DUMP_USE_KUBECTL:-}"
 
-readonly master_ssh_supported_providers="gce aws kubemark"
+# In order to more trivially extend log-dump for custom deployments,
+# check for a function named log_dump_custom_get_instances. If it's
+# defined, we assume the function can me called with one argument, the
+# role, which is either "master" or "node".
+echo "Checking for custom logdump instances, if any"
+if [[ $(type -t log_dump_custom_get_instances) == "function" ]]; then
+  readonly use_custom_instance_list=yes
+else
+  readonly use_custom_instance_list=
+fi
+
+readonly master_ssh_supported_providers="gce aws"
 readonly node_ssh_supported_providers="gce gke aws"
+readonly gcloud_supported_providers="gce gke"
 
-readonly master_logfiles="kube-apiserver kube-scheduler rescheduler kube-controller-manager etcd glbc cluster-autoscaler kube-addon-manager"
-readonly node_logfiles="kube-proxy"
+readonly master_logfiles="kube-apiserver kube-apiserver-audit kube-scheduler rescheduler kube-controller-manager etcd etcd-events glbc cluster-autoscaler kube-addon-manager fluentd"
+readonly node_logfiles="kube-proxy fluentd node-problem-detector"
+readonly node_systemd_services="node-problem-detector"
+readonly hollow_node_logfiles="kubelet-hollow-node-* kubeproxy-hollow-node-* npd-hollow-node-*"
 readonly aws_logfiles="cloud-init-output"
 readonly gce_logfiles="startupscript"
 readonly kern_logfile="kern"
 readonly initd_logfiles="docker"
 readonly supervisord_logfiles="kubelet supervisor/supervisord supervisor/kubelet-stdout supervisor/kubelet-stderr supervisor/docker-stdout supervisor/docker-stderr"
+readonly systemd_services="kubelet docker"
 
 # Limit the number of concurrent node connections so that we don't run out of
 # file descriptors for large clusters.
 readonly max_scp_processes=25
 
-# This template spits out the external IPs and images for each node in the cluster in a format like so:
-# 52.32.7.85 gcr.io/google_containers/kube-apiserver:1355c18c32d7bef16125120bce194fad gcr.io/google_containers/kube-controller-manager:46365cdd8d28b8207950c3c21d1f3900 [...]
-readonly ips_and_images='{range .items[*]}{@.status.addresses[?(@.type == "ExternalIP")].address} {@.status.images[*].names[*]}{"\n"}{end}'
-
+# TODO: Get rid of all the sourcing of bash dependencies eventually.
 function setup() {
-  if [[ -z "${use_kubectl}" ]]; then
-    KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+  KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+  if [[ -z "${use_custom_instance_list}" ]]; then
     : ${KUBE_CONFIG_FILE:="config-test.sh"}
+    echo "Sourcing kube-util.sh"
     source "${KUBE_ROOT}/cluster/kube-util.sh"
-    detect-project &> /dev/null
+    echo "Detecting project"
+    detect-project 2>&1
+  elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+    echo "Using 'use_custom_instance_list' with gke, skipping check for LOG_DUMP_SSH_KEY and LOG_DUMP_SSH_USER"
+    # Source the below script for the ssh-to-node utility function.
+    # Hack to save and restore the value of the ZONE env as the script overwrites it.
+    local gke_zone="${ZONE:-}"
+    source "${KUBE_ROOT}/cluster/gce/util.sh"
+    ZONE="${gke_zone}"
   elif [[ -z "${LOG_DUMP_SSH_KEY:-}" ]]; then
-    echo "LOG_DUMP_SSH_KEY not set, but required by LOG_DUMP_USE_KUBECTL"
+    echo "LOG_DUMP_SSH_KEY not set, but required when using log_dump_custom_get_instances"
     exit 1
   elif [[ -z "${LOG_DUMP_SSH_USER:-}" ]]; then
-    echo "LOG_DUMP_SSH_USER not set, but required by LOG_DUMP_USE_KUBECTL"
+    echo "LOG_DUMP_SSH_USER not set, but required when using log_dump_custom_get_instances"
     exit 1
   fi
 }
 
 function log-dump-ssh() {
-  if [[ -z "${use_kubectl}" ]]; then
+  if [[ "${gcloud_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
     ssh-to-node "$@"
     return
   fi
@@ -92,37 +107,39 @@ function copy-logs-from-node() {
     # Comma delimit (even the singleton, or scp does the wrong thing), surround by braces.
     local -r scp_files="{$(printf "%s," "${files[@]}")}"
 
-    if [[ -n "${use_kubectl}" ]]; then
+    if [[ "${gcloud_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
+      # get-serial-port-output lets you ask for ports 1-4, but currently (11/21/2016) only port 1 contains useful information
+      gcloud compute instances get-serial-port-output --project "${PROJECT}" --zone "${ZONE}" --port 1 "${node}" > "${dir}/serial-1.log" || true
+      gcloud compute scp --recurse --project "${PROJECT}" --zone "${ZONE}" "${node}:${scp_files}" "${dir}" > /dev/null || true
+    elif  [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
+      local ip=$(get_ssh_hostname "${node}")
+      scp -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${ip}:${scp_files}" "${dir}" > /dev/null || true
+    elif  [[ -n "${use_custom_instance_list}" ]]; then
       scp -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${LOG_DUMP_SSH_KEY}" "${LOG_DUMP_SSH_USER}@${node}:${scp_files}" "${dir}" > /dev/null || true
     else
-      case "${KUBERNETES_PROVIDER}" in
-        gce|gke|kubemark)
-          # get-serial-port-output lets you ask for ports 1-4, but currently (11/21/2016) only port 1 contains useful information
-          gcloud compute instances get-serial-port-output --project "${PROJECT}" --zone "${ZONE}" --port 1 "${node}" > "${dir}/serial-1.log" || true
-          gcloud compute copy-files --project "${PROJECT}" --zone "${ZONE}" "${node}:${scp_files}" "${dir}" > /dev/null || true
-          ;;
-        aws)
-          local ip=$(get_ssh_hostname "${node}")
-          scp -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${ip}:${scp_files}" "${dir}" > /dev/null || true
-          ;;
-      esac
+      echo "Unknown cloud-provider '${KUBERNETES_PROVIDER}' and use_custom_instance_list is unset too - skipping logdump for '${node}'"
     fi
 }
 
 # Save logs for node $1 into directory $2. Pass in any non-common files in $3.
-# $3 should be a space-separated list of files.
+# Pass in any non-common systemd services in $4.
+# $3 and $4 should be a space-separated list of files.
+# Set $5 to true to indicate it is on master. Default to false.
 # This function shouldn't ever trigger errexit
 function save-logs() {
     local -r node_name="${1}"
     local -r dir="${2}"
     local files="${3}"
-    if [[ -n "${use_kubectl}" ]]; then
+    local opt_systemd_services="${4:-""}"
+    local on_master="${5:-"false"}"
+
+    if [[ -n "${use_custom_instance_list}" ]]; then
       if [[ -n "${LOG_DUMP_SAVE_LOGS:-}" ]]; then
         files="${files} ${LOG_DUMP_SAVE_LOGS:-}"
       fi
     else
       case "${KUBERNETES_PROVIDER}" in
-        gce|gke|kubemark)
+        gce|gke)
           files="${files} ${gce_logfiles}"
           ;;
         aws)
@@ -130,71 +147,59 @@ function save-logs() {
           ;;
       esac
     fi
+    local -r services=( ${systemd_services} ${opt_systemd_services} ${LOG_DUMP_SAVE_SERVICES:-} )
 
     if log-dump-ssh "${node_name}" "command -v journalctl" &> /dev/null; then
-        log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-installation.service" > "${dir}/kube-node-installation.log" || true
-        log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-configuration.service" > "${dir}/kube-node-configuration.log" || true
-        log-dump-ssh "${node_name}" "sudo journalctl --output=cat -u kubelet.service" > "${dir}/kubelet.log" || true
-        log-dump-ssh "${node_name}" "sudo journalctl --output=cat -u docker.service" > "${dir}/docker.log" || true
+        if [[ "${on_master}" == "true" ]]; then
+          log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-master-installation.service" > "${dir}/kube-master-installation.log" || true
+          log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-master-configuration.service" > "${dir}/kube-master-configuration.log" || true
+        else
+          log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-installation.service" > "${dir}/kube-node-installation.log" || true
+          log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-node-configuration.service" > "${dir}/kube-node-configuration.log" || true
+        fi
         log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -k" > "${dir}/kern.log" || true
+
+        for svc in "${services[@]}"; do
+            log-dump-ssh "${node_name}" "sudo journalctl --output=cat -u ${svc}.service" > "${dir}/${svc}.log" || true
+        done
     else
         files="${kern_logfile} ${files} ${initd_logfiles} ${supervisord_logfiles}"
     fi
+
+    echo "Changing logfiles to be world-readable for download"
+    log-dump-ssh "${node_name}" "sudo chmod -R a+r /var/log" || true
+
     echo "Copying '${files}' from ${node_name}"
     copy-logs-from-node "${node_name}" "${dir}" "${files}"
 }
 
-function kubectl-guess-master() {
-  kubectl get node -ojsonpath --template="${ips_and_images}" | grep kube-apiserver | cut -f1 -d" "
-}
-
-function kubectl-guess-nodes() {
-  kubectl get node -ojsonpath --template="${ips_and_images}" | grep -v kube-apiserver | cut -f1 -d" "
-}
-
-function dump_master() {
-  local master_name
-  if [[ -n "${use_kubectl}" ]]; then
-    master_name=$(kubectl-guess-master)
+function dump_masters() {
+  local master_names
+  if [[ -n "${use_custom_instance_list}" ]]; then
+    master_names=( $(log_dump_custom_get_instances master) )
   elif [[ ! "${master_ssh_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
     echo "Master SSH not supported for ${KUBERNETES_PROVIDER}"
     return
+  elif [[ -n "${KUBEMARK_MASTER_NAME:-}" ]]; then
+    master_names=( "${KUBEMARK_MASTER_NAME}" )
   else
-    if ! (detect-master &> /dev/null); then
+    if ! (detect-master); then
       echo "Master not detected. Is the cluster up?"
       return
     fi
-    master_name="${MASTER_NAME}"
+    master_names=( "${MASTER_NAME}" )
   fi
 
-  readonly master_dir="${report_dir}/${master_name}"
-  mkdir -p "${master_dir}"
-  save-logs "${master_name}" "${master_dir}" "${master_logfiles}"
-}
-
-function dump_nodes() {
-  local node_names
-  if [[ -n "${use_kubectl}" ]]; then
-    node_names=( $(kubectl-guess-nodes) )
-  elif [[ ! "${node_ssh_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
-    echo "Node SSH not supported for ${KUBERNETES_PROVIDER}"
+  if [[ "${#master_names[@]}" == 0 ]]; then
+    echo "No masters found?"
     return
-  else
-    detect-node-names &> /dev/null
-    if [[ "${#NODE_NAMES[@]}" -eq 0 ]]; then
-      echo "Nodes not detected. Is the cluster up?"
-      return
-    fi
-    node_names=( "${NODE_NAMES[@]}" )
   fi
 
   proc=${max_scp_processes}
-  for node_name in "${node_names[@]}"; do
-    node_dir="${report_dir}/${node_name}"
-    mkdir -p "${node_dir}"
-    # Save logs in the background. This speeds up things when there are
-    # many nodes.
-    save-logs "${node_name}" "${node_dir}" "${node_logfiles}" &
+  for master_name in "${master_names[@]}"; do
+    master_dir="${report_dir}/${master_name}"
+    mkdir -p "${master_dir}"
+    save-logs "${master_name}" "${master_dir}" "${master_logfiles}" "" "true" &
 
     # We don't want to run more than ${max_scp_processes} at a time, so
     # wait once we hit that many nodes. This isn't ideal, since one might
@@ -211,7 +216,75 @@ function dump_nodes() {
   fi
 }
 
-setup
-echo "Dumping master and node logs to ${report_dir}"
-dump_master
-dump_nodes
+function dump_nodes() {
+  local node_names
+  if [[ -n "${use_custom_instance_list}" ]]; then
+    echo "Dumping logs for nodes provided by log_dump_custom_get_instances() function"
+    node_names=( $(log_dump_custom_get_instances node) )
+  elif [[ ! "${node_ssh_supported_providers}" =~ "${KUBERNETES_PROVIDER}" ]]; then
+    echo "Node SSH not supported for ${KUBERNETES_PROVIDER}"
+    return
+  else
+    echo "Detecting nodes in the cluster"
+    detect-node-names &> /dev/null
+    node_names=( "${NODE_NAMES[@]}" )
+  fi
+
+  if [[ "${#node_names[@]}" == 0 ]]; then
+    echo "No nodes found!"
+    return
+  fi
+
+  node_logfiles_all="${node_logfiles}"
+  if [[ "${ENABLE_HOLLOW_NODE_LOGS:-}" == "true" ]]; then
+    node_logfiles_all="${node_logfiles_all} ${hollow_node_logfiles}"
+  fi
+
+  nodes_selected_for_logs=()
+  if [[ -n "${LOGDUMP_ONLY_N_RANDOM_NODES:-}" ]]; then
+    # We randomly choose 'LOGDUMP_ONLY_N_RANDOM_NODES' many nodes for fetching logs.
+    for index in `shuf -i 0-$(( ${#node_names[*]} - 1 )) -n ${LOGDUMP_ONLY_N_RANDOM_NODES}`
+    do
+      nodes_selected_for_logs+=("${node_names[$index]}")
+    done
+  else
+    nodes_selected_for_logs=( "${node_names[@]}" )
+  fi
+
+  proc=${max_scp_processes}
+  for node_name in "${nodes_selected_for_logs[@]}"; do
+    node_dir="${report_dir}/${node_name}"
+    mkdir -p "${node_dir}"
+    # Save logs in the background. This speeds up things when there are
+    # many nodes.
+    save-logs "${node_name}" "${node_dir}" "${node_logfiles_all}" "${node_systemd_services}" &
+
+    # We don't want to run more than ${max_scp_processes} at a time, so
+    # wait once we hit that many nodes. This isn't ideal, since one might
+    # take much longer than the others, but it should help.
+    proc=$((proc - 1))
+    if [[ proc -eq 0 ]]; then
+      proc=${max_scp_processes}
+      wait
+    fi
+  done
+  # Wait for any remaining processes.
+  if [[ proc -gt 0 && proc -lt ${max_scp_processes} ]]; then
+    wait
+  fi
+}
+
+function main() {
+  setup
+  # Copy master logs to artifacts dir locally (through SSH).
+  echo "Dumping logs from master locally to '${report_dir}'"
+  dump_masters
+  if [[ "${DUMP_ONLY_MASTER_LOGS:-}" == "true" ]]; then
+    echo "Skipping dumping of node logs"
+    return
+  fi
+  echo "Dumping logs from nodes locally to '${report_dir}'"
+  dump_nodes
+}
+
+main
