@@ -96,7 +96,7 @@ func Run(s *options.CloudControllerManagerServer, cloud cloudprovider.Interface)
 	}
 
 	// Set the ContentType of the requests from kube client
-	kubeconfig.ContentConfig.ContentType = s.ContentType
+	kubeconfig.ContentType = s.ContentType
 	// Override kubeconfig qps/burst settings from flags
 	kubeconfig.QPS = s.KubeAPIQPS
 	kubeconfig.Burst = int(s.KubeAPIBurst)

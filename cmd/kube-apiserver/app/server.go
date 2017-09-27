@@ -402,7 +402,7 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 	// Since not every generic apiserver has to support protobufs, we
 	// cannot default to it in generic apiserver and need to explicitly
 	// set it in kube-apiserver.
-	genericConfig.LoopbackClientConfig.ContentConfig.ContentType = "application/vnd.kubernetes.protobuf"
+	genericConfig.LoopbackClientConfig.ContentType = "application/vnd.kubernetes.protobuf"
 
 	client, err := internalclientset.NewForConfig(genericConfig.LoopbackClientConfig)
 	if err != nil {
