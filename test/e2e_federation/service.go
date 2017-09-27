@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes/scheme"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
@@ -184,33 +183,7 @@ var _ = framework.KubeDescribe("Federated Services [Feature:Federation]", func()
 				backendPods = createBackendPodsOrFail(clusters, nsName, FederatedServicePodName)
 
 				service = createLBServiceOrFail(f.FederationClientset, nsName, FederatedServiceName, clusters)
-				obj, err := scheme.Scheme.DeepCopy(service)
-				// Cloning shouldn't fail. On the off-chance it does, we
-				// should shallow copy service to serviceShard before
-				// failing. If we don't do this we will never really
-				// get a chance to clean up the underlying services
-				// when the cloner fails for reasons not in our
-				// control. For example, cloner bug. That will cause
-				// the resources to leak, which in turn causes the
-				// test project to run out of quota and the entire
-				// suite starts failing. So we must try as hard as
-				// possible to cleanup the underlying services. So
-				// if DeepCopy fails, we are going to try with shallow
-				// copy as a last resort.
-				if err != nil {
-					serviceCopy := *service
-					serviceShard = &serviceCopy
-					framework.ExpectNoError(err, fmt.Sprintf("Error in deep copying service %q", service.Name))
-				}
-				var ok bool
-				serviceShard, ok = obj.(*v1.Service)
-				// Same argument as above about using shallow copy
-				// as a last resort.
-				if !ok {
-					serviceCopy := *service
-					serviceShard = &serviceCopy
-					framework.ExpectNoError(err, fmt.Sprintf("Unexpected service object copied %T", obj))
-				}
+				serviceShard := service.DeepCopy()
 
 				waitForServiceShardsOrFail(nsName, serviceShard, clusters)
 			})
