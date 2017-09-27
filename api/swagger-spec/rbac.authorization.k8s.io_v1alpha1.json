@@ -137,6 +137,16 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1alpha1.ClusterRoleBinding"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1alpha1.ClusterRoleBinding"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1alpha1.ClusterRoleBinding"
        }
       ],
       "produces": [
@@ -426,6 +436,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1alpha1.ClusterRoleBinding"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1alpha1.ClusterRoleBinding"
        }
       ],
@@ -800,6 +815,16 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1alpha1.ClusterRole"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1alpha1.ClusterRole"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1alpha1.ClusterRole"
        }
       ],
       "produces": [
@@ -1089,6 +1114,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1alpha1.ClusterRole"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1alpha1.ClusterRole"
        }
       ],
@@ -1479,6 +1509,16 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1alpha1.RoleBinding"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1alpha1.RoleBinding"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1alpha1.RoleBinding"
        }
       ],
       "produces": [
@@ -1800,6 +1840,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1alpha1.RoleBinding"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1alpha1.RoleBinding"
        }
       ],
@@ -2420,6 +2465,16 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1alpha1.Role"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1alpha1.Role"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1alpha1.Role"
        }
       ],
       "produces": [
@@ -2741,6 +2796,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1alpha1.Role"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1alpha1.Role"
        }
       ],

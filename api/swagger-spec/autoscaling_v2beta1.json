@@ -153,6 +153,16 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v2beta1.HorizontalPodAutoscaler"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v2beta1.HorizontalPodAutoscaler"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v2beta1.HorizontalPodAutoscaler"
        }
       ],
       "produces": [
@@ -490,6 +500,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v2beta1.HorizontalPodAutoscaler"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v2beta1.HorizontalPodAutoscaler"
        }
       ],
@@ -1059,6 +1074,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v2beta1.HorizontalPodAutoscaler"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v2beta1.HorizontalPodAutoscaler"
        }
       ],

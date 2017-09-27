@@ -153,6 +153,16 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1alpha1.PodPreset"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1alpha1.PodPreset"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1alpha1.PodPreset"
        }
       ],
       "produces": [
@@ -490,6 +500,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1alpha1.PodPreset"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1alpha1.PodPreset"
        }
       ],

@@ -153,6 +153,16 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1.NetworkPolicy"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1.NetworkPolicy"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1.NetworkPolicy"
        }
       ],
       "produces": [
@@ -490,6 +500,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1.NetworkPolicy"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1.NetworkPolicy"
        }
       ],
