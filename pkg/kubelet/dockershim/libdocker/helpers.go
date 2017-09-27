@@ -58,7 +58,10 @@ func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
 			// An image name (without the tag/digest) can be [hostname '/'] component ['/' component]*
 			// Because either the RepoTag or the name *may* contain the
 			// hostname or not, we only check for the suffix match.
-			if strings.HasSuffix(image, tag) || strings.HasSuffix(tag, image) {
+			t, _ := dockerref.ParseNormalizedNamed(tag)
+			t2 := t.(dockerref.Tagged)
+			normalizedTag := t2.String()
+			if strings.HasSuffix(image, normalizedTag) || strings.HasSuffix(normalizedTag, image) {
 				return true
 			}
 		}
