@@ -19,8 +19,8 @@ package eventratelimit
 import (
 	"io"
 
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api"
 	eventratelimitapi "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit"
 	"k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit/validation"
@@ -41,7 +41,7 @@ func Register(plugins *admission.Plugins) {
 					return nil, errs.ToAggregate()
 				}
 			}
-			return newEventRateLimit(configuration, realClock{})
+			return newEventRateLimit(configuration, clock.RealClock{})
 		})
 }
 
@@ -55,7 +55,7 @@ type eventRateLimitAdmission struct {
 }
 
 // newEventRateLimit configures an admission controller that can enforce event rate limits
-func newEventRateLimit(config *eventratelimitapi.Configuration, clock flowcontrol.Clock) (admission.Interface, error) {
+func newEventRateLimit(config *eventratelimitapi.Configuration, clock clock.Clock) (admission.Interface, error) {
 	limitEnforcers := make([]*limitEnforcer, 0, len(config.Limits))
 	for _, limitConfig := range config.Limits {
 		enforcer, err := newLimitEnforcer(limitConfig, clock)

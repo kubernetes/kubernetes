@@ -1118,6 +1118,11 @@ func (b *testBackoffManager) Sleep(d time.Duration) {
 	b.sleeps = append(b.sleeps, d)
 }
 
+func (b *testBackoffManager) SleepContext(ctx context.Context, d time.Duration) error {
+	b.sleeps = append(b.sleeps, d)
+	return nil
+}
+
 func TestCheckRetryClosesBody(t *testing.T) {
 	count := 0
 	ch := make(chan struct{})

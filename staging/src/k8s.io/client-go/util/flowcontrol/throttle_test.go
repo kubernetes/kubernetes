@@ -25,7 +25,10 @@ import (
 
 func TestMultithreadedThrottling(t *testing.T) {
 	// Bucket with 100QPS and no burst
-	r := NewTokenBucketRateLimiter(100, 1)
+	r, err := NewTokenBucketRateLimiter(100, 1)
+	if err != nil {
+		t.Fatalf("unable to create rate limiter: %v", err)
+	}
 
 	// channel to collect 100 tokens
 	taken := make(chan bool, 100)
@@ -74,10 +77,13 @@ func TestMultithreadedThrottling(t *testing.T) {
 }
 
 func TestBasicThrottle(t *testing.T) {
-	r := NewTokenBucketRateLimiter(1, 3)
+	r, err := NewTokenBucketRateLimiter(1, 3)
+	if err != nil {
+		t.Fatalf("unable to create rate limiter: %v", err)
+	}
 	for i := 0; i < 3; i++ {
 		if !r.TryAccept() {
-			t.Error("unexpected false accept")
+			t.Errorf("unexpected false accept %v", i)
 		}
 	}
 	if r.TryAccept() {
@@ -86,7 +92,10 @@ func TestBasicThrottle(t *testing.T) {
 }
 
 func TestIncrementThrottle(t *testing.T) {
-	r := NewTokenBucketRateLimiter(1, 1)
+	r, err := NewTokenBucketRateLimiter(1, 1)
+	if err != nil {
+		t.Fatalf("unable to create rate limiter: %v", err)
+	}
 	if !r.TryAccept() {
 		t.Error("unexpected false accept")
 	}
@@ -103,7 +112,10 @@ func TestIncrementThrottle(t *testing.T) {
 }
 
 func TestThrottle(t *testing.T) {
-	r := NewTokenBucketRateLimiter(10, 5)
+	r, err := NewTokenBucketRateLimiter(10, 5)
+	if err != nil {
+		t.Fatalf("unable to create rate limiter: %v", err)
+	}
 
 	// Should consume 5 tokens immediately, then
 	// the remaining 11 should take at least 1 second (0.1s each)
@@ -128,7 +140,10 @@ func TestRateLimiterSaturation(t *testing.T) {
 		{10, 3, 0.3},
 	}
 	for i, tt := range tests {
-		rl := NewTokenBucketRateLimiter(1, tt.capacity)
+		rl, err := NewTokenBucketRateLimiter(1, tt.capacity)
+		if err != nil {
+			t.Fatalf("unable to create rate limiter: %v", err)
+		}
 		for i := 0; i < tt.take; i++ {
 			rl.Accept()
 		}

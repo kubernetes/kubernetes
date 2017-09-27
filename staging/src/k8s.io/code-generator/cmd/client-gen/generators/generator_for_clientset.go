@@ -149,11 +149,14 @@ var newClientsetForConfigTemplate = `
 // NewForConfig creates a new Clientset for the given config.
 func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 	configShallowCopy := *c
+	var err error
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
-		configShallowCopy.RateLimiter = $.flowcontrolNewTokenBucketRateLimiter|raw$(configShallowCopy.QPS, configShallowCopy.Burst)
+		configShallowCopy.RateLimiter, err = $.flowcontrolNewTokenBucketRateLimiter|raw$(configShallowCopy.QPS, configShallowCopy.Burst)
+		if err != nil {
+			return nil, err
+		}
 	}
 	var cs Clientset
-	var err error
 $range .allGroups$    cs.$.LowerCaseGroupVersion$, err =$.PackageName$.NewForConfig(&configShallowCopy)
 	if err!=nil {
 		return nil, err

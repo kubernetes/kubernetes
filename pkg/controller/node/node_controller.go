@@ -592,11 +592,11 @@ func (nc *Controller) addPodEvictorForNewZone(node *v1.Node) {
 		if !nc.useTaintBasedEvictions {
 			nc.zonePodEvictor[zone] =
 				scheduler.NewRateLimitedTimedQueue(
-					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
+					flowcontrol.MustNewTokenBucketRateLimiter(nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
 		} else {
 			nc.zoneNoExecuteTainer[zone] =
 				scheduler.NewRateLimitedTimedQueue(
-					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
+					flowcontrol.MustNewTokenBucketRateLimiter(nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
 		}
 		// Init the metric for the new zone.
 		glog.Infof("Initializing eviction metric for zone: %v", zone)

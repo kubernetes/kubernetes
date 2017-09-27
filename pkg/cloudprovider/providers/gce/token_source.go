@@ -106,7 +106,7 @@ func NewAltTokenSource(tokenURL, tokenBody string) oauth2.TokenSource {
 		oauthClient: client,
 		tokenURL:    tokenURL,
 		tokenBody:   tokenBody,
-		throttle:    flowcontrol.NewTokenBucketRateLimiter(tokenURLQPS, tokenURLBurst),
+		throttle:    flowcontrol.MustNewTokenBucketRateLimiter(tokenURLQPS, tokenURLBurst),
 	}
 	return oauth2.ReuseTokenSource(nil, a)
 }

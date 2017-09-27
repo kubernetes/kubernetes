@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"context"
 	"io"
 	"net"
 	"net/http"
@@ -173,6 +174,8 @@ func (t *fakeLimiter) QPS() float32 {
 func (t *fakeLimiter) Stop() {}
 
 func (t *fakeLimiter) Accept() {}
+
+func (t *fakeLimiter) AcceptContext(_ context.Context) error { return nil }
 
 type fakeCodec struct{}
 

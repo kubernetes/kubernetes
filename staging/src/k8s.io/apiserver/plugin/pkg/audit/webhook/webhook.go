@@ -152,13 +152,18 @@ func newBatchWebhook(configFile string, groupVersion schema.GroupVersion) (*batc
 		return nil, err
 	}
 
+	throttle, err := flowcontrol.NewTokenBucketRateLimiter(defaultBatchThrottleQPS, defaultBatchThrottleBurst)
+	if err != nil {
+		return nil, err
+	}
+
 	return &batchBackend{
 		w:            w,
 		buffer:       make(chan *auditinternal.Event, defaultBatchBufferSize),
 		maxBatchSize: defaultBatchMaxSize,
 		maxBatchWait: defaultBatchMaxWait,
 		shutdownCh:   make(chan struct{}),
-		throttle:     flowcontrol.NewTokenBucketRateLimiter(defaultBatchThrottleQPS, defaultBatchThrottleBurst),
+		throttle:     throttle,
 	}, nil
 }
 

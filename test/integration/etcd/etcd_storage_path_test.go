@@ -964,10 +964,14 @@ func (c *allClient) createPrerequisites(mapper meta.RESTMapper, ns string, prere
 }
 
 func newClient(config restclient.Config) (*allClient, error) {
+	var err error
 	config.ContentConfig.NegotiatedSerializer = legacyscheme.Codecs
 	config.ContentConfig.ContentType = "application/json"
 	config.Timeout = 30 * time.Second
-	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(3, 10)
+	config.RateLimiter, err = flowcontrol.NewTokenBucketRateLimiter(3, 10)
+	if err != nil {
+		return nil, err
+	}
 
 	transport, err := restclient.TransportFor(&config)
 	if err != nil {
