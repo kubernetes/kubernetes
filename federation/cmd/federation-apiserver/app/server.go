@@ -219,6 +219,8 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	err = s.Admission.ApplyTo(
 		genericConfig,
 		versionedInformers,
+		nil,
+		nil,
 		pluginInitializer,
 	)
 	if err != nil {
