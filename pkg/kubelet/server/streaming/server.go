@@ -158,9 +158,24 @@ type server struct {
 	server  *http.Server
 }
 
-func (s *server) GetExec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
+func validateExecRequest(req *runtimeapi.ExecRequest) error {
 	if req.ContainerId == "" {
-		return nil, grpc.Errorf(codes.InvalidArgument, "missing required container_id")
+		return grpc.Errorf(codes.InvalidArgument, "missing required container_id")
+	}
+	if req.Tty && req.Stderr {
+		// If TTY is set, stderr cannot be true because multiplexing is not
+		// supported.
+		return grpc.Errorf(codes.InvalidArgument, "tty and stderr cannot both be true")
+	}
+	if !req.Stdin && !req.Stdout && !req.Stderr {
+		return grpc.Errorf(codes.InvalidArgument, "one of stdin, stdout, or stderr must be set")
+	}
+	return nil
+}
+
+func (s *server) GetExec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
+	if err := validateExecRequest(req); err != nil {
+		return nil, err
 	}
 	token, err := s.cache.Insert(req)
 	if err != nil {
@@ -171,9 +186,24 @@ func (s *server) GetExec(req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse,
 	}, nil
 }
 
-func (s *server) GetAttach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
+func validateAttachRequest(req *runtimeapi.AttachRequest) error {
 	if req.ContainerId == "" {
-		return nil, grpc.Errorf(codes.InvalidArgument, "missing required container_id")
+		return grpc.Errorf(codes.InvalidArgument, "missing required container_id")
+	}
+	if req.Tty && req.Stderr {
+		// If TTY is set, stderr cannot be true because multiplexing is not
+		// supported.
+		return grpc.Errorf(codes.InvalidArgument, "tty and stderr cannot both be true")
+	}
+	if !req.Stdin && !req.Stdout && !req.Stderr {
+		return grpc.Errorf(codes.InvalidArgument, "one of stdin, stdout, and stderr must be set")
+	}
+	return nil
+}
+
+func (s *server) GetAttach(req *runtimeapi.AttachRequest) (*runtimeapi.AttachResponse, error) {
+	if err := validateAttachRequest(req); err != nil {
+		return nil, err
 	}
 	token, err := s.cache.Insert(req)
 	if err != nil {
@@ -239,8 +269,8 @@ func (s *server) serveExec(req *restful.Request, resp *restful.Response) {
 
 	streamOpts := &remotecommandserver.Options{
 		Stdin:  exec.Stdin,
-		Stdout: true,
-		Stderr: !exec.Tty,
+		Stdout: exec.Stdout,
+		Stderr: exec.Stderr,
 		TTY:    exec.Tty,
 	}
 
@@ -273,8 +303,8 @@ func (s *server) serveAttach(req *restful.Request, resp *restful.Response) {
 
 	streamOpts := &remotecommandserver.Options{
 		Stdin:  attach.Stdin,
-		Stdout: true,
-		Stderr: !attach.Tty,
+		Stdout: attach.Stdout,
+		Stderr: attach.Stderr,
 		TTY:    attach.Tty,
 	}
 	remotecommandserver.ServeAttach(

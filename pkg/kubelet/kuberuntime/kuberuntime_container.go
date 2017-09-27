@@ -767,6 +767,8 @@ func (m *kubeGenericRuntimeManager) GetExec(id kubecontainer.ContainerID, cmd []
 		Cmd:         cmd,
 		Tty:         tty,
 		Stdin:       stdin,
+		Stdout:      stdout,
+		Stderr:      stderr,
 	}
 	resp, err := m.runtimeService.Exec(req)
 	if err != nil {
@@ -781,6 +783,8 @@ func (m *kubeGenericRuntimeManager) GetAttach(id kubecontainer.ContainerID, stdi
 	req := &runtimeapi.AttachRequest{
 		ContainerId: id.ID,
 		Stdin:       stdin,
+		Stdout:      stdout,
+		Stderr:      stderr,
 		Tty:         tty,
 	}
 	resp, err := m.runtimeService.Attach(req)
