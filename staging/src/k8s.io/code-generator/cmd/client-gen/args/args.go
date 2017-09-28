@@ -16,16 +16,23 @@ limitations under the License.
 
 package args
 
-import "k8s.io/code-generator/cmd/client-gen/types"
+import (
+	"github.com/spf13/pflag"
+
+	"k8s.io/code-generator/cmd/client-gen/types"
+)
 
 // ClientGenArgs is a wrapper for arguments to client-gen.
-type Args struct {
+type CustomArgs struct {
+	// A sorted list of group versions to generate. For each of them the package path is found
+	// in GroupVersionToInputPath.
 	Groups []types.GroupVersions
-
-	// GroupVersionToInputPath is a map between GroupVersion and the path to
-	// the respective types.go. We still need GroupVersions in the struct because
-	// we need an order.
+	// GroupVersionToInputPath is a map between GroupVersion and the path to the respective
+	// types.go, relative to InputBasePath. We still need GroupVersions in the
+	// struct because we need an order.
 	GroupVersionToInputPath map[types.GroupVersion]string
+	// The base for the path of GroupVersionToInputPath.
+	InputBasePath string
 
 	// Overrides for which types should be included in the client.
 	IncludedTypesOverrides map[types.GroupVersion][]string
@@ -44,6 +51,33 @@ type Args struct {
 	ClientsetOnly bool
 	// FakeClient determines if client-gen generates the fake clients.
 	FakeClient bool
-	// CmdArgs is the command line arguments supplied when the client-gen is called.
-	CmdArgs string
+}
+
+var defaultInput = []string{
+	"api/",
+	"admissionregistration/",
+	"authentication/",
+	"authorization/",
+	"autoscaling/",
+	"batch/",
+	"certificates/",
+	"extensions/",
+	"rbac/",
+	"storage/",
+	"apps/",
+	"policy/",
+	"scheduling/",
+	"settings/",
+	"networking/",
+}
+
+func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
+	pflag.Var(NewGVPackagesValue(&ca.GroupVersionToInputPath, &ca.Groups, defaultInput), "input", "group/versions that client-gen will generate clients for. At most one version per group is allowed. Specified in the format \"group1/version1,group2/version2...\".")
+	pflag.Var(NewGVTypesValue(&ca.IncludedTypesOverrides, []string{}), "included-types-overrides", "list of group/version/type for which client should be generated. By default, client is generated for all types which have genclient in types.go. This overrides that. For each groupVersion in this list, only the types mentioned here will be included. The default check of genclient will be used for other group versions.")
+	pflag.StringVar(&ca.InputBasePath, "input-base", "k8s.io/kubernetes/pkg/apis", "base path to look for the api group.")
+	pflag.StringVarP(&ca.ClientsetName, "clientset-name", "n", "internalclientset", "the name of the generated clientset package.")
+	pflag.StringVarP(&ca.ClientsetAPIPath, "clientset-api-path", "", "", "the value of default API path.")
+	pflag.StringVar(&ca.ClientsetOutputPath, "clientset-path", "k8s.io/kubernetes/pkg/client/clientset_generated/", "the generated clientset will be output to <clientset-path>/<clientset-name>.")
+	pflag.BoolVar(&ca.ClientsetOnly, "clientset-only", false, "when set, client-gen only generates the clientset shell, without generating the individual typed clients")
+	pflag.BoolVar(&ca.FakeClient, "fake-clientset", true, "when set, client-gen will generate the fake clientset that can be used in tests")
 }
