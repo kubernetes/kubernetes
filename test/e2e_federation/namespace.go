@@ -57,8 +57,8 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 		AfterEach(func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
 			deleteNamespace(nil, nsName,
-				f.FederationClientset.Core().Namespaces().Get,
-				f.FederationClientset.Core().Namespaces().Delete)
+				f.FederationClientset.CoreV1().Namespaces().Get,
+				f.FederationClientset.CoreV1().Namespaces().Delete)
 			for _, cluster := range clusters {
 				deleteNamespace(nil, nsName,
 					cluster.CoreV1().Namespaces().Get,
@@ -70,7 +70,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 		It("deletes replicasets in the namespace when the namespace is deleted", func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
 
-			nsName = createNamespace(f.FederationClientset.Core().Namespaces())
+			nsName = createNamespace(f.FederationClientset.CoreV1().Namespaces())
 			rsName := k8s_api_v1.SimpleNameGenerator.GenerateName(replicaSetNamePrefix)
 			replicaCount := int32(2)
 			rs := &v1beta1.ReplicaSet{
@@ -100,15 +100,15 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 			}
 
 			By(fmt.Sprintf("Creating replicaset %s in namespace %s", rsName, nsName))
-			_, err := f.FederationClientset.Extensions().ReplicaSets(nsName).Create(rs)
+			_, err := f.FederationClientset.ExtensionsV1beta1().ReplicaSets(nsName).Create(rs)
 			if err != nil {
 				framework.Failf("Failed to create replicaset %v in namespace %s, err: %s", rs, nsName, err)
 			}
 
 			By(fmt.Sprintf("Deleting namespace %s", nsName))
 			deleteNamespace(nil, nsName,
-				f.FederationClientset.Core().Namespaces().Get,
-				f.FederationClientset.Core().Namespaces().Delete)
+				f.FederationClientset.CoreV1().Namespaces().Get,
+				f.FederationClientset.CoreV1().Namespaces().Delete)
 
 			By(fmt.Sprintf("Verify that replicaset %s was deleted as well", rsName))
 
@@ -118,7 +118,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 		It("all resources in the namespace should be deleted when namespace is deleted", func() {
 			fedframework.SkipUnlessFederated(f.ClientSet)
 
-			nsName = createNamespace(f.FederationClientset.Core().Namespaces())
+			nsName = createNamespace(f.FederationClientset.CoreV1().Namespaces())
 
 			// Create resources in the namespace.
 			event := v1.Event{
@@ -133,18 +133,18 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 				},
 			}
 			By(fmt.Sprintf("Creating event %s in namespace %s", event.Name, nsName))
-			_, err := f.FederationClientset.Core().Events(nsName).Create(&event)
+			_, err := f.FederationClientset.CoreV1().Events(nsName).Create(&event)
 			if err != nil {
 				framework.Failf("Failed to create event %v in namespace %s, err: %s", event, nsName, err)
 			}
 
 			By(fmt.Sprintf("Deleting namespace %s", nsName))
 			deleteNamespace(nil, nsName,
-				f.FederationClientset.Core().Namespaces().Get,
-				f.FederationClientset.Core().Namespaces().Delete)
+				f.FederationClientset.CoreV1().Namespaces().Get,
+				f.FederationClientset.CoreV1().Namespaces().Delete)
 
 			By(fmt.Sprintf("Verify that event %s was deleted as well", event.Name))
-			latestEvent, err := f.FederationClientset.Core().Events(nsName).Get(event.Name, metav1.GetOptions{})
+			latestEvent, err := f.FederationClientset.CoreV1().Events(nsName).Get(event.Name, metav1.GetOptions{})
 			if !errors.IsNotFound(err) {
 				framework.Failf("Event %s should have been deleted. Found: %v", event.Name, latestEvent)
 			}
