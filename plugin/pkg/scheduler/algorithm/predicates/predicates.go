@@ -446,14 +446,14 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta algorithm.PredicateMetad
 				if k != kubeletapis.LabelZoneFailureDomain && k != kubeletapis.LabelZoneRegion {
 					continue
 				}
-				nodeV, _ := nodeConstraints[k]
+				nodeV, ok := nodeConstraints[k]
 				volumeVSet, err := volumeutil.LabelZonesToSet(v)
 				if err != nil {
 					glog.Warningf("Failed to parse label for %q: %q. Ignoring the label. err=%v. ", k, v, err)
 					continue
 				}
 
-				if !volumeVSet.Has(nodeV) {
+				if ok && !volumeVSet.Has(nodeV) {
 					glog.V(10).Infof("Won't schedule pod %q onto node %q due to volume %q (mismatch on %q)", pod.Name, node.Name, pvName, k)
 					return false, []algorithm.PredicateFailureReason{ErrVolumeZoneConflict}, nil
 				}
