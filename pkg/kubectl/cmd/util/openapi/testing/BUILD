@@ -9,9 +9,11 @@ go_library(
     name = "go_default_library",
     srcs = ["openapi.go"],
     deps = [
+        "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
         "//vendor/github.com/googleapis/gnostic/compiler:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
 )
 
