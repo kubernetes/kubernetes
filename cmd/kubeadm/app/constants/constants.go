@@ -134,6 +134,10 @@ const (
 	// It's copied over to kubeadm until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
 	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
 
+	// LabelNodeRoleExcludeBalancer specifies that the node should be
+	// exclude from load balancers created by a cloud provider.
+	LabelNodeRoleExcludeBalancer = "node.role.kubernetes.io/exclude-balancer"
+
 	// MasterConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the `kubeadm init` configuration should be stored
 	MasterConfigurationConfigMap = "kubeadm-config"
 
