@@ -206,7 +206,7 @@ var (
 	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.7.0")
+	MinimumControlPlaneVersion = version.MustParseSemantic("v1.8.0")
 
 	// MinimumCSRAutoApprovalClusterRolesVersion defines whether kubeadm can rely on the built-in CSR approval ClusterRole or not (note, the binding is always created by kubeadm!)
 	// TODO: Remove this when the v1.9 cycle starts and we bump the minimum supported version to v1.8.0
@@ -217,7 +217,7 @@ var (
 	UseEnableBootstrapTokenAuthFlagVersion = version.MustParseSemantic("v1.8.0-beta.0")
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
-	MinimumKubeletVersion = version.MustParseSemantic("v1.8.0-beta.0")
+	MinimumKubeletVersion = version.MustParseSemantic("v1.8.0")
 )
 
 // GetStaticPodDirectory returns the location on the disk where the Static Pod should be present
