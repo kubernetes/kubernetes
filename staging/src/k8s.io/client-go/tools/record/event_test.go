@@ -120,6 +120,9 @@ func TestEventf(t *testing.T) {
 		},
 	}
 	testRef, err := ref.GetPartialReference(scheme.Scheme, testPod, "spec.containers[2]")
+	if err != nil {
+		t.Fatal(err)
+	}
 	testRef2, err := ref.GetPartialReference(scheme.Scheme, testPod2, "spec.containers[3]")
 	if err != nil {
 		t.Fatal(err)
@@ -641,6 +644,9 @@ func TestMultiSinkCache(t *testing.T) {
 		},
 	}
 	testRef, err := ref.GetPartialReference(scheme.Scheme, testPod, "spec.containers[2]")
+	if err != nil {
+		t.Fatal(err)
+	}
 	testRef2, err := ref.GetPartialReference(scheme.Scheme, testPod2, "spec.containers[3]")
 	if err != nil {
 		t.Fatal(err)
