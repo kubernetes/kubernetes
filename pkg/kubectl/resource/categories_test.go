@@ -20,8 +20,6 @@ import (
 	"reflect"
 	"testing"
 
-	swagger "github.com/emicklei/go-restful-swagger12"
-
 	"github.com/googleapis/gnostic/OpenAPIv2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -181,10 +179,6 @@ func (c *fakeDiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.AP
 
 func (c *fakeDiscoveryClient) ServerVersion() (*version.Info, error) {
 	return &version.Info{}, nil
-}
-
-func (c *fakeDiscoveryClient) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
-	return &swagger.ApiDeclaration{}, nil
 }
 
 func (c *fakeDiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {

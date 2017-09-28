@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"time"
 
-	swagger "github.com/emicklei/go-restful-swagger12"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -419,10 +418,6 @@ func (f *FakeFactory) Validator(validate bool) (validation.Schema, error) {
 	return f.tf.Validator, f.tf.Err
 }
 
-func (f *FakeFactory) SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclaration, error) {
-	return nil, nil
-}
-
 func (f *FakeFactory) OpenAPISchema() (openapi.Resources, error) {
 	return nil, nil
 }
@@ -763,10 +758,6 @@ func (f *fakeAPIFactory) NewBuilder() *resource.Builder {
 
 func (f *fakeAPIFactory) SuggestedPodTemplateResources() []schema.GroupResource {
 	return []schema.GroupResource{}
-}
-
-func (f *fakeAPIFactory) SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclaration, error) {
-	return nil, nil
 }
 
 func (f *fakeAPIFactory) OpenAPISchema() (openapi.Resources, error) {
