@@ -155,7 +155,7 @@ func (c *FederatedTypeCRUDTester) CheckDelete(obj pkgruntime.Object, orphanDepen
 		return false, err
 	})
 	if err != nil {
-		c.tl.Fatalf("Error deleting federated %s %q: %v", c.kind, qualifiedName, err)
+		c.tl.Fatalf("Error deleting federated %s %q in %s: %v", c.kind, qualifiedName, waitTimeout, err)
 	}
 
 	var stateMsg string = "present"

@@ -18,12 +18,14 @@ package framework
 
 import (
 	"testing"
+	"time"
 
-	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes/crudtester"
 )
+
+const FederatedDefaultTestTimeout = 10 * time.Minute
 
 type IntegrationLogger struct {
 	t *testing.T
@@ -43,5 +45,5 @@ func (l *IntegrationLogger) Fatal(msg string) {
 
 func NewFederatedTypeCRUDTester(t *testing.T, adapter federatedtypes.FederatedTypeAdapter, clusterClients []clientset.Interface) *crudtester.FederatedTypeCRUDTester {
 	logger := &IntegrationLogger{t}
-	return crudtester.NewFederatedTypeCRUDTester(logger, adapter, clusterClients, DefaultWaitInterval, wait.ForeverTestTimeout)
+	return crudtester.NewFederatedTypeCRUDTester(logger, adapter, clusterClients, DefaultWaitInterval, FederatedDefaultTestTimeout)
 }
