@@ -83,7 +83,7 @@ func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 	}
 }
 
-func PackageForClientset(customArgs clientgenargs.Args, fakeClientsetPackage string, boilerplate []byte, generatedBy string) generator.Package {
+func PackageForClientset(customArgs *clientgenargs.Args, fakeClientsetPackage string, boilerplate []byte, generatedBy string) generator.Package {
 	return &generator.DefaultPackage{
 		// TODO: we'll generate fake clientset for different release in the future.
 		// Package name and path are hard coded for now.
