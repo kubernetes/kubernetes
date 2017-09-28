@@ -18,6 +18,7 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -29,11 +30,11 @@ import (
 	"k8s.io/gengo/args"
 
 	"github.com/golang/glog"
-	flag "github.com/spf13/pflag"
+	"github.com/spf13/pflag"
 )
 
 var (
-	inputVersions = flag.StringSlice("input", []string{
+	inputVersions = pflag.StringSlice("input", []string{
 		"api/",
 		"admissionregistration/",
 		"authentication/",
@@ -50,13 +51,13 @@ var (
 		"settings/",
 		"networking/",
 	}, "group/versions that client-gen will generate clients for. At most one version per group is allowed. Specified in the format \"group1/version1,group2/version2...\".")
-	includedTypesOverrides = flag.StringSlice("included-types-overrides", []string{}, "list of group/version/type for which client should be generated. By default, client is generated for all types which have genclient in types.go. This overrides that. For each groupVersion in this list, only the types mentioned here will be included. The default check of genclient will be used for other group versions.")
-	basePath               = flag.String("input-base", "k8s.io/kubernetes/pkg/apis", "base path to look for the api group.")
-	clientsetName          = flag.StringP("clientset-name", "n", "internalclientset", "the name of the generated clientset package.")
-	clientsetAPIPath       = flag.StringP("clientset-api-path", "", "", "the value of default API path.")
-	clientsetPath          = flag.String("clientset-path", "k8s.io/kubernetes/pkg/client/clientset_generated/", "the generated clientset will be output to <clientset-path>/<clientset-name>.")
-	clientsetOnly          = flag.Bool("clientset-only", false, "when set, client-gen only generates the clientset shell, without generating the individual typed clients")
-	fakeClient             = flag.Bool("fake-clientset", true, "when set, client-gen will generate the fake clientset that can be used in tests")
+	includedTypesOverrides = pflag.StringSlice("included-types-overrides", []string{}, "list of group/version/type for which client should be generated. By default, client is generated for all types which have genclient in types.go. This overrides that. For each groupVersion in this list, only the types mentioned here will be included. The default check of genclient will be used for other group versions.")
+	basePath               = pflag.String("input-base", "k8s.io/kubernetes/pkg/apis", "base path to look for the api group.")
+	clientsetName          = pflag.StringP("clientset-name", "n", "internalclientset", "the name of the generated clientset package.")
+	clientsetAPIPath       = pflag.StringP("clientset-api-path", "", "", "the value of default API path.")
+	clientsetPath          = pflag.String("clientset-path", "k8s.io/kubernetes/pkg/client/clientset_generated/", "the generated clientset will be output to <clientset-path>/<clientset-name>.")
+	clientsetOnly          = pflag.Bool("clientset-only", false, "when set, client-gen only generates the clientset shell, without generating the individual typed clients")
+	fakeClient             = pflag.Bool("fake-clientset", true, "when set, client-gen will generate the fake clientset that can be used in tests")
 )
 
 func versionToPath(gvPath string, group string, version string) (path string) {
@@ -151,16 +152,7 @@ func parseIncludedTypesOverrides() (map[types.GroupVersion][]string, error) {
 }
 
 func main() {
-	arguments := args.Default()
-	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
-	flag.Parse()
-	var cmdArgs string
-	flag.VisitAll(func(f *flag.Flag) {
-		if !f.Changed || f.Name == "verify-only" {
-			return
-		}
-		cmdArgs = cmdArgs + fmt.Sprintf("--%s=%s ", f.Name, f.Value)
-	})
+	arguments := args.Default().WithoutDefaultFlagParsing()
 
 	dependencies := []string{
 		"k8s.io/apimachinery/pkg/fields",
@@ -169,6 +161,25 @@ func main() {
 		"k8s.io/apimachinery/pkg/apimachinery/registered",
 	}
 
+	customArgs := clientgenargs.Args{
+		ClientsetName:       *clientsetName,
+		ClientsetAPIPath:    *clientsetAPIPath,
+		ClientsetOutputPath: *clientsetPath,
+		ClientsetOnly:       *clientsetOnly,
+		FakeClient:          *fakeClient,
+	}
+
+	// Override defaults.
+	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
+	arguments.CustomArgs = customArgs
+
+	// Register default flags. We do this manually here because we have to override InputDirs below after additional
+	// input dirs are parse fromt he command-line.
+	arguments.AddFlags(pflag.CommandLine)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
+
+	// Post-parse arguments.
 	inputPath, groups, gvToPath, err := parseInputVersions()
 	if err != nil {
 		glog.Fatalf("Error: %v", err)
@@ -178,21 +189,22 @@ func main() {
 		glog.Fatalf("Unexpected error: %v", err)
 	}
 	glog.V(3).Infof("going to generate clientset from these input paths: %v", inputPath)
-	arguments.InputDirs = append(inputPath, dependencies...)
 
-	arguments.CustomArgs = clientgenargs.Args{
-		Groups:                  groups,
-		GroupVersionToInputPath: gvToPath,
-		ClientsetName:           *clientsetName,
-		ClientsetAPIPath:        *clientsetAPIPath,
-		ClientsetOutputPath:     *clientsetPath,
-		ClientsetOnly:           *clientsetOnly,
-		FakeClient:              *fakeClient,
-		CmdArgs:                 cmdArgs,
-		IncludedTypesOverrides:  includedTypesOverrides,
-	}
+	// Override
+	arguments.InputDirs = append(arguments.InputDirs, append(inputPath, dependencies...)...)
+	customArgs.Groups = groups
+	customArgs.GroupVersionToInputPath = gvToPath
+	customArgs.IncludedTypesOverrides = includedTypesOverrides
 
-	glog.V(3).Infof("==arguments: %v\n", arguments)
+	// Derive customArgs.CmdArgs
+	var cmdArgs string
+	pflag.VisitAll(func(f *pflag.Flag) {
+		if !f.Changed || f.Name == "verify-only" {
+			return
+		}
+		cmdArgs = cmdArgs + fmt.Sprintf("--%s=%s ", f.Name, f.Value)
+	})
+	customArgs.CmdArgs = cmdArgs
 
 	if err := arguments.Execute(
 		generators.NameSystems(),
