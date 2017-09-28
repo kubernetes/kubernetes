@@ -38,7 +38,6 @@ import (
 )
 
 const maxNumberOfPods int64 = 10
-const minPodCPURequest int64 = 500
 const imagePrePullingTimeout = 5 * time.Minute
 
 // variable set in BeforeEach, never modified afterwards
@@ -147,14 +146,36 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		verifyResult(cs, podsNeededForSaturation, 1, ns)
 	})
 
-	// This test verifies we don't allow scheduling of pods in a way that sum of limits of pods is greater than machines capacity.
-	// It assumes that cluster add-on pods stay stable and cannot be run in parallel with any other test that touches Nodes or Pods.
+	// This test verifies we don't allow scheduling of pods in a way that sum of
+	// limits of pods is greater than machines capacity.
+	// It assumes that cluster add-on pods stay stable and cannot be run in parallel
+	// with any other test that touches Nodes or Pods.
 	// It is so because we need to have precise control on what's running in the cluster.
+	// Test scenario:
+	// 1. Find the amount CPU resources on each node.
+	// 2. Create one pod with affinity to each node that uses 70% of the node CPU.
+	// 3. Wait for the pods to be scheduled.
+	// 4. Create another pod with no affinity to any node that need 50% of the largest node CPU.
+	// 5. Make sure this additional pod is not scheduled.
 	It("validates resource limits of pods that are allowed to run [Conformance]", func() {
+		framework.WaitForStableCluster(cs, masterNodes)
 		nodeMaxCapacity := int64(0)
 
 		nodeToCapacityMap := make(map[string]int64)
 		for _, node := range nodeList.Items {
+			nodeReady := false
+			for _, condition := range node.Status.Conditions {
+				if condition.Type == v1.NodeReady && condition.Status == v1.ConditionTrue {
+					nodeReady = true
+					break
+				}
+			}
+			if !nodeReady {
+				continue
+			}
+			// Apply node label to each node
+			framework.AddOrUpdateLabelOnNode(cs, node.Name, "node", node.Name)
+			framework.ExpectNodeHasLabel(cs, node.Name, "node", node.Name)
 			capacity, found := node.Status.Capacity["cpu"]
 			Expect(found).To(Equal(true))
 			nodeToCapacityMap[node.Name] = capacity.MilliValue()
@@ -162,7 +183,12 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				nodeMaxCapacity = capacity.MilliValue()
 			}
 		}
-		framework.WaitForStableCluster(cs, masterNodes)
+		// Clean up added labels after this test.
+		defer func() {
+			for nodeName := range nodeToCapacityMap {
+				framework.RemoveLabelOffNode(cs, nodeName, "node")
+			}
+		}()
 
 		pods, err := cs.Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
@@ -174,51 +200,59 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			}
 		}
 
-		var podsNeededForSaturation int
-
-		milliCpuPerPod := nodeMaxCapacity / maxNumberOfPods
-		if milliCpuPerPod < minPodCPURequest {
-			milliCpuPerPod = minPodCPURequest
-		}
-		framework.Logf("Using pod capacity: %vm", milliCpuPerPod)
-		for name, leftCapacity := range nodeToCapacityMap {
-			framework.Logf("Node: %v has cpu capacity: %vm", name, leftCapacity)
-			podsNeededForSaturation += (int)(leftCapacity / milliCpuPerPod)
-		}
-
-		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster CPU and trying to start another one", podsNeededForSaturation))
-
-		// As the pods are distributed randomly among nodes,
-		// it can easily happen that all nodes are saturated
-		// and there is no need to create additional pods.
-		// StartPods requires at least one pod to replicate.
-		if podsNeededForSaturation > 0 {
-			framework.ExpectNoError(testutils.StartPods(cs, podsNeededForSaturation, ns, "overcommit",
-				*initPausePod(f, pausePodConfig{
-					Name:   "",
-					Labels: map[string]string{"name": ""},
-					Resources: &v1.ResourceRequirements{
-						Limits: v1.ResourceList{
-							"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
-						},
-						Requests: v1.ResourceList{
-							"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+		// Create one pod per node that requires 70% of the node remaining CPU.
+		fillerPods := []*v1.Pod{}
+		for nodeName, cpu := range nodeToCapacityMap {
+			requestedCPU := cpu * 7 / 10
+			fillerPods = append(fillerPods, createPausePod(f, pausePodConfig{
+				Name: "filler-pod-" + nodeName,
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(requestedCPU, "DecimalSI"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(requestedCPU, "DecimalSI"),
+					},
+				},
+				Affinity: &v1.Affinity{
+					NodeAffinity: &v1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+							NodeSelectorTerms: []v1.NodeSelectorTerm{
+								{
+									MatchExpressions: []v1.NodeSelectorRequirement{
+										{
+											Key:      "node",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{nodeName},
+										},
+									},
+								},
+							},
 						},
 					},
-				}), true, framework.Logf))
+				},
+			}))
 		}
+		// Wait for filler pods to schedule.
+		for _, pod := range fillerPods {
+			framework.ExpectNoError(framework.WaitForPodRunningInNamespace(cs, pod))
+		}
+		By("Creating another pod that requires unavailable amount of CPU.")
+		// Create another pod that requires 50% of the largest node CPU resources.
+		// This pod should remain pending as at least 70% of CPU of other nodes in
+		// the cluster are already consumed.
 		podName := "additional-pod"
 		conf := pausePodConfig{
 			Name:   podName,
 			Labels: map[string]string{"name": "additional"},
 			Resources: &v1.ResourceRequirements{
 				Limits: v1.ResourceList{
-					"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+					v1.ResourceCPU: *resource.NewMilliQuantity(nodeMaxCapacity*5/10, "DecimalSI"),
 				},
 			},
 		}
 		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), podName, false)
-		verifyResult(cs, podsNeededForSaturation, 1, ns)
+		verifyResult(cs, len(fillerPods), 1, ns)
 	})
 
 	// Test Nodes does not have any label, hence it should be impossible to schedule Pod with
