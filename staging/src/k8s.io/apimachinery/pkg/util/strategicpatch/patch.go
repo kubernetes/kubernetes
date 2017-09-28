@@ -554,7 +554,13 @@ func diffLists(original, modified []interface{}, t reflect.Type, mergeKey string
 	switch kind {
 	case reflect.Map:
 		patchList, deleteList, err = diffListsOfMaps(original, modified, t, mergeKey, diffOptions)
+		if err != nil {
+			return nil, nil, nil, err
+		}
 		patchList, err = normalizeSliceOrder(patchList, modified, mergeKey, kind)
+		if err != nil {
+			return nil, nil, nil, err
+		}
 		orderSame, err := isOrderSame(original, modified, mergeKey)
 		if err != nil {
 			return nil, nil, nil, err
@@ -580,6 +586,9 @@ func diffLists(original, modified []interface{}, t reflect.Type, mergeKey string
 		return nil, nil, nil, mergepatch.ErrNoListOfLists
 	default:
 		patchList, deleteList, err = diffListsOfScalars(original, modified, diffOptions)
+		if err != nil {
+			return nil, nil, nil, err
+		}
 		patchList, err = normalizeSliceOrder(patchList, modified, mergeKey, kind)
 		// generate the setElementOrder list when there are content changes or order changes
 		if diffOptions.SetElementOrder && ((!diffOptions.IgnoreDeletions && len(deleteList) > 0) ||
