@@ -154,24 +154,32 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 			kubeletmetrics.VolumeStatsInodesFreeKey,
 			kubeletmetrics.VolumeStatsInodesUsedKey,
 		}
-
+		// Poll kubelet metrics waiting for the volume to be picked up
+		// by the volume stats collector
+		var kubeMetrics metrics.KubeletMetrics
 		waitErr := wait.Poll(30*time.Second, 5*time.Minute, func() (bool, error) {
+			framework.Logf("Grabbing Kubelet metrics")
 			// Grab kubelet metrics from the node the pod was scheduled on
-			kubeMetrics, err := metricsGrabber.GrabFromKubelet(pod.Spec.NodeName)
+			var err error
+			kubeMetrics, err = metricsGrabber.GrabFromKubelet(pod.Spec.NodeName)
 			if err != nil {
 				framework.Logf("Error fetching kubelet metrics")
 				return false, err
 			}
-
-			for _, key := range volumeStatKeys {
-				kubeletKeyName := fmt.Sprintf("%s_%s", kubeletmetrics.KubeletSubsystem, key)
-				if !findVolumeStatMetric(kubeletKeyName, pvc.Namespace, pvc.Name, kubeMetrics) {
-					return false, nil
-				}
+			key := volumeStatKeys[0]
+			kubeletKeyName := fmt.Sprintf("%s_%s", kubeletmetrics.KubeletSubsystem, key)
+			if !findVolumeStatMetric(kubeletKeyName, pvc.Namespace, pvc.Name, kubeMetrics) {
+				return false, nil
 			}
 			return true, nil
 		})
 		Expect(waitErr).NotTo(HaveOccurred(), "Error finding volume metrics : %v", waitErr)
+
+		for _, key := range volumeStatKeys {
+			kubeletKeyName := fmt.Sprintf("%s_%s", kubeletmetrics.KubeletSubsystem, key)
+			found := findVolumeStatMetric(kubeletKeyName, pvc.Namespace, pvc.Name, kubeMetrics)
+			Expect(found).To(BeTrue(), "PVC %s, Namespace %s not found for %s", pvc.Name, pvc.Namespace, kubeletKeyName)
+		}
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
 		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
