@@ -637,6 +637,10 @@ func (pc *PCCloud) DiskIsAttached(pdID string, nodeName k8stypes.NodeName) (bool
 	}
 
 	vmID, err := pc.InstanceID(nodeName)
+	if err == cloudprovider.InstanceNotFound {
+		glog.Infof("Instance %q does not exist, disk %s will be detached automatically.", nodeName, pdID)
+		return false, nil
+	}
 	if err != nil {
 		glog.Errorf("Photon Cloud Provider: pc.InstanceID failed for DiskIsAttached. Error[%v]", err)
 		return false, err
@@ -665,6 +669,11 @@ func (pc *PCCloud) DisksAreAttached(pdIDs []string, nodeName k8stypes.NodeName) 
 	}
 
 	vmID, err := pc.InstanceID(nodeName)
+	if err == cloudprovider.InstanceNotFound {
+		glog.Infof("Instance %q does not exist, its disks will be detached automatically.", nodeName)
+		// make all the disks as detached.
+		return attached, nil
+	}
 	if err != nil {
 		glog.Errorf("Photon Cloud Provider: pc.InstanceID failed for DiskIsAttached. Error[%v]", err)
 		return attached, err
