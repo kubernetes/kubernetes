@@ -3665,7 +3665,7 @@ func TestParentResourceIsRequired(t *testing.T) {
 	}
 }
 
-func TestCreateWithName(t *testing.T) {
+func TestNamedCreaterWithName(t *testing.T) {
 	pathName := "helloworld"
 	storage := &NamedCreaterRESTStorage{SimpleRESTStorage: &SimpleRESTStorage{}}
 	handler := handle(map[string]rest.Storage{
@@ -3694,6 +3694,145 @@ func TestCreateWithName(t *testing.T) {
 	}
 	if storage.createdName != pathName {
 		t.Errorf("Did not get expected name in create context. Got: %s, Expected: %s", storage.createdName, pathName)
+	}
+}
+
+func TestNamedCreaterWithoutName(t *testing.T) {
+	storage := &NamedCreaterRESTStorage{
+		SimpleRESTStorage: &SimpleRESTStorage{
+			injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
+				time.Sleep(5 * time.Millisecond)
+				return obj, nil
+			},
+		},
+	}
+
+	selfLinker := &setTestSelfLinker{
+		t:           t,
+		name:        "bar",
+		namespace:   "default",
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo",
+	}
+	handler := handleLinker(map[string]rest.Storage{"foo": storage}, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	simple := &genericapitesting.Simple{
+		Other: "bar",
+	}
+	data, err := runtime.Encode(testCodec, simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo", bytes.NewBuffer(data))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	var response *http.Response
+	go func() {
+		response, err = client.Do(request)
+		wg.Done()
+	}()
+	wg.Wait()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// empty name is not allowed for NamedCreater
+	if response.StatusCode != http.StatusBadRequest {
+		t.Errorf("Unexpected response %#v", response)
+	}
+}
+
+type namePopulatorAdmissionControl struct {
+	t            *testing.T
+	populateName string
+}
+
+func (npac *namePopulatorAdmissionControl) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+	if a.GetName() != npac.populateName {
+		npac.t.Errorf("Unexpected name: got %q, expected %q", a.GetName(), npac.populateName)
+	}
+	return nil
+}
+
+func (npac *namePopulatorAdmissionControl) Handles(operation admission.Operation) bool {
+	return true
+}
+
+func TestNamedCreaterWithGenerateName(t *testing.T) {
+	populateName := "bar"
+	storage := &SimpleRESTStorage{
+		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
+			time.Sleep(5 * time.Millisecond)
+			if metadata, err := meta.Accessor(obj); err == nil {
+				if len(metadata.GetName()) != 0 {
+					t.Errorf("Unexpected name %q", metadata.GetName())
+				}
+				metadata.SetName(populateName)
+			} else {
+				return nil, err
+			}
+			return obj, nil
+		},
+	}
+
+	selfLinker := &setTestSelfLinker{
+		t:           t,
+		namespace:   "default",
+		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo",
+	}
+
+	ac := &namePopulatorAdmissionControl{
+		t:            t,
+		populateName: populateName,
+	}
+
+	handler := handleInternal(map[string]rest.Storage{"foo": storage}, ac, selfLinker, nil)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	simple := &genericapitesting.Simple{
+		Other: "bar",
+	}
+	data, err := runtime.Encode(testCodec, simple)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo", bytes.NewBuffer(data))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	var response *http.Response
+	go func() {
+		response, err = client.Do(request)
+		wg.Done()
+	}()
+	wg.Wait()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if response.StatusCode != http.StatusCreated {
+		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
+	}
+
+	var itemOut genericapitesting.Simple
+	body, err := extractBody(response, &itemOut)
+	if err != nil {
+		t.Errorf("unexpected error: %v %#v", err, response)
+	}
+
+	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
+	simple.Name = populateName
+	if !reflect.DeepEqual(&itemOut, simple) {
+		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
 }
 
@@ -3879,6 +4018,7 @@ func TestCreateYAML(t *testing.T) {
 		t.Errorf("Never set self link")
 	}
 }
+
 func TestCreateInNamespace(t *testing.T) {
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
