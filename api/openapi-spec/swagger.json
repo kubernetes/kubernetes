@@ -775,6 +775,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -827,6 +839,18 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Binding"
+       }
+      },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Binding"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.Binding"
        }
@@ -986,6 +1010,18 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.ConfigMap"
+       }
+      },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.ConfigMap"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.ConfigMap"
        }
@@ -1194,6 +1230,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.ConfigMap"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.ConfigMap"
        }
@@ -1478,6 +1520,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Endpoints"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Endpoints"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Endpoints"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -1682,6 +1736,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Endpoints"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.Endpoints"
        }
@@ -1966,6 +2026,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Event"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Event"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Event"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -2170,6 +2242,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Event"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.Event"
        }
@@ -2454,6 +2532,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.LimitRange"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.LimitRange"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.LimitRange"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -2658,6 +2748,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.LimitRange"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.LimitRange"
        }
@@ -2942,6 +3038,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeClaim"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeClaim"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeClaim"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -3146,6 +3254,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeClaim"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeClaim"
        }
@@ -3370,6 +3484,12 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeClaim"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolumeClaim"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -3584,6 +3704,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -3788,6 +3920,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
        }
@@ -4098,6 +4236,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Binding"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Binding"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Binding"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -4166,6 +4316,18 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.policy.v1beta1.Eviction"
+       }
+      },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.policy.v1beta1.Eviction"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.policy.v1beta1.Eviction"
        }
@@ -5134,6 +5296,12 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -5348,6 +5516,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.PodTemplate"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.PodTemplate"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.PodTemplate"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -5552,6 +5732,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.PodTemplate"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.PodTemplate"
        }
@@ -5836,6 +6022,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.ReplicationController"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.ReplicationController"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.ReplicationController"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -6040,6 +6238,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.ReplicationController"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.ReplicationController"
        }
@@ -6264,6 +6468,12 @@
         "$ref": "#/definitions/io.k8s.api.autoscaling.v1.Scale"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v1.Scale"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -6414,6 +6624,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.ReplicationController"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.ReplicationController"
        }
@@ -6632,6 +6848,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.ResourceQuota"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.ResourceQuota"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.ResourceQuota"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -6836,6 +7064,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.ResourceQuota"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.ResourceQuota"
        }
@@ -7060,6 +7294,12 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.ResourceQuota"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.ResourceQuota"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -7274,6 +7514,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Secret"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Secret"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Secret"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -7478,6 +7730,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Secret"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.Secret"
        }
@@ -7762,6 +8020,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.ServiceAccount"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.ServiceAccount"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.ServiceAccount"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -7966,6 +8236,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.ServiceAccount"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.ServiceAccount"
        }
@@ -8250,6 +8526,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Service"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Service"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Service"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -8361,6 +8649,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Service"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.Service"
        }
@@ -9078,6 +9372,12 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Service"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Service"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -9244,6 +9544,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
        }
@@ -9425,6 +9731,12 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -9520,6 +9832,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
        }
@@ -9730,6 +10048,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Node"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Node"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Node"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -9926,6 +10256,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Node"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.Node"
        }
@@ -10650,6 +10986,12 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Node"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Node"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -10960,6 +11302,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolume"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolume"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolume"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -11156,6 +11510,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolume"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolume"
        }
@@ -11368,6 +11728,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolume"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.PersistentVolume"
        }
@@ -18599,6 +18965,18 @@
         "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -18795,6 +19173,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration"
        }
@@ -19071,6 +19455,18 @@
         "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.InitializerConfiguration"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.InitializerConfiguration"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.InitializerConfiguration"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -19267,6 +19663,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.InitializerConfiguration"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.InitializerConfiguration"
        }
@@ -20041,6 +20443,18 @@
         "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -20241,6 +20655,12 @@
         "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -20414,6 +20834,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition"
        }
@@ -20859,6 +21285,18 @@
         "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIService"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIService"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIService"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -21059,6 +21497,12 @@
         "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIService"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIService"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -21232,6 +21676,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIService"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1beta1.APIService"
        }
@@ -21885,6 +22335,18 @@
         "$ref": "#/definitions/io.k8s.api.apps.v1beta1.ControllerRevision"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.ControllerRevision"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.ControllerRevision"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -22089,6 +22551,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.ControllerRevision"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.apps.v1beta1.ControllerRevision"
        }
@@ -22373,6 +22841,18 @@
         "$ref": "#/definitions/io.k8s.api.apps.v1beta1.Deployment"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.Deployment"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.Deployment"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -22581,6 +23061,12 @@
         "$ref": "#/definitions/io.k8s.api.apps.v1beta1.Deployment"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.Deployment"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -22766,6 +23252,18 @@
         "$ref": "#/definitions/io.k8s.api.apps.v1beta1.DeploymentRollback"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.DeploymentRollback"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.DeploymentRollback"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -22869,6 +23367,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.Scale"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.apps.v1beta1.Scale"
        }
@@ -23023,6 +23527,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.Deployment"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.apps.v1beta1.Deployment"
        }
@@ -23241,6 +23751,18 @@
         "$ref": "#/definitions/io.k8s.api.apps.v1beta1.StatefulSet"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.StatefulSet"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.StatefulSet"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -23445,6 +23967,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.StatefulSet"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.apps.v1beta1.StatefulSet"
        }
@@ -23669,6 +24197,12 @@
         "$ref": "#/definitions/io.k8s.api.apps.v1beta1.Scale"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.Scale"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -23819,6 +24353,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta1.StatefulSet"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.apps.v1beta1.StatefulSet"
        }
@@ -25494,6 +26034,18 @@
         "$ref": "#/definitions/io.k8s.api.apps.v1beta2.ControllerRevision"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.ControllerRevision"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.ControllerRevision"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -25698,6 +26250,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.ControllerRevision"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.apps.v1beta2.ControllerRevision"
        }
@@ -25982,6 +26540,18 @@
         "$ref": "#/definitions/io.k8s.api.apps.v1beta2.DaemonSet"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.DaemonSet"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.DaemonSet"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -26186,6 +26756,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.DaemonSet"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.apps.v1beta2.DaemonSet"
        }
@@ -26410,6 +26986,12 @@
         "$ref": "#/definitions/io.k8s.api.apps.v1beta2.DaemonSet"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.DaemonSet"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -26624,6 +27206,18 @@
         "$ref": "#/definitions/io.k8s.api.apps.v1beta2.Deployment"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.Deployment"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.Deployment"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -26828,6 +27422,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.Deployment"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.apps.v1beta2.Deployment"
        }
@@ -27052,6 +27652,12 @@
         "$ref": "#/definitions/io.k8s.api.apps.v1beta2.Scale"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.Scale"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -27202,6 +27808,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.Deployment"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.apps.v1beta2.Deployment"
        }
@@ -27420,6 +28032,18 @@
         "$ref": "#/definitions/io.k8s.api.apps.v1beta2.ReplicaSet"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.ReplicaSet"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.ReplicaSet"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -27624,6 +28248,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.ReplicaSet"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.apps.v1beta2.ReplicaSet"
        }
@@ -27848,6 +28478,12 @@
         "$ref": "#/definitions/io.k8s.api.apps.v1beta2.Scale"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.Scale"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -27998,6 +28634,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.ReplicaSet"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.apps.v1beta2.ReplicaSet"
        }
@@ -28216,6 +28858,18 @@
         "$ref": "#/definitions/io.k8s.api.apps.v1beta2.StatefulSet"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.StatefulSet"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.StatefulSet"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -28420,6 +29074,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.StatefulSet"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.apps.v1beta2.StatefulSet"
        }
@@ -28644,6 +29304,12 @@
         "$ref": "#/definitions/io.k8s.api.apps.v1beta2.Scale"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.Scale"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -28794,6 +29460,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.apps.v1beta2.StatefulSet"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.apps.v1beta2.StatefulSet"
        }
@@ -30871,6 +31543,18 @@
         "$ref": "#/definitions/io.k8s.api.authentication.v1.TokenReview"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authentication.v1.TokenReview"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authentication.v1.TokenReview"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -30956,6 +31640,18 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authentication.v1beta1.TokenReview"
+       }
+      },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authentication.v1beta1.TokenReview"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.authentication.v1beta1.TokenReview"
        }
@@ -31082,6 +31778,18 @@
         "$ref": "#/definitions/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authorization.v1.LocalSubjectAccessReview"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -31146,6 +31854,18 @@
         "$ref": "#/definitions/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authorization.v1.SelfSubjectAccessReview"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -31202,6 +31922,18 @@
         "$ref": "#/definitions/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authorization.v1.SelfSubjectRulesReview"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -31254,6 +31986,18 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authorization.v1.SubjectAccessReview"
+       }
+      },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authorization.v1.SubjectAccessReview"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.authorization.v1.SubjectAccessReview"
        }
@@ -31347,6 +32091,18 @@
         "$ref": "#/definitions/io.k8s.api.authorization.v1beta1.LocalSubjectAccessReview"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authorization.v1beta1.LocalSubjectAccessReview"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authorization.v1beta1.LocalSubjectAccessReview"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -31411,6 +32167,18 @@
         "$ref": "#/definitions/io.k8s.api.authorization.v1beta1.SelfSubjectAccessReview"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authorization.v1beta1.SelfSubjectAccessReview"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authorization.v1beta1.SelfSubjectAccessReview"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -31467,6 +32235,18 @@
         "$ref": "#/definitions/io.k8s.api.authorization.v1beta1.SelfSubjectRulesReview"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authorization.v1beta1.SelfSubjectRulesReview"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authorization.v1beta1.SelfSubjectRulesReview"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -31519,6 +32299,18 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authorization.v1beta1.SubjectAccessReview"
+       }
+      },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.authorization.v1beta1.SubjectAccessReview"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.authorization.v1beta1.SubjectAccessReview"
        }
@@ -31844,6 +32636,18 @@
         "$ref": "#/definitions/io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -32048,6 +32852,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler"
        }
@@ -32268,6 +33078,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler"
        }
@@ -32959,6 +33775,18 @@
         "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -33163,6 +33991,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
        }
@@ -33383,6 +34217,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.autoscaling.v2beta1.HorizontalPodAutoscaler"
        }
@@ -34107,6 +34947,18 @@
         "$ref": "#/definitions/io.k8s.api.batch.v1.Job"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v1.Job"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v1.Job"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -34311,6 +35163,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v1.Job"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.batch.v1.Job"
        }
@@ -34531,6 +35389,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v1.Job"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.batch.v1.Job"
        }
@@ -35222,6 +36086,18 @@
         "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJob"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJob"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJob"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -35426,6 +36302,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJob"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJob"
        }
@@ -35646,6 +36528,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJob"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.batch.v1beta1.CronJob"
        }
@@ -36337,6 +37225,18 @@
         "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJob"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJob"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJob"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -36541,6 +37441,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJob"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJob"
        }
@@ -36761,6 +37667,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJob"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.batch.v2alpha1.CronJob"
        }
@@ -37381,6 +38293,18 @@
         "$ref": "#/definitions/io.k8s.api.certificates.v1beta1.CertificateSigningRequest"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.certificates.v1beta1.CertificateSigningRequest"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.certificates.v1beta1.CertificateSigningRequest"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -37581,6 +38505,12 @@
         "$ref": "#/definitions/io.k8s.api.certificates.v1beta1.CertificateSigningRequest"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.certificates.v1beta1.CertificateSigningRequest"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -37758,6 +38688,12 @@
         "$ref": "#/definitions/io.k8s.api.certificates.v1beta1.CertificateSigningRequest"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.certificates.v1beta1.CertificateSigningRequest"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -37818,6 +38754,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.certificates.v1beta1.CertificateSigningRequest"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.certificates.v1beta1.CertificateSigningRequest"
        }
@@ -38575,6 +39517,18 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DaemonSet"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DaemonSet"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DaemonSet"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -38779,6 +39733,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DaemonSet"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DaemonSet"
        }
@@ -39003,6 +39963,12 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DaemonSet"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DaemonSet"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -39217,6 +40183,18 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Deployment"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Deployment"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Deployment"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -39425,6 +40403,12 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Deployment"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Deployment"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -39610,6 +40594,18 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DeploymentRollback"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DeploymentRollback"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DeploymentRollback"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -39713,6 +40709,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Scale"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Scale"
        }
@@ -39867,6 +40869,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Deployment"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Deployment"
        }
@@ -40085,6 +41093,18 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Ingress"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Ingress"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Ingress"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -40289,6 +41309,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Ingress"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Ingress"
        }
@@ -40513,6 +41539,12 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Ingress"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Ingress"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -40727,6 +41759,18 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.NetworkPolicy"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.NetworkPolicy"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.NetworkPolicy"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -40931,6 +41975,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.NetworkPolicy"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.NetworkPolicy"
        }
@@ -41215,6 +42265,18 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.ReplicaSet"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.ReplicaSet"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.ReplicaSet"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -41419,6 +42481,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.ReplicaSet"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.ReplicaSet"
        }
@@ -41643,6 +42711,12 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Scale"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Scale"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -41797,6 +42871,12 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.ReplicaSet"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.ReplicaSet"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -41947,6 +43027,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Scale"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Scale"
        }
@@ -42269,6 +43355,18 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.PodSecurityPolicy"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.PodSecurityPolicy"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.PodSecurityPolicy"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -42465,6 +43563,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.PodSecurityPolicy"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.PodSecurityPolicy"
        }
@@ -44807,6 +45911,18 @@
         "$ref": "#/definitions/io.k8s.api.networking.v1.NetworkPolicy"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.networking.v1.NetworkPolicy"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.networking.v1.NetworkPolicy"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -45011,6 +46127,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.networking.v1.NetworkPolicy"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.networking.v1.NetworkPolicy"
        }
@@ -45801,6 +46923,18 @@
         "$ref": "#/definitions/io.k8s.api.policy.v1beta1.PodDisruptionBudget"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.policy.v1beta1.PodDisruptionBudget"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.policy.v1beta1.PodDisruptionBudget"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -46005,6 +47139,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.policy.v1beta1.PodDisruptionBudget"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.policy.v1beta1.PodDisruptionBudget"
        }
@@ -46225,6 +47365,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.policy.v1beta1.PodDisruptionBudget"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.policy.v1beta1.PodDisruptionBudget"
        }
@@ -46949,6 +48095,18 @@
         "$ref": "#/definitions/io.k8s.api.rbac.v1.ClusterRoleBinding"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1.ClusterRoleBinding"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1.ClusterRoleBinding"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -47129,6 +48287,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1.ClusterRoleBinding"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.rbac.v1.ClusterRoleBinding"
        }
@@ -47405,6 +48569,18 @@
         "$ref": "#/definitions/io.k8s.api.rbac.v1.ClusterRole"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1.ClusterRole"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1.ClusterRole"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -47585,6 +48761,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1.ClusterRole"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.rbac.v1.ClusterRole"
        }
@@ -47861,6 +49043,18 @@
         "$ref": "#/definitions/io.k8s.api.rbac.v1.RoleBinding"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1.RoleBinding"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1.RoleBinding"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -48049,6 +49243,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1.RoleBinding"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.rbac.v1.RoleBinding"
        }
@@ -48333,6 +49533,18 @@
         "$ref": "#/definitions/io.k8s.api.rbac.v1.Role"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1.Role"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1.Role"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -48521,6 +49733,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1.Role"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.rbac.v1.Role"
        }
@@ -50150,6 +51368,18 @@
         "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.ClusterRoleBinding"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.ClusterRoleBinding"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.ClusterRoleBinding"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -50330,6 +51560,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.ClusterRoleBinding"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.ClusterRoleBinding"
        }
@@ -50606,6 +51842,18 @@
         "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.ClusterRole"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.ClusterRole"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.ClusterRole"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -50786,6 +52034,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.ClusterRole"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.ClusterRole"
        }
@@ -51062,6 +52316,18 @@
         "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.RoleBinding"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.RoleBinding"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.RoleBinding"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -51250,6 +52516,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.RoleBinding"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.RoleBinding"
        }
@@ -51534,6 +52806,18 @@
         "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.Role"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.Role"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.Role"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -51722,6 +53006,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.Role"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.rbac.v1alpha1.Role"
        }
@@ -53351,6 +54641,18 @@
         "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.ClusterRoleBinding"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.ClusterRoleBinding"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.ClusterRoleBinding"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -53531,6 +54833,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.ClusterRoleBinding"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.ClusterRoleBinding"
        }
@@ -53807,6 +55115,18 @@
         "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.ClusterRole"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.ClusterRole"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.ClusterRole"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -53987,6 +55307,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.ClusterRole"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.ClusterRole"
        }
@@ -54263,6 +55589,18 @@
         "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.RoleBinding"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.RoleBinding"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.RoleBinding"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -54451,6 +55789,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.RoleBinding"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.RoleBinding"
        }
@@ -54735,6 +56079,18 @@
         "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.Role"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.Role"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.Role"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -54923,6 +56279,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.Role"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.rbac.v1beta1.Role"
        }
@@ -56585,6 +57947,18 @@
         "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha1.PriorityClass"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha1.PriorityClass"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha1.PriorityClass"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -56781,6 +58155,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha1.PriorityClass"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha1.PriorityClass"
        }
@@ -57339,6 +58719,18 @@
         "$ref": "#/definitions/io.k8s.api.settings.v1alpha1.PodPreset"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.settings.v1alpha1.PodPreset"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.settings.v1alpha1.PodPreset"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -57543,6 +58935,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.settings.v1alpha1.PodPreset"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.settings.v1alpha1.PodPreset"
        }
@@ -58333,6 +59731,18 @@
         "$ref": "#/definitions/io.k8s.api.storage.v1.StorageClass"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.storage.v1.StorageClass"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.storage.v1.StorageClass"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -58529,6 +59939,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.storage.v1.StorageClass"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.storage.v1.StorageClass"
        }
@@ -59054,6 +60470,18 @@
         "$ref": "#/definitions/io.k8s.api.storage.v1beta1.StorageClass"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.storage.v1beta1.StorageClass"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.storage.v1beta1.StorageClass"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -59250,6 +60678,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.storage.v1beta1.StorageClass"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.storage.v1beta1.StorageClass"
        }

@@ -48,6 +48,16 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1beta1.LocalSubjectAccessReview"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.LocalSubjectAccessReview"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1beta1.LocalSubjectAccessReview"
        }
       ],
       "produces": [
@@ -92,6 +102,16 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1beta1.SelfSubjectAccessReview"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.SelfSubjectAccessReview"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
         "responseModel": "v1beta1.SelfSubjectAccessReview"
        }
       ],
@@ -138,6 +158,16 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1beta1.SelfSubjectRulesReview"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.SelfSubjectRulesReview"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1beta1.SelfSubjectRulesReview"
        }
       ],
       "produces": [
@@ -182,6 +212,16 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1beta1.SubjectAccessReview"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.SubjectAccessReview"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
         "responseModel": "v1beta1.SubjectAccessReview"
        }
       ],
