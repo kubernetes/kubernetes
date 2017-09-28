@@ -567,9 +567,11 @@ def launch_default_ingress_controller():
         return
 
     # Render the ingress replication controller manifest
-    context['ingress_image'] = "gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.13"
+    context['ingress_image'] = \
+        "gcr.io/google_containers/nginx-ingress-controller:0.9.0-beta.13"
     if arch() == 's390x':
-        context['ingress_image'] = "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
+        context['ingress_image'] = \
+            "docker.io/cdkbot/nginx-ingress-controller-s390x:0.9.0-beta.13"
     manifest = addon_path.format('ingress-replication-controller.yaml')
     render('ingress-replication-controller.yaml', manifest, context)
     hookenv.log('Creating the ingress replication controller.')
