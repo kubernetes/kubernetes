@@ -515,6 +515,9 @@ func normalizeSliceOrder(toSort, order []interface{}, mergeKey string, kind refl
 			return nil, err
 		}
 		toSort, toDelete, err = extractToDeleteItems(toSort)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	sort.SliceStable(toSort, func(i, j int) bool {
