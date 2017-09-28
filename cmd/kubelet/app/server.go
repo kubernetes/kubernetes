@@ -334,6 +334,12 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		var clientCertificateManager certificate.Manager
 		if err == nil {
 			if s.RotateCertificates && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletClientCertificate) {
+				if clientConfig.CertFile == "" {
+					clientConfig.CertFile = path.Join(s.CertDirectory, "kubelet.crt")
+				}
+				if clientConfig.KeyFile == "" {
+					clientConfig.KeyFile = path.Join(s.CertDirectory, "kubelet.key")
+				}
 				clientCertificateManager, err = certificate.NewKubeletClientCertificateManager(s.CertDirectory, nodeName, clientConfig.CertData, clientConfig.KeyData, clientConfig.CertFile, clientConfig.KeyFile)
 				if err != nil {
 					return err
