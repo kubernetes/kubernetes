@@ -17,23 +17,19 @@ limitations under the License.
 package cm
 
 import (
-	"time"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	// TODO: Migrate kubelet to either use its own internal objects or client library.
 	"k8s.io/api/core/v1"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	cmcontainerlifecycle "k8s.io/kubernetes/pkg/kubelet/cm/containerlifecycle"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 
 	"fmt"
 	"strconv"
 	"strings"
 )
-
-type ActivePodsFunc func() []*v1.Pod
 
 // Manages the containers running on a machine.
 type ContainerManager interface {
@@ -76,31 +72,7 @@ type ContainerManager interface {
 	// extended resources required by container.
 	GetResources(pod *v1.Pod, container *v1.Container, activePods []*v1.Pod) (*kubecontainer.RunContainerOptions, error)
 
-	InternalContainerLifecycle() InternalContainerLifecycle
-}
-
-type NodeConfig struct {
-	RuntimeCgroupsName    string
-	SystemCgroupsName     string
-	KubeletCgroupsName    string
-	ContainerRuntime      string
-	CgroupsPerQOS         bool
-	CgroupRoot            string
-	CgroupDriver          string
-	ProtectKernelDefaults bool
-	NodeAllocatableConfig
-	ExperimentalQOSReserved               map[v1.ResourceName]int64
-	ExperimentalCPUManagerPolicy          string
-	ExperimentalCPUManagerReconcilePeriod time.Duration
-}
-
-type NodeAllocatableConfig struct {
-	KubeReservedCgroupName   string
-	SystemReservedCgroupName string
-	EnforceNodeAllocatable   sets.String
-	KubeReserved             v1.ResourceList
-	SystemReserved           v1.ResourceList
-	HardEvictionThresholds   []evictionapi.Threshold
+	InternalContainerLifecycle() cmcontainerlifecycle.InternalContainerLifecycle
 }
 
 type Status struct {

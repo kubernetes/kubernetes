@@ -16,9 +16,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cm
+package cgroupmanager
 
-import "testing"
+import (
+	"testing"
+
+	cm "k8s.io/kubernetes/pkg/kubelet/cm"
+)
 
 func TestLibcontainerAdapterAdaptToSystemd(t *testing.T) {
 	testCases := []struct {
@@ -64,7 +68,7 @@ func TestLibcontainerAdapterAdaptToSystemd(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		f := newLibcontainerAdapter(libcontainerSystemd)
-		if actual := f.adaptName(CgroupName(testCase.input), false); actual != testCase.expected {
+		if actual := f.adaptName(cm.CgroupName(testCase.input), false); actual != testCase.expected {
 			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
 		}
 	}
@@ -94,7 +98,7 @@ func TestLibcontainerAdapterAdaptToSystemdAsCgroupFs(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		f := newLibcontainerAdapter(libcontainerSystemd)
-		if actual := f.adaptName(CgroupName(testCase.input), true); actual != testCase.expected {
+		if actual := f.adaptName(cm.CgroupName(testCase.input), true); actual != testCase.expected {
 			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
 		}
 	}

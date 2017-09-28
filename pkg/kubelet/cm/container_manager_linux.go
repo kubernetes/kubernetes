@@ -44,7 +44,12 @@ import (
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cgroupmanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/containerlifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/deviceplugin"
+	"k8s.io/kubernetes/pkg/kubelet/cm/podcontainer"
+	qoscontainer "k8s.io/kubernetes/pkg/kubelet/cm/qoscontainer"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -123,9 +128,9 @@ type containerManagerImpl struct {
 	// Event recorder interface.
 	recorder record.EventRecorder
 	// Interface for QoS cgroup management
-	qosContainerManager QOSContainerManager
+	qosContainerManager qoscontainer.QOSContainerManager
 	// Interface for exporting and allocating devices reported by device plugins.
-	devicePluginHandler DevicePluginHandler
+	devicePluginHandler deviceplugin.DevicePluginHandler
 	// Interface for CPU affinity management.
 	cpuManager cpumanager.Manager
 }
@@ -191,7 +196,7 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
 func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {
-	subsystems, err := GetCgroupSubsystems()
+	subsystems, err := cmutil.GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
 	}
@@ -234,7 +239,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	capacity = cadvisor.CapacityFromMachineInfo(machineInfo)
 
 	cgroupRoot := nodeConfig.CgroupRoot
-	cgroupManager := NewCgroupManager(subsystems, nodeConfig.CgroupDriver)
+	cgroupManager := cgroupmanager.NewCgroupManager(subsystems, nodeConfig.CgroupDriver)
 	// Check if Cgroup-root actually exists on the node
 	if nodeConfig.CgroupsPerQOS {
 		// this does default to / when enabled, but this tests against regressions.
@@ -256,7 +261,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	}
 	glog.Infof("Creating Container Manager object based on Node Config: %+v", nodeConfig)
 
-	qosContainerManager, err := NewQOSContainerManager(subsystems, cgroupRoot, nodeConfig)
+	qosContainerManager, err := qoscontainer.NewQOSContainerManager(subsystems, cgroupRoot, nodeConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -287,9 +292,9 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 	glog.Infof("Creating device plugin handler: %t", devicePluginEnabled)
 	if devicePluginEnabled {
-		cm.devicePluginHandler, err = NewDevicePluginHandlerImpl(updateDeviceCapacityFunc)
+		cm.devicePluginHandler, err = deviceplugin.NewDevicePluginHandlerImpl(updateDeviceCapacityFunc)
 	} else {
-		cm.devicePluginHandler, err = NewDevicePluginHandlerStub()
+		cm.devicePluginHandler, err = deviceplugin.NewDevicePluginHandlerStub()
 	}
 	if err != nil {
 		return nil, err
@@ -317,7 +322,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 // otherwise it returns a no-op manager which essentially does nothing
 func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 	if cm.NodeConfig.CgroupsPerQOS {
-		return &podContainerManagerImpl{
+		return &podcontainer.PodContainerManagerImpl{
 			qosContainersInfo: cm.GetQOSContainersInfo(),
 			subsystems:        cm.subsystems,
 			cgroupManager:     cm.cgroupManager,
@@ -328,7 +333,7 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 	}
 }
 
-func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLifecycle {
+func (cm *containerManagerImpl) InternalContainerLifecycle() containerlifecycle.InternalContainerLifecycle {
 	return &internalContainerLifecycleImpl{cm.cpuManager}
 }
 

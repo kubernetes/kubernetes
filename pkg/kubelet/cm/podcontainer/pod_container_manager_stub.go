@@ -1,5 +1,3 @@
-// +build !linux
-
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -16,38 +14,39 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cm
+package podcontainer
 
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
-type unsupportedPodContainerManager struct {
+type podContainerManagerStub struct {
 }
 
-var _ PodContainerManager = &unsupportedPodContainerManager{}
+var _ PodContainerManager = &podContainerManagerStub{}
 
-func (m *unsupportedPodContainerManager) Exists(_ *v1.Pod) bool {
+func (m *podContainerManagerStub) Exists(_ *v1.Pod) bool {
 	return true
 }
 
-func (m *unsupportedPodContainerManager) EnsureExists(_ *v1.Pod) error {
+func (m *podContainerManagerStub) EnsureExists(_ *v1.Pod) error {
 	return nil
 }
 
-func (m *unsupportedPodContainerManager) GetPodContainerName(_ *v1.Pod) (CgroupName, string) {
+func (m *podContainerManagerStub) GetPodContainerName(_ *v1.Pod) (cm.CgroupName, string) {
 	return "", ""
 }
 
-func (m *unsupportedPodContainerManager) ReduceCPULimits(_ CgroupName) error {
+func (m *podContainerManagerStub) Destroy(_ cm.CgroupName) error {
 	return nil
 }
 
-func (m *unsupportedPodContainerManager) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
+func (m *podContainerManagerStub) ReduceCPULimits(_ cm.CgroupName) error {
+	return nil
+}
+
+func (m *podContainerManagerStub) GetAllPodsFromCgroups() (map[types.UID]cm.CgroupName, error) {
 	return nil, nil
-}
-
-func (m *unsupportedPodContainerManager) Destroy(name CgroupName) error {
-	return nil
 }

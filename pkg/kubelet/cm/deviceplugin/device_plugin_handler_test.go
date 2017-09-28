@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cm
+package deviceplugin
 
 import (
 	"flag"
@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
 func TestUpdateCapacity(t *testing.T) {
@@ -226,7 +227,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		},
 	}
 
-	cm := &containerManagerImpl{
+	cm := &cm.containerManagerImpl{
 		devicePluginHandler: testDevicePluginHandler,
 	}
 	activePods = append(activePods, pod)

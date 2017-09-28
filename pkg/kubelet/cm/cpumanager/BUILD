@@ -14,6 +14,7 @@ go_library(
     deps = [
         "//pkg/api/v1/helper/qos:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
+        "//pkg/kubelet/cm:go_default_library",
         "//pkg/kubelet/cm/cpumanager/state:go_default_library",
         "//pkg/kubelet/cm/cpumanager/topology:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",

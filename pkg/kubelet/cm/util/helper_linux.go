@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cm
+package util
 
 import (
 	"bufio"
@@ -24,11 +24,14 @@ import (
 	"strconv"
 
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	libcontainerutils "github.com/opencontainers/runc/libcontainer/utils"
+
 
 	"k8s.io/api/core/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
 const (
@@ -102,7 +105,7 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
+func ResourceConfigForPod(pod *v1.Pod) *cm.ResourceConfig {
 	// sum requests and limits.
 	reqs, limits := resource.PodRequestsAndLimits(pod)
 
@@ -149,7 +152,7 @@ func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 	qosClass := v1qos.GetPodQOS(pod)
 
 	// build the result
-	result := &ResourceConfig{}
+	result := &cm.ResourceConfig{}
 	if qosClass == v1.PodQOSGuaranteed {
 		result.CpuShares = &cpuShares
 		result.CpuQuota = &cpuQuota
@@ -173,14 +176,14 @@ func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 }
 
 // GetCgroupSubsystems returns information about the mounted cgroup subsystems
-func GetCgroupSubsystems() (*CgroupSubsystems, error) {
+func GetCgroupSubsystems() (*cm.CgroupSubsystems, error) {
 	// get all cgroup mounts.
 	allCgroups, err := libcontainercgroups.GetCgroupMounts(true)
 	if err != nil {
-		return &CgroupSubsystems{}, err
+		return &cm.CgroupSubsystems{}, err
 	}
 	if len(allCgroups) == 0 {
-		return &CgroupSubsystems{}, fmt.Errorf("failed to find cgroup mounts")
+		return &cm.CgroupSubsystems{}, fmt.Errorf("failed to find cgroup mounts")
 	}
 	mountPoints := make(map[string]string, len(allCgroups))
 	for _, mount := range allCgroups {
@@ -188,7 +191,7 @@ func GetCgroupSubsystems() (*CgroupSubsystems, error) {
 			mountPoints[subsystem] = mount.Mountpoint
 		}
 	}
-	return &CgroupSubsystems{
+	return &cm.CgroupSubsystems{
 		Mounts:      allCgroups,
 		MountPoints: mountPoints,
 	}, nil
@@ -197,7 +200,7 @@ func GetCgroupSubsystems() (*CgroupSubsystems, error) {
 // getCgroupProcs takes a cgroup directory name as an argument
 // reads through the cgroup's procs file and returns a list of tgid's.
 // It returns an empty list if a procs file doesn't exists
-func getCgroupProcs(dir string) ([]int, error) {
+func GetCgroupProcs(dir string) ([]int, error) {
 	procsFile := filepath.Join(dir, "cgroup.procs")
 	f, err := os.Open(procsFile)
 	if err != nil {
@@ -221,4 +224,57 @@ func getCgroupProcs(dir string) ([]int, error) {
 		}
 	}
 	return out, nil
+}
+
+
+// Forked from opencontainers/runc/libcontainer/cgroup/fs.Manager.GetPids()
+func GetPids(cgroupPath string) ([]int, error) {
+	dir, err := getCgroupPath(cgroupPath)
+	if err != nil {
+		return nil, err
+	}
+	return libcontainercgroups.GetPids(dir)
+}
+
+// getCgroupPath gets the file path to the "devices" subsystem of the desired cgroup.
+// cgroupPath is the path in the cgroup hierarchy.
+func getCgroupPath(cgroupPath string) (string, error) {
+	cgroupPath = libcontainerutils.CleanPath(cgroupPath)
+
+	mnt, root, err := libcontainercgroups.FindCgroupMountpointAndRoot("devices")
+	// If we didn't mount the subsystem, there is no point we make the path.
+	if err != nil {
+		return "", err
+	}
+
+	// If the cgroup name/path is absolute do not look relative to the cgroup of the init process.
+	if filepath.IsAbs(cgroupPath) {
+		// Sometimes subsystems can be mounted together as 'cpu,cpuacct'.
+		return filepath.Join(root, mnt, cgroupPath), nil
+	}
+
+	parentPath, err := getCgroupParentPath(mnt, root)
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(parentPath, cgroupPath), nil
+}
+
+// getCgroupParentPath gets the parent filepath to this cgroup, for resolving relative cgroup paths.
+func getCgroupParentPath(mountpoint, root string) (string, error) {
+	// Use GetThisCgroupDir instead of GetInitCgroupDir, because the creating
+	// process could in container and shared pid namespace with host, and
+	// /proc/1/cgroup could point to whole other world of cgroups.
+	initPath, err := libcontainercgroups.GetOwnCgroup("devices")
+	if err != nil {
+		return "", err
+	}
+	// This is needed for nested containers, because in /proc/self/cgroup we
+	// see paths from host, which don't exist in container.
+	relDir, err := filepath.Rel(root, initPath)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(mountpoint, relDir), nil
 }

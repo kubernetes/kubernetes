@@ -1,3 +1,5 @@
+// +build !linux
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -14,38 +16,38 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cm
+package podcontainer
 
 import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-type podContainerManagerStub struct {
+type unsupportedPodContainerManager struct {
 }
 
-var _ PodContainerManager = &podContainerManagerStub{}
+var _ PodContainerManager = &unsupportedPodContainerManager{}
 
-func (m *podContainerManagerStub) Exists(_ *v1.Pod) bool {
+func (m *unsupportedPodContainerManager) Exists(_ *v1.Pod) bool {
 	return true
 }
 
-func (m *podContainerManagerStub) EnsureExists(_ *v1.Pod) error {
+func (m *unsupportedPodContainerManager) EnsureExists(_ *v1.Pod) error {
 	return nil
 }
 
-func (m *podContainerManagerStub) GetPodContainerName(_ *v1.Pod) (CgroupName, string) {
+func (m *unsupportedPodContainerManager) GetPodContainerName(_ *v1.Pod) (CgroupName, string) {
 	return "", ""
 }
 
-func (m *podContainerManagerStub) Destroy(_ CgroupName) error {
+func (m *unsupportedPodContainerManager) ReduceCPULimits(_ CgroupName) error {
 	return nil
 }
 
-func (m *podContainerManagerStub) ReduceCPULimits(_ CgroupName) error {
-	return nil
-}
-
-func (m *podContainerManagerStub) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
+func (m *unsupportedPodContainerManager) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
 	return nil, nil
+}
+
+func (m *unsupportedPodContainerManager) Destroy(name CgroupName) error {
+	return nil
 }

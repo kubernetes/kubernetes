@@ -44,7 +44,7 @@ go_library(
         "//pkg/kubelet/apis/cri:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
-        "//pkg/kubelet/cm:go_default_library",
+        "//pkg/kubelet/cm/cgroupmanager:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockershim/cm:go_default_library",
         "//pkg/kubelet/dockershim/errors:go_default_library",
