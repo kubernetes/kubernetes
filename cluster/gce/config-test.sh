@@ -345,6 +345,10 @@ if [[ "${ENABLE_APISERVER_ADVANCED_AUDIT}" == "true" ]]; then
   FEATURE_GATES="${FEATURE_GATES},AdvancedAuditing=true"
 fi
 
+if [[ "${ENABLE_APISERVER_BASIC_AUDIT:-}" == "true" ]]; then
+  echo "Warning: Basic audit logging is deprecated and will be removed. Please use advanced auditing instead."
+fi
+
 ENABLE_BIG_CLUSTER_SUBNETS="${ENABLE_BIG_CLUSTER_SUBNETS:-false}"
 
 if [[ -n "${LOGROTATE_FILES_MAX_COUNT:-}" ]]; then
