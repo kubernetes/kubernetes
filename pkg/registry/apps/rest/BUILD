@@ -16,6 +16,7 @@ go_library(
         "//pkg/registry/extensions/daemonset/storage:go_default_library",
         "//pkg/registry/extensions/deployment/storage:go_default_library",
         "//pkg/registry/extensions/replicaset/storage:go_default_library",
+        "//vendor/k8s.io/api/apps/v1:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta2:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",
