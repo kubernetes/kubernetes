@@ -143,7 +143,7 @@ func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, 
 
 	// TODO: Improve error messages by first testing if 'tar' is present in the container?
 	cmdArr := []string{"tar", "xf", "-"}
-	destDir := path.Dir(dest.File)
+	destDir := path.Clean(dest.File)
 	if len(destDir) > 0 {
 		cmdArr = append(cmdArr, "-C", destDir)
 	}
