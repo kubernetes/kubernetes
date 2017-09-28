@@ -304,8 +304,8 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 // If managedZones is nil / empty all zones in the region will be managed.
 func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	// Remove any pre-release version and build metadata from the semver, leaving only the MAJOR.MINOR.PATCH portion.
-        // See http://semver.org/.
-	version := strings.Split(strings.Split(version.Get().GitVersion, "-")[0], "+")[0]
+	// See http://semver.org/.
+	version := strings.TrimLeft(strings.Split(strings.Split(version.Get().GitVersion, "-")[0], "+")[0], "v")
 
         // Create a user-agent header append string to supply to the Google API clients, to identify Kubernetes as the origin of the GCP API calls.
 	userAgent := fmt.Sprintf("(%s %s) Kubernetes/%s", runtime.GOOS, runtime.GOARCH, version)
