@@ -22,7 +22,7 @@ import (
 	pkgruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/federation/pkg/federatedtypes"
 	crudtester "k8s.io/kubernetes/federation/pkg/federatedtypes/crudtester"
-	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
+	fedframework "k8s.io/kubernetes/federation/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 )

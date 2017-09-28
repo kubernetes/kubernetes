@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_federation
+package e2e
 
 import (
+	fedframework "k8s.io/kubernetes/federation/test/e2e/framework"
+	"k8s.io/kubernetes/federation/test/e2e/upgrades"
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
-	fedframework "k8s.io/kubernetes/test/e2e_federation/framework"
-	"k8s.io/kubernetes/test/e2e_federation/upgrades"
 
 	. "github.com/onsi/ginkgo"
 )
