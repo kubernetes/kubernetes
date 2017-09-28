@@ -220,6 +220,8 @@ func TestKubernetesIsCIVersion(t *testing.T) {
 		// CI builds
 		{"ci/latest-1", true},
 		{"ci-cross/latest", true},
+		{"ci/v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
+		{"ci-cross/v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
 	}
 
 	for _, tc := range cases {
@@ -230,4 +232,59 @@ func TestKubernetesIsCIVersion(t *testing.T) {
 		}
 	}
 
+}
+
+// Validate KubernetesReleaseVersion but with bucket prefixes
+func TestCIBuildVersion(t *testing.T) {
+	type T struct {
+		input    string
+		expected string
+		valid    bool
+	}
+	cases := []T{
+		// Official releases
+		{"v1.7.0", "v1.7.0", true},
+		{"release/v1.8.0", "v1.8.0", true},
+		{"1.4.0-beta.0", "v1.4.0-beta.0", true},
+		{"release/0invalid", "", false},
+		// CI or custom builds
+		{"ci/v1.9.0-alpha.1.123+acbcbfd53bfa0a", "v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
+		{"ci-cross/v1.9.0-alpha.1.123+acbcbfd53bfa0a", "v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
+		{"ci/1.9.0-alpha.1.123+acbcbfd53bfa0a", "v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
+		{"ci-cross/1.9.0-alpha.1.123+acbcbfd53bfa0a", "v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
+		{"ci/0invalid", "", false},
+	}
+
+	for _, tc := range cases {
+		ver, err := KubernetesReleaseVersion(tc.input)
+		t.Logf("Input: %q. Result: %q, Error: %v", tc.input, ver, err)
+		switch {
+		case err != nil && tc.valid:
+			t.Errorf("KubernetesReleaseVersion: unexpected error for input %q. Error: %v", tc.input, err)
+		case err == nil && !tc.valid:
+			t.Errorf("KubernetesReleaseVersion: error expected for input %q, but result is %q", tc.input, ver)
+		case ver != tc.expected:
+			t.Errorf("KubernetesReleaseVersion: unexpected result for input %q. Expected: %q Actual: %q", tc.input, tc.expected, ver)
+		}
+	}
+}
+
+func TestNormalizedBuildVersionVersion(t *testing.T) {
+	type T struct {
+		input    string
+		expected string
+	}
+	cases := []T{
+		{"v1.7.0", "v1.7.0"},
+		{"v1.8.0-alpha.2.1231+afabd012389d53a", "v1.8.0-alpha.2.1231+afabd012389d53a"},
+		{"1.7.0", "v1.7.0"},
+		{"unknown-1", ""},
+	}
+
+	for _, tc := range cases {
+		output := normalizedBuildVersion(tc.input)
+		if output != tc.expected {
+			t.Errorf("normalizedBuildVersion: unexpected output %q for input %q. Expected: %q", output, tc.input, tc.expected)
+		}
+	}
 }

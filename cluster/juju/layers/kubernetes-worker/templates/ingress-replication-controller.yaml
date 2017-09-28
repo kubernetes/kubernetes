@@ -24,7 +24,7 @@ spec:
       # see https://github.com/kubernetes/kubernetes/issues/23920
       hostNetwork: true
       containers:
-      - image: gcr.io/google_containers/nginx-ingress-controller:0.8.3
+      - image: {{ ingress_image }}
         name: nginx-ingress-lb
         imagePullPolicy: Always
         livenessProbe:
@@ -50,4 +50,4 @@ spec:
         args:
         - /nginx-ingress-controller
         - --default-backend-service=$(POD_NAMESPACE)/default-http-backend
-        - --nginx-configmap=$(POD_NAMESPACE)/nginx-load-balancer-conf
+        - --configmap=$(POD_NAMESPACE)/nginx-load-balancer-conf

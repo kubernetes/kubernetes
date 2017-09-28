@@ -58,3 +58,21 @@ func TestUnstructuredList(t *testing.T) {
 		t.Fatalf("unexpected fields: %#v", items[0])
 	}
 }
+
+func TestNilDeletionTimestamp(t *testing.T) {
+	var u Unstructured
+	del := u.GetDeletionTimestamp()
+	if del != nil {
+		t.Errorf("unexpected non-nil deletion timestamp: %v", del)
+	}
+	u.SetDeletionTimestamp(u.GetDeletionTimestamp())
+	del = u.GetDeletionTimestamp()
+	if del != nil {
+		t.Errorf("unexpected non-nil deletion timestamp: %v", del)
+	}
+	metadata := u.Object["metadata"].(map[string]interface{})
+	deletionTimestamp := metadata["deletionTimestamp"]
+	if deletionTimestamp != nil {
+		t.Errorf("unexpected deletion timestamp field: %q", deletionTimestamp)
+	}
+}

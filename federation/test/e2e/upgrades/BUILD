@@ -14,7 +14,7 @@ go_library(
     deps = [
         "//federation/pkg/federatedtypes:go_default_library",
         "//federation/pkg/federatedtypes/crudtester:go_default_library",
-        "//test/e2e_federation/framework:go_default_library",
+        "//federation/test/e2e/framework:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
     ],

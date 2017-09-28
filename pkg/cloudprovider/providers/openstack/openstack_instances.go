@@ -32,6 +32,7 @@ import (
 
 type Instances struct {
 	compute *gophercloud.ServiceClient
+	opts    MetadataOpts
 }
 
 // Instances returns an implementation of Instances for OpenStack.
@@ -45,13 +46,16 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 
 	glog.V(1).Info("Claiming to support Instances")
 
-	return &Instances{compute}, true
+	return &Instances{
+		compute: compute,
+		opts:    os.metadataOpts,
+	}, true
 }
 
 // Implementation of Instances.CurrentNodeName
 // Note this is *not* necessarily the same as hostname.
 func (i *Instances) CurrentNodeName(hostname string) (types.NodeName, error) {
-	md, err := getMetadata()
+	md, err := getMetadata(i.opts.SearchOrder)
 	if err != nil {
 		return "", err
 	}
@@ -119,7 +123,7 @@ func (i *Instances) InstanceExistsByProviderID(providerID string) (bool, error) 
 // InstanceID returns the kubelet's cloud provider ID.
 func (os *OpenStack) InstanceID() (string, error) {
 	if len(os.localInstanceID) == 0 {
-		id, err := readInstanceID()
+		id, err := readInstanceID(os.metadataOpts.SearchOrder)
 		if err != nil {
 			return "", err
 		}

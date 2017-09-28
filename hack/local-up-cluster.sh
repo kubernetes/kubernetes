@@ -760,7 +760,6 @@ function start_kubedns {
         sed -e "s/{{ pillar\['dns_server'\] }}/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-svc.yaml.in" >| kubedns-svc.yaml
 
         # TODO update to dns role once we have one.
-        ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" create clusterrolebinding system:kube-dns --clusterrole=cluster-admin --serviceaccount=kube-system:default
         # use kubectl to create kubedns deployment and service
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f ${KUBE_ROOT}/cluster/addons/dns/kubedns-sa.yaml
         ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f ${KUBE_ROOT}/cluster/addons/dns/kubedns-cm.yaml

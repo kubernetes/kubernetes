@@ -100,13 +100,18 @@ type RouterOpts struct {
 	RouterId string `gcfg:"router-id"` // required
 }
 
+type MetadataOpts struct {
+	SearchOrder string `gcfg:"search-order"`
+}
+
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
 type OpenStack struct {
-	provider  *gophercloud.ProviderClient
-	region    string
-	lbOpts    LoadBalancerOpts
-	bsOpts    BlockStorageOpts
-	routeOpts RouterOpts
+	provider     *gophercloud.ProviderClient
+	region       string
+	lbOpts       LoadBalancerOpts
+	bsOpts       BlockStorageOpts
+	routeOpts    RouterOpts
+	metadataOpts MetadataOpts
 	// InstanceID of the server where this OpenStack object is instantiated.
 	localInstanceID string
 }
@@ -128,6 +133,7 @@ type Config struct {
 	LoadBalancer LoadBalancerOpts
 	BlockStorage BlockStorageOpts
 	Route        RouterOpts
+	Metadata     MetadataOpts
 }
 
 func init() {
@@ -181,6 +187,7 @@ func readConfig(config io.Reader) (Config, error) {
 	// Set default values for config params
 	cfg.BlockStorage.BSVersion = "auto"
 	cfg.BlockStorage.TrustDevicePath = false
+	cfg.Metadata.SearchOrder = fmt.Sprintf("%s,%s", configDriveID, metadataID)
 
 	err := gcfg.ReadInto(&cfg, config)
 	return cfg, err
@@ -198,7 +205,7 @@ func (c *Caller) Call(f func()) {
 	}
 }
 
-func readInstanceID() (string, error) {
+func readInstanceID(searchOrder string) (string, error) {
 	// Try to find instance ID on the local filesystem (created by cloud-init)
 	const instanceIDFile = "/var/lib/cloud/data/instance-id"
 	idBytes, err := ioutil.ReadFile(instanceIDFile)
@@ -212,7 +219,7 @@ func readInstanceID() (string, error) {
 		// Fall through to metadata server lookup
 	}
 
-	md, err := getMetadata()
+	md, err := getMetadata(searchOrder)
 	if err != nil {
 		return "", err
 	}
@@ -244,6 +251,10 @@ func checkOpenStackOpts(openstackOpts *OpenStack) error {
 		if len(lbOpts.NodeSecurityGroupID) == 0 {
 			return fmt.Errorf("node-security-group not set in cloud provider config")
 		}
+	}
+
+	if err := checkMetadataSearchOrder(openstackOpts.metadataOpts.SearchOrder); err != nil {
+		return err
 	}
 
 	return nil
@@ -280,11 +291,12 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 	}
 
 	os := OpenStack{
-		provider:  provider,
-		region:    cfg.Global.Region,
-		lbOpts:    cfg.LoadBalancer,
-		bsOpts:    cfg.BlockStorage,
-		routeOpts: cfg.Route,
+		provider:     provider,
+		region:       cfg.Global.Region,
+		lbOpts:       cfg.LoadBalancer,
+		bsOpts:       cfg.BlockStorage,
+		routeOpts:    cfg.Route,
+		metadataOpts: cfg.Metadata,
 	}
 
 	err = checkOpenStackOpts(&os)
@@ -541,7 +553,7 @@ func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
 }
 
 func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
-	md, err := getMetadata()
+	md, err := getMetadata(os.metadataOpts.SearchOrder)
 	if err != nil {
 		return cloudprovider.Zone{}, err
 	}
@@ -743,4 +755,29 @@ func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
 		glog.Warningf(err_txt)
 		return nil, errors.New(err_txt)
 	}
+}
+
+func checkMetadataSearchOrder(order string) error {
+	if order == "" {
+		return errors.New("Invalid value in section [Metadata] with key `search-order`. Value cannot be empty")
+	}
+
+	elements := strings.Split(order, ",")
+	if len(elements) > 2 {
+		return errors.New("Invalid value in section [Metadata] with key `search-order`. Value cannot contain more than 2 elements")
+	}
+
+	for _, id := range elements {
+		id = strings.TrimSpace(id)
+		switch id {
+		case configDriveID:
+		case metadataID:
+		default:
+			errTxt := "Invalid element '%s' found in section [Metadata] with key `search-order`." +
+				"Supported elements include '%s' and '%s'"
+			return fmt.Errorf(errTxt, id, configDriveID, metadataID)
+		}
+	}
+
+	return nil
 }

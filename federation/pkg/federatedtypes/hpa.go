@@ -92,7 +92,7 @@ func (a *HpaAdapter) Copy(obj pkgruntime.Object) pkgruntime.Object {
 	hpa := obj.(*autoscalingv1.HorizontalPodAutoscaler)
 	return &autoscalingv1.HorizontalPodAutoscaler{
 		ObjectMeta: fedutil.DeepCopyRelevantObjectMeta(hpa.ObjectMeta),
-		Spec:       *fedutil.DeepCopyApiTypeOrPanic(&hpa.Spec).(*autoscalingv1.HorizontalPodAutoscalerSpec),
+		Spec:       *hpa.Spec.DeepCopy(),
 	}
 }
 
