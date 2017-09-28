@@ -45,7 +45,7 @@ import (
 )
 
 var testArgs = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
-var testSuite = flag.String("test-suite", "", "Test suite the runner initializes with.")
+var testSuite = flag.String("test-suite", "default", "Test suite the runner initializes with. Currently support default|conformance")
 var instanceNamePrefix = flag.String("instance-name-prefix", "", "prefix for instance names")
 var zone = flag.String("zone", "", "gce zone the hosts live in")
 var project = flag.String("project", "", "gce project the hosts live in")
@@ -150,9 +150,11 @@ func main() {
 	case "conformance":
 		suite = remote.InitConformanceRemote()
 	// TODO: Add subcommand for node soaking, node conformance, cri validation.
-	default:
+	case "default":
 		// Use node e2e suite by default if no subcommand is specified.
 		suite = remote.InitNodeE2ERemote()
+	default:
+		glog.Fatalf("--test-suite must be one of default or conformance")
 	}
 
 	rand.Seed(time.Now().UTC().UnixNano())
