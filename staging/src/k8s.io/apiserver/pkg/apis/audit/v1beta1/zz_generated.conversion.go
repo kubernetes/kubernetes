@@ -73,6 +73,8 @@ func autoConvert_v1beta1_Event_To_audit_Event(in *Event, out *audit.Event, s con
 	out.ResponseStatus = (*v1.Status)(unsafe.Pointer(in.ResponseStatus))
 	out.RequestObject = (*runtime.Unknown)(unsafe.Pointer(in.RequestObject))
 	out.ResponseObject = (*runtime.Unknown)(unsafe.Pointer(in.ResponseObject))
+	out.RequestReceivedTimestamp = in.RequestReceivedTimestamp
+	out.StageTimestamp = in.StageTimestamp
 	return nil
 }
 
@@ -99,6 +101,8 @@ func autoConvert_audit_Event_To_v1beta1_Event(in *audit.Event, out *Event, s con
 	out.ResponseStatus = (*v1.Status)(unsafe.Pointer(in.ResponseStatus))
 	out.RequestObject = (*runtime.Unknown)(unsafe.Pointer(in.RequestObject))
 	out.ResponseObject = (*runtime.Unknown)(unsafe.Pointer(in.ResponseObject))
+	out.RequestReceivedTimestamp = in.RequestReceivedTimestamp
+	out.StageTimestamp = in.StageTimestamp
 	return nil
 }
 
