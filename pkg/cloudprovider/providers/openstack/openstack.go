@@ -52,6 +52,7 @@ import (
 const (
 	ProviderName     = "openstack"
 	AvailabilityZone = "availability_zone"
+	defaultTimeOut   = 60 * time.Second
 )
 
 var ErrNotFound = errors.New("Failed to find object")
@@ -101,7 +102,8 @@ type RouterOpts struct {
 }
 
 type MetadataOpts struct {
-	SearchOrder string `gcfg:"search-order"`
+	SearchOrder    string     `gcfg:"search-order"`
+	RequestTimeout MyDuration `gcfg:"request-timeout"`
 }
 
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
@@ -289,6 +291,12 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	emptyDuration := MyDuration{}
+	if cfg.Metadata.RequestTimeout == emptyDuration {
+		cfg.Metadata.RequestTimeout.Duration = time.Duration(defaultTimeOut)
+	}
+	provider.HTTPClient.Timeout = cfg.Metadata.RequestTimeout.Duration
 
 	os := OpenStack{
 		provider:     provider,
