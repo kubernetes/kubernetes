@@ -106,7 +106,7 @@ You can now apply the upgrade by executing the following command:
 
 	kubeadm upgrade apply v1.7.3
 
-Note: Before you do can perform this upgrade, you have to update kubeadm to v1.7.3
+Note: Before you can perform this upgrade, you have to update kubeadm to v1.7.3
 
 _____________________________________________________________________
 
@@ -223,7 +223,7 @@ You can now apply the upgrade by executing the following command:
 
 	kubeadm upgrade apply v1.8.2
 
-Note: Before you do can perform this upgrade, you have to update kubeadm to v1.8.2
+Note: Before you can perform this upgrade, you have to update kubeadm to v1.8.2
 
 _____________________________________________________________________
 
@@ -265,7 +265,7 @@ You can now apply the upgrade by executing the following command:
 
 	kubeadm upgrade apply v1.8.0-beta.1
 
-Note: Before you do can perform this upgrade, you have to update kubeadm to v1.8.0-beta.1
+Note: Before you can perform this upgrade, you have to update kubeadm to v1.8.0-beta.1
 
 _____________________________________________________________________
 
@@ -307,7 +307,7 @@ You can now apply the upgrade by executing the following command:
 
 	kubeadm upgrade apply v1.8.0-rc.1
 
-Note: Before you do can perform this upgrade, you have to update kubeadm to v1.8.0-rc.1
+Note: Before you can perform this upgrade, you have to update kubeadm to v1.8.0-rc.1
 
 _____________________________________________________________________
 
