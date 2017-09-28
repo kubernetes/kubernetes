@@ -80,6 +80,11 @@ func (populator *pvcPopulator) Sync() {
 			glog.V(5).Infof("Error getting persistent volume for pvc %q : %v", pvc.UID, err)
 			continue
 		}
+		// We are only going to add PVCs which are:
+		//  - bound
+		//  - pvc.Spec.Size > pvc.Status.Size
+		// These 2 checks are already performed in AddPVCUpdate function before adding pvc for resize
+		// and hence we do not repeat those checks here.
 		populator.resizeMap.AddPVCUpdate(pvc, pv)
 	}
 }
