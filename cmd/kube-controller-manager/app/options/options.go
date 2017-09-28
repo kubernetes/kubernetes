@@ -115,7 +115,7 @@ func NewCMServer() *CMServer {
 			ClusterSigningDuration:                metav1.Duration{Duration: helpers.OneYear},
 			ReconcilerSyncLoopPeriod:              metav1.Duration{Duration: 60 * time.Second},
 			EnableTaintManager:                    true,
-			HorizontalPodAutoscalerUseRESTClients: false,
+			HorizontalPodAutoscalerUseRESTClients: true,
 		},
 	}
 	s.LeaderElection.LeaderElect = true
