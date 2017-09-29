@@ -347,6 +347,14 @@ func TestValidateCronJob(t *testing.T) {
 		if errs := ValidateCronJob(&v); len(errs) != 0 {
 			t.Errorf("expected success for %s: %v", k, errs)
 		}
+
+		// Update validation should pass same success cases
+		// copy to avoid polluting the testcase object, set a resourceVersion to allow validating update, and test a no-op update
+		v = *v.DeepCopy()
+		v.ResourceVersion = "1"
+		if errs := ValidateCronJobUpdate(&v, &v); len(errs) != 0 {
+			t.Errorf("expected success for %s: %v", k, errs)
+		}
 	}
 
 	negative := int32(-1)
@@ -580,6 +588,24 @@ func TestValidateCronJob(t *testing.T) {
 	for k, v := range errorCases {
 		errs := ValidateCronJob(&v)
 		if len(errs) == 0 {
+			t.Errorf("expected failure for %s", k)
+		} else {
+			s := strings.Split(k, ":")
+			err := errs[0]
+			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
+				t.Errorf("unexpected error: %v, expected: %s", err, k)
+			}
+		}
+
+		// Update validation should fail all failure cases other than the 52 character name limit
+		// copy to avoid polluting the testcase object, set a resourceVersion to allow validating update, and test a no-op update
+		v = *v.DeepCopy()
+		v.ResourceVersion = "1"
+		errs = ValidateCronJobUpdate(&v, &v)
+		if len(errs) == 0 {
+			if k == "metadata.name: must be no more than 52 characters" {
+				continue
+			}
 			t.Errorf("expected failure for %s", k)
 		} else {
 			s := strings.Split(k, ":")
