@@ -1958,7 +1958,7 @@ func (r *Runtime) getKubernetesDirective(serviceFilePath string) (podService pod
 	return podService, fmt.Errorf("failed to parse pod from file %s", serviceFilePath)
 }
 
-func (r *Runtime) DeleteContainer(containerID kubecontainer.ContainerID) error {
+func (r *Runtime) DeleteContainer(containerID string) error {
 	return fmt.Errorf("unimplemented")
 }
 

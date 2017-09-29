@@ -122,7 +122,7 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 	// Remove from oldest to newest (last to first).
 	numToKeep := len(containers) - toRemove
 	for i := len(containers) - 1; i >= numToKeep; i-- {
-		if err := cgc.manager.removeContainer(containers[i].id); err != nil {
+		if err := cgc.manager.DeleteContainer(containers[i].id); err != nil {
 			glog.Errorf("Failed to remove container %q: %v", containers[i].id, err)
 		}
 	}
