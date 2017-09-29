@@ -21,11 +21,8 @@ import (
 	"io"
 	"net/http"
 	"regexp"
-<<<<<<< master
 	"runtime"
-=======
 	"strconv"
->>>>>>> master
 	"strings"
 	"sync"
 	"time"
@@ -348,19 +345,17 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 // If no tokenSource is specified, uses oauth2.DefaultTokenSource.
 // If managedZones is nil / empty all zones in the region will be managed.
 func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
-<<<<<<< master
 	// Remove any pre-release version and build metadata from the semver, leaving only the MAJOR.MINOR.PATCH portion.
 	// See http://semver.org/.
 	version := strings.TrimLeft(strings.Split(strings.Split(version.Get().GitVersion, "-")[0], "+")[0], "v")
 
 	// Create a user-agent header append string to supply to the Google API clients, to identify Kubernetes as the origin of the GCP API calls.
 	userAgent := fmt.Sprintf("Kubernetes/%s (%s %s)", version, runtime.GOOS, runtime.GOARCH)
-=======
+
 	// Use ProjectID for NetworkProjectID, if it wasn't explicitly set.
 	if config.NetworkProjectID == "" {
 		config.NetworkProjectID = config.ProjectID
 	}
->>>>>>> master
 
 	client, err := newOauthClient(config.TokenSource)
 	if err != nil {
