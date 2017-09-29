@@ -309,7 +309,7 @@ clean:
 else
 clean: clean_meta
 	build/make-clean.sh
-	git clean -Xdf
+	hack/make-rules/clean.sh
 endif
 
 define CLEAN_META_HELP_INFO
