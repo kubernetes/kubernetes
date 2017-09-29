@@ -28,8 +28,8 @@ import (
 // It is useful in tests and when using kubernetes in an open manner.
 type alwaysAllowAuthorizer struct{}
 
-func (alwaysAllowAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
-	return true, "", nil
+func (alwaysAllowAuthorizer) Authorize(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+	return authorizer.DecisionAllow, "", nil
 }
 
 func (alwaysAllowAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
@@ -56,8 +56,8 @@ func NewAlwaysAllowAuthorizer() *alwaysAllowAuthorizer {
 // It is useful in unit tests to force an operation to be forbidden.
 type alwaysDenyAuthorizer struct{}
 
-func (alwaysDenyAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
-	return false, "Everything is forbidden.", nil
+func (alwaysDenyAuthorizer) Authorize(a authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
+	return authorizer.DecisionNoOpinion, "Everything is forbidden.", nil
 }
 
 func (alwaysDenyAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
@@ -73,8 +73,8 @@ func NewAlwaysDenyAuthorizer() *alwaysDenyAuthorizer {
 // It is useful in unit tests to force an operation to fail with error.
 type alwaysFailAuthorizer struct{}
 
-func (alwaysFailAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
-	return false, "", errors.New("Authorization failure.")
+func (alwaysFailAuthorizer) Authorize(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+	return authorizer.DecisionNoOpinion, "", errors.New("Authorization failure.")
 }
 
 func NewAlwaysFailAuthorizer() authorizer.Authorizer {
@@ -85,18 +85,18 @@ type privilegedGroupAuthorizer struct {
 	groups []string
 }
 
-func (r *privilegedGroupAuthorizer) Authorize(attr authorizer.Attributes) (bool, string, error) {
+func (r *privilegedGroupAuthorizer) Authorize(attr authorizer.Attributes) (authorizer.Decision, string, error) {
 	if attr.GetUser() == nil {
-		return false, "Error", errors.New("no user on request.")
+		return authorizer.DecisionNoOpinion, "Error", errors.New("no user on request.")
 	}
 	for _, attr_group := range attr.GetUser().GetGroups() {
 		for _, priv_group := range r.groups {
 			if priv_group == attr_group {
-				return true, "", nil
+				return authorizer.DecisionAllow, "", nil
 			}
 		}
 	}
-	return false, "", nil
+	return authorizer.DecisionNoOpinion, "", nil
 }
 
 // NewPrivilegedGroups is for use in loopback scenarios

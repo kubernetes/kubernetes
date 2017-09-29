@@ -140,7 +140,10 @@ func newWithBackoff(subjectAccessReview authorizationclient.SubjectAccessReviewI
 //       }
 //     }
 //
-func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bool, reason string, err error) {
+// TODO(mikedanese): We should eventually fail closed when we encounter and
+// error. We are failing open now to preserve backwards compatible behavior.
+// Fix this after deprecation.
+func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
 	r := &authorization.SubjectAccessReview{}
 	if user := attr.GetUser(); user != nil {
 		r.Spec = authorization.SubjectAccessReviewSpec{
@@ -169,7 +172,7 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 	}
 	key, err := json.Marshal(r.Spec)
 	if err != nil {
-		return false, "", err
+		return authorizer.DecisionNoOpinion, "", err
 	}
 	if entry, ok := w.responseCache.Get(string(key)); ok {
 		r.Status = entry.(authorization.SubjectAccessReviewStatus)
@@ -185,7 +188,7 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 		if err != nil {
 			// An error here indicates bad configuration or an outage. Log for debugging.
 			glog.Errorf("Failed to make webhook authorizer request: %v", err)
-			return false, "", err
+			return authorizer.DecisionNoOpinion, "", err
 		}
 		r.Status = result.Status
 		if r.Status.Allowed {
@@ -194,7 +197,12 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 			w.responseCache.Add(string(key), r.Status, w.unauthorizedTTL)
 		}
 	}
-	return r.Status.Allowed, r.Status.Reason, nil
+	if r.Status.Allowed {
+		return authorizer.DecisionAllow, r.Status.Reason, nil
+	} else {
+		return authorizer.DecisionNoOpinion, r.Status.Reason, nil
+	}
+
 }
 
 //TODO: need to finish the method to get the rules when using webhook mode

@@ -236,14 +236,14 @@ func (s *Server) InstallAuthFilter() {
 		attrs := s.auth.GetRequestAttributes(u, req.Request)
 
 		// Authorize
-		authorized, _, err := s.auth.Authorize(attrs)
+		decision, _, err := s.auth.Authorize(attrs)
 		if err != nil {
 			msg := fmt.Sprintf("Authorization error (user=%s, verb=%s, resource=%s, subresource=%s)", u.GetName(), attrs.GetVerb(), attrs.GetResource(), attrs.GetSubresource())
 			glog.Errorf(msg, err)
 			resp.WriteErrorString(http.StatusInternalServerError, msg)
 			return
 		}
-		if !authorized {
+		if decision != authorizer.DecisionAllow {
 			msg := fmt.Sprintf("Forbidden (user=%s, verb=%s, resource=%s, subresource=%s)", u.GetName(), attrs.GetVerb(), attrs.GetResource(), attrs.GetSubresource())
 			glog.V(2).Info(msg)
 			resp.WriteErrorString(http.StatusForbidden, msg)

@@ -38,9 +38,12 @@ type fakeAuthorizer struct {
 	err    error
 }
 
-func (f *fakeAuthorizer) Authorize(attrs authorizer.Attributes) (bool, string, error) {
+func (f *fakeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	f.attrs = attrs
-	return f.ok, f.reason, f.err
+	if f.ok {
+		return authorizer.DecisionAllow, f.reason, f.err
+	}
+	return authorizer.DecisionNoOpinion, f.reason, f.err
 }
 
 func TestCreate(t *testing.T) {
