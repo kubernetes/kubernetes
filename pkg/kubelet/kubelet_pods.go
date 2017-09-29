@@ -820,6 +820,16 @@ func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
 	return status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(status.ContainerStatuses))
 }
 
+// IsPodTerminated returns trus if the pod with the provided UID is in a terminated state ("Failed" or "Succeeded")
+// or if the pod has been deleted or removed
+func (kl *Kubelet) IsPodTerminated(uid types.UID) bool {
+	pod, podFound := kl.podManager.GetPodByUID(uid)
+	if !podFound {
+		return true
+	}
+	return kl.podIsTerminated(pod)
+}
+
 // IsPodDeleted returns true if the pod is deleted.  For the pod to be deleted, either:
 // 1. The pod object is deleted
 // 2. The pod's status is evicted

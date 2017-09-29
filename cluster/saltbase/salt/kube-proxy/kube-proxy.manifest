@@ -65,16 +65,6 @@ metadata:
 spec:
   {{pod_priority}}
   hostNetwork: true
-  initContainers:
-  - name: touch-lock
-    image: busybox
-    command: ['/bin/touch', '/run/xtables.lock']
-    securityContext:
-      privileged: true
-    volumeMounts:
-    - mountPath: /run
-      name: run
-      readOnly: false
   containers:
   - name: kube-proxy
     image: {{pillar['kube_docker_registry']}}/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
@@ -120,9 +110,6 @@ spec:
   - hostPath:
       path: /var/log
     name: varlog
-  - hostPath:
-      path: /run
-    name: run
   - hostPath:
       path: /run/xtables.lock
       type: FileOrCreate

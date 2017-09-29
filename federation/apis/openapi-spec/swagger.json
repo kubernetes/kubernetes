@@ -409,6 +409,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -556,6 +568,18 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.ConfigMap"
+       }
+      },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.ConfigMap"
+       }
+      },
+      "202": {
+       "description": "Accepted",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.ConfigMap"
        }
@@ -764,6 +788,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.ConfigMap"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.ConfigMap"
        }
@@ -1048,6 +1078,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Event"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Event"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Event"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -1252,6 +1294,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Event"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.Event"
        }
@@ -1536,6 +1584,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Secret"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Secret"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Secret"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -1740,6 +1800,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Secret"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.Secret"
        }
@@ -2024,6 +2090,18 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Service"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Service"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Service"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -2228,6 +2306,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Service"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.Service"
        }
@@ -2452,6 +2536,12 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Service"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Service"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -2618,6 +2708,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
        }
@@ -2799,6 +2895,12 @@
         "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -2894,6 +2996,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.core.v1.Namespace"
        }
@@ -5283,6 +5391,18 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DaemonSet"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DaemonSet"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DaemonSet"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -5487,6 +5607,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DaemonSet"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DaemonSet"
        }
@@ -5711,6 +5837,12 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DaemonSet"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DaemonSet"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -5925,6 +6057,18 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Deployment"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Deployment"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Deployment"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -6133,6 +6277,12 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Deployment"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Deployment"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -6318,6 +6468,18 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DeploymentRollback"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DeploymentRollback"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.DeploymentRollback"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -6421,6 +6583,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Scale"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Scale"
        }
@@ -6575,6 +6743,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Deployment"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Deployment"
        }
@@ -6793,6 +6967,18 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Ingress"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Ingress"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Ingress"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -6997,6 +7183,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Ingress"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Ingress"
        }
@@ -7221,6 +7413,12 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Ingress"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Ingress"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -7435,6 +7633,18 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.ReplicaSet"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.ReplicaSet"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.ReplicaSet"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -7639,6 +7849,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.ReplicaSet"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.ReplicaSet"
        }
@@ -7863,6 +8079,12 @@
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Scale"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.Scale"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -8013,6 +8235,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.ReplicaSet"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.api.extensions.v1beta1.ReplicaSet"
        }
@@ -9745,6 +9973,18 @@
         "$ref": "#/definitions/io.k8s.kubernetes.federation.apis.federation.v1beta1.Cluster"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.federation.apis.federation.v1beta1.Cluster"
+       }
+      },
+      "202": {
+       "description": "Accepted",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.federation.apis.federation.v1beta1.Cluster"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -9945,6 +10185,12 @@
         "$ref": "#/definitions/io.k8s.kubernetes.federation.apis.federation.v1beta1.Cluster"
        }
       },
+      "201": {
+       "description": "Created",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.federation.apis.federation.v1beta1.Cluster"
+       }
+      },
       "401": {
        "description": "Unauthorized"
       }
@@ -10118,6 +10364,12 @@
      "responses": {
       "200": {
        "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/io.k8s.kubernetes.federation.apis.federation.v1beta1.Cluster"
+       }
+      },
+      "201": {
+       "description": "Created",
        "schema": {
         "$ref": "#/definitions/io.k8s.kubernetes.federation.apis.federation.v1beta1.Cluster"
        }

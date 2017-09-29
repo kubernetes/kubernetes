@@ -137,6 +137,16 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1alpha1.ExternalAdmissionHookConfiguration"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1alpha1.ExternalAdmissionHookConfiguration"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1alpha1.ExternalAdmissionHookConfiguration"
        }
       ],
       "produces": [
@@ -442,6 +452,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1alpha1.ExternalAdmissionHookConfiguration"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1alpha1.ExternalAdmissionHookConfiguration"
        }
       ],
@@ -816,6 +831,16 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1alpha1.InitializerConfiguration"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1alpha1.InitializerConfiguration"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1alpha1.InitializerConfiguration"
        }
       ],
       "produces": [
@@ -1121,6 +1146,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1alpha1.InitializerConfiguration"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1alpha1.InitializerConfiguration"
        }
       ],

@@ -176,6 +176,8 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 // Otherwise, the caller is assumed to have set up the Dependencies object and a default one will
 // not be generated.
 func Run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) error {
+	// To help debugging, immediately log version
+	glog.Infof("Version: %+v", version.Get())
 	if err := run(s, kubeDeps); err != nil {
 		return fmt.Errorf("failed to run Kubelet: %v", err)
 	}
@@ -712,10 +714,10 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 		if _, err := k.RunOnce(podCfg.Updates()); err != nil {
 			return fmt.Errorf("runonce failed: %v", err)
 		}
-		glog.Infof("Started kubelet %s as runonce", version.Get().String())
+		glog.Infof("Started kubelet as runonce")
 	} else {
 		startKubelet(k, podCfg, kubeCfg, kubeDeps)
-		glog.Infof("Started kubelet %s", version.Get().String())
+		glog.Infof("Started kubelet")
 	}
 	return nil
 }

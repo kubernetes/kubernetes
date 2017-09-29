@@ -153,6 +153,16 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1beta1.DaemonSet"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.DaemonSet"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1beta1.DaemonSet"
        }
       ],
       "produces": [
@@ -490,6 +500,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1beta1.DaemonSet"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1beta1.DaemonSet"
        }
       ],
@@ -1060,6 +1075,11 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1beta1.DaemonSet"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.DaemonSet"
        }
       ],
       "produces": [
@@ -1274,6 +1294,16 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1beta1.Deployment"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.Deployment"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
         "responseModel": "v1beta1.Deployment"
        }
       ],
@@ -1612,6 +1642,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1beta1.Deployment"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1beta1.Deployment"
        }
       ],
@@ -2135,6 +2170,16 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1beta1.DeploymentRollback"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.DeploymentRollback"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1beta1.DeploymentRollback"
        }
       ],
       "produces": [
@@ -2242,6 +2287,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1beta1.Scale"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1beta1.Scale"
        }
       ],
@@ -2407,6 +2457,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1beta1.Deployment"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1beta1.Deployment"
        }
       ],
@@ -2622,6 +2677,16 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1beta1.Ingress"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.Ingress"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
         "responseModel": "v1beta1.Ingress"
        }
       ],
@@ -2960,6 +3025,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1beta1.Ingress"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1beta1.Ingress"
        }
       ],
@@ -3530,6 +3600,11 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1beta1.Ingress"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.Ingress"
        }
       ],
       "produces": [
@@ -3744,6 +3819,16 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1beta1.NetworkPolicy"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.NetworkPolicy"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
         "responseModel": "v1beta1.NetworkPolicy"
        }
       ],
@@ -4082,6 +4167,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1beta1.NetworkPolicy"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1beta1.NetworkPolicy"
        }
       ],
@@ -4686,6 +4776,16 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1beta1.PodSecurityPolicy"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.PodSecurityPolicy"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1beta1.PodSecurityPolicy"
        }
       ],
       "produces": [
@@ -4991,6 +5091,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1beta1.PodSecurityPolicy"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1beta1.PodSecurityPolicy"
        }
       ],
@@ -5381,6 +5486,16 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1beta1.ReplicaSet"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.ReplicaSet"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1beta1.ReplicaSet"
        }
       ],
       "produces": [
@@ -5718,6 +5833,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1beta1.ReplicaSet"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1beta1.ReplicaSet"
        }
       ],
@@ -6288,6 +6408,11 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1beta1.Scale"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.Scale"
        }
       ],
       "produces": [
@@ -6453,6 +6578,11 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1beta1.ReplicaSet"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.ReplicaSet"
        }
       ],
       "produces": [
@@ -6617,6 +6747,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1beta1.Scale"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1beta1.Scale"
        }
       ],

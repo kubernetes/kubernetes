@@ -28,16 +28,6 @@ spec:
       hostNetwork: true
       nodeSelector:
         beta.kubernetes.io/kube-proxy-ds-ready: "true"
-      initContainers:
-      - name: touch-lock
-        image: busybox
-        command: ['/bin/touch', '/run/xtables.lock']
-        securityContext:
-          privileged: true
-        volumeMounts:
-        - mountPath: /run
-          name: run
-          readOnly: false
       containers:
       - name: kube-proxy
         image: {{pillar['kube_docker_registry']}}/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
@@ -73,7 +63,5 @@ spec:
       - name: xtables-lock
         hostPath:
           path: /run/xtables.lock
-      - name: run
-        hostPath:
-          path: /run
+          type: FileOrCreate
       serviceAccountName: kube-proxy

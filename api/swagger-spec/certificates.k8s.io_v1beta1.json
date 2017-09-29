@@ -137,6 +137,16 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1beta1.CertificateSigningRequest"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.CertificateSigningRequest"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1beta1.CertificateSigningRequest"
        }
       ],
       "produces": [
@@ -443,6 +453,11 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1beta1.CertificateSigningRequest"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.CertificateSigningRequest"
        }
       ],
       "produces": [
@@ -727,6 +742,11 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1beta1.CertificateSigningRequest"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1beta1.CertificateSigningRequest"
        }
       ],
       "produces": [
@@ -779,6 +799,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1beta1.CertificateSigningRequest"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1beta1.CertificateSigningRequest"
        }
       ],

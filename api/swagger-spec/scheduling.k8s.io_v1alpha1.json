@@ -137,6 +137,16 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1alpha1.PriorityClass"
+       },
+       {
+        "code": 201,
+        "message": "Created",
+        "responseModel": "v1alpha1.PriorityClass"
+       },
+       {
+        "code": 202,
+        "message": "Accepted",
+        "responseModel": "v1alpha1.PriorityClass"
        }
       ],
       "produces": [
@@ -442,6 +452,11 @@
        {
         "code": 200,
         "message": "OK",
+        "responseModel": "v1alpha1.PriorityClass"
+       },
+       {
+        "code": 201,
+        "message": "Created",
         "responseModel": "v1alpha1.PriorityClass"
        }
       ],

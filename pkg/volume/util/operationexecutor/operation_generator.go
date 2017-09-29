@@ -756,6 +756,9 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 				return expandErr
 			}
 			newSize = updatedSize
+			// k8s doesn't have transactions, we can't guarantee that after updating PV - updating PVC will be
+			// successful, that is why all PVCs for which pvc.Spec.Size > pvc.Status.Size must be reprocessed
+			// until they reflect user requested size in pvc.Status.Size
 			updateErr := resizeMap.UpdatePVSize(pvcWithResizeRequest, newSize)
 
 			if updateErr != nil {
@@ -766,6 +769,8 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 		}
 
 		// No Cloudprovider resize needed, lets mark resizing as done
+		// Rest of the volume expand controller code will assume PVC as *not* resized until pvc.Status.Size
+		// reflects user requested size.
 		if !volumePlugin.RequiresFSResize() {
 			glog.V(4).Infof("Controller resizing done for PVC %s", pvcWithResizeRequest.QualifiedName())
 			err := resizeMap.MarkAsResized(pvcWithResizeRequest, newSize)

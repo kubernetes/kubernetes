@@ -354,7 +354,7 @@ func (vs *VSphere) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddres
 
 // AddSSHKeyToAllInstances add SSH key to all instances
 func (vs *VSphere) AddSSHKeyToAllInstances(user string, keyData []byte) error {
-	return errors.New("unimplemented")
+	return cloudprovider.NotImplemented
 }
 
 // CurrentNodeName gives the current node name
@@ -380,7 +380,7 @@ func (vs *VSphere) ExternalID(nodeName k8stypes.NodeName) (string, error) {
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (vs *VSphere) InstanceExistsByProviderID(providerID string) (bool, error) {
-	return false, errors.New("unimplemented")
+	return false, cloudprovider.NotImplemented
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified Name.
@@ -412,8 +412,8 @@ func (vs *VSphere) InstanceID(nodeName k8stypes.NodeName) (string, error) {
 	if isActive {
 		return "/" + vm.InventoryPath, nil
 	}
-
-	return "", fmt.Errorf("The node %q is not active", nodeNameToVMName(nodeName))
+	glog.Warningf("The VM: %s is not in %s state", nodeNameToVMName(nodeName), vclib.ActivePowerState)
+	return "", cloudprovider.InstanceNotFound
 }
 
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID

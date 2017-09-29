@@ -17,7 +17,6 @@ limitations under the License.
 package openstack
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 
@@ -63,7 +62,7 @@ func (i *Instances) CurrentNodeName(hostname string) (types.NodeName, error) {
 }
 
 func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
-	return errors.New("unimplemented")
+	return cloudprovider.NotImplemented
 }
 
 func (i *Instances) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
@@ -117,7 +116,7 @@ func (i *Instances) ExternalID(name types.NodeName) (string, error) {
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (i *Instances) InstanceExistsByProviderID(providerID string) (bool, error) {
-	return false, errors.New("unimplemented")
+	return false, cloudprovider.NotImplemented
 }
 
 // InstanceID returns the kubelet's cloud provider ID.
