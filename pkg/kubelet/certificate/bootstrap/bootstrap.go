@@ -73,6 +73,17 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 	if err != nil {
 		return fmt.Errorf("unable to build bootstrap key path: %v", err)
 	}
+	// If we are unable to generate a CSR, we remove our key file and start fresh.
+	// This method is used before enabling client rotation and so we must ensure we
+	// can make forward progress if we crash and exit when a CSR exists but the cert
+	// it is signed for has expired.
+	defer func() {
+		if !success {
+			if err := os.Remove(keyPath); err != nil && !os.IsNotExist(err) {
+				glog.Warningf("Cannot clean up the key file %q: %v", keyPath, err)
+			}
+		}
+	}()
 	keyData, _, err := certutil.LoadOrGenerateKeyFile(keyPath)
 	if err != nil {
 		return err
@@ -83,6 +94,13 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 	if err != nil {
 		return fmt.Errorf("unable to build bootstrap client cert path: %v", err)
 	}
+	defer func() {
+		if !success {
+			if err := os.Remove(certPath); err != nil && !os.IsNotExist(err) {
+				glog.Warningf("Cannot clean up the cert file %q: %v", certPath, err)
+			}
+		}
+	}()
 	certData, err := csr.RequestNodeCertificate(bootstrapClient.CertificateSigningRequests(), keyData, nodeName)
 	if err != nil {
 		return err
@@ -90,13 +108,6 @@ func LoadClientCert(kubeconfigPath string, bootstrapPath string, certDir string,
 	if err := certutil.WriteCert(certPath, certData); err != nil {
 		return err
 	}
-	defer func() {
-		if !success {
-			if err := os.Remove(certPath); err != nil {
-				glog.Warningf("Cannot clean up the cert file %q: %v", certPath, err)
-			}
-		}
-	}()
 
 	// Get the CA data from the bootstrap client config.
 	caFile, caData := bootstrapClientConfig.CAFile, []byte{}
