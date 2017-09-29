@@ -64,16 +64,16 @@ var (
 	pvResource        = api.Resource("persistentvolumes")
 )
 
-func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (bool, string, error) {
+func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	nodeName, isNode := r.identifier.NodeIdentity(attrs.GetUser())
 	if !isNode {
 		// reject requests from non-nodes
-		return false, "", nil
+		return authorizer.DecisionNoOpinion, "", nil
 	}
 	if len(nodeName) == 0 {
 		// reject requests from unidentifiable nodes
 		glog.V(2).Infof("NODE DENY: unknown node for user %q", attrs.GetUser().GetName())
-		return false, fmt.Sprintf("unknown node for user %q", attrs.GetUser().GetName()), nil
+		return authorizer.DecisionNoOpinion, fmt.Sprintf("unknown node for user %q", attrs.GetUser().GetName()), nil
 	}
 
 	// subdivide access to specific resources
@@ -92,31 +92,34 @@ func (r *NodeAuthorizer) Authorize(attrs authorizer.Attributes) (bool, string, e
 	}
 
 	// Access to other resources is not subdivided, so just evaluate against the statically defined node rules
-	return rbac.RulesAllow(attrs, r.nodeRules...), "", nil
+	if rbac.RulesAllow(attrs, r.nodeRules...) {
+		return authorizer.DecisionAllow, "", nil
+	}
+	return authorizer.DecisionNoOpinion, "", nil
 }
 
 // authorizeGet authorizes "get" requests to objects of the specified type if they are related to the specified node
-func (r *NodeAuthorizer) authorizeGet(nodeName string, startingType vertexType, attrs authorizer.Attributes) (bool, string, error) {
+func (r *NodeAuthorizer) authorizeGet(nodeName string, startingType vertexType, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 	if attrs.GetVerb() != "get" || len(attrs.GetName()) == 0 {
 		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
-		return false, "can only get individual resources of this type", nil
+		return authorizer.DecisionNoOpinion, "can only get individual resources of this type", nil
 	}
 
 	if len(attrs.GetSubresource()) > 0 {
 		glog.V(2).Infof("NODE DENY: %s %#v", nodeName, attrs)
-		return false, "cannot get subresource", nil
+		return authorizer.DecisionNoOpinion, "cannot get subresource", nil
 	}
 
 	ok, err := r.hasPathFrom(nodeName, startingType, attrs.GetNamespace(), attrs.GetName())
 	if err != nil {
 		glog.V(2).Infof("NODE DENY: %v", err)
-		return false, "no path found to object", nil
+		return authorizer.DecisionNoOpinion, "no path found to object", nil
 	}
 	if !ok {
 		glog.V(2).Infof("NODE DENY: %q %#v", nodeName, attrs)
-		return false, "no path found to object", nil
+		return authorizer.DecisionNoOpinion, "no path found to object", nil
 	}
-	return ok, "", nil
+	return authorizer.DecisionAllow, "", nil
 }
 
 // hasPathFrom returns true if there is a directed path from the specified type/namespace/name to the specified Node

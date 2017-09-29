@@ -372,7 +372,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	// 1. The "root" user is allowed to do anything
 	// 2. ServiceAccounts named "ro" are allowed read-only operations in their namespace
 	// 3. ServiceAccounts named "rw" are allowed any operation in their namespace
-	authorizer := authorizer.AuthorizerFunc(func(attrs authorizer.Attributes) (bool, string, error) {
+	authorizer := authorizer.AuthorizerFunc(func(attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 		username := ""
 		if user := attrs.GetUser(); user != nil {
 			username = user.GetName()
@@ -382,7 +382,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 		// If the user is "root"...
 		if username == rootUserName {
 			// allow them to do anything
-			return true, "", nil
+			return authorizer.DecisionAllow, "", nil
 		}
 
 		// If the user is a service account...
@@ -392,15 +392,15 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 				switch serviceAccountName {
 				case readOnlyServiceAccountName:
 					if attrs.IsReadOnly() {
-						return true, "", nil
+						return authorizer.DecisionAllow, "", nil
 					}
 				case readWriteServiceAccountName:
-					return true, "", nil
+					return authorizer.DecisionAllow, "", nil
 				}
 			}
 		}
 
-		return false, fmt.Sprintf("User %s is denied (ns=%s, readonly=%v, resource=%s)", username, ns, attrs.IsReadOnly(), attrs.GetResource()), nil
+		return authorizer.DecisionNoOpinion, fmt.Sprintf("User %s is denied (ns=%s, readonly=%v, resource=%s)", username, ns, attrs.IsReadOnly(), attrs.GetResource()), nil
 	})
 
 	// Set up admission plugin to auto-assign serviceaccounts to pods
