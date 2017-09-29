@@ -22,6 +22,8 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -30,8 +32,12 @@ import (
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes/fake"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
+	core "k8s.io/client-go/testing"
 )
 
 type certificateData struct {
@@ -449,7 +455,7 @@ func TestInitializeCertificateSigningRequestClient(t *testing.T) {
 			bootstrapCert:           bootstrapCertData,
 			apiCert:                 apiServerCertData,
 			expectedCertBeforeStart: bootstrapCertData,
-			expectedCertAfterStart:  apiServerCertData,
+			expectedCertAfterStart:  bootstrapCertData,
 		},
 		{
 			description:             "Current certificate, no bootstrap certificate",
@@ -527,6 +533,42 @@ func TestInitializeCertificateSigningRequestClient(t *testing.T) {
 	}
 }
 
+func TestNewKubeletClientCertificateManager(t *testing.T) {
+	certDir, err := ioutil.TempDir("", "certs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(certDir)
+
+	manager, err := NewKubeletClientCertificateManager(certDir, types.NodeName("foo"), bootstrapCertData.certificatePEM, bootstrapCertData.keyPEM, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// make sure Current() returns a cert to us
+	if cert := manager.Current(); cert == nil {
+		t.Fatalf("Expected cert, got nil")
+	}
+
+	client := fake.NewSimpleClientset()
+	client.AddReactor("create", "certificatesigningrequests", func(action core.Action) (bool, runtime.Object, error) {
+		t.Logf("%#v", action)
+		return false, nil, nil
+	})
+
+	if err := manager.SetCertificateSigningRequestClient(client.Certificates().CertificateSigningRequests()); err != nil {
+		t.Fatal(err)
+	}
+
+	// make sure Start() doesn't block
+	manager.Start()
+
+	// make sure Current() returns a cert to us
+	if cert := manager.Current(); cert == nil {
+		t.Fatalf("Expected cert, got nil")
+	}
+}
+
 func TestInitializeOtherRESTClients(t *testing.T) {
 	var nilCertificate = &certificateData{}
 	testCases := []struct {
@@ -551,7 +593,7 @@ func TestInitializeOtherRESTClients(t *testing.T) {
 			bootstrapCert:           bootstrapCertData,
 			apiCert:                 apiServerCertData,
 			expectedCertBeforeStart: bootstrapCertData,
-			expectedCertAfterStart:  apiServerCertData,
+			expectedCertAfterStart:  bootstrapCertData,
 		},
 		{
 			description:             "Current certificate, no bootstrap certificate",

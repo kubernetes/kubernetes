@@ -276,7 +276,7 @@ func getCurrentCertificateOrBootstrap(
 		return nil, false, fmt.Errorf("unable to parse certificate data: %v", err)
 	}
 	bootstrapCert.Leaf = certs[0]
-	return &bootstrapCert, true, nil
+	return &bootstrapCert, false, nil
 }
 
 // shouldRotate looks at how close the current certificate is to expiring and
