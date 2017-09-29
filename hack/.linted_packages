@@ -88,6 +88,7 @@ pkg/apis/imagepolicy/install
 pkg/apis/networking/install
 pkg/apis/networking/validation
 pkg/apis/policy/install
+pkg/apis/rbac
 pkg/apis/rbac/install
 pkg/apis/rbac/v1alpha1
 pkg/apis/settings/install
