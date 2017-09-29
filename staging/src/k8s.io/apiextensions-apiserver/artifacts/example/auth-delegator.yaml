@@ -1,4 +1,4 @@
-apiVersion: rbac.authorization.k8s.io/v1alpha1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: apiextensions:system:auth-delegator
@@ -7,7 +7,6 @@ roleRef:
   kind: ClusterRole
   name: system:auth-delegator
 subjects:
-- apiVersion: v1
-  kind: ServiceAccount
+- kind: ServiceAccount
   name: apiserver
   namespace: apiextensions
