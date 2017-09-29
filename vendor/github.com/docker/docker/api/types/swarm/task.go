@@ -1,6 +1,10 @@
 package swarm
 
-import "time"
+import (
+	"time"
+
+	"github.com/docker/docker/api/types/swarm/runtime"
+)
 
 // TaskState represents the state of a task.
 type TaskState string
@@ -47,11 +51,16 @@ type Task struct {
 	Status              TaskStatus          `json:",omitempty"`
 	DesiredState        TaskState           `json:",omitempty"`
 	NetworksAttachments []NetworkAttachment `json:",omitempty"`
+	GenericResources    []GenericResource   `json:",omitempty"`
 }
 
 // TaskSpec represents the spec of a task.
 type TaskSpec struct {
-	ContainerSpec ContainerSpec             `json:",omitempty"`
+	// ContainerSpec and PluginSpec are mutually exclusive.
+	// PluginSpec will only be used when the `Runtime` field is set to `plugin`
+	ContainerSpec *ContainerSpec      `json:",omitempty"`
+	PluginSpec    *runtime.PluginSpec `json:",omitempty"`
+
 	Resources     *ResourceRequirements     `json:",omitempty"`
 	RestartPolicy *RestartPolicy            `json:",omitempty"`
 	Placement     *Placement                `json:",omitempty"`
@@ -65,12 +74,40 @@ type TaskSpec struct {
 	// ForceUpdate is a counter that triggers an update even if no relevant
 	// parameters have been changed.
 	ForceUpdate uint64
+
+	Runtime RuntimeType `json:",omitempty"`
 }
 
 // Resources represents resources (CPU/Memory).
 type Resources struct {
-	NanoCPUs    int64 `json:",omitempty"`
-	MemoryBytes int64 `json:",omitempty"`
+	NanoCPUs         int64             `json:",omitempty"`
+	MemoryBytes      int64             `json:",omitempty"`
+	GenericResources []GenericResource `json:",omitempty"`
+}
+
+// GenericResource represents a "user defined" resource which can
+// be either an integer (e.g: SSD=3) or a string (e.g: SSD=sda1)
+type GenericResource struct {
+	NamedResourceSpec    *NamedGenericResource    `json:",omitempty"`
+	DiscreteResourceSpec *DiscreteGenericResource `json:",omitempty"`
+}
+
+// NamedGenericResource represents a "user defined" resource which is defined
+// as a string.
+// "Kind" is used to describe the Kind of a resource (e.g: "GPU", "FPGA", "SSD", ...)
+// Value is used to identify the resource (GPU="UUID-1", FPGA="/dev/sdb5", ...)
+type NamedGenericResource struct {
+	Kind  string `json:",omitempty"`
+	Value string `json:",omitempty"`
+}
+
+// DiscreteGenericResource represents a "user defined" resource which is defined
+// as an integer
+// "Kind" is used to describe the Kind of a resource (e.g: "GPU", "FPGA", "SSD", ...)
+// Value is used to count the resource (SSD=5, HDD=3, ...)
+type DiscreteGenericResource struct {
+	Kind  string `json:",omitempty"`
+	Value int64  `json:",omitempty"`
 }
 
 // ResourceRequirements represents resources requirements.
@@ -81,7 +118,26 @@ type ResourceRequirements struct {
 
 // Placement represents orchestration parameters.
 type Placement struct {
-	Constraints []string `json:",omitempty"`
+	Constraints []string              `json:",omitempty"`
+	Preferences []PlacementPreference `json:",omitempty"`
+
+	// Platforms stores all the platforms that the image can run on.
+	// This field is used in the platform filter for scheduling. If empty,
+	// then the platform filter is off, meaning there are no scheduling restrictions.
+	Platforms []Platform `json:",omitempty"`
+}
+
+// PlacementPreference provides a way to make the scheduler aware of factors
+// such as topology.
+type PlacementPreference struct {
+	Spread *SpreadOver
+}
+
+// SpreadOver is a scheduling preference that instructs the scheduler to spread
+// tasks evenly over groups of nodes identified by labels.
+type SpreadOver struct {
+	// label descriptor, such as engine.labels.az
+	SpreadDescriptor string
 }
 
 // RestartPolicy represents the restart policy.

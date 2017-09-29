@@ -28,6 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+const (
+	// StatusTooManyRequests means the server experienced too many requests within a
+	// given window and that the client must wait to perform the action again.
+	StatusTooManyRequests = 429
+)
+
 // StatusError is an error intended for consumption by a REST API server; it can also be
 // reconstructed by clients from a REST response. Public to allow easy type switches.
 type StatusError struct {
@@ -128,6 +134,14 @@ func NewUnauthorized(reason string) *StatusError {
 
 // NewForbidden returns an error indicating the requested action was forbidden
 func NewForbidden(qualifiedResource schema.GroupResource, name string, err error) *StatusError {
+	var message string
+	if qualifiedResource.Empty() {
+		message = fmt.Sprintf("forbidden: %v", err)
+	} else if name == "" {
+		message = fmt.Sprintf("%s is forbidden: %v", qualifiedResource.String(), err)
+	} else {
+		message = fmt.Sprintf("%s %q is forbidden: %v", qualifiedResource.String(), name, err)
+	}
 	return &StatusError{metav1.Status{
 		Status: metav1.StatusFailure,
 		Code:   http.StatusForbidden,
@@ -137,7 +151,7 @@ func NewForbidden(qualifiedResource schema.GroupResource, name string, err error
 			Kind:  qualifiedResource.Resource,
 			Name:  name,
 		},
-		Message: fmt.Sprintf("%s %q is forbidden: %v", qualifiedResource.String(), name, err),
+		Message: message,
 	}}
 }
 
@@ -162,6 +176,17 @@ func NewGone(message string) *StatusError {
 		Status:  metav1.StatusFailure,
 		Code:    http.StatusGone,
 		Reason:  metav1.StatusReasonGone,
+		Message: message,
+	}}
+}
+
+// NewResourceExpired creates an error that indicates that the requested resource content has expired from
+// the server (usually due to a resourceVersion that is too old).
+func NewResourceExpired(message string) *StatusError {
+	return &StatusError{metav1.Status{
+		Status:  metav1.StatusFailure,
+		Code:    http.StatusGone,
+		Reason:  metav1.StatusReasonExpired,
 		Message: message,
 	}}
 }
@@ -290,6 +315,18 @@ func NewTimeoutError(message string, retryAfterSeconds int) *StatusError {
 	}}
 }
 
+// NewTooManyRequestsError returns an error indicating that the request was rejected because
+// the server has received too many requests. Client should wait and retry. But if the request
+// is perishable, then the client should not retry the request.
+func NewTooManyRequestsError(message string) *StatusError {
+	return &StatusError{metav1.Status{
+		Status:  metav1.StatusFailure,
+		Code:    StatusTooManyRequests,
+		Reason:  metav1.StatusReasonTooManyRequests,
+		Message: fmt.Sprintf("Too many requests: %s", message),
+	}}
+}
+
 // NewGenericServerResponse returns a new error for server responses that are not in a recognizable form.
 func NewGenericServerResponse(code int, verb string, qualifiedResource schema.GroupResource, name, serverMessage string, retryAfterSeconds int, isUnexpectedResponse bool) *StatusError {
 	reason := metav1.StatusReasonUnknown
@@ -386,10 +423,26 @@ func IsInvalid(err error) bool {
 	return reasonForError(err) == metav1.StatusReasonInvalid
 }
 
+// IsGone is true if the error indicates the requested resource is no longer available.
+func IsGone(err error) bool {
+	return reasonForError(err) == metav1.StatusReasonGone
+}
+
+// IsResourceExpired is true if the error indicates the resource has expired and the current action is
+// no longer possible.
+func IsResourceExpired(err error) bool {
+	return reasonForError(err) == metav1.StatusReasonExpired
+}
+
 // IsMethodNotSupported determines if the err is an error which indicates the provided action could not
 // be performed because it is not supported by the server.
 func IsMethodNotSupported(err error) bool {
 	return reasonForError(err) == metav1.StatusReasonMethodNotAllowed
+}
+
+// IsServiceUnavailable is true if the error indicates the underlying service is no longer available.
+func IsServiceUnavailable(err error) bool {
+	return reasonForError(err) == metav1.StatusReasonServiceUnavailable
 }
 
 // IsBadRequest determines if err is an error which indicates that the request is invalid.

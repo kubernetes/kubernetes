@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -16,7 +11,10 @@ go_library(
         "tables.go",
         "trieval.go",
     ],
+    cgo = True,
+    visibility = ["//visibility:public"],
     deps = [
+        "//vendor/golang.org/x/text/internal:go_default_library",
         "//vendor/golang.org/x/text/language:go_default_library",
         "//vendor/golang.org/x/text/transform:go_default_library",
         "//vendor/golang.org/x/text/unicode/norm:go_default_library",
@@ -34,4 +32,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

@@ -39,7 +39,7 @@ var _ = Describe("Getting the Resources", func() {
 		expectedData, err = openapi.NewOpenAPIData(d)
 		Expect(err).To(BeNil())
 
-		instance = openapi.NewOpenAPIGetter("", "", client)
+		instance = openapi.NewOpenAPIGetter(client)
 	})
 
 	Context("when the server returns a successful result", func() {

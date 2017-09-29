@@ -40,6 +40,7 @@ go_library(
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/client/listers/core/internalversion:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
+        "//pkg/kubeapiserver/admission/util:go_default_library",
         "//pkg/util/tolerations:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction/install:go_default_library",

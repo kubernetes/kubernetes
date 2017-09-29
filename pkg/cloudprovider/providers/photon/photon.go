@@ -421,11 +421,11 @@ func (pc *PCCloud) NodeAddresses(nodeName k8stypes.NodeName) ([]v1.NodeAddress, 
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (pc *PCCloud) NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error) {
-	return []v1.NodeAddress{}, errors.New("unimplemented")
+	return []v1.NodeAddress{}, cloudprovider.NotImplemented
 }
 
 func (pc *PCCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
-	return errors.New("unimplemented")
+	return cloudprovider.NotImplemented
 }
 
 func (pc *PCCloud) CurrentNodeName(hostname string) (k8stypes.NodeName, error) {
@@ -470,6 +470,12 @@ func (pc *PCCloud) ExternalID(nodeName k8stypes.NodeName) (string, error) {
 	}
 }
 
+// InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
+// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+func (pc *PCCloud) InstanceExistsByProviderID(providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
+}
+
 // InstanceID returns the cloud provider ID of the specified instance.
 func (pc *PCCloud) InstanceID(nodeName k8stypes.NodeName) (string, error) {
 	name := string(nodeName)
@@ -491,7 +497,7 @@ func (pc *PCCloud) InstanceID(nodeName k8stypes.NodeName) (string, error) {
 // This method will not be called from the node that is requesting this ID. i.e. metadata service
 // and other local methods cannot be used here
 func (pc *PCCloud) InstanceTypeByProviderID(providerID string) (string, error) {
-	return "", errors.New("unimplemented")
+	return "", cloudprovider.NotImplemented
 }
 
 func (pc *PCCloud) InstanceType(nodeName k8stypes.NodeName) (string, error) {
@@ -519,6 +525,20 @@ func (pc *PCCloud) Zones() (cloudprovider.Zones, bool) {
 
 func (pc *PCCloud) GetZone() (cloudprovider.Zone, error) {
 	return pc.Zone, nil
+}
+
+// GetZoneByProviderID implements Zones.GetZoneByProviderID
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (pc *PCCloud) GetZoneByProviderID(providerID string) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, errors.New("GetZoneByProviderID not implemented")
+}
+
+// GetZoneByNodeName implements Zones.GetZoneByNodeName
+// This is particularly useful in external cloud providers where the kubelet
+// does not initialize node data.
+func (pc *PCCloud) GetZoneByNodeName(nodeName k8stypes.NodeName) (cloudprovider.Zone, error) {
+	return cloudprovider.Zone{}, errors.New("GetZoneByNodeName not imeplemented")
 }
 
 // Routes returns a false since the interface is not supported for photon controller.
@@ -617,6 +637,10 @@ func (pc *PCCloud) DiskIsAttached(pdID string, nodeName k8stypes.NodeName) (bool
 	}
 
 	vmID, err := pc.InstanceID(nodeName)
+	if err == cloudprovider.InstanceNotFound {
+		glog.Infof("Instance %q does not exist, disk %s will be detached automatically.", nodeName, pdID)
+		return false, nil
+	}
 	if err != nil {
 		glog.Errorf("Photon Cloud Provider: pc.InstanceID failed for DiskIsAttached. Error[%v]", err)
 		return false, err
@@ -645,6 +669,11 @@ func (pc *PCCloud) DisksAreAttached(pdIDs []string, nodeName k8stypes.NodeName) 
 	}
 
 	vmID, err := pc.InstanceID(nodeName)
+	if err == cloudprovider.InstanceNotFound {
+		glog.Infof("Instance %q does not exist, its disks will be detached automatically.", nodeName)
+		// make all the disks as detached.
+		return attached, nil
+	}
 	if err != nil {
 		glog.Errorf("Photon Cloud Provider: pc.InstanceID failed for DiskIsAttached. Error[%v]", err)
 		return attached, err

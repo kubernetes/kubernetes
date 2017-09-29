@@ -1,4 +1,4 @@
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: heapster-binding
@@ -16,7 +16,7 @@ subjects:
 ---
 # Heapster's pod_nanny monitors the heapster deployment & its pod(s), and scales
 # the resources of the deployment if necessary.
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: system:pod-nanny
@@ -39,7 +39,7 @@ rules:
   - get
   - update
 ---
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: heapster-binding

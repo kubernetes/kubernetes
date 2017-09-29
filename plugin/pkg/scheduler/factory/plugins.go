@@ -23,12 +23,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
+
+	"github.com/golang/glog"
 )
 
 // PluginFactoryArgs are passed to all plugin factory functions.
@@ -46,7 +47,11 @@ type PluginFactoryArgs struct {
 }
 
 // MetadataProducerFactory produces MetadataProducer from the given args.
+// TODO: Rename this to PriorityMetadataProducerFactory.
 type MetadataProducerFactory func(PluginFactoryArgs) algorithm.MetadataProducer
+
+// PredicateMetadataProducerFactory produces PredicateMetadataProducer from the given args.
+type PredicateMetadataProducerFactory func(PluginFactoryArgs) algorithm.PredicateMetadataProducer
 
 // A FitPredicateFactory produces a FitPredicate from the given args.
 type FitPredicateFactory func(PluginFactoryArgs) algorithm.FitPredicate
@@ -72,14 +77,14 @@ var (
 	schedulerFactoryMutex sync.Mutex
 
 	// maps that hold registered algorithm types
-	fitPredicateMap          = make(map[string]FitPredicateFactory)
-	mandatoryFitPredicateMap = make(map[string]FitPredicateFactory)
-	priorityFunctionMap      = make(map[string]PriorityConfigFactory)
-	algorithmProviderMap     = make(map[string]AlgorithmProviderConfig)
+	fitPredicateMap        = make(map[string]FitPredicateFactory)
+	mandatoryFitPredicates = sets.NewString()
+	priorityFunctionMap    = make(map[string]PriorityConfigFactory)
+	algorithmProviderMap   = make(map[string]AlgorithmProviderConfig)
 
 	// Registered metadata producers
 	priorityMetadataProducer  MetadataProducerFactory
-	predicateMetadataProducer MetadataProducerFactory
+	predicateMetadataProducer PredicateMetadataProducerFactory
 
 	// get equivalence pod function
 	getEquivalencePodFunc algorithm.GetEquivalencePodFunc
@@ -107,7 +112,8 @@ func RegisterMandatoryFitPredicate(name string, predicate algorithm.FitPredicate
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	validateAlgorithmNameOrDie(name)
-	mandatoryFitPredicateMap[name] = func(PluginFactoryArgs) algorithm.FitPredicate { return predicate }
+	fitPredicateMap[name] = func(PluginFactoryArgs) algorithm.FitPredicate { return predicate }
+	mandatoryFitPredicates.Insert(name)
 	return name
 }
 
@@ -141,7 +147,7 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 				)
 
 				// Once we generate the predicate we should also Register the Precomputation
-				predicates.RegisterPredicatePrecomputation(policy.Name, precomputationFunction)
+				predicates.RegisterPredicateMetadataProducer(policy.Name, precomputationFunction)
 				return predicate
 			}
 		} else if policy.Argument.LabelsPresence != nil {
@@ -179,7 +185,7 @@ func RegisterPriorityMetadataProducerFactory(factory MetadataProducerFactory) {
 	priorityMetadataProducer = factory
 }
 
-func RegisterPredicateMetadataProducerFactory(factory MetadataProducerFactory) {
+func RegisterPredicateMetadataProducerFactory(factory PredicateMetadataProducerFactory) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	predicateMetadataProducer = factory
@@ -321,9 +327,9 @@ func getFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[st
 		predicates[name] = factory(args)
 	}
 
-	// Always include required fit predicates.
-	for name, factory := range mandatoryFitPredicateMap {
-		if _, found := predicates[name]; !found {
+	// Always include mandatory fit predicates.
+	for name := range mandatoryFitPredicates {
+		if factory, found := fitPredicateMap[name]; found {
 			predicates[name] = factory(args)
 		}
 	}
@@ -341,12 +347,12 @@ func getPriorityMetadataProducer(args PluginFactoryArgs) (algorithm.MetadataProd
 	return priorityMetadataProducer(args), nil
 }
 
-func getPredicateMetadataProducer(args PluginFactoryArgs) (algorithm.MetadataProducer, error) {
+func getPredicateMetadataProducer(args PluginFactoryArgs) (algorithm.PredicateMetadataProducer, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
 	if predicateMetadataProducer == nil {
-		return algorithm.EmptyMetadataProducer, nil
+		return algorithm.EmptyPredicateMetadataProducer, nil
 	}
 	return predicateMetadataProducer(args), nil
 }

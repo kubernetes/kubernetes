@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud/openstack"
 
+	"k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -102,6 +103,8 @@ type tokenRoundTripper struct {
 	tokenGetter TokenGetter
 }
 
+var _ net.RoundTripperWrapper = &tokenRoundTripper{}
+
 // RoundTrip adds the bearer token into the request.
 func (t *tokenRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	// if the authorization header already present, use it.
@@ -118,6 +121,8 @@ func (t *tokenRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 
 	return t.RoundTripper.RoundTrip(req)
 }
+
+func (t *tokenRoundTripper) WrappedRoundTripper() http.RoundTripper { return t.RoundTripper }
 
 // newOpenstackAuthProvider creates an auth provider which works with openstack
 // environment.

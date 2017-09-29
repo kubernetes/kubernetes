@@ -331,7 +331,7 @@ kube::util::group-version-to-pkg-path() {
     return
   fi
 
-  # "v1" is the API GroupVersion 
+  # "v1" is the API GroupVersion
   if [[ "${group_version}" == "v1" ]]; then
     echo "vendor/k8s.io/api/core/v1"
     return
@@ -437,6 +437,23 @@ kube::util::git_upstream_remote_name() {
     head -n 1 | awk '{print $1}'
 }
 
+# Ensures the current directory is a git tree for doing things like restoring or
+# validating godeps
+kube::util::create-fake-git-tree() {
+  local -r target_dir=${1:-$(pwd)}
+
+  pushd "${target_dir}" >/dev/null
+    git init >/dev/null
+    git config --local user.email "nobody@k8s.io"
+    git config --local user.name "$0"
+    git add . >/dev/null
+    git commit -q -m "Snapshot" >/dev/null
+    if (( ${KUBE_VERBOSE:-5} >= 6 )); then
+      kube::log::status "${target_dir} is now a git tree."
+    fi
+  popd >/dev/null
+}
+
 # Checks whether godep restore was run in the current GOPATH, i.e. that all referenced repos exist
 # and are checked out to the referenced rev.
 kube::util::godep_restored() {
@@ -505,7 +522,7 @@ kube::util::ensure_godep_version() {
   kube::util::ensure-temp-dir
   mkdir -p "${KUBE_TEMP}/go/src"
 
-  GOPATH="${KUBE_TEMP}/go" go get -d -u github.com/tools/godep 2>/dev/null
+  GOPATH="${KUBE_TEMP}/go" go get -d -u github.com/tools/godep
   pushd "${KUBE_TEMP}/go/src/github.com/tools/godep" >/dev/null
     git checkout -q "${GODEP_VERSION}"
     GOPATH="${KUBE_TEMP}/go" go install .
@@ -539,7 +556,7 @@ kube::util::go_install_from_commit() {
 
   kube::util::ensure-temp-dir
   mkdir -p "${KUBE_TEMP}/go/src"
-  GOPATH="${KUBE_TEMP}/go" go get -d -u "${pkg}" 2>/dev/null
+  GOPATH="${KUBE_TEMP}/go" go get -d -u "${pkg}"
   (
     cd "${KUBE_TEMP}/go/src/${pkg}"
     git checkout -q "${commit}"

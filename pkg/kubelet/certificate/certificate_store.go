@@ -101,7 +101,7 @@ func (s *fileStore) recover() error {
 		}
 		return err
 	} else if fi.Mode()&os.ModeSymlink != os.ModeSymlink {
-		return fmt.Errorf("expected %q to be a symlink but it is a file.", updatedPath)
+		return fmt.Errorf("expected %q to be a symlink but it is a file", updatedPath)
 	}
 
 	// Move the 'updated' symlink to 'current'.
@@ -184,7 +184,7 @@ func loadCertKeyBlocks(pairFile string) (cert *pem.Block, key *pem.Block, err er
 	if certBlock == nil {
 		return nil, nil, fmt.Errorf("could not decode the first block from %q from expected PEM format", pairFile)
 	}
-	keyBlock, rest := pem.Decode(rest)
+	keyBlock, _ := pem.Decode(rest)
 	if keyBlock == nil {
 		return nil, nil, fmt.Errorf("could not decode the second block from %q from expected PEM format", pairFile)
 	}

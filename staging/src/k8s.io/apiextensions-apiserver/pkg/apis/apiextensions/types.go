@@ -26,9 +26,10 @@ type CustomResourceDefinitionSpec struct {
 	Version string
 	// Names are the names used to describe this custom resource
 	Names CustomResourceDefinitionNames
-
 	// Scope indicates whether this resource is cluster or namespace scoped.  Default is namespaced
 	Scope ResourceScope
+	// Validation describes the validation methods for CustomResources
+	Validation *CustomResourceValidation
 }
 
 // CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition
@@ -138,4 +139,10 @@ type CustomResourceDefinitionList struct {
 
 	// Items individual CustomResourceDefinitions
 	Items []CustomResourceDefinition
+}
+
+// CustomResourceValidation is a list of validation methods for CustomResources.
+type CustomResourceValidation struct {
+	// OpenAPIV3Schema is the OpenAPI v3 schema to be validated against.
+	OpenAPIV3Schema *JSONSchemaProps
 }

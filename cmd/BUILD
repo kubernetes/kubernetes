@@ -16,7 +16,6 @@ filegroup(
         "//cmd/gendocs:all-srcs",
         "//cmd/genkubedocs:all-srcs",
         "//cmd/genman:all-srcs",
-        "//cmd/genslateyaml:all-srcs",
         "//cmd/genswaggertypedocs:all-srcs",
         "//cmd/genutils:all-srcs",
         "//cmd/genyaml:all-srcs",
@@ -31,7 +30,6 @@ filegroup(
         "//cmd/kubelet:all-srcs",
         "//cmd/kubemark:all-srcs",
         "//cmd/linkcheck:all-srcs",
-        "//cmd/mungedocs:all-srcs",
     ],
     tags = ["automanaged"],
 )

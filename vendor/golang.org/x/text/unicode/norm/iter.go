@@ -41,6 +41,7 @@ func (i *Iter) Init(f Form, src []byte) {
 	i.next = i.rb.f.nextMain
 	i.asciiF = nextASCIIBytes
 	i.info = i.rb.f.info(i.rb.src, i.p)
+	i.rb.ss.first(i.info)
 }
 
 // InitString initializes i to iterate over src after normalizing it to Form f.
@@ -56,11 +57,12 @@ func (i *Iter) InitString(f Form, src string) {
 	i.next = i.rb.f.nextMain
 	i.asciiF = nextASCIIString
 	i.info = i.rb.f.info(i.rb.src, i.p)
+	i.rb.ss.first(i.info)
 }
 
 // Seek sets the segment to be returned by the next call to Next to start
 // at position p.  It is the responsibility of the caller to set p to the
-// start of a UTF8 rune.
+// start of a segment.
 func (i *Iter) Seek(offset int64, whence int) (int64, error) {
 	var abs int64
 	switch whence {
@@ -84,6 +86,7 @@ func (i *Iter) Seek(offset int64, whence int) (int64, error) {
 	i.multiSeg = nil
 	i.next = i.rb.f.nextMain
 	i.info = i.rb.f.info(i.rb.src, i.p)
+	i.rb.ss.first(i.info)
 	return abs, nil
 }
 
@@ -161,6 +164,7 @@ func nextHangul(i *Iter) []byte {
 	if next >= i.rb.nsrc {
 		i.setDone()
 	} else if i.rb.src.hangul(next) == 0 {
+		i.rb.ss.next(i.info)
 		i.info = i.rb.f.info(i.rb.src, i.p)
 		i.next = i.rb.f.nextMain
 		return i.next(i)
@@ -204,12 +208,10 @@ func nextMultiNorm(i *Iter) []byte {
 		if info.BoundaryBefore() {
 			i.rb.compose()
 			seg := i.buf[:i.rb.flushCopy(i.buf[:])]
-			i.rb.ss.first(info)
 			i.rb.insertUnsafe(input{bytes: d}, j, info)
 			i.multiSeg = d[j+int(info.size):]
 			return seg
 		}
-		i.rb.ss.next(info)
 		i.rb.insertUnsafe(input{bytes: d}, j, info)
 		j += int(info.size)
 	}
@@ -222,9 +224,9 @@ func nextMultiNorm(i *Iter) []byte {
 func nextDecomposed(i *Iter) (next []byte) {
 	outp := 0
 	inCopyStart, outCopyStart := i.p, 0
-	ss := mkStreamSafe(i.info)
 	for {
 		if sz := int(i.info.size); sz <= 1 {
+			i.rb.ss = 0
 			p := i.p
 			i.p++ // ASCII or illegal byte.  Either way, advance by 1.
 			if i.p >= i.rb.nsrc {
@@ -243,6 +245,8 @@ func nextDecomposed(i *Iter) (next []byte) {
 			p := outp + len(d)
 			if outp > 0 {
 				i.rb.src.copySlice(i.buf[outCopyStart:], inCopyStart, i.p)
+				// TODO: this condition should not be possible, but we leave it
+				// in for defensive purposes.
 				if p > len(i.buf) {
 					return i.buf[:outp]
 				}
@@ -266,7 +270,7 @@ func nextDecomposed(i *Iter) (next []byte) {
 			} else {
 				i.info = i.rb.f.info(i.rb.src, i.p)
 			}
-			switch ss.next(i.info) {
+			switch i.rb.ss.next(i.info) {
 			case ssOverflow:
 				i.next = nextCGJDecompose
 				fallthrough
@@ -309,7 +313,7 @@ func nextDecomposed(i *Iter) (next []byte) {
 		}
 		prevCC := i.info.tccc
 		i.info = i.rb.f.info(i.rb.src, i.p)
-		if v := ss.next(i.info); v == ssStarter {
+		if v := i.rb.ss.next(i.info); v == ssStarter {
 			break
 		} else if v == ssOverflow {
 			i.next = nextCGJDecompose
@@ -335,10 +339,6 @@ doNorm:
 
 func doNormDecomposed(i *Iter) []byte {
 	for {
-		if s := i.rb.ss.next(i.info); s == ssOverflow {
-			i.next = nextCGJDecompose
-			break
-		}
 		i.rb.insertUnsafe(i.rb.src, i.p, i.info)
 		if i.p += int(i.info.size); i.p >= i.rb.nsrc {
 			i.setDone()
@@ -346,6 +346,10 @@ func doNormDecomposed(i *Iter) []byte {
 		}
 		i.info = i.rb.f.info(i.rb.src, i.p)
 		if i.info.ccc == 0 {
+			break
+		}
+		if s := i.rb.ss.next(i.info); s == ssOverflow {
+			i.next = nextCGJDecompose
 			break
 		}
 	}
@@ -357,6 +361,7 @@ func nextCGJDecompose(i *Iter) []byte {
 	i.rb.ss = 0
 	i.rb.insertCGJ()
 	i.next = nextDecomposed
+	i.rb.ss.first(i.info)
 	buf := doNormDecomposed(i)
 	return buf
 }
@@ -365,7 +370,6 @@ func nextCGJDecompose(i *Iter) []byte {
 func nextComposed(i *Iter) []byte {
 	outp, startp := 0, i.p
 	var prevCC uint8
-	ss := mkStreamSafe(i.info)
 	for {
 		if !i.info.isYesC() {
 			goto doNorm
@@ -385,11 +389,12 @@ func nextComposed(i *Iter) []byte {
 			i.setDone()
 			break
 		} else if i.rb.src._byte(i.p) < utf8.RuneSelf {
+			i.rb.ss = 0
 			i.next = i.asciiF
 			break
 		}
 		i.info = i.rb.f.info(i.rb.src, i.p)
-		if v := ss.next(i.info); v == ssStarter {
+		if v := i.rb.ss.next(i.info); v == ssStarter {
 			break
 		} else if v == ssOverflow {
 			i.next = nextCGJCompose
@@ -401,8 +406,10 @@ func nextComposed(i *Iter) []byte {
 	}
 	return i.returnSlice(startp, i.p)
 doNorm:
+	// reset to start position
 	i.p = startp
 	i.info = i.rb.f.info(i.rb.src, i.p)
+	i.rb.ss.first(i.info)
 	if i.info.multiSegment() {
 		d := i.info.Decomposition()
 		info := i.rb.f.info(input{bytes: d}, 0)

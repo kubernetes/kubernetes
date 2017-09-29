@@ -119,6 +119,13 @@ func getDefaultCNINetwork(pluginDir, binDir, vendorCNIDirPrefix string) (*cniNet
 				glog.Warningf("Error loading CNI config file %s: %v", confFile, err)
 				continue
 			}
+			// Ensure the config has a "type" so we know what plugin to run.
+			// Also catches the case where somebody put a conflist into a conf file.
+			if conf.Network.Type == "" {
+				glog.Warningf("Error loading CNI config file %s: no 'type'; perhaps this is a .conflist?", confFile)
+				continue
+			}
+
 			confList, err = libcni.ConfListFromConf(conf)
 			if err != nil {
 				glog.Warningf("Error converting CNI config file %s to list: %v", confFile, err)

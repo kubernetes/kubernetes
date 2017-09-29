@@ -133,6 +133,9 @@ func SetObjectDefaults_NodeList(in *v1.NodeList) {
 func SetObjectDefaults_PersistentVolume(in *v1.PersistentVolume) {
 	SetDefaults_PersistentVolume(in)
 	SetDefaults_ResourceList(&in.Spec.Capacity)
+	if in.Spec.PersistentVolumeSource.HostPath != nil {
+		SetDefaults_HostPathVolumeSource(in.Spec.PersistentVolumeSource.HostPath)
+	}
 	if in.Spec.PersistentVolumeSource.RBD != nil {
 		SetDefaults_RBDVolumeSource(in.Spec.PersistentVolumeSource.RBD)
 	}
@@ -174,6 +177,9 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 	for i := range in.Spec.Volumes {
 		a := &in.Spec.Volumes[i]
 		SetDefaults_Volume(a)
+		if a.VolumeSource.HostPath != nil {
+			SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+		}
 		if a.VolumeSource.Secret != nil {
 			SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
@@ -322,6 +328,9 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 	for i := range in.Template.Spec.Volumes {
 		a := &in.Template.Spec.Volumes[i]
 		SetDefaults_Volume(a)
+		if a.VolumeSource.HostPath != nil {
+			SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+		}
 		if a.VolumeSource.Secret != nil {
 			SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
@@ -464,6 +473,9 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 		for i := range in.Spec.Template.Spec.Volumes {
 			a := &in.Spec.Template.Spec.Volumes[i]
 			SetDefaults_Volume(a)
+			if a.VolumeSource.HostPath != nil {
+				SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+			}
 			if a.VolumeSource.Secret != nil {
 				SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 			}

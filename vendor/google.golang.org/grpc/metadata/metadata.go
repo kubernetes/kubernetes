@@ -32,49 +32,19 @@
  */
 
 // Package metadata define the structure of the metadata supported by gRPC library.
+// Please refer to http://www.grpc.io/docs/guides/wire.html for more information about custom-metadata.
 package metadata
 
 import (
-	"encoding/base64"
 	"fmt"
 	"strings"
 
 	"golang.org/x/net/context"
 )
 
-const (
-	binHdrSuffix = "-bin"
-)
-
-// encodeKeyValue encodes key and value qualified for transmission via gRPC.
-// Transmitting binary headers violates HTTP/2 spec.
-// TODO(zhaoq): Maybe check if k is ASCII also.
-func encodeKeyValue(k, v string) (string, string) {
-	k = strings.ToLower(k)
-	if strings.HasSuffix(k, binHdrSuffix) {
-		val := base64.StdEncoding.EncodeToString([]byte(v))
-		v = string(val)
-	}
-	return k, v
-}
-
-// DecodeKeyValue returns the original key and value corresponding to the
-// encoded data in k, v.
-// If k is a binary header and v contains comma, v is split on comma before decoded,
-// and the decoded v will be joined with comma before returned.
+// DecodeKeyValue returns k, v, nil.  It is deprecated and should not be used.
 func DecodeKeyValue(k, v string) (string, string, error) {
-	if !strings.HasSuffix(k, binHdrSuffix) {
-		return k, v, nil
-	}
-	vvs := strings.Split(v, ",")
-	for i, vv := range vvs {
-		val, err := base64.StdEncoding.DecodeString(vv)
-		if err != nil {
-			return "", "", err
-		}
-		vvs[i] = string(val)
-	}
-	return k, strings.Join(vvs, ","), nil
+	return k, v, nil
 }
 
 // MD is a mapping from metadata keys to values. Users should use the following
@@ -82,10 +52,11 @@ func DecodeKeyValue(k, v string) (string, string, error) {
 type MD map[string][]string
 
 // New creates a MD from given key-value map.
+// Keys are automatically converted to lowercase.
 func New(m map[string]string) MD {
 	md := MD{}
-	for k, v := range m {
-		key, val := encodeKeyValue(k, v)
+	for k, val := range m {
+		key := strings.ToLower(k)
 		md[key] = append(md[key], val)
 	}
 	return md
@@ -93,19 +64,19 @@ func New(m map[string]string) MD {
 
 // Pairs returns an MD formed by the mapping of key, value ...
 // Pairs panics if len(kv) is odd.
+// Keys are automatically converted to lowercase.
 func Pairs(kv ...string) MD {
 	if len(kv)%2 == 1 {
 		panic(fmt.Sprintf("metadata: Pairs got the odd number of input pairs for metadata: %d", len(kv)))
 	}
 	md := MD{}
-	var k string
+	var key string
 	for i, s := range kv {
 		if i%2 == 0 {
-			k = s
+			key = strings.ToLower(s)
 			continue
 		}
-		key, val := encodeKeyValue(k, s)
-		md[key] = append(md[key], val)
+		md[key] = append(md[key], s)
 	}
 	return md
 }
@@ -133,15 +104,41 @@ func Join(mds ...MD) MD {
 	return out
 }
 
-type mdKey struct{}
+type mdIncomingKey struct{}
+type mdOutgoingKey struct{}
 
-// NewContext creates a new context with md attached.
+// NewContext is a wrapper for NewOutgoingContext(ctx, md).  Deprecated.
 func NewContext(ctx context.Context, md MD) context.Context {
-	return context.WithValue(ctx, mdKey{}, md)
+	return NewOutgoingContext(ctx, md)
 }
 
-// FromContext returns the MD in ctx if it exists.
+// NewIncomingContext creates a new context with incoming md attached.
+func NewIncomingContext(ctx context.Context, md MD) context.Context {
+	return context.WithValue(ctx, mdIncomingKey{}, md)
+}
+
+// NewOutgoingContext creates a new context with outgoing md attached.
+func NewOutgoingContext(ctx context.Context, md MD) context.Context {
+	return context.WithValue(ctx, mdOutgoingKey{}, md)
+}
+
+// FromContext is a wrapper for FromIncomingContext(ctx).  Deprecated.
 func FromContext(ctx context.Context) (md MD, ok bool) {
-	md, ok = ctx.Value(mdKey{}).(MD)
+	return FromIncomingContext(ctx)
+}
+
+// FromIncomingContext returns the incoming MD in ctx if it exists.  The
+// returned md should be immutable, writing to it may cause races.
+// Modification should be made to the copies of the returned md.
+func FromIncomingContext(ctx context.Context) (md MD, ok bool) {
+	md, ok = ctx.Value(mdIncomingKey{}).(MD)
+	return
+}
+
+// FromOutgoingContext returns the outgoing MD in ctx if it exists.  The
+// returned md should be immutable, writing to it may cause races.
+// Modification should be made to the copies of the returned md.
+func FromOutgoingContext(ctx context.Context) (md MD, ok bool) {
+	md, ok = ctx.Value(mdOutgoingKey{}).(MD)
 	return
 }

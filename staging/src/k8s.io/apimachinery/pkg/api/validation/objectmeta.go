@@ -195,14 +195,9 @@ func ValidateInitializers(initializers *metav1.Initializers, fldPath *field.Path
 		return allErrs
 	}
 	for i, initializer := range initializers.Pending {
-		for _, msg := range validation.IsQualifiedName(initializer.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("pending").Index(i), initializer.Name, msg))
-		}
+		allErrs = append(allErrs, validation.IsFullyQualifiedName(fldPath.Child("pending").Index(i).Child("name"), initializer.Name)...)
 	}
 	allErrs = append(allErrs, validateInitializersResult(initializers.Result, fldPath.Child("result"))...)
-	if len(initializers.Pending) == 0 && initializers.Result == nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("pending"), nil, "must be non-empty when result is not set"))
-	}
 	return allErrs
 }
 
@@ -288,7 +283,7 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 	if newMeta.GetDeletionGracePeriodSeconds() != nil && (oldMeta.GetDeletionGracePeriodSeconds() == nil || *newMeta.GetDeletionGracePeriodSeconds() != *oldMeta.GetDeletionGracePeriodSeconds()) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("deletionGracePeriodSeconds"), newMeta.GetDeletionGracePeriodSeconds(), "field is immutable; may only be changed via deletion"))
 	}
-	if newMeta.GetDeletionTimestamp() != nil && (oldMeta.GetDeletionTimestamp() == nil || !newMeta.GetDeletionTimestamp().Equal(*oldMeta.GetDeletionTimestamp())) {
+	if newMeta.GetDeletionTimestamp() != nil && (oldMeta.GetDeletionTimestamp() == nil || !newMeta.GetDeletionTimestamp().Equal(oldMeta.GetDeletionTimestamp())) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("deletionTimestamp"), newMeta.GetDeletionTimestamp(), "field is immutable; may only be changed via deletion"))
 	}
 

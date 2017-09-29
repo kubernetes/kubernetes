@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 )
 
 type REST struct {
@@ -40,7 +39,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		NewFunc:                  func() runtime.Object { return &autoscaling.HorizontalPodAutoscaler{} },
 		NewListFunc:              func() runtime.Object { return &autoscaling.HorizontalPodAutoscalerList{} },
 		DefaultQualifiedResource: autoscaling.Resource("horizontalpodautoscalers"),
-		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("horizontalpodautoscalers"),
 
 		CreateStrategy: horizontalpodautoscaler.Strategy,
 		UpdateStrategy: horizontalpodautoscaler.Strategy,

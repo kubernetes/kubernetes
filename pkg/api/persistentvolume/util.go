@@ -37,13 +37,27 @@ func VisitPVSecretNames(pv *api.PersistentVolume, visitor Visitor) bool {
 	source := &pv.Spec.PersistentVolumeSource
 	switch {
 	case source.AzureFile != nil:
-		if len(source.AzureFile.SecretName) > 0 && !visitor(getClaimRefNamespace(pv), source.AzureFile.SecretName) {
-			return false
+		if source.AzureFile.SecretNamespace != nil && len(*source.AzureFile.SecretNamespace) > 0 {
+			if len(source.AzureFile.SecretName) > 0 && !visitor(*source.AzureFile.SecretNamespace, source.AzureFile.SecretName) {
+				return false
+			}
+		} else {
+			if len(source.AzureFile.SecretName) > 0 && !visitor(getClaimRefNamespace(pv), source.AzureFile.SecretName) {
+				return false
+			}
 		}
 		return true
 	case source.CephFS != nil:
-		if source.CephFS.SecretRef != nil && !visitor(getClaimRefNamespace(pv), source.CephFS.SecretRef.Name) {
-			return false
+		if source.CephFS.SecretRef != nil {
+			// previously persisted PV objects use claimRef namespace
+			ns := getClaimRefNamespace(pv)
+			if len(source.CephFS.SecretRef.Namespace) > 0 {
+				// use the secret namespace if namespace is set
+				ns = source.CephFS.SecretRef.Namespace
+			}
+			if !visitor(ns, source.CephFS.SecretRef.Name) {
+				return false
+			}
 		}
 	case source.FlexVolume != nil:
 		if source.FlexVolume.SecretRef != nil && !visitor(getClaimRefNamespace(pv), source.FlexVolume.SecretRef.Name) {

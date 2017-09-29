@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/kubectl/util/hash"
 )
 
 // SecretForDockerRegistryGeneratorV1 supports stable generation of a docker registry secret
@@ -37,6 +38,8 @@ type SecretForDockerRegistryGeneratorV1 struct {
 	Password string
 	// Server for registry (required)
 	Server string
+	// AppendHash; if true, derive a hash from the Secret and append it to the name
+	AppendHash bool
 }
 
 // Ensure it supports the generator pattern that uses parameter injection
@@ -51,6 +54,16 @@ func (s SecretForDockerRegistryGeneratorV1) Generate(genericParams map[string]in
 	if err != nil {
 		return nil, err
 	}
+	delegate := &SecretForDockerRegistryGeneratorV1{}
+	hashParam, found := genericParams["append-hash"]
+	if found {
+		hashBool, isBool := hashParam.(bool)
+		if !isBool {
+			return nil, fmt.Errorf("expected bool, found :%v", hashParam)
+		}
+		delegate.AppendHash = hashBool
+		delete(genericParams, "append-hash")
+	}
 	params := map[string]string{}
 	for key, value := range genericParams {
 		strVal, isString := value.(string)
@@ -59,13 +72,11 @@ func (s SecretForDockerRegistryGeneratorV1) Generate(genericParams map[string]in
 		}
 		params[key] = strVal
 	}
-	delegate := &SecretForDockerRegistryGeneratorV1{
-		Name:     params["name"],
-		Username: params["docker-username"],
-		Email:    params["docker-email"],
-		Password: params["docker-password"],
-		Server:   params["docker-server"],
-	}
+	delegate.Name = params["name"]
+	delegate.Username = params["docker-username"]
+	delegate.Email = params["docker-email"]
+	delegate.Password = params["docker-password"]
+	delegate.Server = params["docker-server"]
 	return delegate.StructuredGenerate()
 }
 
@@ -83,6 +94,13 @@ func (s SecretForDockerRegistryGeneratorV1) StructuredGenerate() (runtime.Object
 	secret.Type = api.SecretTypeDockercfg
 	secret.Data = map[string][]byte{}
 	secret.Data[api.DockerConfigKey] = dockercfgContent
+	if s.AppendHash {
+		h, err := hash.SecretHash(secret)
+		if err != nil {
+			return nil, err
+		}
+		secret.Name = fmt.Sprintf("%s-%s", secret.Name, h)
+	}
 	return secret, nil
 }
 
@@ -94,6 +112,7 @@ func (s SecretForDockerRegistryGeneratorV1) ParamNames() []GeneratorParam {
 		{"docker-email", false},
 		{"docker-password", true},
 		{"docker-server", true},
+		{"append-hash", false},
 	}
 }
 

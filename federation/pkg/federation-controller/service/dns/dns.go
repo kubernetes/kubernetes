@@ -182,6 +182,7 @@ func (s *ServiceDNSController) workerFunction() bool {
 	for _, clusterIngress := range ingress.Items {
 		err = s.ensureDNSRecords(clusterIngress.Cluster, service)
 		if err != nil {
+			runtime.HandleError(fmt.Errorf("Error when ensuring DNS records for service %s/%s: %v", service.Namespace, service.Name, err))
 			s.deliverService(service, 0, true)
 		}
 	}

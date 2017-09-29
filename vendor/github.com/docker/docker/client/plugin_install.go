@@ -15,7 +15,7 @@ import (
 // PluginInstall installs a plugin
 func (cli *Client) PluginInstall(ctx context.Context, name string, options types.PluginInstallOptions) (rc io.ReadCloser, err error) {
 	query := url.Values{}
-	if _, err := reference.ParseNamed(options.RemoteRef); err != nil {
+	if _, err := reference.ParseNormalizedNamed(options.RemoteRef); err != nil {
 		return nil, errors.Wrap(err, "invalid remote reference")
 	}
 	query.Set("remote", options.RemoteRef)
@@ -60,8 +60,8 @@ func (cli *Client) PluginInstall(ctx context.Context, name string, options types
 			return
 		}
 
-		err = cli.PluginEnable(ctx, name, types.PluginEnableOptions{Timeout: 0})
-		pw.CloseWithError(err)
+		enableErr := cli.PluginEnable(ctx, name, types.PluginEnableOptions{Timeout: 0})
+		pw.CloseWithError(enableErr)
 	}()
 	return pr, nil
 }

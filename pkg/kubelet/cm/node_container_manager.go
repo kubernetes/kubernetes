@@ -28,7 +28,9 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
@@ -53,7 +55,7 @@ func (cm *containerManagerImpl) createNodeAllocatableCgroups() error {
 	return nil
 }
 
-// Enforce Node Allocatable Cgroup settings.
+// enforceNodeAllocatableCgroups enforce Node Allocatable Cgroup settings.
 func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	nc := cm.NodeConfig.NodeAllocatableConfig
 
@@ -137,7 +139,7 @@ func enforceExistingCgroup(cgroupManager CgroupManager, cName string, rl v1.Reso
 	return nil
 }
 
-// Returns a ResourceConfig object that can be used to create or update cgroups via CgroupManager interface.
+// getCgroupConfig returns a ResourceConfig object that can be used to create or update cgroups via CgroupManager interface.
 func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
 	// TODO(vishh): Set CPU Quota if necessary.
 	if rl == nil {
@@ -154,6 +156,10 @@ func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
 		val := MilliCPUToShares(q.MilliValue())
 		rc.CpuShares = &val
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.HugePages) {
+		rc.HugePageLimit = HugePageLimits(rl)
+	}
+
 	return &rc
 }
 
@@ -180,7 +186,7 @@ func (cm *containerManagerImpl) getNodeAllocatableAbsolute() v1.ResourceList {
 
 }
 
-// GetNodeAllocatable returns amount of compute or storage resource that have to be reserved on this node from scheduling.
+// GetNodeAllocatableReservation returns amount of compute or storage resource that have to be reserved on this node from scheduling.
 func (cm *containerManagerImpl) GetNodeAllocatableReservation() v1.ResourceList {
 	evictionReservation := hardEvictionReservation(cm.HardEvictionThresholds, cm.capacity)
 	result := make(v1.ResourceList)
@@ -218,9 +224,9 @@ func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.Res
 			value := evictionapi.GetThresholdQuantity(threshold.Value, &memoryCapacity)
 			ret[v1.ResourceMemory] = *value
 		case evictionapi.SignalNodeFsAvailable:
-			storageCapacity := capacity[v1.ResourceStorageScratch]
+			storageCapacity := capacity[v1.ResourceEphemeralStorage]
 			value := evictionapi.GetThresholdQuantity(threshold.Value, &storageCapacity)
-			ret[v1.ResourceStorageScratch] = *value
+			ret[v1.ResourceEphemeralStorage] = *value
 		}
 	}
 	return ret

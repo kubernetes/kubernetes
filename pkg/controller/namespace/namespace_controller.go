@@ -183,14 +183,16 @@ func (nm *NamespaceController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer nm.queue.ShutDown()
 
+	glog.Infof("Starting namespace controller")
+	defer glog.Infof("Shutting down namespace controller")
+
 	if !controller.WaitForCacheSync("namespace", stopCh, nm.listerSynced) {
 		return
 	}
 
-	glog.V(5).Info("Starting workers")
+	glog.V(5).Info("Starting workers of namespace controller")
 	for i := 0; i < workers; i++ {
 		go wait.Until(nm.worker, time.Second, stopCh)
 	}
 	<-stopCh
-	glog.V(1).Infof("Shutting down")
 }

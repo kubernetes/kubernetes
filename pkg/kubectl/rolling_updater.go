@@ -772,12 +772,8 @@ type updateRcFunc func(controller *api.ReplicationController)
 // 3. Update the resource
 func updateRcWithRetries(rcClient coreclient.ReplicationControllersGetter, namespace string, rc *api.ReplicationController, applyUpdate updateRcFunc) (*api.ReplicationController, error) {
 	// Deep copy the rc in case we failed on Get during retry loop
-	obj, err := api.Scheme.Copy(rc)
-	if err != nil {
-		return nil, fmt.Errorf("failed to deep copy rc before updating it: %v", err)
-	}
-	oldRc := obj.(*api.ReplicationController)
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (e error) {
+	oldRc := rc.DeepCopy()
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() (e error) {
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(rc)
 		if rc, e = rcClient.ReplicationControllers(namespace).Update(rc); e == nil {
@@ -807,12 +803,8 @@ type updatePodFunc func(controller *api.Pod)
 // 3. Update the resource
 func updatePodWithRetries(podClient coreclient.PodsGetter, namespace string, pod *api.Pod, applyUpdate updatePodFunc) (*api.Pod, error) {
 	// Deep copy the pod in case we failed on Get during retry loop
-	obj, err := api.Scheme.Copy(pod)
-	if err != nil {
-		return nil, fmt.Errorf("failed to deep copy pod before updating it: %v", err)
-	}
-	oldPod := obj.(*api.Pod)
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (e error) {
+	oldPod := pod.DeepCopy()
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() (e error) {
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(pod)
 		if pod, e = podClient.Pods(namespace).Update(pod); e == nil {

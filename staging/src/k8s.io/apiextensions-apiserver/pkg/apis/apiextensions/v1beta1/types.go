@@ -26,9 +26,12 @@ type CustomResourceDefinitionSpec struct {
 	Version string `json:"version" protobuf:"bytes,2,opt,name=version"`
 	// Names are the names used to describe this custom resource
 	Names CustomResourceDefinitionNames `json:"names" protobuf:"bytes,3,opt,name=names"`
-
 	// Scope indicates whether this resource is cluster or namespace scoped.  Default is namespaced
 	Scope ResourceScope `json:"scope" protobuf:"bytes,4,opt,name=scope,casttype=ResourceScope"`
+	// Validation describes the validation methods for CustomResources
+	// This field is alpha-level and should only be sent to servers that enable the CustomResourceValidation feature.
+	// +optional
+	Validation *CustomResourceValidation `json:"validation,omitempty" protobuf:"bytes,5,opt,name=validation"`
 }
 
 // CustomResourceDefinitionNames indicates the names to serve this CustomResourceDefinition
@@ -138,4 +141,10 @@ type CustomResourceDefinitionList struct {
 
 	// Items individual CustomResourceDefinitions
 	Items []CustomResourceDefinition `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// CustomResourceValidation is a list of validation methods for CustomResources.
+type CustomResourceValidation struct {
+	// OpenAPIV3Schema is the OpenAPI v3 schema to be validated against.
+	OpenAPIV3Schema *JSONSchemaProps `json:"openAPIV3Schema,omitempty" protobuf:"bytes,1,opt,name=openAPIV3Schema"`
 }

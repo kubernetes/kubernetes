@@ -18,10 +18,10 @@ package selfhosting
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 
 	"k8s.io/api/core/v1"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -72,9 +72,8 @@ func TestMutatePodSpec(t *testing.T) {
 		},
 	}
 
-	cfg := &kubeadmapi.MasterConfiguration{}
 	for _, rt := range tests {
-		mutatePodSpec(cfg, rt.component, rt.podSpec)
+		mutatePodSpec(GetDefaultMutators(), rt.component, rt.podSpec)
 
 		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
 			t.Errorf("failed mutatePodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
@@ -110,9 +109,8 @@ func TestAddNodeSelectorToPodSpec(t *testing.T) {
 		},
 	}
 
-	cfg := &kubeadmapi.MasterConfiguration{}
 	for _, rt := range tests {
-		addNodeSelectorToPodSpec(cfg, rt.podSpec)
+		addNodeSelectorToPodSpec(rt.podSpec)
 
 		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
 			t.Errorf("failed addNodeSelectorToPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
@@ -148,9 +146,8 @@ func TestSetMasterTolerationOnPodSpec(t *testing.T) {
 		},
 	}
 
-	cfg := &kubeadmapi.MasterConfiguration{}
 	for _, rt := range tests {
-		setMasterTolerationOnPodSpec(cfg, rt.podSpec)
+		setMasterTolerationOnPodSpec(rt.podSpec)
 
 		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
 			t.Errorf("failed setMasterTolerationOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
@@ -179,12 +176,293 @@ func TestSetRightDNSPolicyOnPodSpec(t *testing.T) {
 		},
 	}
 
-	cfg := &kubeadmapi.MasterConfiguration{}
 	for _, rt := range tests {
-		setRightDNSPolicyOnPodSpec(cfg, rt.podSpec)
+		setRightDNSPolicyOnPodSpec(rt.podSpec)
 
 		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
 			t.Errorf("failed setRightDNSPolicyOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
+		}
+	}
+}
+
+func TestSetSelfHostedVolumesForAPIServer(t *testing.T) {
+	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
+	var tests = []struct {
+		podSpec  *v1.PodSpec
+		expected v1.PodSpec
+	}{
+		{
+			podSpec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "ca-certs",
+								MountPath: "/etc/ssl/certs",
+							},
+							{
+								Name:      "k8s-certs",
+								MountPath: "/etc/kubernetes/pki",
+							},
+						},
+						Command: []string{
+							"--foo=bar",
+						},
+					},
+				},
+				Volumes: []v1.Volume{
+					{
+						Name: "ca-certs",
+						VolumeSource: v1.VolumeSource{
+							HostPath: &v1.HostPathVolumeSource{
+								Path: "/etc/ssl/certs",
+								Type: &hostPathDirectoryOrCreate,
+							},
+						},
+					},
+					{
+						Name: "k8s-certs",
+						VolumeSource: v1.VolumeSource{
+							HostPath: &v1.HostPathVolumeSource{
+								Path: "/etc/kubernetes/pki",
+								Type: &hostPathDirectoryOrCreate,
+							},
+						},
+					},
+				},
+			},
+			expected: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "ca-certs",
+								MountPath: "/etc/ssl/certs",
+							},
+							{
+								Name:      "k8s-certs",
+								MountPath: "/etc/kubernetes/pki",
+							},
+						},
+						Command: []string{
+							"--foo=bar",
+						},
+					},
+				},
+				Volumes: []v1.Volume{
+					{
+						Name: "ca-certs",
+						VolumeSource: v1.VolumeSource{
+							HostPath: &v1.HostPathVolumeSource{
+								Path: "/etc/ssl/certs",
+								Type: &hostPathDirectoryOrCreate,
+							},
+						},
+					},
+					{
+						Name:         "k8s-certs",
+						VolumeSource: apiServerCertificatesVolumeSource(),
+					},
+				},
+			},
+		},
+	}
+
+	for _, rt := range tests {
+		setSelfHostedVolumesForAPIServer(rt.podSpec)
+		sort.Strings(rt.podSpec.Containers[0].Command)
+		sort.Strings(rt.expected.Containers[0].Command)
+
+		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
+			t.Errorf("failed setSelfHostedVolumesForAPIServer:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
+		}
+	}
+}
+
+func TestSetSelfHostedVolumesForControllerManager(t *testing.T) {
+	hostPathFileOrCreate := v1.HostPathFileOrCreate
+	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
+	var tests = []struct {
+		podSpec  *v1.PodSpec
+		expected v1.PodSpec
+	}{
+		{
+			podSpec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "ca-certs",
+								MountPath: "/etc/ssl/certs",
+							},
+							{
+								Name:      "k8s-certs",
+								MountPath: "/etc/kubernetes/pki",
+							},
+							{
+								Name:      "kubeconfig",
+								MountPath: "/etc/kubernetes/controller-manager.conf",
+							},
+						},
+						Command: []string{
+							"--kubeconfig=/etc/kubernetes/controller-manager.conf",
+							"--foo=bar",
+						},
+					},
+				},
+				Volumes: []v1.Volume{
+					{
+						Name: "ca-certs",
+						VolumeSource: v1.VolumeSource{
+							HostPath: &v1.HostPathVolumeSource{
+								Path: "/etc/ssl/certs",
+								Type: &hostPathDirectoryOrCreate,
+							},
+						},
+					},
+					{
+						Name: "k8s-certs",
+						VolumeSource: v1.VolumeSource{
+							HostPath: &v1.HostPathVolumeSource{
+								Path: "/etc/kubernetes/pki",
+								Type: &hostPathDirectoryOrCreate,
+							},
+						},
+					},
+					{
+						Name: "kubeconfig",
+						VolumeSource: v1.VolumeSource{
+							HostPath: &v1.HostPathVolumeSource{
+								Path: "/etc/kubernetes/controller-manager.conf",
+								Type: &hostPathFileOrCreate,
+							},
+						},
+					},
+				},
+			},
+			expected: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "ca-certs",
+								MountPath: "/etc/ssl/certs",
+							},
+							{
+								Name:      "k8s-certs",
+								MountPath: "/etc/kubernetes/pki",
+							},
+							{
+								Name:      "kubeconfig",
+								MountPath: "/etc/kubernetes/kubeconfig",
+							},
+						},
+						Command: []string{
+							"--kubeconfig=/etc/kubernetes/kubeconfig/controller-manager.conf",
+							"--foo=bar",
+						},
+					},
+				},
+				Volumes: []v1.Volume{
+					{
+						Name: "ca-certs",
+						VolumeSource: v1.VolumeSource{
+							HostPath: &v1.HostPathVolumeSource{
+								Path: "/etc/ssl/certs",
+								Type: &hostPathDirectoryOrCreate,
+							},
+						},
+					},
+					{
+						Name:         "k8s-certs",
+						VolumeSource: controllerManagerCertificatesVolumeSource(),
+					},
+					{
+						Name:         "kubeconfig",
+						VolumeSource: kubeConfigVolumeSource(kubeadmconstants.ControllerManagerKubeConfigFileName),
+					},
+				},
+			},
+		},
+	}
+
+	for _, rt := range tests {
+		setSelfHostedVolumesForControllerManager(rt.podSpec)
+		sort.Strings(rt.podSpec.Containers[0].Command)
+		sort.Strings(rt.expected.Containers[0].Command)
+
+		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
+			t.Errorf("failed setSelfHostedVolumesForControllerManager:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
+		}
+	}
+}
+
+func TestSetSelfHostedVolumesForScheduler(t *testing.T) {
+	hostPathFileOrCreate := v1.HostPathFileOrCreate
+	var tests = []struct {
+		podSpec  *v1.PodSpec
+		expected v1.PodSpec
+	}{
+		{
+			podSpec: &v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "kubeconfig",
+								MountPath: "/etc/kubernetes/scheduler.conf",
+							},
+						},
+						Command: []string{
+							"--kubeconfig=/etc/kubernetes/scheduler.conf",
+							"--foo=bar",
+						},
+					},
+				},
+				Volumes: []v1.Volume{
+					{
+						Name: "kubeconfig",
+						VolumeSource: v1.VolumeSource{
+							HostPath: &v1.HostPathVolumeSource{
+								Path: "/etc/kubernetes/scheduler.conf",
+								Type: &hostPathFileOrCreate,
+							},
+						},
+					},
+				},
+			},
+			expected: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						VolumeMounts: []v1.VolumeMount{
+							{
+								Name:      "kubeconfig",
+								MountPath: "/etc/kubernetes/kubeconfig",
+							},
+						},
+						Command: []string{
+							"--kubeconfig=/etc/kubernetes/kubeconfig/scheduler.conf",
+							"--foo=bar",
+						},
+					},
+				},
+				Volumes: []v1.Volume{
+					{
+						Name:         "kubeconfig",
+						VolumeSource: kubeConfigVolumeSource(kubeadmconstants.SchedulerKubeConfigFileName),
+					},
+				},
+			},
+		},
+	}
+
+	for _, rt := range tests {
+		setSelfHostedVolumesForScheduler(rt.podSpec)
+		sort.Strings(rt.podSpec.Containers[0].Command)
+		sort.Strings(rt.expected.Containers[0].Command)
+
+		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
+			t.Errorf("failed setSelfHostedVolumesForScheduler:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
 		}
 	}
 }

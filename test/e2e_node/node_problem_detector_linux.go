@@ -161,6 +161,8 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 			By("Create the node problem detector")
+			hostPathType := new(v1.HostPathType)
+			*hostPathType = v1.HostPathType(string(v1.HostPathFileOrCreate))
 			f.PodClient().CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
@@ -186,7 +188,10 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 						{
 							Name: localtimeVolume,
 							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{Path: etcLocaltime},
+								HostPath: &v1.HostPathVolumeSource{
+									Path: etcLocaltime,
+									Type: hostPathType,
+								},
 							},
 						},
 					},

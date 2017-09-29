@@ -86,6 +86,12 @@ func (az *Cloud) ExternalID(name types.NodeName) (string, error) {
 	return az.InstanceID(name)
 }
 
+// InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
+// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+func (az *Cloud) InstanceExistsByProviderID(providerID string) (bool, error) {
+	return false, cloudprovider.NotImplemented
+}
+
 func (az *Cloud) isCurrentInstance(name types.NodeName) (bool, error) {
 	nodeName := mapNodeNameToVMName(name)
 	metadataName, err := az.metadata.Text("instance/compute/name")
@@ -138,7 +144,7 @@ func (az *Cloud) InstanceTypeByProviderID(providerID string) (string, error) {
 		return "", err
 	}
 
-	return az.InstanceID(name)
+	return az.InstanceType(name)
 }
 
 // InstanceType returns the type of the specified instance.

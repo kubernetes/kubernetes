@@ -29,7 +29,7 @@ func (cli *Client) VolumesPrune(ctx context.Context, pruneFilters filters.Args) 
 	defer ensureReaderClosed(serverResp)
 
 	if err := json.NewDecoder(serverResp.body).Decode(&report); err != nil {
-		return report, fmt.Errorf("Error retrieving disk usage: %v", err)
+		return report, fmt.Errorf("Error retrieving volume prune report: %v", err)
 	}
 
 	return report, nil

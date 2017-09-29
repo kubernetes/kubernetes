@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
+	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	utiltest "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/test"
 )
 
@@ -92,6 +93,11 @@ func TestRemoteConfigMapUID(t *testing.T) {
 }
 
 func TestRemoteConfigMapDownload(t *testing.T) {
+	_, kubeletCodecs, err := kubeletscheme.NewSchemeAndCodecs()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	cm := &apiv1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "name",
@@ -110,7 +116,7 @@ func TestRemoteConfigMapDownload(t *testing.T) {
 		// object doesn't exist
 		{"object doesn't exist",
 			&remoteConfigMap{&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "bogus", Namespace: "namespace", UID: "bogus"}}},
-			nil, "could not download ConfigMap"},
+			nil, "failed to download ConfigMap"},
 		// UID of downloaded object doesn't match UID of referent found via namespace/name
 		{"UID is incorrect for namespace/name",
 			&remoteConfigMap{&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "bogus"}}},
@@ -118,7 +124,7 @@ func TestRemoteConfigMapDownload(t *testing.T) {
 		// successful download
 		{"object exists and reference is correct",
 			&remoteConfigMap{&apiv1.NodeConfigSource{ConfigMapRef: &apiv1.ObjectReference{Name: "name", Namespace: "namespace", UID: "uid"}}},
-			&configMapCheckpoint{cm}, ""},
+			&configMapCheckpoint{kubeletCodecs, cm}, ""},
 	}
 
 	for _, c := range cases {

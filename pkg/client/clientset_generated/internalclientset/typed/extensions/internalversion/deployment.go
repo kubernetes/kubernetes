@@ -42,6 +42,9 @@ type DeploymentInterface interface {
 	List(opts v1.ListOptions) (*extensions.DeploymentList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.Deployment, err error)
+	GetScale(deploymentName string, options v1.GetOptions) (*extensions.Scale, error)
+	UpdateScale(deploymentName string, scale *extensions.Scale) (*extensions.Scale, error)
+
 	DeploymentExpansion
 }
 
@@ -166,6 +169,34 @@ func (c *deployments) Patch(name string, pt types.PatchType, data []byte, subres
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Do().
+		Into(result)
+	return
+}
+
+// GetScale takes name of the deployment, and returns the corresponding extensions.Scale object, and an error if there is any.
+func (c *deployments) GetScale(deploymentName string, options v1.GetOptions) (result *extensions.Scale, err error) {
+	result = &extensions.Scale{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("deployments").
+		Name(deploymentName).
+		SubResource("scale").
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
+func (c *deployments) UpdateScale(deploymentName string, scale *extensions.Scale) (result *extensions.Scale, err error) {
+	result = &extensions.Scale{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("deployments").
+		Name(deploymentName).
+		SubResource("scale").
+		Body(scale).
 		Do().
 		Into(result)
 	return

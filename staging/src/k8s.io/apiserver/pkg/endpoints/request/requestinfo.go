@@ -24,6 +24,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+type RequestInfoResolver interface {
+	NewRequestInfo(req *http.Request) (*RequestInfo, error)
+}
+
 // RequestInfo holds information parsed from the http.Request
 type RequestInfo struct {
 	// IsResourceRequest indicates whether or not the request is for an API resource or subresource

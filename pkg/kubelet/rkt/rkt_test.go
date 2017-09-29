@@ -1073,8 +1073,8 @@ func TestSetApp(t *testing.T) {
 				Command:    []string{"/bin/bar", "$(env-bar)"},
 				WorkingDir: tmpDir,
 				Resources: v1.ResourceRequirements{
-					Limits:   v1.ResourceList{"cpu": resource.MustParse("50m"), "memory": resource.MustParse("50M")},
-					Requests: v1.ResourceList{"cpu": resource.MustParse("5m"), "memory": resource.MustParse("5M")},
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m"), v1.ResourceMemory: resource.MustParse("50M")},
+					Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m"), v1.ResourceMemory: resource.MustParse("5M")},
 				},
 			},
 			mountPoints: []appctypes.MountPoint{
@@ -1137,8 +1137,8 @@ func TestSetApp(t *testing.T) {
 				Args:       []string{"hello", "world", "$(env-bar)"},
 				WorkingDir: tmpDir,
 				Resources: v1.ResourceRequirements{
-					Limits:   v1.ResourceList{"cpu": resource.MustParse("50m")},
-					Requests: v1.ResourceList{"memory": resource.MustParse("5M")},
+					Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("50m")},
+					Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("5M")},
 				},
 			},
 			mountPoints: []appctypes.MountPoint{
@@ -1636,7 +1636,7 @@ func TestGarbageCollect(t *testing.T) {
 	fs := newFakeSystemd()
 	cli := newFakeRktCli()
 	fakeOS := kubetesting.NewFakeOS()
-	getter := newFakePodGetter()
+	deletionProvider := newFakePodDeletionProvider()
 	fug := newfakeUnitGetter()
 	frh := &containertesting.FakeRuntimeHelper{}
 
@@ -1644,7 +1644,7 @@ func TestGarbageCollect(t *testing.T) {
 		os:                  fakeOS,
 		cli:                 cli,
 		apisvc:              fr,
-		podGetter:           getter,
+		podDeletionProvider: deletionProvider,
 		systemd:             fs,
 		containerRefManager: kubecontainer.NewRefManager(),
 		unitGetter:          fug,
@@ -1830,7 +1830,7 @@ func TestGarbageCollect(t *testing.T) {
 
 		fr.pods = tt.pods
 		for _, p := range tt.apiPods {
-			getter.pods[p.UID] = p
+			deletionProvider.pods[p.UID] = struct{}{}
 		}
 
 		allSourcesReady := true
@@ -1862,7 +1862,7 @@ func TestGarbageCollect(t *testing.T) {
 		ctrl.Finish()
 		fakeOS.Removes = []string{}
 		fs.resetFailedUnits = []string{}
-		getter.pods = make(map[kubetypes.UID]*v1.Pod)
+		deletionProvider.pods = make(map[kubetypes.UID]struct{})
 	}
 }
 

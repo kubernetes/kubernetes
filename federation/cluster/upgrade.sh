@@ -19,9 +19,6 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-# For `kube::log::status` function since it already sources
-# "${KUBE_ROOT}/cluster/lib/logging.sh"
-source "${KUBE_ROOT}/cluster/common.sh"
 # For $FEDERATION_NAME, $FEDERATION_NAMESPACE, $HOST_CLUSTER_CONTEXT,
 source "${KUBE_ROOT}/federation/cluster/common.sh"
 

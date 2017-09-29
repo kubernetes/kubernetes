@@ -5,12 +5,14 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 )
 
-// GetResult temporarily stores a Get response.
+// GetResult is the response from a Get operation. Call its Extract method to
+// interpret it as an Image.
 type GetResult struct {
 	gophercloud.Result
 }
 
-// DeleteResult represents the result of an image.Delete operation.
+// DeleteResult is the result from a Delete operation. Call its ExtractErr
+// method to determine if the call succeeded or failed.
 type DeleteResult struct {
 	gophercloud.ErrResult
 }
@@ -24,44 +26,53 @@ func (r GetResult) Extract() (*Image, error) {
 	return s.Image, err
 }
 
-// Image is used for JSON (un)marshalling.
-// It provides a description of an OS image.
+// Image represents an Image returned by the Compute API.
 type Image struct {
-	// ID contains the image's unique identifier.
+	// ID is the unique ID of an image.
 	ID string
 
+	// Created is the date when the image was created.
 	Created string
 
-	// MinDisk and MinRAM specify the minimum resources a server must provide to be able to install the image.
+	// MinDisk is the minimum amount of disk a flavor must have to be able
+	// to create a server based on the image, measured in GB.
 	MinDisk int
-	MinRAM  int
+
+	// MinRAM is the minimum amount of RAM a flavor must have to be able
+	// to create a server based on the image, measured in MB.
+	MinRAM int
 
 	// Name provides a human-readable moniker for the OS image.
 	Name string
 
 	// The Progress and Status fields indicate image-creation status.
-	// Any usable image will have 100% progress.
 	Progress int
-	Status   string
 
+	// Status is the current status of the image.
+	Status string
+
+	// Update is the date when the image was updated.
 	Updated string
 
+	// Metadata provides free-form key/value pairs that further describe the
+	// image.
 	Metadata map[string]interface{}
 }
 
-// ImagePage contains a single page of results from a List operation.
-// Use ExtractImages to convert it into a slice of usable structs.
+// ImagePage contains a single page of all Images returne from a ListDetail
+// operation. Use ExtractImages to convert it into a slice of usable structs.
 type ImagePage struct {
 	pagination.LinkedPageBase
 }
 
-// IsEmpty returns true if a page contains no Image results.
+// IsEmpty returns true if an ImagePage contains no Image results.
 func (page ImagePage) IsEmpty() (bool, error) {
 	images, err := ExtractImages(page)
 	return len(images) == 0, err
 }
 
-// NextPageURL uses the response's embedded link reference to navigate to the next page of results.
+// NextPageURL uses the response's embedded link reference to navigate to the
+// next page of results.
 func (page ImagePage) NextPageURL() (string, error) {
 	var s struct {
 		Links []gophercloud.Link `json:"images_links"`
@@ -73,7 +84,8 @@ func (page ImagePage) NextPageURL() (string, error) {
 	return gophercloud.ExtractNextURL(s.Links)
 }
 
-// ExtractImages converts a page of List results into a slice of usable Image structs.
+// ExtractImages converts a page of List results into a slice of usable Image
+// structs.
 func ExtractImages(r pagination.Page) ([]Image, error) {
 	var s struct {
 		Images []Image `json:"images"`

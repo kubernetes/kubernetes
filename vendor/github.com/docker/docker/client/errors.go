@@ -228,8 +228,8 @@ func IsErrPluginPermissionDenied(err error) bool {
 // NewVersionError returns an error if the APIVersion required
 // if less than the current supported version
 func (cli *Client) NewVersionError(APIrequired, feature string) error {
-	if versions.LessThan(cli.version, APIrequired) {
-		return fmt.Errorf("%q requires API version %s, but the Docker server is version %s", feature, APIrequired, cli.version)
+	if cli.version != "" && versions.LessThan(cli.version, APIrequired) {
+		return fmt.Errorf("%q requires API version %s, but the Docker daemon API version is %s", feature, APIrequired, cli.version)
 	}
 	return nil
 }
@@ -244,7 +244,7 @@ func (e secretNotFoundError) Error() string {
 	return fmt.Sprintf("Error: no such secret: %s", e.name)
 }
 
-// NoFound indicates that this error type is of NotFound
+// NotFound indicates that this error type is of NotFound
 func (e secretNotFoundError) NotFound() bool {
 	return true
 }
@@ -253,6 +253,28 @@ func (e secretNotFoundError) NotFound() bool {
 // when a secret is not found.
 func IsErrSecretNotFound(err error) bool {
 	_, ok := err.(secretNotFoundError)
+	return ok
+}
+
+// configNotFoundError implements an error returned when a config is not found.
+type configNotFoundError struct {
+	name string
+}
+
+// Error returns a string representation of a configNotFoundError
+func (e configNotFoundError) Error() string {
+	return fmt.Sprintf("Error: no such config: %s", e.name)
+}
+
+// NotFound indicates that this error type is of NotFound
+func (e configNotFoundError) NotFound() bool {
+	return true
+}
+
+// IsErrConfigNotFound returns true if the error is caused
+// when a config is not found.
+func IsErrConfigNotFound(err error) bool {
+	_, ok := err.(configNotFoundError)
 	return ok
 }
 

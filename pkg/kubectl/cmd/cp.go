@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -195,6 +195,8 @@ func makeTar(filepath string, writer io.Writer) error {
 	// TODO: use compression here?
 	tarWriter := tar.NewWriter(writer)
 	defer tarWriter.Close()
+
+	filepath = path.Clean(filepath)
 	return recursiveTar(path.Dir(filepath), path.Base(filepath), tarWriter)
 }
 
@@ -257,8 +259,12 @@ func untarAll(reader io.Reader, destFile, prefix string) error {
 		if err != nil {
 			return err
 		}
-		defer outFile.Close()
-		io.Copy(outFile, tarReader)
+		if _, err := io.Copy(outFile, tarReader); err != nil {
+			return err
+		}
+		if err := outFile.Close(); err != nil {
+			return err
+		}
 	}
 	return nil
 }

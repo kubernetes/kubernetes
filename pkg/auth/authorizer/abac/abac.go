@@ -28,6 +28,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	api "k8s.io/kubernetes/pkg/apis/abac"
 	_ "k8s.io/kubernetes/pkg/apis/abac/latest"
@@ -114,7 +115,7 @@ func NewFromFile(path string) (policyList, error) {
 }
 
 func matches(p api.Policy, a authorizer.Attributes) bool {
-	if subjectMatches(p, a) {
+	if subjectMatches(p, a.GetUser()) {
 		if verbMatches(p, a) {
 			// Resource and non-resource requests are mutually exclusive, at most one will match a policy
 			if resourceMatches(p, a) {
@@ -129,15 +130,14 @@ func matches(p api.Policy, a authorizer.Attributes) bool {
 }
 
 // subjectMatches returns true if specified user and group properties in the policy match the attributes
-func subjectMatches(p api.Policy, a authorizer.Attributes) bool {
+func subjectMatches(p api.Policy, user user.Info) bool {
 	matched := false
 
-	username := ""
-	groups := []string{}
-	if user := a.GetUser(); user != nil {
-		username = user.GetName()
-		groups = user.GetGroups()
+	if user == nil {
+		return false
 	}
+	username := user.GetName()
+	groups := user.GetGroups()
 
 	// If the policy specified a user, ensure it matches
 	if len(p.Spec.User) > 0 {
@@ -231,4 +231,43 @@ func (pl policyList) Authorize(a authorizer.Attributes) (bool, string, error) {
 	// TODO: Benchmark how much time policy matching takes with a medium size
 	// policy file, compared to other steps such as encoding/decoding.
 	// Then, add Caching only if needed.
+}
+
+func (pl policyList) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+	var (
+		resourceRules    []authorizer.ResourceRuleInfo
+		nonResourceRules []authorizer.NonResourceRuleInfo
+	)
+
+	for _, p := range pl {
+		if subjectMatches(*p, user) {
+			if p.Spec.Namespace == "*" || p.Spec.Namespace == namespace {
+				if len(p.Spec.Resource) > 0 {
+					r := authorizer.DefaultResourceRuleInfo{
+						Verbs:     getVerbs(p.Spec.Readonly),
+						APIGroups: []string{p.Spec.APIGroup},
+						Resources: []string{p.Spec.Resource},
+					}
+					var resourceRule authorizer.ResourceRuleInfo = &r
+					resourceRules = append(resourceRules, resourceRule)
+				}
+				if len(p.Spec.NonResourcePath) > 0 {
+					r := authorizer.DefaultNonResourceRuleInfo{
+						Verbs:           getVerbs(p.Spec.Readonly),
+						NonResourceURLs: []string{p.Spec.NonResourcePath},
+					}
+					var nonResourceRule authorizer.NonResourceRuleInfo = &r
+					nonResourceRules = append(nonResourceRules, nonResourceRule)
+				}
+			}
+		}
+	}
+	return resourceRules, nonResourceRules, false, nil
+}
+
+func getVerbs(isReadOnly bool) []string {
+	if isReadOnly {
+		return []string{"get", "list", "watch"}
+	}
+	return []string{"*"}
 }

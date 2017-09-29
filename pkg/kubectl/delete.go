@@ -72,7 +72,7 @@ func ReaperFor(kind schema.GroupKind, c internalclientset.Interface) (Reaper, er
 	case api.Kind("ReplicationController"):
 		return &ReplicationControllerReaper{c.Core(), Interval, Timeout}, nil
 
-	case extensions.Kind("ReplicaSet"):
+	case extensions.Kind("ReplicaSet"), apps.Kind("ReplicaSet"):
 		return &ReplicaSetReaper{c.Extensions(), Interval, Timeout}, nil
 
 	case extensions.Kind("DaemonSet"), apps.Kind("DaemonSet"):
@@ -403,6 +403,11 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	})
 	if err != nil {
 		return err
+	}
+	if deployment.Initializers != nil {
+		var falseVar = false
+		nonOrphanOption := metav1.DeleteOptions{OrphanDependents: &falseVar}
+		return deployments.Delete(name, &nonOrphanOption)
 	}
 
 	// Use observedGeneration to determine if the deployment controller noticed the pause.

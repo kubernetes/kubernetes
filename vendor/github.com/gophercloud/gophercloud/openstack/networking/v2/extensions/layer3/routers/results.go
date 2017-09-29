@@ -26,28 +26,30 @@ type Route struct {
 // whenever a router is associated with a subnet, a port for that router
 // interface is added to the subnet's network.
 type Router struct {
-	// Indicates whether or not a router is currently operational.
+	// Status indicates whether or not a router is currently operational.
 	Status string `json:"status"`
 
-	// Information on external gateway for the router.
+	// GateayInfo provides information on external gateway for the router.
 	GatewayInfo GatewayInfo `json:"external_gateway_info"`
 
-	// Administrative state of the router.
+	// AdminStateUp is the administrative state of the router.
 	AdminStateUp bool `json:"admin_state_up"`
 
-	// Whether router is disitrubted or not..
+	// Distributed is whether router is disitrubted or not.
 	Distributed bool `json:"distributed"`
 
-	// Human readable name for the router. Does not have to be unique.
+	// Name is the human readable name for the router. It does not have to be
+	// unique.
 	Name string `json:"name"`
 
-	// Unique identifier for the router.
+	// ID is the unique identifier for the router.
 	ID string `json:"id"`
 
-	// Owner of the router. Only admin users can specify a tenant identifier
-	// other than its own.
+	// TenantID is the owner of the router. Only admin users can specify a tenant
+	// identifier other than its own.
 	TenantID string `json:"tenant_id"`
 
+	// Routes are a collection of static routes that the router will host.
 	Routes []Route `json:"routes"`
 }
 
@@ -101,22 +103,26 @@ func (r commonResult) Extract() (*Router, error) {
 	return s.Router, err
 }
 
-// CreateResult represents the result of a create operation.
+// CreateResult represents the result of a create operation. Call its Extract
+// method to interpret it as a Router.
 type CreateResult struct {
 	commonResult
 }
 
-// GetResult represents the result of a get operation.
+// GetResult represents the result of a get operation. Call its Extract
+// method to interpret it as a Router.
 type GetResult struct {
 	commonResult
 }
 
-// UpdateResult represents the result of an update operation.
+// UpdateResult represents the result of an update operation. Call its Extract
+// method to interpret it as a Router.
 type UpdateResult struct {
 	commonResult
 }
 
-// DeleteResult represents the result of a delete operation.
+// DeleteResult represents the result of a delete operation. Call its ExtractErr
+// method to determine if the request succeeded or failed.
 type DeleteResult struct {
 	gophercloud.ErrResult
 }
@@ -125,21 +131,22 @@ type DeleteResult struct {
 // mentioned above, in order for a router to forward to a subnet, it needs an
 // interface.
 type InterfaceInfo struct {
-	// The ID of the subnet which this interface is associated with.
+	// SubnetID is the ID of the subnet which this interface is associated with.
 	SubnetID string `json:"subnet_id"`
 
-	// The ID of the port that is a part of the subnet.
+	// PortID is the ID of the port that is a part of the subnet.
 	PortID string `json:"port_id"`
 
-	// The UUID of the interface.
+	// ID is the UUID of the interface.
 	ID string `json:"id"`
 
-	// Owner of the interface.
+	// TenantID is the owner of the interface.
 	TenantID string `json:"tenant_id"`
 }
 
 // InterfaceResult represents the result of interface operations, such as
-// AddInterface() and RemoveInterface().
+// AddInterface() and RemoveInterface(). Call its Extract method to interpret
+// the result as a InterfaceInfo.
 type InterfaceResult struct {
 	gophercloud.Result
 }

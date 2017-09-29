@@ -21,7 +21,9 @@ import (
 
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	utilcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 )
 
@@ -29,7 +31,8 @@ const configMapConfigKey = "kubelet"
 
 // configMapCheckpoint implements Checkpoint, backed by a v1/ConfigMap config source object
 type configMapCheckpoint struct {
-	configMap *apiv1.ConfigMap
+	kubeletCodecs *serializer.CodecFactory // codecs for the KubeletConfiguration
+	configMap     *apiv1.ConfigMap
 }
 
 // NewConfigMapCheckpoint returns a Checkpoint backed by `cm`. `cm` must be non-nil
@@ -40,7 +43,13 @@ func NewConfigMapCheckpoint(cm *apiv1.ConfigMap) (Checkpoint, error) {
 	} else if len(cm.ObjectMeta.UID) == 0 {
 		return nil, fmt.Errorf("ConfigMap must have a UID to be treated as a Checkpoint")
 	}
-	return &configMapCheckpoint{cm}, nil
+
+	_, kubeletCodecs, err := kubeletscheme.NewSchemeAndCodecs()
+	if err != nil {
+		return nil, err
+	}
+
+	return &configMapCheckpoint{kubeletCodecs, cm}, nil
 }
 
 // UID returns the UID of a configMapCheckpoint
@@ -48,25 +57,23 @@ func (c *configMapCheckpoint) UID() string {
 	return string(c.configMap.UID)
 }
 
-// implements Parse for v1/ConfigMap checkpoints
+// Parse extracts the KubeletConfiguration from v1/ConfigMap checkpoints, applies defaults, and converts to the internal type
 func (c *configMapCheckpoint) Parse() (*kubeletconfig.KubeletConfiguration, error) {
 	const emptyCfgErr = "config was empty, but some parameters are required"
 
-	cm := c.configMap
-
-	if len(cm.Data) == 0 {
+	if len(c.configMap.Data) == 0 {
 		return nil, fmt.Errorf(emptyCfgErr)
 	}
 
 	// TODO(mtaufen): Once the KubeletConfiguration type is decomposed, extend this to a key for each sub-object
-	config, ok := cm.Data[configMapConfigKey]
+	config, ok := c.configMap.Data[configMapConfigKey]
 	if !ok {
 		return nil, fmt.Errorf("key %q not found in ConfigMap", configMapConfigKey)
 	} else if len(config) == 0 {
 		return nil, fmt.Errorf(emptyCfgErr)
 	}
 
-	return utilcodec.DecodeKubeletConfiguration([]byte(config))
+	return utilcodec.DecodeKubeletConfiguration(c.kubeletCodecs, []byte(config))
 }
 
 // Encode encodes a configMapCheckpoint

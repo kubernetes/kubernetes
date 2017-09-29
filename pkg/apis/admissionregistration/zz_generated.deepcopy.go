@@ -212,15 +212,6 @@ func (in *Initializer) DeepCopyInto(out *Initializer) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.FailurePolicy != nil {
-		in, out := &in.FailurePolicy, &out.FailurePolicy
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(FailurePolicyType)
-			**out = **in
-		}
-	}
 	return
 }
 

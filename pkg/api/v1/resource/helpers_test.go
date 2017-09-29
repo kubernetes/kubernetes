@@ -30,9 +30,8 @@ func TestResourceHelpers(t *testing.T) {
 	memoryLimit := resource.MustParse("10G")
 	resourceSpec := v1.ResourceRequirements{
 		Limits: v1.ResourceList{
-			"cpu":             cpuLimit,
-			"memory":          memoryLimit,
-			"kube.io/storage": memoryLimit,
+			v1.ResourceCPU:    cpuLimit,
+			v1.ResourceMemory: memoryLimit,
 		},
 	}
 	if res := resourceSpec.Limits.Cpu(); res.Cmp(cpuLimit) != 0 {
@@ -43,8 +42,7 @@ func TestResourceHelpers(t *testing.T) {
 	}
 	resourceSpec = v1.ResourceRequirements{
 		Limits: v1.ResourceList{
-			"memory":          memoryLimit,
-			"kube.io/storage": memoryLimit,
+			v1.ResourceMemory: memoryLimit,
 		},
 	}
 	if res := resourceSpec.Limits.Cpu(); res.Value() != 0 {

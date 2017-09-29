@@ -382,6 +382,11 @@ type Termios struct {
 	Ospeed int32
 }
 
+const (
+	AT_FDCWD            = -0x64
+	AT_SYMLINK_NOFOLLOW = 0x200
+)
+
 type Sysctlnode struct {
 	Flags           uint32
 	Num             int32

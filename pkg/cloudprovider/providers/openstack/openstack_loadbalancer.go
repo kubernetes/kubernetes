@@ -68,8 +68,15 @@ const (
 	errorStatus  = "ERROR"
 
 	ServiceAnnotationLoadBalancerFloatingNetworkId = "loadbalancer.openstack.org/floating-network-id"
+
+	// ServiceAnnotationLoadBalancerInternal is the annotation used on the service
+	// to indicate that we want an internal loadbalancer service.
+	// If the value of ServiceAnnotationLoadBalancerInternal is false, it indicates that we want an external loadbalancer service. Default to true.
+	ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/openstack-internal-load-balancer"
 )
 
+// Deprecated; Since LBaaS v1 is deprecated in the OpenStack Liberty release, Kubernetes deprecated it at V1.8.
+// TODO(FengyunPan): remove LBaaS v1 after kubernetes V1.9.
 // LoadBalancer implementation for LBaaS v1
 type LbaasV1 struct {
 	LoadBalancer
@@ -501,7 +508,7 @@ func createNodeSecurityGroup(client *gophercloud.ServiceClient, nodeSecurityGrou
 	return nil
 }
 
-func (lbaas *LbaasV2) createLoadBalancer(service *v1.Service, name string) (*loadbalancers.LoadBalancer, error) {
+func (lbaas *LbaasV2) createLoadBalancer(service *v1.Service, name string, internalAnnotation bool) (*loadbalancers.LoadBalancer, error) {
 	createOpts := loadbalancers.CreateOpts{
 		Name:        name,
 		Description: fmt.Sprintf("Kubernetes external service %s", name),
@@ -509,7 +516,7 @@ func (lbaas *LbaasV2) createLoadBalancer(service *v1.Service, name string) (*loa
 	}
 
 	loadBalancerIP := service.Spec.LoadBalancerIP
-	if loadBalancerIP != "" {
+	if loadBalancerIP != "" && internalAnnotation {
 		createOpts.VipAddress = loadBalancerIP
 	}
 
@@ -531,7 +538,17 @@ func (lbaas *LbaasV2) GetLoadBalancer(clusterName string, service *v1.Service) (
 	}
 
 	status := &v1.LoadBalancerStatus{}
-	status.Ingress = []v1.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
+
+	portID := loadbalancer.VipPortID
+	if portID != "" {
+		floatIP, err := getFloatingIPByPortID(lbaas.network, portID)
+		if err != nil {
+			return nil, false, fmt.Errorf("Error getting floating ip for port %s: %v", portID, err)
+		}
+		status.Ingress = []v1.LoadBalancerIngress{{IP: floatIP.FloatingIP}}
+	} else {
+		status.Ingress = []v1.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
+	}
 
 	return status, true, err
 }
@@ -626,6 +643,24 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 	floatingPool := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerFloatingNetworkId, lbaas.opts.FloatingNetworkId)
 	glog.V(4).Infof("EnsureLoadBalancer using floatingPool: %v", floatingPool)
 
+	var internalAnnotation bool
+	internal := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerInternal, "true")
+	switch internal {
+	case "true":
+		glog.V(4).Infof("Ensure an internal loadbalancer service.")
+		internalAnnotation = true
+	case "false":
+		if len(floatingPool) != 0 {
+			glog.V(4).Infof("Ensure an external loadbalancer service.")
+			internalAnnotation = false
+		} else {
+			return nil, fmt.Errorf("floating-network-id or loadbalancer.openstack.org/floating-network-id should be specified when service.beta.kubernetes.io/openstack-internal-load-balancer is false")
+		}
+	default:
+		return nil, fmt.Errorf("unknow service.beta.kubernetes.io/openstack-internal-load-balancer annotation: %v, specify \"true\" or \"false\".",
+			internal)
+	}
+
 	// Check for TCP protocol on each port
 	// TODO: Convert all error messages to use an event recorder
 	for _, port := range ports {
@@ -661,7 +696,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 			return nil, fmt.Errorf("Error getting loadbalancer %s: %v", name, err)
 		}
 		glog.V(2).Infof("Creating loadbalancer %s", name)
-		loadbalancer, err = lbaas.createLoadBalancer(apiService, name)
+		loadbalancer, err = lbaas.createLoadBalancer(apiService, name, internalAnnotation)
 		if err != nil {
 			// Unknown error, retry later
 			return nil, fmt.Errorf("Error creating loadbalancer %s: %v", name, err)
@@ -846,28 +881,35 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		glog.V(2).Infof("Deleted obsolete listener: %s", listener.ID)
 	}
 
-	status := &v1.LoadBalancerStatus{}
-
-	status.Ingress = []v1.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
-
 	portID := loadbalancer.VipPortID
 	floatIP, err := getFloatingIPByPortID(lbaas.network, portID)
 	if err != nil && err != ErrNotFound {
 		return nil, fmt.Errorf("Error getting floating ip for port %s: %v", portID, err)
 	}
-	if floatIP == nil && floatingPool != "" {
+	if floatIP == nil && floatingPool != "" && !internalAnnotation {
 		glog.V(4).Infof("Creating floating ip for loadbalancer %s port %s", loadbalancer.ID, portID)
 		floatIPOpts := floatingips.CreateOpts{
 			FloatingNetworkID: floatingPool,
 			PortID:            portID,
 		}
+
+		loadBalancerIP := apiService.Spec.LoadBalancerIP
+		if loadBalancerIP != "" {
+			floatIPOpts.FloatingIP = loadBalancerIP
+		}
+
 		floatIP, err = floatingips.Create(lbaas.network, floatIPOpts).Extract()
 		if err != nil {
 			return nil, fmt.Errorf("Error creating LB floatingip %+v: %v", floatIPOpts, err)
 		}
 	}
+
+	status := &v1.LoadBalancerStatus{}
+
 	if floatIP != nil {
-		status.Ingress = append(status.Ingress, v1.LoadBalancerIngress{IP: floatIP.FloatingIP})
+		status.Ingress = []v1.LoadBalancerIngress{{IP: floatIP.FloatingIP}}
+	} else {
+		status.Ingress = []v1.LoadBalancerIngress{{IP: loadbalancer.VipAddress}}
 	}
 
 	if lbaas.opts.ManageSecurityGroups {
@@ -965,7 +1007,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Serv
 		}
 
 		portID := loadbalancer.VipPortID
-		update_opts := neutronports.UpdateOpts{SecurityGroups: []string{lbSecGroup.ID}}
+		update_opts := neutronports.UpdateOpts{SecurityGroups: &[]string{lbSecGroup.ID}}
 		res := neutronports.Update(lbaas.network, portID, update_opts)
 		if res.Err != nil {
 			glog.Errorf("Error occured updating port: %s", portID)
@@ -1116,7 +1158,7 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 		return nil
 	}
 
-	if lbaas.opts.FloatingNetworkId != "" && loadbalancer != nil {
+	if loadbalancer != nil && loadbalancer.VipPortID != "" {
 		portID := loadbalancer.VipPortID
 		floatingIP, err := getFloatingIPByPortID(lbaas.network, portID)
 		if err != nil && err != ErrNotFound {
@@ -1144,10 +1186,12 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 		if err != nil && err != ErrNotFound {
 			return fmt.Errorf("Error getting pool for listener %s: %v", listener.ID, err)
 		}
-		poolIDs = append(poolIDs, pool.ID)
-		// If create-monitor of cloud-config is false, pool has not monitor.
-		if pool.MonitorID != "" {
-			monitorIDs = append(monitorIDs, pool.MonitorID)
+		if pool != nil {
+			poolIDs = append(poolIDs, pool.ID)
+			// If create-monitor of cloud-config is false, pool has not monitor.
+			if pool.MonitorID != "" {
+				monitorIDs = append(monitorIDs, pool.MonitorID)
+			}
 		}
 	}
 
@@ -1256,7 +1300,16 @@ func (lb *LbaasV1) GetLoadBalancer(clusterName string, service *v1.Service) (*v1
 	}
 
 	status := &v1.LoadBalancerStatus{}
-	status.Ingress = []v1.LoadBalancerIngress{{IP: vip.Address}}
+
+	if vip.PortID != "" {
+		floatingIP, err := getFloatingIPByPortID(lb.network, vip.PortID)
+		if err != nil {
+			return nil, false, fmt.Errorf("Error getting floating ip for port %s: %v", vip.PortID, err)
+		}
+		status.Ingress = []v1.LoadBalancerIngress{{IP: floatingIP.FloatingIP}}
+	} else {
+		status.Ingress = []v1.LoadBalancerIngress{{IP: vip.Address}}
+	}
 
 	return status, true, err
 }
@@ -1279,6 +1332,27 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 				"and failed to find subnet-id from OpenStack: %v", apiService.Namespace, apiService.Name, err)
 		}
 		lb.opts.SubnetId = subnetID
+	}
+
+	floatingPool := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerFloatingNetworkId, lb.opts.FloatingNetworkId)
+	glog.V(4).Infof("EnsureLoadBalancer using floatingPool: %v", floatingPool)
+
+	var internalAnnotation bool
+	internal := getStringFromServiceAnnotation(apiService, ServiceAnnotationLoadBalancerInternal, "true")
+	switch internal {
+	case "true":
+		glog.V(4).Infof("Ensure an internal loadbalancer service.")
+		internalAnnotation = true
+	case "false":
+		if len(floatingPool) != 0 {
+			glog.V(4).Infof("Ensure an external loadbalancer service.")
+			internalAnnotation = false
+		} else {
+			return nil, fmt.Errorf("floating-network-id or loadbalancer.openstack.org/floating-network-id should be specified when service.beta.kubernetes.io/openstack-internal-load-balancer is false")
+		}
+	default:
+		return nil, fmt.Errorf("unknow service.beta.kubernetes.io/openstack-internal-load-balancer annotation: %v, specify \"true\" or \"false\".",
+			internal)
 	}
 
 	ports := apiService.Spec.Ports
@@ -1391,7 +1465,7 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 	}
 
 	loadBalancerIP := apiService.Spec.LoadBalancerIP
-	if loadBalancerIP != "" {
+	if loadBalancerIP != "" && internalAnnotation {
 		createOpts.Address = loadBalancerIP
 	}
 
@@ -1401,20 +1475,25 @@ func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service
 	}
 
 	status := &v1.LoadBalancerStatus{}
-
-	status.Ingress = []v1.LoadBalancerIngress{{IP: vip.Address}}
-
-	if lb.opts.FloatingNetworkId != "" {
+	if floatingPool != "" && !internalAnnotation {
 		floatIPOpts := floatingips.CreateOpts{
-			FloatingNetworkID: lb.opts.FloatingNetworkId,
+			FloatingNetworkID: floatingPool,
 			PortID:            vip.PortID,
 		}
+
+		loadBalancerIP := apiService.Spec.LoadBalancerIP
+		if loadBalancerIP != "" {
+			floatIPOpts.FloatingIP = loadBalancerIP
+		}
+
 		floatIP, err := floatingips.Create(lb.network, floatIPOpts).Extract()
 		if err != nil {
 			return nil, fmt.Errorf("Error creating floatingip for openstack load balancer %s: %v", name, err)
 		}
 
-		status.Ingress = append(status.Ingress, v1.LoadBalancerIngress{IP: floatIP.FloatingIP})
+		status.Ingress = []v1.LoadBalancerIngress{{IP: floatIP.FloatingIP}}
+	} else {
+		status.Ingress = []v1.LoadBalancerIngress{{IP: vip.Address}}
 	}
 
 	return status, nil
@@ -1492,7 +1571,7 @@ func (lb *LbaasV1) EnsureLoadBalancerDeleted(clusterName string, service *v1.Ser
 		return err
 	}
 
-	if lb.opts.FloatingNetworkId != "" && vip != nil {
+	if vip != nil && vip.PortID != "" {
 		floatingIP, err := getFloatingIPByPortID(lb.network, vip.PortID)
 		if err != nil && !isNotFound(err) {
 			return err

@@ -24,15 +24,13 @@ import (
 	"github.com/spf13/cobra"
 
 	batchv1 "k8s.io/api/batch/v1"
-	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/discovery"
 	"k8s.io/kubernetes/pkg/api"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	conditions "k8s.io/kubernetes/pkg/client/unversioned"
@@ -40,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 	uexec "k8s.io/utils/exec"
 )
@@ -176,6 +174,9 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	if interactive && replicas != 1 {
 		return cmdutil.UsageErrorf(cmd, "-i/--stdin requires that replicas is 1, found %d", replicas)
 	}
+	if cmdutil.GetFlagBool(cmd, "expose") && len(cmdutil.GetFlagString(cmd, "port")) == 0 {
+		return cmdutil.UsageErrorf(cmd, "--port must be set when exposing a service")
+	}
 
 	namespace, _, err := f.DefaultNamespace()
 	if err != nil {
@@ -222,20 +223,24 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
 	schedule := cmdutil.GetFlagString(cmd, "schedule")
 	if len(schedule) != 0 && len(generatorName) == 0 {
-		generatorName = cmdutil.CronJobV2Alpha1GeneratorName
+		if cmdutil.Contains(resourcesList, batchv1beta1.SchemeGroupVersion.WithResource("cronjobs")) {
+			generatorName = cmdutil.CronJobV1Beta1GeneratorName
+		} else {
+			generatorName = cmdutil.CronJobV2Alpha1GeneratorName
+		}
 	}
 	if len(generatorName) == 0 {
 		switch restartPolicy {
 		case api.RestartPolicyAlways:
 			// TODO: we need to deprecate this along with extensions/v1beta1.Deployments
 			// in favor of the new generator for apps/v1beta1.Deployments
-			if contains(resourcesList, extensionsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
+			if cmdutil.Contains(resourcesList, extensionsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
 				generatorName = cmdutil.DeploymentV1Beta1GeneratorName
 			} else {
 				generatorName = cmdutil.RunV1GeneratorName
 			}
 		case api.RestartPolicyOnFailure:
-			if contains(resourcesList, batchv1.SchemeGroupVersion.WithResource("jobs")) {
+			if cmdutil.Contains(resourcesList, batchv1.SchemeGroupVersion.WithResource("jobs")) {
 				generatorName = cmdutil.JobV1GeneratorName
 			} else {
 				generatorName = cmdutil.RunPodV1GeneratorName
@@ -245,13 +250,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		}
 	}
 
-	// TODO: this should be removed alongside with extensions/v1beta1 depployments generator
-	generatorName = fallbackGeneratorNameIfNecessary(generatorName, resourcesList, cmdErr)
-
-	if generatorName == cmdutil.CronJobV2Alpha1GeneratorName &&
-		!contains(resourcesList, batchv2alpha1.SchemeGroupVersion.WithResource("cronjobs")) {
-		return fmt.Errorf("CronJob generator specified, but batch/v2alpha1.CronJobs are not available")
-	}
+	generatorName = cmdutil.FallbackGeneratorNameIfNecessary(generatorName, resourcesList, cmdErr)
 
 	generators := f.Generators("run")
 	generator, found := generators[generatorName]
@@ -344,7 +343,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 				if err != nil {
 					return err
 				}
-				r := f.NewBuilder(true).
+				r := f.NewBuilder().
 					ContinueOnError().
 					NamespaceParam(namespace).DefaultNamespace().
 					ResourceNames(obj.Mapping.Resource, name).
@@ -397,14 +396,6 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	}
 	cmdutil.PrintSuccess(runObject.Mapper, false, cmdOut, runObject.Mapping.Resource, args[0], cmdutil.GetDryRunFlag(cmd), "created")
 	return nil
-}
-
-// TODO turn this into reusable method checking available resources
-func contains(resourcesList []*metav1.APIResourceList, resource schema.GroupVersionResource) bool {
-	resources := discovery.FilteredBy(discovery.ResourcePredicateFunc(func(gv string, r *metav1.APIResource) bool {
-		return resource.GroupVersion().String() == gv && resource.Resource == r.Name
-	}), resourcesList)
-	return len(resources) != 0
 }
 
 // waitForPod watches the given pod until the exitCondition is true
@@ -536,11 +527,6 @@ func generateService(f cmdutil.Factory, cmd *cobra.Command, args []string, servi
 		return nil, fmt.Errorf("missing service generator: %s", serviceGenerator)
 	}
 	names := generator.ParamNames()
-
-	port := cmdutil.GetFlagString(cmd, "port")
-	if len(port) == 0 {
-		return nil, fmt.Errorf("--port must be set when exposing a service")
-	}
 
 	params := map[string]interface{}{}
 	for key, value := range paramsIn {

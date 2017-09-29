@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -21,18 +16,27 @@ go_library(
         "network.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "cgroup_unix.go",
-            "config_unix.go",
+            "cgroup_linux.go",
+            "config_linux.go",
             "device_defaults.go",
+            "namespaces_linux.go",
             "namespaces_syscall.go",
-            "namespaces_unix.go",
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "cgroup_windows.go",
         ],
         "//conditions:default": [],
     }),
-    deps = ["//vendor/github.com/Sirupsen/logrus:go_default_library"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vendor/github.com/opencontainers/runtime-spec/specs-go:go_default_library",
+        "//vendor/github.com/sirupsen/logrus:go_default_library",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 filegroup(
@@ -49,4 +53,5 @@ filegroup(
         "//vendor/github.com/opencontainers/runc/libcontainer/configs/validate:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

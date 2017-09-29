@@ -72,7 +72,9 @@ func TestGarbageCollectorConstruction(t *testing.T) {
 
 	// No monitor will be constructed for the non-core resource, but the GC
 	// construction will not fail.
-	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, rm, twoResources, map[schema.GroupResource]struct{}{}, sharedInformers)
+	alwaysStarted := make(chan struct{})
+	close(alwaysStarted)
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, rm, twoResources, map[schema.GroupResource]struct{}{}, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +176,9 @@ func setupGC(t *testing.T, config *restclient.Config) garbageCollector {
 	podResource := map[schema.GroupVersionResource]struct{}{{Version: "v1", Resource: "pods"}: {}}
 	client := fake.NewSimpleClientset()
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
-	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, &testRESTMapper{api.Registry.RESTMapper()}, podResource, ignoredResources, sharedInformers)
+	alwaysStarted := make(chan struct{})
+	close(alwaysStarted)
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, &testRESTMapper{api.Registry.RESTMapper()}, podResource, ignoredResources, sharedInformers, alwaysStarted)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,9 +362,12 @@ func TestProcessEvent(t *testing.T) {
 		},
 	}
 
+	alwaysStarted := make(chan struct{})
+	close(alwaysStarted)
 	for _, scenario := range testScenarios {
 		dependencyGraphBuilder := &GraphBuilder{
-			graphChanges: workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+			informersStarted: alwaysStarted,
+			graphChanges:     workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 			uidToNode: &concurrentUIDToNode{
 				uidToNodeLock: sync.RWMutex{},
 				uidToNode:     make(map[types.UID]*node),
@@ -413,6 +420,7 @@ func TestGCListWatcher(t *testing.T) {
 		t.Fatal(err)
 	}
 	lw := listWatcher(client, podResource)
+	lw.DisableChunking = true
 	if _, err := lw.Watch(metav1.ListOptions{ResourceVersion: "1"}); err != nil {
 		t.Fatal(err)
 	}

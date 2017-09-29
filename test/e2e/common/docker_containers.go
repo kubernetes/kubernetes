@@ -21,6 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -80,7 +81,7 @@ func entrypointTestPod() *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  testContainerName,
-					Image: "gcr.io/google_containers/eptest:0.1",
+					Image: imageutils.GetE2EImage(imageutils.EntrypointTester),
 				},
 			},
 			RestartPolicy:                 v1.RestartPolicyNever,

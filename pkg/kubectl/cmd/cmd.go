@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -161,7 +161,7 @@ __kubectl_require_pod_and_container()
 
 __custom_func() {
     case ${last_command} in
-        kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_stop | kubectl_edit | kubectl_patch |\
+        kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_edit | kubectl_patch |\
         kubectl_annotate | kubectl_expose | kubectl_scale | kubectl_autoscale | kubectl_taint | kubectl_rollout_*)
             __kubectl_get_resource
             return
@@ -239,7 +239,8 @@ __custom_func() {
     * services (aka 'svc')
     * statefulsets
     * storageclasses
-    `
+
+`
 )
 
 var (
@@ -285,8 +286,8 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdCreate(f, out, err),
 				NewCmdExposeService(f, out),
 				NewCmdRun(f, in, out, err),
+				set.NewCmdSet(f, in, out, err),
 				deprecatedAlias("run-container", NewCmdRun(f, in, out, err)),
-				set.NewCmdSet(f, out, err),
 			},
 		},
 		{
@@ -303,9 +304,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Commands: []*cobra.Command{
 				rollout.NewCmdRollout(f, out, err),
 				NewCmdRollingUpdate(f, out),
-				deprecatedAlias("rollingupdate", NewCmdRollingUpdate(f, out)),
 				NewCmdScale(f, out),
-				deprecatedAlias("resize", NewCmdScale(f, out)),
 				NewCmdAutoscale(f, out),
 			},
 		},
@@ -314,7 +313,6 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			Commands: []*cobra.Command{
 				NewCmdCertificate(f, out),
 				NewCmdClusterInfo(f, out),
-				deprecatedAlias("clusterinfo", NewCmdClusterInfo(f, out)),
 				NewCmdTop(f, out, err),
 				NewCmdCordon(f, out),
 				NewCmdUncordon(f, out),
@@ -341,7 +339,6 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 				NewCmdApply("kubectl", f, out, err),
 				NewCmdPatch(f, out),
 				NewCmdReplace(f, out),
-				deprecatedAlias("update", NewCmdReplace(f, out)),
 				NewCmdConvert(f, out),
 			},
 		},
@@ -356,10 +353,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	}
 	groups.Add(cmds)
 
-	filters := []string{
-		"options",
-		deprecated("kubectl", "delete", cmds, NewCmdStop(f, out)),
-	}
+	filters := []string{"options"}
 
 	// Hide the "alpha" subcommand if there are no alpha commands in this build.
 	alpha := NewCmdAlpha(f, in, out, err)
@@ -386,7 +380,6 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.AddCommand(NewCmdPlugin(f, in, out, err))
 	cmds.AddCommand(NewCmdVersion(f, out))
 	cmds.AddCommand(NewCmdApiVersions(f, out))
-	cmds.AddCommand(deprecatedAlias("apiversions", NewCmdApiVersions(f, out)))
 	cmds.AddCommand(NewCmdOptions(out))
 
 	return cmds

@@ -27,6 +27,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 /*
@@ -368,7 +369,7 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 		// Build the containers for the server pod.
 		containers = append(containers, v1.Container{
 			Name:  fmt.Sprintf("%s-container-%d", podName, port),
-			Image: "gcr.io/google_containers/redis:e2e",
+			Image: imageutils.GetE2EImage(imageutils.Redis),
 			Args: []string{
 				"/bin/sh",
 				"-c",
@@ -447,7 +448,7 @@ func createNetworkClientPod(f *framework.Framework, namespace *v1.Namespace, pod
 			Containers: []v1.Container{
 				{
 					Name:  fmt.Sprintf("%s-container", podName),
-					Image: "gcr.io/google_containers/redis:e2e",
+					Image: imageutils.GetE2EImage(imageutils.Redis),
 					Args: []string{
 						"/bin/sh",
 						"-c",

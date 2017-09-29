@@ -22,10 +22,52 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/helper"
 )
+
+// IsExtendedResourceName returns true if the resource name is not in the
+// default namespace, or it has the opaque integer resource prefix.
+func IsExtendedResourceName(name v1.ResourceName) bool {
+	// TODO: Remove OIR part following deprecation.
+	return !IsDefaultNamespaceResource(name) || IsOpaqueIntResourceName(name)
+}
+
+// IsDefaultNamespaceResource returns true if the resource name is in the
+// *kubernetes.io/ namespace. Partially-qualified (unprefixed) names are
+// implicitly in the kubernetes.io/ namespace.
+func IsDefaultNamespaceResource(name v1.ResourceName) bool {
+	return !strings.Contains(string(name), "/") ||
+		strings.Contains(string(name), v1.ResourceDefaultNamespacePrefix)
+
+}
+
+// IsHugePageResourceName returns true if the resource name has the huge page
+// resource prefix.
+func IsHugePageResourceName(name v1.ResourceName) bool {
+	return strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
+}
+
+// HugePageResourceName returns a ResourceName with the canonical hugepage
+// prefix prepended for the specified page size.  The page size is converted
+// to its canonical representation.
+func HugePageResourceName(pageSize resource.Quantity) v1.ResourceName {
+	return v1.ResourceName(fmt.Sprintf("%s%s", v1.ResourceHugePagesPrefix, pageSize.String()))
+}
+
+// HugePageSizeFromResourceName returns the page size for the specified huge page
+// resource name.  If the specified input is not a valid huge page resource name
+// an error is returned.
+func HugePageSizeFromResourceName(name v1.ResourceName) (resource.Quantity, error) {
+	if !IsHugePageResourceName(name) {
+		return resource.Quantity{}, fmt.Errorf("resource name: %s is not valid hugepage name", name)
+	}
+	pageSize := strings.TrimPrefix(string(name), v1.ResourceHugePagesPrefix)
+	return resource.ParseQuantity(pageSize)
+}
 
 // IsOpaqueIntResourceName returns true if the resource name has the opaque
 // integer resource prefix.
@@ -41,6 +83,21 @@ func OpaqueIntResourceName(name string) v1.ResourceName {
 		return v1.ResourceName(name)
 	}
 	return v1.ResourceName(fmt.Sprintf("%s%s", v1.ResourceOpaqueIntPrefix, name))
+}
+
+var overcommitBlacklist = sets.NewString(string(v1.ResourceNvidiaGPU))
+
+// IsOvercommitAllowed returns true if the resource is in the default
+// namespace and not blacklisted and is not hugepages.
+func IsOvercommitAllowed(name v1.ResourceName) bool {
+	return IsDefaultNamespaceResource(name) &&
+		!IsHugePageResourceName(name) &&
+		!overcommitBlacklist.Has(string(name))
+}
+
+// Extended and Hugepages resources
+func IsScalarResourceName(name v1.ResourceName) bool {
+	return IsExtendedResourceName(name) || IsHugePageResourceName(name)
 }
 
 // this function aims to check if the service's ClusterIP is set or not

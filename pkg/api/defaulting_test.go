@@ -22,9 +22,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 
-	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	roundtrip "k8s.io/apimachinery/pkg/api/testing/roundtrip"
@@ -33,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
-	k8s_batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 )
 
 type orderedGroupVersionKinds []schema.GroupVersionKind
@@ -42,14 +40,6 @@ func (o orderedGroupVersionKinds) Len() int      { return len(o) }
 func (o orderedGroupVersionKinds) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 func (o orderedGroupVersionKinds) Less(i, j int) bool {
 	return o[i].String() < o[j].String()
-}
-
-func TestVerifyDefaulting(t *testing.T) {
-	job := &batchv2alpha1.JobTemplate{}
-	k8s_batchv2alpha1.SetObjectDefaults_JobTemplate(job)
-	if job.Template.Spec.Template.Spec.DNSPolicy != apiv1.DNSClusterFirst {
-		t.Errorf("unexpected defaulting: %#v", job)
-	}
 }
 
 // TODO: add a reflexive test that verifies that all SetDefaults functions are registered
@@ -86,14 +76,15 @@ func TestDefaulting(t *testing.T) {
 		{Group: "apps", Version: "v1beta2", Kind: "StatefulSetList"}:                              {},
 		{Group: "autoscaling", Version: "v1", Kind: "HorizontalPodAutoscaler"}:                    {},
 		{Group: "autoscaling", Version: "v1", Kind: "HorizontalPodAutoscalerList"}:                {},
-		{Group: "autoscaling", Version: "v2alpha1", Kind: "HorizontalPodAutoscaler"}:              {},
-		{Group: "autoscaling", Version: "v2alpha1", Kind: "HorizontalPodAutoscalerList"}:          {},
+		{Group: "autoscaling", Version: "v2beta1", Kind: "HorizontalPodAutoscaler"}:               {},
+		{Group: "autoscaling", Version: "v2beta1", Kind: "HorizontalPodAutoscalerList"}:           {},
 		{Group: "batch", Version: "v1", Kind: "Job"}:                                              {},
 		{Group: "batch", Version: "v1", Kind: "JobList"}:                                          {},
+		{Group: "batch", Version: "v1beta1", Kind: "CronJob"}:                                     {},
+		{Group: "batch", Version: "v1beta1", Kind: "CronJobList"}:                                 {},
+		{Group: "batch", Version: "v1beta1", Kind: "JobTemplate"}:                                 {},
 		{Group: "batch", Version: "v2alpha1", Kind: "CronJob"}:                                    {},
 		{Group: "batch", Version: "v2alpha1", Kind: "CronJobList"}:                                {},
-		{Group: "batch", Version: "v2alpha1", Kind: "Job"}:                                        {},
-		{Group: "batch", Version: "v2alpha1", Kind: "JobList"}:                                    {},
 		{Group: "batch", Version: "v2alpha1", Kind: "JobTemplate"}:                                {},
 		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequest"}:     {},
 		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequestList"}: {},
@@ -118,6 +109,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "apps", Version: "v1beta2", Kind: "ReplicaSetList"}:                                                  {},
 		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSet"}:                                                {},
 		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSetList"}:                                            {},
+		{Group: "extensions", Version: "v1beta1", Kind: "NetworkPolicy"}:                                             {},
+		{Group: "extensions", Version: "v1beta1", Kind: "NetworkPolicyList"}:                                         {},
 		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBinding"}:                        {},
 		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "ClusterRoleBindingList"}:                    {},
 		{Group: "rbac.authorization.k8s.io", Version: "v1alpha1", Kind: "RoleBinding"}:                               {},
@@ -132,12 +125,14 @@ func TestDefaulting(t *testing.T) {
 		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "RoleBindingList"}:                                 {},
 		{Group: "settings.k8s.io", Version: "v1alpha1", Kind: "PodPreset"}:                                           {},
 		{Group: "settings.k8s.io", Version: "v1alpha1", Kind: "PodPresetList"}:                                       {},
-		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "InitializerConfiguration"}:               {},
-		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "InitializerConfigurationList"}:           {},
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ExternalAdmissionHookConfiguration"}:     {},
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ExternalAdmissionHookConfigurationList"}: {},
 		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}:                                           {},
 		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicyList"}:                                       {},
+		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClass"}:                                          {},
+		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClassList"}:                                      {},
+		{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClass"}:                                               {},
+		{Group: "storage.k8s.io", Version: "v1", Kind: "StorageClassList"}:                                           {},
 	}
 
 	f := fuzz.New().NilChance(.5).NumElements(1, 1).RandSource(rand.NewSource(1))
@@ -194,13 +189,10 @@ func TestDefaulting(t *testing.T) {
 
 			src.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 
-			original, err := scheme.DeepCopy(src)
-			if err != nil {
-				t.Fatal(err)
-			}
+			original := src.DeepCopyObject()
 
 			// get internal
-			withDefaults, _ := scheme.DeepCopy(src)
+			withDefaults := src.DeepCopyObject()
 			scheme.Default(withDefaults.(runtime.Object))
 
 			if !reflect.DeepEqual(original, withDefaults) {

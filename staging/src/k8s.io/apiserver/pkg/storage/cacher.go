@@ -37,6 +37,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/client-go/tools/cache"
 )
@@ -406,9 +408,11 @@ func (c *Cacher) Get(ctx context.Context, key string, resourceVersion string, ob
 
 // Implements storage.Interface.
 func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion string, pred SelectionPredicate, listObj runtime.Object) error {
-	if resourceVersion == "" {
+	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
+	if resourceVersion == "" || (pagingEnabled && (len(pred.Continue) > 0 || pred.Limit > 0)) {
 		// If resourceVersion is not specified, serve it from underlying
-		// storage (for backward compatibility).
+		// storage (for backward compatibility). If a continuation or limit is
+		// requested, serve it from the underlying storage as well.
 		return c.storage.GetToList(ctx, key, resourceVersion, pred, listObj)
 	}
 
@@ -459,7 +463,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 		}
 	}
 	if c.versioner != nil {
-		if err := c.versioner.UpdateList(listObj, readResourceVersion); err != nil {
+		if err := c.versioner.UpdateList(listObj, readResourceVersion, ""); err != nil {
 			return err
 		}
 	}
@@ -468,9 +472,11 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 
 // Implements storage.Interface.
 func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, pred SelectionPredicate, listObj runtime.Object) error {
-	if resourceVersion == "" {
+	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
+	if resourceVersion == "" || (pagingEnabled && (len(pred.Continue) > 0 || pred.Limit > 0)) {
 		// If resourceVersion is not specified, serve it from underlying
-		// storage (for backward compatibility).
+		// storage (for backward compatibility). If a continuation or limit is
+		// requested, serve it from the underlying storage as well.
 		return c.storage.List(ctx, key, resourceVersion, pred, listObj)
 	}
 
@@ -527,7 +533,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	}
 	trace.Step(fmt.Sprintf("Filtered %d items", listVal.Len()))
 	if c.versioner != nil {
-		if err := c.versioner.UpdateList(listObj, readResourceVersion); err != nil {
+		if err := c.versioner.UpdateList(listObj, readResourceVersion, ""); err != nil {
 			return err
 		}
 	}

@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 )
@@ -68,13 +67,11 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 		nodeObj, err := nsu.nodeLister.Get(string(nodeName))
 		if errors.IsNotFound(err) {
 			// If node does not exist, its status cannot be updated.
-			// Remove the node entry from the collection of attach updates, preventing the
-			// status updater from unnecessarily updating the node.
+			// Do nothing so that there is no retry until node is created.
 			glog.V(2).Infof(
 				"Could not update node status. Failed to find node %q in NodeInformer cache. Error: '%v'",
 				nodeName,
 				err)
-			nsu.actualStateOfWorld.RemoveNodeFromAttachUpdates(nodeName)
 			continue
 		} else if err != nil {
 			// For all other errors, log error and reset flag statusUpdateNeeded
@@ -102,20 +99,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 }
 
 func (nsu *nodeStatusUpdater) updateNodeStatus(nodeName types.NodeName, nodeObj *v1.Node, attachedVolumes []v1.AttachedVolume) error {
-	clonedNode, err := scheme.Scheme.DeepCopy(nodeObj)
-	if err != nil {
-		return fmt.Errorf("error cloning node %q: %v",
-			nodeName,
-			err)
-	}
-
-	node, ok := clonedNode.(*v1.Node)
-	if !ok || node == nil {
-		return fmt.Errorf(
-			"failed to cast %q object %#v to Node",
-			nodeName,
-			clonedNode)
-	}
+	node := nodeObj.DeepCopy()
 
 	// TODO: Change to pkg/util/node.UpdateNodeStatus.
 	oldData, err := json.Marshal(node)

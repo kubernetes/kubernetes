@@ -103,7 +103,8 @@
   },
   { "name": "varlogetcd",
     "hostPath": {
-        "path": "/var/log/etcd{{ suffix }}.log"}
+        "path": "/var/log/etcd{{ suffix }}.log",
+        "type": "FileOrCreate"}
   },
   { "name": "etc",
     "hostPath": {

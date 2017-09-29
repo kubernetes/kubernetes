@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"syscall"
+	"syscall" // used for STD_INPUT_HANDLE, STD_OUTPUT_HANDLE and STD_ERROR_HANDLE
 
 	"github.com/Azure/go-ansiterm/winterm"
 	"github.com/docker/docker/pkg/term/windows"
@@ -33,7 +33,7 @@ const (
 // vtInputSupported is true if enableVirtualTerminalInput is supported by the console
 var vtInputSupported bool
 
-// StdStreams returns the standard streams (stdin, stdout, stedrr).
+// StdStreams returns the standard streams (stdin, stdout, stderr).
 func StdStreams() (stdIn io.ReadCloser, stdOut, stdErr io.Writer) {
 	// Turn on VT handling on all std handles, if possible. This might
 	// fail, in which case we will fall back to terminal emulation.
@@ -78,20 +78,24 @@ func StdStreams() (stdIn io.ReadCloser, stdOut, stdErr io.Writer) {
 		emulateStderr = false
 	}
 
+	// Temporarily use STD_INPUT_HANDLE, STD_OUTPUT_HANDLE and
+	// STD_ERROR_HANDLE from syscall rather than x/sys/windows as long as
+	// go-ansiterm hasn't switch to x/sys/windows.
+	// TODO: switch back to x/sys/windows once go-ansiterm has switched
 	if emulateStdin {
-		stdIn = windows.NewAnsiReader(syscall.STD_INPUT_HANDLE)
+		stdIn = windowsconsole.NewAnsiReader(syscall.STD_INPUT_HANDLE)
 	} else {
 		stdIn = os.Stdin
 	}
 
 	if emulateStdout {
-		stdOut = windows.NewAnsiWriter(syscall.STD_OUTPUT_HANDLE)
+		stdOut = windowsconsole.NewAnsiWriter(syscall.STD_OUTPUT_HANDLE)
 	} else {
 		stdOut = os.Stdout
 	}
 
 	if emulateStderr {
-		stdErr = windows.NewAnsiWriter(syscall.STD_ERROR_HANDLE)
+		stdErr = windowsconsole.NewAnsiWriter(syscall.STD_ERROR_HANDLE)
 	} else {
 		stdErr = os.Stderr
 	}
@@ -101,7 +105,7 @@ func StdStreams() (stdIn io.ReadCloser, stdOut, stdErr io.Writer) {
 
 // GetFdInfo returns the file descriptor for an os.File and indicates whether the file represents a terminal.
 func GetFdInfo(in interface{}) (uintptr, bool) {
-	return windows.GetHandleInfo(in)
+	return windowsconsole.GetHandleInfo(in)
 }
 
 // GetWinsize returns the window size based on the specified file descriptor.
@@ -121,7 +125,7 @@ func GetWinsize(fd uintptr) (*Winsize, error) {
 
 // IsTerminal returns true if the given file descriptor is a terminal.
 func IsTerminal(fd uintptr) bool {
-	return windows.IsConsole(fd)
+	return windowsconsole.IsConsole(fd)
 }
 
 // RestoreTerminal restores the terminal connected to the given file descriptor

@@ -25,10 +25,11 @@ import (
 	apiextensionscmd "k8s.io/apiextensions-apiserver/pkg/cmd/server"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
-func createAPIExtensionsConfig(kubeAPIServerConfig genericapiserver.Config, commandOptions *options.ServerRunOptions) (*apiextensionsapiserver.Config, error) {
+func createAPIExtensionsConfig(kubeAPIServerConfig genericapiserver.Config, externalInformers kubeexternalinformers.SharedInformerFactory, commandOptions *options.ServerRunOptions) (*apiextensionsapiserver.Config, error) {
 	// make a shallow copy to let us twiddle a few things
 	// most of the config actually remains the same.  We only need to mess with a couple items related to the particulars of the apiextensions
 	genericConfig := kubeAPIServerConfig
@@ -40,12 +41,16 @@ func createAPIExtensionsConfig(kubeAPIServerConfig genericapiserver.Config, comm
 	genericConfig.RESTOptionsGetter = &genericoptions.SimpleRestOptionsFactory{Options: etcdOptions}
 
 	apiextensionsConfig := &apiextensionsapiserver.Config{
-		GenericConfig:        &genericConfig,
-		CRDRESTOptionsGetter: apiextensionscmd.NewCRDRESTOptionsGetter(etcdOptions),
+		GenericConfig: &genericapiserver.RecommendedConfig{
+			Config:                genericConfig,
+			SharedInformerFactory: externalInformers,
+		},
+		ExtraConfig: apiextensionsapiserver.ExtraConfig{
+			CRDRESTOptionsGetter: apiextensionscmd.NewCRDRESTOptionsGetter(etcdOptions),
+		},
 	}
 
 	return apiextensionsConfig, nil
-
 }
 
 func createAPIExtensionsServer(apiextensionsConfig *apiextensionsapiserver.Config, delegateAPIServer genericapiserver.DelegationTarget) (*apiextensionsapiserver.CustomResourceDefinitions, error) {

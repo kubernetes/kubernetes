@@ -124,7 +124,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "secret-volume-test",
-						Image: "gcr.io/google_containers/mounttest:0.8",
+						Image: mountImage,
 						Args: []string{
 							"--file_content=/etc/secret-volume/data-1",
 							"--file_mode=/etc/secret-volume/data-1"},
@@ -245,8 +245,8 @@ var _ = framework.KubeDescribe("Secrets", func() {
 				Containers: []v1.Container{
 					{
 						Name:    deleteContainerName,
-						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/delete/data-1"},
+						Image:   mountImage,
+						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/delete/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      deleteVolumeName,
@@ -257,8 +257,8 @@ var _ = framework.KubeDescribe("Secrets", func() {
 					},
 					{
 						Name:    updateContainerName,
-						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/update/data-3"},
+						Image:   mountImage,
+						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/update/data-3"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      updateVolumeName,
@@ -269,8 +269,8 @@ var _ = framework.KubeDescribe("Secrets", func() {
 					},
 					{
 						Name:    createContainerName,
-						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/create/data-1"},
+						Image:   mountImage,
+						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/secret-volumes/create/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      createVolumeName,
@@ -342,7 +342,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "secret-env-test",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"sh", "-c", "env"},
 						Env: []v1.EnvVar{
 							{
@@ -385,7 +385,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 				Containers: []v1.Container{
 					{
 						Name:    "env-test",
-						Image:   "gcr.io/google_containers/busybox:1.24",
+						Image:   busyboxImage,
 						Command: []string{"sh", "-c", "env"},
 						EnvFrom: []v1.EnvFromSource{
 							{
@@ -470,7 +470,7 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secre
 			Containers: []v1.Container{
 				{
 					Name:  "secret-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.8",
+					Image: mountImage,
 					Args: []string{
 						"--file_content=/etc/secret-volume/data-1",
 						"--file_mode=/etc/secret-volume/data-1"},
@@ -547,7 +547,7 @@ func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 			Containers: []v1.Container{
 				{
 					Name:  "secret-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.8",
+					Image: mountImage,
 					Args: []string{
 						"--file_content=/etc/secret-volume/new-path-data-1",
 						"--file_mode=/etc/secret-volume/new-path-data-1"},

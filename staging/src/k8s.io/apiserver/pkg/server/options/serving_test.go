@@ -487,7 +487,7 @@ NextTest:
 				return
 			}
 
-			s, err := config.Complete().New("test", server.EmptyDelegate)
+			s, err := config.Complete(nil).New("test", server.EmptyDelegate)
 			if err != nil {
 				t.Errorf("%q - failed creating the server: %v", title, err)
 				return

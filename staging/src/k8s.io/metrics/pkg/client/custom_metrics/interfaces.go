@@ -19,7 +19,7 @@ package custom_metrics
 import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/metrics/pkg/apis/custom_metrics/v1alpha1"
+	"k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
 )
 
 // CustomMetricsClient is a client for fetching metrics
@@ -45,10 +45,10 @@ type NamespacedMetricsGetter interface {
 // MetricsInterface provides access to metrics describing Kubernetes objects.
 type MetricsInterface interface {
 	// GetForObject fetchs the given metric describing the given object.
-	GetForObject(groupKind schema.GroupKind, name string, metricName string) (*v1alpha1.MetricValue, error)
+	GetForObject(groupKind schema.GroupKind, name string, metricName string) (*v1beta1.MetricValue, error)
 
 	// GetForObjects fetches the given metric describing all objects of the given
 	// type matching the given label selector (or simply all objects of the given type
 	// if the selector is nil).
-	GetForObjects(groupKind schema.GroupKind, selector labels.Selector, metricName string) (*v1alpha1.MetricValueList, error)
+	GetForObjects(groupKind schema.GroupKind, selector labels.Selector, metricName string) (*v1beta1.MetricValueList, error)
 }

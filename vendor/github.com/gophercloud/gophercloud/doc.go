@@ -3,11 +3,17 @@ Package gophercloud provides a multi-vendor interface to OpenStack-compatible
 clouds. The library has a three-level hierarchy: providers, services, and
 resources.
 
-Provider structs represent the service providers that offer and manage a
-collection of services. The IdentityEndpoint is typically refered to as
-"auth_url" in information provided by the cloud operator. Additionally,
-the cloud may refer to TenantID or TenantName as project_id and project_name.
-These are defined like so:
+Authenticating with Providers
+
+Provider structs represent the cloud providers that offer and manage a
+collection of services. You will generally want to create one Provider
+client per OpenStack cloud.
+
+Use your OpenStack credentials to create a Provider client.  The
+IdentityEndpoint is typically refered to as "auth_url" or "OS_AUTH_URL" in
+information provided by the cloud operator. Additionally, the cloud may refer to
+TenantID or TenantName as project_id and project_name. Credentials are
+specified like so:
 
   opts := gophercloud.AuthOptions{
     IdentityEndpoint: "https://openstack.example.com:5000/v2.0",
@@ -18,6 +24,16 @@ These are defined like so:
 
   provider, err := openstack.AuthenticatedClient(opts)
 
+You may also use the openstack.AuthOptionsFromEnv() helper function. This
+function reads in standard environment variables frequently found in an
+OpenStack `openrc` file. Again note that Gophercloud currently uses "tenant"
+instead of "project".
+
+	opts, err := openstack.AuthOptionsFromEnv()
+	provider, err := openstack.AuthenticatedClient(opts)
+
+Service Clients
+
 Service structs are specific to a provider and handle all of the logic and
 operations for a particular OpenStack service. Examples of services include:
 Compute, Object Storage, Block Storage. In order to define one, you need to
@@ -26,6 +42,8 @@ pass in the parent provider, like so:
   opts := gophercloud.EndpointOpts{Region: "RegionOne"}
 
   client := openstack.NewComputeV2(provider, opts)
+
+Resources
 
 Resource structs are the domain models that services make use of in order
 to work with and represent the state of API resources:
@@ -61,6 +79,12 @@ of results:
     // Return "false" or an error to prematurely stop fetching new pages.
     return true, nil
   })
+
+If you want to obtain the entire collection of pages without doing any
+intermediary processing on each page, you can use the AllPages method:
+
+	allPages, err := servers.List(client, nil).AllPages()
+	allServers, err := servers.ExtractServers(allPages)
 
 This top-level package contains utility functions and data types that are used
 throughout the provider and service packages. Of particular note for end users

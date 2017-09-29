@@ -20,7 +20,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -210,13 +209,8 @@ func (p *sdLogProvider) buildFilter() (string, error) {
 		return fmt.Sprintf("resource.type=\"gke_cluster\" AND jsonPayload.metadata.namespace=\"%s\"",
 			p.framework.Namespace.Name), nil
 	case systemScope:
-		nodeFilters := []string{}
-		for _, nodeID := range utils.GetNodeIds(p.framework.ClientSet) {
-			nodeFilter := fmt.Sprintf("resource.labels.instance_id=%s", nodeID)
-			nodeFilters = append(nodeFilters, nodeFilter)
-		}
-		return fmt.Sprintf("resource.type=\"gce_instance\" AND (%s)",
-			strings.Join(nodeFilters, " OR ")), nil
+		// TODO(instrumentation): Filter logs from the current project only.
+		return "resource.type=\"gce_instance\"", nil
 	}
 	return "", fmt.Errorf("Unknown log provider scope: %v", p.scope)
 }
@@ -315,23 +309,27 @@ func (p *sdLogProvider) tryGetName(sdLogEntry sd.LogEntry) (string, bool) {
 	return "", false
 }
 
-func convertLogEntry(sdLogEntry sd.LogEntry) (utils.LogEntry, error) {
+func convertLogEntry(sdLogEntry sd.LogEntry) (entry utils.LogEntry, err error) {
+	entry = utils.LogEntry{LogName: sdLogEntry.LogName}
 	if sdLogEntry.TextPayload != "" {
-		return utils.LogEntry{TextPayload: sdLogEntry.TextPayload}, nil
+		entry.TextPayload = sdLogEntry.TextPayload
+		return
 	}
 
 	bytes, err := sdLogEntry.JsonPayload.MarshalJSON()
 	if err != nil {
-		return utils.LogEntry{}, fmt.Errorf("Failed to get jsonPayload from LogEntry %v", sdLogEntry)
+		err = fmt.Errorf("Failed to get jsonPayload from LogEntry %v", sdLogEntry)
+		return
 	}
 
 	var jsonObject map[string]interface{}
 	err = json.Unmarshal(bytes, &jsonObject)
 	if err != nil {
-		return utils.LogEntry{},
-			fmt.Errorf("Failed to deserialize jsonPayload as json object %s", string(bytes[:]))
+		err = fmt.Errorf("Failed to deserialize jsonPayload as json object %s", string(bytes[:]))
+		return
 	}
-	return utils.LogEntry{JSONPayload: jsonObject}, nil
+	entry.JSONPayload = jsonObject
+	return
 }
 
 func pullAndAck(service *pubsub.Service, subs *pubsub.Subscription) ([]*pubsub.ReceivedMessage, error) {

@@ -66,12 +66,13 @@ func (obj *baz) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKin
 // childStructs tests some of the types we serialize to query params for log API calls
 // notably, the nested time struct
 type childStructs struct {
-	Container    string       `json:"container,omitempty"`
-	Follow       bool         `json:"follow,omitempty"`
-	Previous     bool         `json:"previous,omitempty"`
-	SinceSeconds *int64       `json:"sinceSeconds,omitempty"`
-	SinceTime    *metav1.Time `json:"sinceTime,omitempty"`
-	EmptyTime    *metav1.Time `json:"emptyTime"`
+	Container      string       `json:"container,omitempty"`
+	Follow         bool         `json:"follow,omitempty"`
+	Previous       bool         `json:"previous,omitempty"`
+	SinceSeconds   *int64       `json:"sinceSeconds,omitempty"`
+	SinceTime      *metav1.Time `json:"sinceTime,omitempty"`
+	EmptyTime      *metav1.Time `json:"emptyTime"`
+	NonPointerTime metav1.Time  `json:"nonPointerTime"`
 }
 
 func (obj *childStructs) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
@@ -177,24 +178,26 @@ func TestConvert(t *testing.T) {
 		},
 		{
 			input: &childStructs{
-				Container:    "mycontainer",
-				Follow:       true,
-				Previous:     true,
-				SinceSeconds: &sinceSeconds,
-				SinceTime:    &sinceTime, // test a custom marshaller
-				EmptyTime:    nil,        // test a nil custom marshaller without omitempty
+				Container:      "mycontainer",
+				Follow:         true,
+				Previous:       true,
+				SinceSeconds:   &sinceSeconds,
+				SinceTime:      &sinceTime, // test a custom marshaller
+				EmptyTime:      nil,        // test a nil custom marshaller without omitempty
+				NonPointerTime: sinceTime,
 			},
-			expected: url.Values{"container": {"mycontainer"}, "follow": {"true"}, "previous": {"true"}, "sinceSeconds": {"123"}, "sinceTime": {"2000-01-01T12:34:56Z"}, "emptyTime": {""}},
+			expected: url.Values{"container": {"mycontainer"}, "follow": {"true"}, "previous": {"true"}, "sinceSeconds": {"123"}, "sinceTime": {"2000-01-01T12:34:56Z"}, "emptyTime": {""}, "nonPointerTime": {"2000-01-01T12:34:56Z"}},
 		},
 		{
 			input: &childStructs{
-				Container:    "mycontainer",
-				Follow:       true,
-				Previous:     true,
-				SinceSeconds: &sinceSeconds,
-				SinceTime:    nil, // test a nil custom marshaller with omitempty
+				Container:      "mycontainer",
+				Follow:         true,
+				Previous:       true,
+				SinceSeconds:   &sinceSeconds,
+				SinceTime:      nil, // test a nil custom marshaller with omitempty
+				NonPointerTime: sinceTime,
 			},
-			expected: url.Values{"container": {"mycontainer"}, "follow": {"true"}, "previous": {"true"}, "sinceSeconds": {"123"}, "emptyTime": {""}},
+			expected: url.Values{"container": {"mycontainer"}, "follow": {"true"}, "previous": {"true"}, "sinceSeconds": {"123"}, "emptyTime": {""}, "nonPointerTime": {"2000-01-01T12:34:56Z"}},
 		},
 	}
 

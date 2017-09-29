@@ -43,6 +43,7 @@ type flexVolumePlugin struct {
 
 	sync.Mutex
 	unsupportedCommands []string
+	capabilities        DriverCapabilities
 }
 
 type flexVolumeAttachablePlugin struct {
@@ -52,7 +53,13 @@ type flexVolumeAttachablePlugin struct {
 var _ volume.AttachableVolumePlugin = &flexVolumeAttachablePlugin{}
 var _ volume.PersistentVolumePlugin = &flexVolumePlugin{}
 
-func NewFlexVolumePlugin(pluginDir, name string) (volume.VolumePlugin, error) {
+type PluginFactory interface {
+	NewFlexVolumePlugin(pluginDir, driverName string) (volume.VolumePlugin, error)
+}
+
+type pluginFactory struct{}
+
+func (pluginFactory) NewFlexVolumePlugin(pluginDir, name string) (volume.VolumePlugin, error) {
 	execPath := path.Join(pluginDir, name)
 
 	driverName := utilstrings.UnescapePluginName(name)
@@ -64,13 +71,15 @@ func NewFlexVolumePlugin(pluginDir, name string) (volume.VolumePlugin, error) {
 		unsupportedCommands: []string{},
 	}
 
-	// Check whether the plugin is attachable.
-	ok, err := isAttachable(flexPlugin)
+	// Initialize the plugin and probe the capabilities
+	call := flexPlugin.NewDriverCall(initCmd)
+	ds, err := call.Run()
 	if err != nil {
 		return nil, err
 	}
+	flexPlugin.capabilities = *ds.Capabilities
 
-	if ok {
+	if flexPlugin.capabilities.Attach {
 		// Plugin supports attach/detach, so return flexVolumeAttachablePlugin
 		return &flexVolumeAttachablePlugin{flexVolumePlugin: flexPlugin}, nil
 	} else {
@@ -78,30 +87,11 @@ func NewFlexVolumePlugin(pluginDir, name string) (volume.VolumePlugin, error) {
 	}
 }
 
-func isAttachable(plugin *flexVolumePlugin) (bool, error) {
-	call := plugin.NewDriverCall(initCmd)
-	res, err := call.Run()
-	if err != nil {
-		return false, err
-	}
-
-	// By default all plugins are attachable, unless they report otherwise.
-	cap, ok := res.Capabilities[attachCapability]
-	if ok {
-		// cap is false, so plugin does not support attach/detach calls.
-		return cap, nil
-	}
-
-	return true, nil
-}
-
 // Init is part of the volume.VolumePlugin interface.
 func (plugin *flexVolumePlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
-	// call the init script
-	call := plugin.NewDriverCall(initCmd)
-	_, err := call.Run()
-	return err
+	// Hardwired 'success' as any errors from calling init() will be caught by NewFlexVolumePlugin()
+	return nil
 }
 
 func (plugin *flexVolumePlugin) getExecutable() string {
@@ -158,7 +148,7 @@ func (plugin *flexVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMod
 
 // NewMounter is part of the volume.VolumePlugin interface.
 func (plugin *flexVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(), plugin.runner)
+	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(plugin.GetPluginName()), plugin.runner)
 }
 
 // newMounterInternal is the internal mounter routine to build the volume.
@@ -176,16 +166,15 @@ func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.P
 			podServiceAccountName: pod.Spec.ServiceAccountName,
 			volName:               spec.Name(),
 		},
-		runner:             runner,
-		spec:               spec,
-		readOnly:           readOnly,
-		blockDeviceMounter: &mount.SafeFormatAndMount{Interface: mounter, Runner: runner},
+		runner:   runner,
+		spec:     spec,
+		readOnly: readOnly,
 	}, nil
 }
 
 // NewUnmounter is part of the volume.VolumePlugin interface.
 func (plugin *flexVolumePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter(), plugin.runner)
+	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter(plugin.GetPluginName()), plugin.runner)
 }
 
 // newUnmounterInternal is the internal unmounter routine to clean the volume.
@@ -254,7 +243,7 @@ func (plugin *flexVolumePlugin) isUnsupported(command string) bool {
 }
 
 func (plugin *flexVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
-	mounter := plugin.host.GetMounter()
+	mounter := plugin.host.GetMounter(plugin.GetPluginName())
 	return mount.GetMountRefs(mounter, deviceMountPath)
 }
 

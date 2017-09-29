@@ -190,6 +190,13 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 					return metricValues{{value: float64(s.Cpu.CFS.ThrottledTime) / float64(time.Second)}}
 				},
 			}, {
+				name:      "container_cpu_load_average_10s",
+				help:      "Value of container cpu load average over the last 10 seconds.",
+				valueType: prometheus.GaugeValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Cpu.LoadAverage)}}
+				},
+			}, {
 				name:      "container_memory_cache",
 				help:      "Number of bytes of page cache memory.",
 				valueType: prometheus.GaugeValue,
@@ -579,6 +586,84 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 					return values
 				},
 			}, {
+				name:        "container_network_tcp_usage_total",
+				help:        "tcp connection usage statistic for container",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"tcp_state"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{
+						{
+							value:  float64(s.Network.Tcp.Established),
+							labels: []string{"established"},
+						},
+						{
+							value:  float64(s.Network.Tcp.SynSent),
+							labels: []string{"synsent"},
+						},
+						{
+							value:  float64(s.Network.Tcp.SynRecv),
+							labels: []string{"synrecv"},
+						},
+						{
+							value:  float64(s.Network.Tcp.FinWait1),
+							labels: []string{"finwait1"},
+						},
+						{
+							value:  float64(s.Network.Tcp.FinWait2),
+							labels: []string{"finwait2"},
+						},
+						{
+							value:  float64(s.Network.Tcp.TimeWait),
+							labels: []string{"timewait"},
+						},
+						{
+							value:  float64(s.Network.Tcp.Close),
+							labels: []string{"close"},
+						},
+						{
+							value:  float64(s.Network.Tcp.CloseWait),
+							labels: []string{"closewait"},
+						},
+						{
+							value:  float64(s.Network.Tcp.LastAck),
+							labels: []string{"lastack"},
+						},
+						{
+							value:  float64(s.Network.Tcp.Listen),
+							labels: []string{"listen"},
+						},
+						{
+							value:  float64(s.Network.Tcp.Closing),
+							labels: []string{"closing"},
+						},
+					}
+				},
+			}, {
+				name:        "container_network_udp_usage_total",
+				help:        "udp connection usage statistic for container",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"udp_state"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{
+						{
+							value:  float64(s.Network.Udp.Listen),
+							labels: []string{"listen"},
+						},
+						{
+							value:  float64(s.Network.Udp.Dropped),
+							labels: []string{"dropped"},
+						},
+						{
+							value:  float64(s.Network.Udp.RxQueued),
+							labels: []string{"rxqueued"},
+						},
+						{
+							value:  float64(s.Network.Udp.TxQueued),
+							labels: []string{"txqueued"},
+						},
+					}
+				},
+			}, {
 				name:        "container_tasks_state",
 				help:        "Number of tasks in given state",
 				extraLabels: []string{"state"},
@@ -610,6 +695,7 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCo
 			},
 		},
 	}
+
 	return c
 }
 

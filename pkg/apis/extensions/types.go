@@ -166,6 +166,8 @@ type ThirdPartyResourceData struct {
 }
 
 // +genclient
+// +genclient:method=GetScale,verb=get,subresource=scale,result=Scale
+// +genclient:method=UpdateScale,verb=update,subresource=scale,input=Scale,result=Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Deployment struct {
@@ -224,10 +226,10 @@ type DeploymentSpec struct {
 	// The maximum time in seconds for a deployment to make progress before it
 	// is considered to be failed. The deployment controller will continue to
 	// process failed deployments and a condition with a ProgressDeadlineExceeded
-	// reason will be surfaced in the deployment status. Once autoRollback is
-	// implemented, the deployment controller will automatically rollback failed
-	// deployments. Note that progress will not be estimated during the time a
-	// deployment is paused. This is not set by default.
+	// reason will be surfaced in the deployment status. Note that progress will
+	// not be estimated during the time a deployment is paused. This is not set
+	// by default.
+	// +optional
 	ProgressDeadlineSeconds *int32
 }
 
@@ -334,7 +336,9 @@ type DeploymentStatus struct {
 	// +optional
 	AvailableReplicas int32
 
-	// Total number of unavailable pods targeted by this deployment.
+	// Total number of unavailable pods targeted by this deployment. This is the total number of
+	// pods that are still required for the deployment to have 100% available capacity. They may
+	// either be pods that are running but not yet available or pods that still have not been created.
 	// +optional
 	UnavailableReplicas int32
 
@@ -345,7 +349,7 @@ type DeploymentStatus struct {
 	// field as a collision avoidance mechanism when it needs to create the name for the
 	// newest ReplicaSet.
 	// +optional
-	CollisionCount *int64
+	CollisionCount *int32
 }
 
 type DeploymentConditionType string
@@ -519,7 +523,7 @@ type DaemonSetStatus struct {
 	// uses this field as a collision avoidance mechanism when it needs to
 	// create the name for the newest ControllerRevision.
 	// +optional
-	CollisionCount *int64
+	CollisionCount *int32
 }
 
 // +genclient
@@ -751,6 +755,8 @@ type IngressBackend struct {
 }
 
 // +genclient
+// +genclient:method=GetScale,verb=get,subresource=scale,result=Scale
+// +genclient:method=UpdateScale,verb=update,subresource=scale,input=Scale,result=Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ReplicaSet represents the configuration of a replica set.
@@ -892,6 +898,7 @@ type PodSecurityPolicySpec struct {
 	// AllowedCapabilities is a list of capabilities that can be requested to add to the container.
 	// Capabilities in this field may be added at the pod author's discretion.
 	// You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.
+	// To allow all capabilities you may use '*'.
 	// +optional
 	AllowedCapabilities []api.Capability
 	// Volumes is a white list of allowed volume plugins.  Empty indicates that all plugins
@@ -933,6 +940,22 @@ type PodSecurityPolicySpec struct {
 	// privilege escalation.
 	// +optional
 	AllowPrivilegeEscalation bool
+	// AllowedHostPaths is a white list of allowed host paths. Empty indicates that all host paths may be used.
+	// +optional
+	AllowedHostPaths []AllowedHostPath
+}
+
+// AllowedHostPath defines the host volume conditions that will be enabled by a policy
+// for pods to use. It requires the path prefix to be defined.
+type AllowedHostPath struct {
+	// PathPrefix is the path prefix that the host volume must match.
+	// PathPrefix does not support `*`.
+	// Trailing slashes are trimmed when validating the path prefix with a host path.
+	//
+	// Examples:
+	// `/foo` would allow `/foo`, `/foo/` and `/foo/bar`
+	// `/foo` would not allow `/food` or `/etc/foo`
+	PathPrefix string
 }
 
 // HostPortRange defines a range of host ports that will be enabled by a policy
@@ -943,6 +966,10 @@ type HostPortRange struct {
 	// Max is the end of the range, inclusive.
 	Max int
 }
+
+// AllowAllCapabilities can be used as a value for the PodSecurityPolicy.AllowAllCapabilities
+// field and means that any capabilities are allowed to be requested.
+var AllowAllCapabilities api.Capability = "*"
 
 // FSType gives strong typing to different file systems that are used by volumes.
 type FSType string

@@ -58,9 +58,6 @@ resources:
         name: testprovider
         configfile: testproviderconfig
         cachesize: 10
-    - cloudprovidedkms:
-        name: testprovider
-        cachesize: 10
     - aescbc:
         keys:
         - name: key1
@@ -100,9 +97,6 @@ resources:
           secret: c2VjcmV0IGlzIHNlY3VyZQ==
         - name: key2
           secret: dGhpcyBpcyBwYXNzd29yZA==
-    - cloudprovidedkms:
-        name: testprovider
-        cachesize: 10
     - identity: {}
 `
 
@@ -124,9 +118,6 @@ resources:
         configfile: testproviderconfig
         cachesize: 10
     - identity: {}
-    - cloudprovidedkms:
-        name: testprovider
-        cachesize: 10
     - secretbox:
         keys:
         - name: key1
@@ -150,9 +141,6 @@ resources:
         keys:
         - name: key1
           secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
-    - cloudprovidedkms:
-        name: testprovider
-        cachesize: 10
     - aescbc:
         keys:
         - name: key1
@@ -194,45 +182,6 @@ resources:
         - name: key2
           secret: dGhpcyBpcyBwYXNzd29yZA==
     - identity: {}
-    - cloudprovidedkms:
-        name: testprovider
-        cachesize: 10
-    - aesgcm:
-        keys:
-        - name: key1
-          secret: c2VjcmV0IGlzIHNlY3VyZQ==
-        - name: key2
-          secret: dGhpcyBpcyBwYXNzd29yZA==
-`
-
-	correctConfigWithCloudProvidedKMSFirst = `
-kind: EncryptionConfig
-apiVersion: v1
-resources:
-  - resources:
-    - secrets
-    providers:
-    - cloudprovidedkms:
-        name: testprovider
-        cachesize: 10
-    - kms:
-        name: testprovider
-        configfile: testproviderconfig
-        cachesize: 10
-    - secretbox:
-        keys:
-        - name: key1
-          secret: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
-    - aescbc:
-        keys:
-        - name: key1
-          secret: c2VjcmV0IGlzIHNlY3VyZQ==
-        - name: key2
-          secret: dGhpcyBpcyBwYXNzd29yZA==
-    - identity: {}
-    - cloudprovidedkms:
-        name: testprovider
-        cachesize: 10
     - aesgcm:
         keys:
         - name: key1
@@ -300,14 +249,8 @@ var _ envelope.Service = &testEnvelopeService{}
 func TestEncryptionProviderConfigCorrect(t *testing.T) {
 	os.OpenFile(testEnvelopeServiceConfigPath, os.O_CREATE, 0666)
 	defer os.Remove(testEnvelopeServiceConfigPath)
-	KMSPluginRegistry.Register(testEnvelopeServiceProviderName, func(config io.Reader) (envelope.Service, error) {
+	KMSPluginRegistry.Register(testEnvelopeServiceProviderName, func(_ io.Reader) (envelope.Service, error) {
 		return &testEnvelopeService{}, nil
-	})
-	KMSPluginRegistry.RegisterCloudProvidedKMSPlugin(func(name string) (envelope.Service, error) {
-		if name == testEnvelopeServiceProviderName {
-			return &testEnvelopeService{}, nil
-		}
-		return nil, fmt.Errorf("no such cloud provided KMS plugin registered: %q", name)
 	})
 
 	// Creates compound/prefix transformers with different ordering of available transformers.
@@ -338,18 +281,12 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithKMSFirst)
 	}
 
-	cloudProvidedKMSFirstTransformerOverrides, err := ParseEncryptionConfiguration(strings.NewReader(correctConfigWithCloudProvidedKMSFirst))
-	if err != nil {
-		t.Fatalf("error while parsing configuration file: %s.\nThe file was:\n%s", err, correctConfigWithCloudProvidedKMSFirst)
-	}
-
 	// Pick the transformer for any of the returned resources.
 	identityFirstTransformer := identityFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
 	aesGcmFirstTransformer := aesGcmFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
 	aesCbcFirstTransformer := aesCbcFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
 	secretboxFirstTransformer := secretboxFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
 	kmsFirstTransformer := kmsFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
-	cloudProvidedKMSFirstTransformer := cloudProvidedKMSFirstTransformerOverrides[schema.ParseGroupResource("secrets")]
 
 	context := value.DefaultContext([]byte(sampleContextText))
 	originalText := []byte(sampleText)
@@ -363,7 +300,6 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 		{secretboxFirstTransformer, "secretboxFirst"},
 		{identityFirstTransformer, "identityFirst"},
 		{kmsFirstTransformer, "kmsFirst"},
-		{cloudProvidedKMSFirstTransformer, "cloudProvidedKMSFirst"},
 	}
 
 	for _, testCase := range transformers {

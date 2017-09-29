@@ -49,11 +49,13 @@ type Resources interface {
 // - Map is a map of string to one and only one given subtype
 // - Primitive can be string, integer, number and boolean.
 // - Kind is an object with specific fields mapping to specific types.
+// - Reference is a link to another definition.
 type SchemaVisitor interface {
 	VisitArray(*Array)
 	VisitMap(*Map)
 	VisitPrimitive(*Primitive)
 	VisitKind(*Kind)
+	VisitReference(Reference)
 }
 
 // Schema is the base definition of an openapi type.
@@ -218,4 +220,12 @@ func (p *Primitive) GetName() string {
 		return p.Type
 	}
 	return fmt.Sprintf("%s (%s)", p.Type, p.Format)
+}
+
+// Reference implementation depends on the type of document.
+type Reference interface {
+	Schema
+
+	Reference() string
+	SubSchema() Schema
 }

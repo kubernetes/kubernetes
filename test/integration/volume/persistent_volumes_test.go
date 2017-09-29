@@ -245,8 +245,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 	claims := []*v1.PersistentVolumeClaim{}
 	for counter <= maxClaims {
 		counter += 1
-		clone, _ := api.Scheme.DeepCopy(pvc)
-		newPvc, _ := clone.(*v1.PersistentVolumeClaim)
+		newPvc := pvc.DeepCopy()
 		newPvc.ObjectMeta = metav1.ObjectMeta{Name: fmt.Sprintf("fake-pvc-race-%d", counter)}
 		claim, err := testClient.CoreV1().PersistentVolumeClaims(ns.Name).Create(newPvc)
 		if err != nil {

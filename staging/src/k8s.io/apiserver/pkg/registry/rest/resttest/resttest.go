@@ -207,6 +207,7 @@ func (t *Tester) TestList(valid runtime.Object, assignFn AssignFunc) {
 	t.testListNotFound(assignFn)
 	t.testListFound(valid.DeepCopyObject(), assignFn)
 	t.testListMatchLabels(valid.DeepCopyObject(), assignFn)
+	t.testListTableConversion(valid.DeepCopyObject(), assignFn)
 }
 
 // Test watching objects.
@@ -1044,7 +1045,7 @@ func (t *Tester) testDeleteGracefulShorten(obj runtime.Object, createFn CreateFu
 	}
 	objectMeta = t.getObjectMetaOrFail(object)
 	if objectMeta.GetDeletionTimestamp() == nil || objectMeta.GetDeletionGracePeriodSeconds() == nil ||
-		*objectMeta.GetDeletionGracePeriodSeconds() != expectedGrace || !objectMeta.GetDeletionTimestamp().Before(deletionTimestamp) {
+		*objectMeta.GetDeletionGracePeriodSeconds() != expectedGrace || !objectMeta.GetDeletionTimestamp().Before(&deletionTimestamp) {
 		t.Errorf("unexpected deleted meta: %#v", objectMeta)
 	}
 }
@@ -1253,6 +1254,97 @@ func (t *Tester) testListNotFound(assignFn AssignFunc) {
 	}
 	if len(items) != 0 {
 		t.Errorf("unexpected items: %#v", items)
+	}
+}
+
+// testListTableConversion verifies a set of known bounds and expected limitations for the values
+// returned from a TableList. These conditions may be changed if necessary with adequate review.
+func (t *Tester) testListTableConversion(obj runtime.Object, assignFn AssignFunc) {
+	ctx := t.TestContext()
+	testLabels := map[string]string{"key": "value"}
+
+	foo3 := obj.DeepCopyObject()
+	t.setObjectMeta(foo3, "foo3")
+	foo4 := obj.DeepCopyObject()
+	foo4Meta := t.getObjectMetaOrFail(foo4)
+	foo4Meta.SetName("foo4")
+	foo4Meta.SetNamespace(genericapirequest.NamespaceValue(ctx))
+	foo4Meta.SetLabels(testLabels)
+
+	objs := ([]runtime.Object{foo3, foo4})
+
+	assignFn(objs)
+
+	options := &metainternalversion.ListOptions{}
+	listObj, err := t.storage.(rest.Lister).List(ctx, options)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	items, err := listToItems(listObj)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(items) != len(objs) {
+		t.Errorf("unexpected number of items: %v", len(items))
+	}
+	if !apiequality.Semantic.DeepEqual(objs, items) {
+		t.Errorf("expected: %#v, got: %#v", objs, items)
+	}
+
+	table, err := t.storage.(rest.TableConvertor).ConvertToTable(ctx, listObj, nil)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(table.Rows) != len(items) {
+		t.Errorf("unexpected number of rows: %v", len(table.Rows))
+	}
+	columns := table.ColumnDefinitions
+	if len(columns) == 0 {
+		t.Errorf("unexpected number of columns: %v", len(columns))
+	}
+	if columns[0].Name != "Name" || columns[0].Type != "string" || columns[0].Format != "name" {
+		t.Errorf("expect column 0 to be the name column: %#v", columns[0])
+	}
+	for j, column := range columns {
+		if len(column.Name) == 0 {
+			t.Errorf("column %d has no name", j)
+		}
+		switch column.Type {
+		case "string", "date", "integer":
+		default:
+			t.Errorf("column %d has unexpected type: %q", j, column.Type)
+		}
+		switch {
+		case column.Format == "":
+		case column.Format == "name" && column.Type == "string":
+		default:
+			t.Errorf("column %d has unexpected format: %q with type %q", j, column.Format, column.Type)
+		}
+		if column.Priority < 0 || column.Priority > 2 {
+			t.Errorf("column %d has unexpected priority", j, column.Priority)
+		}
+		if len(column.Description) == 0 {
+			t.Errorf("column %d has no description", j)
+		}
+		if column.Name == "Created At" && column.Type != "date" && column.Format != "" {
+			t.Errorf("column %d looks like a created at column, but has a different type and format: %#v", j, column)
+		}
+	}
+	for i, row := range table.Rows {
+		if len(row.Cells) != len(table.ColumnDefinitions) {
+			t.Errorf("row %d did not have the correct number of cells: %d in %v", len(table.ColumnDefinitions), row.Cells)
+		}
+		for j, cell := range row.Cells {
+			// do not add to this test without discussion - may break clients
+			switch cell.(type) {
+			case float64, int64, int32, int, string, bool:
+			case []interface{}:
+			default:
+				t.Errorf("row %d, cell %d has an unrecognized type, only JSON serialization safe types are allowed: %T ", i, j, cell)
+			}
+		}
+		if len(row.Cells) != len(table.ColumnDefinitions) {
+		}
 	}
 }
 

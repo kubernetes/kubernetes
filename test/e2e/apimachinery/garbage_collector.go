@@ -21,7 +21,7 @@ import (
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
-	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
@@ -41,6 +41,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 func getForegroundOptions() *metav1.DeleteOptions {
@@ -66,7 +67,7 @@ func getNonOrphanOptions() *metav1.DeleteOptions {
 var (
 	zero = int64(0)
 
-	CronJobGroupVersionResource = schema.GroupVersionResource{Group: batchv2alpha1.GroupName, Version: "v2alpha1", Resource: "cronjobs"}
+	CronJobGroupVersionResource = schema.GroupVersionResource{Group: batchv1beta1.GroupName, Version: "v1beta1", Resource: "cronjobs"}
 )
 
 func getPodTemplateSpec(labels map[string]string) v1.PodTemplateSpec {
@@ -79,7 +80,7 @@ func getPodTemplateSpec(labels map[string]string) v1.PodTemplateSpec {
 			Containers: []v1.Container{
 				{
 					Name:  "nginx",
-					Image: "gcr.io/google_containers/nginx-slim:0.7",
+					Image: imageutils.GetE2EImage(imageutils.NginxSlim),
 				},
 			},
 		},
@@ -179,7 +180,7 @@ func newGCPod(name string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "nginx",
-					Image: "gcr.io/google_containers/nginx:1.7.9",
+					Image: imageutils.GetE2EImage(imageutils.NginxSlim),
 				},
 			},
 		},
@@ -217,7 +218,7 @@ func verifyRemainingCronJobsJobsPods(f *framework.Framework, clientSet clientset
 	cjNum, jobNum, podNum int) (bool, error) {
 	var ret = true
 
-	cronJobs, err := f.ClientSet.BatchV2alpha1().CronJobs(f.Namespace.Name).List(metav1.ListOptions{})
+	cronJobs, err := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name).List(metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list cronjobs: %v", err)
 	}
@@ -264,19 +265,19 @@ func gatherMetrics(f *framework.Framework) {
 	}
 }
 
-func newCronJob(name, schedule string) *batchv2alpha1.CronJob {
+func newCronJob(name, schedule string) *batchv1beta1.CronJob {
 	parallelism := int32(1)
 	completions := int32(1)
-	return &batchv2alpha1.CronJob{
+	return &batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind: "CronJob",
 		},
-		Spec: batchv2alpha1.CronJobSpec{
+		Spec: batchv1beta1.CronJobSpec{
 			Schedule: schedule,
-			JobTemplate: batchv2alpha1.JobTemplateSpec{
+			JobTemplate: batchv1beta1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
 					Parallelism: &parallelism,
 					Completions: &completions,
@@ -287,7 +288,7 @@ func newCronJob(name, schedule string) *batchv2alpha1.CronJob {
 							Containers: []v1.Container{
 								{
 									Name:    "c",
-									Image:   "gcr.io/google_containers/busybox:1.24",
+									Image:   imageutils.GetBusyBoxImage(),
 									Command: []string{"sleep", "300"},
 								},
 							},
@@ -940,7 +941,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 		By("Create the cronjob")
 		cronJob := newCronJob("simple", "*/1 * * * ?")
-		cronJob, err := f.ClientSet.BatchV2alpha1().CronJobs(f.Namespace.Name).Create(cronJob)
+		cronJob, err := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name).Create(cronJob)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Wait for the CronJob to create new Job")
@@ -956,7 +957,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 
 		By("Delete the cronjob")
-		if err := f.ClientSet.BatchV2alpha1().CronJobs(f.Namespace.Name).Delete(cronJob.Name, getBackgroundOptions()); err != nil {
+		if err := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name).Delete(cronJob.Name, getBackgroundOptions()); err != nil {
 			framework.Failf("Failed to delete the CronJob: %v", err)
 		}
 		By("Verify if cronjob does not leave jobs nor pods behind")

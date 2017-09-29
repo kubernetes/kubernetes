@@ -1,13 +1,9 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = ["validate.go"],
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/google/cadvisor/container/docker:go_default_library",
         "//vendor/github.com/google/cadvisor/manager:go_default_library",
@@ -27,4 +23,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

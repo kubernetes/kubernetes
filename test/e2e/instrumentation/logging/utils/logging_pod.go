@@ -134,27 +134,38 @@ func (p *loadLoggingPod) ExpectedLineCount() int {
 	return p.expectedLinesCount
 }
 
-var _ LoggingPod = &repeatingLoggingPod{}
-
-type repeatingLoggingPod struct {
-	name string
-	line string
-}
-
 // NewRepeatingLoggingPod returns a logging pod that each second prints
 // line value to its stdout.
 func NewRepeatingLoggingPod(podName string, line string) LoggingPod {
-	return &repeatingLoggingPod{
+	cmd := []string{
+		"/bin/sh",
+		"-c",
+		fmt.Sprintf("while :; do echo '%s'; sleep 1; done", line),
+	}
+	return NewExecLoggingPod(podName, cmd)
+}
+
+var _ LoggingPod = &execLoggingPod{}
+
+type execLoggingPod struct {
+	name string
+	cmd  []string
+}
+
+// NewExecLoggingPod returns a logging pod that produces logs through
+// executing a command, passed in cmd.
+func NewExecLoggingPod(podName string, cmd []string) LoggingPod {
+	return &execLoggingPod{
 		name: podName,
-		line: line,
+		cmd:  cmd,
 	}
 }
 
-func (p *repeatingLoggingPod) Name() string {
+func (p *execLoggingPod) Name() string {
 	return p.name
 }
 
-func (p *repeatingLoggingPod) Start(f *framework.Framework) error {
+func (p *execLoggingPod) Start(f *framework.Framework) error {
 	framework.Logf("Starting repeating logging pod %s", p.name)
 	f.PodClient().Create(&api_v1.Pod{
 		ObjectMeta: meta_v1.ObjectMeta{
@@ -163,13 +174,9 @@ func (p *repeatingLoggingPod) Start(f *framework.Framework) error {
 		Spec: api_v1.PodSpec{
 			Containers: []api_v1.Container{
 				{
-					Name:  loggingContainerName,
-					Image: "busybox",
-					Command: []string{
-						"/bin/sh",
-						"-c",
-						fmt.Sprintf("while :; do echo '%s'; sleep 1; done", p.line),
-					},
+					Name:    loggingContainerName,
+					Image:   "busybox",
+					Command: p.cmd,
 					Resources: api_v1.ResourceRequirements{
 						Requests: api_v1.ResourceList{
 							api_v1.ResourceCPU: *resource.NewMilliQuantity(

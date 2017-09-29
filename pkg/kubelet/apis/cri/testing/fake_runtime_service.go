@@ -50,9 +50,22 @@ type FakeRuntimeService struct {
 
 	Called []string
 
-	FakeStatus *runtimeapi.RuntimeStatus
-	Containers map[string]*FakeContainer
-	Sandboxes  map[string]*FakePodSandbox
+	FakeStatus         *runtimeapi.RuntimeStatus
+	Containers         map[string]*FakeContainer
+	Sandboxes          map[string]*FakePodSandbox
+	FakeContainerStats map[string]*runtimeapi.ContainerStats
+}
+
+func (r *FakeRuntimeService) GetContainerID(sandboxID, name string, attempt uint32) (string, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	for id, c := range r.Containers {
+		if c.SandboxID == sandboxID && c.Metadata.Name == name && c.Metadata.Attempt == attempt {
+			return id, nil
+		}
+	}
+	return "", fmt.Errorf("container (name, attempt, sandboxID)=(%q, %d, %q) not found", name, attempt, sandboxID)
 }
 
 func (r *FakeRuntimeService) SetFakeSandboxes(sandboxes []*FakePodSandbox) {
@@ -90,9 +103,10 @@ func (r *FakeRuntimeService) AssertCalls(calls []string) error {
 
 func NewFakeRuntimeService() *FakeRuntimeService {
 	return &FakeRuntimeService{
-		Called:     make([]string, 0),
-		Containers: make(map[string]*FakeContainer),
-		Sandboxes:  make(map[string]*FakePodSandbox),
+		Called:             make([]string, 0),
+		Containers:         make(map[string]*FakeContainer),
+		Sandboxes:          make(map[string]*FakePodSandbox),
+		FakeContainerStats: make(map[string]*runtimeapi.ContainerStats),
 	}
 }
 
@@ -394,10 +408,54 @@ func (r *FakeRuntimeService) UpdateRuntimeConfig(runtimeCOnfig *runtimeapi.Runti
 	return nil
 }
 
-func (r *FakeRuntimeService) ContainerStats(req *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
-	return nil, fmt.Errorf("Not implemented")
+func (r *FakeRuntimeService) SetFakeContainerStats(containerStats []*runtimeapi.ContainerStats) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.FakeContainerStats = make(map[string]*runtimeapi.ContainerStats)
+	for _, s := range containerStats {
+		r.FakeContainerStats[s.Attributes.Id] = s
+	}
 }
 
-func (r *FakeRuntimeService) ListContainerStats(req *runtimeapi.ListContainerStatsRequest) (*runtimeapi.ListContainerStatsResponse, error) {
-	return nil, fmt.Errorf("Not implemented")
+func (r *FakeRuntimeService) ContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "ContainerStats")
+
+	s, found := r.FakeContainerStats[containerID]
+	if !found {
+		return nil, fmt.Errorf("no stats for container %q", containerID)
+	}
+	return s, nil
+}
+
+func (r *FakeRuntimeService) ListContainerStats(filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "ListContainerStats")
+
+	var result []*runtimeapi.ContainerStats
+	for _, c := range r.Containers {
+		if filter != nil {
+			if filter.Id != "" && filter.Id != c.Id {
+				continue
+			}
+			if filter.PodSandboxId != "" && filter.PodSandboxId != c.SandboxID {
+				continue
+			}
+			if filter.LabelSelector != nil && !filterInLabels(filter.LabelSelector, c.GetLabels()) {
+				continue
+			}
+		}
+		s, found := r.FakeContainerStats[c.Id]
+		if !found {
+			continue
+		}
+		result = append(result, s)
+	}
+
+	return result, nil
 }

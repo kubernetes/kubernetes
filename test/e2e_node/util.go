@@ -22,20 +22,20 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os/exec"
 	"reflect"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
 
-	"k8s.io/api/core/v1"
+	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -44,6 +44,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // TODO(random-liu): Get this automatically from kubelet flag.
@@ -51,6 +52,7 @@ var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "H
 
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
+var busyboxImage = imageutils.GetBusyBoxImage()
 
 func getNodeSummary() (*stats.Summary, error) {
 	req, err := http.NewRequest("GET", *kubeletAddress+"/stats/summary", nil)
@@ -98,19 +100,14 @@ func tempSetCurrentKubeletConfig(f *framework.Framework, updateFunction func(ini
 	BeforeEach(func() {
 		configEnabled, err := isKubeletConfigEnabled(f)
 		framework.ExpectNoError(err)
-		if configEnabled {
-			oldCfg, err = getCurrentKubeletConfig()
-			framework.ExpectNoError(err)
-			clone, err := scheme.Scheme.DeepCopy(oldCfg)
-			framework.ExpectNoError(err)
-			newCfg := clone.(*kubeletconfig.KubeletConfiguration)
-			updateFunction(newCfg)
-			framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
-		} else {
-			framework.Logf("The Dynamic Kubelet Configuration feature is not enabled.\n" +
-				"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet to enable this feature.\n" +
-				"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`.")
-		}
+		Expect(configEnabled).To(BeTrue(), "The Dynamic Kubelet Configuration feature is not enabled.\n"+
+			"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet to enable this feature.\n"+
+			"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`.")
+		oldCfg, err = getCurrentKubeletConfig()
+		framework.ExpectNoError(err)
+		newCfg := oldCfg.DeepCopy()
+		updateFunction(newCfg)
+		framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
 	})
 	AfterEach(func() {
 		if oldCfg != nil {
@@ -132,6 +129,7 @@ func isKubeletConfigEnabled(f *framework.Framework) (bool, error) {
 // Creates or updates the configmap for KubeletConfiguration, waits for the Kubelet to restart
 // with the new configuration. Returns an error if the configuration after waiting for restartGap
 // doesn't match what you attempted to set, or if the dynamic configuration feature is disabled.
+// You should only call this from serial tests.
 func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.KubeletConfiguration) error {
 	const (
 		restartGap   = 40 * time.Second
@@ -139,17 +137,13 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 	)
 
 	// make sure Dynamic Kubelet Configuration feature is enabled on the Kubelet we are about to reconfigure
-	configEnabled, err := isKubeletConfigEnabled(f)
-	if err != nil {
-		return fmt.Errorf("could not determine whether 'DynamicKubeletConfig' feature is enabled, err: %v", err)
-	}
-	if !configEnabled {
+	if configEnabled, err := isKubeletConfigEnabled(f); err != nil {
+		return err
+	} else if !configEnabled {
 		return fmt.Errorf("The Dynamic Kubelet Configuration feature is not enabled.\n" +
 			"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet to enable this feature.\n" +
 			"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`.")
 	}
-
-	nodeclient := f.ClientSet.CoreV1().Nodes()
 
 	// create the ConfigMap with the new configuration
 	cm, err := createConfigMap(f, kubeCfg)
@@ -157,25 +151,22 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 		return err
 	}
 
-	// create the correct reference object
-	src := &v1.NodeConfigSource{
-		ConfigMapRef: &v1.ObjectReference{
+	// create the reference and set Node.Spec.ConfigSource
+	src := &apiv1.NodeConfigSource{
+		ConfigMapRef: &apiv1.ObjectReference{
 			Namespace: "kube-system",
 			Name:      cm.Name,
 			UID:       cm.UID,
 		},
 	}
 
-	// serialize the new node config source
-	raw, err := json.Marshal(src)
-	framework.ExpectNoError(err)
-	data := []byte(fmt.Sprintf(`{"spec":{"configSource":%s}}`, raw))
-
-	// patch the node
-	_, err = nodeclient.Patch(framework.TestContext.NodeName,
-		types.StrategicMergePatchType,
-		data)
-	framework.ExpectNoError(err)
+	// set the source, retry a few times in case we are competing with other writers
+	Eventually(func() error {
+		if err := setNodeConfigSource(f, src); err != nil {
+			return err
+		}
+		return nil
+	}, time.Minute, time.Second).Should(BeNil())
 
 	// poll for new config, for a maximum wait of restartGap
 	Eventually(func() error {
@@ -190,6 +181,41 @@ func setKubeletConfiguration(f *framework.Framework, kubeCfg *kubeletconfig.Kube
 		return nil
 	}, restartGap, pollInterval).Should(BeNil())
 
+	return nil
+}
+
+// sets the current node's configSource, this should only be called from Serial tests
+func setNodeConfigSource(f *framework.Framework, source *apiv1.NodeConfigSource) error {
+	// since this is a serial test, we just get the node, change the source, and then update it
+	// this prevents any issues with the patch API from affecting the test results
+	nodeclient := f.ClientSet.CoreV1().Nodes()
+
+	// get the node
+	node, err := nodeclient.Get(framework.TestContext.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	// set new source
+	node.Spec.ConfigSource = source
+
+	// update to the new source
+	_, err = nodeclient.Update(node)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// getConfigOK returns the first NodeCondition in `cs` with Type == apiv1.NodeConfigOK,
+// or if no such condition exists, returns nil.
+func getConfigOKCondition(cs []apiv1.NodeCondition) *apiv1.NodeCondition {
+	for i := range cs {
+		if cs[i].Type == apiv1.NodeConfigOK {
+			return &cs[i]
+		}
+	}
 	return nil
 }
 
@@ -247,8 +273,8 @@ func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, er
 }
 
 // creates a configmap containing kubeCfg in kube-system namespace
-func createConfigMap(f *framework.Framework, internalKC *kubeletconfig.KubeletConfiguration) (*v1.ConfigMap, error) {
-	cmap := makeKubeletConfigMap(internalKC)
+func createConfigMap(f *framework.Framework, internalKC *kubeletconfig.KubeletConfiguration) (*apiv1.ConfigMap, error) {
+	cmap := newKubeletConfigMap("testcfg", internalKC)
 	cmap, err := f.ClientSet.Core().ConfigMaps("kube-system").Create(cmap)
 	if err != nil {
 		return nil, err
@@ -256,24 +282,27 @@ func createConfigMap(f *framework.Framework, internalKC *kubeletconfig.KubeletCo
 	return cmap, nil
 }
 
-// constructs a ConfigMap, populating one of its keys with the KubeletConfiguration. Uses GenerateName.
-func makeKubeletConfigMap(internalKC *kubeletconfig.KubeletConfiguration) *v1.ConfigMap {
-	externalKC := &kubeletconfigv1alpha1.KubeletConfiguration{}
-	api.Scheme.Convert(internalKC, externalKC, nil)
-
-	encoder, err := newJSONEncoder(kubeletconfig.GroupName)
+// constructs a ConfigMap, populating one of its keys with the KubeletConfiguration. Always uses GenerateName to generate a suffix.
+func newKubeletConfigMap(name string, internalKC *kubeletconfig.KubeletConfiguration) *apiv1.ConfigMap {
+	scheme, _, err := kubeletscheme.NewSchemeAndCodecs()
 	framework.ExpectNoError(err)
 
-	data, err := runtime.Encode(encoder, externalKC)
+	versioned := &kubeletconfigv1alpha1.KubeletConfiguration{}
+	err = scheme.Convert(internalKC, versioned, nil)
 	framework.ExpectNoError(err)
 
-	cmap := &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: "testcfg"},
+	encoder, err := newKubeletConfigJSONEncoder()
+	framework.ExpectNoError(err)
+
+	data, err := runtime.Encode(encoder, versioned)
+	framework.ExpectNoError(err)
+
+	cmap := &apiv1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{GenerateName: name},
 		Data: map[string]string{
 			"kubelet": string(data),
 		},
 	}
-
 	return cmap
 }
 
@@ -289,7 +318,7 @@ func logNodeEvents(f *framework.Framework) {
 	framework.ExpectNoError(err)
 }
 
-func getLocalNode(f *framework.Framework) *v1.Node {
+func getLocalNode(f *framework.Framework) *apiv1.Node {
 	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 	Expect(len(nodeList.Items)).To(Equal(1), "Unexpected number of node objects for node e2e. Expects only one node.")
 	return &nodeList.Items[0]
@@ -309,19 +338,26 @@ func logKubeletMetrics(metricKeys ...string) {
 	}
 }
 
-func newJSONEncoder(groupName string) (runtime.Encoder, error) {
-	// encode to json
+func newKubeletConfigJSONEncoder() (runtime.Encoder, error) {
+	_, kubeletCodecs, err := kubeletscheme.NewSchemeAndCodecs()
+	if err != nil {
+		return nil, err
+	}
+
 	mediaType := "application/json"
-	info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), mediaType)
+	info, ok := runtime.SerializerInfoForMediaType(kubeletCodecs.SupportedMediaTypes(), mediaType)
 	if !ok {
 		return nil, fmt.Errorf("unsupported media type %q", mediaType)
 	}
+	return kubeletCodecs.EncoderForVersion(info.Serializer, kubeletconfigv1alpha1.SchemeGroupVersion), nil
+}
 
-	versions := api.Registry.EnabledVersionsForGroup(groupName)
-	if len(versions) == 0 {
-		return nil, fmt.Errorf("no enabled versions for group %q", groupName)
+// runCommand runs the cmd and returns the combined stdout and stderr, or an
+// error if the command failed.
+func runCommand(cmd ...string) (string, error) {
+	output, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to run %q: %s (%s)", strings.Join(cmd, " "), err, output)
 	}
-
-	// the "best" version supposedly comes first in the list returned from api.Registry.EnabledVersionsForGroup
-	return api.Codecs.EncoderForVersion(info.Serializer, versions[0]), nil
+	return string(output), nil
 }

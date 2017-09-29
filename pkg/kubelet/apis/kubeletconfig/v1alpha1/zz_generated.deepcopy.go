@@ -143,15 +143,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			**out = **in
 		}
 	}
-	if in.CrashLoopThreshold != nil {
-		in, out := &in.CrashLoopThreshold, &out.CrashLoopThreshold
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
-	}
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
@@ -161,6 +152,15 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			*out = nil
 		} else {
 			*out = new(bool)
+			**out = **in
+		}
+	}
+	if in.ReadOnlyPort != nil {
+		in, out := &in.ReadOnlyPort, &out.ReadOnlyPort
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
 			**out = **in
 		}
 	}
@@ -236,6 +236,15 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			**out = **in
 		}
 	}
+	if in.HealthzPort != nil {
+		in, out := &in.HealthzPort, &out.HealthzPort
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
+	}
 	if in.OOMScoreAdj != nil {
 		in, out := &in.OOMScoreAdj, &out.OOMScoreAdj
 		if *in == nil {
@@ -290,6 +299,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			**out = **in
 		}
 	}
+	out.CPUManagerReconcilePeriod = in.CPUManagerReconcilePeriod
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	if in.LockFilePath != nil {
 		in, out := &in.LockFilePath, &out.LockFilePath

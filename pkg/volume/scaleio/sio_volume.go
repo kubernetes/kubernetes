@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
-	"k8s.io/utils/exec"
 )
 
 type sioVolume struct {
@@ -94,7 +93,8 @@ func (v *sioVolume) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	notDevMnt, err := v.plugin.mounter.IsLikelyNotMountPoint(dir)
+	mounter := v.plugin.host.GetMounter(v.plugin.GetPluginName())
+	notDevMnt, err := mounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
 		glog.Error(log("IsLikelyNotMountPoint test failed for dir %v", dir))
 		return err
@@ -143,10 +143,7 @@ func (v *sioVolume) SetUpAt(dir string, fsGroup *int64) error {
 	}
 	glog.V(4).Info(log("setup created mount point directory %s", dir))
 
-	diskMounter := &mount.SafeFormatAndMount{
-		Interface: v.plugin.mounter,
-		Runner:    exec.New(),
-	}
+	diskMounter := volumehelper.NewSafeFormatAndMountFromHost(v.plugin.GetPluginName(), v.plugin.host)
 	err = diskMounter.FormatAndMount(devicePath, dir, v.fsType, options)
 
 	if err != nil {
@@ -190,21 +187,22 @@ func (v *sioVolume) TearDownAt(dir string) error {
 	v.plugin.volumeMtx.LockKey(v.volSpecName)
 	defer v.plugin.volumeMtx.UnlockKey(v.volSpecName)
 
-	dev, _, err := mount.GetDeviceNameFromMount(v.plugin.mounter, dir)
+	mounter := v.plugin.host.GetMounter(v.plugin.GetPluginName())
+	dev, _, err := mount.GetDeviceNameFromMount(mounter, dir)
 	if err != nil {
 		glog.Errorf(log("failed to get reference count for volume: %s", dir))
 		return err
 	}
 
 	glog.V(4).Info(log("attempting to unmount %s", dir))
-	if err := util.UnmountPath(dir, v.plugin.mounter); err != nil {
+	if err := util.UnmountPath(dir, mounter); err != nil {
 		glog.Error(log("teardown failed while unmounting dir %s: %v ", dir, err))
 		return err
 	}
 	glog.V(4).Info(log("dir %s unmounted successfully", dir))
 
 	// detach/unmap
-	deviceBusy, err := v.plugin.mounter.DeviceOpened(dev)
+	deviceBusy, err := mounter.DeviceOpened(dev)
 	if err != nil {
 		glog.Error(log("teardown unable to get status for device %s: %v", dev, err))
 		return err
@@ -388,7 +386,13 @@ func (v *sioVolume) setSioMgr() error {
 			return err
 		}
 
-		mgr, err := newSioMgr(configData)
+		// merge in Sdc Guid label value
+		if err := attachSdcGuid(v.plugin, configData); err != nil {
+			glog.Error(log("failed to retrieve sdc guid: %v", err))
+			return err
+		}
+		mgr, err := newSioMgr(configData, v.plugin.host.GetExec(v.plugin.GetPluginName()))
+
 		if err != nil {
 			glog.Error(log("failed to reset sio manager: %v", err))
 			return err
@@ -420,7 +424,14 @@ func (v *sioVolume) resetSioMgr() error {
 			return err
 		}
 
-		mgr, err := newSioMgr(configData)
+		// merge in Sdc Guid label value
+		if err := attachSdcGuid(v.plugin, configData); err != nil {
+			glog.Error(log("failed to retrieve sdc guid: %v", err))
+			return err
+		}
+
+		mgr, err := newSioMgr(configData, v.plugin.host.GetExec(v.plugin.GetPluginName()))
+
 		if err != nil {
 			glog.Error(log("failed to reset scaleio mgr: %v", err))
 			return err
@@ -454,7 +465,8 @@ func (v *sioVolume) setSioMgrFromConfig() error {
 			return err
 		}
 
-		mgr, err := newSioMgr(data)
+		mgr, err := newSioMgr(data, v.plugin.host.GetExec(v.plugin.GetPluginName()))
+
 		if err != nil {
 			glog.Error(log("failed while setting scaleio mgr from config: %v", err))
 			return err
@@ -464,6 +476,8 @@ func (v *sioVolume) setSioMgrFromConfig() error {
 	return nil
 }
 
+// setSioMgrFromSpec sets the scaleio manager from a spec object.
+// The spec may be complete or incomplete depending on lifecycle phase.
 func (v *sioVolume) setSioMgrFromSpec() error {
 	glog.V(4).Info(log("setting sio manager from spec"))
 	if v.sioMgr == nil {
@@ -483,7 +497,8 @@ func (v *sioVolume) setSioMgrFromSpec() error {
 			return err
 		}
 
-		mgr, err := newSioMgr(configData)
+		mgr, err := newSioMgr(configData, v.plugin.host.GetExec(v.plugin.GetPluginName()))
+
 		if err != nil {
 			glog.Error(log("failed to reset sio manager: %v", err))
 			return err

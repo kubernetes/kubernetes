@@ -143,7 +143,7 @@ func autoConvert_testapigroup_CarpList_To_v1_CarpList(in *testapigroup.CarpList,
 			}
 		}
 	} else {
-		out.Items = make([]Carp, 0)
+		out.Items = nil
 	}
 	return nil
 }

@@ -31,6 +31,7 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
+	dockerimagetypes "github.com/docker/docker/api/types/image"
 	dockerapi "github.com/docker/docker/client"
 	dockermessage "github.com/docker/docker/pkg/jsonmessage"
 	dockerstdcopy "github.com/docker/docker/pkg/stdcopy"
@@ -91,7 +92,7 @@ func newKubeDockerClient(dockerClient *dockerapi.Client, requestTimeout, imagePu
 		glog.Warningf("Using empty version for docker client, this may sometimes cause compatibility issue.")
 	} else {
 		// Update client version with real api version.
-		dockerClient.UpdateClientVersion(v.APIVersion)
+		dockerClient.NegotiateAPIVersionPing(dockertypes.Ping{APIVersion: v.APIVersion})
 	}
 	return k
 }
@@ -222,7 +223,7 @@ func (d *kubeDockerClient) InspectImageByRef(imageRef string) (*dockertypes.Imag
 	return resp, nil
 }
 
-func (d *kubeDockerClient) ImageHistory(id string) ([]dockertypes.ImageHistory, error) {
+func (d *kubeDockerClient) ImageHistory(id string) ([]dockerimagetypes.HistoryResponseItem, error) {
 	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	resp, err := d.client.ImageHistory(ctx, id)
@@ -376,7 +377,7 @@ func (d *kubeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, 
 	return nil
 }
 
-func (d *kubeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDelete, error) {
+func (d *kubeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDeleteResponseItem, error) {
 	ctx, cancel := d.getTimeoutContext()
 	defer cancel()
 	resp, err := d.client.ImageRemove(ctx, image, opts)
@@ -464,6 +465,15 @@ func (d *kubeDockerClient) StartExec(startExec string, opts dockertypes.ExecStar
 		return err
 	}
 	defer resp.Close()
+
+	if sopts.ExecStarted != nil {
+		// Send a message to the channel indicating that the exec has started. This is needed so
+		// interactive execs can handle resizing correctly - the request to resize the TTY has to happen
+		// after the call to d.client.ContainerExecAttach, and because d.holdHijackedConnection below
+		// blocks, we use sopts.ExecStarted to signal the caller that it's ok to resize.
+		sopts.ExecStarted <- struct{}{}
+	}
+
 	return d.holdHijackedConnection(sopts.RawTerminal || opts.Tty, sopts.InputStream, sopts.OutputStream, sopts.ErrorStream, resp)
 }
 
@@ -594,6 +604,7 @@ type StreamOptions struct {
 	InputStream  io.Reader
 	OutputStream io.Writer
 	ErrorStream  io.Writer
+	ExecStarted  chan struct{}
 }
 
 // operationTimeout is the error returned when the docker operations are timeout.

@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -12,6 +7,7 @@ go_library(
         "doc.go",
         "retry.go",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/vmware/govmomi/vim25/methods:go_default_library",
         "//vendor/github.com/vmware/govmomi/vim25/soap:go_default_library",
@@ -39,4 +35,5 @@ filegroup(
         "//vendor/github.com/vmware/govmomi/vim25/xml:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

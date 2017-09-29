@@ -4,7 +4,7 @@
 
 // The startup permutation array and substitution boxes.
 // They are the hexadecimal digits of PI; see:
-// http://www.schneier.com/code/constants.txt.
+// https://www.schneier.com/code/constants.txt.
 
 package blowfish
 

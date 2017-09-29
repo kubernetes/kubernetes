@@ -34,9 +34,10 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	clientretry "k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-var _ = SIGDescribe("Initializers", func() {
+var _ = SIGDescribe("Initializers [Feature:Initializers]", func() {
 	f := framework.NewDefaultFramework("initializers")
 
 	// TODO: Add failure traps once we have JustAfterEach
@@ -262,12 +263,35 @@ var _ = SIGDescribe("Initializers", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(pods.Items)).Should(Equal(1))
 	})
+
+	It("will be set to nil if a patch removes the last pending initializer", func() {
+		ns := f.Namespace.Name
+		c := f.ClientSet
+
+		podName := "to-be-patch-initialized-pod"
+		framework.Logf("Creating pod %s", podName)
+
+		// TODO: lower the timeout so that the server responds faster.
+		_, err := c.CoreV1().Pods(ns).Create(newUninitializedPod(podName))
+		if err != nil && !errors.IsTimeout(err) {
+			framework.Failf("expect err to be timeout error, got %v", err)
+		}
+		uninitializedPod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(uninitializedPod.Initializers).NotTo(BeNil())
+		Expect(len(uninitializedPod.Initializers.Pending)).Should(Equal(1))
+
+		patch := fmt.Sprintf(`{"metadata":{"initializers":{"pending":[{"$patch":"delete","name":"%s"}]}}}`, uninitializedPod.Initializers.Pending[0].Name)
+		patchedPod, err := c.CoreV1().Pods(ns).Patch(uninitializedPod.Name, types.StrategicMergePatchType, []byte(patch))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(patchedPod.Initializers).To(BeNil())
+	})
 })
 
 func newUninitializedPod(podName string) *v1.Pod {
 	pod := newInitPod(podName)
 	pod.Initializers = &metav1.Initializers{
-		Pending: []metav1.Initializer{{Name: "Test"}},
+		Pending: []metav1.Initializer{{Name: "test.k8s.io"}},
 	}
 	return pod
 }
@@ -311,7 +335,7 @@ func newInitPod(podName string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  containerName,
-					Image: "gcr.io/google_containers/porter:4524579c0eb935c056c8e75563b4e1eda31587e0",
+					Image: imageutils.GetE2EImage(imageutils.Porter),
 					Env:   []v1.EnvVar{{Name: fmt.Sprintf("SERVE_PORT_%d", port), Value: "foo"}},
 					Ports: []v1.ContainerPort{{ContainerPort: int32(port)}},
 				},

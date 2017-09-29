@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"
 	utilfiles "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/files"
-	utilfs "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/filesystem"
 	utiltest "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/test"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
 const testCheckpointsDir = "/test-checkpoints-dir"

@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/api"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
@@ -48,10 +49,13 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/api/v1/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/envvars"
+	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
@@ -188,12 +192,19 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			}
 		}
 
+		propagation, err := translateMountPropagation(mount.MountPropagation)
+		if err != nil {
+			return nil, err
+		}
+		glog.V(5).Infof("Pod %q container %q mount %q has propagation %q", format.Pod(pod), container.Name, mount.Name, propagation)
+
 		mounts = append(mounts, kubecontainer.Mount{
 			Name:           mount.Name,
 			ContainerPath:  containerPath,
 			HostPath:       hostPath,
 			ReadOnly:       mount.ReadOnly,
 			SELinuxRelabel: relabelVolume,
+			Propagation:    propagation,
 		})
 	}
 	if mountEtcHostsFile {
@@ -205,6 +216,26 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 		mounts = append(mounts, *hostsMount)
 	}
 	return mounts, nil
+}
+
+// translateMountPropagation transforms v1.MountPropagationMode to
+// runtimeapi.MountPropagation.
+func translateMountPropagation(mountMode *v1.MountPropagationMode) (runtimeapi.MountPropagation, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MountPropagation) {
+		// mount propagation is disabled, use private as in the old versions
+		return runtimeapi.MountPropagation_PROPAGATION_PRIVATE, nil
+	}
+	switch {
+	case mountMode == nil:
+		// HostToContainer is the default
+		return runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER, nil
+	case *mountMode == v1.MountPropagationHostToContainer:
+		return runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER, nil
+	case *mountMode == v1.MountPropagationBidirectional:
+		return runtimeapi.MountPropagation_PROPAGATION_BIDIRECTIONAL, nil
+	default:
+		return 0, fmt.Errorf("invalid MountPropagation mode: %q", mountMode)
+	}
 }
 
 // makeHostsMount makes the mountpoint for the hosts file that the containers
@@ -233,7 +264,7 @@ func ensureHostsFile(fileName, hostIP, hostName, hostDomainName string, hostAlia
 		// if Pod is using host network, read hosts file from the node's filesystem.
 		// `etcHostsPath` references the location of the hosts file on the node.
 		// `/etc/hosts` for *nix systems.
-		hostsFileContent, err = nodeHostsFileContent(etcHostsPath)
+		hostsFileContent, err = nodeHostsFileContent(etcHostsPath, hostAliases)
 		if err != nil {
 			return err
 		}
@@ -246,8 +277,13 @@ func ensureHostsFile(fileName, hostIP, hostName, hostDomainName string, hostAlia
 }
 
 // nodeHostsFileContent reads the content of node's hosts file.
-func nodeHostsFileContent(hostsFilePath string) ([]byte, error) {
-	return ioutil.ReadFile(hostsFilePath)
+func nodeHostsFileContent(hostsFilePath string, hostAliases []v1.HostAlias) ([]byte, error) {
+	hostsFileContent, err := ioutil.ReadFile(hostsFilePath)
+	if err != nil {
+		return nil, err
+	}
+	hostsFileContent = append(hostsFileContent, hostsEntriesFromHostAliases(hostAliases)...)
+	return hostsFileContent, nil
 }
 
 // managedHostsFileContent generates the content of the managed etc hosts based on Pod IP and other
@@ -266,6 +302,19 @@ func managedHostsFileContent(hostIP, hostName, hostDomainName string, hostAliase
 	} else {
 		buffer.WriteString(fmt.Sprintf("%s\t%s\n", hostIP, hostName))
 	}
+	hostsFileContent := buffer.Bytes()
+	hostsFileContent = append(hostsFileContent, hostsEntriesFromHostAliases(hostAliases)...)
+	return hostsFileContent
+}
+
+func hostsEntriesFromHostAliases(hostAliases []v1.HostAlias) []byte {
+	if len(hostAliases) == 0 {
+		return []byte{}
+	}
+
+	var buffer bytes.Buffer
+	buffer.WriteString("\n")
+	buffer.WriteString("# Entries added by HostAliases.\n")
 	// write each IP/hostname pair as an entry into hosts file
 	for _, hostAlias := range hostAliases {
 		for _, hostname := range hostAlias.Hostnames {
@@ -333,10 +382,14 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
 func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, bool, error) {
-	var err error
 	useClusterFirstPolicy := false
+	opts, err := kl.containerManager.GetResources(pod, container, kl.GetActivePods())
+	if err != nil {
+		return nil, false, err
+	}
+
 	cgroupParent := kl.GetPodCgroupParent(pod)
-	opts := &kubecontainer.RunContainerOptions{CgroupParent: cgroupParent}
+	opts.CgroupParent = cgroupParent
 	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
 	if err != nil {
 		return nil, false, err
@@ -347,19 +400,23 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 
 	opts.PortMappings = kubecontainer.MakePortMappings(container)
 	// TODO(random-liu): Move following convert functions into pkg/kubelet/container
-	opts.Devices, err = kl.makeDevices(pod, container)
+	devices, err := kl.makeDevices(pod, container)
 	if err != nil {
 		return nil, false, err
 	}
+	opts.Devices = append(opts.Devices, devices...)
 
-	opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
+	mounts, err := makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
 	if err != nil {
 		return nil, false, err
 	}
-	opts.Envs, err = kl.makeEnvironmentVariables(pod, container, podIP)
+	opts.Mounts = append(opts.Mounts, mounts...)
+
+	envs, err := kl.makeEnvironmentVariables(pod, container, podIP)
 	if err != nil {
 		return nil, false, err
 	}
+	opts.Envs = append(opts.Envs, envs...)
 
 	// Disabling adding TerminationMessagePath on Windows as these files would be mounted as docker volume and
 	// Docker for Windows has a bug where only directories can be mounted
@@ -763,12 +820,48 @@ func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
 	return status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(status.ContainerStatuses))
 }
 
+// IsPodTerminated returns trus if the pod with the provided UID is in a terminated state ("Failed" or "Succeeded")
+// or if the pod has been deleted or removed
+func (kl *Kubelet) IsPodTerminated(uid types.UID) bool {
+	pod, podFound := kl.podManager.GetPodByUID(uid)
+	if !podFound {
+		return true
+	}
+	return kl.podIsTerminated(pod)
+}
+
+// IsPodDeleted returns true if the pod is deleted.  For the pod to be deleted, either:
+// 1. The pod object is deleted
+// 2. The pod's status is evicted
+// 3. The pod's deletion timestamp is set, and containers are not running
+func (kl *Kubelet) IsPodDeleted(uid types.UID) bool {
+	pod, podFound := kl.podManager.GetPodByUID(uid)
+	if !podFound {
+		return true
+	}
+	status, statusFound := kl.statusManager.GetPodStatus(pod.UID)
+	if !statusFound {
+		status = pod.Status
+	}
+	return eviction.PodIsEvicted(status) || (pod.DeletionTimestamp != nil && notRunning(status.ContainerStatuses))
+}
+
 // PodResourcesAreReclaimed returns true if all required node-level resources that a pod was consuming have
 // been reclaimed by the kubelet.  Reclaiming resources is a prerequisite to deleting a pod from the API server.
 func (kl *Kubelet) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool {
 	if !notRunning(status.ContainerStatuses) {
 		// We shouldnt delete pods that still have running containers
 		glog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
+		return false
+	}
+	// pod's containers should be deleted
+	runtimeStatus, err := kl.podCache.Get(pod.UID)
+	if err != nil {
+		glog.V(3).Infof("Pod %q is terminated, Error getting runtimeStatus from the podCache: %s", format.Pod(pod), err)
+		return false
+	}
+	if len(runtimeStatus.ContainerStatuses) > 0 {
+		glog.V(3).Infof("Pod %q is terminated, but some containers have not been cleaned up: %+v", format.Pod(pod), runtimeStatus.ContainerStatuses)
 		return false
 	}
 	if kl.podVolumesExist(pod.UID) && !kl.kubeletConfiguration.KeepTerminatedPodVolumes {
@@ -1329,10 +1422,17 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			Image: container.Image,
 			State: defaultWaitingState,
 		}
-		// Apply some values from the old statuses as the default values.
-		if oldStatus, found := oldStatuses[container.Name]; found {
-			status.RestartCount = oldStatus.RestartCount
-			status.LastTerminationState = oldStatus.LastTerminationState
+		oldStatus, found := oldStatuses[container.Name]
+		if found {
+			if isInitContainer && oldStatus.State.Terminated != nil {
+				// Do not update status on terminated init containers as
+				// they be removed at any time.
+				status = &oldStatus
+			} else {
+				// Apply some values from the old statuses as the default values.
+				status.RestartCount = oldStatus.RestartCount
+				status.LastTerminationState = oldStatus.LastTerminationState
+			}
 		}
 		statuses[container.Name] = status
 	}

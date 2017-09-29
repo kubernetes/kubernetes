@@ -48,7 +48,7 @@ func (az *Cloud) CreateFileShare(name, storageAccount, storageType, location str
 
 			err = az.createFileShare(account.Name, key, name, requestGB)
 			if err != nil {
-				glog.V(2).Infof("failed to create share in account %s: %v", account.Name, err)
+				glog.V(2).Infof("failed to create share %s in account %s: %v", name, account.Name, err)
 				continue
 			}
 			glog.V(4).Infof("created share %s in account %s", name, account.Name)

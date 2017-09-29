@@ -24,7 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// +k8s:deepcopy-gen=false
 // PolicyRuleBuilder let's us attach methods.  A no-no for API types.
 // We use it to construct rules in code.  It's more compact than trying to write them
 // out in a literal and allows us to perform some basic checking during construction
@@ -91,7 +90,6 @@ func (r *PolicyRuleBuilder) Rule() (rbacv1beta1.PolicyRule, error) {
 	return r.PolicyRule, nil
 }
 
-// +k8s:deepcopy-gen=false
 // ClusterRoleBindingBuilder let's us attach methods.  A no-no for API types.
 // We use it to construct bindings in code.  It's more compact than trying to write them
 // out in a literal.

@@ -44,6 +44,7 @@ func ApiCallToPerfData(apicalls *APIResponsiveness) *perftype.PerfData {
 				"Verb":        apicall.Verb,
 				"Resource":    apicall.Resource,
 				"Subresource": apicall.Subresource,
+				"Scope":       apicall.Scope,
 				"Count":       fmt.Sprintf("%v", apicall.Count),
 			},
 		}

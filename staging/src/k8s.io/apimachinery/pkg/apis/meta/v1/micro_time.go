@@ -40,8 +40,8 @@ type MicroTime struct {
 // DeepCopy returns a deep-copy of the MicroTime value.  The underlying time.Time
 // type is effectively immutable in the time API, so it is safe to
 // copy-by-assign, despite the presence of (unexported) Pointer fields.
-func (t MicroTime) DeepCopy() MicroTime {
-	return t
+func (t *MicroTime) DeepCopyInto(out *MicroTime) {
+	*out = *t
 }
 
 // String returns the representation of the time.
@@ -74,22 +74,22 @@ func (t *MicroTime) IsZero() bool {
 }
 
 // Before reports whether the time instant t is before u.
-func (t MicroTime) Before(u MicroTime) bool {
+func (t *MicroTime) Before(u *MicroTime) bool {
 	return t.Time.Before(u.Time)
 }
 
 // Equal reports whether the time instant t is equal to u.
-func (t MicroTime) Equal(u MicroTime) bool {
+func (t *MicroTime) Equal(u *MicroTime) bool {
 	return t.Time.Equal(u.Time)
 }
 
 // BeforeTime reports whether the time instant t is before second-lever precision u.
-func (t MicroTime) BeforeTime(u Time) bool {
+func (t *MicroTime) BeforeTime(u *Time) bool {
 	return t.Time.Before(u.Time)
 }
 
 // EqualTime reports whether the time instant t is equal to second-lever precision u.
-func (t MicroTime) EqualTime(u Time) bool {
+func (t *MicroTime) EqualTime(u *Time) bool {
 	return t.Time.Equal(u.Time)
 }
 
@@ -175,10 +175,10 @@ func (t *MicroTime) Fuzz(c fuzz.Continue) {
 	if t == nil {
 		return
 	}
-	// Allow for about 1000 years of randomness.  Leave off nanoseconds
-	// because JSON doesn't represent them so they can't round-trip
-	// properly.
-	t.Time = time.Unix(c.Rand.Int63n(1000*365*24*60*60*1000*1000), 0)
+	// Allow for about 1000 years of randomness. Accurate to a tenth of
+	// micro second. Leave off nanoseconds because JSON doesn't
+	// represent them so they can't round-trip properly.
+	t.Time = time.Unix(c.Rand.Int63n(1000*365*24*60*60), 1000*c.Rand.Int63n(1000000))
 }
 
 var _ fuzz.Interface = &MicroTime{}

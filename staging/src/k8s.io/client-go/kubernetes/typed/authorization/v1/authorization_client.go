@@ -27,6 +27,7 @@ type AuthorizationV1Interface interface {
 	RESTClient() rest.Interface
 	LocalSubjectAccessReviewsGetter
 	SelfSubjectAccessReviewsGetter
+	SelfSubjectRulesReviewsGetter
 	SubjectAccessReviewsGetter
 }
 
@@ -41,6 +42,10 @@ func (c *AuthorizationV1Client) LocalSubjectAccessReviews(namespace string) Loca
 
 func (c *AuthorizationV1Client) SelfSubjectAccessReviews() SelfSubjectAccessReviewInterface {
 	return newSelfSubjectAccessReviews(c)
+}
+
+func (c *AuthorizationV1Client) SelfSubjectRulesReviews() SelfSubjectRulesReviewInterface {
+	return newSelfSubjectRulesReviews(c)
 }
 
 func (c *AuthorizationV1Client) SubjectAccessReviews() SubjectAccessReviewInterface {

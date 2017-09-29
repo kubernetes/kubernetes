@@ -328,6 +328,7 @@ func (g openAPITypeWriter) generateMembers(t *types.Type, required []string) ([]
 			required = append(required, name)
 		}
 		if err = g.generateProperty(&m, t); err != nil {
+			glog.Errorf("Error when generating: %v, %v\n", name, m)
 			return required, err
 		}
 	}

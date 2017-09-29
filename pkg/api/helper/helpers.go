@@ -31,6 +31,30 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 )
 
+// IsHugePageResourceName returns true if the resource name has the huge page
+// resource prefix.
+func IsHugePageResourceName(name api.ResourceName) bool {
+	return strings.HasPrefix(string(name), api.ResourceHugePagesPrefix)
+}
+
+// HugePageResourceName returns a ResourceName with the canonical hugepage
+// prefix prepended for the specified page size.  The page size is converted
+// to its canonical representation.
+func HugePageResourceName(pageSize resource.Quantity) api.ResourceName {
+	return api.ResourceName(fmt.Sprintf("%s%s", api.ResourceHugePagesPrefix, pageSize.String()))
+}
+
+// HugePageSizeFromResourceName returns the page size for the specified huge page
+// resource name.  If the specified input is not a valid huge page resource name
+// an error is returned.
+func HugePageSizeFromResourceName(name api.ResourceName) (resource.Quantity, error) {
+	if !IsHugePageResourceName(name) {
+		return resource.Quantity{}, fmt.Errorf("resource name: %s is not valid hugepage name", name)
+	}
+	pageSize := strings.TrimPrefix(string(name), api.ResourceHugePagesPrefix)
+	return resource.ParseQuantity(pageSize)
+}
+
 // NonConvertibleFields iterates over the provided map and filters out all but
 // any keys with the "non-convertible.kubernetes.io" prefix.
 func NonConvertibleFields(annotations map[string]string) map[string]string {
@@ -107,12 +131,28 @@ func IsResourceQuotaScopeValidForResource(scope api.ResourceQuotaScope, resource
 var standardContainerResources = sets.NewString(
 	string(api.ResourceCPU),
 	string(api.ResourceMemory),
+	string(api.ResourceEphemeralStorage),
 )
 
 // IsStandardContainerResourceName returns true if the container can make a resource request
 // for the specified resource
 func IsStandardContainerResourceName(str string) bool {
-	return standardContainerResources.Has(str)
+	return standardContainerResources.Has(str) || IsHugePageResourceName(api.ResourceName(str))
+}
+
+// IsExtendedResourceName returns true if the resource name is not in the
+// default namespace, or it has the opaque integer resource prefix.
+func IsExtendedResourceName(name api.ResourceName) bool {
+	// TODO: Remove OIR part following deprecation.
+	return !IsDefaultNamespaceResource(name) || IsOpaqueIntResourceName(name)
+}
+
+// IsDefaultNamespaceResource returns true if the resource name is in the
+// *kubernetes.io/ namespace. Partially-qualified (unprefixed) names are
+// implicitly in the kubernetes.io/ namespace.
+func IsDefaultNamespaceResource(name api.ResourceName) bool {
+	return !strings.Contains(string(name), "/") ||
+		strings.Contains(string(name), api.ResourceDefaultNamespacePrefix)
 }
 
 // IsOpaqueIntResourceName returns true if the resource name has the opaque
@@ -131,6 +171,16 @@ func OpaqueIntResourceName(name string) api.ResourceName {
 	return api.ResourceName(fmt.Sprintf("%s%s", api.ResourceOpaqueIntPrefix, name))
 }
 
+var overcommitBlacklist = sets.NewString(string(api.ResourceNvidiaGPU))
+
+// IsOvercommitAllowed returns true if the resource is in the default
+// namespace and not blacklisted.
+func IsOvercommitAllowed(name api.ResourceName) bool {
+	return IsDefaultNamespaceResource(name) &&
+		!IsHugePageResourceName(name) &&
+		!overcommitBlacklist.Has(string(name))
+}
+
 var standardLimitRangeTypes = sets.NewString(
 	string(api.LimitTypePod),
 	string(api.LimitTypeContainer),
@@ -145,11 +195,14 @@ func IsStandardLimitRangeType(str string) bool {
 var standardQuotaResources = sets.NewString(
 	string(api.ResourceCPU),
 	string(api.ResourceMemory),
+	string(api.ResourceEphemeralStorage),
 	string(api.ResourceRequestsCPU),
 	string(api.ResourceRequestsMemory),
 	string(api.ResourceRequestsStorage),
+	string(api.ResourceRequestsEphemeralStorage),
 	string(api.ResourceLimitsCPU),
 	string(api.ResourceLimitsMemory),
+	string(api.ResourceLimitsEphemeralStorage),
 	string(api.ResourcePods),
 	string(api.ResourceQuotas),
 	string(api.ResourceServices),
@@ -170,10 +223,13 @@ func IsStandardQuotaResourceName(str string) bool {
 var standardResources = sets.NewString(
 	string(api.ResourceCPU),
 	string(api.ResourceMemory),
+	string(api.ResourceEphemeralStorage),
 	string(api.ResourceRequestsCPU),
 	string(api.ResourceRequestsMemory),
+	string(api.ResourceRequestsEphemeralStorage),
 	string(api.ResourceLimitsCPU),
 	string(api.ResourceLimitsMemory),
+	string(api.ResourceLimitsEphemeralStorage),
 	string(api.ResourcePods),
 	string(api.ResourceQuotas),
 	string(api.ResourceServices),
@@ -183,11 +239,13 @@ var standardResources = sets.NewString(
 	string(api.ResourcePersistentVolumeClaims),
 	string(api.ResourceStorage),
 	string(api.ResourceRequestsStorage),
+	string(api.ResourceServicesNodePorts),
+	string(api.ResourceServicesLoadBalancers),
 )
 
 // IsStandardResourceName returns true if the resource is known to the system
 func IsStandardResourceName(str string) bool {
-	return standardResources.Has(str)
+	return standardResources.Has(str) || IsHugePageResourceName(api.ResourceName(str))
 }
 
 var integerResources = sets.NewString(
@@ -204,7 +262,12 @@ var integerResources = sets.NewString(
 
 // IsIntegerResourceName returns true if the resource is measured in integer values
 func IsIntegerResourceName(str string) bool {
-	return integerResources.Has(str) || IsOpaqueIntResourceName(api.ResourceName(str))
+	return integerResources.Has(str) || IsExtendedResourceName(api.ResourceName(str))
+}
+
+// Extended and HugePages resources
+func IsScalarResourceName(name api.ResourceName) bool {
+	return IsExtendedResourceName(name) || IsHugePageResourceName(name)
 }
 
 // this function aims to check if the service's ClusterIP is set or not

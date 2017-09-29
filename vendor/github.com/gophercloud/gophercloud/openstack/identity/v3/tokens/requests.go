@@ -10,20 +10,22 @@ type Scope struct {
 	DomainName  string
 }
 
-// AuthOptionsBuilder describes any argument that may be passed to the Create call.
+// AuthOptionsBuilder provides the ability for extensions to add additional
+// parameters to AuthOptions. Extensions must satisfy all required methods.
 type AuthOptionsBuilder interface {
-	// ToTokenV3CreateMap assembles the Create request body, returning an error if parameters are
-	// missing or inconsistent.
+	// ToTokenV3CreateMap assembles the Create request body, returning an error
+	// if parameters are missing or inconsistent.
 	ToTokenV3CreateMap(map[string]interface{}) (map[string]interface{}, error)
 	ToTokenV3ScopeMap() (map[string]interface{}, error)
 	CanReauth() bool
 }
 
+// AuthOptions represents options for authenticating a user.
 type AuthOptions struct {
 	// IdentityEndpoint specifies the HTTP endpoint that is required to work with
-	// the Identity API of the appropriate version. While it's ultimately needed by
-	// all of the identity services, it will often be populated by a provider-level
-	// function.
+	// the Identity API of the appropriate version. While it's ultimately needed
+	// by all of the identity services, it will often be populated by a
+	// provider-level function.
 	IdentityEndpoint string `json:"-"`
 
 	// Username is required if using Identity V2 API. Consult with your provider's
@@ -39,11 +41,11 @@ type AuthOptions struct {
 	DomainID   string `json:"-"`
 	DomainName string `json:"name,omitempty"`
 
-	// AllowReauth should be set to true if you grant permission for Gophercloud to
-	// cache your credentials in memory, and to allow Gophercloud to attempt to
-	// re-authenticate automatically if/when your token expires.  If you set it to
-	// false, it will not cache these settings, but re-authentication will not be
-	// possible.  This setting defaults to false.
+	// AllowReauth should be set to true if you grant permission for Gophercloud
+	// to cache your credentials in memory, and to allow Gophercloud to attempt
+	// to re-authenticate automatically if/when your token expires.  If you set
+	// it to false, it will not cache these settings, but re-authentication will
+	// not be possible.  This setting defaults to false.
 	AllowReauth bool `json:"-"`
 
 	// TokenID allows users to authenticate (possibly as another user) with an
@@ -53,6 +55,7 @@ type AuthOptions struct {
 	Scope Scope `json:"-"`
 }
 
+// ToTokenV3CreateMap builds a request body from AuthOptions.
 func (opts *AuthOptions) ToTokenV3CreateMap(scope map[string]interface{}) (map[string]interface{}, error) {
 	gophercloudAuthOpts := gophercloud.AuthOptions{
 		Username:    opts.Username,
@@ -67,6 +70,7 @@ func (opts *AuthOptions) ToTokenV3CreateMap(scope map[string]interface{}) (map[s
 	return gophercloudAuthOpts.ToTokenV3CreateMap(scope)
 }
 
+// ToTokenV3CreateMap builds a scope request body from AuthOptions.
 func (opts *AuthOptions) ToTokenV3ScopeMap() (map[string]interface{}, error) {
 	if opts.Scope.ProjectName != "" {
 		// ProjectName provided: either DomainID or DomainName must also be supplied.
@@ -125,7 +129,12 @@ func (opts *AuthOptions) ToTokenV3ScopeMap() (map[string]interface{}, error) {
 			},
 		}, nil
 	} else if opts.Scope.DomainName != "" {
-		return nil, gophercloud.ErrScopeDomainName{}
+		// DomainName
+		return map[string]interface{}{
+			"domain": map[string]interface{}{
+				"name": &opts.Scope.DomainName,
+			},
+		}, nil
 	}
 
 	return nil, nil
@@ -141,7 +150,8 @@ func subjectTokenHeaders(c *gophercloud.ServiceClient, subjectToken string) map[
 	}
 }
 
-// Create authenticates and either generates a new token, or changes the Scope of an existing token.
+// Create authenticates and either generates a new token, or changes the Scope
+// of an existing token.
 func Create(c *gophercloud.ServiceClient, opts AuthOptionsBuilder) (r CreateResult) {
 	scope, err := opts.ToTokenV3ScopeMap()
 	if err != nil {

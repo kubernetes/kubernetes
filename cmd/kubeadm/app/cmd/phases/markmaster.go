@@ -17,10 +17,9 @@ limitations under the License.
 package phases
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	markmasterphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markmaster"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -34,15 +33,13 @@ func NewCmdMarkMaster() *cobra.Command {
 		Short:   "Mark a node as master.",
 		Aliases: []string{"markmaster"},
 		RunE: func(_ *cobra.Command, args []string) error {
-			err := validateExactArgNumber(args, []string{"node-name"})
+			err := cmdutil.ValidateExactArgNumber(args, []string{"node-name"})
 			kubeadmutil.CheckErr(err)
 
 			client, err := kubeconfigutil.ClientSetFromFile(kubeConfigFile)
 			kubeadmutil.CheckErr(err)
 
 			nodeName := args[0]
-			fmt.Printf("[markmaster] Will mark node %s as master by adding a label and a taint\n", nodeName)
-
 			return markmasterphase.MarkMaster(client, nodeName)
 		},
 	}

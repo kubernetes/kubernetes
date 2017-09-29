@@ -25,7 +25,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	pkg_admission "k8s.io/apiserver/pkg/admission"
 	admission "k8s.io/kubernetes/pkg/apis/admission"
 	unsafe "unsafe"
 )
@@ -85,7 +84,7 @@ func autoConvert_v1alpha1_AdmissionReviewSpec_To_admission_AdmissionReviewSpec(i
 	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.OldObject, &out.OldObject, s); err != nil {
 		return err
 	}
-	out.Operation = pkg_admission.Operation(in.Operation)
+	out.Operation = admission.Operation(in.Operation)
 	out.Name = in.Name
 	out.Namespace = in.Namespace
 	out.Resource = in.Resource
@@ -112,7 +111,7 @@ func autoConvert_admission_AdmissionReviewSpec_To_v1alpha1_AdmissionReviewSpec(i
 	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.OldObject, &out.OldObject, s); err != nil {
 		return err
 	}
-	out.Operation = pkg_admission.Operation(in.Operation)
+	out.Operation = v1alpha1.Operation(in.Operation)
 	out.Resource = in.Resource
 	out.SubResource = in.SubResource
 	// TODO: Inefficient conversion - can we improve it?

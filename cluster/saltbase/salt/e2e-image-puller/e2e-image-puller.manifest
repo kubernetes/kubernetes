@@ -50,9 +50,11 @@ spec:
   volumes:
   - hostPath:
       path: /var/run/docker.sock
+      type: Socket
     name: socket
   - hostPath:
       path: /usr/bin/docker
+      type: File
     name: docker
   # This pod is really fire-and-forget.
   restartPolicy: OnFailure

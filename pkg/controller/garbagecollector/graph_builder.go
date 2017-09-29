@@ -78,6 +78,10 @@ type GraphBuilder struct {
 	// dependencyGraphBuilder
 	monitors    monitors
 	monitorLock sync.Mutex
+	// informersStarted is closed after after all of the controllers have been initialized and are running.
+	// After that it is safe to start them here, before that it is not.
+	informersStarted <-chan struct{}
+
 	// stopCh drives shutdown. If it is nil, it indicates that Run() has not been
 	// called yet. If it is non-nil, then when closed it indicates everything
 	// should shut down.
@@ -88,9 +92,6 @@ type GraphBuilder struct {
 	// metaOnlyClientPool uses a special codec, which removes fields except for
 	// apiVersion, kind, and metadata during decoding.
 	metaOnlyClientPool dynamic.ClientPool
-	// used to register exactly once the rate limiters of the clients used by
-	// the `monitors`.
-	registeredRateLimiterForControllers *RegisteredRateLimiter
 	// monitors are the producer of the graphChanges queue, graphBuilder alters
 	// the in-memory graph according to the changes.
 	graphChanges workqueue.RateLimitingInterface
@@ -200,8 +201,6 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 	if err != nil {
 		return nil, err
 	}
-	// TODO: since the gv is never unregistered, isn't this a memory leak?
-	gb.registeredRateLimiterForControllers.registerIfNotPresent(resource.GroupVersion(), client, "garbage_collector_monitoring")
 	_, monitor := cache.NewInformer(
 		listWatcher(client, resource),
 		nil,
@@ -279,6 +278,10 @@ func (gb *GraphBuilder) startMonitors() {
 		return
 	}
 
+	// we're waiting until after the informer start that happens once all the controllers are initialized.  This ensures
+	// that they don't get unexpected events on their work queues.
+	<-gb.informersStarted
+
 	monitors := gb.monitors
 	started := 0
 	for _, monitor := range monitors {
@@ -351,6 +354,7 @@ var ignoredResources = map[schema.GroupResource]struct{}{
 	{Group: "authorization.k8s.io", Resource: "subjectaccessreviews"}:      {},
 	{Group: "authorization.k8s.io", Resource: "selfsubjectaccessreviews"}:  {},
 	{Group: "authorization.k8s.io", Resource: "localsubjectaccessreviews"}: {},
+	{Group: "authorization.k8s.io", Resource: "selfsubjectrulesreviews"}:   {},
 	{Group: "apiregistration.k8s.io", Resource: "apiservices"}:             {},
 	{Group: "apiextensions.k8s.io", Resource: "customresourcedefinitions"}: {},
 }

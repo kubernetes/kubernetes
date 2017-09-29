@@ -16,10 +16,10 @@
 
 REGISTRY?="gcr.io/google-containers"
 IMAGE=debian-iptables
-TAG=v7
+TAG=v8
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-QEMUVERSION=v2.7.0
+QEMUVERSION=v2.9.1
 
 ifeq ($(ARCH),arm)
 	QEMUARCH=arm
@@ -34,7 +34,7 @@ ifeq ($(ARCH),s390x)
 	QEMUARCH=s390x
 endif
 
-BASEIMAGE=gcr.io/google-containers/debian-base-$(ARCH):0.1
+BASEIMAGE=gcr.io/google-containers/debian-base-$(ARCH):0.2
 
 build:
 	cp ./* $(TEMP_DIR)

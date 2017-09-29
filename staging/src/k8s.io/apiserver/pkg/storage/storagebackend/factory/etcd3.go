@@ -61,7 +61,7 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 		transformer = value.IdentityTransformer
 	}
 	if c.Quorum {
-		return etcd3.New(client, c.Codec, c.Prefix, transformer), destroyFunc, nil
+		return etcd3.New(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
 	}
-	return etcd3.NewWithNoQuorumRead(client, c.Codec, c.Prefix, transformer), destroyFunc, nil
+	return etcd3.NewWithNoQuorumRead(client, c.Codec, c.Prefix, transformer, c.Paging), destroyFunc, nil
 }

@@ -24,10 +24,12 @@ import (
 
 	"bytes"
 
+	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	rbaclisters "k8s.io/kubernetes/pkg/client/listers/rbac/internalversion"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 
@@ -121,6 +123,36 @@ func (r *RBACAuthorizer) Authorize(requestAttributes authorizer.Attributes) (boo
 	return false, reason, nil
 }
 
+func (r *RBACAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+	var (
+		resourceRules    []authorizer.ResourceRuleInfo
+		nonResourceRules []authorizer.NonResourceRuleInfo
+	)
+
+	policyRules, err := r.authorizationRuleResolver.RulesFor(user, namespace)
+	for _, policyRule := range policyRules {
+		if len(policyRule.Resources) > 0 {
+			r := authorizer.DefaultResourceRuleInfo{
+				Verbs:         policyRule.Verbs,
+				APIGroups:     policyRule.APIGroups,
+				Resources:     policyRule.Resources,
+				ResourceNames: policyRule.ResourceNames,
+			}
+			var resourceRule authorizer.ResourceRuleInfo = &r
+			resourceRules = append(resourceRules, resourceRule)
+		}
+		if len(policyRule.NonResourceURLs) > 0 {
+			r := authorizer.DefaultNonResourceRuleInfo{
+				Verbs:           policyRule.Verbs,
+				NonResourceURLs: policyRule.NonResourceURLs,
+			}
+			var nonResourceRule authorizer.NonResourceRuleInfo = &r
+			nonResourceRules = append(nonResourceRules, nonResourceRule)
+		}
+	}
+	return resourceRules, nonResourceRules, false, err
+}
+
 func New(roles rbacregistryvalidation.RoleGetter, roleBindings rbacregistryvalidation.RoleBindingLister, clusterRoles rbacregistryvalidation.ClusterRoleGetter, clusterRoleBindings rbacregistryvalidation.ClusterRoleBindingLister) *RBACAuthorizer {
 	authorizer := &RBACAuthorizer{
 		authorizationRuleResolver: rbacregistryvalidation.NewDefaultRuleResolver(
@@ -155,4 +187,36 @@ func RuleAllows(requestAttributes authorizer.Attributes, rule *rbac.PolicyRule) 
 
 	return rbac.VerbMatches(rule, requestAttributes.GetVerb()) &&
 		rbac.NonResourceURLMatches(rule, requestAttributes.GetPath())
+}
+
+type RoleGetter struct {
+	Lister rbaclisters.RoleLister
+}
+
+func (g *RoleGetter) GetRole(namespace, name string) (*rbac.Role, error) {
+	return g.Lister.Roles(namespace).Get(name)
+}
+
+type RoleBindingLister struct {
+	Lister rbaclisters.RoleBindingLister
+}
+
+func (l *RoleBindingLister) ListRoleBindings(namespace string) ([]*rbac.RoleBinding, error) {
+	return l.Lister.RoleBindings(namespace).List(labels.Everything())
+}
+
+type ClusterRoleGetter struct {
+	Lister rbaclisters.ClusterRoleLister
+}
+
+func (g *ClusterRoleGetter) GetClusterRole(name string) (*rbac.ClusterRole, error) {
+	return g.Lister.Get(name)
+}
+
+type ClusterRoleBindingLister struct {
+	Lister rbaclisters.ClusterRoleBindingLister
+}
+
+func (l *ClusterRoleBindingLister) ListClusterRoleBindings() ([]*rbac.ClusterRoleBinding, error) {
+	return l.Lister.List(labels.Everything())
 }

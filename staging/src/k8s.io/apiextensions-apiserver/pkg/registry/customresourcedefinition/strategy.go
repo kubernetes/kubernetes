@@ -19,6 +19,7 @@ package customresourcedefinition
 import (
 	"fmt"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,9 +28,11 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 )
 
 type strategy struct {
@@ -46,9 +49,37 @@ func (strategy) NamespaceScoped() bool {
 }
 
 func (strategy) PrepareForCreate(ctx genericapirequest.Context, obj runtime.Object) {
+	crd := obj.(*apiextensions.CustomResourceDefinition)
+	crd.Status = apiextensions.CustomResourceDefinitionStatus{}
+	crd.Generation = 1
+
+	// if the feature gate is disabled, drop the feature.
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) {
+		crd.Spec.Validation = nil
+	}
 }
 
 func (strategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old runtime.Object) {
+	newCRD := obj.(*apiextensions.CustomResourceDefinition)
+	oldCRD := old.(*apiextensions.CustomResourceDefinition)
+	newCRD.Status = oldCRD.Status
+
+	// Any changes to the spec increment the generation number, any changes to the
+	// status should reflect the generation number of the corresponding object. We push
+	// the burden of managing the status onto the clients because we can't (in general)
+	// know here what version of spec the writer of the status has seen. It may seem like
+	// we can at first -- since obj contains spec -- but in the future we will probably make
+	// status its own object, and even if we don't, writes may be the result of a
+	// read-update-write loop, so the contents of spec may not actually be the spec that
+	// the controller has *seen*.
+	if !apiequality.Semantic.DeepEqual(oldCRD.Spec, newCRD.Spec) {
+		newCRD.Generation = oldCRD.Generation + 1
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceValidation) {
+		newCRD.Spec.Validation = nil
+		oldCRD.Spec.Validation = nil
+	}
 }
 
 func (strategy) Validate(ctx genericapirequest.Context, obj runtime.Object) field.ErrorList {
@@ -87,9 +118,14 @@ func (statusStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old r
 	newObj := obj.(*apiextensions.CustomResourceDefinition)
 	oldObj := old.(*apiextensions.CustomResourceDefinition)
 	newObj.Spec = oldObj.Spec
+
+	// Status updates are for only for updating status, not objectmeta.
+	// TODO: Update after ResetObjectMetaForStatus is added to meta/v1.
 	newObj.Labels = oldObj.Labels
 	newObj.Annotations = oldObj.Annotations
 	newObj.OwnerReferences = oldObj.OwnerReferences
+	newObj.Generation = oldObj.Generation
+	newObj.SelfLink = oldObj.SelfLink
 }
 
 func (statusStrategy) AllowCreateOnUpdate() bool {

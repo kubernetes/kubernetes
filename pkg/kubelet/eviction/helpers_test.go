@@ -1604,6 +1604,20 @@ func newResourceList(cpu, memory string) v1.ResourceList {
 	return res
 }
 
+func newEphemeralStorageResourceList(ephemeral, cpu, memory string) v1.ResourceList {
+	res := v1.ResourceList{}
+	if ephemeral != "" {
+		res[v1.ResourceEphemeralStorage] = resource.MustParse(ephemeral)
+	}
+	if cpu != "" {
+		res[v1.ResourceCPU] = resource.MustParse(cpu)
+	}
+	if memory != "" {
+		res[v1.ResourceMemory] = resource.MustParse("1Mi")
+	}
+	return res
+}
+
 func newResourceRequirements(requests, limits v1.ResourceList) v1.ResourceRequirements {
 	res := v1.ResourceRequirements{}
 	res.Requests = requests

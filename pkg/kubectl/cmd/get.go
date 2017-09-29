@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -26,18 +27,20 @@ import (
 
 	kapierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
-	"k8s.io/kubernetes/pkg/util/i18n"
 	"k8s.io/kubernetes/pkg/util/interrupt"
 )
 
@@ -58,7 +61,8 @@ var (
 
 		This command will hide resources that have completed, such as pods that are
 		in the Succeeded or Failed phases. You can see the full results for any
-		resource by providing the '--show-all' flag.
+		resource by providing the '--show-all' flag, but this flag does not include
+		the uninitialized objects by default, unless '--include-uninitialized' is explicitly set.
 
 		By specifying the output as 'template' and providing a Go template as the value
 		of the --template flag, you can filter the attributes of the fetched resources.`)
@@ -126,8 +130,9 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 		ArgAliases: argAliases,
 	}
 	cmdutil.AddPrinterFlags(cmd)
-	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
-	cmd.Flags().BoolP("watch", "w", false, "After listing/getting the requested object, watch for changes.")
+	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmdutil.AddIncludeUninitializedFlag(cmd)
+	cmd.Flags().BoolP("watch", "w", false, "After listing/getting the requested object, watch for changes. Uninitialized objects are excluded if no object name is provided.")
 	cmd.Flags().Bool("watch-only", false, "Watch for changes to the requested object(s), without listing/getting first.")
 	cmd.Flags().Bool("show-kind", false, "If present, list the resource type for the requested object(s).")
 	cmd.Flags().Bool("all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
@@ -138,7 +143,6 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
-	cmdutil.AddOpenAPIFlags(cmd)
 	cmd.Flags().StringVar(&options.Raw, "raw", options.Raw, "Raw URI to request from the server.  Uses the transport specified by the kubeconfig file.")
 	return cmd
 }
@@ -165,13 +169,15 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		return nil
 	}
 
-	selector := cmdutil.GetFlagString(cmd, "selector")
-	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
-	showKind := cmdutil.GetFlagBool(cmd, "show-kind")
-	builder, err := f.NewUnstructuredBuilder(true)
+	mapper, typer, err := f.UnstructuredObject()
 	if err != nil {
 		return err
 	}
+
+	selector := cmdutil.GetFlagString(cmd, "selector")
+	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
+	showKind := cmdutil.GetFlagBool(cmd, "show-kind")
+	builder := f.NewBuilder().Unstructured(f.UnstructuredClientForMapping, mapper, typer)
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -201,17 +207,23 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 
 	// handle watch separately since we cannot watch multiple resource types
 	isWatch, isWatchOnly := cmdutil.GetFlagBool(cmd, "watch"), cmdutil.GetFlagBool(cmd, "watch-only")
-	if isWatch || isWatchOnly {
-		builder, err := f.NewUnstructuredBuilder(true)
-		if err != nil {
-			return err
-		}
 
-		r := builder.
+	var includeUninitialized bool
+	if isWatch && len(args) == 2 {
+		// include the uninitialized one for watching on a single object
+		// unless explicitly set --include-uninitialized=false
+		includeUninitialized = true
+	}
+	includeUninitialized = cmdutil.ShouldIncludeUninitialized(cmd, includeUninitialized)
+
+	if isWatch || isWatchOnly {
+		r := f.NewBuilder().
+			Unstructured(f.UnstructuredClientForMapping, mapper, typer).
 			NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
 			FilenameParam(enforceNamespace, &options.FilenameOptions).
 			SelectorParam(selector).
 			ExportParam(export).
+			IncludeUninitialized(includeUninitialized).
 			ResourceTypeOrNameArgs(true, args...).
 			SingleResourceType().
 			Latest().
@@ -267,8 +279,12 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				objsToPrint = append(objsToPrint, obj)
 			}
 			for _, objToPrint := range objsToPrint {
-				if err := printer.PrintObj(objToPrint, writer); err != nil {
-					return fmt.Errorf("unable to output the provided object: %v", err)
+				if isFiltered, err := filterFuncs.Filter(objToPrint, filterOpts); !isFiltered {
+					if err != nil {
+						glog.V(2).Infof("Unable to filter resource: %v", err)
+					} else if err := printer.PrintObj(objToPrint, writer); err != nil {
+						return fmt.Errorf("unable to output the provided object: %v", err)
+					}
 				}
 			}
 			writer.Flush()
@@ -289,7 +305,15 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 					first = false
 					return false, nil
 				}
-				return false, printer.PrintObj(e.Object, out)
+
+				if isFiltered, err := filterFuncs.Filter(e.Object, filterOpts); !isFiltered {
+					if err != nil {
+						glog.V(2).Infof("Unable to filter resource: %v", err)
+					} else if err := printer.PrintObj(e.Object, out); err != nil {
+						return false, err
+					}
+				}
+				return false, nil
 			})
 			return err
 		})
@@ -301,6 +325,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
 		SelectorParam(selector).
 		ExportParam(export).
+		IncludeUninitialized(includeUninitialized).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
 		Latest().
@@ -344,17 +369,32 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		var obj runtime.Object
 		if !singleItemImplied || len(infos) > 1 {
 			// we have more than one item, so coerce all items into a list
-			list := &unstructured.UnstructuredList{
-				Object: map[string]interface{}{
-					"kind":       "List",
-					"apiVersion": "v1",
-					"metadata":   map[string]interface{}{},
+			// we have more than one item, so coerce all items into a list.
+			// we don't want an *unstructured.Unstructured list yet, as we
+			// may be dealing with non-unstructured objects. Compose all items
+			// into an api.List, and then decode using an unstructured scheme.
+			list := api.List{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "List",
+					APIVersion: "v1",
 				},
+				ListMeta: metav1.ListMeta{},
 			}
 			for _, info := range infos {
-				list.Items = append(list.Items, *info.Object.(*unstructured.Unstructured))
+				list.Items = append(list.Items, info.Object)
 			}
-			obj = list
+
+			listData, err := json.Marshal(list)
+			if err != nil {
+				return err
+			}
+
+			converted, err := runtime.Decode(unstructured.UnstructuredJSONScheme, listData)
+			if err != nil {
+				return err
+			}
+
+			obj = converted
 		} else {
 			obj = infos[0].Object
 		}
@@ -457,7 +497,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			// if cmd does not specify output format and useOpenAPIPrintColumnFlagLabel flag is true,
 			// then get the default output options for this mapping from OpenAPI schema.
 			if !cmdSpecifiesOutputFmt(cmd) && useOpenAPIPrintColumns {
-				outputOpts, _ = outputOptsForMappingFromOpenAPI(f, cmdutil.GetOpenAPICacheDir(cmd), mapping)
+				outputOpts, _ = outputOptsForMappingFromOpenAPI(f, mapping)
 			}
 
 			printer, err = f.PrinterForMapping(cmd, false, outputOpts, mapping, allNamespaces)
@@ -556,11 +596,11 @@ func cmdSpecifiesOutputFmt(cmd *cobra.Command) bool {
 
 // outputOptsForMappingFromOpenAPI looks for the output format metatadata in the
 // openapi schema and returns the output options for the mapping if found.
-func outputOptsForMappingFromOpenAPI(f cmdutil.Factory, openAPIcacheDir string, mapping *meta.RESTMapping) (*printers.OutputOptions, bool) {
+func outputOptsForMappingFromOpenAPI(f cmdutil.Factory, mapping *meta.RESTMapping) (*printers.OutputOptions, bool) {
 
 	// user has not specified any output format, check if OpenAPI has
 	// default specification to print this resource type
-	api, err := f.OpenAPISchema(openAPIcacheDir)
+	api, err := f.OpenAPISchema()
 	if err != nil {
 		// Error getting schema
 		return nil, false

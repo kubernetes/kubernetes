@@ -19,7 +19,7 @@ go_library(
     }),
     deps = select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "//vendor/github.com/opencontainers/runc/libcontainer/selinux:go_default_library",
+            "//vendor/github.com/opencontainers/selinux/go-selinux:go_default_library",
         ],
         "//conditions:default": [],
     }),

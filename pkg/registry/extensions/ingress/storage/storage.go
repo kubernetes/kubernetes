@@ -25,7 +25,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/extensions/ingress"
 )
 
@@ -41,11 +43,12 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		NewFunc:                  func() runtime.Object { return &extensions.Ingress{} },
 		NewListFunc:              func() runtime.Object { return &extensions.IngressList{} },
 		DefaultQualifiedResource: extensions.Resource("ingresses"),
-		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("ingresses"),
 
 		CreateStrategy: ingress.Strategy,
 		UpdateStrategy: ingress.Strategy,
 		DeleteStrategy: ingress.Strategy,
+
+		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {

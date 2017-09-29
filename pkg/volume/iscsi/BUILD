@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "attacher.go",
         "disk_manager.go",
         "doc.go",
         "iscsi.go",
@@ -22,7 +23,6 @@ go_library(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 

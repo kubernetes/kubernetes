@@ -68,7 +68,8 @@ func BuildClusterConfig(c *federation_v1beta1.Cluster) (*restclient.Config, erro
 			if c.Spec.SecretRef.Name == "" {
 				return nil, fmt.Errorf("found secretRef but no secret name for cluster %s", c.Name)
 			}
-			secret, err := getSecret(c.Spec.SecretRef.Name)
+			var secret *api.Secret
+			secret, err = getSecret(c.Spec.SecretRef.Name)
 			if err != nil {
 				return nil, err
 			}

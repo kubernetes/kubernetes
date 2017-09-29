@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/core/pod"
 	podrest "k8s.io/kubernetes/pkg/registry/core/pod/rest"
 )
@@ -71,7 +70,6 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		NewListFunc:              func() runtime.Object { return &api.PodList{} },
 		PredicateFunc:            pod.MatchPod,
 		DefaultQualifiedResource: api.Resource("pods"),
-		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("pods"),
 
 		CreateStrategy:      pod.Strategy,
 		UpdateStrategy:      pod.Strategy,

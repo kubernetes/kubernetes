@@ -19,11 +19,11 @@ package taints
 
 import (
 	"fmt"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"strings"
 
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
@@ -35,7 +35,7 @@ const (
 	UNTAINTED = "untainted"
 )
 
-// parseTaint parses a taint from a string. Taint must be off the format '<key>=<value>:<effect>'.
+// parseTaint parses a taint from a string. Taint must be of the format '<key>=<value>:<effect>'.
 func parseTaint(st string) (v1.Taint, error) {
 	var taint v1.Taint
 	parts := strings.Split(st, "=")
@@ -76,6 +76,10 @@ type taintsVar struct {
 }
 
 func (t taintsVar) Set(s string) error {
+	if len(s) == 0 {
+		*t.ptr = nil
+		return nil
+	}
 	sts := strings.Split(s, ",")
 	var taints []api.Taint
 	for _, st := range sts {
@@ -91,7 +95,7 @@ func (t taintsVar) Set(s string) error {
 
 func (t taintsVar) String() string {
 	if len(*t.ptr) == 0 {
-		return "<nil>"
+		return ""
 	}
 	var taints []string
 	for _, taint := range *t.ptr {
@@ -298,4 +302,34 @@ func TaintExists(taints []v1.Taint, taintToFind *v1.Taint) bool {
 		}
 	}
 	return false
+}
+
+func TaintSetDiff(t1, t2 []v1.Taint) (taintsToAdd []*v1.Taint, taintsToRemove []*v1.Taint) {
+	for _, taint := range t1 {
+		if !TaintExists(t2, &taint) {
+			t := taint
+			taintsToAdd = append(taintsToAdd, &t)
+		}
+	}
+
+	for _, taint := range t2 {
+		if !TaintExists(t1, &taint) {
+			t := taint
+			taintsToRemove = append(taintsToRemove, &t)
+		}
+	}
+
+	return
+}
+
+func TaintSetFilter(taints []v1.Taint, fn func(*v1.Taint) bool) []v1.Taint {
+	res := []v1.Taint{}
+
+	for _, taint := range taints {
+		if fn(&taint) {
+			res = append(res, taint)
+		}
+	}
+
+	return res
 }

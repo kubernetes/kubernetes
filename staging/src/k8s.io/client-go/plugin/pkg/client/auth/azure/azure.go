@@ -28,6 +28,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -113,6 +114,8 @@ type azureRoundTripper struct {
 	roundTripper http.RoundTripper
 }
 
+var _ net.RoundTripperWrapper = &azureRoundTripper{}
+
 func (r *azureRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	if len(req.Header.Get(authHeader)) != 0 {
 		return r.roundTripper.RoundTrip(req)
@@ -136,6 +139,8 @@ func (r *azureRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 
 	return r.roundTripper.RoundTrip(req2)
 }
+
+func (r *azureRoundTripper) WrappedRoundTripper() http.RoundTripper { return r.roundTripper }
 
 type azureToken struct {
 	token       adal.Token

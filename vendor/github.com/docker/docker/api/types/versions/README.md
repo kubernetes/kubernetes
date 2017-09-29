@@ -1,10 +1,10 @@
-## Legacy API type versions
+# Legacy API type versions
 
 This package includes types for legacy API versions. The stable version of the API types live in `api/types/*.go`.
 
 Consider moving a type here when you need to keep backwards compatibility in the API. This legacy types are organized by the latest API version they appear in. For instance, types in the `v1p19` package are valid for API versions below or equal `1.19`. Types in the `v1p20` package are valid for the API version `1.20`, since the versions below that will use the legacy types in `v1p19`.
 
-### Package name conventions
+## Package name conventions
 
 The package name convention is to use `v` as a prefix for the version number and `p`(patch) as a separator. We use this nomenclature due to a few restrictions in the Go package name convention:
 

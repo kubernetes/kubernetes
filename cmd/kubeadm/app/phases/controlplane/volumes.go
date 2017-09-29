@@ -30,11 +30,11 @@ import (
 )
 
 const (
-	k8sCertsVolumeName   = "k8s-certs"
-	caCertsVolumeName    = "ca-certs"
-	caCertsVolumePath    = "/etc/ssl/certs"
-	caCertsPkiVolumeName = "ca-certs-etc-pki"
-	kubeConfigVolumeName = "kubeconfig"
+	caCertsVolumeName       = "ca-certs"
+	caCertsVolumePath       = "/etc/ssl/certs"
+	caCertsPkiVolumeName    = "ca-certs-etc-pki"
+	flexvolumeDirVolumeName = "flexvolume-dir"
+	flexvolumeDirVolumePath = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec"
 )
 
 // caCertsPkiVolumePath specifies the path that can be conditionally mounted into the apiserver and controller-manager containers
@@ -44,14 +44,16 @@ var caCertsPkiVolumePath = "/etc/pki"
 
 // getHostPathVolumesForTheControlPlane gets the required hostPath volumes and mounts for the control plane
 func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.MasterConfiguration) controlPlaneHostPathMounts {
+	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
+	hostPathFileOrCreate := v1.HostPathFileOrCreate
 	mounts := newControlPlaneHostPathMounts()
 
 	// HostPath volumes for the API Server
 	// Read-only mount for the certificates directory
 	// TODO: Always mount the K8s Certificates directory to a static path inside of the container
-	mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, k8sCertsVolumeName, cfg.CertificatesDir, cfg.CertificatesDir, true)
+	mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeCertificatesVolumeName, cfg.CertificatesDir, cfg.CertificatesDir, true, &hostPathDirectoryOrCreate)
 	// Read-only mount for the ca certs (/etc/ssl/certs) directory
-	mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, caCertsVolumeName, caCertsVolumePath, caCertsVolumePath, true)
+	mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, caCertsVolumeName, caCertsVolumePath, caCertsVolumePath, true, &hostPathDirectoryOrCreate)
 
 	// If external etcd is specified, mount the directories needed for accessing the CA/serving certs and the private key
 	if len(cfg.Etcd.Endpoints) != 0 {
@@ -62,23 +64,26 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.MasterConfiguration) c
 	// HostPath volumes for the controller manager
 	// Read-only mount for the certificates directory
 	// TODO: Always mount the K8s Certificates directory to a static path inside of the container
-	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, k8sCertsVolumeName, cfg.CertificatesDir, cfg.CertificatesDir, true)
+	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeCertificatesVolumeName, cfg.CertificatesDir, cfg.CertificatesDir, true, &hostPathDirectoryOrCreate)
 	// Read-only mount for the ca certs (/etc/ssl/certs) directory
-	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, caCertsVolumeName, caCertsVolumePath, caCertsVolumePath, true)
+	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, caCertsVolumeName, caCertsVolumePath, caCertsVolumePath, true, &hostPathDirectoryOrCreate)
 	// Read-only mount for the controller manager kubeconfig file
 	controllerManagerKubeConfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
-	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, kubeConfigVolumeName, controllerManagerKubeConfigFile, controllerManagerKubeConfigFile, true)
+	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeConfigVolumeName, controllerManagerKubeConfigFile, controllerManagerKubeConfigFile, true, &hostPathFileOrCreate)
+	// Mount for the flexvolume directory (/usr/libexec/kubernetes/kubelet-plugins/volume/exec) directory
+	// Flexvolume dir must NOT be readonly as it is used for third-party plugins to integrate with their storage backends via unix domain socket.
+	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, flexvolumeDirVolumeName, flexvolumeDirVolumePath, flexvolumeDirVolumePath, false, &hostPathDirectoryOrCreate)
 
 	// HostPath volumes for the scheduler
 	// Read-only mount for the scheduler kubeconfig file
 	schedulerKubeConfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName)
-	mounts.NewHostPathMount(kubeadmconstants.KubeScheduler, kubeConfigVolumeName, schedulerKubeConfigFile, schedulerKubeConfigFile, true)
+	mounts.NewHostPathMount(kubeadmconstants.KubeScheduler, kubeadmconstants.KubeConfigVolumeName, schedulerKubeConfigFile, schedulerKubeConfigFile, true, &hostPathFileOrCreate)
 
 	// On some systems were we host-mount /etc/ssl/certs, it is also required to mount /etc/pki. This is needed
 	// due to symlinks pointing from files in /etc/ssl/certs into /etc/pki/
 	if isPkiVolumeMountNeeded() {
-		mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, caCertsPkiVolumeName, caCertsPkiVolumePath, caCertsPkiVolumePath, true)
-		mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, caCertsPkiVolumeName, caCertsPkiVolumePath, caCertsPkiVolumePath, true)
+		mounts.NewHostPathMount(kubeadmconstants.KubeAPIServer, caCertsPkiVolumeName, caCertsPkiVolumePath, caCertsPkiVolumePath, true, &hostPathDirectoryOrCreate)
+		mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, caCertsPkiVolumeName, caCertsPkiVolumePath, caCertsPkiVolumePath, true, &hostPathDirectoryOrCreate)
 	}
 
 	return mounts
@@ -97,8 +102,8 @@ func newControlPlaneHostPathMounts() controlPlaneHostPathMounts {
 	}
 }
 
-func (c *controlPlaneHostPathMounts) NewHostPathMount(component, mountName, hostPath, containerPath string, readOnly bool) {
-	c.volumes[component] = append(c.volumes[component], staticpodutil.NewVolume(mountName, hostPath))
+func (c *controlPlaneHostPathMounts) NewHostPathMount(component, mountName, hostPath, containerPath string, readOnly bool, hostPathType *v1.HostPathType) {
+	c.volumes[component] = append(c.volumes[component], staticpodutil.NewVolume(mountName, hostPath, hostPathType))
 	c.volumeMounts[component] = append(c.volumeMounts[component], staticpodutil.NewVolumeMount(mountName, containerPath, readOnly))
 }
 
@@ -145,9 +150,10 @@ func getEtcdCertVolumes(etcdCfg kubeadmapi.Etcd) ([]v1.Volume, []v1.VolumeMount)
 
 	volumes := []v1.Volume{}
 	volumeMounts := []v1.VolumeMount{}
+	pathType := v1.HostPathDirectoryOrCreate
 	for i, certDir := range certDirs.List() {
 		name := fmt.Sprintf("etcd-certs-%d", i)
-		volumes = append(volumes, staticpodutil.NewVolume(name, certDir))
+		volumes = append(volumes, staticpodutil.NewVolume(name, certDir, &pathType))
 		volumeMounts = append(volumeMounts, staticpodutil.NewVolumeMount(name, certDir, true))
 	}
 	return volumes, volumeMounts

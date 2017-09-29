@@ -150,8 +150,9 @@ func (o *ObjectCountEvaluator) GroupKind() schema.GroupKind {
 	return o.InternalGroupKind
 }
 
-// Handles returns true if the object count evaluator needs to track this operation.
-func (o *ObjectCountEvaluator) Handles(operation admission.Operation) bool {
+// Handles returns true if the object count evaluator needs to track this attributes.
+func (o *ObjectCountEvaluator) Handles(a admission.Attributes) bool {
+	operation := a.GetOperation()
 	return operation == admission.Create || (o.AllowCreateOnUpdate && operation == admission.Update)
 }
 

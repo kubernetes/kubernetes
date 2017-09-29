@@ -21,6 +21,7 @@ import (
 	"sort"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
@@ -88,9 +89,8 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 	allPossibleModes := pvIndex.allPossibleMatchingAccessModes(claim.Spec.AccessModes)
 
 	var smallestVolume *v1.PersistentVolume
-	var smallestVolumeSize int64
+	var smallestVolumeQty resource.Quantity
 	requestedQty := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	requestedSize := requestedQty.Value()
 	requestedClass := v1helper.GetPersistentVolumeClaimClass(claim)
 
 	var selector labels.Selector
@@ -121,8 +121,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 				// the volume if the size request is satisfied,
 				// otherwise continue searching for a match
 				volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
-				volumeSize := volumeQty.Value()
-				if volumeSize < requestedSize {
+				if volumeQty.Cmp(requestedQty) < 0 {
 					continue
 				}
 				return volume, nil
@@ -142,11 +141,10 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 			}
 
 			volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
-			volumeSize := volumeQty.Value()
-			if volumeSize >= requestedSize {
-				if smallestVolume == nil || smallestVolumeSize > volumeSize {
+			if volumeQty.Cmp(requestedQty) >= 0 {
+				if smallestVolume == nil || smallestVolumeQty.Cmp(volumeQty) > 0 {
 					smallestVolume = volume
-					smallestVolumeSize = volumeSize
+					smallestVolumeQty = volumeQty
 				}
 			}
 		}

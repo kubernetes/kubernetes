@@ -50,7 +50,7 @@ data:
 
 	// KubeProxyDaemonSet is the proxy DaemonSet manifest
 	KubeProxyDaemonSet = `
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1beta2
 kind: DaemonSet
 metadata:
   labels:
@@ -81,7 +81,6 @@ spec:
         volumeMounts:
         - mountPath: /var/lib/kube-proxy
           name: kube-proxy
-        # TODO: Make this a file hostpath mount
         - mountPath: /run/xtables.lock
           name: xtables-lock
           readOnly: false
@@ -100,5 +99,6 @@ spec:
       - name: xtables-lock
         hostPath:
           path: /run/xtables.lock
+          type: FileOrCreate
 `
 )

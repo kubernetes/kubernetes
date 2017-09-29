@@ -72,13 +72,6 @@ type Initializer struct {
 	// The initializer cares about an operation if it matches _any_ Rule.
 	// Rule.Resources must not include subresources.
 	Rules []Rule `json:"rules,omitempty" protobuf:"bytes,2,rep,name=rules"`
-
-	// FailurePolicy defines what happens if the responsible initializer controller
-	// fails to takes action. Allowed values are Ignore, or Fail. If "Ignore" is
-	// set, initializer is removed from the initializers list of an object if
-	// the timeout is reached; If "Fail" is set, admissionregistration returns timeout error
-	// if the timeout is reached.
-	FailurePolicy *FailurePolicyType `json:"failurePolicy,omitempty" protobuf:"bytes,3,opt,name=failurePolicy,casttype=FailurePolicyType"`
 }
 
 // Rule is a tuple of APIGroups, APIVersion, and Resources.It is recommended

@@ -664,7 +664,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 			Spec: api.PersistentVolumeSpec{
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					HostPath: &api.HostPathVolumeSource{},
+					HostPath: &api.HostPathVolumeSource{Type: new(api.HostPathType)},
 				},
 			},
 		},
@@ -819,6 +819,7 @@ func TestDescribeCluster(t *testing.T) {
 }
 
 func TestDescribeStorageClass(t *testing.T) {
+	reclaimPolicy := api.PersistentVolumeReclaimRetain
 	f := fake.NewSimpleClientset(&storage.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -832,6 +833,7 @@ func TestDescribeStorageClass(t *testing.T) {
 			"param1": "value1",
 			"param2": "value2",
 		},
+		ReclaimPolicy: &reclaimPolicy,
 	})
 	s := StorageClassDescriber{f}
 	out, err := s.Describe("", "foo", printers.DescriberSettings{ShowEvents: true})
@@ -1499,22 +1501,22 @@ URL:	http://localhost
 
 func TestDescribePodSecurityPolicy(t *testing.T) {
 	expected := []string{
-		"Name:\t*mypsp",
-		"Allow Privileged:\t*false",
-		"Default Add Capabilities:\t*<none>",
-		"Required Drop Capabilities:\t*<none>",
-		"Allowed Capabilities:\t*<none>",
-		"Allowed Volume Types:\t*<none>",
-		"Allow Host Network:\t*false",
-		"Allow Host Ports:\t*<none>",
-		"Allow Host PID:\t*false",
-		"Allow Host IPC:\t*false",
-		"Read Only Root Filesystem:\t*false",
+		"Name:\\s*mypsp",
+		"Allow Privileged:\\s*false",
+		"Default Add Capabilities:\\s*<none>",
+		"Required Drop Capabilities:\\s*<none>",
+		"Allowed Capabilities:\\s*<none>",
+		"Allowed Volume Types:\\s*<none>",
+		"Allow Host Network:\\s*false",
+		"Allow Host Ports:\\s*<none>",
+		"Allow Host PID:\\s*false",
+		"Allow Host IPC:\\s*false",
+		"Read Only Root Filesystem:\\s*false",
 		"SELinux Context Strategy: RunAsAny",
-		"User:\t*<none>",
-		"Role:\t*<none>",
-		"Type:\t*<none>",
-		"Level:\t*<none>",
+		"User:\\s*<none>",
+		"Role:\\s*<none>",
+		"Type:\\s*<none>",
+		"Level:\\s*<none>",
 		"Run As User Strategy: RunAsAny",
 		"FSGroup Strategy: RunAsAny",
 		"Supplemental Groups Strategy: RunAsAny",

@@ -43,10 +43,10 @@ func List(c *gophercloud.ServiceClient, opts ListOpts) pagination.Pager {
 	})
 }
 
-// LBMethod is a type used for possible load balancing methods
+// LBMethod is a type used for possible load balancing methods.
 type LBMethod string
 
-// LBProtocol is a type used for possible load balancing protocols
+// LBProtocol is a type used for possible load balancing protocols.
 type LBProtocol string
 
 // Supported attributes for create/update operations.
@@ -59,8 +59,8 @@ const (
 	ProtocolHTTPS LBProtocol = "HTTPS"
 )
 
-// CreateOptsBuilder is the interface types must satisfy to be used as options
-// for the Create function
+// CreateOptsBuilder allows extensions to add additional parameters to the
+// Create request.
 type CreateOptsBuilder interface {
 	ToLBPoolCreateMap() (map[string]interface{}, error)
 }
@@ -69,25 +69,29 @@ type CreateOptsBuilder interface {
 type CreateOpts struct {
 	// Name of the pool.
 	Name string `json:"name" required:"true"`
-	// The protocol used by the pool members, you can use either
+
+	// Protocol used by the pool members, you can use either
 	// ProtocolTCP, ProtocolHTTP, or ProtocolHTTPS.
 	Protocol LBProtocol `json:"protocol" required:"true"`
-	// Only required if the caller has an admin role and wants to create a pool
-	// for another tenant.
+
+	// TenantID is only required if the caller has an admin role and wants
+	// to create a pool for another tenant.
 	TenantID string `json:"tenant_id,omitempty"`
-	// The network on which the members of the pool will be located. Only members
-	// that are on this network can be added to the pool.
+
+	// SubnetID is the network on which the members of the pool will be located.
+	// Only members that are on this network can be added to the pool.
 	SubnetID string `json:"subnet_id,omitempty"`
-	// The algorithm used to distribute load between the members of the pool. The
-	// current specification supports LBMethodRoundRobin and
+
+	// LBMethod is the algorithm used to distribute load between the members of
+	// the pool. The current specification supports LBMethodRoundRobin and
 	// LBMethodLeastConnections as valid values for this attribute.
 	LBMethod LBMethod `json:"lb_method" required:"true"`
 
-	// The provider of the pool
+	// Provider of the pool.
 	Provider string `json:"provider,omitempty"`
 }
 
-// ToLBPoolCreateMap allows CreateOpts to satisfy the CreateOptsBuilder interface
+// ToLBPoolCreateMap builds a request body based on CreateOpts.
 func (opts CreateOpts) ToLBPoolCreateMap() (map[string]interface{}, error) {
 	return gophercloud.BuildRequestBody(opts, "pool")
 }
@@ -110,8 +114,8 @@ func Get(c *gophercloud.ServiceClient, id string) (r GetResult) {
 	return
 }
 
-// UpdateOptsBuilder is the interface types must satisfy to be used as options
-// for the Update function
+// UpdateOptsBuilder allows extensions to add additional parameters ot the
+// Update request.
 type UpdateOptsBuilder interface {
 	ToLBPoolUpdateMap() (map[string]interface{}, error)
 }
@@ -120,13 +124,14 @@ type UpdateOptsBuilder interface {
 type UpdateOpts struct {
 	// Name of the pool.
 	Name string `json:"name,omitempty"`
-	// The algorithm used to distribute load between the members of the pool. The
-	// current specification supports LBMethodRoundRobin and
+
+	// LBMethod is the algorithm used to distribute load between the members of
+	// the pool. The current specification supports LBMethodRoundRobin and
 	// LBMethodLeastConnections as valid values for this attribute.
 	LBMethod LBMethod `json:"lb_method,omitempty"`
 }
 
-// ToLBPoolUpdateMap allows UpdateOpts to satisfy the UpdateOptsBuilder interface
+// ToLBPoolUpdateMap builds a request body based on UpdateOpts.
 func (opts UpdateOpts) ToLBPoolUpdateMap() (map[string]interface{}, error) {
 	return gophercloud.BuildRequestBody(opts, "pool")
 }

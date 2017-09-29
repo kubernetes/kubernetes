@@ -19,15 +19,16 @@ filegroup(
         "//pkg/util/ebtables:all-srcs",
         "//pkg/util/env:all-srcs",
         "//pkg/util/file:all-srcs",
+        "//pkg/util/filesystem:all-srcs",
         "//pkg/util/flock:all-srcs",
         "//pkg/util/goroutinemap:all-srcs",
         "//pkg/util/hash:all-srcs",
-        "//pkg/util/i18n:all-srcs",
         "//pkg/util/initsystem:all-srcs",
         "//pkg/util/interrupt:all-srcs",
         "//pkg/util/io:all-srcs",
         "//pkg/util/ipconfig:all-srcs",
         "//pkg/util/iptables:all-srcs",
+        "//pkg/util/ipvs:all-srcs",
         "//pkg/util/keymutex:all-srcs",
         "//pkg/util/labels:all-srcs",
         "//pkg/util/limitwriter:all-srcs",
@@ -60,4 +61,11 @@ filegroup(
         "//pkg/util/workqueue/prometheus:all-srcs",
     ],
     tags = ["automanaged"],
+)
+
+sh_test(
+    name = "verify-util-pkg",
+    size = "small",
+    srcs = ["verify-util-pkg.sh"],
+    data = glob(["*.go"]),
 )

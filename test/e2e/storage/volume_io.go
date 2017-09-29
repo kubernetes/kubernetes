@@ -42,7 +42,22 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-const minFileSize = 1 * framework.MiB
+const (
+	minFileSize = 1 * framework.MiB
+
+	fileSizeSmall  = 1 * framework.MiB
+	fileSizeMedium = 100 * framework.MiB
+	fileSizeLarge  = 1 * framework.GiB
+)
+
+// MD5 hashes of the test file corresponding to each file size.
+// Test files are generated in testVolumeIO()
+// If test file generation algorithm changes, these must be recomputed.
+var md5hashes = map[int64]string{
+	fileSizeSmall:  "5c34c2813223a7ca05a3c2f38c0d1710",
+	fileSizeMedium: "f2fa202b1ffeedda5f3a58bd1ae81104",
+	fileSizeLarge:  "8d763edc71bd16217664793b5a15e403",
+}
 
 // Return the plugin's client pod spec. Use an InitContainer to setup the file i/o test env.
 func makePodSpec(config framework.VolumeTestConfig, dir, initCmd string, volsrc v1.VolumeSource, podSecContext *v1.PodSecurityContext) *v1.Pod {
@@ -131,22 +146,20 @@ func verifyFile(pod *v1.Pod, fpath string, expectSize int64, dd_input string) er
 		return fmt.Errorf("size of file %s is %d, expected %d", fpath, size, expectSize)
 	}
 
-	By("verifying file content")
-	// use `grep ... -f` rather than the expected content in a variable to reduce logging
-	rtnstr, err = podExec(pod, fmt.Sprintf("grep -c -m1 -f %s %s", dd_input, fpath))
+	By("verifying file hash")
+	rtnstr, err = podExec(pod, fmt.Sprintf("md5sum %s | cut -d' ' -f1", fpath))
 	if err != nil {
-		return fmt.Errorf("unable to test file content via `grep %s`: %v", fpath, err)
+		return fmt.Errorf("unable to test file hash via `md5sum %s`: %v", fpath, err)
 	}
-	foundCnt, err := strconv.Atoi(strings.TrimSuffix(rtnstr, "\n"))
-	if err != nil {
-		return fmt.Errorf("unable to convert string %q to int: %v", rtnstr, err)
+	actualHash := strings.TrimSuffix(rtnstr, "\n")
+	expectedHash, ok := md5hashes[expectSize]
+	if !ok {
+		return fmt.Errorf("File hash is unknown for file size %d. Was a new file size added to the test suite?",
+			expectSize)
 	}
-	if foundCnt == 0 {
-		rtnstr, err = podExec(pod, fmt.Sprintf("cat %s", dd_input))
-		if err != nil || len(rtnstr) == 0 {
-			return fmt.Errorf("string not found in file %s and unable to read dd's input file %s: %v", fpath, dd_input, err)
-		}
-		return fmt.Errorf("string %q not found in file %s", rtnstr, fpath)
+	if actualHash != expectedHash {
+		return fmt.Errorf("MD5 hash is incorrect for file %s with size %d. Expected: `%s`; Actual: `%s`",
+			fpath, expectSize, expectedHash, actualHash)
 	}
 
 	return nil
@@ -270,7 +283,7 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 		})
 
 		It("should write files of various sizes, verify size, validate content", func() {
-			fileSizes := []int64{1 * framework.MiB, 100 * framework.MiB, 1 * framework.GiB}
+			fileSizes := []int64{fileSizeSmall, fileSizeMedium, fileSizeLarge}
 			err := testVolumeIO(f, cs, config, volSource, &podSec, testFile, fileSizes)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -315,7 +328,7 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 		})
 
 		It("should write files of various sizes, verify size, validate content", func() {
-			fileSizes := []int64{1 * framework.MiB, 100 * framework.MiB}
+			fileSizes := []int64{fileSizeSmall, fileSizeMedium}
 			err := testVolumeIO(f, cs, config, volSource, nil /*no secContext*/, testFile, fileSizes)
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -349,7 +362,7 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 		})
 
 		It("should write files of various sizes, verify size, validate content", func() {
-			fileSizes := []int64{1 * framework.MiB, 100 * framework.MiB}
+			fileSizes := []int64{fileSizeSmall, fileSizeMedium}
 			fsGroup := int64(1234)
 			podSec := v1.PodSecurityContext{
 				FSGroup: &fsGroup,
@@ -424,7 +437,7 @@ var _ = SIGDescribe("Volume plugin streaming [Slow]", func() {
 		})
 
 		It("should write files of various sizes, verify size, validate content", func() {
-			fileSizes := []int64{1 * framework.MiB, 100 * framework.MiB}
+			fileSizes := []int64{fileSizeSmall, fileSizeMedium}
 			fsGroup := int64(1234)
 			podSec := v1.PodSecurityContext{
 				FSGroup: &fsGroup,

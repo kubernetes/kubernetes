@@ -82,6 +82,7 @@ if [ -e "${DATA_DIRECTORY}/${VERSION_FILE}" ]; then
   CURRENT_VERSION="$(echo $VERSION_CONTENTS | cut -d '/' -f 1)"
   CURRENT_STORAGE="$(echo $VERSION_CONTENTS | cut -d '/' -f 2)"
 fi
+ETCD_DATA_PREFIX="${ETCD_DATA_PREFIX:-/registry}"
 
 # If there is no data in DATA_DIRECTORY, this means that we are
 # starting etcd from scratch. In that case, we don't need to do
@@ -207,7 +208,7 @@ for step in ${SUPPORTED_VERSIONS}; do
     # Create a lease and attach all keys to it.
     ${ATTACHLEASE} \
       --etcd-address http://127.0.0.1:${ETCD_PORT} \
-      --ttl-keys-prefix "${TTL_KEYS_DIRECTORY:-/registry/events}" \
+      --ttl-keys-prefix "${TTL_KEYS_DIRECTORY:-${ETCD_DATA_PREFIX}/events}" \
       --lease-duration 1h
     # Kill etcd and wait until this is down.
     stop_etcd
@@ -226,7 +227,7 @@ for step in ${SUPPORTED_VERSIONS}; do
       echo "Starting etcd ${step} in v3 mode failed"
       exit 1
     fi
-    ${ETCDCTL_CMD} rm --recursive "/registry"
+    ${ETCDCTL_CMD} rm --recursive "${ETCD_DATA_PREFIX}"
     # Kill etcd and wait until this is down.
     stop_etcd
     echo "Successfully remove v2 data"

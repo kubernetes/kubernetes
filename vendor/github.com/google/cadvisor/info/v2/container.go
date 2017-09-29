@@ -199,6 +199,9 @@ type DerivedStats struct {
 }
 
 type FsInfo struct {
+	// Time of generation of these stats.
+	Timestamp time.Time `json:"timestamp"`
+
 	// The block device name associated with the filesystem.
 	Device string `json:"device"`
 

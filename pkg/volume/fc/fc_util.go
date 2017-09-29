@@ -219,14 +219,17 @@ func (util *FCUtil) AttachDisk(b fcDiskMounter) (string, error) {
 	}
 	// mount it
 	globalPDPath := util.MakeGlobalPDName(*b.fcDisk)
+	if err := os.MkdirAll(globalPDPath, 0750); err != nil {
+		return devicePath, fmt.Errorf("fc: failed to mkdir %s, error", globalPDPath)
+	}
+
 	noMnt, err := b.mounter.IsLikelyNotMountPoint(globalPDPath)
+	if err != nil {
+		return devicePath, fmt.Errorf("Heuristic determination of mount point failed:%v", err)
+	}
 	if !noMnt {
 		glog.Infof("fc: %s already mounted", globalPDPath)
 		return devicePath, nil
-	}
-
-	if err := os.MkdirAll(globalPDPath, 0750); err != nil {
-		return devicePath, fmt.Errorf("fc: failed to mkdir %s, error", globalPDPath)
 	}
 
 	err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil)

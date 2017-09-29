@@ -55,7 +55,7 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 						RestartPolicy: v1.RestartPolicyNever,
 						Containers: []v1.Container{
 							{
-								Image:   "gcr.io/google_containers/busybox:1.24",
+								Image:   busyboxImage,
 								Name:    logContName,
 								Command: []string{"sh", "-c", "echo " + logString},
 							},
@@ -74,6 +74,9 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 
 				expectedlogFile := logDir + "/" + logPodName + "_" + ns + "_" + logContName + "-" + logConID.ID + ".log"
 
+				hostPathType := new(v1.HostPathType)
+				*hostPathType = v1.HostPathType(string(v1.HostPathFileOrCreate))
+
 				checkPod := &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: checkPodName,
@@ -83,7 +86,7 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 						RestartPolicy: v1.RestartPolicyNever,
 						Containers: []v1.Container{
 							{
-								Image: "gcr.io/google_containers/busybox:1.24",
+								Image: busyboxImage,
 								Name:  checkContName,
 								// If we find expected log file and contains right content, exit 0
 								// else, keep checking until test timeout
@@ -104,6 +107,7 @@ var _ = framework.KubeDescribe("ContainerLogPath", func() {
 								VolumeSource: v1.VolumeSource{
 									HostPath: &v1.HostPathVolumeSource{
 										Path: expectedlogFile,
+										Type: hostPathType,
 									},
 								},
 							},

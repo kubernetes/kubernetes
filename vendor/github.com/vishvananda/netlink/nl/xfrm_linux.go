@@ -11,34 +11,40 @@ const (
 	XFRM_INF = ^uint64(0)
 )
 
+type XfrmMsgType uint8
+
+type XfrmMsg interface {
+	Type() XfrmMsgType
+}
+
 // Message Types
 const (
-	XFRM_MSG_BASE        = 0x10
-	XFRM_MSG_NEWSA       = 0x10
-	XFRM_MSG_DELSA       = 0x11
-	XFRM_MSG_GETSA       = 0x12
-	XFRM_MSG_NEWPOLICY   = 0x13
-	XFRM_MSG_DELPOLICY   = 0x14
-	XFRM_MSG_GETPOLICY   = 0x15
-	XFRM_MSG_ALLOCSPI    = 0x16
-	XFRM_MSG_ACQUIRE     = 0x17
-	XFRM_MSG_EXPIRE      = 0x18
-	XFRM_MSG_UPDPOLICY   = 0x19
-	XFRM_MSG_UPDSA       = 0x1a
-	XFRM_MSG_POLEXPIRE   = 0x1b
-	XFRM_MSG_FLUSHSA     = 0x1c
-	XFRM_MSG_FLUSHPOLICY = 0x1d
-	XFRM_MSG_NEWAE       = 0x1e
-	XFRM_MSG_GETAE       = 0x1f
-	XFRM_MSG_REPORT      = 0x20
-	XFRM_MSG_MIGRATE     = 0x21
-	XFRM_MSG_NEWSADINFO  = 0x22
-	XFRM_MSG_GETSADINFO  = 0x23
-	XFRM_MSG_NEWSPDINFO  = 0x24
-	XFRM_MSG_GETSPDINFO  = 0x25
-	XFRM_MSG_MAPPING     = 0x26
-	XFRM_MSG_MAX         = 0x26
-	XFRM_NR_MSGTYPES     = 0x17
+	XFRM_MSG_BASE        XfrmMsgType = 0x10
+	XFRM_MSG_NEWSA                   = 0x10
+	XFRM_MSG_DELSA                   = 0x11
+	XFRM_MSG_GETSA                   = 0x12
+	XFRM_MSG_NEWPOLICY               = 0x13
+	XFRM_MSG_DELPOLICY               = 0x14
+	XFRM_MSG_GETPOLICY               = 0x15
+	XFRM_MSG_ALLOCSPI                = 0x16
+	XFRM_MSG_ACQUIRE                 = 0x17
+	XFRM_MSG_EXPIRE                  = 0x18
+	XFRM_MSG_UPDPOLICY               = 0x19
+	XFRM_MSG_UPDSA                   = 0x1a
+	XFRM_MSG_POLEXPIRE               = 0x1b
+	XFRM_MSG_FLUSHSA                 = 0x1c
+	XFRM_MSG_FLUSHPOLICY             = 0x1d
+	XFRM_MSG_NEWAE                   = 0x1e
+	XFRM_MSG_GETAE                   = 0x1f
+	XFRM_MSG_REPORT                  = 0x20
+	XFRM_MSG_MIGRATE                 = 0x21
+	XFRM_MSG_NEWSADINFO              = 0x22
+	XFRM_MSG_GETSADINFO              = 0x23
+	XFRM_MSG_NEWSPDINFO              = 0x24
+	XFRM_MSG_GETSPDINFO              = 0x25
+	XFRM_MSG_MAPPING                 = 0x26
+	XFRM_MSG_MAX                     = 0x26
+	XFRM_NR_MSGTYPES                 = 0x17
 )
 
 // Attribute types
@@ -78,6 +84,21 @@ const (
 	SizeofXfrmLifetimeCfg = 0x40
 	SizeofXfrmLifetimeCur = 0x20
 	SizeofXfrmId          = 0x18
+	SizeofXfrmMark        = 0x08
+)
+
+// Netlink groups
+const (
+	XFRMNLGRP_NONE    = 0x0
+	XFRMNLGRP_ACQUIRE = 0x1
+	XFRMNLGRP_EXPIRE  = 0x2
+	XFRMNLGRP_SA      = 0x3
+	XFRMNLGRP_POLICY  = 0x4
+	XFRMNLGRP_AEVENTS = 0x5
+	XFRMNLGRP_REPORT  = 0x6
+	XFRMNLGRP_MIGRATE = 0x7
+	XFRMNLGRP_MAPPING = 0x8
+	__XFRMNLGRP_MAX   = 0x9
 )
 
 // typedef union {
@@ -255,4 +276,21 @@ func DeserializeXfrmId(b []byte) *XfrmId {
 
 func (msg *XfrmId) Serialize() []byte {
 	return (*(*[SizeofXfrmId]byte)(unsafe.Pointer(msg)))[:]
+}
+
+type XfrmMark struct {
+	Value uint32
+	Mask  uint32
+}
+
+func (msg *XfrmMark) Len() int {
+	return SizeofXfrmMark
+}
+
+func DeserializeXfrmMark(b []byte) *XfrmMark {
+	return (*XfrmMark)(unsafe.Pointer(&b[0:SizeofXfrmMark][0]))
+}
+
+func (msg *XfrmMark) Serialize() []byte {
+	return (*(*[SizeofXfrmMark]byte)(unsafe.Pointer(msg)))[:]
 }

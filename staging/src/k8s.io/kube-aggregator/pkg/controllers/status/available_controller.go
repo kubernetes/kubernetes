@@ -26,7 +26,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -42,8 +41,6 @@ import (
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
 	"k8s.io/kube-aggregator/pkg/controllers"
 )
-
-var cloner = conversion.NewCloner()
 
 type AvailableConditionController struct {
 	apiServiceClient apiregistrationclient.APIServicesGetter
@@ -123,10 +120,7 @@ func (c *AvailableConditionController) sync(key string) error {
 
 	// local API services are always considered available
 	if apiService.Spec.Service == nil {
-		availableCondition.Status = apiregistration.ConditionTrue
-		availableCondition.Reason = "Local"
-		availableCondition.Message = "Local APIServices are always available"
-		apiregistration.SetAPIServiceCondition(apiService, availableCondition)
+		apiregistration.SetAPIServiceCondition(apiService, apiregistration.NewLocalAvailableAPIServiceCondition())
 		_, err := c.apiServiceClient.APIServices().UpdateStatus(apiService)
 		return err
 	}

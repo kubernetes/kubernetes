@@ -26,8 +26,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/apimachinery/announced"
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
@@ -71,12 +69,12 @@ const pluginName = "webhook"
 // NewBackend returns an audit backend that sends events over HTTP to an external service.
 // The mode indicates the caching behavior of the webhook. Either blocking (ModeBlocking)
 // or buffered with batch POSTs (ModeBatch).
-func NewBackend(kubeConfigFile string, mode string, groupVersions []schema.GroupVersion) (audit.Backend, error) {
+func NewBackend(kubeConfigFile string, mode string, groupVersion schema.GroupVersion) (audit.Backend, error) {
 	switch mode {
 	case ModeBatch:
-		return newBatchWebhook(kubeConfigFile, groupVersions)
+		return newBatchWebhook(kubeConfigFile, groupVersion)
 	case ModeBlocking:
-		return newBlockingWebhook(kubeConfigFile, groupVersions)
+		return newBlockingWebhook(kubeConfigFile, groupVersion)
 	default:
 		return nil, fmt.Errorf("webhook mode %q is not in list of known modes (%s)",
 			mode, strings.Join(AllowedModes, ","))
@@ -101,12 +99,12 @@ func init() {
 	install.Install(groupFactoryRegistry, registry, audit.Scheme)
 }
 
-func loadWebhook(configFile string, groupVersions []schema.GroupVersion) (*webhook.GenericWebhook, error) {
-	return webhook.NewGenericWebhook(registry, audit.Codecs, configFile, groupVersions, 0)
+func loadWebhook(configFile string, groupVersion schema.GroupVersion) (*webhook.GenericWebhook, error) {
+	return webhook.NewGenericWebhook(registry, audit.Codecs, configFile, []schema.GroupVersion{groupVersion}, 0)
 }
 
-func newBlockingWebhook(configFile string, groupVersions []schema.GroupVersion) (*blockingBackend, error) {
-	w, err := loadWebhook(configFile, groupVersions)
+func newBlockingWebhook(configFile string, groupVersion schema.GroupVersion) (*blockingBackend, error) {
+	w, err := loadWebhook(configFile, groupVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -141,22 +139,10 @@ func (b *blockingBackend) processEvents(ev ...*auditinternal.Event) error {
 	return b.w.RestClient.Post().Body(&list).Do().Error()
 }
 
-func newBatchWebhook(configFile string, groupVersions []schema.GroupVersion) (*batchBackend, error) {
-	w, err := loadWebhook(configFile, groupVersions)
+func newBatchWebhook(configFile string, groupVersion schema.GroupVersion) (*batchBackend, error) {
+	w, err := loadWebhook(configFile, groupVersion)
 	if err != nil {
 		return nil, err
-	}
-
-	c := conversion.NewCloner()
-	for _, f := range metav1.GetGeneratedDeepCopyFuncs() {
-		if err := c.RegisterGeneratedDeepCopyFunc(f); err != nil {
-			return nil, fmt.Errorf("registering meta deep copy method: %v", err)
-		}
-	}
-	for _, f := range auditinternal.GetGeneratedDeepCopyFuncs() {
-		if err := c.RegisterGeneratedDeepCopyFunc(f); err != nil {
-			return nil, fmt.Errorf("registering audit deep copy method: %v", err)
-		}
 	}
 
 	return &batchBackend{
@@ -164,16 +150,12 @@ func newBatchWebhook(configFile string, groupVersions []schema.GroupVersion) (*b
 		buffer:       make(chan *auditinternal.Event, defaultBatchBufferSize),
 		maxBatchSize: defaultBatchMaxSize,
 		maxBatchWait: defaultBatchMaxWait,
-		cloner:       c,
 		shutdownCh:   make(chan struct{}),
 	}, nil
 }
 
 type batchBackend struct {
 	w *webhook.GenericWebhook
-
-	// Cloner is used to deep copy events as they are buffered.
-	cloner *conversion.Cloner
 
 	// Channel to buffer events in memory before sending them on the webhook.
 	buffer chan *auditinternal.Event

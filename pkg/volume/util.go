@@ -298,9 +298,52 @@ func GetPath(mounter Mounter) (string, error) {
 func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 	// We create the volume in a zone determined by the name
 	// Eventually the scheduler will coordinate placement into an available zone
-	var hash uint32
-	var index uint32
+	hash, index := getPVCNameHashAndIndexOffset(pvcName)
 
+	// Zones.List returns zones in a consistent order (sorted)
+	// We do have a potential failure case where volumes will not be properly spread,
+	// if the set of zones changes during StatefulSet volume creation.  However, this is
+	// probably relatively unlikely because we expect the set of zones to be essentially
+	// static for clusters.
+	// Hopefully we can address this problem if/when we do full scheduler integration of
+	// PVC placement (which could also e.g. avoid putting volumes in overloaded or
+	// unhealthy zones)
+	zoneSlice := zones.List()
+	zone := zoneSlice[(hash+index)%uint32(len(zoneSlice))]
+
+	glog.V(2).Infof("Creating volume for PVC %q; chose zone=%q from zones=%q", pvcName, zone, zoneSlice)
+	return zone
+}
+
+// ChooseZonesForVolume is identical to ChooseZoneForVolume, but selects a multiple zones, for multi-zone disks.
+func ChooseZonesForVolume(zones sets.String, pvcName string, numZones uint32) sets.String {
+	// We create the volume in a zone determined by the name
+	// Eventually the scheduler will coordinate placement into an available zone
+	hash, index := getPVCNameHashAndIndexOffset(pvcName)
+
+	// Zones.List returns zones in a consistent order (sorted)
+	// We do have a potential failure case where volumes will not be properly spread,
+	// if the set of zones changes during StatefulSet volume creation.  However, this is
+	// probably relatively unlikely because we expect the set of zones to be essentially
+	// static for clusters.
+	// Hopefully we can address this problem if/when we do full scheduler integration of
+	// PVC placement (which could also e.g. avoid putting volumes in overloaded or
+	// unhealthy zones)
+	zoneSlice := zones.List()
+	replicaZones := sets.NewString()
+
+	startingIndex := index * numZones
+	for index = startingIndex; index < startingIndex+numZones; index++ {
+		zone := zoneSlice[(hash+index)%uint32(len(zoneSlice))]
+		replicaZones.Insert(zone)
+	}
+
+	glog.V(2).Infof("Creating volume for replicated PVC %q; chosen zones=%q from zones=%q",
+		pvcName, replicaZones.UnsortedList(), zoneSlice)
+	return replicaZones
+}
+
+func getPVCNameHashAndIndexOffset(pvcName string) (hash uint32, index uint32) {
 	if pvcName == "" {
 		// We should always be called with a name; this shouldn't happen
 		glog.Warningf("No name defined during volume create; choosing random zone")
@@ -349,19 +392,7 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 		hash = h.Sum32()
 	}
 
-	// Zones.List returns zones in a consistent order (sorted)
-	// We do have a potential failure case where volumes will not be properly spread,
-	// if the set of zones changes during StatefulSet volume creation.  However, this is
-	// probably relatively unlikely because we expect the set of zones to be essentially
-	// static for clusters.
-	// Hopefully we can address this problem if/when we do full scheduler integration of
-	// PVC placement (which could also e.g. avoid putting volumes in overloaded or
-	// unhealthy zones)
-	zoneSlice := zones.List()
-	zone := zoneSlice[(hash+index)%uint32(len(zoneSlice))]
-
-	glog.V(2).Infof("Creating volume for PVC %q; chose zone=%q from zones=%q", pvcName, zone, zoneSlice)
-	return zone
+	return hash, index
 }
 
 // UnmountViaEmptyDir delegates the tear down operation for secret, configmap, git_repo and downwardapi
@@ -389,12 +420,17 @@ func MountOptionFromSpec(spec *Spec, options ...string) []string {
 	pv := spec.PersistentVolume
 
 	if pv != nil {
+		// Use beta annotation first
 		if mo, ok := pv.Annotations[v1.MountOptionAnnotation]; ok {
 			moList := strings.Split(mo, ",")
 			return JoinMountOptions(moList, options)
 		}
 
+		if len(pv.Spec.MountOptions) > 0 {
+			return JoinMountOptions(pv.Spec.MountOptions, options)
+		}
 	}
+
 	return options
 }
 
@@ -412,20 +448,6 @@ func JoinMountOptions(userOptions []string, systemOptions []string) []string {
 		allMountOptions.Insert(mountOption)
 	}
 	return allMountOptions.UnsortedList()
-}
-
-// ZonesToSet converts a string containing a comma separated list of zones to set
-func ZonesToSet(zonesString string) (sets.String, error) {
-	zonesSlice := strings.Split(zonesString, ",")
-	zonesSet := make(sets.String)
-	for _, zone := range zonesSlice {
-		trimmedZone := strings.TrimSpace(zone)
-		if trimmedZone == "" {
-			return make(sets.String), fmt.Errorf("comma separated list of zones (%q) must not contain an empty zone", zonesString)
-		}
-		zonesSet.Insert(trimmedZone)
-	}
-	return zonesSet, nil
 }
 
 // ValidateZone returns:

@@ -32,7 +32,6 @@ go_library(
     srcs = ["storage.go"],
     deps = [
         "//pkg/api:go_default_library",
-        "//pkg/registry/cachesize:go_default_library",
         "//pkg/registry/core/persistentvolumeclaim:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

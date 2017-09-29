@@ -32,6 +32,10 @@ import (
 const (
 	DefaultRootDir = "/var/lib/kubelet"
 
+	// DEPRECATED: auto detecting cloud providers goes against the initiative
+	// for out-of-tree cloud providers as we'll now depend on cAdvisor integrations
+	// with cloud providers instead of in the core repo.
+	// More details here: https://github.com/kubernetes/kubernetes/issues/50986
 	AutoDetectCloudProvider = "auto-detect"
 
 	defaultIPTablesMasqueradeBit = 14
@@ -52,9 +56,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	// pointer because the zeroDuration is valid - if you want to skip the trial period
 	if obj.ConfigTrialDuration == nil {
 		obj.ConfigTrialDuration = &metav1.Duration{Duration: 10 * time.Minute}
-	}
-	if obj.CrashLoopThreshold == nil {
-		obj.CrashLoopThreshold = utilpointer.Int32Ptr(10)
 	}
 	if obj.Authentication.Anonymous.Enabled == nil {
 		obj.Authentication.Anonymous.Enabled = boolVar(true)
@@ -85,7 +86,7 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.VolumeStatsAggPeriod = metav1.Duration{Duration: time.Minute}
 	}
 	if obj.ContainerRuntime == "" {
-		obj.ContainerRuntime = "docker"
+		obj.ContainerRuntime = kubetypes.DockerContainerRuntime
 	}
 	if obj.RuntimeRequestTimeout == zeroDuration {
 		obj.RuntimeRequestTimeout = metav1.Duration{Duration: 2 * time.Minute}
@@ -115,8 +116,8 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.HealthzBindAddress == "" {
 		obj.HealthzBindAddress = "127.0.0.1"
 	}
-	if obj.HealthzPort == 0 {
-		obj.HealthzPort = 10248
+	if obj.HealthzPort == nil {
+		obj.HealthzPort = utilpointer.Int32Ptr(10248)
 	}
 	if obj.HostNetworkSources == nil {
 		obj.HostNetworkSources = []string{kubetypes.AllSource}
@@ -170,6 +171,12 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.NodeStatusUpdateFrequency == zeroDuration {
 		obj.NodeStatusUpdateFrequency = metav1.Duration{Duration: 10 * time.Second}
 	}
+	if obj.CPUManagerPolicy == "" {
+		obj.CPUManagerPolicy = "none"
+	}
+	if obj.CPUManagerReconcilePeriod == zeroDuration {
+		obj.CPUManagerReconcilePeriod = obj.NodeStatusUpdateFrequency
+	}
 	if obj.OOMScoreAdj == nil {
 		temp := int32(qos.KubeletOOMScoreAdj)
 		obj.OOMScoreAdj = &temp
@@ -177,8 +184,8 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.Port == 0 {
 		obj.Port = ports.KubeletPort
 	}
-	if obj.ReadOnlyPort == 0 {
-		obj.ReadOnlyPort = ports.KubeletReadOnlyPort
+	if obj.ReadOnlyPort == nil {
+		obj.ReadOnlyPort = utilpointer.Int32Ptr(ports.KubeletReadOnlyPort)
 	}
 	if obj.RegisterNode == nil {
 		obj.RegisterNode = boolVar(true)
@@ -222,7 +229,7 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 		obj.HairpinMode = PromiscuousBridge
 	}
 	if obj.EvictionHard == nil {
-		temp := "memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%"
+		temp := "memory.available<100Mi,nodefs.available<10%,nodefs.inodesFree<5%,imagefs.available<15%"
 		obj.EvictionHard = &temp
 	}
 	if obj.EvictionPressureTransitionPeriod == zeroDuration {

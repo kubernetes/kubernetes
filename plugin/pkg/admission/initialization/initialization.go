@@ -33,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubeapiserver/admission/configuration"
@@ -71,6 +73,18 @@ func (i *initializer) Validate() error {
 	if i.config == nil {
 		return fmt.Errorf("the Initializer admission plugin requires a Kubernetes client to be provided")
 	}
+	if i.authorizer == nil {
+		return fmt.Errorf("the Initializer admission plugin requires an authorizer to be provided")
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
+		if err := utilfeature.DefaultFeatureGate.Set(string(features.Initializers) + "=true"); err != nil {
+			glog.Errorf("error enabling Initializers feature as part of admission plugin setup: %v", err)
+		} else {
+			glog.Infof("enabled Initializers feature as part of admission plugin setup")
+		}
+	}
+
 	i.config.Run(wait.NeverStop)
 	return nil
 }
@@ -194,6 +208,13 @@ func (i *initializer) Admit(a admission.Attributes) (err error) {
 		}
 		updated := accessor.GetInitializers()
 
+		// controllers deployed with an empty initializers.pending have their initializers set to nil
+		// but should be able to update without changing their manifest
+		if updated != nil && len(updated.Pending) == 0 && updated.Result == nil {
+			accessor.SetInitializers(nil)
+			updated = nil
+		}
+
 		existingAccessor, err := meta.Accessor(a.GetOldObject())
 		if err != nil {
 			// if the old object does not have an accessor, but the new one does, error out
@@ -225,11 +246,6 @@ func (i *initializer) Admit(a admission.Attributes) (err error) {
 }
 
 func (i *initializer) canInitialize(a admission.Attributes, message string) error {
-	// if no authorizer is present, the initializer plugin allows modification of uninitialized resources
-	if i.authorizer == nil {
-		glog.V(4).Infof("No authorizer provided to initialization admission control, unable to check permissions")
-		return nil
-	}
 	// caller must have the ability to mutate un-initialized resources
 	authorized, reason, err := i.authorizer.Authorize(authorizer.AttributesRecord{
 		Name:            a.GetName(),

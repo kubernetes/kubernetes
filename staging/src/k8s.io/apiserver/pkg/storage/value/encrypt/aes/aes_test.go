@@ -158,7 +158,7 @@ func BenchmarkGCMWrite_16_1024(b *testing.B)  { benchmarkGCMWrite(b, 16, 1024) }
 func BenchmarkGCMWrite_32_1024(b *testing.B)  { benchmarkGCMWrite(b, 32, 1024) }
 func BenchmarkGCMWrite_32_16384(b *testing.B) { benchmarkGCMWrite(b, 32, 16384) }
 
-func benchmarkGCMRead(b *testing.B, keyLength int, valueLength int, stale bool) {
+func benchmarkGCMRead(b *testing.B, keyLength int, valueLength int, expectStale bool) {
 	block1, err := aes.NewCipher(bytes.Repeat([]byte("a"), keyLength))
 	if err != nil {
 		b.Fatal(err)
@@ -179,11 +179,11 @@ func benchmarkGCMRead(b *testing.B, keyLength int, valueLength int, stale bool) 
 	if err != nil {
 		b.Fatal(err)
 	}
-	// reverse the key order if stale
-	if stale {
+	// reverse the key order if expecting stale
+	if expectStale {
 		p = value.NewPrefixTransformers(nil,
-			value.PrefixTransformer{Prefix: []byte("first:"), Transformer: NewGCMTransformer(block1)},
 			value.PrefixTransformer{Prefix: []byte("second:"), Transformer: NewGCMTransformer(block2)},
+			value.PrefixTransformer{Prefix: []byte("first:"), Transformer: NewGCMTransformer(block1)},
 		)
 	}
 
@@ -193,8 +193,8 @@ func benchmarkGCMRead(b *testing.B, keyLength int, valueLength int, stale bool) 
 		if err != nil {
 			b.Fatal(err)
 		}
-		if stale {
-			b.Fatalf("unexpected data: %t %q", stale, from)
+		if expectStale != stale {
+			b.Fatalf("unexpected data: %q, expect stale %t but got %t", from, expectStale, stale)
 		}
 	}
 	b.StopTimer()
@@ -234,7 +234,7 @@ func BenchmarkCBCRead_32_16384_Stale(b *testing.B) { benchmarkCBCRead(b, 32, 163
 func BenchmarkCBCWrite_32_1024(b *testing.B)  { benchmarkCBCWrite(b, 32, 1024) }
 func BenchmarkCBCWrite_32_16384(b *testing.B) { benchmarkCBCWrite(b, 32, 16384) }
 
-func benchmarkCBCRead(b *testing.B, keyLength int, valueLength int, stale bool) {
+func benchmarkCBCRead(b *testing.B, keyLength int, valueLength int, expectStale bool) {
 	block1, err := aes.NewCipher(bytes.Repeat([]byte("a"), keyLength))
 	if err != nil {
 		b.Fatal(err)
@@ -255,11 +255,11 @@ func benchmarkCBCRead(b *testing.B, keyLength int, valueLength int, stale bool) 
 	if err != nil {
 		b.Fatal(err)
 	}
-	// reverse the key order if stale
-	if stale {
+	// reverse the key order if expecting stale
+	if expectStale {
 		p = value.NewPrefixTransformers(nil,
-			value.PrefixTransformer{Prefix: []byte("first:"), Transformer: NewCBCTransformer(block1)},
 			value.PrefixTransformer{Prefix: []byte("second:"), Transformer: NewCBCTransformer(block2)},
+			value.PrefixTransformer{Prefix: []byte("first:"), Transformer: NewCBCTransformer(block1)},
 		)
 	}
 
@@ -269,8 +269,8 @@ func benchmarkCBCRead(b *testing.B, keyLength int, valueLength int, stale bool) 
 		if err != nil {
 			b.Fatal(err)
 		}
-		if stale {
-			b.Fatalf("unexpected data: %t %q", stale, from)
+		if expectStale != stale {
+			b.Fatalf("unexpected data: %q, expect stale %t but got %t", from, expectStale, stale)
 		}
 	}
 	b.StopTimer()

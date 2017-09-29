@@ -28,11 +28,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/authorization"
 	"k8s.io/kubernetes/pkg/registry/authorization/localsubjectaccessreview"
 	"k8s.io/kubernetes/pkg/registry/authorization/selfsubjectaccessreview"
+	"k8s.io/kubernetes/pkg/registry/authorization/selfsubjectrulesreview"
 	"k8s.io/kubernetes/pkg/registry/authorization/subjectaccessreview"
 )
 
 type RESTStorageProvider struct {
-	Authorizer authorizer.Authorizer
+	Authorizer   authorizer.Authorizer
+	RuleResolver authorizer.RuleResolver
 }
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
@@ -70,6 +72,9 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("localsubjectaccessreviews")) {
 		storage["localsubjectaccessreviews"] = localsubjectaccessreview.NewREST(p.Authorizer)
 	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("selfsubjectrulesreviews")) {
+		storage["selfsubjectrulesreviews"] = selfsubjectrulesreview.NewREST(p.RuleResolver)
+	}
 
 	return storage
 }
@@ -86,6 +91,9 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("localsubjectaccessreviews")) {
 		storage["localsubjectaccessreviews"] = localsubjectaccessreview.NewREST(p.Authorizer)
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("selfsubjectrulesreviews")) {
+		storage["selfsubjectrulesreviews"] = selfsubjectrulesreview.NewREST(p.RuleResolver)
 	}
 
 	return storage

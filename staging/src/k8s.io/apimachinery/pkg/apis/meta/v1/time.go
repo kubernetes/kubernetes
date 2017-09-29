@@ -74,12 +74,12 @@ func (t *Time) IsZero() bool {
 }
 
 // Before reports whether the time instant t is before u.
-func (t Time) Before(u Time) bool {
+func (t *Time) Before(u *Time) bool {
 	return t.Time.Before(u.Time)
 }
 
 // Equal reports whether the time instant t is equal to u.
-func (t Time) Equal(u Time) bool {
+func (t *Time) Equal(u *Time) bool {
 	return t.Time.Equal(u.Time)
 }
 

@@ -23,7 +23,6 @@ import (
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/keymutex"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -35,7 +34,6 @@ const (
 
 type sioPlugin struct {
 	host      volume.VolumeHost
-	mounter   mount.Interface
 	volumeMtx keymutex.KeyMutex
 }
 
@@ -53,7 +51,6 @@ var _ volume.VolumePlugin = &sioPlugin{}
 
 func (p *sioPlugin) Init(host volume.VolumeHost) error {
 	p.host = host
-	p.mounter = host.GetMounter()
 	p.volumeMtx = keymutex.NewKeyMutex()
 	return nil
 }

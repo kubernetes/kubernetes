@@ -76,6 +76,8 @@ type SelectionPredicate struct {
 	IncludeUninitialized bool
 	GetAttrs             AttrFunc
 	IndexFields          []string
+	Limit                int64
+	Continue             string
 }
 
 // Matches returns true if the given object's labels and fields (as
@@ -118,6 +120,9 @@ func (s *SelectionPredicate) MatchesObjectAttributes(l labels.Set, f fields.Set,
 // MatchesSingle will return (name, true) if and only if s.Field matches on the object's
 // name.
 func (s *SelectionPredicate) MatchesSingle() (string, bool) {
+	if len(s.Continue) > 0 {
+		return "", false
+	}
 	// TODO: should be namespace.name
 	if name, ok := s.Field.RequiresExactMatch("metadata.name"); ok {
 		return name, true

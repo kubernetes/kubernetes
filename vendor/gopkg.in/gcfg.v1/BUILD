@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -15,6 +10,7 @@ go_library(
         "read.go",
         "set.go",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/gopkg.in/gcfg.v1/scanner:go_default_library",
         "//vendor/gopkg.in/gcfg.v1/token:go_default_library",
@@ -39,4 +35,5 @@ filegroup(
         "//vendor/gopkg.in/gcfg.v1/types:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

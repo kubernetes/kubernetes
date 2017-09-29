@@ -188,6 +188,11 @@ func (in *GroupResources) DeepCopyInto(out *GroupResources) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.ResourceNames != nil {
+		in, out := &in.ResourceNames, &out.ResourceNames
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
@@ -318,6 +323,11 @@ func (in *PolicyRule) DeepCopyInto(out *PolicyRule) {
 	if in.NonResourceURLs != nil {
 		in, out := &in.NonResourceURLs, &out.NonResourceURLs
 		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.OmitStages != nil {
+		in, out := &in.OmitStages, &out.OmitStages
+		*out = make([]Stage, len(*in))
 		copy(*out, *in)
 	}
 	return

@@ -17,8 +17,6 @@ limitations under the License.
 package resource
 
 import (
-	"errors"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 )
@@ -36,6 +34,58 @@ func (e SimpleCategoryExpander) Expand(category string) ([]schema.GroupResource,
 	return ret, ok
 }
 
+type discoveryCategoryExpander struct {
+	fallbackExpander CategoryExpander
+	discoveryClient  discovery.DiscoveryInterface
+}
+
+// NewDiscoveryCategoryExpander returns a category expander that makes use of the "categories" fields from
+// the API, found through the discovery client. In case of any error or no category found (which likely
+// means we're at a cluster prior to categories support, fallback to the expander provided.
+func NewDiscoveryCategoryExpander(fallbackExpander CategoryExpander, client discovery.DiscoveryInterface) (discoveryCategoryExpander, error) {
+	if client == nil {
+		panic("Please provide discovery client to shortcut expander")
+	}
+	return discoveryCategoryExpander{fallbackExpander: fallbackExpander, discoveryClient: client}, nil
+}
+
+func (e discoveryCategoryExpander) Expand(category string) ([]schema.GroupResource, bool) {
+	apiResourceLists, _ := e.discoveryClient.ServerResources()
+	if len(apiResourceLists) == 0 {
+		return e.fallbackExpander.Expand(category)
+	}
+
+	discoveredExpansions := map[string][]schema.GroupResource{}
+
+	for _, apiResourceList := range apiResourceLists {
+		gv, err := schema.ParseGroupVersion(apiResourceList.GroupVersion)
+		if err != nil {
+			return e.fallbackExpander.Expand(category)
+		}
+
+		for _, apiResource := range apiResourceList.APIResources {
+			if categories := apiResource.Categories; len(categories) > 0 {
+				for _, category := range categories {
+					groupResource := schema.GroupResource{
+						Group:    gv.Group,
+						Resource: apiResource.Name,
+					}
+					discoveredExpansions[category] = append(discoveredExpansions[category], groupResource)
+				}
+			}
+		}
+	}
+
+	if len(discoveredExpansions) == 0 {
+		// We don't know if the server really don't have any resource with categories,
+		// or we're on a cluster version prior to categories support. Anyways, fallback.
+		return e.fallbackExpander.Expand(category)
+	}
+
+	ret, ok := discoveredExpansions[category]
+	return ret, ok
+}
+
 type discoveryFilteredExpander struct {
 	delegate CategoryExpander
 
@@ -46,7 +96,7 @@ type discoveryFilteredExpander struct {
 // what the server has available
 func NewDiscoveryFilteredExpander(delegate CategoryExpander, client discovery.DiscoveryInterface) (discoveryFilteredExpander, error) {
 	if client == nil {
-		return discoveryFilteredExpander{}, errors.New("Please provide discovery client to shortcut expander")
+		panic("Please provide discovery client to shortcut expander")
 	}
 	return discoveryFilteredExpander{delegate: delegate, discoveryClient: client}, nil
 }

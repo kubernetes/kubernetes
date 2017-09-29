@@ -581,6 +581,7 @@ func IoctlGetTermio(fd int, req uint) (*Termio, error) {
 //sys	Fchown(fd int, uid int, gid int) (err error)
 //sys	Fchownat(dirfd int, path string, uid int, gid int, flags int) (err error)
 //sys	Fdatasync(fd int) (err error)
+//sys Flock(fd int, how int) (err error)
 //sys	Fpathconf(fd int, name int) (val int, err error)
 //sys	Fstat(fd int, stat *Stat_t) (err error)
 //sys	Fstatvfs(fd int, vfsstat *Statvfs_t) (err error)

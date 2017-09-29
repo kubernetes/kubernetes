@@ -43,6 +43,7 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/proxy:go_default_library",
+        "//pkg/proxy/util:go_default_library",
         "//pkg/util/async:go_default_library",
         "//pkg/util/iptables:go_default_library",
         "//pkg/util/iptables/testing:go_default_library",

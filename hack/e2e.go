@@ -25,6 +25,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"time"
@@ -81,12 +82,21 @@ func main() {
 }
 
 func wait(cmd string, args ...string) error {
+	sigChannel := make(chan os.Signal, 1)
+	signal.Notify(sigChannel, os.Interrupt)
+
 	c := exec.Command(cmd, args...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	if err := c.Start(); err != nil {
 		return err
 	}
+	go func() {
+		sig := <-sigChannel
+		if err := c.Process.Signal(sig); err != nil {
+			log.Fatalf("could not send %s signal %s: %v", cmd, sig, err)
+		}
+	}()
 	return c.Wait()
 }
 

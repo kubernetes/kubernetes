@@ -19,11 +19,11 @@
 
 REGISTRY?=gcr.io/google-containers
 IMAGE?=debian-hyperkube-base
-TAG=0.1
+TAG=0.3
 ARCH?=amd64
 CACHEBUST?=1
 
-BASEIMAGE=gcr.io/google-containers/debian-base-$(ARCH):0.1
+BASEIMAGE=gcr.io/google-containers/debian-base-$(ARCH):0.2
 CNI_RELEASE=0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff
 
 TEMP_DIR:=$(shell mktemp -d)
@@ -51,6 +51,8 @@ endif
 	mkdir -p ${TEMP_DIR}/cni-bin
 	tar -xz -C ${TEMP_DIR}/cni-bin -f "cni-tars/${CNI_TARBALL}"
 
+	# Register /usr/bin/qemu-ARCH-static as the handler for non-x86 binaries in the kernel
+	docker run --rm --privileged multiarch/qemu-user-static:register --reset
 	docker build --pull -t $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
 	rm -rf $(TEMP_DIR)
 

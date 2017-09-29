@@ -27,8 +27,9 @@ import (
 	authorizationv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	authorizationv1beta1 "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
 	autoscalingv1 "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
-	autoscalingv2alpha1 "k8s.io/client-go/kubernetes/typed/autoscaling/v2alpha1"
+	autoscalingv2beta1 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta1"
 	batchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
+	batchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
 	batchv2alpha1 "k8s.io/client-go/kubernetes/typed/batch/v2alpha1"
 	certificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -66,10 +67,11 @@ type Interface interface {
 	AutoscalingV1() autoscalingv1.AutoscalingV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Autoscaling() autoscalingv1.AutoscalingV1Interface
-	AutoscalingV2alpha1() autoscalingv2alpha1.AutoscalingV2alpha1Interface
+	AutoscalingV2beta1() autoscalingv2beta1.AutoscalingV2beta1Interface
 	BatchV1() batchv1.BatchV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Batch() batchv1.BatchV1Interface
+	BatchV1beta1() batchv1beta1.BatchV1beta1Interface
 	BatchV2alpha1() batchv2alpha1.BatchV2alpha1Interface
 	CertificatesV1beta1() certificatesv1beta1.CertificatesV1beta1Interface
 	// Deprecated: please explicitly pick a version if possible.
@@ -115,8 +117,9 @@ type Clientset struct {
 	authorizationV1               *authorizationv1.AuthorizationV1Client
 	authorizationV1beta1          *authorizationv1beta1.AuthorizationV1beta1Client
 	autoscalingV1                 *autoscalingv1.AutoscalingV1Client
-	autoscalingV2alpha1           *autoscalingv2alpha1.AutoscalingV2alpha1Client
+	autoscalingV2beta1            *autoscalingv2beta1.AutoscalingV2beta1Client
 	batchV1                       *batchv1.BatchV1Client
+	batchV1beta1                  *batchv1beta1.BatchV1beta1Client
 	batchV2alpha1                 *batchv2alpha1.BatchV2alpha1Client
 	certificatesV1beta1           *certificatesv1beta1.CertificatesV1beta1Client
 	coreV1                        *corev1.CoreV1Client
@@ -202,9 +205,9 @@ func (c *Clientset) Autoscaling() autoscalingv1.AutoscalingV1Interface {
 	return c.autoscalingV1
 }
 
-// AutoscalingV2alpha1 retrieves the AutoscalingV2alpha1Client
-func (c *Clientset) AutoscalingV2alpha1() autoscalingv2alpha1.AutoscalingV2alpha1Interface {
-	return c.autoscalingV2alpha1
+// AutoscalingV2beta1 retrieves the AutoscalingV2beta1Client
+func (c *Clientset) AutoscalingV2beta1() autoscalingv2beta1.AutoscalingV2beta1Interface {
+	return c.autoscalingV2beta1
 }
 
 // BatchV1 retrieves the BatchV1Client
@@ -216,6 +219,11 @@ func (c *Clientset) BatchV1() batchv1.BatchV1Interface {
 // Please explicitly pick a version.
 func (c *Clientset) Batch() batchv1.BatchV1Interface {
 	return c.batchV1
+}
+
+// BatchV1beta1 retrieves the BatchV1beta1Client
+func (c *Clientset) BatchV1beta1() batchv1beta1.BatchV1beta1Interface {
+	return c.batchV1beta1
 }
 
 // BatchV2alpha1 retrieves the BatchV2alpha1Client
@@ -385,11 +393,15 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	cs.autoscalingV2alpha1, err = autoscalingv2alpha1.NewForConfig(&configShallowCopy)
+	cs.autoscalingV2beta1, err = autoscalingv2beta1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
 	cs.batchV1, err = batchv1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	cs.batchV1beta1, err = batchv1beta1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -466,8 +478,9 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.authorizationV1 = authorizationv1.NewForConfigOrDie(c)
 	cs.authorizationV1beta1 = authorizationv1beta1.NewForConfigOrDie(c)
 	cs.autoscalingV1 = autoscalingv1.NewForConfigOrDie(c)
-	cs.autoscalingV2alpha1 = autoscalingv2alpha1.NewForConfigOrDie(c)
+	cs.autoscalingV2beta1 = autoscalingv2beta1.NewForConfigOrDie(c)
 	cs.batchV1 = batchv1.NewForConfigOrDie(c)
+	cs.batchV1beta1 = batchv1beta1.NewForConfigOrDie(c)
 	cs.batchV2alpha1 = batchv2alpha1.NewForConfigOrDie(c)
 	cs.certificatesV1beta1 = certificatesv1beta1.NewForConfigOrDie(c)
 	cs.coreV1 = corev1.NewForConfigOrDie(c)
@@ -497,8 +510,9 @@ func New(c rest.Interface) *Clientset {
 	cs.authorizationV1 = authorizationv1.New(c)
 	cs.authorizationV1beta1 = authorizationv1beta1.New(c)
 	cs.autoscalingV1 = autoscalingv1.New(c)
-	cs.autoscalingV2alpha1 = autoscalingv2alpha1.New(c)
+	cs.autoscalingV2beta1 = autoscalingv2beta1.New(c)
 	cs.batchV1 = batchv1.New(c)
+	cs.batchV1beta1 = batchv1beta1.New(c)
 	cs.batchV2alpha1 = batchv2alpha1.New(c)
 	cs.certificatesV1beta1 = certificatesv1beta1.New(c)
 	cs.coreV1 = corev1.New(c)

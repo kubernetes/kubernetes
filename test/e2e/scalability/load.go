@@ -92,7 +92,7 @@ var _ = SIGDescribe("Load capacity", func() {
 	// TODO add flag that allows to skip cleanup on failure
 	AfterEach(func() {
 		// Verify latency metrics
-		highLatencyRequests, metrics, err := framework.HighLatencyRequests(clientset)
+		highLatencyRequests, metrics, err := framework.HighLatencyRequests(clientset, nodeCount)
 		framework.ExpectNoError(err)
 		if err == nil {
 			summaries := make([]framework.TestDataSummary, 0, 1)

@@ -16,17 +16,10 @@ limitations under the License.
 
 package gce
 
-import (
-	"time"
-
-	compute "google.golang.org/api/compute/v1"
-)
+import compute "google.golang.org/api/compute/v1"
 
 func newTargetPoolMetricContext(request, region string) *metricContext {
-	return &metricContext{
-		start:      time.Now(),
-		attributes: []string{"targetpool_" + request, region, unusedMetricLabel},
-	}
+	return newGenericMetricContext("targetpool", request, region, unusedMetricLabel, computeV1Version)
 }
 
 // GetTargetPool returns the TargetPool by name.

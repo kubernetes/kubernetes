@@ -208,11 +208,15 @@ func main() {
 				images = []string{imageConfig.Image}
 			}
 			for _, image := range images {
+				metadata := imageConfig.Metadata
+				if len(strings.TrimSpace(*instanceMetadata)) > 0 {
+					metadata += "," + *instanceMetadata
+				}
 				gceImage := internalGCEImage{
 					image:     image,
 					imageDesc: imageConfig.ImageDesc,
 					project:   imageConfig.Project,
-					metadata:  getImageMetadata(imageConfig.Metadata),
+					metadata:  getImageMetadata(metadata),
 					machine:   imageConfig.Machine,
 					tests:     imageConfig.Tests,
 					resources: imageConfig.Resources,
@@ -369,7 +373,7 @@ func getImageMetadata(input string) *compute.Metadata {
 		val := v
 		metadataItems = append(metadataItems, &compute.MetadataItems{
 			Key:   k,
-			Value: val,
+			Value: &val,
 		})
 	}
 	ret := compute.Metadata{Items: metadataItems}
@@ -540,10 +544,11 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 
 	for _, accelerator := range imageConfig.resources.Accelerators {
 		if i.GuestAccelerators == nil {
+			autoRestart := true
 			i.GuestAccelerators = []*compute.AcceleratorConfig{}
 			i.Scheduling = &compute.Scheduling{
 				OnHostMaintenance: "TERMINATE",
-				AutomaticRestart:  true,
+				AutomaticRestart:  &autoRestart,
 			}
 		}
 		aType := fmt.Sprintf(acceleratorTypeResourceFormat, *project, *zone, accelerator.Type)
@@ -627,7 +632,7 @@ func isCloudInitUsed(metadata *compute.Metadata) bool {
 		return false
 	}
 	for _, item := range metadata.Items {
-		if item.Key == "user-data" && strings.HasPrefix(item.Value, "#cloud-config") {
+		if item.Key == "user-data" && item.Value != nil && strings.HasPrefix(*item.Value, "#cloud-config") {
 			return true
 		}
 	}

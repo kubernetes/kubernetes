@@ -35,6 +35,8 @@ func Convert_internalversion_ListOptions_To_v1_ListOptions(in *ListOptions, out 
 	out.ResourceVersion = in.ResourceVersion
 	out.TimeoutSeconds = in.TimeoutSeconds
 	out.Watch = in.Watch
+	out.Limit = in.Limit
+	out.Continue = in.Continue
 	return nil
 }
 
@@ -49,6 +51,8 @@ func Convert_v1_ListOptions_To_internalversion_ListOptions(in *metav1.ListOption
 	out.ResourceVersion = in.ResourceVersion
 	out.TimeoutSeconds = in.TimeoutSeconds
 	out.Watch = in.Watch
+	out.Limit = in.Limit
+	out.Continue = in.Continue
 	return nil
 }
 

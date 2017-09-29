@@ -33,7 +33,6 @@ import (
 	restful "github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -53,7 +52,6 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1/validation"
-	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
@@ -62,7 +60,6 @@ import (
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/limitwriter"
-	"k8s.io/kubernetes/pkg/volume"
 )
 
 const (
@@ -169,14 +166,10 @@ type AuthInterface interface {
 // HostInterface contains all the kubelet methods required by the server.
 // For testability.
 type HostInterface interface {
-	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error)
-	GetContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error)
-	GetRawContainerInfo(containerName string, req *cadvisorapi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorapi.ContainerInfo, error)
+	stats.StatsProvider
 	GetVersionInfo() (*cadvisorapi.VersionInfo, error)
 	GetCachedMachineInfo() (*cadvisorapi.MachineInfo, error)
-	GetPods() []*v1.Pod
 	GetRunningPods() ([]*v1.Pod, error)
-	GetPodByName(namespace, name string) (*v1.Pod, bool)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
 	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error
 	AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
@@ -186,12 +179,7 @@ type HostInterface interface {
 	StreamingConnectionIdleTimeout() time.Duration
 	ResyncInterval() time.Duration
 	GetHostname() string
-	GetNode() (*v1.Node, error)
-	GetNodeConfig() cm.NodeConfig
 	LatestLoopEntryTime() time.Time
-	ImagesFsInfo() (cadvisorapiv2.FsInfo, error)
-	RootFsInfo() (cadvisorapiv2.FsInfo, error)
-	ListVolumesForPod(podUID types.UID) (map[string]volume.Volume, bool)
 	GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetPortForward(podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error)
@@ -813,21 +801,29 @@ func (a prometheusHostAdapter) GetMachineInfo() (*cadvisorapi.MachineInfo, error
 
 // containerPrometheusLabels maps cAdvisor labels to prometheus labels.
 func containerPrometheusLabels(c *cadvisorapi.ContainerInfo) map[string]string {
-	set := map[string]string{metrics.LabelID: c.Name}
+	// Prometheus requires that all metrics in the same family have the same labels,
+	// so we arrange to supply blank strings for missing labels
+	var name, image, podName, namespace, containerName string
 	if len(c.Aliases) > 0 {
-		set[metrics.LabelName] = c.Aliases[0]
+		name = c.Aliases[0]
 	}
-	if image := c.Spec.Image; len(image) > 0 {
-		set[metrics.LabelImage] = image
-	}
+	image = c.Spec.Image
 	if v, ok := c.Spec.Labels[kubelettypes.KubernetesPodNameLabel]; ok {
-		set["pod_name"] = v
+		podName = v
 	}
 	if v, ok := c.Spec.Labels[kubelettypes.KubernetesPodNamespaceLabel]; ok {
-		set["namespace"] = v
+		namespace = v
 	}
 	if v, ok := c.Spec.Labels[kubelettypes.KubernetesContainerNameLabel]; ok {
-		set["container_name"] = v
+		containerName = v
+	}
+	set := map[string]string{
+		metrics.LabelID:    c.Name,
+		metrics.LabelName:  name,
+		metrics.LabelImage: image,
+		"pod_name":         podName,
+		"namespace":        namespace,
+		"container_name":   containerName,
 	}
 	return set
 }

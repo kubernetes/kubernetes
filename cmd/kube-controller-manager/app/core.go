@@ -51,6 +51,7 @@ import (
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	ttlcontroller "k8s.io/kubernetes/pkg/controller/ttl"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
+	"k8s.io/kubernetes/pkg/controller/volume/expand"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/features"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
@@ -112,6 +113,7 @@ func startNodeController(ctx ControllerContext) (bool, error) {
 		ipam.CIDRAllocatorType(ctx.Options.CIDRAllocatorType),
 		ctx.Options.EnableTaintManager,
 		utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions),
+		utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition),
 	)
 	if err != nil {
 		return true, err
@@ -175,7 +177,8 @@ func startAttachDetachController(ctx ControllerContext) (bool, error) {
 			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 			ctx.InformerFactory.Core().V1().PersistentVolumes(),
 			ctx.Cloud,
-			ProbeAttachableVolumePlugins(ctx.Options.VolumeConfiguration),
+			ProbeAttachableVolumePlugins(),
+			GetDynamicPluginProber(ctx.Options.VolumeConfiguration),
 			ctx.Options.DisableAttachDetachReconcilerSync,
 			ctx.Options.ReconcilerSyncLoopPeriod.Duration,
 			attachdetach.DefaultTimerConfig,
@@ -185,6 +188,24 @@ func startAttachDetachController(ctx ControllerContext) (bool, error) {
 	}
 	go attachDetachController.Run(ctx.Stop)
 	return true, nil
+}
+
+func startVolumeExpandController(ctx ControllerContext) (bool, error) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+		expandController, expandControllerErr := expand.NewExpandController(
+			ctx.ClientBuilder.ClientOrDie("expand-controller"),
+			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
+			ctx.InformerFactory.Core().V1().PersistentVolumes(),
+			ctx.Cloud,
+			ProbeExpandableVolumePlugins(ctx.Options.VolumeConfiguration))
+
+		if expandControllerErr != nil {
+			return true, fmt.Errorf("Failed to start volume expand controller : %v", expandControllerErr)
+		}
+		go expandController.Run(ctx.Stop)
+		return true, nil
+	}
+	return false, nil
 }
 
 func startEndpointController(ctx ControllerContext) (bool, error) {
@@ -329,6 +350,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 		deletableResources,
 		ignoredResources,
 		ctx.InformerFactory,
+		ctx.InformersStarted,
 	)
 	if err != nil {
 		return true, fmt.Errorf("Failed to start the generic garbage collector: %v", err)

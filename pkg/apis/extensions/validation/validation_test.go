@@ -1238,6 +1238,7 @@ func int64p(i int) *int64 {
 }
 
 func TestValidateDeploymentStatus(t *testing.T) {
+	collisionCount := int32(-3)
 	tests := []struct {
 		name string
 
@@ -1246,7 +1247,7 @@ func TestValidateDeploymentStatus(t *testing.T) {
 		readyReplicas      int32
 		availableReplicas  int32
 		observedGeneration int64
-		collisionCount     *int64
+		collisionCount     *int32
 
 		expectedErr bool
 	}{
@@ -1347,7 +1348,7 @@ func TestValidateDeploymentStatus(t *testing.T) {
 			name:               "invalid collisionCount",
 			replicas:           3,
 			observedGeneration: 1,
-			collisionCount:     int64p(-3),
+			collisionCount:     &collisionCount,
 			expectedErr:        true,
 		},
 	}
@@ -1371,6 +1372,8 @@ func TestValidateDeploymentStatus(t *testing.T) {
 }
 
 func TestValidateDeploymentStatusUpdate(t *testing.T) {
+	collisionCount := int32(1)
+	otherCollisionCount := int32(2)
 	tests := []struct {
 		name string
 
@@ -1384,24 +1387,24 @@ func TestValidateDeploymentStatusUpdate(t *testing.T) {
 				CollisionCount: nil,
 			},
 			to: extensions.DeploymentStatus{
-				CollisionCount: int64p(1),
+				CollisionCount: &collisionCount,
 			},
 			expectedErr: false,
 		},
 		{
 			name: "stable: valid update",
 			from: extensions.DeploymentStatus{
-				CollisionCount: int64p(1),
+				CollisionCount: &collisionCount,
 			},
 			to: extensions.DeploymentStatus{
-				CollisionCount: int64p(1),
+				CollisionCount: &collisionCount,
 			},
 			expectedErr: false,
 		},
 		{
 			name: "unset: invalid update",
 			from: extensions.DeploymentStatus{
-				CollisionCount: int64p(1),
+				CollisionCount: &collisionCount,
 			},
 			to: extensions.DeploymentStatus{
 				CollisionCount: nil,
@@ -1411,10 +1414,10 @@ func TestValidateDeploymentStatusUpdate(t *testing.T) {
 		{
 			name: "decrease: invalid update",
 			from: extensions.DeploymentStatus{
-				CollisionCount: int64p(2),
+				CollisionCount: &otherCollisionCount,
 			},
 			to: extensions.DeploymentStatus{
-				CollisionCount: int64p(1),
+				CollisionCount: &collisionCount,
 			},
 			expectedErr: true,
 		},
@@ -2415,6 +2418,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 				SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
 					Rule: extensions.SupplementalGroupsStrategyRunAsAny,
 				},
+				AllowedHostPaths: []extensions.AllowedHostPath{
+					{PathPrefix: "/foo/bar"},
+					{PathPrefix: "/baz/"},
+				},
 			},
 		}
 	}
@@ -2465,6 +2472,10 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		{Min: 1, Max: -10},
 	}
 
+	wildcardAllowedCapAndRequiredDrop := validPSP()
+	wildcardAllowedCapAndRequiredDrop.Spec.RequiredDropCapabilities = []api.Capability{"foo"}
+	wildcardAllowedCapAndRequiredDrop.Spec.AllowedCapabilities = []api.Capability{extensions.AllowAllCapabilities}
+
 	requiredCapAddAndDrop := validPSP()
 	requiredCapAddAndDrop.Spec.DefaultAddCapabilities = []api.Capability{"foo"}
 	requiredCapAddAndDrop.Spec.RequiredDropCapabilities = []api.Capability{"foo"}
@@ -2489,9 +2500,23 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	invalidSeccompDefault.Annotations = map[string]string{
 		seccomp.DefaultProfileAnnotationKey: "not-good",
 	}
+	invalidSeccompAllowAnyDefault := validPSP()
+	invalidSeccompAllowAnyDefault.Annotations = map[string]string{
+		seccomp.DefaultProfileAnnotationKey: "*",
+	}
 	invalidSeccompAllowed := validPSP()
 	invalidSeccompAllowed.Annotations = map[string]string{
 		seccomp.AllowedProfilesAnnotationKey: "docker/default,not-good",
+	}
+
+	invalidAllowedHostPathMissingPath := validPSP()
+	invalidAllowedHostPathMissingPath.Spec.AllowedHostPaths = []extensions.AllowedHostPath{
+		{PathPrefix: ""},
+	}
+
+	invalidAllowedHostPathBacksteps := validPSP()
+	invalidAllowedHostPathBacksteps.Spec.AllowedHostPaths = []extensions.AllowedHostPath{
+		{PathPrefix: "/dont/allow/backsteps/.."},
 	}
 
 	invalidDefaultAllowPrivilegeEscalation := validPSP()
@@ -2569,6 +2594,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "max cannot be negative",
 		},
+		"non-empty required drops and all caps are allowed by a wildcard": {
+			psp:         wildcardAllowedCapAndRequiredDrop,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "must be empty when all capabilities are allowed by a wildcard",
+		},
 		"invalid required caps": {
 			psp:         requiredCapAddAndDrop,
 			errorType:   field.ErrorTypeInvalid,
@@ -2599,6 +2629,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "must be a valid seccomp profile",
 		},
+		"invalid seccomp allow any default profile": {
+			psp:         invalidSeccompAllowAnyDefault,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "must be a valid seccomp profile",
+		},
 		"invalid seccomp allowed profile": {
 			psp:         invalidSeccompAllowed,
 			errorType:   field.ErrorTypeInvalid,
@@ -2608,6 +2643,16 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			psp:         invalidDefaultAllowPrivilegeEscalation,
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "Cannot set DefaultAllowPrivilegeEscalation to true without also setting AllowPrivilegeEscalation to true",
+		},
+		"invalid allowed host path empty path": {
+			psp:         invalidAllowedHostPathMissingPath,
+			errorType:   field.ErrorTypeRequired,
+			errorDetail: "is required",
+		},
+		"invalid allowed host path with backsteps": {
+			psp:         invalidAllowedHostPathBacksteps,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "must not contain '..'",
 		},
 	}
 
@@ -2680,7 +2725,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	validSeccomp := validPSP()
 	validSeccomp.Annotations = map[string]string{
 		seccomp.DefaultProfileAnnotationKey:  "docker/default",
-		seccomp.AllowedProfilesAnnotationKey: "docker/default,unconfined,localhost/foo",
+		seccomp.AllowedProfilesAnnotationKey: "docker/default,unconfined,localhost/foo,*",
 	}
 
 	validDefaultAllowPrivilegeEscalation := validPSP()

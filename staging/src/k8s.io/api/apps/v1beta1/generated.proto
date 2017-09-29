@@ -31,6 +31,8 @@ import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
 
+// DEPRECATED - This group version of ControllerRevision is deprecated by apps/v1beta2/ControllerRevision. See the
+// release notes for more information.
 // ControllerRevision implements an immutable snapshot of state data. Clients
 // are responsible for serializing and deserializing the objects that contain
 // their internal state.
@@ -63,6 +65,8 @@ message ControllerRevisionList {
   repeated ControllerRevision items = 2;
 }
 
+// DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
+// more information.
 // Deployment enables declarative updates for Pods and ReplicaSets.
 message Deployment {
   // Standard object metadata.
@@ -166,10 +170,9 @@ message DeploymentSpec {
   // The maximum time in seconds for a deployment to make progress before it
   // is considered to be failed. The deployment controller will continue to
   // process failed deployments and a condition with a ProgressDeadlineExceeded
-  // reason will be surfaced in the deployment status. Once autoRollback is
-  // implemented, the deployment controller will automatically rollback failed
-  // deployments. Note that progress will not be estimated during the time a
-  // deployment is paused. Defaults to 600s.
+  // reason will be surfaced in the deployment status. Note that progress will
+  // not be estimated during the time a deployment is paused. Defaults to 600s.
+  // +optional
   optional int32 progressDeadlineSeconds = 9;
 }
 
@@ -195,7 +198,9 @@ message DeploymentStatus {
   // +optional
   optional int32 availableReplicas = 4;
 
-  // Total number of unavailable pods targeted by this deployment.
+  // Total number of unavailable pods targeted by this deployment. This is the total number of
+  // pods that are still required for the deployment to have 100% available capacity. They may
+  // either be pods that are running but not yet available or pods that still have not been created.
   // +optional
   optional int32 unavailableReplicas = 5;
 
@@ -208,7 +213,7 @@ message DeploymentStatus {
   // field as a collision avoidance mechanism when it needs to create the name for the
   // newest ReplicaSet.
   // +optional
-  optional int64 collisionCount = 8;
+  optional int32 collisionCount = 8;
 }
 
 // DeploymentStrategy describes how to replace existing pods with new ones.
@@ -311,6 +316,8 @@ message ScaleStatus {
   optional string targetSelector = 3;
 }
 
+// DEPRECATED - This group version of StatefulSet is deprecated by apps/v1beta2/StatefulSet. See the release notes for
+// more information.
 // StatefulSet represents a set of pods with consistent identities.
 // Identities are defined as:
 //  - Network: A single stable DNS and hostname.
@@ -434,7 +441,7 @@ message StatefulSetStatus {
   // uses this field as a collision avoidance mechanism when it needs to create the name for the
   // newest ControllerRevision.
   // +optional
-  optional int64 collisionCount = 9;
+  optional int32 collisionCount = 9;
 }
 
 // StatefulSetUpdateStrategy indicates the strategy that the StatefulSet

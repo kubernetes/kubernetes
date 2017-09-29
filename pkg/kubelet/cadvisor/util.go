@@ -21,6 +21,9 @@ import (
 	cadvisorapi2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) v1.ResourceList {
@@ -32,21 +35,23 @@ func CapacityFromMachineInfo(info *cadvisorapi.MachineInfo) v1.ResourceList {
 			int64(info.MemoryCapacity),
 			resource.BinarySI),
 	}
-	return c
-}
 
-func StorageScratchCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceList {
-	c := v1.ResourceList{
-		v1.ResourceStorageScratch: *resource.NewQuantity(
-			int64(info.Capacity),
-			resource.BinarySI),
+	// if huge pages are enabled, we report them as a schedulable resource on the node
+	if utilfeature.DefaultFeatureGate.Enabled(features.HugePages) {
+		for _, hugepagesInfo := range info.HugePages {
+			pageSizeBytes := int64(hugepagesInfo.PageSize * 1024)
+			hugePagesBytes := pageSizeBytes * int64(hugepagesInfo.NumPages)
+			pageSizeQuantity := resource.NewQuantity(pageSizeBytes, resource.BinarySI)
+			c[v1helper.HugePageResourceName(*pageSizeQuantity)] = *resource.NewQuantity(hugePagesBytes, resource.BinarySI)
+		}
 	}
+
 	return c
 }
 
-func StorageOverlayCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceList {
+func EphemeralStorageCapacityFromFsInfo(info cadvisorapi2.FsInfo) v1.ResourceList {
 	c := v1.ResourceList{
-		v1.ResourceStorageOverlay: *resource.NewQuantity(
+		v1.ResourceEphemeralStorage: *resource.NewQuantity(
 			int64(info.Capacity),
 			resource.BinarySI),
 	}

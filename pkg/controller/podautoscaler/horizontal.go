@@ -23,7 +23,7 @@ import (
 
 	"github.com/golang/glog"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	autoscalingv2 "k8s.io/api/autoscaling/v2alpha1"
+	autoscalingv2 "k8s.io/api/autoscaling/v2beta1"
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -358,26 +358,15 @@ func (a *HorizontalController) reconcileKey(key string) error {
 
 func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.HorizontalPodAutoscaler) error {
 	// make a copy so that we never mutate the shared informer cache (conversion can mutate the object)
-	hpav1Raw, err := scheme.Scheme.DeepCopy(hpav1Shared)
-	if err != nil {
-		a.eventRecorder.Event(hpav1Shared, v1.EventTypeWarning, "FailedConvertHPA", err.Error())
-		return fmt.Errorf("failed to deep-copy the HPA: %v", err)
-	}
-
+	hpav1 := hpav1Shared.DeepCopy()
 	// then, convert to autoscaling/v2, which makes our lives easier when calculating metrics
-	hpav1 := hpav1Raw.(*autoscalingv1.HorizontalPodAutoscaler)
 	hpaRaw, err := UnsafeConvertToVersionVia(hpav1, autoscalingv2.SchemeGroupVersion)
 	if err != nil {
 		a.eventRecorder.Event(hpav1, v1.EventTypeWarning, "FailedConvertHPA", err.Error())
 		return fmt.Errorf("failed to convert the given HPA to %s: %v", autoscalingv2.SchemeGroupVersion.String(), err)
 	}
 	hpa := hpaRaw.(*autoscalingv2.HorizontalPodAutoscaler)
-	hpaStatusOriginalRaw, err := scheme.Scheme.DeepCopy(&hpa.Status)
-	if err != nil {
-		a.eventRecorder.Event(hpav1Shared, v1.EventTypeWarning, "FailedConvertHPA", err.Error())
-		return fmt.Errorf("failed to deep-copy the HPA status: %v", err)
-	}
-	hpaStatusOriginal := hpaStatusOriginalRaw.(*autoscalingv2.HorizontalPodAutoscalerStatus)
+	hpaStatusOriginal := hpa.Status.DeepCopy()
 
 	reference := fmt.Sprintf("%s/%s/%s", hpa.Spec.ScaleTargetRef.Kind, hpa.Namespace, hpa.Spec.ScaleTargetRef.Name)
 
@@ -452,7 +441,14 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 			desiredReplicas = scaleUpLimit
 		case hpa.Spec.MinReplicas != nil && desiredReplicas < *hpa.Spec.MinReplicas:
 			// make sure we aren't below our minimum
-			setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, "TooFewReplicas", "the desired replica count was less than the minimum replica count")
+			var statusMsg string
+			if desiredReplicas == 0 {
+				statusMsg = "the desired replica count was zero"
+			} else {
+				statusMsg = "the desired replica count was less than the minimum replica count"
+			}
+
+			setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, "TooFewReplicas", statusMsg)
 			desiredReplicas = *hpa.Spec.MinReplicas
 		case desiredReplicas == 0:
 			//  never scale down to 0, reserved for disabling autoscaling

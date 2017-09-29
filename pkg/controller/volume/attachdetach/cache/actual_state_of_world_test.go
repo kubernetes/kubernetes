@@ -506,8 +506,8 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSet(t *testing.T) {
 	}
 
 	// Act
-	setVolumeMountedErr1 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, true /* mounted */, false /* force unmount */)
-	setVolumeMountedErr2 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, false /* mounted */, false /* force unmount */)
+	setVolumeMountedErr1 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, true /* mounted */)
+	setVolumeMountedErr2 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, false /* mounted */)
 
 	// Assert
 	if setVolumeMountedErr1 != nil {
@@ -527,7 +527,7 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSet(t *testing.T) {
 
 // Populates data struct with one volume/node entry.
 // Calls SetVolumeMountedByNode once, setting mounted to false.
-// Verifies mountedByNode is still true (since there was no SetVolumeMountedByNode to true call first)
+// Verifies mountedByNode is false because value is overwritten
 func Test_SetVolumeMountedByNode_Positive_UnsetWithoutInitialSet(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
@@ -541,20 +541,27 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithoutInitialSet(t *testing.T) {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
 	}
 
-	// Act
-	setVolumeMountedErr := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, false /* mounted */, false /* force unmount */)
-
-	// Assert
-	if setVolumeMountedErr != nil {
-		t.Fatalf("SetVolumeMountedByNode failed. Expected <no error> Actual: <%v>", setVolumeMountedErr)
-	}
-
 	attachedVolumes := asw.GetAttachedVolumes()
 	if len(attachedVolumes) != 1 {
 		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
 	}
 
 	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, true /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
+
+	// Act
+	setVolumeMountedErr := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, false /* mounted */)
+
+	// Assert
+	if setVolumeMountedErr != nil {
+		t.Fatalf("SetVolumeMountedByNode failed. Expected <no error> Actual: <%v>", setVolumeMountedErr)
+	}
+
+	attachedVolumes = asw.GetAttachedVolumes()
+	if len(attachedVolumes) != 1 {
+		t.Fatalf("len(attachedVolumes) Expected: <1> Actual: <%v>", len(attachedVolumes))
+	}
+
+	verifyAttachedVolume(t, attachedVolumes, generatedVolumeName, string(volumeName), nodeName, devicePath, false /* expectedMountedByNode */, false /* expectNonZeroDetachRequestedTime */)
 }
 
 // Populates data struct with one volume/node entry.
@@ -575,8 +582,8 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSetAddVolumeNodeNotRes
 	}
 
 	// Act
-	setVolumeMountedErr1 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, true /* mounted */, false /* force unmount */)
-	setVolumeMountedErr2 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, false /* mounted */, false /* force unmount */)
+	setVolumeMountedErr1 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, true /* mounted */)
+	setVolumeMountedErr2 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, false /* mounted */)
 	generatedVolumeName, addErr = asw.AddVolumeNode(volumeName, volumeSpec, nodeName, devicePath)
 
 	// Assert
@@ -625,8 +632,8 @@ func Test_SetVolumeMountedByNode_Positive_UnsetWithInitialSetVerifyDetachRequest
 	expectedDetachRequestedTime := asw.GetAttachedVolumes()[0].DetachRequestedTime
 
 	// Act
-	setVolumeMountedErr1 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, true /* mounted */, false /* force unmount */)
-	setVolumeMountedErr2 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, false /* mounted */, false /* force unmount */)
+	setVolumeMountedErr1 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, true /* mounted */)
+	setVolumeMountedErr2 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, false /* mounted */)
 
 	// Assert
 	if setVolumeMountedErr1 != nil {
@@ -767,8 +774,8 @@ func Test_RemoveVolumeFromReportAsAttached_Positive_UnsetWithInitialSetVolumeMou
 	if addErr != nil {
 		t.Fatalf("AddVolumeNode failed. Expected: <no error> Actual: <%v>", addErr)
 	}
-	setVolumeMountedErr1 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, true /* mounted */, false /* force unmount */)
-	setVolumeMountedErr2 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, false /* mounted */, false /* force unmount */)
+	setVolumeMountedErr1 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, true /* mounted */)
+	setVolumeMountedErr2 := asw.SetVolumeMountedByNode(generatedVolumeName, nodeName, false /* mounted */)
 	if setVolumeMountedErr1 != nil {
 		t.Fatalf("SetVolumeMountedByNode1 failed. Expected <no error> Actual: <%v>", setVolumeMountedErr1)
 	}
@@ -1162,89 +1169,6 @@ func Test_updateNodeStatusUpdateNeededError(t *testing.T) {
 	// Assert
 	if err == nil {
 		t.Fatalf("updateNodeStatusUpdateNeeded should return error, but got nothing")
-	}
-}
-
-// Test_RemoveNodeFromAttachUpdates_Positive expects an entire node entry to be removed
-// from nodesToUpdateStatusFor
-func Test_RemoveNodeFromAttachUpdates_Positive(t *testing.T) {
-	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	asw := &actualStateOfWorld{
-		attachedVolumes:        make(map[v1.UniqueVolumeName]attachedVolume),
-		nodesToUpdateStatusFor: make(map[types.NodeName]nodeToUpdateStatusFor),
-		volumePluginMgr:        volumePluginMgr,
-	}
-	nodeName := types.NodeName("node-1")
-	nodeToUpdate := nodeToUpdateStatusFor{
-		nodeName:                  nodeName,
-		statusUpdateNeeded:        true,
-		volumesToReportAsAttached: make(map[v1.UniqueVolumeName]v1.UniqueVolumeName),
-	}
-	asw.nodesToUpdateStatusFor[nodeName] = nodeToUpdate
-
-	// Act
-	err := asw.RemoveNodeFromAttachUpdates(nodeName)
-
-	// Assert
-	if err != nil {
-		t.Fatalf("RemoveNodeFromAttachUpdates should not return error, but got: %v", err)
-	}
-	if len(asw.nodesToUpdateStatusFor) > 0 {
-		t.Fatal("nodesToUpdateStatusFor should be empty as its only entry has been deleted.")
-	}
-}
-
-// Test_RemoveNodeFromAttachUpdates_Negative_NodeDoesNotExist expects an error to be thrown
-// when nodeName is not in nodesToUpdateStatusFor.
-func Test_RemoveNodeFromAttachUpdates_Negative_NodeDoesNotExist(t *testing.T) {
-	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	asw := &actualStateOfWorld{
-		attachedVolumes:        make(map[v1.UniqueVolumeName]attachedVolume),
-		nodesToUpdateStatusFor: make(map[types.NodeName]nodeToUpdateStatusFor),
-		volumePluginMgr:        volumePluginMgr,
-	}
-	nodeName := types.NodeName("node-1")
-	nodeToUpdate := nodeToUpdateStatusFor{
-		nodeName:                  nodeName,
-		statusUpdateNeeded:        true,
-		volumesToReportAsAttached: make(map[v1.UniqueVolumeName]v1.UniqueVolumeName),
-	}
-	asw.nodesToUpdateStatusFor[nodeName] = nodeToUpdate
-
-	// Act
-	err := asw.RemoveNodeFromAttachUpdates("node-2")
-
-	// Assert
-	if err == nil {
-		t.Fatal("RemoveNodeFromAttachUpdates should return an error as the nodeName doesn't exist.")
-	}
-	if len(asw.nodesToUpdateStatusFor) != 1 {
-		t.Fatal("The length of nodesToUpdateStatusFor should not change because no operation was performed.")
-	}
-}
-
-// Test_RemoveNodeFromAttachUpdates_Negative_Empty expects an error to be thrown
-// when a nodesToUpdateStatusFor is empty.
-func Test_RemoveNodeFromAttachUpdates_Negative_Empty(t *testing.T) {
-	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
-	asw := &actualStateOfWorld{
-		attachedVolumes:        make(map[v1.UniqueVolumeName]attachedVolume),
-		nodesToUpdateStatusFor: make(map[types.NodeName]nodeToUpdateStatusFor),
-		volumePluginMgr:        volumePluginMgr,
-	}
-
-	// Act
-	err := asw.RemoveNodeFromAttachUpdates("node-1")
-
-	// Assert
-	if err == nil {
-		t.Fatal("RemoveNodeFromAttachUpdates should return an error as nodeToUpdateStatusFor is empty.")
-	}
-	if len(asw.nodesToUpdateStatusFor) != 0 {
-		t.Fatal("The length of nodesToUpdateStatusFor should be 0.")
 	}
 }
 

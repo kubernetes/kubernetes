@@ -24,10 +24,11 @@ import (
 
 	"k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/upgrade"
 )
 
-func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
+// NewKubeadmCommand return cobra.Command to run kubeadm command
+func NewKubeadmCommand(_ io.Reader, out, err io.Writer) *cobra.Command {
 	cmds := &cobra.Command{
 		Use:   "kubeadm",
 		Short: "kubeadm: easily bootstrap a secure Kubernetes cluster",
@@ -39,13 +40,14 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			    │                                                          │
 			    │ But, please try it out! Give us feedback at:             │
 			    │ https://github.com/kubernetes/kubeadm/issues             │
-			    │ and at-mention @kubernetes/sig-cluster-lifecycle-misc    │
+			    │ and at-mention @kubernetes/sig-cluster-lifecycle-bugs    │
+			    │ or @kubernetes/sig-cluster-lifecycle-feature-requests    │
 			    └──────────────────────────────────────────────────────────┘
 
 			Example usage:
 
 			    Create a two-machine cluster with one master (which controls the cluster),
-			    and one node (where your workloads, like Pods and ReplicaSets run).
+			    and one node (where your workloads, like Pods and Deployments run).
 
 			    ┌──────────────────────────────────────────────────────────┐
 			    │ On the first machine                                     │
@@ -56,7 +58,7 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 			    ┌──────────────────────────────────────────────────────────┐
 			    │ On the second machine                                    │
 			    ├──────────────────────────────────────────────────────────┤
-			    │ node# kubeadm join --token=<token> <ip-of-master>:<port> │
+			    │ node# kubeadm join <arguments-returned-from-init>        │
 			    └──────────────────────────────────────────────────────────┘
 
 			    You can then repeat the second step on as many other machines as you like.
@@ -68,11 +70,13 @@ func NewKubeadmCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
 
 	cmds.AddCommand(NewCmdCompletion(out, ""))
+	cmds.AddCommand(NewCmdConfig(out))
 	cmds.AddCommand(NewCmdInit(out))
 	cmds.AddCommand(NewCmdJoin(out))
 	cmds.AddCommand(NewCmdReset(out))
 	cmds.AddCommand(NewCmdVersion(out))
 	cmds.AddCommand(NewCmdToken(out, err))
+	cmds.AddCommand(upgrade.NewCmdUpgrade(out))
 
 	// Wrap not yet fully supported commands in an alpha subcommand
 	experimentalCmd := &cobra.Command{

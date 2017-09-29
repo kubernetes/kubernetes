@@ -66,6 +66,10 @@ func (mounter *fakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
+func (mounter *fakeMounter) MakeRShared(path string) error {
+	return nil
+}
+
 func TestRemoveAllOneFilesystem(t *testing.T) {
 	tests := []struct {
 		name string

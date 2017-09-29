@@ -85,8 +85,8 @@ func TestPriorityMetadata(t *testing.T) {
 					ImagePullPolicy: "Always",
 					Resources: v1.ResourceRequirements{
 						Requests: v1.ResourceList{
-							"cpu":    resource.MustParse("200m"),
-							"memory": resource.MustParse("2000"),
+							v1.ResourceCPU:    resource.MustParse("200m"),
+							v1.ResourceMemory: resource.MustParse("2000"),
 						},
 					},
 				},

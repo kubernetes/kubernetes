@@ -19,6 +19,7 @@ package vclib
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/golang/glog"
@@ -142,6 +143,23 @@ func (dc *Datacenter) GetVMMoList(ctx context.Context, vmObjList []*VirtualMachi
 	return vmMoList, nil
 }
 
+// GetVirtualDiskPage83Data gets the virtual disk UUID by diskPath
+func (dc *Datacenter) GetVirtualDiskPage83Data(ctx context.Context, diskPath string) (string, error) {
+	if len(diskPath) > 0 && filepath.Ext(diskPath) != ".vmdk" {
+		diskPath += ".vmdk"
+	}
+	vdm := object.NewVirtualDiskManager(dc.Client())
+	// Returns uuid of vmdk virtual disk
+	diskUUID, err := vdm.QueryVirtualDiskUuid(ctx, diskPath, dc.Datacenter)
+
+	if err != nil {
+		glog.Warningf("QueryVirtualDiskUuid failed for diskPath: %q. err: %+v", diskPath, err)
+		return "", err
+	}
+	diskUUID = formatVirtualDiskUUID(diskUUID)
+	return diskUUID, nil
+}
+
 // GetDatastoreMoList gets the Datastore Managed Objects with the given properties from the datastore objects
 func (dc *Datacenter) GetDatastoreMoList(ctx context.Context, dsObjList []*Datastore, properties []string) ([]mo.Datastore, error) {
 	var dsMoList []mo.Datastore
@@ -161,4 +179,79 @@ func (dc *Datacenter) GetDatastoreMoList(ctx context.Context, dsObjList []*Datas
 		return nil, err
 	}
 	return dsMoList, nil
+}
+
+// CheckDisksAttached checks if the disk is attached to node.
+// This is done by comparing the volume path with the backing.FilePath on the VM Virtual disk devices.
+func (dc *Datacenter) CheckDisksAttached(ctx context.Context, nodeVolumes map[string][]string) (map[string]map[string]bool, error) {
+	attached := make(map[string]map[string]bool)
+	var vmList []*VirtualMachine
+	for nodeName, volPaths := range nodeVolumes {
+		for _, volPath := range volPaths {
+			setNodeVolumeMap(attached, volPath, nodeName, false)
+		}
+		vm, err := dc.GetVMByPath(ctx, nodeName)
+		if err != nil {
+			if IsNotFound(err) {
+				glog.Warningf("Node %q does not exist, vSphere CP will assume disks %v are not attached to it.", nodeName, volPaths)
+			}
+			continue
+		}
+		vmList = append(vmList, vm)
+	}
+	if len(vmList) == 0 {
+		glog.V(2).Infof("vSphere CP will assume no disks are attached to any node.")
+		return attached, nil
+	}
+	vmMoList, err := dc.GetVMMoList(ctx, vmList, []string{"config.hardware.device", "name"})
+	if err != nil {
+		// When there is an error fetching instance information
+		// it is safer to return nil and let volume information not be touched.
+		glog.Errorf("Failed to get VM Managed object for nodes: %+v. err: +%v", vmList, err)
+		return nil, err
+	}
+
+	for _, vmMo := range vmMoList {
+		if vmMo.Config == nil {
+			glog.Errorf("Config is not available for VM: %q", vmMo.Name)
+			continue
+		}
+		for nodeName, volPaths := range nodeVolumes {
+			if nodeName == vmMo.Name {
+				verifyVolumePathsForVM(vmMo, volPaths, attached)
+			}
+		}
+	}
+	return attached, nil
+}
+
+// VerifyVolumePathsForVM verifies if the volume paths (volPaths) are attached to VM.
+func verifyVolumePathsForVM(vmMo mo.VirtualMachine, volPaths []string, nodeVolumeMap map[string]map[string]bool) {
+	// Verify if the volume paths are present on the VM backing virtual disk devices
+	for _, volPath := range volPaths {
+		vmDevices := object.VirtualDeviceList(vmMo.Config.Hardware.Device)
+		for _, device := range vmDevices {
+			if vmDevices.TypeName(device) == "VirtualDisk" {
+				virtualDevice := device.GetVirtualDevice()
+				if backing, ok := virtualDevice.Backing.(*types.VirtualDiskFlatVer2BackingInfo); ok {
+					if backing.FileName == volPath {
+						setNodeVolumeMap(nodeVolumeMap, volPath, vmMo.Name, true)
+					}
+				}
+			}
+		}
+	}
+}
+
+func setNodeVolumeMap(
+	nodeVolumeMap map[string]map[string]bool,
+	volumePath string,
+	nodeName string,
+	check bool) {
+	volumeMap := nodeVolumeMap[nodeName]
+	if volumeMap == nil {
+		volumeMap = make(map[string]bool)
+		nodeVolumeMap[nodeName] = volumeMap
+	}
+	volumeMap[volumePath] = check
 }

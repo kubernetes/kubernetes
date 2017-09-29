@@ -19,6 +19,8 @@ package options
 import (
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/spf13/pflag"
 
@@ -34,6 +36,8 @@ import (
 )
 
 type EtcdOptions struct {
+	// The value of Paging on StorageConfig will be overriden by the
+	// calculated feature gate value.
 	StorageConfig                    storagebackend.Config
 	EncryptionProviderConfigFilepath string
 
@@ -49,6 +53,8 @@ type EtcdOptions struct {
 	EnableWatchCache bool
 	// Set DefaultWatchCacheSize to zero to disable watch caches for those resources that have no explicit cache size set
 	DefaultWatchCacheSize int
+	// WatchCacheSizes represents override to a given resource
+	WatchCacheSizes []string
 }
 
 var storageTypes = sets.NewString(
@@ -69,6 +75,10 @@ func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
 }
 
 func (s *EtcdOptions) Validate() []error {
+	if s == nil {
+		return nil
+	}
+
 	allErrors := []error{}
 	if len(s.StorageConfig.ServerList) == 0 {
 		allErrors = append(allErrors, fmt.Errorf("--etcd-servers must be specified"))
@@ -83,6 +93,10 @@ func (s *EtcdOptions) Validate() []error {
 
 // AddEtcdFlags adds flags related to etcd storage for a specific APIServer to the specified FlagSet
 func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
+	if s == nil {
+		return
+	}
+
 	fs.StringSliceVar(&s.EtcdServersOverrides, "etcd-servers-overrides", s.EtcdServersOverrides, ""+
 		"Per-resource etcd servers overrides, comma separated. The individual override "+
 		"format: group/resource#servers, where servers are http://ip:port, semicolon separated.")
@@ -97,9 +111,16 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 		"Enables the generic garbage collector. MUST be synced with the corresponding flag "+
 		"of the kube-controller-manager.")
 
-	// TODO: enable cache in integration tests.
 	fs.BoolVar(&s.EnableWatchCache, "watch-cache", s.EnableWatchCache,
 		"Enable watch caching in the apiserver")
+
+	fs.IntVar(&s.DefaultWatchCacheSize, "default-watch-cache-size", s.DefaultWatchCacheSize,
+		"Default watch cache size. If zero, watch cache will be disabled for resources that do not have a default watch size set.")
+
+	fs.StringSliceVar(&s.WatchCacheSizes, "watch-cache-sizes", s.WatchCacheSizes, ""+
+		"List of watch cache sizes for every resource (pods, nodes, etc.), comma separated. "+
+		"The individual override format: resource#size, where size is a number. It takes effect "+
+		"when watch-cache is enabled.")
 
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
 		"The storage backend for persistence. Options: 'etcd3' (default), 'etcd2'.")
@@ -130,6 +151,10 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 func (s *EtcdOptions) ApplyTo(c *server.Config) error {
+	if s == nil {
+		return nil
+	}
+
 	s.addEtcdHealthEndpoint(c)
 	c.RESTOptionsGetter = &SimpleRestOptionsFactory{Options: *s}
 	return nil
@@ -167,7 +192,15 @@ func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource)
 		ResourcePrefix:          resource.Group + "/" + resource.Resource,
 	}
 	if f.Options.EnableWatchCache {
-		ret.Decorator = genericregistry.StorageWithCacher(f.Options.DefaultWatchCacheSize)
+		sizes, err := ParseWatchCacheSizes(f.Options.WatchCacheSizes)
+		if err != nil {
+			return generic.RESTOptions{}, err
+		}
+		cacheSize, ok := sizes[resource]
+		if !ok {
+			cacheSize = f.Options.DefaultWatchCacheSize
+		}
+		ret.Decorator = genericregistry.StorageWithCacher(cacheSize)
 	}
 	return ret, nil
 }
@@ -191,8 +224,52 @@ func (f *storageFactoryRestOptionsFactory) GetRESTOptions(resource schema.GroupR
 		ResourcePrefix:          f.StorageFactory.ResourcePrefix(resource),
 	}
 	if f.Options.EnableWatchCache {
-		ret.Decorator = genericregistry.StorageWithCacher(f.Options.DefaultWatchCacheSize)
+		sizes, err := ParseWatchCacheSizes(f.Options.WatchCacheSizes)
+		if err != nil {
+			return generic.RESTOptions{}, err
+		}
+		cacheSize, ok := sizes[resource]
+		if !ok {
+			cacheSize = f.Options.DefaultWatchCacheSize
+		}
+		ret.Decorator = genericregistry.StorageWithCacher(cacheSize)
 	}
 
 	return ret, nil
+}
+
+// ParseWatchCacheSizes turns a list of cache size values into a map of group resources
+// to requested sizes.
+func ParseWatchCacheSizes(cacheSizes []string) (map[schema.GroupResource]int, error) {
+	watchCacheSizes := make(map[schema.GroupResource]int)
+	for _, c := range cacheSizes {
+		tokens := strings.Split(c, "#")
+		if len(tokens) != 2 {
+			return nil, fmt.Errorf("invalid value of watch cache size: %s", c)
+		}
+
+		size, err := strconv.Atoi(tokens[1])
+		if err != nil {
+			return nil, fmt.Errorf("invalid size of watch cache size: %s", c)
+		}
+		if size < 0 {
+			return nil, fmt.Errorf("watch cache size cannot be negative: %s", c)
+		}
+
+		watchCacheSizes[schema.ParseGroupResource(tokens[0])] = size
+	}
+	return watchCacheSizes, nil
+}
+
+// WriteWatchCacheSizes turns a map of cache size values into a list of string specifications.
+func WriteWatchCacheSizes(watchCacheSizes map[schema.GroupResource]int) ([]string, error) {
+	var cacheSizes []string
+
+	for resource, size := range watchCacheSizes {
+		if size < 0 {
+			return nil, fmt.Errorf("watch cache size cannot be negative for resource %s", resource)
+		}
+		cacheSizes = append(cacheSizes, fmt.Sprintf("%s#%d", resource.String(), size))
+	}
+	return cacheSizes, nil
 }

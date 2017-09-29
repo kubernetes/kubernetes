@@ -122,7 +122,7 @@ func (a *gcPermissionsEnforcement) Admit(attributes admission.Attributes) (err e
 		for _, record := range records {
 			allowed, reason, err := a.authorizer.Authorize(record)
 			if !allowed {
-				return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't delete: %v, %v", reason, err))
+				return admission.NewForbidden(attributes, fmt.Errorf("cannot set blockOwnerDeletion if an ownerReference refers to a resource you can't set finalizers on: %v, %v", reason, err))
 			}
 		}
 	}
@@ -178,12 +178,13 @@ func (a *gcPermissionsEnforcement) ownerRefToDeleteAttributeRecords(ref metav1.O
 	for _, mapping := range mappings {
 		ret = append(ret, authorizer.AttributesRecord{
 			User: attributes.GetUserInfo(),
-			Verb: "delete",
+			Verb: "update",
 			// ownerReference can only refer to an object in the same namespace, so attributes.GetNamespace() equals to the owner's namespace
 			Namespace:       attributes.GetNamespace(),
 			APIGroup:        groupVersion.Group,
 			APIVersion:      groupVersion.Version,
 			Resource:        mapping.Resource,
+			Subresource:     "finalizers",
 			Name:            ref.Name,
 			ResourceRequest: true,
 			Path:            "",

@@ -30,12 +30,12 @@ func makeNode(node string, milliCPU, memory int64) *v1.Node {
 		ObjectMeta: metav1.ObjectMeta{Name: node},
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
-				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-				"memory": *resource.NewQuantity(memory, resource.BinarySI),
+				v1.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
 			},
 			Allocatable: v1.ResourceList{
-				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
-				"memory": *resource.NewQuantity(memory, resource.BinarySI),
+				v1.ResourceCPU:    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(memory, resource.BinarySI),
 			},
 		},
 	}

@@ -187,40 +187,34 @@ func (a *noNewPrivsAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult
 		return PodAdmitResult{Admit: true}
 	}
 
-	// Make sure it is either docker or rkt runtimes.
-	if a.Runtime.Type() != kubetypes.DockerContainerRuntime && a.Runtime.Type() != kubetypes.RktContainerRuntime {
+	// Always admit runtimes except docker.
+	if a.Runtime.Type() != kubetypes.DockerContainerRuntime {
+		return PodAdmitResult{Admit: true}
+	}
+
+	// Make sure docker api version is valid.
+	rversion, err := a.Runtime.APIVersion()
+	if err != nil {
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  "NoNewPrivs",
-			Message: fmt.Sprintf("Cannot enforce NoNewPrivs: %s runtime not supported", a.Runtime.Type()),
+			Message: fmt.Sprintf("Cannot enforce NoNewPrivs: %v", err),
 		}
 	}
-
-	if a.Runtime.Type() != kubetypes.DockerContainerRuntime {
-		// Make sure docker api version is valid.
-		rversion, err := a.Runtime.APIVersion()
-		if err != nil {
-			return PodAdmitResult{
-				Admit:   false,
-				Reason:  "NoNewPrivs",
-				Message: fmt.Sprintf("Cannot enforce NoNewPrivs: %v", err),
-			}
+	v, err := rversion.Compare("1.23.0")
+	if err != nil {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "NoNewPrivs",
+			Message: fmt.Sprintf("Cannot enforce NoNewPrivs: %v", err),
 		}
-		v, err := rversion.Compare("1.23")
-		if err != nil {
-			return PodAdmitResult{
-				Admit:   false,
-				Reason:  "NoNewPrivs",
-				Message: fmt.Sprintf("Cannot enforce NoNewPrivs: %v", err),
-			}
-		}
-		// If the version is less than 1.23 it will return -1 above.
-		if v == -1 {
-			return PodAdmitResult{
-				Admit:   false,
-				Reason:  "NoNewPrivs",
-				Message: fmt.Sprintf("Cannot enforce NoNewPrivs: docker runtime API version %q must be greater than or equal to 1.23", rversion.String()),
-			}
+	}
+	// If the version is less than 1.23 it will return -1 above.
+	if v == -1 {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "NoNewPrivs",
+			Message: fmt.Sprintf("Cannot enforce NoNewPrivs: docker runtime API version %q must be greater than or equal to 1.23", rversion.String()),
 		}
 	}
 

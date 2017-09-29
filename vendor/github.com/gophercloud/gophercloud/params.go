@@ -10,10 +10,28 @@ import (
 	"time"
 )
 
-// BuildRequestBody builds a map[string]interface from the given `struct`. If
-// parent is not the empty string, the final map[string]interface returned will
-// encapsulate the built one
-//
+/*
+BuildRequestBody builds a map[string]interface from the given `struct`. If
+parent is not an empty string, the final map[string]interface returned will
+encapsulate the built one. For example:
+
+  disk := 1
+  createOpts := flavors.CreateOpts{
+    ID:         "1",
+    Name:       "m1.tiny",
+    Disk:       &disk,
+    RAM:        512,
+    VCPUs:      1,
+    RxTxFactor: 1.0,
+  }
+
+  body, err := gophercloud.BuildRequestBody(createOpts, "flavor")
+
+The above example can be run as-is, however it is recommended to look at how
+BuildRequestBody is used within Gophercloud to more fully understand how it
+fits within the request process as a whole rather than use it directly as shown
+above.
+*/
 func BuildRequestBody(opts interface{}, parent string) (map[string]interface{}, error) {
 	optsValue := reflect.ValueOf(opts)
 	if optsValue.Kind() == reflect.Ptr {

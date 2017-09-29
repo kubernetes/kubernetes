@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
-	"k8s.io/utils/exec"
 )
 
 var (
@@ -42,12 +41,11 @@ var (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&rbdPlugin{nil, exec.New()}}
+	return []volume.VolumePlugin{&rbdPlugin{nil}}
 }
 
 type rbdPlugin struct {
 	host volume.VolumeHost
-	exe  exec.Interface
 }
 
 var _ volume.VolumePlugin = &rbdPlugin{}
@@ -131,7 +129,7 @@ func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.Vol
 	}
 
 	// Inject real implementations here, test through the internal function.
-	return plugin.newMounterInternal(spec, pod.UID, &RBDUtil{}, plugin.host.GetMounter(), secret)
+	return plugin.newMounterInternal(spec, pod.UID, &RBDUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()), secret)
 }
 
 func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) (*v1.RBDVolumeSource, bool) {
@@ -144,7 +142,7 @@ func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) (*v1.RBDVolumeSou
 	}
 }
 
-func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, secret string) (volume.Mounter, error) {
+func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec, secret string) (volume.Mounter, error) {
 	source, readOnly := plugin.getRBDVolumeSource(spec)
 	pool := source.RBDPool
 	id := source.RadosUser
@@ -158,7 +156,8 @@ func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID,
 			Pool:            pool,
 			ReadOnly:        readOnly,
 			manager:         manager,
-			mounter:         &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
+			mounter:         &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
+			exec:            exec,
 			plugin:          plugin,
 			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
@@ -173,17 +172,18 @@ func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID,
 
 func (plugin *rbdPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newUnmounterInternal(volName, podUID, &RBDUtil{}, plugin.host.GetMounter())
+	return plugin.newUnmounterInternal(volName, podUID, &RBDUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
 }
 
-func (plugin *rbdPlugin) newUnmounterInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Unmounter, error) {
+func (plugin *rbdPlugin) newUnmounterInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec) (volume.Unmounter, error) {
 	return &rbdUnmounter{
 		rbdMounter: &rbdMounter{
 			rbd: &rbd{
 				podUID:          podUID,
 				volName:         volName,
 				manager:         manager,
-				mounter:         &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
+				mounter:         &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
+				exec:            exec,
 				plugin:          plugin,
 				MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 			},
@@ -246,6 +246,8 @@ func (plugin *rbdPlugin) newDeleterInternal(spec *volume.Spec, admin, secret str
 				Pool:    spec.PersistentVolume.Spec.RBD.RBDPool,
 				manager: manager,
 				plugin:  plugin,
+				mounter: &mount.SafeFormatAndMount{Interface: plugin.host.GetMounter(plugin.GetPluginName())},
+				exec:    plugin.host.GetExec(plugin.GetPluginName()),
 			},
 			Mon:         spec.PersistentVolume.Spec.RBD.CephMonitors,
 			adminId:     admin,
@@ -263,6 +265,8 @@ func (plugin *rbdPlugin) newProvisionerInternal(options volume.VolumeOptions, ma
 			rbd: &rbd{
 				manager: manager,
 				plugin:  plugin,
+				mounter: &mount.SafeFormatAndMount{Interface: plugin.host.GetMounter(plugin.GetPluginName())},
+				exec:    plugin.host.GetExec(plugin.GetPluginName()),
 			},
 		},
 		options: options,
@@ -287,7 +291,7 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	adminSecretNamespace := rbdDefaultAdminSecretNamespace
 	secretName := ""
 	secret := ""
-	imageFormat := rbdImageFormat1
+	imageFormat := rbdImageFormat2
 	fstype := ""
 
 	for k, v := range r.options.Parameters {
@@ -379,6 +383,7 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	pv.Spec.Capacity = v1.ResourceList{
 		v1.ResourceName(v1.ResourceStorage): resource.MustParse(fmt.Sprintf("%dMi", sizeMB)),
 	}
+	pv.Spec.MountOptions = r.options.MountOptions
 	return pv, nil
 }
 
@@ -402,9 +407,10 @@ type rbd struct {
 	ReadOnly bool
 	plugin   *rbdPlugin
 	mounter  *mount.SafeFormatAndMount
+	exec     mount.Exec
 	// Utility interface that provides API calls to the provider to attach/detach disks.
-	manager diskManager
-	volume.MetricsProvider
+	manager                diskManager
+	volume.MetricsProvider `json:"-"`
 }
 
 func (rbd *rbd) GetPath() string {
@@ -478,11 +484,6 @@ func (c *rbdUnmounter) TearDownAt(dir string) error {
 		return nil
 	}
 	return diskTearDown(c.manager, *c, dir, c.mounter)
-}
-
-func (plugin *rbdPlugin) execCommand(command string, args []string) ([]byte, error) {
-	cmd := plugin.exe.Command(command, args...)
-	return cmd.CombinedOutput()
 }
 
 func getVolumeSource(

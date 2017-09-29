@@ -18,16 +18,12 @@ package gce
 
 import (
 	"net/http"
-	"time"
 
 	compute "google.golang.org/api/compute/v1"
 )
 
 func newTargetProxyMetricContext(request string) *metricContext {
-	return &metricContext{
-		start:      time.Now(),
-		attributes: []string{"targetproxy_" + request, unusedMetricLabel, unusedMetricLabel},
-	}
+	return newGenericMetricContext("targetproxy", request, unusedMetricLabel, unusedMetricLabel, computeV1Version)
 }
 
 // GetTargetHttpProxy returns the UrlMap by name.

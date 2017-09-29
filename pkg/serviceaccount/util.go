@@ -28,7 +28,7 @@ func UserInfo(namespace, name, uid string) user.Info {
 	return &user.DefaultInfo{
 		Name:   apiserverserviceaccount.MakeUsername(namespace, name),
 		UID:    uid,
-		Groups: apiserverserviceaccount.MakeGroupNames(namespace, name),
+		Groups: apiserverserviceaccount.MakeGroupNames(namespace),
 	}
 }
 

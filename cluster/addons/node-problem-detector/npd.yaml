@@ -7,7 +7,7 @@ metadata:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 ---
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: npd-binding
@@ -76,6 +76,7 @@ spec:
       - name: localtime
         hostPath:
           path: /etc/localtime
+          type: "FileOrCreate"
       serviceAccountName: node-problem-detector
       tolerations:
       - operator: "Exists"

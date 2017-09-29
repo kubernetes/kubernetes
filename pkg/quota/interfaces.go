@@ -45,9 +45,9 @@ type Evaluator interface {
 	Constraints(required []api.ResourceName, item runtime.Object) error
 	// GroupKind returns the groupKind that this object knows how to evaluate
 	GroupKind() schema.GroupKind
-	// Handles determines if quota could be impacted by the specified operation.
+	// Handles determines if quota could be impacted by the specified attribute.
 	// If true, admission control must perform quota processing for the operation, otherwise it is safe to ignore quota.
-	Handles(operation admission.Operation) bool
+	Handles(operation admission.Attributes) bool
 	// Matches returns true if the specified quota matches the input item
 	Matches(resourceQuota *api.ResourceQuota, item runtime.Object) (bool, error)
 	// MatchingResources takes the input specified list of resources and returns the set of resources evaluator matches.

@@ -52,6 +52,9 @@ type Attributes struct {
 	// The system uuid
 	SystemUUID string `json:"system_uuid"`
 
+	// HugePages on this machine.
+	HugePages []v1.HugePagesInfo `json:"hugepages"`
+
 	// Filesystems on this machine.
 	Filesystems []v1.FsInfo `json:"filesystems"`
 

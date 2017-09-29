@@ -331,7 +331,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		}
 	}
 
-	handler := genericapifilters.WithAudit(mux, requestContextMapper, auditSink, auditpolicy.FakeChecker(auditinternal.LevelRequestResponse), func(r *http.Request, requestInfo *request.RequestInfo) bool {
+	handler := genericapifilters.WithAudit(mux, requestContextMapper, auditSink, auditpolicy.FakeChecker(auditinternal.LevelRequestResponse, nil), func(r *http.Request, requestInfo *request.RequestInfo) bool {
 		// simplified long-running check
 		return requestInfo.Verb == "watch" || requestInfo.Verb == "proxy"
 	})
@@ -1869,7 +1869,7 @@ func TestGetTable(t *testing.T) {
 			expected: &metav1alpha1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1alpha1"},
 				ColumnDefinitions: []metav1alpha1.TableColumnDefinition{
-					{Name: "Name", Type: "string", Description: metaDoc["name"]},
+					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
 				Rows: []metav1alpha1.TableRow{
@@ -1883,7 +1883,7 @@ func TestGetTable(t *testing.T) {
 			expected: &metav1alpha1.Table{
 				TypeMeta: metav1.TypeMeta{Kind: "Table", APIVersion: "meta.k8s.io/v1alpha1"},
 				ColumnDefinitions: []metav1alpha1.TableColumnDefinition{
-					{Name: "Name", Type: "string", Description: metaDoc["name"]},
+					{Name: "Name", Type: "string", Format: "name", Description: metaDoc["name"]},
 					{Name: "Created At", Type: "date", Description: metaDoc["creationTimestamp"]},
 				},
 				Rows: []metav1alpha1.TableRow{
@@ -2136,14 +2136,24 @@ func TestGetWithOptions(t *testing.T) {
 			expectedPath: "",
 		},
 		{
+			name:         "with root slash",
+			requestURL:   "/namespaces/default/simple/id/?param1=test1&param2=test2",
+			expectedPath: "/",
+		},
+		{
 			name:         "with path",
 			requestURL:   "/namespaces/default/simple/id/a/different/path?param1=test1&param2=test2",
-			expectedPath: "a/different/path",
+			expectedPath: "/a/different/path",
+		},
+		{
+			name:         "with path with trailing slash",
+			requestURL:   "/namespaces/default/simple/id/a/different/path/?param1=test1&param2=test2",
+			expectedPath: "/a/different/path/",
 		},
 		{
 			name:         "as subresource",
 			requestURL:   "/namespaces/default/simple/id/subresource/another/different/path?param1=test1&param2=test2",
-			expectedPath: "another/different/path",
+			expectedPath: "/another/different/path",
 		},
 		{
 			name:         "cluster-scoped basic",
@@ -2155,13 +2165,13 @@ func TestGetWithOptions(t *testing.T) {
 			name:         "cluster-scoped basic with path",
 			rootScoped:   true,
 			requestURL:   "/simple/id/a/cluster/path?param1=test1&param2=test2",
-			expectedPath: "a/cluster/path",
+			expectedPath: "/a/cluster/path",
 		},
 		{
 			name:         "cluster-scoped basic as subresource",
 			rootScoped:   true,
 			requestURL:   "/simple/id/subresource/another/cluster/path?param1=test1&param2=test2",
-			expectedPath: "another/cluster/path",
+			expectedPath: "/another/cluster/path",
 		},
 	}
 
@@ -2556,7 +2566,7 @@ func TestConnectWithOptions(t *testing.T) {
 func TestConnectWithOptionsAndPath(t *testing.T) {
 	responseText := "Hello World"
 	itemID := "theID"
-	testPath := "a/b/c/def"
+	testPath := "/a/b/c/def"
 	connectStorage := &ConnecterRESTStorage{
 		connectHandler: &OutputConnect{
 			response: responseText,
@@ -2572,7 +2582,7 @@ func TestConnectWithOptionsAndPath(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect/" + testPath + "?param1=value1&param2=value2")
+	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect" + testPath + "?param1=value1&param2=value2")
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

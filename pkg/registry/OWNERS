@@ -3,6 +3,7 @@ approvers:
 - lavalamp
 - smarterclayton
 - wojtek-t
+- liggitt
 reviewers:
 - thockin
 - lavalamp
@@ -37,3 +38,4 @@ reviewers:
 - dims
 - madhusudancs
 - hongchaodeng
+- enj

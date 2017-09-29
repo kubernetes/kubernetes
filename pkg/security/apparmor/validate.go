@@ -28,6 +28,7 @@ import (
 	"k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
 )
 
@@ -111,8 +112,8 @@ func validateHost(runtime string) error {
 	}
 
 	// Check runtime support. Currently only Docker is supported.
-	if runtime != "docker" {
-		return fmt.Errorf("AppArmor is only enabled for 'docker' runtime. Found: %q.", runtime)
+	if runtime != kubetypes.DockerContainerRuntime && runtime != kubetypes.RemoteContainerRuntime {
+		return fmt.Errorf("AppArmor is only enabled for 'docker' and 'remote' runtimes. Found: %q.", runtime)
 	}
 
 	return nil

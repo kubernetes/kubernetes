@@ -9,10 +9,12 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "deepcopy.go",
         "doc.go",
         "helpers.go",
         "register.go",
         "types.go",
+        "types_jsonschema.go",
         "zz_generated.deepcopy.go",
     ],
     deps = [

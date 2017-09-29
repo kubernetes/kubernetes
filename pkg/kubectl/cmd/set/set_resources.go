@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 var (
@@ -70,7 +70,7 @@ type ResourcesOptions struct {
 	Err               io.Writer
 	Selector          string
 	ContainerSelector string
-	ShortOutput       bool
+	Output            string
 	All               bool
 	Record            bool
 	ChangeCause       string
@@ -114,12 +114,13 @@ func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.
 	//kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
-	cmd.Flags().BoolVar(&options.All, "all", false, "Select all resources in the namespace of the specified resource types")
-	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.")
+	cmd.Flags().BoolVar(&options.All, "all", false, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
+	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, not including uninitialized ones,supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVarP(&options.ContainerSelector, "containers", "c", "*", "The names of containers in the selected pod templates to change, all containers are selected by default - may use wildcards")
 	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set resources will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddRecordFlag(cmd)
+	cmdutil.AddIncludeUninitializedFlag(cmd)
 	cmd.Flags().StringVar(&options.Limits, "limits", options.Limits, "The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.")
 	cmd.Flags().StringVar(&options.Requests, "requests", options.Requests, "The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.")
 	return cmd
@@ -129,7 +130,7 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	o.Mapper, o.Typer = f.Object()
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
 	o.Encoder = f.JSONEncoder()
-	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
+	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.Record = cmdutil.GetRecordFlag(cmd)
 	o.Local = cmdutil.GetFlagBool(cmd, "local")
 	o.ChangeCause = f.Command(cmd, false)
@@ -141,11 +142,12 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		return err
 	}
 
-	builder := f.NewBuilder(!o.Local).
+	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
+	builder := f.NewBuilder().
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		//FilenameParam(enforceNamespace, o.Filenames...).
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		IncludeUninitialized(includeUninitialized).
 		Flatten()
 
 	if !o.Local {
@@ -153,6 +155,15 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 			SelectorParam(o.Selector).
 			ResourceTypeOrNameArgs(o.All, args...).
 			Latest()
+	} else {
+		// if a --local flag was provided, and a resource was specified in the form
+		// <resource>/<name>, fail immediately as --local cannot query the api server
+		// for the specified resource.
+		if len(args) > 0 {
+			return resource.LocalResourceError
+		}
+
+		builder = builder.Local(f.ClientForMapping)
 	}
 
 	o.Infos, err = builder.Do().Infos()
@@ -243,7 +254,12 @@ func (o *ResourcesOptions) Run() error {
 			}
 		}
 		info.Refresh(obj, true)
-		cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, false, "resource requirements updated")
+
+		shortOutput := o.Output == "name"
+		if len(o.Output) > 0 && !shortOutput {
+			return o.PrintObject(o.Cmd, o.Local, o.Mapper, info.Object, o.Out)
+		}
+		cmdutil.PrintSuccess(o.Mapper, shortOutput, o.Out, info.Mapping.Resource, info.Name, false, "resource requirements updated")
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

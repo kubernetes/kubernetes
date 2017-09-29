@@ -23,7 +23,6 @@ import (
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/kubernetes/scheme"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
@@ -36,8 +35,7 @@ import (
 // label which contains templateGeneration (for backward compatibility),
 // hash of provided template and sets default daemon tolerations.
 func CreatePodTemplate(template v1.PodTemplateSpec, generation int64, hash string) v1.PodTemplateSpec {
-	obj, _ := scheme.Scheme.DeepCopy(template)
-	newTemplate := obj.(v1.PodTemplateSpec)
+	newTemplate := *template.DeepCopy()
 	// DaemonSet pods shouldn't be deleted by NodeController in case of node problems.
 	// Add infinite toleration for taint notReady:NoExecute here
 	// to survive taint-based eviction enforced by NodeController
@@ -73,6 +71,7 @@ func CreatePodTemplate(template v1.PodTemplateSpec, generation int64, hash strin
 		Effect:   v1.TaintEffectNoSchedule,
 	})
 
+	// TODO(#48843) OutOfDisk taints will be removed in 1.10
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
 		kubelettypes.IsCritical(newTemplate.Namespace, newTemplate.Annotations) {
 		v1helper.AddOrUpdateTolerationInPodSpec(&newTemplate.Spec, &v1.Toleration{

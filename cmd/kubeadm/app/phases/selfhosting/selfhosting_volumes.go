@@ -19,13 +19,13 @@ package selfhosting
 import (
 	"fmt"
 	"io/ioutil"
-	"path"
+	"path/filepath"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
 type tlsKeyPair struct {
@@ -34,115 +34,96 @@ type tlsKeyPair struct {
 	key  string
 }
 
-func k8sSelfHostedVolumeMount() v1.VolumeMount {
-	return v1.VolumeMount{
-		Name:      "k8s",
-		MountPath: kubeadmconstants.KubernetesDir,
-		ReadOnly:  true,
-	}
-}
-
-func apiServerProjectedVolume(cfg *kubeadmapi.MasterConfiguration) v1.Volume {
-	return v1.Volume{
-		Name: "k8s",
-		VolumeSource: v1.VolumeSource{
-			Projected: &v1.ProjectedVolumeSource{
-				Sources: []v1.VolumeProjection{
-					{
-						Secret: &v1.SecretProjection{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: kubeadmconstants.CACertAndKeyBaseName,
-							},
-							Items: []v1.KeyToPath{
-								{
-									Key:  v1.TLSCertKey,
-									Path: path.Join(path.Base(cfg.CertificatesDir), kubeadmconstants.CACertName),
-								},
-								{
-									Key:  v1.TLSPrivateKeyKey,
-									Path: path.Join(path.Base(cfg.CertificatesDir), kubeadmconstants.CAKeyName),
-								},
+func apiServerCertificatesVolumeSource() v1.VolumeSource {
+	return v1.VolumeSource{
+		Projected: &v1.ProjectedVolumeSource{
+			Sources: []v1.VolumeProjection{
+				{
+					Secret: &v1.SecretProjection{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: kubeadmconstants.CACertAndKeyBaseName,
+						},
+						Items: []v1.KeyToPath{
+							{
+								Key:  v1.TLSCertKey,
+								Path: kubeadmconstants.CACertName,
 							},
 						},
 					},
-					{
-						Secret: &v1.SecretProjection{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: kubeadmconstants.APIServerCertAndKeyBaseName,
+				},
+				{
+					Secret: &v1.SecretProjection{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: kubeadmconstants.APIServerCertAndKeyBaseName,
+						},
+						Items: []v1.KeyToPath{
+							{
+								Key:  v1.TLSCertKey,
+								Path: kubeadmconstants.APIServerCertName,
 							},
-							Items: []v1.KeyToPath{
-								{
-									Key:  v1.TLSCertKey,
-									Path: path.Join(path.Base(cfg.CertificatesDir), kubeadmconstants.APIServerCertName),
-								},
-								{
-									Key:  v1.TLSPrivateKeyKey,
-									Path: path.Join(path.Base(cfg.CertificatesDir), kubeadmconstants.APIServerKeyName),
-								},
+							{
+								Key:  v1.TLSPrivateKeyKey,
+								Path: kubeadmconstants.APIServerKeyName,
 							},
 						},
 					},
-					{
-						Secret: &v1.SecretProjection{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName,
+				},
+				{
+					Secret: &v1.SecretProjection{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: kubeadmconstants.APIServerKubeletClientCertAndKeyBaseName,
+						},
+						Items: []v1.KeyToPath{
+							{
+								Key:  v1.TLSCertKey,
+								Path: kubeadmconstants.APIServerKubeletClientCertName,
 							},
-							Items: []v1.KeyToPath{
-								{
-									Key:  v1.TLSCertKey,
-									Path: path.Join(path.Base(cfg.CertificatesDir), kubeadmconstants.APIServerKubeletClientCertName),
-								},
-								{
-									Key:  v1.TLSPrivateKeyKey,
-									Path: path.Join(path.Base(cfg.CertificatesDir), kubeadmconstants.APIServerKubeletClientKeyName),
-								},
+							{
+								Key:  v1.TLSPrivateKeyKey,
+								Path: kubeadmconstants.APIServerKubeletClientKeyName,
 							},
 						},
 					},
-					{
-						Secret: &v1.SecretProjection{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: kubeadmconstants.ServiceAccountKeyBaseName,
-							},
-							Items: []v1.KeyToPath{
-								{
-									Key:  v1.TLSCertKey,
-									Path: path.Join(path.Base(cfg.CertificatesDir), kubeadmconstants.ServiceAccountPublicKeyName),
-								},
-								{
-									Key:  v1.TLSPrivateKeyKey,
-									Path: path.Join(path.Base(cfg.CertificatesDir), kubeadmconstants.ServiceAccountPrivateKeyName),
-								},
+				},
+				{
+					Secret: &v1.SecretProjection{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: kubeadmconstants.ServiceAccountKeyBaseName,
+						},
+						Items: []v1.KeyToPath{
+							{
+								Key:  v1.TLSCertKey,
+								Path: kubeadmconstants.ServiceAccountPublicKeyName,
 							},
 						},
 					},
-					{
-						Secret: &v1.SecretProjection{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: kubeadmconstants.FrontProxyCACertAndKeyBaseName,
-							},
-							Items: []v1.KeyToPath{
-								{
-									Key:  v1.TLSCertKey,
-									Path: path.Join(path.Base(cfg.CertificatesDir), kubeadmconstants.FrontProxyCACertName),
-								},
+				},
+				{
+					Secret: &v1.SecretProjection{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: kubeadmconstants.FrontProxyCACertAndKeyBaseName,
+						},
+						Items: []v1.KeyToPath{
+							{
+								Key:  v1.TLSCertKey,
+								Path: kubeadmconstants.FrontProxyCACertName,
 							},
 						},
 					},
-					{
-						Secret: &v1.SecretProjection{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: kubeadmconstants.FrontProxyClientCertAndKeyBaseName,
+				},
+				{
+					Secret: &v1.SecretProjection{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: kubeadmconstants.FrontProxyClientCertAndKeyBaseName,
+						},
+						Items: []v1.KeyToPath{
+							{
+								Key:  v1.TLSCertKey,
+								Path: kubeadmconstants.FrontProxyClientCertName,
 							},
-							Items: []v1.KeyToPath{
-								{
-									Key:  v1.TLSCertKey,
-									Path: path.Join(path.Base(cfg.CertificatesDir), kubeadmconstants.FrontProxyClientCertName),
-								},
-								{
-									Key:  v1.TLSPrivateKeyKey,
-									Path: path.Join(path.Base(cfg.CertificatesDir), kubeadmconstants.FrontProxyClientKeyName),
-								},
+							{
+								Key:  v1.TLSPrivateKeyKey,
+								Path: kubeadmconstants.FrontProxyClientKeyName,
 							},
 						},
 					},
@@ -152,16 +133,36 @@ func apiServerProjectedVolume(cfg *kubeadmapi.MasterConfiguration) v1.Volume {
 	}
 }
 
-func schedulerProjectedVolume(cfg *kubeadmapi.MasterConfiguration) v1.Volume {
-	return v1.Volume{
-		Name: "k8s",
-		VolumeSource: v1.VolumeSource{
-			Projected: &v1.ProjectedVolumeSource{
-				Sources: []v1.VolumeProjection{
-					{
-						Secret: &v1.SecretProjection{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: kubeadmconstants.SchedulerKubeConfigFileName,
+func controllerManagerCertificatesVolumeSource() v1.VolumeSource {
+	return v1.VolumeSource{
+		Projected: &v1.ProjectedVolumeSource{
+			Sources: []v1.VolumeProjection{
+				{
+					Secret: &v1.SecretProjection{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: kubeadmconstants.CACertAndKeyBaseName,
+						},
+						Items: []v1.KeyToPath{
+							{
+								Key:  v1.TLSCertKey,
+								Path: kubeadmconstants.CACertName,
+							},
+							{
+								Key:  v1.TLSPrivateKeyKey,
+								Path: kubeadmconstants.CAKeyName,
+							},
+						},
+					},
+				},
+				{
+					Secret: &v1.SecretProjection{
+						LocalObjectReference: v1.LocalObjectReference{
+							Name: kubeadmconstants.ServiceAccountKeyBaseName,
+						},
+						Items: []v1.KeyToPath{
+							{
+								Key:  v1.TLSPrivateKeyKey,
+								Path: kubeadmconstants.ServiceAccountPrivateKeyName,
 							},
 						},
 					},
@@ -171,67 +172,26 @@ func schedulerProjectedVolume(cfg *kubeadmapi.MasterConfiguration) v1.Volume {
 	}
 }
 
-func controllerManagerProjectedVolume(cfg *kubeadmapi.MasterConfiguration) v1.Volume {
-	return v1.Volume{
-		Name: "k8s",
-		VolumeSource: v1.VolumeSource{
-			Projected: &v1.ProjectedVolumeSource{
-				Sources: []v1.VolumeProjection{
-					{
-						Secret: &v1.SecretProjection{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: kubeadmconstants.ControllerManagerKubeConfigFileName,
-							},
-						},
-					},
-					{
-						Secret: &v1.SecretProjection{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: kubeadmconstants.CACertAndKeyBaseName,
-							},
-							Items: []v1.KeyToPath{
-								{
-									Key:  v1.TLSCertKey,
-									Path: path.Join(path.Base(cfg.CertificatesDir), kubeadmconstants.CACertName),
-								},
-								{
-									Key:  v1.TLSPrivateKeyKey,
-									Path: path.Join(path.Base(cfg.CertificatesDir), kubeadmconstants.CAKeyName),
-								},
-							},
-						},
-					},
-					{
-						Secret: &v1.SecretProjection{
-							LocalObjectReference: v1.LocalObjectReference{
-								Name: kubeadmconstants.ServiceAccountKeyBaseName,
-							},
-							Items: []v1.KeyToPath{
-								{
-									Key:  v1.TLSPrivateKeyKey,
-									Path: path.Join(path.Base(cfg.CertificatesDir), kubeadmconstants.ServiceAccountPrivateKeyName),
-								},
-							},
-						},
-					},
-				},
-			},
+func kubeConfigVolumeSource(kubeconfigSecretName string) v1.VolumeSource {
+	return v1.VolumeSource{
+		Secret: &v1.SecretVolumeSource{
+			SecretName: kubeconfigSecretName,
 		},
 	}
 }
 
-func createTLSSecrets(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+func uploadTLSSecrets(client clientset.Interface, certDir string) error {
 	for _, tlsKeyPair := range getTLSKeyPairs() {
 		secret, err := createTLSSecretFromFiles(
 			tlsKeyPair.name,
-			path.Join(cfg.CertificatesDir, tlsKeyPair.cert),
-			path.Join(cfg.CertificatesDir, tlsKeyPair.key),
+			filepath.Join(certDir, tlsKeyPair.cert),
+			filepath.Join(certDir, tlsKeyPair.key),
 		)
 		if err != nil {
 			return err
 		}
 
-		if _, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret); err != nil {
+		if err := apiclient.CreateOrUpdateSecret(client, secret); err != nil {
 			return err
 		}
 		fmt.Printf("[self-hosted] Created TLS secret %q from %s and %s\n", tlsKeyPair.name, tlsKeyPair.cert, tlsKeyPair.key)
@@ -240,24 +200,22 @@ func createTLSSecrets(cfg *kubeadmapi.MasterConfiguration, client clientset.Inte
 	return nil
 }
 
-func createOpaqueSecrets(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+func uploadKubeConfigSecrets(client clientset.Interface, kubeConfigDir string) error {
 	files := []string{
 		kubeadmconstants.SchedulerKubeConfigFileName,
 		kubeadmconstants.ControllerManagerKubeConfigFileName,
 	}
 	for _, file := range files {
-		secret, err := createOpaqueSecretFromFile(
-			file,
-			path.Join(kubeadmconstants.KubernetesDir, file),
-		)
+		kubeConfigPath := filepath.Join(kubeConfigDir, file)
+		secret, err := createOpaqueSecretFromFile(file, kubeConfigPath)
 		if err != nil {
 			return err
 		}
 
-		if _, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Create(secret); err != nil {
+		if err := apiclient.CreateOrUpdateSecret(client, secret); err != nil {
 			return err
 		}
-		fmt.Printf("[self-hosted] Created secret %q\n", file)
+		fmt.Printf("[self-hosted] Created secret for kubeconfig file %q\n", file)
 	}
 
 	return nil
@@ -299,7 +257,7 @@ func createOpaqueSecretFromFile(secretName, file string) (*v1.Secret, error) {
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			path.Base(file): fileBytes,
+			filepath.Base(file): fileBytes,
 		},
 	}, nil
 }

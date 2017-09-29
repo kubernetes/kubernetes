@@ -21,7 +21,7 @@ import (
 	"math"
 	"time"
 
-	autoscaling "k8s.io/api/autoscaling/v2alpha1"
+	autoscaling "k8s.io/api/autoscaling/v2beta1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"

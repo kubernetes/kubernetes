@@ -11,11 +11,13 @@ go_library(
     srcs = [
         "cadvisor_unsupported.go",
         "doc.go",
+        "helpers_unsupported.go",
         "types.go",
         "util.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "cadvisor_linux.go",
+            "helpers_linux.go",
         ],
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "cadvisor_windows.go",
@@ -23,11 +25,14 @@ go_library(
         "//conditions:default": [],
     }),
     deps = [
+        "//pkg/api/v1/helper:go_default_library",
+        "//pkg/features:go_default_library",
         "//vendor/github.com/google/cadvisor/events:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//pkg/kubelet/types:go_default_library",
@@ -40,6 +45,9 @@ go_library(
             "//vendor/github.com/google/cadvisor/metrics:go_default_library",
             "//vendor/github.com/google/cadvisor/utils/sysfs:go_default_library",
             "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "//pkg/kubelet/winstats:go_default_library",
         ],
         "//conditions:default": [],
     }),

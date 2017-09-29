@@ -33,9 +33,66 @@ import (
 	cmdtestutil "k8s.io/kubernetes/cmd/kubeadm/test/cmd"
 )
 
-func TestSubCmdCertsCreateFiles(t *testing.T) {
+// phaseTestK8sVersion is a fake kubernetes version to use when testing
+const phaseTestK8sVersion = "v1.8.0"
 
-	subCmds := getCertsSubCommands()
+func TestCertsSubCommandsHasFlags(t *testing.T) {
+
+	subCmds := getCertsSubCommands(phaseTestK8sVersion)
+
+	commonFlags := []string{
+		"cert-dir",
+		"config",
+	}
+
+	var tests = []struct {
+		command         string
+		additionalFlags []string
+	}{
+		{
+			command: "all",
+			additionalFlags: []string{
+				"apiserver-advertise-address",
+				"apiserver-cert-extra-sans",
+				"service-cidr",
+				"service-dns-domain",
+			},
+		},
+		{
+			command: "ca",
+		},
+		{
+			command: "apiserver",
+			additionalFlags: []string{
+				"apiserver-advertise-address",
+				"apiserver-cert-extra-sans",
+				"service-cidr",
+				"service-dns-domain",
+			},
+		},
+		{
+			command: "apiserver-kubelet-client",
+		},
+		{
+			command: "sa",
+		},
+		{
+			command: "front-proxy-ca",
+		},
+		{
+			command: "front-proxy-client",
+		},
+	}
+
+	for _, test := range tests {
+		expectedFlags := append(commonFlags, test.additionalFlags...)
+		cmdtestutil.AssertSubCommandHasFlags(t, subCmds, test.command, expectedFlags...)
+	}
+}
+
+func TestSubCmdCertsCreateFilesWithFlags(t *testing.T) {
+
+	subCmds := getCertsSubCommands(phaseTestK8sVersion)
 
 	var tests = []struct {
 		subCmds       []string
@@ -53,24 +110,12 @@ func TestSubCmdCertsCreateFiles(t *testing.T) {
 			},
 		},
 		{
-			subCmds:       []string{"ca"},
-			expectedFiles: []string{kubeadmconstants.CACertName, kubeadmconstants.CAKeyName},
-		},
-		{
-			subCmds:       []string{"ca", "apiserver"},
-			expectedFiles: []string{kubeadmconstants.CACertName, kubeadmconstants.CAKeyName, kubeadmconstants.APIServerCertName, kubeadmconstants.APIServerKeyName},
-		},
-		{
-			subCmds:       []string{"ca", "apiserver-kubelet-client"},
-			expectedFiles: []string{kubeadmconstants.CACertName, kubeadmconstants.CAKeyName, kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName},
+			subCmds:       []string{"ca", "apiserver", "apiserver-kubelet-client"},
+			expectedFiles: []string{kubeadmconstants.CACertName, kubeadmconstants.CAKeyName, kubeadmconstants.APIServerCertName, kubeadmconstants.APIServerKeyName, kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName},
 		},
 		{
 			subCmds:       []string{"sa"},
 			expectedFiles: []string{kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName},
-		},
-		{
-			subCmds:       []string{"front-proxy-ca"},
-			expectedFiles: []string{kubeadmconstants.FrontProxyCACertName, kubeadmconstants.FrontProxyCAKeyName},
 		},
 		{
 			subCmds:       []string{"front-proxy-ca", "front-proxy-client"},
@@ -94,9 +139,9 @@ func TestSubCmdCertsCreateFiles(t *testing.T) {
 	}
 }
 
-func TestSubCmdApiServerFlags(t *testing.T) {
+func TestSubCmdCertsApiServerForwardsFlags(t *testing.T) {
 
-	subCmds := getCertsSubCommands()
+	subCmds := getCertsSubCommands(phaseTestK8sVersion)
 
 	// Create temp folder for the test case
 	tmpdir := testutil.SetupTempDir(t)
@@ -116,6 +161,7 @@ func TestSubCmdApiServerFlags(t *testing.T) {
 	}
 	cmdtestutil.RunSubCommand(t, subCmds, "apiserver", apiserverFlags...)
 
+	// asserts created cert has values from CLI flags
 	APIserverCert, err := pkiutil.TryLoadCertFromDisk(tmpdir, kubeadmconstants.APIServerCertAndKeyBaseName)
 	if err != nil {
 		t.Fatalf("Error loading API server certificate: %v", err)
@@ -135,29 +181,36 @@ func TestSubCmdApiServerFlags(t *testing.T) {
 	}
 }
 
-func TestSubCmdCertsReadsConfig(t *testing.T) {
+func TestSubCmdCertsCreateFilesWithConfigFile(t *testing.T) {
 
-	subCmds := getCertsSubCommands()
+	subCmds := getCertsSubCommands(phaseTestK8sVersion)
 
 	var tests = []struct {
-		subCmds           []string
-		expectedFileCount int
+		subCmds       []string
+		expectedFiles []string
 	}{
 		{
-			subCmds:           []string{"sa"},
-			expectedFileCount: 2,
+			subCmds: []string{"all"},
+			expectedFiles: []string{
+				kubeadmconstants.CACertName, kubeadmconstants.CAKeyName,
+				kubeadmconstants.APIServerCertName, kubeadmconstants.APIServerKeyName,
+				kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName,
+				kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName,
+				kubeadmconstants.FrontProxyCACertName, kubeadmconstants.FrontProxyCAKeyName,
+				kubeadmconstants.FrontProxyClientCertName, kubeadmconstants.FrontProxyClientKeyName,
+			},
 		},
 		{
-			subCmds:           []string{"front-proxy-ca", "front-proxy-client"},
-			expectedFileCount: 4,
+			subCmds:       []string{"ca", "apiserver", "apiserver-kubelet-client"},
+			expectedFiles: []string{kubeadmconstants.CACertName, kubeadmconstants.CAKeyName, kubeadmconstants.APIServerCertName, kubeadmconstants.APIServerKeyName, kubeadmconstants.APIServerKubeletClientCertName, kubeadmconstants.APIServerKubeletClientKeyName},
 		},
 		{
-			subCmds:           []string{"ca", "apiserver", "apiserver-kubelet-client"},
-			expectedFileCount: 6,
+			subCmds:       []string{"front-proxy-ca", "front-proxy-client"},
+			expectedFiles: []string{kubeadmconstants.FrontProxyCACertName, kubeadmconstants.FrontProxyCAKeyName, kubeadmconstants.FrontProxyClientCertName, kubeadmconstants.FrontProxyClientKeyName},
 		},
 		{
-			subCmds:           []string{"all"},
-			expectedFileCount: 12,
+			subCmds:       []string{"sa"},
+			expectedFiles: []string{kubeadmconstants.ServiceAccountPrivateKeyName, kubeadmconstants.ServiceAccountPublicKeyName},
 		},
 	}
 
@@ -182,6 +235,6 @@ func TestSubCmdCertsReadsConfig(t *testing.T) {
 		}
 
 		// verify expected files are there
-		testutil.AssertFilesCount(t, tmpdir, test.expectedFileCount)
+		testutil.AssertFileExists(t, tmpdir, test.expectedFiles...)
 	}
 }

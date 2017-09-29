@@ -17,7 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -154,32 +153,6 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		return err
 	}
 
-	// Add field label conversions for kinds having selectable nothing but v1.ObjectMeta fields.
-	for _, k := range []string{
-		"Endpoints",
-		"ResourceQuota",
-		"PersistentVolumeClaim",
-		"Service",
-		"ServiceAccount",
-		"ConfigMap",
-	} {
-		kind := k // don't close over range variables
-		err = scheme.AddFieldLabelConversionFunc("v1", kind,
-			func(label, value string) (string, string, error) {
-				switch label {
-				case "metadata.namespace",
-					"metadata.name":
-					return label, value, nil
-				default:
-					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
-				}
-			},
-		)
-		if err != nil {
-			return err
-		}
-	}
-
 	// Add field conversion funcs.
 	err = scheme.AddFieldLabelConversionFunc("v1", "Pod",
 		func(label, value string) (string, string, error) {
@@ -192,6 +165,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				"spec.nodeName",
 				"spec.restartPolicy",
 				"spec.serviceAccountName",
+				"spec.schedulerName",
 				"status.phase",
 				"status.hostIP",
 				"status.podIP":
@@ -233,19 +207,6 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}
 		})
-	if err != nil {
-		return err
-	}
-	err = scheme.AddFieldLabelConversionFunc("v1", "PersistentVolume",
-		func(label, value string) (string, string, error) {
-			switch label {
-			case "metadata.name":
-				return label, value, nil
-			default:
-				return "", "", fmt.Errorf("field label not supported: %s", label)
-			}
-		},
-	)
 	if err != nil {
 		return err
 	}
@@ -368,146 +329,19 @@ func Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *v
 	return nil
 }
 
-func Convert_api_PodStatusResult_To_v1_PodStatusResult(in *api.PodStatusResult, out *v1.PodStatusResult, s conversion.Scope) error {
-	if err := autoConvert_api_PodStatusResult_To_v1_PodStatusResult(in, out, s); err != nil {
-		return err
-	}
-
-	if old := out.Annotations; old != nil {
-		out.Annotations = make(map[string]string, len(old))
-		for k, v := range old {
-			out.Annotations[k] = v
-		}
-	}
-	if len(out.Status.InitContainerStatuses) > 0 {
-		if out.Annotations == nil {
-			out.Annotations = make(map[string]string)
-		}
-		value, err := json.Marshal(out.Status.InitContainerStatuses)
-		if err != nil {
-			return err
-		}
-		out.Annotations[v1.PodInitContainerStatusesAnnotationKey] = string(value)
-		out.Annotations[v1.PodInitContainerStatusesBetaAnnotationKey] = string(value)
-	} else {
-		delete(out.Annotations, v1.PodInitContainerStatusesAnnotationKey)
-		delete(out.Annotations, v1.PodInitContainerStatusesBetaAnnotationKey)
-	}
-	return nil
-}
-
-func Convert_v1_PodStatusResult_To_api_PodStatusResult(in *v1.PodStatusResult, out *api.PodStatusResult, s conversion.Scope) error {
-	// TODO: sometime after we move init container to stable, remove these conversions
-	// If there is a beta annotation, copy to alpha key.
-	// See commit log for PR #31026 for why we do this.
-	if valueBeta, okBeta := in.Annotations[v1.PodInitContainerStatusesBetaAnnotationKey]; okBeta {
-		in.Annotations[v1.PodInitContainerStatusesAnnotationKey] = valueBeta
-	}
-	// Move the annotation to the internal repr. field
-	if value, ok := in.Annotations[v1.PodInitContainerStatusesAnnotationKey]; ok {
-		var values []v1.ContainerStatus
-		if err := json.Unmarshal([]byte(value), &values); err != nil {
-			return err
-		}
-		// Conversion from external to internal version exists more to
-		// satisfy the needs of the decoder than it does to be a general
-		// purpose tool. And Decode always creates an intermediate object
-		// to decode to. Thus the caller of UnsafeConvertToVersion is
-		// taking responsibility to ensure mutation of in is not exposed
-		// back to the caller.
-		in.Status.InitContainerStatuses = values
-	}
-
-	if err := autoConvert_v1_PodStatusResult_To_api_PodStatusResult(in, out, s); err != nil {
-		return err
-	}
-	if len(out.Annotations) > 0 {
-		old := out.Annotations
-		out.Annotations = make(map[string]string, len(old))
-		for k, v := range old {
-			out.Annotations[k] = v
-		}
-		delete(out.Annotations, v1.PodInitContainerStatusesAnnotationKey)
-		delete(out.Annotations, v1.PodInitContainerStatusesBetaAnnotationKey)
-	}
-	return nil
-}
-
 func Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in *api.PodTemplateSpec, out *v1.PodTemplateSpec, s conversion.Scope) error {
 	if err := autoConvert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in, out, s); err != nil {
 		return err
 	}
 
-	// TODO: sometime after we move init container to stable, remove these conversions.
-	if old := out.Annotations; old != nil {
-		out.Annotations = make(map[string]string, len(old))
-		for k, v := range old {
-			out.Annotations[k] = v
-		}
-	}
-	if len(out.Spec.InitContainers) > 0 {
-		if out.Annotations == nil {
-			out.Annotations = make(map[string]string)
-		}
-		value, err := json.Marshal(out.Spec.InitContainers)
-		if err != nil {
-			return err
-		}
-		out.Annotations[v1.PodInitContainersAnnotationKey] = string(value)
-		out.Annotations[v1.PodInitContainersBetaAnnotationKey] = string(value)
-	} else {
-		delete(out.Annotations, v1.PodInitContainersAnnotationKey)
-		delete(out.Annotations, v1.PodInitContainersBetaAnnotationKey)
-	}
 	return nil
 }
 
 func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *v1.PodTemplateSpec, out *api.PodTemplateSpec, s conversion.Scope) error {
-	// TODO: sometime after we move init container to stable, remove these conversions
-	// If there is a beta annotation, copy to alpha key.
-	// See commit log for PR #31026 for why we do this.
-	if valueBeta, okBeta := in.Annotations[v1.PodInitContainersBetaAnnotationKey]; okBeta {
-		in.Annotations[v1.PodInitContainersAnnotationKey] = valueBeta
-	}
-	// Move the annotation to the internal repr. field
-	if value, ok := in.Annotations[v1.PodInitContainersAnnotationKey]; ok {
-		var values []v1.Container
-		if err := json.Unmarshal([]byte(value), &values); err != nil {
-			return err
-		}
-		// Conversion from external to internal version exists more to
-		// satisfy the needs of the decoder than it does to be a general
-		// purpose tool. And Decode always creates an intermediate object
-		// to decode to. Thus the caller of UnsafeConvertToVersion is
-		// taking responsibility to ensure mutation of in is not exposed
-		// back to the caller.
-		in.Spec.InitContainers = values
-
-		// Call defaulters explicitly until annotations are removed
-		tmpPodTemp := &v1.PodTemplate{
-			Template: v1.PodTemplateSpec{
-				Spec: v1.PodSpec{
-					HostNetwork:    in.Spec.HostNetwork,
-					InitContainers: values,
-				},
-			},
-		}
-		SetObjectDefaults_PodTemplate(tmpPodTemp)
-		in.Spec.InitContainers = tmpPodTemp.Template.Spec.InitContainers
-	}
-
 	if err := autoConvert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in, out, s); err != nil {
 		return err
 	}
-	if len(out.Annotations) > 0 {
-		old := out.Annotations
-		out.Annotations = make(map[string]string, len(old))
-		for k, v := range old {
-			out.Annotations[k] = v
-		}
-		delete(out.Annotations, v1.PodInitContainersAnnotationKey)
-		delete(out.Annotations, v1.PodInitContainersBetaAnnotationKey)
-	}
+
 	return nil
 }
 
@@ -560,101 +394,20 @@ func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *v1.Pod, s conversion.Scope) err
 		return err
 	}
 
-	// TODO: sometime after we move init container to stable, remove these conversions
-	if len(out.Spec.InitContainers) > 0 || len(out.Status.InitContainerStatuses) > 0 {
-		old := out.Annotations
-		out.Annotations = make(map[string]string, len(old))
-		for k, v := range old {
-			out.Annotations[k] = v
-		}
-		delete(out.Annotations, v1.PodInitContainersAnnotationKey)
-		delete(out.Annotations, v1.PodInitContainersBetaAnnotationKey)
-		delete(out.Annotations, v1.PodInitContainerStatusesAnnotationKey)
-		delete(out.Annotations, v1.PodInitContainerStatusesBetaAnnotationKey)
-	}
-	if len(out.Spec.InitContainers) > 0 {
-		value, err := json.Marshal(out.Spec.InitContainers)
-		if err != nil {
-			return err
-		}
-		out.Annotations[v1.PodInitContainersAnnotationKey] = string(value)
-		out.Annotations[v1.PodInitContainersBetaAnnotationKey] = string(value)
-	}
-	if len(out.Status.InitContainerStatuses) > 0 {
-		value, err := json.Marshal(out.Status.InitContainerStatuses)
-		if err != nil {
-			return err
-		}
-		out.Annotations[v1.PodInitContainerStatusesAnnotationKey] = string(value)
-		out.Annotations[v1.PodInitContainerStatusesBetaAnnotationKey] = string(value)
-	}
-
-	return nil
-}
-
-func Convert_v1_Pod_To_api_Pod(in *v1.Pod, out *api.Pod, s conversion.Scope) error {
-	// If there is a beta annotation, copy to alpha key.
-	// See commit log for PR #31026 for why we do this.
-	if valueBeta, okBeta := in.Annotations[v1.PodInitContainersBetaAnnotationKey]; okBeta {
-		in.Annotations[v1.PodInitContainersAnnotationKey] = valueBeta
-	}
-	// TODO: sometime after we move init container to stable, remove these conversions
-	// Move the annotation to the internal repr. field
-	if value, ok := in.Annotations[v1.PodInitContainersAnnotationKey]; ok {
-		var values []v1.Container
-		if err := json.Unmarshal([]byte(value), &values); err != nil {
-			return err
-		}
-		// Conversion from external to internal version exists more to
-		// satisfy the needs of the decoder than it does to be a general
-		// purpose tool. And Decode always creates an intermediate object
-		// to decode to. Thus the caller of UnsafeConvertToVersion is
-		// taking responsibility to ensure mutation of in is not exposed
-		// back to the caller.
-		in.Spec.InitContainers = values
-		// Call defaulters explicitly until annotations are removed
-		tmpPod := &v1.Pod{
-			Spec: v1.PodSpec{
-				HostNetwork:    in.Spec.HostNetwork,
-				InitContainers: values,
-			},
-		}
-		SetObjectDefaults_Pod(tmpPod)
-		in.Spec.InitContainers = tmpPod.Spec.InitContainers
-	}
-	// If there is a beta annotation, copy to alpha key.
-	// See commit log for PR #31026 for why we do this.
-	if valueBeta, okBeta := in.Annotations[v1.PodInitContainerStatusesBetaAnnotationKey]; okBeta {
-		in.Annotations[v1.PodInitContainerStatusesAnnotationKey] = valueBeta
-	}
-	if value, ok := in.Annotations[v1.PodInitContainerStatusesAnnotationKey]; ok {
-		var values []v1.ContainerStatus
-		if err := json.Unmarshal([]byte(value), &values); err != nil {
-			return err
-		}
-		// Conversion from external to internal version exists more to
-		// satisfy the needs of the decoder than it does to be a general
-		// purpose tool. And Decode always creates an intermediate object
-		// to decode to. Thus the caller of UnsafeConvertToVersion is
-		// taking responsibility to ensure mutation of in is not exposed
-		// back to the caller.
-		in.Status.InitContainerStatuses = values
-	}
-
-	if err := autoConvert_v1_Pod_To_api_Pod(in, out, s); err != nil {
-		return err
-	}
+	// drop init container annotations so they don't take effect on legacy kubelets.
+	// remove this once the oldest supported kubelet no longer honors the annotations over the field.
 	if len(out.Annotations) > 0 {
 		old := out.Annotations
 		out.Annotations = make(map[string]string, len(old))
 		for k, v := range old {
 			out.Annotations[k] = v
 		}
-		delete(out.Annotations, v1.PodInitContainersAnnotationKey)
-		delete(out.Annotations, v1.PodInitContainersBetaAnnotationKey)
-		delete(out.Annotations, v1.PodInitContainerStatusesAnnotationKey)
-		delete(out.Annotations, v1.PodInitContainerStatusesBetaAnnotationKey)
+		delete(out.Annotations, "pod.beta.kubernetes.io/init-containers")
+		delete(out.Annotations, "pod.alpha.kubernetes.io/init-containers")
+		delete(out.Annotations, "pod.beta.kubernetes.io/init-container-statuses")
+		delete(out.Annotations, "pod.alpha.kubernetes.io/init-container-statuses")
 	}
+
 	return nil
 }
 

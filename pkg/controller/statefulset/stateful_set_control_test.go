@@ -41,11 +41,9 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1beta1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
-	"k8s.io/metrics/pkg/client/clientset_generated/clientset/scheme"
 )
 
 type invariantFunc func(set *apps.StatefulSet, spc *fakeStatefulPodControl) error
@@ -465,14 +463,18 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 			informerFactory.Core().V1().Pods().Informer().HasSynced,
 			informerFactory.Apps().V1beta1().ControllerRevisions().Informer().HasSynced,
 		)
+		test.set.Status.CollisionCount = new(int32)
 		for i := range test.existing {
-			ssc.controllerHistory.CreateControllerRevision(test.set, test.existing[i])
+			ssc.controllerHistory.CreateControllerRevision(test.set, test.existing[i], test.set.Status.CollisionCount)
 		}
 		revisions, err := ssc.ListRevisions(test.set)
 		if err != nil {
 			t.Fatal(err)
 		}
-		current, update, err := ssc.getStatefulSetRevisions(test.set, revisions)
+		current, update, _, err := ssc.getStatefulSetRevisions(test.set, revisions)
+		if err != nil {
+			t.Fatalf("error getting statefulset revisions:%v", err)
+		}
 		revisions, err = ssc.ListRevisions(test.set)
 		if err != nil {
 			t.Fatal(err)
@@ -480,42 +482,41 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		if len(revisions) != test.expectedCount {
 			t.Errorf("%s: want %d revisions got %d", test.name, test.expectedCount, len(revisions))
 		}
-		if test.err && err != nil {
+		if test.err && err == nil {
 			t.Errorf("%s: expected error", test.name)
 		}
 		if !test.err && !history.EqualRevision(current, test.expectedCurrent) {
 			t.Errorf("%s: for current want %v got %v", test.name, test.expectedCurrent, current)
 		}
 		if !test.err && !history.EqualRevision(update, test.expectedUpdate) {
-			t.Errorf("%s: for current want %v got %v", test.name, test.expectedUpdate, update)
+			t.Errorf("%s: for update want %v got %v", test.name, test.expectedUpdate, update)
 		}
 		if !test.err && test.expectedCurrent != nil && current != nil && test.expectedCurrent.Revision != current.Revision {
 			t.Errorf("%s: for current revision want %d got %d", test.name, test.expectedCurrent.Revision, current.Revision)
 		}
 		if !test.err && test.expectedUpdate != nil && update != nil && test.expectedUpdate.Revision != update.Revision {
-			t.Errorf("%s: for current revision want %d got %d", test.name, test.expectedUpdate.Revision, update.Revision)
+			t.Errorf("%s: for update revision want %d got %d", test.name, test.expectedUpdate.Revision, update.Revision)
 		}
 	}
 
 	updateRevision := func(cr *apps.ControllerRevision, revision int64) *apps.ControllerRevision {
-		obj, err := scheme.Scheme.DeepCopy(cr)
-		if err != nil {
-			t.Fatal(err)
-		}
-		clone := obj.(*apps.ControllerRevision)
+		clone := cr.DeepCopy()
 		clone.Revision = revision
 		return clone
 	}
 
 	set := newStatefulSet(3)
+	set.Status.CollisionCount = new(int32)
 	rev0 := newRevisionOrDie(set, 1)
-	set1 := copySet(set)
+	set1 := set.DeepCopy()
 	set1.Spec.Template.Spec.Containers[0].Image = "foo"
 	set1.Status.CurrentRevision = rev0.Name
+	set1.Status.CollisionCount = new(int32)
 	rev1 := newRevisionOrDie(set1, 2)
-	set2 := copySet(set1)
+	set2 := set1.DeepCopy()
 	set2.Spec.Template.Labels["new"] = "label"
 	set2.Status.CurrentRevision = rev0.Name
+	set2.Status.CollisionCount = new(int32)
 	rev2 := newRevisionOrDie(set2, 3)
 	tests := []testcase{
 		{
@@ -1274,7 +1275,7 @@ func TestStatefulSetControlRollback(t *testing.T) {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		history.SortControllerRevisions(revisions)
-		set, err = applyRevision(set, revisions[0])
+		set, err = ApplyRevision(set, revisions[0])
 		if err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
@@ -1542,22 +1543,6 @@ func (spc *fakeStatefulPodControl) SetDeleteStatefulPodError(err error, after in
 	spc.deletePodTracker.after = after
 }
 
-func copyPod(pod *v1.Pod) *v1.Pod {
-	obj, err := api.Scheme.Copy(pod)
-	if err != nil {
-		panic(err)
-	}
-	return obj.(*v1.Pod)
-}
-
-func copySet(set *apps.StatefulSet) *apps.StatefulSet {
-	obj, err := scheme.Scheme.Copy(set)
-	if err != nil {
-		panic(err)
-	}
-	return obj.(*apps.StatefulSet)
-}
-
 func (spc *fakeStatefulPodControl) setPodPending(set *apps.StatefulSet, ordinal int) ([]*v1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
@@ -1571,7 +1556,7 @@ func (spc *fakeStatefulPodControl) setPodPending(set *apps.StatefulSet, ordinal 
 		return nil, fmt.Errorf("ordinal %d out of range [0,%d)", ordinal, len(pods))
 	}
 	sort.Sort(ascendingOrdinal(pods))
-	pod := copyPod(pods[ordinal])
+	pod := pods[ordinal].DeepCopy()
 	pod.Status.Phase = v1.PodPending
 	fakeResourceVersion(pod)
 	spc.podsIndexer.Update(pod)
@@ -1591,7 +1576,7 @@ func (spc *fakeStatefulPodControl) setPodRunning(set *apps.StatefulSet, ordinal 
 		return nil, fmt.Errorf("ordinal %d out of range [0,%d)", ordinal, len(pods))
 	}
 	sort.Sort(ascendingOrdinal(pods))
-	pod := copyPod(pods[ordinal])
+	pod := pods[ordinal].DeepCopy()
 	pod.Status.Phase = v1.PodRunning
 	fakeResourceVersion(pod)
 	spc.podsIndexer.Update(pod)
@@ -1611,7 +1596,7 @@ func (spc *fakeStatefulPodControl) setPodReady(set *apps.StatefulSet, ordinal in
 		return nil, fmt.Errorf("ordinal %d out of range [0,%d)", ordinal, len(pods))
 	}
 	sort.Sort(ascendingOrdinal(pods))
-	pod := copyPod(pods[ordinal])
+	pod := pods[ordinal].DeepCopy()
 	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
 	podutil.UpdatePodCondition(&pod.Status, &condition)
 	fakeResourceVersion(pod)
@@ -2097,7 +2082,7 @@ func updateStatefulSetControl(set *apps.StatefulSet,
 }
 
 func newRevisionOrDie(set *apps.StatefulSet, revision int64) *apps.ControllerRevision {
-	rev, err := newRevision(set, revision)
+	rev, err := newRevision(set, revision, set.Status.CollisionCount)
 	if err != nil {
 		panic(err)
 	}

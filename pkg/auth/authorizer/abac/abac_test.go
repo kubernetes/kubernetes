@@ -19,6 +19,7 @@ package abac
 import (
 	"io/ioutil"
 	"os"
+	"reflect"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -137,6 +138,203 @@ func TestAuthorizeV0(t *testing.T) {
 			t.Logf("tc: %v -> attr %v", tc, attr)
 			t.Errorf("%d: Expected allowed=%v but actually allowed=%v\n\t%v",
 				i, tc.ExpectAllow, authorized, tc)
+		}
+	}
+}
+
+func getResourceRules(infos []authorizer.ResourceRuleInfo) []authorizer.DefaultResourceRuleInfo {
+	rules := make([]authorizer.DefaultResourceRuleInfo, len(infos))
+	for i, info := range infos {
+		rules[i] = authorizer.DefaultResourceRuleInfo{
+			Verbs:         info.GetVerbs(),
+			APIGroups:     info.GetAPIGroups(),
+			Resources:     info.GetResources(),
+			ResourceNames: info.GetResourceNames(),
+		}
+	}
+	return rules
+}
+
+func getNonResourceRules(infos []authorizer.NonResourceRuleInfo) []authorizer.DefaultNonResourceRuleInfo {
+	rules := make([]authorizer.DefaultNonResourceRuleInfo, len(infos))
+	for i, info := range infos {
+		rules[i] = authorizer.DefaultNonResourceRuleInfo{
+			Verbs:           info.GetVerbs(),
+			NonResourceURLs: info.GetNonResourceURLs(),
+		}
+	}
+	return rules
+}
+
+func TestRulesFor(t *testing.T) {
+	a, err := newWithContents(t, `
+{                    "readonly": true, "resource": "events"   }
+{"user":"scheduler", "readonly": true, "resource": "pods"     }
+{"user":"scheduler",                   "resource": "bindings" }
+{"user":"kubelet",   "readonly": true, "resource": "pods"     }
+{"user":"kubelet",                     "resource": "events"   }
+{"user":"alice",                                              "namespace": "projectCaribou"}
+{"user":"bob",       "readonly": true,                        "namespace": "projectCaribou"}
+{"user":"bob",       "readonly": true,                                                     "nonResourcePath": "*"}
+{"group":"a",                          "resource": "bindings" }
+{"group":"b",        "readonly": true,                                                     "nonResourcePath": "*"}
+`)
+	if err != nil {
+		t.Fatalf("unable to read policy file: %v", err)
+	}
+
+	authenticatedGroup := []string{user.AllAuthenticated}
+
+	uScheduler := user.DefaultInfo{Name: "scheduler", UID: "uid1", Groups: authenticatedGroup}
+	uKubelet := user.DefaultInfo{Name: "kubelet", UID: "uid2", Groups: []string{"a", "b"}}
+	uAlice := user.DefaultInfo{Name: "alice", UID: "uid3", Groups: authenticatedGroup}
+	uBob := user.DefaultInfo{Name: "bob", UID: "uid4", Groups: authenticatedGroup}
+	uChuck := user.DefaultInfo{Name: "chuck", UID: "uid5", Groups: []string{"a", "b"}}
+
+	testCases := []struct {
+		User                   user.DefaultInfo
+		Namespace              string
+		ExpectResourceRules    []authorizer.DefaultResourceRuleInfo
+		ExpectNonResourceRules []authorizer.DefaultNonResourceRuleInfo
+	}{
+		{
+			User:      uScheduler,
+			Namespace: "ns1",
+			ExpectResourceRules: []authorizer.DefaultResourceRuleInfo{
+				{
+					Verbs:     []string{"get", "list", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"events"},
+				},
+				{
+					Verbs:     []string{"get", "list", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"pods"},
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"*"},
+					Resources: []string{"bindings"},
+				},
+			},
+			ExpectNonResourceRules: []authorizer.DefaultNonResourceRuleInfo{},
+		},
+		{
+			User:      uKubelet,
+			Namespace: "ns1",
+			ExpectResourceRules: []authorizer.DefaultResourceRuleInfo{
+				{
+					Verbs:     []string{"get", "list", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"pods"},
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"*"},
+					Resources: []string{"events"},
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"*"},
+					Resources: []string{"bindings"},
+				},
+				{
+					Verbs:     []string{"get", "list", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"*"},
+				},
+			},
+			ExpectNonResourceRules: []authorizer.DefaultNonResourceRuleInfo{
+				{
+					Verbs:           []string{"get", "list", "watch"},
+					NonResourceURLs: []string{"*"},
+				},
+			},
+		},
+		{
+			User:      uAlice,
+			Namespace: "projectCaribou",
+			ExpectResourceRules: []authorizer.DefaultResourceRuleInfo{
+				{
+					Verbs:     []string{"get", "list", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"events"},
+				},
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"*"},
+					Resources: []string{"*"},
+				},
+			},
+			ExpectNonResourceRules: []authorizer.DefaultNonResourceRuleInfo{},
+		},
+		{
+			User:      uBob,
+			Namespace: "projectCaribou",
+			ExpectResourceRules: []authorizer.DefaultResourceRuleInfo{
+				{
+					Verbs:     []string{"get", "list", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"events"},
+				},
+				{
+					Verbs:     []string{"get", "list", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"*"},
+				},
+				{
+					Verbs:     []string{"get", "list", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"*"},
+				},
+			},
+			ExpectNonResourceRules: []authorizer.DefaultNonResourceRuleInfo{
+				{
+					Verbs:           []string{"get", "list", "watch"},
+					NonResourceURLs: []string{"*"},
+				},
+			},
+		},
+		{
+			User:      uChuck,
+			Namespace: "ns1",
+			ExpectResourceRules: []authorizer.DefaultResourceRuleInfo{
+				{
+					Verbs:     []string{"*"},
+					APIGroups: []string{"*"},
+					Resources: []string{"bindings"},
+				},
+				{
+					Verbs:     []string{"get", "list", "watch"},
+					APIGroups: []string{"*"},
+					Resources: []string{"*"},
+				},
+			},
+			ExpectNonResourceRules: []authorizer.DefaultNonResourceRuleInfo{
+				{
+					Verbs:           []string{"get", "list", "watch"},
+					NonResourceURLs: []string{"*"},
+				},
+			},
+		},
+	}
+	for i, tc := range testCases {
+		attr := authorizer.AttributesRecord{
+			User:      &tc.User,
+			Namespace: tc.Namespace,
+		}
+		resourceRules, nonResourceRules, _, _ := a.RulesFor(attr.GetUser(), attr.GetNamespace())
+		actualResourceRules := getResourceRules(resourceRules)
+		if !reflect.DeepEqual(tc.ExpectResourceRules, actualResourceRules) {
+			t.Logf("tc: %v -> attr %v", tc, attr)
+			t.Errorf("%d: Expected: \n%#v\n but actual: \n%#v\n",
+				i, tc.ExpectResourceRules, actualResourceRules)
+		}
+		actualNonResourceRules := getNonResourceRules(nonResourceRules)
+		if !reflect.DeepEqual(tc.ExpectNonResourceRules, actualNonResourceRules) {
+			t.Logf("tc: %v -> attr %v", tc, attr)
+			t.Errorf("%d: Expected: \n%#v\n but actual: \n%#v\n",
+				i, tc.ExpectNonResourceRules, actualNonResourceRules)
 		}
 	}
 }
@@ -609,7 +807,7 @@ func TestSubjectMatches(t *testing.T) {
 		attr := authorizer.AttributesRecord{
 			User: &tc.User,
 		}
-		actualMatch := subjectMatches(*policy, attr)
+		actualMatch := subjectMatches(*policy, attr.GetUser())
 		if tc.ExpectMatch != actualMatch {
 			t.Errorf("%v: Expected actorMatches=%v but actually got=%v",
 				k, tc.ExpectMatch, actualMatch)
@@ -617,7 +815,7 @@ func TestSubjectMatches(t *testing.T) {
 	}
 }
 
-func newWithContents(t *testing.T, contents string) (authorizer.Authorizer, error) {
+func newWithContents(t *testing.T, contents string) (policyList, error) {
 	f, err := ioutil.TempFile("", "abac_test")
 	if err != nil {
 		t.Fatalf("unexpected error creating policyfile: %v", err)

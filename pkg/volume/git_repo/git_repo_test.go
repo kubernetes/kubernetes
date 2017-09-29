@@ -47,7 +47,7 @@ func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	tempDir, host := newTestHost(t)
 	defer os.RemoveAll(tempDir)
-	plugMgr.InitPlugins(ProbeVolumePlugins(), host)
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/git-repo")
 	if err != nil {
@@ -225,7 +225,7 @@ func doTestPlugin(scenario struct {
 	plugMgr := volume.VolumePluginMgr{}
 	rootDir, host := newTestHost(t)
 	defer os.RemoveAll(rootDir)
-	plugMgr.InitPlugins(ProbeVolumePlugins(), host)
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/git-repo")
 	if err != nil {

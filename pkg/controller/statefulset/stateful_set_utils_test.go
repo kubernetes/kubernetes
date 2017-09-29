@@ -78,16 +78,6 @@ func TestIdentityMatches(t *testing.T) {
 	if identityMatches(set, pod) {
 		t.Error("identity matches for a Pod with the wrong namespace")
 	}
-	pod = newStatefulSetPod(set, 1)
-	pod.Spec.Hostname = ""
-	if identityMatches(set, pod) {
-		t.Error("identity matches for a Pod with no hostname")
-	}
-	pod = newStatefulSetPod(set, 1)
-	pod.Spec.Subdomain = ""
-	if identityMatches(set, pod) {
-		t.Error("identity matches for a Pod with no subdomain")
-	}
 }
 
 func TestStorageMatches(t *testing.T) {
@@ -136,24 +126,6 @@ func TestUpdateIdentity(t *testing.T) {
 	updateIdentity(set, pod)
 	if !identityMatches(set, pod) {
 		t.Error("updateIdentity failed to update the Pods namespace")
-	}
-	pod = newStatefulSetPod(set, 1)
-	pod.Spec.Hostname = ""
-	if identityMatches(set, pod) {
-		t.Error("identity matches for a Pod with no hostname")
-	}
-	updateIdentity(set, pod)
-	if !identityMatches(set, pod) {
-		t.Error("updateIdentity failed to update the Pod's hostname")
-	}
-	pod = newStatefulSetPod(set, 1)
-	pod.Spec.Subdomain = ""
-	if identityMatches(set, pod) {
-		t.Error("identity matches for a Pod with no subdomain")
-	}
-	updateIdentity(set, pod)
-	if !identityMatches(set, pod) {
-		t.Error("updateIdentity failed to update the Pod's subdomain")
 	}
 }
 
@@ -274,7 +246,8 @@ func TestNewPodControllerRef(t *testing.T) {
 
 func TestCreateApplyRevision(t *testing.T) {
 	set := newStatefulSet(1)
-	revision, err := newRevision(set, 1)
+	set.Status.CollisionCount = new(int32)
+	revision, err := newRevision(set, 1, set.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,11 +258,11 @@ func TestCreateApplyRevision(t *testing.T) {
 	key := "foo"
 	expectedValue := "bar"
 	set.Annotations[key] = expectedValue
-	restoredSet, err := applyRevision(set, revision)
+	restoredSet, err := ApplyRevision(set, revision)
 	if err != nil {
 		t.Fatal(err)
 	}
-	restoredRevision, err := newRevision(restoredSet, 2)
+	restoredRevision, err := newRevision(restoredSet, 2, restoredSet.Status.CollisionCount)
 	if err != nil {
 		t.Fatal(err)
 	}

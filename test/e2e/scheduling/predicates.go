@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -39,7 +39,8 @@ import (
 )
 
 const maxNumberOfPods int64 = 10
-const minPodCPURequest int64 = 500
+
+var localStorageVersion = utilversion.MustParseSemantic("v1.8.0-beta.0")
 
 // variable set in BeforeEach, never modified afterwards
 var masterNodes sets.String
@@ -53,6 +54,7 @@ type pausePodConfig struct {
 	NodeName                          string
 	Ports                             []v1.ContainerPort
 	OwnerReferences                   []metav1.OwnerReference
+	PriorityClassName                 string
 }
 
 var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
@@ -120,7 +122,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 		for _, node := range nodeList.Items {
 			framework.Logf("Node: %v", node)
-			podCapacity, found := node.Status.Capacity["pods"]
+			podCapacity, found := node.Status.Capacity[v1.ResourcePods]
 			Expect(found).To(Equal(true))
 			totalPodCapacity += podCapacity.Value()
 		}
@@ -149,15 +151,18 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		verifyResult(cs, podsNeededForSaturation, 1, ns)
 	})
 
-	// This test verifies we don't allow scheduling of pods in a way that sum of limits of pods is greater than machines capacity.
+	// This test verifies we don't allow scheduling of pods in a way that sum of local ephemeral storage limits of pods is greater than machines capacity.
 	// It assumes that cluster add-on pods stay stable and cannot be run in parallel with any other test that touches Nodes or Pods.
 	// It is so because we need to have precise control on what's running in the cluster.
-	It("validates resource limits of pods that are allowed to run [Conformance]", func() {
+	It("validates local ephemeral storage resource limits of pods that are allowed to run [Feature:LocalStorageCapacityIsolation]", func() {
+
+		framework.SkipUnlessServerVersionGTE(localStorageVersion, f.ClientSet.Discovery())
+
 		nodeMaxAllocatable := int64(0)
 
 		nodeToAllocatableMap := make(map[string]int64)
 		for _, node := range nodeList.Items {
-			allocatable, found := node.Status.Allocatable["cpu"]
+			allocatable, found := node.Status.Allocatable[v1.ResourceEphemeralStorage]
 			Expect(found).To(Equal(true))
 			nodeToAllocatableMap[node.Name] = allocatable.MilliValue()
 			if nodeMaxAllocatable < allocatable.MilliValue() {
@@ -171,24 +176,22 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		for _, pod := range pods.Items {
 			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
 			if found && pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
-				framework.Logf("Pod %v requesting resource cpu=%vm on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
-				nodeToAllocatableMap[pod.Spec.NodeName] -= getRequestedCPU(pod)
+				framework.Logf("Pod %v requesting local ephemeral resource =%vm on Node %v", pod.Name, getRequestedStorageEphemeralStorage(pod), pod.Spec.NodeName)
+				nodeToAllocatableMap[pod.Spec.NodeName] -= getRequestedStorageEphemeralStorage(pod)
 			}
 		}
 
 		var podsNeededForSaturation int
 
-		milliCpuPerPod := nodeMaxAllocatable / maxNumberOfPods
-		if milliCpuPerPod < minPodCPURequest {
-			milliCpuPerPod = minPodCPURequest
-		}
-		framework.Logf("Using pod capacity: %vm", milliCpuPerPod)
+		milliEphemeralStoragePerPod := nodeMaxAllocatable / maxNumberOfPods
+
+		framework.Logf("Using pod capacity: %vm", milliEphemeralStoragePerPod)
 		for name, leftAllocatable := range nodeToAllocatableMap {
-			framework.Logf("Node: %v has cpu allocatable: %vm", name, leftAllocatable)
-			podsNeededForSaturation += (int)(leftAllocatable / milliCpuPerPod)
+			framework.Logf("Node: %v has local ephemeral resource allocatable: %vm", name, leftAllocatable)
+			podsNeededForSaturation += (int)(leftAllocatable / milliEphemeralStoragePerPod)
 		}
 
-		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster CPU and trying to start another one", podsNeededForSaturation))
+		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster local ephemeral resource and trying to start another one", podsNeededForSaturation))
 
 		// As the pods are distributed randomly among nodes,
 		// it can easily happen that all nodes are saturated
@@ -201,10 +204,10 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 					Labels: map[string]string{"name": ""},
 					Resources: &v1.ResourceRequirements{
 						Limits: v1.ResourceList{
-							"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+							v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(milliEphemeralStoragePerPod, "DecimalSI"),
 						},
 						Requests: v1.ResourceList{
-							"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+							v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(milliEphemeralStoragePerPod, "DecimalSI"),
 						},
 					},
 				}), true, framework.Logf))
@@ -215,12 +218,122 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 			Labels: map[string]string{"name": "additional"},
 			Resources: &v1.ResourceRequirements{
 				Limits: v1.ResourceList{
-					"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+					v1.ResourceEphemeralStorage: *resource.NewMilliQuantity(milliEphemeralStoragePerPod, "DecimalSI"),
 				},
 			},
 		}
 		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), podName, false)
 		verifyResult(cs, podsNeededForSaturation, 1, ns)
+	})
+
+	// This test verifies we don't allow scheduling of pods in a way that sum of
+	// limits of pods is greater than machines capacity.
+	// It assumes that cluster add-on pods stay stable and cannot be run in parallel
+	// with any other test that touches Nodes or Pods.
+	// It is so because we need to have precise control on what's running in the cluster.
+	// Test scenario:
+	// 1. Find the amount CPU resources on each node.
+	// 2. Create one pod with affinity to each node that uses 70% of the node CPU.
+	// 3. Wait for the pods to be scheduled.
+	// 4. Create another pod with no affinity to any node that need 50% of the largest node CPU.
+	// 5. Make sure this additional pod is not scheduled.
+	It("validates resource limits of pods that are allowed to run [Conformance]", func() {
+		framework.WaitForStableCluster(cs, masterNodes)
+		nodeMaxAllocatable := int64(0)
+		nodeToAllocatableMap := make(map[string]int64)
+		for _, node := range nodeList.Items {
+			nodeReady := false
+			for _, condition := range node.Status.Conditions {
+				if condition.Type == v1.NodeReady && condition.Status == v1.ConditionTrue {
+					nodeReady = true
+					break
+				}
+			}
+			if !nodeReady {
+				continue
+			}
+			// Apply node label to each node
+			framework.AddOrUpdateLabelOnNode(cs, node.Name, "node", node.Name)
+			framework.ExpectNodeHasLabel(cs, node.Name, "node", node.Name)
+			// Find allocatable amount of CPU.
+			allocatable, found := node.Status.Allocatable[v1.ResourceCPU]
+			Expect(found).To(Equal(true))
+			nodeToAllocatableMap[node.Name] = allocatable.MilliValue()
+			if nodeMaxAllocatable < allocatable.MilliValue() {
+				nodeMaxAllocatable = allocatable.MilliValue()
+			}
+		}
+		// Clean up added labels after this test.
+		defer func() {
+			for nodeName := range nodeToAllocatableMap {
+				framework.RemoveLabelOffNode(cs, nodeName, "node")
+			}
+		}()
+
+		pods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		for _, pod := range pods.Items {
+			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
+			if found && pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
+				framework.Logf("Pod %v requesting resource cpu=%vm on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
+				nodeToAllocatableMap[pod.Spec.NodeName] -= getRequestedCPU(pod)
+			}
+		}
+
+		By("Starting Pods to consume most of the cluster CPU.")
+		// Create one pod per node that requires 70% of the node remaining CPU.
+		fillerPods := []*v1.Pod{}
+		for nodeName, cpu := range nodeToAllocatableMap {
+			requestedCPU := cpu * 7 / 10
+			fillerPods = append(fillerPods, createPausePod(f, pausePodConfig{
+				Name: "filler-pod-" + nodeName,
+				Resources: &v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(requestedCPU, "DecimalSI"),
+					},
+					Requests: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(requestedCPU, "DecimalSI"),
+					},
+				},
+				Affinity: &v1.Affinity{
+					NodeAffinity: &v1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+							NodeSelectorTerms: []v1.NodeSelectorTerm{
+								{
+									MatchExpressions: []v1.NodeSelectorRequirement{
+										{
+											Key:      "node",
+											Operator: v1.NodeSelectorOpIn,
+											Values:   []string{nodeName},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			}))
+		}
+		// Wait for filler pods to schedule.
+		for _, pod := range fillerPods {
+			framework.ExpectNoError(framework.WaitForPodRunningInNamespace(cs, pod))
+		}
+		By("Creating another pod that requires unavailable amount of CPU.")
+		// Create another pod that requires 50% of the largest node CPU resources.
+		// This pod should remain pending as at least 70% of CPU of other nodes in
+		// the cluster are already consumed.
+		podName := "additional-pod"
+		conf := pausePodConfig{
+			Name:   podName,
+			Labels: map[string]string{"name": "additional"},
+			Resources: &v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU: *resource.NewMilliQuantity(nodeMaxAllocatable*5/10, "DecimalSI"),
+				},
+			},
+		}
+		WaitForSchedulerAfterAction(f, createPausePodAction(f, conf), podName, false)
+		verifyResult(cs, len(fillerPods), 1, ns)
 	})
 
 	// Test Nodes does not have any label, hence it should be impossible to schedule Pod with
@@ -484,8 +597,9 @@ func initPausePod(f *framework.Framework, conf pausePodConfig) *v1.Pod {
 					Ports: conf.Ports,
 				},
 			},
-			Tolerations: conf.Tolerations,
-			NodeName:    conf.NodeName,
+			Tolerations:       conf.Tolerations,
+			NodeName:          conf.NodeName,
+			PriorityClassName: conf.PriorityClassName,
 		},
 	}
 	if conf.Resources != nil {
@@ -522,101 +636,18 @@ func runPodAndGetNodeName(f *framework.Framework, conf pausePodConfig) string {
 	return pod.Spec.NodeName
 }
 
-func createPodWithNodeAffinity(f *framework.Framework) *v1.Pod {
-	return createPausePod(f, pausePodConfig{
-		Name: "with-nodeaffinity-" + string(uuid.NewUUID()),
-		Affinity: &v1.Affinity{
-			NodeAffinity: &v1.NodeAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-					NodeSelectorTerms: []v1.NodeSelectorTerm{
-						{
-							MatchExpressions: []v1.NodeSelectorRequirement{
-								{
-									Key:      "kubernetes.io/e2e-az-name",
-									Operator: v1.NodeSelectorOpIn,
-									Values:   []string{"e2e-az1", "e2e-az2"},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	})
-}
-
-func createPodWithPodAffinity(f *framework.Framework, topologyKey string) *v1.Pod {
-	return createPausePod(f, pausePodConfig{
-		Name: "with-podantiaffinity-" + string(uuid.NewUUID()),
-		Affinity: &v1.Affinity{
-			PodAffinity: &v1.PodAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
-								{
-									Key:      "security",
-									Operator: metav1.LabelSelectorOpIn,
-									Values:   []string{"S1"},
-								},
-							},
-						},
-						TopologyKey: topologyKey,
-					},
-				},
-			},
-			PodAntiAffinity: &v1.PodAntiAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
-								{
-									Key:      "security",
-									Operator: metav1.LabelSelectorOpIn,
-									Values:   []string{"S2"},
-								},
-							},
-						},
-						TopologyKey: topologyKey,
-					},
-				},
-			},
-		},
-	})
-}
-
-// Returns a number of currently scheduled and not scheduled Pods.
-func getPodsScheduled(pods *v1.PodList) (scheduledPods, notScheduledPods []v1.Pod) {
-	for _, pod := range pods.Items {
-		if !masterNodes.Has(pod.Spec.NodeName) {
-			if pod.Spec.NodeName != "" {
-				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				// We can't assume that the scheduledCondition is always set if Pod is assigned to Node,
-				// as e.g. DaemonController doesn't set it when assigning Pod to a Node. Currently
-				// Kubelet sets this condition when it gets a Pod without it, but if we were expecting
-				// that it would always be not nil, this would cause a rare race condition.
-				if scheduledCondition != nil {
-					Expect(scheduledCondition.Status).To(Equal(v1.ConditionTrue))
-				}
-				scheduledPods = append(scheduledPods, pod)
-			} else {
-				_, scheduledCondition := podutil.GetPodCondition(&pod.Status, v1.PodScheduled)
-				if scheduledCondition != nil {
-					Expect(scheduledCondition.Status).To(Equal(v1.ConditionFalse))
-				}
-				if scheduledCondition.Reason == "Unschedulable" {
-					notScheduledPods = append(notScheduledPods, pod)
-				}
-			}
-		}
-	}
-	return
-}
-
 func getRequestedCPU(pod v1.Pod) int64 {
 	var result int64
 	for _, container := range pod.Spec.Containers {
 		result += container.Resources.Requests.Cpu().MilliValue()
+	}
+	return result
+}
+
+func getRequestedStorageEphemeralStorage(pod v1.Pod) int64 {
+	var result int64
+	for _, container := range pod.Spec.Containers {
+		result += container.Resources.Requests.StorageEphemeral().MilliValue()
 	}
 	return result
 }

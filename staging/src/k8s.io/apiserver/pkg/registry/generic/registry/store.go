@@ -175,10 +175,6 @@ type Store struct {
 	Storage storage.Interface
 	// Called to cleanup clients used by the underlying Storage; optional.
 	DestroyFunc func()
-	// Maximum size of the watch history cached in memory, in number of entries.
-	// This value is ignored if Storage is non-nil. Nil is replaced with a default value.
-	// A zero integer will disable caching.
-	WatchCacheSize *int
 }
 
 // Note: the rest.StandardStorage interface aggregates the common REST verbs
@@ -293,6 +289,8 @@ func (e *Store) ListPredicate(ctx genericapirequest.Context, p storage.Selection
 		options = &metainternalversion.ListOptions{ResourceVersion: ""}
 	}
 	p.IncludeUninitialized = options.IncludeUninitialized
+	p.Limit = options.Limit
+	p.Continue = options.Continue
 	list := e.NewListFunc()
 	qualifiedResource := e.qualifiedResourceFromContext(ctx)
 	if name, ok := p.MatchesSingle(); ok {
@@ -442,12 +440,8 @@ func (e *Store) WaitForInitialized(ctx genericapirequest.Context, obj runtime.Ob
 
 // shouldDeleteDuringUpdate checks if a Update is removing all the object's
 // finalizers. If so, it further checks if the object's
-// DeletionGracePeriodSeconds is 0. If so, it returns true. If garbage collection
-// is disabled it always returns false.
+// DeletionGracePeriodSeconds is 0.
 func (e *Store) shouldDeleteDuringUpdate(ctx genericapirequest.Context, key string, obj, existing runtime.Object) bool {
-	if !e.EnableGarbageCollection {
-		return false
-	}
 	newMeta, err := meta.Accessor(obj)
 	if err != nil {
 		utilruntime.HandleError(err)
@@ -765,9 +759,18 @@ func shouldDeleteDependents(e *Store, accessor metav1.Object, options *metav1.De
 	return false
 }
 
-// deletionFinalizers returns the deletion finalizers we should set on the object and a bool indicate they did or
-// did not change.
-func deletionFinalizers(e *Store, accessor metav1.Object, options *metav1.DeleteOptions) (bool, []string) {
+// deletionFinalizersForGarbageCollection analyzes the object and delete options
+// to determine whether the object is in need of finalization by the garbage
+// collector. If so, returns the set of deletion finalizers to apply and a bool
+// indicating whether the finalizer list has changed and is in need of updating.
+//
+// The finalizers returned are intended to be handled by the garbage collector.
+// If garbage collection is disabled for the store, this function returns false
+// to ensure finalizers aren't set which will never be cleared.
+func deletionFinalizersForGarbageCollection(e *Store, accessor metav1.Object, options *metav1.DeleteOptions) (bool, []string) {
+	if !e.EnableGarbageCollection {
+		return false, []string{}
+	}
 	shouldOrphan := shouldOrphanDependents(e, accessor, options)
 	shouldDeleteDependentInForeground := shouldDeleteDependents(e, accessor, options)
 	newFinalizers := []string{}
@@ -816,72 +819,6 @@ func markAsDeleting(obj runtime.Object) (err error) {
 	return nil
 }
 
-// updateForGracefulDeletion and updateForGracefulDeletionAndFinalizers both
-// implement deletion flows for graceful deletion.  Graceful deletion is
-// implemented as setting the deletion timestamp in an update.  If the
-// implementation of graceful deletion is changed, both of these methods
-// should be changed together.
-
-// updateForGracefulDeletion updates the given object for graceful deletion by
-// setting the deletion timestamp and grace period seconds and returns:
-//
-// 1. an error
-// 2. a boolean indicating that the object was not found, but it should be
-//    ignored
-// 3. a boolean indicating that the object's grace period is exhausted and it
-//    should be deleted immediately
-// 4. a new output object with the state that was updated
-// 5. a copy of the last existing state of the object
-func (e *Store) updateForGracefulDeletion(ctx genericapirequest.Context, name, key string, options *metav1.DeleteOptions, preconditions storage.Preconditions, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
-	lastGraceful := int64(0)
-	out = e.NewFunc()
-	err = e.Storage.GuaranteedUpdate(
-		ctx,
-		key,
-		out,
-		false, /* ignoreNotFound */
-		&preconditions,
-		storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
-			graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options)
-			if err != nil {
-				return nil, err
-			}
-			if pendingGraceful {
-				return nil, errAlreadyDeleting
-			}
-			if !graceful {
-				return nil, errDeleteNow
-			}
-			lastGraceful = *options.GracePeriodSeconds
-			lastExisting = existing
-			return existing, nil
-		}),
-	)
-	switch err {
-	case nil:
-		if lastGraceful > 0 {
-			return nil, false, false, out, lastExisting
-		}
-		// If we are here, the registry supports grace period mechanism and
-		// we are intentionally delete gracelessly. In this case, we may
-		// enter a race with other k8s components. If other component wins
-		// the race, the object will not be found, and we should tolerate
-		// the NotFound error. See
-		// https://github.com/kubernetes/kubernetes/issues/19403 for
-		// details.
-		return nil, true, true, out, lastExisting
-	case errDeleteNow:
-		// we've updated the object to have a zero grace period, or it's already at 0, so
-		// we should fall through and truly delete the object.
-		return nil, false, true, out, lastExisting
-	case errAlreadyDeleting:
-		out, err = e.finalizeDelete(ctx, in, true)
-		return err, false, false, out, lastExisting
-	default:
-		return storeerr.InterpretUpdateError(err, e.qualifiedResourceFromContext(ctx), name), false, false, out, lastExisting
-	}
-}
-
 // updateForGracefulDeletionAndFinalizers updates the given object for
 // graceful deletion and finalization by setting the deletion timestamp and
 // grace period seconds (graceful deletion) and updating the list of
@@ -921,7 +858,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx genericapirequest.Con
 			if err != nil {
 				return nil, err
 			}
-			needsUpdate, newFinalizers := deletionFinalizers(e, existingAccessor, options)
+			needsUpdate, newFinalizers := deletionFinalizersForGarbageCollection(e, existingAccessor, options)
 			if needsUpdate {
 				existingAccessor.SetFinalizers(newFinalizers)
 			}
@@ -1013,18 +950,12 @@ func (e *Store) Delete(ctx genericapirequest.Context, name string, options *meta
 
 	// Handle combinations of graceful deletion and finalization by issuing
 	// the correct updates.
-	if e.EnableGarbageCollection {
-		shouldUpdateFinalizers, _ := deletionFinalizers(e, accessor, options)
-		// TODO: remove the check, because we support no-op updates now.
-		if graceful || pendingFinalizers || shouldUpdateFinalizers {
-			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletionAndFinalizers(ctx, name, key, options, preconditions, obj)
-		}
-	} else {
-		// TODO: remove the check on graceful, because we support no-op updates now.
-		if graceful {
-			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletion(ctx, name, key, options, preconditions, obj)
-		}
+	shouldUpdateFinalizers, _ := deletionFinalizersForGarbageCollection(e, accessor, options)
+	// TODO: remove the check, because we support no-op updates now.
+	if graceful || pendingFinalizers || shouldUpdateFinalizers {
+		err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletionAndFinalizers(ctx, name, key, options, preconditions, obj)
 	}
+
 	// !deleteImmediately covers all cases where err != nil. We keep both to be future-proof.
 	if !deleteImmediately || err != nil {
 		return out, false, err
@@ -1402,7 +1333,6 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		e.Storage, e.DestroyFunc = opts.Decorator(
 			e.Copier,
 			opts.StorageConfig,
-			e.WatchCacheSize,
 			e.NewFunc(),
 			prefix,
 			keyFunc,

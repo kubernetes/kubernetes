@@ -23,6 +23,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	// This dependency is needed to register API types.
+	_ "k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
@@ -41,8 +43,30 @@ var _ = Describe("resource validation using OpenAPI Schema", func() {
 		Expect(validator).ToNot(BeNil())
 	})
 
+	It("finds Deployment in Schema and validates it", func() {
+		err := validator.ValidateBytes([]byte(`
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    name: redis-master
+  name: name
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - image: redis
+        name: redis
+`))
+		Expect(err).To(BeNil())
+	})
+
 	It("validates a valid pod", func() {
-		err := validator.Validate([]byte(`
+		err := validator.ValidateBytes([]byte(`
 apiVersion: v1
 kind: Pod
 metadata:
@@ -64,7 +88,7 @@ spec:
 	})
 
 	It("finds invalid command (string instead of []string) in Json Pod", func() {
-		err := validator.Validate([]byte(`
+		err := validator.ValidateBytes([]byte(`
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -98,7 +122,7 @@ spec:
 	})
 
 	It("fails because hostPort is string instead of int", func() {
-		err := validator.Validate([]byte(`
+		err := validator.ValidateBytes([]byte(`
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -150,7 +174,7 @@ spec:
 	})
 
 	It("fails because volume is not an array of object", func() {
-		err := validator.Validate([]byte(`
+		err := validator.ValidateBytes([]byte(`
 {
   "kind": "Pod",
   "apiVersion": "v1",
@@ -191,7 +215,7 @@ spec:
 	})
 
 	It("fails because some string lists have empty strings", func() {
-		err := validator.Validate([]byte(`
+		err := validator.ValidateBytes([]byte(`
 apiVersion: v1
 kind: Pod
 metadata:
@@ -209,14 +233,106 @@ spec:
 `))
 
 		Expect(err).To(Equal(utilerrors.NewAggregate([]error{
-			validation.InvalidObjectTypeError{
-				Path: "Pod.spec.containers[0].args[0]",
-				Type: "nil",
+			validation.ValidationError{
+				Path: "Pod.spec.containers[0].args",
+				Err: validation.InvalidObjectTypeError{
+					Path: "Pod.spec.containers[0].args[0]",
+					Type: "nil",
+				},
 			},
-			validation.InvalidObjectTypeError{
-				Path: "Pod.spec.containers[0].command[0]",
-				Type: "nil",
+			validation.ValidationError{
+				Path: "Pod.spec.containers[0].command",
+				Err: validation.InvalidObjectTypeError{
+					Path: "Pod.spec.containers[0].command[0]",
+					Type: "nil",
+				},
 			},
 		})))
+	})
+
+	It("fails if required fields are missing", func() {
+		err := validator.ValidateBytes([]byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    name: redis-master
+  name: name
+spec:
+  containers:
+  - command: ["my", "command"]
+`))
+
+		Expect(err).To(Equal(utilerrors.NewAggregate([]error{
+			validation.ValidationError{
+				Path: "Pod.spec.containers[0]",
+				Err: validation.MissingRequiredFieldError{
+					Path:  "io.k8s.api.core.v1.Container",
+					Field: "name",
+				},
+			},
+		})))
+	})
+
+	It("fails if required fields are empty", func() {
+		err := validator.ValidateBytes([]byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    name: redis-master
+  name: name
+spec:
+  containers:
+  - image:
+    name:
+`))
+
+		Expect(err).To(Equal(utilerrors.NewAggregate([]error{
+			validation.ValidationError{
+				Path: "Pod.spec.containers[0]",
+				Err: validation.MissingRequiredFieldError{
+					Path:  "io.k8s.api.core.v1.Container",
+					Field: "name",
+				},
+			},
+		})))
+	})
+
+	It("is fine with empty non-mandatory fields", func() {
+		err := validator.ValidateBytes([]byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    name: redis-master
+  name: name
+spec:
+  containers:
+  - image: image
+    name: name
+    command:
+`))
+
+		Expect(err).To(BeNil())
+	})
+
+	It("can validate lists", func() {
+		err := validator.ValidateBytes([]byte(`
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      labels:
+        name: redis-master
+      name: name
+    spec:
+      containers:
+      - name: name
+`))
+
+		Expect(err).To(BeNil())
 	})
 })

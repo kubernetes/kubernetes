@@ -227,6 +227,13 @@ type BpfTimeval C.struct_bpf_timeval
 
 type Termios C.struct_termios
 
+// fchmodat-like syscalls.
+
+const (
+	AT_FDCWD            = C.AT_FDCWD
+	AT_SYMLINK_NOFOLLOW = C.AT_SYMLINK_NOFOLLOW
+)
+
 // Sysctl
 
 type Sysctlnode C.struct_sysctlnode

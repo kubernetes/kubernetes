@@ -188,7 +188,8 @@ func isLess(i, j reflect.Value) (bool, error) {
 		// sort metav1.Time
 		in := i.Interface()
 		if t, ok := in.(metav1.Time); ok {
-			return t.Before(j.Interface().(metav1.Time)), nil
+			time := j.Interface().(metav1.Time)
+			return t.Before(&time), nil
 		}
 		// fallback to the fields comparison
 		for idx := 0; idx < i.NumField(); idx++ {

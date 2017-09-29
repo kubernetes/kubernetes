@@ -33,7 +33,7 @@ type Interface interface {
 
 	VersionInfo() (*cadvisorapi.VersionInfo, error)
 
-	// Returns usage information about the filesystem holding Docker images.
+	// Returns usage information about the filesystem holding container images.
 	ImagesFsInfo() (cadvisorapiv2.FsInfo, error)
 
 	// Returns usage information about the root filesystem.
@@ -44,4 +44,14 @@ type Interface interface {
 
 	// HasDedicatedImageFs returns true iff a dedicated image filesystem exists for storing images.
 	HasDedicatedImageFs() (bool, error)
+
+	// GetFsInfoByFsUUID returns the stats of the filesystem with the specified
+	// uuid.
+	GetFsInfoByFsUUID(uuid string) (cadvisorapiv2.FsInfo, error)
+}
+
+// ImageFsInfoProvider informs cAdvisor how to find imagefs for container images.
+type ImageFsInfoProvider interface {
+	// ImageFsInfoLabel returns the label cAdvisor should use to find the filesystem holding container images.
+	ImageFsInfoLabel() (string, error)
 }

@@ -40,7 +40,6 @@ filegroup(
         "//test/integration/etcd:all-srcs",
         "//test/integration/evictions:all-srcs",
         "//test/integration/examples:all-srcs",
-        "//test/integration/federation:all-srcs",
         "//test/integration/framework:all-srcs",
         "//test/integration/garbagecollector:all-srcs",
         "//test/integration/kubectl:all-srcs",

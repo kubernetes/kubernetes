@@ -46,6 +46,7 @@ import (
 	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/integer"
 	"k8s.io/client-go/util/workqueue"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -65,7 +66,7 @@ const (
 	// The value of 250 is chosen b/c values that are too high can cause registry DoS issues
 	BurstReplicas = 250
 
-	// If sending a status upate to API server fails, we retry a finite number of times.
+	// If sending a status update to API server fails, we retry a finite number of times.
 	StatusUpdateRetries = 1
 
 	// Reasons for DaemonSet events
@@ -743,7 +744,7 @@ func (dsc *DaemonSetsController) getDaemonPods(ds *extensions.DaemonSet) ([]*v1.
 	}
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
-	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
+	dsNotDeleted := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
 		fresh, err := dsc.kubeClient.ExtensionsV1beta1().DaemonSets(ds.Namespace).Get(ds.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
@@ -753,8 +754,9 @@ func (dsc *DaemonSetsController) getDaemonPods(ds *extensions.DaemonSet) ([]*v1.
 		}
 		return fresh, nil
 	})
+
 	// Use ControllerRefManager to adopt/orphan as needed.
-	cm := controller.NewPodControllerRefManager(dsc.podControl, ds, selector, controllerKind, canAdoptFunc)
+	cm := controller.NewPodControllerRefManager(dsc.podControl, ds, selector, controllerKind, dsNotDeleted)
 	return cm.ClaimPods(pods)
 }
 
@@ -770,10 +772,6 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) 
 	// Group Pods by Node name.
 	nodeToDaemonPods := make(map[string][]*v1.Pod)
 	for _, pod := range claimedPods {
-		// Skip terminating pods
-		if pod.DeletionTimestamp != nil {
-			continue
-		}
 		nodeName := pod.Spec.NodeName
 		nodeToDaemonPods[nodeName] = append(nodeToDaemonPods[nodeName], pod)
 	}
@@ -838,8 +836,11 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet, hash string) e
 			// If there's non-daemon pods left on this node, we will create it in the next sync loop
 			var daemonPodsRunning []*v1.Pod
 			for _, pod := range daemonPods {
+				if pod.DeletionTimestamp != nil {
+					continue
+				}
 				if pod.Status.Phase == v1.PodFailed {
-					msg := fmt.Sprintf("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, node.Name, pod.Name)
+					msg := fmt.Sprintf("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, pod.Name, node.Name)
 					glog.V(2).Infof(msg)
 					// Emit an event so that it's discoverable to users.
 					dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedDaemonPodReason, msg)
@@ -854,7 +855,7 @@ func (dsc *DaemonSetsController) manage(ds *extensions.DaemonSet, hash string) e
 			if len(daemonPodsRunning) > 1 {
 				sort.Sort(podByCreationTimestamp(daemonPodsRunning))
 				for i := 1; i < len(daemonPodsRunning); i++ {
-					podsToDelete = append(podsToDelete, daemonPods[i].Name)
+					podsToDelete = append(podsToDelete, daemonPodsRunning[i].Name)
 				}
 			}
 		case !shouldContinueRunning && exists:
@@ -904,31 +905,54 @@ func (dsc *DaemonSetsController) syncNodes(ds *extensions.DaemonSet, podsToDelet
 
 	glog.V(4).Infof("Nodes needing daemon pods for daemon set %s: %+v, creating %d", ds.Name, nodesNeedingDaemonPods, createDiff)
 	createWait := sync.WaitGroup{}
-	createWait.Add(createDiff)
 	template := util.CreatePodTemplate(ds.Spec.Template, ds.Spec.TemplateGeneration, hash)
-	for i := 0; i < createDiff; i++ {
-		go func(ix int) {
-			defer createWait.Done()
-			err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, &template, ds, metav1.NewControllerRef(ds, controllerKind))
-			if err != nil && errors.IsTimeout(err) {
-				// Pod is created but its initialization has timed out.
-				// If the initialization is successful eventually, the
-				// controller will observe the creation via the informer.
-				// If the initialization fails, or if the pod keeps
-				// uninitialized for a long time, the informer will not
-				// receive any update, and the controller will create a new
-				// pod when the expectation expires.
-				return
-			}
-			if err != nil {
-				glog.V(2).Infof("Failed creation, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
+	// Batch the pod creates. Batch sizes start at SlowStartInitialBatchSize
+	// and double with each successful iteration in a kind of "slow start".
+	// This handles attempts to start large numbers of pods that would
+	// likely all fail with the same error. For example a project with a
+	// low quota that attempts to create a large number of pods will be
+	// prevented from spamming the API service with the pod create requests
+	// after one of its pods fails.  Conveniently, this also prevents the
+	// event spam that those failures would generate.
+	batchSize := integer.IntMin(createDiff, controller.SlowStartInitialBatchSize)
+	for pos := 0; createDiff > pos; batchSize, pos = integer.IntMin(2*batchSize, createDiff-(pos+batchSize)), pos+batchSize {
+		errorCount := len(errCh)
+		createWait.Add(batchSize)
+		for i := pos; i < pos+batchSize; i++ {
+			go func(ix int) {
+				defer createWait.Done()
+				err := dsc.podControl.CreatePodsOnNode(nodesNeedingDaemonPods[ix], ds.Namespace, &template, ds, metav1.NewControllerRef(ds, controllerKind))
+				if err != nil && errors.IsTimeout(err) {
+					// Pod is created but its initialization has timed out.
+					// If the initialization is successful eventually, the
+					// controller will observe the creation via the informer.
+					// If the initialization fails, or if the pod keeps
+					// uninitialized for a long time, the informer will not
+					// receive any update, and the controller will create a new
+					// pod when the expectation expires.
+					return
+				}
+				if err != nil {
+					glog.V(2).Infof("Failed creation, decrementing expectations for set %q/%q", ds.Namespace, ds.Name)
+					dsc.expectations.CreationObserved(dsKey)
+					errCh <- err
+					utilruntime.HandleError(err)
+				}
+			}(i)
+		}
+		createWait.Wait()
+		// any skipped pods that we never attempted to start shouldn't be expected.
+		skippedPods := createDiff - batchSize
+		if errorCount < len(errCh) && skippedPods > 0 {
+			glog.V(2).Infof("Slow-start failure. Skipping creation of %d pods, decrementing expectations for set %q/%q", skippedPods, ds.Namespace, ds.Name)
+			for i := 0; i < skippedPods; i++ {
 				dsc.expectations.CreationObserved(dsKey)
-				errCh <- err
-				utilruntime.HandleError(err)
 			}
-		}(i)
+			// The skipped pods will be retried later. The next controller resync will
+			// retry the slow start process.
+			break
+		}
 	}
-	createWait.Wait()
 
 	glog.V(4).Infof("Pods to delete for daemon set %s: %+v, deleting %d", ds.Name, podsToDelete, deleteDiff)
 	deleteWait := sync.WaitGroup{}
@@ -967,12 +991,7 @@ func storeDaemonSetStatus(dsClient unversionedextensions.DaemonSetInterface, ds 
 		return nil
 	}
 
-	clone, err := scheme.Scheme.DeepCopy(ds)
-	if err != nil {
-		return err
-	}
-
-	toUpdate := clone.(*extensions.DaemonSet)
+	toUpdate := ds.DeepCopy()
 
 	var updateErr, getErr error
 	for i := 0; i < StatusUpdateRetries; i++ {
@@ -1161,6 +1180,7 @@ func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *ext
 		Effect:   v1.TaintEffectNoSchedule,
 	})
 
+	// TODO(#48843) OutOfDisk taints will be removed in 1.10
 	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
 		kubelettypes.IsCriticalPod(newPod) {
 		v1helper.AddOrUpdateTolerationInPod(newPod, &v1.Toleration{
@@ -1202,7 +1222,7 @@ func (dsc *DaemonSetsController) simulate(newPod *v1.Pod, node *v1.Node, ds *ext
 // summary. Returned booleans are:
 // * wantToRun:
 //     Returns true when a user would expect a pod to run on this node and ignores conditions
-//     such as OutOfDisk or insufficient resource that would cause a daemonset pod not to schedule.
+//     such as DiskPressure or insufficient resource that would cause a daemonset pod not to schedule.
 //     This is primarily used to populate daemonset status.
 // * shouldSchedule:
 //     Returns true when a daemonset should be scheduled to a node if a daemonset pod is not already
@@ -1238,11 +1258,6 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *exten
 			var emitEvent bool
 			// we try to partition predicates into two partitions here: intentional on the part of the operator and not.
 			switch reason {
-			case predicates.ErrNodeOutOfDisk:
-				// the kubelet will evict this pod if it needs to. Let kubelet
-				// decide whether to continue running this pod so leave shouldContinueRunning
-				// set to true
-				shouldSchedule = false
 			// intentional
 			case
 				predicates.ErrNodeSelectorNotMatch,
@@ -1325,9 +1340,6 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 		fit, reasons, err = predicates.EssentialPredicates(pod, nil, nodeInfo)
 	} else {
 		fit, reasons, err = predicates.GeneralPredicates(pod, nil, nodeInfo)
-		ncFit, ncReasons := NodeConditionPredicates(nodeInfo)
-		fit = ncFit && fit
-		reasons = append(reasons, ncReasons...)
 	}
 	if err != nil {
 		return false, predicateFails, err
@@ -1339,26 +1351,6 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulercache.NodeInfo) (bool, []algorit
 	return len(predicateFails) == 0, predicateFails, nil
 }
 
-func NodeConditionPredicates(nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason) {
-	reasons := []algorithm.PredicateFailureReason{}
-
-	// If TaintNodesByCondition feature was enabled, account PodToleratesNodeTaints predicates.
-	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
-		return true, nil
-	}
-
-	for _, c := range nodeInfo.Node().Status.Conditions {
-		// TODO: There are other node status that the DaemonSet should ideally respect too,
-		//       e.g. MemoryPressure, and DiskPressure
-		if c.Type == v1.NodeOutOfDisk && c.Status == v1.ConditionTrue {
-			reasons = append(reasons, predicates.ErrNodeSelectorNotMatch)
-			break
-		}
-	}
-
-	return len(reasons) == 0, reasons
-}
-
 // byCreationTimestamp sorts a list by creation timestamp, using their names as a tie breaker.
 type byCreationTimestamp []*extensions.DaemonSet
 
@@ -1366,10 +1358,10 @@ func (o byCreationTimestamp) Len() int      { return len(o) }
 func (o byCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
 func (o byCreationTimestamp) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
+	if o[i].CreationTimestamp.Equal(&o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}
-	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
 }
 
 type podByCreationTimestamp []*v1.Pod
@@ -1378,8 +1370,8 @@ func (o podByCreationTimestamp) Len() int      { return len(o) }
 func (o podByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 
 func (o podByCreationTimestamp) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
+	if o[i].CreationTimestamp.Equal(&o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}
-	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
 }

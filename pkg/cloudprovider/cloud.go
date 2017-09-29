@@ -124,7 +124,7 @@ type Instances interface {
 	// ProviderID is a unique identifier of the node. This will not be called
 	// from the node whose nodeaddresses are being queried. i.e. local metadata
 	// services cannot be used in this method to obtain nodeaddresses
-	NodeAddressesByProviderID(providerId string) ([]v1.NodeAddress, error)
+	NodeAddressesByProviderID(providerID string) ([]v1.NodeAddress, error)
 	// ExternalID returns the cloud provider ID of the node with the specified NodeName.
 	// Note that if the instance does not exist or is no longer running, we must return ("", cloudprovider.InstanceNotFound)
 	ExternalID(nodeName types.NodeName) (string, error)
@@ -140,6 +140,9 @@ type Instances interface {
 	// CurrentNodeName returns the name of the node we are currently running on
 	// On most clouds (e.g. GCE) this is the hostname, so we provide the hostname
 	CurrentNodeName(hostname string) (types.NodeName, error)
+	// InstanceExistsByProviderID returns true if the instance for the given provider id still is running.
+	// If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
+	InstanceExistsByProviderID(providerID string) (bool, error)
 }
 
 // Route is a representation of an advanced routing rule.
@@ -173,6 +176,7 @@ type Routes interface {
 var (
 	InstanceNotFound = errors.New("instance not found")
 	DiskNotFound     = errors.New("disk is not found")
+	NotImplemented   = errors.New("unimplemented")
 )
 
 // Zone represents the location of a particular machine.
@@ -184,5 +188,23 @@ type Zone struct {
 // Zones is an abstract, pluggable interface for zone enumeration.
 type Zones interface {
 	// GetZone returns the Zone containing the current failure zone and locality region that the program is running in
+	// In most cases, this method is called from the kubelet querying a local metadata service to aquire its zone.
+	// For the case of external cloud providers, use GetZoneByProviderID or GetZoneByNodeName since GetZone
+	// can no longer be called from the kubelets.
 	GetZone() (Zone, error)
+
+	// GetZoneByProviderID returns the Zone containing the current zone and locality region of the node specified by providerId
+	// This method is particularly used in the context of external cloud providers where node initialization must be down
+	// outside the kubelets.
+	GetZoneByProviderID(providerID string) (Zone, error)
+
+	// GetZoneByNodeName returns the Zone containing the current zone and locality region of the node specified by node name
+	// This method is particularly used in the context of external cloud providers where node initialization must be down
+	// outside the kubelets.
+	GetZoneByNodeName(nodeName types.NodeName) (Zone, error)
+}
+
+// PVLabeler is an abstract, pluggable interface for fetching labels for volumes
+type PVLabeler interface {
+	GetLabelsForVolume(pv *v1.PersistentVolume) (map[string]string, error)
 }

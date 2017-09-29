@@ -145,33 +145,13 @@ func (u *Unstructured) UnmarshalJSON(b []byte) error {
 	return err
 }
 
-func deepCopyJSON(x interface{}) interface{} {
-	switch x := x.(type) {
-	case map[string]interface{}:
-		clone := make(map[string]interface{}, len(x))
-		for k, v := range x {
-			clone[k] = deepCopyJSON(v)
-		}
-		return clone
-	case []interface{}:
-		clone := make([]interface{}, len(x))
-		for i := range x {
-			clone[i] = deepCopyJSON(x[i])
-		}
-		return clone
-	default:
-		// only non-pointer values (float64, int64, bool, string) are left. These can be copied by-value.
-		return x
-	}
-}
-
 func (in *Unstructured) DeepCopy() *Unstructured {
 	if in == nil {
 		return nil
 	}
 	out := new(Unstructured)
 	*out = *in
-	out.Object = deepCopyJSON(in.Object).(map[string]interface{})
+	out.Object = unstructured.DeepCopyJSON(in.Object)
 	return out
 }
 
@@ -181,7 +161,7 @@ func (in *UnstructuredList) DeepCopy() *UnstructuredList {
 	}
 	out := new(UnstructuredList)
 	*out = *in
-	out.Object = deepCopyJSON(in.Object).(map[string]interface{})
+	out.Object = unstructured.DeepCopyJSON(in.Object)
 	out.Items = make([]Unstructured, len(in.Items))
 	for i := range in.Items {
 		in.Items[i].DeepCopyInto(&out.Items[i])
@@ -468,6 +448,14 @@ func (u *Unstructured) SetSelfLink(selfLink string) {
 	u.setNestedField(selfLink, "metadata", "selfLink")
 }
 
+func (u *Unstructured) GetContinue() string {
+	return getNestedString(u.Object, "metadata", "continue")
+}
+
+func (u *Unstructured) SetContinue(c string) {
+	u.setNestedField(c, "metadata", "continue")
+}
+
 func (u *Unstructured) GetCreationTimestamp() metav1.Time {
 	var timestamp metav1.Time
 	timestamp.UnmarshalQueryParameter(getNestedString(u.Object, "metadata", "creationTimestamp"))
@@ -652,6 +640,14 @@ func (u *UnstructuredList) SetSelfLink(selfLink string) {
 	u.setNestedField(selfLink, "metadata", "selfLink")
 }
 
+func (u *UnstructuredList) GetContinue() string {
+	return getNestedString(u.Object, "metadata", "continue")
+}
+
+func (u *UnstructuredList) SetContinue(c string) {
+	u.setNestedField(c, "metadata", "continue")
+}
+
 func (u *UnstructuredList) SetGroupVersionKind(gvk schema.GroupVersionKind) {
 	u.SetAPIVersion(gvk.GroupVersion().String())
 	u.SetKind(gvk.Kind)
@@ -702,9 +698,12 @@ func (unstructuredJSONScheme) Encode(obj runtime.Object, w io.Writer) error {
 		for _, i := range t.Items {
 			items = append(items, i.Object)
 		}
-		t.Object["items"] = items
-		defer func() { delete(t.Object, "items") }()
-		return json.NewEncoder(w).Encode(t.Object)
+		listObj := make(map[string]interface{}, len(t.Object)+1)
+		for k, v := range t.Object { // Make a shallow copy
+			listObj[k] = v
+		}
+		listObj["items"] = items
+		return json.NewEncoder(w).Encode(listObj)
 	case *runtime.Unknown:
 		// TODO: Unstructured needs to deal with ContentType.
 		_, err := w.Write(t.Raw)

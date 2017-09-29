@@ -351,7 +351,7 @@ type HorizontalPodAutoscaler struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// HorizontalPodAutoscaler is a list of horizontal pod autoscaler objects.
+// HorizontalPodAutoscalerList is a list of horizontal pod autoscaler objects.
 type HorizontalPodAutoscalerList struct {
 	metav1.TypeMeta
 	// Metadata is the standard list metadata.

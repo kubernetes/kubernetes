@@ -3,6 +3,8 @@ approvers:
 - lavalamp
 - smarterclayton
 - thockin
+- liggitt
+# - bgrant0607 # manual escalations only
 reviewers:
 - thockin
 - lavalamp

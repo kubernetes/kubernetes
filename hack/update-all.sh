@@ -46,7 +46,7 @@ done
 trap 'exit 1' SIGINT
 
 if $SILENT ; then
-	echo "Running in the silent mode, run with -v if you want to see script logs."
+	echo "Running in silent mode, run with -v if you want to see script logs."
 fi
 
 if ! $ALL ; then
@@ -63,7 +63,6 @@ fi
 BASH_TARGETS="
 	update-generated-protobuf
 	update-codegen
-	update-codecgen
 	update-generated-docs
 	update-generated-swagger-docs
 	update-swagger-spec
@@ -77,7 +76,7 @@ BASH_TARGETS="
 	update-bazel"
 
 for t in $BASH_TARGETS; do
-	echo -e "${color_yellow}Updating $t${color_norm}"
+	echo -e "${color_yellow}Running $t${color_norm}"
 	if $SILENT ; then
 		if ! bash "$KUBE_ROOT/hack/$t.sh" 1> /dev/null; then
 			echo -e "${color_red}Running $t FAILED${color_norm}"

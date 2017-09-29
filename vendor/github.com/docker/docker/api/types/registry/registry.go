@@ -3,13 +3,17 @@ package registry
 import (
 	"encoding/json"
 	"net"
+
+	"github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // ServiceConfig stores daemon registry services configuration.
 type ServiceConfig struct {
-	InsecureRegistryCIDRs []*NetIPNet           `json:"InsecureRegistryCIDRs"`
-	IndexConfigs          map[string]*IndexInfo `json:"IndexConfigs"`
-	Mirrors               []string
+	AllowNondistributableArtifactsCIDRs     []*NetIPNet
+	AllowNondistributableArtifactsHostnames []string
+	InsecureRegistryCIDRs                   []*NetIPNet           `json:"InsecureRegistryCIDRs"`
+	IndexConfigs                            map[string]*IndexInfo `json:"IndexConfigs"`
+	Mirrors                                 []string
 }
 
 // NetIPNet is the net.IPNet type, which can be marshalled and
@@ -101,4 +105,15 @@ type SearchResults struct {
 	NumResults int `json:"num_results"`
 	// Results is a slice containing the actual results for the search
 	Results []SearchResult `json:"results"`
+}
+
+// DistributionInspect describes the result obtained from contacting the
+// registry to retrieve image metadata
+type DistributionInspect struct {
+	// Descriptor contains information about the manifest, including
+	// the content addressable digest
+	Descriptor v1.Descriptor
+	// Platforms contains the list of platforms supported by the image,
+	// obtained by parsing the manifest
+	Platforms []v1.Platform
 }

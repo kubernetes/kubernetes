@@ -28,6 +28,7 @@ go_library(
         "//test/e2e/upgrades/apps:go_default_library",
         "//test/e2e/upgrades/storage:go_default_library",
         "//test/utils:go_default_library",
+        "//test/utils/image:go_default_library",
         "//test/utils/junit:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",

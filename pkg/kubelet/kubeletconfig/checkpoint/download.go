@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
 	utilcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 )
@@ -50,8 +51,7 @@ type RemoteConfigSource interface {
 func NewRemoteConfigSource(source *apiv1.NodeConfigSource) (RemoteConfigSource, string, error) {
 	// exactly one subfield of the config source must be non-nil, toady ConfigMapRef is the only reference
 	if source.ConfigMapRef == nil {
-		reason := "invalid NodeConfigSource, exactly one subfield must be non-nil, but all were nil"
-		return nil, reason, fmt.Errorf("%s, NodeConfigSource was: %#v", reason, source)
+		return nil, status.FailSyncReasonAllNilSubfields, fmt.Errorf("%s, NodeConfigSource was: %#v", status.FailSyncReasonAllNilSubfields, source)
 	}
 
 	// validate the NodeConfigSource:
@@ -61,8 +61,7 @@ func NewRemoteConfigSource(source *apiv1.NodeConfigSource) (RemoteConfigSource, 
 
 	// name, namespace, and UID must all be non-empty for ConfigMapRef
 	if ref.Name == "" || ref.Namespace == "" || string(ref.UID) == "" {
-		reason := "invalid ObjectReference, all of UID, Name, and Namespace must be specified"
-		return nil, reason, fmt.Errorf("%s, ObjectReference was: %#v", reason, ref)
+		return nil, status.FailSyncReasonPartialObjectReference, fmt.Errorf("%s, ObjectReference was: %#v", status.FailSyncReasonPartialObjectReference, ref)
 	}
 
 	return &remoteConfigMap{source}, "", nil
@@ -113,7 +112,6 @@ func (r *remoteConfigMap) UID() string {
 
 func (r *remoteConfigMap) Download(client clientset.Interface) (Checkpoint, string, error) {
 	var reason string
-
 	uid := string(r.source.ConfigMapRef.UID)
 
 	utillog.Infof("attempting to download ConfigMap with UID %q", uid)
@@ -121,18 +119,24 @@ func (r *remoteConfigMap) Download(client clientset.Interface) (Checkpoint, stri
 	// get the ConfigMap via namespace/name, there doesn't seem to be a way to get it by UID
 	cm, err := client.CoreV1().ConfigMaps(r.source.ConfigMapRef.Namespace).Get(r.source.ConfigMapRef.Name, metav1.GetOptions{})
 	if err != nil {
-		reason = fmt.Sprintf("could not download ConfigMap with name %q from namespace %q", r.source.ConfigMapRef.Name, r.source.ConfigMapRef.Namespace)
+		reason = fmt.Sprintf(status.FailSyncReasonDownloadFmt, r.source.ConfigMapRef.Name, r.source.ConfigMapRef.Namespace)
 		return nil, reason, fmt.Errorf("%s, error: %v", reason, err)
 	}
 
 	// ensure that UID matches the UID on the reference, the ObjectReference must be unambiguous
 	if r.source.ConfigMapRef.UID != cm.UID {
-		reason = fmt.Sprintf("invalid ObjectReference, UID %q does not match UID of downloaded ConfigMap %q", r.source.ConfigMapRef.UID, cm.UID)
+		reason = fmt.Sprintf(status.FailSyncReasonUIDMismatchFmt, r.source.ConfigMapRef.UID, cm.UID)
 		return nil, reason, fmt.Errorf(reason)
 	}
 
+	checkpoint, err := NewConfigMapCheckpoint(cm)
+	if err != nil {
+		reason = fmt.Sprintf("invalid downloaded object")
+		return nil, reason, fmt.Errorf("%s, error: %v", reason, err)
+	}
+
 	utillog.Infof("successfully downloaded ConfigMap with UID %q", uid)
-	return &configMapCheckpoint{cm}, "", nil
+	return checkpoint, "", nil
 }
 
 func (r *remoteConfigMap) Encode() ([]byte, error) {

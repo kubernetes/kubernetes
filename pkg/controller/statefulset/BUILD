@@ -16,7 +16,6 @@ go_library(
         "stateful_set_utils.go",
     ],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/history:go_default_library",
@@ -56,7 +55,6 @@ go_test(
     ],
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
@@ -70,6 +68,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",
         "//vendor/k8s.io/client-go/informers/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/client-go/informers/core/v1:go_default_library",
@@ -80,7 +79,6 @@ go_test(
         "//vendor/k8s.io/client-go/testing:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
-        "//vendor/k8s.io/metrics/pkg/client/clientset_generated/clientset/scheme:go_default_library",
     ],
 )
 

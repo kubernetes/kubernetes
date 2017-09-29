@@ -62,7 +62,7 @@ type ClusterID struct {
 func (gce *GCECloud) watchClusterID() {
 	gce.ClusterID = ClusterID{
 		cfgMapKey: fmt.Sprintf("%v/%v", UIDNamespace, UIDConfigMapName),
-		client:    gce.clientBuilder.ClientOrDie("cloud-provider"),
+		client:    gce.client,
 	}
 
 	mapEventHandler := cache.ResourceEventHandlerFuncs{

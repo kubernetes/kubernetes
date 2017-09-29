@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/proxy"
+	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
@@ -51,6 +52,52 @@ func checkAllLines(t *testing.T, table utiliptables.Table, save []byte, expected
 			}
 		} else {
 			t.Errorf("getChainLines expected chain not present: %s", chain)
+		}
+	}
+}
+
+func TestIpPart(t *testing.T) {
+	const noError = ""
+
+	testCases := []struct {
+		endpoint      string
+		expectedIP    string
+		expectedError string
+	}{
+		{"1.2.3.4", "1.2.3.4", noError},
+		{"1.2.3.4:9999", "1.2.3.4", noError},
+		{"2001:db8::1:1", "2001:db8::1:1", noError},
+		{"[2001:db8::2:2]:9999", "2001:db8::2:2", noError},
+		{"1.2.3.4::9999", "", "too many colons"},
+		{"1.2.3.4:[0]", "", "unexpected '[' in address"},
+	}
+
+	for _, tc := range testCases {
+		ip := ipPart(tc.endpoint)
+		if tc.expectedError == noError {
+			if ip != tc.expectedIP {
+				t.Errorf("Unexpected IP for %s: Expected: %s, Got %s", tc.endpoint, tc.expectedIP, ip)
+			}
+		} else if ip != "" {
+			t.Errorf("Error did not occur for %s, expected: '%s' error", tc.endpoint, tc.expectedError)
+		}
+	}
+}
+
+func TestHostAddress(t *testing.T) {
+	testCases := []struct {
+		ip           string
+		expectedAddr string
+	}{
+		{"1.2.3.4", "1.2.3.4/32"},
+		{"2001:db8::1:1", "2001:db8::1:1/128"},
+	}
+
+	for _, tc := range testCases {
+		ip := net.ParseIP(tc.ip)
+		addr := hostAddress(ip)
+		if addr != tc.expectedAddr {
+			t.Errorf("Unexpected host address for %s: Expected: %s, Got %s", tc.ip, tc.expectedAddr, addr)
 		}
 	}
 }
@@ -178,8 +225,8 @@ func TestGetChainLinesMultipleTables(t *testing.T) {
 
 func newFakeServiceInfo(service proxy.ServicePortName, ip net.IP, port int, protocol api.Protocol, onlyNodeLocalEndpoints bool) *serviceInfo {
 	return &serviceInfo{
-		sessionAffinityType:    api.ServiceAffinityNone, // default
-		stickyMaxAgeMinutes:    180,                     // TODO: paramaterize this in the API.
+		sessionAffinityType:    api.ServiceAffinityNone,                        // default
+		stickyMaxAgeSeconds:    int(api.DefaultClientIPServiceAffinitySeconds), // default
 		clusterIP:              ip,
 		port:                   port,
 		protocol:               protocol,
@@ -258,103 +305,14 @@ func (c *fakeClosable) Close() error {
 	return nil
 }
 
-func TestRevertPorts(t *testing.T) {
-	testCases := []struct {
-		replacementPorts []localPort
-		existingPorts    []localPort
-		expectToBeClose  []bool
-	}{
-		{
-			replacementPorts: []localPort{
-				{port: 5001},
-				{port: 5002},
-				{port: 5003},
-			},
-			existingPorts:   []localPort{},
-			expectToBeClose: []bool{true, true, true},
-		},
-		{
-			replacementPorts: []localPort{},
-			existingPorts: []localPort{
-				{port: 5001},
-				{port: 5002},
-				{port: 5003},
-			},
-			expectToBeClose: []bool{},
-		},
-		{
-			replacementPorts: []localPort{
-				{port: 5001},
-				{port: 5002},
-				{port: 5003},
-			},
-			existingPorts: []localPort{
-				{port: 5001},
-				{port: 5002},
-				{port: 5003},
-			},
-			expectToBeClose: []bool{false, false, false},
-		},
-		{
-			replacementPorts: []localPort{
-				{port: 5001},
-				{port: 5002},
-				{port: 5003},
-			},
-			existingPorts: []localPort{
-				{port: 5001},
-				{port: 5003},
-			},
-			expectToBeClose: []bool{false, true, false},
-		},
-		{
-			replacementPorts: []localPort{
-				{port: 5001},
-				{port: 5002},
-				{port: 5003},
-			},
-			existingPorts: []localPort{
-				{port: 5001},
-				{port: 5002},
-				{port: 5003},
-				{port: 5004},
-			},
-			expectToBeClose: []bool{false, false, false},
-		},
-	}
-
-	for i, tc := range testCases {
-		replacementPortsMap := make(map[localPort]closeable)
-		for _, lp := range tc.replacementPorts {
-			replacementPortsMap[lp] = &fakeClosable{}
-		}
-		existingPortsMap := make(map[localPort]closeable)
-		for _, lp := range tc.existingPorts {
-			existingPortsMap[lp] = &fakeClosable{}
-		}
-		revertPorts(replacementPortsMap, existingPortsMap)
-		for j, expectation := range tc.expectToBeClose {
-			if replacementPortsMap[tc.replacementPorts[j]].(*fakeClosable).closed != expectation {
-				t.Errorf("Expect replacement localport %v to be %v in test case %v", tc.replacementPorts[j], expectation, i)
-			}
-		}
-		for _, lp := range tc.existingPorts {
-			if existingPortsMap[lp].(*fakeClosable).closed == true {
-				t.Errorf("Expect existing localport %v to be false in test case %v", lp, i)
-			}
-		}
-	}
-
-}
-
 // fakePortOpener implements portOpener.
 type fakePortOpener struct {
-	openPorts []*localPort
+	openPorts []*utilproxy.LocalPort
 }
 
 // OpenLocalPort fakes out the listen() and bind() used by syncProxyRules
 // to lock a local port.
-func (f *fakePortOpener) OpenLocalPort(lp *localPort) (closeable, error) {
+func (f *fakePortOpener) OpenLocalPort(lp *utilproxy.LocalPort) (utilproxy.Closeable, error) {
 	f.openPorts = append(f.openPorts, lp)
 	return nil, nil
 }
@@ -395,8 +353,8 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		iptables:                 ipt,
 		clusterCIDR:              "10.0.0.0/24",
 		hostname:                 testHostname,
-		portsMap:                 make(map[localPort]closeable),
-		portMapper:               &fakePortOpener{[]*localPort{}},
+		portsMap:                 make(map[utilproxy.LocalPort]utilproxy.Closeable),
+		portMapper:               &fakePortOpener{[]*utilproxy.LocalPort{}},
 		healthChecker:            newFakeHealthChecker(),
 		precomputedProbabilities: make([]string, 0, 1001),
 		iptablesData:             bytes.NewBuffer(nil),

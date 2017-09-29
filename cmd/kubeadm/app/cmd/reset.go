@@ -59,10 +59,12 @@ func NewCmdReset(out io.Writer) *cobra.Command {
 	return cmd
 }
 
+// Reset defines struct used for kubeadm reset command
 type Reset struct {
 	certsDir string
 }
 
+// NewReset instantiate Reset struct
 func NewReset(skipPreFlight bool, certsDir string) (*Reset, error) {
 	if !skipPreFlight {
 		fmt.Println("[preflight] Running pre-flight checks")
@@ -113,7 +115,7 @@ func (r *Reset) Run(out io.Writer) error {
 		fmt.Println("[reset] docker doesn't seem to be running, skipping the removal of running kubernetes containers")
 	}
 
-	dirsToClean := []string{"/var/lib/kubelet", "/etc/cni/net.d", "/var/lib/dockershim"}
+	dirsToClean := []string{"/var/lib/kubelet", "/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes"}
 
 	// Only clear etcd data when the etcd manifest is found. In case it is not found, we must assume that the user
 	// provided external etcd endpoints. In that case, it is his own responsibility to reset etcd

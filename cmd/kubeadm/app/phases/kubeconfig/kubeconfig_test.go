@@ -34,6 +34,7 @@ import (
 
 	pkiutil "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/test/certs"
 	kubeconfigtestutil "k8s.io/kubernetes/cmd/kubeadm/test/kubeconfig"
@@ -117,8 +118,12 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 			}
 
 			// Asserts MasterConfiguration values injected into spec
-			if spec.APIServer != cfg.GetMasterEndpoint() {
-				t.Errorf("getKubeConfigSpecs didn't injected cfg.APIServer address into spec for %s", assertion.kubeConfigFile)
+			masterEndpoint, err := kubeadmutil.GetMasterEndpoint(cfg)
+			if err != nil {
+				t.Error(err)
+			}
+			if spec.APIServer != masterEndpoint {
+				t.Errorf("getKubeConfigSpecs didn't injected cfg.APIServer endpoint into spec for %s", assertion.kubeConfigFile)
 			}
 
 			// Asserts CA certs and CA keys loaded into specs

@@ -26,12 +26,33 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
 	"golang.org/x/net/http2"
 )
+
+// JoinPreservingTrailingSlash does a path.Join of the specified elements,
+// preserving any trailing slash on the last non-empty segment
+func JoinPreservingTrailingSlash(elem ...string) string {
+	// do the basic path join
+	result := path.Join(elem...)
+
+	// find the last non-empty segment
+	for i := len(elem) - 1; i >= 0; i-- {
+		if len(elem[i]) > 0 {
+			// if the last segment ended in a slash, ensure our result does as well
+			if strings.HasSuffix(elem[i], "/") && !strings.HasSuffix(result, "/") {
+				result += "/"
+			}
+			break
+		}
+	}
+
+	return result
+}
 
 // IsProbableEOF returns true if the given error resembles a connection termination
 // scenario that would justify assuming that the watch is empty.
@@ -108,7 +129,7 @@ func DialerFor(transport http.RoundTripper) (DialFunc, error) {
 	case RoundTripperWrapper:
 		return DialerFor(transport.WrappedRoundTripper())
 	default:
-		return nil, fmt.Errorf("unknown transport type: %v", transport)
+		return nil, fmt.Errorf("unknown transport type: %T", transport)
 	}
 }
 
@@ -129,7 +150,7 @@ func TLSClientConfig(transport http.RoundTripper) (*tls.Config, error) {
 	case RoundTripperWrapper:
 		return TLSClientConfig(transport.WrappedRoundTripper())
 	default:
-		return nil, fmt.Errorf("unknown transport type: %v", transport)
+		return nil, fmt.Errorf("unknown transport type: %T", transport)
 	}
 }
 
@@ -235,8 +256,11 @@ func isDefault(transportProxier func(*http.Request) (*url.URL, error)) bool {
 // NewProxierWithNoProxyCIDR constructs a Proxier function that respects CIDRs in NO_PROXY and delegates if
 // no matching CIDRs are found
 func NewProxierWithNoProxyCIDR(delegate func(req *http.Request) (*url.URL, error)) func(req *http.Request) (*url.URL, error) {
-	// we wrap the default method, so we only need to perform our check if the NO_PROXY envvar has a CIDR in it
+	// we wrap the default method, so we only need to perform our check if the NO_PROXY (or no_proxy) envvar has a CIDR in it
 	noProxyEnv := os.Getenv("NO_PROXY")
+	if noProxyEnv == "" {
+		noProxyEnv = os.Getenv("no_proxy")
+	}
 	noProxyRules := strings.Split(noProxyEnv, ",")
 
 	cidrs := []*net.IPNet{}

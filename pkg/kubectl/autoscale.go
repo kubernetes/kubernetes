@@ -20,10 +20,9 @@ import (
 	"fmt"
 	"strconv"
 
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
 )
 
 type HorizontalPodAutoscalerV1 struct{}
@@ -91,12 +90,12 @@ func generateHPA(genericParams map[string]interface{}) (runtime.Object, error) {
 		}
 	}
 
-	scaler := autoscaling.HorizontalPodAutoscaler{
+	scaler := autoscalingv1.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: autoscaling.HorizontalPodAutoscalerSpec{
-			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+		Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
 				Kind:       params["scaleRef-kind"],
 				Name:       params["scaleRef-name"],
 				APIVersion: params["scaleRef-apiVersion"],
@@ -110,15 +109,7 @@ func generateHPA(genericParams map[string]interface{}) (runtime.Object, error) {
 	}
 	if cpu >= 0 {
 		c := int32(cpu)
-		scaler.Spec.Metrics = []autoscaling.MetricSpec{
-			{
-				Type: autoscaling.ResourceMetricSourceType,
-				Resource: &autoscaling.ResourceMetricSource{
-					Name: api.ResourceCPU,
-					TargetAverageUtilization: &c,
-				},
-			},
-		}
+		scaler.Spec.TargetCPUUtilizationPercentage = &c
 	}
 	return &scaler, nil
 }

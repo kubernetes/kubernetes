@@ -30,20 +30,6 @@ import (
 	utiltest "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/test"
 )
 
-// newUnsupportedEncoded returns an encoding of an object that does not have a Checkpoint implementation
-func newUnsupportedEncoded(t *testing.T) []byte {
-	encoder, err := utilcodec.NewJSONEncoder(apiv1.GroupName)
-	if err != nil {
-		t.Fatalf("could not create an encoder, error: %v", err)
-	}
-	unsupported := &apiv1.Node{}
-	data, err := runtime.Encode(encoder, unsupported)
-	if err != nil {
-		t.Fatalf("could not encode object, error: %v", err)
-	}
-	return data
-}
-
 func TestDecodeCheckpoint(t *testing.T) {
 	// generate correct Checkpoint for v1/ConfigMap test case
 	cm, err := NewConfigMapCheckpoint(&apiv1.ConfigMap{ObjectMeta: metav1.ObjectMeta{UID: types.UID("uid")}})
@@ -86,4 +72,18 @@ func TestDecodeCheckpoint(t *testing.T) {
 			t.Errorf("case %q, expect checkpoint %s but got %s", c.desc, spew.Sdump(c.expect), spew.Sdump(cpt))
 		}
 	}
+}
+
+// newUnsupportedEncoded returns an encoding of an object that does not have a Checkpoint implementation
+func newUnsupportedEncoded(t *testing.T) []byte {
+	encoder, err := utilcodec.NewJSONEncoder(apiv1.GroupName)
+	if err != nil {
+		t.Fatalf("could not create an encoder, error: %v", err)
+	}
+	unsupported := &apiv1.Node{}
+	data, err := runtime.Encode(encoder, unsupported)
+	if err != nil {
+		t.Fatalf("could not encode object, error: %v", err)
+	}
+	return data
 }

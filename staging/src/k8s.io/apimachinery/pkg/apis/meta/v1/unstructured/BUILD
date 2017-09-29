@@ -10,6 +10,7 @@ go_test(
     name = "go_default_test",
     srcs = ["unstructured_test.go"],
     library = ":go_default_library",
+    deps = ["//vendor/github.com/stretchr/testify/assert:go_default_library"],
 )
 
 go_library(

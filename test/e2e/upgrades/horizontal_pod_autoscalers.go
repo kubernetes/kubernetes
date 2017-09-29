@@ -39,6 +39,7 @@ func (HPAUpgradeTest) Name() string { return "hpa-upgrade" }
 func (t *HPAUpgradeTest) Setup(f *framework.Framework) {
 	t.rc = common.NewDynamicResourceConsumer(
 		"res-cons-upgrade",
+		f.Namespace.Name,
 		common.KindRC,
 		1,   /* replicas */
 		250, /* initCPUTotal */
@@ -46,7 +47,8 @@ func (t *HPAUpgradeTest) Setup(f *framework.Framework) {
 		0,
 		500, /* cpuLimit */
 		200, /* memLimit */
-		f)
+		f.ClientSet,
+		f.InternalClientset)
 	t.hpa = common.CreateCPUHorizontalPodAutoscaler(
 		t.rc,
 		20, /* targetCPUUtilizationPercent */

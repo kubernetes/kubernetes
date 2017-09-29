@@ -19,6 +19,7 @@ package certs
 import (
 	"crypto/rsa"
 	"crypto/x509"
+	"net"
 	"testing"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
@@ -33,6 +34,13 @@ func SetupCertificateAuthorithy(t *testing.T) (*x509.Certificate, *rsa.PrivateKe
 	}
 
 	return caCert, caKey
+}
+
+// AssertCertificateIsCa is a utility function for kubeadm testing that asserts if a given certificate is a CA
+func AssertCertificateIsCa(t *testing.T, cert *x509.Certificate) {
+	if !cert.IsCA {
+		t.Error("cert is not a valida CA")
+	}
 }
 
 // AssertCertificateIsSignedByCa is a utility function for kubeadm testing that asserts if a given certificate is signed
@@ -76,4 +84,51 @@ func AssertCertificateHasClientAuthUsage(t *testing.T, cert *x509.Certificate) {
 		}
 	}
 	t.Error("cert has not ClientAuth usage as expected")
+}
+
+// AssertCertificateHasServerAuthUsage is a utility function for kubeadm testing that asserts if a given certificate has
+// the expected ExtKeyUsageServerAuth
+func AssertCertificateHasServerAuthUsage(t *testing.T, cert *x509.Certificate) {
+	for i := range cert.ExtKeyUsage {
+		if cert.ExtKeyUsage[i] == x509.ExtKeyUsageServerAuth {
+			return
+		}
+	}
+	t.Error("cert is not a ServerAuth")
+}
+
+// AssertCertificateHasDNSNames is a utility function for kubeadm testing that asserts if a given certificate has
+// the expected DNSNames
+func AssertCertificateHasDNSNames(t *testing.T, cert *x509.Certificate, DNSNames ...string) {
+	for _, DNSName := range DNSNames {
+		found := false
+		for _, val := range cert.DNSNames {
+			if val == DNSName {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			t.Errorf("cert does not contain DNSName %s", DNSName)
+		}
+	}
+}
+
+// AssertCertificateHasIPAddresses is a utility function for kubeadm testing that asserts if a given certificate has
+// the expected IPAddresses
+func AssertCertificateHasIPAddresses(t *testing.T, cert *x509.Certificate, IPAddresses ...net.IP) {
+	for _, IPAddress := range IPAddresses {
+		found := false
+		for _, val := range cert.IPAddresses {
+			if val.Equal(IPAddress) {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			t.Errorf("cert does not contain IPAddress %s", IPAddress)
+		}
+	}
 }

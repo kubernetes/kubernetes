@@ -24,8 +24,7 @@ import (
 	"testing"
 
 	"github.com/ghodss/yaml"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 const (
@@ -36,39 +35,36 @@ metadata:
   annotations:
     scheduler.alpha.kubernetes.io/critical-pod: ""
   creationTimestamp: null
-  labels:
-    component: kube-apiserver
-    tier: control-plane
   name: kube-apiserver
   namespace: kube-system
 spec:
   containers:
   - command:
     - kube-apiserver
-    - --client-ca-file=/etc/kubernetes/pki/ca.crt
-    - --tls-private-key-file=/etc/kubernetes/pki/apiserver.key
-    - --allow-privileged=true
-    - --service-cluster-ip-range=10.96.0.0/12
     - --service-account-key-file=/etc/kubernetes/pki/sa.pub
+    - --kubelet-client-key=/etc/kubernetes/pki/apiserver-kubelet-client.key
+    - --secure-port=6443
+    - --proxy-client-cert-file=/etc/kubernetes/pki/front-proxy-client.crt
+    - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+    - --requestheader-group-headers=X-Remote-Group
+    - --service-cluster-ip-range=10.96.0.0/12
     - --tls-cert-file=/etc/kubernetes/pki/apiserver.crt
     - --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt
-    - --secure-port=6443
-    - --insecure-port=0
-    - --admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
-    - --requestheader-extra-headers-prefix=X-Remote-Extra-
-    - --proxy-client-cert-file=/etc/kubernetes/pki/front-proxy-client.crt
-    - --experimental-bootstrap-token-auth=true
-    - --requestheader-group-headers=X-Remote-Group
-    - --requestheader-allowed-names=front-proxy-client
-    - --kubelet-client-key=/etc/kubernetes/pki/apiserver-kubelet-client.key
+    - --advertise-address=192.168.1.115
     - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
-    - --proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key
-    - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+    - --insecure-port=0
+    - --experimental-bootstrap-token-auth=true
     - --requestheader-username-headers=X-Remote-User
+    - --requestheader-extra-headers-prefix=X-Remote-Extra-
+    - --requestheader-allowed-names=front-proxy-client
+    - --admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
+    - --allow-privileged=true
+    - --client-ca-file=/etc/kubernetes/pki/ca.crt
+    - --tls-private-key-file=/etc/kubernetes/pki/apiserver.key
+    - --proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key
     - --authorization-mode=Node,RBAC
-    - --advertise-address=192.168.200.101
     - --etcd-servers=http://127.0.0.1:2379
-    image: gcr.io/google_containers/kube-apiserver-amd64:v1.7.0
+    image: gcr.io/google_containers/kube-apiserver-amd64:v1.7.4
     livenessProbe:
       failureThreshold: 8
       httpGet:
@@ -83,64 +79,26 @@ spec:
       requests:
         cpu: 250m
     volumeMounts:
-    - mountPath: /etc/kubernetes
-      name: k8s
+    - mountPath: /etc/kubernetes/pki
+      name: k8s-certs
       readOnly: true
     - mountPath: /etc/ssl/certs
-      name: certs
+      name: ca-certs
+      readOnly: true
     - mountPath: /etc/pki
-      name: pki
+      name: ca-certs-etc-pki
+      readOnly: true
   hostNetwork: true
   volumes:
-  - name: k8s
-    projected:
-      sources:
-      - secret:
-          items:
-          - key: tls.crt
-            path: ca.crt
-          - key: tls.key
-            path: ca.key
-          name: ca
-      - secret:
-          items:
-          - key: tls.crt
-            path: apiserver.crt
-          - key: tls.key
-            path: apiserver.key
-          name: apiserver
-      - secret:
-          items:
-          - key: tls.crt
-            path: apiserver-kubelet-client.crt
-          - key: tls.key
-            path: apiserver-kubelet-client.key
-          name: apiserver-kubelet-client
-      - secret:
-          items:
-          - key: tls.crt
-            path: sa.pub
-          - key: tls.key
-            path: sa.key
-          name: sa
-      - secret:
-          items:
-          - key: tls.crt
-            path: front-proxy-ca.crt
-          name: front-proxy-ca
-      - secret:
-          items:
-          - key: tls.crt
-            path: front-proxy-client.crt
-          - key: tls.key
-            path: front-proxy-client.key
-          name: front-proxy-client
+  - hostPath:
+      path: /etc/kubernetes/pki
+    name: k8s-certs
   - hostPath:
       path: /etc/ssl/certs
-    name: certs
+    name: ca-certs
   - hostPath:
       path: /etc/pki
-    name: pki
+    name: ca-certs-etc-pki
 status: {}
 `
 
@@ -160,30 +118,30 @@ spec:
       containers:
       - command:
         - kube-apiserver
-        - --client-ca-file=/etc/kubernetes/pki/ca.crt
-        - --tls-private-key-file=/etc/kubernetes/pki/apiserver.key
-        - --allow-privileged=true
-        - --service-cluster-ip-range=10.96.0.0/12
         - --service-account-key-file=/etc/kubernetes/pki/sa.pub
+        - --kubelet-client-key=/etc/kubernetes/pki/apiserver-kubelet-client.key
+        - --secure-port=6443
+        - --proxy-client-cert-file=/etc/kubernetes/pki/front-proxy-client.crt
+        - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+        - --requestheader-group-headers=X-Remote-Group
+        - --service-cluster-ip-range=10.96.0.0/12
         - --tls-cert-file=/etc/kubernetes/pki/apiserver.crt
         - --kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt
-        - --secure-port=6443
-        - --insecure-port=0
-        - --admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
-        - --requestheader-extra-headers-prefix=X-Remote-Extra-
-        - --proxy-client-cert-file=/etc/kubernetes/pki/front-proxy-client.crt
-        - --experimental-bootstrap-token-auth=true
-        - --requestheader-group-headers=X-Remote-Group
-        - --requestheader-allowed-names=front-proxy-client
-        - --kubelet-client-key=/etc/kubernetes/pki/apiserver-kubelet-client.key
+        - --advertise-address=192.168.1.115
         - --requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt
-        - --proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key
-        - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+        - --insecure-port=0
+        - --experimental-bootstrap-token-auth=true
         - --requestheader-username-headers=X-Remote-User
+        - --requestheader-extra-headers-prefix=X-Remote-Extra-
+        - --requestheader-allowed-names=front-proxy-client
+        - --admission-control=Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,ResourceQuota
+        - --allow-privileged=true
+        - --client-ca-file=/etc/kubernetes/pki/ca.crt
+        - --tls-private-key-file=/etc/kubernetes/pki/apiserver.key
+        - --proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key
         - --authorization-mode=Node,RBAC
-        - --advertise-address=192.168.200.101
         - --etcd-servers=http://127.0.0.1:2379
-        image: gcr.io/google_containers/kube-apiserver-amd64:v1.7.0
+        image: gcr.io/google_containers/kube-apiserver-amd64:v1.7.4
         livenessProbe:
           failureThreshold: 8
           httpGet:
@@ -198,13 +156,15 @@ spec:
           requests:
             cpu: 250m
         volumeMounts:
-        - mountPath: /etc/kubernetes
-          name: k8s
+        - mountPath: /etc/kubernetes/pki
+          name: k8s-certs
           readOnly: true
         - mountPath: /etc/ssl/certs
-          name: certs
+          name: ca-certs
+          readOnly: true
         - mountPath: /etc/pki
-          name: pki
+          name: ca-certs-etc-pki
+          readOnly: true
       dnsPolicy: ClusterFirstWithHostNet
       hostNetwork: true
       nodeSelector:
@@ -213,56 +173,17 @@ spec:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
       volumes:
-      - name: k8s
-        projected:
-          sources:
-          - secret:
-              items:
-              - key: tls.crt
-                path: ca.crt
-              - key: tls.key
-                path: ca.key
-              name: ca
-          - secret:
-              items:
-              - key: tls.crt
-                path: apiserver.crt
-              - key: tls.key
-                path: apiserver.key
-              name: apiserver
-          - secret:
-              items:
-              - key: tls.crt
-                path: apiserver-kubelet-client.crt
-              - key: tls.key
-                path: apiserver-kubelet-client.key
-              name: apiserver-kubelet-client
-          - secret:
-              items:
-              - key: tls.crt
-                path: sa.pub
-              - key: tls.key
-                path: sa.key
-              name: sa
-          - secret:
-              items:
-              - key: tls.crt
-                path: front-proxy-ca.crt
-              name: front-proxy-ca
-          - secret:
-              items:
-              - key: tls.crt
-                path: front-proxy-client.crt
-              - key: tls.key
-                path: front-proxy-client.key
-              name: front-proxy-client
+      - hostPath:
+          path: /etc/kubernetes/pki
+        name: k8s-certs
       - hostPath:
           path: /etc/ssl/certs
-        name: certs
+        name: ca-certs
       - hostPath:
           path: /etc/pki
-        name: pki
-  updateStrategy: {}
+        name: ca-certs-etc-pki
+  updateStrategy:
+    type: RollingUpdate
 status:
   currentNumberScheduled: 0
   desiredNumberScheduled: 0
@@ -277,25 +198,22 @@ metadata:
   annotations:
     scheduler.alpha.kubernetes.io/critical-pod: ""
   creationTimestamp: null
-  labels:
-    component: kube-controller-manager
-    tier: control-plane
   name: kube-controller-manager
   namespace: kube-system
 spec:
   containers:
   - command:
     - kube-controller-manager
+    - --leader-elect=true
+    - --controllers=*,bootstrapsigner,tokencleaner
+    - --kubeconfig=/etc/kubernetes/controller-manager.conf
+    - --root-ca-file=/etc/kubernetes/pki/ca.crt
     - --service-account-private-key-file=/etc/kubernetes/pki/sa.key
     - --cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt
     - --cluster-signing-key-file=/etc/kubernetes/pki/ca.key
-    - --leader-elect=true
-    - --kubeconfig=/etc/kubernetes/controller-manager.conf
-    - --controllers=*,bootstrapsigner,tokencleaner
-    - --root-ca-file=/etc/kubernetes/pki/ca.crt
     - --address=127.0.0.1
     - --use-service-account-credentials=true
-    image: gcr.io/google_containers/kube-controller-manager-amd64:v1.7.0
+    image: gcr.io/google_containers/kube-controller-manager-amd64:v1.7.4
     livenessProbe:
       failureThreshold: 8
       httpGet:
@@ -310,38 +228,33 @@ spec:
       requests:
         cpu: 200m
     volumeMounts:
-    - mountPath: /etc/kubernetes
-      name: k8s
+    - mountPath: /etc/kubernetes/pki
+      name: k8s-certs
       readOnly: true
     - mountPath: /etc/ssl/certs
-      name: certs
+      name: ca-certs
+      readOnly: true
+    - mountPath: /etc/kubernetes/controller-manager.conf
+      name: kubeconfig
+      readOnly: true
     - mountPath: /etc/pki
-      name: pki
+      name: ca-certs-etc-pki
+      readOnly: true
   hostNetwork: true
   volumes:
-  - name: k8s
-    projected:
-      sources:
-      - secret:
-          name: controller-manager.conf
-      - secret:
-          items:
-          - key: tls.crt
-            path: ca.crt
-          - key: tls.key
-            path: ca.key
-          name: ca
-      - secret:
-          items:
-          - key: tls.key
-            path: sa.key
-          name: sa
+  - hostPath:
+      path: /etc/kubernetes/pki
+    name: k8s-certs
   - hostPath:
       path: /etc/ssl/certs
-    name: certs
+    name: ca-certs
+  - hostPath:
+      path: /etc/kubernetes/controller-manager.conf
+      type: FileOrCreate
+    name: kubeconfig
   - hostPath:
       path: /etc/pki
-    name: pki
+    name: ca-certs-etc-pki
 status: {}
 `
 
@@ -361,16 +274,16 @@ spec:
       containers:
       - command:
         - kube-controller-manager
+        - --leader-elect=true
+        - --controllers=*,bootstrapsigner,tokencleaner
+        - --kubeconfig=/etc/kubernetes/controller-manager.conf
+        - --root-ca-file=/etc/kubernetes/pki/ca.crt
         - --service-account-private-key-file=/etc/kubernetes/pki/sa.key
         - --cluster-signing-cert-file=/etc/kubernetes/pki/ca.crt
         - --cluster-signing-key-file=/etc/kubernetes/pki/ca.key
-        - --leader-elect=true
-        - --kubeconfig=/etc/kubernetes/controller-manager.conf
-        - --controllers=*,bootstrapsigner,tokencleaner
-        - --root-ca-file=/etc/kubernetes/pki/ca.crt
         - --address=127.0.0.1
         - --use-service-account-credentials=true
-        image: gcr.io/google_containers/kube-controller-manager-amd64:v1.7.0
+        image: gcr.io/google_containers/kube-controller-manager-amd64:v1.7.4
         livenessProbe:
           failureThreshold: 8
           httpGet:
@@ -385,13 +298,18 @@ spec:
           requests:
             cpu: 200m
         volumeMounts:
-        - mountPath: /etc/kubernetes
-          name: k8s
+        - mountPath: /etc/kubernetes/pki
+          name: k8s-certs
           readOnly: true
         - mountPath: /etc/ssl/certs
-          name: certs
+          name: ca-certs
+          readOnly: true
+        - mountPath: /etc/kubernetes/controller-manager.conf
+          name: kubeconfig
+          readOnly: true
         - mountPath: /etc/pki
-          name: pki
+          name: ca-certs-etc-pki
+          readOnly: true
       dnsPolicy: ClusterFirstWithHostNet
       hostNetwork: true
       nodeSelector:
@@ -400,30 +318,21 @@ spec:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
       volumes:
-      - name: k8s
-        projected:
-          sources:
-          - secret:
-              name: controller-manager.conf
-          - secret:
-              items:
-              - key: tls.crt
-                path: ca.crt
-              - key: tls.key
-                path: ca.key
-              name: ca
-          - secret:
-              items:
-              - key: tls.key
-                path: sa.key
-              name: sa
+      - hostPath:
+          path: /etc/kubernetes/pki
+        name: k8s-certs
       - hostPath:
           path: /etc/ssl/certs
-        name: certs
+        name: ca-certs
+      - hostPath:
+          path: /etc/kubernetes/controller-manager.conf
+          type: FileOrCreate
+        name: kubeconfig
       - hostPath:
           path: /etc/pki
-        name: pki
-  updateStrategy: {}
+        name: ca-certs-etc-pki
+  updateStrategy:
+    type: RollingUpdate
 status:
   currentNumberScheduled: 0
   desiredNumberScheduled: 0
@@ -438,19 +347,16 @@ metadata:
   annotations:
     scheduler.alpha.kubernetes.io/critical-pod: ""
   creationTimestamp: null
-  labels:
-    component: kube-scheduler
-    tier: control-plane
   name: kube-scheduler
   namespace: kube-system
 spec:
   containers:
   - command:
     - kube-scheduler
-    - --address=127.0.0.1
     - --leader-elect=true
     - --kubeconfig=/etc/kubernetes/scheduler.conf
-    image: gcr.io/google_containers/kube-scheduler-amd64:v1.7.0
+    - --address=127.0.0.1
+    image: gcr.io/google_containers/kube-scheduler-amd64:v1.7.4
     livenessProbe:
       failureThreshold: 8
       httpGet:
@@ -465,16 +371,15 @@ spec:
       requests:
         cpu: 100m
     volumeMounts:
-    - mountPath: /etc/kubernetes
-      name: k8s
+    - mountPath: /etc/kubernetes/scheduler.conf
+      name: kubeconfig
       readOnly: true
   hostNetwork: true
   volumes:
-  - name: k8s
-    projected:
-      sources:
-      - secret:
-          name: scheduler.conf
+  - hostPath:
+      path: /etc/kubernetes/scheduler.conf
+      type: FileOrCreate
+    name: kubeconfig
 status: {}
 `
 
@@ -494,10 +399,10 @@ spec:
       containers:
       - command:
         - kube-scheduler
-        - --address=127.0.0.1
         - --leader-elect=true
         - --kubeconfig=/etc/kubernetes/scheduler.conf
-        image: gcr.io/google_containers/kube-scheduler-amd64:v1.7.0
+        - --address=127.0.0.1
+        image: gcr.io/google_containers/kube-scheduler-amd64:v1.7.4
         livenessProbe:
           failureThreshold: 8
           httpGet:
@@ -512,8 +417,8 @@ spec:
           requests:
             cpu: 100m
         volumeMounts:
-        - mountPath: /etc/kubernetes
-          name: k8s
+        - mountPath: /etc/kubernetes/scheduler.conf
+          name: kubeconfig
           readOnly: true
       dnsPolicy: ClusterFirstWithHostNet
       hostNetwork: true
@@ -523,12 +428,12 @@ spec:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
       volumes:
-      - name: k8s
-        projected:
-          sources:
-          - secret:
-              name: scheduler.conf
-  updateStrategy: {}
+      - hostPath:
+          path: /etc/kubernetes/scheduler.conf
+          type: FileOrCreate
+        name: kubeconfig
+  updateStrategy:
+    type: RollingUpdate
 status:
   currentNumberScheduled: 0
   desiredNumberScheduled: 0
@@ -544,17 +449,17 @@ func TestBuildDaemonSet(t *testing.T) {
 		dsBytes   []byte
 	}{
 		{
-			component: kubeadmconstants.KubeAPIServer,
+			component: constants.KubeAPIServer,
 			podBytes:  []byte(testAPIServerPod),
 			dsBytes:   []byte(testAPIServerDaemonSet),
 		},
 		{
-			component: kubeadmconstants.KubeControllerManager,
+			component: constants.KubeControllerManager,
 			podBytes:  []byte(testControllerManagerPod),
 			dsBytes:   []byte(testControllerManagerDaemonSet),
 		},
 		{
-			component: kubeadmconstants.KubeScheduler,
+			component: constants.KubeScheduler,
 			podBytes:  []byte(testSchedulerPod),
 			dsBytes:   []byte(testSchedulerDaemonSet),
 		},
@@ -569,8 +474,7 @@ func TestBuildDaemonSet(t *testing.T) {
 			t.Fatalf("couldn't load the specified Pod")
 		}
 
-		cfg := &kubeadmapi.MasterConfiguration{}
-		ds := buildDaemonSet(cfg, rt.component, podSpec)
+		ds := BuildDaemonSet(rt.component, podSpec, GetDefaultMutators())
 		dsBytes, err := yaml.Marshal(ds)
 		if err != nil {
 			t.Fatalf("failed to marshal daemonset to YAML: %v", err)

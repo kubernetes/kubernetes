@@ -79,3 +79,7 @@ func (c *Fake) WatchEvents(request *events.Request) (*events.EventChannel, error
 func (c *Fake) HasDedicatedImageFs() (bool, error) {
 	return false, nil
 }
+
+func (c *Fake) GetFsInfoByFsUUID(uuid string) (cadvisorapiv2.FsInfo, error) {
+	return cadvisorapiv2.FsInfo{}, nil
+}

@@ -128,8 +128,14 @@ func StartTestServerOrDie(t *testing.T) (*restclient.Config, TearDownFunc) {
 	// retry test because the bind might fail due to a race with another process
 	// binding to the port. We cannot listen to :0 (then the kernel would give us
 	// a port which is free for sure), so we need this workaround.
+
+	var err error
+
 	for retry := 0; retry < 5 && !t.Failed(); retry++ {
-		config, td, err := StartTestServer(t)
+		var config *restclient.Config
+		var td TearDownFunc
+
+		config, td, err = StartTestServer(t)
 		if err == nil {
 			return config, td
 		}
@@ -139,7 +145,7 @@ func StartTestServerOrDie(t *testing.T) (*restclient.Config, TearDownFunc) {
 		t.Logf("Bind error, retrying...")
 	}
 
-	t.Fatalf("Failed to launch server")
+	t.Fatalf("Failed to launch server: %v", err)
 	return nil, nil
 }
 

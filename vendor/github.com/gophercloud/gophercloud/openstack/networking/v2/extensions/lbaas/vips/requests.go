@@ -29,10 +29,10 @@ type ListOpts struct {
 }
 
 // List returns a Pager which allows you to iterate over a collection of
-// routers. It accepts a ListOpts struct, which allows you to filter and sort
-// the returned collection for greater efficiency.
+// Virtual IPs. It accepts a ListOpts struct, which allows you to filter and
+// sort the returned collection for greater efficiency.
 //
-// Default policy settings return only those routers that are owned by the
+// Default policy settings return only those virtual IPs that are owned by the
 // tenant who submits the request, unless an admin user submits the request.
 func List(c *gophercloud.ServiceClient, opts ListOpts) pagination.Pager {
 	q, err := gophercloud.BuildQueryString(&opts)
@@ -45,43 +45,54 @@ func List(c *gophercloud.ServiceClient, opts ListOpts) pagination.Pager {
 	})
 }
 
-// CreateOptsBuilder is what types must satisfy to be used as Create
-// options.
+// CreateOptsBuilder allows extensions to add additional parameters to the
+// Create Request.
 type CreateOptsBuilder interface {
 	ToVIPCreateMap() (map[string]interface{}, error)
 }
 
 // CreateOpts contains all the values needed to create a new virtual IP.
 type CreateOpts struct {
-	// Human-readable name for the VIP. Does not have to be unique.
+	// Name is the human-readable name for the VIP. Does not have to be unique.
 	Name string `json:"name" required:"true"`
-	// The network on which to allocate the VIP's address. A tenant can
-	// only create VIPs on networks authorized by policy (e.g. networks that
+
+	// SubnetID is the network on which to allocate the VIP's address. A tenant
+	// can only create VIPs on networks authorized by policy (e.g. networks that
 	// belong to them or networks that are shared).
 	SubnetID string `json:"subnet_id" required:"true"`
-	// The protocol - can either be TCP, HTTP or HTTPS.
+
+	// Protocol - can either be TCP, HTTP or HTTPS.
 	Protocol string `json:"protocol" required:"true"`
-	// The port on which to listen for client traffic.
+
+	// ProtocolPort is the port on which to listen for client traffic.
 	ProtocolPort int `json:"protocol_port" required:"true"`
-	// The ID of the pool with which the VIP is associated.
+
+	// PoolID is the ID of the pool with which the VIP is associated.
 	PoolID string `json:"pool_id" required:"true"`
-	// Required for admins. Indicates the owner of the VIP.
+
+	// TenantID is only required if the caller has an admin role and wants
+	// to create a pool for another tenant.
 	TenantID string `json:"tenant_id,omitempty"`
-	// The IP address of the VIP.
+
+	// Address is the IP address of the VIP.
 	Address string `json:"address,omitempty"`
-	// Human-readable description for the VIP.
+
+	// Description is the human-readable description for the VIP.
 	Description string `json:"description,omitempty"`
+
+	// Persistence is the the of session persistence to use.
 	// Omit this field to prevent session persistence.
 	Persistence *SessionPersistence `json:"session_persistence,omitempty"`
-	// The maximum number of connections allowed for the VIP.
+
+	// ConnLimit is the maximum number of connections allowed for the VIP.
 	ConnLimit *int `json:"connection_limit,omitempty"`
-	// The administrative state of the VIP. A valid value is true (UP)
-	// or false (DOWN).
+
+	// AdminStateUp is the administrative state of the VIP. A valid value is
+	// true (UP) or false (DOWN).
 	AdminStateUp *bool `json:"admin_state_up,omitempty"`
 }
 
-// ToVIPCreateMap allows CreateOpts to satisfy the CreateOptsBuilder
-// interface
+// ToVIPCreateMap builds a request body from CreateOpts.
 func (opts CreateOpts) ToVIPCreateMap() (map[string]interface{}, error) {
 	return gophercloud.BuildRequestBody(opts, "vip")
 }
@@ -113,8 +124,8 @@ func Get(c *gophercloud.ServiceClient, id string) (r GetResult) {
 	return
 }
 
-// UpdateOptsBuilder is what types must satisfy to be used as Update
-// options.
+// UpdateOptsBuilder allows extensions to add additional parameters to the
+// Update request.
 type UpdateOptsBuilder interface {
 	ToVIPUpdateMap() (map[string]interface{}, error)
 }
@@ -123,22 +134,28 @@ type UpdateOptsBuilder interface {
 // Attributes not listed here but appear in CreateOpts are immutable and cannot
 // be updated.
 type UpdateOpts struct {
-	// Human-readable name for the VIP. Does not have to be unique.
+	// Name is the human-readable name for the VIP. Does not have to be unique.
 	Name *string `json:"name,omitempty"`
-	// The ID of the pool with which the VIP is associated.
+
+	// PoolID is the ID of the pool with which the VIP is associated.
 	PoolID *string `json:"pool_id,omitempty"`
-	// Human-readable description for the VIP.
+
+	// Description is the human-readable description for the VIP.
 	Description *string `json:"description,omitempty"`
+
+	// Persistence is the the of session persistence to use.
 	// Omit this field to prevent session persistence.
 	Persistence *SessionPersistence `json:"session_persistence,omitempty"`
-	// The maximum number of connections allowed for the VIP.
+
+	// ConnLimit is the maximum number of connections allowed for the VIP.
 	ConnLimit *int `json:"connection_limit,omitempty"`
-	// The administrative state of the VIP. A valid value is true (UP)
-	// or false (DOWN).
+
+	// AdminStateUp is the administrative state of the VIP. A valid value is
+	// true (UP) or false (DOWN).
 	AdminStateUp *bool `json:"admin_state_up,omitempty"`
 }
 
-// ToVIPUpdateMap allows UpdateOpts to satisfy the UpdateOptsBuilder interface
+// ToVIPUpdateMap builds a request body based on UpdateOpts.
 func (opts UpdateOpts) ToVIPUpdateMap() (map[string]interface{}, error) {
 	return gophercloud.BuildRequestBody(opts, "vip")
 }

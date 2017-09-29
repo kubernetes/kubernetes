@@ -17,14 +17,17 @@
 
 : "${KUBE_ROOT?Must set KUBE_ROOT env var}"
 
-# Provides the $KUBERNETES_PROVIDER, kubeconfig-federation-context()
-# and detect-project function
+# Provides the kubeconfig-federation-context() function
 source "${KUBE_ROOT}/cluster/kube-util.sh"
+
+# For `kube::log::status` function
+source "${KUBE_ROOT}/cluster/lib/logging.sh"
 
 # kubefed configuration
 FEDERATION_NAME="${FEDERATION_NAME:-e2e-federation}"
 FEDERATION_NAMESPACE=${FEDERATION_NAMESPACE:-federation-system}
 FEDERATION_KUBE_CONTEXT="${FEDERATION_KUBE_CONTEXT:-${FEDERATION_NAME}}"
+FEDERATION_USE_PV_FOR_ETCD=${FEDERATION_USE_PV_FOR_ETCD:-false}
 HOST_CLUSTER_ZONE="${FEDERATION_HOST_CLUSTER_ZONE:-}"
 # If $HOST_CLUSTER_ZONE isn't specified, arbitrarily choose
 # last zone as the host cluster zone.
@@ -51,7 +54,7 @@ function federation_cluster_contexts() {
   federation_contexts=()
   for context in ${contexts}; do
     # Skip federation context
-    if [[ "${context}" == "${FEDERATION_NAME}" ]]; then
+    if [[ "${context}" == "${FEDERATION_KUBE_CONTEXT}" ]]; then
       continue
     fi
     # Skip contexts not beginning with "federation"
@@ -60,11 +63,9 @@ function federation_cluster_contexts() {
     fi
     federation_contexts+=("${context}")
   done
-  echo ${federation_contexts[@]}
+  echo ${federation_contexts[@]:-}
 }
 
-
-source "${KUBE_ROOT}/cluster/common.sh"
 
 host_kubectl="${KUBE_ROOT}/cluster/kubectl.sh --namespace=${FEDERATION_NAMESPACE}"
 
@@ -74,17 +75,16 @@ function cleanup-federation-api-objects {
   set +o errexit
 
   echo "Cleaning Federation control plane objects"
-  # Delete all resources with the federated-cluster label.
-  $host_kubectl delete pods,svc,rc,deployment,secret -lapp=federated-cluster
-
-  # Delete all PVs bound to PVCs in FEDERATION_NAMESPACE
-  pvs=$($host_kubectl get pvc --namespace=${FEDERATION_NAMESPACE} -o jsonpath='{.items[*].spec.volumeName}')
-  while $host_kubectl delete pv ${pvs} >/dev/null 2>&1; do
-    sleep 2
+  kube::log::status "Removing namespace \"${FEDERATION_NAMESPACE}\" from \"${FEDERATION_KUBE_CONTEXT}\""
+  # Try deleting until the namespace is completely gone.
+  while $host_kubectl --context="${FEDERATION_KUBE_CONTEXT}" delete namespace "${FEDERATION_NAMESPACE}" >/dev/null 2>&1; do
+    # It is usually slower to remove a namespace because it involves
+    # performing a cascading deletion of all the resources in the
+    # namespace. So we sleep a little longer than other resources
+    # before retrying
+    sleep 5
   done
-
-  # Delete all resources in FEDERATION_NAMESPACE.
-  $host_kubectl delete pvc,pods,svc,rc,deployment,secret --namespace=${FEDERATION_NAMESPACE} --all
+  kube::log::status "Removed namespace \"${FEDERATION_NAMESPACE}\" from \"${FEDERATION_KUBE_CONTEXT}\""
 
   # This is a big hammer. We get rid of federation-system namespace from
   # all the clusters

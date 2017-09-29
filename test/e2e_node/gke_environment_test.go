@@ -342,16 +342,6 @@ var _ = framework.KubeDescribe("GKE system requirements [Conformance] [Feature:G
 	})
 })
 
-// runCommand runs the cmd and returns the combined stdout and stderr, or an
-// error if the command failed.
-func runCommand(cmd ...string) (string, error) {
-	output, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to run %q: %s (%s)", strings.Join(cmd, " "), err, output)
-	}
-	return string(output), nil
-}
-
 // getPPID returns the PPID for the pid.
 func getPPID(pid int) (int, error) {
 	statusFile := "/proc/" + strconv.Itoa(pid) + "/status"

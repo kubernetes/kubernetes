@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"strconv"
 	"time"
 
@@ -31,7 +32,6 @@ import (
 	"github.com/google/cadvisor/cache/memory"
 	cadvisormetrics "github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/events"
-	cadvisorfs "github.com/google/cadvisor/fs"
 	cadvisorhttp "github.com/google/cadvisor/http"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
@@ -43,8 +43,8 @@ import (
 )
 
 type cadvisorClient struct {
-	runtime  string
-	rootPath string
+	imageFsInfoProvider ImageFsInfoProvider
+	rootPath            string
 	manager.Manager
 }
 
@@ -77,27 +77,35 @@ func init() {
 }
 
 func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
-	set := map[string]string{metrics.LabelID: c.Name}
+	// Prometheus requires that all metrics in the same family have the same labels,
+	// so we arrange to supply blank strings for missing labels
+	var name, image, podName, namespace, containerName string
 	if len(c.Aliases) > 0 {
-		set[metrics.LabelName] = c.Aliases[0]
+		name = c.Aliases[0]
 	}
-	if image := c.Spec.Image; len(image) > 0 {
-		set[metrics.LabelImage] = image
-	}
+	image = c.Spec.Image
 	if v, ok := c.Spec.Labels[types.KubernetesPodNameLabel]; ok {
-		set["pod_name"] = v
+		podName = v
 	}
 	if v, ok := c.Spec.Labels[types.KubernetesPodNamespaceLabel]; ok {
-		set["namespace"] = v
+		namespace = v
 	}
 	if v, ok := c.Spec.Labels[types.KubernetesContainerNameLabel]; ok {
-		set["container_name"] = v
+		containerName = v
+	}
+	set := map[string]string{
+		metrics.LabelID:    c.Name,
+		metrics.LabelName:  name,
+		metrics.LabelImage: image,
+		"pod_name":         podName,
+		"namespace":        namespace,
+		"container_name":   containerName,
 	}
 	return set
 }
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(address string, port uint, runtime string, rootPath string) (Interface, error) {
+func New(address string, port uint, imageFsInfoProvider ImageFsInfoProvider, rootPath string) (Interface, error) {
 	sysFs := sysfs.NewRealSysFs()
 
 	// Create and start the cAdvisor container manager.
@@ -108,16 +116,18 @@ func New(address string, port uint, runtime string, rootPath string) (Interface,
 
 	if _, err := os.Stat(rootPath); err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("rootDirectory %q does not exist", rootPath)
+			if err := os.MkdirAll(path.Clean(rootPath), 0750); err != nil {
+				return nil, fmt.Errorf("error creating root directory %q: %v", rootPath, err)
+			}
 		} else {
 			return nil, fmt.Errorf("failed to Stat %q: %v", rootPath, err)
 		}
 	}
 
 	cadvisorClient := &cadvisorClient{
-		runtime:  runtime,
-		rootPath: rootPath,
-		Manager:  m,
+		imageFsInfoProvider: imageFsInfoProvider,
+		rootPath:            rootPath,
+		Manager:             m,
 	}
 
 	err = cadvisorClient.exportHTTP(address, port)
@@ -197,17 +207,10 @@ func (cc *cadvisorClient) MachineInfo() (*cadvisorapi.MachineInfo, error) {
 }
 
 func (cc *cadvisorClient) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
-	var label string
-
-	switch cc.runtime {
-	case "docker":
-		label = cadvisorfs.LabelDockerImages
-	case "rkt":
-		label = cadvisorfs.LabelRktImages
-	default:
-		return cadvisorapiv2.FsInfo{}, fmt.Errorf("ImagesFsInfo: unknown runtime: %v", cc.runtime)
+	label, err := cc.imageFsInfoProvider.ImageFsInfoLabel()
+	if err != nil {
+		return cadvisorapiv2.FsInfo{}, err
 	}
-
 	return cc.getFsInfo(label)
 }
 

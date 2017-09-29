@@ -248,9 +248,9 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	if err != nil {
 		glog.Fatal(err)
 	}
-	masterConfig.GenericConfig.SharedInformerFactory = extinformers.NewSharedInformerFactory(clientset, masterConfig.GenericConfig.LoopbackClientConfig.Timeout)
 
-	m, err = masterConfig.Complete().New(genericapiserver.EmptyDelegate)
+	sharedInformers := extinformers.NewSharedInformerFactory(clientset, masterConfig.GenericConfig.LoopbackClientConfig.Timeout)
+	m, err = masterConfig.Complete(sharedInformers).New(genericapiserver.EmptyDelegate)
 	if err != nil {
 		closeFn()
 		glog.Fatalf("error in bringing up the master: %v", err)
@@ -300,7 +300,13 @@ func NewMasterConfig() *master.Config {
 	info, _ := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	ns := NewSingleContentTypeSerializer(api.Scheme, info)
 
-	storageFactory := serverstorage.NewDefaultStorageFactory(etcdOptions.StorageConfig, runtime.ContentTypeJSON, ns, serverstorage.NewDefaultResourceEncodingConfig(api.Registry), master.DefaultAPIResourceConfigSource())
+	resourceEncoding := serverstorage.NewDefaultResourceEncodingConfig(api.Registry)
+	// FIXME (soltysh): this GroupVersionResource override should be configurable
+	// we need to set both for the whole group and for cronjobs, separately
+	resourceEncoding.SetVersionEncoding(batch.GroupName, *testapi.Batch.GroupVersion(), schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
+	resourceEncoding.SetResourceEncoding(schema.GroupResource{Group: "batch", Resource: "cronjobs"}, schema.GroupVersion{Group: batch.GroupName, Version: "v1beta1"}, schema.GroupVersion{Group: batch.GroupName, Version: runtime.APIVersionInternal})
+
+	storageFactory := serverstorage.NewDefaultStorageFactory(etcdOptions.StorageConfig, runtime.ContentTypeJSON, ns, resourceEncoding, master.DefaultAPIResourceConfigSource(), nil)
 	storageFactory.SetSerializer(
 		schema.GroupResource{Group: v1.GroupName, Resource: serverstorage.AllResources},
 		"",
@@ -351,22 +357,24 @@ func NewMasterConfig() *master.Config {
 	}
 
 	return &master.Config{
-		GenericConfig:           genericConfig,
-		APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
-		StorageFactory:          storageFactory,
-		EnableCoreControllers:   true,
-		KubeletClientConfig:     kubeletclient.KubeletClientConfig{Port: 10250},
-		APIServerServicePort:    443,
-		MasterCount:             1,
+		GenericConfig: genericConfig,
+		ExtraConfig: master.ExtraConfig{
+			APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
+			StorageFactory:          storageFactory,
+			EnableCoreControllers:   true,
+			KubeletClientConfig:     kubeletclient.KubeletClientConfig{Port: 10250},
+			APIServerServicePort:    443,
+			MasterCount:             1,
+		},
 	}
 }
 
 // Returns the master config appropriate for most integration tests.
 func NewIntegrationTestMasterConfig() *master.Config {
 	masterConfig := NewMasterConfig()
-	masterConfig.EnableCoreControllers = true
+	masterConfig.ExtraConfig.EnableCoreControllers = true
 	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
-	masterConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
+	masterConfig.ExtraConfig.APIResourceConfigSource = master.DefaultAPIResourceConfigSource()
 	return masterConfig
 }
 

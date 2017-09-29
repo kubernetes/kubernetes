@@ -1,6 +1,6 @@
 // +build windows
 
-package windows
+package windowsconsole
 
 import (
 	"io"

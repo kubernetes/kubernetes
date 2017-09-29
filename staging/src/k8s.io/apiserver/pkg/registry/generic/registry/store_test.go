@@ -44,6 +44,7 @@ import (
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
@@ -52,10 +53,14 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilfeaturetesting "k8s.io/apiserver/pkg/util/feature/testing"
 )
 
 var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
+
+const validInitializerName = "test.k8s.io"
 
 func init() {
 	metav1.AddToGroupVersion(scheme, metav1.SchemeGroupVersion)
@@ -390,11 +395,13 @@ func isQualifiedResource(err error, kind, group string) bool {
 }
 
 func TestStoreCreateInitialized(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Initializers, true)()
+
 	podA := &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo", Namespace: "test",
 			Initializers: &metav1.Initializers{
-				Pending: []metav1.Initializer{{Name: "Test"}},
+				Pending: []metav1.Initializer{{Name: validInitializerName}},
 			},
 		},
 		Spec: example.PodSpec{NodeName: "machine"},
@@ -422,7 +429,7 @@ func TestStoreCreateInitialized(t *testing.T) {
 		defer w.Stop()
 		event := <-w.ResultChan()
 		pod := event.Object.(*example.Pod)
-		if event.Type != watch.Added || !hasInitializers(pod, "Test") {
+		if event.Type != watch.Added || !hasInitializers(pod, validInitializerName) {
 			t.Fatalf("unexpected event: %s %#v", event.Type, event.Object)
 		}
 
@@ -493,11 +500,13 @@ func TestStoreCreateInitialized(t *testing.T) {
 }
 
 func TestStoreCreateInitializedFailed(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Initializers, true)()
+
 	podA := &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo", Namespace: "test",
 			Initializers: &metav1.Initializers{
-				Pending: []metav1.Initializer{{Name: "Test"}},
+				Pending: []metav1.Initializer{{Name: validInitializerName}},
 			},
 		},
 		Spec: example.PodSpec{NodeName: "machine"},
@@ -519,7 +528,7 @@ func TestStoreCreateInitializedFailed(t *testing.T) {
 		}
 		event := <-w.ResultChan()
 		pod := event.Object.(*example.Pod)
-		if event.Type != watch.Added || !hasInitializers(pod, "Test") {
+		if event.Type != watch.Added || !hasInitializers(pod, validInitializerName) {
 			t.Fatalf("unexpected event: %s %#v", event.Type, event.Object)
 		}
 		pod.Initializers.Pending = nil
@@ -849,7 +858,7 @@ func TestStoreDelete(t *testing.T) {
 
 func TestStoreDeleteUninitialized(t *testing.T) {
 	podA := &example.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Initializers: &metav1.Initializers{Pending: []metav1.Initializer{{Name: "Testing"}}}},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Initializers: &metav1.Initializers{Pending: []metav1.Initializer{{Name: validInitializerName}}}},
 		Spec:       example.PodSpec{NodeName: "machine"},
 	}
 
@@ -931,63 +940,71 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
-	registry.EnableGarbageCollection = true
 	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
 	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
 	defer destroyFunc()
-	// create pod
-	_, err := registry.Create(testContext, podWithFinalizer, false)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
 
-	// delete the pod with grace period=0, the pod should still exist because it has a finalizer
-	_, wasDeleted, err := registry.Delete(testContext, podWithFinalizer.Name, metav1.NewDeleteOptions(0))
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if wasDeleted {
-		t.Errorf("unexpected, pod %s should not have been deleted immediately", podWithFinalizer.Name)
-	}
-	_, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	gcStates := []bool{true, false}
+	for _, gcEnabled := range gcStates {
+		t.Logf("garbage collection enabled: %t", gcEnabled)
+		registry.EnableGarbageCollection = gcEnabled
 
-	updatedPodWithFinalizer := &example.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
-		Spec:       example.PodSpec{NodeName: "machine"},
-	}
-	_, _, err = registry.Update(testContext, updatedPodWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(updatedPodWithFinalizer, scheme))
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+		// create pod
+		_, err := registry.Create(testContext, podWithFinalizer, false)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
 
-	// the object should still exist, because it still has a finalizer
-	_, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+		// delete the pod with grace period=0, the pod should still exist because it has a finalizer
+		_, wasDeleted, err := registry.Delete(testContext, podWithFinalizer.Name, metav1.NewDeleteOptions(0))
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if wasDeleted {
+			t.Errorf("unexpected, pod %s should not have been deleted immediately", podWithFinalizer.Name)
+		}
+		_, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
 
-	podWithNoFinalizer := &example.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
-		Spec:       example.PodSpec{NodeName: "anothermachine"},
-	}
-	_, _, err = registry.Update(testContext, podWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(podWithNoFinalizer, scheme))
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	// the pod should be removed, because its finalizer is removed
-	_, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
-	if !errors.IsNotFound(err) {
-		t.Fatalf("Unexpected error: %v", err)
+		updatedPodWithFinalizer := &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
+			Spec:       example.PodSpec{NodeName: "machine"},
+		}
+		_, _, err = registry.Update(testContext, updatedPodWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(updatedPodWithFinalizer, scheme))
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
+		// the object should still exist, because it still has a finalizer
+		_, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
+		podWithNoFinalizer := &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
+			Spec:       example.PodSpec{NodeName: "anothermachine"},
+		}
+		_, _, err = registry.Update(testContext, podWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(podWithNoFinalizer, scheme))
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		// the pod should be removed, because its finalizer is removed
+		_, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
+		if !errors.IsNotFound(err) {
+			t.Fatalf("Unexpected error: %v", err)
+		}
 	}
 }
 
 func TestFailedInitializationStoreUpdate(t *testing.T) {
+	defer utilfeaturetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.Initializers, true)()
+
 	initialGeneration := int64(1)
 	podInitializing := &example.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Initializers: &metav1.Initializers{Pending: []metav1.Initializer{{Name: "Test"}}}, Generation: initialGeneration},
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Initializers: &metav1.Initializers{Pending: []metav1.Initializer{{Name: validInitializerName}}}, Generation: initialGeneration},
 		Spec:       example.PodSpec{NodeName: "machine"},
 	}
 
@@ -1030,73 +1047,79 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
-	registry.EnableGarbageCollection = true
+
 	defer destroyFunc()
-	// create pod
-	_, err := registry.Create(testContext, podWithFinalizer, false)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
+	gcStates := []bool{true, false}
+	for _, gcEnabled := range gcStates {
+		t.Logf("garbage collection enabled: %t", gcEnabled)
+		registry.EnableGarbageCollection = gcEnabled
 
-	// delete object with nil delete options doesn't delete the object
-	_, wasDeleted, err := registry.Delete(testContext, podWithFinalizer.Name, nil)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	if wasDeleted {
-		t.Errorf("unexpected, pod %s should not have been deleted immediately", podWithFinalizer.Name)
-	}
+		// create pod
+		_, err := registry.Create(testContext, podWithFinalizer, false)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
 
-	// the object should still exist
-	obj, err := registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	podWithFinalizer, ok := obj.(*example.Pod)
-	if !ok {
-		t.Errorf("Unexpected object: %#v", obj)
-	}
-	if podWithFinalizer.ObjectMeta.DeletionTimestamp == nil {
-		t.Errorf("Expect the object to have DeletionTimestamp set, but got %#v", podWithFinalizer.ObjectMeta)
-	}
-	if podWithFinalizer.ObjectMeta.DeletionGracePeriodSeconds == nil || *podWithFinalizer.ObjectMeta.DeletionGracePeriodSeconds != 0 {
-		t.Errorf("Expect the object to have 0 DeletionGracePeriodSecond, but got %#v", podWithFinalizer.ObjectMeta)
-	}
-	if podWithFinalizer.Generation <= initialGeneration {
-		t.Errorf("Deletion didn't increase Generation.")
-	}
+		// delete object with nil delete options doesn't delete the object
+		_, wasDeleted, err := registry.Delete(testContext, podWithFinalizer.Name, nil)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if wasDeleted {
+			t.Errorf("unexpected, pod %s should not have been deleted immediately", podWithFinalizer.Name)
+		}
 
-	updatedPodWithFinalizer := &example.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
-		Spec:       example.PodSpec{NodeName: "machine"},
-	}
-	_, _, err = registry.Update(testContext, updatedPodWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(updatedPodWithFinalizer, scheme))
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
+		// the object should still exist
+		obj, err := registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		podWithFinalizer, ok := obj.(*example.Pod)
+		if !ok {
+			t.Errorf("Unexpected object: %#v", obj)
+		}
+		if podWithFinalizer.ObjectMeta.DeletionTimestamp == nil {
+			t.Errorf("Expect the object to have DeletionTimestamp set, but got %#v", podWithFinalizer.ObjectMeta)
+		}
+		if podWithFinalizer.ObjectMeta.DeletionGracePeriodSeconds == nil || *podWithFinalizer.ObjectMeta.DeletionGracePeriodSeconds != 0 {
+			t.Errorf("Expect the object to have 0 DeletionGracePeriodSecond, but got %#v", podWithFinalizer.ObjectMeta)
+		}
+		if podWithFinalizer.Generation <= initialGeneration {
+			t.Errorf("Deletion didn't increase Generation.")
+		}
 
-	// the object should still exist, because it still has a finalizer
-	obj, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	podWithFinalizer, ok = obj.(*example.Pod)
-	if !ok {
-		t.Errorf("Unexpected object: %#v", obj)
-	}
+		updatedPodWithFinalizer := &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
+			Spec:       example.PodSpec{NodeName: "machine"},
+		}
+		_, _, err = registry.Update(testContext, updatedPodWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(updatedPodWithFinalizer, scheme))
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
 
-	podWithNoFinalizer := &example.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
-		Spec:       example.PodSpec{NodeName: "anothermachine"},
-	}
-	_, _, err = registry.Update(testContext, podWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(podWithNoFinalizer, scheme))
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	// the pod should be removed, because its finalizer is removed
-	_, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
-	if !errors.IsNotFound(err) {
-		t.Errorf("Unexpected error: %v", err)
+		// the object should still exist, because it still has a finalizer
+		obj, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		podWithFinalizer, ok = obj.(*example.Pod)
+		if !ok {
+			t.Errorf("Unexpected object: %#v", obj)
+		}
+
+		podWithNoFinalizer := &example.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
+			Spec:       example.PodSpec{NodeName: "anothermachine"},
+		}
+		_, _, err = registry.Update(testContext, podWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(podWithNoFinalizer, scheme))
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		// the pod should be removed, because its finalizer is removed
+		_, err = registry.Get(testContext, podWithFinalizer.Name, &metav1.GetOptions{})
+		if !errors.IsNotFound(err) {
+			t.Errorf("Unexpected error: %v", err)
+		}
 	}
 }
 
@@ -1596,7 +1619,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "baz",
 			Initializers: &metav1.Initializers{
-				Pending: []metav1.Initializer{{Name: "Test"}},
+				Pending: []metav1.Initializer{{Name: validInitializerName}},
 			},
 		},
 	}

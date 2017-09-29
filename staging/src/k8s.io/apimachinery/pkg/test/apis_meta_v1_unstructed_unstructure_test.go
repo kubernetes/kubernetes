@@ -206,11 +206,11 @@ func TestUnstructuredGetters(t *testing.T) {
 		t.Errorf("GetSelfLink() = %s, want %s", got, want)
 	}
 
-	if got, want := unstruct.GetCreationTimestamp(), metav1.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC); !got.Equal(want) {
+	if got, want := unstruct.GetCreationTimestamp(), metav1.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC); !got.Equal(&want) {
 		t.Errorf("GetCreationTimestamp() = %s, want %s", got, want)
 	}
 
-	if got, want := unstruct.GetDeletionTimestamp(), metav1.Date(2010, time.November, 10, 23, 0, 0, 0, time.UTC); got == nil || !got.Equal(want) {
+	if got, want := unstruct.GetDeletionTimestamp(), metav1.Date(2010, time.November, 10, 23, 0, 0, 0, time.UTC); got == nil || !got.Equal(&want) {
 		t.Errorf("GetDeletionTimestamp() = %s, want %s", got, want)
 	}
 

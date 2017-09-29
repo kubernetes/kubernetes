@@ -102,6 +102,10 @@ func (p RESTStorageProvider) v1beta2Storage(apiResourceConfigSource serverstorag
 		storage["replicasets/status"] = replicaSetStorage.Status
 		storage["replicasets/scale"] = replicaSetStorage.Scale
 	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("controllerrevisions")) {
+		historyStorage := controllerrevisionsstore.NewREST(restOptionsGetter)
+		storage["controllerrevisions"] = historyStorage
+	}
 	return storage
 }
 

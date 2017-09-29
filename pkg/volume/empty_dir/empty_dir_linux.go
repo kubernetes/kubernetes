@@ -27,7 +27,10 @@ import (
 )
 
 // Defined by Linux - the type number for tmpfs mounts.
-const linuxTmpfsMagic = 0x01021994
+const (
+	linuxTmpfsMagic     = 0x01021994
+	linuxHugetlbfsMagic = 0x958458f6
+)
 
 // realMountDetector implements mountDetector in terms of syscalls.
 type realMountDetector struct {
@@ -48,6 +51,8 @@ func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, er
 	glog.V(5).Infof("Statfs_t of %v: %+v", path, buf)
 	if buf.Type == linuxTmpfsMagic {
 		return mediumMemory, !notMnt, nil
+	} else if int64(buf.Type) == linuxHugetlbfsMagic {
+		return mediumHugepages, !notMnt, nil
 	}
 	return mediumUnknown, !notMnt, nil
 }

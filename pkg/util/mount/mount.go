@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
-	"k8s.io/utils/exec"
 )
 
 const (
@@ -68,6 +67,19 @@ type Interface interface {
 	// GetDeviceNameFromMount finds the device name by checking the mount path
 	// to get the global mount path which matches its plugin directory
 	GetDeviceNameFromMount(mountPath, pluginDir string) (string, error)
+	// MakeRShared checks that given path is on a mount with 'rshared' mount
+	// propagation. If not, it bind-mounts the path as rshared.
+	MakeRShared(path string) error
+}
+
+// Exec executes command where mount utilities are. This can be either the host,
+// container where kubelet runs or even a remote pod with mount utilities.
+// Usual pkg/util/exec interface is not used because kubelet.RunInContainer does
+// not provide stdin/stdout/stderr streams.
+type Exec interface {
+	// Run executes a command and returns its stdout + stderr combined in one
+	// stream.
+	Run(cmd string, args ...string) ([]byte, error)
 }
 
 // Compile-time check to ensure all Mounter implementations satisfy
@@ -89,7 +101,7 @@ type MountPoint struct {
 // mounts it otherwise the device is formatted first then mounted.
 type SafeFormatAndMount struct {
 	Interface
-	Runner exec.Interface
+	Exec
 }
 
 // FormatAndMount formats the given disk, if needed, and mounts it.
@@ -114,7 +126,6 @@ func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	// Find the device name.
 	deviceName := ""
 	// If mountPath is symlink, need get its target path.
@@ -136,6 +147,39 @@ func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
 	} else {
 		for i := range mps {
 			if mps[i].Device == deviceName && mps[i].Path != slTarget {
+				refs = append(refs, mps[i].Path)
+			}
+		}
+	}
+	return refs, nil
+}
+
+// GetMountRefsByDev finds all references to the device provided
+// by mountPath; returns a list of paths.
+func GetMountRefsByDev(mounter Interface, mountPath string) ([]string, error) {
+	mps, err := mounter.List()
+	if err != nil {
+		return nil, err
+	}
+	slTarget, err := filepath.EvalSymlinks(mountPath)
+	if err != nil {
+		slTarget = mountPath
+	}
+
+	// Finding the device mounted to mountPath
+	diskDev := ""
+	for i := range mps {
+		if slTarget == mps[i].Path {
+			diskDev = mps[i].Device
+			break
+		}
+	}
+
+	// Find all references to the device.
+	var refs []string
+	for i := range mps {
+		if mps[i].Device == diskDev || mps[i].Device == slTarget {
+			if mps[i].Path != slTarget {
 				refs = append(refs, mps[i].Path)
 			}
 		}
@@ -233,4 +277,29 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 		}
 	}
 	return notMnt, nil
+}
+
+// isBind detects whether a bind mount is being requested and makes the remount options to
+// use in case of bind mount, due to the fact that bind mount doesn't respect mount options.
+// The list equals:
+//   options - 'bind' + 'remount' (no duplicate)
+func isBind(options []string) (bool, []string) {
+	bindRemountOpts := []string{"remount"}
+	bind := false
+
+	if len(options) != 0 {
+		for _, option := range options {
+			switch option {
+			case "bind":
+				bind = true
+				break
+			case "remount":
+				break
+			default:
+				bindRemountOpts = append(bindRemountOpts, option)
+			}
+		}
+	}
+
+	return bind, bindRemountOpts
 }

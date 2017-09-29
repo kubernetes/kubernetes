@@ -23,7 +23,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/api"
 	schedulingapi "k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/scheduling/priorityclass"
 )
 
@@ -39,7 +38,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		NewFunc:                  func() runtime.Object { return &schedulingapi.PriorityClass{} },
 		NewListFunc:              func() runtime.Object { return &schedulingapi.PriorityClassList{} },
 		DefaultQualifiedResource: schedulingapi.Resource("priorityclasses"),
-		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("priorityclasses"),
 
 		CreateStrategy: priorityclass.Strategy,
 		UpdateStrategy: priorityclass.Strategy,

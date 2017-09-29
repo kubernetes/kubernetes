@@ -76,6 +76,17 @@ func SetupMasterConfigurationFile(t *testing.T, tmpdir string, cfg *kubeadmapi.M
 	return cfgPath
 }
 
+// SetupEmptyFiles is a utility function for kubeadm testing that creates one or more empty files (touch)
+func SetupEmptyFiles(t *testing.T, tmpdir string, fileNames ...string) {
+	for _, fileName := range fileNames {
+		newFile, err := os.Create(filepath.Join(tmpdir, fileName))
+		if err != nil {
+			t.Fatalf("Error creating file %s in %s: %v", fileName, tmpdir, err)
+		}
+		newFile.Close()
+	}
+}
+
 // SetupPkiDirWithCertificateAuthorithy is a utility function for kubeadm testing that creates a
 // CertificateAuthorithy cert/key pair into /pki subfolder of a given temporary directory.
 // The funtion returns the path of the created pki.

@@ -22,6 +22,7 @@ import (
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	"k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -922,7 +923,7 @@ func TestGenerateJob(t *testing.T) {
 	}
 }
 
-func TestGenerateCronJob(t *testing.T) {
+func TestGenerateCronJobAlpha(t *testing.T) {
 	tests := []struct {
 		params    map[string]interface{}
 		expected  *batchv2alpha1.CronJob
@@ -1016,6 +1017,104 @@ func TestGenerateCronJob(t *testing.T) {
 		}
 		if !reflect.DeepEqual(obj.(*batchv2alpha1.CronJob), test.expected) {
 			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*batchv2alpha1.CronJob))
+		}
+	}
+}
+
+func TestGenerateCronJobBeta(t *testing.T) {
+	tests := []struct {
+		params    map[string]interface{}
+		expected  *batchv1beta1.CronJob
+		expectErr bool
+	}{
+		{
+			params: map[string]interface{}{
+				"labels":           "foo=bar,baz=blah",
+				"name":             "foo",
+				"image":            "someimage",
+				"port":             "80",
+				"hostport":         "80",
+				"stdin":            "true",
+				"leave-stdin-open": "true",
+				"command":          "true",
+				"args":             []string{"bar", "baz", "blah"},
+				"env":              []string{"a=b", "c=d"},
+				"requests":         "cpu=100m,memory=100Mi",
+				"limits":           "cpu=400m,memory=200Mi",
+				"restart":          "OnFailure",
+				"schedule":         "0/5 * * * ?",
+			},
+			expected: &batchv1beta1.CronJob{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"foo": "bar", "baz": "blah"},
+				},
+				Spec: batchv1beta1.CronJobSpec{
+					Schedule:          "0/5 * * * ?",
+					ConcurrencyPolicy: batchv1beta1.AllowConcurrent,
+					JobTemplate: batchv1beta1.JobTemplateSpec{
+						Spec: batchv1.JobSpec{
+							Template: v1.PodTemplateSpec{
+								ObjectMeta: metav1.ObjectMeta{
+									Labels: map[string]string{"foo": "bar", "baz": "blah"},
+								},
+								Spec: v1.PodSpec{
+									RestartPolicy: v1.RestartPolicyOnFailure,
+									Containers: []v1.Container{
+										{
+											Name:      "foo",
+											Image:     "someimage",
+											Stdin:     true,
+											StdinOnce: false,
+											Ports: []v1.ContainerPort{
+												{
+													ContainerPort: 80,
+													HostPort:      80,
+												},
+											},
+											Command: []string{"bar", "baz", "blah"},
+											Env: []v1.EnvVar{
+												{
+													Name:  "a",
+													Value: "b",
+												},
+												{
+													Name:  "c",
+													Value: "d",
+												},
+											},
+											Resources: v1.ResourceRequirements{
+												Requests: v1.ResourceList{
+													v1.ResourceCPU:    resource.MustParse("100m"),
+													v1.ResourceMemory: resource.MustParse("100Mi"),
+												},
+												Limits: v1.ResourceList{
+													v1.ResourceCPU:    resource.MustParse("400m"),
+													v1.ResourceMemory: resource.MustParse("200Mi"),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	generator := CronJobV1Beta1{}
+	for _, test := range tests {
+		obj, err := generator.Generate(test.params)
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if test.expectErr && err != nil {
+			continue
+		}
+		if !reflect.DeepEqual(obj.(*batchv1beta1.CronJob), test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*batchv1beta1.CronJob))
 		}
 	}
 }

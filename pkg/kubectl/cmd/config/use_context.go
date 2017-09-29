@@ -27,7 +27,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 var (
@@ -47,6 +47,7 @@ func NewCmdConfigUseContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	cmd := &cobra.Command{
 		Use:     "use-context CONTEXT_NAME",
 		Short:   i18n.T("Sets the current-context in a kubeconfig file"),
+		Aliases: []string{"use"},
 		Long:    `Sets the current-context in a kubeconfig file`,
 		Example: use_context_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -72,18 +73,13 @@ func (o useContextOptions) run() error {
 
 	config.CurrentContext = o.contextName
 
-	if err := clientcmd.ModifyConfig(o.configAccess, *config, true); err != nil {
-		return err
-	}
-
-	return nil
+	return clientcmd.ModifyConfig(o.configAccess, *config, true)
 }
 
 func (o *useContextOptions) complete(cmd *cobra.Command) error {
 	endingArgs := cmd.Flags().Args()
 	if len(endingArgs) != 1 {
-		cmd.Help()
-		return fmt.Errorf("Unexpected args: %v", endingArgs)
+		return helpErrorf(cmd, "Unexpected args: %v", endingArgs)
 	}
 
 	o.contextName = endingArgs[0]

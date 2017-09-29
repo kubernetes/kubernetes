@@ -29,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
@@ -160,7 +160,7 @@ func (dc *DeploymentController) rsAndPodsWithHashKeySynced(d *extensions.Deploym
 // 1. Add hash label to the rs's pod template, and make sure the controller sees this update so that no orphaned pods will be created
 // 2. Add hash label to all pods this rs owns, wait until replicaset controller reports rs.Status.FullyLabeledReplicas equal to the desired number of replicas
 // 3. Add hash label to the rs's label and selector
-func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet, podList *v1.PodList, collisionCount *int64) (*extensions.ReplicaSet, error) {
+func (dc *DeploymentController) addHashKeyToRSAndPods(rs *extensions.ReplicaSet, podList *v1.PodList, collisionCount *int32) (*extensions.ReplicaSet, error) {
 	// If the rs already has the new hash label in its selector, it's done syncing
 	if labelsutil.SelectorHasLabel(rs.Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
 		return rs, nil
@@ -250,11 +250,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 	// and maxReplicas) and also update the revision annotation in the deployment with the
 	// latest revision.
 	if existingNewRS != nil {
-		objCopy, err := scheme.Scheme.Copy(existingNewRS)
-		if err != nil {
-			return nil, err
-		}
-		rsCopy := objCopy.(*extensions.ReplicaSet)
+		rsCopy := existingNewRS.DeepCopy()
 
 		// Set existing new replica set's annotation
 		annotationsUpdated := deploymentutil.SetNewReplicaSetAnnotations(d, rsCopy, newRevision, true)
@@ -290,11 +286,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 	}
 
 	// new ReplicaSet does not exist, create one.
-	templateCopy, err := scheme.Scheme.DeepCopy(d.Spec.Template)
-	if err != nil {
-		return nil, err
-	}
-	newRSTemplate := templateCopy.(v1.PodTemplateSpec)
+	newRSTemplate := *d.Spec.Template.DeepCopy()
 	podTemplateSpecHash := fmt.Sprintf("%d", controller.ComputeHash(&newRSTemplate, d.Status.CollisionCount))
 	newRSTemplate.Labels = labelsutil.CloneAndAddLabel(d.Spec.Template.Labels, extensions.DefaultDeploymentUniqueLabelKey, podTemplateSpecHash)
 	// Add podTemplateHash label to selector.
@@ -304,7 +296,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 	newRS := extensions.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			// Make the name deterministic, to ensure idempotence
-			Name:            d.Name + "-" + podTemplateSpecHash,
+			Name:            d.Name + "-" + rand.SafeEncodeString(podTemplateSpecHash),
 			Namespace:       d.Namespace,
 			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(d, controllerKind)},
 		},
@@ -349,7 +341,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *extensions.Deployment, rsLis
 		// and requeue the Deployment.
 		if !isEqual {
 			if d.Status.CollisionCount == nil {
-				d.Status.CollisionCount = new(int64)
+				d.Status.CollisionCount = new(int32)
 			}
 			preCollisionCount := *d.Status.CollisionCount
 			*d.Status.CollisionCount++
@@ -513,11 +505,7 @@ func (dc *DeploymentController) scaleReplicaSetAndRecordEvent(rs *extensions.Rep
 }
 
 func (dc *DeploymentController) scaleReplicaSet(rs *extensions.ReplicaSet, newScale int32, deployment *extensions.Deployment, scalingOperation string) (bool, *extensions.ReplicaSet, error) {
-	objCopy, err := scheme.Scheme.Copy(rs)
-	if err != nil {
-		return false, nil, err
-	}
-	rsCopy := objCopy.(*extensions.ReplicaSet)
+	rsCopy := rs.DeepCopy()
 
 	sizeNeedsUpdate := *(rsCopy.Spec.Replicas) != newScale
 	// TODO: Do not mutate the replica set here, instead simply compare the annotation and if they mismatch
@@ -526,6 +514,7 @@ func (dc *DeploymentController) scaleReplicaSet(rs *extensions.ReplicaSet, newSc
 	annotationsNeedUpdate := deploymentutil.SetReplicasAnnotations(rsCopy, *(deployment.Spec.Replicas), *(deployment.Spec.Replicas)+deploymentutil.MaxSurge(*deployment))
 
 	scaled := false
+	var err error
 	if sizeNeedsUpdate || annotationsNeedUpdate {
 		*(rsCopy.Spec.Replicas) = newScale
 		rs, err = dc.client.Extensions().ReplicaSets(rsCopy.Namespace).Update(rsCopy)

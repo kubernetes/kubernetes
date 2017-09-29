@@ -9,6 +9,7 @@ import (
 type ListOpts struct {
 	// Marker is the ID of the last Tenant on the previous page.
 	Marker string `q:"marker"`
+
 	// Limit specifies the page size.
 	Limit int `q:"limit"`
 }
@@ -32,18 +33,22 @@ func List(client *gophercloud.ServiceClient, opts *ListOpts) pagination.Pager {
 type CreateOpts struct {
 	// Name is the name of the tenant.
 	Name string `json:"name" required:"true"`
+
 	// Description is the description of the tenant.
 	Description string `json:"description,omitempty"`
+
 	// Enabled sets the tenant status to enabled or disabled.
 	Enabled *bool `json:"enabled,omitempty"`
 }
 
-// CreateOptsBuilder describes struct types that can be accepted by the Create call.
+// CreateOptsBuilder enables extensions to add additional parameters to the
+// Create request.
 type CreateOptsBuilder interface {
 	ToTenantCreateMap() (map[string]interface{}, error)
 }
 
-// ToTenantCreateMap assembles a request body based on the contents of a CreateOpts.
+// ToTenantCreateMap assembles a request body based on the contents of
+// a CreateOpts.
 func (opts CreateOpts) ToTenantCreateMap() (map[string]interface{}, error) {
 	return gophercloud.BuildRequestBody(opts, "tenant")
 }
@@ -67,17 +72,21 @@ func Get(client *gophercloud.ServiceClient, id string) (r GetResult) {
 	return
 }
 
-// UpdateOptsBuilder allows extensions to add additional attributes to the Update request.
+// UpdateOptsBuilder allows extensions to add additional parameters to the
+// Update request.
 type UpdateOptsBuilder interface {
 	ToTenantUpdateMap() (map[string]interface{}, error)
 }
 
-// UpdateOpts specifies the base attributes that may be updated on an existing server.
+// UpdateOpts specifies the base attributes that may be updated on an existing
+// tenant.
 type UpdateOpts struct {
 	// Name is the name of the tenant.
 	Name string `json:"name,omitempty"`
+
 	// Description is the description of the tenant.
 	Description string `json:"description,omitempty"`
+
 	// Enabled sets the tenant status to enabled or disabled.
 	Enabled *bool `json:"enabled,omitempty"`
 }
@@ -100,7 +109,7 @@ func Update(client *gophercloud.ServiceClient, id string, opts UpdateOptsBuilder
 	return
 }
 
-// Delete is the operation responsible for permanently deleting an API tenant.
+// Delete is the operation responsible for permanently deleting a tenant.
 func Delete(client *gophercloud.ServiceClient, id string) (r DeleteResult) {
 	_, r.Err = client.Delete(deleteURL(client, id), nil)
 	return

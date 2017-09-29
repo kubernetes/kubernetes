@@ -25,8 +25,7 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ListOptions is the query options to a standard REST list call, and has future support for
-// watch calls.
+// ListOptions is the query options to a standard REST list call.
 type ListOptions struct {
 	metav1.TypeMeta
 
@@ -48,6 +47,15 @@ type ListOptions struct {
 	ResourceVersion string
 	// Timeout for the list/watch call.
 	TimeoutSeconds *int64
+	// Limit specifies the maximum number of results to return from the server. The server may
+	// not support this field on all resource types, but if it does and more results remain it
+	// will set the continue field on the returned list object.
+	Limit int64
+	// Continue is a token returned by the server that lets a client retrieve chunks of results
+	// from the server by specifying limit. The server may reject requests for continuation tokens
+	// it does not recognize and will return a 410 error if the token can no longer be used because
+	// it has expired.
+	Continue string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

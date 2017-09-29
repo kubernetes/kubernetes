@@ -2,17 +2,21 @@ package tokens
 
 import "github.com/gophercloud/gophercloud"
 
+// PasswordCredentialsV2 represents the required options to authenticate
+// with a username and password.
 type PasswordCredentialsV2 struct {
 	Username string `json:"username" required:"true"`
 	Password string `json:"password" required:"true"`
 }
 
+// TokenCredentialsV2 represents the required options to authenticate
+// with a token.
 type TokenCredentialsV2 struct {
 	ID string `json:"id,omitempty" required:"true"`
 }
 
-// AuthOptionsV2 wraps a gophercloud AuthOptions in order to adhere to the AuthOptionsBuilder
-// interface.
+// AuthOptionsV2 wraps a gophercloud AuthOptions in order to adhere to the
+// AuthOptionsBuilder interface.
 type AuthOptionsV2 struct {
 	PasswordCredentials *PasswordCredentialsV2 `json:"passwordCredentials,omitempty" xor:"TokenCredentials"`
 
@@ -23,15 +27,16 @@ type AuthOptionsV2 struct {
 	TenantID   string `json:"tenantId,omitempty"`
 	TenantName string `json:"tenantName,omitempty"`
 
-	// TokenCredentials allows users to authenticate (possibly as another user) with an
-	// authentication token ID.
+	// TokenCredentials allows users to authenticate (possibly as another user)
+	// with an authentication token ID.
 	TokenCredentials *TokenCredentialsV2 `json:"token,omitempty" xor:"PasswordCredentials"`
 }
 
-// AuthOptionsBuilder describes any argument that may be passed to the Create call.
+// AuthOptionsBuilder allows extensions to add additional parameters to the
+// token create request.
 type AuthOptionsBuilder interface {
-	// ToTokenCreateMap assembles the Create request body, returning an error if parameters are
-	// missing or inconsistent.
+	// ToTokenCreateMap assembles the Create request body, returning an error
+	// if parameters are missing or inconsistent.
 	ToTokenV2CreateMap() (map[string]interface{}, error)
 }
 
@@ -47,8 +52,7 @@ type AuthOptions struct {
 	TokenID          string
 }
 
-// ToTokenV2CreateMap allows AuthOptions to satisfy the AuthOptionsBuilder
-// interface in the v2 tokens package
+// ToTokenV2CreateMap builds a token request body from the given AuthOptions.
 func (opts AuthOptions) ToTokenV2CreateMap() (map[string]interface{}, error) {
 	v2Opts := AuthOptionsV2{
 		TenantID:   opts.TenantID,
@@ -74,9 +78,9 @@ func (opts AuthOptions) ToTokenV2CreateMap() (map[string]interface{}, error) {
 }
 
 // Create authenticates to the identity service and attempts to acquire a Token.
-// If successful, the CreateResult
-// Generally, rather than interact with this call directly, end users should call openstack.AuthenticatedClient(),
-// which abstracts all of the gory details about navigating service catalogs and such.
+// Generally, rather than interact with this call directly, end users should
+// call openstack.AuthenticatedClient(), which abstracts all of the gory details
+// about navigating service catalogs and such.
 func Create(client *gophercloud.ServiceClient, auth AuthOptionsBuilder) (r CreateResult) {
 	b, err := auth.ToTokenV2CreateMap()
 	if err != nil {

@@ -22,7 +22,6 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
 )
 
@@ -38,7 +37,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		NewFunc:                  func() runtime.Object { return &rbac.ClusterRole{} },
 		NewListFunc:              func() runtime.Object { return &rbac.ClusterRoleList{} },
 		DefaultQualifiedResource: rbac.Resource("clusterroles"),
-		WatchCacheSize:           cachesize.GetWatchCacheSizeByResource("clusterroles"),
 
 		CreateStrategy: clusterrole.Strategy,
 		UpdateStrategy: clusterrole.Strategy,

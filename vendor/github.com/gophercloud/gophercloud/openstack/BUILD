@@ -1,18 +1,15 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = [
         "auth_env.go",
         "client.go",
+        "doc.go",
         "endpoint_location.go",
         "errors.go",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/gophercloud/gophercloud:go_default_library",
         "//vendor/github.com/gophercloud/gophercloud/openstack/identity/v2/tokens:go_default_library",
@@ -50,4 +47,5 @@ filegroup(
         "//vendor/github.com/gophercloud/gophercloud/openstack/utils:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

@@ -223,7 +223,14 @@ func (s *ServiceController) init() error {
 // indicating whether processing should be retried; zero means no-retry; otherwise
 // we should retry in that Duration.
 func (s *ServiceController) processServiceUpdate(cachedService *cachedService, service *v1.Service, key string) (error, time.Duration) {
-
+	if cachedService.state != nil {
+		if cachedService.state.UID != service.UID {
+			err, retry := s.processLoadBalancerDelete(cachedService, key)
+			if err != nil {
+				return err, retry
+			}
+		}
+	}
 	// cache the service, we need the info for service deletion
 	cachedService.state = service
 	err, retry := s.createLoadBalancerIfNeeded(key, service)
@@ -280,24 +287,19 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 
 		// TODO: We could do a dry-run here if wanted to avoid the spurious cloud-calls & events when we restart
 
-		// The load balancer doesn't exist yet, so create it.
-		s.eventRecorder.Event(service, v1.EventTypeNormal, "CreatingLoadBalancer", "Creating load balancer")
-		newState, err = s.createLoadBalancer(service)
+		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuringLoadBalancer", "Ensuring load balancer")
+		newState, err = s.ensureLoadBalancer(service)
 		if err != nil {
-			return fmt.Errorf("Failed to create load balancer for service %s: %v", key, err), retryable
+			return fmt.Errorf("Failed to ensure load balancer for service %s: %v", key, err), retryable
 		}
-		s.eventRecorder.Event(service, v1.EventTypeNormal, "CreatedLoadBalancer", "Created load balancer")
+		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuredLoadBalancer", "Ensured load balancer")
 	}
 
 	// Write the state if changed
 	// TODO: Be careful here ... what if there were other changes to the service?
 	if !v1helper.LoadBalancerStatusEqual(previousState, newState) {
 		// Make a copy so we don't mutate the shared informer cache
-		copy, err := scheme.Scheme.DeepCopy(service)
-		if err != nil {
-			return err, retryable
-		}
-		service = copy.(*v1.Service)
+		service = service.DeepCopy()
 
 		// Update the status on the copy
 		service.Status.LoadBalancer = *newState
@@ -340,7 +342,7 @@ func (s *ServiceController) persistUpdate(service *v1.Service) error {
 	return err
 }
 
-func (s *ServiceController) createLoadBalancer(service *v1.Service) (*v1.LoadBalancerStatus, error) {
+func (s *ServiceController) ensureLoadBalancer(service *v1.Service) (*v1.LoadBalancerStatus, error) {
 	nodes, err := s.nodeLister.ListWithPredicate(getNodeConditionPredicate())
 	if err != nil {
 		return nil, err
@@ -596,6 +598,10 @@ func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
 			return false
 		}
 
+		if _, hasExcludeBalancerLabel := node.Labels[constants.LabelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
+			return false
+		}
+
 		// If we have no info, don't accept
 		if len(node.Status.Conditions) == 0 {
 			return false
@@ -765,6 +771,10 @@ func (s *ServiceController) processServiceDeletion(key string) (error, time.Dura
 	if !ok {
 		return fmt.Errorf("Service %s not in cache even though the watcher thought it was. Ignoring the deletion.", key), doNotRetry
 	}
+	return s.processLoadBalancerDelete(cachedService, key)
+}
+
+func (s *ServiceController) processLoadBalancerDelete(cachedService *cachedService, key string) (error, time.Duration) {
 	service := cachedService.state
 	// delete load balancer info only if the service type is LoadBalancer
 	if !wantsLoadBalancer(service) {

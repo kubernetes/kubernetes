@@ -153,9 +153,9 @@ type DaemonSetHistoryViewer struct {
 // ViewHistory returns a revision-to-history map as the revision history of a deployment
 // TODO: this should be a describer
 func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
-	versionedExtensionsClient := versionedExtensionsClientV1beta1(h.c)
 	versionedAppsClient := versionedAppsClientV1beta1(h.c)
-	ds, allHistory, err := controlledHistories(versionedExtensionsClient, versionedAppsClient, namespace, name)
+	versionedExtensionsClient := versionedExtensionsClientV1beta1(h.c)
+	versionedObj, allHistory, err := controlledHistories(versionedAppsClient, versionedExtensionsClient, namespace, name, "DaemonSet")
 	if err != nil {
 		return "", fmt.Errorf("unable to find history controlled by DaemonSet %s: %v", name, err)
 	}
@@ -175,7 +175,13 @@ func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision in
 		if !ok {
 			return "", fmt.Errorf("unable to find the specified revision")
 		}
-		dsOfHistory, err := applyHistory(ds, history)
+
+		versionedDS, ok := versionedObj.(*extensionsv1beta1.DaemonSet)
+		if !ok {
+			return "", fmt.Errorf("unexpected non-DaemonSet object returned: %v", versionedDS)
+		}
+
+		dsOfHistory, err := applyHistory(versionedDS, history)
 		if err != nil {
 			return "", fmt.Errorf("unable to parse history %s", history.Name)
 		}
@@ -256,29 +262,51 @@ func (h *StatefulSetHistoryViewer) ViewHistory(namespace, name string, revision 
 	})
 }
 
-// controlledHistories returns all ControllerRevisions controlled by the given DaemonSet
-func controlledHistories(extensions clientextensionsv1beta1.ExtensionsV1beta1Interface, apps clientappsv1beta1.AppsV1beta1Interface, namespace, name string) (*extensionsv1beta1.DaemonSet, []*appsv1beta1.ControllerRevision, error) {
-	ds, err := extensions.DaemonSets(namespace).Get(name, metav1.GetOptions{})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to retrieve DaemonSet %s: %v", name, err)
+// controlledHistories returns all ControllerRevisions controlled by the given API object
+func controlledHistories(apps clientappsv1beta1.AppsV1beta1Interface, extensions clientextensionsv1beta1.ExtensionsV1beta1Interface, namespace, name, kind string) (runtime.Object, []*appsv1beta1.ControllerRevision, error) {
+	var obj runtime.Object
+	var labelSelector *metav1.LabelSelector
+
+	switch kind {
+	case "DaemonSet":
+		ds, err := extensions.DaemonSets(namespace).Get(name, metav1.GetOptions{})
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to retrieve DaemonSet %s: %v", name, err)
+		}
+		labelSelector = ds.Spec.Selector
+		obj = ds
+	case "StatefulSet":
+		ss, err := apps.StatefulSets(namespace).Get(name, metav1.GetOptions{})
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to retrieve StatefulSet %s: %v", name, err)
+		}
+		labelSelector = ss.Spec.Selector
+		obj = ss
+	default:
+		return nil, nil, fmt.Errorf("unsupported API object kind: %s", kind)
 	}
+
 	var result []*appsv1beta1.ControllerRevision
-	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
 	if err != nil {
 		return nil, nil, err
 	}
-	historyList, err := apps.ControllerRevisions(ds.Namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
+	historyList, err := apps.ControllerRevisions(namespace).List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
 		return nil, nil, err
+	}
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to obtain accessor for %s named %s: %v", kind, name, err)
 	}
 	for i := range historyList.Items {
 		history := historyList.Items[i]
-		// Only add history that belongs to the DaemonSet
-		if metav1.IsControlledBy(&history, ds) {
+		// Only add history that belongs to the API object
+		if metav1.IsControlledBy(&history, accessor) {
 			result = append(result, &history)
 		}
 	}
-	return ds, result, nil
+	return obj, result, nil
 }
 
 // applyHistory returns a specific revision of DaemonSet by applying the given history to a copy of the given DaemonSet
@@ -307,7 +335,7 @@ func applyHistory(ds *extensionsv1beta1.DaemonSet, history *appsv1beta1.Controll
 func tabbedString(f func(io.Writer) error) (string, error) {
 	out := new(tabwriter.Writer)
 	buf := &bytes.Buffer{}
-	out.Init(buf, 0, 8, 1, '\t', 0)
+	out.Init(buf, 0, 8, 2, ' ', 0)
 
 	err := f(out)
 	if err != nil {

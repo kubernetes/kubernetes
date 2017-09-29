@@ -67,6 +67,32 @@ func TestRESTMapper(t *testing.T) {
 				},
 			},
 		},
+
+		// This group tests finding and prioritizing resources that only exist in non-preferred versions
+		{
+			Group: metav1.APIGroup{
+				Name: "unpreferred",
+				Versions: []metav1.GroupVersionForDiscovery{
+					{Version: "v1"},
+					{Version: "v2beta1"},
+					{Version: "v2alpha1"},
+				},
+				PreferredVersion: metav1.GroupVersionForDiscovery{Version: "v1"},
+			},
+			VersionedResources: map[string][]metav1.APIResource{
+				"v1": {
+					{Name: "broccoli", Namespaced: true, Kind: "Broccoli"},
+				},
+				"v2beta1": {
+					{Name: "broccoli", Namespaced: true, Kind: "Broccoli"},
+					{Name: "peas", Namespaced: true, Kind: "Pea"},
+				},
+				"v2alpha1": {
+					{Name: "broccoli", Namespaced: true, Kind: "Broccoli"},
+					{Name: "peas", Namespaced: true, Kind: "Pea"},
+				},
+			},
+		},
 	}
 
 	restMapper := NewRESTMapper(resources, nil)
@@ -121,6 +147,16 @@ func TestRESTMapper(t *testing.T) {
 				Group:   "extensions",
 				Version: "v1beta",
 				Kind:    "Job",
+			},
+		},
+		{
+			input: schema.GroupVersionResource{
+				Resource: "peas",
+			},
+			want: schema.GroupVersionKind{
+				Group:   "unpreferred",
+				Version: "v2beta1",
+				Kind:    "Pea",
 			},
 		},
 	}

@@ -21,8 +21,8 @@ import (
 	"net"
 	"runtime"
 
+	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
@@ -32,6 +32,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
@@ -41,16 +42,24 @@ const (
 
 // EnsureDNSAddon creates the kube-dns addon
 func EnsureDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
+	if err != nil {
+		return fmt.Errorf("couldn't parse kubernetes version %q: %v", cfg.KubernetesVersion, err)
+	}
+
 	if err := CreateServiceAccount(client); err != nil {
 		return err
 	}
 
-	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(KubeDNSDeployment, struct{ ImageRepository, Arch, Version, DNSDomain, MasterTaintKey string }{
+	// Get the YAML manifest conditionally based on the k8s version
+	kubeDNSDeploymentBytes := GetKubeDNSManifest(k8sVersion)
+	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(kubeDNSDeploymentBytes, struct{ ImageRepository, Arch, Version, DNSDomain, MasterTaintKey string }{
 		ImageRepository: cfg.ImageRepository,
 		Arch:            runtime.GOARCH,
-		Version:         KubeDNSVersion,
-		DNSDomain:       cfg.Networking.DNSDomain,
-		MasterTaintKey:  kubeadmconstants.LabelNodeRoleMaster,
+		// Get the kube-dns version conditionally based on the k8s version
+		Version:        GetKubeDNSVersion(k8sVersion),
+		DNSDomain:      cfg.Networking.DNSDomain,
+		MasterTaintKey: kubeadmconstants.LabelNodeRoleMaster,
 	})
 	if err != nil {
 		return fmt.Errorf("error when parsing kube-dns deployment template: %v", err)
@@ -87,7 +96,7 @@ func CreateServiceAccount(client clientset.Interface) error {
 }
 
 func createKubeDNSAddon(deploymentBytes, serviceBytes []byte, client clientset.Interface) error {
-	kubednsDeployment := &extensions.Deployment{}
+	kubednsDeployment := &apps.Deployment{}
 	if err := kuberuntime.DecodeInto(api.Codecs.UniversalDecoder(), deploymentBytes, kubednsDeployment); err != nil {
 		return fmt.Errorf("unable to decode kube-dns deployment %v", err)
 	}

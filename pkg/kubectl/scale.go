@@ -54,7 +54,7 @@ func ScalerFor(kind schema.GroupKind, c internalclientset.Interface) (Scaler, er
 	switch kind {
 	case api.Kind("ReplicationController"):
 		return &ReplicationControllerScaler{c.Core()}, nil
-	case extensions.Kind("ReplicaSet"):
+	case extensions.Kind("ReplicaSet"), apps.Kind("ReplicaSet"):
 		return &ReplicaSetScaler{c.Extensions()}, nil
 	case batch.Kind("Job"):
 		return &JobScaler{c.Batch()}, nil // Either kind of job can be scaled with Batch interface.
@@ -104,9 +104,11 @@ type ScaleError struct {
 }
 
 func (c ScaleError) Error() string {
-	return fmt.Sprintf(
-		"Scaling the resource failed with: %v; Current resource version %s",
-		c.ActualError, c.ResourceVersion)
+	msg := fmt.Sprintf("Scaling the resource failed with: %v", c.ActualError)
+	if len(c.ResourceVersion) > 0 {
+		msg += fmt.Sprintf("; Current resource version %s", c.ResourceVersion)
+	}
+	return msg
 }
 
 // RetryParams encapsulates the retry parameters used by kubectl's scaler.
@@ -169,7 +171,7 @@ type ReplicationControllerScaler struct {
 func (scaler *ReplicationControllerScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (string, error) {
 	controller, err := scaler.c.ReplicationControllers(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
-		return "", ScaleError{ScaleGetFailure, "Unknown", err}
+		return "", ScaleError{ScaleGetFailure, "", err}
 	}
 	if preconditions != nil {
 		if err := preconditions.ValidateReplicationController(controller); err != nil {
@@ -267,7 +269,7 @@ type ReplicaSetScaler struct {
 func (scaler *ReplicaSetScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (string, error) {
 	rs, err := scaler.c.ReplicaSets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
-		return "", ScaleError{ScaleGetFailure, "Unknown", err}
+		return "", ScaleError{ScaleGetFailure, "", err}
 	}
 	if preconditions != nil {
 		if err := preconditions.ValidateReplicaSet(rs); err != nil {
@@ -305,6 +307,9 @@ func (scaler *ReplicaSetScaler) Scale(namespace, name string, newSize uint, prec
 		if err != nil {
 			return err
 		}
+		if rs.Initializers != nil {
+			return nil
+		}
 		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.ReplicaSetHasDesiredReplicas(scaler.c, rs))
 
 		if err == wait.ErrWaitTimeout {
@@ -338,7 +343,7 @@ type StatefulSetScaler struct {
 func (scaler *StatefulSetScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (string, error) {
 	ss, err := scaler.c.StatefulSets(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
-		return "", ScaleError{ScaleGetFailure, "Unknown", err}
+		return "", ScaleError{ScaleGetFailure, "", err}
 	}
 	if preconditions != nil {
 		if err := preconditions.ValidateStatefulSet(ss); err != nil {
@@ -373,6 +378,9 @@ func (scaler *StatefulSetScaler) Scale(namespace, name string, newSize uint, pre
 		if err != nil {
 			return err
 		}
+		if job.Initializers != nil {
+			return nil
+		}
 		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.StatefulSetHasDesiredReplicas(scaler.c, job))
 		if err == wait.ErrWaitTimeout {
 			return fmt.Errorf("timed out waiting for %q to be synced", name)
@@ -391,7 +399,7 @@ type JobScaler struct {
 func (scaler *JobScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (string, error) {
 	job, err := scaler.c.Jobs(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
-		return "", ScaleError{ScaleGetFailure, "Unknown", err}
+		return "", ScaleError{ScaleGetFailure, "", err}
 	}
 	if preconditions != nil {
 		if err := preconditions.ValidateJob(job); err != nil {
@@ -460,7 +468,7 @@ type DeploymentScaler struct {
 func (scaler *DeploymentScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (string, error) {
 	deployment, err := scaler.c.Deployments(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
-		return "", ScaleError{ScaleGetFailure, "Unknown", err}
+		return "", ScaleError{ScaleGetFailure, "", err}
 	}
 	if preconditions != nil {
 		if err := preconditions.ValidateDeployment(deployment); err != nil {

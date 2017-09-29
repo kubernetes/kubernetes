@@ -350,7 +350,7 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 		return nil
 	}
 
-	cpu, _ := resource.ParseQuantity("100Gi")
+	cpu, _ := resource.ParseQuantity("100m")
 	mem, _ := resource.ParseQuantity("100Mi")
 
 	tests := []struct {
@@ -364,15 +364,12 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								"pod.beta.kubernetes.io/init-containers": `
-                                [
-                                    {
-                                        "name": "install",
-                                        "image": "busybox"
-                                    }
-                                ]`,
+						Spec: v1.PodSpec{
+							InitContainers: []v1.Container{
+								{
+									Name:  "install",
+									Image: "busybox",
+								},
 							},
 						},
 					},
@@ -390,26 +387,23 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								"pod.beta.kubernetes.io/init-containers": `
-                                [
-                                    {
-                                    "name": "fun",
-                                    "image": "alpine",
-                                    "env": [
-                                      {
-                                        "name": "MY_POD_IP",
-                                        "valueFrom": {
-                                          "fieldRef": {
-                                            "apiVersion": "",
-                                            "fieldPath": "status.podIP"
-                                          }
-                                        }
-                                      }
-                                    ]
-                                  }
-                                ]`,
+						Spec: v1.PodSpec{
+							InitContainers: []v1.Container{
+								{
+									Name:  "fun",
+									Image: "alpine",
+									Env: []v1.EnvVar{
+										{
+											Name: "MY_POD_IP",
+											ValueFrom: &v1.EnvVarSource{
+												FieldRef: &v1.ObjectFieldSelector{
+													APIVersion: "",
+													FieldPath:  "status.podIP",
+												},
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -437,20 +431,17 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								"pod.beta.kubernetes.io/init-containers": `
-                                [
-                                    {
-                                    "name": "fun",
-                                    "image": "alpine",
-                                    "ports": [
-                                      {
-                                        "name": "default"
-                                      }
-                                    ]
-                                  }
-                                ]`,
+						Spec: v1.PodSpec{
+							InitContainers: []v1.Container{
+								{
+									Name:  "fun",
+									Image: "alpine",
+									Ports: []v1.ContainerPort{
+										{
+											Name: "default",
+										},
+									},
+								},
 							},
 						},
 					},
@@ -473,25 +464,22 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								"pod.beta.kubernetes.io/init-containers": `
-                                [
-                                  {
-                                    "name": "fun",
-                                    "image": "alpine",
-                                    "resources": {
-                                        "limits": {
-                                            "cpu": "100Gi",
-                                            "memory": "100Mi"
-                                        },
-                                        "requests": {
-                                            "cpu": "100Gi",
-                                            "memory": "100Mi"
-                                        }
-                                    }
-                                  }
-                                ]`,
+						Spec: v1.PodSpec{
+							InitContainers: []v1.Container{
+								{
+									Name:  "fun",
+									Image: "alpine",
+									Resources: v1.ResourceRequirements{
+										Limits: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("100m"),
+											v1.ResourceMemory: resource.MustParse("100Mi"),
+										},
+										Requests: v1.ResourceList{
+											v1.ResourceCPU:    resource.MustParse("100m"),
+											v1.ResourceMemory: resource.MustParse("100Mi"),
+										},
+									},
+								},
 							},
 						},
 					},
@@ -514,29 +502,30 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			validators: []InitContainerValidator{assertResource},
 		},
 		{
-			name: "Prob",
+			name: "Probe",
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								"pod.beta.kubernetes.io/init-containers": `
-                                [
-                                    {
-                                    "name": "fun",
-                                    "image": "alpine",
-                                    "livenessProbe": {
-                                        "httpGet": {
-                                            "host": "localhost"
-                                        }
-                                    },
-                                    "readinessProbe": {
-                                        "httpGet": {
-                                            "host": "localhost"
-                                        }
-                                    }
-                                  }
-                                ]`,
+						Spec: v1.PodSpec{
+							InitContainers: []v1.Container{
+								{
+									Name:  "fun",
+									Image: "alpine",
+									LivenessProbe: &v1.Probe{
+										Handler: v1.Handler{
+											HTTPGet: &v1.HTTPGetAction{
+												Host: "localhost",
+											},
+										},
+									},
+									ReadinessProbe: &v1.Probe{
+										Handler: v1.Handler{
+											HTTPGet: &v1.HTTPGetAction{
+												Host: "localhost",
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -577,27 +566,29 @@ func TestSetDefaultReplicationControllerInitContainers(t *testing.T) {
 			rc: v1.ReplicationController{
 				Spec: v1.ReplicationControllerSpec{
 					Template: &v1.PodTemplateSpec{
-						ObjectMeta: metav1.ObjectMeta{
-							Annotations: map[string]string{
-								"pod.beta.kubernetes.io/init-containers": `
-                                [
-                                    {
-                                    "name": "fun",
-                                    "image": "alpine",
-                                    "lifecycle": {
-                                        "postStart": {
-                                            "httpGet": {
-                                                "host": "localhost"
-                                            }
-                                        },
-                                        "preStop": {
-                                            "httpGet": {
-                                                "host": "localhost"
-                                            }
-                                        }
-                                    }
-                                  }
-                                ]`,
+						Spec: v1.PodSpec{
+							InitContainers: []v1.Container{
+								{
+									Name:  "fun",
+									Image: "alpine",
+									Ports: []v1.ContainerPort{
+										{
+											Name: "default",
+										},
+									},
+									Lifecycle: &v1.Lifecycle{
+										PostStart: &v1.Handler{
+											HTTPGet: &v1.HTTPGetAction{
+												Host: "localhost",
+											},
+										},
+										PreStop: &v1.Handler{
+											HTTPGet: &v1.HTTPGetAction{
+												Host: "localhost",
+											},
+										},
+									},
+								},
 							},
 						},
 					},
@@ -667,8 +658,50 @@ func TestSetDefaultService(t *testing.T) {
 	if svc2.Spec.SessionAffinity != v1.ServiceAffinityNone {
 		t.Errorf("Expected default session affinity type:%s, got: %s", v1.ServiceAffinityNone, svc2.Spec.SessionAffinity)
 	}
+	if svc2.Spec.SessionAffinityConfig != nil {
+		t.Errorf("Expected empty session affinity config when session affinity type: %s, got: %v", v1.ServiceAffinityNone, svc2.Spec.SessionAffinityConfig)
+	}
 	if svc2.Spec.Type != v1.ServiceTypeClusterIP {
 		t.Errorf("Expected default type:%s, got: %s", v1.ServiceTypeClusterIP, svc2.Spec.Type)
+	}
+}
+
+func TestSetDefaultServiceSessionAffinityConfig(t *testing.T) {
+	testCases := map[string]v1.Service{
+		"SessionAffinityConfig is empty": {
+			Spec: v1.ServiceSpec{
+				SessionAffinity:       v1.ServiceAffinityClientIP,
+				SessionAffinityConfig: nil,
+			},
+		},
+		"ClientIP is empty": {
+			Spec: v1.ServiceSpec{
+				SessionAffinity: v1.ServiceAffinityClientIP,
+				SessionAffinityConfig: &v1.SessionAffinityConfig{
+					ClientIP: nil,
+				},
+			},
+		},
+		"TimeoutSeconds is empty": {
+			Spec: v1.ServiceSpec{
+				SessionAffinity: v1.ServiceAffinityClientIP,
+				SessionAffinityConfig: &v1.SessionAffinityConfig{
+					ClientIP: &v1.ClientIPConfig{
+						TimeoutSeconds: nil,
+					},
+				},
+			},
+		},
+	}
+	for name, test := range testCases {
+		obj2 := roundTrip(t, runtime.Object(&test))
+		svc2 := obj2.(*v1.Service)
+		if svc2.Spec.SessionAffinityConfig == nil || svc2.Spec.SessionAffinityConfig.ClientIP == nil || svc2.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds == nil {
+			t.Fatalf("Case: %s, unexpected empty SessionAffinityConfig/ClientIP/TimeoutSeconds when session affinity type: %s, got: %v", name, v1.ServiceAffinityClientIP, svc2.Spec.SessionAffinityConfig)
+		}
+		if *svc2.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds != v1.DefaultClientIPServiceAffinitySeconds {
+			t.Errorf("Case: %s, default TimeoutSeconds should be %d when session affinity type: %s, got: %d", name, v1.DefaultClientIPServiceAffinitySeconds, v1.ServiceAffinityClientIP, *svc2.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
+		}
 	}
 }
 
@@ -1275,5 +1308,27 @@ func TestSetDefaultSchedulerName(t *testing.T) {
 	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
 	if output.Spec.SchedulerName != v1.DefaultSchedulerName {
 		t.Errorf("Expected scheduler name: %+v\ngot: %+v\n", v1.DefaultSchedulerName, output.Spec.SchedulerName)
+	}
+}
+
+func TestSetDefaultHostPathVolumeSource(t *testing.T) {
+	s := v1.PodSpec{}
+	s.Volumes = []v1.Volume{
+		{
+			VolumeSource: v1.VolumeSource{
+				HostPath: &v1.HostPathVolumeSource{Path: "foo"},
+			},
+		},
+	}
+	pod := &v1.Pod{
+		Spec: s,
+	}
+	output := roundTrip(t, runtime.Object(pod))
+	pod2 := output.(*v1.Pod)
+	defaultType := pod2.Spec.Volumes[0].VolumeSource.HostPath.Type
+	expectedType := v1.HostPathUnset
+
+	if defaultType == nil || *defaultType != expectedType {
+		t.Errorf("Expected v1.HostPathVolumeSource default type %v, got %v", expectedType, defaultType)
 	}
 }

@@ -19,11 +19,12 @@ package azure_dd
 import (
 	"fmt"
 	"os"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
-	"k8s.io/utils/exec"
-	fakeexec "k8s.io/utils/exec/testing"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 type fakeFileInfo struct {
@@ -107,29 +108,26 @@ func (handler *fakeIOHandler) Readlink(name string) (string, error) {
 	return "/dev/azure/disk/sda", nil
 }
 
+func (handler *fakeIOHandler) ReadFile(filename string) ([]byte, error) {
+	if strings.HasSuffix(filename, "vendor") {
+		return []byte("Msft    \n"), nil
+	}
+	if strings.HasSuffix(filename, "model") {
+		return []byte("Virtual Disk \n"), nil
+	}
+	return nil, fmt.Errorf("unknown file")
+}
+
 func TestIoHandler(t *testing.T) {
-	var fcmd fakeexec.FakeCmd
-	fcmd = fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			// cat
-			func() ([]byte, error) {
-				return []byte("Msft    \nVirtual Disk \n"), nil
-			},
-			// cat
-			func() ([]byte, error) {
-				return []byte("Msft    \nVirtual Disk \n"), nil
-			},
-		},
-	}
-	fake := fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-	}
-	disk, err := findDiskByLun(lun, &fakeIOHandler{}, &fake)
-	// if no disk matches lun, exit
-	if disk != "/dev/"+devName || err != nil {
-		t.Errorf("no data disk found: disk %v err %v", disk, err)
+	disk, err := findDiskByLun(lun, &fakeIOHandler{}, mount.NewOsExec())
+	if runtime.GOOS == "windows" {
+		if err != nil {
+			t.Errorf("no data disk found: disk %v err %v", disk, err)
+		}
+	} else {
+		// if no disk matches lun, exit
+		if disk != "/dev/"+devName || err != nil {
+			t.Errorf("no data disk found: disk %v err %v", disk, err)
+		}
 	}
 }

@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -15,6 +10,7 @@ go_library(
         "stats.go",
         "types.go",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/docker/engine-api/types/container:go_default_library",
         "//vendor/github.com/docker/engine-api/types/filters:go_default_library",
@@ -47,4 +43,5 @@ filegroup(
         "//vendor/github.com/docker/engine-api/types/versions:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

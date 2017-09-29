@@ -108,7 +108,8 @@ func (p *serviceEvaluator) GroupKind() schema.GroupKind {
 }
 
 // Handles returns true of the evaluator should handle the specified operation.
-func (p *serviceEvaluator) Handles(operation admission.Operation) bool {
+func (p *serviceEvaluator) Handles(a admission.Attributes) bool {
+	operation := a.GetOperation()
 	// We handle create and update because a service type can change.
 	return admission.Create == operation || admission.Update == operation
 }

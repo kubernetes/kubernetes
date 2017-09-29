@@ -21,6 +21,7 @@ RUN ln -s /bin/sh /bin/bash
 
 RUN echo CACHEBUST>/dev/null && clean-install \
     iptables \
+    e2fsprogs \
     ebtables \
     ethtool \
     ca-certificates \

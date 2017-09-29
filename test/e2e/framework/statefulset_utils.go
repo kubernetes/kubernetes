@@ -41,6 +41,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/manifest"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -134,7 +135,7 @@ func (s *StatefulSetTester) CheckMount(ss *apps.StatefulSet, mountPath string) e
 func (s *StatefulSetTester) ExecInStatefulPods(ss *apps.StatefulSet, cmd string) error {
 	podList := s.GetPodList(ss)
 	for _, statefulPod := range podList.Items {
-		stdout, err := RunHostCmd(statefulPod.Namespace, statefulPod.Name, cmd)
+		stdout, err := RunHostCmdWithRetries(statefulPod.Namespace, statefulPod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
 		Logf("stdout of %v on %v: %v", cmd, statefulPod.Name, stdout)
 		if err != nil {
 			return err
@@ -148,7 +149,7 @@ func (s *StatefulSetTester) CheckHostname(ss *apps.StatefulSet) error {
 	cmd := "printf $(hostname)"
 	podList := s.GetPodList(ss)
 	for _, statefulPod := range podList.Items {
-		hostname, err := RunHostCmd(statefulPod.Namespace, statefulPod.Name, cmd)
+		hostname, err := RunHostCmdWithRetries(statefulPod.Namespace, statefulPod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
 		if err != nil {
 			return err
 		}
@@ -197,10 +198,12 @@ func getStatefulSetPodNameAtIndex(index int, ss *apps.StatefulSet) string {
 }
 
 // Scale scales ss to count replicas.
-func (s *StatefulSetTester) Scale(ss *apps.StatefulSet, count int32) error {
+func (s *StatefulSetTester) Scale(ss *apps.StatefulSet, count int32) (*apps.StatefulSet, error) {
 	name := ss.Name
 	ns := ss.Namespace
-	s.update(ns, name, func(ss *apps.StatefulSet) { *(ss.Spec.Replicas) = count })
+
+	Logf("Scaling statefulset %s to %d", name, count)
+	ss = s.update(ns, name, func(ss *apps.StatefulSet) { *(ss.Spec.Replicas) = count })
 
 	var statefulPodList *v1.PodList
 	pollErr := wait.PollImmediate(StatefulSetPoll, StatefulSetTimeout, func() (bool, error) {
@@ -218,9 +221,9 @@ func (s *StatefulSetTester) Scale(ss *apps.StatefulSet, count int32) error {
 				unhealthy = append(unhealthy, fmt.Sprintf("%v: deletion %v, phase %v, readiness %v", statefulPod.Name, delTs, phase, readiness))
 			}
 		}
-		return fmt.Errorf("Failed to scale statefulset to %d in %v. Remaining pods:\n%v", count, StatefulSetTimeout, unhealthy)
+		return ss, fmt.Errorf("Failed to scale statefulset to %d in %v. Remaining pods:\n%v", count, StatefulSetTimeout, unhealthy)
 	}
-	return nil
+	return ss, nil
 }
 
 // UpdateReplicas updates the replicas of ss to count.
@@ -231,11 +234,16 @@ func (s *StatefulSetTester) UpdateReplicas(ss *apps.StatefulSet, count int32) {
 // Restart scales ss to 0 and then back to its previous number of replicas.
 func (s *StatefulSetTester) Restart(ss *apps.StatefulSet) {
 	oldReplicas := *(ss.Spec.Replicas)
-	ExpectNoError(s.Scale(ss, 0))
+	ss, err := s.Scale(ss, 0)
+	ExpectNoError(err)
+	// Wait for controller to report the desired number of Pods.
+	// This way we know the controller has observed all Pod deletions
+	// before we scale it back up.
+	s.WaitForStatusReplicas(ss, 0)
 	s.update(ss.Namespace, ss.Name, func(ss *apps.StatefulSet) { *(ss.Spec.Replicas) = oldReplicas })
 }
 
-func (s *StatefulSetTester) update(ns, name string, update func(ss *apps.StatefulSet)) {
+func (s *StatefulSetTester) update(ns, name string, update func(ss *apps.StatefulSet)) *apps.StatefulSet {
 	for i := 0; i < 3; i++ {
 		ss, err := s.c.AppsV1beta1().StatefulSets(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
@@ -244,13 +252,14 @@ func (s *StatefulSetTester) update(ns, name string, update func(ss *apps.Statefu
 		update(ss)
 		ss, err = s.c.AppsV1beta1().StatefulSets(ns).Update(ss)
 		if err == nil {
-			return
+			return ss
 		}
 		if !apierrs.IsConflict(err) && !apierrs.IsServerTimeout(err) {
 			Failf("failed to update statefulset %q: %v", name, err)
 		}
 	}
 	Failf("too many retries draining statefulset %q", name)
+	return nil
 }
 
 // GetPodList gets the current Pods in ss.
@@ -508,7 +517,8 @@ func (s *StatefulSetTester) BreakHttpProbe(ss *apps.StatefulSet) error {
 	if path == "" {
 		return fmt.Errorf("Path expected to be not empty: %v", path)
 	}
-	cmd := fmt.Sprintf("mv -v /usr/share/nginx/html%v /tmp/", path)
+	// Ignore 'mv' errors to make this idempotent.
+	cmd := fmt.Sprintf("mv -v /usr/share/nginx/html%v /tmp/ || true", path)
 	return s.ExecInStatefulPods(ss, cmd)
 }
 
@@ -518,8 +528,9 @@ func (s *StatefulSetTester) BreakPodHttpProbe(ss *apps.StatefulSet, pod *v1.Pod)
 	if path == "" {
 		return fmt.Errorf("Path expected to be not empty: %v", path)
 	}
-	cmd := fmt.Sprintf("mv -v /usr/share/nginx/html%v /tmp/", path)
-	stdout, err := RunHostCmd(pod.Namespace, pod.Name, cmd)
+	// Ignore 'mv' errors to make this idempotent.
+	cmd := fmt.Sprintf("mv -v /usr/share/nginx/html%v /tmp/ || true", path)
+	stdout, err := RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
 	Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
 }
@@ -530,7 +541,8 @@ func (s *StatefulSetTester) RestoreHttpProbe(ss *apps.StatefulSet) error {
 	if path == "" {
 		return fmt.Errorf("Path expected to be not empty: %v", path)
 	}
-	cmd := fmt.Sprintf("mv -v /tmp%v /usr/share/nginx/html/", path)
+	// Ignore 'mv' errors to make this idempotent.
+	cmd := fmt.Sprintf("mv -v /tmp%v /usr/share/nginx/html/ || true", path)
 	return s.ExecInStatefulPods(ss, cmd)
 }
 
@@ -540,15 +552,16 @@ func (s *StatefulSetTester) RestorePodHttpProbe(ss *apps.StatefulSet, pod *v1.Po
 	if path == "" {
 		return fmt.Errorf("Path expected to be not empty: %v", path)
 	}
-	cmd := fmt.Sprintf("mv -v /tmp%v /usr/share/nginx/html/", path)
-	stdout, err := RunHostCmd(pod.Namespace, pod.Name, cmd)
+	// Ignore 'mv' errors to make this idempotent.
+	cmd := fmt.Sprintf("mv -v /tmp%v /usr/share/nginx/html/ || true", path)
+	stdout, err := RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
 	Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
 }
 
 var pauseProbe = &v1.Probe{
 	Handler: v1.Handler{
-		Exec: &v1.ExecAction{Command: []string{"test", "-f", "/tmp/statefulset-continue"}},
+		Exec: &v1.ExecAction{Command: []string{"test", "-f", "/data/statefulset-continue"}},
 	},
 	PeriodSeconds:    1,
 	SuccessThreshold: 1,
@@ -586,7 +599,7 @@ func (s *StatefulSetTester) ResumeNextPod(ss *apps.StatefulSet) {
 		if resumedPod != "" {
 			Failf("Found multiple paused stateful pods: %v and %v", pod.Name, resumedPod)
 		}
-		_, err := RunHostCmd(pod.Namespace, pod.Name, "touch /tmp/statefulset-continue")
+		_, err := RunHostCmdWithRetries(pod.Namespace, pod.Name, "touch /data/statefulset-continue; sync", StatefulSetPoll, StatefulPodTimeout)
 		ExpectNoError(err)
 		Logf("Resumed pod %v", pod.Name)
 		resumedPod = pod.Name
@@ -669,12 +682,13 @@ func DeleteAllStatefulSets(c clientset.Interface, ns string) {
 	// Scale down each statefulset, then delete it completely.
 	// Deleting a pvc without doing this will leak volumes, #25101.
 	errList := []string{}
-	for _, ss := range ssList.Items {
-		Logf("Scaling statefulset %v to 0", ss.Name)
-		if err := sst.Scale(&ss, 0); err != nil {
+	for i := range ssList.Items {
+		ss := &ssList.Items[i]
+		var err error
+		if ss, err = sst.Scale(ss, 0); err != nil {
 			errList = append(errList, fmt.Sprintf("%v", err))
 		}
-		sst.WaitForStatusReplicas(&ss, 0)
+		sst.WaitForStatusReplicas(ss, 0)
 		Logf("Deleting statefulset %v", ss.Name)
 		// Use OrphanDependents=false so it's deleted synchronously.
 		// We already made sure the Pods are gone inside Scale().
@@ -799,7 +813,7 @@ func NewStatefulSet(name, ns, governingSvcName string, replicas int32, statefulP
 					Containers: []v1.Container{
 						{
 							Name:         "nginx",
-							Image:        "gcr.io/google_containers/nginx-slim:0.7",
+							Image:        imageutils.GetE2EImage(imageutils.NginxSlim),
 							VolumeMounts: mounts,
 						},
 					},

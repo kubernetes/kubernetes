@@ -89,11 +89,13 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 		},
 		Username:    c.Username,
 		Password:    c.Password,
+		CacheDir:    c.CacheDir,
 		BearerToken: c.BearerToken,
 		Impersonate: transport.ImpersonationConfig{
 			UserName: c.Impersonate.UserName,
 			Groups:   c.Impersonate.Groups,
 			Extra:    c.Impersonate.Extra,
 		},
+		Dial: c.Dial,
 	}, nil
 }

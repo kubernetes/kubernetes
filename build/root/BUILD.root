@@ -29,6 +29,7 @@ gcs_upload(
         "//build/release-tars:release-tars-and-hashes",
         "//cluster/gce:gcs-release-artifacts-and-hashes",
     ],
+    tags = ["manual"],
     upload_paths = {
         "//:_binary-artifacts-and-hashes": "bin/linux/amd64",
         "//build/release-tars:release-tars-and-hashes": "",

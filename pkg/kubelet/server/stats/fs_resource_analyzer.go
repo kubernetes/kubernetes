@@ -36,7 +36,7 @@ type fsResourceAnalyzerInterface interface {
 	GetPodVolumeStats(uid types.UID) (PodVolumeStats, bool)
 }
 
-// diskResourceAnalyzer provider stats about fs resource usage
+// fsResourceAnalyzer provides stats about fs resource usage
 type fsResourceAnalyzer struct {
 	statsProvider     StatsProvider
 	calcPeriod        time.Duration

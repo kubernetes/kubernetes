@@ -30,6 +30,7 @@ import (
 
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
+	"k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -189,6 +190,8 @@ type roundTripper struct {
 	wrapped  http.RoundTripper
 }
 
+var _ net.RoundTripperWrapper = &roundTripper{}
+
 func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	if len(req.Header.Get("Authorization")) != 0 {
 		return r.wrapped.RoundTrip(req)
@@ -211,6 +214,8 @@ func (r *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	return r.wrapped.RoundTrip(r2)
 }
+
+func (t *roundTripper) WrappedRoundTripper() http.RoundTripper { return t.wrapped }
 
 func (p *oidcAuthProvider) idToken() (string, error) {
 	p.mu.Lock()
@@ -253,7 +258,11 @@ func (p *oidcAuthProvider) idToken() (string, error) {
 
 	idToken, ok := token.Extra("id_token").(string)
 	if !ok {
-		return "", fmt.Errorf("token response did not contain an id_token")
+		// id_token isn't a required part of a refresh token response, so some
+		// providers (Okta) don't return this value.
+		//
+		// See https://github.com/kubernetes/kubernetes/issues/36847
+		return "", fmt.Errorf("token response did not contain an id_token, either the scope \"openid\" wasn't requested upon login, or the provider doesn't support id_tokens as part of the refresh response.")
 	}
 
 	// Create a new config to persist.

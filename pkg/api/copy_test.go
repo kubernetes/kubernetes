@@ -50,12 +50,7 @@ func doDeepCopyTest(t *testing.T, kind schema.GroupVersionKind, f *fuzz.Fuzzer) 
 		t.Fatalf("Could not create a %v: %s", kind, err)
 	}
 	f.Fuzz(item)
-	itemCopy, err := api.Scheme.DeepCopy(item)
-	if err != nil {
-		t.Errorf("Could not deep copy a %v: %s", kind, err)
-		return
-	}
-
+	itemCopy := item.DeepCopyObject()
 	if !reflect.DeepEqual(item, itemCopy) {
 		t.Errorf("\nexpected: %#v\n\ngot:      %#v\n\ndiff:      %v", item, itemCopy, diff.ObjectReflectDiff(item, itemCopy))
 	}

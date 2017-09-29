@@ -440,9 +440,6 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		return
 	}
 	pod.Status = status.status
-	if err := podutil.SetInitContainersStatusesAnnotations(pod); err != nil {
-		glog.Error(err)
-	}
 	// TODO: handle conflict as a retry, make that easier too.
 	newPod, err := m.kubeClient.Core().Pods(pod.Namespace).UpdateStatus(pod)
 	if err != nil {

@@ -1,5 +1,9 @@
 package swarm
 
+import (
+	"github.com/docker/docker/api/types/network"
+)
+
 // Endpoint represents an endpoint.
 type Endpoint struct {
 	Spec       EndpointSpec        `json:",omitempty"`
@@ -78,17 +82,21 @@ type Network struct {
 // NetworkSpec represents the spec of a network.
 type NetworkSpec struct {
 	Annotations
-	DriverConfiguration *Driver      `json:",omitempty"`
-	IPv6Enabled         bool         `json:",omitempty"`
-	Internal            bool         `json:",omitempty"`
-	Attachable          bool         `json:",omitempty"`
-	IPAMOptions         *IPAMOptions `json:",omitempty"`
+	DriverConfiguration *Driver                  `json:",omitempty"`
+	IPv6Enabled         bool                     `json:",omitempty"`
+	Internal            bool                     `json:",omitempty"`
+	Attachable          bool                     `json:",omitempty"`
+	Ingress             bool                     `json:",omitempty"`
+	IPAMOptions         *IPAMOptions             `json:",omitempty"`
+	ConfigFrom          *network.ConfigReference `json:",omitempty"`
+	Scope               string                   `json:",omitempty"`
 }
 
 // NetworkAttachmentConfig represents the configuration of a network attachment.
 type NetworkAttachmentConfig struct {
-	Target  string   `json:",omitempty"`
-	Aliases []string `json:",omitempty"`
+	Target     string            `json:",omitempty"`
+	Aliases    []string          `json:",omitempty"`
+	DriverOpts map[string]string `json:",omitempty"`
 }
 
 // NetworkAttachment represents a network attachment.

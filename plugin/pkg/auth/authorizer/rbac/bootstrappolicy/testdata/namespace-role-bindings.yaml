@@ -1,6 +1,6 @@
 apiVersion: v1
 items:
-- apiVersion: rbac.authorization.k8s.io/v1beta1
+- apiVersion: rbac.authorization.k8s.io/v1
   kind: RoleBinding
   metadata:
     annotations:
@@ -18,7 +18,7 @@ items:
   - kind: ServiceAccount
     name: bootstrap-signer
     namespace: kube-system
-- apiVersion: rbac.authorization.k8s.io/v1beta1
+- apiVersion: rbac.authorization.k8s.io/v1
   kind: RoleBinding
   metadata:
     annotations:
@@ -36,7 +36,7 @@ items:
   - kind: ServiceAccount
     name: kube-controller-manager
     namespace: kube-system
-- apiVersion: rbac.authorization.k8s.io/v1beta1
+- apiVersion: rbac.authorization.k8s.io/v1
   kind: RoleBinding
   metadata:
     annotations:
@@ -54,7 +54,7 @@ items:
   - kind: ServiceAccount
     name: kube-scheduler
     namespace: kube-system
-- apiVersion: rbac.authorization.k8s.io/v1beta1
+- apiVersion: rbac.authorization.k8s.io/v1
   kind: RoleBinding
   metadata:
     annotations:
@@ -72,7 +72,7 @@ items:
   - kind: ServiceAccount
     name: bootstrap-signer
     namespace: kube-system
-- apiVersion: rbac.authorization.k8s.io/v1beta1
+- apiVersion: rbac.authorization.k8s.io/v1
   kind: RoleBinding
   metadata:
     annotations:
@@ -90,7 +90,7 @@ items:
   - kind: ServiceAccount
     name: cloud-provider
     namespace: kube-system
-- apiVersion: rbac.authorization.k8s.io/v1beta1
+- apiVersion: rbac.authorization.k8s.io/v1
   kind: RoleBinding
   metadata:
     annotations:

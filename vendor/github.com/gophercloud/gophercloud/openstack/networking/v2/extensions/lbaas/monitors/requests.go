@@ -31,10 +31,10 @@ type ListOpts struct {
 }
 
 // List returns a Pager which allows you to iterate over a collection of
-// routers. It accepts a ListOpts struct, which allows you to filter and sort
+// monitors. It accepts a ListOpts struct, which allows you to filter and sort
 // the returned collection for greater efficiency.
 //
-// Default policy settings return only those routers that are owned by the
+// Default policy settings return only those monitors that are owned by the
 // tenant who submits the request, unless an admin user submits the request.
 func List(c *gophercloud.ServiceClient, opts ListOpts) pagination.Pager {
 	q, err := gophercloud.BuildQueryString(&opts)
@@ -47,7 +47,7 @@ func List(c *gophercloud.ServiceClient, opts ListOpts) pagination.Pager {
 	})
 }
 
-// MonitorType is the type for all the types of LB monitors
+// MonitorType is the type for all the types of LB monitors.
 type MonitorType string
 
 // Constants that represent approved monitoring types.
@@ -58,42 +58,52 @@ const (
 	TypeHTTPS MonitorType = "HTTPS"
 )
 
-// CreateOptsBuilder is what types must satisfy to be used as Create
-// options.
+// CreateOptsBuilder allows extensions to add additional parameters to the
+// Create request.
 type CreateOptsBuilder interface {
 	ToLBMonitorCreateMap() (map[string]interface{}, error)
 }
 
 // CreateOpts contains all the values needed to create a new health monitor.
 type CreateOpts struct {
-	// Required. The type of probe, which is PING, TCP, HTTP, or HTTPS, that is
-	// sent by the load balancer to verify the member state.
+	// MonitorType is the type of probe, which is PING, TCP, HTTP, or HTTPS,
+	// that is sent by the load balancer to verify the member state.
 	Type MonitorType `json:"type" required:"true"`
-	// Required. The time, in seconds, between sending probes to members.
+
+	// Delay is the time, in seconds, between sending probes to members.
 	Delay int `json:"delay" required:"true"`
-	// Required. Maximum number of seconds for a monitor to wait for a ping reply
-	// before it times out. The value must be less than the delay value.
+
+	// Timeout is the maximum number of seconds for a monitor to wait for a ping
+	// reply before it times out. The value must be less than the delay value.
 	Timeout int `json:"timeout" required:"true"`
-	// Required. Number of permissible ping failures before changing the member's
-	// status to INACTIVE. Must be a number between 1 and 10.
+
+	// MaxRetries is the number of permissible ping failures before changing the
+	// member's status to INACTIVE. Must be a number between 1 and 10.
 	MaxRetries int `json:"max_retries" required:"true"`
-	// Required for HTTP(S) types. URI path that will be accessed if monitor type
-	// is HTTP or HTTPS.
+
+	// URLPath is the URI path that will be accessed if monitor type
+	// is HTTP or HTTPS. Required for HTTP(S) types.
 	URLPath string `json:"url_path,omitempty"`
-	// Required for HTTP(S) types. The HTTP method used for requests by the
-	// monitor. If this attribute is not specified, it defaults to "GET".
+
+	// HTTPMethod is the HTTP method used for requests by the monitor. If this
+	// attribute is not specified, it defaults to "GET". Required for HTTP(S)
+	// types.
 	HTTPMethod string `json:"http_method,omitempty"`
-	// Required for HTTP(S) types. Expected HTTP codes for a passing HTTP(S)
-	// monitor. You can either specify a single status like "200", or a range
-	// like "200-202".
+
+	// ExpectedCodes is the expected HTTP codes for a passing HTTP(S) monitor
+	// You can either specify a single status like "200", or a range like
+	// "200-202". Required for HTTP(S) types.
 	ExpectedCodes string `json:"expected_codes,omitempty"`
-	// Required for admins. Indicates the owner of the VIP.
-	TenantID     string `json:"tenant_id,omitempty"`
-	AdminStateUp *bool  `json:"admin_state_up,omitempty"`
+
+	// TenantID is only required if the caller has an admin role and wants
+	// to create a pool for another tenant.
+	TenantID string `json:"tenant_id,omitempty"`
+
+	// AdminStateUp denotes whether the monitor is administratively up or down.
+	AdminStateUp *bool `json:"admin_state_up,omitempty"`
 }
 
-// ToLBMonitorCreateMap allows CreateOpts to satisfy the CreateOptsBuilder
-// interface
+// ToLBMonitorCreateMap builds a request body from CreateOpts.
 func (opts CreateOpts) ToLBMonitorCreateMap() (map[string]interface{}, error) {
 	if opts.Type == TypeHTTP || opts.Type == TypeHTTPS {
 		if opts.URLPath == "" {
@@ -146,39 +156,45 @@ func Get(c *gophercloud.ServiceClient, id string) (r GetResult) {
 	return
 }
 
-// UpdateOptsBuilder is what types must satisfy to be used as Update
-// options.
+// UpdateOptsBuilder allows extensions to add additional parameters to the
+// Update request.
 type UpdateOptsBuilder interface {
 	ToLBMonitorUpdateMap() (map[string]interface{}, error)
 }
 
-// UpdateOpts contains all the values needed to update an existing virtual IP.
+// UpdateOpts contains all the values needed to update an existing monitor.
 // Attributes not listed here but appear in CreateOpts are immutable and cannot
 // be updated.
 type UpdateOpts struct {
-	// The time, in seconds, between sending probes to members.
+	// Delay is the time, in seconds, between sending probes to members.
 	Delay int `json:"delay,omitempty"`
-	// Maximum number of seconds for a monitor to wait for a ping reply
-	// before it times out. The value must be less than the delay value.
+
+	// Timeout is the maximum number of seconds for a monitor to wait for a ping
+	// reply before it times out. The value must be less than the delay value.
 	Timeout int `json:"timeout,omitempty"`
-	// Number of permissible ping failures before changing the member's
-	// status to INACTIVE. Must be a number between 1 and 10.
+
+	// MaxRetries is the number of permissible ping failures before changing the
+	// member's status to INACTIVE. Must be a number between 1 and 10.
 	MaxRetries int `json:"max_retries,omitempty"`
-	// URI path that will be accessed if monitor type
+
+	// URLPath is the URI path that will be accessed if monitor type
 	// is HTTP or HTTPS.
 	URLPath string `json:"url_path,omitempty"`
-	// The HTTP method used for requests by the
-	// monitor. If this attribute is not specified, it defaults to "GET".
+
+	// HTTPMethod is the HTTP method used for requests by the monitor. If this
+	// attribute is not specified, it defaults to "GET".
 	HTTPMethod string `json:"http_method,omitempty"`
-	// Expected HTTP codes for a passing HTTP(S)
-	// monitor. You can either specify a single status like "200", or a range
-	// like "200-202".
+
+	// ExpectedCodes is the expected HTTP codes for a passing HTTP(S) monitor
+	// You can either specify a single status like "200", or a range like
+	// "200-202".
 	ExpectedCodes string `json:"expected_codes,omitempty"`
-	AdminStateUp  *bool  `json:"admin_state_up,omitempty"`
+
+	// AdminStateUp denotes whether the monitor is administratively up or down.
+	AdminStateUp *bool `json:"admin_state_up,omitempty"`
 }
 
-// ToLBMonitorUpdateMap allows UpdateOpts to satisfy the UpdateOptsBuilder
-// interface
+// ToLBMonitorUpdateMap builds a request body from UpdateOpts.
 func (opts UpdateOpts) ToLBMonitorUpdateMap() (map[string]interface{}, error) {
 	if opts.Delay > 0 && opts.Timeout > 0 && opts.Delay < opts.Timeout {
 		err := gophercloud.ErrInvalidInput{}
@@ -190,7 +206,8 @@ func (opts UpdateOpts) ToLBMonitorUpdateMap() (map[string]interface{}, error) {
 	return gophercloud.BuildRequestBody(opts, "health_monitor")
 }
 
-// Update is an operation which modifies the attributes of the specified monitor.
+// Update is an operation which modifies the attributes of the specified
+// monitor.
 func Update(c *gophercloud.ServiceClient, id string, opts UpdateOptsBuilder) (r UpdateResult) {
 	b, err := opts.ToLBMonitorUpdateMap()
 	if err != nil {

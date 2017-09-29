@@ -21,7 +21,6 @@ import (
 	"runtime"
 	"testing"
 
-	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 )
 
@@ -181,40 +180,30 @@ func TestSafeFormatAndMount(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		commandScripts := []fakeexec.FakeCommandAction{}
-		for _, expected := range test.execScripts {
-			ecmd := expected.command
-			eargs := expected.args
-			output := expected.output
-			err := expected.err
-			commandScript := func(cmd string, args ...string) exec.Cmd {
-				if cmd != ecmd {
-					t.Errorf("Unexpected command %s. Expecting %s", cmd, ecmd)
-				}
-
-				for j := range args {
-					if args[j] != eargs[j] {
-						t.Errorf("Unexpected args %v. Expecting %v", args, eargs)
-					}
-				}
-				fake := fakeexec.FakeCmd{
-					CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-						func() ([]byte, error) { return []byte(output), err },
-					},
-				}
-				return fakeexec.InitFakeCmd(&fake, cmd, args...)
+		execCallCount := 0
+		execCallback := func(cmd string, args ...string) ([]byte, error) {
+			if len(test.execScripts) <= execCallCount {
+				t.Errorf("Unexpected command: %s %v", cmd, args)
+				return nil, nil
 			}
-			commandScripts = append(commandScripts, commandScript)
-		}
-
-		fake := fakeexec.FakeExec{
-			CommandScript: commandScripts,
+			script := test.execScripts[execCallCount]
+			execCallCount++
+			if script.command != cmd {
+				t.Errorf("Unexpected command %s. Expecting %s", cmd, script.command)
+			}
+			for j := range args {
+				if args[j] != script.args[j] {
+					t.Errorf("Unexpected args %v. Expecting %v", args, script.args)
+				}
+			}
+			return []byte(script.output), script.err
 		}
 
 		fakeMounter := ErrorMounter{&FakeMounter{}, 0, test.mountErrs}
+		fakeExec := NewFakeExec(execCallback)
 		mounter := SafeFormatAndMount{
 			Interface: &fakeMounter,
-			Runner:    &fake,
+			Exec:      fakeExec,
 		}
 
 		device := "/dev/foo"

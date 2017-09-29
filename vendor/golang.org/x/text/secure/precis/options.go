@@ -6,10 +6,10 @@ package precis
 
 import (
 	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
-	"golang.org/x/text/width"
 )
 
 // An Option is used to define the behavior and rules of a Profile.
@@ -20,11 +20,12 @@ type options struct {
 	foldWidth bool
 
 	// Enforcement options
-	cases         transform.Transformer
+	asciiLower    bool
+	cases         transform.SpanningTransformer
 	disallow      runes.Set
-	norm          norm.Form
-	additional    []func() transform.Transformer
-	width         *width.Transformer
+	norm          transform.SpanningTransformer
+	additional    []func() transform.SpanningTransformer
+	width         transform.SpanningTransformer
 	disallowEmpty bool
 	bidiRule      bool
 
@@ -35,6 +36,11 @@ type options struct {
 func getOpts(o ...Option) (res options) {
 	for _, f := range o {
 		f(&res)
+	}
+	// Using a SpanningTransformer, instead of norm.Form prevents an allocation
+	// down the road.
+	if res.norm == nil {
+		res.norm = norm.NFC
 	}
 	return
 }
@@ -74,11 +80,36 @@ var (
 	}
 )
 
+// TODO: move this logic to package transform
+
+type spanWrap struct{ transform.Transformer }
+
+func (s spanWrap) Span(src []byte, atEOF bool) (n int, err error) {
+	return 0, transform.ErrEndOfSpan
+}
+
+// TODO: allow different types? For instance:
+//     func() transform.Transformer
+//     func() transform.SpanningTransformer
+//     func([]byte) bool  // validation only
+//
+// Also, would be great if we could detect if a transformer is reentrant.
+
 // The AdditionalMapping option defines the additional mapping rule for the
 // Profile by applying Transformer's in sequence.
 func AdditionalMapping(t ...func() transform.Transformer) Option {
 	return func(o *options) {
-		o.additional = t
+		for _, f := range t {
+			sf := func() transform.SpanningTransformer {
+				return f().(transform.SpanningTransformer)
+			}
+			if _, ok := f().(transform.SpanningTransformer); !ok {
+				sf = func() transform.SpanningTransformer {
+					return spanWrap{f()}
+				}
+			}
+			o.additional = append(o.additional, sf)
+		}
 	}
 }
 
@@ -93,7 +124,23 @@ func Norm(f norm.Form) Option {
 // provided to determine the type of case folding used.
 func FoldCase(opts ...cases.Option) Option {
 	return func(o *options) {
+		o.asciiLower = true
 		o.cases = cases.Fold(opts...)
+	}
+}
+
+// The LowerCase option defines a Profile's case mapping rule. Options can be
+// provided to determine the type of case folding used.
+func LowerCase(opts ...cases.Option) Option {
+	return func(o *options) {
+		o.asciiLower = true
+		if len(opts) == 0 {
+			o.cases = cases.Lower(language.Und, cases.HandleFinalSigma(false))
+			return
+		}
+
+		opts = append([]cases.Option{cases.HandleFinalSigma(false)}, opts...)
+		o.cases = cases.Lower(language.Und, opts...)
 	}
 }
 

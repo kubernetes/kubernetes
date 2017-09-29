@@ -22,7 +22,7 @@ import (
 
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
-	validationutil "k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
@@ -38,23 +38,11 @@ func ValidateInitializerConfiguration(ic *admissionregistration.InitializerConfi
 func validateInitializer(initializer *admissionregistration.Initializer, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 	// initlializer.Name must be fully qualified
-	if len(initializer.Name) == 0 {
-		allErrors = append(allErrors, field.Required(fldPath.Child("name"), ""))
-	}
-	if errs := validationutil.IsDNS1123Subdomain(initializer.Name); len(errs) > 0 {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("name"), initializer.Name, strings.Join(errs, ",")))
-	}
-	if len(strings.Split(initializer.Name, ".")) < 3 {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("name"), initializer.Name, "should be a domain with at least two dots"))
-	}
+	allErrors = append(allErrors, validation.IsFullyQualifiedName(fldPath.Child("name"), initializer.Name)...)
 
 	for i, rule := range initializer.Rules {
 		notAllowSubresources := false
 		allErrors = append(allErrors, validateRule(&rule, fldPath.Child("rules").Index(i), notAllowSubresources)...)
-	}
-	// TODO: relax the validation rule when admissionregistration is beta.
-	if initializer.FailurePolicy != nil && *initializer.FailurePolicy != admissionregistration.Ignore {
-		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *initializer.FailurePolicy, []string{string(admissionregistration.Ignore)}))
 	}
 	return allErrors
 }
@@ -186,15 +174,7 @@ func ValidateExternalAdmissionHookConfiguration(e *admissionregistration.Externa
 func validateExternalAdmissionHook(hook *admissionregistration.ExternalAdmissionHook, fldPath *field.Path) field.ErrorList {
 	var allErrors field.ErrorList
 	// hook.Name must be fully qualified
-	if len(hook.Name) == 0 {
-		allErrors = append(allErrors, field.Required(fldPath.Child("name"), ""))
-	}
-	if errs := validationutil.IsDNS1123Subdomain(hook.Name); len(errs) > 0 {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("name"), hook.Name, strings.Join(errs, ",")))
-	}
-	if len(strings.Split(hook.Name, ".")) < 3 {
-		allErrors = append(allErrors, field.Invalid(fldPath.Child("name"), hook.Name, "should be a domain with at least two dots"))
-	}
+	allErrors = append(allErrors, validation.IsFullyQualifiedName(fldPath.Child("name"), hook.Name)...)
 
 	for i, rule := range hook.Rules {
 		allErrors = append(allErrors, validateRuleWithOperations(&rule, fldPath.Child("rules").Index(i))...)

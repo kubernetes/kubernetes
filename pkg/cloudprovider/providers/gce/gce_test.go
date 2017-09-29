@@ -17,11 +17,55 @@ limitations under the License.
 package gce
 
 import (
-	"golang.org/x/oauth2/google"
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
+
+	"golang.org/x/oauth2/google"
+
+	computealpha "google.golang.org/api/compute/v0.alpha"
+	computebeta "google.golang.org/api/compute/v0.beta"
+	computev1 "google.golang.org/api/compute/v1"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 )
+
+func TestReadConfigFile(t *testing.T) {
+	const s = `[Global]
+token-url = my-token-url
+token-body = my-token-body
+project-id = my-project
+network-project-id = my-network-project
+network-name = my-network
+subnetwork-name = my-subnetwork
+secondary-range-name = my-secondary-range
+node-tags = my-node-tag1
+node-instance-prefix = my-prefix
+multizone = true
+   `
+	reader := strings.NewReader(s)
+	config, err := readConfig(reader)
+	if err != nil {
+		t.Fatalf("Unexpected config parsing error %v", err)
+	}
+
+	expected := &ConfigFile{Global: ConfigGlobal{
+		TokenURL:           "my-token-url",
+		TokenBody:          "my-token-body",
+		ProjectID:          "my-project",
+		NetworkProjectID:   "my-network-project",
+		NetworkName:        "my-network",
+		SubnetworkName:     "my-subnetwork",
+		SecondaryRangeName: "my-secondary-range",
+		NodeTags:           []string{"my-node-tag1"},
+		NodeInstancePrefix: "my-prefix",
+		Multizone:          true,
+	}}
+
+	if !reflect.DeepEqual(expected, config) {
+		t.Fatalf("Expected config file values to be read into ConfigFile struct.  \nExpected:\n%+v\nActual:\n%+v", expected, config)
+	}
+}
 
 func TestExtraKeyInConfig(t *testing.T) {
 	const s = `[Global]
@@ -238,7 +282,7 @@ func TestSplitProviderID(t *testing.T) {
 	for _, test := range providers {
 		project, zone, instance, err := splitProviderID(test.providerID)
 		if (err != nil) != test.fail {
-			t.Errorf("Expected to failt=%t, with pattern %v", test.fail, test)
+			t.Errorf("Expected to fail=%t, with pattern %v", test.fail, test)
 		}
 
 		if test.fail {
@@ -257,183 +301,328 @@ func TestSplitProviderID(t *testing.T) {
 	}
 }
 
-func TestGenerateCloudConfigs(t *testing.T) {
-	testCases := []struct {
-		TokenURL           string
-		TokenBody          string
-		ProjectID          string
-		NetworkName        string
-		SubnetworkName     string
-		NodeTags           []string
-		NodeInstancePrefix string
-		Multizone          bool
-		ApiEndpoint        string
-		LocalZone          string
-		cloudConfig        *CloudConfig
+func TestGetZoneByProviderID(t *testing.T) {
+	tests := []struct {
+		providerID string
+
+		expectedZone cloudprovider.Zone
+
+		fail        bool
+		description string
 	}{
 		{
-			TokenURL:           "",
-			TokenBody:          "",
-			ProjectID:          "project-id",
-			NetworkName:        "network-name",
-			SubnetworkName:     "subnetwork-name",
-			NodeTags:           []string{"node-tag"},
-			NodeInstancePrefix: "node-prefix",
-			Multizone:          false,
-			ApiEndpoint:        "",
-			LocalZone:          "us-central1-a",
-			cloudConfig: &CloudConfig{
-				ApiEndpoint:        "",
-				ProjectID:          "project-id",
-				Region:             "us-central1",
-				Zone:               "us-central1-a",
-				ManagedZones:       []string{"us-central1-a"},
-				NetworkURL:         "https://www.googleapis.com/compute/v1/projects/project-id/global/networks/network-name",
-				SubnetworkURL:      "https://www.googleapis.com/compute/v1/projects/project-id/regions/us-central1/subnetworks/subnetwork-name",
-				NodeTags:           []string{"node-tag"},
-				NodeInstancePrefix: "node-prefix",
-				TokenSource:        google.ComputeTokenSource(""),
-				UseMetadataServer:  true,
+			providerID:   ProviderName + "://project-example-164317/us-central1-f/kubernetes-node-fhx1",
+			expectedZone: cloudprovider.Zone{FailureDomain: "us-central1-f", Region: "us-central1"},
+			fail:         false,
+			description:  "standard gce providerID",
+		},
+		{
+			providerID:   ProviderName + "://project-example-164317/us-central1-f/kubernetes-node-fhx1/",
+			expectedZone: cloudprovider.Zone{},
+			fail:         true,
+			description:  "too many slashes('/') trailing",
+		},
+		{
+			providerID:   ProviderName + "://project-example.164317//kubernetes-node-fhx1",
+			expectedZone: cloudprovider.Zone{},
+			fail:         true,
+			description:  "too many slashes('/') embedded",
+		},
+		{
+			providerID:   ProviderName + "://project-example-164317/uscentral1f/kubernetes-node-fhx1",
+			expectedZone: cloudprovider.Zone{},
+			fail:         true,
+			description:  "invalid name of the GCE zone",
+		},
+	}
+
+	gce := &GCECloud{
+		localZone: "us-central1-f",
+		region:    "us-central1",
+	}
+	for _, test := range tests {
+		zone, err := gce.GetZoneByProviderID(test.providerID)
+		if (err != nil) != test.fail {
+			t.Errorf("Expected to fail=%t, provider ID %v, tests %s", test.fail, test, test.description)
+		}
+
+		if test.fail {
+			continue
+		}
+
+		if zone != test.expectedZone {
+			t.Errorf("Expected %v, but got %v", test.expectedZone, zone)
+		}
+	}
+}
+
+func TestGenerateCloudConfigs(t *testing.T) {
+	configBoilerplate := ConfigGlobal{
+		TokenURL:           "",
+		TokenBody:          "",
+		ProjectID:          "project-id",
+		NetworkName:        "network-name",
+		SubnetworkName:     "",
+		SecondaryRangeName: "",
+		NodeTags:           []string{"node-tag"},
+		NodeInstancePrefix: "node-prefix",
+		Multizone:          false,
+		ApiEndpoint:        "",
+		LocalZone:          "us-central1-a",
+		AlphaFeatures:      []string{},
+	}
+
+	cloudBoilerplate := CloudConfig{
+		ApiEndpoint:        "",
+		ProjectID:          "project-id",
+		NetworkProjectID:   "",
+		Region:             "us-central1",
+		Zone:               "us-central1-a",
+		ManagedZones:       []string{"us-central1-a"},
+		NetworkName:        "network-name",
+		SubnetworkName:     "",
+		NetworkURL:         "",
+		SubnetworkURL:      "",
+		SecondaryRangeName: "",
+		NodeTags:           []string{"node-tag"},
+		TokenSource:        google.ComputeTokenSource(""),
+		NodeInstancePrefix: "node-prefix",
+		UseMetadataServer:  true,
+		AlphaFeatureGate:   &AlphaFeatureGate{map[string]bool{}},
+	}
+
+	testCases := []struct {
+		name   string
+		config func() ConfigGlobal
+		cloud  func() CloudConfig
+	}{
+		{
+			name:   "Empty Config",
+			config: func() ConfigGlobal { return configBoilerplate },
+			cloud:  func() CloudConfig { return cloudBoilerplate },
+		},
+		{
+			name: "Nil token URL",
+			config: func() ConfigGlobal {
+				v := configBoilerplate
+				v.TokenURL = "nil"
+				return v
+			},
+			cloud: func() CloudConfig {
+				v := cloudBoilerplate
+				v.TokenSource = nil
+				return v
 			},
 		},
-		// nil token source
 		{
-			TokenURL:           "nil",
-			TokenBody:          "",
-			ProjectID:          "project-id",
-			NetworkName:        "network-name",
-			SubnetworkName:     "subnetwork-name",
-			NodeTags:           []string{"node-tag"},
-			NodeInstancePrefix: "node-prefix",
-			Multizone:          false,
-			ApiEndpoint:        "",
-			LocalZone:          "us-central1-a",
-			cloudConfig: &CloudConfig{
-				ApiEndpoint:        "",
-				ProjectID:          "project-id",
-				Region:             "us-central1",
-				Zone:               "us-central1-a",
-				ManagedZones:       []string{"us-central1-a"},
-				NetworkURL:         "https://www.googleapis.com/compute/v1/projects/project-id/global/networks/network-name",
-				SubnetworkURL:      "https://www.googleapis.com/compute/v1/projects/project-id/regions/us-central1/subnetworks/subnetwork-name",
-				NodeTags:           []string{"node-tag"},
-				NodeInstancePrefix: "node-prefix",
-				TokenSource:        nil,
-				UseMetadataServer:  true,
+			name: "Network Project ID",
+			config: func() ConfigGlobal {
+				v := configBoilerplate
+				v.NetworkProjectID = "my-awesome-project"
+				return v
+			},
+			cloud: func() CloudConfig {
+				v := cloudBoilerplate
+				v.NetworkProjectID = "my-awesome-project"
+				return v
 			},
 		},
-		// specified api endpoint
 		{
-			TokenURL:           "",
-			TokenBody:          "",
-			ProjectID:          "project-id",
-			NetworkName:        "network-name",
-			SubnetworkName:     "subnetwork-name",
-			NodeTags:           []string{"node-tag"},
-			NodeInstancePrefix: "node-prefix",
-			Multizone:          false,
-			ApiEndpoint:        "https://www.googleapis.com/compute/staging_v1/",
-			LocalZone:          "us-central1-a",
-			cloudConfig: &CloudConfig{
-				ApiEndpoint:        "https://www.googleapis.com/compute/staging_v1/",
-				ProjectID:          "project-id",
-				Region:             "us-central1",
-				Zone:               "us-central1-a",
-				ManagedZones:       []string{"us-central1-a"},
-				NetworkURL:         "https://www.googleapis.com/compute/staging_v1/projects/project-id/global/networks/network-name",
-				SubnetworkURL:      "https://www.googleapis.com/compute/staging_v1/projects/project-id/regions/us-central1/subnetworks/subnetwork-name",
-				NodeTags:           []string{"node-tag"},
-				NodeInstancePrefix: "node-prefix",
-				TokenSource:        google.ComputeTokenSource(""),
-				UseMetadataServer:  true,
+			name: "Specified API Endpint",
+			config: func() ConfigGlobal {
+				v := configBoilerplate
+				v.ApiEndpoint = "https://www.googleapis.com/compute/staging_v1/"
+				return v
+			},
+			cloud: func() CloudConfig {
+				v := cloudBoilerplate
+				v.ApiEndpoint = "https://www.googleapis.com/compute/staging_v1/"
+				return v
 			},
 		},
-		// empty subnet-name
 		{
-			TokenURL:           "",
-			TokenBody:          "",
-			ProjectID:          "project-id",
-			NetworkName:        "network-name",
-			SubnetworkName:     "",
-			NodeTags:           []string{"node-tag"},
-			NodeInstancePrefix: "node-prefix",
-			Multizone:          false,
-			ApiEndpoint:        "",
-			LocalZone:          "us-central1-a",
-			cloudConfig: &CloudConfig{
-				ApiEndpoint:        "",
-				ProjectID:          "project-id",
-				Region:             "us-central1",
-				Zone:               "us-central1-a",
-				ManagedZones:       []string{"us-central1-a"},
-				NetworkURL:         "https://www.googleapis.com/compute/v1/projects/project-id/global/networks/network-name",
-				SubnetworkURL:      "",
-				NodeTags:           []string{"node-tag"},
-				NodeInstancePrefix: "node-prefix",
-				TokenSource:        google.ComputeTokenSource(""),
-				UseMetadataServer:  true,
+			name: "Network & Subnetwork names",
+			config: func() ConfigGlobal {
+				v := configBoilerplate
+				v.NetworkName = "my-network"
+				v.SubnetworkName = "my-subnetwork"
+				return v
+			},
+			cloud: func() CloudConfig {
+				v := cloudBoilerplate
+				v.NetworkName = "my-network"
+				v.SubnetworkName = "my-subnetwork"
+				return v
 			},
 		},
-		// multi zone
 		{
-			TokenURL:           "",
-			TokenBody:          "",
-			ProjectID:          "project-id",
-			NetworkName:        "network-name",
-			SubnetworkName:     "subnetwork-name",
-			NodeTags:           []string{"node-tag"},
-			NodeInstancePrefix: "node-prefix",
-			Multizone:          true,
-			ApiEndpoint:        "",
-			LocalZone:          "us-central1-a",
-			cloudConfig: &CloudConfig{
-				ApiEndpoint:        "",
-				ProjectID:          "project-id",
-				Region:             "us-central1",
-				Zone:               "us-central1-a",
-				ManagedZones:       nil,
-				NetworkURL:         "https://www.googleapis.com/compute/v1/projects/project-id/global/networks/network-name",
-				SubnetworkURL:      "https://www.googleapis.com/compute/v1/projects/project-id/regions/us-central1/subnetworks/subnetwork-name",
-				NodeTags:           []string{"node-tag"},
-				NodeInstancePrefix: "node-prefix",
-				TokenSource:        google.ComputeTokenSource(""),
-				UseMetadataServer:  true,
+			name: "Network & Subnetwork URLs",
+			config: func() ConfigGlobal {
+				v := configBoilerplate
+				v.NetworkName = "https://www.googleapis.com/compute/v1/projects/project-id/global/networks/my-network"
+				v.SubnetworkName = "https://www.googleapis.com/compute/v1/projects/project-id/regions/us-central1/subnetworks/my-subnetwork"
+				return v
+			},
+			cloud: func() CloudConfig {
+				v := cloudBoilerplate
+				v.NetworkName = ""
+				v.SubnetworkName = ""
+				v.NetworkURL = "https://www.googleapis.com/compute/v1/projects/project-id/global/networks/my-network"
+				v.SubnetworkURL = "https://www.googleapis.com/compute/v1/projects/project-id/regions/us-central1/subnetworks/my-subnetwork"
+				return v
+			},
+		},
+		{
+			name: "Multizone",
+			config: func() ConfigGlobal {
+				v := configBoilerplate
+				v.Multizone = true
+				return v
+			},
+			cloud: func() CloudConfig {
+				v := cloudBoilerplate
+				v.ManagedZones = nil
+				return v
+			},
+		},
+		{
+			name: "Secondary Range Name",
+			config: func() ConfigGlobal {
+				v := configBoilerplate
+				v.SecondaryRangeName = "my-secondary"
+				return v
+			},
+			cloud: func() CloudConfig {
+				v := cloudBoilerplate
+				v.SecondaryRangeName = "my-secondary"
+				return v
 			},
 		},
 	}
 
 	for _, tc := range testCases {
-		cloudConfig, err := generateCloudConfig(&ConfigFile{
-			Global: struct {
-				TokenURL           string   `gcfg:"token-url"`
-				TokenBody          string   `gcfg:"token-body"`
-				ProjectID          string   `gcfg:"project-id"`
-				NetworkName        string   `gcfg:"network-name"`
-				SubnetworkName     string   `gcfg:"subnetwork-name"`
-				NodeTags           []string `gcfg:"node-tags"`
-				NodeInstancePrefix string   `gcfg:"node-instance-prefix"`
-				Multizone          bool     `gcfg:"multizone"`
-				ApiEndpoint        string   `gcfg:"api-endpoint"`
-				LocalZone          string   `gcfg:"local-zone"`
-			}{
-				TokenURL:           tc.TokenURL,
-				TokenBody:          tc.TokenBody,
-				ProjectID:          tc.ProjectID,
-				NetworkName:        tc.NetworkName,
-				SubnetworkName:     tc.SubnetworkName,
-				NodeTags:           tc.NodeTags,
-				NodeInstancePrefix: tc.NodeInstancePrefix,
-				Multizone:          tc.Multizone,
-				ApiEndpoint:        tc.ApiEndpoint,
-				LocalZone:          tc.LocalZone,
-			},
+		t.Run(tc.name, func(t *testing.T) {
+			resultCloud, err := generateCloudConfig(&ConfigFile{Global: tc.config()})
+			if err != nil {
+				t.Fatalf("Unexpect error: %v", err)
+			}
+
+			v := tc.cloud()
+			if !reflect.DeepEqual(*resultCloud, v) {
+				t.Errorf("Got: \n%v\nWant\n%v\n", v, *resultCloud)
+			}
 		})
-		if err != nil {
-			t.Fatalf("Unexpect error: %v", err)
+	}
+}
+
+func TestConvertToV1Operation(t *testing.T) {
+	v1Op := getTestOperation()
+	enc, _ := v1Op.MarshalJSON()
+	var op interface{}
+	var alphaOp computealpha.Operation
+	var betaOp computebeta.Operation
+
+	if err := json.Unmarshal(enc, &alphaOp); err != nil {
+		t.Errorf("Failed to unmarshal operation: %v", err)
+	}
+
+	if err := json.Unmarshal(enc, &betaOp); err != nil {
+		t.Errorf("Failed to unmarshal operation: %v", err)
+	}
+
+	op = convertToV1Operation(&alphaOp)
+	if _, ok := op.(*computev1.Operation); ok {
+		if !reflect.DeepEqual(op, v1Op) {
+			t.Errorf("Failed to maintain consistency across conversion")
+		}
+	} else {
+		t.Errorf("Expect output to be type v1 operation, but got %v", op)
+	}
+
+	op = convertToV1Operation(&betaOp)
+	if _, ok := op.(*computev1.Operation); ok {
+		if !reflect.DeepEqual(op, v1Op) {
+			t.Errorf("Failed to maintain consistency across conversion")
+		}
+	} else {
+		t.Errorf("Expect output to be type v1 operation, but got %v", op)
+	}
+}
+
+func getTestOperation() *computev1.Operation {
+	return &computev1.Operation{
+		Name:        "test",
+		Description: "test",
+		Id:          uint64(12345),
+		Error: &computev1.OperationError{
+			Errors: []*computev1.OperationErrorErrors{
+				{
+					Code:    "555",
+					Message: "error",
+				},
+			},
+		},
+	}
+}
+
+func TestNewAlphaFeatureGate(t *testing.T) {
+	knownAlphaFeatures["foo"] = true
+	knownAlphaFeatures["bar"] = true
+
+	testCases := []struct {
+		alphaFeatures  []string
+		expectEnabled  []string
+		expectDisabled []string
+		expectError    bool
+	}{
+		// enable foo bar
+		{
+			alphaFeatures:  []string{"foo", "bar"},
+			expectEnabled:  []string{"foo", "bar"},
+			expectDisabled: []string{"aaa"},
+			expectError:    false,
+		},
+		// no alpha feature
+		{
+			alphaFeatures:  []string{},
+			expectEnabled:  []string{},
+			expectDisabled: []string{"foo", "bar"},
+			expectError:    false,
+		},
+		// unsupported alpha feature
+		{
+			alphaFeatures:  []string{"aaa", "foo"},
+			expectError:    true,
+			expectEnabled:  []string{"foo"},
+			expectDisabled: []string{"aaa"},
+		},
+		// enable foo
+		{
+			alphaFeatures:  []string{"foo"},
+			expectEnabled:  []string{"foo"},
+			expectDisabled: []string{"bar"},
+			expectError:    false,
+		},
+	}
+
+	for _, tc := range testCases {
+		featureGate, err := NewAlphaFeatureGate(tc.alphaFeatures)
+
+		if (tc.expectError && err == nil) || (!tc.expectError && err != nil) {
+			t.Errorf("Expect error to be %v, but got error %v", tc.expectError, err)
 		}
 
-		if !reflect.DeepEqual(cloudConfig, tc.cloudConfig) {
-			t.Errorf("Expecting cloud config: %v, but got %v", tc.cloudConfig, cloudConfig)
+		for _, key := range tc.expectEnabled {
+			if !featureGate.Enabled(key) {
+				t.Errorf("Expect %q to be enabled.", key)
+			}
+		}
+		for _, key := range tc.expectDisabled {
+			if featureGate.Enabled(key) {
+				t.Errorf("Expect %q to be disabled.", key)
+			}
 		}
 	}
+	delete(knownAlphaFeatures, "foo")
+	delete(knownAlphaFeatures, "bar")
 }

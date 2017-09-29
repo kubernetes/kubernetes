@@ -46,8 +46,18 @@ func Predicate(f func(rune) bool) Set {
 
 // Transformer implements the transform.Transformer interface.
 type Transformer struct {
-	transform.Transformer
+	t transform.SpanningTransformer
 }
+
+func (t Transformer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
+	return t.t.Transform(dst, src, atEOF)
+}
+
+func (t Transformer) Span(b []byte, atEOF bool) (n int, err error) {
+	return t.t.Span(b, atEOF)
+}
+
+func (t Transformer) Reset() { t.t.Reset() }
 
 // Bytes returns a new byte slice with the result of converting b using t.  It
 // calls Reset on t. It returns nil if any error was found. This can only happen
@@ -96,39 +106,57 @@ type remove func(r rune) bool
 
 func (remove) Reset() {}
 
+// Span implements transform.Spanner.
+func (t remove) Span(src []byte, atEOF bool) (n int, err error) {
+	for r, size := rune(0), 0; n < len(src); {
+		if r = rune(src[n]); r < utf8.RuneSelf {
+			size = 1
+		} else if r, size = utf8.DecodeRune(src[n:]); size == 1 {
+			// Invalid rune.
+			if !atEOF && !utf8.FullRune(src[n:]) {
+				err = transform.ErrShortSrc
+			} else {
+				err = transform.ErrEndOfSpan
+			}
+			break
+		}
+		if t(r) {
+			err = transform.ErrEndOfSpan
+			break
+		}
+		n += size
+	}
+	return
+}
+
 // Transform implements transform.Transformer.
 func (t remove) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
 	for r, size := rune(0), 0; nSrc < len(src); {
 		if r = rune(src[nSrc]); r < utf8.RuneSelf {
 			size = 1
-		} else {
-			r, size = utf8.DecodeRune(src[nSrc:])
-
-			if size == 1 {
-				// Invalid rune.
-				if !atEOF && !utf8.FullRune(src[nSrc:]) {
-					err = transform.ErrShortSrc
+		} else if r, size = utf8.DecodeRune(src[nSrc:]); size == 1 {
+			// Invalid rune.
+			if !atEOF && !utf8.FullRune(src[nSrc:]) {
+				err = transform.ErrShortSrc
+				break
+			}
+			// We replace illegal bytes with RuneError. Not doing so might
+			// otherwise turn a sequence of invalid UTF-8 into valid UTF-8.
+			// The resulting byte sequence may subsequently contain runes
+			// for which t(r) is true that were passed unnoticed.
+			if !t(utf8.RuneError) {
+				if nDst+3 > len(dst) {
+					err = transform.ErrShortDst
 					break
 				}
-				// We replace illegal bytes with RuneError. Not doing so might
-				// otherwise turn a sequence of invalid UTF-8 into valid UTF-8.
-				// The resulting byte sequence may subsequently contain runes
-				// for which t(r) is true that were passed unnoticed.
-				if !t(utf8.RuneError) {
-					if nDst+3 > len(dst) {
-						err = transform.ErrShortDst
-						break
-					}
-					dst[nDst+0] = runeErrorString[0]
-					dst[nDst+1] = runeErrorString[1]
-					dst[nDst+2] = runeErrorString[2]
-					nDst += 3
-				}
-				nSrc++
-				continue
+				dst[nDst+0] = runeErrorString[0]
+				dst[nDst+1] = runeErrorString[1]
+				dst[nDst+2] = runeErrorString[2]
+				nDst += 3
 			}
+			nSrc++
+			continue
 		}
-
 		if t(r) {
 			nSrc += size
 			continue
@@ -156,6 +184,28 @@ func Map(mapping func(rune) rune) Transformer {
 type mapper func(rune) rune
 
 func (mapper) Reset() {}
+
+// Span implements transform.Spanner.
+func (t mapper) Span(src []byte, atEOF bool) (n int, err error) {
+	for r, size := rune(0), 0; n < len(src); n += size {
+		if r = rune(src[n]); r < utf8.RuneSelf {
+			size = 1
+		} else if r, size = utf8.DecodeRune(src[n:]); size == 1 {
+			// Invalid rune.
+			if !atEOF && !utf8.FullRune(src[n:]) {
+				err = transform.ErrShortSrc
+			} else {
+				err = transform.ErrEndOfSpan
+			}
+			break
+		}
+		if t(r) != r {
+			err = transform.ErrEndOfSpan
+			break
+		}
+	}
+	return n, err
+}
 
 // Transform implements transform.Transformer.
 func (t mapper) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
@@ -230,24 +280,51 @@ func ReplaceIllFormed() Transformer {
 
 type replaceIllFormed struct{ transform.NopResetter }
 
+func (t replaceIllFormed) Span(src []byte, atEOF bool) (n int, err error) {
+	for n < len(src) {
+		// ASCII fast path.
+		if src[n] < utf8.RuneSelf {
+			n++
+			continue
+		}
+
+		r, size := utf8.DecodeRune(src[n:])
+
+		// Look for a valid non-ASCII rune.
+		if r != utf8.RuneError || size != 1 {
+			n += size
+			continue
+		}
+
+		// Look for short source data.
+		if !atEOF && !utf8.FullRune(src[n:]) {
+			err = transform.ErrShortSrc
+			break
+		}
+
+		// We have an invalid rune.
+		err = transform.ErrEndOfSpan
+		break
+	}
+	return n, err
+}
+
 func (t replaceIllFormed) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err error) {
 	for nSrc < len(src) {
-		r, size := utf8.DecodeRune(src[nSrc:])
-
-		// Look for an ASCII rune.
-		if r < utf8.RuneSelf {
+		// ASCII fast path.
+		if r := src[nSrc]; r < utf8.RuneSelf {
 			if nDst == len(dst) {
 				err = transform.ErrShortDst
 				break
 			}
-			dst[nDst] = byte(r)
+			dst[nDst] = r
 			nDst++
 			nSrc++
 			continue
 		}
 
 		// Look for a valid non-ASCII rune.
-		if r != utf8.RuneError || size != 1 {
+		if _, size := utf8.DecodeRune(src[nSrc:]); size != 1 {
 			if size != copy(dst[nDst:], src[nSrc:nSrc+size]) {
 				err = transform.ErrShortDst
 				break

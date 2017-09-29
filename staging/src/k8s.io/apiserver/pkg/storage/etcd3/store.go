@@ -18,10 +18,13 @@ package etcd3
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,6 +32,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -60,12 +64,13 @@ type store struct {
 	client *clientv3.Client
 	// getOpts contains additional options that should be passed
 	// to all Get() calls.
-	getOps      []clientv3.OpOption
-	codec       runtime.Codec
-	versioner   storage.Versioner
-	transformer value.Transformer
-	pathPrefix  string
-	watcher     *watcher
+	getOps        []clientv3.OpOption
+	codec         runtime.Codec
+	versioner     storage.Versioner
+	transformer   value.Transformer
+	pathPrefix    string
+	watcher       *watcher
+	pagingEnabled bool
 }
 
 type elemForDecode struct {
@@ -82,23 +87,24 @@ type objState struct {
 }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *clientv3.Client, codec runtime.Codec, prefix string, transformer value.Transformer) storage.Interface {
-	return newStore(c, true, codec, prefix, transformer)
+func New(c *clientv3.Client, codec runtime.Codec, prefix string, transformer value.Transformer, pagingEnabled bool) storage.Interface {
+	return newStore(c, true, pagingEnabled, codec, prefix, transformer)
 }
 
 // NewWithNoQuorumRead returns etcd3 implementation of storage.Interface
 // where Get operations don't require quorum read.
-func NewWithNoQuorumRead(c *clientv3.Client, codec runtime.Codec, prefix string, transformer value.Transformer) storage.Interface {
-	return newStore(c, false, codec, prefix, transformer)
+func NewWithNoQuorumRead(c *clientv3.Client, codec runtime.Codec, prefix string, transformer value.Transformer, pagingEnabled bool) storage.Interface {
+	return newStore(c, false, pagingEnabled, codec, prefix, transformer)
 }
 
-func newStore(c *clientv3.Client, quorumRead bool, codec runtime.Codec, prefix string, transformer value.Transformer) *store {
+func newStore(c *clientv3.Client, quorumRead, pagingEnabled bool, codec runtime.Codec, prefix string, transformer value.Transformer) *store {
 	versioner := etcd.APIObjectVersioner{}
 	result := &store{
-		client:      c,
-		codec:       codec,
-		versioner:   versioner,
-		transformer: transformer,
+		client:        c,
+		codec:         codec,
+		versioner:     versioner,
+		transformer:   transformer,
+		pagingEnabled: pagingEnabled,
 		// for compatibility with etcd2 impl.
 		// no-op for default prefix of '/registry'.
 		// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
@@ -266,6 +272,14 @@ func (s *store) GuaranteedUpdate(
 	}
 	key = path.Join(s.pathPrefix, key)
 
+	getCurrentState := func() (*objState, error) {
+		getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
+		if err != nil {
+			return nil, err
+		}
+		return s.getState(getResp, key, v, ignoreNotFound)
+	}
+
 	var origState *objState
 	var mustCheckData bool
 	if len(suggestion) == 1 && suggestion[0] != nil {
@@ -275,11 +289,7 @@ func (s *store) GuaranteedUpdate(
 		}
 		mustCheckData = true
 	} else {
-		getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
-		if err != nil {
-			return err
-		}
-		origState, err = s.getState(getResp, key, v, ignoreNotFound)
+		origState, err = getCurrentState()
 		if err != nil {
 			return err
 		}
@@ -294,6 +304,18 @@ func (s *store) GuaranteedUpdate(
 
 		ret, ttl, err := s.updateState(origState, tryUpdate)
 		if err != nil {
+			// It's possible we were working with stale data
+			if mustCheckData && apierrors.IsConflict(err) {
+				// Actually fetch
+				origState, err = getCurrentState()
+				if err != nil {
+					return err
+				}
+				mustCheckData = false
+				// Retry
+				continue
+			}
+
 			return err
 		}
 
@@ -306,11 +328,7 @@ func (s *store) GuaranteedUpdate(
 			// etcd in order to be sure the data in the store is equivalent to
 			// our desired serialization
 			if mustCheckData {
-				getResp, err := s.client.KV.Get(ctx, key, s.getOps...)
-				if err != nil {
-					return err
-				}
-				origState, err = s.getState(getResp, key, v, ignoreNotFound)
+				origState, err = getCurrentState()
 				if err != nil {
 					return err
 				}
@@ -386,7 +404,66 @@ func (s *store) GetToList(ctx context.Context, key string, resourceVersion strin
 		return err
 	}
 	// update version with cluster level revision
-	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision))
+	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision), "")
+}
+
+// continueToken is a simple structured object for encoding the state of a continue token.
+// TODO: if we change the version of the encoded from, we can't start encoding the new version
+// until all other servers are upgraded (i.e. we need to support rolling schema)
+// This is a public API struct and cannot change.
+type continueToken struct {
+	APIVersion      string `json:"v"`
+	ResourceVersion int64  `json:"rv"`
+	StartKey        string `json:"start"`
+}
+
+// parseFrom transforms an encoded predicate from into a versioned struct.
+// TODO: return a typed error that instructs clients that they must relist
+func decodeContinue(continueValue, keyPrefix string) (fromKey string, rv int64, err error) {
+	data, err := base64.RawURLEncoding.DecodeString(continueValue)
+	if err != nil {
+		return "", 0, fmt.Errorf("continue key is not valid: %v", err)
+	}
+	var c continueToken
+	if err := json.Unmarshal(data, &c); err != nil {
+		return "", 0, fmt.Errorf("continue key is not valid: %v", err)
+	}
+	switch c.APIVersion {
+	case "v1alpha1":
+		if c.ResourceVersion == 0 {
+			return "", 0, fmt.Errorf("continue key is not valid: incorrect encoded start resourceVersion (version v1alpha1)")
+		}
+		if len(c.StartKey) == 0 {
+			return "", 0, fmt.Errorf("continue key is not valid: encoded start key empty (version v1alpha1)")
+		}
+		// defend against path traversal attacks by clients - path.Clean will ensure that startKey cannot
+		// be at a higher level of the hierarchy, and so when we append the key prefix we will end up with
+		// continue start key that is fully qualified and cannot range over anything less specific than
+		// keyPrefix.
+		cleaned := path.Clean(c.StartKey)
+		if cleaned != c.StartKey || cleaned == "." || cleaned == "/" {
+			return "", 0, fmt.Errorf("continue key is not valid: %s", cleaned)
+		}
+		if len(cleaned) == 0 {
+			return "", 0, fmt.Errorf("continue key is not valid: encoded start key empty (version 0)")
+		}
+		return keyPrefix + cleaned, c.ResourceVersion, nil
+	default:
+		return "", 0, fmt.Errorf("continue key is not valid: server does not recognize this encoded version %q", c.APIVersion)
+	}
+}
+
+// encodeContinue returns a string representing the encoded continuation of the current query.
+func encodeContinue(key, keyPrefix string, resourceVersion int64) (string, error) {
+	nextKey := strings.TrimPrefix(key, keyPrefix)
+	if nextKey == key {
+		return "", fmt.Errorf("unable to encode next field: the key and key prefix do not match")
+	}
+	out, err := json.Marshal(&continueToken{APIVersion: "v1alpha1", ResourceVersion: resourceVersion, StartKey: nextKey})
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(out), nil
 }
 
 // List implements storage.Interface.List.
@@ -402,16 +479,50 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 	if !strings.HasSuffix(key, "/") {
 		key += "/"
 	}
-	getResp, err := s.client.KV.Get(ctx, key, clientv3.WithPrefix())
+	keyPrefix := key
+
+	// set the appropriate clientv3 options to filter the returned data set
+	options := make([]clientv3.OpOption, 0, 4)
+	if s.pagingEnabled && pred.Limit > 0 {
+		options = append(options, clientv3.WithLimit(pred.Limit))
+	}
+	var returnedRV int64
+	switch {
+	case s.pagingEnabled && len(pred.Continue) > 0:
+		continueKey, continueRV, err := decodeContinue(pred.Continue, keyPrefix)
+		if err != nil {
+			return err
+		}
+
+		options = append(options, clientv3.WithRange(clientv3.GetPrefixRangeEnd(key)))
+		key = continueKey
+
+		options = append(options, clientv3.WithRev(continueRV))
+		returnedRV = continueRV
+
+	case len(resourceVersion) > 0:
+		fromRV, err := strconv.ParseInt(resourceVersion, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid resource version: %v", err)
+		}
+
+		options = append(options, clientv3.WithPrefix(), clientv3.WithRev(fromRV))
+		returnedRV = fromRV
+
+	default:
+		options = append(options, clientv3.WithPrefix())
+	}
+
+	getResp, err := s.client.KV.Get(ctx, key, options...)
 	if err != nil {
-		return err
+		return interpretListError(err, len(pred.Continue) > 0)
 	}
 
 	elems := make([]*elemForDecode, 0, len(getResp.Kvs))
 	for _, kv := range getResp.Kvs {
 		data, _, err := s.transformer.TransformFromStorage(kv.Value, authenticatedDataString(kv.Key))
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("unable to transform key %q: %v", key, err))
+			utilruntime.HandleError(fmt.Errorf("unable to transform key %q: %v", kv.Key, err))
 			continue
 		}
 
@@ -420,11 +531,31 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 			rev:  uint64(kv.ModRevision),
 		})
 	}
+
 	if err := decodeList(elems, storage.SimpleFilter(pred), listPtr, s.codec, s.versioner); err != nil {
 		return err
 	}
-	// update version with cluster level revision
-	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision))
+
+	// indicate to the client which resource version was returned
+	if returnedRV == 0 {
+		returnedRV = getResp.Header.Revision
+	}
+	switch {
+	case !getResp.More:
+		// no continuation
+		return s.versioner.UpdateList(listObj, uint64(returnedRV), "")
+	case len(getResp.Kvs) == 0:
+		return fmt.Errorf("no results were found, but etcd indicated there were more values")
+	default:
+		// we want to start immediately after the last key
+		// TODO: this reveals info about certain keys
+		key := string(getResp.Kvs[len(getResp.Kvs)-1].Key)
+		next, err := encodeContinue(key+"\x00", keyPrefix, returnedRV)
+		if err != nil {
+			return err
+		}
+		return s.versioner.UpdateList(listObj, uint64(returnedRV), next)
+	}
 }
 
 // Watch implements storage.Interface.Watch.
@@ -548,8 +679,8 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 
 // decodeList decodes a list of values into a list of objects, with resource version set to corresponding rev.
 // On success, ListPtr would be set to the list of objects.
-func decodeList(elems []*elemForDecode, filter storage.FilterFunc, ListPtr interface{}, codec runtime.Codec, versioner storage.Versioner) error {
-	v, err := conversion.EnforcePtr(ListPtr)
+func decodeList(elems []*elemForDecode, filter storage.FilterFunc, listPtr interface{}, codec runtime.Codec, versioner storage.Versioner) error {
+	v, err := conversion.EnforcePtr(listPtr)
 	if err != nil || v.Kind() != reflect.Slice {
 		panic("need ptr to slice")
 	}

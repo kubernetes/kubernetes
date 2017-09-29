@@ -35,6 +35,7 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/node"
 	_ "k8s.io/kubernetes/test/e2e/scalability"
 	_ "k8s.io/kubernetes/test/e2e/scheduling"
+	_ "k8s.io/kubernetes/test/e2e/servicecatalog"
 	_ "k8s.io/kubernetes/test/e2e/storage"
 )
 

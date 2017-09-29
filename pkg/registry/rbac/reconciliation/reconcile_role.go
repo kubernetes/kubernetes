@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
@@ -41,6 +42,7 @@ type RuleOwnerModifier interface {
 }
 
 type RuleOwner interface {
+	GetObject() runtime.Object
 	GetNamespace() string
 	GetName() string
 	GetLabels() map[string]string

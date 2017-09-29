@@ -39,7 +39,7 @@ func (t *JobUpgradeTest) Setup(f *framework.Framework) {
 	t.namespace = f.Namespace.Name
 
 	By("Creating a job")
-	t.job = framework.NewTestJob("notTerminate", "foo", v1.RestartPolicyOnFailure, 2, 2)
+	t.job = framework.NewTestJob("notTerminate", "foo", v1.RestartPolicyOnFailure, 2, 2, nil, 6)
 	job, err := framework.CreateJob(f.ClientSet, t.namespace, t.job)
 	t.job = job
 	Expect(err).NotTo(HaveOccurred())

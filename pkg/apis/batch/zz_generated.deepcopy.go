@@ -342,6 +342,15 @@ func (in *JobSpec) DeepCopyInto(out *JobSpec) {
 			**out = **in
 		}
 	}
+	if in.BackoffLimit != nil {
+		in, out := &in.BackoffLimit, &out.BackoffLimit
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
+	}
 	if in.Selector != nil {
 		in, out := &in.Selector, &out.Selector
 		if *in == nil {

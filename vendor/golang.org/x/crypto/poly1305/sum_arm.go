@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build arm,!gccgo,!appengine
+// +build arm,!gccgo,!appengine,!nacl
 
 package poly1305
 
-// This function is implemented in poly1305_arm.s
-
+// This function is implemented in sum_arm.s
 //go:noescape
-
 func poly1305_auth_armv6(out *[16]byte, m *byte, mlen uint32, key *[32]byte)
 
 // Sum generates an authenticator for m using a one-time key and puts the

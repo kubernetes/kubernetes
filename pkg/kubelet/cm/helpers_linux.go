@@ -26,6 +26,7 @@ import (
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 
 	"k8s.io/api/core/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 )
@@ -42,7 +43,7 @@ const (
 )
 
 // MilliCPUToQuota converts milliCPU to CFS quota and period values.
-func MilliCPUToQuota(milliCPU int64) (quota int64, period int64) {
+func MilliCPUToQuota(milliCPU int64) (quota int64, period uint64) {
 	// CFS quota is measured in two values:
 	//  - cfs_period_us=100ms (the amount of time to measure usage across)
 	//  - cfs_quota=20ms (the amount of cpu time allowed to be used across a period)
@@ -68,7 +69,7 @@ func MilliCPUToQuota(milliCPU int64) (quota int64, period int64) {
 }
 
 // MilliCPUToShares converts the milliCPU to CFS shares.
-func MilliCPUToShares(milliCPU int64) int64 {
+func MilliCPUToShares(milliCPU int64) uint64 {
 	if milliCPU == 0 {
 		// Docker converts zero milliCPU to unset, which maps to kernel default
 		// for unset: 1024. Return 2 here to really match kernel default for
@@ -80,7 +81,24 @@ func MilliCPUToShares(milliCPU int64) int64 {
 	if shares < MinShares {
 		return MinShares
 	}
-	return shares
+	return uint64(shares)
+}
+
+// HugePageLimits converts the API representation to a map
+// from huge page size (in bytes) to huge page limit (in bytes).
+func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
+	hugePageLimits := map[int64]int64{}
+	for k, v := range resourceList {
+		if v1helper.IsHugePageResourceName(k) {
+			pageSize, _ := v1helper.HugePageSizeFromResourceName(k)
+			if value, exists := hugePageLimits[pageSize.Value()]; exists {
+				hugePageLimits[pageSize.Value()] = value + v.Value()
+			} else {
+				hugePageLimits[pageSize.Value()] = v.Value()
+			}
+		}
+	}
+	return hugePageLimits
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
@@ -108,12 +126,22 @@ func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 	// track if limits were applied for each resource.
 	memoryLimitsDeclared := true
 	cpuLimitsDeclared := true
+	// map hugepage pagesize (bytes) to limits (bytes)
+	hugePageLimits := map[int64]int64{}
 	for _, container := range pod.Spec.Containers {
 		if container.Resources.Limits.Cpu().IsZero() {
 			cpuLimitsDeclared = false
 		}
 		if container.Resources.Limits.Memory().IsZero() {
 			memoryLimitsDeclared = false
+		}
+		containerHugePageLimits := HugePageLimits(container.Resources.Requests)
+		for k, v := range containerHugePageLimits {
+			if value, exists := hugePageLimits[k]; exists {
+				hugePageLimits[k] = value + v
+			} else {
+				hugePageLimits[k] = v
+			}
 		}
 	}
 
@@ -137,9 +165,10 @@ func ResourceConfigForPod(pod *v1.Pod) *ResourceConfig {
 			result.Memory = &memoryLimits
 		}
 	} else {
-		shares := int64(MinShares)
+		shares := uint64(MinShares)
 		result.CpuShares = &shares
 	}
+	result.HugePageLimit = hugePageLimits
 	return result
 }
 

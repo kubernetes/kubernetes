@@ -85,30 +85,6 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	if err != nil {
 		return err
 	}
-	err = scheme.AddFieldLabelConversionFunc("apps/v1beta2", "Deployment",
-		func(label, value string) (string, string, error) {
-			switch label {
-			case "metadata.name", "metadata.namespace":
-				return label, value, nil
-			default:
-				return "", "", fmt.Errorf("field label %q not supported for appsv1beta2.Deployment", label)
-			}
-		})
-	if err != nil {
-		return err
-	}
-	err = scheme.AddFieldLabelConversionFunc("apps/v1beta2", "ReplicaSet",
-		func(label, value string) (string, string, error) {
-			switch label {
-			case "metadata.name", "metadata.namespace":
-				return label, value, nil
-			default:
-				return "", "", fmt.Errorf("field label %q not supported for appsv1beta2.ReplicaSet", label)
-			}
-		})
-	if err != nil {
-		return err
-	}
 
 	return nil
 }
@@ -244,7 +220,7 @@ func Convert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus(in *appsv1beta2
 	out.CurrentRevision = in.CurrentRevision
 	out.UpdateRevision = in.UpdateRevision
 	if in.CollisionCount != nil {
-		out.CollisionCount = new(int64)
+		out.CollisionCount = new(int32)
 		*out.CollisionCount = *in.CollisionCount
 	}
 	return nil
@@ -261,7 +237,7 @@ func Convert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus(in *apps.Statef
 	out.CurrentRevision = in.CurrentRevision
 	out.UpdateRevision = in.UpdateRevision
 	if in.CollisionCount != nil {
-		out.CollisionCount = new(int64)
+		out.CollisionCount = new(int32)
 		*out.CollisionCount = *in.CollisionCount
 	}
 	return nil

@@ -36,11 +36,10 @@ import (
 )
 
 const (
-	aesCBCTransformerPrefixV1           = "k8s:enc:aescbc:v1:"
-	aesGCMTransformerPrefixV1           = "k8s:enc:aesgcm:v1:"
-	secretboxTransformerPrefixV1        = "k8s:enc:secretbox:v1:"
-	kmsTransformerPrefixV1              = "k8s:enc:kms:v1:"
-	cloudProvidedKMSTransformerPrefixV1 = "k8s:enc:cloudprovidedkms:v1:"
+	aesCBCTransformerPrefixV1    = "k8s:enc:aescbc:v1:"
+	aesGCMTransformerPrefixV1    = "k8s:enc:aesgcm:v1:"
+	secretboxTransformerPrefixV1 = "k8s:enc:secretbox:v1:"
+	kmsTransformerPrefixV1       = "k8s:enc:kms:v1:"
 )
 
 // GetTransformerOverrides returns the transformer overrides by reading and parsing the encryption provider configuration file
@@ -163,19 +162,7 @@ func GetPrefixTransformers(config *ResourceConfig) ([]value.PrefixTransformer, e
 			if pluginFound == false {
 				return nil, fmt.Errorf("KMS plugin %q not found", provider.KMS.Name)
 			}
-			transformer, err = getEnvelopePrefixTransformer(provider.KMS.CoreKMSConfig, envelopeService, kmsTransformerPrefixV1)
-			found = true
-		}
-
-		if provider.CloudProvidedKMS != nil {
-			if found == true {
-				return nil, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
-			}
-			envelopeService, err := KMSPluginRegistry.getCloudProvidedPlugin(provider.CloudProvidedKMS.Name)
-			if err != nil {
-				return nil, fmt.Errorf("could not configure Cloud-Provided KMS plugin %q, %v", provider.CloudProvidedKMS.Name, err)
-			}
-			transformer, err = getEnvelopePrefixTransformer(provider.CloudProvidedKMS.CoreKMSConfig, envelopeService, cloudProvidedKMSTransformerPrefixV1)
+			transformer, err = getEnvelopePrefixTransformer(provider.KMS, envelopeService, kmsTransformerPrefixV1)
 			found = true
 		}
 
@@ -296,7 +283,7 @@ func GetSecretboxPrefixTransformer(config *SecretboxConfig) (value.PrefixTransfo
 
 // getEnvelopePrefixTransformer returns a prefix transformer from the provided config.
 // envelopeService is used as the root of trust.
-func getEnvelopePrefixTransformer(config *CoreKMSConfig, envelopeService envelope.Service, prefix string) (value.PrefixTransformer, error) {
+func getEnvelopePrefixTransformer(config *KMSConfig, envelopeService envelope.Service, prefix string) (value.PrefixTransformer, error) {
 	envelopeTransformer, err := envelope.NewEnvelopeTransformer(envelopeService, config.CacheSize, aestransformer.NewCBCTransformer)
 	if err != nil {
 		return value.PrefixTransformer{}, err

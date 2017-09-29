@@ -16,17 +16,10 @@ limitations under the License.
 
 package gce
 
-import (
-	"time"
-
-	compute "google.golang.org/api/compute/v1"
-)
+import compute "google.golang.org/api/compute/v1"
 
 func newInstanceGroupMetricContext(request string, zone string) *metricContext {
-	return &metricContext{
-		start:      time.Now(),
-		attributes: []string{"instancegroup_" + request, unusedMetricLabel, zone},
-	}
+	return newGenericMetricContext("instancegroup", request, unusedMetricLabel, zone, computeV1Version)
 }
 
 // CreateInstanceGroup creates an instance group with the given

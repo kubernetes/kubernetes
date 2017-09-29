@@ -19,6 +19,8 @@ package validation
 import (
 	"fmt"
 	"net"
+
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -95,7 +97,7 @@ func ValidateDaemonSetStatusUpdate(ds, oldDS *extensions.DaemonSet) field.ErrorL
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&ds.ObjectMeta, &oldDS.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateDaemonSetStatus(&ds.Status, field.NewPath("status"))...)
 	if isDecremented(ds.Status.CollisionCount, oldDS.Status.CollisionCount) {
-		value := int64(0)
+		value := int32(0)
 		if ds.Status.CollisionCount != nil {
 			value = *ds.Status.CollisionCount
 		}
@@ -311,7 +313,7 @@ func ValidateDeploymentStatus(status *extensions.DeploymentStatus, fldPath *fiel
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.AvailableReplicas), fldPath.Child("availableReplicas"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.UnavailableReplicas), fldPath.Child("unavailableReplicas"))...)
 	if status.CollisionCount != nil {
-		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(*status.CollisionCount, fldPath.Child("collisionCount"))...)
+		allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(*status.CollisionCount), fldPath.Child("collisionCount"))...)
 	}
 	msg := "cannot be greater than status.replicas"
 	if status.UpdatedReplicas > status.Replicas {
@@ -342,7 +344,7 @@ func ValidateDeploymentStatusUpdate(update, old *extensions.Deployment) field.Er
 	fldPath := field.NewPath("status")
 	allErrs = append(allErrs, ValidateDeploymentStatus(&update.Status, fldPath)...)
 	if isDecremented(update.Status.CollisionCount, old.Status.CollisionCount) {
-		value := int64(0)
+		value := int32(0)
 		if update.Status.CollisionCount != nil {
 			value = *update.Status.CollisionCount
 		}
@@ -352,7 +354,7 @@ func ValidateDeploymentStatusUpdate(update, old *extensions.Deployment) field.Er
 }
 
 // TODO: Move in "k8s.io/kubernetes/pkg/api/validation"
-func isDecremented(update, old *int64) bool {
+func isDecremented(update, old *int32) bool {
 	if update == nil && old != nil {
 		return true
 	}
@@ -658,9 +660,14 @@ func ValidatePodSecurityPolicySpec(spec *extensions.PodSecurityPolicySpec, fldPa
 	allErrs = append(allErrs, validatePSPSupplementalGroup(fldPath.Child("supplementalGroups"), &spec.SupplementalGroups)...)
 	allErrs = append(allErrs, validatePSPFSGroup(fldPath.Child("fsGroup"), &spec.FSGroup)...)
 	allErrs = append(allErrs, validatePodSecurityPolicyVolumes(fldPath, spec.Volumes)...)
+	if len(spec.RequiredDropCapabilities) > 0 && hasCap(extensions.AllowAllCapabilities, spec.AllowedCapabilities) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("requiredDropCapabilities"), spec.RequiredDropCapabilities,
+			"must be empty when all capabilities are allowed by a wildcard"))
+	}
 	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.DefaultAddCapabilities, field.NewPath("defaultAddCapabilities"))...)
 	allErrs = append(allErrs, validatePSPCapsAgainstDrops(spec.RequiredDropCapabilities, spec.AllowedCapabilities, field.NewPath("allowedCapabilities"))...)
 	allErrs = append(allErrs, validatePSPDefaultAllowPrivilegeEscalation(fldPath.Child("defaultAllowPrivilegeEscalation"), spec.DefaultAllowPrivilegeEscalation, spec.AllowPrivilegeEscalation)...)
+	allErrs = append(allErrs, validatePSPAllowedHostPaths(fldPath.Child("allowedHostPaths"), spec.AllowedHostPaths)...)
 
 	return allErrs
 }
@@ -695,9 +702,35 @@ func ValidatePodSecurityPolicySpecificAnnotations(annotations map[string]string,
 	}
 	if allowed := annotations[seccomp.AllowedProfilesAnnotationKey]; allowed != "" {
 		for _, p := range strings.Split(allowed, ",") {
+			if p == seccomp.AllowAny {
+				continue
+			}
 			allErrs = append(allErrs, apivalidation.ValidateSeccompProfile(p, fldPath.Key(seccomp.AllowedProfilesAnnotationKey))...)
 		}
 	}
+	return allErrs
+}
+
+// validatePSPAllowedHostPaths makes sure all allowed host paths follow:
+// 1. path prefix is required
+// 2. path prefix does not have any element which is ".."
+func validatePSPAllowedHostPaths(fldPath *field.Path, allowedHostPaths []extensions.AllowedHostPath) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	for i, target := range allowedHostPaths {
+		if target.PathPrefix == "" {
+			allErrs = append(allErrs, field.Required(fldPath.Index(i), "is required"))
+			break
+		}
+		parts := strings.Split(filepath.ToSlash(target.PathPrefix), "/")
+		for _, item := range parts {
+			if item == ".." {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), target.PathPrefix, "must not contain '..'"))
+				break // even for `../../..`, one error is sufficient to make the point
+			}
+		}
+	}
+
 	return allErrs
 }
 

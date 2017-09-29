@@ -287,9 +287,9 @@ func TestGetHashEquivalencePod(t *testing.T) {
 		},
 	}
 
-	hash1 := ecache.getHashEquivalencePod(pod1)
-	hash2 := ecache.getHashEquivalencePod(pod2)
-	hash3 := ecache.getHashEquivalencePod(pod3)
+	hash1, _ := ecache.getHashEquivalencePod(pod1)
+	hash2, _ := ecache.getHashEquivalencePod(pod2)
+	hash3, _ := ecache.getHashEquivalencePod(pod3)
 
 	if hash1 != hash2 {
 		t.Errorf("Failed: pod %v and %v is expected to be equivalent", pod1.Name, pod2.Name)
@@ -305,11 +305,10 @@ func TestGetHashEquivalencePod(t *testing.T) {
 			Name: "pod4",
 		},
 	}
-	hash4 := ecache.getHashEquivalencePod(pod4)
-
-	if hash4 != 0 {
-		t.Errorf("Failed: equivalence hash of pod %v is expected to be: 0, but got: %v",
-			pod4.Name, hash4)
+	_, found := ecache.getHashEquivalencePod(pod4)
+	if found {
+		t.Errorf("Failed: equivalence hash of pod %v is not expected to be found, but got: %v",
+			pod4.Name, found)
 	}
 }
 

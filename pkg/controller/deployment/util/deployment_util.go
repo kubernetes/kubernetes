@@ -36,7 +36,6 @@ import (
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	extensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
@@ -549,13 +548,6 @@ func RsListFromClient(c extensionsv1beta1.ExtensionsV1beta1Interface) RsListFunc
 	}
 }
 
-// podListFromClient returns a podListFunc that wraps the given client.
-func podListFromClient(c clientset.Interface) podListFunc {
-	return func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
-		return c.Core().Pods(namespace).List(options)
-	}
-}
-
 // TODO: switch this to full namespacers
 type RsListFunc func(string, metav1.ListOptions) ([]*extensions.ReplicaSet, error)
 type podListFunc func(string, metav1.ListOptions) (*v1.PodList, error)
@@ -649,16 +641,8 @@ func ListPods(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet
 // (e.g. the addition of a new field will cause the hash code to change)
 // Note that we assume input podTemplateSpecs contain non-empty labels
 func EqualIgnoreHash(template1, template2 *v1.PodTemplateSpec) (bool, error) {
-	cp, err := scheme.Scheme.DeepCopy(template1)
-	if err != nil {
-		return false, err
-	}
-	t1Copy := cp.(*v1.PodTemplateSpec)
-	cp, err = scheme.Scheme.DeepCopy(template2)
-	if err != nil {
-		return false, err
-	}
-	t2Copy := cp.(*v1.PodTemplateSpec)
+	t1Copy := template1.DeepCopy()
+	t2Copy := template2.DeepCopy()
 	// First, compare template.Labels (ignoring hash)
 	labels1, labels2 := t1Copy.Labels, t2Copy.Labels
 	if len(labels1) > len(labels2) {
@@ -870,6 +854,20 @@ func DeploymentTimedOut(deployment *extensions.Deployment, newStatus *extensions
 	if condition == nil {
 		return false
 	}
+	// If the previous condition has been a successful rollout then we shouldn't try to
+	// estimate any progress. Scenario:
+	//
+	// * progressDeadlineSeconds is smaller than the difference between now and the time
+	//   the last rollout finished in the past.
+	// * the creation of a new ReplicaSet triggers a resync of the Deployment prior to the
+	//   cached copy of the Deployment getting updated with the status.condition that indicates
+	//   the creation of the new ReplicaSet.
+	//
+	// The Deployment will be resynced and eventually its Progressing condition will catch
+	// up with the state of the world.
+	if condition.Reason == NewRSAvailableReason {
+		return false
+	}
 	if condition.Reason == TimedOutReason {
 		return true
 	}
@@ -939,7 +937,7 @@ func IsSaturated(deployment *extensions.Deployment, rs *extensions.ReplicaSet) b
 // Returns error if polling timesout.
 func WaitForObservedDeployment(getDeploymentFunc func() (*extensions.Deployment, error), desiredGeneration int64, interval, timeout time.Duration) error {
 	// TODO: This should take clientset.Interface when all code is updated to use clientset. Keeping it this way allows the function to be used by callers who have client.Interface.
-	return wait.Poll(interval, timeout, func() (bool, error) {
+	return wait.PollImmediate(interval, timeout, func() (bool, error) {
 		deployment, err := getDeploymentFunc()
 		if err != nil {
 			return false, err
@@ -989,16 +987,4 @@ func ResolveFenceposts(maxSurge, maxUnavailable *intstrutil.IntOrString, desired
 	}
 
 	return int32(surge), int32(unavailable), nil
-}
-
-func DeploymentDeepCopy(deployment *extensions.Deployment) (*extensions.Deployment, error) {
-	objCopy, err := scheme.Scheme.DeepCopy(deployment)
-	if err != nil {
-		return nil, err
-	}
-	copied, ok := objCopy.(*extensions.Deployment)
-	if !ok {
-		return nil, fmt.Errorf("expected Deployment, got %#v", objCopy)
-	}
-	return copied, nil
 }

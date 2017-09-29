@@ -242,6 +242,8 @@ func setup(t *testing.T, workerCount int) *testContext {
 	metaOnlyClientPool := dynamic.NewClientPool(&config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 	clientPool := dynamic.NewClientPool(&config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 	sharedInformers := informers.NewSharedInformerFactory(clientSet, 0)
+	alwaysStarted := make(chan struct{})
+	close(alwaysStarted)
 	gc, err := garbagecollector.NewGarbageCollector(
 		metaOnlyClientPool,
 		clientPool,
@@ -249,6 +251,7 @@ func setup(t *testing.T, workerCount int) *testContext {
 		deletableResources,
 		garbagecollector.DefaultIgnoredResources(),
 		sharedInformers,
+		alwaysStarted,
 	)
 	if err != nil {
 		t.Fatalf("failed to create garbage collector: %v", err)
@@ -418,8 +421,8 @@ func TestCreateWithNonExistentOwner(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to list pods: %v", err)
 	}
-	if len(pods.Items) != 1 {
-		t.Fatalf("Expect only 1 pod")
+	if len(pods.Items) > 1 {
+		t.Fatalf("Unexpected pod list: %v", pods.Items)
 	}
 	// wait for the garbage collector to delete the pod
 	if err := integration.WaitForPodToDisappear(podClient, garbageCollectedPodName, 5*time.Second, 30*time.Second); err != nil {

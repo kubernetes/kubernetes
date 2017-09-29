@@ -56,17 +56,8 @@ type KubeletConfiguration struct {
 	metav1.TypeMeta
 
 	// Only used for dynamic configuration.
-	// The length of the trial period for this configuration. If the Kubelet records CrashLoopThreshold or
-	// more startups during this period, the current configuration will be marked bad and the
-	// Kubelet will roll-back to the last-known-good. Default 10 minutes.
-	ConfigTrialDuration metav1.Duration
-	// Only used for dynamic configuration.
-	// If this number of Kubelet "crashes" during ConfigTrialDuration meets this threshold,
-	// the configuration fails the trial and the Kubelet rolls back to its last-known-good config.
-	// Crash-loops are detected by counting Kubelet startups, so one startup is implicitly added
-	// to this threshold to always allow a single restart per config change.
-	// Default 10, mimimum allowed is 0, maximum allowed is 10.
-	CrashLoopThreshold int32
+	// The length of the trial period for this configuration. This configuration will become the last-known-good after this duration.
+	ConfigTrialDuration *metav1.Duration
 	// podManifestPath is the path to the directory containing pod manifests to
 	// run, or the path to a single manifest file
 	PodManifestPath string
@@ -149,9 +140,9 @@ type KubeletConfiguration struct {
 	// maxContainerCount is the maximum number of old instances of containers
 	// to retain globally. Each container takes up some disk space.
 	MaxContainerCount int32
-	// cAdvisorPort is the port of the localhost cAdvisor endpoint
+	// cAdvisorPort is the port of the localhost cAdvisor endpoint (set to 0 to disable)
 	CAdvisorPort int32
-	// healthzPort is the port of the localhost healthz endpoint
+	// healthzPort is the port of the localhost healthz endpoint (set to 0 to disable)
 	HealthzPort int32
 	// healthzBindAddress is the IP address for the healthz server to serve
 	// on.
@@ -223,6 +214,10 @@ type KubeletConfiguration struct {
 	RemoteRuntimeEndpoint string
 	// remoteImageEndpoint is the endpoint of remote image service
 	RemoteImageEndpoint string
+	// CPUManagerPolicy is the name of the policy to use.
+	CPUManagerPolicy string
+	// CPU Manager reconciliation period.
+	CPUManagerReconcilePeriod metav1.Duration
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
 	// +optional
@@ -358,7 +353,7 @@ type KubeletConfiguration struct {
 	SystemReserved ConfigurationMap
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
 	// that describe resources reserved for kubernetes system components.
-	// Currently only cpu and memory are supported. [default=none]
+	// Currently cpu, memory and local ephemeral storage for root file system are supported. [default=none]
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	KubeReserved ConfigurationMap
 	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.

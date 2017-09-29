@@ -287,9 +287,12 @@ iptables:
   masqueradeBit: 17
   minSyncPeriod: 10s
   syncPeriod: 60s
+ipvs:
+  minSyncPeriod: 10s
+  syncPeriod: 60s
 kind: KubeProxyConfiguration
 metricsBindAddress: "%s"
-mode: "iptables"
+mode: "%s"
 oomScoreAdj: 17
 portRange: "2-7"
 resourceContainer: /foo
@@ -298,20 +301,23 @@ udpTimeoutMilliseconds: 123ms
 
 	testCases := []struct {
 		name               string
+		mode               string
 		bindAddress        string
 		clusterCIDR        string
 		healthzBindAddress string
 		metricsBindAddress string
 	}{
 		{
-			name:               "IPv4 config",
+			name:               "iptables mode, IPv4 config",
+			mode:               "iptables",
 			bindAddress:        "9.8.7.6",
 			clusterCIDR:        "1.2.3.0/24",
 			healthzBindAddress: "1.2.3.4:12345",
 			metricsBindAddress: "2.3.4.5:23456",
 		},
 		{
-			name:               "IPv6 config",
+			name:               "ipvs mode, IPv6 config",
+			mode:               "ipvs",
 			bindAddress:        "2001:db8::1",
 			clusterCIDR:        "fd00:1::0/64",
 			healthzBindAddress: "[fd00:1::5]:12345",
@@ -347,8 +353,12 @@ udpTimeoutMilliseconds: 123ms
 				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
 				SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
 			},
+			IPVS: componentconfig.KubeProxyIPVSConfiguration{
+				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
+				SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
+			},
 			MetricsBindAddress: tc.metricsBindAddress,
-			Mode:               "iptables",
+			Mode:               componentconfig.ProxyMode(tc.mode),
 			OOMScoreAdj:        utilpointer.Int32Ptr(17),
 			PortRange:          "2-7",
 			ResourceContainer:  "/foo",
@@ -360,7 +370,7 @@ udpTimeoutMilliseconds: 123ms
 
 		yaml := fmt.Sprintf(
 			yamlTemplate, tc.bindAddress, tc.clusterCIDR,
-			tc.healthzBindAddress, tc.metricsBindAddress)
+			tc.healthzBindAddress, tc.metricsBindAddress, tc.mode)
 		config, err := options.loadConfig([]byte(yaml))
 		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
 		if !reflect.DeepEqual(expected, config) {

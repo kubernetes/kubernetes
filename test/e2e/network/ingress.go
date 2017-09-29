@@ -64,7 +64,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 	//
 	// Slow by design ~10m for each "It" block dominated by loadbalancer setup time
 	// TODO: write similar tests for nginx, haproxy and AWS Ingress.
-	SIGDescribe("GCE [Slow] [Feature:Ingress]", func() {
+	Describe("GCE [Slow] [Feature:Ingress]", func() {
 		var gceController *framework.GCEIngressController
 
 		// Platform specific setup
@@ -151,7 +151,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 	})
 
 	// Time: borderline 5m, slow by design
-	SIGDescribe("[Slow] Nginx", func() {
+	Describe("[Slow] Nginx", func() {
 		var nginxController *framework.NginxIngressController
 
 		BeforeEach(func() {

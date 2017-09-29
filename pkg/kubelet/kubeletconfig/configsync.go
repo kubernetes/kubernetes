@@ -24,6 +24,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
 	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 )
 
@@ -55,19 +56,18 @@ func (cc *Controller) syncConfigSource(client clientset.Interface, nodeName stri
 
 	node, err := latestNode(cc.informer.GetStore(), nodeName)
 	if err != nil {
-		reason := "unable to read Node from internal object cache"
-		cc.configOK.SetFailedSyncCondition(reason)
-		syncerr = fmt.Errorf("%s, error: %v", reason, err)
+		cc.configOK.SetFailSyncCondition(status.FailSyncReasonInformer)
+		syncerr = fmt.Errorf("%s, error: %v", status.FailSyncReasonInformer, err)
 		return
 	}
 
 	// check the Node and download any new config
 	if updated, reason, err := cc.doSyncConfigSource(client, node.Spec.ConfigSource); err != nil {
-		cc.configOK.SetFailedSyncCondition(reason)
+		cc.configOK.SetFailSyncCondition(reason)
 		syncerr = fmt.Errorf("%s, error: %v", reason, err)
 		return
 	} else if updated {
-		// TODO(mtaufen): Consider adding a "currently restarting" node condition for this case
+		// TODO(mtaufen): Consider adding a "currently restarting kubelet" ConfigOK message for this case
 		utillog.Infof("config updated, Kubelet will restart to begin using new config")
 		os.Exit(0)
 	}
@@ -75,32 +75,8 @@ func (cc *Controller) syncConfigSource(client clientset.Interface, nodeName stri
 	// If we get here:
 	// - there is no need to restart to update the current config
 	// - there was no error trying to sync configuration
-	// - if, previously, there was an error trying to sync configuration, we need to update to the correct condition
-	errfmt := `sync succeeded but unable to clear "failed to sync" message from ConfigOK, error: %v`
-
-	currentUID := ""
-	if currentSource, err := cc.checkpointStore.Current(); err != nil {
-		utillog.Errorf(errfmt, err)
-		return
-	} else if currentSource != nil {
-		currentUID = currentSource.UID()
-	}
-
-	lkgUID := ""
-	if lkgSource, err := cc.checkpointStore.LastKnownGood(); err != nil {
-		utillog.Errorf(errfmt, err)
-		return
-	} else if lkgSource != nil {
-		lkgUID = lkgSource.UID()
-	}
-
-	currentBadReason := ""
-	if entry, err := cc.badConfigTracker.Entry(currentUID); err != nil {
-		utillog.Errorf(errfmt, err)
-	} else if entry != nil {
-		currentBadReason = entry.Reason
-	}
-	cc.configOK.ClearFailedSyncCondition(currentUID, lkgUID, currentBadReason, cc.initConfig != nil)
+	// - if, previously, there was an error trying to sync configuration, we need to clear that error from the condition
+	cc.configOK.ClearFailSyncCondition()
 }
 
 // doSyncConfigSource checkpoints and sets the store's current config to the new config or resets config,
@@ -139,7 +115,7 @@ func (cc *Controller) checkpointConfigSource(client clientset.Interface, source 
 
 	// if the checkpoint already exists, skip downloading
 	if ok, err := cc.checkpointStore.Exists(uid); err != nil {
-		reason := fmt.Sprintf("unable to determine whether object with UID %q was already checkpointed", uid)
+		reason := fmt.Sprintf(status.FailSyncReasonCheckpointExistenceFmt, uid)
 		return reason, fmt.Errorf("%s, error: %v", reason, err)
 	} else if ok {
 		utillog.Infof("checkpoint already exists for object with UID %q, skipping download", uid)
@@ -155,7 +131,7 @@ func (cc *Controller) checkpointConfigSource(client clientset.Interface, source 
 	// save
 	err = cc.checkpointStore.Save(checkpoint)
 	if err != nil {
-		reason := fmt.Sprintf("failed to save checkpoint for object with UID %q", checkpoint.UID())
+		reason := fmt.Sprintf(status.FailSyncReasonSaveCheckpointFmt, checkpoint.UID())
 		return reason, fmt.Errorf("%s, error: %v", reason, err)
 	}
 
@@ -167,11 +143,10 @@ func (cc *Controller) checkpointConfigSource(client clientset.Interface, source 
 func (cc *Controller) setCurrentConfig(source checkpoint.RemoteConfigSource) (bool, string, error) {
 	updated, err := cc.checkpointStore.SetCurrentUpdated(source)
 	if err != nil {
-		str := "default"
-		if source != nil {
-			str = fmt.Sprintf("object with UID %q", source.UID())
+		if source == nil {
+			return false, status.FailSyncReasonSetCurrentDefault, err
 		}
-		return false, fmt.Sprintf("failed to set current checkpoint to %s", str), err
+		return false, fmt.Sprintf(status.FailSyncReasonSetCurrentUIDFmt, source.UID()), err
 	}
 	return updated, "", nil
 }
@@ -181,7 +156,7 @@ func (cc *Controller) setCurrentConfig(source checkpoint.RemoteConfigSource) (bo
 func (cc *Controller) resetConfig() (bool, string, error) {
 	updated, err := cc.checkpointStore.Reset()
 	if err != nil {
-		return false, "failed to reset to using local (default or init) config", err
+		return false, status.FailSyncReasonReset, err
 	}
 	return updated, "", nil
 }

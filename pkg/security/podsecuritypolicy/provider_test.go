@@ -248,6 +248,23 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		},
 	}
 
+	failHostPathDirPod := defaultPod()
+	failHostPathDirPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "bad volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/fail",
+				},
+			},
+		},
+	}
+	failHostPathDirPSP := defaultPSP()
+	failHostPathDirPSP.Spec.Volumes = []extensions.FSType{extensions.HostPath}
+	failHostPathDirPSP.Spec.AllowedHostPaths = []extensions.AllowedHostPath{
+		{PathPrefix: "/foo/bar"},
+	}
+
 	failOtherSysctlsAllowedPSP := defaultPSP()
 	failOtherSysctlsAllowedPSP.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "bar,abc"
 
@@ -317,6 +334,11 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 			pod:           failHostDirPod,
 			psp:           defaultPSP(),
 			expectedError: "hostPath volumes are not allowed to be used",
+		},
+		"failHostPathDirPSP": {
+			pod:           failHostPathDirPod,
+			psp:           failHostPathDirPSP,
+			expectedError: "is not allowed to be used",
 		},
 		"failSafeSysctlFooPod with failNoSysctlAllowedSCC": {
 			pod:           failSafeSysctlFooPod,
@@ -556,6 +578,30 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		Level: "level",
 	}
 
+	hostPathDirPod := defaultPod()
+	hostPathDirPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "good volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/foo/bar/baz",
+				},
+			},
+		},
+	}
+
+	hostPathDirPSP := defaultPSP()
+	hostPathDirPSP.Spec.Volumes = []extensions.FSType{extensions.HostPath}
+	hostPathDirPSP.Spec.AllowedHostPaths = []extensions.AllowedHostPath{
+		{PathPrefix: "/foo/bar"},
+	}
+
+	hostPathDirAsterisksPSP := defaultPSP()
+	hostPathDirAsterisksPSP.Spec.Volumes = []extensions.FSType{extensions.All}
+	hostPathDirAsterisksPSP.Spec.AllowedHostPaths = []extensions.AllowedHostPath{
+		{PathPrefix: "/foo/bar"},
+	}
+
 	sysctlAllowFooPSP := defaultPSP()
 	sysctlAllowFooPSP.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "foo"
 
@@ -575,7 +621,7 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		api.SeccompPodAnnotationKey: "foo",
 	}
 
-	errorCases := map[string]struct {
+	successCases := map[string]struct {
 		pod *api.Pod
 		psp *extensions.PodSecurityPolicy
 	}{
@@ -619,13 +665,21 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 			pod: unsafeSysctlFooPod,
 			psp: defaultPSP(),
 		},
+		"pass hostDir allowed directory validating PSP": {
+			pod: hostPathDirPod,
+			psp: hostPathDirPSP,
+		},
+		"pass hostDir all volumes allowed validating PSP": {
+			pod: hostPathDirPod,
+			psp: hostPathDirAsterisksPSP,
+		},
 		"pass seccomp validating PSP": {
 			pod: seccompPod,
 			psp: seccompPSP,
 		},
 	}
 
-	for k, v := range errorCases {
+	for k, v := range successCases {
 		provider, err := NewSimpleProvider(v.psp, "namespace", NewSimpleStrategyFactory())
 		if err != nil {
 			t.Fatalf("unable to create provider %v", err)
@@ -639,25 +693,6 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 }
 
 func TestValidateContainerSecurityContextSuccess(t *testing.T) {
-	var notPriv bool = false
-	defaultPod := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				SecurityContext: &api.PodSecurityContext{},
-				Containers: []api.Container{
-					{
-						Name: defaultContainerName,
-						SecurityContext: &api.SecurityContext{
-							// expected to be set by defaulting mechanisms
-							Privileged: &notPriv,
-							// fill in the rest for test cases
-						},
-					},
-				},
-			},
-		}
-	}
-
 	// success user strat
 	userPSP := defaultPSP()
 	uid := int64(999)
@@ -751,7 +786,7 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 		api.SeccompPodAnnotationKey: "foo",
 	}
 
-	errorCases := map[string]struct {
+	successCases := map[string]struct {
 		pod *api.Pod
 		psp *extensions.PodSecurityPolicy
 	}{
@@ -809,7 +844,7 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 		},
 	}
 
-	for k, v := range errorCases {
+	for k, v := range successCases {
 		provider, err := NewSimpleProvider(v.psp, "namespace", NewSimpleStrategyFactory())
 		if err != nil {
 			t.Fatalf("unable to create provider %v", err)

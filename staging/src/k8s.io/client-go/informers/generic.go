@@ -24,9 +24,10 @@ import (
 	v1beta1 "k8s.io/api/apps/v1beta1"
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/api/autoscaling/v1"
-	v2alpha1 "k8s.io/api/autoscaling/v2alpha1"
+	v2beta1 "k8s.io/api/autoscaling/v2beta1"
 	batch_v1 "k8s.io/api/batch/v1"
-	batch_v2alpha1 "k8s.io/api/batch/v2alpha1"
+	batch_v1beta1 "k8s.io/api/batch/v1beta1"
+	v2alpha1 "k8s.io/api/batch/v2alpha1"
 	certificates_v1beta1 "k8s.io/api/certificates/v1beta1"
 	core_v1 "k8s.io/api/core/v1"
 	extensions_v1beta1 "k8s.io/api/extensions/v1beta1"
@@ -84,6 +85,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().StatefulSets().Informer()}, nil
 
 		// Group=Apps, Version=V1beta2
+	case v1beta2.SchemeGroupVersion.WithResource("controllerrevisions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta2().ControllerRevisions().Informer()}, nil
 	case v1beta2.SchemeGroupVersion.WithResource("daemonsets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta2().DaemonSets().Informer()}, nil
 	case v1beta2.SchemeGroupVersion.WithResource("deployments"):
@@ -97,16 +100,20 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case v1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Autoscaling().V1().HorizontalPodAutoscalers().Informer()}, nil
 
-		// Group=Autoscaling, Version=V2alpha1
-	case v2alpha1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Autoscaling().V2alpha1().HorizontalPodAutoscalers().Informer()}, nil
+		// Group=Autoscaling, Version=V2beta1
+	case v2beta1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Autoscaling().V2beta1().HorizontalPodAutoscalers().Informer()}, nil
 
 		// Group=Batch, Version=V1
 	case batch_v1.SchemeGroupVersion.WithResource("jobs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Batch().V1().Jobs().Informer()}, nil
 
+		// Group=Batch, Version=V1beta1
+	case batch_v1beta1.SchemeGroupVersion.WithResource("cronjobs"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Batch().V1beta1().CronJobs().Informer()}, nil
+
 		// Group=Batch, Version=V2alpha1
-	case batch_v2alpha1.SchemeGroupVersion.WithResource("cronjobs"):
+	case v2alpha1.SchemeGroupVersion.WithResource("cronjobs"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Batch().V2alpha1().CronJobs().Informer()}, nil
 
 		// Group=Certificates, Version=V1beta1

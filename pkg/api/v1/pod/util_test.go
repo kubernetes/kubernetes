@@ -17,7 +17,6 @@ limitations under the License.
 package pod
 
 import (
-	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -402,55 +401,6 @@ func TestIsPodAvailable(t *testing.T) {
 		isAvailable := IsPodAvailable(test.pod, test.minReadySeconds, now)
 		if isAvailable != test.expected {
 			t.Errorf("[tc #%d] expected available pod: %t, got: %t", i, test.expected, isAvailable)
-		}
-	}
-}
-
-func TestSetInitContainersStatusesAnnotations(t *testing.T) {
-	testStatuses := []v1.ContainerStatus{
-		{
-			Name: "test",
-		},
-	}
-	value, _ := json.Marshal(testStatuses)
-	testAnnotation := string(value)
-	tests := []struct {
-		name        string
-		pod         *v1.Pod
-		annotations map[string]string
-	}{
-		{
-			name: "Populate annotations from status",
-			pod: &v1.Pod{
-				Status: v1.PodStatus{
-					InitContainerStatuses: testStatuses,
-				},
-			},
-			annotations: map[string]string{
-				v1.PodInitContainerStatusesAnnotationKey:     testAnnotation,
-				v1.PodInitContainerStatusesBetaAnnotationKey: testAnnotation,
-			},
-		},
-		{
-			name: "Clear annotations if no status",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.PodInitContainerStatusesAnnotationKey:     testAnnotation,
-						v1.PodInitContainerStatusesBetaAnnotationKey: testAnnotation,
-					},
-				},
-				Status: v1.PodStatus{
-					InitContainerStatuses: []v1.ContainerStatus{},
-				},
-			},
-			annotations: map[string]string{},
-		},
-	}
-	for _, test := range tests {
-		SetInitContainersStatusesAnnotations(test.pod)
-		if !reflect.DeepEqual(test.pod.Annotations, test.annotations) {
-			t.Errorf("%v, actual = %v, expected = %v", test.name, test.pod.Annotations, test.annotations)
 		}
 	}
 }

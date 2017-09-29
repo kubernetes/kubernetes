@@ -25,6 +25,7 @@ import (
 
 type AppsV1beta2Interface interface {
 	RESTClient() rest.Interface
+	ControllerRevisionsGetter
 	DaemonSetsGetter
 	DeploymentsGetter
 	ReplicaSetsGetter
@@ -35,6 +36,10 @@ type AppsV1beta2Interface interface {
 // AppsV1beta2Client is used to interact with features provided by the apps group.
 type AppsV1beta2Client struct {
 	restClient rest.Interface
+}
+
+func (c *AppsV1beta2Client) ControllerRevisions(namespace string) ControllerRevisionInterface {
+	return newControllerRevisions(c, namespace)
 }
 
 func (c *AppsV1beta2Client) DaemonSets(namespace string) DaemonSetInterface {

@@ -17,12 +17,21 @@ limitations under the License.
 package replicaset
 
 import (
+	"reflect"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+)
+
+const (
+	fakeImageName  = "fake-name"
+	fakeImage      = "fakeimage"
+	replicasetName = "test-replicaset"
+	namespace      = "test-namespace"
 )
 
 func TestReplicaSetStrategy(t *testing.T) {
@@ -139,5 +148,82 @@ func TestReplicaSetStatusStrategy(t *testing.T) {
 	errs := StatusStrategy.ValidateUpdate(ctx, newRS, oldRS)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error %v", errs)
+	}
+}
+
+func TestSelectorImmutability(t *testing.T) {
+	tests := []struct {
+		requestInfo       genericapirequest.RequestInfo
+		oldSelectorLabels map[string]string
+		newSelectorLabels map[string]string
+		expectedErrorList field.ErrorList
+	}{
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1beta2",
+				Resource:   "replicasets",
+			},
+			map[string]string{"a": "b"},
+			map[string]string{"c": "d"},
+			field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: field.NewPath("spec").Child("selector").String(),
+					BadValue: &metav1.LabelSelector{
+						MatchLabels:      map[string]string{"c": "d"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+					Detail: "field is immutable",
+				},
+			},
+		},
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "extensions",
+				APIVersion: "v1beta1",
+				Resource:   "replicasets",
+			},
+			map[string]string{"a": "b"},
+			map[string]string{"c": "d"},
+			field.ErrorList{},
+		},
+	}
+
+	for _, test := range tests {
+		oldReplicaSet := newReplicaSetWithSelectorLabels(test.oldSelectorLabels)
+		newReplicaSet := newReplicaSetWithSelectorLabels(test.newSelectorLabels)
+		context := genericapirequest.NewContext()
+		context = genericapirequest.WithRequestInfo(context, &test.requestInfo)
+		errorList := rsStrategy{}.ValidateUpdate(context, newReplicaSet, oldReplicaSet)
+		if !reflect.DeepEqual(test.expectedErrorList, errorList) {
+			t.Errorf("Unexpected error list, expected: %v, actual: %v", test.expectedErrorList, errorList)
+		}
+	}
+}
+
+func newReplicaSetWithSelectorLabels(selectorLabels map[string]string) *extensions.ReplicaSet {
+	return &extensions.ReplicaSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            replicasetName,
+			Namespace:       namespace,
+			ResourceVersion: "1",
+		},
+		Spec: extensions.ReplicaSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels:      selectorLabels,
+				MatchExpressions: []metav1.LabelSelectorRequirement{},
+			},
+			Template: api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: selectorLabels,
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+					Containers:    []api.Container{{Name: fakeImageName, Image: fakeImage, ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+				},
+			},
+		},
 	}
 }

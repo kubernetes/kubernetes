@@ -2,7 +2,7 @@
 # identify the system:nodes group.  They use the kubelet identity
 # TODO: remove this once new nodes are granted individual identities and the
 # NodeAuthorizer is enabled.
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: kubelet-cluster-admin

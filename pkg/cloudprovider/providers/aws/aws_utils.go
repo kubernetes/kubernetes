@@ -38,7 +38,7 @@ func stringSetFromPointers(in []*string) sets.String {
 	}
 	out := sets.NewString()
 	for i := range in {
-		out.Insert(orEmpty(in[i]))
+		out.Insert(aws.StringValue(in[i]))
 	}
 	return out
 }

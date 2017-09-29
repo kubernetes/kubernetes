@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -24,12 +19,13 @@ go_library(
             "str.go",
             "syscall.go",
             "syscall_windows.go",
+            "types_windows.go",
+            "types_windows_amd64.go",
             "zsyscall_windows.go",
-            "ztypes_windows.go",
-            "ztypes_windows_amd64.go",
         ],
         "//conditions:default": [],
     }),
+    visibility = ["//visibility:public"],
 )
 
 filegroup(
@@ -43,4 +39,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

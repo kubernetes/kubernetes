@@ -11,13 +11,20 @@ go_library(
     srcs = [
         "conntrack.go",
         "server.go",
-    ],
+        "server_others.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "server_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/componentconfig/v1alpha1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/master/ports:go_default_library",
@@ -25,18 +32,19 @@ go_library(
         "//pkg/proxy/config:go_default_library",
         "//pkg/proxy/healthcheck:go_default_library",
         "//pkg/proxy/iptables:go_default_library",
+        "//pkg/proxy/ipvs:go_default_library",
         "//pkg/proxy/userspace:go_default_library",
-        "//pkg/proxy/winuserspace:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/dbus:go_default_library",
         "//pkg/util/iptables:go_default_library",
+        "//pkg/util/ipvs:go_default_library",
         "//pkg/util/mount:go_default_library",
-        "//pkg/util/netsh:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/oom:go_default_library",
         "//pkg/util/pointer:go_default_library",
         "//pkg/util/resourcecontainer:go_default_library",
         "//pkg/util/sysctl:go_default_library",
+        "//pkg/version:go_default_library",
         "//pkg/version/verflag:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
@@ -59,7 +67,14 @@ go_library(
         "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "//pkg/proxy/winkernel:go_default_library",
+            "//pkg/proxy/winuserspace:go_default_library",
+            "//pkg/util/netsh:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 go_test(

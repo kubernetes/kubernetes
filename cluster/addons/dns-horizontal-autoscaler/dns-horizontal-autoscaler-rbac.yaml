@@ -21,7 +21,7 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
 ---
 kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: system:kube-dns-autoscaler
   labels:
@@ -43,7 +43,7 @@ rules:
     verbs: ["get", "create"]
 ---
 kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: system:kube-dns-autoscaler
   labels:

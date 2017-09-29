@@ -34,6 +34,8 @@ import (
 // MarkMaster taints the master and sets the master label
 func MarkMaster(client clientset.Interface, masterName string) error {
 
+	fmt.Printf("[markmaster] Will mark node %s as master by adding a label and a taint\n", masterName)
+
 	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
 	return wait.Poll(kubeadmconstants.APICallRetryInterval, kubeadmconstants.MarkMasterTimeout, func() (bool, error) {
 		// First get the node object

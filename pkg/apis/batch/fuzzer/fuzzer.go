@@ -36,8 +36,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			completions := int32(c.Rand.Int31())
 			parallelism := int32(c.Rand.Int31())
+			backoffLimit := int32(c.Rand.Int31())
 			j.Completions = &completions
 			j.Parallelism = &parallelism
+			j.BackoffLimit = &backoffLimit
 			if c.Rand.Int31()%2 == 0 {
 				j.ManualSelector = newBool(true)
 			} else {
@@ -51,14 +53,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			sds := int64(c.RandUint64())
 			sj.StartingDeadlineSeconds = &sds
 			sj.Schedule = c.RandString()
-			if hasSuccessLimit := c.RandBool(); hasSuccessLimit {
-				successfulJobsHistoryLimit := int32(c.Rand.Int31())
-				sj.SuccessfulJobsHistoryLimit = &successfulJobsHistoryLimit
-			}
-			if hasFailedLimit := c.RandBool(); hasFailedLimit {
-				failedJobsHistoryLimit := int32(c.Rand.Int31())
-				sj.FailedJobsHistoryLimit = &failedJobsHistoryLimit
-			}
+			successfulJobsHistoryLimit := int32(c.Rand.Int31())
+			sj.SuccessfulJobsHistoryLimit = &successfulJobsHistoryLimit
+			failedJobsHistoryLimit := int32(c.Rand.Int31())
+			sj.FailedJobsHistoryLimit = &failedJobsHistoryLimit
 		},
 		func(cp *batch.ConcurrencyPolicy, c fuzz.Continue) {
 			policies := []batch.ConcurrencyPolicy{batch.AllowConcurrent, batch.ForbidConcurrent, batch.ReplaceConcurrent}

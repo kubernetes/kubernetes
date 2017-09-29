@@ -53,6 +53,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&DaemonSetList{},
 		&ReplicaSet{},
 		&ReplicaSetList{},
+		&ControllerRevision{},
+		&ControllerRevisionList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

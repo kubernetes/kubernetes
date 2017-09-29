@@ -7,10 +7,16 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["fake_mirror_client.go"],
+    srcs = [
+        "fake_mirror_client.go",
+        "mock_manager.go",
+    ],
     deps = [
         "//pkg/kubelet/container:go_default_library",
+        "//pkg/kubelet/types:go_default_library",
+        "//vendor/github.com/stretchr/testify/mock:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
     ],
 )

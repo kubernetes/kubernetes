@@ -20,6 +20,8 @@ import (
 	"errors"
 	"strconv"
 
+	"k8s.io/kubernetes/pkg/util/mount"
+
 	"github.com/golang/glog"
 
 	siotypes "github.com/codedellemc/goscaleio/types/v1"
@@ -36,9 +38,10 @@ type storageInterface interface {
 type sioMgr struct {
 	client     sioInterface
 	configData map[string]string
+	exec       mount.Exec
 }
 
-func newSioMgr(configs map[string]string) (*sioMgr, error) {
+func newSioMgr(configs map[string]string, exec mount.Exec) (*sioMgr, error) {
 	if configs == nil {
 		return nil, errors.New("missing configuration data")
 	}
@@ -47,7 +50,7 @@ func newSioMgr(configs map[string]string) (*sioMgr, error) {
 	configs[confKey.sdcRootPath] = defaultString(configs[confKey.sdcRootPath], sdcRootPath)
 	configs[confKey.storageMode] = defaultString(configs[confKey.storageMode], "ThinProvisioned")
 
-	mgr := &sioMgr{configData: configs}
+	mgr := &sioMgr{configData: configs, exec: exec}
 	return mgr, nil
 }
 
@@ -67,7 +70,7 @@ func (m *sioMgr) getClient() (sioInterface, error) {
 		certsEnabled := b
 
 		glog.V(4).Info(log("creating new client for gateway %s", gateway))
-		client, err := newSioClient(gateway, username, password, certsEnabled)
+		client, err := newSioClient(gateway, username, password, certsEnabled, m.exec)
 		if err != nil {
 			glog.Error(log("failed to create scaleio client: %v", err))
 			return nil, err
@@ -78,6 +81,7 @@ func (m *sioMgr) getClient() (sioInterface, error) {
 		client.spName = configs[confKey.storagePool]
 		client.sdcPath = configs[confKey.sdcRootPath]
 		client.provisionMode = configs[confKey.storageMode]
+		client.sdcGuid = configs[confKey.sdcGuid]
 
 		m.client = client
 
@@ -212,21 +216,10 @@ func (m *sioMgr) DeleteVolume(volName string) error {
 	if err != nil {
 		return err
 	}
-	iid, err := client.IID()
-	if err != nil {
-		glog.Error(log("failed to get instanceID: %v", err))
-		return err
-	}
 
 	vol, err := client.FindVolume(volName)
 	if err != nil {
 		return err
-	}
-
-	// if still attached, stop
-	if m.isSdcMappedToVol(iid, vol) {
-		glog.Error(log("volume %s still attached,  unable to delete", volName))
-		return errors.New("volume still attached")
 	}
 
 	if err := client.DeleteVolume(sioVolumeID(vol.ID)); err != nil {
@@ -238,10 +231,6 @@ func (m *sioMgr) DeleteVolume(volName string) error {
 	return nil
 
 }
-
-//*****************************************************************
-// Helpers
-//*****************************************************************
 
 // isSdcMappedToVol returns true if the sdc is mapped to the volume
 func (m *sioMgr) isSdcMappedToVol(sdcID string, vol *siotypes.Volume) bool {

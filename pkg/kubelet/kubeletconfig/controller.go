@@ -27,23 +27,18 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
-	"k8s.io/kubernetes/pkg/version"
 
-	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/badconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint/store"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
-	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/startups"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
-	utilfs "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/filesystem"
 	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 	utilpanic "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/panic"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
 const (
-	badConfigTrackingDir = "bad-config-tracking"
-	startupTrackingDir   = "startup-tracking"
-	checkpointsDir       = "checkpoints"
-	initConfigDir        = "init"
+	checkpointsDir = "checkpoints"
+	initConfigDir  = "init"
 )
 
 // Controller is the controller which, among other things:
@@ -51,9 +46,8 @@ const (
 // - checkpoints configuration to disk
 // - downloads new configuration from the API server
 // - validates configuration
-// - monitors for potential crash-loops caused by new configurations
 // - tracks the last-known-good configuration, and rolls-back to last-known-good when necessary
-// For more information, see the proposal: https://github.com/kubernetes/kubernetes/pull/29459
+// For more information, see the proposal: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/dynamic-kubelet-configuration.md
 type Controller struct {
 	// dynamicConfig, if true, indicates that we should sync config from the API server
 	dynamicConfig bool
@@ -78,37 +72,30 @@ type Controller struct {
 
 	// checkpointStore persists config source checkpoints to a storage layer
 	checkpointStore store.Store
-
-	// badConfigTracker persists bad-config records to a storage layer
-	badConfigTracker badconfig.Tracker
-
-	// startupTracker persists Kubelet startup records, used for crash-loop detection, to a storage layer
-	startupTracker startups.Tracker
 }
 
 // NewController constructs a new Controller object and returns it. Directory paths must be absolute.
 // If the `initConfigDir` is an empty string, skips trying to load the init config.
 // If the `dynamicConfigDir` is an empty string, skips trying to load checkpoints or download new config,
 // but will still sync the ConfigOK condition if you call StartSync with a non-nil client.
-func NewController(initConfigDir string, dynamicConfigDir string, defaultConfig *kubeletconfig.KubeletConfiguration) *Controller {
+func NewController(defaultConfig *kubeletconfig.KubeletConfiguration,
+	initConfigDir string,
+	dynamicConfigDir string) (*Controller, error) {
+	var err error
+
 	fs := utilfs.DefaultFs{}
 
 	var initLoader configfiles.Loader
 	if len(initConfigDir) > 0 {
-		initLoader = configfiles.NewFSLoader(fs, initConfigDir)
+		initLoader, err = configfiles.NewFsLoader(fs, initConfigDir)
+		if err != nil {
+			return nil, err
+		}
 	}
 	dynamicConfig := false
 	if len(dynamicConfigDir) > 0 {
 		dynamicConfig = true
 	}
-
-	// Get the current kubelet version; bad-config and startup-tracking information can be kubelet-version specific,
-	// e.g. a bug that crash loops an old Kubelet under a given config might be fixed in a new Kubelet or vice-versa,
-	// validation might be relaxed in a new Kubelet, etc.
-	// We also don't want a change in a file format to break Kubelet upgrades; this makes sure a new kubelet gets
-	// a fresh dir to put its config health data in.
-	// Note that config checkpoints use the api machinery to store ConfigMaps, and thus get file format versioning for free.
-	kubeletVersion := version.Get().String()
 
 	return &Controller{
 		dynamicConfig: dynamicConfig,
@@ -117,10 +104,8 @@ func NewController(initConfigDir string, dynamicConfigDir string, defaultConfig 
 		pendingConfigSource: make(chan bool, 1),
 		configOK:            status.NewConfigOKCondition(),
 		checkpointStore:     store.NewFsStore(fs, filepath.Join(dynamicConfigDir, checkpointsDir)),
-		badConfigTracker:    badconfig.NewFsTracker(fs, filepath.Join(dynamicConfigDir, badConfigTrackingDir, kubeletVersion)),
-		startupTracker:      startups.NewFsTracker(fs, filepath.Join(dynamicConfigDir, startupTrackingDir, kubeletVersion)),
 		initLoader:          initLoader,
-	}
+	}, nil
 }
 
 // Bootstrap attempts to return a valid KubeletConfiguration based on the configuration of the Controller,
@@ -163,11 +148,6 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 		return nil, err
 	}
 
-	// record the kubelet startup time, used for crashloop detection
-	if err := cc.startupTracker.RecordStartup(); err != nil {
-		return nil, err
-	}
-
 	// determine UID of the current config source
 	curUID := ""
 	if curSource, err := cc.checkpointStore.Current(); err != nil {
@@ -181,14 +161,6 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 		return cc.localConfig(), nil
 	} // Assert: we will not use the local configurations, unless we roll back to lkg; curUID is non-empty
 
-	// check whether the current config is marked bad
-	if entry, err := cc.badConfigTracker.Entry(curUID); err != nil {
-		return nil, err
-	} else if entry != nil {
-		utillog.Infof("current config %q was marked bad for reason %q at time %q", curUID, entry.Reason, entry.Time)
-		return cc.lkgRollback(entry.Reason)
-	}
-
 	// TODO(mtaufen): consider re-verifying integrity and re-attempting download when a load/verify/parse/validate
 	// error happens outside trial period, we already made it past the trial so it's probably filesystem corruption
 	// or something else scary (unless someone is using a 0-length trial period)
@@ -196,33 +168,26 @@ func (cc *Controller) Bootstrap() (*kubeletconfig.KubeletConfiguration, error) {
 	// load the current config
 	checkpoint, err := cc.checkpointStore.Load(curUID)
 	if err != nil {
-		// TODO(mtaufen): rollback and mark bad for now, but this could reasonably be handled by re-attempting a download,
+		// TODO(mtaufen): rollback for now, but this could reasonably be handled by re-attempting a download,
 		// it probably indicates some sort of corruption
-		return cc.badRollback(curUID, fmt.Sprintf(status.CurFailLoadReasonFmt, curUID), fmt.Sprintf("error: %v", err))
+		return cc.lkgRollback(fmt.Sprintf(status.CurFailLoadReasonFmt, curUID), fmt.Sprintf("error: %v", err))
 	}
 
 	// parse the checkpoint into a KubeletConfiguration
 	cur, err := checkpoint.Parse()
 	if err != nil {
-		return cc.badRollback(curUID, fmt.Sprintf(status.CurFailParseReasonFmt, curUID), fmt.Sprintf("error: %v", err))
+		return cc.lkgRollback(fmt.Sprintf(status.CurFailParseReasonFmt, curUID), fmt.Sprintf("error: %v", err))
 	}
 
 	// validate current config
 	if err := validation.ValidateKubeletConfiguration(cur); err != nil {
-		return cc.badRollback(curUID, fmt.Sprintf(status.CurFailValidateReasonFmt, curUID), fmt.Sprintf("error: %v", err))
+		return cc.lkgRollback(fmt.Sprintf(status.CurFailValidateReasonFmt, curUID), fmt.Sprintf("error: %v", err))
 	}
 
-	// check for crash loops if we're still in the trial period
+	// when the trial period is over, the current config becomes the last-known-good
 	if trial, err := cc.inTrial(cur.ConfigTrialDuration.Duration); err != nil {
 		return nil, err
-	} else if trial {
-		if crashing, err := cc.crashLooping(cur.CrashLoopThreshold); err != nil {
-			return nil, err
-		} else if crashing {
-			return cc.badRollback(curUID, fmt.Sprintf(status.CurFailCrashLoopReasonFmt, curUID), "")
-		}
-	} else {
-		// when the trial period is over, the current config becomes the last-known-good
+	} else if !trial {
 		if err := cc.graduateCurrentToLastKnownGood(); err != nil {
 			return nil, err
 		}
@@ -286,18 +251,11 @@ func (cc *Controller) initialize() error {
 	if err := cc.checkpointStore.Initialize(); err != nil {
 		return err
 	}
-	// initialize bad config tracker
-	if err := cc.badConfigTracker.Initialize(); err != nil {
-		return err
-	}
-	// initialize startup tracker
-	if err := cc.startupTracker.Initialize(); err != nil {
-		return err
-	}
 	return nil
 }
 
-// localConfig returns the initConfig if it is loaded, otherwise returns the defaultConfig
+// localConfig returns the initConfig if it is loaded, otherwise returns the defaultConfig.
+// It also sets the local configOK condition to match the returned config.
 func (cc *Controller) localConfig() *kubeletconfig.KubeletConfiguration {
 	if cc.initConfig != nil {
 		cc.configOK.Set(status.CurInitMessage, status.CurInitOKReason, apiv1.ConditionTrue)
@@ -307,32 +265,17 @@ func (cc *Controller) localConfig() *kubeletconfig.KubeletConfiguration {
 	return cc.defaultConfig
 }
 
-// inTrial returns true if the time elapsed since the last modification of the current config exceeds `trialDur`, false otherwise
+// inTrial returns true if the time elapsed since the last modification of the current config does not exceed `trialDur`, false otherwise
 func (cc *Controller) inTrial(trialDur time.Duration) (bool, error) {
 	now := time.Now()
 	t, err := cc.checkpointStore.CurrentModified()
 	if err != nil {
 		return false, err
 	}
-	if now.Sub(t) > trialDur {
+	if now.Sub(t) <= trialDur {
 		return true, nil
 	}
 	return false, nil
-}
-
-// crashLooping returns true if the number of startups since the last modification of the current config exceeds `threshold`, false otherwise
-func (cc *Controller) crashLooping(threshold int32) (bool, error) {
-	// determine the last time the current config changed
-	modTime, err := cc.checkpointStore.CurrentModified()
-	if err != nil {
-		return false, err
-	}
-	// get the number of startups since that modification time
-	num, err := cc.startupTracker.StartupsSince(modTime)
-	if err != nil {
-		return false, err
-	}
-	return num > threshold, nil
 }
 
 // graduateCurrentToLastKnownGood sets the last-known-good UID on the checkpointStore

@@ -12,6 +12,7 @@ go_library(
         "density_utils.go",
         "deployment.go",
         "pod_store.go",
+        "replicaset.go",
         "runners.go",
         "tmpdir.go",
     ],
@@ -58,6 +59,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//test/utils/image:all-srcs",
         "//test/utils/junit:all-srcs",
     ],
     tags = ["automanaged"],

@@ -209,6 +209,71 @@ func TestValidateIPNetFromString(t *testing.T) {
 	}
 }
 
+func TestValidateAPIEndpoint(t *testing.T) {
+	var tests = []struct {
+		name     string
+		s        *kubeadm.MasterConfiguration
+		expected bool
+	}{
+		{
+			name:     "Missing configuration",
+			s:        &kubeadm.MasterConfiguration{},
+			expected: false,
+		},
+		{
+			name: "Valid IPv4 address and default port",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         6443,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Valid IPv6 address and port",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					AdvertiseAddress: "2001:db7::1",
+					BindPort:         3446,
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "Invalid IPv4 address",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					AdvertiseAddress: "1.2.34",
+					BindPort:         6443,
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "Invalid IPv6 address",
+			s: &kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					AdvertiseAddress: "2001:db7:1",
+					BindPort:         3446,
+				},
+			},
+			expected: false,
+		},
+	}
+	for _, rt := range tests {
+		actual := ValidateAPIEndpoint(rt.s, nil)
+		if (len(actual) == 0) != rt.expected {
+			t.Errorf(
+				"%s test case failed:\n\texpected: %t\n\t  actual: %t",
+				rt.name,
+				rt.expected,
+				(len(actual) == 0),
+			)
+		}
+	}
+}
+
 func TestValidateMasterConfiguration(t *testing.T) {
 	nodename := "valid-nodename"
 	var tests = []struct {
@@ -220,6 +285,10 @@ func TestValidateMasterConfiguration(t *testing.T) {
 			&kubeadm.MasterConfiguration{}, false},
 		{"invalid missing token with IPv4 service subnet",
 			&kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         6443,
+				},
 				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "10.96.0.1/12",
@@ -230,6 +299,10 @@ func TestValidateMasterConfiguration(t *testing.T) {
 			}, false},
 		{"invalid missing token with IPv6 service subnet",
 			&kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         6443,
+				},
 				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "2001:db8::1/98",
@@ -240,6 +313,10 @@ func TestValidateMasterConfiguration(t *testing.T) {
 			}, false},
 		{"invalid missing node name",
 			&kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         6443,
+				},
 				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "10.96.0.1/12",
@@ -250,6 +327,10 @@ func TestValidateMasterConfiguration(t *testing.T) {
 			}, false},
 		{"valid master configuration with IPv4 service subnet",
 			&kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         6443,
+				},
 				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "10.96.0.1/12",
@@ -261,6 +342,10 @@ func TestValidateMasterConfiguration(t *testing.T) {
 			}, true},
 		{"valid master configuration using IPv6 service subnet",
 			&kubeadm.MasterConfiguration{
+				API: kubeadm.API{
+					AdvertiseAddress: "1:2:3::4",
+					BindPort:         3446,
+				},
 				AuthorizationModes: []string{"Node", "RBAC"},
 				Networking: kubeadm.Networking{
 					ServiceSubnet: "2001:db8::1/98",
@@ -325,7 +410,6 @@ func TestValidateMixedArguments(t *testing.T) {
 	}
 
 	var cfgPath string
-
 	for _, rt := range tests {
 		f := pflag.NewFlagSet("test", pflag.ContinueOnError)
 		if f.Parsed() {
@@ -351,10 +435,10 @@ func TestValidateMixedArguments(t *testing.T) {
 	}
 }
 
-func TestValidateFeatureFlags(t *testing.T) {
+func TestValidateFeatureGates(t *testing.T) {
 	type featureFlag map[string]bool
 	var tests = []struct {
-		featureFlags featureFlag
+		featureGates featureFlag
 		expected     bool
 	}{
 		{featureFlag{"SelfHosting": true}, true},
@@ -364,10 +448,10 @@ func TestValidateFeatureFlags(t *testing.T) {
 		{featureFlag{"Foo": true}, false},
 	}
 	for _, rt := range tests {
-		actual := ValidateFeatureFlags(rt.featureFlags, nil)
+		actual := ValidateFeatureGates(rt.featureGates, nil)
 		if (len(actual) == 0) != rt.expected {
 			t.Errorf(
-				"failed featureFlags:\n\texpected: %t\n\t  actual: %t",
+				"failed featureGates:\n\texpected: %t\n\t  actual: %t",
 				rt.expected,
 				(len(actual) == 0),
 			)

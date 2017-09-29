@@ -145,6 +145,25 @@ func TestSecretForTLSGenerate(t *testing.T) {
 			},
 			expectErr: false,
 		},
+		"test-valid-tls-secret-append-hash": {
+			params: map[string]interface{}{
+				"name":        "foo",
+				"key":         validKeyPath,
+				"cert":        validCertPath,
+				"append-hash": true,
+			},
+			expected: &api.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo-272h6tt825",
+				},
+				Data: map[string][]byte{
+					api.TLSCertKey:       []byte(rsaCertPEM),
+					api.TLSPrivateKeyKey: []byte(rsaKeyPEM),
+				},
+				Type: api.SecretTypeTLS,
+			},
+			expectErr: false,
+		},
 		"test-invalid-key-pair": {
 			params: map[string]interface{}{
 				"name": "foo",

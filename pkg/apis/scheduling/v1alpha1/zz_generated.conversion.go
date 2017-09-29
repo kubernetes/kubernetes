@@ -82,11 +82,7 @@ func Convert_v1alpha1_PriorityClassList_To_scheduling_PriorityClassList(in *v1al
 
 func autoConvert_scheduling_PriorityClassList_To_v1alpha1_PriorityClassList(in *scheduling.PriorityClassList, out *v1alpha1.PriorityClassList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	if in.Items == nil {
-		out.Items = make([]v1alpha1.PriorityClass, 0)
-	} else {
-		out.Items = *(*[]v1alpha1.PriorityClass)(unsafe.Pointer(&in.Items))
-	}
+	out.Items = *(*[]v1alpha1.PriorityClass)(unsafe.Pointer(&in.Items))
 	return nil
 }
 

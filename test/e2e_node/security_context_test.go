@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var _ = framework.KubeDescribe("Security Context", func() {
@@ -59,7 +60,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		}
 		createAndWaitHostPidPod := func(podName string, hostPID bool) {
 			podClient.Create(makeHostPidPod(podName,
-				"gcr.io/google_containers/busybox:1.24",
+				busyboxImage,
 				[]string{"sh", "-c", "pidof nginx || true"},
 				hostPID,
 			))
@@ -71,7 +72,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		BeforeEach(func() {
 			nginxPodName := "nginx-hostpid-" + string(uuid.NewUUID())
 			podClient.CreateSync(makeHostPidPod(nginxPodName,
-				"gcr.io/google_containers/nginx-slim:0.7",
+				imageutils.GetE2EImage(imageutils.NginxSlim),
 				nil,
 				true,
 			))
@@ -139,7 +140,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		}
 		createAndWaitHostIPCPod := func(podName string, hostNetwork bool) {
 			podClient.Create(makeHostIPCPod(podName,
-				"gcr.io/google_containers/busybox:1.24",
+				busyboxImage,
 				[]string{"sh", "-c", "ipcs -m | awk '{print $2}'"},
 				hostNetwork,
 			))
@@ -219,7 +220,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		listListeningPortsCommand := []string{"sh", "-c", "netstat -ln"}
 		createAndWaitHostNetworkPod := func(podName string, hostNetwork bool) {
 			podClient.Create(makeHostNetworkPod(podName,
-				"gcr.io/google_containers/busybox:1.24",
+				busyboxImage,
 				listListeningPortsCommand,
 				hostNetwork,
 			))
@@ -229,8 +230,9 @@ var _ = framework.KubeDescribe("Security Context", func() {
 
 		listeningPort := ""
 		var l net.Listener
+		var err error
 		BeforeEach(func() {
-			l, err := net.Listen("tcp", ":0")
+			l, err = net.Listen("tcp", ":0")
 			if err != nil {
 				framework.Failf("Failed to open a new tcp port: %v", err)
 			}
@@ -298,7 +300,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		createAndWaitUserPod := func(userid int64) {
 			podName := fmt.Sprintf("busybox-user-%d-%s", userid, uuid.NewUUID())
 			podClient.Create(makeUserPod(podName,
-				"gcr.io/google_containers/busybox:1.24",
+				busyboxImage,
 				[]string{"sh", "-c", fmt.Sprintf("test $(id -u) -eq %d", userid)},
 				userid,
 			))
@@ -339,7 +341,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		createAndWaitUserPod := func(readOnlyRootFilesystem bool) string {
 			podName := fmt.Sprintf("busybox-readonly-%v-%s", readOnlyRootFilesystem, uuid.NewUUID())
 			podClient.Create(makeUserPod(podName,
-				"gcr.io/google_containers/busybox:1.24",
+				imageutils.GetBusyBoxImage(),
 				[]string{"sh", "-c", "touch checkfile"},
 				readOnlyRootFilesystem,
 			))
@@ -383,7 +385,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 					RestartPolicy: v1.RestartPolicyNever,
 					Containers: []v1.Container{
 						{
-							Image: "gcr.io/google_containers/nonewprivs:1.2",
+							Image: imageutils.GetE2EImage(imageutils.Nonewprivs),
 							Name:  podName,
 							SecurityContext: &v1.SecurityContext{
 								AllowPrivilegeEscalation: allowPrivilegeEscalation,
@@ -457,7 +459,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		createAndWaitUserPod := func(privileged bool) string {
 			podName := fmt.Sprintf("busybox-privileged-%v-%s", privileged, uuid.NewUUID())
 			podClient.Create(makeUserPod(podName,
-				"gcr.io/google_containers/busybox:1.24",
+				busyboxImage,
 				[]string{"sh", "-c", "ip link add dummy0 type dummy || true"},
 				privileged,
 			))

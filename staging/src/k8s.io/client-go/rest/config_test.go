@@ -18,6 +18,7 @@ package rest
 
 import (
 	"io"
+	"net"
 	"net/http"
 	"path/filepath"
 	"reflect"
@@ -236,6 +237,8 @@ func TestAnonymousConfig(t *testing.T) {
 		func(r *clientcmdapi.AuthProviderConfig, f fuzz.Continue) {
 			r.Config = map[string]string{}
 		},
+		// Dial does not require fuzzer
+		func(r *func(network, addr string) (net.Conn, error), f fuzz.Continue) {},
 	)
 	for i := 0; i < 20; i++ {
 		original := &Config{}
@@ -249,6 +252,7 @@ func TestAnonymousConfig(t *testing.T) {
 		expected.BearerToken = ""
 		expected.Username = ""
 		expected.Password = ""
+		expected.CacheDir = ""
 		expected.AuthProvider = nil
 		expected.AuthConfigPersister = nil
 		expected.TLSClientConfig.CertData = nil

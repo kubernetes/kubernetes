@@ -74,10 +74,9 @@ func TestMain(m *testing.M) {
 		},
 		Status: v1.NodeStatus{},
 	}
-	clone, _ := api.Scheme.DeepCopy(node)
 
 	// A copy of the same node, but cordoned.
-	cordoned_node = clone.(*v1.Node)
+	cordoned_node = node.DeepCopy()
 	cordoned_node.Spec.Unschedulable = true
 	os.Exit(m.Run())
 }

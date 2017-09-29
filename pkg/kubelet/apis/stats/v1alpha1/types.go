@@ -195,6 +195,15 @@ type VolumeStats struct {
 	// Name is the name given to the Volume
 	// +optional
 	Name string `json:"name,omitempty"`
+	// Reference to the PVC, if one exists
+	// +optional
+	PVCRef *PVCReference `json:"pvcRef,omitempty"`
+}
+
+// PVCReference contains enough information to describe the referenced PVC.
+type PVCReference struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
 }
 
 // FsStats contains data about filesystem usage.

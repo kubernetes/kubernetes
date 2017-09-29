@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	intstrutil "k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/apimachinery/pkg/util/rand"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
@@ -93,12 +93,7 @@ func (dsc *DaemonSetsController) constructHistory(ds *extensions.DaemonSet) (cur
 		// Add the unique label if it's not already added to the history
 		// We use history name instead of computing hash, so that we don't need to worry about hash collision
 		if _, ok := history.Labels[extensions.DefaultDaemonSetUniqueLabelKey]; !ok {
-			var clone interface{}
-			clone, err = scheme.Scheme.DeepCopy(history)
-			if err != nil {
-				return nil, nil, err
-			}
-			toUpdate := clone.(*apps.ControllerRevision)
+			toUpdate := history.DeepCopy()
 			toUpdate.Labels[extensions.DefaultDaemonSetUniqueLabelKey] = toUpdate.Name
 			history, err = dsc.kubeClient.AppsV1beta1().ControllerRevisions(ds.Namespace).Update(toUpdate)
 			if err != nil {
@@ -133,12 +128,7 @@ func (dsc *DaemonSetsController) constructHistory(ds *extensions.DaemonSet) (cur
 		}
 		// Update revision number if necessary
 		if cur.Revision < currRevision {
-			var clone interface{}
-			clone, err = scheme.Scheme.DeepCopy(cur)
-			if err != nil {
-				return nil, nil, err
-			}
-			toUpdate := clone.(*apps.ControllerRevision)
+			toUpdate := cur.DeepCopy()
 			toUpdate.Revision = currRevision
 			_, err = dsc.kubeClient.AppsV1beta1().ControllerRevisions(ds.Namespace).Update(toUpdate)
 			if err != nil {
@@ -233,11 +223,7 @@ func (dsc *DaemonSetsController) dedupCurHistories(ds *extensions.DaemonSet, cur
 		}
 		for _, pod := range pods {
 			if pod.Labels[extensions.DefaultDaemonSetUniqueLabelKey] != keepCur.Labels[extensions.DefaultDaemonSetUniqueLabelKey] {
-				clone, err := scheme.Scheme.DeepCopy(pod)
-				if err != nil {
-					return nil, err
-				}
-				toUpdate := clone.(*v1.Pod)
+				toUpdate := pod.DeepCopy()
 				if toUpdate.Labels == nil {
 					toUpdate.Labels = make(map[string]string)
 				}
@@ -332,7 +318,7 @@ func (dsc *DaemonSetsController) snapshot(ds *extensions.DaemonSet, revision int
 		return nil, err
 	}
 	hash := fmt.Sprint(controller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount))
-	name := ds.Name + "-" + hash
+	name := ds.Name + "-" + rand.SafeEncodeString(hash)
 	history := &apps.ControllerRevision{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            name,
@@ -368,7 +354,7 @@ func (dsc *DaemonSetsController) snapshot(ds *extensions.DaemonSet, revision int
 			return nil, getErr
 		}
 		if currDS.Status.CollisionCount == nil {
-			currDS.Status.CollisionCount = new(int64)
+			currDS.Status.CollisionCount = new(int32)
 		}
 		*currDS.Status.CollisionCount++
 		_, updateErr := dsc.kubeClient.ExtensionsV1beta1().DaemonSets(ds.Namespace).UpdateStatus(currDS)
@@ -423,7 +409,8 @@ func (dsc *DaemonSetsController) getUnavailableNumbers(ds *extensions.DaemonSet,
 		}
 		available := false
 		for _, pod := range daemonPods {
-			if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) {
+			//for the purposes of update we ensure that the Pod is both available and not terminating
+			if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) && pod.DeletionTimestamp == nil {
 				available = true
 				break
 			}

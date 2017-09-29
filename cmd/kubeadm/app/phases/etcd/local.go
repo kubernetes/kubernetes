@@ -17,10 +17,13 @@ limitations under the License.
 package etcd
 
 import (
+	"fmt"
+
 	"k8s.io/api/core/v1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
@@ -35,12 +38,18 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.Ma
 	spec := GetEtcdPodSpec(cfg)
 
 	// writes etcd StaticPod to disk
-	return staticpodutil.WriteStaticPodToDisk(kubeadmconstants.Etcd, manifestDir, spec)
+	if err := staticpodutil.WriteStaticPodToDisk(kubeadmconstants.Etcd, manifestDir, spec); err != nil {
+		return err
+	}
+
+	fmt.Printf("[etcd] Wrote Static Pod manifest for a local etcd instance to %q\n", kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestDir))
+	return nil
 }
 
 // GetEtcdPodSpec returns the etcd static Pod actualized to the context of the current MasterConfiguration
 // NB. GetEtcdPodSpec methods holds the information about how kubeadm creates etcd static pod mainfests.
 func GetEtcdPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.Pod {
+	pathType := v1.HostPathDirectoryOrCreate
 	return staticpodutil.ComponentPod(v1.Container{
 		Name:    kubeadmconstants.Etcd,
 		Command: getEtcdCommand(cfg),
@@ -48,7 +57,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.Pod {
 		// Mount the etcd datadir path read-write so etcd can store data in a more persistent manner
 		VolumeMounts:  []v1.VolumeMount{staticpodutil.NewVolumeMount(etcdVolumeName, cfg.Etcd.DataDir, false)},
 		LivenessProbe: staticpodutil.ComponentProbe(2379, "/health", v1.URISchemeHTTP),
-	}, []v1.Volume{staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.DataDir)})
+	}, []v1.Volume{staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.DataDir, &pathType)})
 }
 
 // getEtcdCommand builds the right etcd command from the given config object
@@ -60,6 +69,6 @@ func getEtcdCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 	}
 
 	command := []string{"etcd"}
-	command = append(command, staticpodutil.GetExtraParameters(cfg.Etcd.ExtraArgs, defaultArguments)...)
+	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.Etcd.ExtraArgs)...)
 	return command
 }

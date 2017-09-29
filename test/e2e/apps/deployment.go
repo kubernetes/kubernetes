@@ -84,9 +84,6 @@ var _ = SIGDescribe("Deployment", func() {
 	It("deployment should support rollover", func() {
 		testRolloverDeployment(f)
 	})
-	It("paused deployment should be ignored by the controller", func() {
-		testPausedDeployment(f)
-	})
 	It("deployment should support rollback", func() {
 		testRollbackDeployment(f)
 	})
@@ -95,9 +92,6 @@ var _ = SIGDescribe("Deployment", func() {
 	})
 	It("deployment should label adopted RSs and pods", func() {
 		testDeploymentLabelAdopted(f)
-	})
-	It("paused deployment should be able to scale", func() {
-		testScalePausedDeployment(f)
 	})
 	It("scaled rollout deployment should not block on annotation check", func() {
 		testScaledRolloutDeployment(f)
@@ -113,9 +107,6 @@ var _ = SIGDescribe("Deployment", func() {
 	})
 	It("test Deployment ReplicaSet orphaning and adoption regarding controllerRef", func() {
 		testDeploymentsControllerRef(f)
-	})
-	It("deployment can avoid hash collisions", func() {
-		testDeploymentHashCollisionAvoidance(f)
 	})
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
 	// See https://github.com/kubernetes/kubernetes/issues/29229
@@ -523,93 +514,6 @@ func ensureReplicas(rs *extensions.ReplicaSet, replicas int32) {
 	Expect(rs.Status.Replicas).Should(Equal(replicas))
 }
 
-// TODO: Can be moved to a unit test.
-func testPausedDeployment(f *framework.Framework) {
-	ns := f.Namespace.Name
-	c := f.ClientSet
-	deploymentName := "test-paused-deployment"
-	podLabels := map[string]string{"name": NginxImageName}
-	d := framework.NewDeployment(deploymentName, 1, podLabels, NginxImageName, NginxImage, extensions.RollingUpdateDeploymentStrategyType)
-	d.Spec.Paused = true
-	tgps := int64(1)
-	d.Spec.Template.Spec.TerminationGracePeriodSeconds = &tgps
-	framework.Logf("Creating paused deployment %s", deploymentName)
-	_, err := c.Extensions().Deployments(ns).Create(d)
-	Expect(err).NotTo(HaveOccurred())
-	// Check that deployment is created fine.
-	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	// Verify that there is no latest state realized for the new deployment.
-	rs, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
-	Expect(err).NotTo(HaveOccurred())
-	Expect(rs).To(Equal(nilRs))
-
-	// Update the deployment to run
-	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, d.Name, func(update *extensions.Deployment) {
-		update.Spec.Paused = false
-	})
-	Expect(err).NotTo(HaveOccurred())
-
-	// Use observedGeneration to determine if the controller noticed the resume.
-	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	Expect(err).NotTo(HaveOccurred())
-
-	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
-	Expect(err).NotTo(HaveOccurred())
-
-	opts := metav1.ListOptions{LabelSelector: selector.String()}
-	w, err := c.Extensions().ReplicaSets(ns).Watch(opts)
-	Expect(err).NotTo(HaveOccurred())
-
-	select {
-	case <-w.ResultChan():
-		// this is it
-	case <-time.After(time.Minute):
-		err = fmt.Errorf("expected a new replica set to be created")
-		Expect(err).NotTo(HaveOccurred())
-	}
-
-	// Pause the deployment and delete the replica set.
-	// The paused deployment shouldn't recreate a new one.
-	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, d.Name, func(update *extensions.Deployment) {
-		update.Spec.Paused = true
-	})
-	Expect(err).NotTo(HaveOccurred())
-
-	// Use observedGeneration to determine if the controller noticed the pause.
-	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	Expect(err).NotTo(HaveOccurred())
-
-	// Update the deployment template - the new replicaset should stay the same
-	framework.Logf("Updating paused deployment %q", deploymentName)
-	newTGPS := int64(0)
-	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, d.Name, func(update *extensions.Deployment) {
-		update.Spec.Template.Spec.TerminationGracePeriodSeconds = &newTGPS
-	})
-	Expect(err).NotTo(HaveOccurred())
-
-	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	Expect(err).NotTo(HaveOccurred())
-
-	framework.Logf("Looking for new replicaset for paused deployment %q (there should be none)", deploymentName)
-	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
-	Expect(err).NotTo(HaveOccurred())
-	Expect(newRS).To(Equal(nilRs))
-
-	_, allOldRs, err := deploymentutil.GetOldReplicaSets(deployment, c.ExtensionsV1beta1())
-	Expect(err).NotTo(HaveOccurred())
-	if len(allOldRs) != 1 {
-		err = fmt.Errorf("expected an old replica set")
-		Expect(err).NotTo(HaveOccurred())
-	}
-	framework.Logf("Comparing deployment diff with old replica set %q", allOldRs[0].Name)
-	if *allOldRs[0].Spec.Template.Spec.TerminationGracePeriodSeconds == newTGPS {
-		err = fmt.Errorf("TerminationGracePeriodSeconds on the replica set should be %d but is %d", tgps, newTGPS)
-		Expect(err).NotTo(HaveOccurred())
-	}
-}
-
 // testRollbackDeployment tests that a deployment is created (revision 1) and updated (revision 2), and
 // then rollback to revision 1 (should update template to revision 1, and then update revision 1 to 3),
 // and then rollback to last revision.
@@ -902,57 +806,6 @@ func testDeploymentLabelAdopted(f *framework.Framework) {
 	err = framework.CheckPodHashLabel(pods)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(int32(len(pods.Items))).Should(Equal(replicas))
-}
-
-// TODO: Can be moved to a unit test.
-func testScalePausedDeployment(f *framework.Framework) {
-	ns := f.Namespace.Name
-	c := f.ClientSet
-
-	podLabels := map[string]string{"name": NginxImageName}
-	replicas := int32(0)
-
-	// Create a nginx deployment.
-	deploymentName := "nginx-deployment"
-	d := framework.NewDeployment(deploymentName, replicas, podLabels, NginxImageName, NginxImage, extensions.RollingUpdateDeploymentStrategyType)
-	framework.Logf("Creating deployment %q", deploymentName)
-	_, err := c.Extensions().Deployments(ns).Create(d)
-	Expect(err).NotTo(HaveOccurred())
-
-	// Check that deployment is created fine.
-	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-
-	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	Expect(err).NotTo(HaveOccurred())
-
-	framework.Logf("Waiting for deployment %q to have no running pods", deploymentName)
-	Expect(framework.WaitForDeploymentUpdatedReplicasLTE(c, ns, deploymentName, replicas, deployment.Generation))
-
-	// Pause the deployment and try to scale it.
-	framework.Logf("Pause deployment %q before scaling it up", deploymentName)
-	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, d.Name, func(update *extensions.Deployment) {
-		update.Spec.Paused = true
-	})
-	Expect(err).NotTo(HaveOccurred())
-
-	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	Expect(err).NotTo(HaveOccurred())
-
-	// Scale the paused deployment.
-	framework.Logf("Scaling up the paused deployment %q", deploymentName)
-	newReplicas := int32(1)
-	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
-		update.Spec.Replicas = &newReplicas
-	})
-	Expect(err).NotTo(HaveOccurred())
-
-	err = framework.WaitForObservedDeployment(c, ns, deploymentName, deployment.Generation)
-	Expect(err).NotTo(HaveOccurred())
-
-	rs, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
-	Expect(err).NotTo(HaveOccurred())
-	Expect(*(rs.Spec.Replicas)).Should(Equal(newReplicas))
 }
 
 func testScaledRolloutDeployment(f *framework.Framework) {
@@ -1413,48 +1266,4 @@ func orphanDeploymentReplicaSets(c clientset.Interface, d *extensions.Deployment
 	deleteOptions := &metav1.DeleteOptions{OrphanDependents: &trueVar}
 	deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(d.UID))
 	return c.Extensions().Deployments(d.Namespace).Delete(d.Name, deleteOptions)
-}
-
-func testDeploymentHashCollisionAvoidance(f *framework.Framework) {
-	ns := f.Namespace.Name
-	c := f.ClientSet
-
-	deploymentName := "test-hash-collision"
-	framework.Logf("Creating Deployment %q", deploymentName)
-	podLabels := map[string]string{"name": NginxImageName}
-	d := framework.NewDeployment(deploymentName, int32(0), podLabels, NginxImageName, NginxImage, extensions.RollingUpdateDeploymentStrategyType)
-	deployment, err := c.Extensions().Deployments(ns).Create(d)
-	Expect(err).NotTo(HaveOccurred())
-	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", NginxImage)
-	Expect(err).NotTo(HaveOccurred())
-
-	// TODO: Switch this to do a non-cascading deletion of the Deployment, mutate the ReplicaSet
-	// once it has no owner reference, then recreate the Deployment if we ever proceed with
-	// https://github.com/kubernetes/kubernetes/issues/44237
-	framework.Logf("Mock a hash collision")
-	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.ExtensionsV1beta1())
-	Expect(err).NotTo(HaveOccurred())
-	var nilRs *extensions.ReplicaSet
-	Expect(newRS).NotTo(Equal(nilRs))
-	_, err = framework.UpdateReplicaSetWithRetries(c, ns, newRS.Name, func(update *extensions.ReplicaSet) {
-		*update.Spec.Template.Spec.TerminationGracePeriodSeconds = int64(5)
-	})
-	Expect(err).NotTo(HaveOccurred())
-
-	framework.Logf("Expect deployment collision counter to increment")
-	if err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-		d, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-		if err != nil {
-			framework.Logf("cannot get deployment %q: %v", deploymentName, err)
-			return false, nil
-		}
-		framework.Logf(spew.Sprintf("deployment status: %#v", d.Status))
-		return d.Status.CollisionCount != nil && *d.Status.CollisionCount == int64(1), nil
-	}); err != nil {
-		framework.Failf("Failed to increment collision counter for deployment %q: %v", deploymentName, err)
-	}
-
-	framework.Logf("Expect a new ReplicaSet to be created")
-	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "2", NginxImage)
-	Expect(err).NotTo(HaveOccurred())
 }

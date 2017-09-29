@@ -61,7 +61,6 @@ const (
 	GlusterfsServerImage string = "gcr.io/google_containers/volume-gluster:0.2"
 	CephServerImage      string = "gcr.io/google_containers/volume-ceph:0.1"
 	RbdServerImage       string = "gcr.io/google_containers/volume-rbd:0.1"
-	BusyBoxImage         string = "gcr.io/google_containers/busybox:1.24"
 )
 
 const (
@@ -457,7 +456,7 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 			Containers: []v1.Container{
 				{
 					Name:    config.Prefix + "-injector",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   BusyBoxImage,
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", "echo '" + content + "' > /mnt/index.html && chmod o+rX /mnt /mnt/index.html"},
 					VolumeMounts: []v1.VolumeMount{
@@ -492,4 +491,16 @@ func InjectHtml(client clientset.Interface, config VolumeTestConfig, volume v1.V
 	ExpectNoError(err, "Failed to create injector pod: %v", err)
 	err = WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Namespace)
 	Expect(err).NotTo(HaveOccurred())
+}
+
+func CreateGCEVolume() (*v1.PersistentVolumeSource, string) {
+	diskName, err := CreatePDWithRetry()
+	ExpectNoError(err)
+	return &v1.PersistentVolumeSource{
+		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+			PDName:   diskName,
+			FSType:   "ext3",
+			ReadOnly: false,
+		},
+	}, diskName
 }

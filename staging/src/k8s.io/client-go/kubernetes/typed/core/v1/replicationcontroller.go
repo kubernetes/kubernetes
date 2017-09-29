@@ -18,6 +18,7 @@ package v1
 
 import (
 	v1 "k8s.io/api/core/v1"
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -42,6 +43,9 @@ type ReplicationControllerInterface interface {
 	List(opts meta_v1.ListOptions) (*v1.ReplicationControllerList, error)
 	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ReplicationController, err error)
+	GetScale(replicationControllerName string, options meta_v1.GetOptions) (*v1beta1.Scale, error)
+	UpdateScale(replicationControllerName string, scale *v1beta1.Scale) (*v1beta1.Scale, error)
+
 	ReplicationControllerExpansion
 }
 
@@ -166,6 +170,34 @@ func (c *replicationControllers) Patch(name string, pt types.PatchType, data []b
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Do().
+		Into(result)
+	return
+}
+
+// GetScale takes name of the replicationController, and returns the corresponding v1beta1.Scale object, and an error if there is any.
+func (c *replicationControllers) GetScale(replicationControllerName string, options meta_v1.GetOptions) (result *v1beta1.Scale, err error) {
+	result = &v1beta1.Scale{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		Name(replicationControllerName).
+		SubResource("scale").
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
+func (c *replicationControllers) UpdateScale(replicationControllerName string, scale *v1beta1.Scale) (result *v1beta1.Scale, err error) {
+	result = &v1beta1.Scale{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		Name(replicationControllerName).
+		SubResource("scale").
+		Body(scale).
 		Do().
 		Into(result)
 	return

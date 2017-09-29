@@ -60,27 +60,13 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_v1beta1_NetworkPolicySpec_To_networking_NetworkPolicySpec,
 		Convert_networking_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec,
 		Convert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec,
+		Convert_v1beta1_IPBlock_To_networking_IPBlock,
+		Convert_networking_IPBlock_To_v1beta1_IPBlock,
+		Convert_networking_NetworkPolicyEgressRule_To_v1beta1_NetworkPolicyEgressRule,
+		Convert_v1beta1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgressRule,
 	)
 	if err != nil {
 		return err
-	}
-
-	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
-	for _, k := range []string{"DaemonSet", "Deployment", "Ingress"} {
-		kind := k // don't close over range variables
-		err = scheme.AddFieldLabelConversionFunc("extensions/v1beta1", kind,
-			func(label, value string) (string, string, error) {
-				switch label {
-				case "metadata.name", "metadata.namespace":
-					return label, value, nil
-				default:
-					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
-				}
-			},
-		)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -299,6 +285,21 @@ func Convert_v1beta1_NetworkPolicySpec_To_networking_NetworkPolicySpec(in *exten
 			return err
 		}
 	}
+	out.Egress = make([]networking.NetworkPolicyEgressRule, len(in.Egress))
+	for i := range in.Egress {
+		if err := Convert_v1beta1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgressRule(&in.Egress[i], &out.Egress[i], s); err != nil {
+			return err
+		}
+	}
+	if in.PolicyTypes != nil {
+		in, out := &in.PolicyTypes, &out.PolicyTypes
+		*out = make([]networking.PolicyType, len(*in))
+		for i := range *in {
+			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -310,6 +311,21 @@ func Convert_networking_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec(in *netwo
 	for i := range in.Ingress {
 		if err := Convert_networking_NetworkPolicyIngressRule_To_v1beta1_NetworkPolicyIngressRule(&in.Ingress[i], &out.Ingress[i], s); err != nil {
 			return err
+		}
+	}
+	out.Egress = make([]extensionsv1beta1.NetworkPolicyEgressRule, len(in.Egress))
+	for i := range in.Egress {
+		if err := Convert_networking_NetworkPolicyEgressRule_To_v1beta1_NetworkPolicyEgressRule(&in.Egress[i], &out.Egress[i], s); err != nil {
+			return err
+		}
+	}
+	if in.PolicyTypes != nil {
+		in, out := &in.PolicyTypes, &out.PolicyTypes
+		*out = make([]extensionsv1beta1.PolicyType, len(*in))
+		for i := range *in {
+			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -347,6 +363,38 @@ func Convert_networking_NetworkPolicyIngressRule_To_v1beta1_NetworkPolicyIngress
 	return nil
 }
 
+func Convert_v1beta1_NetworkPolicyEgressRule_To_networking_NetworkPolicyEgressRule(in *extensionsv1beta1.NetworkPolicyEgressRule, out *networking.NetworkPolicyEgressRule, s conversion.Scope) error {
+	out.Ports = make([]networking.NetworkPolicyPort, len(in.Ports))
+	for i := range in.Ports {
+		if err := Convert_v1beta1_NetworkPolicyPort_To_networking_NetworkPolicyPort(&in.Ports[i], &out.Ports[i], s); err != nil {
+			return err
+		}
+	}
+	out.To = make([]networking.NetworkPolicyPeer, len(in.To))
+	for i := range in.To {
+		if err := Convert_v1beta1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(&in.To[i], &out.To[i], s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func Convert_networking_NetworkPolicyEgressRule_To_v1beta1_NetworkPolicyEgressRule(in *networking.NetworkPolicyEgressRule, out *extensionsv1beta1.NetworkPolicyEgressRule, s conversion.Scope) error {
+	out.Ports = make([]extensionsv1beta1.NetworkPolicyPort, len(in.Ports))
+	for i := range in.Ports {
+		if err := Convert_networking_NetworkPolicyPort_To_v1beta1_NetworkPolicyPort(&in.Ports[i], &out.Ports[i], s); err != nil {
+			return err
+		}
+	}
+	out.To = make([]extensionsv1beta1.NetworkPolicyPeer, len(in.To))
+	for i := range in.To {
+		if err := Convert_networking_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(&in.To[i], &out.To[i], s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func Convert_v1beta1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(in *extensionsv1beta1.NetworkPolicyPeer, out *networking.NetworkPolicyPeer, s conversion.Scope) error {
 	if in.PodSelector != nil {
 		out.PodSelector = new(metav1.LabelSelector)
@@ -363,6 +411,14 @@ func Convert_v1beta1_NetworkPolicyPeer_To_networking_NetworkPolicyPeer(in *exten
 		}
 	} else {
 		out.NamespaceSelector = nil
+	}
+	if in.IPBlock != nil {
+		out.IPBlock = new(networking.IPBlock)
+		if err := s.Convert(in.IPBlock, out.IPBlock, 0); err != nil {
+			return err
+		}
+	} else {
+		out.IPBlock = nil
 	}
 	return nil
 }
@@ -384,6 +440,30 @@ func Convert_networking_NetworkPolicyPeer_To_v1beta1_NetworkPolicyPeer(in *netwo
 	} else {
 		out.NamespaceSelector = nil
 	}
+	if in.IPBlock != nil {
+		out.IPBlock = new(extensionsv1beta1.IPBlock)
+		if err := s.Convert(in.IPBlock, out.IPBlock, 0); err != nil {
+			return err
+		}
+	} else {
+		out.IPBlock = nil
+	}
+	return nil
+}
+
+func Convert_v1beta1_IPBlock_To_networking_IPBlock(in *extensionsv1beta1.IPBlock, out *networking.IPBlock, s conversion.Scope) error {
+	out.CIDR = in.CIDR
+
+	out.Except = make([]string, len(in.Except))
+	copy(out.Except, in.Except)
+	return nil
+}
+
+func Convert_networking_IPBlock_To_v1beta1_IPBlock(in *networking.IPBlock, out *extensionsv1beta1.IPBlock, s conversion.Scope) error {
+	out.CIDR = in.CIDR
+
+	out.Except = make([]string, len(in.Except))
+	copy(out.Except, in.Except)
 	return nil
 }
 

@@ -164,8 +164,9 @@ func (d *Definitions) parseReference(s *openapi_v2.Schema, path *Path) (Schema, 
 	if _, ok := d.models[reference]; !ok {
 		return nil, newSchemaError(path, "unknown model in reference: %q", reference)
 	}
-	return &Reference{
-		Reference:   reference,
+	return &Ref{
+		BaseSchema:  d.parseBaseSchema(s, path),
+		reference:   reference,
 		definitions: d,
 	}, nil
 }
@@ -303,38 +304,27 @@ func (d *Definitions) LookupResource(gvk schema.GroupVersionKind) Schema {
 	return model
 }
 
-// SchemaReference doesn't match a specific type. It's mostly a
-// pass-through type.
-type Reference struct {
-	Reference string
+type Ref struct {
+	BaseSchema
 
+	reference   string
 	definitions *Definitions
 }
 
-var _ Schema = &Reference{}
+var _ Reference = &Ref{}
 
-func (r *Reference) GetSubSchema() Schema {
-	return r.definitions.models[r.Reference]
+func (r *Ref) Reference() string {
+	return r.reference
 }
 
-func (r *Reference) Accept(s SchemaVisitor) {
-	r.GetSubSchema().Accept(s)
+func (r *Ref) SubSchema() Schema {
+	return r.definitions.models[r.reference]
 }
 
-func (r *Reference) GetDescription() string {
-	return r.GetSubSchema().GetDescription()
+func (r *Ref) Accept(v SchemaVisitor) {
+	v.VisitReference(r)
 }
 
-func (r *Reference) GetExtensions() map[string]interface{} {
-	return r.GetSubSchema().GetExtensions()
-}
-
-func (*Reference) GetPath() *Path {
-	// Reference never has a path, because it can be referenced from
-	// multiple locations.
-	return &Path{}
-}
-
-func (r *Reference) GetName() string {
-	return r.Reference
+func (r *Ref) GetName() string {
+	return fmt.Sprintf("Reference to %q", r.reference)
 }

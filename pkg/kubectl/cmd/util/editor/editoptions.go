@@ -29,6 +29,7 @@ import (
 
 	"github.com/evanphx/json-patch"
 	"github.com/golang/glog"
+	"github.com/spf13/cobra"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -86,7 +87,7 @@ type editPrinterOptions struct {
 }
 
 // Complete completes all the required options
-func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []string) error {
+func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []string, cmd *cobra.Command) error {
 	if o.EditMode != NormalEditMode && o.EditMode != EditBeforeCreateMode && o.EditMode != ApplyEditMode {
 		return fmt.Errorf("unsupported edit mode %q", o.EditMode)
 	}
@@ -110,16 +111,15 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 		return err
 	}
 
-	b, err := f.NewUnstructuredBuilder(true)
-	if err != nil {
-		return err
-	}
+	b := f.NewBuilder().Unstructured(f.UnstructuredClientForMapping, mapper, typer)
 	if o.EditMode == NormalEditMode || o.EditMode == ApplyEditMode {
 		// when do normal edit or apply edit we need to always retrieve the latest resource from server
 		b = b.ResourceTypeOrNameArgs(true, args...).Latest()
 	}
+	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
 	r := b.NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
+		IncludeUninitialized(includeUninitialized).
 		ContinueOnError().
 		Flatten().
 		Do()
@@ -133,6 +133,7 @@ func (o *EditOptions) Complete(f cmdutil.Factory, out, errOut io.Writer, args []
 		// resource builder to read objects from edited data
 		return resource.NewBuilder(mapper, f.CategoryExpander(), typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), unstructured.UnstructuredJSONScheme).
 			Stream(bytes.NewReader(data), "edited-file").
+			IncludeUninitialized(includeUninitialized).
 			ContinueOnError().
 			Flatten().
 			Do()
@@ -229,7 +230,7 @@ func (o *EditOptions) Run() error {
 			glog.V(4).Infof("User edited:\n%s", string(edited))
 
 			// Apply validation
-			schema, err := o.f.Validator(o.EnableValidation, o.SchemaCacheDir)
+			schema, err := o.f.Validator(o.EnableValidation, o.UseOpenAPI, o.SchemaCacheDir)
 			if err != nil {
 				return preservedFile(err, file, o.ErrOut)
 			}
@@ -445,10 +446,7 @@ func GetApplyPatch(obj runtime.Object, codec runtime.Encoder) ([]byte, []byte, t
 	if err != nil {
 		return nil, []byte(""), types.MergePatchType, err
 	}
-	objCopy, err := api.Scheme.Copy(obj)
-	if err != nil {
-		return nil, beforeJSON, types.MergePatchType, err
-	}
+	objCopy := obj.DeepCopyObject()
 	accessor := meta.NewAccessor()
 	annotations, err := accessor.Annotations(objCopy)
 	if err != nil {

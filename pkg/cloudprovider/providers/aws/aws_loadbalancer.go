@@ -388,7 +388,7 @@ func (c *Cloud) ensureLoadBalancerHealthCheck(loadBalancer *elb.LoadBalancerDesc
 
 	expectedTarget := protocol + ":" + strconv.FormatInt(int64(port), 10) + path
 
-	if expectedTarget == orEmpty(actual.Target) &&
+	if expectedTarget == aws.StringValue(actual.Target) &&
 		expectedHealthyThreshold == orZero(actual.HealthyThreshold) &&
 		expectedUnhealthyThreshold == orZero(actual.UnhealthyThreshold) &&
 		expectedTimeout == orZero(actual.Timeout) &&
@@ -426,7 +426,7 @@ func (c *Cloud) ensureLoadBalancerInstances(loadBalancerName string, lbInstances
 
 	actual := sets.NewString()
 	for _, lbInstance := range lbInstances {
-		actual.Insert(orEmpty(lbInstance.InstanceId))
+		actual.Insert(aws.StringValue(lbInstance.InstanceId))
 	}
 
 	additions := expected.Difference(actual)

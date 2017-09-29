@@ -30,19 +30,25 @@ import (
 	"time"
 
 	"github.com/golang/glog"
-	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
@@ -118,6 +124,10 @@ type containerManagerImpl struct {
 	recorder record.EventRecorder
 	// Interface for QoS cgroup management
 	qosContainerManager QOSContainerManager
+	// Interface for exporting and allocating devices reported by device plugins.
+	devicePluginHandler DevicePluginHandler
+	// Interface for CPU affinity management.
+	cpuManager cpumanager.Manager
 }
 
 type features struct {
@@ -180,7 +190,7 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
@@ -217,11 +227,11 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
 	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
-	if info, err := cadvisorInterface.MachineInfo(); err == nil {
-		capacity = cadvisor.CapacityFromMachineInfo(info)
-	} else {
+	machineInfo, err := cadvisorInterface.MachineInfo()
+	if err != nil {
 		return nil, err
 	}
+	capacity = cadvisor.CapacityFromMachineInfo(machineInfo)
 
 	cgroupRoot := nodeConfig.CgroupRoot
 	cgroupManager := NewCgroupManager(subsystems, nodeConfig.CgroupDriver)
@@ -251,7 +261,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		return nil, err
 	}
 
-	return &containerManagerImpl{
+	cm := &containerManagerImpl{
 		cadvisorInterface:   cadvisorInterface,
 		mountUtil:           mountUtil,
 		NodeConfig:          nodeConfig,
@@ -261,7 +271,45 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		cgroupRoot:          cgroupRoot,
 		recorder:            recorder,
 		qosContainerManager: qosContainerManager,
-	}, nil
+	}
+
+	updateDeviceCapacityFunc := func(updates v1.ResourceList) {
+		cm.Lock()
+		defer cm.Unlock()
+		for k, v := range updates {
+			if v.Value() <= 0 {
+				delete(cm.capacity, k)
+			} else {
+				cm.capacity[k] = v
+			}
+		}
+	}
+
+	glog.Infof("Creating device plugin handler: %t", devicePluginEnabled)
+	if devicePluginEnabled {
+		cm.devicePluginHandler, err = NewDevicePluginHandlerImpl(updateDeviceCapacityFunc)
+	} else {
+		cm.devicePluginHandler, err = NewDevicePluginHandlerStub()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Initialize CPU manager
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
+		cm.cpuManager, err = cpumanager.NewManager(
+			nodeConfig.ExperimentalCPUManagerPolicy,
+			nodeConfig.ExperimentalCPUManagerReconcilePeriod,
+			machineInfo,
+			cm.GetNodeAllocatableReservation(),
+		)
+		if err != nil {
+			glog.Errorf("failed to initialize cpu manager: %v", err)
+			return nil, err
+		}
+	}
+
+	return cm, nil
 }
 
 // NewPodContainerManager is a factory method returns a PodContainerManager object
@@ -278,6 +326,10 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 	return &podContainerManagerNoop{
 		cgroupRoot: CgroupName(cm.cgroupRoot),
 	}
+}
+
+func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLifecycle {
+	return &internalContainerLifecycleImpl{cm.cpuManager}
 }
 
 // Create a cgroup container manager.
@@ -486,7 +538,16 @@ func (cm *containerManagerImpl) Status() Status {
 	return cm.status
 }
 
-func (cm *containerManagerImpl) Start(node *v1.Node, activePods ActivePodsFunc) error {
+func (cm *containerManagerImpl) Start(node *v1.Node,
+	activePods ActivePodsFunc,
+	podStatusProvider status.PodStatusProvider,
+	runtimeService internalapi.RuntimeService) error {
+
+	// Initialize CPU manager
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
+		cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), podStatusProvider, runtimeService)
+	}
+
 	// cache the node Info including resource capacity and
 	// allocatable of the node
 	cm.nodeInfo = node
@@ -544,6 +605,11 @@ func (cm *containerManagerImpl) Start(node *v1.Node, activePods ActivePodsFunc) 
 		}
 		close(stopChan)
 	}, time.Second, stopChan)
+
+	// Starts device plugin manager.
+	if err := cm.devicePluginHandler.Start(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -552,26 +618,83 @@ func (cm *containerManagerImpl) setFsCapacity() error {
 	if err != nil {
 		return fmt.Errorf("Fail to get rootfs information %v", err)
 	}
-	hasDedicatedImageFs, _ := cm.cadvisorInterface.HasDedicatedImageFs()
-	var imagesfs cadvisorapiv2.FsInfo
-	if hasDedicatedImageFs {
-		imagesfs, err = cm.cadvisorInterface.ImagesFsInfo()
-		if err != nil {
-			return fmt.Errorf("Fail to get imagefs information %v", err)
-		}
-	}
 
 	cm.Lock()
-	for rName, rCap := range cadvisor.StorageScratchCapacityFromFsInfo(rootfs) {
+	for rName, rCap := range cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs) {
 		cm.capacity[rName] = rCap
-	}
-	if hasDedicatedImageFs {
-		for rName, rCap := range cadvisor.StorageOverlayCapacityFromFsInfo(imagesfs) {
-			cm.capacity[rName] = rCap
-		}
 	}
 	cm.Unlock()
 	return nil
+}
+
+// TODO: move the GetResources logic to PodContainerManager.
+func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Container, activePods []*v1.Pod) (*kubecontainer.RunContainerOptions, error) {
+	opts := &kubecontainer.RunContainerOptions{}
+	// Gets devices, mounts, and envs from device plugin handler.
+	glog.V(3).Infof("Calling devicePluginHandler AllocateDevices")
+	// Maps to detect duplicate settings.
+	devsMap := make(map[string]string)
+	mountsMap := make(map[string]string)
+	envsMap := make(map[string]string)
+	allocResps, err := cm.devicePluginHandler.Allocate(pod, container, activePods)
+	if err != nil {
+		return opts, err
+	}
+	// Loops through AllocationResponses of all required extended resources.
+	for _, resp := range allocResps {
+		// Loops through runtime spec of all devices of the given resource.
+		for _, devRuntime := range resp.Spec {
+			// Updates RunContainerOptions.Devices.
+			for _, dev := range devRuntime.Devices {
+				if d, ok := devsMap[dev.ContainerPath]; ok {
+					glog.V(3).Infof("skip existing device %s %s", dev.ContainerPath, dev.HostPath)
+					if d != dev.HostPath {
+						glog.Errorf("Container device %s has conflicting mapping host devices: %s and %s",
+							dev.ContainerPath, d, dev.HostPath)
+					}
+					continue
+				}
+				devsMap[dev.ContainerPath] = dev.HostPath
+				opts.Devices = append(opts.Devices, kubecontainer.DeviceInfo{
+					PathOnHost:      dev.HostPath,
+					PathInContainer: dev.ContainerPath,
+					Permissions:     dev.Permissions,
+				})
+			}
+			// Updates RunContainerOptions.Mounts.
+			for _, mount := range devRuntime.Mounts {
+				if m, ok := mountsMap[mount.ContainerPath]; ok {
+					glog.V(3).Infof("skip existing mount %s %s", mount.ContainerPath, mount.HostPath)
+					if m != mount.HostPath {
+						glog.Errorf("Container mount %s has conflicting mapping host mounts: %s and %s",
+							mount.ContainerPath, m, mount.HostPath)
+					}
+					continue
+				}
+				mountsMap[mount.ContainerPath] = mount.HostPath
+				opts.Mounts = append(opts.Mounts, kubecontainer.Mount{
+					Name:           mount.ContainerPath,
+					ContainerPath:  mount.ContainerPath,
+					HostPath:       mount.HostPath,
+					ReadOnly:       mount.ReadOnly,
+					SELinuxRelabel: false,
+				})
+			}
+			// Updates RunContainerOptions.Envs.
+			for k, v := range devRuntime.Envs {
+				if e, ok := envsMap[k]; ok {
+					glog.V(3).Infof("skip existing envs %s %s", k, v)
+					if e != v {
+						glog.Errorf("Environment variable %s has conflicting setting: %s and %s", k, e, v)
+					}
+					continue
+				}
+				envsMap[k] = v
+				opts.Envs = append(opts.Envs, kubecontainer.EnvVar{Name: k, Value: v})
+			}
+		}
+	}
+	return opts, nil
 }
 
 func (cm *containerManagerImpl) SystemCgroupsLimit() v1.ResourceList {

@@ -69,9 +69,6 @@ type GarbageCollector struct {
 	// garbage collector attempts to orphan the dependents of the items in the attemptToOrphan queue, then deletes the items.
 	attemptToOrphan        workqueue.RateLimitingInterface
 	dependencyGraphBuilder *GraphBuilder
-	// used to register exactly once the rate limiter of the dynamic client
-	// used by the garbage collector controller.
-	registeredRateLimiter *RegisteredRateLimiter
 	// GC caches the owners that do not exist according to the API server.
 	absentOwnerCache *UIDCache
 	sharedInformers  informers.SharedInformerFactory
@@ -86,23 +83,23 @@ func NewGarbageCollector(
 	deletableResources map[schema.GroupVersionResource]struct{},
 	ignoredResources map[schema.GroupResource]struct{},
 	sharedInformers informers.SharedInformerFactory,
+	informersStarted <-chan struct{},
 ) (*GarbageCollector, error) {
 	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
 	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
 	absentOwnerCache := NewUIDCache(500)
 	gc := &GarbageCollector{
-		clientPool:            clientPool,
-		restMapper:            mapper,
-		attemptToDelete:       attemptToDelete,
-		attemptToOrphan:       attemptToOrphan,
-		registeredRateLimiter: NewRegisteredRateLimiter(deletableResources),
-		absentOwnerCache:      absentOwnerCache,
+		clientPool:       clientPool,
+		restMapper:       mapper,
+		attemptToDelete:  attemptToDelete,
+		attemptToOrphan:  attemptToOrphan,
+		absentOwnerCache: absentOwnerCache,
 	}
 	gb := &GraphBuilder{
-		metaOnlyClientPool:                  metaOnlyClientPool,
-		registeredRateLimiterForControllers: NewRegisteredRateLimiter(deletableResources),
-		restMapper:                          mapper,
-		graphChanges:                        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
+		metaOnlyClientPool: metaOnlyClientPool,
+		informersStarted:   informersStarted,
+		restMapper:         mapper,
+		graphChanges:       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_graph_changes"),
 		uidToNode: &concurrentUIDToNode{
 			uidToNode: make(map[types.UID]*node),
 		},

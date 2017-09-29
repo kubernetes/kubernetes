@@ -21,6 +21,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	"k8s.io/kubernetes/pkg/api"
@@ -31,18 +32,26 @@ func NewCmdEtcd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "etcd",
 		Short: "Generate static pod manifest file for etcd.",
-		RunE:  subCmdRunE("etcd"),
+		RunE:  cmdutil.SubCmdRunE("etcd"),
 	}
 
 	manifestPath := kubeadmconstants.GetStaticPodDirectory()
-	cmd.AddCommand(getEtcdSubCommands(manifestPath)...)
+	cmd.AddCommand(getEtcdSubCommands(manifestPath, "")...)
 	return cmd
 }
 
 // getEtcdSubCommands returns sub commands for etcd phase
-func getEtcdSubCommands(outDir string) []*cobra.Command {
+func getEtcdSubCommands(outDir, defaultKubernetesVersion string) []*cobra.Command {
 
 	cfg := &kubeadmapiext.MasterConfiguration{}
+
+	// This is used for unit testing only...
+	// If we wouldn't set this to something, the code would dynamically look up the version from the internet
+	// By setting this explicitely for tests workarounds that
+	if defaultKubernetesVersion != "" {
+		cfg.KubernetesVersion = defaultKubernetesVersion
+	}
+
 	// Default values for the cobra help text
 	api.Scheme.Default(cfg)
 

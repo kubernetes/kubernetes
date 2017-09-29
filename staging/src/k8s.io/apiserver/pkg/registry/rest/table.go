@@ -64,7 +64,7 @@ func (c defaultTableConvertor) ConvertToTable(ctx genericapirequest.Context, obj
 		}
 	}
 	table.ColumnDefinitions = []metav1alpha1.TableColumnDefinition{
-		{Name: "Name", Type: "string", Description: swaggerMetadataDescriptions["name"]},
+		{Name: "Name", Type: "string", Format: "name", Description: swaggerMetadataDescriptions["name"]},
 		{Name: "Created At", Type: "date", Description: swaggerMetadataDescriptions["creationTimestamp"]},
 	}
 	return &table, nil

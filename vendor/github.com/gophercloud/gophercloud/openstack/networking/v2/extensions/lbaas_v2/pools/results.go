@@ -22,17 +22,19 @@ import (
 //              requests carrying the same cookie value will be handled by the
 //              same Member of the Pool.
 type SessionPersistence struct {
-	// The type of persistence mode
+	// The type of persistence mode.
 	Type string `json:"type"`
 
-	// Name of cookie if persistence mode is set appropriately
+	// Name of cookie if persistence mode is set appropriately.
 	CookieName string `json:"cookie_name,omitempty"`
 }
 
+// LoadBalancerID represents a load balancer.
 type LoadBalancerID struct {
 	ID string `json:"id"`
 }
 
+// ListenerID represents a listener.
 type ListenerID struct {
 	ID string `json:"id"`
 }
@@ -46,36 +48,50 @@ type Pool struct {
 	// so on. This value, which must be supported, is dependent on the provider.
 	// Round-robin must be supported.
 	LBMethod string `json:"lb_algorithm"`
+
 	// The protocol of the Pool, which is TCP, HTTP, or HTTPS.
 	Protocol string `json:"protocol"`
+
 	// Description for the Pool.
 	Description string `json:"description"`
+
 	// A list of listeners objects IDs.
 	Listeners []ListenerID `json:"listeners"` //[]map[string]interface{}
+
 	// A list of member objects IDs.
 	Members []Member `json:"members"`
+
 	// The ID of associated health monitor.
 	MonitorID string `json:"healthmonitor_id"`
+
 	// The network on which the members of the Pool will be located. Only members
 	// that are on this network can be added to the Pool.
 	SubnetID string `json:"subnet_id"`
-	// Owner of the Pool. Only an administrative user can specify a tenant ID
-	// other than its own.
+
+	// Owner of the Pool.
 	TenantID string `json:"tenant_id"`
+
 	// The administrative state of the Pool, which is up (true) or down (false).
 	AdminStateUp bool `json:"admin_state_up"`
+
 	// Pool name. Does not have to be unique.
 	Name string `json:"name"`
+
 	// The unique ID for the Pool.
 	ID string `json:"id"`
+
 	// A list of load balancer objects IDs.
 	Loadbalancers []LoadBalancerID `json:"loadbalancers"`
+
 	// Indicates whether connections in the same session will be processed by the
 	// same Pool member or not.
 	Persistence SessionPersistence `json:"session_persistence"`
-	// The provider
-	Provider string           `json:"provider"`
-	Monitor  monitors.Monitor `json:"healthmonitor"`
+
+	// The load balancer provider.
+	Provider string `json:"provider"`
+
+	// The Monitor associated with this Pool.
+	Monitor monitors.Monitor `json:"healthmonitor"`
 }
 
 // PoolPage is the page returned by a pager when traversing over a
@@ -105,7 +121,7 @@ func (r PoolPage) IsEmpty() (bool, error) {
 }
 
 // ExtractPools accepts a Page struct, specifically a PoolPage struct,
-// and extracts the elements into a slice of Router structs. In other words,
+// and extracts the elements into a slice of Pool structs. In other words,
 // a generic collection is mapped into a relevant slice.
 func ExtractPools(r pagination.Page) ([]Pool, error) {
 	var s struct {
@@ -119,7 +135,7 @@ type commonResult struct {
 	gophercloud.Result
 }
 
-// Extract is a function that accepts a result and extracts a router.
+// Extract is a function that accepts a result and extracts a pool.
 func (r commonResult) Extract() (*Pool, error) {
 	var s struct {
 		Pool *Pool `json:"pool"`
@@ -128,22 +144,26 @@ func (r commonResult) Extract() (*Pool, error) {
 	return s.Pool, err
 }
 
-// CreateResult represents the result of a Create operation.
+// CreateResult represents the result of a Create operation. Call its Extract
+// method to interpret the result as a Pool.
 type CreateResult struct {
 	commonResult
 }
 
-// GetResult represents the result of a Get operation.
+// GetResult represents the result of a Get operation. Call its Extract
+// method to interpret the result as a Pool.
 type GetResult struct {
 	commonResult
 }
 
-// UpdateResult represents the result of an Update operation.
+// UpdateResult represents the result of an Update operation. Call its Extract
+// method to interpret the result as a Pool.
 type UpdateResult struct {
 	commonResult
 }
 
-// DeleteResult represents the result of a Delete operation.
+// DeleteResult represents the result of a Delete operation. Call its
+// ExtractErr method to determine if the request succeeded or failed.
 type DeleteResult struct {
 	gophercloud.ErrResult
 }
@@ -152,21 +172,28 @@ type DeleteResult struct {
 type Member struct {
 	// Name of the Member.
 	Name string `json:"name"`
+
 	// Weight of Member.
 	Weight int `json:"weight"`
+
 	// The administrative state of the member, which is up (true) or down (false).
 	AdminStateUp bool `json:"admin_state_up"`
-	// Owner of the Member. Only an administrative user can specify a tenant ID
-	// other than its own.
+
+	// Owner of the Member.
 	TenantID string `json:"tenant_id"`
-	// parameter value for the subnet UUID.
+
+	// Parameter value for the subnet UUID.
 	SubnetID string `json:"subnet_id"`
+
 	// The Pool to which the Member belongs.
 	PoolID string `json:"pool_id"`
+
 	// The IP address of the Member.
 	Address string `json:"address"`
+
 	// The port on which the application is hosted.
 	ProtocolPort int `json:"protocol_port"`
+
 	// The unique ID for the Member.
 	ID string `json:"id"`
 }
@@ -197,8 +224,8 @@ func (r MemberPage) IsEmpty() (bool, error) {
 	return len(is) == 0, err
 }
 
-// ExtractMembers accepts a Page struct, specifically a RouterPage struct,
-// and extracts the elements into a slice of Router structs. In other words,
+// ExtractMembers accepts a Page struct, specifically a MemberPage struct,
+// and extracts the elements into a slice of Members structs. In other words,
 // a generic collection is mapped into a relevant slice.
 func ExtractMembers(r pagination.Page) ([]Member, error) {
 	var s struct {
@@ -212,7 +239,7 @@ type commonMemberResult struct {
 	gophercloud.Result
 }
 
-// ExtractMember is a function that accepts a result and extracts a router.
+// ExtractMember is a function that accepts a result and extracts a member.
 func (r commonMemberResult) Extract() (*Member, error) {
 	var s struct {
 		Member *Member `json:"member"`
@@ -222,21 +249,25 @@ func (r commonMemberResult) Extract() (*Member, error) {
 }
 
 // CreateMemberResult represents the result of a CreateMember operation.
+// Call its Extract method to interpret it as a Member.
 type CreateMemberResult struct {
 	commonMemberResult
 }
 
 // GetMemberResult represents the result of a GetMember operation.
+// Call its Extract method to interpret it as a Member.
 type GetMemberResult struct {
 	commonMemberResult
 }
 
 // UpdateMemberResult represents the result of an UpdateMember operation.
+// Call its Extract method to interpret it as a Member.
 type UpdateMemberResult struct {
 	commonMemberResult
 }
 
 // DeleteMemberResult represents the result of a DeleteMember operation.
+// Call its ExtractErr method to determine if the request succeeded or failed.
 type DeleteMemberResult struct {
 	gophercloud.ErrResult
 }

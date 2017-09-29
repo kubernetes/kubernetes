@@ -51,7 +51,7 @@ func NewAdmissionReview(attr admission.Attributes) admissionv1alpha1.AdmissionRe
 				Version:  gvr.Version,
 			},
 			SubResource: attr.GetSubresource(),
-			Operation:   attr.GetOperation(),
+			Operation:   admissionv1alpha1.Operation(attr.GetOperation()),
 			Object: runtime.RawExtension{
 				Object: attr.GetObject(),
 			},

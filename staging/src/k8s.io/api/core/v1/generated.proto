@@ -21,6 +21,7 @@ syntax = 'proto2';
 
 package k8s.io.api.core.v1;
 
+import "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1/generated.proto";
 import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
@@ -125,6 +126,25 @@ message AzureDiskVolumeSource {
 }
 
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
+message AzureFilePersistentVolumeSource {
+  // the name of secret that contains Azure Storage Account Name and Key
+  optional string secretName = 1;
+
+  // Share Name
+  optional string shareName = 2;
+
+  // Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  // +optional
+  optional bool readOnly = 3;
+
+  // the namespace of the secret that contains Azure Storage Account Name and Key
+  // default is the same as the Pod
+  // +optional
+  optional string secretNamespace = 4;
+}
+
+// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 message AzureFileVolumeSource {
   // the name of secret that contains Azure Storage Account Name and Key
   optional string secretName = 1;
@@ -159,6 +179,39 @@ message Capabilities {
   // Removed capabilities
   // +optional
   repeated string drop = 2;
+}
+
+// Represents a Ceph Filesystem mount that lasts the lifetime of a pod
+// Cephfs volumes do not support ownership management or SELinux relabeling.
+message CephFSPersistentVolumeSource {
+  // Required: Monitors is a collection of Ceph monitors
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  repeated string monitors = 1;
+
+  // Optional: Used as the mounted root, rather than the full Ceph tree, default is /
+  // +optional
+  optional string path = 2;
+
+  // Optional: User is the rados user name, default is admin
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // +optional
+  optional string user = 3;
+
+  // Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // +optional
+  optional string secretFile = 4;
+
+  // Optional: SecretRef is reference to the authentication secret for User, default is empty.
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // +optional
+  optional SecretReference secretRef = 5;
+
+  // Optional: Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // +optional
+  optional bool readOnly = 6;
 }
 
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod
@@ -215,6 +268,15 @@ message CinderVolumeSource {
   // More info: https://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
   // +optional
   optional bool readOnly = 3;
+}
+
+// ClientIPConfig represents the configurations of Client IP based session affinity.
+message ClientIPConfig {
+  // timeoutSeconds specifies the seconds of ClientIP type session sticky time.
+  // The value must be >0 && <=86400(for 1 day) if ServiceAffinity == "ClientIP".
+  // Default value is 10800(for 3 hours).
+  // +optional
+  optional int32 timeoutSeconds = 1;
 }
 
 // Information about the condition of a component.
@@ -379,6 +441,9 @@ message Container {
 
   // Docker image name.
   // More info: https://kubernetes.io/docs/concepts/containers/images
+  // This field is optional to allow higher level config management to default or override
+  // container images in workload controllers like Deployments and StatefulSets.
+  // +optional
   optional string image = 2;
 
   // Entrypoint array. Not executed within a shell.
@@ -922,7 +987,7 @@ message EnvVarSource {
   optional ObjectFieldSelector fieldRef = 1;
 
   // Selects a resource of the container: only resources limits and requests
-  // (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
+  // (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
   // +optional
   optional ResourceFieldSelector resourceFieldRef = 2;
 
@@ -1223,8 +1288,15 @@ message HostAlias {
 // Host path volumes do not support ownership management or SELinux relabeling.
 message HostPathVolumeSource {
   // Path of the directory on the host.
+  // If the path is a symlink, it will follow the link to the real path.
   // More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
   optional string path = 1;
+
+  // Type for HostPath Volume
+  // Defaults to ""
+  // More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
+  // +optional
+  optional string type = 2;
 }
 
 // Represents an ISCSI disk.
@@ -1274,6 +1346,12 @@ message ISCSIVolumeSource {
   // CHAP secret for iSCSI target and initiator authentication
   // +optional
   optional LocalObjectReference secretRef = 10;
+
+  // Custom iSCSI initiator name.
+  // If initiatorName is specified with iscsiInterface simultaneously, new iSCSI interface
+  // <target portal>:<volume name> will be created for the connection.
+  // +optional
+  optional string initiatorName = 12;
 }
 
 // Maps a string key to a path within a volume.
@@ -1655,8 +1733,6 @@ message NodeSelector {
 // that relates the key and values.
 message NodeSelectorRequirement {
   // The label key that the selector applies to.
-  // +patchMergeKey=key
-  // +patchStrategy=merge
   optional string key = 1;
 
   // Represents a key's relationship to a set of values.
@@ -2060,6 +2136,31 @@ message PersistentVolumeClaim {
   optional PersistentVolumeClaimStatus status = 3;
 }
 
+// PersistentVolumeClaimCondition contails details about state of pvc
+message PersistentVolumeClaimCondition {
+  optional string type = 1;
+
+  optional string status = 2;
+
+  // Last time we probed the condition.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastProbeTime = 3;
+
+  // Last time the condition transitioned from one status to another.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
+
+  // Unique, this should be a short, machine understandable string that gives the reason
+  // for condition's last transition. If it reports "ResizeStarted" that means the underlying
+  // persistent volume is being resized.
+  // +optional
+  optional string reason = 5;
+
+  // Human-readable message indicating details about last transition.
+  // +optional
+  optional string message = 6;
+}
+
 // PersistentVolumeClaimList is a list of PersistentVolumeClaim items.
 message PersistentVolumeClaimList {
   // Standard list metadata.
@@ -2113,6 +2214,13 @@ message PersistentVolumeClaimStatus {
   // Represents the actual resources of the underlying volume.
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 3;
+
+  // Current Condition of persistent volume claim. If underlying persistent volume is being
+  // resized then the Condition will be set to 'ResizeStarted'.
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  repeated PersistentVolumeClaimCondition conditions = 4;
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -2193,7 +2301,7 @@ message PersistentVolumeSource {
 
   // CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
   // +optional
-  optional CephFSVolumeSource cephfs = 9;
+  optional CephFSPersistentVolumeSource cephfs = 9;
 
   // FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
   // +optional
@@ -2211,7 +2319,7 @@ message PersistentVolumeSource {
 
   // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
   // +optional
-  optional AzureFileVolumeSource azureFile = 13;
+  optional AzureFilePersistentVolumeSource azureFile = 13;
 
   // VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
   // +optional
@@ -2279,6 +2387,12 @@ message PersistentVolumeSpec {
   // means that this volume does not belong to any StorageClass.
   // +optional
   optional string storageClassName = 6;
+
+  // A list of mount options, e.g. ["ro", "soft"]. Not validated - mount will
+  // simply fail if one is invalid.
+  // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options
+  // +optional
+  repeated string mountOptions = 7;
 }
 
 // PersistentVolumeStatus is the current status of a persistent volume.
@@ -2642,7 +2756,7 @@ message PodSpec {
   // More info: https://kubernetes.io/docs/concepts/storage/volumes
   // +optional
   // +patchMergeKey=name
-  // +patchStrategy=merge
+  // +patchStrategy=merge,retainKeys
   repeated Volume volumes = 1;
 
   // List of initialization containers belonging to the pod.
@@ -3461,6 +3575,18 @@ message SecretProjection {
   optional bool optional = 4;
 }
 
+// SecretReference represents a Secret Reference. It has enough information to retrieve secret
+// in any namespace
+message SecretReference {
+  // Name is unique within a namespace to reference a secret resource.
+  // +optional
+  optional string name = 1;
+
+  // Namespace defines the space within which the secret name must be unique.
+  // +optional
+  optional string namespace = 2;
+}
+
 // Adapts a Secret into a volume.
 // 
 // The contents of the target Secret's Data field will be presented in a volume
@@ -3539,7 +3665,7 @@ message SecurityContext {
   optional bool readOnlyRootFilesystem = 6;
 
   // AllowPrivilegeEscalation controls whether a process can gain more
-  // privileges than it's parent process. This bool directly controls if
+  // privileges than its parent process. This bool directly controls if
   // the no_new_privs flag will be set on the container process.
   // AllowPrivilegeEscalation is true always when the container is:
   // 1) run as Privileged
@@ -3789,6 +3915,10 @@ message ServiceSpec {
   // field.
   // +optional
   optional bool publishNotReadyAddresses = 13;
+
+  // sessionAffinityConfig contains the configurations of session affinity.
+  // +optional
+  optional SessionAffinityConfig sessionAffinityConfig = 14;
 }
 
 // ServiceStatus represents the current status of a service.
@@ -3797,6 +3927,13 @@ message ServiceStatus {
   // if one is present.
   // +optional
   optional LoadBalancerStatus loadBalancer = 1;
+}
+
+// SessionAffinityConfig represents the configurations of session affinity.
+message SessionAffinityConfig {
+  // clientIP contains the configurations of Client IP based session affinity.
+  // +optional
+  optional ClientIPConfig clientIP = 1;
 }
 
 // Represents a StorageOS persistent volume resource.
@@ -3888,8 +4025,6 @@ message TCPSocketAction {
 // any pod that does not tolerate the Taint.
 message Taint {
   // Required. The taint key to be applied to a node.
-  // +patchMergeKey=key
-  // +patchStrategy=merge
   optional string key = 1;
 
   // Required. The taint value corresponding to the taint key.
@@ -3913,8 +4048,6 @@ message Toleration {
   // Key is the taint key that the toleration applies to. Empty means match all taint keys.
   // If the key is empty, operator must be Exists; this combination means to match all values and all keys.
   // +optional
-  // +patchMergeKey=key
-  // +patchStrategy=merge
   optional string key = 1;
 
   // Operator represents a key's relationship to the value.
@@ -3973,6 +4106,14 @@ message VolumeMount {
   // Defaults to "" (volume's root).
   // +optional
   optional string subPath = 4;
+
+  // mountPropagation determines how mounts are propagated from the host
+  // to container and the other way around.
+  // When not set, MountPropagationHostToContainer is used.
+  // This field is alpha in 1.8 and can be reworked or removed in a future
+  // release.
+  // +optional
+  optional string mountPropagation = 5;
 }
 
 // Projection that may be projected along with other supported volume types

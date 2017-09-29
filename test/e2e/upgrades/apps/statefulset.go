@@ -110,5 +110,5 @@ func (t *StatefulSetUpgradeTest) verify() {
 func (t *StatefulSetUpgradeTest) restart() {
 	By("Restarting statefulset " + t.set.Name)
 	t.tester.Restart(t.set)
-	t.tester.Saturate(t.set)
+	t.tester.WaitForRunningAndReady(*t.set.Spec.Replicas, t.set)
 }

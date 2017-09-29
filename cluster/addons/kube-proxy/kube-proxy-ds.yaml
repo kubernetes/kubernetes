@@ -1,0 +1,67 @@
+# Please keep kube-proxy configuration in-sync with:
+# cluster/saltbase/salt/kube-proxy/kube-proxy.manifest
+
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  labels:
+    k8s-app: kube-proxy
+    addonmanager.kubernetes.io/mode: Reconcile
+  name: kube-proxy
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      k8s-app: kube-proxy
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10%
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-proxy
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      {{pod_priority}}
+      hostNetwork: true
+      nodeSelector:
+        beta.kubernetes.io/kube-proxy-ds-ready: "true"
+      containers:
+      - name: kube-proxy
+        image: {{pillar['kube_docker_registry']}}/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
+        resources:
+          requests:
+            cpu: {{ cpurequest }}
+        command:
+        - /bin/sh
+        - -c
+        - echo -998 > /proc/$$$/oom_score_adj && kube-proxy {{kubeconfig}} {{cluster_cidr}} --resource-container="" {{params}} 1>>/var/log/kube-proxy.log 2>&1
+        {{container_env}}
+        {{kube_cache_mutation_detector_env_name}}
+          {{kube_cache_mutation_detector_env_value}}
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /var/log
+          name: varlog
+          readOnly: false
+        - mountPath: /var/lib/kube-proxy/kubeconfig
+          name: kubeconfig
+          readOnly: false
+        - mountPath: /run/xtables.lock
+          name: xtables-lock
+          readOnly: false
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: kubeconfig
+        hostPath:
+          path: /var/lib/kube-proxy/kubeconfig
+      - name: xtables-lock
+        hostPath:
+          path: /run/xtables.lock
+          type: FileOrCreate
+      serviceAccountName: kube-proxy

@@ -90,6 +90,8 @@ type ListInterface interface {
 	SetResourceVersion(version string)
 	GetSelfLink() string
 	SetSelfLink(selfLink string)
+	GetContinue() string
+	SetContinue(c string)
 }
 
 // Type exposes the type and APIVersion of versioned or internal API objects.
@@ -105,6 +107,8 @@ func (meta *ListMeta) GetResourceVersion() string        { return meta.ResourceV
 func (meta *ListMeta) SetResourceVersion(version string) { meta.ResourceVersion = version }
 func (meta *ListMeta) GetSelfLink() string               { return meta.SelfLink }
 func (meta *ListMeta) SetSelfLink(selfLink string)       { meta.SelfLink = selfLink }
+func (meta *ListMeta) GetContinue() string               { return meta.Continue }
+func (meta *ListMeta) SetContinue(c string)              { meta.Continue = c }
 
 func (obj *TypeMeta) GetObjectKind() schema.ObjectKind { return obj }
 

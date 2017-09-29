@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -28,6 +23,7 @@ go_library(
         "value.go",
         "vec.go",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/beorn7/perks/quantile:go_default_library",
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
@@ -52,4 +48,5 @@ filegroup(
         "//vendor/github.com/prometheus/client_golang/prometheus/promhttp:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

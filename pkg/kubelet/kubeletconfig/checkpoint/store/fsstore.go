@@ -23,8 +23,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"
 	utilfiles "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/files"
-	utilfs "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/filesystem"
 	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
 const (

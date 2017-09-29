@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/endpoints"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	"k8s.io/kubernetes/pkg/master/reconcilers"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	servicecontroller "k8s.io/kubernetes/pkg/registry/core/service/ipallocator/controller"
@@ -57,7 +57,7 @@ type Controller struct {
 	ServiceNodePortInterval time.Duration
 	ServiceNodePortRange    utilnet.PortRange
 
-	EndpointReconciler EndpointReconciler
+	EndpointReconciler reconcilers.EndpointReconciler
 	EndpointInterval   time.Duration
 
 	SystemNamespaces         []string
@@ -77,33 +77,33 @@ type Controller struct {
 }
 
 // NewBootstrapController returns a controller for watching the core capabilities of the master
-func (c *Config) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient coreclient.ServicesGetter, nsClient coreclient.NamespacesGetter) *Controller {
+func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient coreclient.ServicesGetter, nsClient coreclient.NamespacesGetter) *Controller {
 	return &Controller{
 		ServiceClient:   serviceClient,
 		NamespaceClient: nsClient,
 
-		EndpointReconciler: c.EndpointReconcilerConfig.Reconciler,
-		EndpointInterval:   c.EndpointReconcilerConfig.Interval,
+		EndpointReconciler: c.ExtraConfig.EndpointReconcilerConfig.Reconciler,
+		EndpointInterval:   c.ExtraConfig.EndpointReconcilerConfig.Interval,
 
 		SystemNamespaces:         []string{metav1.NamespaceSystem, metav1.NamespacePublic},
 		SystemNamespacesInterval: 1 * time.Minute,
 
 		ServiceClusterIPRegistry: legacyRESTStorage.ServiceClusterIPAllocator,
-		ServiceClusterIPRange:    c.ServiceIPRange,
+		ServiceClusterIPRange:    c.ExtraConfig.ServiceIPRange,
 		ServiceClusterIPInterval: 3 * time.Minute,
 
 		ServiceNodePortRegistry: legacyRESTStorage.ServiceNodePortAllocator,
-		ServiceNodePortRange:    c.ServiceNodePortRange,
+		ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
 		ServiceNodePortInterval: 3 * time.Minute,
 
 		PublicIP: c.GenericConfig.PublicAddress,
 
-		ServiceIP:                 c.APIServerServiceIP,
-		ServicePort:               c.APIServerServicePort,
-		ExtraServicePorts:         c.ExtraServicePorts,
-		ExtraEndpointPorts:        c.ExtraEndpointPorts,
+		ServiceIP:                 c.ExtraConfig.APIServerServiceIP,
+		ServicePort:               c.ExtraConfig.APIServerServicePort,
+		ExtraServicePorts:         c.ExtraConfig.ExtraServicePorts,
+		ExtraEndpointPorts:        c.ExtraConfig.ExtraEndpointPorts,
 		PublicServicePort:         c.GenericConfig.ReadWritePort,
-		KubernetesServiceNodePort: c.KubernetesServiceNodePort,
+		KubernetesServiceNodePort: c.ExtraConfig.KubernetesServiceNodePort,
 	}
 }
 
@@ -242,7 +242,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 	if s, err := c.ServiceClient.Services(metav1.NamespaceDefault).Get(serviceName, metav1.GetOptions{}); err == nil {
 		// The service already exists.
 		if reconcile {
-			if svc, updated := getMasterServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
+			if svc, updated := reconcilers.GetMasterServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
 				glog.Warningf("Resetting master service %q to %#v", serviceName, svc)
 				_, err := c.ServiceClient.Services(metav1.NamespaceDefault).Update(svc)
 				return err
@@ -271,196 +271,4 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 		return c.CreateOrUpdateMasterServiceIfNeeded(serviceName, serviceIP, servicePorts, serviceType, reconcile)
 	}
 	return err
-}
-
-// EndpointReconciler knows how to reconcile the endpoints for the apiserver service.
-type EndpointReconciler interface {
-	// ReconcileEndpoints sets the endpoints for the given apiserver service (ro or rw).
-	// ReconcileEndpoints expects that the endpoints objects it manages will all be
-	// managed only by ReconcileEndpoints; therefore, to understand this, you need only
-	// understand the requirements.
-	//
-	// Requirements:
-	//  * All apiservers MUST use the same ports for their {rw, ro} services.
-	//  * All apiservers MUST use ReconcileEndpoints and only ReconcileEndpoints to manage the
-	//      endpoints for their {rw, ro} services.
-	//  * ReconcileEndpoints is called periodically from all apiservers.
-	ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error
-}
-
-// masterCountEndpointReconciler reconciles endpoints based on a specified expected number of
-// masters. masterCountEndpointReconciler implements EndpointReconciler.
-type masterCountEndpointReconciler struct {
-	masterCount    int
-	endpointClient coreclient.EndpointsGetter
-}
-
-var _ EndpointReconciler = &masterCountEndpointReconciler{}
-
-// NewMasterCountEndpointReconciler creates a new EndpointReconciler that reconciles based on a
-// specified expected number of masters.
-func NewMasterCountEndpointReconciler(masterCount int, endpointClient coreclient.EndpointsGetter) *masterCountEndpointReconciler {
-	return &masterCountEndpointReconciler{
-		masterCount:    masterCount,
-		endpointClient: endpointClient,
-	}
-}
-
-// ReconcileEndpoints sets the endpoints for the given apiserver service (ro or rw).
-// ReconcileEndpoints expects that the endpoints objects it manages will all be
-// managed only by ReconcileEndpoints; therefore, to understand this, you need only
-// understand the requirements and the body of this function.
-//
-// Requirements:
-//  * All apiservers MUST use the same ports for their {rw, ro} services.
-//  * All apiservers MUST use ReconcileEndpoints and only ReconcileEndpoints to manage the
-//      endpoints for their {rw, ro} services.
-//  * All apiservers MUST know and agree on the number of apiservers expected
-//      to be running (c.masterCount).
-//  * ReconcileEndpoints is called periodically from all apiservers.
-func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
-	e, err := r.endpointClient.Endpoints(metav1.NamespaceDefault).Get(serviceName, metav1.GetOptions{})
-	if err != nil {
-		e = &api.Endpoints{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      serviceName,
-				Namespace: metav1.NamespaceDefault,
-			},
-		}
-	}
-	if errors.IsNotFound(err) {
-		// Simply create non-existing endpoints for the service.
-		e.Subsets = []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: ip.String()}},
-			Ports:     endpointPorts,
-		}}
-		_, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Create(e)
-		return err
-	}
-
-	// First, determine if the endpoint is in the format we expect (one
-	// subset, ports matching endpointPorts, N IP addresses).
-	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormat(e, ip.String(), endpointPorts, r.masterCount, reconcilePorts)
-	if !formatCorrect {
-		// Something is egregiously wrong, just re-make the endpoints record.
-		e.Subsets = []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: ip.String()}},
-			Ports:     endpointPorts,
-		}}
-		glog.Warningf("Resetting endpoints for master service %q to %#v", serviceName, e)
-		_, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Update(e)
-		return err
-	}
-	if ipCorrect && portsCorrect {
-		return nil
-	}
-	if !ipCorrect {
-		// We *always* add our own IP address.
-		e.Subsets[0].Addresses = append(e.Subsets[0].Addresses, api.EndpointAddress{IP: ip.String()})
-
-		// Lexicographic order is retained by this step.
-		e.Subsets = endpoints.RepackSubsets(e.Subsets)
-
-		// If too many IP addresses, remove the ones lexicographically after our
-		// own IP address.  Given the requirements stated at the top of
-		// this function, this should cause the list of IP addresses to
-		// become eventually correct.
-		if addrs := &e.Subsets[0].Addresses; len(*addrs) > r.masterCount {
-			// addrs is a pointer because we're going to mutate it.
-			for i, addr := range *addrs {
-				if addr.IP == ip.String() {
-					for len(*addrs) > r.masterCount {
-						// wrap around if necessary.
-						remove := (i + 1) % len(*addrs)
-						*addrs = append((*addrs)[:remove], (*addrs)[remove+1:]...)
-					}
-					break
-				}
-			}
-		}
-	}
-	if !portsCorrect {
-		// Reset ports.
-		e.Subsets[0].Ports = endpointPorts
-	}
-	glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
-	_, err = r.endpointClient.Endpoints(metav1.NamespaceDefault).Update(e)
-	return err
-}
-
-// Determine if the endpoint is in the format ReconcileEndpoints expects.
-//
-// Return values:
-// * formatCorrect is true if exactly one subset is found.
-// * ipCorrect is true when current master's IP is found and the number
-//     of addresses is less than or equal to the master count.
-// * portsCorrect is true when endpoint ports exactly match provided ports.
-//     portsCorrect is only evaluated when reconcilePorts is set to true.
-func checkEndpointSubsetFormat(e *api.Endpoints, ip string, ports []api.EndpointPort, count int, reconcilePorts bool) (formatCorrect bool, ipCorrect bool, portsCorrect bool) {
-	if len(e.Subsets) != 1 {
-		return false, false, false
-	}
-	sub := &e.Subsets[0]
-	portsCorrect = true
-	if reconcilePorts {
-		if len(sub.Ports) != len(ports) {
-			portsCorrect = false
-		}
-		for i, port := range ports {
-			if len(sub.Ports) <= i || port != sub.Ports[i] {
-				portsCorrect = false
-				break
-			}
-		}
-	}
-	for _, addr := range sub.Addresses {
-		if addr.IP == ip {
-			ipCorrect = len(sub.Addresses) <= count
-			break
-		}
-	}
-	return true, ipCorrect, portsCorrect
-}
-
-// * getMasterServiceUpdateIfNeeded sets service attributes for the
-//     given apiserver service.
-// * getMasterServiceUpdateIfNeeded expects that the service object it
-//     manages will be managed only by getMasterServiceUpdateIfNeeded;
-//     therefore, to understand this, you need only understand the
-//     requirements and the body of this function.
-// * getMasterServiceUpdateIfNeeded ensures that the correct ports are
-//     are set.
-//
-// Requirements:
-// * All apiservers MUST use getMasterServiceUpdateIfNeeded and only
-//     getMasterServiceUpdateIfNeeded to manage service attributes
-// * updateMasterService is called periodically from all apiservers.
-func getMasterServiceUpdateIfNeeded(svc *api.Service, servicePorts []api.ServicePort, serviceType api.ServiceType) (s *api.Service, updated bool) {
-	// Determine if the service is in the format we expect
-	// (servicePorts are present and service type matches)
-	formatCorrect := checkServiceFormat(svc, servicePorts, serviceType)
-	if formatCorrect {
-		return svc, false
-	}
-	svc.Spec.Ports = servicePorts
-	svc.Spec.Type = serviceType
-	return svc, true
-}
-
-// Determine if the service is in the correct format
-// getMasterServiceUpdateIfNeeded expects (servicePorts are correct
-// and service type matches).
-func checkServiceFormat(s *api.Service, ports []api.ServicePort, serviceType api.ServiceType) (formatCorrect bool) {
-	if s.Spec.Type != serviceType {
-		return false
-	}
-	if len(ports) != len(s.Spec.Ports) {
-		return false
-	}
-	for i, port := range ports {
-		if port != s.Spec.Ports[i] {
-			return false
-		}
-	}
-	return true
 }

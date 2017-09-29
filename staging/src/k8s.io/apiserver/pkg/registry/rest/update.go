@@ -27,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // RESTUpdateStrategy defines the minimum validation, accepted input, and
@@ -98,6 +100,12 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx genericapirequest.Context, ob
 		return err
 	}
 	objectMeta.SetGeneration(oldMeta.GetGeneration())
+
+	// Ensure Initializers are not set unless the feature is enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
+		oldMeta.SetInitializers(nil)
+		objectMeta.SetInitializers(nil)
+	}
 
 	strategy.PrepareForUpdate(ctx, obj, old)
 

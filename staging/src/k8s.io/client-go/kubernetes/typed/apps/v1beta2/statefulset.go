@@ -42,6 +42,9 @@ type StatefulSetInterface interface {
 	List(opts v1.ListOptions) (*v1beta2.StatefulSetList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta2.StatefulSet, err error)
+	GetScale(statefulSetName string, options v1.GetOptions) (*v1beta2.Scale, error)
+	UpdateScale(statefulSetName string, scale *v1beta2.Scale) (*v1beta2.Scale, error)
+
 	StatefulSetExpansion
 }
 
@@ -166,6 +169,34 @@ func (c *statefulSets) Patch(name string, pt types.PatchType, data []byte, subre
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Do().
+		Into(result)
+	return
+}
+
+// GetScale takes name of the statefulSet, and returns the corresponding v1beta2.Scale object, and an error if there is any.
+func (c *statefulSets) GetScale(statefulSetName string, options v1.GetOptions) (result *v1beta2.Scale, err error) {
+	result = &v1beta2.Scale{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("statefulsets").
+		Name(statefulSetName).
+		SubResource("scale").
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
+func (c *statefulSets) UpdateScale(statefulSetName string, scale *v1beta2.Scale) (result *v1beta2.Scale, err error) {
+	result = &v1beta2.Scale{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("statefulsets").
+		Name(statefulSetName).
+		SubResource("scale").
+		Body(scale).
 		Do().
 		Into(result)
 	return

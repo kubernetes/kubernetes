@@ -262,7 +262,7 @@ func buildConfigFromSecret(secret *api.Secret, serverAddress string) (*restclien
 
 // GetVersionedClientForRBACOrFail discovers the versioned rbac APIs and gets the versioned
 // clientset for either the preferred version or the first listed version (if no preference listed)
-// TODO: We need to evaluate the usage of RESTMapper interface to achieve te same functionality
+// TODO: We need to evaluate the usage of RESTMapper interface to achieve the same functionality
 func GetVersionedClientForRBACOrFail(hostFactory cmdutil.Factory) (client.Interface, error) {
 	discoveryclient, err := hostFactory.DiscoveryClient()
 	if err != nil {

@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	apps "k8s.io/api/apps/v1beta1"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	klabels "k8s.io/apimachinery/pkg/labels"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -114,7 +116,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			By("Restarting statefulset " + ss.Name)
 			sst.Restart(ss)
-			sst.Saturate(ss)
+			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 
 			By("Verifying statefulset mounted data directory is usable")
 			framework.ExpectNoError(sst.CheckMount(ss, "/data"))
@@ -232,13 +234,13 @@ var _ = SIGDescribe("StatefulSet", func() {
 			sst.DeleteStatefulPodAtIndex(0, ss)
 
 			By("Confirming stateful pod at index 0 is recreated.")
-			sst.WaitForRunning(2, 0, ss)
+			sst.WaitForRunning(2, 1, ss)
 
-			By("Deleting unhealthy stateful pod at index 1.")
-			sst.DeleteStatefulPodAtIndex(1, ss)
+			By("Resuming stateful pod at index 1.")
+			sst.ResumeNextPod(ss)
 
 			By("Confirming all stateful pods in statefulset are created.")
-			sst.Saturate(ss)
+			sst.WaitForRunningAndReady(*ss.Spec.Replicas, ss)
 		})
 
 		It("should perform rolling updates and roll backs of template modifications", func() {
@@ -756,7 +758,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("Scaling down stateful set " + ssName + " to 0 replicas and waiting until none of pods will run in namespace" + ns)
 			sst.RestoreHttpProbe(ss)
 			sst.Scale(ss, 0)
-			sst.WaitForStatusReadyReplicas(ss, 0)
+			sst.WaitForStatusReplicas(ss, 0)
 		})
 
 		It("Should recreate evicted statefulset", func() {
@@ -776,7 +778,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 					Containers: []v1.Container{
 						{
 							Name:  "nginx",
-							Image: "gcr.io/google_containers/nginx-slim:0.7",
+							Image: imageutils.GetE2EImage(imageutils.NginxSlim),
 							Ports: []v1.ContainerPort{conflictingPort},
 						},
 					},
@@ -855,8 +857,8 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			By("getting scale subresource")
 			scale := framework.NewStatefulSetScale(ss)
-			scaleResult := &apps.Scale{}
-			err = c.AppsV1beta1().RESTClient().Get().AbsPath("/apis/apps/v1beta1").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Do().Into(scale)
+			scaleResult := &appsv1beta2.Scale{}
+			err = c.AppsV1beta2().RESTClient().Get().AbsPath("/apis/apps/v1beta2").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Do().Into(scale)
 			if err != nil {
 				framework.Failf("Failed to get scale subresource: %v", err)
 			}
@@ -866,7 +868,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			By("updating a scale subresource")
 			scale.ResourceVersion = "" //unconditionally update to 2 replicas
 			scale.Spec.Replicas = 2
-			err = c.AppsV1beta1().RESTClient().Put().AbsPath("/apis/apps/v1beta1").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Body(scale).Do().Into(scaleResult)
+			err = c.AppsV1beta2().RESTClient().Put().AbsPath("/apis/apps/v1beta2").Namespace(ns).Resource("statefulsets").Name(ssName).SubResource("scale").Body(scale).Do().Into(scaleResult)
 			if err != nil {
 				framework.Failf("Failed to put scale subresource: %v", err)
 			}

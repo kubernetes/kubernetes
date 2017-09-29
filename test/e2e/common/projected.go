@@ -142,7 +142,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "secret-volume-test",
-						Image: "gcr.io/google_containers/mounttest:0.8",
+						Image: mountImage,
 						Args: []string{
 							"--file_content=/etc/projected-secret-volume/data-1",
 							"--file_mode=/etc/projected-secret-volume/data-1"},
@@ -287,8 +287,8 @@ var _ = framework.KubeDescribe("Projected", func() {
 				Containers: []v1.Container{
 					{
 						Name:    deleteContainerName,
-						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-secret-volumes/delete/data-1"},
+						Image:   mountImage,
+						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-secret-volumes/delete/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      deleteVolumeName,
@@ -299,8 +299,8 @@ var _ = framework.KubeDescribe("Projected", func() {
 					},
 					{
 						Name:    updateContainerName,
-						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-secret-volumes/update/data-3"},
+						Image:   mountImage,
+						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-secret-volumes/update/data-3"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      updateVolumeName,
@@ -311,8 +311,8 @@ var _ = framework.KubeDescribe("Projected", func() {
 					},
 					{
 						Name:    createContainerName,
-						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-secret-volumes/create/data-1"},
+						Image:   mountImage,
+						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-secret-volumes/create/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      createVolumeName,
@@ -456,8 +456,8 @@ var _ = framework.KubeDescribe("Projected", func() {
 				Containers: []v1.Container{
 					{
 						Name:    containerName,
-						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volume/data-1"},
+						Image:   mountImage,
+						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volume/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      volumeName,
@@ -606,8 +606,8 @@ var _ = framework.KubeDescribe("Projected", func() {
 				Containers: []v1.Container{
 					{
 						Name:    deleteContainerName,
-						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volumes/delete/data-1"},
+						Image:   mountImage,
+						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volumes/delete/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      deleteVolumeName,
@@ -618,8 +618,8 @@ var _ = framework.KubeDescribe("Projected", func() {
 					},
 					{
 						Name:    updateContainerName,
-						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volumes/update/data-3"},
+						Image:   mountImage,
+						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volumes/update/data-3"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      updateVolumeName,
@@ -630,8 +630,8 @@ var _ = framework.KubeDescribe("Projected", func() {
 					},
 					{
 						Name:    createContainerName,
-						Image:   "gcr.io/google_containers/mounttest:0.8",
-						Command: []string{"/mt", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volumes/create/data-1"},
+						Image:   mountImage,
+						Command: []string{"/mounttest", "--break_on_expected_content=false", containerTimeoutArg, "--file_content_in_loop=/etc/projected-configmap-volumes/create/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
 								Name:      createVolumeName,
@@ -744,7 +744,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "projected-configmap-volume-test",
-						Image: "gcr.io/google_containers/mounttest:0.8",
+						Image: mountImage,
 						Args:  []string{"--file_content=/etc/projected-configmap-volume/data-1"},
 						VolumeMounts: []v1.VolumeMount{
 							{
@@ -980,7 +980,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 		pod.Spec.Containers = []v1.Container{
 			{
 				Name:    "projected-all-volume-test",
-				Image:   "gcr.io/google_containers/busybox:1.24",
+				Image:   busyboxImage,
 				Command: []string{"sh", "-c", "cat /all/podname && cat /all/secret-data && cat /all/configmap-data"},
 				VolumeMounts: []v1.VolumeMount{
 					{
@@ -1040,7 +1040,7 @@ func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int
 			Containers: []v1.Container{
 				{
 					Name:  "projected-secret-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.8",
+					Image: mountImage,
 					Args: []string{
 						"--file_content=/etc/projected-secret-volume/data-1",
 						"--file_mode=/etc/projected-secret-volume/data-1"},
@@ -1126,7 +1126,7 @@ func doProjectedSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 			Containers: []v1.Container{
 				{
 					Name:  "projected-secret-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.8",
+					Image: mountImage,
 					Args: []string{
 						"--file_content=/etc/projected-secret-volume/new-path-data-1",
 						"--file_mode=/etc/projected-secret-volume/new-path-data-1"},
@@ -1203,7 +1203,7 @@ func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup
 			Containers: []v1.Container{
 				{
 					Name:  "projected-configmap-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.8",
+					Image: mountImage,
 					Args: []string{
 						"--file_content=/etc/projected-configmap-volume/data-1",
 						"--file_mode=/etc/projected-configmap-volume/data-1"},
@@ -1294,7 +1294,7 @@ func doProjectedConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup in
 			Containers: []v1.Container{
 				{
 					Name:  "projected-configmap-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.8",
+					Image: mountImage,
 					Args: []string{"--file_content=/etc/projected-configmap-volume/path/to/data-2",
 						"--file_mode=/etc/projected-configmap-volume/path/to/data-2"},
 					VolumeMounts: []v1.VolumeMount{
@@ -1344,8 +1344,8 @@ func projectedDownwardAPIVolumePodForModeTest(name, filePath string, itemMode, d
 	pod.Spec.Containers = []v1.Container{
 		{
 			Name:    "client-container",
-			Image:   "gcr.io/google_containers/mounttest:0.8",
-			Command: []string{"/mt", "--file_mode=" + filePath},
+			Image:   mountImage,
+			Command: []string{"/mounttest", "--file_mode=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",
@@ -1370,8 +1370,8 @@ func projectedDownwardAPIVolumePodForUpdateTest(name string, labels, annotations
 	pod.Spec.Containers = []v1.Container{
 		{
 			Name:    "client-container",
-			Image:   "gcr.io/google_containers/mounttest:0.8",
-			Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
+			Image:   mountImage,
+			Command: []string{"/mounttest", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
 			VolumeMounts: []v1.VolumeMount{
 				{
 					Name:      "podinfo",

@@ -35,6 +35,10 @@ import (
 // ServiceAnnotationLoadBalancerInternal is the annotation used on the service
 const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/azure-load-balancer-internal"
 
+// ServiceAnnotationLoadBalancerInternalSubnet is the annotation used on the service
+// to specify what subnet it is exposed on
+const ServiceAnnotationLoadBalancerInternalSubnet = "service.beta.kubernetes.io/azure-load-balancer-internal-subnet"
+
 // GetLoadBalancer returns whether the specified load balancer exists, and
 // if so, what its status is.
 func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
@@ -54,7 +58,7 @@ func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (statu
 	var lbIP *string
 
 	if isInternal {
-		lbFrontendIPConfigName := getFrontendIPConfigName(service)
+		lbFrontendIPConfigName := getFrontendIPConfigName(service, subnet(service))
 		for _, ipConfiguration := range *lb.FrontendIPConfigurations {
 			if lbFrontendIPConfigName == *ipConfiguration.Name {
 				lbIP = ipConfiguration.PrivateIPAddress
@@ -182,7 +186,11 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 	var fipConfigurationProperties *network.FrontendIPConfigurationPropertiesFormat
 
 	if isInternal {
-		subnet, existsSubnet, err := az.getSubnet(az.VnetName, az.SubnetName)
+		subnetName := subnet(service)
+		if subnetName == nil {
+			subnetName = &az.SubnetName
+		}
+		subnet, existsSubnet, err := az.getSubnet(az.VnetName, *subnetName)
 		if err != nil {
 			return nil, err
 		}
@@ -366,7 +374,7 @@ func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, is
 
 		if !isInternalLb {
 			// Find public ip resource to clean up from IP configuration
-			lbFrontendIPConfigName := getFrontendIPConfigName(service)
+			lbFrontendIPConfigName := getFrontendIPConfigName(service, nil)
 			for _, config := range *lb.FrontendIPConfigurations {
 				if strings.EqualFold(*config.Name, lbFrontendIPConfigName) {
 					if config.PublicIPAddress != nil {
@@ -523,7 +531,7 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, fipConfiguration
 	isInternal := requiresInternalLoadBalancer(service)
 	lbName := getLoadBalancerName(clusterName, isInternal)
 	serviceName := getServiceName(service)
-	lbFrontendIPConfigName := getFrontendIPConfigName(service)
+	lbFrontendIPConfigName := getFrontendIPConfigName(service, subnet(service))
 	lbFrontendIPConfigID := az.getFrontendIPConfigID(lbName, lbFrontendIPConfigName)
 	lbBackendPoolName := getBackendPoolName(clusterName)
 	lbBackendPoolID := az.getBackendPoolID(lbName, lbBackendPoolName)
@@ -568,13 +576,23 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, fipConfiguration
 	if !wantLb {
 		for i := len(newConfigs) - 1; i >= 0; i-- {
 			config := newConfigs[i]
-			if strings.EqualFold(*config.Name, lbFrontendIPConfigName) {
+			if serviceOwnsFrontendIP(config, service) {
 				glog.V(3).Infof("reconcile(%s)(%t): lb frontendconfig(%s) - dropping", serviceName, wantLb, lbFrontendIPConfigName)
 				newConfigs = append(newConfigs[:i], newConfigs[i+1:]...)
 				dirtyConfigs = true
 			}
 		}
 	} else {
+		if isInternal {
+			for i := len(newConfigs) - 1; i >= 0; i-- {
+				config := newConfigs[i]
+				if serviceOwnsFrontendIP(config, service) && !strings.EqualFold(*config.Name, lbFrontendIPConfigName) {
+					glog.V(3).Infof("reconcile(%s)(%t): lb frontendconfig(%s) - dropping", serviceName, wantLb, *config.Name)
+					newConfigs = append(newConfigs[:i], newConfigs[i+1:]...)
+					dirtyConfigs = true
+				}
+			}
+		}
 		foundConfig := false
 		for _, config := range newConfigs {
 			if strings.EqualFold(*config.Name, lbFrontendIPConfigName) {
@@ -608,7 +626,7 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, fipConfiguration
 	var expectedProbes []network.Probe
 	var expectedRules []network.LoadBalancingRule
 	for _, port := range ports {
-		lbRuleName := getLoadBalancerRuleName(service, port)
+		lbRuleName := getLoadBalancerRuleName(service, port, subnet(service))
 
 		transportProto, _, probeProto, err := getProtocolsFromKubernetesProtocol(port.Protocol)
 		if err != nil {
@@ -652,6 +670,7 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, fipConfiguration
 		if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
 			loadDistribution = network.SourceIP
 		}
+
 		expectedRule := network.LoadBalancingRule{
 			Name: &lbRuleName,
 			LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
@@ -993,4 +1012,14 @@ func requiresInternalLoadBalancer(service *v1.Service) bool {
 	}
 
 	return false
+}
+
+func subnet(service *v1.Service) *string {
+	if requiresInternalLoadBalancer(service) {
+		if l, ok := service.Annotations[ServiceAnnotationLoadBalancerInternalSubnet]; ok {
+			return &l
+		}
+	}
+
+	return nil
 }

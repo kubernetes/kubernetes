@@ -39,6 +39,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/controller/statefulset"
 	sliceutil "k8s.io/kubernetes/pkg/kubectl/util/slice"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
@@ -59,6 +60,8 @@ func RollbackerFor(kind schema.GroupKind, c clientset.Interface) (Rollbacker, er
 		return &DeploymentRollbacker{c}, nil
 	case extensions.Kind("DaemonSet"), apps.Kind("DaemonSet"):
 		return &DaemonSetRollbacker{c}, nil
+	case apps.Kind("StatefulSet"):
+		return &StatefulSetRollbacker{c}, nil
 	}
 	return nil, fmt.Errorf("no rollbacker has been implemented for %q", kind)
 }
@@ -221,32 +224,22 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 	if !ok {
 		return "", fmt.Errorf("passed object is not a DaemonSet: %#v", obj)
 	}
-	versionedExtensionsClient := versionedExtensionsClientV1beta1(r.c)
 	versionedAppsClient := versionedAppsClientV1beta1(r.c)
-	versionedDS, allHistory, err := controlledHistories(versionedExtensionsClient, versionedAppsClient, ds.Namespace, ds.Name)
+	versionedExtensionsClient := versionedExtensionsClientV1beta1(r.c)
+	versionedObj, allHistory, err := controlledHistories(versionedAppsClient, versionedExtensionsClient, ds.Namespace, ds.Name, "DaemonSet")
 	if err != nil {
 		return "", fmt.Errorf("unable to find history controlled by DaemonSet %s: %v", ds.Name, err)
+	}
+	versionedDS, ok := versionedObj.(*externalextensions.DaemonSet)
+	if !ok {
+		return "", fmt.Errorf("unexpected non-DaemonSet object returned: %v", versionedDS)
 	}
 
 	if toRevision == 0 && len(allHistory) <= 1 {
 		return "", fmt.Errorf("no last revision to roll back to")
 	}
 
-	// Find the history to rollback to
-	var toHistory *appsv1beta1.ControllerRevision
-	if toRevision == 0 {
-		// If toRevision == 0, find the latest revision (2nd max)
-		sort.Sort(historiesByRevision(allHistory))
-		toHistory = allHistory[len(allHistory)-2]
-	} else {
-		for _, h := range allHistory {
-			if h.Revision == toRevision {
-				// If toRevision != 0, find the history with matching revision
-				toHistory = h
-				break
-			}
-		}
-	}
+	toHistory := findHistory(toRevision, allHistory)
 	if toHistory == nil {
 		return "", revisionNotFoundErr(toRevision)
 	}
@@ -256,14 +249,7 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 		if err != nil {
 			return "", err
 		}
-		content := bytes.NewBuffer([]byte{})
-		w := printersinternal.NewPrefixWriter(content)
-		internalTemplate := &api.PodTemplateSpec{}
-		if err := apiv1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&appliedDS.Spec.Template, internalTemplate, nil); err != nil {
-			return "", fmt.Errorf("failed to convert podtemplate while printing: %v", err)
-		}
-		printersinternal.DescribePodTemplate(internalTemplate, w)
-		return fmt.Sprintf("will roll back to %s", content.String()), nil
+		return printPodTemplate(&appliedDS.Spec.Template)
 	}
 
 	// Skip if the revision already matches current DaemonSet
@@ -281,6 +267,104 @@ func (r *DaemonSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations ma
 	}
 
 	return rollbackSuccess, nil
+}
+
+type StatefulSetRollbacker struct {
+	c clientset.Interface
+}
+
+// toRevision is a non-negative integer, with 0 being reserved to indicate rolling back to previous configuration
+func (r *StatefulSetRollbacker) Rollback(obj runtime.Object, updatedAnnotations map[string]string, toRevision int64, dryRun bool) (string, error) {
+	if toRevision < 0 {
+		return "", revisionNotFoundErr(toRevision)
+	}
+
+	ss, ok := obj.(*apps.StatefulSet)
+	if !ok {
+		return "", fmt.Errorf("passed object is not a StatefulSet: %#v", obj)
+	}
+	versionedAppsClient := versionedAppsClientV1beta1(r.c)
+	versionedExtensionsClient := versionedExtensionsClientV1beta1(r.c)
+	versionedObj, allHistory, err := controlledHistories(versionedAppsClient, versionedExtensionsClient, ss.Namespace, ss.Name, "StatefulSet")
+	if err != nil {
+		return "", fmt.Errorf("unable to find history controlled by StatefulSet %s: %v", ss.Name, err)
+	}
+
+	versionedSS, ok := versionedObj.(*appsv1beta1.StatefulSet)
+	if !ok {
+		return "", fmt.Errorf("unexpected non-StatefulSet object returned: %v", versionedSS)
+	}
+
+	if toRevision == 0 && len(allHistory) <= 1 {
+		return "", fmt.Errorf("no last revision to roll back to")
+	}
+
+	toHistory := findHistory(toRevision, allHistory)
+	if toHistory == nil {
+		return "", revisionNotFoundErr(toRevision)
+	}
+
+	if dryRun {
+		appliedSS, err := statefulset.ApplyRevision(versionedSS, toHistory)
+		if err != nil {
+			return "", err
+		}
+		return printPodTemplate(&appliedSS.Spec.Template)
+	}
+
+	// Skip if the revision already matches current StatefulSet
+	done, err := statefulset.Match(versionedSS, toHistory)
+	if err != nil {
+		return "", err
+	}
+	if done {
+		return fmt.Sprintf("%s (current template already matches revision %d)", rollbackSkipped, toRevision), nil
+	}
+
+	// Restore revision
+	if _, err = versionedAppsClient.StatefulSets(ss.Namespace).Patch(ss.Name, types.StrategicMergePatchType, toHistory.Data.Raw); err != nil {
+		return "", fmt.Errorf("failed restoring revision %d: %v", toRevision, err)
+	}
+
+	return rollbackSuccess, nil
+}
+
+// findHistory returns a controllerrevision of a specific revision from the given controllerrevisions.
+// It returns nil if no such controllerrevision exists.
+// If toRevision is 0, the last previously used history is returned.
+func findHistory(toRevision int64, allHistory []*appsv1beta1.ControllerRevision) *appsv1beta1.ControllerRevision {
+	if toRevision == 0 && len(allHistory) <= 1 {
+		return nil
+	}
+
+	// Find the history to rollback to
+	var toHistory *appsv1beta1.ControllerRevision
+	if toRevision == 0 {
+		// If toRevision == 0, find the latest revision (2nd max)
+		sort.Sort(historiesByRevision(allHistory))
+		toHistory = allHistory[len(allHistory)-2]
+	} else {
+		for _, h := range allHistory {
+			if h.Revision == toRevision {
+				// If toRevision != 0, find the history with matching revision
+				return h
+			}
+		}
+	}
+
+	return toHistory
+}
+
+// printPodTemplate converts a given pod template into a human-readable string.
+func printPodTemplate(specTemplate *v1.PodTemplateSpec) (string, error) {
+	content := bytes.NewBuffer([]byte{})
+	w := printersinternal.NewPrefixWriter(content)
+	internalTemplate := &api.PodTemplateSpec{}
+	if err := apiv1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(specTemplate, internalTemplate, nil); err != nil {
+		return "", fmt.Errorf("failed to convert podtemplate while printing: %v", err)
+	}
+	printersinternal.DescribePodTemplate(internalTemplate, w)
+	return fmt.Sprintf("will roll back to %s", content.String()), nil
 }
 
 func revisionNotFoundErr(r int64) error {

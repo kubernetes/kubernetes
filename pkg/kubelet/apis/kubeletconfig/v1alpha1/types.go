@@ -51,17 +51,8 @@ type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// Only used for dynamic configuration.
-	// The length of the trial period for this configuration. If the Kubelet records CrashLoopThreshold or
-	// more startups during this period, the current configuration will be marked bad and the
-	// Kubelet will roll-back to the last-known-good. Default 10 minutes.
+	// The length of the trial period for this configuration. This configuration will become the last-known-good after this duration.
 	ConfigTrialDuration *metav1.Duration `json:"configTrialDuration"`
-	// Only used for dynamic configuration.
-	// If this number of Kubelet "crashes" during ConfigTrialDuration meets this threshold,
-	// the configuration fails the trial and the Kubelet rolls back to its last-known-good config.
-	// Crash-loops are detected by counting Kubelet startups, so one startup is implicitly added
-	// to this threshold to always allow a single restart per config change.
-	// Default 10, mimimum allowed is 0, maximum allowed is 10.
-	CrashLoopThreshold *int32 `json:"crashLoopThreshold"`
 	// podManifestPath is the path to the directory containing pod manifests to
 	// run, or the path to a single manifest file
 	PodManifestPath string `json:"podManifestPath"`
@@ -87,7 +78,7 @@ type KubeletConfiguration struct {
 	Port int32 `json:"port"`
 	// readOnlyPort is the read-only port for the Kubelet to serve on with
 	// no authentication/authorization (set to 0 to disable)
-	ReadOnlyPort int32 `json:"readOnlyPort"`
+	ReadOnlyPort *int32 `json:"readOnlyPort"`
 	// tlsCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate
@@ -144,10 +135,10 @@ type KubeletConfiguration struct {
 	// maxContainerCount is the maximum number of old instances of containers
 	// to retain globally. Each container takes up some disk space.
 	MaxContainerCount *int32 `json:"maxContainerCount"`
-	// cAdvisorPort is the port of the localhost cAdvisor endpoint
+	// cAdvisorPort is the port of the localhost cAdvisor endpoint (set to 0 to disable)
 	CAdvisorPort *int32 `json:"cAdvisorPort"`
-	// healthzPort is the port of the localhost healthz endpoint
-	HealthzPort int32 `json:"healthzPort"`
+	// healthzPort is the port of the localhost healthz endpoint (set to 0 to disable)
+	HealthzPort *int32 `json:"healthzPort"`
 	// healthzBindAddress is the IP address for the healthz server to serve
 	// on.
 	HealthzBindAddress string `json:"healthzBindAddress"`
@@ -215,6 +206,10 @@ type KubeletConfiguration struct {
 	RemoteRuntimeEndpoint string `json:"remoteRuntimeEndpoint"`
 	// remoteImageEndpoint is the endpoint of remote image service
 	RemoteImageEndpoint string `json:"remoteImageEndpoint"`
+	// CPUManagerPolicy is the name of the policy to use.
+	CPUManagerPolicy string `json:"cpuManagerPolicy"`
+	// CPU Manager reconciliation period.
+	CPUManagerReconcilePeriod metav1.Duration `json:"cpuManagerReconcilePeriod"`
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
 	RuntimeRequestTimeout metav1.Duration `json:"runtimeRequestTimeout"`

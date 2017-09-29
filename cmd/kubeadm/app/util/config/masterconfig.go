@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
+// SetInitDynamicDefaults checks and sets conifugration values for Master node
 func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 
 	// Choose the right address for the API Server to advertise. If the advertise address is localhost or 0.0.0.0, the default interface's IP address is used
@@ -44,20 +45,10 @@ func SetInitDynamicDefaults(cfg *kubeadmapi.MasterConfiguration) error {
 	}
 	cfg.API.AdvertiseAddress = ip.String()
 
-	// Validate version argument
-	ver, err := kubeadmutil.KubernetesReleaseVersion(cfg.KubernetesVersion)
+	// Resolve possible version labels and validate version string
+	err = NormalizeKubernetesVersion(cfg)
 	if err != nil {
 		return err
-	}
-	cfg.KubernetesVersion = ver
-
-	// Parse the given kubernetes version and make sure it's higher than the lowest supported
-	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
-	if err != nil {
-		return fmt.Errorf("couldn't parse kubernetes version %q: %v", cfg.KubernetesVersion, err)
-	}
-	if k8sVersion.LessThan(kubeadmconstants.MinimumControlPlaneVersion) {
-		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= %s. Current version: %s", kubeadmconstants.MinimumControlPlaneVersion.String(), cfg.KubernetesVersion)
 	}
 
 	if cfg.Token == "" {
@@ -107,7 +98,6 @@ func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *
 	// static default values to cfg only for values not provided with flags
 	api.Scheme.Default(defaultversionedcfg)
 	api.Scheme.Convert(defaultversionedcfg, internalcfg, nil)
-
 	// Applies dynamic defaults to settings not provided with flags
 	if err := SetInitDynamicDefaults(internalcfg); err != nil {
 		return nil, err
@@ -118,4 +108,31 @@ func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *
 		return nil, err
 	}
 	return internalcfg, nil
+}
+
+// NormalizeKubernetesVersion resolves version labels, sets alternative
+// image registry if requested for CI builds, and validates minimal
+// version that kubeadm supports.
+func NormalizeKubernetesVersion(cfg *kubeadmapi.MasterConfiguration) error {
+	// Requested version is automatic CI build, thus use KubernetesCI Image Repository for core images
+	if kubeadmutil.KubernetesIsCIVersion(cfg.KubernetesVersion) {
+		cfg.CIImageRepository = kubeadmconstants.DefaultCIImageRepository
+	}
+
+	// Parse and validate the version argument and resolve possible CI version labels
+	ver, err := kubeadmutil.KubernetesReleaseVersion(cfg.KubernetesVersion)
+	if err != nil {
+		return err
+	}
+	cfg.KubernetesVersion = ver
+
+	// Parse the given kubernetes version and make sure it's higher than the lowest supported
+	k8sVersion, err := version.ParseSemantic(cfg.KubernetesVersion)
+	if err != nil {
+		return fmt.Errorf("couldn't parse kubernetes version %q: %v", cfg.KubernetesVersion, err)
+	}
+	if k8sVersion.LessThan(kubeadmconstants.MinimumControlPlaneVersion) {
+		return fmt.Errorf("this version of kubeadm only supports deploying clusters with the control plane version >= %s. Current version: %s", kubeadmconstants.MinimumControlPlaneVersion.String(), cfg.KubernetesVersion)
+	}
+	return nil
 }

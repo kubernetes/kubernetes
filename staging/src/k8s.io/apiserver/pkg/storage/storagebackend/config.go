@@ -41,6 +41,11 @@ type Config struct {
 	CAFile   string
 	// Quorum indicates that whether read operations should be quorum-level consistent.
 	Quorum bool
+	// Paging indicates whether the server implementation should allow paging (if it is
+	// supported). This is generally configured by feature gating, or by a specific
+	// resource type not wishing to allow paging, and is not intended for end users to
+	// set.
+	Paging bool
 	// DeserializationCacheSize is the size of cache of deserialized objects.
 	// Currently this is only supported in etcd2.
 	// We will drop the cache once using protobuf.

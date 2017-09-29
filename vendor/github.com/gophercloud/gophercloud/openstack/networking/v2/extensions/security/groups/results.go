@@ -11,8 +11,8 @@ type SecGroup struct {
 	// The UUID for the security group.
 	ID string
 
-	// Human-readable name for the security group. Might not be unique. Cannot be
-	// named "default" as that is automatically created for a tenant.
+	// Human-readable name for the security group. Might not be unique.
+	// Cannot be named "default" as that is automatically created for a tenant.
 	Name string
 
 	// The security group description.
@@ -22,8 +22,7 @@ type SecGroup struct {
 	// traffic entering and leaving the group.
 	Rules []rules.SecGroupRule `json:"security_group_rules"`
 
-	// Owner of the security group. Only admin users can specify a TenantID
-	// other than their own.
+	// Owner of the security group.
 	TenantID string `json:"tenant_id"`
 }
 
@@ -78,22 +77,26 @@ func (r commonResult) Extract() (*SecGroup, error) {
 	return s.SecGroup, err
 }
 
-// CreateResult represents the result of a create operation.
+// CreateResult represents the result of a create operation. Call its Extract
+// method to interpret it as a SecGroup.
 type CreateResult struct {
 	commonResult
 }
 
-// UpdateResult represents the result of an update operation.
+// UpdateResult represents the result of an update operation. Call its Extract
+// method to interpret it as a SecGroup.
 type UpdateResult struct {
 	commonResult
 }
 
-// GetResult represents the result of a get operation.
+// GetResult represents the result of a get operation. Call its Extract
+// method to interpret it as a SecGroup.
 type GetResult struct {
 	commonResult
 }
 
-// DeleteResult represents the result of a delete operation.
+// DeleteResult represents the result of a delete operation. Call its
+// ExtractErr method to determine if the request succeeded or failed.
 type DeleteResult struct {
 	gophercloud.ErrResult
 }

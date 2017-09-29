@@ -20,12 +20,19 @@ set -o pipefail
 export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+if [[ ! -f "${KUBE_ROOT}/vendor/BUILD" ]]; then
+  echo "${KUBE_ROOT}/vendor/BUILD does not exist."
+  echo
+  echo "Run ./hack/update-bazel.sh"
+  exit 1
+fi
+
 # Remove generated files prior to running kazel.
 # TODO(spxtr): Remove this line once Bazel is the only way to build.
 rm -f "${KUBE_ROOT}/pkg/generated/openapi/zz_generated.openapi.go"
 
 # The git commit sha1s here should match the values in $KUBE_ROOT/WORKSPACE.
-kube::util::go_install_from_commit github.com/kubernetes/repo-infra/kazel e9d1a126ef355ff5d38e20612c889b07728225a4
+kube::util::go_install_from_commit github.com/kubernetes/repo-infra/kazel 4eaf9e671bbb549fb4ec292cf251f921d7ef80ac
 kube::util::go_install_from_commit github.com/bazelbuild/rules_go/go/tools/gazelle/gazelle 82483596ec203eb9c1849937636f4cbed83733eb
 
 gazelle_diff=$(gazelle fix -build_file_name=BUILD,BUILD.bazel -external=vendored -mode=diff -repo_root="$(kube::realpath ${KUBE_ROOT})")

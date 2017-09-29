@@ -22,15 +22,24 @@ import (
 	"os"
 	"time"
 
+	apps "k8s.io/api/apps/v1beta2"
 	"k8s.io/api/core/v1"
-	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kuberuntime "k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/pkg/api"
+)
+
+const (
+	// selfHostingWaitTimeout describes the maximum amount of time a self-hosting wait process should wait before timing out
+	selfHostingWaitTimeout = 2 * time.Minute
+
+	// selfHostingFailureThreshold describes how many times kubeadm will retry creating the DaemonSets
+	selfHostingFailureThreshold int = 5
 )
 
 // CreateSelfHostedControlPlane is responsible for turning a Static Pod-hosted control plane to a self-hosted one
@@ -42,21 +51,38 @@ import (
 // 5. Create the DaemonSet resource. Wait until the Pods are running.
 // 6. Remove the Static Pod manifest file. The kubelet will stop the original Static Pod-hosted component that was running.
 // 7. The self-hosted containers should now step up and take over.
-// 8. In order to avoid race conditions, we're still making sure the API /healthz endpoint is healthy
+// 8. In order to avoid race conditions, we have to make sure that static pod is deleted correctly before we continue
+//      Otherwise, there is a race condition when we proceed without kubelet having restarted the API server correctly and the next .Create call flakes
 // 9. Do that for the kube-apiserver, kube-controller-manager and kube-scheduler in a loop
-func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
+func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubeadmapi.MasterConfiguration, client clientset.Interface, waiter apiclient.Waiter) error {
 
-	if err := createTLSSecrets(cfg, client); err != nil {
-		return err
-	}
+	// Adjust the timeout slightly to something self-hosting specific
+	waiter.SetTimeout(selfHostingWaitTimeout)
 
-	if err := createOpaqueSecrets(cfg, client); err != nil {
-		return err
+	// Here the map of different mutators to use for the control plane's podspec is stored
+	mutators := GetMutatorsFromFeatureGates(cfg.FeatureGates)
+
+	// Some extra work to be done if we should store the control plane certificates in Secrets
+	if features.Enabled(cfg.FeatureGates, features.StoreCertsInSecrets) {
+
+		// Upload the certificates and kubeconfig files from disk to the cluster as Secrets
+		if err := uploadTLSSecrets(client, cfg.CertificatesDir); err != nil {
+			return err
+		}
+		if err := uploadKubeConfigSecrets(client, kubeConfigDir); err != nil {
+			return err
+		}
 	}
 
 	for _, componentName := range kubeadmconstants.MasterComponents {
 		start := time.Now()
-		manifestPath := kubeadmconstants.GetStaticPodFilepath(componentName, kubeadmconstants.GetStaticPodDirectory())
+		manifestPath := kubeadmconstants.GetStaticPodFilepath(componentName, manifestsDir)
+
+		// Since we want this function to be idempotent; just continue and try the next component if this file doesn't exist
+		if _, err := os.Stat(manifestPath); err != nil {
+			fmt.Printf("[self-hosted] The Static Pod for the component %q doesn't seem to be on the disk; trying the next one\n", componentName)
+			continue
+		}
 
 		// Load the Static Pod file in order to be able to create a self-hosted variant of that file
 		podSpec, err := loadPodSpecFromFile(manifestPath)
@@ -65,53 +91,66 @@ func CreateSelfHostedControlPlane(cfg *kubeadmapi.MasterConfiguration, client cl
 		}
 
 		// Build a DaemonSet object from the loaded PodSpec
-		ds := buildDaemonSet(cfg, componentName, podSpec)
+		ds := BuildDaemonSet(componentName, podSpec, mutators)
 
-		// Create the DaemonSet in the API Server
-		if err := apiclient.CreateOrUpdateDaemonSet(client, ds); err != nil {
+		// Create or update the DaemonSet in the API Server, and retry selfHostingFailureThreshold times if it errors out
+		if err := apiclient.TryRunCommand(func() error {
+			return apiclient.CreateOrUpdateDaemonSet(client, ds)
+		}, selfHostingFailureThreshold); err != nil {
 			return err
 		}
 
 		// Wait for the self-hosted component to come up
-		// TODO: Enforce a timeout
-		apiclient.WaitForPodsWithLabel(client, buildSelfHostedWorkloadLabelQuery(componentName))
+		if err := waiter.WaitForPodsWithLabel(BuildSelfHostedComponentLabelQuery(componentName)); err != nil {
+			return err
+		}
 
 		// Remove the old Static Pod manifest
 		if err := os.RemoveAll(manifestPath); err != nil {
 			return fmt.Errorf("unable to delete static pod manifest for %s [%v]", componentName, err)
 		}
 
-		// Make sure the API is responsive at /healthz
-		// TODO: Follow-up on fixing the race condition here and respect the timeout error that can be returned
-		apiclient.WaitForAPI(client)
+		// Wait for the mirror Pod hash to be removed; otherwise we'll run into race conditions here when the kubelet hasn't had time to
+		// remove the Static Pod (or the mirror Pod respectively). This implicitely also tests that the API server endpoint is healthy,
+		// because this blocks until the API server returns a 404 Not Found when getting the Static Pod
+		staticPodName := fmt.Sprintf("%s-%s", componentName, cfg.NodeName)
+		if err := waiter.WaitForPodToDisappear(staticPodName); err != nil {
+			return err
+		}
+
+		// Just as an extra safety check; make sure the API server is returning ok at the /healthz endpoint (although we know it could return a GET answer for a Pod above)
+		if err := waiter.WaitForAPI(); err != nil {
+			return err
+		}
 
 		fmt.Printf("[self-hosted] self-hosted %s ready after %f seconds\n", componentName, time.Since(start).Seconds())
 	}
 	return nil
 }
 
-// buildDaemonSet is responsible for mutating the PodSpec and return a DaemonSet which is suitable for the self-hosting purporse
-func buildDaemonSet(cfg *kubeadmapi.MasterConfiguration, name string, podSpec *v1.PodSpec) *extensions.DaemonSet {
+// BuildDaemonSet is responsible for mutating the PodSpec and return a DaemonSet which is suitable for the self-hosting purporse
+func BuildDaemonSet(name string, podSpec *v1.PodSpec, mutators map[string][]PodSpecMutatorFunc) *apps.DaemonSet {
+
 	// Mutate the PodSpec so it's suitable for self-hosting
-	mutatePodSpec(cfg, name, podSpec)
+	mutatePodSpec(mutators, name, podSpec)
 
 	// Return a DaemonSet based on that Spec
-	return &extensions.DaemonSet{
+	return &apps.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.AddSelfHostedPrefix(name),
 			Namespace: metav1.NamespaceSystem,
-			Labels: map[string]string{
-				"k8s-app": kubeadmconstants.AddSelfHostedPrefix(name),
-			},
+			Labels:    BuildSelfhostedComponentLabels(name),
 		},
-		Spec: extensions.DaemonSetSpec{
+		Spec: apps.DaemonSetSpec{
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"k8s-app": kubeadmconstants.AddSelfHostedPrefix(name),
-					},
+					Labels: BuildSelfhostedComponentLabels(name),
 				},
 				Spec: *podSpec,
+			},
+			UpdateStrategy: apps.DaemonSetUpdateStrategy{
+				// Make the DaemonSet utilize the RollingUpdate rollout strategy
+				Type: apps.RollingUpdateDaemonSetStrategyType,
 			},
 		},
 	}
@@ -133,7 +172,14 @@ func loadPodSpecFromFile(manifestPath string) (*v1.PodSpec, error) {
 	return &staticPod.Spec, nil
 }
 
-// buildSelfHostedWorkloadLabelQuery creates the right query for matching a self-hosted Pod
-func buildSelfHostedWorkloadLabelQuery(componentName string) string {
+// BuildSelfhostedComponentLabels returns the labels for a self-hosted component
+func BuildSelfhostedComponentLabels(component string) map[string]string {
+	return map[string]string{
+		"k8s-app": kubeadmconstants.AddSelfHostedPrefix(component),
+	}
+}
+
+// BuildSelfHostedComponentLabelQuery creates the right query for matching a self-hosted Pod
+func BuildSelfHostedComponentLabelQuery(componentName string) string {
 	return fmt.Sprintf("k8s-app=%s", kubeadmconstants.AddSelfHostedPrefix(componentName))
 }

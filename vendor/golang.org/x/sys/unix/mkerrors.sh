@@ -45,6 +45,7 @@ includes_Darwin='
 #include <sys/sockio.h>
 #include <sys/sysctl.h>
 #include <sys/mman.h>
+#include <sys/mount.h>
 #include <sys/wait.h>
 #include <net/bpf.h>
 #include <net/if.h>
@@ -180,6 +181,8 @@ struct ltchars {
 #include <linux/serial.h>
 #include <linux/can.h>
 #include <linux/vm_sockets.h>
+#include <linux/taskstats.h>
+#include <linux/genetlink.h>
 #include <net/route.h>
 #include <asm/termbits.h>
 
@@ -412,6 +415,8 @@ ccflags="$@"
 		$2 ~ /^SECCOMP_MODE_/ ||
 		$2 ~ /^SPLICE_/ ||
 		$2 ~ /^(VM|VMADDR)_/ ||
+		$2 ~ /^(TASKSTATS|TS)_/ ||
+		$2 ~ /^GENL_/ ||
 		$2 ~ /^XATTR_(CREATE|REPLACE)/ ||
 		$2 !~ "WMESGLEN" &&
 		$2 ~ /^W[A-Z0-9]+$/ ||

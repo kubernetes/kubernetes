@@ -27,8 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/printers"
-	"k8s.io/kubernetes/pkg/util/i18n"
 )
 
 var (
@@ -93,7 +93,7 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 		Example: fmt.Sprintf(editExample),
 		Run: func(cmd *cobra.Command, args []string) {
 			options.ChangeCause = f.Command(cmd, false)
-			if err := options.Complete(f, out, errOut, args); err != nil {
+			if err := options.Complete(f, out, errOut, args, cmd); err != nil {
 				cmdutil.CheckErr(err)
 			}
 			if err := options.Run(); err != nil {
@@ -115,5 +115,6 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmdutil.AddApplyAnnotationVarFlags(cmd, &options.ApplyAnnotation)
 	cmdutil.AddRecordVarFlag(cmd, &options.Record)
 	cmdutil.AddInclude3rdPartyVarFlags(cmd, &options.Include3rdParty)
+	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }

@@ -75,15 +75,6 @@ func (ds *dockerService) ListContainers(filter *runtimeapi.ContainerFilter) ([]*
 
 		result = append(result, converted)
 	}
-	// Include legacy containers if there are still legacy containers not cleaned up yet.
-	if !ds.legacyCleanup.Done() {
-		legacyContainers, err := ds.ListLegacyContainers(filter)
-		if err != nil {
-			return nil, err
-		}
-		// Legacy containers are always older, so we can safely append them to the end.
-		result = append(result, legacyContainers...)
-	}
 	return result, nil
 }
 
@@ -131,6 +122,11 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeapi
 			OpenStdin: config.Stdin,
 			StdinOnce: config.StdinOnce,
 			Tty:       config.Tty,
+			// Disable Docker's health check until we officially support it
+			// (https://github.com/kubernetes/kubernetes/issues/25829).
+			Healthcheck: &dockercontainer.HealthConfig{
+				Test: []string{"NONE"},
+			},
 		},
 		HostConfig: &dockercontainer.HostConfig{
 			Binds: generateMountBindings(config.GetMounts()),
@@ -236,18 +232,21 @@ func (ds *dockerService) removeContainerLogSymlink(containerID string) error {
 // StartContainer starts the container.
 func (ds *dockerService) StartContainer(containerID string) error {
 	err := ds.client.StartContainer(containerID)
-	if err != nil {
-		err = transformStartContainerError(err)
-		return fmt.Errorf("failed to start container %q: %v", containerID, err)
-	}
-	// Create container log symlink.
-	if err := ds.createContainerLogSymlink(containerID); err != nil {
+
+	// Create container log symlink for all containers (including failed ones).
+	if linkError := ds.createContainerLogSymlink(containerID); linkError != nil {
 		// Do not stop the container if we failed to create symlink because:
 		//   1. This is not a critical failure.
 		//   2. We don't have enough information to properly stop container here.
 		// Kubelet will surface this error to user via an event.
-		return err
+		return linkError
 	}
+
+	if err != nil {
+		err = transformStartContainerError(err)
+		return fmt.Errorf("failed to start container %q: %v", containerID, err)
+	}
+
 	return nil
 }
 
@@ -364,15 +363,6 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeapi.Contai
 	// Convert to unix timestamps.
 	ct, st, ft := createdAt.UnixNano(), startedAt.UnixNano(), finishedAt.UnixNano()
 	exitCode := int32(r.State.ExitCode)
-
-	// If the container has no containerTypeLabelKey label, treat it as a legacy container.
-	if _, ok := r.Config.Labels[containerTypeLabelKey]; !ok {
-		names, labels, err := convertLegacyNameAndLabels([]string{r.Name}, r.Config.Labels)
-		if err != nil {
-			return nil, err
-		}
-		r.Name, r.Config.Labels = names[0], labels
-	}
 
 	metadata, err := parseContainerName(r.Name)
 	if err != nil {

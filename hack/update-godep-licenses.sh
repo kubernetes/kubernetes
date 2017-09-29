@@ -141,7 +141,7 @@ echo "= Kubernetes licensed under: ="
 echo
 cat ${LICENSE_ROOT}/LICENSE
 echo
-echo "= LICENSE $(cat ${LICENSE_ROOT}/LICENSE | md5sum)"
+echo "= LICENSE $(cat ${LICENSE_ROOT}/LICENSE | md5sum | awk '{print $1}')"
 echo "================================================================================"
 ) > ${TMP_LICENSE_FILE}
 
@@ -180,7 +180,7 @@ __EOF__
   cat "${file}"
 
   echo
-  echo "= ${file} $(cat ${file} | md5sum)"
+  echo "= ${file} $(cat ${file} | md5sum | awk '{print $1}')"
   echo "================================================================================"
   echo
 done >> ${TMP_LICENSE_FILE}

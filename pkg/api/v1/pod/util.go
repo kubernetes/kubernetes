@@ -17,7 +17,6 @@ limitations under the License.
 package pod
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -47,67 +46,6 @@ func FindPort(pod *v1.Pod, svcPort *v1.ServicePort) (int, error) {
 	}
 
 	return 0, fmt.Errorf("no suitable port for manifest: %s", pod.UID)
-}
-
-// TODO: remove this function when init containers becomes a stable feature
-func SetInitContainersAndStatuses(pod *v1.Pod) error {
-	var initContainersAnnotation string
-	initContainersAnnotation = pod.Annotations[v1.PodInitContainersAnnotationKey]
-	initContainersAnnotation = pod.Annotations[v1.PodInitContainersBetaAnnotationKey]
-	if len(initContainersAnnotation) > 0 {
-		var values []v1.Container
-		if err := json.Unmarshal([]byte(initContainersAnnotation), &values); err != nil {
-			return err
-		}
-		pod.Spec.InitContainers = values
-	}
-
-	var initContainerStatusesAnnotation string
-	initContainerStatusesAnnotation = pod.Annotations[v1.PodInitContainerStatusesAnnotationKey]
-	initContainerStatusesAnnotation = pod.Annotations[v1.PodInitContainerStatusesBetaAnnotationKey]
-	if len(initContainerStatusesAnnotation) > 0 {
-		var values []v1.ContainerStatus
-		if err := json.Unmarshal([]byte(initContainerStatusesAnnotation), &values); err != nil {
-			return err
-		}
-		pod.Status.InitContainerStatuses = values
-	}
-	return nil
-}
-
-// TODO: remove this function when init containers becomes a stable feature
-func SetInitContainersAnnotations(pod *v1.Pod) error {
-	if len(pod.Spec.InitContainers) > 0 {
-		value, err := json.Marshal(pod.Spec.InitContainers)
-		if err != nil {
-			return err
-		}
-		if pod.Annotations == nil {
-			pod.Annotations = make(map[string]string)
-		}
-		pod.Annotations[v1.PodInitContainersAnnotationKey] = string(value)
-		pod.Annotations[v1.PodInitContainersBetaAnnotationKey] = string(value)
-	}
-	return nil
-}
-
-// TODO: remove this function when init containers becomes a stable feature
-func SetInitContainersStatusesAnnotations(pod *v1.Pod) error {
-	if len(pod.Status.InitContainerStatuses) > 0 {
-		value, err := json.Marshal(pod.Status.InitContainerStatuses)
-		if err != nil {
-			return err
-		}
-		if pod.Annotations == nil {
-			pod.Annotations = make(map[string]string)
-		}
-		pod.Annotations[v1.PodInitContainerStatusesAnnotationKey] = string(value)
-		pod.Annotations[v1.PodInitContainerStatusesBetaAnnotationKey] = string(value)
-	} else {
-		delete(pod.Annotations, v1.PodInitContainerStatusesAnnotationKey)
-		delete(pod.Annotations, v1.PodInitContainerStatusesBetaAnnotationKey)
-	}
-	return nil
 }
 
 // Visitor is called with each object name, and returns true if visiting should continue
@@ -348,8 +286,8 @@ func UpdatePodCondition(status *v1.PodStatus, condition *v1.PodCondition) bool {
 		isEqual := condition.Status == oldCondition.Status &&
 			condition.Reason == oldCondition.Reason &&
 			condition.Message == oldCondition.Message &&
-			condition.LastProbeTime.Equal(oldCondition.LastProbeTime) &&
-			condition.LastTransitionTime.Equal(oldCondition.LastTransitionTime)
+			condition.LastProbeTime.Equal(&oldCondition.LastProbeTime) &&
+			condition.LastTransitionTime.Equal(&oldCondition.LastTransitionTime)
 
 		status.Conditions[conditionIndex] = *condition
 		// Return true if one of the fields have changed.

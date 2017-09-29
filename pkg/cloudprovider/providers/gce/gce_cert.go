@@ -18,16 +18,12 @@ package gce
 
 import (
 	"net/http"
-	"time"
 
 	compute "google.golang.org/api/compute/v1"
 )
 
 func newCertMetricContext(request string) *metricContext {
-	return &metricContext{
-		start:      time.Now(),
-		attributes: []string{"cert_" + request, unusedMetricLabel, unusedMetricLabel},
-	}
+	return newGenericMetricContext("cert", request, unusedMetricLabel, unusedMetricLabel, computeV1Version)
 }
 
 // GetSslCertificate returns the SslCertificate by name.

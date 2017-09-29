@@ -42,6 +42,9 @@ func ComponentPod(container v1.Container, volumes []v1.Volume) v1.Pod {
 			Name:        container.Name,
 			Namespace:   metav1.NamespaceSystem,
 			Annotations: map[string]string{kubetypes.CriticalPodAnnotationKey: ""},
+			// The component and tier labels are useful for quickly identifying the control plane Pods when doing a .List()
+			// against Pods in the kube-system namespace. Can for example be used together with the WaitForPodsWithLabel function
+			Labels: map[string]string{"component": container.Name, "tier": "control-plane"},
 		},
 		Spec: v1.PodSpec{
 			Containers:  []v1.Container{container},
@@ -79,11 +82,14 @@ func ComponentProbe(port int, path string, scheme v1.URIScheme) *v1.Probe {
 }
 
 // NewVolume creates a v1.Volume with a hostPath mount to the specified location
-func NewVolume(name, path string) v1.Volume {
+func NewVolume(name, path string, pathType *v1.HostPathType) v1.Volume {
 	return v1.Volume{
 		Name: name,
 		VolumeSource: v1.VolumeSource{
-			HostPath: &v1.HostPathVolumeSource{Path: path},
+			HostPath: &v1.HostPathVolumeSource{
+				Path: path,
+				Type: pathType,
+			},
 		},
 	}
 }

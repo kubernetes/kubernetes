@@ -876,14 +876,7 @@ func (s *LabelNodePrepareStrategy) PreparePatch(*v1.Node) []byte {
 }
 
 func (s *LabelNodePrepareStrategy) CleanupNode(node *v1.Node) *v1.Node {
-	objCopy, err := api.Scheme.Copy(node)
-	if err != nil {
-		return &v1.Node{}
-	}
-	nodeCopy, ok := (objCopy).(*v1.Node)
-	if !ok {
-		return &v1.Node{}
-	}
+	nodeCopy := node.DeepCopy()
 	if node.Labels != nil && len(node.Labels[s.labelKey]) != 0 {
 		delete(nodeCopy.Labels, s.labelKey)
 	}
