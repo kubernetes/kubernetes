@@ -21,9 +21,10 @@ package informers
 import (
 	"fmt"
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	v1 "k8s.io/api/apps/v1"
 	v1beta1 "k8s.io/api/apps/v1beta1"
 	v1beta2 "k8s.io/api/apps/v1beta2"
-	v1 "k8s.io/api/autoscaling/v1"
+	autoscaling_v1 "k8s.io/api/autoscaling/v1"
 	v2beta1 "k8s.io/api/autoscaling/v2beta1"
 	batch_v1 "k8s.io/api/batch/v1"
 	batch_v1beta1 "k8s.io/api/batch/v1beta1"
@@ -76,6 +77,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case v1alpha1.SchemeGroupVersion.WithResource("initializerconfigurations"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Admissionregistration().V1alpha1().InitializerConfigurations().Informer()}, nil
 
+		// Group=Apps, Version=V1
+	case v1.SchemeGroupVersion.WithResource("daemonsets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().DaemonSets().Informer()}, nil
+
 		// Group=Apps, Version=V1beta1
 	case v1beta1.SchemeGroupVersion.WithResource("controllerrevisions"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta1().ControllerRevisions().Informer()}, nil
@@ -97,7 +102,7 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1beta2().StatefulSets().Informer()}, nil
 
 		// Group=Autoscaling, Version=V1
-	case v1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"):
+	case autoscaling_v1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Autoscaling().V1().HorizontalPodAutoscalers().Informer()}, nil
 
 		// Group=Autoscaling, Version=V2beta1
