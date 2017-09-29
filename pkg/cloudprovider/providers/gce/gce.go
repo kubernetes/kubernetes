@@ -308,7 +308,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	version := strings.TrimLeft(strings.Split(strings.Split(version.Get().GitVersion, "-")[0], "+")[0], "v")
 
 	// Create a user-agent header append string to supply to the Google API clients, to identify Kubernetes as the origin of the GCP API calls.
-	userAgent := fmt.Sprintf("(%s %s) Kubernetes/%s", runtime.GOOS, runtime.GOARCH, version)
+	userAgent := fmt.Sprintf("Kubernetes/%s (%s %s)", version, runtime.GOOS, runtime.GOARCH)
 
 	client, err := newOauthClient(config.TokenSource)
 	if err != nil {
