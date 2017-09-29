@@ -2967,8 +2967,27 @@ run_rs_tests() {
   kubectl scale --current-replicas=3 --replicas=2 replicasets frontend "${kube_flags[@]}"
   # Post-condition: 2 replicas
   kube::test::get_object_assert 'rs frontend' "{{$rs_replicas_field}}" '2'
+
+  # Set up three deploy, two deploy have same label
+  kubectl create -f hack/testdata/scale-deploy-1.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/scale-deploy-2.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/scale-deploy-3.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert 'deploy scale-1' "{{.spec.replicas}}" '1'
+  kube::test::get_object_assert 'deploy scale-2' "{{.spec.replicas}}" '1'
+  kube::test::get_object_assert 'deploy scale-3' "{{.spec.replicas}}" '1'
+  # Test kubectl scale --selector
+  kubectl scale deploy --replicas=2 -l run=hello
+  kube::test::get_object_assert 'deploy scale-1' "{{.spec.replicas}}" '2'
+  kube::test::get_object_assert 'deploy scale-2' "{{.spec.replicas}}" '2'
+  kube::test::get_object_assert 'deploy scale-3' "{{.spec.replicas}}" '1'
+  # Test kubectl scale --all
+  kubectl scale deploy --replicas=3 --all
+  kube::test::get_object_assert 'deploy scale-1' "{{.spec.replicas}}" '3'
+  kube::test::get_object_assert 'deploy scale-2' "{{.spec.replicas}}" '3'
+  kube::test::get_object_assert 'deploy scale-3' "{{.spec.replicas}}" '3'
   # Clean-up
   kubectl delete rs frontend "${kube_flags[@]}"
+  kubectl delete deploy scale-1 scale-2 scale-3 "${kube_flags[@]}"
 
   ### Expose replica set as service
   kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}"
