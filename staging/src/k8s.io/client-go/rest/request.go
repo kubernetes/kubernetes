@@ -118,6 +118,10 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPa
 		backoff = &NoBackoff{}
 	}
 
+	if client == nil {
+		client = http.DefaultClient
+	}
+
 	pathPrefix := "/"
 	if baseURL != nil {
 		pathPrefix = path.Join(pathPrefix, baseURL.Path)
@@ -498,17 +502,12 @@ func (r *Request) Watch() (watch.Interface, error) {
 		return nil, err
 	}
 	req = req.WithContext(r.ctx)
-
 	req.Header = r.headers
-	client := r.client
-	if client == nil {
-		client = http.DefaultClient
-	}
 
 	if err := r.doBackoff(); err != nil {
 		return nil, err
 	}
-	resp, err := client.Do(req)
+	resp, err := r.client.Do(req)
 	updateURLMetrics(r, resp, err)
 	if r.baseURL != nil {
 		if err != nil {
@@ -576,16 +575,12 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 
 	req = req.WithContext(r.ctx)
 	req.Header = r.headers
-	client := r.client
-	if client == nil {
-		client = http.DefaultClient
-	}
 
 	if err := r.doBackoff(); err != nil {
 		return nil, err
 	}
 
-	resp, err := client.Do(req)
+	resp, err := r.client.Do(req)
 	updateURLMetrics(r, resp, err)
 	if r.baseURL != nil {
 		if err != nil {
@@ -639,11 +634,6 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		return fmt.Errorf("an empty namespace may not be set during creation")
 	}
 
-	client := r.client
-	if client == nil {
-		client = http.DefaultClient
-	}
-
 	// Right now we make about ten retry attempts if we get a Retry-After response.
 	// TODO: Change to a timeout based approach.
 	maxRetries := 10
@@ -668,7 +658,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 				return err
 			}
 		}
-		resp, err := client.Do(req)
+		resp, err := r.client.Do(req)
 		updateURLMetrics(r, resp, err)
 		if err != nil {
 			r.backoffMgr.UpdateBackoff(r.URL(), err, 0)

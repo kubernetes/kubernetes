@@ -96,6 +96,7 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 	original := Request{
 		err:     errors.New("test"),
 		content: ContentConfig{GroupVersion: &gvCopy},
+		ctx:     context.Background(),
 	}
 	r := original
 	changed := r.Param("foo", "bar").
@@ -116,26 +117,26 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 }
 
 func TestRequestPreservesBaseTrailingSlash(t *testing.T) {
-	r := &Request{baseURL: &url.URL{}, pathPrefix: "/path/"}
+	r := &Request{baseURL: &url.URL{}, pathPrefix: "/path/", ctx: context.Background()}
 	if s := r.URL().String(); s != "/path/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 }
 
 func TestRequestAbsPathPreservesTrailingSlash(t *testing.T) {
-	r := (&Request{baseURL: &url.URL{}}).AbsPath("/foo/")
+	r := (&Request{baseURL: &url.URL{}, ctx: context.Background()}).AbsPath("/foo/")
 	if s := r.URL().String(); s != "/foo/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 
-	r = (&Request{baseURL: &url.URL{}}).AbsPath("/foo/")
+	r = (&Request{baseURL: &url.URL{}, ctx: context.Background()}).AbsPath("/foo/")
 	if s := r.URL().String(); s != "/foo/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 }
 
 func TestRequestAbsPathJoins(t *testing.T) {
-	r := (&Request{baseURL: &url.URL{}}).AbsPath("foo/bar", "baz")
+	r := (&Request{baseURL: &url.URL{}, ctx: context.Background()}).AbsPath("foo/bar", "baz")
 	if s := r.URL().String(); s != "foo/bar/baz" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
@@ -146,6 +147,7 @@ func TestRequestSetsNamespace(t *testing.T) {
 		baseURL: &url.URL{
 			Path: "/",
 		},
+		ctx: context.Background(),
 	}).Namespace("foo")
 	if r.namespace == "" {
 		t.Errorf("namespace should be set: %#v", r)
@@ -160,6 +162,7 @@ func TestRequestOrdersNamespaceInPath(t *testing.T) {
 	r := (&Request{
 		baseURL:    &url.URL{},
 		pathPrefix: "/test/",
+		ctx:        context.Background(),
 	}).Name("bar").Resource("baz").Namespace("foo")
 	if s := r.URL().String(); s != "/test/namespaces/foo/baz/bar" {
 		t.Errorf("namespace should be in order in path: %s", s)
@@ -170,6 +173,7 @@ func TestRequestOrdersSubResource(t *testing.T) {
 	r := (&Request{
 		baseURL:    &url.URL{},
 		pathPrefix: "/test/",
+		ctx:        context.Background(),
 	}).Name("bar").Resource("baz").Namespace("foo").Suffix("test").SubResource("a", "b")
 	if s := r.URL().String(); s != "/test/namespaces/foo/baz/bar/a/b/test" {
 		t.Errorf("namespace should be in order in path: %s", s)
@@ -177,7 +181,7 @@ func TestRequestOrdersSubResource(t *testing.T) {
 }
 
 func TestRequestSetTwiceError(t *testing.T) {
-	if (&Request{}).Name("bar").Name("baz").err == nil {
+	if (&Request{ctx: context.Background()}).Name("bar").Name("baz").err == nil {
 		t.Errorf("setting name twice should result in error")
 	}
 	if (&Request{}).Namespace("bar").Namespace("baz").err == nil {
@@ -736,11 +740,11 @@ func TestRequestWatch(t *testing.T) {
 		Empty   bool
 	}{
 		{
-			Request: &Request{err: errors.New("bail")},
+			Request: &Request{err: errors.New("bail"), ctx: context.Background()},
 			Err:     true,
 		},
 		{
-			Request: &Request{baseURL: &url.URL{}, pathPrefix: "%"},
+			Request: &Request{baseURL: &url.URL{}, pathPrefix: "%", ctx: context.Background()},
 			Err:     true,
 		},
 		{
@@ -749,6 +753,7 @@ func TestRequestWatch(t *testing.T) {
 					return nil, errors.New("err")
 				}),
 				baseURL: &url.URL{},
+				ctx:     context.Background(),
 			},
 			Err: true,
 		},
@@ -763,6 +768,7 @@ func TestRequestWatch(t *testing.T) {
 					}, nil
 				}),
 				baseURL: &url.URL{},
+				ctx:     context.Background(),
 			},
 			Err: true,
 			ErrFn: func(err error) bool {
@@ -780,6 +786,7 @@ func TestRequestWatch(t *testing.T) {
 					}, nil
 				}),
 				baseURL: &url.URL{},
+				ctx:     context.Background(),
 			},
 			Err: true,
 			ErrFn: func(err error) bool {
@@ -800,6 +807,7 @@ func TestRequestWatch(t *testing.T) {
 					}, nil
 				}),
 				baseURL: &url.URL{},
+				ctx:     context.Background(),
 			},
 			Err: true,
 			ErrFn: func(err error) bool {
@@ -813,6 +821,7 @@ func TestRequestWatch(t *testing.T) {
 					return nil, io.EOF
 				}),
 				baseURL: &url.URL{},
+				ctx:     context.Background(),
 			},
 			Empty: true,
 		},
@@ -823,6 +832,7 @@ func TestRequestWatch(t *testing.T) {
 					return nil, &url.Error{Err: io.EOF}
 				}),
 				baseURL: &url.URL{},
+				ctx:     context.Background(),
 			},
 			Empty: true,
 		},
@@ -833,6 +843,7 @@ func TestRequestWatch(t *testing.T) {
 					return nil, errors.New("http: can't write HTTP request on broken connection")
 				}),
 				baseURL: &url.URL{},
+				ctx:     context.Background(),
 			},
 			Empty: true,
 		},
@@ -843,6 +854,7 @@ func TestRequestWatch(t *testing.T) {
 					return nil, errors.New("foo: connection reset by peer")
 				}),
 				baseURL: &url.URL{},
+				ctx:     context.Background(),
 			},
 			Empty: true,
 		},
@@ -879,11 +891,11 @@ func TestRequestStream(t *testing.T) {
 		ErrFn   func(error) bool
 	}{
 		{
-			Request: &Request{err: errors.New("bail")},
+			Request: &Request{err: errors.New("bail"), ctx: context.Background(), client: http.DefaultClient},
 			Err:     true,
 		},
 		{
-			Request: &Request{baseURL: &url.URL{}, pathPrefix: "%"},
+			Request: &Request{baseURL: &url.URL{}, pathPrefix: "%", ctx: context.Background(), client: http.DefaultClient},
 			Err:     true,
 		},
 		{
@@ -892,6 +904,7 @@ func TestRequestStream(t *testing.T) {
 					return nil, errors.New("err")
 				}),
 				baseURL: &url.URL{},
+				ctx:     context.Background(),
 			},
 			Err: true,
 		},
@@ -909,6 +922,7 @@ func TestRequestStream(t *testing.T) {
 				content:     defaultContentConfig(),
 				serializers: defaultSerializers(t),
 				baseURL:     &url.URL{},
+				ctx:         context.Background(),
 			},
 			Err: true,
 		},
@@ -923,6 +937,7 @@ func TestRequestStream(t *testing.T) {
 				content:     defaultContentConfig(),
 				serializers: defaultSerializers(t),
 				baseURL:     &url.URL{},
+				ctx:         context.Background(),
 			},
 			Err: true,
 			ErrFn: func(err error) bool {
@@ -992,11 +1007,11 @@ func TestRequestDo(t *testing.T) {
 		Err     bool
 	}{
 		{
-			Request: &Request{err: errors.New("bail")},
+			Request: &Request{err: errors.New("bail"), ctx: context.Background(), client: http.DefaultClient},
 			Err:     true,
 		},
 		{
-			Request: &Request{baseURL: &url.URL{}, pathPrefix: "%"},
+			Request: &Request{baseURL: &url.URL{}, pathPrefix: "%", ctx: context.Background(), client: http.DefaultClient},
 			Err:     true,
 		},
 		{
@@ -1005,6 +1020,7 @@ func TestRequestDo(t *testing.T) {
 					return nil, errors.New("err")
 				}),
 				baseURL: &url.URL{},
+				ctx:     context.Background(),
 			},
 			Err: true,
 		},
