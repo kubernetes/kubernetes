@@ -75,7 +75,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 				Spec: appsv1beta2.DaemonSetSpec{
 					Template: defaultTemplate,
 					UpdateStrategy: appsv1beta2.DaemonSetUpdateStrategy{
-						Type: appsv1beta2.RollingUpdateStatefulSetStrategyType,
+						Type: appsv1beta2.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1beta2.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
 						},
@@ -105,7 +105,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 				Spec: appsv1beta2.DaemonSetSpec{
 					Template: defaultTemplate,
 					UpdateStrategy: appsv1beta2.DaemonSetUpdateStrategy{
-						Type: appsv1beta2.RollingUpdateStatefulSetStrategyType,
+						Type: appsv1beta2.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1beta2.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
 						},
@@ -141,7 +141,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 				Spec: appsv1beta2.DaemonSetSpec{
 					Template: templateNoLabel,
 					UpdateStrategy: appsv1beta2.DaemonSetUpdateStrategy{
-						Type: appsv1beta2.RollingUpdateStatefulSetStrategyType,
+						Type: appsv1beta2.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1beta2.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
 						},

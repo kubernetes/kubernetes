@@ -36,6 +36,7 @@ filegroup(
         ":package-srcs",
         "//pkg/apis/apps/fuzzer:all-srcs",
         "//pkg/apis/apps/install:all-srcs",
+        "//pkg/apis/apps/v1:all-srcs",
         "//pkg/apis/apps/v1beta1:all-srcs",
         "//pkg/apis/apps/v1beta2:all-srcs",
         "//pkg/apis/apps/validation:all-srcs",

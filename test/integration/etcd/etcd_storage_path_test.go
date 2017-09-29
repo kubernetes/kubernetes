@@ -174,6 +174,14 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	},
 	// --
 
+	// k8s.io/kubernetes/pkg/apis/apps/v1
+	gvr("apps", "v1", "daemonsets"): {
+		stub:             `{"metadata": {"name": "ds6"}, "spec": {"selector": {"matchLabels": {"a": "b"}}, "template": {"metadata": {"labels": {"a": "b"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container6"}]}}}}`,
+		expectedEtcdPath: "/registry/daemonsets/etcdstoragepathtestnamespace/ds6",
+		expectedGVK:      gvkP("extensions", "v1beta1", "DaemonSet"),
+	},
+	// --
+
 	// k8s.io/kubernetes/pkg/apis/autoscaling/v1
 	gvr("autoscaling", "v1", "horizontalpodautoscalers"): {
 		stub:             `{"metadata": {"name": "hpa2"}, "spec": {"maxReplicas": 3, "scaleTargetRef": {"kind": "something", "name": "cross"}}}`,
