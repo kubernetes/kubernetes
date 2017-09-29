@@ -69,9 +69,7 @@ var (
 func TestGetCgroupStats(t *testing.T) {
 	const (
 		cgroupName        = "test-cgroup-name"
-		rootFsInfoSeed    = 1000
-		imageFsInfoSeed   = 2000
-		containerInfoSeed = 3000
+		containerInfoSeed = 1000
 	)
 	var (
 		mockCadvisor     = new(cadvisortest.Mock)
@@ -81,16 +79,11 @@ func TestGetCgroupStats(t *testing.T) {
 		assert  = assert.New(t)
 		options = cadvisorapiv2.RequestOptions{IdType: cadvisorapiv2.TypeName, Count: 2, Recursive: false}
 
-		rootFsInfo       = getTestFsInfo(rootFsInfoSeed)
-		imageFsInfo      = getTestFsInfo(imageFsInfoSeed)
 		containerInfo    = getTestContainerInfo(containerInfoSeed, "test-pod", "test-ns", "test-container")
 		containerInfoMap = map[string]cadvisorapiv2.ContainerInfo{cgroupName: containerInfo}
 	)
 
-	mockCadvisor.
-		On("RootFsInfo").Return(rootFsInfo, nil).
-		On("ImagesFsInfo").Return(imageFsInfo, nil).
-		On("ContainerInfoV2", cgroupName, options).Return(containerInfoMap, nil)
+	mockCadvisor.On("ContainerInfoV2", cgroupName, options).Return(containerInfoMap, nil)
 
 	provider := newStatsProvider(mockCadvisor, mockPodManager, mockRuntimeCache, fakeContainerStatsProvider{})
 	cs, ns, err := provider.GetCgroupStats(cgroupName)
@@ -98,20 +91,10 @@ func TestGetCgroupStats(t *testing.T) {
 
 	checkCPUStats(t, "", containerInfoSeed, cs.CPU)
 	checkMemoryStats(t, "", containerInfoSeed, containerInfo, cs.Memory)
-	checkFsStats(t, "", imageFsInfoSeed, cs.Rootfs)
-	checkFsStats(t, "", rootFsInfoSeed, cs.Logs)
 	checkNetworkStats(t, "", containerInfoSeed, ns)
 
 	assert.Equal(cgroupName, cs.Name)
 	assert.Equal(metav1.NewTime(containerInfo.Spec.CreationTime), cs.StartTime)
-
-	assert.Equal(metav1.NewTime(containerInfo.Stats[0].Timestamp), cs.Rootfs.Time)
-	assert.Equal(*containerInfo.Stats[0].Filesystem.BaseUsageBytes, *cs.Rootfs.UsedBytes)
-	assert.Equal(*containerInfo.Stats[0].Filesystem.InodeUsage, *cs.Rootfs.InodesUsed)
-
-	assert.Equal(metav1.NewTime(containerInfo.Stats[0].Timestamp), cs.Logs.Time)
-	assert.Equal(*containerInfo.Stats[0].Filesystem.TotalUsageBytes-*containerInfo.Stats[0].Filesystem.BaseUsageBytes, *cs.Logs.UsedBytes)
-	assert.Equal(*rootFsInfo.Inodes-*rootFsInfo.InodesFree, *cs.Logs.InodesUsed)
 
 	mockCadvisor.AssertExpectations(t)
 }
