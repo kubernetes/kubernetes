@@ -59,7 +59,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.Pod {
 		Image:   images.GetCoreImage(kubeadmconstants.Etcd, cfg.ImageRepository, "", cfg.Etcd.Image),
 		// Mount the etcd datadir path read-write so etcd can store data in a more persistent manner
 		VolumeMounts:  []v1.VolumeMount{staticpodutil.NewVolumeMount(etcdVolumeName, cfg.Etcd.DataDir, false)},
-		LivenessProbe: staticpodutil.ComponentProbe(2379, "/health", v1.URISchemeHTTP),
+		LivenessProbe: staticpodutil.ComponentProbe(cfg, kubeadmconstants.Etcd, 2379, "/health", v1.URISchemeHTTP),
 	}, etcdMounts)
 }
 
