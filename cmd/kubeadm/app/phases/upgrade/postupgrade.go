@@ -66,6 +66,11 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		errs = append(errs, err)
 	}
 
+	// Create/update RBAC rules that makes the 1.8.0+ nodes to rotate certificates and get their CSRs approved automatically
+	if err := nodebootstraptoken.AutoApproveNodeCertificateRotation(client, k8sVersion); err != nil {
+		errs = append(errs, err)
+	}
+
 	// TODO: Is this needed to do here? I think that updating cluster info should probably be separate from a normal upgrade
 	// Create the cluster-info ConfigMap with the associated RBAC rules
 	// if err := clusterinfo.CreateBootstrapConfigMapIfNotExists(client, kubeadmconstants.GetAdminKubeConfigPath()); err != nil {
