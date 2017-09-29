@@ -90,6 +90,39 @@ func TestDevicePluginReRegistration(t *testing.T) {
 	p2.Stop()
 }
 
+// TestDevicePluginAllocate tests if the device plugin can allocate the requested devices correctly.
+func TestDevicePluginAllocate(t *testing.T) {
+	devs := []*pluginapi.Device{
+		{ID: "Dev1", Health: pluginapi.Healthy},
+		{ID: "Dev2", Health: pluginapi.Healthy},
+	}
+
+	callbackChan := make(chan int)
+	callback := func(n string, a, u, r []*pluginapi.Device) {
+		callbackChan <- 1
+	}
+	m, p := setup(t, devs, callback)
+	p.Register(socketName, testResourceName)
+	<-callbackChan
+	devices := m.Devices()
+	require.Equal(t, 2, len(devices[testResourceName]))
+
+	// allocate Dev1
+	response, err := m.Allocate(testResourceName, []string{"Dev1"})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(response.Spec))
+	require.Equal(t, "Dev1", response.Spec[0].ID)
+
+	// allocate Dev1 and Dev2
+	response, err = m.Allocate(testResourceName, []string{"Dev1", "Dev2"})
+	require.NoError(t, err)
+	require.Equal(t, 2, len(response.Spec))
+
+	// Wait long enough to catch unexpected callbacks.
+	time.Sleep(5 * time.Second)
+	cleanup(t, m, p)
+}
+
 func TestCheckpointFile(t *testing.T) {
 	m, err := NewManagerImpl(socketName, func(n string, a, u, r []*pluginapi.Device) {})
 	require.NoError(t, err)
