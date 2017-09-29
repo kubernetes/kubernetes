@@ -41,8 +41,6 @@ import (
 func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs authorizer.Attributes) (*auditinternal.Event, error) {
 	now := time.Now()
 	ev := &auditinternal.Event{
-		// TODO(audit): depercate Timestamp
-		Timestamp:                metav1.NewTime(now),
 		RequestReceivedTimestamp: metav1.NewMicroTime(now),
 		Verb:       attribs.GetVerb(),
 		RequestURI: req.URL.RequestURI(),

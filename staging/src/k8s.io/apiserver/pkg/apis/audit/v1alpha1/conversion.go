@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apiserver/pkg/apis/audit"
 )
@@ -50,5 +51,19 @@ func Convert_v1alpha1_ObjectReference_To_audit_ObjectReference(in *ObjectReferen
 		out.APIGroup = in.APIVersion[:i]
 		out.APIVersion = in.APIVersion[i+1:]
 	}
+	return nil
+}
+
+func Convert_v1alpha1_Event_To_audit_Event(in *Event, out *audit.Event, s conversion.Scope) error {
+	return autoConvert_v1alpha1_Event_To_audit_Event(in, out, s)
+}
+
+func Convert_audit_Event_To_v1alpha1_Event(in *audit.Event, out *Event, s conversion.Scope) error {
+	// Begin by copying all fields
+	if err := autoConvert_audit_Event_To_v1alpha1_Event(in, out, s); err != nil {
+		return err
+	}
+	out.Timestamp = metav1.NewTime(in.RequestReceivedTimestamp.Time)
+	out.CreationTimestamp = metav1.NewTime(in.StageTimestamp.Time)
 	return nil
 }
