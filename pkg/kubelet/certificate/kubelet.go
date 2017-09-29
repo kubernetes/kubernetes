@@ -21,6 +21,7 @@ import (
 	"crypto/x509/pkix"
 	"fmt"
 	"net"
+	"sync"
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
@@ -118,6 +119,7 @@ func NewKubeletClientCertificateManager(certDirectory string, nodeName types.Nod
 		CertificateStore:        certificateStore,
 		BootstrapCertificatePEM: certData,
 		BootstrapKeyPEM:         keyData,
+		RotateCond:              sync.NewCond(&sync.Mutex{}),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize client certificate manager: %v", err)
