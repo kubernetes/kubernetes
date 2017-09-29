@@ -310,6 +310,14 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 			eventsRule(),
 		},
 	})
+	// external provisioners need to list and watch nodes in order to provision a PV in a random zone in which K8s has a node
+	addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "node-observer"},
+		Rules: []rbac.PolicyRule{
+			rbac.NewRule("list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+			eventsRule(),
+		},
+	})
 
 	return controllerRoles, controllerRoleBindings
 }
