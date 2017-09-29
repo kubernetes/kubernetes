@@ -145,7 +145,7 @@ func (r *Mock) GarbageCollect(gcPolicy ContainerGCPolicy, ready bool, evictNonDe
 	return args.Error(0)
 }
 
-func (r *Mock) DeleteContainer(containerID ContainerID) error {
+func (r *Mock) DeleteContainer(containerID string) error {
 	args := r.Called(containerID)
 	return args.Error(0)
 }

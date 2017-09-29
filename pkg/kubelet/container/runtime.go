@@ -115,7 +115,7 @@ type Runtime interface {
 	// "100" or "all") to tail the log.
 	GetContainerLogs(pod *v1.Pod, containerID ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error)
 	// Delete a container. If the container is still running, an error is returned.
-	DeleteContainer(containerID ContainerID) error
+	DeleteContainer(containerID string) error
 	// ImageService provides methods to image-related methods.
 	ImageService
 	// UpdatePodCIDR sends a new podCIDR to the runtime.

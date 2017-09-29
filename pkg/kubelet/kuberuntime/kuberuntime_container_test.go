@@ -58,7 +58,7 @@ func TestRemoveContainer(t *testing.T) {
 
 	containerId := fakeContainers[0].Id
 	fakeOS := m.osInterface.(*containertest.FakeOS)
-	err = m.removeContainer(containerId)
+	err = m.DeleteContainer(containerId)
 	assert.NoError(t, err)
 	// Verify container log is removed
 	expectedContainerLogPath := filepath.Join(podLogsRootDirectory, "12345678", "foo_0.log")

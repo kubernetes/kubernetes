@@ -33,7 +33,7 @@ const (
 type containerStatusbyCreatedList []*kubecontainer.ContainerStatus
 
 type podContainerDeletor struct {
-	worker           chan<- kubecontainer.ContainerID
+	worker           chan<- string
 	containersToKeep int
 }
 
@@ -42,7 +42,7 @@ func (a containerStatusbyCreatedList) Swap(i, j int)      { a[i], a[j] = a[j], a
 func (a containerStatusbyCreatedList) Less(i, j int) bool { return a[i].CreatedAt.After(a[j].CreatedAt) }
 
 func newPodContainerDeletor(runtime kubecontainer.Runtime, containersToKeep int) *podContainerDeletor {
-	buffer := make(chan kubecontainer.ContainerID, containerDeletorBufferLimit)
+	buffer := make(chan string, containerDeletorBufferLimit)
 	go wait.Until(func() {
 		for {
 			select {
@@ -105,7 +105,7 @@ func (p *podContainerDeletor) deleteContainersInPod(filterContainerID string, po
 
 	for _, candidate := range getContainersToDeleteInPod(filterContainerID, podStatus, containersToKeep) {
 		select {
-		case p.worker <- candidate.ID:
+		case p.worker <- candidate.ID.ID:
 		default:
 			glog.Warningf("Failed to issue the request to remove container %v", candidate.ID)
 		}
