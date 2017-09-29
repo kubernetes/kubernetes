@@ -118,25 +118,6 @@ func newResourcePod(usage ...schedulercache.Resource) *v1.Pod {
 	}
 }
 
-func addStorageLimit(pod *v1.Pod, sizeLimit int64, medium v1.StorageMedium) *v1.Pod {
-	return &v1.Pod{
-		Spec: v1.PodSpec{
-			Containers: pod.Spec.Containers,
-			Volumes: []v1.Volume{
-				{
-					Name: "emptyDirVolumeName",
-					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{
-							SizeLimit: resource.NewQuantity(sizeLimit, resource.BinarySI),
-							Medium:    medium,
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
 func newResourceInitPod(pod *v1.Pod, usage ...schedulercache.Resource) *v1.Pod {
 	pod.Spec.InitContainers = newResourcePod(usage...).Spec.Containers
 	return pod
