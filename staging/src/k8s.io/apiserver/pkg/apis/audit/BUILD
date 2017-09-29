@@ -38,6 +38,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/apis/audit/install:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1alpha1:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1beta1:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/apis/audit/v1beta2:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/apis/audit/validation:all-srcs",
     ],
     tags = ["automanaged"],

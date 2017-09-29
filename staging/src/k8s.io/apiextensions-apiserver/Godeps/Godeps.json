@@ -879,6 +879,10 @@
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
 		{
+			"ImportPath": "k8s.io/apiserver/pkg/apis/audit/v1beta2",
+			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+		},
+		{
 			"ImportPath": "k8s.io/apiserver/pkg/apis/audit/validation",
 			"Rev": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 		},
