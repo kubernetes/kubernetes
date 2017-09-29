@@ -349,6 +349,11 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				By(fmt.Sprintf("deleting pod: %s", spec.pod.Name))
 				f.PodClient().DeleteSync(spec.pod.Name, &metav1.DeleteOptions{}, 10*time.Minute)
 			}
+			if expectedNodeCondition == v1.NodeDiskPressure && framework.TestContext.PrepullImages {
+				// The disk eviction test may cause the prepulled images to be evicted,
+				// prepull those images again to ensure this test not affect following tests.
+				PrePullAllImages()
+			}
 			By("making sure we can start a new pod after the test")
 			podName := "test-admit-pod"
 			f.PodClient().CreateSync(&v1.Pod{
