@@ -38,8 +38,12 @@ const (
 	// CSRAutoApprovalClusterRoleName defines the name of the auto-bootstrapped ClusterRole for making the csrapprover controller auto-approve the CSR
 	// TODO: This value should be defined in an other, generic authz package instead of here
 	CSRAutoApprovalClusterRoleName = "system:certificates.k8s.io:certificatesigningrequests:nodeclient"
+	// NodeSelfCSRAutoApprovalClusterRoleName is a role defined in default 1.8 RBAC policies for automatic CSR approvals for automatically rotated node certificates
+	NodeSelfCSRAutoApprovalClusterRoleName = "system:certificates.k8s.io:certificatesigningrequests:selfnodeclient"
 	// NodeAutoApproveBootstrapClusterRoleBinding defines the name of the ClusterRoleBinding that makes the csrapprover approve node CSRs
 	NodeAutoApproveBootstrapClusterRoleBinding = "kubeadm:node-autoapprove-bootstrap"
+	// NodeAutoApproveCertificateRotationClusterRoleBinding defines name of the ClusterRoleBinding that makes the csrapprover approve node auto rotated CSRs
+	NodeAutoApproveCertificateRotationClusterRoleBinding = "kubeadm:node-autoapprove-certificate-rotation"
 )
 
 // AllowBootstrapTokensToPostCSRs creates RBAC rules in a way the makes Node Bootstrap Tokens able to post CSRs
@@ -103,4 +107,31 @@ func AutoApproveNodeBootstrapTokens(client clientset.Interface, k8sVersion *vers
 			},
 		},
 	})
+}
+
+// AutoApproveNodeCertificateRotation creates RBAC rules in a way that makes Node certificate rotation CSR auto-approved by the csrapprover controller
+func AutoApproveNodeCertificateRotation(client clientset.Interface, k8sVersion *version.Version) error {
+
+	// Create autorotation cluster role binding only if we deploying or upgrading to version that supports it.
+	if k8sVersion.AtLeast(constants.MinimumCSRAutoApprovalClusterRolesVersion) {
+		fmt.Println("[bootstraptoken] Configured RBAC rules to allow certificate rotation for all node client certificates in the cluster")
+
+		return apiclient.CreateOrUpdateClusterRoleBinding(client, &rbac.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: NodeAutoApproveCertificateRotationClusterRoleBinding,
+			},
+			RoleRef: rbac.RoleRef{
+				APIGroup: rbac.GroupName,
+				Kind:     "ClusterRole",
+				Name:     NodeSelfCSRAutoApprovalClusterRoleName,
+			},
+			Subjects: []rbac.Subject{
+				{
+					Kind: "Group",
+					Name: constants.NodesGroup,
+				},
+			},
+		})
+	}
+	return nil
 }
