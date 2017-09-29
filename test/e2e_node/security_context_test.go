@@ -230,8 +230,9 @@ var _ = framework.KubeDescribe("Security Context", func() {
 
 		listeningPort := ""
 		var l net.Listener
+		var err error
 		BeforeEach(func() {
-			l, err := net.Listen("tcp", ":0")
+			l, err = net.Listen("tcp", ":0")
 			if err != nil {
 				framework.Failf("Failed to open a new tcp port: %v", err)
 			}
