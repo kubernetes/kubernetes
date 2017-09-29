@@ -316,9 +316,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			return nil, err
 		}
 		getOptionsInternalKind = getOptionsInternalKinds[0]
-		versionedGetOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(getOptionsInternalKind.Kind))
+		versionedGetOptions, err = a.group.Creater.New(a.group.GroupVersion.WithKind(getOptionsInternalKind.Kind))
 		if err != nil {
-			return nil, err
+			versionedGetOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(getOptionsInternalKind.Kind))
+			if err != nil {
+				return nil, err
+			}
 		}
 		isGetter = true
 	}
@@ -347,9 +350,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 
 			connectOptionsInternalKind = connectOptionsInternalKinds[0]
-			versionedConnectOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(connectOptionsInternalKind.Kind))
+			versionedConnectOptions, err = a.group.Creater.New(a.group.GroupVersion.WithKind(connectOptionsInternalKind.Kind))
 			if err != nil {
-				return nil, err
+				versionedConnectOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(connectOptionsInternalKind.Kind))
+				if err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
