@@ -38,6 +38,13 @@ func (gce *GCECloud) GetGlobalBackendService(name string) (*compute.BackendServi
 	return v, mc.Observe(err)
 }
 
+// GetAlphaGlobalBackendService retrieves alpha backend by name.
+func (gce *GCECloud) GetAlphaGlobalBackendService(name string) (*computealpha.BackendService, error) {
+	mc := newBackendServiceMetricContextWithVersion("get", "", computeAlphaVersion)
+	v, err := gce.serviceAlpha.BackendServices.Get(gce.projectID, name).Do()
+	return v, mc.Observe(err)
+}
+
 // UpdateGlobalBackendService applies the given BackendService as an update to an existing service.
 func (gce *GCECloud) UpdateGlobalBackendService(bg *compute.BackendService) error {
 	mc := newBackendServiceMetricContext("update", "")
