@@ -26,7 +26,8 @@ import (
 )
 
 // These tests exercise the Kubernetes expansion syntax $(VAR).
-// For more information, see: docs/design/expansion.md
+// For more information, see:
+// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/expansion.md
 var _ = framework.KubeDescribe("Variable Expansion", func() {
 	f := framework.NewDefaultFramework("var-expansion")
 
