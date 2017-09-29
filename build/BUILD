@@ -86,6 +86,12 @@ grep ^STABLE_BUILD_SCM_REVISION bazel-out/stable-status.txt \
     stamp = 1,
 )
 
+genrule(
+    name = "cni_package_version",
+    outs = ["cni_version"],
+    cmd = "echo 0.5.1 >$@",
+)
+
 release_filegroup(
     name = "docker-artifacts",
     srcs = [":%s.tar" % binary for binary in DOCKERIZED_BINARIES.keys()] +
