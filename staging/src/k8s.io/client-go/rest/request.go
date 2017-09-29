@@ -480,15 +480,19 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
+	ctx := context.Background()
 	if r.ctx != nil {
 		req = req.WithContext(r.ctx)
+		ctx = r.ctx
 	}
 	req.Header = r.headers
 	client := r.client
 	if client == nil {
 		client = http.DefaultClient
 	}
-	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
+	if err := r.backoffMgr.SleepContext(ctx, r.backoffMgr.CalculateBackoff(r.URL())); err != nil {
+		return nil, err
+	}
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
 	if r.baseURL != nil {
@@ -552,15 +556,19 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
+	ctx := context.Background()
 	if r.ctx != nil {
 		req = req.WithContext(r.ctx)
+		ctx = r.ctx
 	}
 	req.Header = r.headers
 	client := r.client
 	if client == nil {
 		client = http.DefaultClient
 	}
-	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
+	if err := r.backoffMgr.SleepContext(ctx, r.backoffMgr.CalculateBackoff(r.URL())); err != nil {
+		return nil, err
+	}
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
 	if r.baseURL != nil {
@@ -620,6 +628,11 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		client = http.DefaultClient
 	}
 
+	ctx := context.Background()
+	if r.ctx != nil {
+		ctx = r.ctx
+	}
+
 	// Right now we make about ten retry attempts if we get a Retry-After response.
 	// TODO: Change to a timeout based approach.
 	maxRetries := 10
@@ -635,7 +648,9 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		}
 		req.Header = r.headers
 
-		r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
+		if err := r.backoffMgr.SleepContext(ctx, r.backoffMgr.CalculateBackoff(r.URL())); err != nil {
+			return err
+		}
 		if retries > 0 {
 			// We are retrying the request that we already send to apiserver
 			// at least once before.
@@ -690,7 +705,9 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 				}
 
 				glog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", seconds, retries, url)
-				r.backoffMgr.Sleep(time.Duration(seconds) * time.Second)
+				if err := r.backoffMgr.SleepContext(ctx, time.Duration(seconds)*time.Second); err != nil {
+					return true
+				}
 				return false
 			}
 			fn(req, resp)
