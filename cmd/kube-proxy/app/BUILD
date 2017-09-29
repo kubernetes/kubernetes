@@ -44,6 +44,7 @@ go_library(
         "//pkg/util/pointer:go_default_library",
         "//pkg/util/resourcecontainer:go_default_library",
         "//pkg/util/sysctl:go_default_library",
+        "//pkg/version:go_default_library",
         "//pkg/version/verflag:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
