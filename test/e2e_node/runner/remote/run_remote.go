@@ -45,6 +45,7 @@ import (
 )
 
 var testArgs = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
+var testSuite = flag.String("test-suite", "default", "Test suite the runner initializes with. Currently support default|conformance")
 var instanceNamePrefix = flag.String("instance-name-prefix", "", "prefix for instance names")
 var zone = flag.String("zone", "", "gce zone the hosts live in")
 var project = flag.String("project", "", "gce project the hosts live in")
@@ -143,27 +144,18 @@ type internalGCEImage struct {
 	tests     []string
 }
 
-// parseFlags parse subcommands and flags
-func parseFlags() {
-	if len(os.Args) <= 1 {
-		glog.Fatalf("Too few flags specified: %v", os.Args)
-	}
-	// Parse subcommand.
-	subcommand := os.Args[1]
-	switch subcommand {
+func main() {
+	flag.Parse()
+	switch *testSuite {
 	case "conformance":
 		suite = remote.InitConformanceRemote()
 	// TODO: Add subcommand for node soaking, node conformance, cri validation.
-	default:
+	case "default":
 		// Use node e2e suite by default if no subcommand is specified.
 		suite = remote.InitNodeE2ERemote()
+	default:
+		glog.Fatalf("--test-suite must be one of default or conformance")
 	}
-	// Parse test flags.
-	flag.CommandLine.Parse(os.Args[2:])
-}
-
-func main() {
-	parseFlags()
 
 	rand.Seed(time.Now().UTC().UnixNano())
 	if *buildOnly {
