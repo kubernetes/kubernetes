@@ -31,7 +31,7 @@ const (
 // IsAllowAll checks whether the netsets.IPNet allows traffic from 0.0.0.0/0
 func IsAllowAll(ipnets netsets.IPNet) bool {
 	for _, s := range ipnets.StringSlice() {
-		if s == "0.0.0.0/0" {
+		if s == defaultLoadBalancerSourceRanges {
 			return true
 		}
 	}
