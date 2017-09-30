@@ -1083,6 +1083,26 @@ func TestMaxReplicas(t *testing.T) {
 	tc.runTest(t)
 }
 
+// Test for case "proposed replica num is bigger than both ScaleUpLimit and MaxReplicas"
+func TestScaleUpLimitExceedMaxReplicas(t *testing.T) {
+	tc := testCase{
+		minReplicas:         1,
+		maxReplicas:         6,
+		initialReplicas:     2,
+		desiredReplicas:     6,
+		CPUTarget:           50,
+		reportedLevels:      []uint64{900, 900, 900},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
+		useMetricsAPI:       true,
+		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.ScalingLimited,
+			Status: v1.ConditionTrue,
+			Reason: "TooManyReplicas",
+		}),
+	}
+	tc.runTest(t)
+}
+
 func TestSuperfluousMetrics(t *testing.T) {
 	tc := testCase{
 		minReplicas:         2,
