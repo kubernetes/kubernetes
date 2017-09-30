@@ -124,6 +124,8 @@ func requestCertificate(client certificatesclient.CertificateSigningRequestInter
 		func(event watch.Event) (bool, error) {
 			switch event.Type {
 			case watch.Modified, watch.Added:
+			case watch.Deleted:
+				return false, fmt.Errorf("csr %q was deleted", csr.Name)
 			default:
 				return false, nil
 			}
