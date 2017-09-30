@@ -1371,6 +1371,12 @@ function start-kube-apiserver {
     # grows at 10MiB/s (~30K QPS), it will rotate after ~6 years if apiserver
     # never restarts. Please manually restart apiserver before this time.
     params+=" --audit-log-maxsize=2000000000"
+    # Disable AdvancedAuditing enabled by default
+    if [[ -z "${FEATURE_GATES:-}" ]]; then
+      FEATURE_GATES="AdvancedAuditing=false"
+    else
+      FEATURE_GATES="${FEATURE_GATES},AdvancedAuditing=false"
+    fi
   elif [[ "${ENABLE_APISERVER_ADVANCED_AUDIT:-}" == "true" ]]; then
     local -r audit_policy_file="/etc/audit_policy.config"
     params+=" --audit-policy-file=${audit_policy_file}"

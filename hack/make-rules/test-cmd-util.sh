@@ -2967,8 +2967,27 @@ run_rs_tests() {
   kubectl scale --current-replicas=3 --replicas=2 replicasets frontend "${kube_flags[@]}"
   # Post-condition: 2 replicas
   kube::test::get_object_assert 'rs frontend' "{{$rs_replicas_field}}" '2'
+
+  # Set up three deploy, two deploy have same label
+  kubectl create -f hack/testdata/scale-deploy-1.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/scale-deploy-2.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/scale-deploy-3.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert 'deploy scale-1' "{{.spec.replicas}}" '1'
+  kube::test::get_object_assert 'deploy scale-2' "{{.spec.replicas}}" '1'
+  kube::test::get_object_assert 'deploy scale-3' "{{.spec.replicas}}" '1'
+  # Test kubectl scale --selector
+  kubectl scale deploy --replicas=2 -l run=hello
+  kube::test::get_object_assert 'deploy scale-1' "{{.spec.replicas}}" '2'
+  kube::test::get_object_assert 'deploy scale-2' "{{.spec.replicas}}" '2'
+  kube::test::get_object_assert 'deploy scale-3' "{{.spec.replicas}}" '1'
+  # Test kubectl scale --all
+  kubectl scale deploy --replicas=3 --all
+  kube::test::get_object_assert 'deploy scale-1' "{{.spec.replicas}}" '3'
+  kube::test::get_object_assert 'deploy scale-2' "{{.spec.replicas}}" '3'
+  kube::test::get_object_assert 'deploy scale-3' "{{.spec.replicas}}" '3'
   # Clean-up
   kubectl delete rs frontend "${kube_flags[@]}"
+  kubectl delete deploy scale-1 scale-2 scale-3 "${kube_flags[@]}"
 
   ### Expose replica set as service
   kubectl create -f hack/testdata/frontend-replicaset.yaml "${kube_flags[@]}"
@@ -2984,6 +3003,16 @@ run_rs_tests() {
   kube::test::get_object_assert 'service frontend-2' "{{$port_name}} {{$port_field}}" 'default 80'
   # Cleanup services
   kubectl delete service frontend{,-2} "${kube_flags[@]}"
+
+  # Test set commands
+  # Pre-condition: frontend replica set exists at generation 1
+  kube::test::get_object_assert 'rs frontend' "{{${generation_field}}}" '1'
+  kubectl set image rs/frontend "${kube_flags[@]}" *=gcr.io/google-containers/pause:test-cmd
+  kube::test::get_object_assert 'rs frontend' "{{${generation_field}}}" '2'
+  kubectl set env rs/frontend "${kube_flags[@]}" foo=bar
+  kube::test::get_object_assert 'rs frontend' "{{${generation_field}}}" '3'
+  kubectl set resources rs/frontend "${kube_flags[@]}" --limits=cpu=200m,memory=512Mi
+  kube::test::get_object_assert 'rs frontend' "{{${generation_field}}}" '4'
 
   ### Delete replica set with id
   # Pre-condition: frontend replica set exists
@@ -3064,6 +3093,14 @@ run_daemonset_tests() {
   kubectl apply -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]}"
   # Template Generation should stay 1
   kube::test::get_object_assert 'daemonsets bind' "{{${template_generation_field}}}" '1'
+  # Test set commands
+  kubectl set image daemonsets/bind "${kube_flags[@]}" *=gcr.io/google-containers/pause:test-cmd
+  kube::test::get_object_assert 'daemonsets bind' "{{${template_generation_field}}}" '2'
+  kubectl set env daemonsets/bind "${kube_flags[@]}" foo=bar
+  kube::test::get_object_assert 'daemonsets bind' "{{${template_generation_field}}}" '3'
+  kubectl set resources daemonsets/bind "${kube_flags[@]}" --limits=cpu=200m,memory=512Mi
+  kube::test::get_object_assert 'daemonsets bind' "{{${template_generation_field}}}" '4'
+
   # Clean up
   kubectl delete -f hack/testdata/rollingupdate-daemonset.yaml "${kube_flags[@]}"
 
@@ -4355,6 +4392,7 @@ runTests() {
   change_cause_annotation='.*kubernetes.io/change-cause.*'
   pdb_min_available=".spec.minAvailable"
   pdb_max_unavailable=".spec.maxUnavailable"
+  generation_field=".metadata.generation"
   template_generation_field=".spec.templateGeneration"
   container_len="(len .spec.template.spec.containers)"
   image_field0="(index .spec.template.spec.containers 0).image"

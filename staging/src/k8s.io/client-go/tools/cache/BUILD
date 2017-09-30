@@ -80,6 +80,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
         "//vendor/k8s.io/client-go/tools/pager:go_default_library",
+        "//vendor/k8s.io/client-go/util/buffer:go_default_library",
     ],
 )
 

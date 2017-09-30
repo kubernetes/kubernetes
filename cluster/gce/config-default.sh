@@ -96,9 +96,9 @@ CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-$(get-cluster-ip-range)}"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 
 if [[ "${FEDERATION:-}" == true ]]; then
-    NODE_SCOPES="${NODE_SCOPES:-compute-rw,monitoring,logging-write,storage-ro,https://www.googleapis.com/auth/ndev.clouddns.readwrite}"
+    NODE_SCOPES="${NODE_SCOPES:-monitoring,logging-write,storage-ro,https://www.googleapis.com/auth/ndev.clouddns.readwrite}"
 else
-    NODE_SCOPES="${NODE_SCOPES:-compute-rw,monitoring,logging-write,storage-ro}"
+    NODE_SCOPES="${NODE_SCOPES:-monitoring,logging-write,storage-ro}"
 fi
 
 # Extra docker options for nodes.
@@ -292,6 +292,10 @@ SOFTLOCKUP_PANIC="${SOFTLOCKUP_PANIC:-false}" # true, false
 METADATA_CLOBBERS_CONFIG="${METADATA_CLOBBERS_CONFIG:-false}"
 
 ENABLE_BIG_CLUSTER_SUBNETS="${ENABLE_BIG_CLUSTER_SUBNETS:-false}"
+
+if [[ "${ENABLE_APISERVER_BASIC_AUDIT:-}" == "true" ]]; then
+  echo "Warning: Basic audit logging is deprecated and will be removed. Please use advanced auditing instead."
+fi
 
 if [[ -n "${LOGROTATE_FILES_MAX_COUNT:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} LOGROTATE_FILES_MAX_COUNT"

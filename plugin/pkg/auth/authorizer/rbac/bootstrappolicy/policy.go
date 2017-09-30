@@ -189,6 +189,8 @@ func ClusterRoles() []rbac.ClusterRole {
 					"deployments", "deployments/scale", "deployments/rollback", "ingresses",
 					"replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
 
+				rbac.NewRule(ReadWrite...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
+
 				// additional admin powers
 				rbac.NewRule("create").Groups(authorizationGroup).Resources("localsubjectaccessreviews").RuleOrDie(),
 				rbac.NewRule(ReadWrite...).Groups(rbacGroup).Resources("roles", "rolebindings").RuleOrDie(),
@@ -220,6 +222,8 @@ func ClusterRoles() []rbac.ClusterRole {
 				rbac.NewRule(ReadWrite...).Groups(extensionsGroup).Resources("daemonsets",
 					"deployments", "deployments/scale", "deployments/rollback", "ingresses",
 					"replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
+
+				rbac.NewRule(ReadWrite...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
 			},
 		},
 		{
@@ -243,6 +247,8 @@ func ClusterRoles() []rbac.ClusterRole {
 
 				rbac.NewRule(Read...).Groups(extensionsGroup).Resources("daemonsets", "deployments", "deployments/scale",
 					"ingresses", "replicasets", "replicasets/scale", "replicationcontrollers/scale").RuleOrDie(),
+
+				rbac.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
 			},
 		},
 		{
