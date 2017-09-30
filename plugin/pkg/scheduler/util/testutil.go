@@ -30,6 +30,8 @@ import (
 	_ "k8s.io/kubernetes/pkg/api/install"
 )
 
+// The file is just a simple copy of pkg/api/testapi.go to remove the dependeny to testapi, so we
+// do not need add the test file. We should avoid duplicating code as much as we can.
 type TestGroup struct {
 	externalGroupVersion schema.GroupVersion
 	internalGroupVersion schema.GroupVersion
