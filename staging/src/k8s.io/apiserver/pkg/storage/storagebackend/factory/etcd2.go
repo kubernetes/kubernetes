@@ -45,8 +45,9 @@ func newETCD2Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, e
 
 func newETCD2Client(tr *http.Transport, serverList []string) (etcd2client.Client, error) {
 	cli, err := etcd2client.New(etcd2client.Config{
-		Endpoints: serverList,
-		Transport: tr,
+		Endpoints:               serverList,
+		Transport:               tr,
+		HeaderTimeoutPerRequest: 10 * time.Second,
 	})
 	if err != nil {
 		return nil, err
