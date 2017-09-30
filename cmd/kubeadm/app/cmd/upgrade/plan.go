@@ -122,7 +122,7 @@ func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer) {
 		fmt.Fprintln(w, "")
 
 		if upgrade.Before.KubeadmVersion != upgrade.After.KubeadmVersion {
-			fmt.Fprintf(w, "Note: Before you do can perform this upgrade, you have to update kubeadm to %s\n", upgrade.After.KubeadmVersion)
+			fmt.Fprintf(w, "Note: Before you can perform this upgrade, you have to update kubeadm to %s\n", upgrade.After.KubeadmVersion)
 			fmt.Fprintln(w, "")
 		}
 
