@@ -18,6 +18,9 @@ package lifecycle
 
 import (
 	"fmt"
+	"net"
+	"strconv"
+	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -137,7 +140,53 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			Message: message,
 		}
 	}
+	for j := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[j]
+		for k := range container.Ports {
+			podPort := &container.Ports[k]
+			if podPort.HostPort == 0 {
+				continue
+			}
+			taken, err := portTaken(int(podPort.HostPort), strings.ToLower(string(podPort.Protocol)))
+			if err != nil {
+				reason := fmt.Sprintf("UnexpectedPredicateFailureType: %v", err)
+				message := fmt.Sprintf("Failure: %s", reason)
+				glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+				return PodAdmitResult{
+					Admit:   false,
+					Reason:  reason,
+					Message: message,
+				}
+			}
+			if taken {
+				reason := fmt.Sprintf("Port %d(%v) already in use", podPort.HostPort, string(podPort.Protocol))
+				message := fmt.Sprintf("Failure: %s", reason)
+				glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+				return PodAdmitResult{
+					Admit:   false,
+					Reason:  reason,
+					Message: message,
+				}
+			}
+		}
+	}
 	return PodAdmitResult{
 		Admit: true,
 	}
+}
+
+// portTaken returns true if a port is used
+func portTaken(port int, protocol string) (bool, error) {
+	host := ":" + strconv.Itoa(port)
+	// Try to create a server with the port
+	server, err := net.Listen(protocol, host)
+	// if it fails then the port is likely taken
+	if err != nil {
+		if strings.Contains(err.Error(), "address already in use") {
+			return true, nil
+		}
+		return true, err
+	}
+	server.Close()
+	return false, nil
 }

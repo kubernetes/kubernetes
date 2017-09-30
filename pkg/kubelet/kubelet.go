@@ -1731,7 +1731,7 @@ func (kl *Kubelet) canAdmitPod(pods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 			return false, result.Reason, result.Message
 		}
 	}
-
+	glog.V(4).Infof("admited pod %s_%s", pod.Name, pod.Namespace)
 	return true, "", ""
 }
 
