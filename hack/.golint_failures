@@ -114,7 +114,6 @@ pkg/apis/policy
 pkg/apis/policy/v1alpha1
 pkg/apis/policy/v1beta1
 pkg/apis/policy/validation
-pkg/apis/rbac
 pkg/apis/rbac/v1
 pkg/apis/rbac/v1beta1
 pkg/apis/rbac/validation
