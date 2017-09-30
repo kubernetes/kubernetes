@@ -53,12 +53,7 @@ if ! $ALL ; then
 	echo "Running in short-circuit mode; run with -a to force all scripts to run."
 fi
 
-kube::util::ensure_godep_version v79
-
-if ! kube::util::godep_restored 2>&1 | sed 's/^/  /'; then
-	echo "Running godep restore"
-	"${KUBE_ROOT}/hack/godep-restore.sh" ${V}
-fi
+"${KUBE_ROOT}/hack/godep-restore.sh" ${V}
 
 BASH_TARGETS="
 	update-generated-protobuf
