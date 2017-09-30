@@ -251,6 +251,7 @@ type Dependencies struct {
 	DynamicPluginProber     volume.DynamicPluginProber
 	TLSOptions              *server.TLSOptions
 	KubeletConfigController *kubeletconfig.Controller
+	Reflectors              []*cache.Reflector
 }
 
 // makePodSourceConfig creates a config.PodConfig from the given
@@ -410,8 +411,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	if kubeDeps.KubeClient != nil {
 		serviceLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.Core().RESTClient(), "services", metav1.NamespaceAll, fields.Everything())
-		r := cache.NewReflector(serviceLW, &v1.Service{}, serviceIndexer, 0)
-		go r.Run(wait.NeverStop)
+		serviceReflector := cache.NewReflector(serviceLW, &v1.Service{}, serviceIndexer, 0)
+		kubeDeps.Reflectors = append(kubeDeps.Reflectors, serviceReflector)
+		go serviceReflector.Run(wait.NeverStop)
 	}
 	serviceLister := corelisters.NewServiceLister(serviceIndexer)
 
@@ -419,8 +421,9 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	if kubeDeps.KubeClient != nil {
 		fieldSelector := fields.Set{api.ObjectNameField: string(nodeName)}.AsSelector()
 		nodeLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.Core().RESTClient(), "nodes", metav1.NamespaceAll, fieldSelector)
-		r := cache.NewReflector(nodeLW, &v1.Node{}, nodeIndexer, 0)
-		go r.Run(wait.NeverStop)
+		nodeReflector := cache.NewReflector(nodeLW, &v1.Node{}, nodeIndexer, 0)
+		kubeDeps.Reflectors = append(kubeDeps.Reflectors, nodeReflector)
+		go nodeReflector.Run(wait.NeverStop)
 	}
 	nodeInfo := &predicates.CachedNodeInfo{NodeLister: corelisters.NewNodeLister(nodeIndexer)}
 
@@ -494,6 +497,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		iptablesMasqueradeBit:                   int(kubeCfg.IPTablesMasqueradeBit),
 		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
+		reflectors:                              kubeDeps.Reflectors,
 	}
 
 	secretManager := secret.NewCachingSecretManager(
@@ -1148,6 +1152,9 @@ type Kubelet struct {
 
 	// StatsProvider provides the node and the container stats.
 	*stats.StatsProvider
+
+	// These reflectors receive updates from the API server for the kubelet
+	reflectors []*cache.Reflector
 }
 
 func allLocalIPsWithoutLoopback() ([]net.IP, error) {

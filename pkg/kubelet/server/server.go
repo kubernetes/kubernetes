@@ -183,6 +183,7 @@ type HostInterface interface {
 	GetExec(podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetAttach(podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetPortForward(podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error)
+	ReflectorsHealthy() (bool, []error)
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
@@ -258,6 +259,7 @@ func (s *Server) InstallDefaultHandlers() {
 	healthz.InstallHandler(s.restfulCont,
 		healthz.PingHealthz,
 		healthz.NamedCheck("syncloop", s.syncLoopHealthCheck),
+		healthz.NamedCheck("reflectorHealthCheck", s.reflectorHealthCheck),
 	)
 	ws := new(restful.WebService)
 	ws.
@@ -429,6 +431,21 @@ func (s *Server) syncLoopHealthCheck(req *http.Request) error {
 		return fmt.Errorf("sync Loop took longer than expected")
 	}
 	return nil
+}
+
+// Checks if any of the kubelet's reflectors have reported any errors
+func (s *Server) reflectorHealthCheck(req *http.Request) error {
+	healthy, reflectorErrors := s.host.ReflectorsHealthy()
+	if healthy {
+		return nil
+	}
+
+	reflectorErrorStrings := make([]string, 0, len(reflectorErrors))
+	for _, reflectorError := range reflectorErrors {
+		reflectorErrorStrings = append(reflectorErrorStrings, reflectorError.Error())
+	}
+
+	return fmt.Errorf("Reflector errors: %s", strings.Join(reflectorErrorStrings, ", "))
 }
 
 // getContainerLogs handles containerLogs request against the Kubelet

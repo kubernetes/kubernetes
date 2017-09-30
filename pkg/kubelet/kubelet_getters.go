@@ -258,3 +258,19 @@ func (kl *Kubelet) GetCachedMachineInfo() (*cadvisorapiv1.MachineInfo, error) {
 	}
 	return kl.machineInfo, nil
 }
+
+// ReflectorsHealthy returns a boolean that is true when all of the kubelet's
+// reflectors are healthy. If the boolean is false then the reflector errors
+// are returned as well.
+func (kl *Kubelet) ReflectorsHealthy() (bool, []error) {
+	reflectorErrors := make([]error, 0, len(kl.reflectors))
+	allHealthy := true
+	for _, reflector := range kl.reflectors {
+		if healthy, reflectorError := reflector.Healthy(); !healthy {
+			reflectorErrors = append(reflectorErrors, reflectorError)
+			allHealthy = false
+		}
+	}
+
+	return allHealthy, reflectorErrors
+}
