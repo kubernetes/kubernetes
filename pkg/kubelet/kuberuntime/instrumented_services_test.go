@@ -59,3 +59,19 @@ func TestRecordOperation(t *testing.T) {
 		mux.ServeHTTP(w, r)
 	}), "GET", prometheusUrl, nil, runtimeOperationsLatencyExpected)
 }
+
+func TestInstrumentedVersion(t *testing.T) {
+	fakeRuntime, _, _, _ := createTestRuntimeManager()
+	irs := newInstrumentedRuntimeService(fakeRuntime)
+	vr, err := irs.Version("1")
+	assert.NoError(t, err)
+	assert.Equal(t, kubeRuntimeAPIVersion, vr.Version)
+}
+
+func TestInstrumentedStatus(t *testing.T) {
+	fakeRuntime, _, _, _ := createTestRuntimeManager()
+	irs := newInstrumentedRuntimeService(fakeRuntime)
+	rs, err := irs.Status()
+	assert.NoError(t, err)
+	assert.Equal(t, "nil", rs.String())
+}
