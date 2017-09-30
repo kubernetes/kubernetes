@@ -62,7 +62,7 @@ function create-master-instance-with-resources {
     --image "${MASTER_IMAGE}" \
     --tags "${MASTER_TAG}" \
     --subnet "${NETWORK}" \
-    --scopes "storage-ro,compute-rw,logging-write" \
+    --scopes "storage-ro,logging-write" \
     --boot-disk-size "${MASTER_ROOT_DISK_SIZE}" \
     --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no"
 

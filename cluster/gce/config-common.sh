@@ -99,7 +99,7 @@ function get-cluster-ip-range {
 }
 
 if [[ "${FEDERATION:-}" == true ]]; then
-    NODE_SCOPES="${NODE_SCOPES:-compute-rw,monitoring,logging-write,storage-ro,https://www.googleapis.com/auth/ndev.clouddns.readwrite}"
+    NODE_SCOPES="${NODE_SCOPES:-monitoring,logging-write,storage-ro,https://www.googleapis.com/auth/ndev.clouddns.readwrite}"
 else
-    NODE_SCOPES="${NODE_SCOPES:-compute-rw,monitoring,logging-write,storage-ro}"
+    NODE_SCOPES="${NODE_SCOPES:-monitoring,logging-write,storage-ro}"
 fi
