@@ -45,13 +45,13 @@ import (
 //
 // stopCh should be used to indicate when the transport is unused and doesn't need
 // to continue checking the manager.
-func UpdateTransport(stopCh <-chan struct{}, clientConfig *restclient.Config, clientCertificateManager certificate.Manager) error {
-	return updateTransport(stopCh, 10*time.Second, clientConfig, clientCertificateManager)
+func UpdateTransport(stopCh <-chan struct{}, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitIfExpired bool) error {
+	return updateTransport(stopCh, 10*time.Second, clientConfig, clientCertificateManager, exitIfExpired)
 }
 
 // updateTransport is an internal method that exposes how often this method checks that the
 // client cert has changed. Intended for testing.
-func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager) error {
+func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitIfExpired bool) error {
 	if clientConfig.Transport != nil {
 		return fmt.Errorf("there is already a transport configured")
 	}
@@ -80,6 +80,9 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 	lastCert := clientCertificateManager.Current()
 	go wait.Until(func() {
 		curr := clientCertificateManager.Current()
+		if exitIfExpired && curr != nil && time.Now().After(curr.Leaf.NotAfter) {
+			glog.Fatalf("The currently active client certificate has expired, exiting.")
+		}
 		if curr == nil || lastCert == curr {
 			// Cert hasn't been rotated.
 			return
