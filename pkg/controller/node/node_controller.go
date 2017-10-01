@@ -298,6 +298,7 @@ func NewNodeController(
 		zoneStates:                  make(map[string]ZoneState),
 		runTaintManager:             runTaintManager,
 		useTaintBasedEvictions:      useTaintBasedEvictions && runTaintManager,
+		taintNodeByCondition:        taintNodeByCondition,
 	}
 	if useTaintBasedEvictions {
 		glog.Infof("Controller is using taint based evictions.")
@@ -394,6 +395,7 @@ func NewNodeController(
 	}
 
 	if nc.taintNodeByCondition {
+		glog.Infof("Controller will taint node by condition.")
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: util.CreateAddNodeHandler(func(node *v1.Node) error {
 				return nc.doNoScheduleTaintingPass(node)
@@ -618,7 +620,7 @@ func (nc *Controller) monitorNodeStatus() error {
 			}
 			return false, nil
 		}); err != nil {
-			glog.Errorf("Update status  of Node %v from Controller error : %v. "+
+			glog.Errorf("Update status of Node '%v' from Controller error: %v. "+
 				"Skipping - no pods will be evicted.", node.Name, err)
 			continue
 		}

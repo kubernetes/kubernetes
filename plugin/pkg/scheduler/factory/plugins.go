@@ -105,6 +105,16 @@ func RegisterFitPredicate(name string, predicate algorithm.FitPredicate) string 
 	return RegisterFitPredicateFactory(name, func(PluginFactoryArgs) algorithm.FitPredicate { return predicate })
 }
 
+// RemoveFitPredicate removes a fit predicate from factory.
+func RemoveFitPredicate(name string) {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
+
+	validateAlgorithmNameOrDie(name)
+	delete(fitPredicateMap, name)
+	mandatoryFitPredicates.Delete(name)
+}
+
 // RegisterMandatoryFitPredicate registers a fit predicate with the algorithm registry, the predicate is used by
 // kubelet, DaemonSet; it is always included in configuration. Returns the name with which the predicate was
 // registered.
