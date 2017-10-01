@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: kibana-logging
-        image: docker.elastic.co/kibana/kibana:5.5.1
+        image: docker.elastic.co/kibana/kibana:5.6.2
         resources:
           # need more cpu upon initialization, therefore burstable class
           limits:
