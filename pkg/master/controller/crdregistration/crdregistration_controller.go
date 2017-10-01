@@ -60,10 +60,8 @@ type crdRegistrationController struct {
 	queue workqueue.RateLimitingInterface
 }
 
-// NewAutoRegistrationController returns a controller which will register TPR GroupVersions with the auto APIService registration
+// NewAutoRegistrationController returns a controller which will register CRD GroupVersions with the auto APIService registration
 // controller so they automatically stay in sync.
-// In order to stay sane with both TPR and CRD present, we have a single controller that manages both.  When choosing whether to have an
-// APIService, we simply iterate through both.
 func NewAutoRegistrationController(crdinformer crdinformers.CustomResourceDefinitionInformer, apiServiceRegistration AutoAPIServiceRegistration) *crdRegistrationController {
 	c := &crdRegistrationController{
 		crdLister:              crdinformer.Lister(),
@@ -213,8 +211,8 @@ func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.Grou
 		Spec: apiregistration.APIServiceSpec{
 			Group:                groupVersion.Group,
 			Version:              groupVersion.Version,
-			GroupPriorityMinimum: 1000, // TPRs should have relatively low priority
-			VersionPriority:      100,  // TPRs should have relatively low priority
+			GroupPriorityMinimum: 1000, // CRDs should have relatively low priority
+			VersionPriority:      100,  // CRDs should have relatively low priority
 		},
 	})
 
