@@ -156,7 +156,11 @@ func getDeviceId(f *framework.Framework, podName string, contName string, restar
 	// Wait till pod has been restarted at least restartCount times.
 	Eventually(func() bool {
 		p, err := f.PodClient().Get(podName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+
+		if err != nil || len(p.Status.ContainerStatuses) == 0 {
+			return false
+		}
+
 		return p.Status.ContainerStatuses[0].RestartCount >= restartCount
 	}, time.Minute, time.Second).Should(BeTrue())
 	logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, contName)
