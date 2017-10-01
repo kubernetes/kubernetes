@@ -30,12 +30,10 @@ import (
 	"github.com/golang/glog"
 
 	certificates "k8s.io/api/certificates/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/util/cert"
+	"k8s.io/kubernetes/pkg/kubelet/util/csr"
 )
 
 // Manager maintains and updates the certificates in use by this certificate
@@ -278,7 +276,7 @@ func (m *manager) shouldRotate() bool {
 func (m *manager) rotateCerts() (bool, error) {
 	glog.V(2).Infof("Rotating certificates")
 
-	csrPEM, keyPEM, err := m.generateCSR()
+	csrPEM, keyPEM, privateKey, err := m.generateCSR()
 	if err != nil {
 		glog.Errorf("Unable to generate a certificate signing request: %v", err)
 		return false, nil
@@ -286,7 +284,7 @@ func (m *manager) rotateCerts() (bool, error) {
 
 	// Call the Certificate Signing Request API to get a certificate for the
 	// new private key.
-	crtPEM, err := requestCertificate(m.certSigningRequestClient, csrPEM, m.usages)
+	crtPEM, err := csr.RequestCertificate(m.certSigningRequestClient, csrPEM, "", m.usages, privateKey)
 	if err != nil {
 		glog.Errorf("Failed while requesting a signed certificate from the master: %v", err)
 		return false, nil
@@ -343,85 +341,22 @@ func (m *manager) updateCached(cert *tls.Certificate) {
 	m.cert = cert
 }
 
-func (m *manager) generateCSR() (csrPEM []byte, keyPEM []byte, err error) {
+func (m *manager) generateCSR() (csrPEM []byte, keyPEM []byte, key interface{}, err error) {
 	// Generate a new private key.
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to generate a new private key: %v", err)
+		return nil, nil, nil, fmt.Errorf("unable to generate a new private key: %v", err)
 	}
 	der, err := x509.MarshalECPrivateKey(privateKey)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to marshal the new key to DER: %v", err)
+		return nil, nil, nil, fmt.Errorf("unable to marshal the new key to DER: %v", err)
 	}
 
 	keyPEM = pem.EncodeToMemory(&pem.Block{Type: cert.ECPrivateKeyBlockType, Bytes: der})
 
 	csrPEM, err = cert.MakeCSRFromTemplate(privateKey, m.template)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to create a csr from the private key: %v", err)
+		return nil, nil, nil, fmt.Errorf("unable to create a csr from the private key: %v", err)
 	}
-	return csrPEM, keyPEM, nil
-}
-
-// requestCertificate will create a certificate signing request using the PEM
-// encoded CSR and send it to API server, then it will watch the object's
-// status, once approved by API server, it will return the API server's issued
-// certificate (pem-encoded). If there is any errors, or the watch timeouts, it
-// will return an error.
-//
-// NOTE This is a copy of a function with the same name in
-// k8s.io/kubernetes/pkg/kubelet/util/csr/csr.go, changing only the package that
-// CertificateSigningRequestInterface and KeyUsage are imported from.
-func requestCertificate(client certificatesclient.CertificateSigningRequestInterface, csrData []byte, usages []certificates.KeyUsage) (certData []byte, err error) {
-	glog.Infof("Requesting new certificate.")
-	req, err := client.Create(&certificates.CertificateSigningRequest{
-		// Username, UID, Groups will be injected by API server.
-		TypeMeta:   metav1.TypeMeta{Kind: "CertificateSigningRequest"},
-		ObjectMeta: metav1.ObjectMeta{GenerateName: "csr-"},
-
-		Spec: certificates.CertificateSigningRequestSpec{
-			Request: csrData,
-			Usages:  usages,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("cannot create certificate signing request: %v", err)
-	}
-
-	// Make a default timeout = 3600s.
-	var defaultTimeoutSeconds int64 = 3600
-	certWatch, err := client.Watch(metav1.ListOptions{
-		Watch:          true,
-		TimeoutSeconds: &defaultTimeoutSeconds,
-		FieldSelector:  fields.OneTermEqualSelector("metadata.name", req.Name).String(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("cannot watch on the certificate signing request: %v", err)
-	}
-	defer certWatch.Stop()
-	ch := certWatch.ResultChan()
-
-	for {
-		event, ok := <-ch
-		if !ok {
-			break
-		}
-
-		if event.Type == watch.Modified || event.Type == watch.Added {
-			if event.Object.(*certificates.CertificateSigningRequest).UID != req.UID {
-				continue
-			}
-			status := event.Object.(*certificates.CertificateSigningRequest).Status
-			for _, c := range status.Conditions {
-				if c.Type == certificates.CertificateDenied {
-					return nil, fmt.Errorf("certificate signing request is not approved, reason: %v, message: %v", c.Reason, c.Message)
-				}
-				if c.Type == certificates.CertificateApproved && status.Certificate != nil {
-					return status.Certificate, nil
-				}
-			}
-		}
-	}
-
-	return nil, fmt.Errorf("watch channel closed")
+	return csrPEM, keyPEM, privateKey, nil
 }

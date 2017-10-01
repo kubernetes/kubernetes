@@ -68,16 +68,16 @@ func RequestNodeCertificate(client certificatesclient.CertificateSigningRequestI
 		certificates.UsageClientAuth,
 	}
 	name := digestedName(privateKeyData, subject, usages)
-	return requestCertificate(client, csrData, name, usages, privateKey)
+	return RequestCertificate(client, csrData, name, usages, privateKey)
 }
 
-// requestCertificate will either use an existing (if this process has run
+// RequestCertificate will either use an existing (if this process has run
 // before but not to completion) or create a certificate signing request using the
 // PEM encoded CSR and send it to API server, then it will watch the object's
 // status, once approved by API server, it will return the API server's issued
 // certificate (pem-encoded). If there is any errors, or the watch timeouts, it
 // will return an error.
-func requestCertificate(client certificatesclient.CertificateSigningRequestInterface, csrData []byte, name string, usages []certificates.KeyUsage, privateKey interface{}) (certData []byte, err error) {
+func RequestCertificate(client certificatesclient.CertificateSigningRequestInterface, csrData []byte, name string, usages []certificates.KeyUsage, privateKey interface{}) (certData []byte, err error) {
 	csr := &certificates.CertificateSigningRequest{
 		// Username, UID, Groups will be injected by API server.
 		TypeMeta: metav1.TypeMeta{Kind: "CertificateSigningRequest"},
@@ -89,11 +89,14 @@ func requestCertificate(client certificatesclient.CertificateSigningRequestInter
 			Usages:  usages,
 		},
 	}
+	if len(csr.Name) == 0 {
+		csr.GenerateName = "csr-"
+	}
 
 	req, err := client.Create(csr)
 	switch {
 	case err == nil:
-	case errors.IsAlreadyExists(err):
+	case errors.IsAlreadyExists(err) && len(name) > 0:
 		glog.Infof("csr for this node already exists, reusing")
 		req, err = client.Get(name, metav1.GetOptions{})
 		if err != nil {
@@ -149,7 +152,6 @@ func requestCertificate(client certificatesclient.CertificateSigningRequestInter
 	}
 
 	return event.Object.(*certificates.CertificateSigningRequest).Status.Certificate, nil
-
 }
 
 // This digest should include all the relevant pieces of the CSR we care about.

@@ -643,6 +643,18 @@ type fakeClient struct {
 	certificatePEM []byte
 }
 
+func (c fakeClient) List(opts v1.ListOptions) (*certificates.CertificateSigningRequestList, error) {
+	if c.failureType == watchError {
+		return nil, fmt.Errorf("Watch error")
+	}
+	csrReply := certificates.CertificateSigningRequestList{
+		Items: []certificates.CertificateSigningRequest{
+			{ObjectMeta: v1.ObjectMeta{UID: "fake-uid"}},
+		},
+	}
+	return &csrReply, nil
+}
+
 func (c fakeClient) Create(*certificates.CertificateSigningRequest) (*certificates.CertificateSigningRequest, error) {
 	if c.failureType == createError {
 		return nil, fmt.Errorf("Create error")
