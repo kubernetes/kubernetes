@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
-	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 
 	"github.com/golang/glog"
@@ -76,6 +76,9 @@ func Run(s *options.SchedulerServer) error {
 	informerFactory := informers.NewSharedInformerFactory(kubecli, 0)
 	// cache only non-terminal pods
 	podInformer := factory.NewPodInformer(kubecli, 0)
+
+	// Apply algorithms based on feature gates.
+	algorithmprovider.ApplyFeatureGates()
 
 	sched, err := CreateScheduler(
 		s,

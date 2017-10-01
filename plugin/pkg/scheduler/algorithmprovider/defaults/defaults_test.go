@@ -17,10 +17,10 @@ limitations under the License.
 package defaults
 
 import (
-	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"os"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestGetMaxVols(t *testing.T) {
@@ -106,51 +106,22 @@ func TestDefaultPriorities(t *testing.T) {
 }
 
 func TestDefaultPredicates(t *testing.T) {
-	testCases := []struct {
-		actionFunc  func(value string) error
-		actionParam string
-		expected    sets.String
-	}{
-		{
-			actionFunc:  utilfeature.DefaultFeatureGate.Set,
-			actionParam: "TaintNodesByCondition=true",
-			expected: sets.NewString(
-				"NoVolumeZoneConflict",
-				"MaxEBSVolumeCount",
-				"MaxGCEPDVolumeCount",
-				"MaxAzureDiskVolumeCount",
-				"MatchInterPodAffinity",
-				"NoDiskConflict",
-				"GeneralPredicates",
-				"CheckNodeMemoryPressure",
-				"CheckNodeDiskPressure",
-				"NoVolumeNodeConflict",
-				"PodToleratesNodeTaints",
-			),
-		},
-		{
-			actionFunc:  utilfeature.DefaultFeatureGate.Set,
-			actionParam: "TaintNodesByCondition=false",
-			expected: sets.NewString(
-				"NoVolumeZoneConflict",
-				"MaxEBSVolumeCount",
-				"MaxGCEPDVolumeCount",
-				"MaxAzureDiskVolumeCount",
-				"MatchInterPodAffinity",
-				"NoDiskConflict",
-				"GeneralPredicates",
-				"CheckNodeMemoryPressure",
-				"CheckNodeDiskPressure",
-				"NoVolumeNodeConflict",
-				"CheckNodeCondition",
-				"PodToleratesNodeTaints",
-			),
-		},
-	}
-	for _, testCase := range testCases {
-		testCase.actionFunc(testCase.actionParam)
-		if result := defaultPredicates(); !result.Equal(testCase.expected) {
-			t.Errorf("expected %v got %v", testCase.expected, result)
-		}
+	result := sets.NewString(
+		"NoVolumeZoneConflict",
+		"MaxEBSVolumeCount",
+		"MaxGCEPDVolumeCount",
+		"MaxAzureDiskVolumeCount",
+		"MatchInterPodAffinity",
+		"NoDiskConflict",
+		"GeneralPredicates",
+		"CheckNodeMemoryPressure",
+		"CheckNodeDiskPressure",
+		"NoVolumeNodeConflict",
+		"CheckNodeCondition",
+		"PodToleratesNodeTaints",
+	)
+
+	if expected := defaultPredicates(); !result.Equal(expected) {
+		t.Errorf("expected %v got %v", expected, result)
 	}
 }
