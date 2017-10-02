@@ -3,18 +3,17 @@ kind: Service
 metadata:
   name: monitoring-influxdb
   namespace: kube-system
-  labels: 
+  labels:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
     kubernetes.io/name: "InfluxDB"
-spec: 
-  ports: 
+spec:
+  ports:
     - name: http
       port: 8083
       targetPort: 8083
     - name: api
       port: 8086
       targetPort: 8086
-  selector: 
+  selector:
     k8s-app: influxGrafana
-
