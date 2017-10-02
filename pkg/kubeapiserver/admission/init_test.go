@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/admission"
+	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
@@ -51,7 +52,7 @@ func (self *WantAuthorizerAdmission) SetAuthorizer(a authorizer.Authorizer) {
 }
 
 var _ admission.Interface = &WantAuthorizerAdmission{}
-var _ WantsAuthorizer = &WantAuthorizerAdmission{}
+var _ genericadmissioninit.WantsAuthorizer = &WantAuthorizerAdmission{}
 
 // TestWantsAuthorizer ensures that the authorizer is injected when the WantsAuthorizer
 // interface is implemented.
@@ -104,21 +105,5 @@ func TestWantsServiceResolver(t *testing.T) {
 	i.SetServiceResolver(fsr).Initialize(sw)
 	if got, ok := sw.got.(*fakeServiceResolver); !ok || got != fsr {
 		t.Errorf("plumbing fail - %v %v#", ok, got)
-	}
-}
-
-type clientCertWanter struct {
-	doNothingAdmission
-	gotCert, gotKey []byte
-}
-
-func (s *clientCertWanter) SetClientCert(cert, key []byte) { s.gotCert, s.gotKey = cert, key }
-
-func TestWantsClientCert(t *testing.T) {
-	i := &PluginInitializer{}
-	ccw := &clientCertWanter{}
-	i.SetClientCert([]byte("cert"), []byte("key")).Initialize(ccw)
-	if string(ccw.gotCert) != "cert" || string(ccw.gotKey) != "key" {
-		t.Errorf("plumbing fail - %v %v", ccw.gotCert, ccw.gotKey)
 	}
 }
