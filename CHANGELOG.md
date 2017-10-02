@@ -681,6 +681,10 @@ Consider the following changes, limitations, and guidelines before you upgrade:
 
 This section contains a list of known issues reported in Kubernetes 1.8 release. The content is populated via [v1.8.x known issues and FAQ accumulator](https://github.com/kubernetes/kubernetes/issues/53004).
 
+* Kubelets using TLS bootstrapping (`--bootstrap-kubeconfig`) or certificate rotation (`--rotate-certificates`) store certificates in the directory specified by `--cert-dir`. The default location (`/var/run/kubernetes`) is automatically erased on reboot on some platforms, which can prevent the kubelet from authenticating to the API server after a reboot. Specifying a non-transient location, such as `--cert-dir=/var/lib/kubelet/pki`, is recommended.
+
+For more information, see [#53288](https://issue.k8s.io/53288).
+
 * A performance issue was identified in large-scale clusters when deleting thousands of pods simultaneously across hundreds of nodes. Kubelets in this scenario can encounter temporarily increased latency of `delete pod` API calls -- above the target service level objective of 1 second. If you run clusters with this usage pattern and if pod deletion latency could be an issue for you, you might want to wait until the issue is resolved before you upgrade. 
 
 For more information and for updates on resolution of this issue, see [[#51899](https://github.com/kubernetes/kubernetes/pull/51899)](https://issue.k8s.io/51899).
