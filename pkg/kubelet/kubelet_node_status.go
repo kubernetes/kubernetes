@@ -608,15 +608,6 @@ func (kl *Kubelet) setNodeStatusMachineInfo(node *v1.Node) {
 					node.Status.Capacity[k] = v
 				}
 			}
-			// Remove stale extended resources.
-			for k := range node.Status.Capacity {
-				if v1helper.IsExtendedResourceName(k) {
-					if _, ok := currentCapacity[k]; !ok {
-						glog.V(2).Infof("delete capacity for %s", k)
-						delete(node.Status.Capacity, k)
-					}
-				}
-			}
 		}
 	}
 
