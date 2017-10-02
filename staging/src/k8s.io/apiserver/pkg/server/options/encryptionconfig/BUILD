@@ -21,9 +21,9 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/storage/value:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/aes:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope:go_default_library",
-        "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/vault:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/identity:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/value/encrypt/secretbox:go_default_library",
+        "//vendor/k8s.io/apiserver/plugin/pkg/kmsprovider/vault:go_default_library",
     ],
 )
 

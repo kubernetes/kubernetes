@@ -26,7 +26,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
-	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope/vault"
+	"k8s.io/apiserver/plugin/pkg/kmsprovider/vault"
 )
 
 func init() {

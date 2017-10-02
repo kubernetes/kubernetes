@@ -65,7 +65,7 @@ func newClientWrapper(config *EnvelopeConfig) (*clientWrapper, error) {
 	}
 
 	// Set token for the api.client.
-	if config.Token != "" {
+	if len(config.Token) != 0 {
 		client.SetToken(config.Token)
 	} else {
 		err = wrapper.refreshToken(config)
