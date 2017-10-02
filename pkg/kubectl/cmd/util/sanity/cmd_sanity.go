@@ -21,6 +21,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -101,12 +102,46 @@ func CheckExamples(cmd *cobra.Command) []error {
 			if !strings.HasPrefix(line, templates.Indentation) {
 				errors = append(errors, fmt.Errorf(`command %q: examples are not normalized, make sure you are calling templates.Examples (from pkg/cmd/templates) before assigning cmd.Example`, cmdPath))
 			}
-			if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "//") {
+
+			trimmed := strings.TrimSpace(line)
+
+			if strings.HasPrefix(trimmed, "//") {
 				errors = append(errors, fmt.Errorf(`command %q: we use # to start comments in examples instead of //`, cmdPath))
+			}
+
+			if strings.HasPrefix(trimmed, "#") {
+				if !strings.HasPrefix(trimmed, "# ") {
+					errors = append(errors, fmt.Errorf(`command %q: we use a space after the hash symbol`, cmdPath))
+				}
+				if isNotCapitalized(trimmed) {
+					errors = append(errors, fmt.Errorf(`command %q: please capitalize command comment strings (or line wrap multi-line comments)`, cmdPath))
+				}
+			}
+
+			if strings.HasPrefix(trimmed, "$") {
+				errors = append(errors, fmt.Errorf(`command %q: we don't use '$' to start example commands`, cmdPath))
 			}
 		}
 	}
 	return errors
+}
+
+// isNotCapitalized returns true if 3rd character is a letter and is lower case.
+func isNotCapitalized(s string) bool {
+	indexOfFirstLetter := 2
+
+	if len(s) <= indexOfFirstLetter {
+		return false
+	}
+	runes := []rune(s)
+	r := runes[indexOfFirstLetter]
+
+	if unicode.IsLetter(r) {
+		if unicode.IsLower(r) {
+			return true
+		}
+	}
+	return false
 }
 
 func CheckFlags(cmd *cobra.Command) []error {

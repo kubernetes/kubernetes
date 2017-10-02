@@ -57,9 +57,8 @@ var (
 		Currently only deployments support being paused.`)
 
 	pause_example = templates.Examples(`
-		# Mark the nginx deployment as paused. Any current state of
-		# the deployment will continue its function, new updates to the deployment will not
-		# have an effect as long as the deployment is paused.
+		# Mark the nginx deployment as paused.
+		# Any current state of the deployment will continue its function, new updates to the deployment will not have an effect as long as the deployment is paused.
 		kubectl rollout pause deployment/nginx`)
 )
 

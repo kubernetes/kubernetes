@@ -73,8 +73,7 @@ var (
 		Bearer token and basic auth are mutually exclusive.`), clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword)
 
 	create_authinfo_example = templates.Examples(`
-		# Set only the "client-key" field on the "cluster-admin"
-		# entry, without touching other values:
+		# Set only the "client-key" field on the "cluster-admin" entry, without touching other values:
 		kubectl config set-credentials cluster-admin --client-key=~/.kube/admin.key
 
 		# Set basic auth for the "cluster-admin" entry
