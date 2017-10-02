@@ -18,11 +18,17 @@ package etcd3
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"sync"
 	"testing"
 
+	"github.com/coreos/etcd/integration"
+	"golang.org/x/net/context"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	apitesting "k8s.io/apimachinery/pkg/api/testing"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -36,9 +42,6 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storagetests "k8s.io/apiserver/pkg/storage/tests"
 	"k8s.io/apiserver/pkg/storage/value"
-
-	"github.com/coreos/etcd/integration"
-	"golang.org/x/net/context"
 )
 
 var scheme = runtime.NewScheme()
@@ -459,6 +462,41 @@ func TestGuaranteedUpdateWithTTL(t *testing.T) {
 	testCheckEventType(t, watch.Deleted, w)
 }
 
+func TestGuaranteedUpdateChecksStoredData(t *testing.T) {
+	ctx, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
+
+	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	key := "/somekey"
+
+	// serialize input into etcd with data that would be normalized by a write - in this case, leading
+	// and trailing whitespace
+	codec := codecs.LegacyCodec(examplev1.SchemeGroupVersion)
+	data, err := runtime.Encode(codec, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := store.client.Put(ctx, key, "test! "+string(data)+" ")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// this update should write the canonical value to etcd because the new serialization differs
+	// from the stored serialization
+	input.ResourceVersion = strconv.FormatInt(resp.Header.Revision, 10)
+	out := &example.Pod{}
+	err = store.GuaranteedUpdate(ctx, key, out, true, nil,
+		func(_ runtime.Object, _ storage.ResponseMeta) (runtime.Object, *uint64, error) {
+			return input, nil, nil
+		}, input)
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+	if out.ResourceVersion == strconv.FormatInt(resp.Header.Revision, 10) {
+		t.Errorf("guaranteed update should have updated the serialized data, got %#v", out)
+	}
+}
+
 func TestGuaranteedUpdateWithConflict(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
@@ -503,6 +541,53 @@ func TestGuaranteedUpdateWithConflict(t *testing.T) {
 
 	if updateCount != 2 {
 		t.Errorf("Should have conflict and called update func twice")
+	}
+}
+
+func TestGuaranteedUpdateWithSuggestionAndConflict(t *testing.T) {
+	ctx, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
+	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+
+	// First, update without a suggestion so originalPod is outdated
+	updatedPod := &example.Pod{}
+	err := store.GuaranteedUpdate(ctx, key, updatedPod, false, nil,
+		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+			pod := obj.(*example.Pod)
+			pod.Name = "foo-2"
+			return pod, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Second, update using the outdated originalPod as the suggestion. Return a conflict error when
+	// passed originalPod, and make sure that SimpleUpdate is called a second time after a live lookup
+	// with the value of updatedPod.
+	sawConflict := false
+	updatedPod2 := &example.Pod{}
+	err = store.GuaranteedUpdate(ctx, key, updatedPod2, false, nil,
+		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+			pod := obj.(*example.Pod)
+			if pod.Name != "foo-2" {
+				if sawConflict {
+					t.Fatalf("unexpected second conflict")
+				}
+				sawConflict = true
+				// simulated stale object - return a conflict
+				return nil, apierrors.NewConflict(example.SchemeGroupVersion.WithResource("pods").GroupResource(), "name", errors.New("foo"))
+			}
+			pod.Name = "foo-3"
+			return pod, nil
+		}),
+		originalPod,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if updatedPod2.Name != "foo-3" {
+		t.Errorf("unexpected pod name: %q", updatedPod2.Name)
 	}
 }
 
@@ -569,10 +654,10 @@ func TestTransformationFailure(t *testing.T) {
 	}); !storage.IsInternalError(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	// GuaranteedUpdate with suggestion should not return an error if we don't change the object
+	// GuaranteedUpdate with suggestion should return an error if we don't change the object
 	if err := store.GuaranteedUpdate(ctx, preset[1].key, &example.Pod{}, false, nil, func(input runtime.Object, res storage.ResponseMeta) (output runtime.Object, ttl *uint64, err error) {
 		return input, nil, nil
-	}, preset[1].obj); err != nil {
+	}, preset[1].obj); err == nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
