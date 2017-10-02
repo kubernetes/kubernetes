@@ -319,7 +319,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 				if err = checkVolumeSatisfyClaim(volume, claim); err != nil {
 					glog.V(4).Infof("Can't bind the claim to volume %q: %v", volume.Name, err)
 					//send a event
-					ctrl.eventRecorder.Event(volume, v1.EventTypeWarning, events.VolumeMismatch, "Volume's size is smaller than requested or volume's class does not match with claim")
+					ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.VolumeMismatch, "Volume's size is smaller than requested or volume's class does not match with claim")
 					//volume does not satisfy the requirements of the claim
 					if _, err = ctrl.updateClaimStatus(claim, v1.ClaimPending, nil); err != nil {
 						return err
