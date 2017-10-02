@@ -22,10 +22,6 @@ type ListElement struct {
 	// FieldMetaImpl contains metadata about the field from openapi
 	FieldMetaImpl
 
-	// HasElementData contains whether the field was set
-	HasElementData
-
-	// ListElementData contains the value a field was set to
 	ListElementData
 
 	// Values contains the combined recorded-local-remote value of each item in the list
@@ -44,39 +40,28 @@ var _ Element = &ListElement{}
 
 // ListElementData contains the recorded, local and remote data for a list
 type ListElementData struct {
-	// recorded contains the value of the field from the recorded object
-	Recorded []interface{}
-
-	// Local contains the value of the field from the recorded object
-	Local []interface{}
-
-	// Remote contains the value of the field from the recorded object
-	Remote []interface{}
+	RawElementData
 }
 
-// GetRecorded implements Element.GetRecorded
-func (e ListElementData) GetRecorded() interface{} {
-	// https://golang.org/doc/faq#nil_error
-	if e.Recorded == nil {
-		return nil
-	}
-	return e.Recorded
+// GetRecordedList returns the Recorded value as a list
+func (e ListElementData) GetRecordedList() []interface{} {
+	return sliceCast(e.recorded)
 }
 
-// GetLocal implements Element.GetLocal
-func (e ListElementData) GetLocal() interface{} {
-	// https://golang.org/doc/faq#nil_error
-	if e.Local == nil {
-		return nil
-	}
-	return e.Local
+// GetLocalList returns the Local value as a list
+func (e ListElementData) GetLocalList() []interface{} {
+	return sliceCast(e.local)
 }
 
-// GetRemote implements Element.GetRemote
-func (e ListElementData) GetRemote() interface{} {
-	// https://golang.org/doc/faq#nil_error
-	if e.Remote == nil {
+// GetRemoteList returns the Remote value as a list
+func (e ListElementData) GetRemoteList() []interface{} {
+	return sliceCast(e.remote)
+}
+
+// sliceCast casts i to a slice if it is non-nil, otherwise returns nil
+func sliceCast(i interface{}) []interface{} {
+	if i == nil {
 		return nil
 	}
-	return e.Remote
+	return i.([]interface{})
 }

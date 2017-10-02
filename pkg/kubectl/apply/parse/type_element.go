@@ -32,16 +32,11 @@ func (v ElementBuildingVisitor) typeElement(meta apply.FieldMetaImpl, item *type
 	}
 
 	// Collect same fields from multiple maps into a map of elements
-	values, err := v.createMapValues(fn, meta, item.HasElementData, item.MapElementData)
+	values, err := v.createMapValues(fn, meta, item.MapElementData)
 	if err != nil {
 		return nil, err
 	}
 
 	// Return the result
-	return &apply.TypeElement{
-		FieldMetaImpl:  meta,
-		HasElementData: item.HasElementData,
-		MapElementData: item.MapElementData,
-		Values:         values,
-	}, nil
+	return &apply.TypeElement{meta, item.MapElementData, values}, nil
 }

@@ -16,18 +16,11 @@ limitations under the License.
 
 package apply
 
-import (
-	"fmt"
-)
-
 // PrimitiveElement contains the recorded, local and remote values for a field
 // of type primitive
 type PrimitiveElement struct {
 	// FieldMetaImpl contains metadata about the field from openapi
 	FieldMetaImpl
-
-	// HasElementData contains whether the field was set
-	HasElementData
 
 	// RawElementData contains the values the field was set to
 	RawElementData
@@ -36,11 +29,6 @@ type PrimitiveElement struct {
 // Merge implements Element.Merge
 func (e PrimitiveElement) Merge(v Strategy) (Result, error) {
 	return v.MergePrimitive(e)
-}
-
-// String returns a string representation of the PrimitiveElement
-func (e PrimitiveElement) String() string {
-	return fmt.Sprintf("name: %s recorded: %v local: %v remote: %v", e.Name, e.Recorded, e.Local, e.Remote)
 }
 
 var _ Element = &PrimitiveElement{}

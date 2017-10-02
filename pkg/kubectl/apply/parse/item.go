@@ -33,7 +33,6 @@ type primitiveItem struct {
 	Name      string
 	Primitive *openapi.Primitive
 
-	apply.HasElementData
 	apply.RawElementData
 }
 
@@ -54,7 +53,6 @@ type listItem struct {
 	Name  string
 	Array *openapi.Array
 
-	apply.HasElementData
 	apply.ListElementData
 }
 
@@ -75,7 +73,6 @@ type mapItem struct {
 	Name string
 	Map  *openapi.Map
 
-	apply.HasElementData
 	apply.MapElementData
 }
 
@@ -96,7 +93,6 @@ type typeItem struct {
 	Name string
 	Type *openapi.Kind
 
-	apply.HasElementData
 	apply.MapElementData
 }
 

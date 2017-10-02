@@ -95,22 +95,6 @@ func getType(args ...interface{}) (reflect.Type, error) {
 	return reflect.TypeOf(last), nil
 }
 
-// sliceCast casts i to a slice if it is non-nil, otherwise returns nil
-func sliceCast(i interface{}) []interface{} {
-	if i == nil {
-		return nil
-	}
-	return i.([]interface{})
-}
-
-// mapCast casts i to a map if it is non-nil, otherwise returns nil
-func mapCast(i interface{}) map[string]interface{} {
-	if i == nil {
-		return nil
-	}
-	return i.(map[string]interface{})
-}
-
 // getFieldMeta parses the metadata about the field from the openapi spec
 func getFieldMeta(s openapi.Schema, name string) (apply.FieldMetaImpl, error) {
 	m := apply.FieldMetaImpl{}

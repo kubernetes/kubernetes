@@ -33,18 +33,13 @@ func (v ElementBuildingVisitor) mapElement(meta apply.FieldMetaImpl, item *mapIt
 	}
 
 	// Collect same fields from multiple maps into a map of elements
-	values, err := v.createMapValues(fn, meta, item.HasElementData, item.MapElementData)
+	values, err := v.createMapValues(fn, meta, item.MapElementData)
 	if err != nil {
 		return nil, err
 	}
 
 	// Return the result
-	return &apply.MapElement{
-		FieldMetaImpl:  meta,
-		HasElementData: item.HasElementData,
-		MapElementData: item.MapElementData,
-		Values:         values,
-	}, nil
+	return &apply.MapElement{meta, item.MapElementData, values}, nil
 }
 
 // schemaFn returns the schema for a field or map value based on its name or key
@@ -55,20 +50,24 @@ type schemaFn func(key string) openapi.Schema
 func (v ElementBuildingVisitor) createMapValues(
 	schemaFn schemaFn,
 	meta apply.FieldMetaImpl,
-	hasData apply.HasElementData,
 	data apply.MapElementData) (map[string]apply.Element, error) {
 
 	// Collate each key in the map
 	values := map[string]apply.Element{}
-	for _, key := range keysUnion(data.Recorded, data.Local, data.Remote) {
-		recorded, recordedSet := nilSafeLookup(key, data.Recorded)
-		local, localSet := nilSafeLookup(key, data.Local)
-		remote, remoteSet := nilSafeLookup(key, data.Remote)
+	for _, key := range keysUnion(data.GetRecordedMap(), data.GetLocalMap(), data.GetRemoteMap()) {
+		combined := apply.RawElementData{}
+		if recorded, recordedSet := nilSafeLookup(key, data.GetRecordedMap()); recordedSet {
+			combined.SetRecorded(recorded)
+		}
+		if local, localSet := nilSafeLookup(key, data.GetLocalMap()); localSet {
+			combined.SetLocal(local)
+		}
+		if remote, remoteSet := nilSafeLookup(key, data.GetRemoteMap()); remoteSet {
+			combined.SetRemote(remote)
+		}
 
 		// Create an item for the field
-		field, err := v.getItem(schemaFn(key), key,
-			apply.RawElementData{recorded, local, remote},
-			apply.HasElementData{recordedSet, localSet, remoteSet})
+		field, err := v.getItem(schemaFn(key), key, combined)
 		if err != nil {
 			return nil, err
 		}

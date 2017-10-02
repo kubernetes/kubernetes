@@ -76,33 +76,6 @@ type FieldMeta interface {
 	GetFieldType() string
 }
 
-// HasElementData contains whether a field was set in the recorded, local and remote sources
-type HasElementData struct {
-	// RecordedSet is true if the field was found in the recorded object
-	RecordedSet bool
-
-	// LocalSet is true if the field was found in the local object
-	LocalSet bool
-
-	// RemoteSet is true if the field was found in the remote object
-	RemoteSet bool
-}
-
-// HasRecorded implements Element.HasRecorded
-func (e HasElementData) HasRecorded() bool {
-	return e.RecordedSet
-}
-
-// HasLocal implements Element.HasLocal
-func (e HasElementData) HasLocal() bool {
-	return e.LocalSet
-}
-
-// HasRemote implements Element.HasRemote
-func (e HasElementData) HasRemote() bool {
-	return e.RemoteSet
-}
-
 // FieldMetaImpl implements FieldMeta
 type FieldMetaImpl struct {
 	// The type of merge strategy to use for this field
@@ -195,7 +168,7 @@ type CombinedPrimitiveSlice struct {
 
 // PrimitiveListItem represents a single value in a slice of primitives
 type PrimitiveListItem struct {
-	// Value is the value of the primitive, should match Recorded, Local and Remote
+	// Value is the value of the primitive, should match recorded, local and remote
 	Value interface{}
 
 	RawElementData
@@ -230,21 +203,27 @@ func (s *CombinedPrimitiveSlice) upsert(l interface{}) *PrimitiveListItem {
 // slice for either the local or remote, set on that value as the recorded value
 // Otherwise append a new item to the list with the recorded value.
 func (s *CombinedPrimitiveSlice) UpsertRecorded(l interface{}) {
-	s.upsert(l).Recorded = l
+	v := s.upsert(l)
+	v.recorded = l
+	v.recordedSet = true
 }
 
 // UpsertLocal adds l to the slice.  If there is already a value of l in the
 // slice for either the recorded or remote, set on that value as the local value
 // Otherwise append a new item to the list with the local value.
 func (s *CombinedPrimitiveSlice) UpsertLocal(l interface{}) {
-	s.upsert(l).Local = l
+	v := s.upsert(l)
+	v.local = l
+	v.localSet = true
 }
 
 // UpsertRemote adds l to the slice.  If there is already a value of l in the
 // slice for either the local or recorded, set on that value as the remote value
 // Otherwise append a new item to the list with the remote value.
 func (s *CombinedPrimitiveSlice) UpsertRemote(l interface{}) {
-	s.upsert(l).Recorded = l
+	v := s.upsert(l)
+	v.remote = l
+	v.remoteSet = true
 }
 
 // ListItem represents a single value in a slice of maps or types
@@ -299,7 +278,8 @@ func (s *CombinedMapSlice) UpsertRecorded(key MergeKeys, l interface{}) error {
 	if err != nil {
 		return err
 	}
-	item.Recorded = l
+	item.recorded = l
+	item.recordedSet = true
 	return nil
 }
 
@@ -311,7 +291,8 @@ func (s *CombinedMapSlice) UpsertLocal(key MergeKeys, l interface{}) error {
 	if err != nil {
 		return err
 	}
-	item.Local = l
+	item.local = l
+	item.localSet = true
 	return nil
 }
 
@@ -323,7 +304,8 @@ func (s *CombinedMapSlice) UpsertRemote(key MergeKeys, l interface{}) error {
 	if err != nil {
 		return err
 	}
-	item.Remote = l
+	item.remote = l
+	item.remoteSet = true
 	return nil
 }
 
@@ -345,29 +327,97 @@ func IsAdd(e Element) bool {
 	return e.HasLocal() && !e.HasRemote()
 }
 
+// NewRawElementData returns a new RawElementData, setting IsSet to true for
+// non-nil values, and leaving IsSet false for nil values.
+// Note: use this only when you want a nil-value to be considered "unspecified"
+// (ignore) and not "unset" (deleted).
+func NewRawElementData(recorded, local, remote interface{}) RawElementData {
+	data := RawElementData{}
+	if recorded != nil {
+		data.SetRecorded(recorded)
+	}
+	if local != nil {
+		data.SetLocal(local)
+	}
+	if remote != nil {
+		data.SetRemote(remote)
+	}
+	return data
+}
+
 // RawElementData contains the raw recorded, local and remote data
+// and metadata about whethere or not each was set
 type RawElementData struct {
-	// recorded contains the value of the field from the recorded object
-	Recorded interface{}
+	HasElementData
 
-	// Local contains the value of the field from the recorded object
-	Local interface{}
+	recorded interface{}
+	local    interface{}
+	remote   interface{}
+}
 
-	// Remote contains the value of the field from the recorded object
-	Remote interface{}
+// SetRecorded sets the recorded value
+func (b *RawElementData) SetRecorded(value interface{}) {
+	b.recorded = value
+	b.recordedSet = true
+}
+
+// SetLocal sets the recorded value
+func (b *RawElementData) SetLocal(value interface{}) {
+	b.local = value
+	b.localSet = true
+}
+
+// SetRemote sets the recorded value
+func (b *RawElementData) SetRemote(value interface{}) {
+	b.remote = value
+	b.remoteSet = true
 }
 
 // GetRecorded implements Element.GetRecorded
-func (e RawElementData) GetRecorded() interface{} {
-	return e.Recorded
+func (b RawElementData) GetRecorded() interface{} {
+	// https://golang.org/doc/faq#nil_error
+	if b.recorded == nil {
+		return nil
+	}
+	return b.recorded
 }
 
 // GetLocal implements Element.GetLocal
-func (e RawElementData) GetLocal() interface{} {
-	return e.Local
+func (b RawElementData) GetLocal() interface{} {
+	// https://golang.org/doc/faq#nil_error
+	if b.local == nil {
+		return nil
+	}
+	return b.local
 }
 
 // GetRemote implements Element.GetRemote
-func (e RawElementData) GetRemote() interface{} {
-	return e.Remote
+func (b RawElementData) GetRemote() interface{} {
+	// https://golang.org/doc/faq#nil_error
+	if b.remote == nil {
+		return nil
+	}
+	return b.remote
+}
+
+// HasElementData contains whether a field was set in the recorded, local and remote sources
+type HasElementData struct {
+	recordedSet bool
+	localSet    bool
+	remoteSet   bool
+}
+
+// HasRecorded implements Element.HasRecorded
+func (e HasElementData) HasRecorded() bool {
+	return e.recordedSet
+}
+
+// HasLocal implements Element.HasLocal
+func (e HasElementData) HasLocal() bool {
+	return e.localSet
+}
+
+// HasRemote implements Element.HasRemote
+func (e HasElementData) HasRemote() bool {
+	return e.remoteSet
 }

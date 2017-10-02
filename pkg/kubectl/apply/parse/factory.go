@@ -48,14 +48,9 @@ func (b *Factory) CreateElement(recorded, local, remote map[string]interface{}) 
 		return nil, err
 	}
 
-	// Get the item for the type
-	hasRecorded := recorded != nil
-	hasLocal := local != nil
-	hasRemote := remote != nil
+	data := apply.NewRawElementData(recorded, local, remote)
 	fieldName := ""
-	item, err := visitor.getItem(oapiKind, fieldName,
-		apply.RawElementData{recorded, local, remote},
-		apply.HasElementData{hasRecorded, hasLocal, hasRemote})
+	item, err := visitor.getItem(oapiKind, fieldName, data)
 	if err != nil {
 		return nil, err
 	}
@@ -65,10 +60,8 @@ func (b *Factory) CreateElement(recorded, local, remote map[string]interface{}) 
 }
 
 // getItem returns the appropriate Item based on the underlying type of the arguments
-func (v *ElementBuildingVisitor) getItem(s openapi.Schema, name string,
-	data apply.RawElementData,
-	isSet apply.HasElementData) (Item, error) {
-	kind, err := getType(data.Recorded, data.Local, data.Remote)
+func (v *ElementBuildingVisitor) getItem(s openapi.Schema, name string, data apply.RawElementData) (Item, error) {
+	kind, err := getType(data.GetRecorded(), data.GetLocal(), data.GetRemote())
 	if err != nil {
 		return nil, err
 	}
@@ -86,38 +79,23 @@ func (v *ElementBuildingVisitor) getItem(s openapi.Schema, name string,
 		if err != nil {
 			return nil, fmt.Errorf("expected openapi Primitive, was %T for %v", s, kind)
 		}
-		return &primitiveItem{name, p, isSet, data}, nil
+		return &primitiveItem{name, p, data}, nil
 	case reflect.Array, reflect.Slice:
 		a, err := getArray(s)
 		if err != nil {
 			return nil, fmt.Errorf("expected openapi Array, was %T for %v", s, kind)
 		}
-		return &listItem{name, a, isSet,
-			apply.ListElementData{
-				sliceCast(data.Recorded),
-				sliceCast(data.Local),
-				sliceCast(data.Remote),
-			}}, nil
+		return &listItem{name, a, apply.ListElementData{data}}, nil
 	case reflect.Map:
 		if k, err := getKind(s); err == nil {
-			return &typeItem{name, k, isSet,
-				apply.MapElementData{
-					mapCast(data.Recorded),
-					mapCast(data.Local),
-					mapCast(data.Remote),
-				}}, nil
+			return &typeItem{name, k, apply.MapElementData{data}}, nil
 		}
 		// If it looks like a map, and no openapi type is found, default to mapItem
 		m, err := getMap(s)
 		if err != nil {
 			return nil, fmt.Errorf("expected openapi Kind or Map, was %T for %v", s, kind)
 		}
-		return &mapItem{name, m, isSet,
-			apply.MapElementData{
-				mapCast(data.Recorded),
-				mapCast(data.Local),
-				mapCast(data.Remote),
-			}}, nil
+		return &mapItem{name, m, apply.MapElementData{data}}, nil
 	}
 	return nil, fmt.Errorf("unsupported type type %v", kind)
 }

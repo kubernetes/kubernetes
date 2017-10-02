@@ -47,7 +47,6 @@ func (v ElementBuildingVisitor) doPrimitiveList(meta apply.FieldMetaImpl, item *
 			MergeType: "merge",
 			Name:      item.Name,
 		},
-		HasElementData:  item.HasElementData,
 		ListElementData: item.ListElementData,
 		Values:          []apply.Element{},
 	}
@@ -57,32 +56,26 @@ func (v ElementBuildingVisitor) doPrimitiveList(meta apply.FieldMetaImpl, item *
 
 	// Locally defined items come first and retain their order
 	// as defined locally
-	for _, l := range item.Local {
+	for _, l := range item.GetLocalList() {
 		orderedKeys.UpsertLocal(l)
 	}
 	// Mixin remote values, adding any that are not present locally
-	for _, l := range item.Remote {
+	for _, l := range item.GetRemoteList() {
 		orderedKeys.UpsertRemote(l)
 	}
 	// Mixin recorded values, adding any that are not present locally
 	// or remotely
-	for _, l := range item.Recorded {
+	for _, l := range item.GetRecordedList() {
 		orderedKeys.UpsertRecorded(l)
 	}
 
 	for i, l := range orderedKeys.Items {
-		recordedSet := l.Recorded != nil
-		localSet := l.Local != nil
-		remoteSet := l.Remote != nil
-
 		var s openapi.Schema
 		if item.Array != nil && item.Array.SubType != nil {
 			s = item.Array.SubType
 		}
 
-		subitem, err := v.getItem(s, fmt.Sprintf("%d", i),
-			l.RawElementData,
-			apply.HasElementData{recordedSet, localSet, remoteSet})
+		subitem, err := v.getItem(s, fmt.Sprintf("%d", i), l.RawElementData)
 
 		if err != nil {
 			return nil, err
@@ -111,7 +104,6 @@ func (v ElementBuildingVisitor) doMapList(meta apply.FieldMetaImpl, item *listIt
 			MergeKeys: key,
 			Name:      item.Name,
 		},
-		HasElementData:  item.HasElementData,
 		ListElementData: item.ListElementData,
 		Values:          []apply.Element{},
 	}
@@ -121,31 +113,25 @@ func (v ElementBuildingVisitor) doMapList(meta apply.FieldMetaImpl, item *listIt
 
 	// Locally defined items come first and retain their order
 	// as defined locally
-	for _, l := range item.Local {
+	for _, l := range item.GetLocalList() {
 		orderedKeys.UpsertLocal(key, l)
 	}
 	// Mixin remote values, adding any that are not present locally
-	for _, l := range item.Remote {
+	for _, l := range item.GetRemoteList() {
 		orderedKeys.UpsertRemote(key, l)
 	}
 	// Mixin recorded values, adding any that are not present locally
 	// or remotely
-	for _, l := range item.Recorded {
+	for _, l := range item.GetRecordedList() {
 		orderedKeys.UpsertRecorded(key, l)
 	}
 
 	for i, l := range orderedKeys.Items {
-		recordedSet := l.Recorded != nil
-		localSet := l.Local != nil
-		remoteSet := l.Remote != nil
-
 		var s openapi.Schema
 		if item.Array != nil && item.Array.SubType != nil {
 			s = item.Array.SubType
 		}
-		subitem, err := v.getItem(s, fmt.Sprintf("%d", i),
-			l.RawElementData,
-			apply.HasElementData{recordedSet, localSet, remoteSet})
+		subitem, err := v.getItem(s, fmt.Sprintf("%d", i), l.RawElementData)
 		if err != nil {
 			return nil, err
 		}
@@ -166,30 +152,30 @@ func (v ElementBuildingVisitor) doMapList(meta apply.FieldMetaImpl, item *listIt
 // replaceListElement builds a new ListElement from a listItem
 // Uses the "replace" strategy and identify "same" elements across lists by their index
 func (v ElementBuildingVisitor) replaceListElement(meta apply.FieldMetaImpl, item *listItem) (*apply.ListElement, error) {
-	result := &apply.ListElement{
-		FieldMetaImpl:   meta,
-		ListElementData: item.ListElementData,
-		HasElementData:  item.HasElementData,
-		Values:          []apply.Element{},
-	}
-	result.Name = item.Name
+	meta.Name = item.Name
+	result := &apply.ListElement{meta, item.ListElementData, []apply.Element{}}
 
 	// Use the max length to iterate over the slices
-	for i := 0; i < max(len(item.Recorded), len(item.Local), len(item.Remote)); i++ {
+	for i := 0; i < max(len(item.GetRecordedList()), len(item.GetLocalList()), len(item.GetRemoteList())); i++ {
 
 		// Lookup the item from each list
-		recorded, recordedSet := boundsSafeLookup(i, item.Recorded)
-		local, localSet := boundsSafeLookup(i, item.Local)
-		remote, remoteSet := boundsSafeLookup(i, item.Remote)
+		data := apply.RawElementData{}
+		if recorded, recordedSet := boundsSafeLookup(i, item.GetRecordedList()); recordedSet {
+			data.SetRecorded(recorded)
+		}
+		if local, localSet := boundsSafeLookup(i, item.GetLocalList()); localSet {
+			data.SetLocal(local)
+		}
+		if remote, remoteSet := boundsSafeLookup(i, item.GetRemoteList()); remoteSet {
+			data.SetRemote(remote)
+		}
 
 		// Create the Item
 		var s openapi.Schema
 		if item.Array != nil && item.Array.SubType != nil {
 			s = item.Array.SubType
 		}
-		subitem, err := v.getItem(s, fmt.Sprintf("%d", i),
-			apply.RawElementData{recorded, local, remote},
-			apply.HasElementData{recordedSet, localSet, remoteSet})
+		subitem, err := v.getItem(s, fmt.Sprintf("%d", i), data)
 		if err != nil {
 			return nil, err
 		}

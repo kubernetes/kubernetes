@@ -46,19 +46,20 @@ func (v mergeStrategy) MergeList(e apply.ListElement) (apply.Result, error) {
 	merged := []interface{}{}
 	for _, value := range e.Values {
 		// Recursively merge the list element before adding the value to the list
-		result, err := value.Merge(v.strategic)
+		m, err := value.Merge(v.strategic)
 		if err != nil {
 			return apply.Result{}, err
 		}
 
-		switch result.Operation {
+		fmt.Printf("\nResult %+v\n%+v\n", m.MergedResult, value)
+		switch m.Operation {
 		case apply.SET:
 			// Keep the list item value
-			merged = append(merged, result.MergedResult)
+			merged = append(merged, m.MergedResult)
 		case apply.DROP:
 			// Drop the list item value
 		default:
-			panic(fmt.Errorf("Unexpected result operation type %+v", result))
+			panic(fmt.Errorf("Unexpected result operation type %+v", m))
 		}
 	}
 

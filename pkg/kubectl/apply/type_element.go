@@ -22,10 +22,6 @@ type TypeElement struct {
 	// FieldMetaImpl contains metadata about the field from openapi
 	FieldMetaImpl
 
-	// HasElementData contains whether the field was set
-	HasElementData
-
-	// ListElementData contains the value a field was set to
 	MapElementData
 
 	// Values contains the combined recorded-local-remote value of each field in the type

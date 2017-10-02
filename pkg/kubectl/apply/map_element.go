@@ -22,9 +22,6 @@ type MapElement struct {
 	// FieldMetaImpl contains metadata about the field from openapi
 	FieldMetaImpl
 
-	// HasElementData contains whether the field was set
-	HasElementData
-
 	// MapElementData contains the value a field was set to
 	MapElementData
 
@@ -48,39 +45,28 @@ var _ Element = &MapElement{}
 
 // MapElementData contains the recorded, local and remote data for a map or type
 type MapElementData struct {
-	// recorded contains the value of the field from the recorded object
-	Recorded map[string]interface{}
-
-	// Local contains the value of the field from the recorded object
-	Local map[string]interface{}
-
-	// Remote contains the value of the field from the recorded object
-	Remote map[string]interface{}
+	RawElementData
 }
 
-// GetRecorded implements Element.GetRecorded
-func (e MapElementData) GetRecorded() interface{} {
-	// https://golang.org/doc/faq#nil_error
-	if e.Recorded == nil {
-		return nil
-	}
-	return e.Recorded
+// GetRecordedMap returns the Recorded value as a map
+func (e MapElementData) GetRecordedMap() map[string]interface{} {
+	return mapCast(e.recorded)
 }
 
-// GetLocal implements Element.GetLocal
-func (e MapElementData) GetLocal() interface{} {
-	// https://golang.org/doc/faq#nil_error
-	if e.Local == nil {
-		return nil
-	}
-	return e.Local
+// GetLocalMap returns the Local value as a map
+func (e MapElementData) GetLocalMap() map[string]interface{} {
+	return mapCast(e.local)
 }
 
-// GetRemote implements Element.GetRemote
-func (e MapElementData) GetRemote() interface{} {
-	// https://golang.org/doc/faq#nil_error
-	if e.Remote == nil {
+// GetRemoteMap returns the Remote value as a map
+func (e MapElementData) GetRemoteMap() map[string]interface{} {
+	return mapCast(e.remote)
+}
+
+// mapCast casts i to a map if it is non-nil, otherwise returns nil
+func mapCast(i interface{}) map[string]interface{} {
+	if i == nil {
 		return nil
 	}
-	return e.Remote
+	return i.(map[string]interface{})
 }
