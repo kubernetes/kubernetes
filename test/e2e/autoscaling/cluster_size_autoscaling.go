@@ -110,7 +110,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		Expect(nodeCount).Should(Equal(sum))
 
 		if framework.ProviderIs("gke") {
-			val, err := isAutoscalerEnabled(3)
+			val, err := isAutoscalerEnabled(5)
 			framework.ExpectNoError(err)
 			if !val {
 				err = enableAutoscaler("default-pool", 3, 5)
@@ -775,7 +775,7 @@ func getGKEClusterUrl() string {
 		token)
 }
 
-func isAutoscalerEnabled(expectedMinNodeCountInTargetPool int) (bool, error) {
+func isAutoscalerEnabled(expectedMaxNodeCountInTargetPool int) (bool, error) {
 	resp, err := http.Get(getGKEClusterUrl())
 	if err != nil {
 		return false, err
@@ -786,7 +786,7 @@ func isAutoscalerEnabled(expectedMinNodeCountInTargetPool int) (bool, error) {
 		return false, err
 	}
 	strBody := string(body)
-	if strings.Contains(strBody, "\"minNodeCount\": "+strconv.Itoa(expectedMinNodeCountInTargetPool)) {
+	if strings.Contains(strBody, "\"maxNodeCount\": "+strconv.Itoa(expectedMaxNodeCountInTargetPool)) {
 		return true, nil
 	}
 	return false, nil
@@ -833,7 +833,7 @@ func enableAutoscaler(nodePool string, minCount, maxCount int) error {
 
 	var finalErr error
 	for startTime := time.Now(); startTime.Add(gkeUpdateTimeout).After(time.Now()); time.Sleep(30 * time.Second) {
-		val, err := isAutoscalerEnabled(minCount)
+		val, err := isAutoscalerEnabled(maxCount)
 		if err == nil && val {
 			return nil
 		}
@@ -880,7 +880,7 @@ func disableAutoscaler(nodePool string, minCount, maxCount int) error {
 	}
 
 	for startTime := time.Now(); startTime.Add(gkeUpdateTimeout).After(time.Now()); time.Sleep(30 * time.Second) {
-		if val, err := isAutoscalerEnabled(minCount); err == nil && !val {
+		if val, err := isAutoscalerEnabled(maxCount); err == nil && !val {
 			return nil
 		}
 	}
