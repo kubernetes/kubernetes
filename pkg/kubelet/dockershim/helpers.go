@@ -393,6 +393,11 @@ func getAppArmorOpts(profile string) ([]dockerOpt, error) {
 		return nil, nil
 	}
 
+	// Return unconfined profile explicitly
+	if profile == apparmor.ProfileNameUnconfined {
+		return []dockerOpt{{"apparmor", apparmor.ProfileNameUnconfined, ""}}, nil
+	}
+
 	// Assume validation has already happened.
 	profileName := strings.TrimPrefix(profile, apparmor.ProfileNamePrefix)
 	return []dockerOpt{{"apparmor", profileName, ""}}, nil

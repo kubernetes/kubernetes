@@ -1397,6 +1397,7 @@ type LinuxContainerSecurityContext struct {
 	SupplementalGroups []int64 `protobuf:"varint,8,rep,packed,name=supplemental_groups,json=supplementalGroups" json:"supplemental_groups,omitempty"`
 	// AppArmor profile for the container, candidate values are:
 	// * runtime/default: equivalent to not specifying a profile.
+	// * unconfined: no profiles are loaded
 	// * localhost/<profile_name>: profile loaded on the node
 	//    (localhost) by name. The possible profile names are detailed at
 	//    http://wiki.apparmor.net/index.php/AppArmor_Core_Policy_Reference
