@@ -180,7 +180,7 @@ func TestCPUManagerAdd(t *testing.T) {
 			description: "cpu manager add - container update error",
 			regErr:      nil,
 			updateErr:   fmt.Errorf("fake update error"),
-			expErr:      fmt.Errorf("fake update error"),
+			expErr:      nil,
 		},
 	}
 
