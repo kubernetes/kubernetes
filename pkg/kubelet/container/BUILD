@@ -6,6 +6,7 @@ go_library(
         "cache.go",
         "container_gc.go",
         "container_reference_manager.go",
+        "doc.go",
         "helpers.go",
         "os.go",
         "pty_unsupported.go",

@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "doc.go",
         "generate.go",
         "status_manager.go",
     ],

@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "doc.go",
         "well_known_annotations.go",
         "well_known_labels.go",
     ],

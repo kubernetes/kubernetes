@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "doc.go",
         "network.go",
         "plugins.go",
     ],

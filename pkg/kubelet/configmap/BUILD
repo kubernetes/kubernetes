@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "configmap_manager.go",
+        "doc.go",
         "fake_manager.go",
     ],
     deps = [

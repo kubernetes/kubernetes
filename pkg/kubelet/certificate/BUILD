@@ -11,6 +11,7 @@ go_library(
     srcs = [
         "certificate_manager.go",
         "certificate_store.go",
+        "doc.go",
         "kubelet.go",
         "transport.go",
     ],

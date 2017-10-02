@@ -8,7 +8,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["volume_manager.go"],
+    srcs = [
+        "doc.go",
+        "volume_manager.go",
+    ],
     deps = [
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
