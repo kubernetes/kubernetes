@@ -117,7 +117,7 @@ func masterUpgradeKubernetesAnywhere(v string) error {
 	// modify config with specified k8s version
 	if _, _, err := RunCmd("sed",
 		"-i.bak", // writes original to .config.bak
-		fmt.Sprintf(`s/kubernetes_version=.*$/kubernetes_version=%s/`, v),
+		fmt.Sprintf(`s/kubernetes_version=.*$/kubernetes_version=%q/`, v),
 		originalConfigPath); err != nil {
 		return err
 	}
