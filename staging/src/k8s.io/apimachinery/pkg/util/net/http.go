@@ -26,12 +26,33 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
 	"golang.org/x/net/http2"
 )
+
+// JoinPreservingTrailingSlash does a path.Join of the specified elements,
+// preserving any trailing slash on the last non-empty segment
+func JoinPreservingTrailingSlash(elem ...string) string {
+	// do the basic path join
+	result := path.Join(elem...)
+
+	// find the last non-empty segment
+	for i := len(elem) - 1; i >= 0; i-- {
+		if len(elem[i]) > 0 {
+			// if the last segment ended in a slash, ensure our result does as well
+			if strings.HasSuffix(elem[i], "/") && !strings.HasSuffix(result, "/") {
+				result += "/"
+			}
+			break
+		}
+	}
+
+	return result
+}
 
 // IsProbableEOF returns true if the given error resembles a connection termination
 // scenario that would justify assuming that the watch is empty.
