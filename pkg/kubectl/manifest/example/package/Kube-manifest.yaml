@@ -1,0 +1,28 @@
+# This example is from https://docs.google.com/document/d/1cLPGweVEYrVqQvBLJg6sxV-TrE5Rm2MNOBA_cxZP2WU/edit#heading=h.dr88tktf0e99
+
+# Inspired by https://github.com/kubernetes/helm/blob/master/docs/charts.md
+# But Kubernetes API style
+apiVersion: manifest.k8s.io/v1alpha1
+kind: Package # was BaseManifest
+metadata:
+  name: mungebot
+description: Mungegithub package
+# These are search keywords
+keywords: [github, bot, kubernetes]
+appVersion: 0.1.0
+home: https://github.com/bgrant0607/mungebot-pkg/blob/master/README.md
+sources:
+- https://github.com/bgrant0607/mungebot-pkg
+icon: https://github.com/bgrant0607/mungebot-pkg/blob/master/icon.png
+maintainers:
+- name: Brian Grant
+  email: briangrant@google.com
+  github: bgrant0607
+bases:
+#- service.yaml
+- deployment.yaml
+#- pvc.yaml
+#Recursive would be similar to kubectl --recursive behavior, extended to look for Kube-manifest.yaml
+recursive: false
+#Whether PersistentVolumeClaims should be deleted with the other resources
+ownPersistentVolumeClaims: true

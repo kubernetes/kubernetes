@@ -1059,6 +1059,37 @@ run_kubectl_apply_tests() {
   set +o errexit
 }
 
+# Runs tests related to kubectl alpha apply-manifest.
+run_kubectl_expand_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing kubectl alpha expand"
+  ## kubectl apply should create the resource that doesn't exist yet
+  # Pre-Condition: no deployment exists
+  kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command: generated manifest and then use kubectl apply to create it.
+  kubectl alpha apply-manifest -f=pkg/kubectl/manifest/examples/instances/exampleinstance/ "${kube_flags[@]}" | kubectl apply -f -
+  # Post-Condition: deployment "test-infra-mungebot" is created.
+  kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}:{{end}}" 'test-infra-mungebot'
+  # Post-Condition: one additional has been added.
+  kube::test::get_object_assert deployments test-infra-mungebot "{{$container_len}}" '2'
+  # Post-Condition: replica has been updated to 2.
+  kube::test::get_object_assert deployments test-infra-mungebot "{{$deployment_replicas}}" '2'
+  # Post-Condition: env foo=var exists.
+  ! [[ "$(kubectl get deployments test-infra-mungebot -o yaml "${kube_flags[@]}" | grep "foo: bar")" ]]
+  # Post-Condition: new labels have been injected.
+  kube::test::get_object_assert deployments test-infra-mungebot "{{$labels_field}}" 'map[app:mungebot org:kubernetes repo:test-infra]'
+  # Post-Condition: a new annotaion has been injected.
+  [[ "$(kubectl get deployments test-infra-mungebot -o yaml "${kube_flags[@]}" | grep "note: This is my first try")" ]]
+  # Clean up
+  kubectl delete deployments test-infra-mungebot "${kube_flags[@]}"
+
+  set +o nounset
+  set +o errexit
+}
+
 # Runs tests related to kubectl create --filename(-f) --selector(-l).
 run_kubectl_create_filter_tests() {
   set -o nounset
