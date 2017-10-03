@@ -690,7 +690,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	It("Should be able to scale a node group down to 0[Feature:ClusterSizeAutoscalingScaleDown]", func() {
 		if framework.ProviderIs("gke") { // In GKE, we can just add a node pool
 			gkeScaleToZero()
-		} else if len(originalSizes) < 2 {
+		} else if len(originalSizes) >= 2 {
 			gceScaleToZero()
 		} else {
 			framework.Skipf("At least 2 node groups are needed for scale-to-0 tests")
