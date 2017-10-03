@@ -553,9 +553,9 @@ func TestBootstrapping(t *testing.T) {
 
 	t.Errorf("missing cluster-admin: %v", clusterRoles)
 
-	healthBytes, err := clientset.Discovery().RESTClient().Get().AbsPath("/healthz/poststarthooks/rbac/bootstrap-roles").DoRaw()
+	healthBytes, err := clientset.Discovery().RESTClient().Get().AbsPath("/healthz/poststarthook/rbac/bootstrap-roles").DoRaw()
 	if err != nil {
 		t.Error(err)
 	}
-	t.Errorf("expected %v, got %v", "asdf", string(healthBytes))
+	t.Errorf("error bootstrapping roles: %s", string(healthBytes))
 }
