@@ -51,6 +51,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	taintutils "k8s.io/kubernetes/pkg/util/taints"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -154,6 +155,8 @@ type initFederationOptions struct {
 	apiServerNodePortPortPtr         *int32
 	apiServerEnableHTTPBasicAuth     bool
 	apiServerEnableTokenAuth         bool
+	tolerations                      []api.Toleration
+	tolerationsString                string
 }
 
 func (o *initFederationOptions) Bind(flags *pflag.FlagSet, defaultServerImage, defaultEtcdImage string) {
@@ -173,6 +176,7 @@ func (o *initFederationOptions) Bind(flags *pflag.FlagSet, defaultServerImage, d
 	flags.Int32Var(&o.apiServerNodePortPort, apiserverPortFlag, 0, "Preferred port to use for api server nodeport service (0 for random port assignment). Valid only if '"+apiserverServiceTypeFlag+"=NodePort'.")
 	flags.BoolVar(&o.apiServerEnableHTTPBasicAuth, "apiserver-enable-basic-auth", false, "Enables HTTP Basic authentication for the federation-apiserver. Defaults to false.")
 	flags.BoolVar(&o.apiServerEnableTokenAuth, "apiserver-enable-token-auth", false, "Enables token authentication for the federation-apiserver. Defaults to false.")
+	flags.StringVar(&o.tolerationsString, "tolerations", "", "If specified, the pod's tolerations. Example \"key1=value1:NoSchedule,key2=value2:NoSchedule\"")
 }
 
 // NewCmdInit defines the `init` command that bootstraps a federation
@@ -256,6 +260,10 @@ func (i *initFederation) Complete(cmd *cobra.Command, args []string) error {
 	i.options.controllerManagerOverrides, err = marshallOverrides(i.options.controllerManagerOverridesString)
 	if err != nil {
 		return fmt.Errorf("error marshalling --controllermanager-arg-overrides: %v", err)
+	}
+	i.options.tolerations, err = marshallingTolerations(i.options.tolerationsString)
+	if err != nil {
+		return fmt.Errorf("error marshalling --tolerations: %v", err)
 	}
 
 	if i.options.dnsProviderConfig != "" {
@@ -361,7 +369,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 
 	fmt.Fprint(cmdOut, "Creating federation component deployments...")
 	glog.V(4).Info("Creating federation control plane components")
-	_, err = createAPIServer(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.commonOptions.Name, i.options.serverImage, i.options.etcdImage, advertiseAddress, serverCredName, i.options.apiServerEnableHTTPBasicAuth, i.options.apiServerEnableTokenAuth, i.options.apiServerOverrides, pvc, i.options.dryRun)
+	_, err = createAPIServer(hostClientset, i.commonOptions.FederationSystemNamespace, serverName, i.commonOptions.Name, i.options.serverImage, i.options.etcdImage, advertiseAddress, serverCredName, i.options.apiServerEnableHTTPBasicAuth, i.options.apiServerEnableTokenAuth, i.options.apiServerOverrides, pvc, i.options.dryRun, i.options.tolerations)
 	if err != nil {
 		return err
 	}
@@ -396,7 +404,7 @@ func (i *initFederation) Run(cmdOut io.Writer, config util.AdminConfig) error {
 
 	glog.V(4).Info("Creating federation controller manager deployment")
 
-	_, err = createControllerManager(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmName, i.options.serverImage, cmKubeconfigName, i.options.dnsZoneName, i.options.dnsProvider, i.options.dnsProviderConfig, sa.Name, dnsProviderSecret, i.options.controllerManagerOverrides, i.options.dryRun)
+	_, err = createControllerManager(hostClientset, i.commonOptions.FederationSystemNamespace, i.commonOptions.Name, svc.Name, cmName, i.options.serverImage, cmKubeconfigName, i.options.dnsZoneName, i.options.dnsProvider, i.options.dnsProviderConfig, sa.Name, dnsProviderSecret, i.options.controllerManagerOverrides, i.options.dryRun, i.options.tolerations)
 	if err != nil {
 		return err
 	}
@@ -702,7 +710,7 @@ func createPVC(clientset client.Interface, namespace, svcName, federationName, e
 	return clientset.Core().PersistentVolumeClaims(namespace).Create(pvc)
 }
 
-func createAPIServer(clientset client.Interface, namespace, name, federationName, serverImage, etcdImage, advertiseAddress, credentialsName string, hasHTTPBasicAuthFile, hasTokenAuthFile bool, argOverrides map[string]string, pvc *api.PersistentVolumeClaim, dryRun bool) (*extensions.Deployment, error) {
+func createAPIServer(clientset client.Interface, namespace, name, federationName, serverImage, etcdImage, advertiseAddress, credentialsName string, hasHTTPBasicAuthFile, hasTokenAuthFile bool, argOverrides map[string]string, pvc *api.PersistentVolumeClaim, dryRun bool, tolerations []api.Toleration) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-apiserver",
@@ -789,6 +797,7 @@ func createAPIServer(clientset client.Interface, namespace, name, federationName
 							},
 						},
 					},
+					Tolerations: tolerations,
 				},
 			},
 		},
@@ -876,7 +885,7 @@ func createRoleBindings(clientset client.Interface, namespace, saName, federatio
 	return newRole, newRolebinding, err
 }
 
-func createControllerManager(clientset client.Interface, namespace, name, svcName, cmName, image, kubeconfigName, dnsZoneName, dnsProvider, dnsProviderConfig, saName string, dnsProviderSecret *api.Secret, argOverrides map[string]string, dryRun bool) (*extensions.Deployment, error) {
+func createControllerManager(clientset client.Interface, namespace, name, svcName, cmName, image, kubeconfigName, dnsZoneName, dnsProvider, dnsProviderConfig, saName string, dnsProviderSecret *api.Secret, argOverrides map[string]string, dryRun bool, tolerations []api.Toleration) (*extensions.Deployment, error) {
 	command := []string{
 		"/hyperkube",
 		"federation-controller-manager",
@@ -955,6 +964,7 @@ func createControllerManager(clientset client.Interface, namespace, name, svcNam
 							},
 						},
 					},
+					Tolerations: tolerations,
 				},
 			},
 		},
@@ -1201,4 +1211,25 @@ func addCoreDNSServerAnnotation(deployment *extensions.Deployment, dnsZoneName, 
 	deployment.Annotations[util.FedNameServer] = cfg.Global.CoreDNSEndpoints
 	deployment.Annotations[util.FedDNSProvider] = util.FedDNSProviderCoreDNS
 	return deployment, nil
+}
+
+func marshallingTolerations(tolerationsString string) ([]api.Toleration, error) {
+	if tolerationsString == "" {
+		return nil, nil
+	}
+	var tolerations []api.Toleration
+	taintArgs := strings.Split(tolerationsString, ",")
+	taintsToAdd, _, err := taintutils.ParseTaints(taintArgs)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling --tolerations: %v", err)
+	}
+	for _, taintToAdd := range taintsToAdd {
+		var tmpToleration api.Toleration
+		tmpToleration.Key = taintToAdd.Key
+		tmpToleration.Value = taintToAdd.Value
+		tmpToleration.Effect = api.TaintEffect(taintToAdd.Effect)
+		tmpToleration.Operator = api.TolerationOpEqual
+		tolerations = append(tolerations, tmpToleration)
+	}
+	return tolerations, nil
 }
