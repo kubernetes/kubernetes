@@ -160,6 +160,7 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
 
+// NewOptions creates a new Options structure.
 func NewOptions() (*Options, error) {
 	o := &Options{
 		config:      new(componentconfig.KubeProxyConfiguration),
@@ -202,6 +203,7 @@ func (o *Options) Validate(args []string) error {
 	return nil
 }
 
+// Run does the actual work.
 func (o *Options) Run() error {
 	config := o.config
 
@@ -210,13 +212,13 @@ func (o *Options) Run() error {
 	}
 
 	if len(o.ConfigFile) > 0 {
-		if c, err := o.loadConfigFromFile(o.ConfigFile); err != nil {
+		c, err := o.loadConfigFromFile(o.ConfigFile)
+		if err != nil {
 			return err
-		} else {
-			config = c
-			// Make sure we apply the feature gate settings in the config file.
-			utilfeature.DefaultFeatureGate.Set(config.FeatureGates)
 		}
+		config = c
+		// Make sure we apply the feature gate settings in the config file.
+		utilfeature.DefaultFeatureGate.Set(config.FeatureGates)
 	}
 
 	proxyServer, err := NewProxyServer(config, o.CleanupAndExit, o.scheme, o.master)
@@ -301,6 +303,7 @@ func (o *Options) loadConfig(data []byte) (*componentconfig.KubeProxyConfigurati
 	return config, nil
 }
 
+// ApplyDefaults
 func (o *Options) ApplyDefaults(in *componentconfig.KubeProxyConfiguration) (*componentconfig.KubeProxyConfiguration, error) {
 	external, err := o.scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
 	if err != nil {
@@ -319,7 +322,7 @@ func (o *Options) ApplyDefaults(in *componentconfig.KubeProxyConfiguration) (*co
 	return out, nil
 }
 
-// NewProxyCommand creates a *cobra.Command object with default parameters
+// NewProxyCommand creates a *cobra.Command object with default parameters.
 func NewProxyCommand() *cobra.Command {
 	opts, err := NewOptions()
 	if err != nil {

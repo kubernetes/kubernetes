@@ -39,10 +39,7 @@ func NewKubeAggregator() *Server {
 			if err := o.Validate(args); err != nil {
 				return err
 			}
-			if err := o.RunAggregator(stopCh); err != nil {
-				return err
-			}
-			return nil
+			return o.RunAggregator(stopCh)
 		},
 		RespectsStopCh: true,
 	}
