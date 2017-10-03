@@ -1597,9 +1597,14 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 			}
 		}
 		if mirrorPod == nil || deleted {
-			glog.V(3).Infof("Creating a mirror pod for static pod %q", format.Pod(pod))
-			if err := kl.podManager.CreateMirrorPod(pod); err != nil {
-				glog.Errorf("Failed creating a mirror pod for %q: %v", format.Pod(pod), err)
+			node, err := kl.GetNode()
+			if err != nil || node.DeletionTimestamp != nil {
+				glog.V(4).Infof("No need to create a mirror pod, since node %q has been removed from the cluster", kl.nodeName)
+			} else {
+				glog.V(4).Infof("Creating a mirror pod for static pod %q", format.Pod(pod))
+				if err := kl.podManager.CreateMirrorPod(pod); err != nil {
+					glog.Errorf("Failed creating a mirror pod for %q: %v", format.Pod(pod), err)
+				}
 			}
 		}
 	}
