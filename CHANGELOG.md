@@ -667,6 +667,12 @@ Consider the following changes, limitations, and guidelines before you upgrade:
 
   Don't use these flags. Using deprecated flags causes the server to print a warning. Using a removed flag causes the server to abort the startup.
 
+* The following deprecated flags were removed from `kubelet`:
+
+  * `api-servers` - add apiserver addresses to the kubeconfig file instead.
+
+  Don't use these flags. Using deprecated flags causes the kubelet to print a warning. Using a removed flag causes the kubelet to abort the startup.
+
 * StatefulSet: The deprecated `pod.alpha.kubernetes.io/initialized` annotation for interrupting the StatefulSet Pod management is now ignored. StatefulSets with this annotation set to `true` or with no value will behave just as they did in previous versions. Dormant StatefulSets with the annotation set to `false` will become active after upgrading.
 
 * The CronJob object is now enabled by default at `v1beta1`. CronJob `v2alpha1` is still available, but it must be explicitly enabled. We recommend that you move any current CronJob objects to `batch/v1beta1.CronJob`. Be aware that if you specify the deprecated version, you may encounter Resource Not Found errors. These errors occur because the new controllers look for the new version during a rolling update.
