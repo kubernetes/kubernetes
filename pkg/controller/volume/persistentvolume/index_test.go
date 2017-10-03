@@ -23,6 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/scheme"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -37,6 +38,28 @@ func makePVC(size string, modfn func(*v1.PersistentVolumeClaim)) *v1.PersistentV
 		},
 		Spec: v1.PersistentVolumeClaimSpec{
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadOnlyMany, v1.ReadWriteOnce},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse(size),
+				},
+			},
+		},
+	}
+	if modfn != nil {
+		modfn(&pvc)
+	}
+	return &pvc
+}
+
+func makeVolumeModePVC(size string, mode *v1.PersistentVolumeMode, modfn func(*v1.PersistentVolumeClaim)) *v1.PersistentVolumeClaim {
+	pvc := v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "claim01",
+			Namespace: "myns",
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			VolumeMode:  mode,
+			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceStorage): resource.MustParse(size),
@@ -666,6 +689,249 @@ func testVolume(name, size string) *v1.PersistentVolume {
 			PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{}},
 			AccessModes:            []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 		},
+	}
+}
+
+func createVolumeModeBlockTestVolume() *v1.PersistentVolume {
+	blockMode := v1.PersistentVolumeBlock
+
+	return &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:  "local-1",
+			Name: "block",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G"),
+			},
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				Local: &v1.LocalVolumeSource{},
+			},
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+			},
+			VolumeMode: &blockMode,
+		},
+	}
+}
+
+func createVolumeModeFilesystemTestVolume() *v1.PersistentVolume {
+	filesystemMode := v1.PersistentVolumeFilesystem
+
+	return &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:  "local-1",
+			Name: "block",
+		},
+		Spec: v1.PersistentVolumeSpec{
+			Capacity: v1.ResourceList{
+				v1.ResourceName(v1.ResourceStorage): resource.MustParse("10G"),
+			},
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				Local: &v1.LocalVolumeSource{},
+			},
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+			},
+			VolumeMode: &filesystemMode,
+		},
+	}
+}
+
+func createTestVolOrderedIndex(pv *v1.PersistentVolume) persistentVolumeOrderedIndex {
+	volFile := newPersistentVolumeOrderedIndex()
+	volFile.store.Add(pv)
+	return volFile
+}
+
+func toggleBlockVolumeFeature(toggleFlag bool, t *testing.T) {
+	if toggleFlag {
+		// Enable alpha feature BlockVolume
+		err := utilfeature.DefaultFeatureGate.Set("BlockVolume=true")
+		if err != nil {
+			t.Errorf("Failed to enable feature gate for BlockVolume: %v", err)
+			return
+		}
+	} else {
+		err := utilfeature.DefaultFeatureGate.Set("BlockVolume=false")
+		if err != nil {
+			t.Errorf("Failed to disable feature gate for BlockVolume: %v", err)
+			return
+		}
+	}
+}
+
+func TestAlphaVolumeModeCheck(t *testing.T) {
+
+	blockMode := v1.PersistentVolumeBlock
+	filesystemMode := v1.PersistentVolumeFilesystem
+
+	// If feature gate is enabled, VolumeMode will always be defaulted
+	// If feature gate is disabled, VolumeMode is dropped by API and ignored
+	scenarios := map[string]struct {
+		isExpectedMisMatch bool
+		vol                *v1.PersistentVolume
+		pvc                *v1.PersistentVolumeClaim
+		enableBlock        bool
+	}{
+		"feature enabled - pvc block and pv filesystem": {
+			isExpectedMisMatch: true,
+			vol:                createVolumeModeFilesystemTestVolume(),
+			pvc:                makeVolumeModePVC("8G", &blockMode, nil),
+			enableBlock:        true,
+		},
+		"feature enabled - pvc filesystem and pv block": {
+			isExpectedMisMatch: true,
+			vol:                createVolumeModeBlockTestVolume(),
+			pvc:                makeVolumeModePVC("8G", &filesystemMode, nil),
+			enableBlock:        true,
+		},
+		"feature enabled - pvc block and pv block": {
+			isExpectedMisMatch: false,
+			vol:                createVolumeModeBlockTestVolume(),
+			pvc:                makeVolumeModePVC("8G", &blockMode, nil),
+			enableBlock:        true,
+		},
+		"feature enabled - pvc filesystem and pv filesystem": {
+			isExpectedMisMatch: false,
+			vol:                createVolumeModeFilesystemTestVolume(),
+			pvc:                makeVolumeModePVC("8G", &filesystemMode, nil),
+			enableBlock:        true,
+		},
+		"feature disabled - pvc block and pv filesystem": {
+			isExpectedMisMatch: false,
+			vol:                createVolumeModeFilesystemTestVolume(),
+			pvc:                makeVolumeModePVC("8G", &blockMode, nil),
+			enableBlock:        false,
+		},
+		"feature disabled - pvc filesystem and pv block": {
+			isExpectedMisMatch: false,
+			vol:                createVolumeModeBlockTestVolume(),
+			pvc:                makeVolumeModePVC("8G", &filesystemMode, nil),
+			enableBlock:        false,
+		},
+		"feature disabled - pvc block and pv block": {
+			isExpectedMisMatch: false,
+			vol:                createVolumeModeBlockTestVolume(),
+			pvc:                makeVolumeModePVC("8G", &blockMode, nil),
+			enableBlock:        false,
+		},
+		"feature disabled - pvc filesystem and pv filesystem": {
+			isExpectedMisMatch: false,
+			vol:                createVolumeModeFilesystemTestVolume(),
+			pvc:                makeVolumeModePVC("8G", &filesystemMode, nil),
+			enableBlock:        false,
+		},
+	}
+
+	for name, scenario := range scenarios {
+		toggleBlockVolumeFeature(scenario.enableBlock, t)
+		expectedMisMatch, err := checkVolumeModeMisMatches(&scenario.pvc.Spec, &scenario.vol.Spec)
+		if err != nil {
+			t.Errorf("Unexpected failure for checkVolumeModeMisMatches: %v", err)
+		}
+		// expected to match but either got an error or no returned pvmatch
+		if expectedMisMatch && !scenario.isExpectedMisMatch {
+			t.Errorf("Unexpected failure for scenario, expected not to mismatch on modes but did: %s", name)
+		}
+		if !expectedMisMatch && scenario.isExpectedMisMatch {
+			t.Errorf("Unexpected failure for scenario, did not mismatch on mode when expected to mismatch: %s", name)
+		}
+	}
+
+}
+
+func TestAlphaFilteringVolumeModes(t *testing.T) {
+	blockMode := v1.PersistentVolumeBlock
+	filesystemMode := v1.PersistentVolumeFilesystem
+
+	// If feature gate is enabled, VolumeMode will always be defaulted
+	// If feature gate is disabled, VolumeMode is dropped by API and ignored
+	scenarios := map[string]struct {
+		isExpectedMatch bool
+		vol             persistentVolumeOrderedIndex
+		pvc             *v1.PersistentVolumeClaim
+		enableBlock     bool
+	}{
+		"1-1 feature enabled - pvc block and pv filesystem": {
+			isExpectedMatch: false,
+			vol:             createTestVolOrderedIndex(createVolumeModeFilesystemTestVolume()),
+			pvc:             makeVolumeModePVC("8G", &blockMode, nil),
+			enableBlock:     true,
+		},
+		"1-2 feature enabled - pvc filesystem and pv block": {
+			isExpectedMatch: false,
+			vol:             createTestVolOrderedIndex(createVolumeModeBlockTestVolume()),
+			pvc:             makeVolumeModePVC("8G", &filesystemMode, nil),
+			enableBlock:     true,
+		},
+		"1-3 feature enabled - pvc block and pv no mode with default filesystem": {
+			isExpectedMatch: false,
+			vol:             createTestVolOrderedIndex(createVolumeModeFilesystemTestVolume()),
+			pvc:             makeVolumeModePVC("8G", &blockMode, nil),
+			enableBlock:     true,
+		},
+		"1-4 feature enabled - pvc no mode defaulted to filesystem and pv block": {
+			isExpectedMatch: false,
+			vol:             createTestVolOrderedIndex(createVolumeModeBlockTestVolume()),
+			pvc:             makeVolumeModePVC("8G", &filesystemMode, nil),
+			enableBlock:     true,
+		},
+		"1-5 feature enabled - pvc block and pv block": {
+			isExpectedMatch: true,
+			vol:             createTestVolOrderedIndex(createVolumeModeBlockTestVolume()),
+			pvc:             makeVolumeModePVC("8G", &blockMode, nil),
+			enableBlock:     true,
+		},
+		"1-6 feature enabled - pvc filesystem and pv filesystem": {
+			isExpectedMatch: true,
+			vol:             createTestVolOrderedIndex(createVolumeModeFilesystemTestVolume()),
+			pvc:             makeVolumeModePVC("8G", &filesystemMode, nil),
+			enableBlock:     true,
+		},
+		"1-7 feature enabled - pvc mode is nil and defaulted and pv mode is nil and defaulted": {
+			isExpectedMatch: true,
+			vol:             createTestVolOrderedIndex(createVolumeModeFilesystemTestVolume()),
+			pvc:             makeVolumeModePVC("8G", &filesystemMode, nil),
+			enableBlock:     true,
+		},
+		"2-1 feature disabled - pvc mode is nil and pv mode is nil": {
+			isExpectedMatch: true,
+			vol:             createTestVolOrderedIndex(testVolume("nomode-1", "8G")),
+			pvc:             makeVolumeModePVC("8G", nil, nil),
+			enableBlock:     false,
+		},
+		"2-2 feature disabled - pvc mode is block and pv mode is block - fields should be dropped by api and not analyzed with gate disabled": {
+			isExpectedMatch: true,
+			vol:             createTestVolOrderedIndex(createVolumeModeBlockTestVolume()),
+			pvc:             makeVolumeModePVC("8G", &blockMode, nil),
+			enableBlock:     false,
+		},
+		"2-3 feature disabled - pvc mode is filesystem and pv mode is filesystem - fields should be dropped by api and not analyzed with gate disabled": {
+			isExpectedMatch: true,
+			vol:             createTestVolOrderedIndex(createVolumeModeFilesystemTestVolume()),
+			pvc:             makeVolumeModePVC("8G", &filesystemMode, nil),
+			enableBlock:     false,
+		},
+	}
+
+	for name, scenario := range scenarios {
+		toggleBlockVolumeFeature(scenario.enableBlock, t)
+		pvmatch, err := scenario.vol.findBestMatchForClaim(scenario.pvc)
+		// expected to match but either got an error or no returned pvmatch
+		if pvmatch == nil && scenario.isExpectedMatch {
+			t.Errorf("Unexpected failure for scenario, no matching volume: %s", name)
+		}
+		if err != nil && scenario.isExpectedMatch {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, err)
+		}
+		// expected to not match but either got an error or a returned pvmatch
+		if pvmatch != nil && !scenario.isExpectedMatch {
+			t.Errorf("Unexpected failure for scenario, expected no matching volume: %s", name)
+		}
+		if err != nil && !scenario.isExpectedMatch {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, err)
+		}
 	}
 }
 
