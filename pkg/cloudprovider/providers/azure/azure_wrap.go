@@ -21,6 +21,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
+	"github.com/Azure/azure-sdk-for-go/arm/resources/resources"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
@@ -121,13 +122,37 @@ func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exi
 	return lb, exists, err
 }
 
-func (az *Cloud) getPublicIPAddress(name string) (pip network.PublicIPAddress, exists bool, err error) {
+func (az *Cloud) getPublicIPAddressByID(pipID string) (pip network.PublicIPAddress, exists bool, err error) {
+	if pipID == "" {
+		return network.PublicIPAddress{}, false, nil
+	}
+
 	var realErr error
+	var resource resources.GenericResource
+	var resourceGroupName string
 
 	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("PublicIPAddressesClient.Get(%s): start", name)
-	pip, err = az.PublicIPAddressesClient.Get(az.ResourceGroup, name, "")
-	glog.V(10).Infof("PublicIPAddressesClient.Get(%s): end", name)
+	glog.V(10).Infof("ResourcesClient.GetByID(%s): start", pipID)
+	resource, err = az.ResourcesClient.GetByID(pipID)
+	glog.V(10).Infof("ResourcesClient.GetByID(%s): end", pipID)
+
+	exists, realErr = checkResourceExistsFromError(err)
+	if realErr != nil {
+		return network.PublicIPAddress{}, false, realErr
+	}
+
+	if !exists {
+		return network.PublicIPAddress{}, false, nil
+	}
+
+	resourceGroupName, err = parseResourceGroupNameFromID(pipID)
+	if err != nil {
+		return network.PublicIPAddress{}, true, err
+	}
+
+	glog.V(10).Infof("PublicIPAddressesClient.Get(%s, %s): start", resourceGroupName, resource.Name)
+	pip, err = az.PublicIPAddressesClient.Get(resourceGroupName, *resource.Name, "")
+	glog.V(10).Infof("PublicIPAddressesClient.Get(%s, %s): end", resourceGroupName, resource.Name)
 
 	exists, realErr = checkResourceExistsFromError(err)
 	if realErr != nil {

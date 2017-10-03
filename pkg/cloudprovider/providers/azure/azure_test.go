@@ -1051,3 +1051,15 @@ func addTestSubnet(t *testing.T, svc *v1.Service) {
 	}
 	svc.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = "TestSubnet"
 }
+
+func TestParseResourceGroupNameFromID(t *testing.T) {
+	resourceID := "/Subscriptions/00000000-0000-0000-0000-000000000000/resourcegroups/myResourceGroupName/Providers/Microsoft.Compute/virtualMachines/k8s-agent-AAAAAAAA-0"
+	resourceGroupName, err := parseResourceGroupNameFromID(resourceID)
+	if err != nil {
+		t.Errorf("Failed to parse resource group name: %v", err)
+	}
+
+	if !strings.EqualFold(resourceGroupName, "myResourceGroupName") {
+		t.Errorf("Unexpected inequality:\n%#v\nvs\n%#v", resourceGroupName, "myResourceGroupName")
+	}
+}
