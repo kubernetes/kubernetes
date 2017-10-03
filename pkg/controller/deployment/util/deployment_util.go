@@ -502,14 +502,8 @@ func GetAllReplicaSets(deployment *extensions.Deployment, c extensionsv1beta1.Ex
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	oldRSes, allOldRSes, err := FindOldReplicaSets(deployment, rsList)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	newRS, err := FindNewReplicaSet(deployment, rsList)
-	if err != nil {
-		return nil, nil, nil, err
-	}
+	oldRSes, allOldRSes := FindOldReplicaSets(deployment, rsList)
+	newRS := FindNewReplicaSet(deployment, rsList)
 	return oldRSes, allOldRSes, newRS, nil
 }
 
@@ -520,7 +514,8 @@ func GetOldReplicaSets(deployment *extensions.Deployment, c extensionsv1beta1.Ex
 	if err != nil {
 		return nil, nil, err
 	}
-	return FindOldReplicaSets(deployment, rsList)
+	oldRSes, allOldRSes := FindOldReplicaSets(deployment, rsList)
+	return oldRSes, allOldRSes, nil
 }
 
 // GetNewReplicaSet returns a replica set that matches the intent of the given deployment; get ReplicaSetList from client interface.
@@ -530,7 +525,7 @@ func GetNewReplicaSet(deployment *extensions.Deployment, c extensionsv1beta1.Ext
 	if err != nil {
 		return nil, err
 	}
-	return FindNewReplicaSet(deployment, rsList)
+	return FindNewReplicaSet(deployment, rsList), nil
 }
 
 // RsListFromClient returns an rsListFunc that wraps the given client.
@@ -567,7 +562,7 @@ func ListReplicaSets(deployment *extensions.Deployment, getRSList RsListFunc) ([
 	options := metav1.ListOptions{LabelSelector: selector.String()}
 	all, err := getRSList(namespace, options)
 	if err != nil {
-		return all, err
+		return nil, err
 	}
 	// Only include those whose ControllerRef matches the Deployment.
 	owned := make([]*extensions.ReplicaSet, 0, len(all))
@@ -640,7 +635,7 @@ func ListPods(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet
 // We ignore pod-template-hash because the hash result would be different upon podTemplateSpec API changes
 // (e.g. the addition of a new field will cause the hash code to change)
 // Note that we assume input podTemplateSpecs contain non-empty labels
-func EqualIgnoreHash(template1, template2 *v1.PodTemplateSpec) (bool, error) {
+func EqualIgnoreHash(template1, template2 *v1.PodTemplateSpec) bool {
 	t1Copy := template1.DeepCopy()
 	t2Copy := template2.DeepCopy()
 	// First, compare template.Labels (ignoring hash)
@@ -651,43 +646,36 @@ func EqualIgnoreHash(template1, template2 *v1.PodTemplateSpec) (bool, error) {
 	// We make sure len(labels2) >= len(labels1)
 	for k, v := range labels2 {
 		if labels1[k] != v && k != extensions.DefaultDeploymentUniqueLabelKey {
-			return false, nil
+			return false
 		}
 	}
 	// Then, compare the templates without comparing their labels
 	t1Copy.Labels, t2Copy.Labels = nil, nil
-	return apiequality.Semantic.DeepEqual(t1Copy, t2Copy), nil
+	return apiequality.Semantic.DeepEqual(t1Copy, t2Copy)
 }
 
 // FindNewReplicaSet returns the new RS this given deployment targets (the one with the same pod template).
-func FindNewReplicaSet(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet) (*extensions.ReplicaSet, error) {
+func FindNewReplicaSet(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet) *extensions.ReplicaSet {
 	sort.Sort(controller.ReplicaSetsByCreationTimestamp(rsList))
 	for i := range rsList {
-		equal, err := EqualIgnoreHash(&rsList[i].Spec.Template, &deployment.Spec.Template)
-		if err != nil {
-			return nil, err
-		}
-		if equal {
+		if EqualIgnoreHash(&rsList[i].Spec.Template, &deployment.Spec.Template) {
 			// In rare cases, such as after cluster upgrades, Deployment may end up with
 			// having more than one new ReplicaSets that have the same template as its template,
 			// see https://github.com/kubernetes/kubernetes/issues/40415
 			// We deterministically choose the oldest new ReplicaSet.
-			return rsList[i], nil
+			return rsList[i]
 		}
 	}
 	// new ReplicaSet does not exist.
-	return nil, nil
+	return nil
 }
 
 // FindOldReplicaSets returns the old replica sets targeted by the given Deployment, with the given slice of RSes.
 // Note that the first set of old replica sets doesn't include the ones with no pods, and the second set of old replica sets include all old replica sets.
-func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet, error) {
+func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.ReplicaSet) ([]*extensions.ReplicaSet, []*extensions.ReplicaSet) {
 	var requiredRSs []*extensions.ReplicaSet
 	var allRSs []*extensions.ReplicaSet
-	newRS, err := FindNewReplicaSet(deployment, rsList)
-	if err != nil {
-		return nil, nil, err
-	}
+	newRS := FindNewReplicaSet(deployment, rsList)
 	for _, rs := range rsList {
 		// Filter out new replica set
 		if newRS != nil && rs.UID == newRS.UID {
@@ -698,7 +686,7 @@ func FindOldReplicaSets(deployment *extensions.Deployment, rsList []*extensions.
 			requiredRSs = append(requiredRSs, rs)
 		}
 	}
-	return requiredRSs, allRSs, nil
+	return requiredRSs, allRSs
 }
 
 // WaitForReplicaSetUpdated polls the replica set until it is updated.

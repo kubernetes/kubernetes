@@ -396,11 +396,7 @@ func TestEqualIgnoreHash(t *testing.T) {
 					reverseString = " (reverse order)"
 				}
 				// Run
-				equal, err := EqualIgnoreHash(t1, t2)
-				if err != nil {
-					t.Errorf("%s: unexpected error: %v", err, test.Name)
-					return
-				}
+				equal := EqualIgnoreHash(t1, t2)
 				if equal != test.expected {
 					t.Errorf("%q%s: expected %v", test.Name, reverseString, test.expected)
 					return
@@ -463,8 +459,8 @@ func TestFindNewReplicaSet(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			if rs, err := FindNewReplicaSet(&test.deployment, test.rsList); !reflect.DeepEqual(rs, test.expected) || err != nil {
-				t.Errorf("In test case %q, expected %#v, got %#v: %v", test.Name, test.expected, rs, err)
+			if rs := FindNewReplicaSet(&test.deployment, test.rsList); !reflect.DeepEqual(rs, test.expected) {
+				t.Errorf("In test case %q, expected %#v, got %#v", test.Name, test.expected, rs)
 			}
 		})
 	}
@@ -531,15 +527,15 @@ func TestFindOldReplicaSets(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			requireRS, allRS, err := FindOldReplicaSets(&test.deployment, test.rsList)
+			requireRS, allRS := FindOldReplicaSets(&test.deployment, test.rsList)
 			sort.Sort(controller.ReplicaSetsByCreationTimestamp(allRS))
 			sort.Sort(controller.ReplicaSetsByCreationTimestamp(test.expected))
-			if !reflect.DeepEqual(allRS, test.expected) || err != nil {
-				t.Errorf("In test case %q, expected %#v, got %#v: %v", test.Name, test.expected, allRS, err)
+			if !reflect.DeepEqual(allRS, test.expected) {
+				t.Errorf("In test case %q, expected %#v, got %#v", test.Name, test.expected, allRS)
 			}
 			// RSs are getting filtered correctly by rs.spec.replicas
-			if !reflect.DeepEqual(requireRS, test.expectedRequire) || err != nil {
-				t.Errorf("In test case %q, expected %#v, got %#v: %v", test.Name, test.expectedRequire, requireRS, err)
+			if !reflect.DeepEqual(requireRS, test.expectedRequire) {
+				t.Errorf("In test case %q, expected %#v, got %#v", test.Name, test.expectedRequire, requireRS)
 			}
 		})
 	}
