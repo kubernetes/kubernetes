@@ -135,8 +135,8 @@ func TestFeatureGateFlag(t *testing.T) {
 			t.Errorf("%d: Parse() Expected nil, Got %v", i, err)
 		}
 		for k, v := range test.expect {
-			if f.enabled[k] != v {
-				t.Errorf("%d: expected %s=%v, Got %v", i, k, v, f.enabled[k])
+			if actual := f.enabled.Load().(map[Feature]bool)[k]; actual != v {
+				t.Errorf("%d: expected %s=%v, Got %v", i, k, v, actual)
 			}
 		}
 	}
