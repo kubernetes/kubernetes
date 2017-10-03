@@ -105,7 +105,7 @@ var _ = SIGDescribe("vsphere volume operations storm", func() {
 		}
 
 		By("Waiting for all claims to be in bound phase")
-		persistentvolumes, err = framework.WaitForPVClaimBoundPhase(client, pvclaims)
+		persistentvolumes, err = framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating pod to attach PVs to the node")

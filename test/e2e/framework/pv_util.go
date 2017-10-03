@@ -935,11 +935,11 @@ func CreateClientPod(c clientset.Interface, ns string, pvc *v1.PersistentVolumeC
 }
 
 // wait until all pvcs phase set to bound
-func WaitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.PersistentVolumeClaim) ([]*v1.PersistentVolume, error) {
+func WaitForPVClaimBoundPhase(client clientset.Interface, pvclaims []*v1.PersistentVolumeClaim, timeout time.Duration) ([]*v1.PersistentVolume, error) {
 	persistentvolumes := make([]*v1.PersistentVolume, len(pvclaims))
 
 	for index, claim := range pvclaims {
-		err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, Poll, ClaimProvisionTimeout)
+		err := WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, claim.Namespace, claim.Name, Poll, timeout)
 		if err != nil {
 			return persistentvolumes, err
 		}

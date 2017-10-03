@@ -86,7 +86,7 @@ func invokeTestForFstype(f *framework.Framework, client clientset.Interface, nam
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
 	By("Waiting for claim to be in bound phase")
-	persistentvolumes, err := framework.WaitForPVClaimBoundPhase(client, pvclaims)
+	persistentvolumes, err := framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Creating pod to attach PV to the node")
