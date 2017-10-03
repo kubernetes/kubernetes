@@ -196,7 +196,7 @@ __custom_func() {
 }
 `
 
-	// If you add a resource to this list, please also take a look at pkg/kubectl/kubectl.go
+	// If you add a resource to this list, please also take a look at pkg/kubectl/generators.go
 	// and add a short forms entry in expandResourceShortcut() when appropriate.
 	// TODO: This should be populated using the discovery information from apiserver.
 	validResources = `Valid resource types include:

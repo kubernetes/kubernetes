@@ -53,6 +53,7 @@ import (
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"k8s.io/kubernetes/pkg/kubectl/generators"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
@@ -183,7 +184,7 @@ type ClientAccessFactory interface {
 	// overridden.
 	DefaultNamespace() (string, bool, error)
 	// Generators returns the generators for the provided command
-	Generators(cmdName string) map[string]kubectl.Generator
+	Generators(cmdName string) map[string]generators.Generator
 	// Check whether the kind of resources could be exposed
 	CanBeExposed(kind schema.GroupKind) error
 	// Check whether the kind of resources could be autoscaled

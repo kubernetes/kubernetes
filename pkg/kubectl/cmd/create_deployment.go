@@ -22,9 +22,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generators"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -68,12 +68,12 @@ func generatorFromName(
 	generatorName string,
 	imageNames []string,
 	deploymentName string,
-) (kubectl.StructuredGenerator, bool) {
+) (generators.StructuredGenerator, bool) {
 
 	switch generatorName {
 	case cmdutil.DeploymentBasicAppsV1Beta1GeneratorName:
-		generator := &kubectl.DeploymentBasicAppsGeneratorV1{
-			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
+		generator := &generators.DeploymentBasicAppsGeneratorV1{
+			BaseDeploymentGenerator: generators.BaseDeploymentGenerator{
 				Name:   deploymentName,
 				Images: imageNames,
 			},
@@ -81,8 +81,8 @@ func generatorFromName(
 		return generator, true
 
 	case cmdutil.DeploymentBasicV1Beta1GeneratorName:
-		generator := &kubectl.DeploymentBasicGeneratorV1{
-			BaseDeploymentGenerator: kubectl.BaseDeploymentGenerator{
+		generator := &generators.DeploymentBasicGeneratorV1{
+			BaseDeploymentGenerator: generators.BaseDeploymentGenerator{
 				Name:   deploymentName,
 				Images: imageNames,
 			},

@@ -49,7 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/generators"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
@@ -131,7 +131,7 @@ func TestProtocolsForObject(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	protocolsString := kubectl.MakeProtocols(protocolsMap)
+	protocolsString := generators.MakeProtocols(protocolsMap)
 	protocolsStrings := strings.Split(protocolsString, ",")
 	got := sets.NewString(protocolsStrings...)
 
@@ -183,7 +183,7 @@ func TestLabelsForObject(t *testing.T) {
 		if err != test.err {
 			t.Fatalf("%s: Error mismatch: Expected %v, got %v", test.name, test.err, err)
 		}
-		got := kubectl.MakeLabels(gotLabels)
+		got := generators.MakeLabels(gotLabels)
 		if test.expected != got {
 			t.Fatalf("%s: Labels mismatch! Expected %s, got %s", test.name, test.expected, got)
 		}

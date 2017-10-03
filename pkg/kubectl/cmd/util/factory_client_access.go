@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/generators"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -262,31 +263,31 @@ func (f *ring0Factory) MapBasedSelectorForObject(object runtime.Object) (string,
 	// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
 	switch t := object.(type) {
 	case *api.ReplicationController:
-		return kubectl.MakeLabels(t.Spec.Selector), nil
+		return generators.MakeLabels(t.Spec.Selector), nil
 	case *api.Pod:
 		if len(t.Labels) == 0 {
 			return "", fmt.Errorf("the pod has no labels and cannot be exposed")
 		}
-		return kubectl.MakeLabels(t.Labels), nil
+		return generators.MakeLabels(t.Labels), nil
 	case *api.Service:
 		if t.Spec.Selector == nil {
 			return "", fmt.Errorf("the service has no pod selector set")
 		}
-		return kubectl.MakeLabels(t.Spec.Selector), nil
+		return generators.MakeLabels(t.Spec.Selector), nil
 	case *extensions.Deployment:
 		// TODO(madhusudancs): Make this smarter by admitting MatchExpressions with Equals
 		// operator, DoubleEquals operator and In operator with only one element in the set.
 		if len(t.Spec.Selector.MatchExpressions) > 0 {
 			return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format", t.Spec.Selector.MatchExpressions)
 		}
-		return kubectl.MakeLabels(t.Spec.Selector.MatchLabels), nil
+		return generators.MakeLabels(t.Spec.Selector.MatchLabels), nil
 	case *extensions.ReplicaSet:
 		// TODO(madhusudancs): Make this smarter by admitting MatchExpressions with Equals
 		// operator, DoubleEquals operator and In operator with only one element in the set.
 		if len(t.Spec.Selector.MatchExpressions) > 0 {
 			return "", fmt.Errorf("couldn't convert expressions - \"%+v\" to map-based selector format", t.Spec.Selector.MatchExpressions)
 		}
-		return kubectl.MakeLabels(t.Spec.Selector.MatchLabels), nil
+		return generators.MakeLabels(t.Spec.Selector.MatchLabels), nil
 	default:
 		gvks, _, err := api.Scheme.ObjectKinds(object)
 		if err != nil {
@@ -508,66 +509,66 @@ const (
 )
 
 // DefaultGenerators returns the set of default generators for use in Factory instances
-func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
-	var generator map[string]kubectl.Generator
+func DefaultGenerators(cmdName string) map[string]generators.Generator {
+	var generator map[string]generators.Generator
 	switch cmdName {
 	case "expose":
-		generator = map[string]kubectl.Generator{
-			ServiceV1GeneratorName: kubectl.ServiceGeneratorV1{},
-			ServiceV2GeneratorName: kubectl.ServiceGeneratorV2{},
+		generator = map[string]generators.Generator{
+			ServiceV1GeneratorName: generators.ServiceGeneratorV1{},
+			ServiceV2GeneratorName: generators.ServiceGeneratorV2{},
 		}
 	case "service-clusterip":
-		generator = map[string]kubectl.Generator{
-			ServiceClusterIPGeneratorV1Name: kubectl.ServiceClusterIPGeneratorV1{},
+		generator = map[string]generators.Generator{
+			ServiceClusterIPGeneratorV1Name: generators.ServiceClusterIPGeneratorV1{},
 		}
 	case "service-nodeport":
-		generator = map[string]kubectl.Generator{
-			ServiceNodePortGeneratorV1Name: kubectl.ServiceNodePortGeneratorV1{},
+		generator = map[string]generators.Generator{
+			ServiceNodePortGeneratorV1Name: generators.ServiceNodePortGeneratorV1{},
 		}
 	case "service-loadbalancer":
-		generator = map[string]kubectl.Generator{
-			ServiceLoadBalancerGeneratorV1Name: kubectl.ServiceLoadBalancerGeneratorV1{},
+		generator = map[string]generators.Generator{
+			ServiceLoadBalancerGeneratorV1Name: generators.ServiceLoadBalancerGeneratorV1{},
 		}
 	case "deployment":
 		// Create Deployment has only StructuredGenerators and no
 		// param-based Generators.
 		// The StructuredGenerators are as follows (as of 2017-07-17):
-		// DeploymentBasicV1Beta1GeneratorName -> kubectl.DeploymentBasicGeneratorV1
-		// DeploymentBasicAppsV1Beta1GeneratorName -> kubectl.DeploymentBasicAppsGeneratorV1
-		generator = map[string]kubectl.Generator{}
+		// DeploymentBasicV1Beta1GeneratorName -> generators.DeploymentBasicGeneratorV1
+		// DeploymentBasicAppsV1Beta1GeneratorName -> generators.DeploymentBasicAppsGeneratorV1
+		generator = map[string]generators.Generator{}
 	case "run":
-		generator = map[string]kubectl.Generator{
-			RunV1GeneratorName:                 kubectl.BasicReplicationController{},
-			RunPodV1GeneratorName:              kubectl.BasicPod{},
-			DeploymentV1Beta1GeneratorName:     kubectl.DeploymentV1Beta1{},
-			DeploymentAppsV1Beta1GeneratorName: kubectl.DeploymentAppsV1Beta1{},
-			JobV1GeneratorName:                 kubectl.JobV1{},
-			CronJobV2Alpha1GeneratorName:       kubectl.CronJobV2Alpha1{},
-			CronJobV1Beta1GeneratorName:        kubectl.CronJobV1Beta1{},
+		generator = map[string]generators.Generator{
+			RunV1GeneratorName:                 generators.BasicReplicationController{},
+			RunPodV1GeneratorName:              generators.BasicPod{},
+			DeploymentV1Beta1GeneratorName:     generators.DeploymentV1Beta1{},
+			DeploymentAppsV1Beta1GeneratorName: generators.DeploymentAppsV1Beta1{},
+			JobV1GeneratorName:                 generators.JobV1{},
+			CronJobV2Alpha1GeneratorName:       generators.CronJobV2Alpha1{},
+			CronJobV1Beta1GeneratorName:        generators.CronJobV1Beta1{},
 		}
 	case "autoscale":
-		generator = map[string]kubectl.Generator{
-			HorizontalPodAutoscalerV1GeneratorName: kubectl.HorizontalPodAutoscalerV1{},
+		generator = map[string]generators.Generator{
+			HorizontalPodAutoscalerV1GeneratorName: generators.HorizontalPodAutoscalerV1{},
 		}
 	case "namespace":
-		generator = map[string]kubectl.Generator{
-			NamespaceV1GeneratorName: kubectl.NamespaceGeneratorV1{},
+		generator = map[string]generators.Generator{
+			NamespaceV1GeneratorName: generators.NamespaceGeneratorV1{},
 		}
 	case "quota":
-		generator = map[string]kubectl.Generator{
-			ResourceQuotaV1GeneratorName: kubectl.ResourceQuotaGeneratorV1{},
+		generator = map[string]generators.Generator{
+			ResourceQuotaV1GeneratorName: generators.ResourceQuotaGeneratorV1{},
 		}
 	case "secret":
-		generator = map[string]kubectl.Generator{
-			SecretV1GeneratorName: kubectl.SecretGeneratorV1{},
+		generator = map[string]generators.Generator{
+			SecretV1GeneratorName: generators.SecretGeneratorV1{},
 		}
 	case "secret-for-docker-registry":
-		generator = map[string]kubectl.Generator{
-			SecretForDockerRegistryV1GeneratorName: kubectl.SecretForDockerRegistryGeneratorV1{},
+		generator = map[string]generators.Generator{
+			SecretForDockerRegistryV1GeneratorName: generators.SecretForDockerRegistryGeneratorV1{},
 		}
 	case "secret-for-tls":
-		generator = map[string]kubectl.Generator{
-			SecretForTLSV1GeneratorName: kubectl.SecretForTLSGeneratorV1{},
+		generator = map[string]generators.Generator{
+			SecretForTLSV1GeneratorName: generators.SecretForTLSGeneratorV1{},
 		}
 	}
 
@@ -618,7 +619,7 @@ func Contains(resourcesList []*metav1.APIResourceList, resource schema.GroupVers
 	return len(resources) != 0
 }
 
-func (f *ring0Factory) Generators(cmdName string) map[string]kubectl.Generator {
+func (f *ring0Factory) Generators(cmdName string) map[string]generators.Generator {
 	return DefaultGenerators(cmdName)
 }
 

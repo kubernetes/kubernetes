@@ -21,9 +21,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/generators"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -99,10 +99,10 @@ func CreateSecretGeneric(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command
 	if err != nil {
 		return err
 	}
-	var generator kubectl.StructuredGenerator
+	var generator generators.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.SecretV1GeneratorName:
-		generator = &kubectl.SecretGeneratorV1{
+		generator = &generators.SecretGeneratorV1{
 			Name:           name,
 			Type:           cmdutil.GetFlagString(cmd, "type"),
 			FileSources:    cmdutil.GetFlagStringSlice(cmd, "from-file"),
@@ -182,10 +182,10 @@ func CreateSecretDockerRegistry(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.
 			return cmdutil.UsageErrorf(cmd, "flag %s is required", requiredFlag)
 		}
 	}
-	var generator kubectl.StructuredGenerator
+	var generator generators.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.SecretForDockerRegistryV1GeneratorName:
-		generator = &kubectl.SecretForDockerRegistryGeneratorV1{
+		generator = &generators.SecretForDockerRegistryGeneratorV1{
 			Name:       name,
 			Username:   cmdutil.GetFlagString(cmd, "docker-username"),
 			Email:      cmdutil.GetFlagString(cmd, "docker-email"),
@@ -249,10 +249,10 @@ func CreateSecretTLS(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, ar
 			return cmdutil.UsageErrorf(cmd, "flag %s is required", requiredFlag)
 		}
 	}
-	var generator kubectl.StructuredGenerator
+	var generator generators.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.SecretForTLSV1GeneratorName:
-		generator = &kubectl.SecretForTLSGeneratorV1{
+		generator = &generators.SecretForTLSGeneratorV1{
 			Name:       name,
 			Key:        cmdutil.GetFlagString(cmd, "key"),
 			Cert:       cmdutil.GetFlagString(cmd, "cert"),
