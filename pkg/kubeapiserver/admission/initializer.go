@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
+	admissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -37,21 +38,9 @@ type WantsInternalKubeClientSet interface {
 	admission.Validator
 }
 
-// WantsExternalKubeClientSet defines a function which sets ClientSet for admission plugins that need it
-type WantsExternalKubeClientSet interface {
-	SetExternalKubeClientSet(clientset.Interface)
-	admission.Validator
-}
-
 // WantsInternalKubeInformerFactory defines a function which sets InformerFactory for admission plugins that need it
 type WantsInternalKubeInformerFactory interface {
 	SetInternalKubeInformerFactory(informers.SharedInformerFactory)
-	admission.Validator
-}
-
-// WantsAuthorizer defines a function which sets Authorizer for admission plugins that need it.
-type WantsAuthorizer interface {
-	SetAuthorizer(authorizer.Authorizer)
 	admission.Validator
 }
 
@@ -77,12 +66,6 @@ type WantsServiceResolver interface {
 	SetServiceResolver(ServiceResolver)
 }
 
-// WantsClientCert defines a fuction that accepts a cert & key for admission
-// plugins that need to make calls and prove their identity.
-type WantsClientCert interface {
-	SetClientCert(cert, key []byte)
-}
-
 // ServiceResolver knows how to convert a service reference into an actual
 // location.
 type ServiceResolver interface {
@@ -106,8 +89,6 @@ type PluginInitializer struct {
 	serviceResolver ServiceResolver
 
 	// for proving we are apiserver in call-outs
-	clientCert     []byte
-	clientKey      []byte
 	proxyTransport *http.Transport
 }
 
@@ -142,14 +123,6 @@ func (i *PluginInitializer) SetServiceResolver(s ServiceResolver) *PluginInitial
 	return i
 }
 
-// SetClientCert sets the client cert & key (identity used for calling out to
-// web hooks) which is needed by some plugins.
-func (i *PluginInitializer) SetClientCert(cert, key []byte) *PluginInitializer {
-	i.clientCert = cert
-	i.clientKey = key
-	return i
-}
-
 // SetProxyTransport sets the proxyTransport which is needed by some plugins.
 func (i *PluginInitializer) SetProxyTransport(proxyTransport *http.Transport) *PluginInitializer {
 	i.proxyTransport = proxyTransport
@@ -163,7 +136,7 @@ func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 		wants.SetInternalKubeClientSet(i.internalClient)
 	}
 
-	if wants, ok := plugin.(WantsExternalKubeClientSet); ok {
+	if wants, ok := plugin.(admissioninit.WantsExternalKubeClientSet); ok {
 		wants.SetExternalKubeClientSet(i.externalClient)
 	}
 
@@ -171,7 +144,7 @@ func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 		wants.SetInternalKubeInformerFactory(i.informers)
 	}
 
-	if wants, ok := plugin.(WantsAuthorizer); ok {
+	if wants, ok := plugin.(admissioninit.WantsAuthorizer); ok {
 		wants.SetAuthorizer(i.authorizer)
 	}
 
@@ -189,13 +162,6 @@ func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 
 	if wants, ok := plugin.(WantsServiceResolver); ok {
 		wants.SetServiceResolver(i.serviceResolver)
-	}
-
-	if wants, ok := plugin.(WantsClientCert); ok {
-		if i.clientCert == nil || i.clientKey == nil {
-			panic("An admission plugin wants a client cert/key, but they were not provided.")
-		}
-		wants.SetClientCert(i.clientCert, i.clientKey)
 	}
 
 	if wants, ok := plugin.(WantsProxyTransport); ok {

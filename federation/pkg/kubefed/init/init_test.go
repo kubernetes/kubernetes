@@ -35,7 +35,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -109,6 +109,7 @@ func TestInitFederation(t *testing.T) {
 		apiserverEnableHTTPBasicAuth bool
 		apiserverEnableTokenAuth     bool
 		isRBACAPIAvailable           bool
+		nodeSelector                 string
 	}{
 		{
 			federation:            "union",
@@ -126,6 +127,7 @@ func TestInitFederation(t *testing.T) {
 			dryRun:                "",
 			apiserverArgOverrides: "--client-ca-file=override,--log-dir=override",
 			cmArgOverrides:        "--dns-provider=override,--log-dir=override",
+			nodeSelector:          "disk=ssh,role=node",
 		},
 		{
 			federation:           "union",
@@ -211,7 +213,7 @@ func TestInitFederation(t *testing.T) {
 		},
 	}
 
-	defaultEtcdImage := "gcr.io/google_containers/etcd:3.0.17"
+	defaultEtcdImage := "gcr.io/google_containers/etcd:3.1.10"
 
 	//TODO: implement a negative case for dry run
 
@@ -246,7 +248,7 @@ func TestInitFederation(t *testing.T) {
 			tc.etcdImage = defaultEtcdImage
 		}
 
-		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.serverImage, tc.etcdImage, tc.dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.etcdPVStorageClass, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable)
+		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.serverImage, tc.etcdImage, tc.dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.etcdPVStorageClass, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable, tc.nodeSelector)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -291,6 +293,9 @@ func TestInitFederation(t *testing.T) {
 		}
 		if tc.apiserverEnableTokenAuth {
 			cmd.Flags().Set("apiserver-enable-token-auth", "true")
+		}
+		if tc.nodeSelector != "" {
+			cmd.Flags().Set("node-selector", tc.nodeSelector)
 		}
 
 		cmd.Run(cmd, []string{tc.federation})
@@ -621,7 +626,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, serverImage, etcdImage, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, etcdPVStorageClass, apiserverOverrideArg, cmOverrideArg, tmpDirPath string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth, isRBACAPIAvailable bool) (cmdutil.Factory, error) {
+func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, serverImage, etcdImage, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, etcdPVStorageClass, apiserverOverrideArg, cmOverrideArg, tmpDirPath string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth, isRBACAPIAvailable bool, nodeSelectorString string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -780,10 +785,10 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 		},
 	}
 
-	role := rbacv1beta1.Role{
+	role := rbacv1.Role{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Role",
-			APIVersion: rbacv1beta1.SchemeGroupVersion.String(),
+			APIVersion: rbacv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "federation-system:federation-controller-manager",
@@ -793,7 +798,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				federation.FederationNameAnnotation: federationName,
 			},
 		},
-		Rules: []rbacv1beta1.PolicyRule{
+		Rules: []rbacv1.PolicyRule{
 			{
 				Verbs:     []string{"get", "list", "watch"},
 				APIGroups: []string{""},
@@ -802,10 +807,10 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 		},
 	}
 
-	rolebinding := rbacv1beta1.RoleBinding{
+	rolebinding := rbacv1.RoleBinding{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "RoleBinding",
-			APIVersion: rbacv1beta1.SchemeGroupVersion.String(),
+			APIVersion: rbacv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "federation-system:federation-controller-manager",
@@ -815,7 +820,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				federation.FederationNameAnnotation: federationName,
 			},
 		},
-		Subjects: []rbacv1beta1.Subject{
+		Subjects: []rbacv1.Subject{
 			{
 				Kind:      "ServiceAccount",
 				APIGroup:  "",
@@ -823,7 +828,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				Namespace: "federation-system",
 			},
 		},
-		RoleRef: rbacv1beta1.RoleRef{
+		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "Role",
 			Name:     "federation-system:federation-controller-manager",
@@ -889,6 +894,11 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	sort.Strings(apiserverArgs)
 	apiserverCommand = append(apiserverCommand, apiserverArgs...)
 
+	nodeSelector, err := marshallOverrides(nodeSelectorString)
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling --node-selector: %v", err)
+	}
+
 	apiserver := &v1beta1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
@@ -943,6 +953,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 							},
 						},
 					},
+					NodeSelector: nodeSelector,
 					Volumes: []v1.Volume{
 						{
 							Name: credSecretName,
@@ -1051,6 +1062,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 							},
 						},
 					},
+					NodeSelector: nodeSelector,
 					Volumes: []v1.Volume{
 						{
 							Name: cmKubeconfigSecretName,
@@ -1125,8 +1137,8 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 		Name: rbac.GroupName,
 		Versions: []metav1.GroupVersionForDiscovery{
 			{
-				GroupVersion: rbac.GroupName + "/v1beta1",
-				Version:      "v1beta1",
+				GroupVersion: rbac.GroupName + "/v1",
+				Version:      "v1",
 			},
 		},
 	}
@@ -1284,12 +1296,12 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 					return nil, fmt.Errorf("unexpected service account object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, sa))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &sa)}, nil
-			case p == "/apis/rbac.authorization.k8s.io/v1beta1/namespaces/federation-system/roles" && m == http.MethodPost:
+			case p == "/apis/rbac.authorization.k8s.io/v1/namespaces/federation-system/roles" && m == http.MethodPost:
 				body, err := ioutil.ReadAll(req.Body)
 				if err != nil {
 					return nil, err
 				}
-				var got rbacv1beta1.Role
+				var got rbacv1.Role
 				_, _, err = codec.Decode(body, nil, &got)
 				if err != nil {
 					return nil, err
@@ -1298,12 +1310,12 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 					return nil, fmt.Errorf("unexpected role object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, role))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(rbacCodec, &role)}, nil
-			case p == "/apis/rbac.authorization.k8s.io/v1beta1/namespaces/federation-system/rolebindings" && m == http.MethodPost:
+			case p == "/apis/rbac.authorization.k8s.io/v1/namespaces/federation-system/rolebindings" && m == http.MethodPost:
 				body, err := ioutil.ReadAll(req.Body)
 				if err != nil {
 					return nil, err
 				}
-				var got rbacv1beta1.RoleBinding
+				var got rbacv1.RoleBinding
 				_, _, err = codec.Decode(body, nil, &got)
 				if err != nil {
 					return nil, err

@@ -45,7 +45,7 @@ roleRef:
   name: fluentd-es
   apiGroup: ""
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1beta2
 kind: DaemonSet
 metadata:
   name: fluentd-es-v2.0.1

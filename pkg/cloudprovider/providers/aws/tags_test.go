@@ -24,7 +24,7 @@ import (
 )
 
 func TestFilterTags(t *testing.T) {
-	awsServices := NewFakeAWSServices()
+	awsServices := NewFakeAWSServices(TestClusterId)
 	c, err := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	if err != nil {
 		t.Errorf("Error building aws cloud: %v", err)

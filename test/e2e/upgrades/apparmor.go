@@ -55,7 +55,7 @@ func (t *AppArmorUpgradeTest) Setup(f *framework.Framework) {
 
 	// Create the initial test pod.
 	By("Creating a long-running AppArmor enabled pod.")
-	t.pod = common.CreateAppArmorTestPod(f, false)
+	t.pod = common.CreateAppArmorTestPod(f, false, false)
 
 	// Verify initial state.
 	t.verifyNodesAppArmorEnabled(f)
@@ -91,7 +91,10 @@ func (t *AppArmorUpgradeTest) verifyPodStillUp(f *framework.Framework) {
 
 func (t *AppArmorUpgradeTest) verifyNewPodSucceeds(f *framework.Framework) {
 	By("Verifying an AppArmor profile is enforced for a new pod")
-	common.CreateAppArmorTestPod(f, true)
+	common.CreateAppArmorTestPod(f, false, true)
+
+	By("Verifying an unconfined AppArmor profile is enforced for a new pod")
+	common.CreateAppArmorTestPod(f, true, true)
 }
 
 func (t *AppArmorUpgradeTest) verifyNodesAppArmorEnabled(f *framework.Framework) {

@@ -286,22 +286,22 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	gvr("rbac.authorization.k8s.io", "v1alpha1", "roles"): {
 		stub:             `{"metadata": {"name": "role1"}, "rules": [{"apiGroups": ["v1"], "resources": ["events"], "verbs": ["watch"]}]}`,
 		expectedEtcdPath: "/registry/roles/etcdstoragepathtestnamespace/role1",
-		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1beta1", "Role"),
+		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1", "Role"),
 	},
 	gvr("rbac.authorization.k8s.io", "v1alpha1", "clusterroles"): {
 		stub:             `{"metadata": {"name": "crole1"}, "rules": [{"nonResourceURLs": ["/version"], "verbs": ["get"]}]}`,
 		expectedEtcdPath: "/registry/clusterroles/crole1",
-		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1beta1", "ClusterRole"),
+		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1", "ClusterRole"),
 	},
 	gvr("rbac.authorization.k8s.io", "v1alpha1", "rolebindings"): {
 		stub:             `{"metadata": {"name": "roleb1"}, "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "somecr"}, "subjects": [{"apiVersion": "rbac.authorization.k8s.io/v1alpha1", "kind": "Group", "name": "system:authenticated"}]}`,
 		expectedEtcdPath: "/registry/rolebindings/etcdstoragepathtestnamespace/roleb1",
-		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1beta1", "RoleBinding"),
+		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1", "RoleBinding"),
 	},
 	gvr("rbac.authorization.k8s.io", "v1alpha1", "clusterrolebindings"): {
 		stub:             `{"metadata": {"name": "croleb1"}, "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "somecr"}, "subjects": [{"apiVersion": "rbac.authorization.k8s.io/v1alpha1", "kind": "Group", "name": "system:authenticated"}]}`,
 		expectedEtcdPath: "/registry/clusterrolebindings/croleb1",
-		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1beta1", "ClusterRoleBinding"),
+		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1", "ClusterRoleBinding"),
 	},
 	// --
 
@@ -309,18 +309,22 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	gvr("rbac.authorization.k8s.io", "v1beta1", "roles"): {
 		stub:             `{"metadata": {"name": "role2"}, "rules": [{"apiGroups": ["v1"], "resources": ["events"], "verbs": ["watch"]}]}`,
 		expectedEtcdPath: "/registry/roles/etcdstoragepathtestnamespace/role2",
+		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1", "Role"),
 	},
 	gvr("rbac.authorization.k8s.io", "v1beta1", "clusterroles"): {
 		stub:             `{"metadata": {"name": "crole2"}, "rules": [{"nonResourceURLs": ["/version"], "verbs": ["get"]}]}`,
 		expectedEtcdPath: "/registry/clusterroles/crole2",
+		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1", "ClusterRole"),
 	},
 	gvr("rbac.authorization.k8s.io", "v1beta1", "rolebindings"): {
 		stub:             `{"metadata": {"name": "roleb2"}, "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "somecr"}, "subjects": [{"apiVersion": "rbac.authorization.k8s.io/v1alpha1", "kind": "Group", "name": "system:authenticated"}]}`,
 		expectedEtcdPath: "/registry/rolebindings/etcdstoragepathtestnamespace/roleb2",
+		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1", "RoleBinding"),
 	},
 	gvr("rbac.authorization.k8s.io", "v1beta1", "clusterrolebindings"): {
 		stub:             `{"metadata": {"name": "croleb2"}, "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "somecr"}, "subjects": [{"apiVersion": "rbac.authorization.k8s.io/v1alpha1", "kind": "Group", "name": "system:authenticated"}]}`,
 		expectedEtcdPath: "/registry/clusterrolebindings/croleb2",
+		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1", "ClusterRoleBinding"),
 	},
 	// --
 
@@ -328,22 +332,18 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 	gvr("rbac.authorization.k8s.io", "v1", "roles"): {
 		stub:             `{"metadata": {"name": "role3"}, "rules": [{"apiGroups": ["v1"], "resources": ["events"], "verbs": ["watch"]}]}`,
 		expectedEtcdPath: "/registry/roles/etcdstoragepathtestnamespace/role3",
-		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1beta1", "Role"),
 	},
 	gvr("rbac.authorization.k8s.io", "v1", "clusterroles"): {
 		stub:             `{"metadata": {"name": "crole3"}, "rules": [{"nonResourceURLs": ["/version"], "verbs": ["get"]}]}`,
 		expectedEtcdPath: "/registry/clusterroles/crole3",
-		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1beta1", "ClusterRole"),
 	},
 	gvr("rbac.authorization.k8s.io", "v1", "rolebindings"): {
 		stub:             `{"metadata": {"name": "roleb3"}, "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "somecr"}, "subjects": [{"apiVersion": "rbac.authorization.k8s.io/v1alpha1", "kind": "Group", "name": "system:authenticated"}]}`,
 		expectedEtcdPath: "/registry/rolebindings/etcdstoragepathtestnamespace/roleb3",
-		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1beta1", "RoleBinding"),
 	},
 	gvr("rbac.authorization.k8s.io", "v1", "clusterrolebindings"): {
 		stub:             `{"metadata": {"name": "croleb3"}, "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "somecr"}, "subjects": [{"apiVersion": "rbac.authorization.k8s.io/v1alpha1", "kind": "Group", "name": "system:authenticated"}]}`,
 		expectedEtcdPath: "/registry/clusterrolebindings/croleb3",
-		expectedGVK:      gvkP("rbac.authorization.k8s.io", "v1beta1", "ClusterRoleBinding"),
 	},
 	// --
 

@@ -30,7 +30,7 @@ import (
 
 const (
 	hyperkubeImageName = "gcr.io/google_containers/hyperkube-amd64"
-	DefaultEtcdImage   = "gcr.io/google_containers/etcd:3.0.17"
+	DefaultEtcdImage   = "gcr.io/google_containers/etcd:3.1.10"
 )
 
 func GetDefaultServerImage() string {

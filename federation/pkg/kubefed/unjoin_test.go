@@ -217,9 +217,9 @@ func testUnjoinFederationFactory(name, server, secret string) cmdutil.Factory {
 
 func fakeUnjoinHostFactory(clusterName string) cmdutil.Factory {
 	secretsPrefix := "/api/v1/namespaces/federation-system/secrets/"
-	clusterRolePrefix := "/apis/rbac.authorization.k8s.io/v1beta1/clusterroles/"
+	clusterRolePrefix := "/apis/rbac.authorization.k8s.io/v1/clusterroles/"
 	serviceAccountPrefix := "/api/v1/namespaces/federation-system/serviceaccounts/"
-	clusterRoleBindingPrefix := "/apis/rbac.authorization.k8s.io/v1beta1/clusterrolebindings/"
+	clusterRoleBindingPrefix := "/apis/rbac.authorization.k8s.io/v1/clusterrolebindings/"
 
 	// Using dummy bytes for now
 	configBytes, _ := clientcmd.Write(clientcmdapi.Config{})

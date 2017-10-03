@@ -49,6 +49,10 @@ declare -a resources=(
     "jobs"
     "horizontalpodautoscalers"
     "storageclasses"
+    "roles.rbac.authorization.k8s.io"
+    "rolebindings.rbac.authorization.k8s.io"
+    "clusterroles.rbac.authorization.k8s.io"
+    "clusterrolebindings.rbac.authorization.k8s.io"
 )
 
 # Find all the namespaces.
