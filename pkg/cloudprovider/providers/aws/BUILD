@@ -10,6 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "aws.go",
+        "aws_fakes.go",
         "aws_instancegroups.go",
         "aws_loadbalancer.go",
         "aws_metrics.go",
@@ -68,11 +69,8 @@ go_test(
     deps = [
         "//pkg/kubelet/apis:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
-        "//vendor/github.com/aws/aws-sdk-go/service/autoscaling:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/service/ec2:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/service/elb:go_default_library",
-        "//vendor/github.com/aws/aws-sdk-go/service/kms:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/mock:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
