@@ -57,7 +57,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/etcd3/preflight"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -417,13 +416,10 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 		// TODO: get rid of KUBE_API_VERSIONS or define sane behaviour if set
 		glog.Errorf("Failed to create clientset with KUBE_API_VERSIONS=%q. KUBE_API_VERSIONS is only for testing. Things will break.", kubeAPIVersions)
 	}
-	externalClient, err := clientset.NewForConfig(genericConfig.LoopbackClientConfig)
-	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to create external clientset: %v", err)
-	}
-	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
 
-	clientgoExternalClient, err := clientgoclientset.NewForConfig(genericConfig.LoopbackClientConfig)
+	kubeClientConfig := genericConfig.LoopbackClientConfig
+	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
+	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeClientConfig)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to create real external clientset: %v", err)
 	}
@@ -457,9 +453,7 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 	pluginInitializer, err := BuildAdmissionPluginInitializer(
 		s,
 		client,
-		externalClient,
 		sharedInformers,
-		genericConfig.Authorizer,
 		serviceResolver,
 		proxyTransport,
 	)
@@ -489,6 +483,7 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 		versionedInformers,
 		certBytes,
 		keyBytes,
+		kubeClientConfig,
 		pluginInitializer)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to initialize admission: %v", err)
@@ -497,7 +492,7 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 }
 
 // BuildAdmissionPluginInitializer constructs the admission plugin initializer
-func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client internalclientset.Interface, externalClient clientset.Interface, sharedInformers informers.SharedInformerFactory, apiAuthorizer authorizer.Authorizer, serviceResolver aggregatorapiserver.ServiceResolver, proxyTransport *http.Transport) (admission.PluginInitializer, error) {
+func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, serviceResolver aggregatorapiserver.ServiceResolver, proxyTransport *http.Transport) (admission.PluginInitializer, error) {
 	var cloudConfig []byte
 
 	if s.CloudProvider.CloudConfigFile != "" {
@@ -515,7 +510,7 @@ func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client interna
 	// do not require us to open watches for all items tracked by quota.
 	quotaRegistry := quotainstall.NewRegistry(nil, nil)
 
-	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, externalClient, sharedInformers, apiAuthorizer, cloudConfig, restMapper, quotaRegistry)
+	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, restMapper, quotaRegistry)
 
 	pluginInitializer = pluginInitializer.SetServiceResolver(serviceResolver)
 	pluginInitializer = pluginInitializer.SetProxyTransport(proxyTransport)

@@ -73,6 +73,7 @@ func (o *CoreAPIOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create Kubernetes clientset: %v", err)
 	}
+	config.ClientConfig = kubeconfig
 	config.SharedInformerFactory = clientgoinformers.NewSharedInformerFactory(clientgoExternalClient, 10*time.Minute)
 
 	return nil

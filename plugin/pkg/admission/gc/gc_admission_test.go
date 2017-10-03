@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/pkg/api"
@@ -69,7 +70,7 @@ func (fakeAuthorizer) Authorize(a authorizer.Attributes) (bool, string, error) {
 }
 
 // newGCPermissionsEnforcement returns the admission controller configured for testing.
-func newGCPermissionsEnforcement() *gcPermissionsEnforcement {
+func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 	// the pods/status endpoint is ignored by this plugin since old kubelets
 	// corrupt them.  the pod status strategy ensures status updates cannot mutate
 	// ownerRef.
@@ -83,9 +84,18 @@ func newGCPermissionsEnforcement() *gcPermissionsEnforcement {
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		whiteList: whiteList,
 	}
-	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, nil, fakeAuthorizer{}, nil, api.Registry.RESTMapper(), nil)
-	pluginInitializer.Initialize(gcAdmit)
-	return gcAdmit
+
+	genericPluginInitializer, err := initializer.New(nil, nil, fakeAuthorizer{}, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	pluginInitializer := kubeadmission.NewPluginInitializer(nil, nil, nil, api.Registry.RESTMapper(), nil)
+	initializersChain := admission.PluginInitializers{}
+	initializersChain = append(initializersChain, genericPluginInitializer)
+	initializersChain = append(initializersChain, pluginInitializer)
+
+	initializersChain.Initialize(gcAdmit)
+	return gcAdmit, nil
 }
 
 func TestGCAdmission(t *testing.T) {
@@ -245,7 +255,10 @@ func TestGCAdmission(t *testing.T) {
 			checkError: expectNoError,
 		},
 	}
-	gcAdmit := newGCPermissionsEnforcement()
+	gcAdmit, err := newGCPermissionsEnforcement()
+	if err != nil {
+		t.Error(err)
+	}
 
 	for _, tc := range tests {
 		operation := admission.Create
@@ -490,7 +503,10 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 			checkError: expectNoError,
 		},
 	}
-	gcAdmit := newGCPermissionsEnforcement()
+	gcAdmit, err := newGCPermissionsEnforcement()
+	if err != nil {
+		t.Error(err)
+	}
 
 	for _, tc := range tests {
 		operation := admission.Create

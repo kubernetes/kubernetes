@@ -42,7 +42,6 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
-	clientset "k8s.io/client-go/kubernetes"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	federationv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
@@ -181,17 +180,14 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 		return fmt.Errorf("invalid Authentication Config: %v", err)
 	}
 
-	client, err := internalclientset.NewForConfig(genericConfig.LoopbackClientConfig)
+	kubeClientConfig := genericConfig.LoopbackClientConfig
+	client, err := internalclientset.NewForConfig(kubeClientConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create clientset: %v", err)
 	}
-	externalClient, err := clientset.NewForConfig(genericConfig.LoopbackClientConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create external clientset: %v", err)
-	}
-	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
 
-	clientgoExternalClient, err := clientgoclientset.NewForConfig(genericConfig.LoopbackClientConfig)
+	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
+	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeClientConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create real external clientset: %v", err)
 	}
@@ -214,13 +210,14 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	// NOTE: we do not provide informers to the quota registry because admission level decisions
 	// do not require us to open watches for all items tracked by quota.
 	quotaRegistry := quotainstall.NewRegistry(nil, nil)
-	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, externalClient, sharedInformers, apiAuthorizer, cloudConfig, nil, quotaRegistry)
+	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, nil, quotaRegistry)
 
 	err = s.Admission.ApplyTo(
 		genericConfig,
 		versionedInformers,
 		nil,
 		nil,
+		kubeClientConfig,
 		pluginInitializer,
 	)
 	if err != nil {
