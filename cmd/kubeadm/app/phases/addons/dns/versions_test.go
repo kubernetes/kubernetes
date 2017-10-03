@@ -28,27 +28,27 @@ func TestGetKubeDNSVersion(t *testing.T) {
 	}{
 		{
 			k8sVersion: "v1.7.0",
-			expected:   "1.14.5",
+			expected:   "1.14.6",
 		},
 		{
 			k8sVersion: "v1.7.1",
-			expected:   "1.14.5",
+			expected:   "1.14.6",
 		},
 		{
 			k8sVersion: "v1.7.2",
-			expected:   "1.14.5",
+			expected:   "1.14.6",
 		},
 		{
 			k8sVersion: "v1.7.3",
-			expected:   "1.14.5",
+			expected:   "1.14.6",
 		},
 		{
 			k8sVersion: "v1.8.0-alpha.2",
-			expected:   "1.14.5",
+			expected:   "1.14.6",
 		},
 		{
 			k8sVersion: "v1.8.0",
-			expected:   "1.14.5",
+			expected:   "1.14.6",
 		},
 	}
 	for _, rt := range tests {
