@@ -16,7 +16,7 @@
 
 PREFIX = gcr.io/google-containers
 IMAGE = elasticsearch
-TAG = v5.5.1-1
+TAG = v5.6.2-1
 
 build:
 	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .
