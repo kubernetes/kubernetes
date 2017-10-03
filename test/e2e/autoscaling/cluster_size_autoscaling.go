@@ -485,6 +485,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		defer deleteNodePool(extraPoolName)
 		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+1, resizeTimeout))
 		framework.ExpectNoError(enableAutoscaler(extraPoolName, 1, 2))
+		defer disableAutoscaler(extraPoolName, 1, 2)
 
 		By("Creating rc with 2 pods too big to fit default-pool but fitting extra-pool")
 		ReserveMemory(f, "memory-reservation", 2, int(2.5*float64(memAllocatableMb)), false, defaultTimeout)
@@ -591,8 +592,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 				minSize = size
 			}
 		}
-		err := framework.ResizeGroup(minMig, int32(0))
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(framework.ResizeGroup(minMig, int32(0)))
 		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount-minSize, resizeTimeout))
 
 		By("Make remaining nodes unschedulable")
@@ -637,8 +637,8 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		addNodePool(extraPoolName, "n1-standard-4", 1)
 		defer deleteNodePool(extraPoolName)
 		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount+1, resizeTimeout))
-		err := enableAutoscaler(extraPoolName, 0, 1)
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(enableAutoscaler(extraPoolName, 0, 1))
+		defer disableAutoscaler(extraPoolName, 0, 1)
 
 		ngNodes := getPoolNodes(f, extraPoolName)
 		Expect(len(ngNodes) == 1).To(BeTrue())
@@ -666,8 +666,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 				minSize = size
 			}
 		}
-		err := framework.ResizeGroup(minMig, int32(1))
-		framework.ExpectNoError(err)
+		framework.ExpectNoError(framework.ResizeGroup(minMig, int32(1)))
 		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount-minSize+1, resizeTimeout))
 		ngNodes, err := framework.GetGroupNodes(minMig)
 		framework.ExpectNoError(err)
@@ -899,12 +898,15 @@ func disableAutoscaler(nodePool string, minCount, maxCount int) error {
 		glog.Infof("Config update result: %s", putResult)
 	}
 
+	var finalErr error
 	for startTime := time.Now(); startTime.Add(gkeUpdateTimeout).After(time.Now()); time.Sleep(30 * time.Second) {
-		if val, err := isAutoscalerEnabled(maxCount); err == nil && !val {
+		val, err := isAutoscalerEnabled(maxCount)
+		if err == nil && !val {
 			return nil
 		}
+		finalErr = err
 	}
-	return fmt.Errorf("autoscaler still enabled")
+	return fmt.Errorf("autoscaler still enabled, last error: %v", finalErr)
 }
 
 func addNodePool(name string, machineType string, numNodes int) {
