@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/errors"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -435,17 +436,8 @@ func (s *Server) syncLoopHealthCheck(req *http.Request) error {
 
 // Checks if any of the kubelet's reflectors have reported any errors
 func (s *Server) reflectorHealthCheck(req *http.Request) error {
-	healthy, reflectorErrors := s.host.ReflectorsHealthy()
-	if healthy {
-		return nil
-	}
-
-	reflectorErrorStrings := make([]string, 0, len(reflectorErrors))
-	for _, reflectorError := range reflectorErrors {
-		reflectorErrorStrings = append(reflectorErrorStrings, reflectorError.Error())
-	}
-
-	return fmt.Errorf("Reflector errors: %s", strings.Join(reflectorErrorStrings, ", "))
+	_, reflectorErrors := s.host.ReflectorsHealthy()
+	return errors.NewAggregate(reflectorErrors)
 }
 
 // getContainerLogs handles containerLogs request against the Kubelet
