@@ -35,7 +35,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
-	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -785,10 +785,10 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 		},
 	}
 
-	role := rbacv1beta1.Role{
+	role := rbacv1.Role{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Role",
-			APIVersion: rbacv1beta1.SchemeGroupVersion.String(),
+			APIVersion: rbacv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "federation-system:federation-controller-manager",
@@ -798,7 +798,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				federation.FederationNameAnnotation: federationName,
 			},
 		},
-		Rules: []rbacv1beta1.PolicyRule{
+		Rules: []rbacv1.PolicyRule{
 			{
 				Verbs:     []string{"get", "list", "watch"},
 				APIGroups: []string{""},
@@ -807,10 +807,10 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 		},
 	}
 
-	rolebinding := rbacv1beta1.RoleBinding{
+	rolebinding := rbacv1.RoleBinding{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "RoleBinding",
-			APIVersion: rbacv1beta1.SchemeGroupVersion.String(),
+			APIVersion: rbacv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "federation-system:federation-controller-manager",
@@ -820,7 +820,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				federation.FederationNameAnnotation: federationName,
 			},
 		},
-		Subjects: []rbacv1beta1.Subject{
+		Subjects: []rbacv1.Subject{
 			{
 				Kind:      "ServiceAccount",
 				APIGroup:  "",
@@ -828,7 +828,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				Namespace: "federation-system",
 			},
 		},
-		RoleRef: rbacv1beta1.RoleRef{
+		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "Role",
 			Name:     "federation-system:federation-controller-manager",
@@ -1137,8 +1137,8 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 		Name: rbac.GroupName,
 		Versions: []metav1.GroupVersionForDiscovery{
 			{
-				GroupVersion: rbac.GroupName + "/v1beta1",
-				Version:      "v1beta1",
+				GroupVersion: rbac.GroupName + "/v1",
+				Version:      "v1",
 			},
 		},
 	}
@@ -1296,12 +1296,12 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 					return nil, fmt.Errorf("unexpected service account object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, sa))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(codec, &sa)}, nil
-			case p == "/apis/rbac.authorization.k8s.io/v1beta1/namespaces/federation-system/roles" && m == http.MethodPost:
+			case p == "/apis/rbac.authorization.k8s.io/v1/namespaces/federation-system/roles" && m == http.MethodPost:
 				body, err := ioutil.ReadAll(req.Body)
 				if err != nil {
 					return nil, err
 				}
-				var got rbacv1beta1.Role
+				var got rbacv1.Role
 				_, _, err = codec.Decode(body, nil, &got)
 				if err != nil {
 					return nil, err
@@ -1310,12 +1310,12 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 					return nil, fmt.Errorf("unexpected role object\n\tDiff: %s", diff.ObjectGoPrintDiff(got, role))
 				}
 				return &http.Response{StatusCode: http.StatusCreated, Header: kubefedtesting.DefaultHeader(), Body: kubefedtesting.ObjBody(rbacCodec, &role)}, nil
-			case p == "/apis/rbac.authorization.k8s.io/v1beta1/namespaces/federation-system/rolebindings" && m == http.MethodPost:
+			case p == "/apis/rbac.authorization.k8s.io/v1/namespaces/federation-system/rolebindings" && m == http.MethodPost:
 				body, err := ioutil.ReadAll(req.Body)
 				if err != nil {
 					return nil, err
 				}
-				var got rbacv1beta1.RoleBinding
+				var got rbacv1.RoleBinding
 				_, _, err = codec.Decode(body, nil, &got)
 				if err != nil {
 					return nil, err
