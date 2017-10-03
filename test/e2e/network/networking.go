@@ -45,10 +45,16 @@ var _ = SIGDescribe("Networking", func() {
 		}
 	})
 
-	It("should provide Internet connection for containers", func() {
+	It("should provide Internet connection for containers [Feature:Networking-IPv4]", func() {
 		By("Running container which tries to ping 8.8.8.8")
 		framework.ExpectNoError(
-			framework.CheckConnectivityToHost(f, "", "ping-test", "8.8.8.8", 30))
+			framework.CheckConnectivityToHost(f, "", "ping-test", "8.8.8.8", framework.IPv4PingCommand, 30))
+	})
+
+	It("should provide Internet connection for containers [Feature:Networking-IPv6][Experimental]", func() {
+		By("Running container which tries to ping google.com")
+		framework.ExpectNoError(
+			framework.CheckConnectivityToHost(f, "", "ping-test", "google.com", framework.IPv6PingCommand, 30))
 	})
 
 	// First test because it has no dependencies on variables created later on.
