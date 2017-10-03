@@ -89,7 +89,7 @@ func newNodeControllerFromClient(
 	nodeInformer := factory.Core().V1().Nodes()
 	daemonSetInformer := factory.Extensions().V1beta1().DaemonSets()
 
-	nc, err := NewNodeController(
+	nc, err := NewController(
 		factory.Core().V1().Pods(),
 		nodeInformer,
 		daemonSetInformer,

@@ -211,11 +211,11 @@ type Controller struct {
 	taintNodeByCondition bool
 }
 
-// NewNodeController returns a new node controller to sync instances from cloudprovider.
+// NewController returns a new node controller to sync instances from cloudprovider.
 // This method returns an error if it is unable to initialize the CIDR bitmap with
 // podCIDRs it has already allocated to nodes. Since we don't allow podCIDR changes
 // currently, this should be handled as a fatal error.
-func NewNodeController(
+func NewController(
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
 	daemonSetInformer extensionsinformers.DaemonSetInformer,

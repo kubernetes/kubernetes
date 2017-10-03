@@ -92,7 +92,7 @@ func startNodeController(ctx ControllerContext) (bool, error) {
 		}
 	}
 
-	nodeController, err := nodecontroller.NewNodeController(
+	nodeController, err := nodecontroller.NewController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.InformerFactory.Extensions().V1beta1().DaemonSets(),
