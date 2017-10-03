@@ -45,6 +45,7 @@ go_library(
         "doc.go",
         "metrics.go",
         "node_controller.go",
+        "node_evictor.go",
     ],
     deps = [
         "//pkg/api/v1/node:go_default_library",
