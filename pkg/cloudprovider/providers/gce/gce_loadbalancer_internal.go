@@ -80,12 +80,18 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 	// Determine IP which will be used for this LB. If no forwarding rule has been established
 	// or specified in the Service spec, then requestedIP = "".
 	requestedIP := determineRequestedIP(svc, existingFwdRule)
-	addrMgr := newAddressManager(gce, nm.String(), gce.Region(), gce.getInternalSubnetURL(), loadBalancerName, requestedIP, schemeInternal)
-	ipToUse, err := addrMgr.HoldAddress()
-	if err != nil {
-		return nil, err
+	ipToUse := requestedIP
+
+	var addrMgr *addressManager
+	// If the network is not a legacy network, use the address manager
+	if !gce.IsLegacyNetwork() {
+		addrMgr = newAddressManager(gce, nm.String(), gce.Region(), gce.SubnetworkURL(), loadBalancerName, requestedIP, schemeInternal)
+		ipToUse, err = addrMgr.HoldAddress()
+		if err != nil {
+			return nil, err
+		}
+		glog.V(2).Infof("ensureInternalLoadBalancer(%v): reserved IP %q for the forwarding rule", loadBalancerName, ipToUse)
 	}
-	glog.V(2).Infof("ensureInternalLoadBalancer(%v): reserved IP %q for the forwarding rule", loadBalancerName, ipToUse)
 
 	// Ensure firewall rules if necessary
 	if err = gce.ensureInternalFirewalls(loadBalancerName, ipToUse, clusterID, nm, svc, strconv.Itoa(int(hcPort)), sharedHealthCheck, nodes); err != nil {
@@ -102,7 +108,7 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 		LoadBalancingScheme: string(scheme),
 	}
 
-	// Specify subnetwork if network type is manual
+	// Specify subnetwork if known
 	if len(gce.subnetworkURL) > 0 {
 		expectedFwdRule.Subnetwork = gce.subnetworkURL
 	} else {
@@ -138,13 +144,21 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 		gce.clearPreviousInternalResources(svc, loadBalancerName, existingBackendService, backendServiceName, hcName)
 	}
 
-	// Now that the controller knows the forwarding rule exists, we can release the address.
-	if err := addrMgr.ReleaseAddress(); err != nil {
-		glog.Errorf("ensureInternalLoadBalancer: failed to release address reservation, possibly causing an orphan: %v", err)
+	if addrMgr != nil {
+		// Now that the controller knows the forwarding rule exists, we can release the address.
+		if err := addrMgr.ReleaseAddress(); err != nil {
+			glog.Errorf("ensureInternalLoadBalancer: failed to release address reservation, possibly causing an orphan: %v", err)
+		}
+	}
+
+	// Get the most recent forwarding rule for the address.
+	updatedFwdRule, err := gce.GetRegionForwardingRule(loadBalancerName, gce.region)
+	if err != nil {
+		return nil, err
 	}
 
 	status := &v1.LoadBalancerStatus{}
-	status.Ingress = []v1.LoadBalancerIngress{{IP: ipToUse}}
+	status.Ingress = []v1.LoadBalancerIngress{{IP: updatedFwdRule.IPAddress}}
 	return status, nil
 }
 
@@ -660,20 +674,6 @@ func getPortsAndProtocol(svcPorts []v1.ServicePort) (ports []string, protocol v1
 
 func (gce *GCECloud) getBackendServiceLink(name string) string {
 	return gce.service.BasePath + strings.Join([]string{gce.projectID, "regions", gce.region, "backendServices", name}, "/")
-}
-
-// getInternalSubnetURL first attempts to return the configured SubnetURL.
-// If subnetwork-name was not specified, then a best-effort generation is made.
-// Note subnet names might not be the network name for some auto networks.
-func (gce *GCECloud) getInternalSubnetURL() string {
-	if gce.SubnetworkURL() != "" {
-		return gce.SubnetworkURL()
-	}
-
-	networkName := getNameFromLink(gce.NetworkURL())
-	v := gceSubnetworkURL("", gce.NetworkProjectID(), gce.Region(), networkName)
-	glog.Warningf("Generating subnetwork URL based off network since subnet name/URL was not configured: %q", v)
-	return v
 }
 
 func getNameFromLink(link string) string {
