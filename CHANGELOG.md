@@ -691,6 +691,10 @@ This section contains a list of known issues reported in Kubernetes 1.8 release.
 
 For more information, see [#53288](https://issue.k8s.io/53288).
 
+* `kubeadm init` and `kubeadm join` invocations on newly installed systems can encounter a `/var/lib/kubelet is not empty` message during pre-flight checks that prevents setup. If this is the only pre-flight failure, it can be safely ignored with `--skip-preflight-checks`.
+
+For more information, see [#53356](https://issue.k8s.io/53356#issuecomment-333748618).
+
 * A performance issue was identified in large-scale clusters when deleting thousands of pods simultaneously across hundreds of nodes. Kubelets in this scenario can encounter temporarily increased latency of `delete pod` API calls -- above the target service level objective of 1 second. If you run clusters with this usage pattern and if pod deletion latency could be an issue for you, you might want to wait until the issue is resolved before you upgrade. 
 
 For more information and for updates on resolution of this issue, see [[#51899](https://github.com/kubernetes/kubernetes/pull/51899)](https://issue.k8s.io/51899).
