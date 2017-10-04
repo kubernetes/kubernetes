@@ -18,10 +18,12 @@ package resourcequota
 
 import (
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -55,7 +57,8 @@ func TestPodReplenishmentUpdateFunc(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "pod"},
 		Status:     v1.PodStatus{Phase: v1.PodFailed},
 	}
-	updateFunc := PodReplenishmentUpdateFunc(&options)
+	fakeClock := clock.NewFakeClock(time.Now())
+	updateFunc := PodReplenishmentUpdateFunc(&options, fakeClock)
 	updateFunc(oldPod, newPod)
 	if mockReplenish.groupKind != api.Kind("Pod") {
 		t.Errorf("Unexpected group kind %v", mockReplenish.groupKind)
