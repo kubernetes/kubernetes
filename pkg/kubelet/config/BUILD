@@ -12,6 +12,7 @@ go_library(
         "apiserver.go",
         "common.go",
         "config.go",
+        "defaults.go",
         "doc.go",
         "file.go",
         "file_unsupported.go",

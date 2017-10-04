@@ -37,13 +37,6 @@ import (
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 )
 
-const (
-	DefaultKubeletPodsDirName       = "pods"
-	DefaultKubeletVolumesDirName    = "volumes"
-	DefaultKubeletPluginsDirName    = "plugins"
-	DefaultKubeletContainersDirName = "containers"
-)
-
 // A configuration field should go in KubeletFlags instead of KubeletConfiguration if any of these are true:
 // - its value will never, or cannot safely be changed during the lifetime of a node
 // - its value cannot be safely shared between nodes at the same time (e.g. a hostname)
