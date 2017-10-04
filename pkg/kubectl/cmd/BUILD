@@ -84,6 +84,7 @@ go_library(
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/util/editor:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
+        "//pkg/kubectl/explain:go_default_library",
         "//pkg/kubectl/metricsutil:go_default_library",
         "//pkg/kubectl/plugins:go_default_library",
         "//pkg/kubectl/proxy:go_default_library",
