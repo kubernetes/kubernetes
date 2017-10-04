@@ -39,12 +39,17 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"golang.org/x/crypto/pkcs12"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
 	// CloudProviderName is the value used for the --cloud-provider flag
-	CloudProviderName      = "azure"
+	CloudProviderName = "azure"
+	// DefaultMaxAzureVolumes defines the maximum number of PD Volumes for Azure
+	// Larger Azure VMs can actually have much more disks attached.
+	// TODO We should determine the max based on VM size
+	DefaultMaxAzureVolumes = 16
 	rateLimitQPSDefault    = 1.0
 	rateLimitBucketDefault = 5
 	backoffRetriesDefault  = 6
@@ -447,4 +452,9 @@ func initDiskControllers(az *Cloud) error {
 	az.controllerCommon = common
 
 	return nil
+}
+
+// MaxPDCount returns the limits of persistant disks that can be attached to an instance
+func MaxPDCount(node *v1.Node) int {
+	return DefaultMaxAzureVolumes
 }

@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"k8s.io/api/core/v1"
@@ -52,7 +53,20 @@ const (
 	diskSourceURITemplateRegional   = "%s/regions/%s/disks/%s" //{gce.projectID}/regions/{disk.Region}/disks/repd"
 
 	replicaZoneURITemplateSingleZone = "%s/zones/%s" // {gce.projectID}/zones/{disk.Zone}
+
 )
+
+// The constants and the variable DiskNmberLimit are used to map from the machine type (number of CPUs) to the limit of
+// persistant disks that can be attached to an instance. Please refer to gcloud doc
+// https://cloud.google.com/compute/docs/disks/#increased_persistent_disk_limits
+const (
+	Default = iota
+	OneCpu
+	TwotoFourCPUs
+	EightCPUsandAbove
+)
+
+var DiskNumberLimit = []int{16, 32, 64, 128}
 
 type diskServiceManager interface {
 	// Creates a new persistent disk on GCE with the given disk spec.
@@ -105,6 +119,27 @@ type diskServiceManager interface {
 
 type gceServiceManager struct {
 	gce *GCECloud
+}
+
+func MaxPDCount(node *v1.Node) int {
+	if node != nil {
+		if machineType, found := node.ObjectMeta.Labels[kubeletapis.LabelInstanceType]; found {
+			if strings.HasPrefix(machineType, "n1-standard-") || strings.HasPrefix(machineType, "n1-highmem-") || strings.HasPrefix(machineType, "n1-highcpu-") {
+				splits := strings.Split(machineType, "-")
+				last := splits[len(splits)-1]
+				if num, err := strconv.Atoi(last); err == nil {
+					if num == 1 {
+						return DiskNumberLimit[OneCpu]
+					} else if num < 8 {
+						return DiskNumberLimit[TwotoFourCPUs]
+					} else {
+						return DiskNumberLimit[EightCPUsandAbove]
+					}
+				}
+			}
+		}
+	}
+	return DiskNumberLimit[Default]
 }
 
 func (manager *gceServiceManager) CreateDiskOnCloudProvider(
