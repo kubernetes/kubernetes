@@ -1238,7 +1238,7 @@ type AzureDiskVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// +optional
 	ReadOnly *bool
-	// Expected values Shared: mulitple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared
+	// Expected values Shared: multiple blob disks per storage account  Dedicated: single blob disk per storage account  Managed: azure managed data disk (only in managed availability set). defaults to shared
 	Kind *AzureDataDiskKind
 }
 
@@ -3117,7 +3117,7 @@ type NodeConfigSource struct {
 type DaemonEndpoint struct {
 	/*
 		The port tag was not properly in quotes in earlier releases, so it must be
-		uppercased for backwards compat (since it was falling back to var name of
+		uppercase for backwards compatibility (since it was falling back to var name of
 		'Port').
 	*/
 
@@ -4043,7 +4043,7 @@ const (
 	// BasicAuthPasswordKey is the key of the password or token for SecretTypeBasicAuth secrets
 	BasicAuthPasswordKey = "password"
 
-	// SecretTypeSSHAuth contains data needed for SSH authetication.
+	// SecretTypeSSHAuth contains data needed for SSH authentication.
 	//
 	// Required field:
 	// - Secret.Data["ssh-privatekey"] - private SSH key needed for authentication
