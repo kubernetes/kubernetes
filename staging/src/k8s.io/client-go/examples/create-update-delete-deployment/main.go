@@ -22,6 +22,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
@@ -34,11 +35,14 @@ import (
 )
 
 func main() {
-	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-	flag.Parse()
-	if *kubeconfig == "" {
-		panic("-kubeconfig not specified")
+	var kubeconfig *string
+	if home := homeDir(); home != "" {
+		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	} else {
+		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	}
+	flag.Parse()
+
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
 		panic(err)
@@ -60,6 +64,9 @@ func main() {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app": "demo",
+					},
+					Annotations: map[string]string{
+						"fizz": "buzz",
 					},
 				},
 				Spec: apiv1.PodSpec{
@@ -100,24 +107,30 @@ func main() {
 	//    2. Modify the "result" returned by Create()/Get() and retry Update(result) until
 	//       you no longer get a conflict error. This way, you can preserve changes made
 	//       by other clients between Create() and Update(). This is implemented below:
+	//
+	// See the API Conventions:
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#concurrency-control-and-consistency
 
 	for {
+		// Retrieve latest version of Deployment before modifying and updating
+		result, err = deploymentsClient.Get("demo-deployment", metav1.GetOptions{})
+		if err != nil {
+			panic(fmt.Errorf("Get failed: %+v", err))
+		}
 		result.Spec.Replicas = int32Ptr(1)                    // reduce replica count
 		result.Spec.Template.Annotations = map[string]string{ // add annotations
 			"foo": "bar",
 		}
 
-		if _, err := deploymentsClient.Update(result); errors.IsConflict(err) {
-			// Deployment is modified in the meanwhile, query the latest version
-			// and modify the retrieved object.
-			fmt.Println("encountered conflict, retrying")
-			result, err = deploymentsClient.Get("demo-deployment", metav1.GetOptions{})
-			if err != nil {
-				panic(fmt.Errorf("Get failed: %+v", err))
+		if _, err = deploymentsClient.Update(result); err != nil {
+			if errors.IsConflict(err) {
+				// Deployment was modified since last retrieved, need to retry
+				fmt.Println("Conflicting resource versions, retrying")
+			} else {
+				panic(err)
 			}
-		} else if err != nil {
-			panic(err)
 		} else {
+			fmt.Println("Updated deployment...")
 			break
 		}
 
@@ -125,7 +138,32 @@ func main() {
 		// exhausting the apiserver, and add a limit/timeout on the retries to
 		// avoid getting stuck in this loop indefintiely.
 	}
-	fmt.Println("Updated deployment...")
+
+	// Rollback Deployment
+	prompt()
+	fmt.Println("Rolling back deployment...")
+
+	// Use same method as above to avoid version conflicts
+	for {
+		result, err = deploymentsClient.Get("demo-deployment", metav1.GetOptions{})
+		if err != nil {
+			panic(fmt.Errorf("Get failed: %+v", err))
+		}
+		result.Spec.RollbackTo = &appsv1beta1.RollbackConfig{
+			Revision: 0, // Can be specific revision number or 0 for last revision
+		}
+
+		if _, err = deploymentsClient.Update(result); err != nil {
+			if errors.IsConflict(err) {
+				fmt.Println("Conflicting resource versions, retrying")
+			} else {
+				panic(err)
+			}
+		} else {
+			fmt.Println("Rolled back deployment...")
+			break
+		}
+	}
 
 	// List Deployments
 	prompt()
@@ -163,3 +201,10 @@ func prompt() {
 }
 
 func int32Ptr(i int32) *int32 { return &i }
+
+func homeDir() string {
+	if h := os.Getenv("HOME"); h != "" {
+		return h
+	}
+	return os.Getenv("USERPROFILE") // windows
+}
