@@ -302,3 +302,71 @@ foo       baz
 		}
 	}
 }
+
+// TestColumnPrintAllowMissingKeys tests CustomColumnsPrinter with
+// AllowMissingKeys set to true.
+func TestColumnPrintAllowMissingKeys(t *testing.T) {
+	tests := []struct {
+		columns        []printers.Column
+		obj            runtime.Object
+		expectedOutput string
+	}{
+		{
+			columns: []printers.Column{
+				{
+					Header:    "NAME",
+					FieldSpec: "{.metadata.name}",
+				},
+				{
+					Header:    "UNKNOWN_KEY",
+					FieldSpec: "{.missing_key}",
+				},
+			},
+			obj: &v1.PodList{
+				Items: []v1.Pod{
+					{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+					{ObjectMeta: metav1.ObjectMeta{Name: "bar"}},
+				},
+			},
+			expectedOutput: `NAME      UNKNOWN_KEY
+foo       <none>
+bar       <none>
+`,
+		},
+		{ // test case where missing key is in the middle column
+			columns: []printers.Column{
+				{
+					Header:    "NAME",
+					FieldSpec: "{.metadata.name}",
+				},
+				{
+					Header:    "UNKNOWN_KEY",
+					FieldSpec: "{.missing_key}",
+				},
+				{
+					Header:    "API_VERSION",
+					FieldSpec: "{.apiVersion}",
+				},
+			},
+			obj: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, TypeMeta: metav1.TypeMeta{APIVersion: "bar"}},
+			expectedOutput: `NAME      UNKNOWN_KEY   API_VERSION
+foo       <none>        bar
+`,
+		},
+	}
+
+	for _, test := range tests {
+		printer := &printers.CustomColumnsPrinter{
+			Columns: test.columns,
+			Decoder: api.Codecs.UniversalDecoder(),
+		}
+		printer.AllowMissingKeys(true)
+		buffer := &bytes.Buffer{}
+		if err := printer.PrintObj(test.obj, buffer); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if buffer.String() != test.expectedOutput {
+			t.Errorf("\nexpected:\n'%s'\nsaw\n'%s'\n", test.expectedOutput, buffer.String())
+		}
+	}
+}
