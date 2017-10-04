@@ -8957,7 +8957,7 @@
    },
    "v1beta2.ReplicaSet": {
     "id": "v1beta2.ReplicaSet",
-    "description": "ReplicaSet represents the configuration of a ReplicaSet.",
+    "description": "ReplicaSet ensures that a specified number of pod replicas are running at any given time.",
     "properties": {
      "kind": {
       "type": "string",

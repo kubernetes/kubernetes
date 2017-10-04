@@ -69,9 +69,8 @@ func (expBackoff *ExponentialBackoff) Update(err *error) {
 	expBackoff.lastErrorTime = time.Now()
 }
 
-func (expBackoff *ExponentialBackoff) GenerateNoRetriesPermittedMsg(
-	operationName string) string {
-	return fmt.Sprintf("Operation for %q failed. No retries permitted until %v (durationBeforeRetry %v). Error: %v",
+func (expBackoff *ExponentialBackoff) GenerateNoRetriesPermittedMsg(operationName string) string {
+	return fmt.Sprintf("Operation for %q failed. No retries permitted until %v (durationBeforeRetry %v). Error: %q",
 		operationName,
 		expBackoff.lastErrorTime.Add(expBackoff.durationBeforeRetry),
 		expBackoff.durationBeforeRetry,

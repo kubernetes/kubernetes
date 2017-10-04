@@ -336,7 +336,7 @@ message DeploymentStrategy {
   optional RollingUpdateDeployment rollingUpdate = 2;
 }
 
-// ReplicaSet represents the configuration of a ReplicaSet.
+// ReplicaSet ensures that a specified number of pod replicas are running at any given time.
 message ReplicaSet {
   // If the Labels of a ReplicaSet are empty, they are defaulted to
   // be the same as the Pod(s) that the ReplicaSet manages.
