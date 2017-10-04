@@ -458,7 +458,7 @@ var map_PodSecurityPolicySpec = map[string]string{
 	"fsGroup":                         "FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.",
 	"readOnlyRootFilesystem":          "ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the PSP should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to.",
 	"defaultAllowPrivilegeEscalation": "DefaultAllowPrivilegeEscalation controls the default setting for whether a process can gain more privileges than its parent process.",
-	"allowPrivilegeEscalation":        "AllowPrivilegeEscalation determines if a pod can request to allow privilege escalation.",
+	"allowPrivilegeEscalation":        "AllowPrivilegeEscalation determines if a pod can request to allow privilege escalation. If unspecified, defaults to true.",
 	"allowedHostPaths":                "is a white list of allowed host paths. Empty indicates that all host paths may be used.",
 }
 

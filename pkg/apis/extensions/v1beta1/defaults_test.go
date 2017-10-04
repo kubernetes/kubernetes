@@ -509,6 +509,15 @@ func TestDefaultRequestIsNotSetForReplicaSet(t *testing.T) {
 	}
 }
 
+func TestDefaultAllowPrivilegeEscalationForPodSecurityPolicy(t *testing.T) {
+	psp := &extensionsv1beta1.PodSecurityPolicy{}
+	output := roundTrip(t, runtime.Object(psp))
+	psp2 := output.(*extensionsv1beta1.PodSecurityPolicy)
+	if psp2.Spec.AllowPrivilegeEscalation == nil || *psp2.Spec.AllowPrivilegeEscalation != true {
+		t.Errorf("Expected default to true, got: %#v", psp2.Spec.AllowPrivilegeEscalation)
+	}
+}
+
 func TestSetDefaultNetworkPolicy(t *testing.T) {
 	tests := []struct {
 		original *extensionsv1beta1.NetworkPolicy
