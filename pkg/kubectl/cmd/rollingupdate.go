@@ -194,7 +194,7 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 	mapper, typer := f.Object()
 
 	if len(filename) != 0 {
-		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagBool(cmd, "openapi-validation"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
+		schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 		if err != nil {
 			return err
 		}

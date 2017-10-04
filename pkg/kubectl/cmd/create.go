@@ -115,7 +115,7 @@ func RunCreate(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opt
 	if options.EditBeforeCreate {
 		return RunEditOnCreate(f, out, errOut, cmd, &options.FilenameOptions)
 	}
-	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagBool(cmd, "openapi-validation"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
+	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
 	if err != nil {
 		return err
 	}
@@ -196,7 +196,6 @@ func RunEditOnCreate(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Comman
 		FilenameOptions: *options,
 		ValidateOptions: cmdutil.ValidateOptions{
 			EnableValidation: cmdutil.GetFlagBool(cmd, "validate"),
-			SchemaCacheDir:   cmdutil.GetFlagString(cmd, "schema-cache-dir"),
 		},
 		Output:             cmdutil.GetFlagString(cmd, "output"),
 		WindowsLineEndings: cmdutil.GetFlagBool(cmd, "windows-line-endings"),
