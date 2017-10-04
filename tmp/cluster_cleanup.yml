@@ -1,0 +1,7 @@
+---
+- name: re-add local node to inventory
+  hosts: localhost
+  connection: local
+  roles:
+    - common/dyn_inventory
+    - gke_cluster_cleanup
