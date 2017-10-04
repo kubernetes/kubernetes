@@ -16,7 +16,10 @@ limitations under the License.
 
 package util
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // IsDefaultStorageClassAnnotation represents a StorageClass annotation that
 // marks a class as the default StorageClass
@@ -50,4 +53,11 @@ func IsDefaultAnnotation(obj metav1.ObjectMeta) bool {
 	}
 
 	return false
+}
+
+// IsBindingModeWaitForFirstConsumer returns true if the VolumeBindingMode is set
+// to VolumeBindingWaitForFirstConsumer
+func IsBindingModeWaitForFirstConsumer(class *storagev1.StorageClass) bool {
+	mode := class.VolumeBindingMode
+	return mode != nil && *mode == storagev1.VolumeBindingWaitForFirstConsumer
 }

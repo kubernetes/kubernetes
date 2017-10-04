@@ -27,6 +27,14 @@ import (
 	"k8s.io/kubernetes/pkg/apis/storage"
 )
 
+var (
+	deleteReclaimPolicy = api.PersistentVolumeReclaimDelete
+	immediateMode1      = storage.VolumeBindingImmediate
+	immediateMode2      = storage.VolumeBindingImmediate
+	waitingMode         = storage.VolumeBindingWaitForFirstConsumer
+	invalidMode         = storage.VolumeBindingMode("foo")
+)
+
 func TestValidateStorageClass(t *testing.T) {
 	deleteReclaimPolicy := api.PersistentVolumeReclaimPolicy("Delete")
 	retainReclaimPolicy := api.PersistentVolumeReclaimPolicy("Retain")
@@ -434,5 +442,143 @@ func TestVolumeAttachmentUpdateValidation(t *testing.T) {
 		if errs := ValidateVolumeAttachmentUpdate(&volumeAttachment, &old); len(errs) == 0 {
 			t.Errorf("Expected failure for test: %v", volumeAttachment)
 		}
+	}
+}
+
+func makeClassWithBinding(mode *storage.VolumeBindingMode) *storage.StorageClass {
+	return &storage.StorageClass{
+		ObjectMeta:        metav1.ObjectMeta{Name: "foo", ResourceVersion: "foo"},
+		Provisioner:       "kubernetes.io/foo-provisioner",
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		VolumeBindingMode: mode,
+	}
+}
+
+// TODO: Remove these tests once feature gate is not required
+func TestValidateVolumeBindingModeAlphaDisabled(t *testing.T) {
+	errorCases := map[string]*storage.StorageClass{
+		"immediate mode": makeClassWithBinding(&immediateMode1),
+		"waiting mode":   makeClassWithBinding(&waitingMode),
+		"invalid mode":   makeClassWithBinding(&invalidMode),
+	}
+
+	for testName, storageClass := range errorCases {
+		if errs := ValidateStorageClass(storageClass); len(errs) == 0 {
+			t.Errorf("Expected failure for test: %v", testName)
+		}
+	}
+}
+
+type bindingTest struct {
+	class         *storage.StorageClass
+	shouldSucceed bool
+}
+
+func TestValidateVolumeBindingMode(t *testing.T) {
+	cases := map[string]bindingTest{
+		"no mode": {
+			class:         makeClassWithBinding(nil),
+			shouldSucceed: true,
+		},
+		"immediate mode": {
+			class:         makeClassWithBinding(&immediateMode1),
+			shouldSucceed: true,
+		},
+		"waiting mode": {
+			class:         makeClassWithBinding(&waitingMode),
+			shouldSucceed: true,
+		},
+		"invalid mode": {
+			class:         makeClassWithBinding(&invalidMode),
+			shouldSucceed: false,
+		},
+	}
+
+	// TODO: remove when feature gate not required
+	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
+	if err != nil {
+		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
+	}
+
+	for testName, testCase := range cases {
+		errs := ValidateStorageClass(testCase.class)
+		if testCase.shouldSucceed && len(errs) != 0 {
+			t.Errorf("Expected success for test %q, got %v", testName, errs)
+		}
+		if !testCase.shouldSucceed && len(errs) == 0 {
+			t.Errorf("Expected failure for test %q, got success", testName)
+		}
+	}
+
+	err = utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
+	if err != nil {
+		t.Fatalf("Failed to disable feature gate for VolumeScheduling: %v", err)
+	}
+}
+
+type updateTest struct {
+	oldClass      *storage.StorageClass
+	newClass      *storage.StorageClass
+	shouldSucceed bool
+}
+
+func TestValidateUpdateVolumeBindingMode(t *testing.T) {
+	noBinding := makeClassWithBinding(nil)
+	immediateBinding1 := makeClassWithBinding(&immediateMode1)
+	immediateBinding2 := makeClassWithBinding(&immediateMode2)
+	waitBinding := makeClassWithBinding(&waitingMode)
+
+	cases := map[string]updateTest{
+		"old and new no mode": {
+			oldClass:      noBinding,
+			newClass:      noBinding,
+			shouldSucceed: true,
+		},
+		"old and new same mode ptr": {
+			oldClass:      immediateBinding1,
+			newClass:      immediateBinding1,
+			shouldSucceed: true,
+		},
+		"old and new same mode value": {
+			oldClass:      immediateBinding1,
+			newClass:      immediateBinding2,
+			shouldSucceed: true,
+		},
+		"old no mode, new mode": {
+			oldClass:      noBinding,
+			newClass:      waitBinding,
+			shouldSucceed: false,
+		},
+		"old mode, new no mode": {
+			oldClass:      waitBinding,
+			newClass:      noBinding,
+			shouldSucceed: false,
+		},
+		"old and new different modes": {
+			oldClass:      waitBinding,
+			newClass:      immediateBinding1,
+			shouldSucceed: false,
+		},
+	}
+
+	// TODO: remove when feature gate not required
+	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
+	if err != nil {
+		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
+	}
+
+	for testName, testCase := range cases {
+		errs := ValidateStorageClassUpdate(testCase.newClass, testCase.oldClass)
+		if testCase.shouldSucceed && len(errs) != 0 {
+			t.Errorf("Expected success for %v, got %v", testName, errs)
+		}
+		if !testCase.shouldSucceed && len(errs) == 0 {
+			t.Errorf("Expected failure for %v, got success", testName)
+		}
+	}
+
+	err = utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
+	if err != nil {
+		t.Fatalf("Failed to disable feature gate for VolumeScheduling: %v", err)
 	}
 }
