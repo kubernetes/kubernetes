@@ -173,7 +173,7 @@ func (sync *NodeSync) Delete(node *v1.Node) {
 
 // syncOp is the interface for generic sync operation.
 type syncOp interface {
-	// Run the requested sync operation.
+	// run the requested sync operation.
 	run(sync *NodeSync) error
 }
 
