@@ -118,7 +118,7 @@ func TestTopPod(t *testing.T) {
 		f, tf, _, ns := cmdtesting.NewAPIFactory()
 		tf.Printer = &testPrinter{}
 		tf.Client = &fake.RESTClient{
-			APIRegistry:          api.Registry,
+			GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m, q := req.URL.Path, req.Method, req.URL.RawQuery; {
@@ -254,7 +254,7 @@ func TestTopPodCustomDefaults(t *testing.T) {
 		f, tf, _, ns := cmdtesting.NewAPIFactory()
 		tf.Printer = &testPrinter{}
 		tf.Client = &fake.RESTClient{
-			APIRegistry:          api.Registry,
+			GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m, q := req.URL.Path, req.Method, req.URL.RawQuery; {

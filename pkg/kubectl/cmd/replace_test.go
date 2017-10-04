@@ -34,7 +34,7 @@ func TestReplaceObject(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	deleted := false
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -91,7 +91,7 @@ func TestReplaceMultipleObject(t *testing.T) {
 	redisMasterDeleted := false
 	frontendDeleted := false
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -160,7 +160,7 @@ func TestReplaceDirectory(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	created := map[string]bool{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -216,7 +216,7 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {

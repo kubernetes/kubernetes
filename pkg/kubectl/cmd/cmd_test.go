@@ -162,7 +162,7 @@ func Example_printReplicationControllerWithNamespace() {
 	printersinternal.AddHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -215,7 +215,7 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 	printersinternal.AddHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -269,7 +269,7 @@ func Example_printReplicationController() {
 	printersinternal.AddHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -324,7 +324,7 @@ func Example_printPodWithWideFormat() {
 	printersinternal.AddHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -367,7 +367,7 @@ func Example_printPodWithShowLabels() {
 	printersinternal.AddHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -504,7 +504,7 @@ func Example_printPodHideTerminated() {
 	printersinternal.AddHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -540,7 +540,7 @@ func Example_printPodShowAll() {
 	printersinternal.AddHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}
@@ -569,7 +569,7 @@ func Example_printServiceWithNamespacesAndLabels() {
 	printersinternal.AddHandlers(p)
 	tf.Printer = p
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: ns,
 		Client:               nil,
 	}

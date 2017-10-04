@@ -76,7 +76,7 @@ func TestCreateDeployment(t *testing.T) {
 	depName := "jonny-dep"
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
@@ -105,7 +105,7 @@ func TestCreateDeploymentNoImage(t *testing.T) {
 	depName := "jonny-dep"
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         api.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
