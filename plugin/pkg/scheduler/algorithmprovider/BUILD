@@ -16,7 +16,10 @@ go_test(
     name = "go_default_test",
     srcs = ["plugins_test.go"],
     library = ":go_default_library",
-    deps = ["//plugin/pkg/scheduler/factory:go_default_library"],
+    deps = [
+        "//plugin/pkg/scheduler/factory:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
+    ],
 )
 
 filegroup(

@@ -778,7 +778,7 @@ type IngressBackend struct {
 
 // DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for
 // more information.
-// ReplicaSet represents the configuration of a ReplicaSet.
+// ReplicaSet ensures that a specified number of pod replicas are running at any given time.
 type ReplicaSet struct {
 	metav1.TypeMeta `json:",inline"`
 

@@ -209,7 +209,6 @@ func NewConfigFactory(
 	// they may need to call.
 	c.scheduledPodLister = assignedPodLister{podInformer.Lister()}
 
-	// Only nodes in the "Ready" condition with status == "True" are schedulable
 	nodeInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    c.addNodeToCache,

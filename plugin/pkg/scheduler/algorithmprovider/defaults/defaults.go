@@ -60,12 +60,7 @@ func init() {
 			return priorities.PriorityMetadata
 		})
 
-	// Registers algorithm providers. By default we use 'DefaultProvider', but user can specify one to be used
-	// by specifying flag.
-	factory.RegisterAlgorithmProvider(factory.DefaultProvider, defaultPredicates(), defaultPriorities())
-	// Cluster autoscaler friendly scheduling algorithm.
-	factory.RegisterAlgorithmProvider(ClusterAutoscalerProvider, defaultPredicates(),
-		copyAndReplace(defaultPriorities(), "LeastRequestedPriority", "MostRequestedPriority"))
+	registerAlgorithmProvider(defaultPredicates(), defaultPriorities())
 
 	// IMPORTANT NOTES for predicate developers:
 	// We are using cached predicate result for pods belonging to the same equivalence class.
@@ -126,7 +121,7 @@ func init() {
 }
 
 func defaultPredicates() sets.String {
-	predSet := sets.NewString(
+	return sets.NewString(
 		// Fit is determined by volume zone requirements.
 		factory.RegisterFitPredicateFactory(
 			"NoVolumeZoneConflict",
@@ -182,6 +177,12 @@ func defaultPredicates() sets.String {
 		// Fit is determined by node disk pressure condition.
 		factory.RegisterFitPredicate("CheckNodeDiskPressure", predicates.CheckNodeDiskPressurePredicate),
 
+		// Fit is determied by node condtions: not ready, network unavailable and out of disk.
+		factory.RegisterMandatoryFitPredicate("CheckNodeCondition", predicates.CheckNodeConditionPredicate),
+
+		// Fit is determined based on whether a pod can tolerate all of the node's taints
+		factory.RegisterFitPredicate("PodToleratesNodeTaints", predicates.PodToleratesNodeTaints),
+
 		// Fit is determined by volume zone requirements.
 		factory.RegisterFitPredicateFactory(
 			"NoVolumeNodeConflict",
@@ -190,19 +191,33 @@ func defaultPredicates() sets.String {
 			},
 		),
 	)
+}
+
+// ApplyFeatureGates applies algorithm by feature gates.
+func ApplyFeatureGates() {
+	predSet := defaultPredicates()
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
+		// Remove "CheckNodeCondition" predicate
+		factory.RemoveFitPredicate("CheckNodeCondition")
+		predSet.Delete("CheckNodeCondition")
+
 		// Fit is determined based on whether a pod can tolerate all of the node's taints
 		predSet.Insert(factory.RegisterMandatoryFitPredicate("PodToleratesNodeTaints", predicates.PodToleratesNodeTaints))
+
 		glog.Warningf("TaintNodesByCondition is enabled, PodToleratesNodeTaints predicate is mandatory")
-	} else {
-		// Fit is determied by node condtions: not ready, network unavailable and out of disk.
-		predSet.Insert(factory.RegisterMandatoryFitPredicate("CheckNodeCondition", predicates.CheckNodeConditionPredicate))
-		// Fit is determined based on whether a pod can tolerate all of the node's taints
-		predSet.Insert(factory.RegisterFitPredicate("PodToleratesNodeTaints", predicates.PodToleratesNodeTaints))
 	}
 
-	return predSet
+	registerAlgorithmProvider(predSet, defaultPriorities())
+}
+
+func registerAlgorithmProvider(predSet, priSet sets.String) {
+	// Registers algorithm providers. By default we use 'DefaultProvider', but user can specify one to be used
+	// by specifying flag.
+	factory.RegisterAlgorithmProvider(factory.DefaultProvider, predSet, priSet)
+	// Cluster autoscaler friendly scheduling algorithm.
+	factory.RegisterAlgorithmProvider(ClusterAutoscalerProvider, predSet,
+		copyAndReplace(priSet, "LeastRequestedPriority", "MostRequestedPriority"))
 }
 
 func defaultPriorities() sets.String {

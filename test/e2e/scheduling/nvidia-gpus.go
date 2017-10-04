@@ -139,24 +139,6 @@ func areGPUsAvailableOnAllSchedulableNodes(f *framework.Framework) bool {
 	return true
 }
 
-func areGPUsAvailableOnAnySchedulableNodes(f *framework.Framework) bool {
-	framework.Logf("Getting list of Nodes from API server")
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
-	framework.ExpectNoError(err, "getting node list")
-	for _, node := range nodeList.Items {
-		if node.Spec.Unschedulable {
-			continue
-		}
-		framework.Logf("gpuResourceName %s", gpuResourceName)
-		if val, ok := node.Status.Capacity[gpuResourceName]; ok && val.Value() > 0 {
-			framework.Logf("Nvidia GPUs available on Node: %q", node.Name)
-			return true
-		}
-	}
-	framework.Logf("Nvidia GPUs don't exist on all schedulable nodes")
-	return false
-}
-
 func getGPUsAvailable(f *framework.Framework) int64 {
 	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "getting node list")
@@ -225,27 +207,6 @@ var _ = SIGDescribe("[Feature:GPU]", func() {
 var _ = SIGDescribe("[Feature:GPUDevicePlugin]", func() {
 	f := framework.NewDefaultFramework("device-plugin-gpus")
 	It("run Nvidia GPU Device Plugin tests on Container Optimized OS only", func() {
-		// 1. Verifies GPU resource is successfully advertised on the nodes
-		// and we can run pods using GPUs.
-		By("Starting device plugin daemonset and running GPU pods")
-		testNvidiaGPUsOnCOS(f)
-
-		// 2. Verifies that when the device plugin DaemonSet is removed, resource capacity drops to zero.
-		By("Deleting device plugin daemonset")
-		ds, err := framework.DsFromManifest(dsYamlUrl)
-		Expect(err).NotTo(HaveOccurred())
-		falseVar := false
-		err = f.ClientSet.Extensions().DaemonSets(f.Namespace.Name).Delete(ds.Name, &metav1.DeleteOptions{OrphanDependents: &falseVar})
-		framework.ExpectNoError(err, "failed to delete daemonset")
-		framework.Logf("Successfully deleted device plugin daemonset. Wait for resource to be removed.")
-		// Wait for Nvidia GPUs to be unavailable on all nodes.
-		Eventually(func() bool {
-			return !areGPUsAvailableOnAnySchedulableNodes(f)
-		}, 10*time.Minute, time.Second).Should(BeTrue())
-
-		// 3. Restarts the device plugin DaemonSet. Verifies GPU resource is successfully advertised
-		// on the nodes and we can run pods using GPUs.
-		By("Restarting device plugin daemonset and running GPU pods")
 		testNvidiaGPUsOnCOS(f)
 	})
 })

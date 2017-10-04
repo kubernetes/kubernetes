@@ -233,7 +233,7 @@ type ObjectMappingFactory interface {
 	AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error)
 
 	// Returns a schema that can validate objects stored on disk.
-	Validator(validate bool, openapi bool, cacheDir string) (validation.Schema, error)
+	Validator(validate bool) (validation.Schema, error)
 	// SwaggerSchema returns the schema declaration for the provided group version kind.
 	SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclaration, error)
 	// OpenAPISchema returns the schema openapi schema definiton

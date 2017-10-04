@@ -5036,7 +5036,7 @@ func TestValidatePod(t *testing.T) {
 				Name:      "pod-forgiveness-invalid",
 				Namespace: "ns",
 			},
-			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "node.alpha.kubernetes.io/notReady", Operator: "Exists", Effect: "NoExecute", TolerationSeconds: &[]int64{-2}[0]}}),
+			Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoExecute", TolerationSeconds: &[]int64{-2}[0]}}),
 		},
 		{ // docker default seccomp profile
 			ObjectMeta: metav1.ObjectMeta{
@@ -5594,7 +5594,7 @@ func TestValidatePod(t *testing.T) {
 					Name:      "pod-forgiveness-invalid",
 					Namespace: "ns",
 				},
-				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "node.alpha.kubernetes.io/notReady", Operator: "Exists", Effect: "NoSchedule", TolerationSeconds: &[]int64{20}[0]}}),
+				Spec: extendPodSpecwithTolerations(validPodSpec(nil), []api.Toleration{{Key: "node.kubernetes.io/not-ready", Operator: "Exists", Effect: "NoSchedule", TolerationSeconds: &[]int64{20}[0]}}),
 			},
 		},
 		"must be a valid pod seccomp profile": {

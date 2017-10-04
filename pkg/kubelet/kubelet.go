@@ -1597,9 +1597,14 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 			}
 		}
 		if mirrorPod == nil || deleted {
-			glog.V(3).Infof("Creating a mirror pod for static pod %q", format.Pod(pod))
-			if err := kl.podManager.CreateMirrorPod(pod); err != nil {
-				glog.Errorf("Failed creating a mirror pod for %q: %v", format.Pod(pod), err)
+			node, err := kl.GetNode()
+			if err != nil || node.DeletionTimestamp != nil {
+				glog.V(4).Infof("No need to create a mirror pod, since node %q has been removed from the cluster", kl.nodeName)
+			} else {
+				glog.V(4).Infof("Creating a mirror pod for static pod %q", format.Pod(pod))
+				if err := kl.podManager.CreateMirrorPod(pod); err != nil {
+					glog.Errorf("Failed creating a mirror pod for %q: %v", format.Pod(pod), err)
+				}
 			}
 		}
 	}
@@ -2152,8 +2157,10 @@ func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID str
 	if podStatus, err := kl.podCache.Get(podID); err == nil {
 		removeAll := false
 		if syncedPod, ok := kl.podManager.GetPodByUID(podID); ok {
-			// When an evicted pod has already synced, all containers can be removed.
-			removeAll = eviction.PodIsEvicted(syncedPod.Status)
+			// generate the api status using the cached runtime status to get up-to-date ContainerStatuses
+			apiPodStatus := kl.generateAPIPodStatus(syncedPod, podStatus)
+			// When an evicted or deleted pod has already synced, all containers can be removed.
+			removeAll = eviction.PodIsEvicted(syncedPod.Status) || (syncedPod.DeletionTimestamp != nil && notRunning(apiPodStatus.ContainerStatuses))
 		}
 		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
 	}

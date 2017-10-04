@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
-	admissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -99,18 +98,14 @@ var _ admission.PluginInitializer = &PluginInitializer{}
 // all public, this construction method is pointless boilerplate.
 func NewPluginInitializer(
 	internalClient internalclientset.Interface,
-	externalClient clientset.Interface,
 	sharedInformers informers.SharedInformerFactory,
-	authz authorizer.Authorizer,
 	cloudConfig []byte,
 	restMapper meta.RESTMapper,
 	quotaRegistry quota.Registry,
 ) *PluginInitializer {
 	return &PluginInitializer{
 		internalClient: internalClient,
-		externalClient: externalClient,
 		informers:      sharedInformers,
-		authorizer:     authz,
 		cloudConfig:    cloudConfig,
 		restMapper:     restMapper,
 		quotaRegistry:  quotaRegistry,
@@ -136,16 +131,8 @@ func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 		wants.SetInternalKubeClientSet(i.internalClient)
 	}
 
-	if wants, ok := plugin.(admissioninit.WantsExternalKubeClientSet); ok {
-		wants.SetExternalKubeClientSet(i.externalClient)
-	}
-
 	if wants, ok := plugin.(WantsInternalKubeInformerFactory); ok {
 		wants.SetInternalKubeInformerFactory(i.informers)
-	}
-
-	if wants, ok := plugin.(admissioninit.WantsAuthorizer); ok {
-		wants.SetAuthorizer(i.authorizer)
 	}
 
 	if wants, ok := plugin.(WantsCloudConfig); ok {

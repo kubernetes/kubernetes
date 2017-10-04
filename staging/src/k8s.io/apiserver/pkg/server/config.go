@@ -192,6 +192,11 @@ type RecommendedConfig struct {
 	// RecommendedOptions.CoreAPI.ApplyTo called by RecommendedOptions.ApplyTo. It uses an in-cluster client config
 	// by default, or the kubeconfig given with kubeconfig command line flag.
 	SharedInformerFactory informers.SharedInformerFactory
+
+	// ClientConfig holds the kubernetes client configuration.
+	// This value is set by RecommendedOptions.CoreAPI.ApplyTo called by RecommendedOptions.ApplyTo.
+	// By default in-cluster client config is used.
+	ClientConfig *restclient.Config
 }
 
 type SecureServingInfo struct {

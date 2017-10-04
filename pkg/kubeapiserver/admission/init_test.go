@@ -21,49 +21,13 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/admission"
-	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
-
-// TestAuthorizer is a testing struct for testing that fulfills the authorizer interface.
-type TestAuthorizer struct{}
-
-func (t *TestAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
-	return false, "", nil
-}
-
-var _ authorizer.Authorizer = &TestAuthorizer{}
 
 type doNothingAdmission struct{}
 
 func (doNothingAdmission) Admit(a admission.Attributes) error { return nil }
 func (doNothingAdmission) Handles(o admission.Operation) bool { return false }
 func (doNothingAdmission) Validate() error                    { return nil }
-
-// WantAuthorizerAdmission is a testing struct that fulfills the WantsAuthorizer
-// interface.
-type WantAuthorizerAdmission struct {
-	doNothingAdmission
-	auth authorizer.Authorizer
-}
-
-func (self *WantAuthorizerAdmission) SetAuthorizer(a authorizer.Authorizer) {
-	self.auth = a
-}
-
-var _ admission.Interface = &WantAuthorizerAdmission{}
-var _ genericadmissioninit.WantsAuthorizer = &WantAuthorizerAdmission{}
-
-// TestWantsAuthorizer ensures that the authorizer is injected when the WantsAuthorizer
-// interface is implemented.
-func TestWantsAuthorizer(t *testing.T) {
-	initializer := NewPluginInitializer(nil, nil, nil, &TestAuthorizer{}, nil, nil, nil)
-	wantAuthorizerAdmission := &WantAuthorizerAdmission{}
-	initializer.Initialize(wantAuthorizerAdmission)
-	if wantAuthorizerAdmission.auth == nil {
-		t.Errorf("expected authorizer to be initialized but found nil")
-	}
-}
 
 type WantsCloudConfigAdmissionPlugin struct {
 	doNothingAdmission
@@ -76,7 +40,7 @@ func (self *WantsCloudConfigAdmissionPlugin) SetCloudConfig(cloudConfig []byte) 
 
 func TestCloudConfigAdmissionPlugin(t *testing.T) {
 	cloudConfig := []byte("cloud-configuration")
-	initializer := NewPluginInitializer(nil, nil, nil, &TestAuthorizer{}, cloudConfig, nil, nil)
+	initializer := NewPluginInitializer(nil, nil, cloudConfig, nil, nil)
 	wantsCloudConfigAdmission := &WantsCloudConfigAdmissionPlugin{}
 	initializer.Initialize(wantsCloudConfigAdmission)
 

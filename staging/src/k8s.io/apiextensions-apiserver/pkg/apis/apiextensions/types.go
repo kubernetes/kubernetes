@@ -47,7 +47,7 @@ type CustomResourceDefinitionNames struct {
 	ListKind string
 }
 
-// ResourceScope is an enum defining the different scopes availabe to a custom resource
+// ResourceScope is an enum defining the different scopes available to a custom resource
 type ResourceScope string
 
 const (

@@ -98,7 +98,7 @@ type TableRowCondition struct {
 type RowConditionType string
 
 // These are valid conditions of a row. This list is not exhaustive and new conditions may be
-// inculded by other resources.
+// included by other resources.
 const (
 	// RowCompleted means the underlying resource has reached completion and may be given less
 	// visual priority than other resources.

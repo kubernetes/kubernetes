@@ -27,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 // AdmissionOptions holds the admission options
@@ -72,13 +73,13 @@ func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
 // In case admission plugin names were not provided by a custer-admin they will be prepared from the recommended/default values.
 // In addition the method lazily initializes a generic plugin that is appended to the list of pluginInitializers
 // note this method uses:
-//  genericconfig.LoopbackClientConfig
 //  genericconfig.Authorizer
 func (a *AdmissionOptions) ApplyTo(
 	c *server.Config,
 	informers informers.SharedInformerFactory,
 	serverIdentifyingClientCert []byte,
 	serverIdentifyingClientKey []byte,
+	clientConfig *rest.Config,
 	pluginInitializers ...admission.PluginInitializer,
 ) error {
 	pluginNames := a.PluginNames
@@ -91,7 +92,7 @@ func (a *AdmissionOptions) ApplyTo(
 		return fmt.Errorf("failed to read plugin config: %v", err)
 	}
 
-	clientset, err := kubernetes.NewForConfig(c.LoopbackClientConfig)
+	clientset, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
 		return err
 	}

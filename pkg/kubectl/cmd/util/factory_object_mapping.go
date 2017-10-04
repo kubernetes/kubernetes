@@ -22,13 +22,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"sort"
 	"sync"
 	"time"
 
 	swagger "github.com/emicklei/go-restful-swagger12"
-	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -409,43 +407,20 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout tim
 	return pod, err
 }
 
-func (f *ring1Factory) Validator(validate, openapi bool, cacheDir string) (validation.Schema, error) {
-	if validate {
-		if openapi {
-			resources, err := f.OpenAPISchema()
-			if err == nil {
-				return validation.ConjunctiveSchema{
-					openapivalidation.NewSchemaValidation(resources),
-					validation.NoDoubleKeySchema{},
-				}, nil
-			}
-
-			glog.Warningf("Failed to download OpenAPI (%v), falling back to swagger", err)
-		}
-
-		discovery, err := f.clientAccessFactory.DiscoveryClient()
-		if err != nil {
-			return nil, err
-		}
-		dir := cacheDir
-		if len(dir) > 0 {
-			version, err := discovery.ServerVersion()
-			if err == nil {
-				dir = path.Join(cacheDir, version.String())
-			} else {
-				dir = "" // disable caching as a fallback
-			}
-		}
-		swaggerSchema := &clientSwaggerSchema{
-			c:        discovery.RESTClient(),
-			cacheDir: dir,
-		}
-		return validation.ConjunctiveSchema{
-			swaggerSchema,
-			validation.NoDoubleKeySchema{},
-		}, nil
+func (f *ring1Factory) Validator(validate bool) (validation.Schema, error) {
+	if !validate {
+		return validation.NullSchema{}, nil
 	}
-	return validation.NullSchema{}, nil
+
+	resources, err := f.OpenAPISchema()
+	if err != nil {
+		return nil, err
+	}
+
+	return validation.ConjunctiveSchema{
+		openapivalidation.NewSchemaValidation(resources),
+		validation.NoDoubleKeySchema{},
+	}, nil
 }
 
 func (f *ring1Factory) SwaggerSchema(gvk schema.GroupVersionKind) (*swagger.ApiDeclaration, error) {

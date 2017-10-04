@@ -487,6 +487,7 @@ def configure_worker_services(api_servers, dns, cluster_cidr):
     kubelet_opts.add('tls-cert-file', server_cert_path)
     kubelet_opts.add('tls-private-key-file', server_key_path)
     kubelet_opts.add('logtostderr', 'true')
+    kubelet_opts.add('fail-swap-on', 'false')
 
     kube_proxy_opts = FlagManager('kube-proxy')
     kube_proxy_opts.add('cluster-cidr', cluster_cidr)

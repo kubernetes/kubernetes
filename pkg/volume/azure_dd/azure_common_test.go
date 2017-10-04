@@ -119,6 +119,9 @@ func (handler *fakeIOHandler) ReadFile(filename string) ([]byte, error) {
 }
 
 func TestIoHandler(t *testing.T) {
+	if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
+		t.Skipf("TestIoHandler not supported on GOOS=%s", runtime.GOOS)
+	}
 	disk, err := findDiskByLun(lun, &fakeIOHandler{}, mount.NewOsExec())
 	if runtime.GOOS == "windows" {
 		if err != nil {
