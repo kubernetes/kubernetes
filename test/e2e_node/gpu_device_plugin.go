@@ -18,6 +18,7 @@ package e2e_node
 
 import (
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"time"
 
@@ -59,7 +60,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			By("Waiting for GPUs to become available on the local node")
 			Eventually(func() bool {
 				return framework.NumberOfNVIDIAGPUs(getLocalNode(f)) > 0
-			}, 10*time.Second, time.Second).Should(BeTrue())
+			}, 10*time.Second, framework.Poll).Should(BeTrue())
 
 			if framework.NumberOfNVIDIAGPUs(getLocalNode(f)) < 2 {
 				Skip("Not enough GPUs to execute this test (at least two needed)")
@@ -138,6 +139,9 @@ func newDecimalResourceList(name v1.ResourceName, quantity int64) v1.ResourceLis
 
 // TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
 func restartKubelet(f *framework.Framework) {
+	beforeSocks, err := filepath.Glob("/var/lib/kubelet/device-plugins/nvidiaGPU*.sock")
+	framework.ExpectNoError(err)
+	Expect(len(beforeSocks)).NotTo(BeZero())
 	stdout, err := exec.Command("sudo", "systemctl", "list-units", "kubelet*", "--state=running").CombinedOutput()
 	framework.ExpectNoError(err)
 	regex := regexp.MustCompile("(kubelet-[0-9]+)")
@@ -146,19 +150,21 @@ func restartKubelet(f *framework.Framework) {
 	kube := matches[0]
 	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kube)
 	stdout, err = exec.Command("sudo", "systemctl", "restart", kube).CombinedOutput()
-	if err == nil {
-		return
-	}
-	framework.Failf("Failed to restart kubelet with systemctl: %v, %v", err, stdout)
+	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
+	Eventually(func() ([]string, error) {
+		return filepath.Glob("/var/lib/kubelet/device-plugins/nvidiaGPU*.sock")
+	}, 5*time.Minute, framework.Poll).ShouldNot(ConsistOf(beforeSocks))
 }
 
 func getDeviceId(f *framework.Framework, podName string, contName string, restartCount int32) string {
 	// Wait till pod has been restarted at least restartCount times.
 	Eventually(func() bool {
 		p, err := f.PodClient().Get(podName, metav1.GetOptions{})
-		framework.ExpectNoError(err)
+		if err != nil || len(p.Status.ContainerStatuses) < 1 {
+			return false
+		}
 		return p.Status.ContainerStatuses[0].RestartCount >= restartCount
-	}, time.Minute, time.Second).Should(BeTrue())
+	}, 5*time.Minute, framework.Poll).Should(BeTrue())
 	logs, err := framework.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, contName)
 	if err != nil {
 		framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
