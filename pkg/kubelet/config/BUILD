@@ -16,6 +16,7 @@ go_library(
         "doc.go",
         "file.go",
         "file_unsupported.go",
+        "flags.go",
         "http.go",
         "sources.go",
     ] + select({
@@ -37,6 +38,7 @@ go_library(
         "//pkg/util/config:go_default_library",
         "//pkg/util/hash:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
