@@ -24,7 +24,7 @@ import (
 	"path"
 	"reflect"
 
-	"github.com/hashicorp/vault/api"
+	vaultapi "github.com/hashicorp/vault/api"
 )
 
 const defaultTransitPath = "transit"
@@ -32,7 +32,7 @@ const defaultAuthPath = "auth"
 
 // Handle all communication with Vault server.
 type clientWrapper struct {
-	client      *api.Client
+	client      *vaultapi.Client
 	encryptPath string
 	decryptPath string
 	authPath    string
@@ -64,7 +64,7 @@ func newClientWrapper(config *EnvelopeConfig) (*clientWrapper, error) {
 		authPath:    path.Join(auth),
 	}
 
-	// Set token for the api.client.
+	// Set token for the vaultapi.client.
 	if len(config.Token) != 0 {
 		client.SetToken(config.Token)
 	} else {
@@ -77,11 +77,11 @@ func newClientWrapper(config *EnvelopeConfig) (*clientWrapper, error) {
 	return wrapper, nil
 }
 
-func newVaultClient(config *EnvelopeConfig) (*api.Client, error) {
-	vaultConfig := api.DefaultConfig()
+func newVaultClient(config *EnvelopeConfig) (*vaultapi.Client, error) {
+	vaultConfig := vaultapi.DefaultConfig()
 	vaultConfig.Address = config.Address
 
-	tlsConfig := &api.TLSConfig{
+	tlsConfig := &vaultapi.TLSConfig{
 		CACert:        config.CACert,
 		ClientCert:    config.ClientCert,
 		ClientKey:     config.ClientKey,
@@ -91,10 +91,10 @@ func newVaultClient(config *EnvelopeConfig) (*api.Client, error) {
 		return nil, err
 	}
 
-	return api.NewClient(vaultConfig)
+	return vaultapi.NewClient(vaultConfig)
 }
 
-// Get token by login and set the value to api.Client.
+// Get token by login and set the value to vaultapi.Client.
 func (c *clientWrapper) refreshToken(config *EnvelopeConfig) error {
 	switch {
 	case config.ClientCert != "" && config.ClientKey != "":
@@ -174,7 +174,7 @@ func (c *clientWrapper) encrypt(keyName string, plain string) (string, error) {
 }
 
 // This request check the response status code. If get code 403, it sets forbidden true.
-func (c *clientWrapper) request(path string, data interface{}) (*api.Secret, error) {
+func (c *clientWrapper) request(path string, data interface{}) (*vaultapi.Secret, error) {
 	req := c.client.NewRequest("POST", "/"+path)
 	if err := req.SetJSONBody(data); err != nil {
 		return nil, err
@@ -188,7 +188,7 @@ func (c *clientWrapper) request(path string, data interface{}) (*api.Secret, err
 		}
 
 		if resp.StatusCode == http.StatusOK {
-			secret, err := api.ParseSecret(resp.Body)
+			secret, err := vaultapi.ParseSecret(resp.Body)
 			if err != nil {
 				return nil, err
 			}
