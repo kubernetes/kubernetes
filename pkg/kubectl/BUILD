@@ -17,7 +17,6 @@ go_test(
         "deployment_test.go",
         "env_file_test.go",
         "generate_test.go",
-        "kubectl_test.go",
         "namespace_test.go",
         "quota_test.go",
         "resource_filter_test.go",

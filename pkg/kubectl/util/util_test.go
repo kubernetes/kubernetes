@@ -14,11 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubectl
+package util
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestParseFileSource(t *testing.T) {
 	cases := []struct {
@@ -91,7 +89,7 @@ func TestParseFileSource(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		key, filepath, err := parseFileSource(tc.input)
+		key, filepath, err := ParseFileSource(tc.input)
 		if err != nil {
 			if tc.err {
 				continue
@@ -173,7 +171,7 @@ func TestParseLiteralSource(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		key, value, err := parseLiteralSource(tc.input)
+		key, value, err := ParseLiteralSource(tc.input)
 		if err != nil {
 			if tc.err {
 				continue
