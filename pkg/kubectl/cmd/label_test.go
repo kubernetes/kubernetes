@@ -358,7 +358,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 	pods, _, _ := testData()
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
+		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
@@ -409,7 +409,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 func TestLabelLocal(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
+		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
@@ -443,7 +443,7 @@ func TestLabelMultipleObjects(t *testing.T) {
 	pods, _, _ := testData()
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
+		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {

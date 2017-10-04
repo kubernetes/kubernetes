@@ -452,7 +452,7 @@ func TestAnnotateObject(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
+		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
@@ -503,7 +503,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
+		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {
@@ -552,7 +552,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 func TestAnnotateLocal(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
+		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
@@ -585,7 +585,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
+		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.Method {

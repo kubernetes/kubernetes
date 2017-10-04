@@ -104,7 +104,7 @@ func TestHelperDelete(t *testing.T) {
 	}
 	for _, test := range tests {
 		client := &fake.RESTClient{
-			APIRegistry:          legacyscheme.Registry,
+			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Resp:                 test.Resp,
 			Err:                  test.HttpErr,
@@ -195,7 +195,7 @@ func TestHelperCreate(t *testing.T) {
 	}
 	for i, test := range tests {
 		client := &fake.RESTClient{
-			APIRegistry:          legacyscheme.Registry,
+			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Resp:                 test.Resp,
 			Err:                  test.HttpErr,
@@ -276,7 +276,7 @@ func TestHelperGet(t *testing.T) {
 	}
 	for _, test := range tests {
 		client := &fake.RESTClient{
-			APIRegistry:          legacyscheme.Registry,
+			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Resp:                 test.Resp,
 			Err:                  test.HttpErr,
@@ -350,7 +350,7 @@ func TestHelperList(t *testing.T) {
 	}
 	for _, test := range tests {
 		client := &fake.RESTClient{
-			APIRegistry:          legacyscheme.Registry,
+			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Resp:                 test.Resp,
 			Err:                  test.HttpErr,
@@ -484,7 +484,7 @@ func TestHelperReplace(t *testing.T) {
 	}
 	for i, test := range tests {
 		client := &fake.RESTClient{
-			APIRegistry:          legacyscheme.Registry,
+			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Client:               test.HTTPClient,
 			Resp:                 test.Resp,

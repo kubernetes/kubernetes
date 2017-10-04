@@ -24,6 +24,7 @@ import (
 
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
@@ -32,7 +33,7 @@ func TestCreatePdb(t *testing.T) {
 	pdbName := "my-pdb"
 	f, tf, _, ns := cmdtesting.NewAPIFactory()
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
+		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
