@@ -109,9 +109,31 @@ func (p *staticPolicy) Name() string {
 }
 
 func (p *staticPolicy) Start(s state.State) {
-	// Configure the shared pool to include all detected CPU IDs.
-	allCPUs := p.topology.CPUDetails.CPUs()
-	s.SetDefaultCPUSet(allCPUs)
+
+
+	if s.GetDefaultCPUSet().IsEmpty() {
+		// Nothing read from state file
+		// Configure the shared pool to include all detected CPU IDs.
+		allCPUs := p.topology.CPUDetails.CPUs()
+		s.SetDefaultCPUSet(allCPUs)
+		s.UpdateStateFile()
+	} else {
+		// State has been initialized from state file, validate
+
+		// 1. Reserved cpuset shall be part of default cpuset
+		if !p.reserved.Intersection(s.GetDefaultCPUSet()).Equals(p.reserved) {
+			glog.Warningf("Reserved cpus: \"%s\" are not fully present in defaultCpuSet: \"%s\"",
+			p.reserved.String(), s.GetDefaultCPUSet().String())
+			s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(p.reserved))
+			s.UpdateStateFile()
+		}
+
+		//TODO(SSc) 2. If cpu is present in default there shouldn't be any entry for
+		// that cpu in state.assignments for other pods
+
+		//TODO(SSc) 3. any other ?
+
+	}
 }
 
 // assignableCPUs returns the set of unassigned CPUs minus the reserved set.
@@ -135,6 +157,7 @@ func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Co
 			return err
 		}
 		s.SetCPUSet(containerID, cpuset)
+		s.UpdateStateFile()
 	}
 	// container belongs in the shared pool (nothing to do; use default cpuset)
 	return nil
@@ -146,6 +169,7 @@ func (p *staticPolicy) RemoveContainer(s state.State, containerID string) error 
 		s.Delete(containerID)
 		// Mutate the shared pool, adding released cpus.
 		s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(toRelease))
+		s.UpdateStateFile()
 	}
 	return nil
 }

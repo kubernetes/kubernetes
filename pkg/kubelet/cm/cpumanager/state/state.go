@@ -37,4 +37,5 @@ type writer interface {
 type State interface {
 	Reader
 	writer
+	UpdateStateFile()
 }

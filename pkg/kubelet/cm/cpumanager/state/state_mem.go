@@ -27,6 +27,7 @@ type stateMemory struct {
 	sync.RWMutex
 	assignments   map[string]cpuset.CPUSet
 	defaultCPUSet cpuset.CPUSet
+	stateFile     *stateFile
 }
 
 var _ State = &stateMemory{}
@@ -34,9 +35,17 @@ var _ State = &stateMemory{}
 // NewMemoryState creates new State for keeping track of cpu/pod assignment
 func NewMemoryState() State {
 	glog.Infof("[cpumanager] initializing new in-memory state store")
+	stateFile := NewStateFileBackend()
+	defaultCPUSet, assignments, err := stateFile.tryRestoreState()
+
+	if err != nil {
+		glog.Infof("[cpumanager] could not restore state from state file, using empty state")
+	}
+
 	return &stateMemory{
-		assignments:   map[string]cpuset.CPUSet{},
-		defaultCPUSet: cpuset.NewCPUSet(),
+		assignments:   assignments,
+		defaultCPUSet: defaultCPUSet,
+		stateFile:     stateFile,
 	}
 }
 
@@ -87,4 +96,13 @@ func (s *stateMemory) Delete(containerID string) {
 
 	delete(s.assignments, containerID)
 	glog.V(2).Infof("[cpumanager] deleted cpuset assignment (container id: %s)", containerID)
+}
+
+func (s *stateMemory) UpdateStateFile() {
+	s.Lock()
+	defer s.Unlock()
+	if err := s.stateFile.updateStateFile(s.defaultCPUSet, s.assignments); err != nil {
+		glog.Errorf("[cpumanager] failed to update state file - %s", err.Error())
+	}
+	glog.V(2).Infof("[cpumanager] updated state file")
 }

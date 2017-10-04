@@ -151,8 +151,8 @@ func NewManager(
 }
 
 func (m *manager) Start(activePods ActivePodsFunc, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService) {
-	glog.Infof("[cpumanger] starting with %s policy", m.policy.Name())
-	glog.Infof("[cpumanger] reconciling every %v", m.reconcilePeriod)
+	glog.Infof("[cpumanager] starting with %s policy", m.policy.Name())
+	glog.Infof("[cpumanager] reconciling every %v", m.reconcilePeriod)
 
 	m.activePods = activePods
 	m.podStatusProvider = podStatusProvider
@@ -230,7 +230,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 
 			// Check whether container is present in state, there may be 3 reasons why it's not present:
 			// - container is in Be/Bu pod
-			// - kubelet just restarted - state is empty
+			// - kubelet just restarted - state has not been restored properly and is empty
 			// - container has been removed from state by RemoveContainer call (DeletionTimestamp is set)
 			if _, ok := m.state.GetCPUSet(containerID); !ok {
 				if status.Phase == v1.PodRunning && pod.DeletionTimestamp == nil {
