@@ -112,7 +112,7 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 	fwdRuleDeleted := false
 	if existingFwdRule != nil && !fwdRuleEqual(existingFwdRule, expectedFwdRule) {
 		glog.V(2).Infof("ensureInternalLoadBalancer(%v): deleting existing forwarding rule with IP address %v", loadBalancerName, existingFwdRule.IPAddress)
-		if err = gce.DeleteRegionForwardingRule(loadBalancerName, gce.region); err != nil && !isNotFound(err) {
+		if err = ignoreNotFound(gce.DeleteRegionForwardingRule(loadBalancerName, gce.region)); err != nil {
 			return nil, err
 		}
 		fwdRuleDeleted = true
@@ -206,7 +206,7 @@ func (gce *GCECloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID st
 	ensureAddressDeleted(gce, loadBalancerName, gce.region)
 
 	glog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting region internal forwarding rule", loadBalancerName)
-	if err := gce.DeleteRegionForwardingRule(loadBalancerName, gce.region); err != nil && !isNotFound(err) {
+	if err := ignoreNotFound(gce.DeleteRegionForwardingRule(loadBalancerName, gce.region)); err != nil {
 		return err
 	}
 
@@ -217,7 +217,7 @@ func (gce *GCECloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID st
 	}
 
 	glog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting firewall for traffic", loadBalancerName)
-	if err := gce.DeleteFirewall(loadBalancerName); err != nil {
+	if err := ignoreNotFound(gce.DeleteFirewall(loadBalancerName)); err != nil {
 		if isForbidden(err) && gce.OnXPN() {
 			glog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): could not delete traffic firewall on XPN cluster. Raising event.", loadBalancerName)
 			gce.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudDeleteCmd(loadBalancerName, gce.NetworkProjectID()))
@@ -272,7 +272,7 @@ func (gce *GCECloud) teardownInternalHealthCheckAndFirewall(svc *v1.Service, hcN
 	glog.V(2).Infof("teardownInternalHealthCheckAndFirewall(%v): health check deleted", hcName)
 
 	hcFirewallName := makeHealthCheckFirewallNameFromHC(hcName)
-	if err := gce.DeleteFirewall(hcFirewallName); err != nil && !isNotFound(err) {
+	if err := ignoreNotFound(gce.DeleteFirewall(hcFirewallName)); err != nil {
 		if isForbidden(err) && gce.OnXPN() {
 			glog.V(2).Infof("teardownInternalHealthCheckAndFirewall(%v): could not delete health check traffic firewall on XPN cluster. Raising Event.", hcName)
 			gce.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudDeleteCmd(hcFirewallName, gce.NetworkProjectID()))
