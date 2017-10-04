@@ -70224,7 +70224,7 @@
     ],
     "properties": {
      "allowPrivilegeEscalation": {
-      "description": "AllowPrivilegeEscalation determines if a pod can request to allow privilege escalation.",
+      "description": "AllowPrivilegeEscalation determines if a pod can request to allow privilege escalation. If unspecified, defaults to true.",
       "type": "boolean"
      },
      "allowedCapabilities": {
