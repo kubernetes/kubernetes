@@ -100,7 +100,8 @@ func NewAttachDetachController(
 	prober volume.DynamicPluginProber,
 	disableReconciliationSync bool,
 	reconcilerSyncDuration time.Duration,
-	timerConfig TimerConfig) (AttachDetachController, error) {
+	timerConfig TimerConfig,
+) (AttachDetachController, error) {
 	// TODO: The default resyncPeriod for shared informers is 12 hours, this is
 	// unacceptable for the attach/detach controller. For example, if a pod is
 	// skipped because the node it is scheduled to didn't set its annotation in
@@ -134,8 +135,8 @@ func NewAttachDetachController(
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "attachdetach"})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "attachdetach-controller"})
 
 	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
 	adc.actualStateOfWorld = cache.NewActualStateOfWorld(&adc.volumePluginMgr)

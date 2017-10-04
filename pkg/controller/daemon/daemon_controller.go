@@ -130,21 +130,28 @@ type DaemonSetsController struct {
 	suspendedDaemonPods      map[string]sets.String
 }
 
-func NewDaemonSetsController(daemonSetInformer extensionsinformers.DaemonSetInformer, historyInformer appsinformers.ControllerRevisionInformer, podInformer coreinformers.PodInformer, nodeInformer coreinformers.NodeInformer, kubeClient clientset.Interface) *DaemonSetsController {
+func NewDaemonSetsController(
+	daemonSetInformer extensionsinformers.DaemonSetInformer,
+	historyInformer appsinformers.ControllerRevisionInformer,
+	podInformer coreinformers.PodInformer,
+	nodeInformer coreinformers.NodeInformer,
+	kubeClient clientset.Interface,
+) *DaemonSetsController {
+	if kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("daemon_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
+	}
+
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
 
-	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("daemon_controller", kubeClient.Core().RESTClient().GetRateLimiter())
-	}
 	dsc := &DaemonSetsController{
 		kubeClient:    kubeClient,
 		eventRecorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "daemonset-controller"}),
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "daemon-set"}),
+			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "daemonset-pod"}),
 		},
 		crControl: controller.RealControllerRevisionControl{
 			KubeClient: kubeClient,

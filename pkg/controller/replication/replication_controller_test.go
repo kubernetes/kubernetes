@@ -151,7 +151,7 @@ func newPodList(store cache.Store, count int, status v1.PodPhase, rc *v1.Replica
 
 // processSync initiates a sync via processNextWorkItem() to test behavior that
 // depends on both functions (such as re-queueing on sync error).
-func processSync(rm *ReplicationManager, key string) error {
+func processSync(rm *ReplicationController, key string) error {
 	// Save old syncHandler and replace with one that captures the error.
 	oldSyncHandler := rm.syncHandler
 	defer func() {
@@ -188,11 +188,11 @@ type serverResponse struct {
 	obj        interface{}
 }
 
-func newReplicationManagerFromClient(kubeClient clientset.Interface, burstReplicas int) (*ReplicationManager, coreinformers.PodInformer, coreinformers.ReplicationControllerInformer) {
+func newReplicationManagerFromClient(kubeClient clientset.Interface, burstReplicas int) (*ReplicationController, coreinformers.PodInformer, coreinformers.ReplicationControllerInformer) {
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	podInformer := informerFactory.Core().V1().Pods()
 	rcInformer := informerFactory.Core().V1().ReplicationControllers()
-	rm := NewReplicationManager(podInformer, rcInformer, kubeClient, burstReplicas)
+	rm := NewReplicationController(podInformer, rcInformer, kubeClient, burstReplicas)
 	rm.podListerSynced = alwaysReady
 	rm.rcListerSynced = alwaysReady
 	return rm, podInformer, rcInformer
@@ -521,7 +521,7 @@ func TestWatchControllers(t *testing.T) {
 	informers := informers.NewSharedInformerFactory(c, controller.NoResyncPeriodFunc())
 	podInformer := informers.Core().V1().Pods()
 	rcInformer := informers.Core().V1().ReplicationControllers()
-	manager := NewReplicationManager(podInformer, rcInformer, c, BurstReplicas)
+	manager := NewReplicationController(podInformer, rcInformer, c, BurstReplicas)
 	informers.Start(stopCh)
 
 	var testControllerSpec v1.ReplicationController
@@ -1254,7 +1254,7 @@ func BenchmarkGetPodControllerSingleNS(b *testing.B) {
 }
 
 // setupManagerWithGCEnabled creates a RC manager with a fakePodControl
-func setupManagerWithGCEnabled(objs ...runtime.Object) (manager *ReplicationManager, fakePodControl *controller.FakePodControl, podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer) {
+func setupManagerWithGCEnabled(objs ...runtime.Object) (manager *ReplicationController, fakePodControl *controller.FakePodControl, podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer) {
 	c := fakeclientset.NewSimpleClientset(objs...)
 	fakePodControl = &controller.FakePodControl{}
 	manager, podInformer, rcInformer = newReplicationManagerFromClient(c, BurstReplicas)

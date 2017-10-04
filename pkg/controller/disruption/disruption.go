@@ -92,8 +92,7 @@ type DisruptionController struct {
 	queue        workqueue.RateLimitingInterface
 	recheckQueue workqueue.DelayingInterface
 
-	broadcaster record.EventBroadcaster
-	recorder    record.EventRecorder
+	recorder record.EventRecorder
 
 	getUpdater func() updater
 }
@@ -118,13 +117,16 @@ func NewDisruptionController(
 	ssInformer appsinformers.StatefulSetInformer,
 	kubeClient clientset.Interface,
 ) *DisruptionController {
+	broadcaster := record.NewBroadcaster()
+	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
+	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "disruption-controller"})
+
 	dc := &DisruptionController{
 		kubeClient:   kubeClient,
 		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "disruption"),
 		recheckQueue: workqueue.NewNamedDelayingQueue("disruption-recheck"),
-		broadcaster:  record.NewBroadcaster(),
+		recorder:     recorder,
 	}
-	dc.recorder = dc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "controllermanager"})
 
 	dc.getUpdater = func() updater { return dc.writePdbStatus }
 
@@ -288,16 +290,19 @@ func (dc *DisruptionController) Run(stopCh <-chan struct{}) {
 	glog.Infof("Starting disruption controller")
 	defer glog.Infof("Shutting down disruption controller")
 
-	if !controller.WaitForCacheSync("disruption", stopCh, dc.podListerSynced, dc.pdbListerSynced, dc.rcListerSynced, dc.rsListerSynced, dc.dListerSynced, dc.ssListerSynced) {
+	if !controller.WaitForCacheSync(
+		"disruption",
+		stopCh,
+		dc.podListerSynced,
+		dc.pdbListerSynced,
+		dc.rcListerSynced,
+		dc.rsListerSynced,
+		dc.dListerSynced,
+		dc.ssListerSynced,
+	) {
 		return
 	}
 
-	if dc.kubeClient != nil {
-		glog.Infof("Sending events to api server.")
-		dc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(dc.kubeClient.Core().RESTClient()).Events("")})
-	} else {
-		glog.Infof("No api server defined - no events will be sent to API server.")
-	}
 	go wait.Until(dc.worker, time.Second, stopCh)
 	go wait.Until(dc.recheckWorker, time.Second, stopCh)
 
@@ -728,7 +733,7 @@ func refresh(pdbClient policyclientset.PodDisruptionBudgetInterface, pdb *policy
 }
 
 func (dc *DisruptionController) writePdbStatus(pdb *policy.PodDisruptionBudget) error {
-	pdbClient := dc.kubeClient.Policy().PodDisruptionBudgets(pdb.Namespace)
+	pdbClient := dc.kubeClient.PolicyV1beta1().PodDisruptionBudgets(pdb.Namespace)
 	st := pdb.Status
 
 	var err error

@@ -65,9 +65,15 @@ type RouteController struct {
 	recorder         record.EventRecorder
 }
 
-func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDR *net.IPNet) *RouteController {
-	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.Core().RESTClient().GetRateLimiter())
+// NewRouteController creates a new route controller to set up routes in the underlying cloud infrastructure.
+func NewRouteController(
+	routes cloudprovider.Routes,
+	kubeClient clientset.Interface,
+	nodeInformer coreinformers.NodeInformer,
+	clusterName string, clusterCIDR *net.IPNet,
+) *RouteController {
+	if kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	if clusterCIDR == nil {
@@ -75,7 +81,8 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route-controller"})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
 
 	rc := &RouteController{
 		routes:           routes,
@@ -99,10 +106,6 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 
 	if !controller.WaitForCacheSync("route", stopCh, rc.nodeListerSynced) {
 		return
-	}
-
-	if rc.broadcaster != nil {
-		rc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(rc.kubeClient.Core().RESTClient()).Events("")})
 	}
 
 	// TODO: If we do just the full Resync every 5 minutes (default value)
