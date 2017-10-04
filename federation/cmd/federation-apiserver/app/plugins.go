@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
 	"k8s.io/kubernetes/plugin/pkg/admission/gc"
-	"k8s.io/kubernetes/plugin/pkg/admission/initialization"
 )
 
 // RegisterAllAdmissionPlugins registers all admission plugins
@@ -37,6 +36,5 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	admit.Register(plugins)
 	deny.Register(plugins)
 	gc.Register(plugins)
-	initialization.Register(plugins)
 	schedulingpolicy.Register(plugins)
 }
