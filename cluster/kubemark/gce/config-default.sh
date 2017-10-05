@@ -116,3 +116,7 @@ ENABLE_POD_PRIORITY="${ENABLE_POD_PRIORITY:-}"
 if [[ "${ENABLE_POD_PRIORITY}" == "true" ]]; then
     FEATURE_GATES="${FEATURE_GATES},PodPriority=true"
 fi
+
+# The number of services that are allowed to sync concurrently. Will be passed
+# into kube-controller-manager via `--concurrent-service-syncs`
+CONCURRENT_SERVICE_SYNCS="${CONCURRENT_SERVICE_SYNCS:-}"

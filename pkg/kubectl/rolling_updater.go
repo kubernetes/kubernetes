@@ -42,6 +42,7 @@ import (
 )
 
 const (
+	kubectlAnnotationPrefix    = "kubectl.kubernetes.io/"
 	sourceIdAnnotation         = kubectlAnnotationPrefix + "update-source-id"
 	desiredReplicasAnnotation  = kubectlAnnotationPrefix + "desired-replicas"
 	originalReplicasAnnotation = kubectlAnnotationPrefix + "original-replicas"

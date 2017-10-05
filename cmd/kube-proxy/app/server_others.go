@@ -65,6 +65,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 
 	protocol := utiliptables.ProtocolIpv4
 	if net.ParseIP(config.BindAddress).To4() == nil {
+		glog.V(0).Infof("IPv6 bind address (%s), assume IPv6 operation", config.BindAddress)
 		protocol = utiliptables.ProtocolIpv6
 	}
 
@@ -115,10 +116,8 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 	proxyMode := getProxyMode(string(config.Mode), iptInterface, iptables.LinuxKernelCompatTester{})
 	if proxyMode == proxyModeIPTables {
 		glog.V(0).Info("Using iptables Proxier.")
-		var nodeIP net.IP
-		if config.BindAddress != "0.0.0.0" {
-			nodeIP = net.ParseIP(config.BindAddress)
-		} else {
+		nodeIP := net.ParseIP(config.BindAddress)
+		if nodeIP.Equal(net.IPv4zero) || nodeIP.Equal(net.IPv6zero) {
 			nodeIP = getNodeIP(client, hostname)
 		}
 		if config.IPTables.MasqueradeBit == nil {

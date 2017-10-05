@@ -286,6 +286,26 @@ bar
 foo       baz
 `,
 		},
+		{
+			columns: []printers.Column{
+				{
+					Header:    "NAME",
+					FieldSpec: "{.metadata.name}",
+				},
+				{
+					Header:    "API_VERSION",
+					FieldSpec: "{.apiVersion}",
+				},
+				{
+					Header:    "NOT_FOUND",
+					FieldSpec: "{.notFound}",
+				},
+			},
+			obj: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, TypeMeta: metav1.TypeMeta{APIVersion: "baz"}},
+			expectedOutput: `NAME      API_VERSION   NOT_FOUND
+foo       baz           <none>
+`,
+		},
 	}
 
 	for _, test := range tests {

@@ -18,6 +18,7 @@ package openapi
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -179,6 +180,26 @@ func (k *Kind) GetName() string {
 		properties = append(properties, key)
 	}
 	return fmt.Sprintf("Kind(%v)", properties)
+}
+
+// IsRequired returns true if `field` is a required field for this type.
+func (k *Kind) IsRequired(field string) bool {
+	for _, f := range k.RequiredFields {
+		if f == field {
+			return true
+		}
+	}
+	return false
+}
+
+// Keys returns a alphabetically sorted list of keys.
+func (k *Kind) Keys() []string {
+	keys := make([]string, 0)
+	for key := range k.Fields {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // Map is an object who values must all be of the same `SubType`.

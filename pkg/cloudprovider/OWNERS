@@ -1,5 +1,6 @@
 approvers:
 - mikedanese
+- dims
 reviewers:
 - thockin
 - lavalamp
@@ -34,7 +35,6 @@ reviewers:
 - jszczepkowski
 - markturansky
 - girishkalele
-- satnam6502
 - jdef
 - freehan
 - jingxu97

@@ -73,7 +73,7 @@ func (f *FakeIPVS) AddVirtualServer(serv *utilipvs.VirtualServer) error {
 	key := toServiceKey(serv)
 	f.Services[key] = serv
 	// make sure no destination present when creating new service
-	f.Destinations = make(map[serviceKey][]*utilipvs.RealServer)
+	f.Destinations[key] = make([]*utilipvs.RealServer, 0)
 	return nil
 }
 

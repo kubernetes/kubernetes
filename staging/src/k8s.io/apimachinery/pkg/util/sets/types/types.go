@@ -23,7 +23,7 @@ package types
 
 type ReferenceSetTypes struct {
 	// These types all cause files to be generated.
-	// These types should be reflected in the ouput of
+	// These types should be reflected in the output of
 	// the "//pkg/util/sets:set-gen" genrule.
 	a int64
 	b int

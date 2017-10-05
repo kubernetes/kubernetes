@@ -942,7 +942,7 @@ func iptablesFlush(ipt iptables.Interface) error {
 var zeroIPv4 = net.ParseIP("0.0.0.0")
 var localhostIPv4 = net.ParseIP("127.0.0.1")
 
-var zeroIPv6 = net.ParseIP("::0")
+var zeroIPv6 = net.ParseIP("::")
 var localhostIPv6 = net.ParseIP("::1")
 
 // Build a slice of iptables args that are common to from-container and from-host portal rules.
