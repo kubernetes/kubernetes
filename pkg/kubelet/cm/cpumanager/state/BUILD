@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "state.go",
+        "state_file.go",
         "state_mem.go",
     ],
     visibility = ["//visibility:public"],

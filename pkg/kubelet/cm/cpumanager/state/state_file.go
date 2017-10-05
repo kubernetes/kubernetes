@@ -41,17 +41,17 @@ func NewStateFileBackend() *stateFile {
 	}
 }
 
-func (sf *stateFile) tryRestoreState() (defaultCPUSet cpuset.CPUSet, assignments map[string]cpuset.CPUSet, err error) {
+func (sf *stateFile) tryRestoreState() (defaultCPUSet cpuset.CPUSet, assignments ContainerCpuAssignment, err error) {
 	sf.RLock()
 	defer sf.RUnlock()
 
 	// init return values
 	defaultCPUSet = cpuset.NewCPUSet()
-	assignments = make(map[string]cpuset.CPUSet)
+	assignments = make(ContainerCpuAssignment)
 	err = nil
 
 	// used when all parsing is ok
-	tmpAssignments := make(map[string]cpuset.CPUSet)
+	tmpAssignments := make(ContainerCpuAssignment)
 	tmpDefaultCPUSet := cpuset.NewCPUSet()
 	tmpContainerCpuSet := cpuset.NewCPUSet()
 
@@ -93,7 +93,7 @@ func (sf *stateFile) tryRestoreState() (defaultCPUSet cpuset.CPUSet, assignments
 	return
 }
 
-func (sf *stateFile) updateStateFile(defaultCPUSet cpuset.CPUSet, assignments map[string]cpuset.CPUSet) error {
+func (sf *stateFile) updateStateFile(defaultCPUSet cpuset.CPUSet, assignments ContainerCpuAssignment) error {
 	sf.RLock()
 	defer sf.RUnlock()
 	var content []byte
@@ -101,7 +101,7 @@ func (sf *stateFile) updateStateFile(defaultCPUSet cpuset.CPUSet, assignments ma
 
 	writeState := stateData{
 		DefaultCpuSet: defaultCPUSet.String(),
-		Entries: map[string]string{},
+		Entries:       map[string]string{},
 	}
 
 	for containerID, cset := range assignments {
@@ -109,11 +109,11 @@ func (sf *stateFile) updateStateFile(defaultCPUSet cpuset.CPUSet, assignments ma
 	}
 
 	if content, err = json.Marshal(writeState); err != nil {
-		glog.Errorf("[cpumanager] could not write parse state to json")
+		glog.Errorf("[cpumanager] could not parse state to json")
 		return err
 	}
 
-	if err = ioutil.WriteFile(sf.stateFilePath, content, 0666); err != nil {
+	if err = ioutil.WriteFile(sf.stateFilePath, content, 0644); err != nil {
 		glog.Errorf("[cpumanager] could not write state to file")
 		return err
 	}
