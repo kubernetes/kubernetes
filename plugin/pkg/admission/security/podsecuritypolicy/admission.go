@@ -19,10 +19,12 @@ package podsecuritypolicy
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/golang/glog"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
@@ -33,11 +35,10 @@ import (
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 	psp "k8s.io/kubernetes/pkg/security/podsecuritypolicy"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
-	sc "k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-	"k8s.io/kubernetes/pkg/util/maps"
 )
 
 const (
@@ -119,8 +120,17 @@ func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 	}
 
 	pod, ok := a.GetObject().(*api.Pod)
-	// if we can't convert then we don't handle this object so just return
+	// if we can't convert then fail closed since we've already checked that this is supposed to be a pod object.
+	// this shouldn't normally happen during admission but could happen if an integrator passes a versioned
+	// pod object rather than an internal object.
 	if !ok {
+		return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+	}
+
+	// if this is an update, see if we are only updating the ownerRef/finalizers.  Garbage collection does this
+	// and we should allow it in general, since you had the power to update and the power to delete.
+	// The worst that happens is that you delete something, but you aren't controlling the privileged object itself
+	if a.GetOperation() == admission.Update && rbacregistry.IsOnlyMutatingGCFields(a.GetObject(), a.GetOldObject(), apiequality.Semantic) {
 		return nil
 	}
 
@@ -142,32 +152,70 @@ func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 		return nil
 	}
 
+	// sort by name to make order deterministic
+	// TODO(liggitt): add priority field to allow admins to bucket differently
+	sort.SliceStable(matchedPolicies, func(i, j int) bool {
+		return strings.Compare(matchedPolicies[i].Name, matchedPolicies[j].Name) < 0
+	})
+
 	providers, errs := c.createProvidersFromPolicies(matchedPolicies, pod.Namespace)
-	logProviders(pod, providers, errs)
+	logProviders(a, pod, providers, errs)
 
 	if len(providers) == 0 {
 		return admission.NewForbidden(a, fmt.Errorf("no providers available to validate pod request"))
 	}
 
+	// TODO(liggitt): allow spec mutation during initializing updates?
+	specMutationAllowed := a.GetOperation() == admission.Create
+
 	// all containers in a single pod must validate under a single provider or we will reject the request
 	validationErrs := field.ErrorList{}
+	var (
+		allowedPod       *api.Pod
+		allowingProvider psp.Provider
+	)
+
+loop:
 	for _, provider := range providers {
-		if errs := assignSecurityContext(provider, pod, field.NewPath(fmt.Sprintf("provider %s: ", provider.GetPSPName()))); len(errs) > 0 {
+		podCopy := pod.DeepCopy()
+
+		if errs := assignSecurityContext(provider, podCopy, field.NewPath(fmt.Sprintf("provider %s: ", provider.GetPSPName()))); len(errs) > 0 {
 			validationErrs = append(validationErrs, errs...)
 			continue
 		}
 
-		// the entire pod validated, annotate and accept the pod
-		glog.V(4).Infof("pod %s (generate: %s) validated against provider %s", pod.Name, pod.GenerateName, provider.GetPSPName())
+		// the entire pod validated
+
+		switch {
+		case apiequality.Semantic.DeepEqual(pod, podCopy):
+			// if it validated without mutating anything, use this result
+			allowedPod = podCopy
+			allowingProvider = provider
+			break loop
+		case specMutationAllowed && allowedPod == nil:
+			// if mutation is allowed and this is the first PSP to allow the pod, remember it,
+			// but continue to see if another PSP allows without mutating
+			allowedPod = podCopy
+			allowingProvider = provider
+			glog.V(6).Infof("pod %s (generate: %s) in namespace %s validated against provider %s with mutation", pod.Name, pod.GenerateName, a.GetNamespace(), provider.GetPSPName())
+		case !specMutationAllowed:
+			glog.V(6).Infof("pod %s (generate: %s) in namespace %s validated against provider %s, but required mutation, skipping", pod.Name, pod.GenerateName, a.GetNamespace(), provider.GetPSPName())
+		}
+	}
+
+	if allowedPod != nil {
+		*pod = *allowedPod
+		// annotate and accept the pod
+		glog.V(4).Infof("pod %s (generate: %s) in namespace %s validated against provider %s", pod.Name, pod.GenerateName, a.GetNamespace(), allowingProvider.GetPSPName())
 		if pod.ObjectMeta.Annotations == nil {
 			pod.ObjectMeta.Annotations = map[string]string{}
 		}
-		pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation] = provider.GetPSPName()
+		pod.ObjectMeta.Annotations[psputil.ValidatedPSPAnnotation] = allowingProvider.GetPSPName()
 		return nil
 	}
 
 	// we didn't validate against any provider, reject the pod and give the errors for each attempt
-	glog.V(4).Infof("unable to validate pod %s (generate: %s) against any pod security policy: %v", pod.Name, pod.GenerateName, validationErrs)
+	glog.V(4).Infof("unable to validate pod %s (generate: %s) in namespace %s against any pod security policy: %v", pod.Name, pod.GenerateName, a.GetNamespace(), validationErrs)
 	return admission.NewForbidden(a, fmt.Errorf("unable to validate against any pod security policy: %v", validationErrs))
 }
 
@@ -175,81 +223,42 @@ func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 // and validates that the sc falls within the psp constraints.  All containers must validate against
 // the same psp or is not considered valid.
 func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.Path) field.ErrorList {
-	generatedSCs := make([]*api.SecurityContext, len(pod.Spec.Containers))
-	var generatedInitSCs []*api.SecurityContext
-
 	errs := field.ErrorList{}
 
 	psc, pscAnnotations, err := provider.CreatePodSecurityContext(pod)
 	if err != nil {
 		errs = append(errs, field.Invalid(field.NewPath("spec", "securityContext"), pod.Spec.SecurityContext, err.Error()))
 	}
-
-	// save the original PSC and validate the generated PSC.  Leave the generated PSC
-	// set for container generation/validation.  We will reset to original post container
-	// validation.
-	originalPSC := pod.Spec.SecurityContext
 	pod.Spec.SecurityContext = psc
-	originalAnnotations := maps.CopySS(pod.Annotations)
 	pod.Annotations = pscAnnotations
+
 	errs = append(errs, provider.ValidatePodSecurityContext(pod, field.NewPath("spec", "securityContext"))...)
 
-	// Note: this is not changing the original container, we will set container SCs later so long
-	// as all containers validated under the same PSP.
-	for i, containerCopy := range pod.Spec.InitContainers {
-		// We will determine the effective security context for the container and validate against that
-		// since that is how the sc provider will eventually apply settings in the runtime.
-		// This results in an SC that is based on the Pod's PSC with the set fields from the container
-		// overriding pod level settings.
-		containerCopy.SecurityContext = sc.InternalDetermineEffectiveSecurityContext(pod, &containerCopy)
-
-		sc, scAnnotations, err := provider.CreateContainerSecurityContext(pod, &containerCopy)
+	for i := range pod.Spec.InitContainers {
+		sc, scAnnotations, err := provider.CreateContainerSecurityContext(pod, &pod.Spec.InitContainers[i])
 		if err != nil {
 			errs = append(errs, field.Invalid(field.NewPath("spec", "initContainers").Index(i).Child("securityContext"), "", err.Error()))
 			continue
 		}
-		generatedInitSCs = append(generatedInitSCs, sc)
-
-		containerCopy.SecurityContext = sc
+		pod.Spec.InitContainers[i].SecurityContext = sc
 		pod.Annotations = scAnnotations
-		errs = append(errs, provider.ValidateContainerSecurityContext(pod, &containerCopy, field.NewPath("spec", "initContainers").Index(i).Child("securityContext"))...)
+		errs = append(errs, provider.ValidateContainerSecurityContext(pod, &pod.Spec.InitContainers[i], field.NewPath("spec", "initContainers").Index(i).Child("securityContext"))...)
 	}
 
-	// Note: this is not changing the original container, we will set container SCs later so long
-	// as all containers validated under the same PSP.
-	for i, containerCopy := range pod.Spec.Containers {
-		// We will determine the effective security context for the container and validate against that
-		// since that is how the sc provider will eventually apply settings in the runtime.
-		// This results in an SC that is based on the Pod's PSC with the set fields from the container
-		// overriding pod level settings.
-		containerCopy.SecurityContext = sc.InternalDetermineEffectiveSecurityContext(pod, &containerCopy)
-
-		sc, scAnnotations, err := provider.CreateContainerSecurityContext(pod, &containerCopy)
+	for i := range pod.Spec.Containers {
+		sc, scAnnotations, err := provider.CreateContainerSecurityContext(pod, &pod.Spec.Containers[i])
 		if err != nil {
 			errs = append(errs, field.Invalid(field.NewPath("spec", "containers").Index(i).Child("securityContext"), "", err.Error()))
 			continue
 		}
-		generatedSCs[i] = sc
 
-		containerCopy.SecurityContext = sc
+		pod.Spec.Containers[i].SecurityContext = sc
 		pod.Annotations = scAnnotations
-		errs = append(errs, provider.ValidateContainerSecurityContext(pod, &containerCopy, field.NewPath("spec", "containers").Index(i).Child("securityContext"))...)
+		errs = append(errs, provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[i], field.NewPath("spec", "containers").Index(i).Child("securityContext"))...)
 	}
 
 	if len(errs) > 0 {
-		// ensure psc is not mutated if there are errors
-		pod.Spec.SecurityContext = originalPSC
-		pod.Annotations = originalAnnotations
 		return errs
-	}
-
-	// if we've reached this code then we've generated and validated an SC for every container in the
-	// pod so let's apply what we generated.  Note: the psc is already applied.
-	for i, sc := range generatedInitSCs {
-		pod.Spec.InitContainers[i].SecurityContext = sc
-	}
-	for i, sc := range generatedSCs {
-		pod.Spec.Containers[i].SecurityContext = sc
 	}
 	return nil
 }
@@ -327,13 +336,13 @@ func buildAttributes(info user.Info, namespace string, policy *extensions.PodSec
 
 // logProviders logs what providers were found for the pod as well as any errors that were encountered
 // while creating providers.
-func logProviders(pod *api.Pod, providers []psp.Provider, providerCreationErrs []error) {
+func logProviders(a admission.Attributes, pod *api.Pod, providers []psp.Provider, providerCreationErrs []error) {
 	for _, err := range providerCreationErrs {
 		glog.V(4).Infof("provider creation error: %v", err)
 	}
 
 	if len(providers) == 0 {
-		glog.V(4).Infof("unable to validate pod %s (generate: %s) against any provider.", pod.Name, pod.GenerateName)
+		glog.V(4).Infof("unable to validate pod %s (generate: %s) in namespace %s against any provider.", pod.Name, pod.GenerateName, a.GetNamespace())
 		return
 	}
 
@@ -341,5 +350,5 @@ func logProviders(pod *api.Pod, providers []psp.Provider, providerCreationErrs [
 	for i, p := range providers {
 		names[i] = p.GetPSPName()
 	}
-	glog.V(4).Infof("validating pod %s (generate: %s) against providers: %s", pod.Name, pod.GenerateName, strings.Join(names, ","))
+	glog.V(4).Infof("validating pod %s (generate: %s) in namespace %s against providers: %s", pod.Name, pod.GenerateName, a.GetNamespace(), strings.Join(names, ","))
 }
