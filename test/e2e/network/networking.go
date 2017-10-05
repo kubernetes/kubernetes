@@ -45,7 +45,7 @@ var _ = SIGDescribe("Networking", func() {
 		}
 	})
 
-	It("should provide Internet connection for containers [Conformance]", func() {
+	It("should provide Internet connection for containers", func() {
 		By("Running container which tries to ping 8.8.8.8")
 		framework.ExpectNoError(
 			framework.CheckConnectivityToHost(f, "", "ping-test", "8.8.8.8", 30))
