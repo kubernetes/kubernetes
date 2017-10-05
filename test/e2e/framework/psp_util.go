@@ -22,9 +22,14 @@ import (
 
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	. "github.com/onsi/ginkgo"
 )
 
-const PodSecurityPolicyPrivileged = "podsecuritypolicy:privileged"
+const (
+	PodSecurityPolicyPrivileged     = "privileged"
+	PodSecurityPolicyPrivilegedRole = "podsecuritypolicy:privileged"
+)
 
 var (
 	isPSPEnabledOnce sync.Once
