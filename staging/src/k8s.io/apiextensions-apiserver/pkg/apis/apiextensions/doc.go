@@ -18,4 +18,4 @@ limitations under the License.
 
 // Package apiextensions is the internal version of the API.
 // +groupName=apiextensions.k8s.io
-package apiextensions // import "k8s.io/apiextension-server/pkg/apis/apiextensions"
+package apiextensions // import "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
