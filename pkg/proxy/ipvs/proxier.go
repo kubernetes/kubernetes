@@ -1157,7 +1157,8 @@ func (proxier *Proxier) syncProxyRules() {
 					continue
 				}
 				if lp.Protocol == "udp" {
-					utilproxy.ClearUDPConntrackForPort(proxier.exec, lp.Port)
+					isIPv6 := svcInfo.clusterIP.To4() != nil
+					utilproxy.ClearUDPConntrackForPort(proxier.exec, lp.Port, isIPv6)
 				}
 				replacementPortsMap[lp] = socket
 			} // We're holding the port, so it's OK to install ipvs rules.

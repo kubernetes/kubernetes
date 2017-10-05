@@ -243,7 +243,7 @@ func NewNodeController(
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "controllermanager"})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "node-controller"})
 	eventBroadcaster.StartLogging(glog.Infof)
 
 	glog.V(0).Infof("Sending events to api server.")

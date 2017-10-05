@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/hash"
 )
 
@@ -169,7 +170,7 @@ func (s ConfigMapGeneratorV1) validate() error {
 // information into the provided configMap.
 func handleConfigMapFromLiteralSources(configMap *api.ConfigMap, literalSources []string) error {
 	for _, literalSource := range literalSources {
-		keyName, value, err := parseLiteralSource(literalSource)
+		keyName, value, err := util.ParseLiteralSource(literalSource)
 		if err != nil {
 			return err
 		}
@@ -185,7 +186,7 @@ func handleConfigMapFromLiteralSources(configMap *api.ConfigMap, literalSources 
 // into the provided configMap
 func handleConfigMapFromFileSources(configMap *api.ConfigMap, fileSources []string) error {
 	for _, fileSource := range fileSources {
-		keyName, filePath, err := parseFileSource(fileSource)
+		keyName, filePath, err := util.ParseFileSource(fileSource)
 		if err != nil {
 			return err
 		}

@@ -18,58 +18,15 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-SCRIPT_PACKAGE=k8s.io/code-generator
-SCRIPT_ROOT=$(dirname "${BASH_SOURCE}")/..
-SCRIPT_BASE=${SCRIPT_ROOT}/../..
-CODEGEN_PKG=${CODEGEN_PKG:-$(ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo "k8s.io/code-generator")}
-
-clientgen="${PWD}/client-gen-binary"
-listergen="${PWD}/lister-gen"
-informergen="${PWD}/informer-gen"
-# Register function to be called on EXIT to remove generated binary.
-function cleanup {
-  rm -f "${clientgen:-}"
-  rm -f "${listergen:-}"
-  rm -f "${informergen:-}"
-}
-trap cleanup EXIT
-
-function generate_group() {
-  local GROUP_NAME=$1
-  local VERSION=$2
-  local CLIENT_PKG=${SCRIPT_PACKAGE}/_test/clientset
-  local LISTERS_PKG=${SCRIPT_PACKAGE}/_test/listers
-  local INFORMERS_PKG=${SCRIPT_PACKAGE}/_test/informers
-  local APIS_PKG=${SCRIPT_PACKAGE}/_test/apis
-  local INPUT_APIS=(
-    ${GROUP_NAME}/
-    ${GROUP_NAME}/${VERSION}
-  )
-
-  echo "Building client-gen"
-  go build -o "${clientgen}" ${CODEGEN_PKG}/cmd/client-gen
-
-  echo "generating clientset for group ${GROUP_NAME} and version ${VERSION} at ${SCRIPT_BASE}/${CLIENT_PKG}"
-  ${clientgen} --clientset-name="internal" --input-base ${APIS_PKG} --input ${INPUT_APIS[@]} --clientset-path ${CLIENT_PKG} --output-base=${SCRIPT_BASE}
-  ${clientgen} --clientset-name="versioned" --input-base ${APIS_PKG} --input ${GROUP_NAME}/${VERSION} --clientset-path ${CLIENT_PKG} --output-base=${SCRIPT_BASE}
-
-  echo "Building lister-gen"
-  go build -o "${listergen}" ${CODEGEN_PKG}/cmd/lister-gen
-
-  echo "generating listers for group ${GROUP_NAME} and version ${VERSION} at ${SCRIPT_BASE}/${LISTERS_PKG}"
-  ${listergen} --input-dirs ${APIS_PKG}/${GROUP_NAME} --input-dirs ${APIS_PKG}/${GROUP_NAME}/${VERSION} --output-package ${LISTERS_PKG} --output-base ${SCRIPT_BASE}
-
-  echo "Building informer-gen"
-  go build -o "${informergen}" ${CODEGEN_PKG}/cmd/informer-gen
-
-  echo "generating informers for group ${GROUP_NAME} and version ${VERSION} at ${SCRIPT_BASE}/${INFORMERS_PKG}"
-  ${informergen} \
-    --input-dirs ${APIS_PKG}/${GROUP_NAME} --input-dirs ${APIS_PKG}/${GROUP_NAME}/${VERSION} \
-    --versioned-clientset-package ${CLIENT_PKG}/versioned \
-    --internal-clientset-package ${CLIENT_PKG}/internal \
-    --listers-package ${LISTERS_PKG} \
-    --output-package ${INFORMERS_PKG} \
-    --output-base ${SCRIPT_BASE}
-}
-
-generate_group testgroup v1
+# generate the code with:
+# - --output-base because this script should also be able to run inside the vendor dir of
+#   k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
+#   instead of the $GOPATH directly. For normal projects this can be dropped.
+$(dirname ${BASH_SOURCE})/../generate-internal-groups.sh all \
+  k8s.io/code-generator/_examples/apiserver k8s.io/code-generator/_examples/apiserver/apis k8s.io/code-generator/_examples/apiserver/apis \
+  example:v1 \
+  --output-base "$(dirname ${BASH_SOURCE})/../../.."
+$(dirname ${BASH_SOURCE})/../generate-groups.sh all \
+  k8s.io/code-generator/_examples/crd k8s.io/code-generator/_examples/crd/apis \
+  example:v1 \
+  --output-base "$(dirname ${BASH_SOURCE})/../../.."

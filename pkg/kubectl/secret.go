@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/hash"
 )
 
@@ -173,7 +174,7 @@ func (s SecretGeneratorV1) validate() error {
 // handleFromLiteralSources adds the specified literal source information into the provided secret
 func handleFromLiteralSources(secret *api.Secret, literalSources []string) error {
 	for _, literalSource := range literalSources {
-		keyName, value, err := parseLiteralSource(literalSource)
+		keyName, value, err := util.ParseLiteralSource(literalSource)
 		if err != nil {
 			return err
 		}
@@ -187,7 +188,7 @@ func handleFromLiteralSources(secret *api.Secret, literalSources []string) error
 // handleFromFileSources adds the specified file source information into the provided secret
 func handleFromFileSources(secret *api.Secret, fileSources []string) error {
 	for _, fileSource := range fileSources {
-		keyName, filePath, err := parseFileSource(fileSource)
+		keyName, filePath, err := util.ParseFileSource(fileSource)
 		if err != nil {
 			return err
 		}

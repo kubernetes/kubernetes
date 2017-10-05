@@ -340,6 +340,8 @@ func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefiniti
 		selfLinkPrefix = "/" + path.Join("apis", crd.Spec.Group, crd.Spec.Version, "namespaces") + "/"
 	}
 
+	clusterScoped := crd.Spec.Scope == apiextensions.ClusterScoped
+
 	requestScope := handlers.RequestScope{
 		Namer: handlers.ContextBasedNaming{
 			GetContext: func(req *http.Request) apirequest.Context {
@@ -347,7 +349,7 @@ func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefiniti
 				return ret
 			},
 			SelfLinker:         meta.NewAccessor(),
-			ClusterScoped:      crd.Spec.Scope == apiextensions.ClusterScoped,
+			ClusterScoped:      clusterScoped,
 			SelfLinkPathPrefix: selfLinkPrefix,
 		},
 		ContextFunc: func(req *http.Request) apirequest.Context {
@@ -358,8 +360,11 @@ func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefiniti
 		Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator},
 		ParameterCodec: parameterCodec,
 
-		Creater:         creator,
-		Convertor:       unstructured.UnstructuredObjectConverter{},
+		Creater: creator,
+		Convertor: crdObjectConverter{
+			UnstructuredObjectConverter: unstructured.UnstructuredObjectConverter{},
+			clusterScoped:               clusterScoped,
+		},
 		Defaulter:       unstructuredDefaulter{parameterScheme},
 		Copier:          UnstructuredCopier{},
 		Typer:           typer,
@@ -388,6 +393,24 @@ func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefiniti
 	storageMap2[crd.UID] = ret
 	r.customStorage.Store(storageMap2)
 	return ret, nil
+}
+
+// crdObjectConverter is a converter that supports field selectors for CRDs.
+type crdObjectConverter struct {
+	unstructured.UnstructuredObjectConverter
+	clusterScoped bool
+}
+
+func (c crdObjectConverter) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
+	// We currently only support metadata.namespace and metadata.name.
+	switch {
+	case label == "metadata.name":
+		return label, value, nil
+	case !c.clusterScoped && label == "metadata.namespace":
+		return label, value, nil
+	default:
+		return "", "", fmt.Errorf("field label not supported: %s", label)
+	}
 }
 
 func (c *crdHandler) updateCustomResourceDefinition(oldObj, _ interface{}) {
