@@ -51,8 +51,8 @@
       - [Scheduling](#scheduling-1)
       - [Storage](#storage)
     - [Cluster Federation](#cluster-federation)
-      - [[alpha] Federated Jobs](#[alpha]-federated-jobs)
-      - [[alpha] Federated Horizontal Pod Autoscaling (HPA)](#[alpha]-federated-horizontal-pod-autoscaling-hpa)
+      - [[alpha] Federated Jobs](#alpha-federated-jobs)
+      - [[alpha] Federated Horizontal Pod Autoscaling (HPA)](#alpha-federated-horizontal-pod-autoscaling-hpa)
     - [Node Components](#node-components)
       - [Autoscaling and Metrics](#autoscaling-and-metrics)
         - [Cluster Autoscaler](#cluster-autoscaler)
@@ -681,7 +681,7 @@ Consider the following changes, limitations, and guidelines before you upgrade:
 
 * The `rbac/v1alpha1`, `settings/v1alpha1`, and `scheduling/v1alpha1` APIs are disabled by default.
 
-* The `system:node` role is no longer automatically granted to the `system:nodes` group in new clusters. The role gives broad read access to resources, including secrets and configmaps. Use the `Node` authorization mode to authorize the nodes in new clusters. To continue providing the `system:node` role to the members of the `system:nodes` group, create an installation-specific `ClusterRoleBinding` in the installation. ([[#49638](https://github.com/kubernetes/kubernetes/pull/49638)](https://github.com/kubernetes/kubernetes/pull/49638))
+* The `system:node` role is no longer automatically granted to the `system:nodes` group in new clusters. The role gives broad read access to resources, including secrets and configmaps. Use the `Node` authorization mode to authorize the nodes in new clusters. To continue providing the `system:node` role to the members of the `system:nodes` group, create an installation-specific `ClusterRoleBinding` in the installation. ([#49638](https://github.com/kubernetes/kubernetes/pull/49638))
 
 ## Known Issues
 
@@ -697,11 +697,11 @@ For more information, see [#53356](https://issue.k8s.io/53356#issuecomment-33374
 
 * A performance issue was identified in large-scale clusters when deleting thousands of pods simultaneously across hundreds of nodes. Kubelets in this scenario can encounter temporarily increased latency of `delete pod` API calls -- above the target service level objective of 1 second. If you run clusters with this usage pattern and if pod deletion latency could be an issue for you, you might want to wait until the issue is resolved before you upgrade. 
 
-For more information and for updates on resolution of this issue, see [[#51899](https://github.com/kubernetes/kubernetes/pull/51899)](https://issue.k8s.io/51899).
+For more information and for updates on resolution of this issue, see [#51899](https://github.com/kubernetes/kubernetes/issues/51899).
 
 * Audit logs might impact the API server performance and the latency of large request and response calls. The issue is observed under the following conditions: if `AdvancedAuditing` feature gate is enabled, which is the default case, if audit logging uses the log backend in JSON format, or if the audit policy records large API calls for requests or responses.
 
-For more information, see [[#51899](https://github.com/kubernetes/kubernetes/pull/51899)](https://github.com/kubernetes/kubernetes/issues/51899).
+For more information, see [#51899](https://github.com/kubernetes/kubernetes/issues/51899).
 
 * Minikube version 0.22.2 or lower does not work with kubectl version 1.8 or higher. This issue is caused by the presence of an unregistered type in the minikube API server. New versions of kubectl force validate the OpenAPI schema, which is not registered with all known types in the minikube API server.
 
@@ -709,15 +709,15 @@ For more information, see [#1996](https://github.com/kubernetes/minikube/issues/
 
 * The `ENABLE_APISERVER_BASIC_AUDIT` configuration parameter for GCE deployments is broken, but deprecated.
 
-For more information, see [[#53154](https://github.com/kubernetes/kubernetes/pull/53154)](https://github.com/kubernetes/kubernetes/issues/53154).
+For more information, see [#53154](https://github.com/kubernetes/kubernetes/issues/53154).
 
 * `kubectl set` commands placed on ReplicaSet and DaemonSet occasionally return version errors. All set commands, including set image, set env, set resources, and set serviceaccounts, are affected.
 
-For more information, see [[#53040](https://github.com/kubernetes/kubernetes/pull/53040)](https://github.com/kubernetes/kubernetes/issues/53040).
+For more information, see [#53040](https://github.com/kubernetes/kubernetes/issues/53040).
 
 * Object quotas are not consistently charged or updated. Specifically, the object count quota does not reliably account for uninitialized objects. Some quotas are charged only when an object is initialized. Others are charged when an object is created, whether it is initialized or not. We plan to fix this issue in a future release.
 
-For more information, see [[#53109](https://github.com/kubernetes/kubernetes/pull/53109)](https://github.com/kubernetes/kubernetes/issues/53109).
+For more information, see [#53109](https://github.com/kubernetes/kubernetes/issues/53109).
 
 ## Deprecations
 
@@ -761,7 +761,7 @@ This section provides an overview of deprecated API versions, options, flags, an
 
   - Enable an out-of-tree cloud provider with `--cloud-provider=external` in either version.
 
-    For more information on deprecating auto-detecting cloud providers in kubelet, see [PR [#51312](https://github.com/kubernetes/kubernetes/pull/51312)](https://github.com/kubernetes/kubernetes/pull/51312) and [announcement](https://groups.google.com/forum/#!topic/kubernetes-dev/UAxwa2inbTA).
+    For more information on deprecating auto-detecting cloud providers in kubelet, see [PR [#51312](https://github.com/kubernetes/kubernetes/pull/51312) and [announcement](https://groups.google.com/forum/#!topic/kubernetes-dev/UAxwa2inbTA).
 
 - The `PersistentVolumeLabel` admission controller in the API server is deprecated.
 
@@ -774,7 +774,7 @@ This section provides an overview of deprecated API versions, options, flags, an
 ### OpenStack
 
 - The `openstack-heat` provider for `kube-up` is deprecated and will be removed
-  in a future release. Refer to [Issue [#49213](https://github.com/kubernetes/kubernetes/pull/49213)](https://github.com/kubernetes/kubernetes/issues/49213)
+  in a future release. Refer to [Issue [#49213](https://github.com/kubernetes/kubernetes/issues/49213)
   for background information.
 
 ### Scheduling
@@ -858,18 +858,17 @@ kind.
 
 ### Workloads API (batch)
 
-- CronJob is now at `batch/v1beta1` ([[#41039](https://github.com/kubernetes/kubernetes/pull/41039)](https://github.com/kubernetes/kubernetes/issues/41039), [[@soltysh](https://github.com/soltysh)](https://github.com/soltysh)).
+- CronJob is now at `batch/v1beta1` ([#41039](https://github.com/kubernetes/kubernetes/issues/41039), [@soltysh](https://github.com/soltysh)).
 
 - `batch/v2alpha.CronJob` is deprecated in favor of `batch/v1beta` and will be removed in a future release.
 
-- Job can now set a failure policy using `.spec.backoffLimit`. The default value for this new field is 6. ([[#30243](https://github.com/kubernetes/kubernetes/pull/30243)](https://github.com/kubernetes/kubernetes/issues/30243), [[@clamoriniere1A](https://github.com/clamoriniere1A)](https://github.com/clamoriniere1A)).
+- Job can now set a failure policy using `.spec.backoffLimit`. The default value for this new field is 6. ([#30243](https://github.com/kubernetes/kubernetes/issues/30243), [@clamoriniere1A](https://github.com/clamoriniere1A)).
 
 - `batch/v2alpha1.ScheduledJob` is removed.
 
-- The Job controller now creates pods in batches instead of all at once. ([[#49142](https://github.com/kubernetes/kubernetes/pull/49142)](https://github.com/kubernetes/kubernetes/pull/49142), [[@joelsmith](https://github.com/joelsmith)](https://github.com/joelsmith)).
+- The Job controller now creates pods in batches instead of all at once. ([#49142](https://github.com/kubernetes/kubernetes/pull/49142), [@joelsmith](https://github.com/joelsmith)).
 
-- Short `.spec.ActiveDeadlineSeconds` is properly applied to a Job. ([[#48545](https://github.com/kubernetes/kubernetes/pull/48545)]
-(https://github.com/kubernetes/kubernetes/pull/48454), [[@weiwei4](https://github.com/weiwei4)](https://github.com/weiwei04)).
+- Short `.spec.ActiveDeadlineSeconds` is properly applied to a Job. ([#48545](https://github.com/kubernetes/kubernetes/pull/48454), [@weiwei4](https://github.com/weiwei04)).
 
 
 #### CLI Changes
@@ -1044,7 +1043,7 @@ to the autoscalers in other clusters if required.
 
 #### Container Runtime Interface (CRI)
 
-* [alpha] Add a CRI validation test suite and CRI command-line tools. ([#292](https://github.com/kubernetes/features/issues/292), [[@feiskyer](https://github.com/feiskyer)](https://github.com/feiskyer))
+* [alpha] Add a CRI validation test suite and CRI command-line tools. ([#292](https://github.com/kubernetes/features/issues/292), [@feiskyer](https://github.com/feiskyer))
 
 * [stable] [cri-o](https://github.com/kubernetes-incubator/cri-o): CRI implementation for OCI-based runtimes [[@mrunalp](https://github.com/mrunalp)]
 
@@ -1068,11 +1067,11 @@ to the autoscalers in other clusters if required.
 
 #### kubelet
 
-* [alpha] Kubelet now supports alternative container-level CPU affinity policies by using the new CPU manager. ([#375](https://github.com/kubernetes/features/issues/375), [[@sjenning](https://github.com/sjenning)](https://github.com/sjenning), [[@ConnorDoyle](https://github.com/ConnorDoyle)](https://github.com/ConnorDoyle))
+* [alpha] Kubelet now supports alternative container-level CPU affinity policies by using the new CPU manager. ([#375](https://github.com/kubernetes/features/issues/375), [@sjenning](https://github.com/sjenning), [@ConnorDoyle](https://github.com/ConnorDoyle))
 
-* [alpha] Applications may now request pre-allocated hugepages by using the new `hugepages` resource in the container resource requests. ([#275](https://github.com/kubernetes/features/issues/275), [[@derekwaynecarr](https://github.com/derekwaynecarr)](https://github.com/derekwaynecarr))
+* [alpha] Applications may now request pre-allocated hugepages by using the new `hugepages` resource in the container resource requests. ([#275](https://github.com/kubernetes/features/issues/275), [@derekwaynecarr](https://github.com/derekwaynecarr))
 
-* [alpha] Add support for dynamic Kubelet configuration. ([#281](https://github.com/kubernetes/features/issues/281), [[@mtaufen](https://github.com/mtaufen)](https://github.com/mtaufen))
+* [alpha] Add support for dynamic Kubelet configuration. ([#281](https://github.com/kubernetes/features/issues/281), [@mtaufen](https://github.com/mtaufen))
 
 * [alpha] Add the Hardware Device Plugins API. ([#368](https://github.com/kubernetes/features/issues/368), [[@jiayingz](https://github.com/jiayingz)], [[@RenaudWasTaken](https://github.com/RenaudWasTaken)])
 
@@ -1105,103 +1104,103 @@ to the autoscalers in other clusters if required.
 
 * [alpha] Building on the 1.7 work to allow encryption of resources such as secrets, a mechanism to store resource encryption keys in external Key Management Systems (KMS) was introduced. This complements the original file-based storage and allows integration with multiple KMS. A Google Cloud KMS plugin was added and will be usable once the Google side of the integration is complete.
 
-* Websocket requests may now authenticate to the API server by passing a bearer token in a websocket subprotocol of the form `base64url.bearer.authorization.k8s.io.<base64url-encoded-bearer-token>`. ([[#47740](https://github.com/kubernetes/kubernetes/pull/47740)](https://github.com/kubernetes/kubernetes/pull/47740) [[@liggitt](https://github.com/liggitt)](https://github.com/liggitt))
+* Websocket requests may now authenticate to the API server by passing a bearer token in a websocket subprotocol of the form `base64url.bearer.authorization.k8s.io.<base64url-encoded-bearer-token>`. ([#47740](https://github.com/kubernetes/kubernetes/pull/47740), [@liggitt](https://github.com/liggitt))
 
-* Advanced audit now correctly reports impersonated user info. ([[#48184](https://github.com/kubernetes/kubernetes/pull/48184)], [[@CaoShuFeng](https://github.com/CaoShuFeng)](https://github.com/CaoShuFeng))
+* Advanced audit now correctly reports impersonated user info. ([#48184](https://github.com/kubernetes/kubernetes/pull/48184), [@CaoShuFeng](https://github.com/CaoShuFeng))
 
-* Advanced audit policy now supports matching subresources and resource names, but the top level resource no longer matches the subresouce. For example "pods" no longer matches requests to the logs subresource of pods. Use "pods/logs" to match subresources. ([[#48836](https://github.com/kubernetes/kubernetes/pull/48836)](https://github.com/kubernetes/kubernetes/pull/48836), [[@ericchiang](https://github.com/ericchiang)](https://github.com/ericchiang))
+* Advanced audit policy now supports matching subresources and resource names, but the top level resource no longer matches the subresouce. For example "pods" no longer matches requests to the logs subresource of pods. Use "pods/logs" to match subresources. ([#48836](https://github.com/kubernetes/kubernetes/pull/48836), [@ericchiang](https://github.com/ericchiang))
 
-* Previously a deleted service account or bootstrapping token secret would be considered valid until it was reaped. It is now invalid as soon as the `deletionTimestamp` is set. ([[#48343](https://github.com/kubernetes/kubernetes/pull/48343)](https://github.com/kubernetes/kubernetes/pull/48343), [[@deads2k](https://github.com/deads2k)](https://github.com/deads2k); [[#49057](https://github.com/kubernetes/kubernetes/pull/49057)](https://github.com/kubernetes/kubernetes/pull/49057), [[@ericchiang](https://github.com/ericchiang)](https://github.com/ericchiang))
+* Previously a deleted service account or bootstrapping token secret would be considered valid until it was reaped. It is now invalid as soon as the `deletionTimestamp` is set. ([#48343](https://github.com/kubernetes/kubernetes/pull/48343), [@deads2k](https://github.com/deads2k); [#49057](https://github.com/kubernetes/kubernetes/pull/49057), [@ericchiang](https://github.com/ericchiang))
 
-* The `--insecure-allow-any-token` flag has been removed from the API server. Users of the flag should use impersonation headers instead for debugging. ([[#49045](https://github.com/kubernetes/kubernetes/pull/49045)](https://github.com/kubernetes/kubernetes/pull/49045), [[@ericchiang](https://github.com/ericchiang)](https://github.com/ericchiang))
+* The `--insecure-allow-any-token` flag has been removed from the API server. Users of the flag should use impersonation headers instead for debugging. ([#49045](https://github.com/kubernetes/kubernetes/pull/49045), [@ericchiang](https://github.com/ericchiang))
 
-* The NodeRestriction admission plugin now allows a node to evict pods bound to itself. ([[#48707](https://github.com/kubernetes/kubernetes/pull/48707)](https://github.com/kubernetes/kubernetes/pull/48707), [[@danielfm](https://github.com/danielfm)](https://github.com/danielfm))
+* The NodeRestriction admission plugin now allows a node to evict pods bound to itself. ([#48707](https://github.com/kubernetes/kubernetes/pull/48707), [@danielfm](https://github.com/danielfm))
 
-* The OwnerReferencesPermissionEnforcement admission plugin now requires `update` permission on the `finalizers` subresource of the referenced owner in order to set `blockOwnerDeletion` on an owner reference. ([[#49133](https://github.com/kubernetes/kubernetes/pull/49133)](https://github.com/kubernetes/kubernetes/pull/49133), [[@deads2k](https://github.com/deads2k)](https://github.com/deads2k))
+* The OwnerReferencesPermissionEnforcement admission plugin now requires `update` permission on the `finalizers` subresource of the referenced owner in order to set `blockOwnerDeletion` on an owner reference. ([#49133](https://github.com/kubernetes/kubernetes/pull/49133), [@deads2k](https://github.com/deads2k))
 
-* The SubjectAccessReview API in the `authorization.k8s.io` API group now allows providing the user uid. ([[#49677](https://github.com/kubernetes/kubernetes/pull/49677)](https://github.com/kubernetes/kubernetes/pull/49677), [[@dims](https://github.com/dims)](https://github.com/dims))
+* The SubjectAccessReview API in the `authorization.k8s.io` API group now allows providing the user uid. ([#49677](https://github.com/kubernetes/kubernetes/pull/49677), [@dims](https://github.com/dims))
 
-* After a kubelet rotates its client cert, it now closes its connections to the API server to force a handshake using the new cert. Previously, the kubelet could keep its existing connection open, even if the cert used for that connection was expired and rejected by the API server. ([[#49899](https://github.com/kubernetes/kubernetes/pull/49899)](https://github.com/kubernetes/kubernetes/pull/49899), [[@ericchiang](https://github.com/ericchiang)](https://github.com/ericchiang))
+* After a kubelet rotates its client cert, it now closes its connections to the API server to force a handshake using the new cert. Previously, the kubelet could keep its existing connection open, even if the cert used for that connection was expired and rejected by the API server. ([#49899](https://github.com/kubernetes/kubernetes/pull/49899), [@ericchiang](https://github.com/ericchiang))
 
-* PodSecurityPolicies can now specify a whitelist of allowed paths for host volumes. ([[#50212](https://github.com/kubernetes/kubernetes/pull/50212)](https://github.com/kubernetes/kubernetes/pull/50212), [[@jhorwit2](https://github.com/jhorwit2)](https://github.com/jhorwit2))
+* PodSecurityPolicies can now specify a whitelist of allowed paths for host volumes. ([#50212](https://github.com/kubernetes/kubernetes/pull/50212), [@jhorwit2](https://github.com/jhorwit2))
 
-* API server authentication now caches successful bearer token authentication results for a few seconds. ([[#50258](https://github.com/kubernetes/kubernetes/pull/50258)](https://github.com/kubernetes/kubernetes/pull/50258), [[@liggitt](https://github.com/liggitt)](https://github.com/liggitt))
+* API server authentication now caches successful bearer token authentication results for a few seconds. ([#50258](https://github.com/kubernetes/kubernetes/pull/50258), [@liggitt](https://github.com/liggitt))
 
-* The OpenID Connect authenticator can now use a custom prefix, or omit the default prefix, for username and groups claims through the --oidc-username-prefix and --oidc-groups-prefix flags. For example, the authenticator can map a user with the username "jane" to "google:jane" by supplying the "google:" username prefix. ([[#50875](https://github.com/kubernetes/kubernetes/pull/50875)](https://github.com/kubernetes/kubernetes/pull/50875), [[@ericchiang](https://github.com/ericchiang)](https://github.com/ericchiang))
+* The OpenID Connect authenticator can now use a custom prefix, or omit the default prefix, for username and groups claims through the --oidc-username-prefix and --oidc-groups-prefix flags. For example, the authenticator can map a user with the username "jane" to "google:jane" by supplying the "google:" username prefix. ([#50875](https://github.com/kubernetes/kubernetes/pull/50875), [@ericchiang](https://github.com/ericchiang))
 
-* The bootstrap token authenticator can now configure tokens with a set of extra groups in addition to `system:bootstrappers`. ([[#50933](https://github.com/kubernetes/kubernetes/pull/50933)](https://github.com/kubernetes/kubernetes/pull/50933), [[@mattmoyer](https://github.com/mattmoyer)](https://github.com/mattmoyer))
+* The bootstrap token authenticator can now configure tokens with a set of extra groups in addition to `system:bootstrappers`. ([#50933](https://github.com/kubernetes/kubernetes/pull/50933), [@mattmoyer](https://github.com/mattmoyer))
 
 * Advanced audit allows logging failed login attempts.
- ([[#51119](https://github.com/kubernetes/kubernetes/pull/51119)](https://github.com/kubernetes/kubernetes/pull/51119), [[@soltysh](https://github.com/soltysh)](https://github.com/soltysh))
+ ([#51119](https://github.com/kubernetes/kubernetes/pull/51119), [@soltysh](https://github.com/soltysh))
 
-* A `kubectl auth reconcile` subcommand has been added for applying RBAC resources. When passed a file which contains RBAC roles, rolebindings, clusterroles, or clusterrolebindings, it will compute covers and add the missing rules. ([[#51636](https://github.com/kubernetes/kubernetes/pull/51636)](https://github.com/kubernetes/kubernetes/pull/51636), [[@deads2k](https://github.com/deads2k)](https://github.com/deads2k))
+* A `kubectl auth reconcile` subcommand has been added for applying RBAC resources. When passed a file which contains RBAC roles, rolebindings, clusterroles, or clusterrolebindings, it will compute covers and add the missing rules. ([#51636](https://github.com/kubernetes/kubernetes/pull/51636), [@deads2k](https://github.com/deads2k))
 
 ### Cluster Lifecycle
 
 #### kubeadm
 
-* [beta] A new `upgrade` subcommand allows you to automatically upgrade a self-hosted cluster created with kubeadm. ([#296](https://github.com/kubernetes/features/issues/296), [[@luxas](https://github.com/luxas)](https://github.com/luxas))
+* [beta] A new `upgrade` subcommand allows you to automatically upgrade a self-hosted cluster created with kubeadm. ([#296](https://github.com/kubernetes/features/issues/296), [@luxas](https://github.com/luxas))
 
-* [alpha] An experimental self-hosted cluster can now easily be created with `kubeadm init`. Enable the feature by setting the SelfHosting feature gate to true: `--feature-gates=SelfHosting=true` ([#296](https://github.com/kubernetes/features/issues/296), [[@luxas](https://github.com/luxas)](https://github.com/luxas))
+* [alpha] An experimental self-hosted cluster can now easily be created with `kubeadm init`. Enable the feature by setting the SelfHosting feature gate to true: `--feature-gates=SelfHosting=true` ([#296](https://github.com/kubernetes/features/issues/296), [@luxas](https://github.com/luxas))
    * **NOTE:** Self-hosting will be the default way to host the control plane in the next release, v1.9
 
-* [alpha] A new `phase` subcommand supports performing only subtasks of the full `kubeadm init` flow. Combined with fine-grained configuration, kubeadm is now more easily consumable by higher-level provisioning tools like kops or GKE. ([#356](https://github.com/kubernetes/features/issues/356), [[@luxas](https://github.com/luxas)](https://github.com/luxas))
+* [alpha] A new `phase` subcommand supports performing only subtasks of the full `kubeadm init` flow. Combined with fine-grained configuration, kubeadm is now more easily consumable by higher-level provisioning tools like kops or GKE. ([#356](https://github.com/kubernetes/features/issues/356), [@luxas](https://github.com/luxas))
    * **NOTE:** This command is currently staged under `kubeadm alpha phase` and will be graduated to top level in a future release.
 
 #### kops
 
-* [alpha] Added support for targeting bare metal (or non-cloudprovider) machines. ([#360](https://github.com/kubernetes/features/issues/360), [[@justinsb](https://github.com/justinsb)](https://github.com/justinsb)).
+* [alpha] Added support for targeting bare metal (or non-cloudprovider) machines. ([#360](https://github.com/kubernetes/features/issues/360), [@justinsb](https://github.com/justinsb)).
 
-* [alpha] kops now supports [running as a server](https://github.com/kubernetes/kops/blob/master/docs/api-server/README.md). ([#359](https://github.com/kubernetes/features/issues/359), [[@justinsb](https://github.com/justinsb)](https://github.com/justinsb)).
+* [alpha] kops now supports [running as a server](https://github.com/kubernetes/kops/blob/master/docs/api-server/README.md). ([#359](https://github.com/kubernetes/features/issues/359), [@justinsb](https://github.com/justinsb))
 
-* [beta] GCE support is promoted from alpha to beta. ([#358](https://github.com/kubernetes/features/issues/358), [[@justinsb](https://github.com/justinsb)](https://github.com/justinsb)).
+* [beta] GCE support is promoted from alpha to beta. ([#358](https://github.com/kubernetes/features/issues/358), [@justinsb](https://github.com/justinsb)).
 
 #### Cluster Discovery/Bootstrap
 
-* [beta] The authentication and verification mechanism called Bootstrap Tokens is improved. Use Bootstrap Tokens to easily add new node identities to a cluster. ([#130](https://github.com/kubernetes/features/issues/130), [[@luxas](https://github.com/luxas)](https://github.com/luxas), [[@jbeda](https://github.com/jbeda)](https://github.com/jbeda)).
+* [beta] The authentication and verification mechanism called Bootstrap Tokens is improved. Use Bootstrap Tokens to easily add new node identities to a cluster. ([#130](https://github.com/kubernetes/features/issues/130), [@luxas](https://github.com/luxas), [@jbeda](https://github.com/jbeda)).
 
 #### Multi-platform
 
-* [alpha] The Conformance e2e test suite now passes on the arm, arm64, and ppc64le platforms. ([#288](https://github.com/kubernetes/features/issues/288), [[@luxas](https://github.com/luxas)](https://github.com/luxas), [[@mkumatag](https://github.com/mkumatag)](https://github.com/mkumatag), [[@ixdy](https://github.com/ixdy)](https://github.com/ixdy))
+* [alpha] The Conformance e2e test suite now passes on the arm, arm64, and ppc64le platforms. ([#288](https://github.com/kubernetes/features/issues/288), [@luxas](https://github.com/luxas), [@mkumatag](https://github.com/mkumatag), [@ixdy](https://github.com/ixdy))
 
 #### Cloud Providers
 
-* [alpha] Support is improved for the pluggable, out-of-tree and out-of-core cloud providers. ([#88](https://github.com/kubernetes/features/issues/88), [[@wlan0](https://github.com/wlan0)](https://github.com/wlan0))
+* [alpha] Support is improved for the pluggable, out-of-tree and out-of-core cloud providers. ([#88](https://github.com/kubernetes/features/issues/88), [@wlan0](https://github.com/wlan0))
 
 ### Network
 
 #### network-policy
 
-* [beta] Apply NetworkPolicy based on CIDR ([[#50033](https://github.com/kubernetes/kubernetes/pull/50033)](https://github.com/kubernetes/kubernetes/pull/50033), [[@cmluciano](https://github.com/cmluciano)](https://github.com/cmluciano))
+* [beta] Apply NetworkPolicy based on CIDR ([#50033](https://github.com/kubernetes/kubernetes/pull/50033), [@cmluciano](https://github.com/cmluciano))
 
-* [beta] Support EgressRules in NetworkPolicy ([[#51351](https://github.com/kubernetes/kubernetes/pull/51351)](https://github.com/kubernetes/kubernetes/pull/51351), [[@cmluciano](https://github.com/cmluciano)](https://github.com/cmluciano))
+* [beta] Support EgressRules in NetworkPolicy ([#51351](https://github.com/kubernetes/kubernetes/pull/51351), [@cmluciano](https://github.com/cmluciano))
 
 #### kube-proxy ipvs mode
 
-[alpha] Support ipvs mode for kube-proxy([[#46580](https://github.com/kubernetes/kubernetes/pull/46580)](https://github.com/kubernetes/kubernetes/pull/46580), [[@haibinxie](https://github.com/haibinxie)](https://github.com/haibinxie))
+[alpha] Support ipvs mode for kube-proxy([#46580](https://github.com/kubernetes/kubernetes/pull/46580), [@haibinxie](https://github.com/haibinxie))
 
 ### API Machinery
 
 #### kube-apiserver
-* Fixed an issue with `APIService` auto-registration. This issue affected rolling restarts of HA API servers that added or removed API groups being served.([[#51921](https://github.com/kubernetes/kubernetes/pull/51921)](https://github.com/kubernetes/kubernetes/pull/51921))
+* Fixed an issue with `APIService` auto-registration. This issue affected rolling restarts of HA API servers that added or removed API groups being served.([#51921](https://github.com/kubernetes/kubernetes/pull/51921))
 
-* [Alpha] The Kubernetes API server now supports the ability to break large LIST calls into multiple smaller chunks. A client can specify a limit to the number of results to return. If more results exist, a token is returned that allows the client to continue the previous list call repeatedly until all results are retrieved.  The resulting list is identical to a list call that does not perform chunking, thanks to capabilities provided by etcd3.  This allows the server to use less memory and CPU when very large lists are returned. This feature is gated as APIListChunking and is not enabled by default. The 1.9 release will begin using this by default.([[#48921](https://github.com/kubernetes/kubernetes/pull/48921)](https://github.com/kubernetes/kubernetes/pull/48921))
+* [Alpha] The Kubernetes API server now supports the ability to break large LIST calls into multiple smaller chunks. A client can specify a limit to the number of results to return. If more results exist, a token is returned that allows the client to continue the previous list call repeatedly until all results are retrieved.  The resulting list is identical to a list call that does not perform chunking, thanks to capabilities provided by etcd3.  This allows the server to use less memory and CPU when very large lists are returned. This feature is gated as APIListChunking and is not enabled by default. The 1.9 release will begin using this by default.([#48921](https://github.com/kubernetes/kubernetes/pull/48921))
 
-* Pods that are marked for deletion and have exceeded their grace period, but are not yet deleted, no longer count toward the resource quota.([[#46542](https://github.com/kubernetes/kubernetes/pull/46542)](https://github.com/kubernetes/kubernetes/pull/46542))
+* Pods that are marked for deletion and have exceeded their grace period, but are not yet deleted, no longer count toward the resource quota.([#46542](https://github.com/kubernetes/kubernetes/pull/46542))
 
 
 #### Dynamic Admission Control
 
-* Pod spec is mutable when the pod is uninitialized. The API server requires the pod spec to be valid even if it's uninitialized. Updating the status field of uninitialized pods is invalid.([[#51733](https://github.com/kubernetes/kubernetes/pull/51733)](https://github.com/kubernetes/kubernetes/pull/51733))
+* Pod spec is mutable when the pod is uninitialized. The API server requires the pod spec to be valid even if it's uninitialized. Updating the status field of uninitialized pods is invalid.([#51733](https://github.com/kubernetes/kubernetes/pull/51733))
 
-* Use of the alpha initializers feature now requires enabling the `Initializers` feature gate. This feature gate is automatically enabled if the `Initializers` admission plugin is enabled.([[#51436](https://github.com/kubernetes/kubernetes/pull/51436)](https://github.com/kubernetes/kubernetes/pull/51436))
+* Use of the alpha initializers feature now requires enabling the `Initializers` feature gate. This feature gate is automatically enabled if the `Initializers` admission plugin is enabled.([#51436](https://github.com/kubernetes/kubernetes/pull/51436))
 
-* [Action required] The validation rule for metadata.initializers.pending[x].name is tightened. The initializer name must contain at least three segments, separated by dots. You can create objects with pending initializers and not rely on the API server to add pending initializers according to `initializerConfiguration`. If you do so, update the initializer name in the existing objects and the configuration files to comply with the new validation rule.([[#51283](https://github.com/kubernetes/kubernetes/pull/51283)](https://github.com/kubernetes/kubernetes/pull/51283))
+* [Action required] The validation rule for metadata.initializers.pending[x].name is tightened. The initializer name must contain at least three segments, separated by dots. You can create objects with pending initializers and not rely on the API server to add pending initializers according to `initializerConfiguration`. If you do so, update the initializer name in the existing objects and the configuration files to comply with the new validation rule.([#51283](https://github.com/kubernetes/kubernetes/pull/51283))
 
 * The webhook admission plugin now works even if the API server and the nodes are in two separate networks,for example, in GKE.
 The webhook admission plugin now lets the webhook author use the DNS name of the service as the CommonName when generating the server cert for the webhook.
 Action required:
-Regenerate the server cert for the admission webhooks. Previously, the CN value could be ignored while generating the server cert for the admission webhook. Now you must set it to the DNS name of the webhook service: `<service.Name>.<service.Namespace>.svc`.([[#50476](https://github.com/kubernetes/kubernetes/pull/50476)](https://github.com/kubernetes/kubernetes/pull/50476))
+Regenerate the server cert for the admission webhooks. Previously, the CN value could be ignored while generating the server cert for the admission webhook. Now you must set it to the DNS name of the webhook service: `<service.Name>.<service.Namespace>.svc`.([#50476](https://github.com/kubernetes/kubernetes/pull/50476))
 
 
 #### Custom Resource Definitions (CRDs)
@@ -1218,11 +1217,11 @@ Regenerate the server cert for the admission webhooks. Previously, the CN value 
 
 
 #### Monitoring/Prometheus
-* [action required] The WATCHLIST calls are now reported as WATCH verbs in prometheus for the apiserver_request_* series.  A new "scope" label is added to all apiserver_request_* values that is either 'cluster', 'resource', or 'namespace' depending on which level the query is performed at.([[#52237](https://github.com/kubernetes/kubernetes/pull/52237)](https://github.com/kubernetes/kubernetes/pull/52237))
+* [action required] The WATCHLIST calls are now reported as WATCH verbs in prometheus for the apiserver_request_* series.  A new "scope" label is added to all apiserver_request_* values that is either 'cluster', 'resource', or 'namespace' depending on which level the query is performed at.([#52237](https://github.com/kubernetes/kubernetes/pull/52237))
 
 
 #### Go Client
-* Add support for client-side spam filtering of events([[#47367](https://github.com/kubernetes/kubernetes/pull/47367)](https://github.com/kubernetes/kubernetes/pull/47367))
+* Add support for client-side spam filtering of events([#47367](https://github.com/kubernetes/kubernetes/pull/47367))
 
 
 ## External Dependencies
@@ -1241,7 +1240,7 @@ versions of Docker to use.
         - The default iptables FORWARD policy was changed from ACCEPT to
           DROP, which causes outbound container traffic to stop working by
           default. See
-          [[#40182](https://github.com/kubernetes/kubernetes/pull/40182)](https://github.com/kubernetes/kubernetes/issues/40182) for
+          [#40182](https://github.com/kubernetes/kubernetes/issues/40182) for
           the workaround.
 
         - The support for the v1 registries was removed.
@@ -1256,25 +1255,25 @@ versions of Docker to use.
           ([#207](https://github.com/kubernetes/community/pull/207#issuecomment-281870043))
 
         - Docker reports incorrect exit codes for containers.
-          ([[#41516](https://github.com/kubernetes/kubernetes/pull/41516)](https://github.com/kubernetes/kubernetes/issues/41516))
+          ([#41516](https://github.com/kubernetes/kubernetes/issues/41516))
 
 - Docker 1.11.2
 
     - **Known issues**
 
         - Kernel crash with Aufs storage driver on Debian Jessie
-          ([[#27885](https://github.com/kubernetes/kubernetes/pull/27885)](https://github.com/kubernetes/kubernetes/issues/27885)).
+          ([#27885](https://github.com/kubernetes/kubernetes/issues/27885)).
           The issue can be identified by using the node problem detector.
 
         - File descriptor leak on init/control.
           ([#275](https://github.com/containerd/containerd/issues/275))
 
         - Additional memory overhead per container.
-          ([[#21737](https://github.com/kubernetes/kubernetes/pull/21737)](https://github.com/kubernetes/kubernetes/pull/21737))
+          ([#21737](https://github.com/kubernetes/kubernetes/pull/21737))
 
         - Processes may be leaked when Docker is repeatedly terminated in a short
           time frame.
-          ([[#41450](https://github.com/kubernetes/kubernetes/pull/41450)](https://github.com/kubernetes/kubernetes/issues/41450))
+          ([#41450](https://github.com/kubernetes/kubernetes/issues/41450))
 - [v1.8.0-rc.1](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG.md#v180-rc1)
 - [v1.8.0-beta.1](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG.md#v180-beta1)
 - [v1.8.0-alpha.3](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG.md#v180-alpha3)
@@ -2655,7 +2654,7 @@ filename | sha256 hash
 * Updated comments for functions. ([#47242](https://github.com/kubernetes/kubernetes/pull/47242), [@k82cn](https://github.com/k82cn))
 * Fix setting juju worker labels during deployment ([#47178](https://github.com/kubernetes/kubernetes/pull/47178), [@ktsakalozos](https://github.com/ktsakalozos))
 * `kubefed init` correctly checks for RBAC API enablement. ([#48077](https://github.com/kubernetes/kubernetes/pull/48077), [@liggitt](https://github.com/liggitt))
-* The garbage collector now cascades deletion properly when deleting an object with propagationPolicy="background". This resolves issue [[#44046](https://github.com/kubernetes/kubernetes/pull/44046)](https://github.com/kubernetes/kubernetes/issues/44046), so that when a deployment is deleted with propagationPolicy="background", the garbage collector ensures dependent pods are deleted as well. ([#44058](https://github.com/kubernetes/kubernetes/pull/44058), [@caesarxuchao](https://github.com/caesarxuchao))
+* The garbage collector now cascades deletion properly when deleting an object with propagationPolicy="background". This resolves issue [#44046](https://github.com/kubernetes/kubernetes/issues/44046), so that when a deployment is deleted with propagationPolicy="background", the garbage collector ensures dependent pods are deleted as well. ([#44058](https://github.com/kubernetes/kubernetes/pull/44058), [@caesarxuchao](https://github.com/caesarxuchao))
 * Fix restart action on juju kubernetes-master ([#47170](https://github.com/kubernetes/kubernetes/pull/47170), [@ktsakalozos](https://github.com/ktsakalozos))
 * e2e: bump kubelet's resurce usage limit ([#47971](https://github.com/kubernetes/kubernetes/pull/47971), [@yujuhong](https://github.com/yujuhong))
 * Cluster Autoscaler 0.6 ([#48074](https://github.com/kubernetes/kubernetes/pull/48074), [@mwielgus](https://github.com/mwielgus))
@@ -3522,7 +3521,7 @@ Features for this release were tracked via the use of the [kubernetes/features](
 
   * Support iSCSI CHAP authentication ([#43396](https://github.com/kubernetes/kubernetes/pull/43396), [@rootfs](https://github.com/rootfs))
 
-  * Openstack cinder v1/v2/auto API support ([#40423](https://github.com/kubernetes/kubernetes/pull/40423), [@mkutsevol](https://github.com/mkutsevol)](https://github.com/kubernetes/kubernetes/pull/41498), [@mikebryant](https://github.com/mikebryant))
+  * Openstack cinder v1/v2/auto API support ([#40423](https://github.com/kubernetes/kubernetes/pull/40423), [@mkutsevol](https://github.com/mkutsevol))
 
   * Alpha feature: allows users to set storage limit to isolate EmptyDir volumes. It enforces the limit by evicting pods that exceed their storage limits ([#45686](https://github.com/kubernetes/kubernetes/pull/45686), [@jingxu97](https://github.com/jingxu97))
 
