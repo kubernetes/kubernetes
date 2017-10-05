@@ -81,7 +81,11 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 	go wait.Until(func() {
 		curr := clientCertificateManager.Current()
 		if exitIfExpired && curr != nil && time.Now().After(curr.Leaf.NotAfter) {
-			glog.Fatalf("The currently active client certificate has expired, exiting.")
+			if clientCertificateManager.ServerHealthy() {
+				glog.Fatalf("The currently active client certificate has expired and the server is responsive, exiting.")
+			} else {
+				glog.Errorf("The currently active client certificate has expired, but the server is not responsive. A restart may be necessary to retrieve new initial credentials.")
+			}
 		}
 		if curr == nil || lastCert == curr {
 			// Cert hasn't been rotated.

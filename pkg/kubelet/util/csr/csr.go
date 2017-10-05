@@ -69,7 +69,11 @@ func RequestNodeCertificate(client certificatesclient.CertificateSigningRequestI
 		certificates.UsageClientAuth,
 	}
 	name := digestedName(privateKeyData, subject, usages)
-	return RequestCertificate(client, csrData, name, usages, privateKey)
+	req, err := RequestCertificate(client, csrData, name, usages, privateKey)
+	if err != nil {
+		return nil, err
+	}
+	return WaitForCertificate(client, req, 3600*time.Second)
 }
 
 // RequestCertificate will either use an existing (if this process has run
@@ -78,7 +82,7 @@ func RequestNodeCertificate(client certificatesclient.CertificateSigningRequestI
 // status, once approved by API server, it will return the API server's issued
 // certificate (pem-encoded). If there is any errors, or the watch timeouts, it
 // will return an error.
-func RequestCertificate(client certificatesclient.CertificateSigningRequestInterface, csrData []byte, name string, usages []certificates.KeyUsage, privateKey interface{}) (certData []byte, err error) {
+func RequestCertificate(client certificatesclient.CertificateSigningRequestInterface, csrData []byte, name string, usages []certificates.KeyUsage, privateKey interface{}) (req *certificates.CertificateSigningRequest, err error) {
 	csr := &certificates.CertificateSigningRequest{
 		// Username, UID, Groups will be injected by API server.
 		TypeMeta: metav1.TypeMeta{Kind: "CertificateSigningRequest"},
@@ -94,27 +98,31 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 		csr.GenerateName = "csr-"
 	}
 
-	req, err := client.Create(csr)
+	req, err = client.Create(csr)
 	switch {
 	case err == nil:
 	case errors.IsAlreadyExists(err) && len(name) > 0:
 		glog.Infof("csr for this node already exists, reusing")
 		req, err = client.Get(name, metav1.GetOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("cannot retrieve certificate signing request: %v", err)
+			return nil, formatError("cannot retrieve certificate signing request: %v", err)
 		}
 		if err := ensureCompatible(req, csr, privateKey); err != nil {
 			return nil, fmt.Errorf("retrieved csr is not compatible: %v", err)
 		}
 		glog.Infof("csr for this node is still valid")
 	default:
-		return nil, fmt.Errorf("cannot create certificate signing request: %v", err)
+		return nil, formatError("cannot create certificate signing request: %v", err)
 	}
+	return req, nil
+}
 
+// WaitForCertificate waits for a certificate to be issued until timeout, or returns an error.
+func WaitForCertificate(client certificatesclient.CertificateSigningRequestInterface, req *certificates.CertificateSigningRequest, timeout time.Duration) (certData []byte, err error) {
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", req.Name).String()
 
 	event, err := cache.ListWatchUntil(
-		3600*time.Second,
+		timeout,
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = fieldSelector
@@ -129,7 +137,7 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 			switch event.Type {
 			case watch.Modified, watch.Added:
 			case watch.Deleted:
-				return false, fmt.Errorf("csr %q was deleted", csr.Name)
+				return false, fmt.Errorf("csr %q was deleted", req.Name)
 			default:
 				return false, nil
 			}
@@ -152,7 +160,7 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 		return nil, wait.ErrWaitTimeout
 	}
 	if err != nil {
-		return nil, fmt.Errorf("cannot watch on the certificate signing request: %v", err)
+		return nil, formatError("cannot watch on the certificate signing request: %v", err)
 	}
 
 	return event.Object.(*certificates.CertificateSigningRequest).Status.Certificate, nil
@@ -224,4 +232,15 @@ func ensureCompatible(new, orig *certificates.CertificateSigningRequest, private
 		}
 	}
 	return nil
+}
+
+// formatError preserves the type of an API message but alters the message. Expects
+// a single argument format string, and returns the wrapped error.
+func formatError(format string, err error) error {
+	if s, ok := err.(errors.APIStatus); ok {
+		se := &errors.StatusError{ErrStatus: s.Status()}
+		se.ErrStatus.Message = fmt.Sprintf(format, se.ErrStatus.Message)
+		return se
+	}
+	return fmt.Errorf(format, err)
 }
