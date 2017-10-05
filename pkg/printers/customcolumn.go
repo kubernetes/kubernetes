@@ -176,7 +176,7 @@ func (s *CustomColumnsPrinter) PrintObj(obj runtime.Object, out io.Writer) error
 	}
 	parsers := make([]*jsonpath.JSONPath, len(s.Columns))
 	for ix := range s.Columns {
-		parsers[ix] = jsonpath.New(fmt.Sprintf("column%d", ix))
+		parsers[ix] = jsonpath.New(fmt.Sprintf("column%d", ix)).AllowMissingKeys(true)
 		if err := parsers[ix].Parse(s.Columns[ix].FieldSpec); err != nil {
 			return err
 		}
@@ -226,10 +226,10 @@ func (s *CustomColumnsPrinter) printOneObject(obj runtime.Object, parsers []*jso
 		if err != nil {
 			return err
 		}
-		if len(values) == 0 || len(values[0]) == 0 {
-			fmt.Fprintf(out, "<none>\t")
-		}
 		valueStrings := []string{}
+		if len(values) == 0 || len(values[0]) == 0 {
+			valueStrings = append(valueStrings, "<none>")
+		}
 		for arrIx := range values {
 			for valIx := range values[arrIx] {
 				valueStrings = append(valueStrings, fmt.Sprintf("%v", values[arrIx][valIx].Interface()))
