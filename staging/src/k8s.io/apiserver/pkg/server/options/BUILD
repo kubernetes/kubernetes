@@ -29,6 +29,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/initializer:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission/plugin/initialization:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/audit/v1beta1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/audit:go_default_library",

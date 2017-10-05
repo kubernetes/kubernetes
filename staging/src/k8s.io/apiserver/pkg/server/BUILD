@@ -80,6 +80,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/version:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/admission/plugin/initialization:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/apiserver/install:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/audit:go_default_library",

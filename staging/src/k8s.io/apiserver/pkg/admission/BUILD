@@ -62,7 +62,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/admission/configuration:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/initializer:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/initialization:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle:all-srcs",
     ],
     tags = ["automanaged"],
