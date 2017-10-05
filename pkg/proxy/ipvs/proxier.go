@@ -35,6 +35,7 @@ import (
 
 	clientv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -155,17 +156,17 @@ func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
 		}
 		intf, err := net.InterfaceByName(name)
 		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("Failed to get interface by name: %s, error: %v", name, err))
 			continue
 		}
 		addrs, err := intf.Addrs()
 		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("Failed to get addresses from interface: %s, error: %v", name, err))
 			continue
 		}
 		for _, a := range addrs {
 			if ipnet, ok := a.(*net.IPNet); ok {
-				if ipnet.IP.To4() != nil {
-					ips = append(ips, ipnet.IP.To4())
-				}
+				ips = append(ips, ipnet.IP)
 			}
 		}
 	}
