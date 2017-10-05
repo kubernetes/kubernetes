@@ -59,7 +59,7 @@ var serverAggregatorVersion = utilversion.MustParseSemantic("v1.7.0")
 var _ = SIGDescribe("Aggregator", func() {
 	f := framework.NewDefaultFramework("aggregator")
 	framework.AddCleanupAction(func() {
-		cleanTest(f, false)
+		cleanTest(f)
 	})
 
 	It("Should be able to support the 1.7 Sample API Server using the current Aggregator", func() {
@@ -68,37 +68,24 @@ var _ = SIGDescribe("Aggregator", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 
 		// Testing a 1.7 version of the sample-apiserver
-		TestSampleAPIServer(f, "gcr.io/kubernetes-e2e-test-images/k8s-aggregator-sample-apiserver-amd64:1.7v2", "sample-system")
+		TestSampleAPIServer(f, "gcr.io/kubernetes-e2e-test-images/k8s-aggregator-sample-apiserver-amd64:1.7v2")
 	})
 })
 
-func cleanTest(f *framework.Framework, block bool) {
+func cleanTest(f *framework.Framework) {
 	// delete the APIService first to avoid causing discovery errors
 	aggrclient := f.AggregatorClient
 	_ = aggrclient.ApiregistrationV1beta1().APIServices().Delete("v1alpha1.wardle.k8s.io", nil)
 
-	namespace := "sample-system"
+	namespace := f.Namespace.Name
 	client := f.ClientSet
 	_ = client.ExtensionsV1beta1().Deployments(namespace).Delete("sample-apiserver", nil)
 	_ = client.CoreV1().Secrets(namespace).Delete("sample-apiserver-secret", nil)
 	_ = client.CoreV1().Services(namespace).Delete("sample-api", nil)
 	_ = client.CoreV1().ServiceAccounts(namespace).Delete("sample-apiserver", nil)
 	_ = client.RbacV1beta1().RoleBindings("kube-system").Delete("wardler-auth-reader", nil)
-	_ = client.CoreV1().Namespaces().Delete(namespace, nil)
 	_ = client.RbacV1beta1().ClusterRoles().Delete("wardler", nil)
-	_ = client.RbacV1beta1().ClusterRoleBindings().Delete("wardler:sample-system:anonymous", nil)
-	if block {
-		_ = wait.Poll(100*time.Millisecond, 5*time.Second, func() (bool, error) {
-			_, err := client.CoreV1().Namespaces().Get("sample-system", metav1.GetOptions{})
-			if err != nil {
-				if apierrs.IsNotFound(err) {
-					return true, nil
-				}
-				return false, err
-			}
-			return false, nil
-		})
-	}
+	_ = client.RbacV1beta1().ClusterRoleBindings().Delete("wardler:"+namespace+":anonymous", nil)
 }
 
 func setupSampleAPIServerCert(namespaceName, serviceName string) *aggregatorContext {
@@ -159,36 +146,23 @@ func setupSampleAPIServerCert(namespaceName, serviceName string) *aggregatorCont
 
 // A basic test if the sample-apiserver code from 1.7 and compiled against 1.7
 // will work on the current Aggregator/API-Server.
-func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
+func TestSampleAPIServer(f *framework.Framework, image string) {
 	By("Registering the sample API server.")
-	cleanTest(f, true)
 	client := f.ClientSet
 	restClient := client.Discovery().RESTClient()
 	iclient := f.InternalClientset
 	aggrclient := f.AggregatorClient
 
-	context := setupSampleAPIServerCert(namespaceName, "sample-api")
-	ns := f.Namespace.Name
+	namespace := f.Namespace.Name
+	context := setupSampleAPIServerCert(namespace, "sample-api")
 	if framework.ProviderIs("gke") {
 		// kubectl create clusterrolebinding user-cluster-admin-binding --clusterrole=cluster-admin --user=user@domain.com
 		authenticated := rbacv1beta1.Subject{Kind: rbacv1beta1.GroupKind, Name: user.AllAuthenticated}
-		framework.BindClusterRole(client.RbacV1beta1(), "cluster-admin", ns, authenticated)
+		framework.BindClusterRole(client.RbacV1beta1(), "cluster-admin", namespace, authenticated)
 	}
 
 	// kubectl create -f namespace.yaml
-	var namespace string
-	err := wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-		got, err := client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespaceName}})
-		if err != nil {
-			if strings.HasPrefix(err.Error(), "object is being deleted:") {
-				return false, nil
-			}
-			return false, err
-		}
-		namespace = got.Name
-		return true, nil
-	})
-	framework.ExpectNoError(err, "creating namespace %q", namespaceName)
+	// NOTE: aggregated apis should generally be set up in there own namespace. As the test framework is setting up a new namespace, we are just using that.
 
 	// kubectl create -f secret.yaml
 	secretName := "sample-apiserver-secret"
@@ -202,7 +176,7 @@ func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
 			"tls.key": context.apiserverKey,
 		},
 	}
-	_, err = client.CoreV1().Secrets(namespace).Create(secret)
+	_, err := client.CoreV1().Secrets(namespace).Create(secret)
 	framework.ExpectNoError(err, "creating secret %q in namespace %q", secretName, namespace)
 
 	// kubectl create -f deploy.yaml
@@ -383,7 +357,9 @@ func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
 	framework.ExpectNoError(err, "creating apiservice %s with namespace %s", "v1alpha1.wardle.k8s.io", namespace)
 
 	// Wait for the extension apiserver to be up and healthy
-	// kubectl get deployments -n sample-system && status == Running
+	// kubectl get deployments -n <aggregated-api-namespace> && status == Running
+	// NOTE: aggregated apis should generally be set up in there own namespace (<aggregated-api-namespace>). As the test framework
+	// is setting up a new namespace, we are just using that.
 	err = framework.WaitForDeploymentStatusValid(client, deployment)
 
 	// We seem to need to do additional waiting until the extension api service is actually up.
@@ -505,12 +481,12 @@ func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
 		framework.Failf("failed to get back the correct deleted flunders list %v from the dynamic client", unstructuredList)
 	}
 
-	cleanTest(f, true)
+	cleanTest(f)
 }
 
 func validateErrorWithDebugInfo(f *framework.Framework, err error, pods *v1.PodList, msg string, fields ...interface{}) {
 	if err != nil {
-		namespace := "sample-system"
+		namespace := f.Namespace.Name
 		msg := fmt.Sprintf(msg, fields...)
 		msg += fmt.Sprintf(" but received unexpected error:\n%v", err)
 		client := f.ClientSet
@@ -520,8 +496,8 @@ func validateErrorWithDebugInfo(f *framework.Framework, err error, pods *v1.PodL
 		}
 		pds, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
 		if err == nil {
-			msg += fmt.Sprintf("\nFound pods in sample-system:\n%v", pds)
-			msg += fmt.Sprintf("\nOriginal pods in sample-system:\n%v", pods)
+			msg += fmt.Sprintf("\nFound pods in %s:\n%v", namespace, pds)
+			msg += fmt.Sprintf("\nOriginal pods in %s:\n%v", namespace, pods)
 		}
 
 		framework.Failf(msg)
