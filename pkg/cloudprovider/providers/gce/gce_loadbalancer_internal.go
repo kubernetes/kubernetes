@@ -108,7 +108,7 @@ func (gce *GCECloud) ensureInternalLoadBalancer(clusterName, clusterID string, s
 	fwdRuleDeleted := false
 	if existingFwdRule != nil && !fwdRuleEqual(existingFwdRule, expectedFwdRule) {
 		glog.V(2).Infof("ensureInternalLoadBalancer(%v): deleting existing forwarding rule with IP address %v", loadBalancerName, existingFwdRule.IPAddress)
-		if err = gce.DeleteRegionForwardingRule(loadBalancerName, gce.region); err != nil && !isNotFound(err) {
+		if err = ignoreNotFound(gce.DeleteRegionForwardingRule(loadBalancerName, gce.region)); err != nil {
 			return nil, err
 		}
 		fwdRuleDeleted = true
@@ -199,7 +199,7 @@ func (gce *GCECloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID st
 	defer gce.sharedResourceLock.Unlock()
 
 	glog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting region internal forwarding rule", loadBalancerName)
-	if err := gce.DeleteRegionForwardingRule(loadBalancerName, gce.region); err != nil && !isNotFound(err) {
+	if err := ignoreNotFound(gce.DeleteRegionForwardingRule(loadBalancerName, gce.region)); err != nil {
 		return err
 	}
 
@@ -210,7 +210,7 @@ func (gce *GCECloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID st
 	}
 
 	glog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting firewall for traffic", loadBalancerName)
-	if err := gce.DeleteFirewall(loadBalancerName); err != nil {
+	if err := ignoreNotFound(gce.DeleteFirewall(loadBalancerName)); err != nil {
 		return err
 	}
 
@@ -260,7 +260,7 @@ func (gce *GCECloud) teardownInternalHealthCheckAndFirewall(hcName string) error
 	glog.V(2).Infof("teardownInternalHealthCheckAndFirewall(%v): health check deleted", hcName)
 
 	hcFirewallName := makeHealthCheckFirewallNameFromHC(hcName)
-	if err := gce.DeleteFirewall(hcFirewallName); err != nil && !isNotFound(err) {
+	if err := ignoreNotFound(gce.DeleteFirewall(hcFirewallName)); err != nil {
 		return fmt.Errorf("failed to delete health check firewall: %v, err: %v", hcFirewallName, err)
 	}
 	glog.V(2).Infof("teardownInternalHealthCheckAndFirewall(%v): health check firewall deleted", hcFirewallName)
