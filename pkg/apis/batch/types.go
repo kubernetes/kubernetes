@@ -238,6 +238,20 @@ type CronJobList struct {
 	Items []CronJob
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CronJobManualInstantiation represents a manual triggering of a CronJob.
+type CronJobManualInstantiation struct {
+	metav1.TypeMeta
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta
+
+	// CreatedJob is the Job created in the instantiation request.
+	CreatedJob Job
+}
+
 // CronJobSpec describes how the job execution will look like and when it will actually run.
 type CronJobSpec struct {
 

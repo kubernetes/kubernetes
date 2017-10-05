@@ -17,6 +17,9 @@ limitations under the License.
 package storage
 
 import (
+	"fmt"
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -28,7 +31,14 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/batch/cronjob"
+	"k8s.io/kubernetes/pkg/registry/batch/job/storage"
 )
+
+type CronJobStorage struct {
+	CronJob     *REST
+	Status      *StatusREST
+	Instantiate *InstantiateREST
+}
 
 // REST implements a RESTStorage for scheduled jobs against etcd
 type REST struct {
@@ -36,8 +46,8 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against CronJobs.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
-	store := &genericregistry.Store{
+func NewREST(optsGetter generic.RESTOptionsGetter) CronJobStorage {
+	cronJobStore := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &batch.CronJob{} },
 		NewListFunc:              func() runtime.Object { return &batch.CronJobList{} },
 		DefaultQualifiedResource: batch.Resource("cronjobs"),
@@ -49,14 +59,21 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
-	if err := store.CompleteWithOptions(options); err != nil {
+	if err := cronJobStore.CompleteWithOptions(options); err != nil {
 		panic(err) // TODO: Propagate error up
 	}
 
-	statusStore := *store
+	statusStore := *cronJobStore
 	statusStore.UpdateStrategy = cronjob.StatusStrategy
 
-	return &REST{store}, &StatusREST{store: &statusStore}
+	// Instantiate needs access to job storage to create jobs
+	jobStore, _ := storage.NewREST(optsGetter)
+
+	return CronJobStorage{
+		CronJob:     &REST{cronJobStore},
+		Status:      &StatusREST{store: &statusStore},
+		Instantiate: &InstantiateREST{cronJobStore, jobStore.Store},
+	}
 }
 
 var _ rest.CategoriesProvider = &REST{}
@@ -83,4 +100,50 @@ func (r *StatusREST) Get(ctx genericapirequest.Context, name string, options *me
 // Update alters the status subset of an object.
 func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
+}
+
+// InstantiateREST implements the REST endpoint for manually triggering a CronJob.
+type InstantiateREST struct {
+	cronJobStore *genericregistry.Store
+	jobStore     *genericregistry.Store
+}
+
+var _ = rest.NamedCreater(&InstantiateREST{})
+
+func (r *InstantiateREST) New() runtime.Object {
+	return &batch.CronJobManualInstantiation{}
+}
+
+func (r *InstantiateREST) Create(ctx genericapirequest.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (out runtime.Object, err error) {
+	sourceCronJobObj, err := r.cronJobStore.Get(ctx, name, &metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+	sourceCronJob, ok := sourceCronJobObj.(*batch.CronJob)
+	if !ok {
+		return nil, fmt.Errorf("got object of type %T, expected *batch.CronJob", sourceCronJobObj)
+	}
+
+	job := &batch.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        fmt.Sprintf("%s-manual-%d", name, time.Now().Unix()),
+			Labels:      sourceCronJob.Spec.JobTemplate.Labels,
+			Annotations: sourceCronJob.Spec.JobTemplate.Annotations,
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(sourceCronJob, batch.SchemeGroupVersion.WithKind("CronJob")),
+			},
+		},
+		Spec: sourceCronJob.Spec.JobTemplate.Spec,
+	}
+
+	createdJobObj, err := r.jobStore.Create(ctx, job, createValidation, includeUninitialized)
+	if err != nil {
+		return nil, err
+	}
+	createdJob, ok := createdJobObj.(*batch.Job)
+	if !ok {
+		return nil, fmt.Errorf("got object of type %T, expected *batch.Job", createdJobObj)
+	}
+
+	return &batch.CronJobManualInstantiation{CreatedJob: *createdJob}, nil
 }

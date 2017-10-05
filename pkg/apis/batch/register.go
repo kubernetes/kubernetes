@@ -50,6 +50,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&JobTemplate{},
 		&CronJob{},
 		&CronJobList{},
+		&CronJobManualInstantiation{},
 	)
 	return nil
 }

@@ -47,6 +47,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&JobTemplate{},
 		&CronJob{},
 		&CronJobList{},
+		&CronJobManualInstantiation{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
