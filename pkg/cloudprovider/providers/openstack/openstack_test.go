@@ -411,8 +411,26 @@ func configFromEnv() (cfg Config, ok bool) {
 	cfg.Global.Username = os.Getenv("OS_USERNAME")
 	cfg.Global.Password = os.Getenv("OS_PASSWORD")
 	cfg.Global.Region = os.Getenv("OS_REGION_NAME")
+
+	cfg.Global.TenantName = os.Getenv("OS_TENANT_NAME")
+	if cfg.Global.TenantName == "" {
+		cfg.Global.TenantName = os.Getenv("OS_PROJECT_NAME")
+	}
+
+	cfg.Global.TenantId = os.Getenv("OS_TENANT_ID")
+	if cfg.Global.TenantId == "" {
+		cfg.Global.TenantId = os.Getenv("OS_PROJECT_ID")
+	}
+
 	cfg.Global.DomainId = os.Getenv("OS_DOMAIN_ID")
+	if cfg.Global.DomainId == "" {
+		cfg.Global.DomainId = os.Getenv("OS_USER_DOMAIN_ID")
+	}
+
 	cfg.Global.DomainName = os.Getenv("OS_DOMAIN_NAME")
+	if cfg.Global.DomainName == "" {
+		cfg.Global.DomainName = os.Getenv("OS_USER_DOMAIN_NAME")
+	}
 
 	ok = (cfg.Global.AuthUrl != "" &&
 		cfg.Global.Username != "" &&
