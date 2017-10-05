@@ -286,7 +286,7 @@ if [[ -n "${GCE_ALPHA_FEATURES:-}" ]]; then
 fi
 
 # Optional: enable the PodSecurityPolicy admission contrller.
-ENABLE_POD_SECURITY_POLICY="${ENABLE_POD_SECURITY_POLICY:-false}"
+ENABLE_POD_SECURITY_POLICY="${ENABLE_POD_SECURITY_POLICY:-true}"
 
 if [[ -z "${KUBE_ADMISSION_CONTROL:-}" ]]; then
   ADMISSION_CONTROL="Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority"

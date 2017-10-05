@@ -68,7 +68,7 @@ var _ = SIGDescribe("Aggregator", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 
 		// Testing a 1.7 version of the sample-apiserver
-		TestSampleAPIServer(f, "gcr.io/kubernetes-e2e-test-images/k8s-aggregator-sample-apiserver-amd64:1.7v2", "sample-system")
+		TestSampleAPIServer(f, "gcr.io/kubernetes-e2e-test-images/k8s-aggregator-sample-apiserver-amd64:1.7v2")
 	})
 })
 
@@ -159,7 +159,7 @@ func setupSampleAPIServerCert(namespaceName, serviceName string) *aggregatorCont
 
 // A basic test if the sample-apiserver code from 1.7 and compiled against 1.7
 // will work on the current Aggregator/API-Server.
-func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
+func TestSampleAPIServer(f *framework.Framework, image string) {
 	By("Registering the sample API server.")
 	cleanTest(f, true)
 	client := f.ClientSet
@@ -167,8 +167,8 @@ func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
 	iclient := f.InternalClientset
 	aggrclient := f.AggregatorClient
 
-	context := setupSampleAPIServerCert(namespaceName, "sample-api")
 	ns := f.Namespace.Name
+	context := setupSampleAPIServerCert(ns, "sample-api")
 	if framework.ProviderIs("gke") {
 		// kubectl create clusterrolebinding user-cluster-admin-binding --clusterrole=cluster-admin --user=user@domain.com
 		authenticated := rbacv1beta1.Subject{Kind: rbacv1beta1.GroupKind, Name: user.AllAuthenticated}
@@ -176,19 +176,7 @@ func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
 	}
 
 	// kubectl create -f namespace.yaml
-	var namespace string
-	err := wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-		got, err := client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespaceName}})
-		if err != nil {
-			if strings.HasPrefix(err.Error(), "object is being deleted:") {
-				return false, nil
-			}
-			return false, err
-		}
-		namespace = got.Name
-		return true, nil
-	})
-	framework.ExpectNoError(err, "creating namespace %q", namespaceName)
+	namespace := ns
 
 	// kubectl create -f secret.yaml
 	secretName := "sample-apiserver-secret"
@@ -202,7 +190,7 @@ func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
 			"tls.key": context.apiserverKey,
 		},
 	}
-	_, err = client.CoreV1().Secrets(namespace).Create(secret)
+	_, err := client.CoreV1().Secrets(namespace).Create(secret)
 	framework.ExpectNoError(err, "creating secret %q in namespace %q", secretName, namespace)
 
 	// kubectl create -f deploy.yaml
