@@ -19,6 +19,7 @@ package app
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"k8s.io/kubernetes/federation/pkg/kubefed"
 	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
@@ -34,7 +35,7 @@ const (
 )
 
 func GetDefaultServerImage() string {
-	return fmt.Sprintf("%s:%s", hyperkubeImageName, version.Get())
+	return fmt.Sprintf("%s:%s", hyperkubeImageName, strings.Replace(version.Get().String(), "+", "_", 1))
 }
 
 func Run() error {
