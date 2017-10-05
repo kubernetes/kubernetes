@@ -23,6 +23,7 @@ import (
 	"sort"
 	"time"
 
+	batchv1 "k8s.io/api/batch/v1"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,6 +73,27 @@ type ReplicaSchedulingInfo struct {
 	Status        ReplicaStatus
 }
 
+type JobStatus struct {
+	//Conditions     []JobCondition
+	StartTime      *metav1.Time
+	CompletionTime *metav1.Time
+	Active         int32
+	Succeeded      int32
+	Failed         int32
+}
+
+type JobScheduleState struct {
+	parallelism *int32
+	completions *int32
+}
+
+// JobSchedulingInfo wraps the information that a job type SchedulingAdapter needs to
+// update objects per a schedule
+type JobSchedulingInfo struct {
+	ScheduleState map[string]*JobScheduleState
+	Status        JobStatus
+}
+
 // SchedulingAdapter defines operations for interacting with a
 // federated type that requires more complex synchronization logic.
 type SchedulingAdapter interface {
@@ -91,7 +113,16 @@ type replicaSchedulingAdapter struct {
 	updateStatusFunc          func(pkgruntime.Object, interface{}) error
 }
 
+type jobSchedulingAdapter struct {
+	preferencesAnnotationName string
+	updateStatusFunc          func(pkgruntime.Object, interface{}) error
+}
+
 func (a *replicaSchedulingAdapter) IsSchedulingAdapter() bool {
+	return true
+}
+
+func (a *jobSchedulingAdapter) IsSchedulingAdapter() bool {
 	return true
 }
 
@@ -215,6 +246,67 @@ func (a *replicaSchedulingAdapter) GetSchedule(obj pkgruntime.Object, key string
 	}, nil
 }
 
+func (a *jobSchedulingAdapter) GetSchedule(obj pkgruntime.Object, key string, clusters []*federationapi.Cluster, informer fedutil.FederatedInformer) (interface{}, error) {
+	job := obj.(*batchv1.Job)
+	var clusterNames []string
+	for _, cluster := range clusters {
+		clusterNames = append(clusterNames, cluster.Name)
+	}
+
+	fedPref, err := replicapreferences.GetAllocationPreferences(obj, a.preferencesAnnotationName)
+	if err != nil {
+		glog.Infof("Invalid workload-type specific preference, using default. object: %v, err: %v", obj, err)
+	}
+	if fedPref == nil {
+		fedPref = &fedapi.ReplicaAllocationPreferences{
+			Clusters: map[string]fedapi.ClusterPreferences{
+				"*": {Weight: 1},
+			},
+		}
+	}
+
+	plnr := planner.NewPlanner(fedPref)
+	parallelismResult, _ := plnr.Plan(int64(*job.Spec.Parallelism), clusterNames, nil, nil, key)
+
+	// Reset min/max replica values to avoid restricting the number
+	// of completions allowed per cluster as it may be larger than
+	// replicas specified in job preferences
+	for _, clusterPref := range fedPref.Clusters {
+		clusterPref.MinReplicas = 0
+		clusterPref.MaxReplicas = nil
+	}
+
+	plnr = planner.NewPlanner(fedPref)
+
+	clusterNames = nil
+	for clusterName := range parallelismResult {
+		clusterNames = append(clusterNames, clusterName)
+	}
+
+	completionsResult := make(map[string]int64)
+	if job.Spec.Completions != nil {
+		completionsResult, _ = plnr.Plan(int64(*job.Spec.Completions), clusterNames, nil, nil, key)
+	}
+
+	results := make(map[string]*JobScheduleState)
+	for _, clusterName := range clusterNames {
+		p := int32(parallelismResult[clusterName])
+		c := int32(completionsResult[clusterName])
+		scheduleInfo := JobScheduleState{
+			parallelism: &p,
+		}
+		if job.Spec.Completions != nil {
+			scheduleInfo.completions = &c
+		}
+		results[clusterName] = &scheduleInfo
+	}
+
+	return &JobSchedulingInfo{
+		ScheduleState: results,
+		Status:        JobStatus{},
+	}, nil
+}
+
 func (a *replicaSchedulingAdapter) ScheduleObject(cluster *federationapi.Cluster, clusterObj pkgruntime.Object, federationObjCopy pkgruntime.Object, schedulingInfo interface{}) (pkgruntime.Object, ScheduleAction, error) {
 	typedSchedulingInfo := schedulingInfo.(*ReplicaSchedulingInfo)
 	clusterScheduleState := typedSchedulingInfo.ScheduleState[cluster.Name]
@@ -249,7 +341,56 @@ func (a *replicaSchedulingAdapter) ScheduleObject(cluster *federationapi.Cluster
 	return federationObjCopy, action, nil
 }
 
+func (a *jobSchedulingAdapter) ScheduleObject(cluster *federationapi.Cluster, clusterObj pkgruntime.Object, federationObjCopy pkgruntime.Object, schedulingInfo interface{}) (pkgruntime.Object, ScheduleAction, error) {
+	typedSchedulingInfo := schedulingInfo.(*JobSchedulingInfo)
+	clusterScheduleState := typedSchedulingInfo.ScheduleState[cluster.Name]
+
+	if clusterObj != nil {
+		schedulingStatusVal := reflect.ValueOf(typedSchedulingInfo).Elem().FieldByName("Status")
+		objStatusVal := reflect.ValueOf(clusterObj).Elem().FieldByName("Status")
+		for i := 0; i < schedulingStatusVal.NumField(); i++ {
+			schedulingStatusField := schedulingStatusVal.Field(i)
+			schedulingStatusFieldName := schedulingStatusVal.Type().Field(i).Name
+			objStatusField := objStatusVal.FieldByName(schedulingStatusFieldName)
+			if objStatusField.IsValid() {
+				switch t := objStatusField.Interface().(type) {
+				// TODO: Conditions
+				case *metav1.Time:
+					objTime := objStatusField.Interface().(*metav1.Time)
+					if objTime == nil {
+						break
+					}
+					if !schedulingStatusField.IsValid() ||
+						(schedulingStatusFieldName == "StartTime" && schedulingStatusField.Interface().(*metav1.Time).After(objTime.Time)) ||
+						(schedulingStatusFieldName == "CompletionTime" && schedulingStatusField.Interface().(*metav1.Time).Before(objTime)) {
+						schedulingStatusField.Set(objStatusField)
+					}
+				case int32:
+					current := schedulingStatusField.Int()
+					additional := objStatusField.Int()
+					schedulingStatusField.SetInt(current + additional)
+				default:
+					glog.V(2).Infof("unrecognized type %T!\n", t)
+				}
+			}
+		}
+	}
+
+	var action ScheduleAction = ActionAdd
+	manualSelector := true
+	specParallelism := int32(*clusterScheduleState.parallelism)
+	specCompletions := int32(*clusterScheduleState.completions)
+	reflect.ValueOf(federationObjCopy).Elem().FieldByName("Spec").FieldByName("Parallelism").Set(reflect.ValueOf(&specParallelism))
+	reflect.ValueOf(federationObjCopy).Elem().FieldByName("Spec").FieldByName("Completions").Set(reflect.ValueOf(&specCompletions))
+	reflect.ValueOf(federationObjCopy).Elem().FieldByName("Spec").FieldByName("ManualSelector").Set(reflect.ValueOf(&manualSelector))
+	return federationObjCopy, action, nil
+}
+
 func (a *replicaSchedulingAdapter) UpdateFederatedStatus(obj pkgruntime.Object, schedulingInfo interface{}) error {
+	return a.updateStatusFunc(obj, schedulingInfo)
+}
+
+func (a *jobSchedulingAdapter) UpdateFederatedStatus(obj pkgruntime.Object, schedulingInfo interface{}) error {
 	return a.updateStatusFunc(obj, schedulingInfo)
 }
 
@@ -316,6 +457,48 @@ func schedule(planner *planner.Planner, obj pkgruntime.Object, key string, clust
 	}
 	return result
 }
+
+//func scheduleJobs(planner *planner.Planner, obj pkgruntime.Object, key string, clusterNames []string) map[string]*JobScheduleState {
+//	// TODO: integrate real scheduler
+//	parallelism := reflect.ValueOf(obj).Elem().FieldByName("Spec").FieldByName("Parallelism").Elem().Int()
+//	parallelismResult, overflow := planner.Plan(parallelism, clusterNames, nil, nil, key)
+//
+//	// Ensure that all current clusters end up in the scheduling result.
+//	result := initialState
+//	for clusterName := range currentReplicasPerCluster {
+//		// We consider 0 replicas equaling to no need of creating a new object.
+//		// isSchedule remains false in such case.
+//		result[clusterName].replicas = 0
+//	}
+//
+//	for clusterName, replicas := range scheduleResult {
+//		result[clusterName].isSelected = true
+//		result[clusterName].replicas = replicas
+//	}
+//	for clusterName, replicas := range overflow {
+//		result[clusterName].isSelected = true
+//		result[clusterName].replicas += replicas
+//	}
+//
+//	if glog.V(4) {
+//		buf := bytes.NewBufferString(fmt.Sprintf("Schedule - %q\n", key))
+//		sort.Strings(clusterNames)
+//		for _, clusterName := range clusterNames {
+//			cur := currentReplicasPerCluster[clusterName]
+//			target := scheduleResult[clusterName]
+//			fmt.Fprintf(buf, "%s: current: %d target: %d", clusterName, cur, target)
+//			if over, found := overflow[clusterName]; found {
+//				fmt.Fprintf(buf, " overflow: %d", over)
+//			}
+//			if capacity, found := estimatedCapacity[clusterName]; found {
+//				fmt.Fprintf(buf, " capacity: %d", capacity)
+//			}
+//			fmt.Fprintf(buf, "\n")
+//		}
+//		glog.V(4).Infof(buf.String())
+//	}
+//	return result
+//}
 
 // clusterReplicaState returns information about the scheduling state of the pods running in the federated clusters.
 func clustersReplicaState(

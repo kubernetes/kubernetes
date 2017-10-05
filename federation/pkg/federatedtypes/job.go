@@ -41,17 +41,34 @@ func init() {
 }
 
 type JobAdapter struct {
-	//*jobSchedulingAdapter
+	*jobSchedulingAdapter
 	client federationclientset.Interface
 }
 
 func NewJobAdapter(client federationclientset.Interface, config *restclient.Config, adapterSpecificArgs map[string]interface{}) FederatedTypeAdapter {
-	return &JobAdapter{client}
-}
-
-// TODO: Remove after implementing scheduling adapter
-func (a *JobAdapter) IsSchedulingAdapter() bool {
-	return false
+	jobSchedulingAdapter := jobSchedulingAdapter{
+		preferencesAnnotationName: FedJobPreferencesAnnotation,
+		updateStatusFunc: func(obj pkgruntime.Object, schedulingInfo interface{}) error {
+			job := obj.(*batchv1.Job)
+			typedStatus := schedulingInfo.(*JobSchedulingInfo).Status
+			//if !typedStatus.StartTime.Equal(job.Status.StartTime) || !typedStatus.CompletionTime.Equal(job.Status.CompletionTime) ||
+			//	typedStatus.Active != job.Status.Active || typedStatus.Succeeded != job.Status.Succeeded || typedStatus.Failed != job.Status.Failed {
+			if typedStatus.Active != job.Status.Active || typedStatus.Succeeded != job.Status.Succeeded || typedStatus.Failed != job.Status.Failed {
+				job.Status = batchv1.JobStatus{
+					Active:    typedStatus.Active,
+					Succeeded: typedStatus.Succeeded,
+					Failed:    typedStatus.Failed,
+				}
+				// TODO: Conditions
+				typedStatus.StartTime.DeepCopyInto(job.Status.StartTime)
+				typedStatus.CompletionTime.DeepCopyInto(job.Status.CompletionTime)
+				_, err := client.BatchV1().Jobs(job.Namespace).UpdateStatus(job)
+				return err
+			}
+			return nil
+		},
+	}
+	return &JobAdapter{&jobSchedulingAdapter, client}
 }
 
 func (a *JobAdapter) Kind() string {
@@ -140,30 +157,27 @@ func (a *JobAdapter) ClusterWatch(client kubeclientset.Interface, namespace stri
 	return client.Batch().Jobs(namespace).Watch(options)
 }
 
-//func (a *JobAdapter) EquivalentIgnoringSchedule(obj1, obj2 pkgruntime.Object) bool {
-//	job1 := obj1.(*batchv1.Job)
-//	job2 := a.Copy(obj2).(*batchv1.Job)
-//	//job2.Spec.Replicas = job1.Spec.Replicas // why do we need to copy Replicas address?
-//	return fedutil.ObjectMetaAndSpecEquivalent(job1, job2)
-//}
+func (a *JobAdapter) EquivalentIgnoringSchedule(obj1, obj2 pkgruntime.Object) bool {
+	job1 := obj1.(*batchv1.Job)
+	job2 := a.Copy(obj2).(*batchv1.Job)
+	job2.Spec.Parallelism = job1.Spec.Parallelism
+	job2.Spec.Completions = job1.Spec.Completions
+	job2.Spec.ManualSelector = job1.Spec.ManualSelector
+	return fedutil.ObjectMetaAndSpecEquivalent(job1, job2)
+}
 
 func (a *JobAdapter) NewTestObject(namespace string) pkgruntime.Object {
 	parallelism := int32(3)
 	completions := int32(3)
 	zero := int64(0)
-	manualSelector := true
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "test-job-",
 			Namespace:    namespace,
 		},
 		Spec: batchv1.JobSpec{
-			Parallelism:    &parallelism,
-			Completions:    &completions,
-			ManualSelector: &manualSelector,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"foo": "bar"},
-			},
+			Parallelism: &parallelism,
+			Completions: &completions,
 			Template: apiv1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"foo": "bar"},
