@@ -815,7 +815,7 @@ message PodSecurityPolicySpec {
   optional bool defaultAllowPrivilegeEscalation = 15;
 
   // AllowPrivilegeEscalation determines if a pod can request to allow
-  // privilege escalation.
+  // privilege escalation. If unspecified, defaults to true.
   // +optional
   optional bool allowPrivilegeEscalation = 16;
 

@@ -1431,6 +1431,15 @@ func (in *PodSecurityPolicySpec) DeepCopyInto(out *PodSecurityPolicySpec) {
 			**out = **in
 		}
 	}
+	if in.AllowPrivilegeEscalation != nil {
+		in, out := &in.AllowPrivilegeEscalation, &out.AllowPrivilegeEscalation
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
 	if in.AllowedHostPaths != nil {
 		in, out := &in.AllowedHostPaths, &out.AllowedHostPaths
 		*out = make([]AllowedHostPath, len(*in))
