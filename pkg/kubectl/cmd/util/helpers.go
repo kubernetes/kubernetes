@@ -120,11 +120,6 @@ func CheckErr(err error) {
 	checkErr(err, fatalErrHandler)
 }
 
-// checkErrWithPrefix works like CheckErr, but adds a caller-defined prefix to non-nil errors
-func checkErrWithPrefix(prefix string, err error) {
-	checkErr(err, fatalErrHandler)
-}
-
 // checkErr formats a given error as a string and calls the passed handleErr
 // func with that string and an kubectl exit code.
 func checkErr(err error, handleErr func(string, int)) {
@@ -578,7 +573,7 @@ func ChangeResourcePatch(info *resource.Info, changeCause string) ([]byte, types
 	}
 }
 
-// containsChangeCause checks if input resource info contains change-cause annotation.
+// ContainsChangeCause checks if input resource info contains change-cause annotation.
 func ContainsChangeCause(info *resource.Info) bool {
 	annotations, err := info.Mapping.MetadataAccessor.Annotations(info.Object)
 	if err != nil {
