@@ -48,8 +48,8 @@ type RecycleEventRecorder func(eventtype, message string)
 // attempted before returning.
 //
 // In case there is a pod with the same namespace+name already running, this
-// function assumes it's an older instance of the recycler pod and watches
-// this old pod instead of starting a new one.
+// function deletes it as it is not able to judge if it is an old recycler
+// or user has forged a fake recycler to block Kubernetes from recycling.//
 //
 //  pod - the pod designed by a volume plugin to recycle the volume. pod.Name
 //        will be overwritten with unique name based on PV.Name.
@@ -81,20 +81,44 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Po
 	_, err = recyclerClient.CreatePod(pod)
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
-			glog.V(5).Infof("old recycler pod %q found for volume", pod.Name)
+			deleteErr := recyclerClient.DeletePod(pod.Name, pod.Namespace)
+			if deleteErr != nil {
+				return fmt.Errorf("failed to delete old recycler pod %s/%s: %s", pod.Namespace, pod.Name, deleteErr)
+			}
+			// Recycler will try again and the old pod will be hopefuly deleted
+			// at that time.
+			return fmt.Errorf("old recycler pod found, will retry later")
 		} else {
 			return fmt.Errorf("unexpected error creating recycler pod:  %+v\n", err)
 		}
 	}
-	defer func(pod *v1.Pod) {
-		glog.V(2).Infof("deleting recycler pod %s/%s", pod.Namespace, pod.Name)
-		if err := recyclerClient.DeletePod(pod.Name, pod.Namespace); err != nil {
-			glog.Errorf("failed to delete recycler pod %s/%s: %v", pod.Namespace, pod.Name, err)
-		}
-	}(pod)
+	err = waitForPod(pod, recyclerClient, podCh)
 
-	// Now only the old pod or the new pod run. Watch it until it finishes
-	// and send all events on the pod to the PV
+	// In all cases delete the recycler pod and log its result.
+	glog.V(2).Infof("deleting recycler pod %s/%s", pod.Namespace, pod.Name)
+	deleteErr := recyclerClient.DeletePod(pod.Name, pod.Namespace)
+	if deleteErr != nil {
+		glog.Errorf("failed to delete recycler pod %s/%s: %v", pod.Namespace, pod.Name, err)
+	}
+
+	// Returning recycler error is preferred, the pod will be deleted again on
+	// the next retry.
+	if err != nil {
+		return fmt.Errorf("failed to recycle volume: %s", err)
+	}
+
+	// Recycle succeeded but we failed to delete the recycler pod. Report it,
+	// the controller will re-try recycling the PV again shortly.
+	if deleteErr != nil {
+		return fmt.Errorf("failed to delete recycler pod: %s", deleteErr)
+	}
+
+	return nil
+}
+
+// waitForPod watches the pod it until it finishes and send all events on the
+// pod to the PV.
+func waitForPod(pod *v1.Pod, recyclerClient recyclerClient, podCh <-chan watch.Event) error {
 	for {
 		event, ok := <-podCh
 		if !ok {
