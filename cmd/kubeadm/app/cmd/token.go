@@ -125,7 +125,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	createCmd.Flags().StringSliceVar(&usages,
 		"usages", kubeadmconstants.DefaultTokenUsages, "The ways in which this token can be used. Valid options: [signing,authentication].")
 	createCmd.Flags().StringSliceVar(&extraGroups,
-		"groups", []string{},
+		"groups", []string{kubeadmconstants.V18NodeBootstrapTokenAuthGroup},
 		fmt.Sprintf("Extra groups that this token will authenticate as when used for authentication. Must match %q.", bootstrapapi.BootstrapGroupPattern))
 	createCmd.Flags().StringVar(&description,
 		"description", "", "A human friendly description of how this token is used.")
