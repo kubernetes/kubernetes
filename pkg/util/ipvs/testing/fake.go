@@ -49,7 +49,7 @@ func NewFake() *FakeIPVS {
 
 func toServiceKey(serv *utilipvs.VirtualServer) serviceKey {
 	return serviceKey{
-		IP:       serv.Address.To4().String(),
+		IP:       serv.Address.String(),
 		Port:     serv.Port,
 		Protocol: serv.Protocol,
 	}
