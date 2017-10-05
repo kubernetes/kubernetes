@@ -42,7 +42,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
-	admissionv1alpha1helper "k8s.io/kubernetes/pkg/apis/admission/v1alpha1"
 	admissioninit "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/kubeapiserver/admission/configuration"
 
@@ -230,7 +229,7 @@ func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Exte
 	}
 
 	// Make the webhook request
-	request := admissionv1alpha1helper.NewAdmissionReview(attr)
+	request := createAdmissionReview(attr)
 	client, err := a.hookClient(h)
 	if err != nil {
 		return &ErrCallingWebhook{WebhookName: h.Name, Reason: err}

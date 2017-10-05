@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+// Package webhook delegates admission checks to dynamically configured webhooks.
+package webhook
 
 import (
 	admissionv1alpha1 "k8s.io/api/admission/v1alpha1"
@@ -24,8 +25,8 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 )
 
-// NewAdmissionReview returns an AdmissionReview for the provided admission.Attributes
-func NewAdmissionReview(attr admission.Attributes) admissionv1alpha1.AdmissionReview {
+// createAdmissionReview creates an AdmissionReview for the provided admission.Attributes
+func createAdmissionReview(attr admission.Attributes) admissionv1alpha1.AdmissionReview {
 	gvk := attr.GetKind()
 	gvr := attr.GetResource()
 	aUserInfo := attr.GetUserInfo()

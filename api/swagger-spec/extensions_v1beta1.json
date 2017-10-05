@@ -10197,7 +10197,7 @@
      },
      "allowPrivilegeEscalation": {
       "type": "boolean",
-      "description": "AllowPrivilegeEscalation determines if a pod can request to allow privilege escalation."
+      "description": "AllowPrivilegeEscalation determines if a pod can request to allow privilege escalation. If unspecified, defaults to true."
      },
      "allowedHostPaths": {
       "type": "array",

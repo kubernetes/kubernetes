@@ -171,8 +171,10 @@ func makeTestEndpoints(namespace, name string, eptFunc func(*api.Endpoints)) *ap
 func TestNodePort(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
-	nodeIP := net.ParseIP("100.101.102.103")
-	fp := NewFakeProxier(ipt, ipvs, []net.IP{nodeIP})
+	nodeIPv4 := net.ParseIP("100.101.102.103")
+	nodeIPv6 := net.ParseIP("2001:db8::1:1")
+	nodeIPs := sets.NewString(nodeIPv4.String(), nodeIPv6.String())
+	fp := NewFakeProxier(ipt, ipvs, []net.IP{nodeIPv4, nodeIPv6})
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -193,12 +195,16 @@ func TestNodePort(t *testing.T) {
 			}}
 		}),
 	)
-	epIP := "10.180.0.1"
+	epIPv4 := "10.180.0.1"
+	epIPv6 := "1002:ab8::2:10"
+	epIPs := sets.NewString(epIPv4, epIPv6)
 	makeEndpointsMap(fp,
 		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *api.Endpoints) {
 			ept.Subsets = []api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{
-					IP: epIP,
+					IP: epIPv4,
+				}, {
+					IP: epIPv6,
 				}},
 				Ports: []api.EndpointPort{{
 					Name: svcPortName.Port,
@@ -215,19 +221,19 @@ func TestNodePort(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to get ipvs services, err: %v", err)
 	}
-	if len(services) != 2 {
-		t.Errorf("Expect 2 ipvs services, got %d", len(services))
+	if len(services) != 3 {
+		t.Errorf("Expect 3 ipvs services, got %d", len(services))
 	}
 	found := false
 	for _, svc := range services {
-		if svc.Address.Equal(nodeIP) && svc.Port == uint16(svcNodePort) && svc.Protocol == string(api.ProtocolTCP) {
+		if nodeIPs.Has(svc.Address.String()) && svc.Port == uint16(svcNodePort) && svc.Protocol == string(api.ProtocolTCP) {
 			found = true
 			destinations, err := ipvs.GetRealServers(svc)
 			if err != nil {
 				t.Errorf("Failed to get ipvs destinations, err: %v", err)
 			}
 			for _, dest := range destinations {
-				if dest.Address.To4().String() != epIP || dest.Port != uint16(svcPort) {
+				if !epIPs.Has(dest.Address.String()) || dest.Port != uint16(svcPort) {
 					t.Errorf("service Endpoint mismatch ipvs service destination")
 				}
 			}
@@ -324,7 +330,7 @@ func TestClusterIPNoEndpoint(t *testing.T) {
 	if len(services) != 1 {
 		t.Errorf("Expect 1 ipvs services, got %d", len(services))
 	} else {
-		if services[0].Address.To4().String() != svcIP || services[0].Port != uint16(svcPort) && services[0].Protocol == string(api.ProtocolTCP) {
+		if services[0].Address.String() != svcIP || services[0].Port != uint16(svcPort) || services[0].Protocol != string(api.ProtocolTCP) {
 			t.Errorf("Unexpected mismatch service")
 		} else {
 			destinations, _ := ipvs.GetRealServers(services[0])
@@ -339,34 +345,60 @@ func TestClusterIP(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	fp := NewFakeProxier(ipt, ipvs, nil)
-	svcIP := "10.20.30.41"
-	svcPort := 80
-	svcPortName := proxy.ServicePortName{
+
+	svcIPv4 := "10.20.30.41"
+	svcPortV4 := 80
+	svcPortNameV4 := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
 	}
-
+	svcIPv6 := "1002:ab8::2:1"
+	svcPortV6 := 8080
+	svcPortNameV6 := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns2", "svc2"),
+		Port:           "p8080",
+	}
 	makeServiceMap(fp,
-		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *api.Service) {
-			svc.Spec.ClusterIP = svcIP
+		makeTestService(svcPortNameV4.Namespace, svcPortNameV4.Name, func(svc *api.Service) {
+			svc.Spec.ClusterIP = svcIPv4
 			svc.Spec.Ports = []api.ServicePort{{
-				Name:     svcPortName.Port,
-				Port:     int32(svcPort),
+				Name:     svcPortNameV4.Port,
+				Port:     int32(svcPortV4),
+				Protocol: api.ProtocolTCP,
+			}}
+		}),
+		makeTestService(svcPortNameV6.Namespace, svcPortNameV6.Name, func(svc *api.Service) {
+			svc.Spec.ClusterIP = svcIPv6
+			svc.Spec.Ports = []api.ServicePort{{
+				Name:     svcPortNameV6.Port,
+				Port:     int32(svcPortV6),
 				Protocol: api.ProtocolTCP,
 			}}
 		}),
 	)
 
-	epIP := "10.180.0.1"
+	epIPv4 := "10.180.0.1"
+	epIPv6 := "1009:ab8::5:6"
 	makeEndpointsMap(fp,
-		makeTestEndpoints(svcPortName.Namespace, svcPortName.Name, func(ept *api.Endpoints) {
+		makeTestEndpoints(svcPortNameV4.Namespace, svcPortNameV4.Name, func(ept *api.Endpoints) {
 			ept.Subsets = []api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{
-					IP: epIP,
+					IP: epIPv4,
 				}},
 				Ports: []api.EndpointPort{{
-					Name: svcPortName.Port,
-					Port: int32(svcPort),
+					Name: svcPortNameV4.Port,
+					Port: int32(svcPortV4),
+				}},
+			}}
+		}),
+		makeTestEndpoints(svcPortNameV6.Namespace, svcPortNameV6.Name, func(ept *api.Endpoints) {
+			ept.Subsets = []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{
+					IP: epIPv6,
+				}},
+				Ports: []api.EndpointPort{{
+					Name: svcPortNameV6.Port,
+					Port: int32(svcPortV6),
 				}},
 			}}
 		}),
@@ -379,16 +411,36 @@ func TestClusterIP(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to get ipvs services, err: %v", err)
 	}
-	if len(services) != 1 {
-		t.Errorf("Expect 1 ipvs services, got %d", len(services))
-	} else {
-		if services[0].Address.To4().String() != svcIP || services[0].Port != uint16(svcPort) && services[0].Protocol == string(api.ProtocolTCP) {
-			t.Errorf("Unexpected mismatch service")
-		} else {
-			destinations, _ := ipvs.GetRealServers(services[0])
+	if len(services) != 2 {
+		t.Errorf("Expect 2 ipvs services, got %d", len(services))
+	}
+	for i := range services {
+		// Check services
+		if services[i].Address.String() == svcIPv4 {
+			if services[i].Port != uint16(svcPortV4) || services[i].Protocol != string(api.ProtocolTCP) {
+				t.Errorf("Unexpected mismatch service")
+			}
+			// Check destinations
+			destinations, _ := ipvs.GetRealServers(services[i])
 			if len(destinations) != 1 {
-				t.Errorf("Unexpected %d destinations, expect 0 destinations", len(destinations))
-			} else if destinations[0].Address.To4().String() != epIP || destinations[0].Port != uint16(svcPort) {
+				t.Errorf("Expected 1 destinations, got %d destinations", len(destinations))
+				continue
+			}
+			if destinations[0].Address.String() != epIPv4 || destinations[0].Port != uint16(svcPortV4) {
+				t.Errorf("Unexpected mismatch destinations")
+			}
+		}
+		if services[i].Address.String() == svcIPv6 {
+			if services[i].Port != uint16(svcPortV6) || services[i].Protocol != string(api.ProtocolTCP) {
+				t.Errorf("Unexpected mismatch service")
+			}
+			// Check destinations
+			destinations, _ := ipvs.GetRealServers(services[i])
+			if len(destinations) != 1 {
+				t.Errorf("Expected 1 destinations, got %d destinations", len(destinations))
+				continue
+			}
+			if destinations[0].Address.String() != epIPv6 || destinations[0].Port != uint16(svcPortV6) {
 				t.Errorf("Unexpected mismatch destinations")
 			}
 		}
@@ -435,7 +487,7 @@ func TestExternalIPsNoEndpoint(t *testing.T) {
 	}
 	found := false
 	for _, svc := range services {
-		if svc.Address.To4().String() == svcExternalIPs && svc.Port == uint16(svcPort) && svc.Protocol == string(api.ProtocolTCP) {
+		if svc.Address.String() == svcExternalIPs && svc.Port == uint16(svcPort) && svc.Protocol == string(api.ProtocolTCP) {
 			found = true
 			destinations, _ := ipvs.GetRealServers(svc)
 			if len(destinations) != 0 {
@@ -455,7 +507,7 @@ func TestExternalIPs(t *testing.T) {
 	fp := NewFakeProxier(ipt, ipvs, nil)
 	svcIP := "10.20.30.41"
 	svcPort := 80
-	svcExternalIPs := "50.60.70.81"
+	svcExternalIPs := sets.NewString("50.60.70.81", "2012::51")
 	svcPortName := proxy.ServicePortName{
 		NamespacedName: makeNSN("ns1", "svc1"),
 		Port:           "p80",
@@ -465,7 +517,7 @@ func TestExternalIPs(t *testing.T) {
 		makeTestService(svcPortName.Namespace, svcPortName.Name, func(svc *api.Service) {
 			svc.Spec.Type = "ClusterIP"
 			svc.Spec.ClusterIP = svcIP
-			svc.Spec.ExternalIPs = []string{svcExternalIPs}
+			svc.Spec.ExternalIPs = svcExternalIPs.UnsortedList()
 			svc.Spec.Ports = []api.ServicePort{{
 				Name:       svcPortName.Port,
 				Port:       int32(svcPort),
@@ -497,16 +549,16 @@ func TestExternalIPs(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to get ipvs services, err: %v", err)
 	}
-	if len(services) != 2 {
-		t.Errorf("Expect 2 ipvs services, got %d", len(services))
+	if len(services) != 3 {
+		t.Errorf("Expect 3 ipvs services, got %d", len(services))
 	}
 	found := false
 	for _, svc := range services {
-		if svc.Address.To4().String() == svcExternalIPs && svc.Port == uint16(svcPort) && svc.Protocol == string(api.ProtocolTCP) {
+		if svcExternalIPs.Has(svc.Address.String()) && svc.Port == uint16(svcPort) && svc.Protocol == string(api.ProtocolTCP) {
 			found = true
 			destinations, _ := ipvs.GetRealServers(svc)
 			for _, dest := range destinations {
-				if dest.Address.To4().String() != epIP || dest.Port != uint16(svcPort) {
+				if dest.Address.String() != epIP || dest.Port != uint16(svcPort) {
 					t.Errorf("service Endpoint mismatch ipvs service destination")
 				}
 			}
@@ -637,7 +689,7 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 			if len(destinations) != 1 {
 				t.Errorf("Expect 1 ipvs destination, got %d", len(destinations))
 			} else {
-				if destinations[0].Address.To4().String() != epIP2 || destinations[0].Port != uint16(svcPort) {
+				if destinations[0].Address.String() != epIP2 || destinations[0].Port != uint16(svcPort) {
 					t.Errorf("service Endpoint mismatch ipvs service destination")
 				}
 			}

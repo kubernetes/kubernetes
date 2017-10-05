@@ -4213,6 +4213,38 @@ run_certificates_tests() {
   set +o errexit
 }
 
+run_cluster_management_tests() {
+   set -o nounset
+   set -o errexit
+
+   kube::log::status "Testing cluster-management commands"
+
+   kube::test::get_object_assert nodes "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:'
+
+   ### kubectl drain command fails when both --selector and a node argument are given
+   # Pre-condition: node exists and contains label test=label
+   kubectl label node "127.0.0.1" "test=label"
+   kube::test::get_object_assert "nodes 127.0.0.1" '{{.metadata.labels.test}}' 'label'
+   response=$(! kubectl drain "127.0.0.1" --selector test=label 2>&1)
+   kube::test::if_has_string "${response}" 'cannot specify both a node name'
+
+   ### kubectl cordon command fails when no arguments are passed
+   # Pre-condition: node exists
+   response=$(! kubectl cordon 2>&1)
+   kube::test::if_has_string "${response}" 'error\: USAGE\: cordon NODE'
+
+   ### kubectl cordon selects all nodes with an empty --selector=
+   # Pre-condition: node "127.0.0.1" is uncordoned
+   kubectl uncordon "127.0.0.1"
+   response=$(kubectl cordon --selector=)
+   kube::test::if_has_string "${response}" 'node "127.0.0.1" cordoned'
+   # Post-condition: node "127.0.0.1" is cordoned
+   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" 'true'
+
+   set +o nounset
+   set +o errexit
+}
+
 run_plugins_tests() {
   set -o nounset
   set -o errexit
@@ -4802,6 +4834,13 @@ runTests() {
   if kube::test::if_supports_resource "${csr}" ; then
     record_command run_certificates_tests
   fi
+
+   ######################
+   # Cluster Management #
+   ######################
+   if kube::test::if_supports_resource "${nodes}" ; then
+     record_command run_cluster_management_tests
+   fi
 
   ###########
   # Plugins #
