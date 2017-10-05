@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/tools/cache"
@@ -147,6 +148,9 @@ func RequestCertificate(client certificatesclient.CertificateSigningRequestInter
 			return false, nil
 		},
 	)
+	if err == wait.ErrWaitTimeout {
+		return nil, wait.ErrWaitTimeout
+	}
 	if err != nil {
 		return nil, fmt.Errorf("cannot watch on the certificate signing request: %v", err)
 	}
