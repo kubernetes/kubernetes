@@ -29,18 +29,19 @@ Now, run this application on your workstation with your local kubeconfig file:
 
 Running this command will execute the following operations on your cluster:
 
-1. **Create Deployment:** This will create a 2 replica Deployment with
-   annotation `fizz=buzz`. Verify with `kubectl get pods`.
+1. **Create Deployment:** This will create a 2 replica Deployment. Verify with
+   `kubectl get pods`.
 2. **Update Deployment:** This will update the Deployment resource created in
-   previous step to set the replica count to 1 and update annotations. You are
-   encouraged to inspect the retry loop that handles conflicts. Verify the new
-   replica count and `foo=bar` annotation with `kubectl describe deployment
-   demo`.
+   previous step by setting the replica count to 1 and changing the container
+   image to `nginx:1.13`. You are encouraged to inspect the retry loop that
+   handles conflicts. Verify the new replica count and container image with
+   `kubectl describe deployment demo`.
 3. **Rollback Deployment:** This will rollback the Deployment to the last
-   revision, in this case the revision created in Step 1. Use `kubectl describe`
-   to verify the original annotation `fizz=buzz`. Also note the replica count
-   is still 1; this is because a Deployment revision is created if and only
-   if the Deployment's pod template (`.spec.template`) is changed.
+   revision. In this case, it's the revision that was created in Step 1.
+   Use `kubectl describe` to verify the container image is now `nginx:1.12`.
+   Also note that the Deployment's replica count is still 1; this is because a
+   Deployment revision is created if and only if the Deployment's pod template
+   (`.spec.template`) is changed.
 4. **List Deployments:** This will retrieve Deployments in the `default`
    namespace and print their names and replica counts.
 5. **Delete Deployment:** This will delete the Deployment object and its

@@ -26,10 +26,10 @@ import (
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/retry"
 	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
@@ -65,15 +65,12 @@ func main() {
 					Labels: map[string]string{
 						"app": "demo",
 					},
-					Annotations: map[string]string{
-						"fizz": "buzz",
-					},
 				},
 				Spec: apiv1.PodSpec{
 					Containers: []apiv1.Container{
 						{
 							Name:  "web",
-							Image: "nginx:1.13",
+							Image: "nginx:1.12",
 							Ports: []apiv1.ContainerPort{
 								{
 									Name:          "http",
@@ -104,66 +101,52 @@ func main() {
 	//    1. Modify the "deployment" variable and call: Update(deployment).
 	//       This works like the "kubectl replace" command and it overwrites/loses changes
 	//       made by other clients between you Create() and Update() the object.
-	//    2. Modify the "result" returned by Create()/Get() and retry Update(result) until
+	//    2. Modify the "result" returned by Get() and retry Update(result) until
 	//       you no longer get a conflict error. This way, you can preserve changes made
-	//       by other clients between Create() and Update(). This is implemented below:
+	//       by other clients between Create() and Update(). This is implemented below
+	//			 using the retry utility package included with client-go. (RECOMMENDED)
 	//
-	// See the API Conventions:
+	// More Info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#concurrency-control-and-consistency
 
-	for {
-		// Retrieve latest version of Deployment before modifying and updating
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() (err error) {
+		// Retrieve the latest version of Deployment before attempting update
+		// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
 		result, err = deploymentsClient.Get("demo-deployment", metav1.GetOptions{})
 		if err != nil {
 			panic(fmt.Errorf("Get failed: %+v", err))
 		}
-		result.Spec.Replicas = int32Ptr(1)                    // reduce replica count
-		result.Spec.Template.Annotations = map[string]string{ // add annotations
-			"foo": "bar",
-		}
 
-		if _, err = deploymentsClient.Update(result); err != nil {
-			if errors.IsConflict(err) {
-				// Deployment was modified since last retrieved, need to retry
-				fmt.Println("Conflicting resource versions, retrying")
-			} else {
-				panic(err)
-			}
-		} else {
-			fmt.Println("Updated deployment...")
-			break
-		}
-
-		// TODO: You should sleep here with an exponential backoff to avoid
-		// exhausting the apiserver, and add a limit/timeout on the retries to
-		// avoid getting stuck in this loop indefintiely.
+		result.Spec.Replicas = int32Ptr(1)                           // reduce replica count
+		result.Spec.Template.Spec.Containers[0].Image = "nginx:1.13" // change nginx version
+		result, err = deploymentsClient.Update(result)
+		return
+	})
+	if err != nil {
+		panic(fmt.Errorf("Update failed: %+v", err))
 	}
+	fmt.Println("Updated deployment...")
 
 	// Rollback Deployment
 	prompt()
 	fmt.Println("Rolling back deployment...")
-
-	// Use same method as above to avoid version conflicts
-	for {
+	// Once again use RetryOnConflict to avoid update conflicts
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() (err error) {
 		result, err = deploymentsClient.Get("demo-deployment", metav1.GetOptions{})
 		if err != nil {
 			panic(fmt.Errorf("Get failed: %+v", err))
 		}
-		result.Spec.RollbackTo = &appsv1beta1.RollbackConfig{
-			Revision: 0, // Can be specific revision number or 0 for last revision
-		}
 
-		if _, err = deploymentsClient.Update(result); err != nil {
-			if errors.IsConflict(err) {
-				fmt.Println("Conflicting resource versions, retrying")
-			} else {
-				panic(err)
-			}
-		} else {
-			fmt.Println("Rolled back deployment...")
-			break
+		result.Spec.RollbackTo = &appsv1beta1.RollbackConfig{
+			Revision: 0, // can be specific revision number, or 0 for last revision
 		}
+		result, err = deploymentsClient.Update(result)
+		return
+	})
+	if err != nil {
+		panic(fmt.Errorf("Rollback failed: %+v", err))
 	}
+	fmt.Println("Rolled back deployment...")
 
 	// List Deployments
 	prompt()
