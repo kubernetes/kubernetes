@@ -105,10 +105,12 @@ func GetStandardPrinter(outputOpts *OutputOptions, noHeaders bool, mapper meta.R
 		printer = jsonpathPrinter
 
 	case "custom-columns":
-		var err error
-		if printer, err = NewCustomColumnsPrinterFromSpec(formatArgument, decoders[0], noHeaders); err != nil {
+		ccPrinter, err := NewCustomColumnsPrinterFromSpec(formatArgument, decoders[0], noHeaders)
+		if err != nil {
 			return nil, err
 		}
+		ccPrinter.AllowMissingKeys(allowMissingTemplateKeys)
+		printer = ccPrinter
 
 	case "custom-columns-file":
 		file, err := os.Open(formatArgument)
@@ -116,9 +118,12 @@ func GetStandardPrinter(outputOpts *OutputOptions, noHeaders bool, mapper meta.R
 			return nil, fmt.Errorf("error reading template %s, %v\n", formatArgument, err)
 		}
 		defer file.Close()
-		if printer, err = NewCustomColumnsPrinterFromTemplate(file, decoders[0]); err != nil {
+		ccPrinter, err := NewCustomColumnsPrinterFromTemplate(file, decoders[0])
+		if err != nil {
 			return nil, err
 		}
+		ccPrinter.AllowMissingKeys(allowMissingTemplateKeys)
+		printer = ccPrinter
 
 	case "wide":
 		fallthrough

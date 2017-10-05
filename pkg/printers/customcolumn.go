@@ -153,9 +153,18 @@ type CustomColumnsPrinter struct {
 	Columns   []Column
 	Decoder   runtime.Decoder
 	NoHeaders bool
+
+	allowMissingKeys bool
 	// lastType records type of resource printed last so that we don't repeat
 	// header while printing same type of resources.
 	lastType reflect.Type
+}
+
+// AllowMissingKeys allows a caller to specify whether they want an error if a field or map key
+// cannot be located, or simply an empty result. The receiver is returned for chaining.
+func (s *CustomColumnsPrinter) AllowMissingKeys(allow bool) *CustomColumnsPrinter {
+	s.allowMissingKeys = allow
+	return s
 }
 
 func (s *CustomColumnsPrinter) AfterPrint(w io.Writer, res string) error {
@@ -176,7 +185,7 @@ func (s *CustomColumnsPrinter) PrintObj(obj runtime.Object, out io.Writer) error
 	}
 	parsers := make([]*jsonpath.JSONPath, len(s.Columns))
 	for ix := range s.Columns {
-		parsers[ix] = jsonpath.New(fmt.Sprintf("column%d", ix))
+		parsers[ix] = jsonpath.New(fmt.Sprintf("column%d", ix)).AllowMissingKeys(s.allowMissingKeys)
 		if err := parsers[ix].Parse(s.Columns[ix].FieldSpec); err != nil {
 			return err
 		}
@@ -227,7 +236,8 @@ func (s *CustomColumnsPrinter) printOneObject(obj runtime.Object, parsers []*jso
 			return err
 		}
 		if len(values) == 0 || len(values[0]) == 0 {
-			fmt.Fprintf(out, "<none>\t")
+			columns[ix] = "<none>"
+			continue
 		}
 		valueStrings := []string{}
 		for arrIx := range values {
