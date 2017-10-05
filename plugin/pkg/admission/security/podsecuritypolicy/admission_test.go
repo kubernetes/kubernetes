@@ -204,37 +204,54 @@ func TestAdmitPrivileged(t *testing.T) {
 	privilegedPSP.Name = "priv"
 	privilegedPSP.Spec.Privileged = true
 
+	trueValue := true
+	falseValue := false
+
 	tests := map[string]struct {
 		pod          *kapi.Pod
 		psps         []*extensions.PodSecurityPolicy
 		shouldPass   bool
-		expectedPriv bool
+		expectedPriv *bool
 		expectedPSP  string
 	}{
-		"pod without priv request allowed under non priv PSP": {
+		"pod with priv=nil allowed under non priv PSP": {
 			pod:          goodPod(),
 			psps:         []*extensions.PodSecurityPolicy{nonPrivilegedPSP},
 			shouldPass:   true,
-			expectedPriv: false,
+			expectedPriv: nil,
 			expectedPSP:  nonPrivilegedPSP.Name,
 		},
-		"pod without priv request allowed under priv PSP": {
+		"pod with priv=nil allowed under priv PSP": {
 			pod:          goodPod(),
 			psps:         []*extensions.PodSecurityPolicy{privilegedPSP},
 			shouldPass:   true,
-			expectedPriv: false,
+			expectedPriv: nil,
 			expectedPSP:  privilegedPSP.Name,
 		},
-		"pod with priv request denied by non priv PSP": {
+		"pod with priv=false allowed under non priv PSP": {
+			pod:          createPodWithPriv(false),
+			psps:         []*extensions.PodSecurityPolicy{nonPrivilegedPSP},
+			shouldPass:   true,
+			expectedPriv: &falseValue,
+			expectedPSP:  nonPrivilegedPSP.Name,
+		},
+		"pod with priv=false allowed under priv PSP": {
+			pod:          createPodWithPriv(false),
+			psps:         []*extensions.PodSecurityPolicy{privilegedPSP},
+			shouldPass:   true,
+			expectedPriv: &falseValue,
+			expectedPSP:  privilegedPSP.Name,
+		},
+		"pod with priv=true denied by non priv PSP": {
 			pod:        createPodWithPriv(true),
 			psps:       []*extensions.PodSecurityPolicy{nonPrivilegedPSP},
 			shouldPass: false,
 		},
-		"pod with priv request allowed by priv PSP": {
+		"pod with priv=true allowed by priv PSP": {
 			pod:          createPodWithPriv(true),
 			psps:         []*extensions.PodSecurityPolicy{nonPrivilegedPSP, privilegedPSP},
 			shouldPass:   true,
-			expectedPriv: true,
+			expectedPriv: &trueValue,
 			expectedPSP:  privilegedPSP.Name,
 		},
 	}
@@ -243,9 +260,11 @@ func TestAdmitPrivileged(t *testing.T) {
 		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
 
 		if v.shouldPass {
-			if v.pod.Spec.Containers[0].SecurityContext.Privileged == nil ||
-				*v.pod.Spec.Containers[0].SecurityContext.Privileged != v.expectedPriv {
-				t.Errorf("%s expected privileged to be %t", k, v.expectedPriv)
+			priv := v.pod.Spec.Containers[0].SecurityContext.Privileged
+			if (priv == nil) != (v.expectedPriv == nil) {
+				t.Errorf("%s expected privileged to be %v, got %v", k, v.expectedPriv, priv)
+			} else if priv != nil && *priv != *v.expectedPriv {
+				t.Errorf("%s expected privileged to be %v, got %v", k, *v.expectedPriv, *priv)
 			}
 		}
 	}
