@@ -42,13 +42,14 @@ type FailedPredicateMap map[string][]algorithm.PredicateFailureReason
 
 type FitError struct {
 	Pod              *v1.Pod
+	NumAllNodes      int
 	FailedPredicates FailedPredicateMap
 }
 
 var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 
 const (
-	NoNodeAvailableMsg = "No nodes are available that match all of the predicates"
+	NoNodeAvailableMsg = "0/%v nodes are available"
 	// NominatedNodeAnnotationKey is used to annotate a pod that has preempted other pods.
 	// The scheduler uses the annotation to find that the pod shouldn't preempt more pods
 	// when it gets to the head of scheduling queue again.
@@ -68,12 +69,12 @@ func (f *FitError) Error() string {
 	sortReasonsHistogram := func() []string {
 		reasonStrings := []string{}
 		for k, v := range reasons {
-			reasonStrings = append(reasonStrings, fmt.Sprintf("%v (%v)", k, v))
+			reasonStrings = append(reasonStrings, fmt.Sprintf("%v %v", v, k))
 		}
 		sort.Strings(reasonStrings)
 		return reasonStrings
 	}
-	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+": %v.", strings.Join(sortReasonsHistogram(), ", "))
+	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+": %v.", f.NumAllNodes, strings.Join(sortReasonsHistogram(), ", "))
 	return reasonMsg
 }
 
@@ -122,6 +123,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 	if len(filteredNodes) == 0 {
 		return "", &FitError{
 			Pod:              pod,
+			NumAllNodes:      len(nodes),
 			FailedPredicates: failedPredicateMap,
 		}
 	}
