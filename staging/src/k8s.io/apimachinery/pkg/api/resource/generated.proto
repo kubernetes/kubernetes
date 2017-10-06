@@ -87,6 +87,7 @@ option go_package = "resource";
 // +protobuf.embed=string
 // +protobuf.options.marshal=false
 // +protobuf.options.(gogoproto.goproto_stringer)=false
+// +k8s:deepcopy-gen=true
 // +k8s:openapi-gen=true
 message Quantity {
   optional string string = 1;

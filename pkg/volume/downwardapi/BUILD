@@ -10,7 +10,6 @@ go_library(
     name = "go_default_library",
     srcs = ["downwardapi.go"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/v1/resource:go_default_library",
         "//pkg/fieldpath:go_default_library",
         "//pkg/util/strings:go_default_library",
