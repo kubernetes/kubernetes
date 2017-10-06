@@ -77,11 +77,13 @@ func (f *FakeIPVS) AddVirtualServer(serv *utilipvs.VirtualServer) error {
 	return nil
 }
 
-//UpdateVirtualServer is an empty implementation
+//UpdateVirtualServer is a fake implementation, it updates the VirtualServer in the cache store.
 func (f *FakeIPVS) UpdateVirtualServer(serv *utilipvs.VirtualServer) error {
 	if serv == nil {
 		return fmt.Errorf("Failed to update service, service can't be nil")
 	}
+	key := toServiceKey(serv)
+	f.Services[key] = serv
 	return nil
 }
 

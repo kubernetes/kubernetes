@@ -31,6 +31,7 @@ func TestVirtualServer(t *testing.T) {
 		Address:  net.ParseIP("1.2.3.4"),
 		Port:     uint16(80),
 		Protocol: string("TCP"),
+		Flags:    utilipvs.FlagHashed,
 	}
 	err := fake.AddVirtualServer(vs1)
 	if err != nil {
@@ -43,6 +44,22 @@ func TestVirtualServer(t *testing.T) {
 	}
 	if !vs1.Equal(got1) {
 		t.Errorf("Expect virtual server: %v, got: %v", vs1, got1)
+	}
+	// Update virtual server
+	vs12 := &utilipvs.VirtualServer{
+		Address:  net.ParseIP("1.2.3.4"),
+		Port:     uint16(80),
+		Protocol: string("TCP"),
+		Flags:    utilipvs.FlagPersistent,
+	}
+	err = fake.UpdateVirtualServer(vs12)
+	if err != nil {
+		t.Errorf("Fail to update virutal server, error: %v", err)
+	}
+	// Check the updated virtual server
+	got12, err := fake.GetVirtualServer(vs1)
+	if !got12.Equal(vs12) {
+		t.Errorf("Expect virutal server: %v, got: %v", vs12, got12)
 	}
 	// Add another virtual server
 	vs2 := &utilipvs.VirtualServer{
