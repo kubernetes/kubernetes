@@ -152,6 +152,9 @@ func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue stri
 
 		needToSetNewMapValue := currMapValue.Kind() == reflect.Invalid
 		if needToSetNewMapValue {
+			if unset {
+				return fmt.Errorf("current map key `%v` is invalid", mapKey.Interface())
+			}
 			currMapValue = reflect.New(mapValueType.Elem()).Elem().Addr()
 			actualCurrValue.SetMapIndex(mapKey, currMapValue)
 		}
