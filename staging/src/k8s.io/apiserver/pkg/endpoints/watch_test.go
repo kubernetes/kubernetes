@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	example "k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
@@ -310,7 +311,7 @@ func TestWatchRead(t *testing.T) {
 				defer r.Close()
 
 				if contentType != "__default__" && contentType != test.ExpectedContentType {
-					t.Errorf("Unexpected content type: %#v", contentType)
+					t.Errorf("Unexpected content type: %#v != %#v", contentType, test.ExpectedContentType)
 				}
 				objectCodec := codecs.DecoderToVersion(info.Serializer, testInternalGroupVersion)
 
@@ -343,6 +344,7 @@ func TestWatchRead(t *testing.T) {
 					}
 
 					gotObj, err := runtime.Decode(objectCodec, got.Object.Raw)
+
 					if err != nil {
 						t.Fatalf("%s: Decode error: %v", name, err)
 					}
@@ -572,6 +574,14 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	}
 	serializer := info.StreamSerializer
 
+	var ctxFn handlers.ContextFunc
+	ctxFn = func(req *http.Request) request.Context {
+		return request.WithUserAgent(request.NewContext(), req.Header.Get("User-Agent"))
+	}
+	reqScope := handlers.RequestScope{
+		ContextFunc: ctxFn,
+	}
+
 	// Setup a new watchserver
 	watchServer := &handlers.WatchServer{
 		Watching: watcher,
@@ -581,8 +591,9 @@ func TestWatchHTTPTimeout(t *testing.T) {
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
 
-		Fixup:          func(obj runtime.Object) {},
+		Fixup:          func(obj runtime.Object) runtime.Object { return obj },
 		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
+		Scope:          reqScope,
 	}
 
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

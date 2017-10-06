@@ -106,8 +106,8 @@ func (r *REST) Watch(ctx genericapirequest.Context, options *metainternalversion
 	return r.store.Watch(ctx, options)
 }
 
-func (r *REST) Export(ctx genericapirequest.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
-	return r.store.Export(ctx, name, opts)
+func (r *REST) Export(ctx genericapirequest.Context, obj runtime.Object, opts metav1.ExportOptions) (runtime.Object, error) {
+	return r.store.Export(ctx, obj, opts)
 }
 
 // Delete enforces life-cycle rules for namespace termination

@@ -168,7 +168,7 @@ func (i *Info) Namespaced() bool {
 
 // Watch returns server changes to this object after it was retrieved.
 func (i *Info) Watch(resourceVersion string) (watch.Interface, error) {
-	return NewHelper(i.Client, i.Mapping).WatchSingle(i.Namespace, i.Name, resourceVersion)
+	return NewHelper(i.Client, i.Mapping).WatchSingle(i.Namespace, i.Name, resourceVersion, i.Export)
 }
 
 // ResourceMapping returns the mapping for this resource and implements ResourceMapping

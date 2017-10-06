@@ -21,6 +21,7 @@ import (
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -35,7 +36,7 @@ type Registry interface {
 	DeleteService(ctx genericapirequest.Context, name string) error
 	UpdateService(ctx genericapirequest.Context, svc *api.Service) (*api.Service, error)
 	WatchServices(ctx genericapirequest.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
-	ExportService(ctx genericapirequest.Context, name string, options metav1.ExportOptions) (*api.Service, error)
+	ExportService(ctx genericapirequest.Context, obj runtime.Object, options metav1.ExportOptions) (*api.Service, error)
 }
 
 // storage puts strong typing around storage calls
@@ -92,12 +93,12 @@ func (s *storage) WatchServices(ctx genericapirequest.Context, options *metainte
 
 // If StandardStorage implements rest.Exporter, returns exported service.
 // Otherwise export is not supported.
-func (s *storage) ExportService(ctx genericapirequest.Context, name string, options metav1.ExportOptions) (*api.Service, error) {
+func (s *storage) ExportService(ctx genericapirequest.Context, obj runtime.Object, options metav1.ExportOptions) (*api.Service, error) {
 	exporter, isExporter := s.StandardStorage.(rest.Exporter)
 	if !isExporter {
 		return nil, fmt.Errorf("export is not supported")
 	}
-	obj, err := exporter.Export(ctx, name, options)
+	obj, err := exporter.Export(ctx, obj, options)
 	if err != nil {
 		return nil, err
 	}

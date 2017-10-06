@@ -1187,11 +1187,7 @@ func exportObjectMeta(accessor metav1.Object, exact bool) {
 }
 
 // Export implements the rest.Exporter interface
-func (e *Store) Export(ctx genericapirequest.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
-	obj, err := e.Get(ctx, name, &metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
+func (e *Store) Export(ctx genericapirequest.Context, obj runtime.Object, opts metav1.ExportOptions) (runtime.Object, error) {
 	if accessor, err := meta.Accessor(obj); err == nil {
 		exportObjectMeta(accessor, opts.Exact)
 	} else {
@@ -1199,7 +1195,7 @@ func (e *Store) Export(ctx genericapirequest.Context, name string, opts metav1.E
 	}
 
 	if e.ExportStrategy != nil {
-		if err = e.ExportStrategy.Export(ctx, obj, opts.Exact); err != nil {
+		if err := e.ExportStrategy.Export(ctx, obj, opts.Exact); err != nil {
 			return nil, err
 		}
 	} else {

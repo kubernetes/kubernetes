@@ -114,7 +114,7 @@ const MaxRetryWhenPatchConflicts = 5
 
 // getResourceHandler is an HTTP handler function for get requests. It delegates to the
 // passed-in getterFunc to perform the actual get.
-func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc {
+func getResourceHandler(e rest.Exporter, scope RequestScope, getter getterFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		trace := utiltrace.New("Get " + req.URL.Path)
 		defer trace.LogIfLong(500 * time.Millisecond)
@@ -143,28 +143,16 @@ func getResourceHandler(scope RequestScope, getter getterFunc) http.HandlerFunc 
 		}
 
 		trace.Step("About to write a response")
-		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
+		transformAndWriteResponseObject(ctx, e, scope, req, w, http.StatusOK, result)
 	}
 }
 
 // GetResource returns a function that handles retrieving a single resource from a rest.Storage object.
 func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.HandlerFunc {
-	return getResourceHandler(scope,
+	return getResourceHandler(e, scope,
 		func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
-			// check for export
 			options := metav1.GetOptions{}
 			if values := req.URL.Query(); len(values) > 0 {
-				exports := metav1.ExportOptions{}
-				if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, &exports); err != nil {
-					err = errors.NewBadRequest(err.Error())
-					return nil, err
-				}
-				if exports.Export {
-					if e == nil {
-						return nil, errors.NewBadRequest(fmt.Sprintf("export of %q is not supported", scope.Resource.Resource))
-					}
-					return e.Export(ctx, name, exports)
-				}
 				if err := metainternalversion.ParameterCodec.DecodeParameters(values, scope.MetaGroupVersion, &options); err != nil {
 					err = errors.NewBadRequest(err.Error())
 					return nil, err
@@ -173,13 +161,18 @@ func GetResource(r rest.Getter, e rest.Exporter, scope RequestScope) http.Handle
 			if trace != nil {
 				trace.Step("About to Get from storage")
 			}
-			return r.Get(ctx, name, &options)
+			result, err := r.Get(ctx, name, &options)
+			if err != nil {
+				return nil, err
+			}
+
+			return result, err
 		})
 }
 
 // GetResourceWithOptions returns a function that handles retrieving a single resource from a rest.Storage object.
-func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, isSubresource bool) http.HandlerFunc {
-	return getResourceHandler(scope,
+func GetResourceWithOptions(r rest.GetterWithOptions, e rest.Exporter, scope RequestScope, isSubresource bool) http.HandlerFunc {
+	return getResourceHandler(e, scope,
 		func(ctx request.Context, name string, req *http.Request, trace *utiltrace.Trace) (runtime.Object, error) {
 			opts, subpath, subpathKey := r.NewGetOptions()
 			trace.Step("About to process Get options")
@@ -290,7 +283,7 @@ func (r *responder) Error(err error) {
 	r.scope.err(err, r.w, r.req)
 }
 
-func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) http.HandlerFunc {
+func ListResource(r rest.Lister, rw rest.Watcher, e rest.Exporter, scope RequestScope, forceWatch bool, minRequestTimeout time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("List " + req.URL.Path)
@@ -363,7 +356,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			if timeout == 0 && minRequestTimeout > 0 {
 				timeout = time.Duration(float64(minRequestTimeout) * (rand.Float64() + 1.0))
 			}
-			glog.V(2).Infof("Starting watch for %s, rv=%s labels=%s fields=%s timeout=%s", req.URL.Path, opts.ResourceVersion, opts.LabelSelector, opts.FieldSelector, timeout)
+			glog.V(2).Infof("#### Starting watch for %s, rv=%s labels=%s fields=%s timeout=%s", req.URL.Path, opts.ResourceVersion, opts.LabelSelector, opts.FieldSelector, timeout)
 
 			watcher, err := rw.Watch(ctx, &opts)
 			if err != nil {
@@ -372,7 +365,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			}
 			requestInfo, _ := request.RequestInfoFrom(ctx)
 			metrics.RecordLongRunning(req, requestInfo, func() {
-				serveWatch(watcher, scope, req, w, timeout)
+				serveWatch(watcher, e, scope, req, w, timeout)
 			})
 			return
 		}
@@ -400,7 +393,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			}
 		}
 
-		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
+		transformAndWriteResponseObject(ctx, e, scope, req, w, http.StatusOK, result)
 		trace.Step(fmt.Sprintf("Writing http response done (%d items)", numberOfItems))
 	}
 }
@@ -510,7 +503,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 			status.Code = int32(code)
 		}
 
-		transformResponseObject(ctx, scope, req, w, code, result)
+		transformAndWriteResponseObject(ctx, nil, scope, req, w, code, result)
 	}
 }
 
@@ -610,7 +603,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			return
 		}
 
-		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
+		transformAndWriteResponseObject(ctx, nil, scope, req, w, http.StatusOK, result)
 	}
 }
 
@@ -940,7 +933,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			status = http.StatusCreated
 		}
 
-		transformResponseObject(ctx, scope, req, w, status, result)
+		transformAndWriteResponseObject(ctx, nil, scope, req, w, status, result)
 	}
 }
 
@@ -1063,7 +1056,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 			}
 		}
 
-		transformResponseObject(ctx, scope, req, w, status, result)
+		transformAndWriteResponseObject(ctx, nil, scope, req, w, status, result)
 	}
 }
 
@@ -1170,7 +1163,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 			}
 		}
 
-		transformResponseObject(ctx, scope, req, w, http.StatusOK, result)
+		transformAndWriteResponseObject(ctx, nil, scope, req, w, http.StatusOK, result)
 	}
 }
 

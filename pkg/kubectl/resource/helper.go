@@ -73,7 +73,6 @@ func (m *Helper) List(namespace, apiVersion string, selector labels.Selector, ex
 			LabelSelector: selector.String(),
 		}, metav1.ParameterCodec)
 	if export {
-		// TODO: I should be part of ListOptions
 		req.Param("export", strconv.FormatBool(export))
 	}
 	if includeUninitialized {
@@ -82,28 +81,35 @@ func (m *Helper) List(namespace, apiVersion string, selector labels.Selector, ex
 	return req.Do().Get()
 }
 
-func (m *Helper) Watch(namespace, resourceVersion, apiVersion string, labelSelector labels.Selector) (watch.Interface, error) {
-	return m.RESTClient.Get().
+func (m *Helper) Watch(namespace, resourceVersion, apiVersion string, labelSelector labels.Selector,
+	export bool) (watch.Interface, error) {
+	req := m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		VersionedParams(&metav1.ListOptions{
 			ResourceVersion: resourceVersion,
 			Watch:           true,
 			LabelSelector:   labelSelector.String(),
-		}, metav1.ParameterCodec).
-		Watch()
+		}, metav1.ParameterCodec)
+	if export {
+		req.Param("export", strconv.FormatBool(export))
+	}
+	return req.Watch()
 }
 
-func (m *Helper) WatchSingle(namespace, name, resourceVersion string) (watch.Interface, error) {
-	return m.RESTClient.Get().
+func (m *Helper) WatchSingle(namespace, name, resourceVersion string, export bool) (watch.Interface, error) {
+	req := m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
 		VersionedParams(&metav1.ListOptions{
 			ResourceVersion: resourceVersion,
 			Watch:           true,
 			FieldSelector:   fields.OneTermEqualSelector("metadata.name", name).String(),
-		}, metav1.ParameterCodec).
-		Watch()
+		}, metav1.ParameterCodec)
+	if export {
+		req.Param("export", strconv.FormatBool(export))
+	}
+	return req.Watch()
 }
 
 func (m *Helper) Delete(namespace, name string) error {

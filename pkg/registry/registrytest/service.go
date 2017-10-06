@@ -21,6 +21,7 @@ import (
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
@@ -116,7 +117,7 @@ func (r *ServiceRegistry) WatchServices(ctx genericapirequest.Context, options *
 	return nil, r.Err
 }
 
-func (r *ServiceRegistry) ExportService(ctx genericapirequest.Context, name string, options metav1.ExportOptions) (*api.Service, error) {
+func (r *ServiceRegistry) ExportService(ctx genericapirequest.Context, obj runtime.Object, options metav1.ExportOptions) (*api.Service, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

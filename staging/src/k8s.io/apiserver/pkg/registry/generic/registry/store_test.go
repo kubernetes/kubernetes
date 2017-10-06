@@ -732,12 +732,7 @@ func TestStoreCustomExport(t *testing.T) {
 	registry.ExportStrategy = testPodExport{}
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
-	registry.UpdateStrategy.(*testRESTStrategy).allowCreateOnUpdate = true
-	if !updateAndVerify(t, testContext, registry, &podA) {
-		t.Errorf("Unexpected error updating podA")
-	}
-
-	obj, err := registry.Export(testContext, podA.Name, metav1.ExportOptions{})
+	obj, err := registry.Export(testContext, &podA, metav1.ExportOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -748,12 +743,8 @@ func TestStoreCustomExport(t *testing.T) {
 	if exportedPod.Labels["exact"] != "false" {
 		t.Errorf("expected: exact->false, found: %s", exportedPod.Labels["exact"])
 	}
-	if exportedPod.Labels["prepare_create"] != "true" {
-		t.Errorf("expected: prepare_create->true, found: %s", exportedPod.Labels["prepare_create"])
-	}
 	delete(exportedPod.Labels, "exported")
 	delete(exportedPod.Labels, "exact")
-	delete(exportedPod.Labels, "prepare_create")
 	exportObjectMeta(&podA.ObjectMeta, false)
 	podA.Spec = exportedPod.Spec
 	if !reflect.DeepEqual(&podA, exportedPod) {
@@ -781,7 +772,7 @@ func TestStoreBasicExport(t *testing.T) {
 		t.Errorf("Unexpected error updating podA")
 	}
 
-	obj, err := registry.Export(testContext, podA.Name, metav1.ExportOptions{})
+	obj, err := registry.Export(testContext, &podA, metav1.ExportOptions{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

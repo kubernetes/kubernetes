@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/util/wsstream"
 
@@ -62,7 +63,22 @@ func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 
 // serveWatch handles serving requests to the server
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
-func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, w http.ResponseWriter, timeout time.Duration) {
+func serveWatch(watcher watch.Interface, e rest.Exporter, scope RequestScope, req *http.Request, w http.ResponseWriter, timeout time.Duration) {
+
+	mediaTypeOptions, info, err := negotiation.NegotiateOutputMediaType(req, scope.Serializer, &scope)
+	if err != nil {
+		err = errors.NewBadRequest(err.Error())
+		scope.err(err, w, req)
+		return
+	}
+
+	exportOptions, err := buildExportOptions(scope, req, mediaTypeOptions, e)
+	if err != nil {
+		err = errors.NewBadRequest(err.Error())
+		scope.err(err, w, req)
+		return
+	}
+
 	// negotiate for the stream serializer
 	serializer, err := negotiation.NegotiateOutputStreamSerializer(req, scope.Serializer)
 	if err != nil {
@@ -83,10 +99,10 @@ func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, 
 	// find the embedded serializer matching the media type
 	embeddedEncoder := scope.Serializer.EncoderForVersion(embedded, scope.Kind.GroupVersion())
 
-	// TODO: next step, get back mediaTypeOptions from negotiate and return the exact value here
-	mediaType := serializer.MediaType
-	if mediaType != runtime.ContentTypeJSON {
-		mediaType += ";stream=watch"
+	// TODO: we now have MediaTypeOptions here, but tests still seem to expect this stream=watch param
+	// to be appended automatically. Test may be inaccurate now?
+	if info.MediaType != runtime.ContentTypeJSON {
+		info.MediaType += ";stream=watch"
 	}
 
 	ctx := scope.ContextFunc(req)
@@ -101,14 +117,19 @@ func serveWatch(watcher watch.Interface, scope RequestScope, req *http.Request, 
 		Scope:    scope,
 
 		UseTextFraming:  useTextFraming,
-		MediaType:       mediaType,
+		MediaType:       info.MediaType,
 		Framer:          framer,
 		Encoder:         encoder,
 		EmbeddedEncoder: embeddedEncoder,
-		Fixup: func(obj runtime.Object) {
+		Fixup: func(obj runtime.Object) runtime.Object {
 			if err := setSelfLink(obj, requestInfo, scope.Namer); err != nil {
-				utilruntime.HandleError(fmt.Errorf("failed to set link for object %v: %v", reflect.TypeOf(obj), err))
+				utilruntime.HandleError(fmt.Errorf("failed to set link for object: %v (%#v)", reflect.TypeOf(obj), err))
 			}
+			obj, err = transformResponseObject(ctx, e, exportOptions, scope, req.URL.Query(), mediaTypeOptions, obj)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("unable to transform watch object: %v (%#v)", reflect.TypeOf(obj), err))
+			}
+			return obj
 		},
 
 		TimeoutFactory: &realTimeoutFactory{timeout},
@@ -132,7 +153,7 @@ type WatchServer struct {
 	Encoder runtime.Encoder
 	// used to encode the nested object in the watch stream
 	EmbeddedEncoder runtime.Encoder
-	Fixup           func(runtime.Object)
+	Fixup           func(runtime.Object) runtime.Object
 
 	TimeoutFactory TimeoutFactory
 }
@@ -200,8 +221,9 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			obj := event.Object
-			s.Fixup(obj)
+			var err error
+			obj := s.Fixup(event.Object)
+
 			if err := s.EmbeddedEncoder.Encode(obj, buf); err != nil {
 				// unexpected error
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v", err))
@@ -218,7 +240,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			// and we get the benefit of using conversion functions which already have to stay in sync
 			outEvent := &metav1.WatchEvent{}
 			*internalEvent = metav1.InternalEvent(event)
-			err := metav1.Convert_versioned_InternalEvent_to_versioned_Event(internalEvent, outEvent, nil)
+			err = metav1.Convert_versioned_InternalEvent_to_versioned_Event(internalEvent, outEvent, nil)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to convert watch object: %v", err))
 				// client disconnect.
@@ -267,8 +289,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 				// End of results.
 				return
 			}
-			obj := event.Object
-			s.Fixup(obj)
+			obj := s.Fixup(event.Object)
 			if err := s.EmbeddedEncoder.Encode(obj, buf); err != nil {
 				// unexpected error
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v", err))
