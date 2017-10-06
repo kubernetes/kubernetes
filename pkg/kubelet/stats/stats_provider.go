@@ -86,21 +86,15 @@ type containerStatsProvider interface {
 	ImageFsStats() (*statsapi.FsStats, error)
 }
 
-// GetCgroupStats returns the stats of the cgroup with the cgroupName.
+// GetCgroupStats returns the stats of the cgroup with the cgroupName. Note that
+// this function doesn't generate filesystem stats.
 func (p *StatsProvider) GetCgroupStats(cgroupName string) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
 	info, err := getCgroupInfo(p.cadvisor, cgroupName)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get cgroup stats for %q: %v", cgroupName, err)
 	}
-	rootFsInfo, err := p.cadvisor.RootFsInfo()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get rootFs info: %v", err)
-	}
-	imageFsInfo, err := p.cadvisor.ImagesFsInfo()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get imageFs info: %v", err)
-	}
-	s := cadvisorInfoToContainerStats(cgroupName, info, &rootFsInfo, &imageFsInfo)
+	// Rootfs and imagefs doesn't make sense for raw cgroup.
+	s := cadvisorInfoToContainerStats(cgroupName, info, nil, nil)
 	n := cadvisorInfoToNetworkStats(cgroupName, info)
 	return s, n, nil
 }
