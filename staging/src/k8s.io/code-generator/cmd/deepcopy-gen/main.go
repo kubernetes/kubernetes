@@ -60,14 +60,14 @@ import (
 func main() {
 	arguments := args.Default()
 
-	// Override defaults.
-	arguments.OutputFileBaseName = "deepcopy_generated"
-	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
-
 	// Custom args.
 	customArgs := &generators.CustomArgs{}
 	pflag.CommandLine.StringSliceVar(&customArgs.BoundingDirs, "bounding-dirs", customArgs.BoundingDirs,
 		"Comma-separated list of import paths which bound the types for which deep-copies will be generated.")
+
+	// Override defaults.
+	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
+	arguments.OutputFileBaseName = "deepcopy_generated"
 	arguments.CustomArgs = customArgs
 
 	// Run it.
