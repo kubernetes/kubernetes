@@ -109,6 +109,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "apps", Version: "v1beta2", Kind: "DeploymentList"}:                                                  {},
 		{Group: "extensions", Version: "v1beta1", Kind: "PodSecurityPolicy"}:                                         {},
 		{Group: "extensions", Version: "v1beta1", Kind: "PodSecurityPolicyList"}:                                     {},
+		{Group: "apps", Version: "v1", Kind: "ReplicaSet"}:                                                           {},
+		{Group: "apps", Version: "v1", Kind: "ReplicaSetList"}:                                                       {},
 		{Group: "apps", Version: "v1beta2", Kind: "ReplicaSet"}:                                                      {},
 		{Group: "apps", Version: "v1beta2", Kind: "ReplicaSetList"}:                                                  {},
 		{Group: "extensions", Version: "v1beta1", Kind: "ReplicaSet"}:                                                {},

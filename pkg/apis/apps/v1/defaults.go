@@ -47,3 +47,10 @@ func SetDefaults_DaemonSet(obj *appsv1.DaemonSet) {
 		*obj.Spec.RevisionHistoryLimit = 10
 	}
 }
+
+func SetDefaults_ReplicaSet(obj *appsv1.ReplicaSet) {
+	if obj.Spec.Replicas == nil {
+		obj.Spec.Replicas = new(int32)
+		*obj.Spec.Replicas = 1
+	}
+}
