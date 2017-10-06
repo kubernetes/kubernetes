@@ -200,7 +200,8 @@ func TestGenericScheduler(t *testing.T) {
 			pod:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 			name:         "test 1",
 			wErr: &FitError{
-				Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+				NumAllNodes: 2,
 				FailedPredicates: FailedPredicateMap{
 					"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 					"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
@@ -260,7 +261,8 @@ func TestGenericScheduler(t *testing.T) {
 			expectsErr:   true,
 			name:         "test 7",
 			wErr: &FitError{
-				Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+				NumAllNodes: 3,
 				FailedPredicates: FailedPredicateMap{
 					"3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 					"2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
@@ -290,7 +292,8 @@ func TestGenericScheduler(t *testing.T) {
 			expectsErr:   true,
 			name:         "test 8",
 			wErr: &FitError{
-				Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+				NumAllNodes: 2,
 				FailedPredicates: FailedPredicateMap{
 					"1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 					"2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
@@ -406,15 +409,16 @@ func makeNode(node string, milliCPU, memory int64) *v1.Node {
 
 func TestHumanReadableFitError(t *testing.T) {
 	err := &FitError{
-		Pod: &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+		Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+		NumAllNodes: 3,
 		FailedPredicates: FailedPredicateMap{
 			"1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderMemoryPressure},
 			"2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
 			"3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrNodeUnderDiskPressure},
 		},
 	}
-	if strings.Contains(err.Error(), NoNodeAvailableMsg) {
-		if strings.Contains(err.Error(), "NodeUnderDiskPressure (2)") && strings.Contains(err.Error(), "NodeUnderMemoryPressure (1)") {
+	if strings.Contains(err.Error(), "0/3 nodes are available") {
+		if strings.Contains(err.Error(), "2 NodeUnderDiskPressure") && strings.Contains(err.Error(), "1 NodeUnderMemoryPressure") {
 			return
 		}
 	}
@@ -1180,7 +1184,7 @@ func TestPreempt(t *testing.T) {
 		scheduler := NewGenericScheduler(
 			cache, nil, map[string]algorithm.FitPredicate{"matches": algorithmpredicates.PodFitsResources}, algorithm.EmptyPredicateMetadataProducer, []algorithm.PriorityConfig{{Function: numericPriority, Weight: 1}}, algorithm.EmptyMetadataProducer, extenders)
 		// Call Preempt and check the expected results.
-		node, victims, err := scheduler.Preempt(test.pod, schedulertesting.FakeNodeLister(makeNodeList(nodeNames)), error(&FitError{test.pod, failedPredMap}))
+		node, victims, err := scheduler.Preempt(test.pod, schedulertesting.FakeNodeLister(makeNodeList(nodeNames)), error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
 		if err != nil {
 			t.Errorf("test [%v]: unexpected error in preemption: %v", test.name, err)
 		}
@@ -1208,7 +1212,7 @@ func TestPreempt(t *testing.T) {
 			test.pod.Annotations[NominatedNodeAnnotationKey] = node.Name
 		}
 		// Call preempt again and make sure it doesn't preempt any more pods.
-		node, victims, err = scheduler.Preempt(test.pod, schedulertesting.FakeNodeLister(makeNodeList(nodeNames)), error(&FitError{test.pod, failedPredMap}))
+		node, victims, err = scheduler.Preempt(test.pod, schedulertesting.FakeNodeLister(makeNodeList(nodeNames)), error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
 		if err != nil {
 			t.Errorf("test [%v]: unexpected error in preemption: %v", test.name, err)
 		}
