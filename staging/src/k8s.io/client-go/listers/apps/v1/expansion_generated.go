@@ -25,3 +25,19 @@ type DaemonSetListerExpansion interface{}
 // DaemonSetNamespaceListerExpansion allows custom methods to be added to
 // DaemonSetNamespaceLister.
 type DaemonSetNamespaceListerExpansion interface{}
+
+// ReplicaSetListerExpansion allows custom methods to be added to
+// ReplicaSetLister.
+type ReplicaSetListerExpansion interface{}
+
+// ReplicaSetNamespaceListerExpansion allows custom methods to be added to
+// ReplicaSetNamespaceLister.
+type ReplicaSetNamespaceListerExpansion interface{}
+
+// ScaleListerExpansion allows custom methods to be added to
+// ScaleLister.
+type ScaleListerExpansion interface{}
+
+// ScaleNamespaceListerExpansion allows custom methods to be added to
+// ScaleNamespaceLister.
+type ScaleNamespaceListerExpansion interface{}

@@ -6,6 +6,8 @@ go_library(
         "doc.go",
         "fake_apps_client.go",
         "fake_daemonset.go",
+        "fake_replicaset.go",
+        "fake_scale.go",
     ],
     visibility = ["//visibility:public"],
     deps = [

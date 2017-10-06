@@ -7,6 +7,8 @@ go_library(
         "daemonset.go",
         "doc.go",
         "generated_expansion.go",
+        "replicaset.go",
+        "scale.go",
     ],
     visibility = ["//visibility:public"],
     deps = [

@@ -160,6 +160,119 @@ message DaemonSetUpdateStrategy {
   optional RollingUpdateDaemonSet rollingUpdate = 2;
 }
 
+// ReplicaSet ensures that a specified number of pod replicas are running at any given time.
+message ReplicaSet {
+  // If the Labels of a ReplicaSet are empty, they are defaulted to
+  // be the same as the Pod(s) that the ReplicaSet manages.
+  // Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Spec defines the specification of the desired behavior of the ReplicaSet.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // +optional
+  optional ReplicaSetSpec spec = 2;
+
+  // Status is the most recently observed status of the ReplicaSet.
+  // This data may be out of date by some window of time.
+  // Populated by the system.
+  // Read-only.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // +optional
+  optional ReplicaSetStatus status = 3;
+}
+
+// ReplicaSetCondition describes the state of a replica set at a certain point.
+message ReplicaSetCondition {
+  // Type of replica set condition.
+  optional string type = 1;
+
+  // Status of the condition, one of True, False, Unknown.
+  optional string status = 2;
+
+  // The last time the condition transitioned from one status to another.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+
+  // The reason for the condition's last transition.
+  // +optional
+  optional string reason = 4;
+
+  // A human readable message indicating details about the transition.
+  // +optional
+  optional string message = 5;
+}
+
+// ReplicaSetList is a collection of ReplicaSets.
+message ReplicaSetList {
+  // Standard list metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // List of ReplicaSets.
+  // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller
+  repeated ReplicaSet items = 2;
+}
+
+// ReplicaSetSpec is the specification of a ReplicaSet.
+message ReplicaSetSpec {
+  // Replicas is the number of desired replicas.
+  // This is a pointer to distinguish between explicit zero and unspecified.
+  // Defaults to 1.
+  // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller
+  // +optional
+  optional int32 replicas = 1;
+
+  // Minimum number of seconds for which a newly created pod should be ready
+  // without any of its container crashing, for it to be considered available.
+  // Defaults to 0 (pod will be considered available as soon as it is ready)
+  // +optional
+  optional int32 minReadySeconds = 4;
+
+  // Selector is a label query over pods that should match the replica count.
+  // If the selector is empty, it is defaulted to the labels present on the pod template.
+  // Label keys and values that must match in order to be controlled by this replica set.
+  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
+
+  // Template is the object that describes the pod that will be created if
+  // insufficient replicas are detected.
+  // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
+  // +optional
+  optional k8s.io.api.core.v1.PodTemplateSpec template = 3;
+}
+
+// ReplicaSetStatus represents the current status of a ReplicaSet.
+message ReplicaSetStatus {
+  // Replicas is the most recently oberved number of replicas.
+  // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller
+  optional int32 replicas = 1;
+
+  // The number of pods that have labels matching the labels of the pod template of the replicaset.
+  // +optional
+  optional int32 fullyLabeledReplicas = 2;
+
+  // The number of ready replicas for this replica set.
+  // +optional
+  optional int32 readyReplicas = 4;
+
+  // The number of available replicas (ready for at least minReadySeconds) for this replica set.
+  // +optional
+  optional int32 availableReplicas = 5;
+
+  // ObservedGeneration reflects the generation of the most recently observed ReplicaSet.
+  // +optional
+  optional int64 observedGeneration = 3;
+
+  // Represents the latest available observations of a replica set's current state.
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  repeated ReplicaSetCondition conditions = 6;
+}
+
 // Spec to control the desired behavior of daemon set rolling update.
 message RollingUpdateDaemonSet {
   // The maximum number of DaemonSet pods that can be unavailable during the
@@ -178,5 +291,46 @@ message RollingUpdateDaemonSet {
   // all times during the update.
   // +optional
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxUnavailable = 1;
+}
+
+// Scale represents a scaling request for a resource.
+message Scale {
+  // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
+  // +optional
+  optional ScaleSpec spec = 2;
+
+  // current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only.
+  // +optional
+  optional ScaleStatus status = 3;
+}
+
+// ScaleSpec describes the attributes of a scale subresource
+message ScaleSpec {
+  // desired number of instances for the scaled object.
+  // +optional
+  optional int32 replicas = 1;
+}
+
+// ScaleStatus represents the current status of a scale subresource.
+message ScaleStatus {
+  // actual number of observed instances of the scaled object.
+  optional int32 replicas = 1;
+
+  // label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
+  // +optional
+  map<string, string> selector = 2;
+
+  // label selector for pods that should match the replicas count. This is a serializated
+  // version of both map-based and more expressive set-based selectors. This is done to
+  // avoid introspection in the clients. The string will be in the same format as the
+  // query-param syntax. If the target type only supports map-based selectors, both this
+  // field and map-based selector field are populated.
+  // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+  // +optional
+  optional string targetSelector = 3;
 }
 

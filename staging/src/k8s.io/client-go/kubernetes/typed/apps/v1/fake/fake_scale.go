@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package fake
 
-type DaemonSetExpansion interface{}
-
-type ReplicaSetExpansion interface{}
-
-type ScaleExpansion interface{}
+// FakeScales implements ScaleInterface
+type FakeScales struct {
+	Fake *FakeAppsV1
+	ns   string
+}
