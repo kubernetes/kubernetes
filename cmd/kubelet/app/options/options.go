@@ -121,7 +121,7 @@ func NewKubeletFlags() *KubeletFlags {
 		RequireKubeConfig:       false,
 		KubeConfig:              flag.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 		ContainerRuntimeOptions: *NewContainerRuntimeOptions(),
-		CertDirectory:           "/var/run/kubernetes",
+		CertDirectory:           "/var/lib/kubelet/pki",
 		RootDirectory:           v1alpha1.DefaultRootDir,
 		// DEPRECATED: auto detecting cloud providers goes against the initiative
 		// for out-of-tree cloud providers as we'll now depend on cAdvisor integrations
