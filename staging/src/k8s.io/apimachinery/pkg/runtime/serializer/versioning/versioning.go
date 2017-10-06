@@ -123,12 +123,7 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 		if c.defaulter != nil {
 			// create a copy to ensure defaulting is not applied to the original versioned objects
 			if isVersioned {
-				copied, err := c.copier.Copy(obj)
-				if err != nil {
-					utilruntime.HandleError(err)
-					copied = obj
-				}
-				versioned.Objects = []runtime.Object{copied}
+				versioned.Objects = []runtime.Object{obj.DeepCopyObject()}
 			}
 			c.defaulter.Default(obj)
 		} else {
@@ -151,12 +146,7 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 	// Convert if needed.
 	if isVersioned {
 		// create a copy, because ConvertToVersion does not guarantee non-mutation of objects
-		copied, err := c.copier.Copy(obj)
-		if err != nil {
-			utilruntime.HandleError(err)
-			copied = obj
-		}
-		versioned.Objects = []runtime.Object{copied}
+		versioned.Objects = []runtime.Object{obj.DeepCopyObject()}
 	}
 
 	// perform defaulting if requested

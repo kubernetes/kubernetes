@@ -420,15 +420,6 @@ func (s *Scheme) Default(src Object) {
 	}
 }
 
-// Copy does a deep copy of an API object.
-func (s *Scheme) Copy(src Object) (Object, error) {
-	dst, err := s.DeepCopy(src)
-	if err != nil {
-		return nil, err
-	}
-	return dst.(Object), nil
-}
-
 // Performs a deep copy of the given object.
 func (s *Scheme) DeepCopy(src interface{}) (interface{}, error) {
 	return s.cloner.DeepCopy(src)
