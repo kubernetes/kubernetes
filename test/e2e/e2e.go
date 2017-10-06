@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/kubectl/util/logs"
+	"k8s.io/kubernetes/pkg/version"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
@@ -225,6 +226,19 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 			framework.Logf("Dumping network health container logs from all nodes...")
 		}
 		framework.LogContainersInPodsWithLabels(c, metav1.NamespaceSystem, framework.ImagePullerLabels, "nethealth", logFunc)
+	}
+
+	// Log the version of the server and this client.
+	framework.Logf("Client version: %s", version.Get().GitVersion)
+
+	dc := c.DiscoveryClient
+
+	serverVersion, serverErr := dc.ServerVersion()
+	if serverErr != nil {
+		framework.Logf("Unexpected server error retrieving version: %v", serverErr)
+	}
+	if serverVersion != nil {
+		framework.Logf("Server version: %s", serverVersion.GitVersion)
 	}
 
 	// Reference common test to make the import valid.

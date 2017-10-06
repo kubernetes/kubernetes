@@ -60,6 +60,7 @@ go_library(
         "//pkg/controller/node:go_default_library",
         "//pkg/kubectl/util/logs:go_default_library",
         "//pkg/quota/evaluator/core:go_default_library",
+        "//pkg/version:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/ginkgowrapper:go_default_library",
