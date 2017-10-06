@@ -455,7 +455,7 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 		"failUserPSP": {
 			pod:           failUserPod,
 			psp:           failUserPSP,
-			expectedError: "does not match required range",
+			expectedError: "runAsUser: Invalid value",
 		},
 		"failSELinuxPSP": {
 			pod:           failSELinuxPod,
