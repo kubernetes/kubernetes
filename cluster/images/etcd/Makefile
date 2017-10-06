@@ -56,10 +56,10 @@ build:
 	find ./ -maxdepth 1 -type f | xargs cp -t $(TEMP_DIR)
 
 	# Compile attachlease
-	docker run -it -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes -v $(TEMP_DIR):/build -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
+	docker run -i -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes -v $(TEMP_DIR):/build -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
 		/bin/bash -c "CGO_ENABLED=0 go build -o /build/attachlease k8s.io/kubernetes/cluster/images/etcd/attachlease"
 	# Compile rollback
-	docker run -it -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes -v $(TEMP_DIR):/build -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
+	docker run -i -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes -v $(TEMP_DIR):/build -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
 		/bin/bash -c "CGO_ENABLED=0 go build -o /build/rollback k8s.io/kubernetes/cluster/images/etcd/rollback"
 
 
@@ -80,7 +80,7 @@ else
 	# For each release create a tmp dir 'etcd_release_tmp_dir' and unpack the release tar there.
 	for tag in $(TAGS); do \
 		etcd_release_tmp_dir=$(shell mktemp -d); \
-		docker run -it -v $$etcd_release_tmp_dir:/etcdbin golang:$(GOLANG_VERSION) /bin/bash -c \
+		docker run -i -v $$etcd_release_tmp_dir:/etcdbin golang:$(GOLANG_VERSION) /bin/bash -c \
 			"git clone https://github.com/coreos/etcd /go/src/github.com/coreos/etcd \
 			&& cd /go/src/github.com/coreos/etcd \
 			&& git checkout v$$tag \
