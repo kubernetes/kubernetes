@@ -123,6 +123,12 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 		storage["daemonsets"] = daemonSetStorage
 		storage["daemonsets/status"] = daemonSetStatusStorage
 	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("statefulsets")) {
+		statefulSetStorage := statefulsetstore.NewStorage(restOptionsGetter)
+		storage["statefulsets"] = statefulSetStorage.StatefulSet
+		storage["statefulsets/status"] = statefulSetStorage.Status
+		storage["statefulsets/scale"] = statefulSetStorage.Scale
+	}
 	return storage
 }
 
