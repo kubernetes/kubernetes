@@ -23,7 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"strings"
+	"regexp"
 
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -56,6 +56,18 @@ var (
 		<file-spec> is:
 		[namespace/]pod-name:/file/path for a remote file
 		/file/path for a local file`)
+
+	// fileSpec format: [[namespace/]pod:]file/path
+	// fileSpec search pattern:
+	//  - An optional non-capturing group wrapping the namespace/pod prefix
+	//    - A optional non-capturing group wrapping the namespace and literal `/` separator
+	//      - A capturing group for the namespace, matching at least one character that
+	//        isn't a `/` or `:` separator
+	//    - A non-capturing group wrapping the pod and `:` separator
+	//      - A capturing group for the pod, matching at least one character that isn't a
+	//        `/` or `:` separator
+	//  - A capturing group for the file path, matching at least one character
+	fileSpecRegexp = regexp.MustCompile(`^(?:(?:([^/:]+)/)?(?:([^/:]+):))?(.+)$`)
 )
 
 // NewCmdCp creates a new Copy command.
@@ -80,36 +92,16 @@ type fileSpec struct {
 	File         string
 }
 
-var errFileSpecDoesntMatchFormat = errors.New("Filespec must match the canonical format: [[namespace/]pod:]file/path")
-
 func extractFileSpec(arg string) (fileSpec, error) {
-	pieces := strings.Split(arg, ":")
-	if len(pieces) == 1 {
-		return fileSpec{File: arg}, nil
+	matches := fileSpecRegexp.FindStringSubmatch(arg)
+	if len(matches) != 4 {
+		return fileSpec{}, errors.New("Filespec must match the canonical format: [[namespace/]pod:]file/path")
 	}
-	if len(pieces) != 2 {
-		// FIXME Kubernetes can't copy files that contain a ':'
-		// character.
-		return fileSpec{}, errFileSpecDoesntMatchFormat
-	}
-	file := pieces[1]
-
-	pieces = strings.Split(pieces[0], "/")
-	if len(pieces) == 1 {
-		return fileSpec{
-			PodName: pieces[0],
-			File:    file,
-		}, nil
-	}
-	if len(pieces) == 2 {
-		return fileSpec{
-			PodNamespace: pieces[0],
-			PodName:      pieces[1],
-			File:         file,
-		}, nil
-	}
-
-	return fileSpec{}, errFileSpecDoesntMatchFormat
+	return fileSpec{
+		PodNamespace: matches[1],
+		PodName:      matches[2],
+		File:         matches[3],
+	}, nil
 }
 
 func runCopy(f cmdutil.Factory, cmd *cobra.Command, out, cmderr io.Writer, args []string) error {
