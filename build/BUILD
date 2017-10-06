@@ -126,9 +126,9 @@ release_filegroup(
         "//cmd/hyperkube",
         "//cmd/kube-apiserver",
         "//cmd/kube-controller-manager",
-        "//cmd/kubeadm",
         "//plugin/cmd/kube-scheduler",
         "//vendor/k8s.io/kube-aggregator",
+        "//vendor/k8s.io/kubeadm",
     ],
 )
 

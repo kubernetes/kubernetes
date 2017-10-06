@@ -177,7 +177,7 @@ func isSecretExpired(secret *api.Secret) bool {
 	return false
 }
 
-// Copied from kubernetes/cmd/kubeadm/app/util/token
+// Copied from kubeadm/app/util/token
 
 var (
 	tokenRegexpString = "^([a-z0-9]{6})\\.([a-z0-9]{16})$"

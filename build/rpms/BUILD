@@ -31,7 +31,7 @@ pkg_rpm(
     changelog = "//:CHANGELOG.md",
     data = [
         "10-kubeadm.conf",
-        "//cmd/kubeadm",
+        "//vendor/k8s.io/kubeadm",
     ],
     spec_file = "kubeadm.spec",
     version_file = "//build:os_package_version",

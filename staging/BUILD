@@ -203,6 +203,7 @@ filegroup(
         "//staging/src/k8s.io/code-generator/cmd/set-gen:all-srcs",
         "//staging/src/k8s.io/code-generator/third_party/forked/golang/reflect:all-srcs",
         "//staging/src/k8s.io/kube-aggregator:all-srcs",
+        "//staging/src/k8s.io/kubeadm:all-srcs",
         "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics:all-srcs",
         "//staging/src/k8s.io/metrics/pkg/apis/metrics:all-srcs",
         "//staging/src/k8s.io/metrics/pkg/client/clientset_generated/clientset:all-srcs",

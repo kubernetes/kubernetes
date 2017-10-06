@@ -68,7 +68,7 @@ deb_data(
     name = "kubeadm",
     data = [
         {
-            "files": ["//cmd/kubeadm"],
+            "files": ["//vendor/k8s.io/kubeadm"],
             "mode": "0755",
             "dir": "/usr/bin",
         },
