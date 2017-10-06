@@ -57,10 +57,31 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		},
 		func(psp *extensions.PodSecurityPolicySpec, c fuzz.Continue) {
 			c.FuzzNoCustom(psp) // fuzz self without calling this function again
-			runAsUserRules := []extensions.RunAsUserStrategy{extensions.RunAsUserStrategyMustRunAsNonRoot, extensions.RunAsUserStrategyMustRunAs, extensions.RunAsUserStrategyRunAsAny}
+
+			runAsUserRules := []extensions.RunAsUserStrategy{
+				extensions.RunAsUserStrategyMustRunAsNonRoot,
+				extensions.RunAsUserStrategyMustRunAs,
+				extensions.RunAsUserStrategyRunAsAny,
+			}
 			psp.RunAsUser.Rule = runAsUserRules[c.Rand.Intn(len(runAsUserRules))]
-			seLinuxRules := []extensions.SELinuxStrategy{extensions.SELinuxStrategyRunAsAny, extensions.SELinuxStrategyMustRunAs}
+
+			seLinuxRules := []extensions.SELinuxStrategy{
+				extensions.SELinuxStrategyMustRunAs,
+				extensions.SELinuxStrategyRunAsAny,
+			}
 			psp.SELinux.Rule = seLinuxRules[c.Rand.Intn(len(seLinuxRules))]
+
+			supplementalGroupsRules := []extensions.SupplementalGroupsStrategyType{
+				extensions.SupplementalGroupsStrategyRunAsAny,
+				extensions.SupplementalGroupsStrategyMustRunAs,
+			}
+			psp.SupplementalGroups.Rule = supplementalGroupsRules[c.Rand.Intn(len(supplementalGroupsRules))]
+
+			fsGroupRules := []extensions.FSGroupStrategyType{
+				extensions.FSGroupStrategyMustRunAs,
+				extensions.FSGroupStrategyRunAsAny,
+			}
+			psp.FSGroup.Rule = fsGroupRules[c.Rand.Intn(len(fsGroupRules))]
 		},
 		func(s *extensions.Scale, c fuzz.Continue) {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
