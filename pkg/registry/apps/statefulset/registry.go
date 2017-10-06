@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
 )
 
@@ -82,7 +81,7 @@ func (s *storage) CreateStatefulSet(ctx genericapirequest.Context, statefulSet *
 }
 
 func (s *storage) UpdateStatefulSet(ctx genericapirequest.Context, statefulSet *apps.StatefulSet) (*apps.StatefulSet, error) {
-	obj, _, err := s.Update(ctx, statefulSet.Name, rest.DefaultUpdatedObjectInfo(statefulSet, api.Scheme))
+	obj, _, err := s.Update(ctx, statefulSet.Name, rest.DefaultUpdatedObjectInfo(statefulSet))
 	if err != nil {
 		return nil, err
 	}

@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // NewCodecForScheme is a convenience method for callers that are using a scheme.
@@ -33,7 +32,7 @@ func NewCodecForScheme(
 	encodeVersion runtime.GroupVersioner,
 	decodeVersion runtime.GroupVersioner,
 ) runtime.Codec {
-	return NewCodec(encoder, decoder, runtime.UnsafeObjectConvertor(scheme), scheme, scheme, scheme, nil, encodeVersion, decodeVersion)
+	return NewCodec(encoder, decoder, runtime.UnsafeObjectConvertor(scheme), scheme, scheme, nil, encodeVersion, decodeVersion)
 }
 
 // NewDefaultingCodecForScheme is a convenience method for callers that are using a scheme.
@@ -45,7 +44,7 @@ func NewDefaultingCodecForScheme(
 	encodeVersion runtime.GroupVersioner,
 	decodeVersion runtime.GroupVersioner,
 ) runtime.Codec {
-	return NewCodec(encoder, decoder, runtime.UnsafeObjectConvertor(scheme), scheme, scheme, scheme, scheme, encodeVersion, decodeVersion)
+	return NewCodec(encoder, decoder, runtime.UnsafeObjectConvertor(scheme), scheme, scheme, scheme, encodeVersion, decodeVersion)
 }
 
 // NewCodec takes objects in their internal versions and converts them to external versions before
@@ -56,7 +55,6 @@ func NewCodec(
 	decoder runtime.Decoder,
 	convertor runtime.ObjectConvertor,
 	creater runtime.ObjectCreater,
-	copier runtime.ObjectCopier,
 	typer runtime.ObjectTyper,
 	defaulter runtime.ObjectDefaulter,
 	encodeVersion runtime.GroupVersioner,
@@ -67,7 +65,6 @@ func NewCodec(
 		decoder:   decoder,
 		convertor: convertor,
 		creater:   creater,
-		copier:    copier,
 		typer:     typer,
 		defaulter: defaulter,
 
@@ -82,7 +79,6 @@ type codec struct {
 	decoder   runtime.Decoder
 	convertor runtime.ObjectConvertor
 	creater   runtime.ObjectCreater
-	copier    runtime.ObjectCopier
 	typer     runtime.ObjectTyper
 	defaulter runtime.ObjectDefaulter
 

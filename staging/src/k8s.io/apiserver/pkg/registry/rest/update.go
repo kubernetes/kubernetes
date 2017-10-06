@@ -136,19 +136,14 @@ type defaultUpdatedObjectInfo struct {
 	// obj is the updated object
 	obj runtime.Object
 
-	// copier makes a copy of the object before returning it.
-	// this allows repeated calls to UpdatedObject() to return
-	// pristine data, even if the returned value is mutated.
-	copier runtime.ObjectCopier
-
 	// transformers is an optional list of transforming functions that modify or
 	// replace obj using information from the context, old object, or other sources.
 	transformers []TransformFunc
 }
 
 // DefaultUpdatedObjectInfo returns an UpdatedObjectInfo impl based on the specified object.
-func DefaultUpdatedObjectInfo(obj runtime.Object, copier runtime.ObjectCopier, transformers ...TransformFunc) UpdatedObjectInfo {
-	return &defaultUpdatedObjectInfo{obj, copier, transformers}
+func DefaultUpdatedObjectInfo(obj runtime.Object, transformers ...TransformFunc) UpdatedObjectInfo {
+	return &defaultUpdatedObjectInfo{obj, transformers}
 }
 
 // Preconditions satisfies the UpdatedObjectInfo interface.

@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/registry/apps/controllerrevision"
 )
@@ -33,7 +32,6 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work with ControllerRevision objects.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
-		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &apps.ControllerRevision{} },
 		NewListFunc:              func() runtime.Object { return &apps.ControllerRevisionList{} },
 		DefaultQualifiedResource: apps.Resource("controllerrevisions"),

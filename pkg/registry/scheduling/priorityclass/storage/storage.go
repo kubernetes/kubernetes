@@ -21,7 +21,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	schedulingapi "k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/registry/scheduling/priorityclass"
 )
@@ -34,7 +33,6 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against priority classes.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
-		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &schedulingapi.PriorityClass{} },
 		NewListFunc:              func() runtime.Object { return &schedulingapi.PriorityClassList{} },
 		DefaultQualifiedResource: schedulingapi.Resource("priorityclasses"),

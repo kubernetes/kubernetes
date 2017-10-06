@@ -487,9 +487,9 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 		// TODO: when we move to server API versions, we should completely remove the unversioned concept
 		if unversionedKind, ok := s.unversionedTypes[t]; ok {
 			if gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{unversionedKind}); ok {
-				return copyAndSetTargetKind(copy, s, in, gvk)
+				return copyAndSetTargetKind(copy, in, gvk)
 			}
-			return copyAndSetTargetKind(copy, s, in, unversionedKind)
+			return copyAndSetTargetKind(copy, in, unversionedKind)
 		}
 
 		return nil, NewNotRegisteredErrForTarget(t, target)
@@ -498,16 +498,16 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 	// target wants to use the existing type, set kind and return (no conversion necessary)
 	for _, kind := range kinds {
 		if gvk == kind {
-			return copyAndSetTargetKind(copy, s, in, gvk)
+			return copyAndSetTargetKind(copy, in, gvk)
 		}
 	}
 
 	// type is unversioned, no conversion necessary
 	if unversionedKind, ok := s.unversionedTypes[t]; ok {
 		if gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{unversionedKind}); ok {
-			return copyAndSetTargetKind(copy, s, in, gvk)
+			return copyAndSetTargetKind(copy, in, gvk)
 		}
-		return copyAndSetTargetKind(copy, s, in, unversionedKind)
+		return copyAndSetTargetKind(copy, in, unversionedKind)
 	}
 
 	out, err := s.New(gvk)
@@ -535,7 +535,7 @@ func (s *Scheme) generateConvertMeta(in interface{}) (conversion.FieldMatchingFl
 }
 
 // copyAndSetTargetKind performs a conditional copy before returning the object, or an error if copy was not successful.
-func copyAndSetTargetKind(copy bool, copier ObjectCopier, obj Object, kind schema.GroupVersionKind) (Object, error) {
+func copyAndSetTargetKind(copy bool, obj Object, kind schema.GroupVersionKind) (Object, error) {
 	if copy {
 		obj = obj.DeepCopyObject()
 	}

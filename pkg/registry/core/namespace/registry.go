@@ -72,7 +72,7 @@ func (s *storage) CreateNamespace(ctx genericapirequest.Context, namespace *api.
 }
 
 func (s *storage) UpdateNamespace(ctx genericapirequest.Context, namespace *api.Namespace) error {
-	_, _, err := s.Update(ctx, namespace.Name, rest.DefaultUpdatedObjectInfo(namespace, api.Scheme))
+	_, _, err := s.Update(ctx, namespace.Name, rest.DefaultUpdatedObjectInfo(namespace))
 	return err
 }
 

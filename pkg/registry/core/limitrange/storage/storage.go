@@ -32,7 +32,6 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against limitranges.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
-		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &api.LimitRange{} },
 		NewListFunc:              func() runtime.Object { return &api.LimitRangeList{} },
 		DefaultQualifiedResource: api.Resource("limitranges"),

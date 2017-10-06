@@ -23,7 +23,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	policyapi "k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -39,7 +38,6 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against pod disruption budgets.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &policyapi.PodDisruptionBudget{} },
 		NewListFunc:              func() runtime.Object { return &policyapi.PodDisruptionBudgetList{} },
 		DefaultQualifiedResource: policyapi.Resource("poddisruptionbudgets"),
