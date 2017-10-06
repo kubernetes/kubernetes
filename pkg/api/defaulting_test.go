@@ -99,6 +99,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "extensions", Version: "v1beta1", Kind: "DaemonSetList"}:                                             {},
 		{Group: "apps", Version: "v1beta2", Kind: "DaemonSet"}:                                                       {},
 		{Group: "apps", Version: "v1beta2", Kind: "DaemonSetList"}:                                                   {},
+		{Group: "apps", Version: "v1", Kind: "DaemonSet"}:                                                            {},
+		{Group: "apps", Version: "v1", Kind: "DaemonSetList"}:                                                        {},
 		{Group: "extensions", Version: "v1beta1", Kind: "Deployment"}:                                                {},
 		{Group: "extensions", Version: "v1beta1", Kind: "DeploymentList"}:                                            {},
 		{Group: "apps", Version: "v1beta1", Kind: "Deployment"}:                                                      {},
