@@ -56,7 +56,7 @@ type kubeAPI interface {
 	UpdateNodePodCIDR(ctx context.Context, node *v1.Node, cidrRange *net.IPNet) error
 	// UpdateNodeNetworkUnavailable updates the network unavailable status for the node.
 	UpdateNodeNetworkUnavailable(nodeName string, unavailable bool) error
-	// EmitNodeEvent emits an event for the given node.
+	// EmitNodeWarningEvent emits an event for the given node.
 	EmitNodeWarningEvent(nodeName, reason, fmt string, args ...interface{})
 }
 
@@ -262,11 +262,6 @@ func (op *updateOp) updateNodeFromAlias(ctx context.Context, sync *NodeSync, nod
 	}
 
 	glog.V(2).Infof("Node %q PodCIDR set to %v", node.Name, aliasRange)
-
-	if err := sync.kubeAPI.UpdateNodeNetworkUnavailable(node.Name, false); err != nil {
-		glog.Errorf("Error setting route status for node %q: %v", node.Name, err)
-		return err
-	}
 
 	if err := sync.kubeAPI.UpdateNodeNetworkUnavailable(node.Name, false); err != nil {
 		glog.Errorf("Could not update node NetworkUnavailable status to false: %v", err)
