@@ -1090,6 +1090,7 @@
 		},
 		{
 			"ImportPath": "github.com/docker/libnetwork/ipvs",
+			"Comment": "v0.8.0-dev.2-910-gba46b92",
 			"Rev": "ba46b928444931e6865d8618dc03622cac79aa6f"
 		},
 		{
@@ -1626,10 +1627,6 @@
 		},
 		{
 			"ImportPath": "github.com/gophercloud/gophercloud/openstack",
-			"Rev": "b4c2377fa77951a0e08163f52dc9b3e206355194"
-		},
-		{
-			"ImportPath": "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions",
 			"Rev": "b4c2377fa77951a0e08163f52dc9b3e206355194"
 		},
 		{

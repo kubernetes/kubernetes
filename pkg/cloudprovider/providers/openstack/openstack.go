@@ -24,13 +24,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
-	apiversions_v1 "github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/extensions/trusts"
@@ -664,49 +662,6 @@ func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 	return r, true
 }
 
-// Implementation of sort interface for blockstorage version probing
-type APIVersionsByID []apiversions_v1.APIVersion
-
-func (apiVersions APIVersionsByID) Len() int {
-	return len(apiVersions)
-}
-
-func (apiVersions APIVersionsByID) Swap(i, j int) {
-	apiVersions[i], apiVersions[j] = apiVersions[j], apiVersions[i]
-}
-
-func (apiVersions APIVersionsByID) Less(i, j int) bool {
-	return apiVersions[i].ID > apiVersions[j].ID
-}
-
-func autoVersionSelector(apiVersion *apiversions_v1.APIVersion) string {
-	switch strings.ToLower(apiVersion.ID) {
-	case "v2.0":
-		return "v2"
-	case "v1.0":
-		return "v1"
-	default:
-		return ""
-	}
-}
-
-func doBsApiVersionAutodetect(availableApiVersions []apiversions_v1.APIVersion) string {
-	sort.Sort(APIVersionsByID(availableApiVersions))
-	for _, status := range []string{"CURRENT", "SUPPORTED"} {
-		for _, version := range availableApiVersions {
-			if strings.ToUpper(version.Status) == status {
-				if detectedApiVersion := autoVersionSelector(&version); detectedApiVersion != "" {
-					glog.V(3).Infof("Blockstorage API version probing has found a suitable %s api version: %s", status, detectedApiVersion)
-					return detectedApiVersion
-				}
-			}
-		}
-	}
-
-	return ""
-
-}
-
 func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
 	bsVersion := ""
 	if forceVersion == "" {
@@ -721,43 +676,36 @@ func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
 		if err != nil {
 			return nil, err
 		}
+		glog.V(3).Infof("Using Blockstorage API V1")
 		return &VolumesV1{sClient, os.bsOpts}, nil
 	case "v2":
 		sClient, err := os.NewBlockStorageV2()
 		if err != nil {
 			return nil, err
 		}
+		glog.V(3).Infof("Using Blockstorage API V2")
 		return &VolumesV2{sClient, os.bsOpts}, nil
 	case "auto":
-		sClient, err := os.NewBlockStorageV1()
+		// Currently kubernetes just support Cinder v1 and Cinder v2.
+		// Choose Cinder v2 firstly, if kubernetes can't initialize cinder v2 client, try to initialize cinder v1 client.
+		// Return appropriate message when kubernetes can't initialize them.
+		// TODO(FengyunPan): revisit 'auto' after supporting Cinder v3.
+		sClient, err := os.NewBlockStorageV2()
 		if err != nil {
-			return nil, err
-		}
-		availableApiVersions := []apiversions_v1.APIVersion{}
-		err = apiversions_v1.List(sClient).EachPage(func(page pagination.Page) (bool, error) {
-			// returning false from this handler stops page iteration, error is propagated to the upper function
-			apiversions, err := apiversions_v1.ExtractAPIVersions(page)
+			sClient, err = os.NewBlockStorageV1()
 			if err != nil {
-				glog.Errorf("Unable to extract api versions from page: %v", err)
-				return false, err
+				// Nothing suitable found, failed autodetection, just exit with appropriate message
+				err_txt := "BlockStorage API version autodetection failed. " +
+					"Please set it explicitly in cloud.conf in section [BlockStorage] with key `bs-version`"
+				return nil, errors.New(err_txt)
+			} else {
+				glog.V(3).Infof("Using Blockstorage API V1")
+				return &VolumesV1{sClient, os.bsOpts}, nil
 			}
-			availableApiVersions = append(availableApiVersions, apiversions...)
-			return true, nil
-		})
-
-		if err != nil {
-			glog.Errorf("Error when retrieving list of supported blockstorage api versions: %v", err)
-			return nil, err
-		}
-		if autodetectedVersion := doBsApiVersionAutodetect(availableApiVersions); autodetectedVersion != "" {
-			return os.volumeService(autodetectedVersion)
 		} else {
-			// Nothing suitable found, failed autodetection, just exit with appropriate message
-			err_txt := "BlockStorage API version autodetection failed. " +
-				"Please set it explicitly in cloud.conf in section [BlockStorage] with key `bs-version`"
-			return nil, errors.New(err_txt)
+			glog.V(3).Infof("Using Blockstorage API V2")
+			return &VolumesV2{sClient, os.bsOpts}, nil
 		}
-
 	default:
 		err_txt := fmt.Sprintf("Config error: unrecognised bs-version \"%v\"", os.bsOpts.BSVersion)
 		glog.Warningf(err_txt)

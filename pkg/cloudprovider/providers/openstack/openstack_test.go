@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack/blockstorage/v1/apiversions"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"k8s.io/api/core/v1"
 
@@ -555,48 +554,6 @@ func TestVolumes(t *testing.T) {
 	}
 	t.Logf("Volume (%s) deleted\n", vol)
 
-}
-
-func TestCinderAutoDetectApiVersion(t *testing.T) {
-	updated := "" // not relevant to this test, can be set to any value
-	status_current := "CURRENT"
-	status_supported := "SUPpORTED" // lowercase to test regression resitance if api returns different case
-	status_deprecated := "DEPRECATED"
-
-	var result_version, api_version [4]string
-
-	for ver := 0; ver <= 3; ver++ {
-		api_version[ver] = fmt.Sprintf("v%d.0", ver)
-		result_version[ver] = fmt.Sprintf("v%d", ver)
-	}
-	result_version[0] = ""
-	api_current_v1 := apiversions.APIVersion{ID: api_version[1], Status: status_current, Updated: updated}
-	api_current_v2 := apiversions.APIVersion{ID: api_version[2], Status: status_current, Updated: updated}
-	api_current_v3 := apiversions.APIVersion{ID: api_version[3], Status: status_current, Updated: updated}
-
-	api_supported_v1 := apiversions.APIVersion{ID: api_version[1], Status: status_supported, Updated: updated}
-	api_supported_v2 := apiversions.APIVersion{ID: api_version[2], Status: status_supported, Updated: updated}
-
-	api_deprecated_v1 := apiversions.APIVersion{ID: api_version[1], Status: status_deprecated, Updated: updated}
-	api_deprecated_v2 := apiversions.APIVersion{ID: api_version[2], Status: status_deprecated, Updated: updated}
-
-	var testCases = []struct {
-		test_case     []apiversions.APIVersion
-		wanted_result string
-	}{
-		{[]apiversions.APIVersion{api_current_v1}, result_version[1]},
-		{[]apiversions.APIVersion{api_current_v2}, result_version[2]},
-		{[]apiversions.APIVersion{api_supported_v1, api_current_v2}, result_version[2]},                     // current always selected
-		{[]apiversions.APIVersion{api_current_v1, api_supported_v2}, result_version[1]},                     // current always selected
-		{[]apiversions.APIVersion{api_current_v3, api_supported_v2, api_deprecated_v1}, result_version[2]},  // with current v3, but should fall back to v2
-		{[]apiversions.APIVersion{api_current_v3, api_deprecated_v2, api_deprecated_v1}, result_version[0]}, // v3 is not supported
-	}
-
-	for _, suite := range testCases {
-		if autodetectedVersion := doBsApiVersionAutodetect(suite.test_case); autodetectedVersion != suite.wanted_result {
-			t.Fatalf("Autodetect for suite: %s, failed with result: '%s', wanted '%s'", suite.test_case, autodetectedVersion, suite.wanted_result)
-		}
-	}
 }
 
 func TestInstanceIDFromProviderID(t *testing.T) {
