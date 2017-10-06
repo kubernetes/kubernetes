@@ -242,11 +242,7 @@ func DeleteTaint(taints []v1.Taint, taintToDelete *v1.Taint) ([]v1.Taint, bool) 
 // RemoveTaint tries to remove a taint from annotations list. Returns a new copy of updated Node and true if something was updated
 // false otherwise.
 func RemoveTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
-	objCopy, err := api.Scheme.DeepCopy(node)
-	if err != nil {
-		return nil, false, err
-	}
-	newNode := objCopy.(*v1.Node)
+	newNode := node.DeepCopy()
 	nodeTaints := newNode.Spec.Taints
 	if len(nodeTaints) == 0 {
 		return newNode, false, nil
@@ -264,11 +260,7 @@ func RemoveTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
 // AddOrUpdateTaint tries to add a taint to annotations list. Returns a new copy of updated Node and true if something was updated
 // false otherwise.
 func AddOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
-	objCopy, err := api.Scheme.DeepCopy(node)
-	if err != nil {
-		return nil, false, err
-	}
-	newNode := objCopy.(*v1.Node)
+	newNode := node.DeepCopy()
 	nodeTaints := newNode.Spec.Taints
 
 	var newTaints []v1.Taint

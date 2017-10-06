@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/api"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -238,16 +237,7 @@ func (cm *containerManagerImpl) validateNodeAllocatable() error {
 	var errors []string
 	nar := cm.GetNodeAllocatableReservation()
 	for k, v := range nar {
-		capacityClone, err := api.Scheme.DeepCopy(cm.capacity[k])
-		if err != nil {
-			errors = append(errors, fmt.Sprintf("DeepCopy capacity error"))
-		}
-		value, ok := capacityClone.(resource.Quantity)
-		if !ok {
-			return fmt.Errorf(
-				"failed to cast object %#v to Quantity",
-				capacityClone)
-		}
+		value := cm.capacity[k].DeepCopy()
 		value.Sub(v)
 
 		if value.Sign() < 0 {

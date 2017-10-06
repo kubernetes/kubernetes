@@ -420,11 +420,6 @@ func (s *Scheme) Default(src Object) {
 	}
 }
 
-// Performs a deep copy of the given object.
-func (s *Scheme) DeepCopy(src interface{}) (interface{}, error) {
-	return s.cloner.DeepCopy(src)
-}
-
 // Convert will attempt to convert in into out. Both must be pointers. For easy
 // testing of conversion functions. Returns an error if the conversion isn't
 // possible. You can call this with types that haven't been registered (for example,

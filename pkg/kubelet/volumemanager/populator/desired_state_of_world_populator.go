@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
@@ -386,18 +385,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 	}
 
 	// Do not return the original volume object, since the source could mutate it
-	clonedPodVolumeObj, err := scheme.Scheme.DeepCopy(&podVolume)
-	if err != nil || clonedPodVolumeObj == nil {
-		return nil, "", fmt.Errorf(
-			"failed to deep copy %q volume object. err=%v", podVolume.Name, err)
-	}
-
-	clonedPodVolume, ok := clonedPodVolumeObj.(*v1.Volume)
-	if !ok {
-		return nil, "", fmt.Errorf(
-			"failed to cast clonedPodVolume %#v to v1.Volume",
-			clonedPodVolumeObj)
-	}
+	clonedPodVolume := podVolume.DeepCopy()
 
 	return volume.NewSpecFromVolume(clonedPodVolume), "", nil
 }
