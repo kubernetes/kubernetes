@@ -323,12 +323,12 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		"failNilSELinux": {
 			pod:           failNilSELinuxPod,
 			psp:           failSELinuxPSP,
-			expectedError: "unable to validate nil seLinuxOptions",
+			expectedError: "seLinuxOptions: Required",
 		},
 		"failInvalidSELinux": {
 			pod:           failInvalidSELinuxPod,
 			psp:           failSELinuxPSP,
-			expectedError: "does not match required level.  Found bar, wanted foo",
+			expectedError: "seLinuxOptions.level: Invalid value",
 		},
 		"failHostDirPSP": {
 			pod:           failHostDirPod,
@@ -460,7 +460,7 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 		"failSELinuxPSP": {
 			pod:           failSELinuxPod,
 			psp:           failSELinuxPSP,
-			expectedError: "does not match required level",
+			expectedError: "seLinuxOptions.level: Invalid value",
 		},
 		"failNilAppArmor": {
 			pod:           failNilAppArmorPod,

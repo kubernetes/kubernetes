@@ -100,19 +100,19 @@ func TestMustRunAsValidate(t *testing.T) {
 	}{
 		"invalid role": {
 			seLinux:     role,
-			expectedMsg: "does not match required role",
+			expectedMsg: "role: Invalid value",
 		},
 		"invalid user": {
 			seLinux:     user,
-			expectedMsg: "does not match required user",
+			expectedMsg: "user: Invalid value",
 		},
 		"invalid level": {
 			seLinux:     level,
-			expectedMsg: "does not match required level",
+			expectedMsg: "level: Invalid value",
 		},
 		"invalid type": {
 			seLinux:     seType,
-			expectedMsg: "does not match required type",
+			expectedMsg: "type: Invalid value",
 		},
 		"valid": {
 			seLinux:     newValidOpts(),
@@ -130,13 +130,8 @@ func TestMustRunAsValidate(t *testing.T) {
 			t.Errorf("unexpected error initializing NewMustRunAs for testcase %s: %#v", name, err)
 			continue
 		}
-		container := &api.Container{
-			SecurityContext: &api.SecurityContext{
-				SELinuxOptions: tc.seLinux,
-			},
-		}
 
-		errs := mustRunAs.Validate(nil, container)
+		errs := mustRunAs.Validate(nil, nil, nil, tc.seLinux)
 		//should've passed but didn't
 		if len(tc.expectedMsg) == 0 && len(errs) > 0 {
 			t.Errorf("%s expected no errors but received %v", name, errs)

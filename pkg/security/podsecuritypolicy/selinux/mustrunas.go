@@ -43,41 +43,33 @@ func NewMustRunAs(options *extensions.SELinuxStrategyOptions) (SELinuxStrategy, 
 }
 
 // Generate creates the SELinuxOptions based on constraint rules.
-func (s *mustRunAs) Generate(pod *api.Pod, container *api.Container) (*api.SELinuxOptions, error) {
+func (s *mustRunAs) Generate(_ *api.Pod, _ *api.Container) (*api.SELinuxOptions, error) {
 	return s.opts.SELinuxOptions, nil
 }
 
 // Validate ensures that the specified values fall within the range of the strategy.
-func (s *mustRunAs) Validate(pod *api.Pod, container *api.Container) field.ErrorList {
+func (s *mustRunAs) Validate(fldPath *field.Path, _ *api.Pod, _ *api.Container, seLinux *api.SELinuxOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if container.SecurityContext == nil {
-		detail := fmt.Sprintf("unable to validate nil security context for %s", container.Name)
-		allErrs = append(allErrs, field.Invalid(field.NewPath("securityContext"), container.SecurityContext, detail))
+	if seLinux == nil {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
 		return allErrs
 	}
-	if container.SecurityContext.SELinuxOptions == nil {
-		detail := fmt.Sprintf("unable to validate nil seLinuxOptions for %s", container.Name)
-		allErrs = append(allErrs, field.Invalid(field.NewPath("seLinuxOptions"), container.SecurityContext.SELinuxOptions, detail))
-		return allErrs
-	}
-	seLinuxOptionsPath := field.NewPath("seLinuxOptions")
-	seLinux := container.SecurityContext.SELinuxOptions
 	if seLinux.Level != s.opts.SELinuxOptions.Level {
-		detail := fmt.Sprintf("seLinuxOptions.level on %s does not match required level.  Found %s, wanted %s", container.Name, seLinux.Level, s.opts.SELinuxOptions.Level)
-		allErrs = append(allErrs, field.Invalid(seLinuxOptionsPath.Child("level"), seLinux.Level, detail))
+		detail := fmt.Sprintf("must be %s", s.opts.SELinuxOptions.Level)
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("level"), seLinux.Level, detail))
 	}
 	if seLinux.Role != s.opts.SELinuxOptions.Role {
-		detail := fmt.Sprintf("seLinuxOptions.role on %s does not match required role.  Found %s, wanted %s", container.Name, seLinux.Role, s.opts.SELinuxOptions.Role)
-		allErrs = append(allErrs, field.Invalid(seLinuxOptionsPath.Child("role"), seLinux.Role, detail))
+		detail := fmt.Sprintf("must be %s", s.opts.SELinuxOptions.Role)
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("role"), seLinux.Role, detail))
 	}
 	if seLinux.Type != s.opts.SELinuxOptions.Type {
-		detail := fmt.Sprintf("seLinuxOptions.type on %s does not match required type.  Found %s, wanted %s", container.Name, seLinux.Type, s.opts.SELinuxOptions.Type)
-		allErrs = append(allErrs, field.Invalid(seLinuxOptionsPath.Child("type"), seLinux.Type, detail))
+		detail := fmt.Sprintf("must be %s", s.opts.SELinuxOptions.Type)
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), seLinux.Type, detail))
 	}
 	if seLinux.User != s.opts.SELinuxOptions.User {
-		detail := fmt.Sprintf("seLinuxOptions.user on %s does not match required user.  Found %s, wanted %s", container.Name, seLinux.User, s.opts.SELinuxOptions.User)
-		allErrs = append(allErrs, field.Invalid(seLinuxOptionsPath.Child("user"), seLinux.User, detail))
+		detail := fmt.Sprintf("must be %s", s.opts.SELinuxOptions.User)
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("user"), seLinux.User, detail))
 	}
 
 	return allErrs
