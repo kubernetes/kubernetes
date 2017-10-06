@@ -56,7 +56,7 @@ import (
 )
 
 const (
-	// Jitter used when starting controller managers
+	// ControllerStartJitter is the jitter value used when starting controller managers.
 	ControllerStartJitter = 1.0
 )
 

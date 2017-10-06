@@ -70,6 +70,13 @@ func TestDevicePluginReRegistration(t *testing.T) {
 	p1.Register(socketName, testResourceName)
 	// Wait for the first callback to be issued.
 	<-callbackChan
+	// Wait till the endpoint is added to the manager.
+	for i := 0; i < 20; i++ {
+		if len(m.Devices()) > 0 {
+			break
+		}
+		time.Sleep(1)
+	}
 	devices := m.Devices()
 	require.Equal(t, 2, len(devices[testResourceName]), "Devices are not updated.")
 

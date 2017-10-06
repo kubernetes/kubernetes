@@ -18,6 +18,7 @@ package storage
 
 import (
 	"fmt"
+	"hash/fnv"
 	"os"
 	"time"
 
@@ -25,6 +26,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/vmware/govmomi/find"
+	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stype "k8s.io/apimachinery/pkg/types"
@@ -54,6 +57,8 @@ const (
 	StripeWidthCapabilityVal                   = "2"
 	DiskStripesCapabilityInvalidVal            = "14"
 	HostFailuresToTolerateCapabilityInvalidVal = "4"
+	DummyVMPrefixName                          = "vsphere-k8s"
+	DiskStripesCapabilityMaxVal                = "11"
 )
 
 /*
@@ -81,6 +86,8 @@ const (
    6. Wait for Disk to be attached to the node.
    7. Delete pod and Wait for Volume Disk to be detached from the Node.
    8. Delete PVC, PV and Storage Class
+
+
 */
 
 var _ = SIGDescribe("vSphere Storage policy support for dynamic provisioning", func() {
@@ -94,6 +101,7 @@ var _ = SIGDescribe("vSphere Storage policy support for dynamic provisioning", f
 		framework.SkipUnlessProviderIs("vsphere")
 		client = f.ClientSet
 		namespace = f.Namespace.Name
+		framework.Logf("framework: %+v", f)
 		scParameters = make(map[string]string)
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		if !(len(nodeList.Items) > 0) {
@@ -208,6 +216,16 @@ var _ = SIGDescribe("vSphere Storage policy support for dynamic provisioning", f
 		invokeValidPolicyTest(f, client, namespace, scParameters)
 	})
 
+	It("verify clean up of stale dummy VM for dynamically provisioned pvc using SPBM policy", func() {
+		scParameters[Policy_DiskStripes] = DiskStripesCapabilityMaxVal
+		scParameters[Policy_ObjectSpaceReservation] = ObjectSpaceReservationCapabilityVal
+		scParameters[Datastore] = VsanDatastore
+		framework.Logf("Invoking Test for SPBM storage policy: %+v", scParameters)
+		clusterName := os.Getenv("VSPHERE_KUBERNETES_CLUSTER")
+		Expect(clusterName).NotTo(BeEmpty())
+		invokeStaleDummyVMTestWithStoragePolicy(client, namespace, clusterName, scParameters)
+	})
+
 	It("verify if a SPBM policy is not honored on a non-compatible datastore for dynamically provisioned pvc using storageclass", func() {
 		By(fmt.Sprintf("Invoking Test for SPBM policy: %s and datastore: %s", os.Getenv("VSPHERE_SPBM_TAG_POLICY"), VsanDatastore))
 		tagPolicy := os.Getenv("VSPHERE_SPBM_TAG_POLICY")
@@ -269,7 +287,7 @@ func invokeValidPolicyTest(f *framework.Framework, client clientset.Interface, n
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
 	By("Waiting for claim to be in bound phase")
-	persistentvolumes, err := framework.WaitForPVClaimBoundPhase(client, pvclaims)
+	persistentvolumes, err := framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Creating pod to attach PV to the node")
@@ -306,4 +324,52 @@ func invokeInvalidPolicyTestNeg(client clientset.Interface, namespace string, sc
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
 	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
+}
+
+func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, namespace string, clusterName string, scParameters map[string]string) {
+	By("Creating Storage Class With storage policy params")
+	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("storagepolicysc", scParameters))
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create storage class with err: %v", err))
+	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
+
+	By("Creating PVC using the Storage Class")
+	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, storageclass))
+	Expect(err).NotTo(HaveOccurred())
+
+	var pvclaims []*v1.PersistentVolumeClaim
+	pvclaims = append(pvclaims, pvclaim)
+	By("Expect claim to fail provisioning volume")
+	_, err = framework.WaitForPVClaimBoundPhase(client, pvclaims, 2*time.Minute)
+	Expect(err).To(HaveOccurred())
+
+	updatedClaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(pvclaim.Name, metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+	vmName := clusterName + "-dynamic-pvc-" + string(updatedClaim.UID)
+	framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+	// Wait for 6 minutes to let the vSphere Cloud Provider clean up routine delete the dummy VM
+	time.Sleep(6 * time.Minute)
+
+	fnvHash := fnv.New32a()
+	fnvHash.Write([]byte(vmName))
+	dummyVMFullName := DummyVMPrefixName + "-" + fmt.Sprint(fnvHash.Sum32())
+	errorMsg := "Dummy VM - " + vmName + "is still present. Failing the test.."
+	Expect(isDummyVMPresent(dummyVMFullName)).NotTo(BeTrue(), errorMsg)
+}
+
+func isDummyVMPresent(vmName string) bool {
+	By("Verifing if the dummy VM is deleted by the vSphere Cloud Provider clean up routine")
+	govMoMiClient, err := vsphere.GetgovmomiClient(nil)
+	Expect(err).NotTo(HaveOccurred())
+
+	f := find.NewFinder(govMoMiClient.Client, true)
+	ctx, _ := context.WithCancel(context.Background())
+
+	workingDir := os.Getenv("VSPHERE_WORKING_DIR")
+	Expect(workingDir).NotTo(BeEmpty())
+	vmPath := workingDir + vmName
+	_, err = f.VirtualMachine(ctx, vmPath)
+	if err != nil {
+		return false
+	}
+	return true
 }

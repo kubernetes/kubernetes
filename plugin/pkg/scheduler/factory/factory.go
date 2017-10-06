@@ -523,15 +523,6 @@ func (c *ConfigFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node,
 		// TODO(resouer): think about lazily initialize this set
 		invalidPredicates := sets.NewString()
 
-		oldTaints, oldErr := helper.GetTaintsFromNodeAnnotations(oldNode.GetAnnotations())
-		if oldErr != nil {
-			glog.Errorf("Failed to get taints from old node annotation for equivalence cache")
-		}
-		newTaints, newErr := helper.GetTaintsFromNodeAnnotations(newNode.GetAnnotations())
-		if newErr != nil {
-			glog.Errorf("Failed to get taints from new node annotation for equivalence cache")
-		}
-
 		if !reflect.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable) {
 			invalidPredicates.Insert("GeneralPredicates") // "PodFitsResources"
 		}
@@ -550,9 +541,20 @@ func (c *ConfigFactory) invalidateCachedPredicatesOnNodeUpdate(newNode *v1.Node,
 				}
 			}
 		}
-		if !reflect.DeepEqual(oldTaints, newTaints) {
+
+		oldTaints, oldErr := helper.GetTaintsFromNodeAnnotations(oldNode.GetAnnotations())
+		if oldErr != nil {
+			glog.Errorf("Failed to get taints from old node annotation for equivalence cache")
+		}
+		newTaints, newErr := helper.GetTaintsFromNodeAnnotations(newNode.GetAnnotations())
+		if newErr != nil {
+			glog.Errorf("Failed to get taints from new node annotation for equivalence cache")
+		}
+		if !reflect.DeepEqual(oldTaints, newTaints) ||
+			!reflect.DeepEqual(oldNode.Spec.Taints, newNode.Spec.Taints) {
 			invalidPredicates.Insert("PodToleratesNodeTaints")
 		}
+
 		if !reflect.DeepEqual(oldNode.Status.Conditions, newNode.Status.Conditions) {
 			oldConditions := make(map[v1.NodeConditionType]v1.ConditionStatus)
 			newConditions := make(map[v1.NodeConditionType]v1.ConditionStatus)
