@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package dockershim provides Docker integration using
-//  pkg/kubelet/apis/cri/v1alpha1/runtime/api.pb.go
-package dockershim
+// Package status provides the status manager. Status manager is the source of truth for kubelet
+// pod status. Manager provides status to other components and updates status in the API server.
+package status

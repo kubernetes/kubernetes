@@ -9,6 +9,7 @@ go_library(
         "container_manager_unsupported.go",
         "device_plugin_handler.go",
         "device_plugin_handler_stub.go",
+        "doc.go",
         "fake_internal_container_lifecycle.go",
         "helpers_unsupported.go",
         "internal_container_lifecycle.go",

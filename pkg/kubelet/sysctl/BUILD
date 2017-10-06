@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "doc.go",
         "namespace.go",
         "runtime.go",
         "whitelist.go",

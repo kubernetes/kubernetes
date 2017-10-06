@@ -25,6 +25,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "doc.go",
         "fake_manager.go",
         "secret_manager.go",
     ],

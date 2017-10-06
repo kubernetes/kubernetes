@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package dockershim provides Docker integration using
-//  pkg/kubelet/apis/cri/v1alpha1/runtime/api.pb.go
-package dockershim
+/*
+Package configmap provides storage and management of pod ConfigMaps. Implements
+a cache of ConfigMaps for registered pods. Interfaces with the API server to fetch
+ConfigMaps not valid in cache.
+*/
+package configmap

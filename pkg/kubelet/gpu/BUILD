@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "doc.go",
         "gpu_manager_stub.go",
         "types.go",
     ],
