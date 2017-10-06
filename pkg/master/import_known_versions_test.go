@@ -106,6 +106,9 @@ func ensureNoTags(t *testing.T, gvk schema.GroupVersionKind, tp reflect.Type, pa
 	case reflect.Struct:
 		for i := 0; i < tp.NumField(); i++ {
 			f := tp.Field(i)
+			if f.PkgPath != "" {
+				continue // Ignore unexported fields
+			}
 			jsonTag := f.Tag.Get("json")
 			protoTag := f.Tag.Get("protobuf")
 			if len(jsonTag) > 0 || len(protoTag) > 0 {
