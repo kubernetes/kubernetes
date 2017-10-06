@@ -1,6 +1,4 @@
 cluster/images/etcd-version-monitor
-cmd/cloud-controller-manager/app
-cmd/cloud-controller-manager/app/options
 cmd/genutils
 cmd/gke-certificates-controller/app
 cmd/hyperkube
