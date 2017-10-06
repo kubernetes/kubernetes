@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "daemonset.go",
         "interface.go",
+        "statefulset.go",
     ],
     visibility = ["//visibility:public"],
     deps = [

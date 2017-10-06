@@ -97,4 +97,104 @@ func (RollingUpdateDaemonSet) SwaggerDoc() map[string]string {
 	return map_RollingUpdateDaemonSet
 }
 
+var map_RollingUpdateStatefulSetStrategy = map[string]string{
+	"":          "RollingUpdateStatefulSetStrategy is used to communicate parameter for RollingUpdateStatefulSetStrategyType.",
+	"partition": "Partition indicates the ordinal at which the StatefulSet should be partitioned. Default value is 0.",
+}
+
+func (RollingUpdateStatefulSetStrategy) SwaggerDoc() map[string]string {
+	return map_RollingUpdateStatefulSetStrategy
+}
+
+var map_Scale = map[string]string{
+	"":         "Scale represents a scaling request for a resource.",
+	"metadata": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.",
+	"spec":     "defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.",
+	"status":   "current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only.",
+}
+
+func (Scale) SwaggerDoc() map[string]string {
+	return map_Scale
+}
+
+var map_ScaleSpec = map[string]string{
+	"":         "ScaleSpec describes the attributes of a scale subresource",
+	"replicas": "desired number of instances for the scaled object.",
+}
+
+func (ScaleSpec) SwaggerDoc() map[string]string {
+	return map_ScaleSpec
+}
+
+var map_ScaleStatus = map[string]string{
+	"":               "ScaleStatus represents the current status of a scale subresource.",
+	"replicas":       "actual number of observed instances of the scaled object.",
+	"selector":       "label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors",
+	"targetSelector": "label selector for pods that should match the replicas count. This is a serializated version of both map-based and more expressive set-based selectors. This is done to avoid introspection in the clients. The string will be in the same format as the query-param syntax. If the target type only supports map-based selectors, both this field and map-based selector field are populated. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+}
+
+func (ScaleStatus) SwaggerDoc() map[string]string {
+	return map_ScaleStatus
+}
+
+var map_StatefulSet = map[string]string{
+	"":       "StatefulSet represents a set of pods with consistent identities. Identities are defined as:\n - Network: A single stable DNS and hostname.\n - Storage: As many VolumeClaims as requested.\nThe StatefulSet guarantees that a given network identity will always map to the same storage identity.",
+	"spec":   "Spec defines the desired identities of pods in this set.",
+	"status": "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time.",
+}
+
+func (StatefulSet) SwaggerDoc() map[string]string {
+	return map_StatefulSet
+}
+
+var map_StatefulSetList = map[string]string{
+	"": "StatefulSetList is a collection of StatefulSets.",
+}
+
+func (StatefulSetList) SwaggerDoc() map[string]string {
+	return map_StatefulSetList
+}
+
+var map_StatefulSetSpec = map[string]string{
+	"":                     "A StatefulSetSpec is the specification of a StatefulSet.",
+	"replicas":             "replicas is the desired number of replicas of the given Template. These are replicas in the sense that they are instantiations of the same Template, but individual replicas also have a consistent identity. If unspecified, defaults to 1.",
+	"selector":             "selector is a label query over pods that should match the replica count. If empty, defaulted to labels on the pod template. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors",
+	"template":             "template is the object that describes the pod that will be created if insufficient replicas are detected. Each pod stamped out by the StatefulSet will fulfill this Template, but have a unique identity from the rest of the StatefulSet.",
+	"volumeClaimTemplates": "volumeClaimTemplates is a list of claims that pods are allowed to reference. The StatefulSet controller is responsible for mapping network identities to claims in a way that maintains the identity of a pod. Every claim in this list must have at least one matching (by name) volumeMount in one container in the template. A claim in this list takes precedence over any volumes in the template, with the same name.",
+	"serviceName":          "serviceName is the name of the service that governs this StatefulSet. This service must exist before the StatefulSet, and is responsible for the network identity of the set. Pods get DNS/hostnames that follow the pattern: pod-specific-string.serviceName.default.svc.cluster.local where \"pod-specific-string\" is managed by the StatefulSet controller.",
+	"podManagementPolicy":  "podManagementPolicy controls how pods are created during initial scale up, when replacing pods on nodes, or when scaling down. The default policy is `OrderedReady`, where pods are created in increasing order (pod-0, then pod-1, etc) and the controller will wait until each pod is ready before continuing. When scaling down, the pods are removed in the opposite order. The alternative policy is `Parallel` which will create pods in parallel to match the desired scale without waiting, and on scale down will delete all pods at once.",
+	"updateStrategy":       "updateStrategy indicates the StatefulSetUpdateStrategy that will be employed to update Pods in the StatefulSet when a revision is made to Template.",
+	"revisionHistoryLimit": "revisionHistoryLimit is the maximum number of revisions that will be maintained in the StatefulSet's revision history. The revision history consists of all revisions not represented by a currently applied StatefulSetSpec version. The default value is 10.",
+}
+
+func (StatefulSetSpec) SwaggerDoc() map[string]string {
+	return map_StatefulSetSpec
+}
+
+var map_StatefulSetStatus = map[string]string{
+	"":                   "StatefulSetStatus represents the current state of a StatefulSet.",
+	"observedGeneration": "observedGeneration is the most recent generation observed for this StatefulSet. It corresponds to the StatefulSet's generation, which is updated on mutation by the API Server.",
+	"replicas":           "replicas is the number of Pods created by the StatefulSet controller.",
+	"readyReplicas":      "readyReplicas is the number of Pods created by the StatefulSet controller that have a Ready Condition.",
+	"currentReplicas":    "currentReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version indicated by currentRevision.",
+	"updatedReplicas":    "updatedReplicas is the number of Pods created by the StatefulSet controller from the StatefulSet version indicated by updateRevision.",
+	"currentRevision":    "currentRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence [0,currentReplicas).",
+	"updateRevision":     "updateRevision, if not empty, indicates the version of the StatefulSet used to generate Pods in the sequence [replicas-updatedReplicas,replicas)",
+	"collisionCount":     "collisionCount is the count of hash collisions for the StatefulSet. The StatefulSet controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ControllerRevision.",
+}
+
+func (StatefulSetStatus) SwaggerDoc() map[string]string {
+	return map_StatefulSetStatus
+}
+
+var map_StatefulSetUpdateStrategy = map[string]string{
+	"":              "StatefulSetUpdateStrategy indicates the strategy that the StatefulSet controller will use to perform updates. It includes any additional parameters necessary to perform the update for the indicated strategy.",
+	"type":          "Type indicates the type of the StatefulSetUpdateStrategy. Default is RollingUpdate.",
+	"rollingUpdate": "RollingUpdate is used to communicate parameters when Type is RollingUpdateStatefulSetStrategyType.",
+}
+
+func (StatefulSetUpdateStrategy) SwaggerDoc() map[string]string {
+	return map_StatefulSetUpdateStrategy
+}
+
 // AUTO-GENERATED FUNCTIONS END HERE
