@@ -69,7 +69,7 @@ const (
 
 	// LabelNodeRoleExcludeBalancer specifies that the node should be
 	// exclude from load balancers created by a cloud provider.
-	LabelNodeRoleExcludeBalancer = "node.role.kubernetes.io/exclude-balancer"
+	LabelNodeRoleExcludeBalancer = "alpha.node.role.kubernetes.io/exclude-balancer"
 )
 
 type cachedService struct {
