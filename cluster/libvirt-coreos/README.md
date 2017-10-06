@@ -1,7 +1,7 @@
 # Kubernetes CoreOS cluster
 
 With this tutorial one creates a Kubernetes CoreOS cluster containing of one
-master and three minions (workers) running on `192.168.10.1`-`192.168.10.4`.
+master and three nodes (workers) running on `192.168.10.1`-`192.168.10.4`.
 
 For working correctly you need to create the directory addressed as `POOL_PATH` in
 `util.sh`:

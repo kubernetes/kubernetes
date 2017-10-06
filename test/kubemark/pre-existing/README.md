@@ -4,7 +4,7 @@
 - A set of Kubernetes control plane components running in a VM
 
 **Kubernetes Cluster**
-- A real Kubernetes Cluster that has master and minions. The hollow-node pods
+- A real Kubernetes Cluster that has master and nodes. The hollow-node pods
   are run in this cluster, but appear as nodes to the Kubemark Master
 
 ## Introduction
