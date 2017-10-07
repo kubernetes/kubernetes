@@ -72,11 +72,11 @@ func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (statu
 		}
 	} else {
 		// TODO: Consider also read address from lb's FrontendIPConfigurations
-		_, pipID, err := az.determinePublicIPName(clusterName, service)
+		pipName, pipResourceGroup, err := az.determinePublicIPName(clusterName, service)
 		if err != nil {
 			return nil, false, err
 		}
-		pip, existsPip, err := az.getPublicIPAddressByID(pipID)
+		pip, existsPip, err := az.getPublicIPAddress(pipResourceGroup, pipName)
 		if err != nil {
 			return nil, false, err
 		}
@@ -95,7 +95,7 @@ func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (statu
 	}, true, nil
 }
 
-func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) (pipName string, pipID string, err error) {
+func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) (pipName string, pipResourceGroup string, err error) {
 	loadBalancerIP := service.Spec.LoadBalancerIP
 	if len(loadBalancerIP) == 0 {
 		return getPublicIPName(clusterName, service), "", nil
@@ -103,7 +103,7 @@ func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) 
 
 	// Override the cluster resource group if public IP resource ID presents
 	resourceGroup := az.ResourceGroup
-	pipID = publicIPAddressResourceID(service)
+	pipID := publicIPAddressResourceID(service)
 	if pipID != "" {
 		resourceGroup, err = parseResourceGroupNameFromID(pipID)
 		if err != nil {
@@ -124,13 +124,13 @@ func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) 
 			ip := &(*list.Value)[ix]
 			if ip.PublicIPAddressPropertiesFormat.IPAddress != nil &&
 				*ip.PublicIPAddressPropertiesFormat.IPAddress == loadBalancerIP {
-				return *ip.Name, *ip.ID, nil
+				return *ip.Name, resourceGroup, nil
 			}
 		}
 	}
 	// TODO: follow next link here? Will there really ever be that many public IPs?
 
-	return "", pipID, fmt.Errorf("user supplied IP Address %s was not found", loadBalancerIP)
+	return "", resourceGroup, fmt.Errorf("user supplied IP Address %s was not found", loadBalancerIP)
 }
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
@@ -232,11 +232,11 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 
 		fipConfigurationProperties = &configProperties
 	} else {
-		pipName, pipID, err := az.determinePublicIPName(clusterName, service)
+		pipName, pipResourceGroup, err := az.determinePublicIPName(clusterName, service)
 		if err != nil {
 			return nil, err
 		}
-		pip, err := az.ensurePublicIPExists(serviceName, pipName, pipID)
+		pip, err := az.ensurePublicIPExists(serviceName, pipResourceGroup, pipName)
 		if err != nil {
 			return nil, err
 		}
@@ -471,8 +471,8 @@ func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, is
 	return nil
 }
 
-func (az *Cloud) ensurePublicIPExists(serviceName, pipName string, pipID string) (*network.PublicIPAddress, error) {
-	pip, existsPip, err := az.getPublicIPAddressByID(pipID)
+func (az *Cloud) ensurePublicIPExists(serviceName, pipResourceGroup string, pipName string) (*network.PublicIPAddress, error) {
+	pip, existsPip, err := az.getPublicIPAddress(pipResourceGroup, pipName)
 	if err != nil {
 		return nil, err
 	}

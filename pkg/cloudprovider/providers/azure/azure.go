@@ -32,7 +32,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/disk"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
-	"github.com/Azure/azure-sdk-for-go/arm/resources/resources"
 	"github.com/Azure/azure-sdk-for-go/arm/storage"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
@@ -130,7 +129,6 @@ type Cloud struct {
 	VirtualMachinesClient    compute.VirtualMachinesClient
 	StorageAccountClient     storage.AccountsClient
 	DisksClient              disk.DisksClient
-	ResourcesClient          resources.GroupClient
 	operationPollRateLimiter flowcontrol.RateLimiter
 	resourceRequestBackoff   wait.Backoff
 	metadata                 *InstanceMetadata
@@ -274,12 +272,6 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	az.DisksClient = disk.NewDisksClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
 	az.DisksClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
 	configureUserAgent(&az.DisksClient.Client)
-
-	az.ResourcesClient = resources.NewGroupClient(az.SubscriptionID)
-	az.ResourcesClient.BaseURI = az.Environment.ResourceManagerEndpoint
-	az.ResourcesClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
-	az.ResourcesClient.PollingDelay = 5 * time.Second
-	configureUserAgent(&az.ResourcesClient.Client)
 
 	// Conditionally configure rate limits
 	if az.CloudProviderRateLimit {
