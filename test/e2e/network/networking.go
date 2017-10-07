@@ -70,7 +70,7 @@ var _ = SIGDescribe("Networking", func() {
 			{path: "/version"},
 			// TODO: test proxy links here
 		}
-		if !framework.ProviderIs("gke") {
+		if !framework.ProviderIs("gke", "skeleton") {
 			tests = append(tests, struct{ path string }{path: "/logs"})
 		}
 		for _, test := range tests {
