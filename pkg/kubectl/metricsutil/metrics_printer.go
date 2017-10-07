@@ -19,6 +19,7 @@ package metricsutil
 import (
 	"fmt"
 	"io"
+	"sort"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api"
@@ -58,6 +59,10 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics,
 	w := printers.GetNewTabWriter(printer.out)
 	defer w.Flush()
 
+	sort.Slice(metrics, func(i, j int) bool {
+		return metrics[i].Name < metrics[j].Name
+	})
+
 	printColumnNames(w, NodeColumns)
 	var usage api.ResourceList
 	for _, m := range metrics {
@@ -87,6 +92,14 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 	if printContainers {
 		printValue(w, PodColumn)
 	}
+
+	sort.Slice(metrics, func(i, j int) bool {
+		if withNamespace && metrics[i].Namespace != metrics[j].Namespace {
+			return metrics[i].Namespace < metrics[j].Namespace
+		}
+		return metrics[i].Name < metrics[j].Name
+	})
+
 	printColumnNames(w, PodColumns)
 	for _, m := range metrics {
 		err := printSinglePodMetrics(w, &m, printContainers, withNamespace)
