@@ -40,6 +40,9 @@ func UploadConfiguration(cfg *kubeadmapi.MasterConfiguration, client clientset.I
 	externalcfg := &kubeadmapiext.MasterConfiguration{}
 	api.Scheme.Convert(cfg, externalcfg, nil)
 
+	// Removes sensitive info from the data that will be stored in the config map
+	externalcfg.Token = ""
+
 	cfgYaml, err := yaml.Marshal(*externalcfg)
 	if err != nil {
 		return err
