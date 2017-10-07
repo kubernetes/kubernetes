@@ -46,11 +46,11 @@ func NewCmdVersion(out io.Writer) *cobra.Command {
 			kubeadmutil.CheckErr(err)
 		},
 	}
-	cmd.Flags().StringP("output", "o", "", "output format, options available are yaml, json and short")
+	cmd.Flags().StringP("output", "o", "", "Output format; available options are 'yaml', 'json' and 'short'")
 	return cmd
 }
 
-// RunVersion provides the version information of kubeadm in format depending on an arguments
+// RunVersion provides the version information of kubeadm in format depending on arguments
 // specified in cobra.Command.
 func RunVersion(out io.Writer, cmd *cobra.Command) error {
 	clientVersion := version.Get()
