@@ -29,6 +29,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -113,7 +114,39 @@ func TestPatchInvalid(t *testing.T) {
 
 	actual := &testPatchType{}
 	err := strategicPatchObject(codec, defaulter, original, []byte(patch), actual, &testPatchType{})
-	if apierrors.IsBadRequest(err) == false {
+	if !apierrors.IsBadRequest(err) {
+		t.Errorf("expected HTTP status: BadRequest, got: %#v", apierrors.ReasonForError(err))
+	}
+	if err.Error() != expectedError {
+		t.Errorf("expected %#v, got %#v", expectedError, err.Error())
+	}
+}
+
+func TestPatchCustomResource(t *testing.T) {
+	testGV := schema.GroupVersion{Group: "mygroup.example.com", Version: "v1beta1"}
+	scheme.AddKnownTypes(testGV, &unstructured.Unstructured{})
+	codec := codecs.LegacyCodec(testGV)
+	defaulter := runtime.ObjectDefaulter(scheme)
+
+	original := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "mygroup.example.com/v1beta1",
+			"kind":       "Noxu",
+			"metadata": map[string]interface{}{
+				"namespace": "Namespaced",
+				"name":      "foo",
+			},
+			"spec": map[string]interface{}{
+				"num": "10",
+			},
+		},
+	}
+	patch := `{"spec":{"num":"20"}}`
+	expectedError := "strategic merge patch format is not supported"
+
+	actual := &unstructured.Unstructured{}
+	err := strategicPatchObject(codec, defaulter, original, []byte(patch), actual, &unstructured.Unstructured{})
+	if !apierrors.IsBadRequest(err) {
 		t.Errorf("expected HTTP status: BadRequest, got: %#v", apierrors.ReasonForError(err))
 	}
 	if err.Error() != expectedError {
