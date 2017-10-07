@@ -39,6 +39,11 @@ const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/azure-
 // to specify what subnet it is exposed on
 const ServiceAnnotationLoadBalancerInternalSubnet = "service.beta.kubernetes.io/azure-load-balancer-internal-subnet"
 
+// ServiceAnnotationLoadBalancerPublicIPAddressID is the annotation used on the service
+// to specify the resource ID of the public IP address,
+// which can be used to specify public IP address that's not in the same resource group as the cluster
+const ServiceAnnotationLoadBalancerPublicIPAddressID = "service.beta.kubernetes.io/azure-load-public-ip-id"
+
 // GetLoadBalancer returns whether the specified load balancer exists, and
 // if so, what its status is.
 func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
@@ -67,11 +72,11 @@ func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (statu
 		}
 	} else {
 		// TODO: Consider also read address from lb's FrontendIPConfigurations
-		pipName, err := az.determinePublicIPName(clusterName, service)
+		pipName, pipResourceGroup, err := az.determinePublicIPName(clusterName, service)
 		if err != nil {
 			return nil, false, err
 		}
-		pip, existsPip, err := az.getPublicIPAddress(pipName)
+		pip, existsPip, err := az.getPublicIPAddress(pipResourceGroup, pipName)
 		if err != nil {
 			return nil, false, err
 		}
@@ -90,18 +95,28 @@ func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (statu
 	}, true, nil
 }
 
-func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) (string, error) {
+func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) (pipName string, pipResourceGroup string, err error) {
 	loadBalancerIP := service.Spec.LoadBalancerIP
 	if len(loadBalancerIP) == 0 {
-		return getPublicIPName(clusterName, service), nil
+		return getPublicIPName(clusterName, service), "", nil
+	}
+
+	// Override the cluster resource group if public IP resource ID presents
+	resourceGroup := az.ResourceGroup
+	pipID := publicIPAddressResourceID(service)
+	if pipID != "" {
+		resourceGroup, err = parseResourceGroupNameFromID(pipID)
+		if err != nil {
+			return "", "", err
+		}
 	}
 
 	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("PublicIPAddressesClient.List(%v): start", az.ResourceGroup)
-	list, err := az.PublicIPAddressesClient.List(az.ResourceGroup)
-	glog.V(10).Infof("PublicIPAddressesClient.List(%v): end", az.ResourceGroup)
+	glog.V(10).Infof("PublicIPAddressesClient.List(%v): start", resourceGroup)
+	list, err := az.PublicIPAddressesClient.List(resourceGroup)
+	glog.V(10).Infof("PublicIPAddressesClient.List(%v): end", resourceGroup)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	if list.Value != nil {
@@ -109,13 +124,13 @@ func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) 
 			ip := &(*list.Value)[ix]
 			if ip.PublicIPAddressPropertiesFormat.IPAddress != nil &&
 				*ip.PublicIPAddressPropertiesFormat.IPAddress == loadBalancerIP {
-				return *ip.Name, nil
+				return *ip.Name, resourceGroup, nil
 			}
 		}
 	}
 	// TODO: follow next link here? Will there really ever be that many public IPs?
 
-	return "", fmt.Errorf("user supplied IP Address %s was not found", loadBalancerIP)
+	return "", resourceGroup, fmt.Errorf("user supplied IP Address %s was not found", loadBalancerIP)
 }
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
@@ -217,11 +232,11 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 
 		fipConfigurationProperties = &configProperties
 	} else {
-		pipName, err := az.determinePublicIPName(clusterName, service)
+		pipName, pipResourceGroup, err := az.determinePublicIPName(clusterName, service)
 		if err != nil {
 			return nil, err
 		}
-		pip, err := az.ensurePublicIPExists(serviceName, pipName)
+		pip, err := az.ensurePublicIPExists(serviceName, pipResourceGroup, pipName)
 		if err != nil {
 			return nil, err
 		}
@@ -435,11 +450,12 @@ func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, is
 
 		// Public IP can be deleted after frontend ip configuration rule deleted.
 		if publicIPToCleanup != nil {
-			// Only delete an IP address if we created it, deducing by name.
+			// Only delete an IP address if we created it, deducing by name and resource group.
+			pipResourceGroup, _ := parseResourceGroupNameFromID(*publicIPToCleanup)
 			if index := strings.LastIndex(*publicIPToCleanup, "/"); index != -1 {
 				managedPipName := getPublicIPName(clusterName, service)
 				pipName := (*publicIPToCleanup)[index+1:]
-				if strings.EqualFold(managedPipName, pipName) {
+				if strings.EqualFold(managedPipName, pipName) && strings.EqualFold(az.ResourceGroup, pipResourceGroup) {
 					glog.V(5).Infof("Deleting public IP resource %q.", pipName)
 					err = az.ensurePublicIPDeleted(serviceName, pipName)
 					if err != nil {
@@ -455,8 +471,8 @@ func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, is
 	return nil
 }
 
-func (az *Cloud) ensurePublicIPExists(serviceName, pipName string) (*network.PublicIPAddress, error) {
-	pip, existsPip, err := az.getPublicIPAddress(pipName)
+func (az *Cloud) ensurePublicIPExists(serviceName, pipResourceGroup string, pipName string) (*network.PublicIPAddress, error) {
+	pip, existsPip, err := az.getPublicIPAddress(pipResourceGroup, pipName)
 	if err != nil {
 		return nil, err
 	}
@@ -1022,4 +1038,12 @@ func subnet(service *v1.Service) *string {
 	}
 
 	return nil
+}
+
+func publicIPAddressResourceID(service *v1.Service) string {
+	if resourceID, ok := service.Annotations[ServiceAnnotationLoadBalancerPublicIPAddressID]; ok {
+		return resourceID
+	}
+
+	return ""
 }
