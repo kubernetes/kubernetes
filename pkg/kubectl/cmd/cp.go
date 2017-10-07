@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -236,6 +237,8 @@ func recursiveTar(base, file string, tw *tar.Writer) error {
 }
 
 func untarAll(reader io.Reader, destFile, prefix string) error {
+	entrySeq := -1
+
 	// TODO: use compression here?
 	tarReader := tar.NewReader(reader)
 	for {
@@ -246,23 +249,36 @@ func untarAll(reader io.Reader, destFile, prefix string) error {
 			}
 			break
 		}
+		entrySeq++
 		outFileName := path.Join(destFile, header.Name[len(prefix):])
 		baseName := path.Dir(outFileName)
 		if err := os.MkdirAll(baseName, 0755); err != nil {
 			return err
 		}
 		if header.FileInfo().IsDir() {
-			os.MkdirAll(outFileName, 0755)
+
+			if err := os.MkdirAll(outFileName, 0755); err != nil {
+				return err
+			}
 			continue
+		}
+
+		// handle coping remote file into local directory
+		if entrySeq == 0 && !header.FileInfo().IsDir() {
+			exists, err := dirExists(outFileName)
+			if err != nil {
+				return err
+			}
+			if exists {
+				outFileName = filepath.Join(outFileName, path.Base(header.Name))
+			}
 		}
 		outFile, err := os.Create(outFileName)
 		if err != nil {
 			return err
 		}
+		defer outFile.Close()
 		if _, err := io.Copy(outFile, tarReader); err != nil {
-			return err
-		}
-		if err := outFile.Close(); err != nil {
 			return err
 		}
 	}
@@ -311,4 +327,16 @@ func execute(f cmdutil.Factory, cmd *cobra.Command, options *ExecOptions) error 
 		return err
 	}
 	return nil
+}
+
+// dirExists checks if a path exists and is a directory.
+func dirExists(path string) (bool, error) {
+	fi, err := os.Stat(path)
+	if err == nil && fi.IsDir() {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }

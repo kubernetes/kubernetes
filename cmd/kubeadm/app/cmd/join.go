@@ -119,20 +119,20 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 
 	cmd.PersistentFlags().StringVar(
 		&cfgPath, "config", cfgPath,
-		"Path to kubeadm config file")
+		"Path to kubeadm config file.")
 
 	cmd.PersistentFlags().StringVar(
 		&cfg.DiscoveryFile, "discovery-file", "",
-		"A file or url from which to load cluster information")
+		"A file or url from which to load cluster information.")
 	cmd.PersistentFlags().StringVar(
 		&cfg.DiscoveryToken, "discovery-token", "",
-		"A token used to validate cluster information fetched from the master")
+		"A token used to validate cluster information fetched from the master.")
 	cmd.PersistentFlags().StringVar(
 		&cfg.NodeName, "node-name", "",
-		"Specify the node name")
+		"Specify the node name.")
 	cmd.PersistentFlags().StringVar(
 		&cfg.TLSBootstrapToken, "tls-bootstrap-token", "",
-		"A token used for TLS bootstrapping")
+		"A token used for TLS bootstrapping.")
 	cmd.PersistentFlags().StringSliceVar(
 		&cfg.DiscoveryTokenCACertHashes, "discovery-token-ca-cert-hash", []string{},
 		"For token-based discovery, validate that the root CA public key matches this hash (format: \"<type>:<value>\").")
@@ -142,11 +142,11 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 
 	cmd.PersistentFlags().StringVar(
 		&cfg.Token, "token", "",
-		"Use this token for both discovery-token and tls-bootstrap-token")
+		"Use this token for both discovery-token and tls-bootstrap-token.")
 
 	cmd.PersistentFlags().BoolVar(
 		&skipPreFlight, "skip-preflight-checks", false,
-		"Skip preflight checks normally run before modifying the system",
+		"Skip preflight checks normally run before modifying the system.",
 	)
 
 	return cmd
@@ -176,7 +176,7 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 	}
 
 	if !skipPreFlight {
-		fmt.Println("[preflight] Running pre-flight checks")
+		fmt.Println("[preflight] Running pre-flight checks.")
 
 		// Then continue with the others...
 		if err := preflight.RunJoinNodeChecks(cfg); err != nil {
@@ -186,7 +186,7 @@ func NewJoin(cfgPath string, args []string, cfg *kubeadmapi.NodeConfiguration, s
 		// Try to start the kubelet service in case it's inactive
 		preflight.TryStartKubelet()
 	} else {
-		fmt.Println("[preflight] Skipping pre-flight checks")
+		fmt.Println("[preflight] Skipping pre-flight checks.")
 	}
 
 	return &Join{cfg: cfg}, nil

@@ -166,6 +166,70 @@ func TestDescribeConfigMap(t *testing.T) {
 	}
 }
 
+func TestDescribeLimitRange(t *testing.T) {
+	fake := fake.NewSimpleClientset(&api.LimitRange{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mylr",
+			Namespace: "foo",
+		},
+		Spec: api.LimitRangeSpec{
+			Limits: []api.LimitRangeItem{
+				{
+					Type:                 api.LimitTypePod,
+					Max:                  getResourceList("100m", "10000Mi"),
+					Min:                  getResourceList("5m", "100Mi"),
+					MaxLimitRequestRatio: getResourceList("10", ""),
+				},
+				{
+					Type:                 api.LimitTypeContainer,
+					Max:                  getResourceList("100m", "10000Mi"),
+					Min:                  getResourceList("5m", "100Mi"),
+					Default:              getResourceList("50m", "500Mi"),
+					DefaultRequest:       getResourceList("10m", "200Mi"),
+					MaxLimitRequestRatio: getResourceList("10", ""),
+				},
+				{
+					Type: api.LimitTypePersistentVolumeClaim,
+					Max:  getStorageResourceList("10Gi"),
+					Min:  getStorageResourceList("5Gi"),
+				},
+			},
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := LimitRangeDescriber{c}
+	out, err := d.Describe("foo", "mylr", printers.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	checks := []string{"foo", "mylr", "Pod", "cpu", "5m", "100m", "memory", "100Mi", "10000Mi", "10", "Container", "cpu", "10m", "50m", "200Mi", "500Mi", "PersistentVolumeClaim", "storage", "5Gi", "10Gi"}
+	for _, check := range checks {
+		if !strings.Contains(out, check) {
+			t.Errorf("unexpected out: %s", out)
+		}
+	}
+}
+
+func getStorageResourceList(storage string) api.ResourceList {
+	res := api.ResourceList{}
+	if storage != "" {
+		res[api.ResourceStorage] = resource.MustParse(storage)
+	}
+	return res
+}
+
+func getResourceList(cpu, memory string) api.ResourceList {
+	res := api.ResourceList{}
+	if cpu != "" {
+		res[api.ResourceCPU] = resource.MustParse(cpu)
+	}
+	if memory != "" {
+		res[api.ResourceMemory] = resource.MustParse(memory)
+	}
+	return res
+}
+
 func TestDescribeService(t *testing.T) {
 	fake := fake.NewSimpleClientset(&api.Service{
 		ObjectMeta: metav1.ObjectMeta{

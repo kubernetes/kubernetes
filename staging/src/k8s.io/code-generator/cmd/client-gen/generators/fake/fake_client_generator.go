@@ -29,7 +29,7 @@ import (
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 )
 
-func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetPackage string, inputPackage string, boilerplate []byte, generatedBy string) generator.Package {
+func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetPackage string, inputPackage string, boilerplate []byte) generator.Package {
 	outputPackage := strings.ToLower(filepath.Join(clientsetPackage, "typed", gv.Group.NonEmpty(), gv.Version.NonEmpty(), "fake"))
 	// TODO: should make this a function, called by here and in client-generator.go
 	realClientPackage := filepath.Join(clientsetPackage, "typed", gv.Group.NonEmpty(), gv.Version.NonEmpty())
@@ -38,8 +38,7 @@ func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 		PackagePath: outputPackage,
 		HeaderText:  boilerplate,
 		PackageDocumentation: []byte(
-			generatedBy +
-				`// Package fake has the automatically generated clients.
+			`// Package fake has the automatically generated clients.
 `),
 		// GeneratorFunc returns a list of generators. Each generator makes a
 		// single file.
@@ -83,7 +82,7 @@ func PackageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 	}
 }
 
-func PackageForClientset(customArgs clientgenargs.Args, fakeClientsetPackage string, boilerplate []byte, generatedBy string) generator.Package {
+func PackageForClientset(customArgs *clientgenargs.CustomArgs, fakeClientsetPackage string, boilerplate []byte) generator.Package {
 	return &generator.DefaultPackage{
 		// TODO: we'll generate fake clientset for different release in the future.
 		// Package name and path are hard coded for now.
@@ -91,8 +90,7 @@ func PackageForClientset(customArgs clientgenargs.Args, fakeClientsetPackage str
 		PackagePath: filepath.Join(fakeClientsetPackage, "fake"),
 		HeaderText:  boilerplate,
 		PackageDocumentation: []byte(
-			generatedBy +
-				`// This package has the automatically generated fake clientset.
+			`// This package has the automatically generated fake clientset.
 `),
 		// GeneratorFunc returns a list of generators. Each generator generates a
 		// single file.

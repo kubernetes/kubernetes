@@ -216,7 +216,6 @@ pkg/kubelet/apis/kubeletconfig
 pkg/kubelet/apis/kubeletconfig/v1alpha1
 pkg/kubelet/cadvisor
 pkg/kubelet/cadvisor/testing
-pkg/kubelet/certificate
 pkg/kubelet/client
 pkg/kubelet/cm
 pkg/kubelet/cm/util
@@ -796,6 +795,7 @@ test/e2e/instrumentation/monitoring
 test/e2e/kubectl
 test/e2e/lifecycle
 test/e2e/lifecycle/bootstrap
+test/e2e/multicluster
 test/e2e/network
 test/e2e/node
 test/e2e/scalability

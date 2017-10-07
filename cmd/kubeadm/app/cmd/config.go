@@ -57,7 +57,7 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 		RunE: cmdutil.SubCmdRunE("config"),
 	}
 
-	cmd.PersistentFlags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use for talking to the cluster")
+	cmd.PersistentFlags().StringVar(&kubeConfigFile, "kubeconfig", "/etc/kubernetes/admin.conf", "The KubeConfig file to use for talking to the cluster.")
 
 	cmd.AddCommand(NewCmdConfigUpload(out, &kubeConfigFile))
 	cmd.AddCommand(NewCmdConfigView(out, &kubeConfigFile))
@@ -69,7 +69,7 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 func NewCmdConfigUpload(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upload",
-		Short: "Upload configuration about the current state so 'kubeadm upgrade' later can know how to configure the upgraded cluster",
+		Short: "Upload configuration about the current state so 'kubeadm upgrade' later can know how to configure the upgraded cluster.",
 		RunE:  cmdutil.SubCmdRunE("upload"),
 	}
 
@@ -82,11 +82,11 @@ func NewCmdConfigUpload(out io.Writer, kubeConfigFile *string) *cobra.Command {
 func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "view",
-		Short: "View the kubeadm configuration stored inside the cluster",
+		Short: "View the kubeadm configuration stored inside the cluster.",
 		Long: fmt.Sprintf(dedent.Dedent(`
-			Using this command, you can view the ConfigMap in the cluster where the configuration for kubeadm is located
+			Using this command, you can view the ConfigMap in the cluster where the configuration for kubeadm is located.
 
-			The configuration is located in the %q namespace in the %q ConfigMap
+			The configuration is located in the %q namespace in the %q ConfigMap.
 		`), metav1.NamespaceSystem, constants.MasterConfigurationConfigMap),
 		Run: func(cmd *cobra.Command, args []string) {
 			client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
@@ -104,13 +104,13 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 	var cfgPath string
 	cmd := &cobra.Command{
 		Use:   "from-file",
-		Short: "Upload a configuration file to the in-cluster ConfigMap for kubeadm configuration",
+		Short: "Upload a configuration file to the in-cluster ConfigMap for kubeadm configuration.",
 		Long: fmt.Sprintf(dedent.Dedent(`
 			Using from-file, you can upload configuration to the ConfigMap in the cluster using the same config file you gave to kubeadm init.
 			If you initialized your cluster using a v1.7.x or lower kubeadm client and used the --config option; you need to run this command with the
 			same config file before upgrading to v1.8 using 'kubeadm upgrade'.
 
-			The configuration is located in the %q namespace in the %q ConfigMap
+			The configuration is located in the %q namespace in the %q ConfigMap.
 		`), metav1.NamespaceSystem, constants.MasterConfigurationConfigMap),
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(cfgPath) == 0 {
@@ -127,7 +127,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 			kubeadmutil.CheckErr(err)
 		},
 	}
-	cmd.Flags().StringVar(&cfgPath, "config", "", "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)")
+	cmd.Flags().StringVar(&cfgPath, "config", "", "Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental.")
 	return cmd
 }
 
@@ -140,13 +140,13 @@ func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.C
 
 	cmd := &cobra.Command{
 		Use:   "from-flags",
-		Short: "Create the in-cluster configuration file for the first time from using flags",
+		Short: "Create the in-cluster configuration file for the first time from using flags.",
 		Long: fmt.Sprintf(dedent.Dedent(`
 			Using from-flags, you can upload configuration to the ConfigMap in the cluster using the same flags you'd give to kubeadm init.
 			If you initialized your cluster using a v1.7.x or lower kubeadm client and set some flag; you need to run this command with the
 			same flags before upgrading to v1.8 using 'kubeadm upgrade'.
 
-			The configuration is located in the %q namespace in the %q ConfigMap
+			The configuration is located in the %q namespace in the %q ConfigMap.
 		`), metav1.NamespaceSystem, constants.MasterConfigurationConfigMap),
 		Run: func(cmd *cobra.Command, args []string) {
 			var err error

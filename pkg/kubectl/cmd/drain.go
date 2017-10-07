@@ -55,6 +55,7 @@ type DrainOptions struct {
 	restClient         *restclient.RESTClient
 	Factory            cmdutil.Factory
 	Force              bool
+	DryRun             bool
 	GracePeriodSeconds int
 	IgnoreDaemonsets   bool
 	Timeout            time.Duration
@@ -113,6 +114,7 @@ func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
+	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
 
@@ -139,6 +141,7 @@ func NewCmdUncordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
+	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
 
@@ -195,6 +198,7 @@ func NewCmdDrain(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.Flags().IntVar(&options.GracePeriodSeconds, "grace-period", -1, "Period of time in seconds given to each pod to terminate gracefully. If negative, the default value specified in the pod will be used.")
 	cmd.Flags().DurationVar(&options.Timeout, "timeout", 0, "The length of time to wait before giving up, zero means infinite")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
+	cmdutil.AddDryRunFlag(cmd)
 	return cmd
 }
 
@@ -213,6 +217,8 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 && len(args) != 1 {
 		return cmdutil.UsageErrorf(cmd, fmt.Sprintf("USAGE: %s [flags]", cmd.Use))
 	}
+
+	o.DryRun = cmdutil.GetFlagBool(cmd, "dry-run")
 
 	if o.client, err = o.Factory.ClientSet(); err != nil {
 		return err
@@ -269,10 +275,13 @@ func (o *DrainOptions) RunDrain() error {
 	var fatal error
 
 	for _, info := range o.nodeInfos {
-		err := o.deleteOrEvictPodsSimple(info)
-		if err == nil {
+		var err error
+		if !o.DryRun {
+			err = o.deleteOrEvictPodsSimple(info)
+		}
+		if err == nil || o.DryRun {
 			drainedNodes.Insert(info.Name)
-			cmdutil.PrintSuccess(o.mapper, false, o.Out, "node", info.Name, false, "drained")
+			cmdutil.PrintSuccess(o.mapper, false, o.Out, "node", info.Name, o.DryRun, "drained")
 		} else {
 			fmt.Fprintf(o.ErrOut, "error: unable to drain node %q, aborting command...\n\n", info.Name)
 			remainingNodes := []string{}
@@ -697,29 +706,31 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 			}
 			unsched := node.Spec.Unschedulable
 			if unsched == desired {
-				cmdutil.PrintSuccess(o.mapper, false, o.Out, nodeInfo.Mapping.Resource, nodeInfo.Name, false, already(desired))
+				cmdutil.PrintSuccess(o.mapper, false, o.Out, nodeInfo.Mapping.Resource, nodeInfo.Name, o.DryRun, already(desired))
 			} else {
-				helper := resource.NewHelper(o.restClient, nodeInfo.Mapping)
-				node.Spec.Unschedulable = desired
-				newData, err := json.Marshal(obj)
-				if err != nil {
-					fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
-					continue
+				if !o.DryRun {
+					helper := resource.NewHelper(o.restClient, nodeInfo.Mapping)
+					node.Spec.Unschedulable = desired
+					newData, err := json.Marshal(obj)
+					if err != nil {
+						fmt.Fprintf(o.ErrOut, "error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
+						continue
+					}
+					patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
+					if err != nil {
+						fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
+						continue
+					}
+					_, err = helper.Patch(cmdNamespace, nodeInfo.Name, types.StrategicMergePatchType, patchBytes)
+					if err != nil {
+						fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
+						continue
+					}
 				}
-				patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
-				if err != nil {
-					fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
-					continue
-				}
-				_, err = helper.Patch(cmdNamespace, nodeInfo.Name, types.StrategicMergePatchType, patchBytes)
-				if err != nil {
-					fmt.Printf("error: unable to %s node %q: %v", cordonOrUncordon, nodeInfo.Name, err)
-					continue
-				}
-				cmdutil.PrintSuccess(o.mapper, false, o.Out, nodeInfo.Mapping.Resource, nodeInfo.Name, false, changed(desired))
+				cmdutil.PrintSuccess(o.mapper, false, o.Out, nodeInfo.Mapping.Resource, nodeInfo.Name, o.DryRun, changed(desired))
 			}
 		} else {
-			cmdutil.PrintSuccess(o.mapper, false, o.Out, nodeInfo.Mapping.Resource, nodeInfo.Name, false, "skipped")
+			cmdutil.PrintSuccess(o.mapper, false, o.Out, nodeInfo.Mapping.Resource, nodeInfo.Name, o.DryRun, "skipped")
 		}
 	}
 

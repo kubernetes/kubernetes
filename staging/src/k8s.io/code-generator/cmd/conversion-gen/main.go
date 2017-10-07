@@ -47,10 +47,6 @@ import (
 func main() {
 	arguments := args.Default()
 
-	// Override defaults.
-	arguments.OutputFileBaseName = "conversion_generated"
-	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
-
 	// Custom args.
 	// TODO: make callers pass this in.  It is too opaque here, and any use of
 	// the flag that DOESN'T include these is broken.
@@ -69,6 +65,10 @@ func main() {
 		"Comma-separated list of import paths which are considered, after tag-specified peers, for conversions.")
 	pflag.CommandLine.BoolVar(&customArgs.SkipUnsafe, "skip-unsafe", customArgs.SkipUnsafe,
 		"If true, will not generate code using unsafe pointer conversions; resulting code may be slower.")
+
+	// Override defaults.
+	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
+	arguments.OutputFileBaseName = "conversion_generated"
 	arguments.CustomArgs = customArgs
 
 	// Run it.

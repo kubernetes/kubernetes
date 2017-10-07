@@ -28,8 +28,8 @@ import (
 
 func assertExists(t *testing.T, path string) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		t.Errorf("file/dir does not exist error: %s", err)
-		t.Errorf("file/dir does not exist: %s", path)
+		t.Errorf("file/directory does not exist; error: %s", err)
+		t.Errorf("file/directory does not exist: %s", path)
 	}
 }
 
@@ -143,7 +143,7 @@ func TestConfigDirCleaner(t *testing.T) {
 		// Create a temporary directory for our fake config dir:
 		tmpDir, err := ioutil.TempDir("", "kubeadm-reset-test")
 		if err != nil {
-			t.Errorf("Unable to create temp directory: %s", err)
+			t.Errorf("Unable to create temporary directory: %s", err)
 		}
 		defer os.RemoveAll(tmpDir)
 
