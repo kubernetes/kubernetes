@@ -45,7 +45,7 @@ func NewCmdAddon() *cobra.Command {
 	return cmd
 }
 
-// EnsureAllAddons install all addons to a Kubernetes cluster.
+// EnsureAllAddons installs all addons to a Kubernetes cluster
 func EnsureAllAddons(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
 
 	addonActions := []func(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error{
