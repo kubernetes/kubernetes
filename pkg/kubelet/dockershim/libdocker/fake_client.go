@@ -372,9 +372,8 @@ func (f *FakeDockerClient) popError(op string) error {
 	if ok {
 		delete(f.Errors, op)
 		return err
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // ListContainers is a test-spy implementation of Interface.ListContainers.

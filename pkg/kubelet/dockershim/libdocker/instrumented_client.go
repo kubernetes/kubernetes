@@ -32,7 +32,7 @@ type instrumentedInterface struct {
 	client Interface
 }
 
-// Creates an instrumented Interface from an existing Interface.
+// NewInstrumentedInterface creates an instrumented Interface from an existing Interface.
 func NewInstrumentedInterface(dockerClient Interface) Interface {
 	return instrumentedInterface{
 		client: dockerClient,
