@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 	"k8s.io/client-go/util/retry"
 	// Uncomment the following line to load the gcp plugin (only required to authenticate against GKE clusters).
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -36,7 +37,7 @@ import (
 
 func main() {
 	var kubeconfig *string
-	if home := homeDir(); home != "" {
+	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
 	} else {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
@@ -109,21 +110,21 @@ func main() {
 	// More Info:
 	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#concurrency-control-and-consistency
 
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() (err error) {
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Retrieve the latest version of Deployment before attempting update
 		// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
-		result, err = deploymentsClient.Get("demo-deployment", metav1.GetOptions{})
-		if err != nil {
-			panic(fmt.Errorf("Get failed: %+v", err))
+		result, getErr := deploymentsClient.Get("demo-deployment", metav1.GetOptions{})
+		if getErr != nil {
+			panic(fmt.Errorf("Failed to get latest version of Deployment: %v", getErr))
 		}
 
 		result.Spec.Replicas = int32Ptr(1)                           // reduce replica count
 		result.Spec.Template.Spec.Containers[0].Image = "nginx:1.13" // change nginx version
-		result, err = deploymentsClient.Update(result)
-		return
+		_, updateErr := deploymentsClient.Update(result)
+		return updateErr
 	})
-	if err != nil {
-		panic(fmt.Errorf("Update failed: %+v", err))
+	if retryErr != nil {
+		panic(fmt.Errorf("Update failed: %v", retryErr))
 	}
 	fmt.Println("Updated deployment...")
 
@@ -131,20 +132,20 @@ func main() {
 	prompt()
 	fmt.Println("Rolling back deployment...")
 	// Once again use RetryOnConflict to avoid update conflicts
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() (err error) {
-		result, err = deploymentsClient.Get("demo-deployment", metav1.GetOptions{})
-		if err != nil {
-			panic(fmt.Errorf("Get failed: %+v", err))
+	retryErr = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		result, getErr := deploymentsClient.Get("demo-deployment", metav1.GetOptions{})
+		if getErr != nil {
+			panic(fmt.Errorf("Failed to get latest version of Deployment: %v", getErr))
 		}
 
 		result.Spec.RollbackTo = &appsv1beta1.RollbackConfig{
 			Revision: 0, // can be specific revision number, or 0 for last revision
 		}
-		result, err = deploymentsClient.Update(result)
-		return
+		_, updateErr := deploymentsClient.Update(result)
+		return updateErr
 	})
-	if err != nil {
-		panic(fmt.Errorf("Rollback failed: %+v", err))
+	if retryErr != nil {
+		panic(fmt.Errorf("Rollback failed: %v", retryErr))
 	}
 	fmt.Println("Rolled back deployment...")
 
@@ -184,10 +185,3 @@ func prompt() {
 }
 
 func int32Ptr(i int32) *int32 { return &i }
-
-func homeDir() string {
-	if h := os.Getenv("HOME"); h != "" {
-		return h
-	}
-	return os.Getenv("USERPROFILE") // windows
-}
