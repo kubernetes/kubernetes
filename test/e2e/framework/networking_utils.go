@@ -511,7 +511,12 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 		}
 	}
 	config.ClusterIP = config.NodePortService.Spec.ClusterIP
-	config.NodeIP = config.ExternalAddrs[0]
+	if len(config.ExternalAddrs) != 0 {
+		config.NodeIP = config.ExternalAddrs[0]
+	} else {
+		internalAddrs := NodeAddresses(nodeList, v1.NodeInternalIP)
+		config.NodeIP = internalAddrs[0]
+	}
 }
 
 func (config *NetworkingTestConfig) cleanup() {
