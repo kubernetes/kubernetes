@@ -18,6 +18,7 @@ filegroup(
         "//cluster/images/etcd-version-monitor:all-srcs",
         "//cluster/images/etcd/attachlease:all-srcs",
         "//cluster/images/etcd/rollback:all-srcs",
+        "//cluster/images/hyperkube:all-srcs",
         "//cluster/lib:all-srcs",
         "//cluster/saltbase:all-srcs",
     ],
