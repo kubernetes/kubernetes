@@ -97,8 +97,8 @@ func nodeMetricsUrl(name string) (string, error) {
 	return fmt.Sprintf("%s/nodes/%s", metricsRoot, name), nil
 }
 
-func (cli *HeapsterMetricsClient) GetNodeMetrics(nodeName string, selector labels.Selector) ([]metricsapi.NodeMetrics, error) {
-	params := map[string]string{"labelSelector": selector.String()}
+func (cli *HeapsterMetricsClient) GetNodeMetrics(nodeName string, selector string) ([]metricsapi.NodeMetrics, error) {
+	params := map[string]string{"labelSelector": selector}
 	path, err := nodeMetricsUrl(nodeName)
 	if err != nil {
 		return []metricsapi.NodeMetrics{}, err

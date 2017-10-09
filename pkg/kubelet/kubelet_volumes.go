@@ -69,7 +69,6 @@ func (kl *Kubelet) newVolumeMounterFromPlugins(spec *volume.Spec, pod *v1.Pod, o
 	if err != nil {
 		return nil, fmt.Errorf("can't use volume plugins for %s: %v", spec.Name(), err)
 	}
-	opts.Containerized = kl.kubeletConfiguration.Containerized
 	physicalMounter, err := plugin.NewMounter(spec, pod, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate mounter for volume: %s using plugin: %s with a root cause: %v", spec.Name(), plugin.GetPluginName(), err)

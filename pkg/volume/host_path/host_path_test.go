@@ -1,5 +1,3 @@
-// +build linux
-
 /*
 Copyright 2014 The Kubernetes Authors.
 
@@ -30,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes/fake"
 	utilfile "k8s.io/kubernetes/pkg/util/file"
+	utilmount "k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -323,8 +322,58 @@ type fakeFileTypeChecker struct {
 	desiredType string
 }
 
-func (fftc *fakeFileTypeChecker) getFileType(_ os.FileInfo) (v1.HostPathType, error) {
-	return *newHostPathType(fftc.desiredType), nil
+func (fftc *fakeFileTypeChecker) Mount(source string, target string, fstype string, options []string) error {
+	return nil
+}
+
+func (fftc *fakeFileTypeChecker) Unmount(target string) error {
+	return nil
+}
+
+func (fftc *fakeFileTypeChecker) List() ([]utilmount.MountPoint, error) {
+	return nil, nil
+}
+func (fftc *fakeFileTypeChecker) IsMountPointMatch(mp utilmount.MountPoint, dir string) bool {
+	return false
+}
+
+func (fftc *fakeFileTypeChecker) IsNotMountPoint(file string) (bool, error) {
+	return false, nil
+}
+
+func (fftc *fakeFileTypeChecker) IsLikelyNotMountPoint(file string) (bool, error) {
+	return false, nil
+}
+
+func (fftc *fakeFileTypeChecker) DeviceOpened(pathname string) (bool, error) {
+	return false, nil
+}
+func (fftc *fakeFileTypeChecker) PathIsDevice(pathname string) (bool, error) {
+	return false, nil
+}
+
+func (fftc *fakeFileTypeChecker) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+	return "fake", nil
+}
+
+func (fftc *fakeFileTypeChecker) MakeRShared(path string) error {
+	return nil
+}
+
+func (fftc *fakeFileTypeChecker) MakeFile(pathname string) error {
+	return nil
+}
+
+func (fftc *fakeFileTypeChecker) MakeDir(pathname string) error {
+	return nil
+}
+
+func (fftc *fakeFileTypeChecker) ExistsPath(pathname string) bool {
+	return true
+}
+
+func (fftc *fakeFileTypeChecker) GetFileType(_ string) (utilmount.FileType, error) {
+	return utilmount.FileType(fftc.desiredType), nil
 }
 
 func setUp() error {
@@ -363,14 +412,16 @@ func TestOSFileTypeChecker(t *testing.T) {
 		isChar      bool
 	}{
 		{
-			name:  "Existing Folder",
-			path:  "/tmp/ExistingFolder",
-			isDir: true,
+			name:        "Existing Folder",
+			path:        "/tmp/ExistingFolder",
+			desiredType: string(utilmount.FileTypeDirectory),
+			isDir:       true,
 		},
 		{
-			name:   "Existing File",
-			path:   "/tmp/ExistingFolder/foo",
-			isFile: true,
+			name:        "Existing File",
+			path:        "/tmp/ExistingFolder/foo",
+			desiredType: string(utilmount.FileTypeFile),
+			isFile:      true,
 		},
 		{
 			name:        "Existing Socket File",
@@ -393,11 +444,8 @@ func TestOSFileTypeChecker(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		oftc, err := newOSFileTypeChecker(tc.path,
-			&fakeFileTypeChecker{desiredType: tc.desiredType})
-		if err != nil {
-			t.Errorf("[%d: %q] expect nil, but got %v", i, tc.name, err)
-		}
+		fakeFTC := &fakeFileTypeChecker{desiredType: tc.desiredType}
+		oftc := newFileTypeChecker(tc.path, fakeFTC)
 
 		path := oftc.GetPath()
 		if path != tc.path {

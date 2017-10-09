@@ -12,6 +12,7 @@ go_library(
         "conntrack.go",
         "server.go",
         "server_others.go",
+        "validation.go",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows_amd64": [
             "server_windows.go",
@@ -20,6 +21,7 @@ go_library(
     }),
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/validation:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/componentconfig/v1alpha1:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
@@ -58,6 +60,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",
@@ -79,7 +82,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["server_test.go"],
+    srcs = [
+        "server_test.go",
+        "validation_test.go",
+    ],
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
@@ -92,6 +98,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
 

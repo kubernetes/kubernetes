@@ -132,23 +132,14 @@ func (o *TopNodeOptions) Validate() error {
 	if len(o.ResourceName) > 0 && len(o.Selector) > 0 {
 		return errors.New("only one of NAME or --selector can be provided")
 	}
-	if len(o.Selector) > 0 {
-		_, err := labels.Parse(o.Selector)
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
 func (o TopNodeOptions) RunTopNode() error {
 	var err error
-	selector := labels.Everything()
+	selector := labels.Everything().String()
 	if len(o.Selector) > 0 {
-		selector, err = labels.Parse(o.Selector)
-		if err != nil {
-			return err
-		}
+		selector = o.Selector
 	}
 	metrics, err := o.Client.GetNodeMetrics(o.ResourceName, selector)
 	if err != nil {
@@ -167,7 +158,7 @@ func (o TopNodeOptions) RunTopNode() error {
 		nodes = append(nodes, *node)
 	} else {
 		nodeList, err := o.NodeClient.Nodes().List(metav1.ListOptions{
-			LabelSelector: selector.String(),
+			LabelSelector: selector,
 		})
 		if err != nil {
 			return err

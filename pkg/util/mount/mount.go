@@ -27,10 +27,17 @@ import (
 	"github.com/golang/glog"
 )
 
+type FileType string
+
 const (
 	// Default mount command if mounter path is not specified
-	defaultMountCommand  = "mount"
-	MountsInGlobalPDPath = "mounts"
+	defaultMountCommand           = "mount"
+	MountsInGlobalPDPath          = "mounts"
+	FileTypeDirectory    FileType = "Directory"
+	FileTypeFile         FileType = "File"
+	FileTypeSocket       FileType = "Socket"
+	FileTypeCharDev      FileType = "CharDevice"
+	FileTypeBlockDev     FileType = "BlockDevice"
 )
 
 type Interface interface {
@@ -70,6 +77,18 @@ type Interface interface {
 	// MakeRShared checks that given path is on a mount with 'rshared' mount
 	// propagation. If not, it bind-mounts the path as rshared.
 	MakeRShared(path string) error
+	// GetFileType checks for file/directory/socket/block/character devices.
+	// Will operate in the host mount namespace if kubelet is running in a container
+	GetFileType(pathname string) (FileType, error)
+	// MakeFile creates an empty file.
+	// Will operate in the host mount namespace if kubelet is running in a container
+	MakeFile(pathname string) error
+	// MakeDir creates a new directory.
+	// Will operate in the host mount namespace if kubelet is running in a container
+	MakeDir(pathname string) error
+	// ExistsPath checks whether the path exists.
+	// Will operate in the host mount namespace if kubelet is running in a container
+	ExistsPath(pathname string) bool
 }
 
 // Exec executes command where mount utilities are. This can be either the host,

@@ -252,17 +252,29 @@ func (mounter *Mounter) DeviceOpened(pathname string) (bool, error) {
 // PathIsDevice uses FileInfo returned from os.Stat to check if path refers
 // to a device.
 func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
-	return pathIsDevice(pathname)
+	pathType, err := mounter.GetFileType(pathname)
+	isDevice := pathType == FileTypeCharDev || pathType == FileTypeBlockDev
+	return isDevice, err
 }
 
 func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
-	isDevice, err := pathIsDevice(pathname)
+	var isDevice bool
+	finfo, err := os.Stat(pathname)
+	if os.IsNotExist(err) {
+		isDevice = false
+	}
+	// err in call to os.Stat
 	if err != nil {
 		return false, fmt.Errorf(
 			"PathIsDevice failed for path %q: %v",
 			pathname,
 			err)
 	}
+	// path refers to a device
+	if finfo.Mode()&os.ModeDevice != 0 {
+		isDevice = true
+	}
+
 	if !isDevice {
 		glog.Errorf("Path %q is not refering to a device.", pathname)
 		return false, nil
@@ -280,23 +292,6 @@ func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
 	}
 	// error during call to Open
 	return false, errno
-}
-
-func pathIsDevice(pathname string) (bool, error) {
-	finfo, err := os.Stat(pathname)
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	// err in call to os.Stat
-	if err != nil {
-		return false, err
-	}
-	// path refers to a device
-	if finfo.Mode()&os.ModeDevice != 0 {
-		return true, nil
-	}
-	// path does not refer to device
-	return false, nil
 }
 
 //GetDeviceNameFromMount: given a mount point, find the device name from its global mount point
@@ -350,9 +345,64 @@ func parseProcMounts(content []byte) ([]MountPoint, error) {
 }
 
 func (mounter *Mounter) MakeRShared(path string) error {
-	mountCmd := defaultMountCommand
-	mountArgs := []string{}
-	return doMakeRShared(path, procMountInfoPath, mountCmd, mountArgs)
+	return doMakeRShared(path, procMountInfoPath)
+}
+
+func (mounter *Mounter) GetFileType(pathname string) (FileType, error) {
+	var pathType FileType
+	finfo, err := os.Stat(pathname)
+	if os.IsNotExist(err) {
+		return pathType, fmt.Errorf("path %q does not exist", pathname)
+	}
+	// err in call to os.Stat
+	if err != nil {
+		return pathType, err
+	}
+
+	mode := finfo.Sys().(*syscall.Stat_t).Mode
+	switch mode & syscall.S_IFMT {
+	case syscall.S_IFSOCK:
+		return FileTypeSocket, nil
+	case syscall.S_IFBLK:
+		return FileTypeBlockDev, nil
+	case syscall.S_IFCHR:
+		return FileTypeBlockDev, nil
+	case syscall.S_IFDIR:
+		return FileTypeDirectory, nil
+	case syscall.S_IFREG:
+		return FileTypeFile, nil
+	}
+
+	return pathType, fmt.Errorf("only recognise file, directory, socket, block device and character device")
+}
+
+func (mounter *Mounter) MakeDir(pathname string) error {
+	err := os.MkdirAll(pathname, os.FileMode(0755))
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (mounter *Mounter) MakeFile(pathname string) error {
+	f, err := os.OpenFile(pathname, os.O_CREATE, os.FileMode(0644))
+	defer f.Close()
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (mounter *Mounter) ExistsPath(pathname string) bool {
+	_, err := os.Stat(pathname)
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 // formatAndMount uses unix utils to format and mount the given disk
@@ -523,7 +573,7 @@ func parseMountInfo(filename string) ([]mountInfo, error) {
 // path is shared and bind-mounts it as rshared if needed. mountCmd and
 // mountArgs are expected to contain mount-like command, doMakeRShared will add
 // '--bind <path> <path>' and '--make-rshared <path>' to mountArgs.
-func doMakeRShared(path string, mountInfoFilename string, mountCmd string, mountArgs []string) error {
+func doMakeRShared(path string, mountInfoFilename string) error {
 	shared, err := isShared(path, mountInfoFilename)
 	if err != nil {
 		return err

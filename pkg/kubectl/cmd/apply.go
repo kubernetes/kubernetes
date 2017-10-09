@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -356,16 +355,12 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		return nil
 	}
 
-	selector, err := labels.Parse(options.Selector)
-	if err != nil {
-		return err
-	}
 	p := pruner{
 		mapper:        mapper,
 		clientFunc:    f.UnstructuredClientForMapping,
 		clientsetFunc: f.ClientSet,
 
-		selector:    selector,
+		selector:    options.Selector,
 		visitedUids: visitedUids,
 
 		cascade:     options.Cascade,
@@ -452,7 +447,7 @@ type pruner struct {
 	clientsetFunc func() (internalclientset.Interface, error)
 
 	visitedUids sets.String
-	selector    labels.Selector
+	selector    string
 
 	cascade     bool
 	dryRun      bool

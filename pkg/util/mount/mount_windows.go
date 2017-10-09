@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/golang/glog"
 )
@@ -165,6 +166,67 @@ func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
 // propagation. Empty implementation here.
 func (mounter *Mounter) MakeRShared(path string) error {
 	return nil
+}
+
+// GetFileType checks for sockets/block/character devices
+func (mounter *Mounter) GetFileType(pathname string) (FileType, error) {
+	var pathType FileType
+	info, err := os.Stat(pathname)
+	if os.IsNotExist(err) {
+		return pathType, fmt.Errorf("path %q does not exist", pathname)
+	}
+	// err in call to os.Stat
+	if err != nil {
+		return pathType, err
+	}
+
+	mode := info.Sys().(*syscall.Win32FileAttributeData).FileAttributes
+	switch mode & syscall.S_IFMT {
+	case syscall.S_IFSOCK:
+		return FileTypeSocket, nil
+	case syscall.S_IFBLK:
+		return FileTypeBlockDev, nil
+	case syscall.S_IFCHR:
+		return FileTypeCharDev, nil
+	case syscall.S_IFDIR:
+		return FileTypeDirectory, nil
+	case syscall.S_IFREG:
+		return FileTypeFile, nil
+	}
+
+	return pathType, fmt.Errorf("only recognise file, directory, socket, block device and character device")
+}
+
+// MakeFile creates a new directory
+func (mounter *Mounter) MakeDir(pathname string) error {
+	err := os.MkdirAll(pathname, os.FileMode(0755))
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+// MakeFile creates an empty file
+func (mounter *Mounter) MakeFile(pathname string) error {
+	f, err := os.OpenFile(pathname, os.O_CREATE, os.FileMode(0644))
+	defer f.Close()
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+// ExistsPath checks whether the path exists
+func (mounter *Mounter) ExistsPath(pathname string) bool {
+	_, err := os.Stat(pathname)
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, fstype string, options []string) error {
