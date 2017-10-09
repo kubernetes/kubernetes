@@ -125,7 +125,6 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 		deploymentStorage := deploymentstore.NewStorage(restOptionsGetter)
 		storage["deployments"] = deploymentStorage.Deployment
 		storage["deployments/status"] = deploymentStorage.Status
-		storage["deployments/scale"] = deploymentStorage.Scale
 	}
 	return storage
 }
