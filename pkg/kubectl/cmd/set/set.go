@@ -43,6 +43,7 @@ func NewCmdSet(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Comma
 	// add subcommands
 	cmd.AddCommand(NewCmdImage(f, out, err))
 	cmd.AddCommand(NewCmdResources(f, out, err))
+	cmd.AddCommand(NewCmdRBACRule(f, out, err))
 	cmd.AddCommand(NewCmdSelector(f, out))
 	cmd.AddCommand(NewCmdSubject(f, out, err))
 	cmd.AddCommand(NewCmdServiceAccount(f, out, err))
