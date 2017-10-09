@@ -623,6 +623,10 @@ func getSubnetIDForLB(compute *gophercloud.ServiceClient, node v1.Node) (string,
 func (lbaas *LbaasV2) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodes, apiService.Annotations)
 
+	if len(nodes) == 0 {
+		return nil, fmt.Errorf("There are no available nodes for LoadBalancer service %s/%s", apiService.Namespace, apiService.Name)
+	}
+
 	if len(lbaas.opts.SubnetId) == 0 {
 		// Get SubnetId automatically.
 		// The LB needs to be configured with instance addresses on the same subnet, so get SubnetId by one node.
@@ -1024,7 +1028,7 @@ func (lbaas *LbaasV2) UpdateLoadBalancer(clusterName string, service *v1.Service
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	glog.V(4).Infof("UpdateLoadBalancer(%v, %v, %v)", clusterName, loadBalancerName, nodes)
 
-	if len(lbaas.opts.SubnetId) == 0 {
+	if len(lbaas.opts.SubnetId) == 0 && len(nodes) > 0 {
 		// Get SubnetId automatically.
 		// The LB needs to be configured with instance addresses on the same subnet, so get SubnetId by one node.
 		subnetID, err := getSubnetIDForLB(lbaas.compute, *nodes[0])
@@ -1321,6 +1325,10 @@ func (lb *LbaasV1) GetLoadBalancer(clusterName string, service *v1.Service) (*v1
 
 func (lb *LbaasV1) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	glog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)", clusterName, apiService.Namespace, apiService.Name, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodes, apiService.Annotations)
+
+	if len(nodes) == 0 {
+		return nil, fmt.Errorf("There are no available nodes for LoadBalancer service %s/%s", apiService.Namespace, apiService.Name)
+	}
 
 	if len(lb.opts.SubnetId) == 0 {
 		// Get SubnetId automatically.
