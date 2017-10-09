@@ -19,7 +19,8 @@ package v1
 import (
 	"fmt"
 
-	apps "k8s.io/api/apps/v1beta2"
+	appsv1 "k8s.io/api/apps/v1"
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -27,7 +28,7 @@ import (
 // DeploymentListerExpansion allows custom methods to be added to
 // DeploymentLister.
 type DeploymentListerExpansion interface {
-	GetDeploymentsForReplicaSet(rs *apps.ReplicaSet) ([]*apps.Deployment, error)
+	GetDeploymentsForReplicaSet(rs *appsv1beta2.ReplicaSet) ([]*appsv1.Deployment, error)
 }
 
 // DeploymentNamespaceListerExpansion allows custom methods to be added to
@@ -38,7 +39,7 @@ type DeploymentNamespaceListerExpansion interface{}
 // match a ReplicaSet. Only the one specified in the ReplicaSet's ControllerRef
 // will actually manage it.
 // Returns an error only if no matching Deployments are found.
-func (s *deploymentLister) GetDeploymentsForReplicaSet(rs *apps.ReplicaSet) ([]*apps.Deployment, error) {
+func (s *deploymentLister) GetDeploymentsForReplicaSet(rs *appsv1beta2.ReplicaSet) ([]*appsv1.Deployment, error) {
 	if len(rs.Labels) == 0 {
 		return nil, fmt.Errorf("no deployments found for ReplicaSet %v because it has no labels", rs.Name)
 	}
@@ -49,7 +50,7 @@ func (s *deploymentLister) GetDeploymentsForReplicaSet(rs *apps.ReplicaSet) ([]*
 		return nil, err
 	}
 
-	var deployments []*apps.Deployment
+	var deployments []*appsv1.Deployment
 	for _, d := range dList {
 		selector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
 		if err != nil {
