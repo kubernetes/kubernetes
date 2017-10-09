@@ -261,7 +261,7 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			reason:  "FailedScheduling",
 			pattern: make([]string, 2)}
 		ep.pattern = append(ep.pattern, "MatchNodeSelector")
-		ep.pattern = append(ep.pattern, "No nodes are available")
+		ep.pattern = append(ep.pattern, "NoVolumeNodeConflict")
 		for _, testVolType := range LocalVolumeTypes {
 
 			It("should not be able to mount due to different NodeAffinity", func() {
