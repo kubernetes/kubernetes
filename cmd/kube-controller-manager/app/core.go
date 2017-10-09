@@ -258,7 +258,9 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 		GroupKindsToReplenish:     groupKindsToReplenish,
 	}
 	if resourceQuotaControllerClient.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.Core().RESTClient().GetRateLimiter())
+		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.Core().RESTClient().GetRateLimiter()); err != nil {
+			return false, err
+		}
 	}
 
 	go resourcequotacontroller.NewResourceQuotaController(
