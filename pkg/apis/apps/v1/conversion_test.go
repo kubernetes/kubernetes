@@ -239,7 +239,7 @@ func TestV1DeploymentSpecConversion(t *testing.T) {
 
 }
 
-func Testappsv1DeploymentStrategyConversion(t *testing.T) {
+func TestV1DeploymentStrategyConversion(t *testing.T) {
 	maxUnavailable := intstr.FromInt(2)
 	maxSurge := intstr.FromInt(2)
 	extensionsRollingUpdate := extensions.RollingUpdateDeployment{MaxUnavailable: maxUnavailable, MaxSurge: maxSurge}
@@ -279,7 +279,7 @@ func Testappsv1DeploymentStrategyConversion(t *testing.T) {
 	}
 }
 
-func Testappsv1RollingUpdateDeploymentConversion(t *testing.T) {
+func TestV1RollingUpdateDeploymentConversion(t *testing.T) {
 	nilIntStr := intstr.IntOrString{}
 	maxUnavailable := intstr.FromInt(2)
 	maxSurge := intstr.FromInt(2)
