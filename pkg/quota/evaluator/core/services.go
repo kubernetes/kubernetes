@@ -87,7 +87,7 @@ func toInternalServiceOrError(obj runtime.Object) (*api.Service, error) {
 	svc := &api.Service{}
 	switch t := obj.(type) {
 	case *v1.Service:
-		if err := k8s_api_v1.Convert_v1_Service_To_api_Service(t, svc, nil); err != nil {
+		if err := k8s_api_v1.Convert_v1_Service_To_core_Service(t, svc, nil); err != nil {
 			return nil, err
 		}
 	case *api.Service:

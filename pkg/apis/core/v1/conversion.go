@@ -39,78 +39,78 @@ func addFastPathConversionFuncs(scheme *runtime.Scheme) error {
 		case *v1.Pod:
 			switch b := objB.(type) {
 			case *core.Pod:
-				return true, Convert_v1_Pod_To_api_Pod(a, b, s)
+				return true, Convert_v1_Pod_To_core_Pod(a, b, s)
 			}
 		case *core.Pod:
 			switch b := objB.(type) {
 			case *v1.Pod:
-				return true, Convert_api_Pod_To_v1_Pod(a, b, s)
+				return true, Convert_core_Pod_To_v1_Pod(a, b, s)
 			}
 
 		case *v1.Event:
 			switch b := objB.(type) {
 			case *core.Event:
-				return true, Convert_v1_Event_To_api_Event(a, b, s)
+				return true, Convert_v1_Event_To_core_Event(a, b, s)
 			}
 		case *core.Event:
 			switch b := objB.(type) {
 			case *v1.Event:
-				return true, Convert_api_Event_To_v1_Event(a, b, s)
+				return true, Convert_core_Event_To_v1_Event(a, b, s)
 			}
 
 		case *v1.ReplicationController:
 			switch b := objB.(type) {
 			case *core.ReplicationController:
-				return true, Convert_v1_ReplicationController_To_api_ReplicationController(a, b, s)
+				return true, Convert_v1_ReplicationController_To_core_ReplicationController(a, b, s)
 			}
 		case *core.ReplicationController:
 			switch b := objB.(type) {
 			case *v1.ReplicationController:
-				return true, Convert_api_ReplicationController_To_v1_ReplicationController(a, b, s)
+				return true, Convert_core_ReplicationController_To_v1_ReplicationController(a, b, s)
 			}
 
 		case *v1.Node:
 			switch b := objB.(type) {
 			case *core.Node:
-				return true, Convert_v1_Node_To_api_Node(a, b, s)
+				return true, Convert_v1_Node_To_core_Node(a, b, s)
 			}
 		case *core.Node:
 			switch b := objB.(type) {
 			case *v1.Node:
-				return true, Convert_api_Node_To_v1_Node(a, b, s)
+				return true, Convert_core_Node_To_v1_Node(a, b, s)
 			}
 
 		case *v1.Namespace:
 			switch b := objB.(type) {
 			case *core.Namespace:
-				return true, Convert_v1_Namespace_To_api_Namespace(a, b, s)
+				return true, Convert_v1_Namespace_To_core_Namespace(a, b, s)
 			}
 		case *core.Namespace:
 			switch b := objB.(type) {
 			case *v1.Namespace:
-				return true, Convert_api_Namespace_To_v1_Namespace(a, b, s)
+				return true, Convert_core_Namespace_To_v1_Namespace(a, b, s)
 			}
 
 		case *v1.Service:
 			switch b := objB.(type) {
 			case *core.Service:
-				return true, Convert_v1_Service_To_api_Service(a, b, s)
+				return true, Convert_v1_Service_To_core_Service(a, b, s)
 			}
 		case *core.Service:
 			switch b := objB.(type) {
 			case *v1.Service:
-				return true, Convert_api_Service_To_v1_Service(a, b, s)
+				return true, Convert_core_Service_To_v1_Service(a, b, s)
 			}
 
 		case *v1.Endpoints:
 			switch b := objB.(type) {
 			case *core.Endpoints:
-				return true, Convert_v1_Endpoints_To_api_Endpoints(a, b, s)
+				return true, Convert_v1_Endpoints_To_core_Endpoints(a, b, s)
 			}
 		case *core.Endpoints:
 			switch b := objB.(type) {
 			case *v1.Endpoints:
-				return true, Convert_api_Endpoints_To_v1_Endpoints(a, b, s)
+				return true, Convert_core_Endpoints_To_v1_Endpoints(a, b, s)
 			}
 
 		case *metav1.WatchEvent:
@@ -132,16 +132,16 @@ func addFastPathConversionFuncs(scheme *runtime.Scheme) error {
 func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions
 	err := scheme.AddConversionFuncs(
-		Convert_api_Pod_To_v1_Pod,
-		Convert_api_PodSpec_To_v1_PodSpec,
-		Convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec,
-		Convert_api_ServiceSpec_To_v1_ServiceSpec,
-		Convert_v1_Pod_To_api_Pod,
-		Convert_v1_PodSpec_To_api_PodSpec,
-		Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
-		Convert_v1_Secret_To_api_Secret,
-		Convert_v1_ServiceSpec_To_api_ServiceSpec,
-		Convert_v1_ResourceList_To_api_ResourceList,
+		Convert_core_Pod_To_v1_Pod,
+		Convert_core_PodSpec_To_v1_PodSpec,
+		Convert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec,
+		Convert_core_ServiceSpec_To_v1_ServiceSpec,
+		Convert_v1_Pod_To_core_Pod,
+		Convert_v1_PodSpec_To_core_PodSpec,
+		Convert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec,
+		Convert_v1_Secret_To_core_Secret,
+		Convert_v1_ServiceSpec_To_core_ServiceSpec,
+		Convert_v1_ResourceList_To_core_ResourceList,
 		Convert_v1_ReplicationController_to_extensions_ReplicaSet,
 		Convert_v1_ReplicationControllerSpec_to_extensions_ReplicaSetSpec,
 		Convert_v1_ReplicationControllerStatus_to_extensions_ReplicaSetStatus,
@@ -241,7 +241,7 @@ func Convert_v1_ReplicationControllerSpec_to_extensions_ReplicaSetSpec(in *v1.Re
 		metav1.Convert_map_to_unversioned_LabelSelector(&in.Selector, out.Selector, s)
 	}
 	if in.Template != nil {
-		if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, &out.Template, s); err != nil {
+		if err := Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in.Template, &out.Template, s); err != nil {
 			return err
 		}
 	}
@@ -293,7 +293,7 @@ func Convert_extensions_ReplicaSetSpec_to_v1_ReplicationControllerSpec(in *exten
 		invalidErr = metav1.Convert_unversioned_LabelSelector_to_map(in.Selector, &out.Selector, s)
 	}
 	out.Template = new(v1.PodTemplateSpec)
-	if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, out.Template, s); err != nil {
+	if err := Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, out.Template, s); err != nil {
 		return err
 	}
 	return invalidErr
@@ -317,13 +317,13 @@ func Convert_extensions_ReplicaSetStatus_to_v1_ReplicationControllerStatus(in *e
 	return nil
 }
 
-func Convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *core.ReplicationControllerSpec, out *v1.ReplicationControllerSpec, s conversion.Scope) error {
+func Convert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *core.ReplicationControllerSpec, out *v1.ReplicationControllerSpec, s conversion.Scope) error {
 	out.Replicas = &in.Replicas
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Selector = in.Selector
 	if in.Template != nil {
 		out.Template = new(v1.PodTemplateSpec)
-		if err := Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in.Template, out.Template, s); err != nil {
+		if err := Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(in.Template, out.Template, s); err != nil {
 			return err
 		}
 	} else {
@@ -332,7 +332,7 @@ func Convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *c
 	return nil
 }
 
-func Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *v1.ReplicationControllerSpec, out *core.ReplicationControllerSpec, s conversion.Scope) error {
+func Convert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec(in *v1.ReplicationControllerSpec, out *core.ReplicationControllerSpec, s conversion.Scope) error {
 	if in.Replicas != nil {
 		out.Replicas = *in.Replicas
 	}
@@ -340,7 +340,7 @@ func Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *v
 	out.Selector = in.Selector
 	if in.Template != nil {
 		out.Template = new(core.PodTemplateSpec)
-		if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {
+		if err := Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in.Template, out.Template, s); err != nil {
 			return err
 		}
 	} else {
@@ -349,16 +349,16 @@ func Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *v
 	return nil
 }
 
-func Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in *core.PodTemplateSpec, out *v1.PodTemplateSpec, s conversion.Scope) error {
-	if err := autoConvert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in, out, s); err != nil {
+func Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(in *core.PodTemplateSpec, out *v1.PodTemplateSpec, s conversion.Scope) error {
+	if err := autoConvert_core_PodTemplateSpec_To_v1_PodTemplateSpec(in, out, s); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *v1.PodTemplateSpec, out *core.PodTemplateSpec, s conversion.Scope) error {
-	if err := autoConvert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in, out, s); err != nil {
+func Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in *v1.PodTemplateSpec, out *core.PodTemplateSpec, s conversion.Scope) error {
+	if err := autoConvert_v1_PodTemplateSpec_To_core_PodTemplateSpec(in, out, s); err != nil {
 		return err
 	}
 
@@ -367,8 +367,8 @@ func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *v1.PodTemplateSpec, o
 
 // The following two v1.PodSpec conversions are done here to support v1.ServiceAccount
 // as an alias for ServiceAccountName.
-func Convert_api_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s conversion.Scope) error {
-	if err := autoConvert_api_PodSpec_To_v1_PodSpec(in, out, s); err != nil {
+func Convert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s conversion.Scope) error {
+	if err := autoConvert_core_PodSpec_To_v1_PodSpec(in, out, s); err != nil {
 		return err
 	}
 
@@ -386,8 +386,8 @@ func Convert_api_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s conv
 	return nil
 }
 
-func Convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *core.PodSpec, s conversion.Scope) error {
-	if err := autoConvert_v1_PodSpec_To_api_PodSpec(in, out, s); err != nil {
+func Convert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s conversion.Scope) error {
+	if err := autoConvert_v1_PodSpec_To_core_PodSpec(in, out, s); err != nil {
 		return err
 	}
 
@@ -409,8 +409,8 @@ func Convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *core.PodSpec, s conv
 	return nil
 }
 
-func Convert_api_Pod_To_v1_Pod(in *core.Pod, out *v1.Pod, s conversion.Scope) error {
-	if err := autoConvert_api_Pod_To_v1_Pod(in, out, s); err != nil {
+func Convert_core_Pod_To_v1_Pod(in *core.Pod, out *v1.Pod, s conversion.Scope) error {
+	if err := autoConvert_core_Pod_To_v1_Pod(in, out, s); err != nil {
 		return err
 	}
 
@@ -431,8 +431,8 @@ func Convert_api_Pod_To_v1_Pod(in *core.Pod, out *v1.Pod, s conversion.Scope) er
 	return nil
 }
 
-func Convert_v1_Secret_To_api_Secret(in *v1.Secret, out *core.Secret, s conversion.Scope) error {
-	if err := autoConvert_v1_Secret_To_api_Secret(in, out, s); err != nil {
+func Convert_v1_Secret_To_core_Secret(in *v1.Secret, out *core.Secret, s conversion.Scope) error {
+	if err := autoConvert_v1_Secret_To_core_Secret(in, out, s); err != nil {
 		return err
 	}
 
@@ -448,10 +448,10 @@ func Convert_v1_Secret_To_api_Secret(in *v1.Secret, out *core.Secret, s conversi
 
 	return nil
 }
-func Convert_api_SecurityContext_To_v1_SecurityContext(in *core.SecurityContext, out *v1.SecurityContext, s conversion.Scope) error {
+func Convert_core_SecurityContext_To_v1_SecurityContext(in *core.SecurityContext, out *v1.SecurityContext, s conversion.Scope) error {
 	if in.Capabilities != nil {
 		out.Capabilities = new(v1.Capabilities)
-		if err := Convert_api_Capabilities_To_v1_Capabilities(in.Capabilities, out.Capabilities, s); err != nil {
+		if err := Convert_core_Capabilities_To_v1_Capabilities(in.Capabilities, out.Capabilities, s); err != nil {
 			return err
 		}
 	} else {
@@ -460,7 +460,7 @@ func Convert_api_SecurityContext_To_v1_SecurityContext(in *core.SecurityContext,
 	out.Privileged = in.Privileged
 	if in.SELinuxOptions != nil {
 		out.SELinuxOptions = new(v1.SELinuxOptions)
-		if err := Convert_api_SELinuxOptions_To_v1_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
+		if err := Convert_core_SELinuxOptions_To_v1_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
 			return err
 		}
 	} else {
@@ -473,11 +473,11 @@ func Convert_api_SecurityContext_To_v1_SecurityContext(in *core.SecurityContext,
 	return nil
 }
 
-func Convert_api_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSecurityContext, out *v1.PodSecurityContext, s conversion.Scope) error {
+func Convert_core_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSecurityContext, out *v1.PodSecurityContext, s conversion.Scope) error {
 	out.SupplementalGroups = in.SupplementalGroups
 	if in.SELinuxOptions != nil {
 		out.SELinuxOptions = new(v1.SELinuxOptions)
-		if err := Convert_api_SELinuxOptions_To_v1_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
+		if err := Convert_core_SELinuxOptions_To_v1_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
 			return err
 		}
 	} else {
@@ -489,11 +489,11 @@ func Convert_api_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSecurit
 	return nil
 }
 
-func Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in *v1.PodSecurityContext, out *core.PodSecurityContext, s conversion.Scope) error {
+func Convert_v1_PodSecurityContext_To_core_PodSecurityContext(in *v1.PodSecurityContext, out *core.PodSecurityContext, s conversion.Scope) error {
 	out.SupplementalGroups = in.SupplementalGroups
 	if in.SELinuxOptions != nil {
 		out.SELinuxOptions = new(core.SELinuxOptions)
-		if err := Convert_v1_SELinuxOptions_To_api_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
+		if err := Convert_v1_SELinuxOptions_To_core_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
 			return err
 		}
 	} else {
@@ -506,7 +506,7 @@ func Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in *v1.PodSecurityC
 }
 
 // +k8s:conversion-fn=copy-only
-func Convert_v1_ResourceList_To_api_ResourceList(in *v1.ResourceList, out *core.ResourceList, s conversion.Scope) error {
+func Convert_v1_ResourceList_To_core_ResourceList(in *v1.ResourceList, out *core.ResourceList, s conversion.Scope) error {
 	if *in == nil {
 		return nil
 	}

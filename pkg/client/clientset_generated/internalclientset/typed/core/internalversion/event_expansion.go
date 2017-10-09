@@ -155,7 +155,7 @@ type EventSinkImpl struct {
 
 func (e *EventSinkImpl) Create(event *v1.Event) (*v1.Event, error) {
 	internalEvent := &api.Event{}
-	err := k8s_api_v1.Convert_v1_Event_To_api_Event(event, internalEvent, nil)
+	err := k8s_api_v1.Convert_v1_Event_To_core_Event(event, internalEvent, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +168,7 @@ func (e *EventSinkImpl) Create(event *v1.Event) (*v1.Event, error) {
 
 func (e *EventSinkImpl) Update(event *v1.Event) (*v1.Event, error) {
 	internalEvent := &api.Event{}
-	err := k8s_api_v1.Convert_v1_Event_To_api_Event(event, internalEvent, nil)
+	err := k8s_api_v1.Convert_v1_Event_To_core_Event(event, internalEvent, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func (e *EventSinkImpl) Update(event *v1.Event) (*v1.Event, error) {
 
 func (e *EventSinkImpl) Patch(event *v1.Event, data []byte) (*v1.Event, error) {
 	internalEvent := &api.Event{}
-	err := k8s_api_v1.Convert_v1_Event_To_api_Event(event, internalEvent, nil)
+	err := k8s_api_v1.Convert_v1_Event_To_core_Event(event, internalEvent, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +190,7 @@ func (e *EventSinkImpl) Patch(event *v1.Event, data []byte) (*v1.Event, error) {
 		return nil, err
 	}
 	externalEvent := &v1.Event{}
-	err = k8s_api_v1.Convert_api_Event_To_v1_Event(internalEvent, externalEvent, nil)
+	err = k8s_api_v1.Convert_core_Event_To_v1_Event(internalEvent, externalEvent, nil)
 	if err != nil {
 		// Patch succeeded, no need to report the failed conversion
 		return event, nil

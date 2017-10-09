@@ -186,7 +186,7 @@ func simpleDryRun(deployment *extensions.Deployment, c kubernetes.Interface, toR
 		}
 		buf := bytes.NewBuffer([]byte{})
 		internalTemplate := &api.PodTemplateSpec{}
-		if err := apiv1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
+		if err := apiv1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template, internalTemplate, nil); err != nil {
 			return "", fmt.Errorf("failed to convert podtemplate, %v", err)
 		}
 		w := printersinternal.NewPrefixWriter(buf)
@@ -205,7 +205,7 @@ func simpleDryRun(deployment *extensions.Deployment, c kubernetes.Interface, toR
 	buf := bytes.NewBuffer([]byte{})
 	buf.WriteString("\n")
 	internalTemplate := &api.PodTemplateSpec{}
-	if err := apiv1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(template, internalTemplate, nil); err != nil {
+	if err := apiv1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(template, internalTemplate, nil); err != nil {
 		return "", fmt.Errorf("failed to convert podtemplate, %v", err)
 	}
 	w := printersinternal.NewPrefixWriter(buf)
@@ -345,7 +345,7 @@ func printPodTemplate(specTemplate *v1.PodTemplateSpec) (string, error) {
 	content := bytes.NewBuffer([]byte{})
 	w := printersinternal.NewPrefixWriter(content)
 	internalTemplate := &api.PodTemplateSpec{}
-	if err := apiv1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(specTemplate, internalTemplate, nil); err != nil {
+	if err := apiv1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(specTemplate, internalTemplate, nil); err != nil {
 		return "", fmt.Errorf("failed to convert podtemplate while printing: %v", err)
 	}
 	printersinternal.DescribePodTemplate(internalTemplate, w)

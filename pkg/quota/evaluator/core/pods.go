@@ -219,7 +219,7 @@ func toInternalPodOrError(obj runtime.Object) (*api.Pod, error) {
 	pod := &api.Pod{}
 	switch t := obj.(type) {
 	case *v1.Pod:
-		if err := k8s_api_v1.Convert_v1_Pod_To_api_Pod(t, pod, nil); err != nil {
+		if err := k8s_api_v1.Convert_v1_Pod_To_core_Pod(t, pod, nil); err != nil {
 			return nil, err
 		}
 	case *api.Pod:
