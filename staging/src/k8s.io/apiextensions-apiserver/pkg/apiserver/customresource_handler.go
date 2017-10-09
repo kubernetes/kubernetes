@@ -245,7 +245,7 @@ func (r *crdHandler) removeDeadStorage() {
 		return
 	}
 
-	for uid := range storageMap {
+	for uid, s := range storageMap {
 		found := false
 		for _, crd := range allCustomResourceDefinitions {
 			if crd.UID == uid {
@@ -254,6 +254,7 @@ func (r *crdHandler) removeDeadStorage() {
 			}
 		}
 		if !found {
+			s.storage.DestroyFunc()
 			delete(storageMap, uid)
 		}
 	}
@@ -423,10 +424,13 @@ func (c *crdHandler) updateCustomResourceDefinition(oldObj, _ interface{}) {
 	// Copy because we cannot write to storageMap without a race
 	// as it is used without locking elsewhere
 	for k, v := range storageMap {
+		if k == oldCRD.UID {
+			v.storage.DestroyFunc()
+			continue
+		}
 		storageMap2[k] = v
 	}
 
-	delete(storageMap2, oldCRD.UID)
 	c.customStorage.Store(storageMap2)
 }
 
