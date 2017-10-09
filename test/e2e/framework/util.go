@@ -315,6 +315,16 @@ func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
 	}
 }
 
+func SkipUnlessLocalSSDExists(interf, filesystem string, node *v1.Node) {
+	res, err := IssueSSHCommandWithResult("ls -1 /mnt/disks/by-uuid/google-local-ssds-"+interf+"-"+filesystem+"/ | wc -l", TestContext.Provider, node)
+	Expect(err).NotTo(HaveOccurred())
+	num, err := strconv.Atoi(strings.TrimSpace(res.Stdout))
+	Expect(err).NotTo(HaveOccurred())
+	if num < 1 {
+		Skipf("Requires at least 1 %s %s localSSD ", interf, filesystem)
+	}
+}
+
 func SkipUnlessNodeCountIsAtMost(maxNodeCount int) {
 	if TestContext.CloudConfig.NumNodes > maxNodeCount {
 		Skipf("Requires at most %d nodes (not %d)", maxNodeCount, TestContext.CloudConfig.NumNodes)

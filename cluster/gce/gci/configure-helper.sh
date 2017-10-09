@@ -25,6 +25,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+readonly UUID_MNT_PREFIX="/mnt/disks/by-uuid/google-local-ssds"
+
 function setup-os-params {
   # Reset core_pattern. On GCI, the default core_pattern pipes the core dumps to
   # /sbin/crash_reporter which is more restrictive in saving crash dumps. So for
@@ -83,16 +85,123 @@ function safe-format-and-mount() {
   mount -o discard,defaults "${device}" "${mountpoint}"
 }
 
-# Local ssds, if present, are mounted at /mnt/disks/ssdN.
+# Creates a symlink for a ($1) so that it may be used as block storage
+function safe-block-symlink(){
+  local device=$1
+  local interface=$2
+  
+  mkdir -p "${UUID_MNT_PREFIX}-${interface}-block"
+  ssdmap="/home/kubernetes/localssdmap.txt"
+  echo "Creating symlink for block devices..."
+
+  if [[ ! -e ${ssdmap} ]]; then
+    touch ${ssdmap}
+    chmod +w ${ssdmap}
+  fi
+
+  # each line of the ssdmap looks like "${device} persistent-uuid"
+  if [[ ! -z $(grep ${device} ${ssdmap}) ]]; then
+    #create symlink based on saved uuid
+    local myuuid=$(grep ${device} ${ssdmap} | cut -d ' ' -f 2)
+  else
+    # generate new uuid and add it to the map
+    local myuuid=$(uuidgen)
+    echo "${device} ${myuuid}" >> ${ssdmap}
+  fi
+
+  local sym="${UUID_MNT_PREFIX}-${interface}-block/local-ssd-${myuuid}"
+  # Do not "mkdir -p ${sym}" as that will cause unintended symlink behavior
+  ln -s ${device} ${sym}
+  echo "Created a symlink for SSD $ssd at ${sym}"
+  chmod a+w ${sym}
+}
+
+#Formats the given device ($1) if needed and mounts it at given mount point
+# ($2).
+function safe-format-and-mount() {
+  local device=$1
+  local mountpoint=$2
+
+  # Format only if the disk is not already formatted.
+  if ! tune2fs -l "${device}" ; then
+    echo "Formatting '${device}'"
+    mkfs.ext4 -F "${device}"
+  fi
+
+  mkdir -p "${mountpoint}"
+  echo "Mounting '${device}' at '${mountpoint}'"
+  mount -o discard,defaults "${device}" "${mountpoint}"
+}
+
+# Creates a bind mounting from the /mnt/disks/ fs mounted folder to
+# a new mountpoint in /mnt/disks/by-uuid/ using the devices UUID 
+function unique-uuid-bind-mount(){
+  local device=$1
+  local interface=$2
+  local mountpoint=$3
+
+  # Trigger udev refresh so that newly formatted devices are propagated in by-uuid
+  udevadm control --reload-rules
+  udevadm trigger
+  udevadm settle
+
+  # Get the real UUID of the device
+  local item=$(readlink -f ${device} | cut -d '/' -f 3)
+  # item should be the kernel device name e.g. "sdb", "nvme0n1"
+  local myuuid=$(ls -l /dev/disk/by-uuid/ | grep ${item} | tr -s ' ' | cut -d ' ' -f 9)
+  # myuuid should be the uuid of the device as found in /dev/disk/by-uuid/ 
+  local bindpoint="${UUID_MNT_PREFIX}-${interface}-fs/local-ssd-${myuuid}"
+  # bindpoint should be the full path of the to-be-bound device
+
+  # Mount device to the mountpoint
+  mkdir -p "${bindpoint}"
+  echo "Binding '${device}' at '${bindpoint}'"
+  mount --bind "${mountpoint}" "${bindpoint}"
+  chmod a+w ${bindpoint}
+
+}
+
+# Mounts, bindmounts, or symlinks depending on the interface and format
+# of the incoming device
+function mount-ext(){
+  local ssd=$1
+  local interface=$2
+  local format=$3  
+
+  if [[ ${format} == "fs" ]]; then
+    if [[ ${interface} == "scsi" ]]; then
+      local scsinum=`echo ${ssd} | sed -e 's/\/dev\/disk\/by-id\/google-local-ssd-\([0-9]*\)/\1/'`
+      local mountpoint="/mnt/disks/ssd${scsinum}"
+    else
+      local nvmenum=`echo ${ssd} | sed -e 's/\/dev\/disk\/by-id\/google-nvme0n\([0-9]*\)/\1/'`
+      local mountpoint="/mnt/disks/ssd-nvme${nvmenum}"
+    fi
+    safe-format-and-mount ${ssd} ${mountpoint}
+    unique-uuid-bind-mount ${ssd} ${interface} ${mountpoint}
+  elif [[ ${format} == "block" ]]; then
+    safe-block-symlink ${ssd} ${interface}
+  else
+    echo "Disk format must be either fs or block, got ${format}"
+  fi
+}
+
+# Local ssds, if present, are mounted or symlinked to their appropriate
+# locations
 function ensure-local-ssds() {
+  # TODO(dyzz) see https://github.com/kubernetes/kubernetes/pull/53466/
+  # to understand why scsiblocknum necessary for future
+  local scsiblocknum=0
+  local i=0
   for ssd in /dev/disk/by-id/google-local-ssd-*; do
     if [ -e "${ssd}" ]; then
-      ssdnum=`echo ${ssd} | sed -e 's/\/dev\/disk\/by-id\/google-local-ssd-\([0-9]*\)/\1/'`
-      ssdmount="/mnt/disks/ssd${ssdnum}/"
-      mkdir -p ${ssdmount}
-      safe-format-and-mount "${ssd}" ${ssdmount}
-      echo "Mounted local SSD $ssd at ${ssdmount}"
-      chmod a+w ${ssdmount}
+      if [[ ${i} -lt ${scsiblocknum} ]]; then
+        mount-ext ${ssd} "scsi" "block"
+      else
+        # GKE does not set NODE_LOCAL_SSDS so all non-block devices
+        # are assumed to be filesystem devices
+        mount-ext ${ssd} "scsi" "fs"
+      fi
+      i=$((i+1))
     else
       echo "No local SSD disks found."
     fi
