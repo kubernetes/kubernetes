@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api_test
+package testing
 
 import (
 	"math/rand"
@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 )
 
 func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
@@ -44,7 +43,7 @@ func doRoundTrip(t *testing.T, group testapi.TestGroup, kind string) {
 		t.Fatalf("Couldn't create internal object %v: %v", kind, err)
 	}
 	seed := rand.Int63()
-	fuzzer.FuzzerFor(kapitesting.FuzzerFuncs, rand.NewSource(seed), api.Codecs).
+	fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), api.Codecs).
 		// We are explicitly overwriting custom fuzzing functions, to ensure
 		// that InitContainers and their statuses are not generated. This is
 		// because in thise test we are simply doing json operations, in which
