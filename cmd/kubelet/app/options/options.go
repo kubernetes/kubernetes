@@ -122,12 +122,7 @@ func NewKubeletFlags() *KubeletFlags {
 		ContainerRuntimeOptions: *NewContainerRuntimeOptions(),
 		CertDirectory:           "/var/lib/kubelet/pki",
 		RootDirectory:           v1alpha1.DefaultRootDir,
-		// DEPRECATED: auto detecting cloud providers goes against the initiative
-		// for out-of-tree cloud providers as we'll now depend on cAdvisor integrations
-		// with cloud providers instead of in the core repo.
-		// More details here: https://github.com/kubernetes/kubernetes/issues/50986
-		CloudProvider:      v1alpha1.AutoDetectCloudProvider,
-		RotateCertificates: false,
+		RotateCertificates:      false,
 	}
 }
 
@@ -226,7 +221,7 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&f.CertDirectory, "cert-dir", f.CertDirectory, "The directory where the TLS certs are located. "+
 		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
 
-	fs.StringVar(&f.CloudProvider, "cloud-provider", f.CloudProvider, "The provider for cloud services. By default, kubelet will attempt to auto-detect the cloud provider (deprecated). Specify empty string for running with no cloud provider, this will be the default in upcoming releases.")
+	fs.StringVar(&f.CloudProvider, "cloud-provider", f.CloudProvider, "The provider for cloud services. Specify empty string for running with no cloud provider.")
 	fs.StringVar(&f.CloudConfigFile, "cloud-config", f.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 
 	fs.StringVar(&f.RootDirectory, "root-dir", f.RootDirectory, "Directory path for managing kubelet files (volume mounts,etc).")
