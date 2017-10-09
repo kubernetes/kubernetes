@@ -95,8 +95,8 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 
 	// Create containers for both qos classes
 	for qosClass, containerName := range qosClasses {
-		// get the container's abstract name
-		abstractContainerName := CgroupName(containerName)
+		// get the container's absolute name
+		absoluteContainerName := CgroupName(containerName)
 
 		resourceParameters := &ResourceConfig{}
 		// the BestEffort QoS class has a statically configured minShares value
@@ -107,7 +107,7 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 
 		// containerConfig object stores the cgroup specifications
 		containerConfig := &CgroupConfig{
-			Name:               abstractContainerName,
+			Name:               absoluteContainerName,
 			ResourceParameters: resourceParameters,
 		}
 
@@ -117,7 +117,7 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 		}
 
 		// check if it exists
-		if !cm.Exists(abstractContainerName) {
+		if !cm.Exists(absoluteContainerName) {
 			if err := cm.Create(containerConfig); err != nil {
 				return fmt.Errorf("failed to create top level %v QOS cgroup : %v", qosClass, err)
 			}
