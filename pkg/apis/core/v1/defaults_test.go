@@ -27,14 +27,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 
 	// enforce that all types are installed
 	_ "k8s.io/kubernetes/pkg/api/testapi"
 )
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
-	codec := legacyscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
+	codec := legacyscheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion)
 	data, err := runtime.Encode(codec, obj)
 	if err != nil {
 		t.Errorf("%v\n %#v", err, obj)
@@ -1129,7 +1129,7 @@ func TestSetMinimumScalePod(t *testing.T) {
 	pod := &v1.Pod{
 		Spec: s,
 	}
-	k8s_api_v1.SetObjectDefaults_Pod(pod)
+	corev1.SetObjectDefaults_Pod(pod)
 
 	if expect := resource.MustParse("1m"); expect.Cmp(pod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory]) != 0 {
 		t.Errorf("did not round resources: %#v", pod.Spec.Containers[0].Resources)
