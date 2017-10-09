@@ -166,6 +166,169 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 	}
 }
 
+func TestSetDefaultDeployment(t *testing.T) {
+	defaultIntOrString := intstr.FromString("25%")
+	differentIntOrString := intstr.FromInt(5)
+	period := int64(v1.DefaultTerminationGracePeriodSeconds)
+	defaultTemplate := v1.PodTemplateSpec{
+		Spec: v1.PodSpec{
+			DNSPolicy:                     v1.DNSClusterFirst,
+			RestartPolicy:                 v1.RestartPolicyAlways,
+			SecurityContext:               &v1.PodSecurityContext{},
+			TerminationGracePeriodSeconds: &period,
+			SchedulerName:                 api.DefaultSchedulerName,
+		},
+	}
+	tests := []struct {
+		original *appsv1.Deployment
+		expected *appsv1.Deployment
+	}{
+		{
+			original: &appsv1.Deployment{},
+			expected: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: newInt32(1),
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RollingUpdateDeploymentStrategyType,
+						RollingUpdate: &appsv1.RollingUpdateDeployment{
+							MaxSurge:       &defaultIntOrString,
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
+					RevisionHistoryLimit:    newInt32(10),
+					ProgressDeadlineSeconds: newInt32(600),
+					Template:                defaultTemplate,
+				},
+			},
+		},
+		{
+			original: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: newInt32(5),
+					Strategy: appsv1.DeploymentStrategy{
+						RollingUpdate: &appsv1.RollingUpdateDeployment{
+							MaxSurge: &differentIntOrString,
+						},
+					},
+				},
+			},
+			expected: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: newInt32(5),
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RollingUpdateDeploymentStrategyType,
+						RollingUpdate: &appsv1.RollingUpdateDeployment{
+							MaxSurge:       &differentIntOrString,
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
+					RevisionHistoryLimit:    newInt32(10),
+					ProgressDeadlineSeconds: newInt32(600),
+					Template:                defaultTemplate,
+				},
+			},
+		},
+		{
+			original: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: newInt32(3),
+					Strategy: appsv1.DeploymentStrategy{
+						Type:          appsv1.RollingUpdateDeploymentStrategyType,
+						RollingUpdate: nil,
+					},
+				},
+			},
+			expected: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: newInt32(3),
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RollingUpdateDeploymentStrategyType,
+						RollingUpdate: &appsv1.RollingUpdateDeployment{
+							MaxSurge:       &defaultIntOrString,
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
+					RevisionHistoryLimit:    newInt32(10),
+					ProgressDeadlineSeconds: newInt32(600),
+					Template:                defaultTemplate,
+				},
+			},
+		},
+		{
+			original: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: newInt32(5),
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RecreateDeploymentStrategyType,
+					},
+					RevisionHistoryLimit: newInt32(0),
+				},
+			},
+			expected: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: newInt32(5),
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RecreateDeploymentStrategyType,
+					},
+					RevisionHistoryLimit:    newInt32(0),
+					ProgressDeadlineSeconds: newInt32(600),
+					Template:                defaultTemplate,
+				},
+			},
+		},
+		{
+			original: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: newInt32(5),
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RecreateDeploymentStrategyType,
+					},
+					ProgressDeadlineSeconds: newInt32(30),
+					RevisionHistoryLimit:    newInt32(2),
+				},
+			},
+			expected: &appsv1.Deployment{
+				Spec: appsv1.DeploymentSpec{
+					Replicas: newInt32(5),
+					Strategy: appsv1.DeploymentStrategy{
+						Type: appsv1.RecreateDeploymentStrategyType,
+					},
+					ProgressDeadlineSeconds: newInt32(30),
+					RevisionHistoryLimit:    newInt32(2),
+					Template:                defaultTemplate,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		original := test.original
+		expected := test.expected
+		obj2 := roundTrip(t, runtime.Object(original))
+		got, ok := obj2.(*appsv1.Deployment)
+		if !ok {
+			t.Errorf("unexpected object: %v", got)
+			t.FailNow()
+		}
+		if !apiequality.Semantic.DeepEqual(got.Spec, expected.Spec) {
+			t.Errorf("object mismatch!\nexpected:\n\t%+v\ngot:\n\t%+v", got.Spec, expected.Spec)
+		}
+	}
+}
+
+func TestDefaultDeploymentAvailability(t *testing.T) {
+	d := roundTrip(t, runtime.Object(&appsv1.Deployment{})).(*appsv1.Deployment)
+
+	maxUnavailable, err := intstr.GetValueFromIntOrPercent(d.Spec.Strategy.RollingUpdate.MaxUnavailable, int(*(d.Spec.Replicas)), false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if *(d.Spec.Replicas)-int32(maxUnavailable) <= 0 {
+		t.Fatalf("the default value of maxUnavailable can lead to no active replicas during rolling update")
+	}
+}
+
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	data, err := runtime.Encode(api.Codecs.LegacyCodec(SchemeGroupVersion), obj)
 	if err != nil {
