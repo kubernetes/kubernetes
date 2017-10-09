@@ -15,6 +15,7 @@
 package validate
 
 import (
+	"log"
 	"reflect"
 	"regexp"
 
@@ -45,7 +46,9 @@ func (o *objectValidator) Applies(source interface{}, kind reflect.Kind) bool {
 	// there is a problem in the type validator where it will be unhappy about null values
 	// so that requires more testing
 	r := reflect.TypeOf(source) == specSchemaType && (kind == reflect.Map || kind == reflect.Struct)
-	//fmt.Printf("object validator for %q applies %t for %T (kind: %v)\n", o.Path, r, source, kind)
+	if Debug {
+		log.Printf("object validator for %q applies %t for %T (kind: %v)\n", o.Path, r, source, kind)
+	}
 	return r
 }
 
@@ -61,14 +64,6 @@ func (o *objectValidator) Validate(data interface{}) *Result {
 	}
 
 	res := new(Result)
-	if len(o.Required) > 0 {
-		for _, k := range o.Required {
-			if _, ok := val[k]; !ok {
-				res.AddErrors(errors.Required(o.Path+"."+k, o.In))
-				continue
-			}
-		}
-	}
 
 	if o.AdditionalProperties != nil && !o.AdditionalProperties.Allows {
 		for k := range val {
@@ -99,6 +94,8 @@ func (o *objectValidator) Validate(data interface{}) *Result {
 		}
 	}
 
+	createdFromDefaults := map[string]bool{}
+
 	for pName, pSchema := range o.Properties {
 		rName := pName
 		if o.Path != "" {
@@ -106,7 +103,24 @@ func (o *objectValidator) Validate(data interface{}) *Result {
 		}
 
 		if v, ok := val[pName]; ok {
-			res.Merge(NewSchemaValidator(&pSchema, o.Root, rName, o.KnownFormats).Validate(v))
+			r := NewSchemaValidator(&pSchema, o.Root, rName, o.KnownFormats).Validate(v)
+			res.Merge(r)
+		} else if pSchema.Default != nil {
+			createdFromDefaults[pName] = true
+			pName := pName // shaddow
+			def := pSchema.Default
+			res.Defaulters = append(res.Defaulters, DefaulterFunc(func() {
+				val[pName] = def
+			}))
+		}
+	}
+
+	if len(o.Required) > 0 {
+		for _, k := range o.Required {
+			if _, ok := val[k]; !ok && !createdFromDefaults[k] {
+				res.AddErrors(errors.Required(o.Path+"."+k, o.In))
+				continue
+			}
 		}
 	}
 
@@ -137,9 +151,6 @@ func (o *objectValidator) validatePatternProperty(key string, value interface{},
 
 			res := validator.Validate(value)
 			result.Merge(res)
-			if res.IsValid() {
-				succeededOnce = true
-			}
 		}
 	}
 
