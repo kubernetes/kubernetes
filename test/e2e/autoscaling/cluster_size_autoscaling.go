@@ -753,8 +753,8 @@ func runDrainTest(f *framework.Framework, migSizes map[string]int, namespace str
 	}.AsSelector().String()})
 	framework.ExpectNoError(err)
 	numPods := len(nodes.Items) * podsPerNode
-	testId := string(uuid.NewUUID()) // So that we can label and find pods
-	labelMap := map[string]string{"test_id": testId}
+	testID := string(uuid.NewUUID()) // So that we can label and find pods
+	labelMap := map[string]string{"test_id": testID}
 	framework.ExpectNoError(runReplicatedPodOnEachNode(f, nodes.Items, namespace, podsPerNode, "reschedulable-pods", labelMap, 0))
 
 	defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, namespace, "reschedulable-pods")
@@ -781,7 +781,7 @@ func runDrainTest(f *framework.Framework, migSizes map[string]int, namespace str
 	verifyFunction(increasedSize)
 }
 
-func getGKEClusterUrl() string {
+func getGKEClusterURL() string {
 	out, err := execCmd("gcloud", "auth", "print-access-token").Output()
 	framework.ExpectNoError(err)
 	token := strings.Replace(string(out), "\n", "", -1)
@@ -795,7 +795,7 @@ func getGKEClusterUrl() string {
 }
 
 func isAutoscalerEnabled(expectedMaxNodeCountInTargetPool int) (bool, error) {
-	resp, err := http.Get(getGKEClusterUrl())
+	resp, err := http.Get(getGKEClusterURL())
 	if err != nil {
 		return false, err
 	}
@@ -841,7 +841,7 @@ func enableAutoscaler(nodePool string, minCount, maxCount int) error {
 			" }" +
 			"}"
 
-		url := getGKEClusterUrl()
+		url := getGKEClusterURL()
 		glog.Infof("Using gke api url %s", url)
 		putResult, err := doPut(url, updateRequest)
 		if err != nil {
@@ -889,7 +889,7 @@ func disableAutoscaler(nodePool string, minCount, maxCount int) error {
 			" }" +
 			"}"
 
-		url := getGKEClusterUrl()
+		url := getGKEClusterURL()
 		glog.Infof("Using gke api url %s", url)
 		putResult, err := doPut(url, updateRequest)
 		if err != nil {
@@ -974,6 +974,8 @@ func doPut(url, content string) (string, error) {
 	return strBody, nil
 }
 
+// ReserveMemory creates a replication controller with pods that, in summation,
+// request the specified amount of memory.
 func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration) func() error {
 	By(fmt.Sprintf("Running RC which reserves %v MB of memory", megabytes))
 	request := int64(1024 * 1024 * megabytes / replicas)
@@ -1009,7 +1011,7 @@ func WaitForClusterSizeFunc(c clientset.Interface, sizeFunc func(int) bool, time
 	return WaitForClusterSizeFuncWithUnready(c, sizeFunc, timeout, 0)
 }
 
-// WaitForClusterSizeWithUnready waits until the cluster size matches the given function and assumes some unready nodes.
+// WaitForClusterSizeFuncWithUnready waits until the cluster size matches the given function and assumes some unready nodes.
 func WaitForClusterSizeFuncWithUnready(c clientset.Interface, sizeFunc func(int) bool, timeout time.Duration, expectedUnready int) error {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
 		nodes, err := c.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
@@ -1151,9 +1153,11 @@ func makeNodeUnschedulable(c clientset.Interface, node *v1.Node) error {
 	return fmt.Errorf("Failed to taint node in allowed number of retries")
 }
 
+// CriticalAddonsOnlyError implements the `error` interface, and signifies the
+// presence of the `CriticalAddonsOnly` taint on the node.
 type CriticalAddonsOnlyError struct{}
 
-func (_ CriticalAddonsOnlyError) Error() string {
+func (CriticalAddonsOnlyError) Error() string {
 	return fmt.Sprintf("CriticalAddonsOnly taint found on node")
 }
 
@@ -1164,7 +1168,7 @@ func makeNodeSchedulable(c clientset.Interface, node *v1.Node, failOnCriticalAdd
 		if err != nil {
 			return err
 		}
-		newTaints := make([]v1.Taint, 0)
+		var newTaints []v1.Taint
 		for _, taint := range freshNode.Spec.Taints {
 			if failOnCriticalAddonsOnly && taint.Key == criticalAddonsOnlyTaint {
 				return CriticalAddonsOnlyError{}
@@ -1520,7 +1524,7 @@ func waitForScaleUpStatus(c clientset.Interface, cond func(s *scaleUpStatus) boo
 func addKubeSystemPdbs(f *framework.Framework) (func(), error) {
 	By("Create PodDisruptionBudgets for kube-system components, so they can be migrated if required")
 
-	newPdbs := make([]string, 0)
+	var newPdbs []string
 	cleanup := func() {
 		var finalErr error
 		for _, newPdbName := range newPdbs {
@@ -1538,21 +1542,21 @@ func addKubeSystemPdbs(f *framework.Framework) (func(), error) {
 	}
 
 	type pdbInfo struct {
-		label         string
-		min_available int
+		label        string
+		minAvailable int
 	}
 	pdbsToAdd := []pdbInfo{
-		{label: "kube-dns", min_available: 1},
-		{label: "kube-dns-autoscaler", min_available: 0},
-		{label: "metrics-server", min_available: 0},
-		{label: "kubernetes-dashboard", min_available: 0},
-		{label: "glbc", min_available: 0},
+		{label: "kube-dns", minAvailable: 1},
+		{label: "kube-dns-autoscaler", minAvailable: 0},
+		{label: "metrics-server", minAvailable: 0},
+		{label: "kubernetes-dashboard", minAvailable: 0},
+		{label: "glbc", minAvailable: 0},
 	}
 	for _, pdbData := range pdbsToAdd {
 		By(fmt.Sprintf("Create PodDisruptionBudget for %v", pdbData.label))
 		labelMap := map[string]string{"k8s-app": pdbData.label}
 		pdbName := fmt.Sprintf("test-pdb-for-%v", pdbData.label)
-		minAvailable := intstr.FromInt(pdbData.min_available)
+		minAvailable := intstr.FromInt(pdbData.minAvailable)
 		pdb := &policy.PodDisruptionBudget{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      pdbName,
