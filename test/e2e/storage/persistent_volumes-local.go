@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -54,7 +55,15 @@ const (
 	DirectoryLocalVolumeType LocalVolumeType = "dir"
 	// creates a tmpfs and mounts it
 	TmpfsLocalVolumeType LocalVolumeType = "tmpfs"
+	// tests based on local ssd at /mnt/disks/by-uuid/
+	GCELocalSSDVolumeType LocalVolumeType = "gce-localssd-scsi-fs"
 )
+
+var setupLocalVolumeMap = map[LocalVolumeType]func(*localTestConfig) *localTestVolume{
+	GCELocalSSDVolumeType:    setupLocalVolumeGCELocalSSD,
+	TmpfsLocalVolumeType:     setupLocalVolumeTmpfs,
+	DirectoryLocalVolumeType: setupLocalVolumeDirectory,
+}
 
 type localTestVolume struct {
 	// Node that the volume is on
@@ -227,41 +236,52 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 		})
 	})
 
-	LocalVolumeTypes := []LocalVolumeType{DirectoryLocalVolumeType, TmpfsLocalVolumeType}
+	LocalVolumeTypes := []LocalVolumeType{DirectoryLocalVolumeType, TmpfsLocalVolumeType, GCELocalSSDVolumeType}
 
 	Context("when two pods mount a local volume at the same time", func() {
-		It("should be able to write from pod1 and read from pod2", func() {
-			for _, testVolType := range LocalVolumeTypes {
+		for _, testVolType := range LocalVolumeTypes {
+			It("should be able to write from pod1 and read from pod2", func() {
+				if testVolType == GCELocalSSDVolumeType {
+					framework.SkipUnlessLocalSSDExists("scsi", "fs", config.node0)
+				}
 				var testVol *localTestVolume
 				By(fmt.Sprintf("local-volume-type: %s", testVolType))
 				testVol = setupLocalVolumePVCPV(config, testVolType)
 				twoPodsReadWriteTest(config, testVol)
 				cleanupLocalVolume(config, testVol)
-			}
-		})
+			})
+		}
 	})
 
 	Context("when two pods mount a local volume one after the other", func() {
-		It("should be able to write from pod1 and read from pod2", func() {
-			for _, testVolType := range LocalVolumeTypes {
+		for _, testVolType := range LocalVolumeTypes {
+			It("should be able to write from pod1 and read from pod2", func() {
+				if testVolType == GCELocalSSDVolumeType {
+					framework.SkipUnlessLocalSSDExists("scsi", "fs", config.node0)
+				}
 				var testVol *localTestVolume
 				By(fmt.Sprintf("local-volume-type: %s", testVolType))
 				testVol = setupLocalVolumePVCPV(config, testVolType)
 				twoPodsReadWriteSerialTest(config, testVol)
 				cleanupLocalVolume(config, testVol)
-			}
-		})
+
+			})
+		}
 	})
 
 	Context("when pod using local volume with non-existant path", func() {
+
 		ep := &eventPatterns{
 			reason:  "FailedMount",
 			pattern: make([]string, 2)}
 		ep.pattern = append(ep.pattern, "MountVolume.SetUp failed")
 		ep.pattern = append(ep.pattern, "does not exist")
 
-		It("should not be able to mount", func() {
-			for _, testVolType := range LocalVolumeTypes {
+		for _, testVolType := range LocalVolumeTypes {
+			It("should not be able to mount", func() {
+				if testVolType == GCELocalSSDVolumeType {
+					framework.SkipUnlessLocalSSDExists("scsi", "fs", config.node0)
+				}
 				By(fmt.Sprintf("local-volume-type: %s", testVolType))
 				testVol := &localTestVolume{
 					node:            config.node0,
@@ -273,8 +293,9 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 				pod, err := createLocalPod(config, testVol)
 				Expect(err).To(HaveOccurred())
 				checkPodEvents(config, pod.Name, ep)
-			}
-		})
+
+			})
+		}
 	})
 
 	Context("when pod's node is different from PV's NodeAffinity", func() {
@@ -293,12 +314,16 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 		for _, testVolType := range LocalVolumeTypes {
 
 			It("should not be able to mount due to different NodeAffinity", func() {
-
+				if testVolType == GCELocalSSDVolumeType {
+					framework.SkipUnlessLocalSSDExists("scsi", "fs", config.node0)
+				}
 				testPodWithNodeName(config, testVolType, ep, config.nodes.Items[1].Name, makeLocalPodWithNodeAffinity)
 			})
 
 			It("should not be able to mount due to different NodeSelector", func() {
-
+				if testVolType == GCELocalSSDVolumeType {
+					framework.SkipUnlessLocalSSDExists("scsi", "fs", config.node0)
+				}
 				testPodWithNodeName(config, testVolType, ep, config.nodes.Items[1].Name, makeLocalPodWithNodeSelector)
 			})
 
@@ -319,9 +344,10 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 		ep.pattern = append(ep.pattern, "NodeSelectorTerm")
 		ep.pattern = append(ep.pattern, "Storage node affinity check failed")
 		for _, testVolType := range LocalVolumeTypes {
-
 			It("should not be able to mount due to different NodeName", func() {
-
+				if testVolType == GCELocalSSDVolumeType {
+					framework.SkipUnlessLocalSSDExists("scsi", "fs", config.node0)
+				}
 				testPodWithNodeName(config, testVolType, ep, config.nodes.Items[1].Name, makeLocalPodWithNodeName)
 			})
 		}
@@ -516,16 +542,7 @@ func podNodeName(config *localTestConfig, pod *v1.Pod) (string, error) {
 	return runtimePod.Spec.NodeName, runtimePodErr
 }
 
-// setupLocalVolume setups a directory to user for local PV
-func setupLocalVolume(config *localTestConfig, localVolumeType LocalVolumeType) *localTestVolume {
-	testDirName := "local-volume-test-" + string(uuid.NewUUID())
-	hostDir := filepath.Join(hostBase, testDirName)
-
-	if localVolumeType == TmpfsLocalVolumeType {
-		createAndMountTmpfsLocalVolume(config, hostDir)
-	}
-
-	// populate volume with testFile containing testFileContent
+func setupWriteTestFile(hostDir string, config *localTestConfig, localVolumeType LocalVolumeType) *localTestVolume {
 	writeCmd, _ := createWriteAndReadCmds(hostDir, testFile, testFileContent)
 	By(fmt.Sprintf("Creating local volume on node %q at path %q", config.node0.Name, hostDir))
 	err := framework.IssueSSHCommand(writeCmd, framework.TestContext.Provider, config.node0)
@@ -535,6 +552,30 @@ func setupLocalVolume(config *localTestConfig, localVolumeType LocalVolumeType) 
 		hostDir:         hostDir,
 		localVolumeType: localVolumeType,
 	}
+}
+
+func setupLocalVolumeTmpfs(config *localTestConfig) *localTestVolume {
+	testDirName := "local-volume-test-" + string(uuid.NewUUID())
+	hostDir := filepath.Join(hostBase, testDirName)
+	createAndMountTmpfsLocalVolume(config, hostDir)
+	// populate volume with testFile containing testFileContent
+	return setupWriteTestFile(hostDir, config, TmpfsLocalVolumeType)
+}
+
+func setupLocalVolumeGCELocalSSD(config *localTestConfig) *localTestVolume {
+	res, err := framework.IssueSSHCommandWithResult("ls /mnt/disks/by-uuid/google-local-ssds-scsi-fs/", framework.TestContext.Provider, config.node0)
+	Expect(err).NotTo(HaveOccurred())
+	dirName := strings.Fields(res.Stdout)[0]
+	hostDir := "/mnt/disks/by-uuid/google-local-ssds-scsi-fs/" + dirName
+	// populate volume with testFile containing testFileContent
+	return setupWriteTestFile(hostDir, config, GCELocalSSDVolumeType)
+}
+
+func setupLocalVolumeDirectory(config *localTestConfig) *localTestVolume {
+	testDirName := "local-volume-test-" + string(uuid.NewUUID())
+	hostDir := filepath.Join(hostBase, testDirName)
+	// populate volume with testFile containing testFileContent
+	return setupWriteTestFile(hostDir, config, DirectoryLocalVolumeType)
 }
 
 // Deletes the PVC/PV, and launches a pod with hostpath volume to remove the test directory
@@ -552,7 +593,12 @@ func cleanupLocalVolume(config *localTestConfig, volume *localTestVolume) {
 	if volume.localVolumeType == TmpfsLocalVolumeType {
 		unmountTmpfsLocalVolume(config, volume.hostDir)
 	}
-
+	if volume.localVolumeType == GCELocalSSDVolumeType {
+		removeCmd := fmt.Sprintf("rm %s", volume.hostDir+"/"+testFile)
+		err := framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, config.node0)
+		Expect(err).NotTo(HaveOccurred())
+		return
+	}
 	By("Removing the test directory")
 	removeCmd := fmt.Sprintf("rm -r %s", volume.hostDir)
 	err := framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, config.node0)
@@ -733,7 +779,9 @@ func podRWCmdExec(pod *v1.Pod, cmd string) string {
 // and create local PVC and PV
 func setupLocalVolumePVCPV(config *localTestConfig, localVolumeType LocalVolumeType) *localTestVolume {
 	By("Initializing test volume")
-	testVol := setupLocalVolume(config, localVolumeType)
+	setupLocalVolume, ok := setupLocalVolumeMap[localVolumeType]
+	Expect(ok).To(BeTrue())
+	testVol := setupLocalVolume(config)
 
 	By("Creating local PVC and PV")
 	createLocalPVCPV(config, testVol)
