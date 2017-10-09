@@ -48,13 +48,17 @@ func NewDefaultCapabilities(defaultAddCapabilities, requiredDropCapabilities, al
 // 1.  a capabilities.Add set containing all the required adds (unless the
 // 		container specifically is dropping the cap) and container requested adds
 // 2.  a capabilities.Drop set containing all the required drops and container requested drops
+//
+// Returns the original container capabilities if no changes are required.
 func (s *defaultCapabilities) Generate(pod *api.Pod, container *api.Container) (*api.Capabilities, error) {
 	defaultAdd := makeCapSet(s.defaultAddCapabilities)
 	requiredDrop := makeCapSet(s.requiredDropCapabilities)
 	containerAdd := sets.NewString()
 	containerDrop := sets.NewString()
 
+	var containerCapabilities *api.Capabilities
 	if container.SecurityContext != nil && container.SecurityContext.Capabilities != nil {
+		containerCapabilities = container.SecurityContext.Capabilities
 		containerAdd = makeCapSet(container.SecurityContext.Capabilities.Add)
 		containerDrop = makeCapSet(container.SecurityContext.Capabilities.Drop)
 	}
@@ -62,17 +66,17 @@ func (s *defaultCapabilities) Generate(pod *api.Pod, container *api.Container) (
 	// remove any default adds that the container is specifically dropping
 	defaultAdd = defaultAdd.Difference(containerDrop)
 
-	combinedAdd := defaultAdd.Union(containerAdd).List()
-	combinedDrop := requiredDrop.Union(containerDrop).List()
+	combinedAdd := defaultAdd.Union(containerAdd)
+	combinedDrop := requiredDrop.Union(containerDrop)
 
-	// nothing generated?  return nil
-	if len(combinedAdd) == 0 && len(combinedDrop) == 0 {
-		return nil, nil
+	// no changes? return the original capabilities
+	if (len(combinedAdd) == len(containerAdd)) && (len(combinedDrop) == len(containerDrop)) {
+		return containerCapabilities, nil
 	}
 
 	return &api.Capabilities{
-		Add:  capabilityFromStringSlice(combinedAdd),
-		Drop: capabilityFromStringSlice(combinedDrop),
+		Add:  capabilityFromStringSlice(combinedAdd.List()),
+		Drop: capabilityFromStringSlice(combinedDrop.List()),
 	}, nil
 }
 
