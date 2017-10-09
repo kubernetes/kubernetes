@@ -218,6 +218,7 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 		nil,
 		nil,
 		kubeClientConfig,
+		api.Scheme,
 		pluginInitializer,
 	)
 	if err != nil {
