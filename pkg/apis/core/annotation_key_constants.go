@@ -16,7 +16,7 @@ limitations under the License.
 
 // This file should be consistent with pkg/api/v1/annotation_key_constants.go.
 
-package api
+package core
 
 const (
 	// ImagePolicyFailedOpenKey is added to pods created by failing open when the image policy

@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestSemantic(t *testing.T) {
@@ -86,49 +86,49 @@ func TestIsStandardContainerResource(t *testing.T) {
 
 func TestAddToNodeAddresses(t *testing.T) {
 	testCases := []struct {
-		existing []api.NodeAddress
-		toAdd    []api.NodeAddress
-		expected []api.NodeAddress
+		existing []core.NodeAddress
+		toAdd    []core.NodeAddress
+		expected []core.NodeAddress
 	}{
 		{
-			existing: []api.NodeAddress{},
-			toAdd:    []api.NodeAddress{},
-			expected: []api.NodeAddress{},
+			existing: []core.NodeAddress{},
+			toAdd:    []core.NodeAddress{},
+			expected: []core.NodeAddress{},
 		},
 		{
-			existing: []api.NodeAddress{},
-			toAdd: []api.NodeAddress{
-				{Type: api.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: api.NodeHostName, Address: "localhost"},
+			existing: []core.NodeAddress{},
+			toAdd: []core.NodeAddress{
+				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
+				{Type: core.NodeHostName, Address: "localhost"},
 			},
-			expected: []api.NodeAddress{
-				{Type: api.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: api.NodeHostName, Address: "localhost"},
-			},
-		},
-		{
-			existing: []api.NodeAddress{},
-			toAdd: []api.NodeAddress{
-				{Type: api.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: api.NodeExternalIP, Address: "1.1.1.1"},
-			},
-			expected: []api.NodeAddress{
-				{Type: api.NodeExternalIP, Address: "1.1.1.1"},
+			expected: []core.NodeAddress{
+				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
+				{Type: core.NodeHostName, Address: "localhost"},
 			},
 		},
 		{
-			existing: []api.NodeAddress{
-				{Type: api.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: api.NodeInternalIP, Address: "10.1.1.1"},
+			existing: []core.NodeAddress{},
+			toAdd: []core.NodeAddress{
+				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
+				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
 			},
-			toAdd: []api.NodeAddress{
-				{Type: api.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: api.NodeHostName, Address: "localhost"},
+			expected: []core.NodeAddress{
+				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
 			},
-			expected: []api.NodeAddress{
-				{Type: api.NodeExternalIP, Address: "1.1.1.1"},
-				{Type: api.NodeInternalIP, Address: "10.1.1.1"},
-				{Type: api.NodeHostName, Address: "localhost"},
+		},
+		{
+			existing: []core.NodeAddress{
+				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
+				{Type: core.NodeInternalIP, Address: "10.1.1.1"},
+			},
+			toAdd: []core.NodeAddress{
+				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
+				{Type: core.NodeHostName, Address: "localhost"},
+			},
+			expected: []core.NodeAddress{
+				{Type: core.NodeExternalIP, Address: "1.1.1.1"},
+				{Type: core.NodeInternalIP, Address: "10.1.1.1"},
+				{Type: core.NodeHostName, Address: "localhost"},
 			},
 		},
 	}
@@ -143,30 +143,30 @@ func TestAddToNodeAddresses(t *testing.T) {
 
 func TestGetAccessModesFromString(t *testing.T) {
 	modes := GetAccessModesFromString("ROX")
-	if !containsAccessMode(modes, api.ReadOnlyMany) {
-		t.Errorf("Expected mode %s, but got %+v", api.ReadOnlyMany, modes)
+	if !containsAccessMode(modes, core.ReadOnlyMany) {
+		t.Errorf("Expected mode %s, but got %+v", core.ReadOnlyMany, modes)
 	}
 
 	modes = GetAccessModesFromString("ROX,RWX")
-	if !containsAccessMode(modes, api.ReadOnlyMany) {
-		t.Errorf("Expected mode %s, but got %+v", api.ReadOnlyMany, modes)
+	if !containsAccessMode(modes, core.ReadOnlyMany) {
+		t.Errorf("Expected mode %s, but got %+v", core.ReadOnlyMany, modes)
 	}
-	if !containsAccessMode(modes, api.ReadWriteMany) {
-		t.Errorf("Expected mode %s, but got %+v", api.ReadWriteMany, modes)
+	if !containsAccessMode(modes, core.ReadWriteMany) {
+		t.Errorf("Expected mode %s, but got %+v", core.ReadWriteMany, modes)
 	}
 
 	modes = GetAccessModesFromString("RWO,ROX,RWX")
-	if !containsAccessMode(modes, api.ReadOnlyMany) {
-		t.Errorf("Expected mode %s, but got %+v", api.ReadOnlyMany, modes)
+	if !containsAccessMode(modes, core.ReadOnlyMany) {
+		t.Errorf("Expected mode %s, but got %+v", core.ReadOnlyMany, modes)
 	}
-	if !containsAccessMode(modes, api.ReadWriteMany) {
-		t.Errorf("Expected mode %s, but got %+v", api.ReadWriteMany, modes)
+	if !containsAccessMode(modes, core.ReadWriteMany) {
+		t.Errorf("Expected mode %s, but got %+v", core.ReadWriteMany, modes)
 	}
 }
 
 func TestRemoveDuplicateAccessModes(t *testing.T) {
-	modes := []api.PersistentVolumeAccessMode{
-		api.ReadWriteOnce, api.ReadOnlyMany, api.ReadOnlyMany, api.ReadOnlyMany,
+	modes := []core.PersistentVolumeAccessMode{
+		core.ReadWriteOnce, core.ReadOnlyMany, core.ReadOnlyMany, core.ReadOnlyMany,
 	}
 	modes = removeDuplicateAccessModes(modes)
 	if len(modes) != 2 {
@@ -175,9 +175,9 @@ func TestRemoveDuplicateAccessModes(t *testing.T) {
 }
 
 func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
-	matchExpressions := []api.NodeSelectorRequirement{{
+	matchExpressions := []core.NodeSelectorRequirement{{
 		Key:      "foo",
-		Operator: api.NodeSelectorOpIn,
+		Operator: core.NodeSelectorOpIn,
 		Values:   []string{"bar", "baz"},
 	}}
 	mustParse := func(s string) labels.Selector {
@@ -188,36 +188,36 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 		return out
 	}
 	tc := []struct {
-		in        []api.NodeSelectorRequirement
+		in        []core.NodeSelectorRequirement
 		out       labels.Selector
 		expectErr bool
 	}{
 		{in: nil, out: labels.Nothing()},
-		{in: []api.NodeSelectorRequirement{}, out: labels.Nothing()},
+		{in: []core.NodeSelectorRequirement{}, out: labels.Nothing()},
 		{
 			in:  matchExpressions,
 			out: mustParse("foo in (baz,bar)"),
 		},
 		{
-			in: []api.NodeSelectorRequirement{{
+			in: []core.NodeSelectorRequirement{{
 				Key:      "foo",
-				Operator: api.NodeSelectorOpExists,
+				Operator: core.NodeSelectorOpExists,
 				Values:   []string{"bar", "baz"},
 			}},
 			expectErr: true,
 		},
 		{
-			in: []api.NodeSelectorRequirement{{
+			in: []core.NodeSelectorRequirement{{
 				Key:      "foo",
-				Operator: api.NodeSelectorOpGt,
+				Operator: core.NodeSelectorOpGt,
 				Values:   []string{"1"},
 			}},
 			out: mustParse("foo>1"),
 		},
 		{
-			in: []api.NodeSelectorRequirement{{
+			in: []core.NodeSelectorRequirement{{
 				Key:      "bar",
-				Operator: api.NodeSelectorOpLt,
+				Operator: core.NodeSelectorOpLt,
 				Values:   []string{"7"},
 			}},
 			out: mustParse("bar<7"),
@@ -241,7 +241,7 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 func TestSysctlsFromPodAnnotation(t *testing.T) {
 	type Test struct {
 		annotation  string
-		expectValue []api.Sysctl
+		expectValue []core.Sysctl
 		expectErr   bool
 	}
 	for i, test := range []Test{
@@ -259,11 +259,11 @@ func TestSysctlsFromPodAnnotation(t *testing.T) {
 		},
 		{
 			annotation:  "foo.bar=",
-			expectValue: []api.Sysctl{{Name: "foo.bar", Value: ""}},
+			expectValue: []core.Sysctl{{Name: "foo.bar", Value: ""}},
 		},
 		{
 			annotation:  "foo.bar=42",
-			expectValue: []api.Sysctl{{Name: "foo.bar", Value: "42"}},
+			expectValue: []core.Sysctl{{Name: "foo.bar", Value: "42"}},
 		},
 		{
 			annotation: "foo.bar=42,",
@@ -271,7 +271,7 @@ func TestSysctlsFromPodAnnotation(t *testing.T) {
 		},
 		{
 			annotation:  "foo.bar=42,abc.def=1",
-			expectValue: []api.Sysctl{{Name: "foo.bar", Value: "42"}, {Name: "abc.def", Value: "1"}},
+			expectValue: []core.Sysctl{{Name: "foo.bar", Value: "42"}, {Name: "abc.def", Value: "1"}},
 		},
 	} {
 		sysctls, err := SysctlsFromPodAnnotation(test.annotation)
@@ -301,7 +301,7 @@ func TestGetNodeAffinityFromAnnotations(t *testing.T) {
 		},
 		{
 			annotations: map[string]string{
-				api.AlphaStorageNodeAffinityAnnotation: `{ 
+				core.AlphaStorageNodeAffinityAnnotation: `{
 					"requiredDuringSchedulingIgnoredDuringExecution": { 
 						"nodeSelectorTerms": [ 
 							{ "matchExpressions": [
@@ -321,7 +321,7 @@ func TestGetNodeAffinityFromAnnotations(t *testing.T) {
 		},
 		{
 			annotations: map[string]string{
-				api.AlphaStorageNodeAffinityAnnotation: `[{ 
+				core.AlphaStorageNodeAffinityAnnotation: `[{
 					"requiredDuringSchedulingIgnoredDuringExecution": { 
 						"nodeSelectorTerms": [ 
 							{ "matchExpressions": [
@@ -341,7 +341,7 @@ func TestGetNodeAffinityFromAnnotations(t *testing.T) {
 		},
 		{
 			annotations: map[string]string{
-				api.AlphaStorageNodeAffinityAnnotation: `{ 
+				core.AlphaStorageNodeAffinityAnnotation: `{
 					"requiredDuringSchedulingIgnoredDuringExecution": { 
 						"nodeSelectorTerms":  
 							 "matchExpressions": [
@@ -374,23 +374,23 @@ func TestGetNodeAffinityFromAnnotations(t *testing.T) {
 
 func TestIsHugePageResourceName(t *testing.T) {
 	testCases := []struct {
-		name   api.ResourceName
+		name   core.ResourceName
 		result bool
 	}{
 		{
-			name:   api.ResourceName("hugepages-2Mi"),
+			name:   core.ResourceName("hugepages-2Mi"),
 			result: true,
 		},
 		{
-			name:   api.ResourceName("hugepages-1Gi"),
+			name:   core.ResourceName("hugepages-1Gi"),
 			result: true,
 		},
 		{
-			name:   api.ResourceName("cpu"),
+			name:   core.ResourceName("cpu"),
 			result: false,
 		},
 		{
-			name:   api.ResourceName("memory"),
+			name:   core.ResourceName("memory"),
 			result: false,
 		},
 	}
@@ -404,20 +404,20 @@ func TestIsHugePageResourceName(t *testing.T) {
 func TestHugePageResourceName(t *testing.T) {
 	testCases := []struct {
 		pageSize resource.Quantity
-		name     api.ResourceName
+		name     core.ResourceName
 	}{
 		{
 			pageSize: resource.MustParse("2Mi"),
-			name:     api.ResourceName("hugepages-2Mi"),
+			name:     core.ResourceName("hugepages-2Mi"),
 		},
 		{
 			pageSize: resource.MustParse("1Gi"),
-			name:     api.ResourceName("hugepages-1Gi"),
+			name:     core.ResourceName("hugepages-1Gi"),
 		},
 		{
 			// verify we do not regress our canonical representation
 			pageSize: *resource.NewQuantity(int64(2097152), resource.BinarySI),
-			name:     api.ResourceName("hugepages-2Mi"),
+			name:     core.ResourceName("hugepages-2Mi"),
 		},
 	}
 	for _, testCase := range testCases {
@@ -429,22 +429,22 @@ func TestHugePageResourceName(t *testing.T) {
 
 func TestHugePageSizeFromResourceName(t *testing.T) {
 	testCases := []struct {
-		name      api.ResourceName
+		name      core.ResourceName
 		expectErr bool
 		pageSize  resource.Quantity
 	}{
 		{
-			name:      api.ResourceName("hugepages-2Mi"),
+			name:      core.ResourceName("hugepages-2Mi"),
 			pageSize:  resource.MustParse("2Mi"),
 			expectErr: false,
 		},
 		{
-			name:      api.ResourceName("hugepages-1Gi"),
+			name:      core.ResourceName("hugepages-1Gi"),
 			pageSize:  resource.MustParse("1Gi"),
 			expectErr: false,
 		},
 		{
-			name:      api.ResourceName("hugepages-bad"),
+			name:      core.ResourceName("hugepages-bad"),
 			expectErr: true,
 		},
 	}
@@ -462,19 +462,19 @@ func TestHugePageSizeFromResourceName(t *testing.T) {
 
 func TestIsOvercommitAllowed(t *testing.T) {
 	testCases := []struct {
-		name    api.ResourceName
+		name    core.ResourceName
 		allowed bool
 	}{
 		{
-			name:    api.ResourceCPU,
+			name:    core.ResourceCPU,
 			allowed: true,
 		},
 		{
-			name:    api.ResourceMemory,
+			name:    core.ResourceMemory,
 			allowed: true,
 		},
 		{
-			name:    api.ResourceNvidiaGPU,
+			name:    core.ResourceNvidiaGPU,
 			allowed: false,
 		},
 		{

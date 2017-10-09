@@ -21,12 +21,12 @@ package qos
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper"
+	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
 
-func isSupportedQoSComputeResource(name api.ResourceName) bool {
-	supportedQoSComputeResources := sets.NewString(string(api.ResourceCPU), string(api.ResourceMemory))
+func isSupportedQoSComputeResource(name core.ResourceName) bool {
+	supportedQoSComputeResources := sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
 	return supportedQoSComputeResources.Has(string(name)) || helper.IsHugePageResourceName(name)
 }
 
@@ -34,9 +34,9 @@ func isSupportedQoSComputeResource(name api.ResourceName) bool {
 // A pod is besteffort if none of its containers have specified any requests or limits.
 // A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
 // A pod is burstable if limits and requests do not match across all containers.
-func GetPodQOS(pod *api.Pod) api.PodQOSClass {
-	requests := api.ResourceList{}
-	limits := api.ResourceList{}
+func GetPodQOS(pod *core.Pod) core.PodQOSClass {
+	requests := core.ResourceList{}
+	limits := core.ResourceList{}
 	zeroQuantity := resource.MustParse("0")
 	isGuaranteed := true
 	for _, container := range pod.Spec.Containers {
@@ -73,12 +73,12 @@ func GetPodQOS(pod *api.Pod) api.PodQOSClass {
 			}
 		}
 
-		if !qosLimitsFound.HasAll(string(api.ResourceMemory), string(api.ResourceCPU)) {
+		if !qosLimitsFound.HasAll(string(core.ResourceMemory), string(core.ResourceCPU)) {
 			isGuaranteed = false
 		}
 	}
 	if len(requests) == 0 && len(limits) == 0 {
-		return api.PodQOSBestEffort
+		return core.PodQOSBestEffort
 	}
 	// Check is requests match limits for all resources.
 	if isGuaranteed {
@@ -91,7 +91,7 @@ func GetPodQOS(pod *api.Pod) api.PodQOSClass {
 	}
 	if isGuaranteed &&
 		len(requests) == len(limits) {
-		return api.PodQOSGuaranteed
+		return core.PodQOSGuaranteed
 	}
-	return api.PodQOSBurstable
+	return core.PodQOSBurstable
 }

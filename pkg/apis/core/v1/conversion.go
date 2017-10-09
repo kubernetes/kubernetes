@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -38,10 +38,10 @@ func addFastPathConversionFuncs(scheme *runtime.Scheme) error {
 		switch a := objA.(type) {
 		case *v1.Pod:
 			switch b := objB.(type) {
-			case *api.Pod:
+			case *core.Pod:
 				return true, Convert_v1_Pod_To_api_Pod(a, b, s)
 			}
-		case *api.Pod:
+		case *core.Pod:
 			switch b := objB.(type) {
 			case *v1.Pod:
 				return true, Convert_api_Pod_To_v1_Pod(a, b, s)
@@ -49,10 +49,10 @@ func addFastPathConversionFuncs(scheme *runtime.Scheme) error {
 
 		case *v1.Event:
 			switch b := objB.(type) {
-			case *api.Event:
+			case *core.Event:
 				return true, Convert_v1_Event_To_api_Event(a, b, s)
 			}
-		case *api.Event:
+		case *core.Event:
 			switch b := objB.(type) {
 			case *v1.Event:
 				return true, Convert_api_Event_To_v1_Event(a, b, s)
@@ -60,10 +60,10 @@ func addFastPathConversionFuncs(scheme *runtime.Scheme) error {
 
 		case *v1.ReplicationController:
 			switch b := objB.(type) {
-			case *api.ReplicationController:
+			case *core.ReplicationController:
 				return true, Convert_v1_ReplicationController_To_api_ReplicationController(a, b, s)
 			}
-		case *api.ReplicationController:
+		case *core.ReplicationController:
 			switch b := objB.(type) {
 			case *v1.ReplicationController:
 				return true, Convert_api_ReplicationController_To_v1_ReplicationController(a, b, s)
@@ -71,10 +71,10 @@ func addFastPathConversionFuncs(scheme *runtime.Scheme) error {
 
 		case *v1.Node:
 			switch b := objB.(type) {
-			case *api.Node:
+			case *core.Node:
 				return true, Convert_v1_Node_To_api_Node(a, b, s)
 			}
-		case *api.Node:
+		case *core.Node:
 			switch b := objB.(type) {
 			case *v1.Node:
 				return true, Convert_api_Node_To_v1_Node(a, b, s)
@@ -82,10 +82,10 @@ func addFastPathConversionFuncs(scheme *runtime.Scheme) error {
 
 		case *v1.Namespace:
 			switch b := objB.(type) {
-			case *api.Namespace:
+			case *core.Namespace:
 				return true, Convert_v1_Namespace_To_api_Namespace(a, b, s)
 			}
-		case *api.Namespace:
+		case *core.Namespace:
 			switch b := objB.(type) {
 			case *v1.Namespace:
 				return true, Convert_api_Namespace_To_v1_Namespace(a, b, s)
@@ -93,10 +93,10 @@ func addFastPathConversionFuncs(scheme *runtime.Scheme) error {
 
 		case *v1.Service:
 			switch b := objB.(type) {
-			case *api.Service:
+			case *core.Service:
 				return true, Convert_v1_Service_To_api_Service(a, b, s)
 			}
-		case *api.Service:
+		case *core.Service:
 			switch b := objB.(type) {
 			case *v1.Service:
 				return true, Convert_api_Service_To_v1_Service(a, b, s)
@@ -104,10 +104,10 @@ func addFastPathConversionFuncs(scheme *runtime.Scheme) error {
 
 		case *v1.Endpoints:
 			switch b := objB.(type) {
-			case *api.Endpoints:
+			case *core.Endpoints:
 				return true, Convert_v1_Endpoints_To_api_Endpoints(a, b, s)
 			}
-		case *api.Endpoints:
+		case *core.Endpoints:
 			switch b := objB.(type) {
 			case *v1.Endpoints:
 				return true, Convert_api_Endpoints_To_v1_Endpoints(a, b, s)
@@ -257,7 +257,7 @@ func Convert_v1_ReplicationControllerStatus_to_extensions_ReplicaSetStatus(in *v
 	for _, cond := range in.Conditions {
 		out.Conditions = append(out.Conditions, extensions.ReplicaSetCondition{
 			Type:               extensions.ReplicaSetConditionType(cond.Type),
-			Status:             api.ConditionStatus(cond.Status),
+			Status:             core.ConditionStatus(cond.Status),
 			LastTransitionTime: cond.LastTransitionTime,
 			Reason:             cond.Reason,
 			Message:            cond.Message,
@@ -317,7 +317,7 @@ func Convert_extensions_ReplicaSetStatus_to_v1_ReplicationControllerStatus(in *e
 	return nil
 }
 
-func Convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *api.ReplicationControllerSpec, out *v1.ReplicationControllerSpec, s conversion.Scope) error {
+func Convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *core.ReplicationControllerSpec, out *v1.ReplicationControllerSpec, s conversion.Scope) error {
 	out.Replicas = &in.Replicas
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Selector = in.Selector
@@ -332,14 +332,14 @@ func Convert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(in *a
 	return nil
 }
 
-func Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *v1.ReplicationControllerSpec, out *api.ReplicationControllerSpec, s conversion.Scope) error {
+func Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *v1.ReplicationControllerSpec, out *core.ReplicationControllerSpec, s conversion.Scope) error {
 	if in.Replicas != nil {
 		out.Replicas = *in.Replicas
 	}
 	out.MinReadySeconds = in.MinReadySeconds
 	out.Selector = in.Selector
 	if in.Template != nil {
-		out.Template = new(api.PodTemplateSpec)
+		out.Template = new(core.PodTemplateSpec)
 		if err := Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in.Template, out.Template, s); err != nil {
 			return err
 		}
@@ -349,7 +349,7 @@ func Convert_v1_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *v
 	return nil
 }
 
-func Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in *api.PodTemplateSpec, out *v1.PodTemplateSpec, s conversion.Scope) error {
+func Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in *core.PodTemplateSpec, out *v1.PodTemplateSpec, s conversion.Scope) error {
 	if err := autoConvert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in, out, s); err != nil {
 		return err
 	}
@@ -357,7 +357,7 @@ func Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in *api.PodTemplateSpec, 
 	return nil
 }
 
-func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *v1.PodTemplateSpec, out *api.PodTemplateSpec, s conversion.Scope) error {
+func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *v1.PodTemplateSpec, out *core.PodTemplateSpec, s conversion.Scope) error {
 	if err := autoConvert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in, out, s); err != nil {
 		return err
 	}
@@ -367,7 +367,7 @@ func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *v1.PodTemplateSpec, o
 
 // The following two v1.PodSpec conversions are done here to support v1.ServiceAccount
 // as an alias for ServiceAccountName.
-func Convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *v1.PodSpec, s conversion.Scope) error {
+func Convert_api_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s conversion.Scope) error {
 	if err := autoConvert_api_PodSpec_To_v1_PodSpec(in, out, s); err != nil {
 		return err
 	}
@@ -386,7 +386,7 @@ func Convert_api_PodSpec_To_v1_PodSpec(in *api.PodSpec, out *v1.PodSpec, s conve
 	return nil
 }
 
-func Convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s conversion.Scope) error {
+func Convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *core.PodSpec, s conversion.Scope) error {
 	if err := autoConvert_v1_PodSpec_To_api_PodSpec(in, out, s); err != nil {
 		return err
 	}
@@ -400,7 +400,7 @@ func Convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s conve
 	// the host namespace fields have to be handled specially for backward compatibility
 	// with v1.0.0
 	if out.SecurityContext == nil {
-		out.SecurityContext = new(api.PodSecurityContext)
+		out.SecurityContext = new(core.PodSecurityContext)
 	}
 	out.SecurityContext.HostNetwork = in.HostNetwork
 	out.SecurityContext.HostPID = in.HostPID
@@ -409,7 +409,7 @@ func Convert_v1_PodSpec_To_api_PodSpec(in *v1.PodSpec, out *api.PodSpec, s conve
 	return nil
 }
 
-func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *v1.Pod, s conversion.Scope) error {
+func Convert_api_Pod_To_v1_Pod(in *core.Pod, out *v1.Pod, s conversion.Scope) error {
 	if err := autoConvert_api_Pod_To_v1_Pod(in, out, s); err != nil {
 		return err
 	}
@@ -431,7 +431,7 @@ func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *v1.Pod, s conversion.Scope) err
 	return nil
 }
 
-func Convert_v1_Secret_To_api_Secret(in *v1.Secret, out *api.Secret, s conversion.Scope) error {
+func Convert_v1_Secret_To_api_Secret(in *v1.Secret, out *core.Secret, s conversion.Scope) error {
 	if err := autoConvert_v1_Secret_To_api_Secret(in, out, s); err != nil {
 		return err
 	}
@@ -448,7 +448,7 @@ func Convert_v1_Secret_To_api_Secret(in *v1.Secret, out *api.Secret, s conversio
 
 	return nil
 }
-func Convert_api_SecurityContext_To_v1_SecurityContext(in *api.SecurityContext, out *v1.SecurityContext, s conversion.Scope) error {
+func Convert_api_SecurityContext_To_v1_SecurityContext(in *core.SecurityContext, out *v1.SecurityContext, s conversion.Scope) error {
 	if in.Capabilities != nil {
 		out.Capabilities = new(v1.Capabilities)
 		if err := Convert_api_Capabilities_To_v1_Capabilities(in.Capabilities, out.Capabilities, s); err != nil {
@@ -473,7 +473,7 @@ func Convert_api_SecurityContext_To_v1_SecurityContext(in *api.SecurityContext, 
 	return nil
 }
 
-func Convert_api_PodSecurityContext_To_v1_PodSecurityContext(in *api.PodSecurityContext, out *v1.PodSecurityContext, s conversion.Scope) error {
+func Convert_api_PodSecurityContext_To_v1_PodSecurityContext(in *core.PodSecurityContext, out *v1.PodSecurityContext, s conversion.Scope) error {
 	out.SupplementalGroups = in.SupplementalGroups
 	if in.SELinuxOptions != nil {
 		out.SELinuxOptions = new(v1.SELinuxOptions)
@@ -489,10 +489,10 @@ func Convert_api_PodSecurityContext_To_v1_PodSecurityContext(in *api.PodSecurity
 	return nil
 }
 
-func Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in *v1.PodSecurityContext, out *api.PodSecurityContext, s conversion.Scope) error {
+func Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in *v1.PodSecurityContext, out *core.PodSecurityContext, s conversion.Scope) error {
 	out.SupplementalGroups = in.SupplementalGroups
 	if in.SELinuxOptions != nil {
-		out.SELinuxOptions = new(api.SELinuxOptions)
+		out.SELinuxOptions = new(core.SELinuxOptions)
 		if err := Convert_v1_SELinuxOptions_To_api_SELinuxOptions(in.SELinuxOptions, out.SELinuxOptions, s); err != nil {
 			return err
 		}
@@ -506,12 +506,12 @@ func Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in *v1.PodSecurityC
 }
 
 // +k8s:conversion-fn=copy-only
-func Convert_v1_ResourceList_To_api_ResourceList(in *v1.ResourceList, out *api.ResourceList, s conversion.Scope) error {
+func Convert_v1_ResourceList_To_api_ResourceList(in *v1.ResourceList, out *core.ResourceList, s conversion.Scope) error {
 	if *in == nil {
 		return nil
 	}
 	if *out == nil {
-		*out = make(api.ResourceList, len(*in))
+		*out = make(core.ResourceList, len(*in))
 	}
 	for key, val := range *in {
 		// Moved to defaults
@@ -520,7 +520,7 @@ func Convert_v1_ResourceList_To_api_ResourceList(in *v1.ResourceList, out *api.R
 		// const milliScale = -3
 		// val.RoundUp(milliScale)
 
-		(*out)[api.ResourceName(key)] = val
+		(*out)[core.ResourceName(key)] = val
 	}
 	return nil
 }

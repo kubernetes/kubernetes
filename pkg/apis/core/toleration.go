@@ -17,7 +17,7 @@ limitations under the License.
 //TODO: consider making these methods functions, because we don't want helper
 //functions in the k8s.io/api repo.
 
-package api
+package core
 
 // MatchToleration checks if the toleration matches tolerationToMatch. Tolerations are unique by <key,effect,operator,value>,
 // if the two tolerations have same <key,effect,operator,value> combination, regard as they match.
