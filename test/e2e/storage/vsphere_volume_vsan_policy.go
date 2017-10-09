@@ -90,7 +90,7 @@ const (
 
 */
 
-var _ = SIGDescribe("vSphere Storage policy support for dynamic provisioning", func() {
+var _ = SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-vsan-policy")
 	var (
 		client       clientset.Interface
@@ -280,7 +280,7 @@ func invokeValidPolicyTest(f *framework.Framework, client clientset.Interface, n
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
-	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, storageclass))
+	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, "2Gi", storageclass))
 	Expect(err).NotTo(HaveOccurred())
 	defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
@@ -314,7 +314,7 @@ func invokeInvalidPolicyTestNeg(client clientset.Interface, namespace string, sc
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
-	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, storageclass))
+	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, "2Gi", storageclass))
 	Expect(err).NotTo(HaveOccurred())
 	defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
@@ -333,7 +333,7 @@ func invokeStaleDummyVMTestWithStoragePolicy(client clientset.Interface, namespa
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
-	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, storageclass))
+	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClassAnnotation(namespace, "2Gi", storageclass))
 	Expect(err).NotTo(HaveOccurred())
 
 	var pvclaims []*v1.PersistentVolumeClaim
