@@ -144,7 +144,7 @@ func TestGetPodQOS(t *testing.T) {
 
 		// Convert v1.Pod to core.Pod, and then check against `core.helper.GetPodQOS`.
 		pod := core.Pod{}
-		corev1.Convert_v1_Pod_To_api_Pod(testCase.pod, &pod, nil)
+		corev1.Convert_v1_Pod_To_core_Pod(testCase.pod, &pod, nil)
 
 		if actual := qos.GetPodQOS(&pod); core.PodQOSClass(testCase.expected) != actual {
 			t.Errorf("[%d]: conversion invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)

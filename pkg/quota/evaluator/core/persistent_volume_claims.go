@@ -196,7 +196,7 @@ func toInternalPersistentVolumeClaimOrError(obj runtime.Object) (*api.Persistent
 	pvc := &api.PersistentVolumeClaim{}
 	switch t := obj.(type) {
 	case *v1.PersistentVolumeClaim:
-		if err := k8s_api_v1.Convert_v1_PersistentVolumeClaim_To_api_PersistentVolumeClaim(t, pvc, nil); err != nil {
+		if err := k8s_api_v1.Convert_v1_PersistentVolumeClaim_To_core_PersistentVolumeClaim(t, pvc, nil); err != nil {
 			return nil, err
 		}
 	case *api.PersistentVolumeClaim:

@@ -88,7 +88,7 @@ func Convert_v1beta1_ReplicaSet_to_api_ReplicationController(in *v1beta1.Replica
 		return err
 	}
 
-	return k8s_api_v1.Convert_v1_ReplicationController_To_api_ReplicationController(intermediate2, out, s)
+	return k8s_api_v1.Convert_v1_ReplicationController_To_core_ReplicationController(intermediate2, out, s)
 }
 
 func TestSetControllerConversion(t *testing.T) {

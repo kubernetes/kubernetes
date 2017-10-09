@@ -112,7 +112,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 		}
 		// TODO: Remove the conversion. Consider only return the NodeAddresses
 		externalNode := &v1.Node{}
-		err = k8s_api_v1.Convert_api_Node_To_v1_Node(node, externalNode, nil)
+		err = k8s_api_v1.Convert_core_Node_To_v1_Node(node, externalNode, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert to v1.Node: %v", err)
 		}
