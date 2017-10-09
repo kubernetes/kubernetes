@@ -10,11 +10,13 @@ go_library(
         "net.go",
         "path.go",
         "util.go",
+        "yaml.go",
     ],
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/mailru/easyjson/jlexer:go_default_library",
         "//vendor/github.com/mailru/easyjson/jwriter:go_default_library",
+        "//vendor/gopkg.in/yaml.v2:go_default_library",
     ],
 )
 
