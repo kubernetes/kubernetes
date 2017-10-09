@@ -20,69 +20,69 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestValidateEvent(t *testing.T) {
 	table := []struct {
-		*api.Event
+		*core.Event
 		valid bool
 	}{
 		{
-			&api.Event{
+			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test1",
 					Namespace: "foo",
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: core.ObjectReference{
 					Namespace: "bar",
 					Kind:      "Pod",
 				},
 			},
 			false,
 		}, {
-			&api.Event{
+			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test2",
 					Namespace: "aoeu-_-aoeu",
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: core.ObjectReference{
 					Namespace: "aoeu-_-aoeu",
 					Kind:      "Pod",
 				},
 			},
 			false,
 		}, {
-			&api.Event{
+			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test3",
 					Namespace: metav1.NamespaceDefault,
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: core.ObjectReference{
 					APIVersion: "v1",
 					Kind:       "Node",
 				},
 			},
 			true,
 		}, {
-			&api.Event{
+			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test4",
 					Namespace: metav1.NamespaceDefault,
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: core.ObjectReference{
 					APIVersion: "v1",
 					Kind:       "Namespace",
 				},
 			},
 			true,
 		}, {
-			&api.Event{
+			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test5",
 					Namespace: metav1.NamespaceDefault,
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: core.ObjectReference{
 					APIVersion: "extensions/v1beta1",
 					Kind:       "NoKind",
 					Namespace:  metav1.NamespaceDefault,
@@ -90,12 +90,12 @@ func TestValidateEvent(t *testing.T) {
 			},
 			true,
 		}, {
-			&api.Event{
+			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test6",
 					Namespace: metav1.NamespaceDefault,
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: core.ObjectReference{
 					APIVersion: "extensions/v1beta1",
 					Kind:       "Job",
 					Namespace:  "foo",
@@ -103,12 +103,12 @@ func TestValidateEvent(t *testing.T) {
 			},
 			false,
 		}, {
-			&api.Event{
+			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test7",
 					Namespace: metav1.NamespaceDefault,
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: core.ObjectReference{
 					APIVersion: "extensions/v1beta1",
 					Kind:       "Job",
 					Namespace:  metav1.NamespaceDefault,
@@ -116,12 +116,12 @@ func TestValidateEvent(t *testing.T) {
 			},
 			true,
 		}, {
-			&api.Event{
+			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test8",
 					Namespace: metav1.NamespaceDefault,
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: core.ObjectReference{
 					APIVersion: "other/v1beta1",
 					Kind:       "Job",
 					Namespace:  "foo",
@@ -129,12 +129,12 @@ func TestValidateEvent(t *testing.T) {
 			},
 			false,
 		}, {
-			&api.Event{
+			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test9",
 					Namespace: "foo",
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: core.ObjectReference{
 					APIVersion: "other/v1beta1",
 					Kind:       "Job",
 					Namespace:  "foo",
@@ -142,12 +142,12 @@ func TestValidateEvent(t *testing.T) {
 			},
 			true,
 		}, {
-			&api.Event{
+			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test10",
 					Namespace: metav1.NamespaceDefault,
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: core.ObjectReference{
 					APIVersion: "extensions",
 					Kind:       "Job",
 					Namespace:  "foo",
@@ -155,12 +155,12 @@ func TestValidateEvent(t *testing.T) {
 			},
 			false,
 		}, {
-			&api.Event{
+			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test11",
 					Namespace: "foo",
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: core.ObjectReference{
 					// must register in v1beta1 to be true
 					APIVersion: "extensions/v1beta1",
 					Kind:       "Job",
@@ -170,12 +170,12 @@ func TestValidateEvent(t *testing.T) {
 			true,
 		},
 		{
-			&api.Event{
+			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test12",
 					Namespace: "foo",
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: core.ObjectReference{
 					APIVersion: "other/v1beta1",
 					Kind:       "FooBar",
 					Namespace:  "bar",
@@ -184,12 +184,12 @@ func TestValidateEvent(t *testing.T) {
 			false,
 		},
 		{
-			&api.Event{
+			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test13",
 					Namespace: "",
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: core.ObjectReference{
 					APIVersion: "other/v1beta1",
 					Kind:       "FooBar",
 					Namespace:  "bar",
@@ -198,12 +198,12 @@ func TestValidateEvent(t *testing.T) {
 			false,
 		},
 		{
-			&api.Event{
+			&core.Event{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test14",
 					Namespace: "foo",
 				},
-				InvolvedObject: api.ObjectReference{
+				InvolvedObject: core.ObjectReference{
 					APIVersion: "other/v1beta1",
 					Kind:       "FooBar",
 					Namespace:  "",

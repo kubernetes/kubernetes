@@ -22,9 +22,9 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper/qos"
-	k8sv1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 func TestGetPodQOS(t *testing.T) {
@@ -142,11 +142,11 @@ func TestGetPodQOS(t *testing.T) {
 			t.Errorf("[%d]: invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)
 		}
 
-		// Convert v1.Pod to api.Pod, and then check against `api.helper.GetPodQOS`.
-		pod := api.Pod{}
-		k8sv1.Convert_v1_Pod_To_api_Pod(testCase.pod, &pod, nil)
+		// Convert v1.Pod to core.Pod, and then check against `core.helper.GetPodQOS`.
+		pod := core.Pod{}
+		corev1.Convert_v1_Pod_To_api_Pod(testCase.pod, &pod, nil)
 
-		if actual := qos.GetPodQOS(&pod); api.PodQOSClass(testCase.expected) != actual {
+		if actual := qos.GetPodQOS(&pod); core.PodQOSClass(testCase.expected) != actual {
 			t.Errorf("[%d]: conversion invalid qos pod %s, expected: %s, actual: %s", id, testCase.pod.Name, testCase.expected, actual)
 		}
 	}

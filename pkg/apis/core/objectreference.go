@@ -17,7 +17,7 @@ limitations under the License.
 //TODO: consider making these methods functions, because we don't want helper
 //functions in the k8s.io/api repo.
 
-package api
+package core
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
