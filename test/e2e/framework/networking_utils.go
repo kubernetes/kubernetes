@@ -61,6 +61,8 @@ const (
 	testTries = 30
 	// Maximum number of pods in a test, to make test work in large clusters.
 	maxNetProxyPodsCount = 10
+	// Number of checks to hit a given set of endpoints when enable session affinity.
+	SessionAffinityChecks = 10
 )
 
 var NetexecImageName = imageutils.GetE2EImage(imageutils.Netexec)
@@ -216,6 +218,47 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, containerIP, tar
 
 	config.diagnoseMissingEndpoints(eps)
 	Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", maxTries, cmd, eps, expectedEps)
+}
+
+func (config *NetworkingTestConfig) GetEndpointsFromTestContainer(protocol, targetIP string, targetPort, maxTries, minTries int) (sets.String, error) {
+	return config.GetEndpointsFromContainer(protocol, config.TestContainerPod.Status.PodIP, targetIP, TestContainerHttpPort, targetPort, maxTries, minTries)
+}
+
+func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containerIP, targetIP string, containerHttpPort, targetPort, maxTries, minTries int) (sets.String, error) {
+	cmd := fmt.Sprintf("curl -q -s 'http://%s:%d/dial?request=hostName&protocol=%s&host=%s&port=%d&tries=1'",
+		containerIP,
+		containerHttpPort,
+		protocol,
+		targetIP,
+		targetPort)
+
+	eps := sets.NewString()
+
+	for i := 0; i < maxTries; i++ {
+		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.HostTestContainerPod.Name, cmd)
+		if err != nil {
+			// A failure to kubectl exec counts as a try, not a hard fail.
+			// Also note that we will keep failing for maxTries in tests where
+			// we confirm unreachability.
+			Logf("Failed to execute %q: %v, stdout: %q, stderr: %q", cmd, err, stdout, stderr)
+		} else {
+			var output map[string][]string
+			if err := json.Unmarshal([]byte(stdout), &output); err != nil {
+				Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
+					cmd, config.HostTestContainerPod.Name, stdout, err)
+				continue
+			}
+
+			for _, hostName := range output["responses"] {
+				trimmed := strings.TrimSpace(hostName)
+				if trimmed != "" {
+					eps.Insert(trimmed)
+				}
+			}
+			return eps, nil
+		}
+	}
+	return nil, fmt.Errorf("Failed to get endpoints:\nTries %d\nCommand %v\n", minTries, cmd)
 }
 
 // DialFromNode executes a tcp or udp request based on protocol via kubectl exec
