@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "fake_apps_client.go",
         "fake_daemonset.go",
+        "fake_deployment.go",
     ],
     visibility = ["//visibility:public"],
     deps = [

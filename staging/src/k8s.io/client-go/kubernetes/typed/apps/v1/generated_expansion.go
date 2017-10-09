@@ -17,3 +17,5 @@ limitations under the License.
 package v1
 
 type DaemonSetExpansion interface{}
+
+type DeploymentExpansion interface{}

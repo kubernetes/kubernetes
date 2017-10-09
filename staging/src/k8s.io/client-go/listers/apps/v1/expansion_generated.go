@@ -25,3 +25,11 @@ type DaemonSetListerExpansion interface{}
 // DaemonSetNamespaceListerExpansion allows custom methods to be added to
 // DaemonSetNamespaceLister.
 type DaemonSetNamespaceListerExpansion interface{}
+
+// DeploymentListerExpansion allows custom methods to be added to
+// DeploymentLister.
+type DeploymentListerExpansion interface{}
+
+// DeploymentNamespaceListerExpansion allows custom methods to be added to
+// DeploymentNamespaceLister.
+type DeploymentNamespaceListerExpansion interface{}

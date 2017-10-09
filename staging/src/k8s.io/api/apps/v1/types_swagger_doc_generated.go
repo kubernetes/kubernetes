@@ -88,6 +88,83 @@ func (DaemonSetUpdateStrategy) SwaggerDoc() map[string]string {
 	return map_DaemonSetUpdateStrategy
 }
 
+var map_Deployment = map[string]string{
+	"":         "Deployment enables declarative updates for Pods and ReplicaSets.",
+	"metadata": "Standard object metadata.",
+	"spec":     "Specification of the desired behavior of the Deployment.",
+	"status":   "Most recently observed status of the Deployment.",
+}
+
+func (Deployment) SwaggerDoc() map[string]string {
+	return map_Deployment
+}
+
+var map_DeploymentCondition = map[string]string{
+	"":                   "DeploymentCondition describes the state of a deployment at a certain point.",
+	"type":               "Type of deployment condition.",
+	"status":             "Status of the condition, one of True, False, Unknown.",
+	"lastUpdateTime":     "The last time this condition was updated.",
+	"lastTransitionTime": "Last time the condition transitioned from one status to another.",
+	"reason":             "The reason for the condition's last transition.",
+	"message":            "A human readable message indicating details about the transition.",
+}
+
+func (DeploymentCondition) SwaggerDoc() map[string]string {
+	return map_DeploymentCondition
+}
+
+var map_DeploymentList = map[string]string{
+	"":         "DeploymentList is a list of Deployments.",
+	"metadata": "Standard list metadata.",
+	"items":    "Items is the list of Deployments.",
+}
+
+func (DeploymentList) SwaggerDoc() map[string]string {
+	return map_DeploymentList
+}
+
+var map_DeploymentSpec = map[string]string{
+	"":                        "DeploymentSpec is the specification of the desired behavior of the Deployment.",
+	"replicas":                "Number of desired pods. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
+	"selector":                "Label selector for pods. Existing ReplicaSets whose pods are selected by this will be the ones affected by this deployment.",
+	"template":                "Template describes the pods that will be created.",
+	"strategy":                "The deployment strategy to use to replace existing pods with new ones.",
+	"minReadySeconds":         "Minimum number of seconds for which a newly created pod should be ready without any of its container crashing, for it to be considered available. Defaults to 0 (pod will be considered available as soon as it is ready)",
+	"revisionHistoryLimit":    "The number of old ReplicaSets to retain to allow rollback. This is a pointer to distinguish between explicit zero and not specified. Defaults to 10.",
+	"paused":                  "Indicates that the deployment is paused.",
+	"progressDeadlineSeconds": "The maximum time in seconds for a deployment to make progress before it is considered to be failed. The deployment controller will continue to process failed deployments and a condition with a ProgressDeadlineExceeded reason will be surfaced in the deployment status. Note that progress will not be estimated during the time a deployment is paused. Defaults to 600s.",
+}
+
+func (DeploymentSpec) SwaggerDoc() map[string]string {
+	return map_DeploymentSpec
+}
+
+var map_DeploymentStatus = map[string]string{
+	"":                    "DeploymentStatus is the most recently observed status of the Deployment.",
+	"observedGeneration":  "The generation observed by the deployment controller.",
+	"replicas":            "Total number of non-terminated pods targeted by this deployment (their labels match the selector).",
+	"updatedReplicas":     "Total number of non-terminated pods targeted by this deployment that have the desired template spec.",
+	"readyReplicas":       "Total number of ready pods targeted by this deployment.",
+	"availableReplicas":   "Total number of available pods (ready for at least minReadySeconds) targeted by this deployment.",
+	"unavailableReplicas": "Total number of unavailable pods targeted by this deployment. This is the total number of pods that are still required for the deployment to have 100% available capacity. They may either be pods that are running but not yet available or pods that still have not been created.",
+	"conditions":          "Represents the latest available observations of a deployment's current state.",
+	"collisionCount":      "Count of hash collisions for the Deployment. The Deployment controller uses this field as a collision avoidance mechanism when it needs to create the name for the newest ReplicaSet.",
+}
+
+func (DeploymentStatus) SwaggerDoc() map[string]string {
+	return map_DeploymentStatus
+}
+
+var map_DeploymentStrategy = map[string]string{
+	"":              "DeploymentStrategy describes how to replace existing pods with new ones.",
+	"type":          "Type of deployment. Can be \"Recreate\" or \"RollingUpdate\". Default is RollingUpdate.",
+	"rollingUpdate": "Rolling update config params. Present only if DeploymentStrategyType = RollingUpdate.",
+}
+
+func (DeploymentStrategy) SwaggerDoc() map[string]string {
+	return map_DeploymentStrategy
+}
+
 var map_RollingUpdateDaemonSet = map[string]string{
 	"":               "Spec to control the desired behavior of daemon set rolling update.",
 	"maxUnavailable": "The maximum number of DaemonSet pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of total number of DaemonSet pods at the start of the update (ex: 10%). Absolute number is calculated from percentage by rounding up. This cannot be 0. Default value is 1. Example: when this is set to 30%, at most 30% of the total number of nodes that should be running the daemon pod (i.e. status.desiredNumberScheduled) can have their pods stopped for an update at any given time. The update starts by stopping at most 30% of those DaemonSet pods and then brings up new DaemonSet pods in their place. Once the new pods are available, it then proceeds onto other DaemonSet pods, thus ensuring that at least 70% of original number of DaemonSet pods are available at all times during the update.",
@@ -95,6 +172,16 @@ var map_RollingUpdateDaemonSet = map[string]string{
 
 func (RollingUpdateDaemonSet) SwaggerDoc() map[string]string {
 	return map_RollingUpdateDaemonSet
+}
+
+var map_RollingUpdateDeployment = map[string]string{
+	"":               "Spec to control the desired behavior of rolling update.",
+	"maxUnavailable": "The maximum number of pods that can be unavailable during the update. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). Absolute number is calculated from percentage by rounding down. This can not be 0 if MaxSurge is 0. Defaults to 25%. Example: when this is set to 30%, the old RC can be scaled down to 70% of desired pods immediately when the rolling update starts. Once new pods are ready, old RC can be scaled down further, followed by scaling up the new RC, ensuring that the total number of pods available at all times during the update is at least 70% of desired pods.",
+	"maxSurge":       "The maximum number of pods that can be scheduled above the desired number of pods. Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%). This can not be 0 if MaxUnavailable is 0. Absolute number is calculated from percentage by rounding up. Defaults to 25%. Example: when this is set to 30%, the new RC can be scaled up immediately when the rolling update starts, such that the total number of old and new pods do not exceed 130% of desired pods. Once old pods have been killed, new RC can be scaled up further, ensuring that total number of pods running at any time during the update is atmost 130% of desired pods.",
+}
+
+func (RollingUpdateDeployment) SwaggerDoc() map[string]string {
+	return map_RollingUpdateDeployment
 }
 
 // AUTO-GENERATED FUNCTIONS END HERE
