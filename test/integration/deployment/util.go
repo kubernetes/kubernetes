@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
+	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutil "k8s.io/kubernetes/test/utils"
 )
@@ -98,7 +99,7 @@ func newDeployment(name, ns string, replicas int32) *v1beta1.Deployment {
 }
 
 // dcSetup sets up necessities for Deployment integration test, including master, apiserver, informers, and clientset
-func dcSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory, clientset.Interface) {
+func dcSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory, clientset.Interface, error) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 
@@ -110,19 +111,23 @@ func dcSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.R
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "deployment-informers")), resyncPeriod)
 
-	dc := deployment.NewDeploymentController(
+	metrics.UnregisterMetricAndUntrackRateLimiterUsage("deployment_controller")
+	dc, err := deployment.NewDeploymentController(
 		informers.Extensions().V1beta1().Deployments(),
 		informers.Extensions().V1beta1().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "deployment-controller")),
 	)
+	if err != nil {
+		return s, closeFn, nil, nil, informers, clientSet, err
+	}
 	rm := replicaset.NewReplicaSetController(
 		informers.Extensions().V1beta1().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "replicaset-controller")),
 		replicaset.BurstReplicas,
 	)
-	return s, closeFn, rm, dc, informers, clientSet
+	return s, closeFn, rm, dc, informers, clientSet, nil
 }
 
 // dcSimpleSetup sets up necessities for Deployment integration test, including master, apiserver,
