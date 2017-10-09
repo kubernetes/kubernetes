@@ -1,0 +1,21 @@
+---
+
+# Here we set vault specific vars
+NAMESPACE: 'vault'
+REPLICAS_COUNT: 1
+MEMORY_LIMIT_VAULT: '512M'
+MEMORY_REQUESTED_VAULT: '512M'
+CPU_LIMIT_VAULT: '500m'
+CPU_REQUESTED_VAULT: '500m'
+MEMORY_LIMIT_CONSUL_AGENT: '512M'
+MEMORY_REQUESTED_CONSUL_AGENT: '512M'
+CPU_LIMIT_CONSUL_AGENT: '500m'
+CPU_REQUESTED_CONSUL_AGENT: '500m'
+VAULT_IMAGE_NAME_SUFFIX: 'vault'
+VAULT_IMAGE_TAG: '0.6.2'
+CONSUL_IMAGE_NAME_SUFFIX: 'consul'
+CONSUL_IMAGE_TAG: '0.7.4'
+
+# vault vars were added during refactoring
+vault_tmp: '/tmp/vault'
+vault_pod_tmpl: 'vault.init.pod.yml'

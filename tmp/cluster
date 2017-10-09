@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+set -e
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+usage(){
+  echo "Usage: cluster {up|down}"
+}
+
+if [ $# -eq 0 ] ; then
+  usage
+  exit 0
+fi
+
+DEBUG=""
+
+if [ $# -eq 2 ] && [ "$2" = "-vvv" ] ; then
+  DEBUG=$2
+fi
+
+export NUM_NODES=${NUM_NODES:-0}
+
+
+# source ./ansible/hacking/env-setup -q
+
+
+# local install selected
+  # always keep gcloud up to date
+  GCLOUD_VERSIONS="`gcloud components list 2>&1`"
+  GCLOUD_CURRENT_VERSION=`echo "$GCLOUD_VERSIONS" | grep 'Your current Cloud SDK version is' | awk {'print $NF'}`
+  GCLOUD_AVAILABLE_VERSION=`echo "$GCLOUD_VERSIONS" | grep 'The latest available version is' | awk {'print $NF'}`
+  if [ $GCLOUD_CURRENT_VERSION != "$GCLOUD_AVAILABLE_VERSION" ] ; then
+    echo gcloud sdk update is available. Installing the update...
+    CLOUDSDK_CORE_DISABLE_PROMPTS=1 gcloud components update
+  fi
+
+  case "$1" in
+    up)
+      export ANSIBLE_HOST_KEY_CHECKING=false
+      #echo "BASH: [Init Vagrant (Virtualbox)] *************************************"
+      #ansible-playbook vagrant-node.yml --tags=vagrant-init --ask-sudo $DEBUG
+
+      echo "BASH: [Cluster Initialization] ************************************************"
+
+      cd vagrant/
+      export VAGRANT_DEFAULT_PROVIDER=${VAGRANT_DEFAULT_PROVIDER-virtualbox}
+      vagrant up
+
+      cd - > /dev/null
+
+#      echo "BASH: [Cluster Lookup] ********************************************************"
+#      ansible-playbook oro-cloud.yml --tags=post-vagrant --ask-sudo $DEBUG
+#      echo "BASH: [Cluster Configuration] *************************************************"
+#      ansible-playbook oro-cloud.yml --tags=cluster -e "mysql_install=yes" $DEBUG
+       if [ ! -d "proxy" ]; then
+         git clone --recursive git@github.com:laboro/oro-cloud-proxy.git proxy
+       fi
+
+#	  ansible-playbook localUp.yml $DEBUG
+#-----------
+      ansible-playbook prepare.yml
+      ansible-playbook gcloud.yml $DEBUG
+      ansible-playbook vagrant_basepackages.yml --ask-sudo $DEBUG
+      ansible-playbook images.yml $DEBUG
+      # ansible-playbook jenkins_master.yml $DEBUG
+      ansible-playbook consul.yml $DEBUG
+      cd vault
+      ansible-playbook prepare.yml
+      ansible-playbook vault.yml $DEBUG
+      cd ../mgmt/
+      ansible-playbook prepare.yml
+      ansible-playbook mgmt.yml $DEBUG
+      cd ../proxy/
+      ansible-playbook prepare.yml
+      ansible-playbook proxy.yml -e "vw_mode=on" $DEBUG
+      cd ../
+      ansible-playbook install_reconnector.yml $DEBUG
+      ansible-playbook local_dns.yml $DEBUG
+#------------------
+      ;;
+
+    down)
+      ansible-playbook local_dns.yml -e "local_dns_down=yes"
+
+      cd vagrant
+      # TODO: ansible roles/tasks for cleanaup all
+      vagrant destroy -f
+
+      cd - > /dev/null
+
+        echo "WARNING! a gke cluster will be deleted!"
+#        if [ "$SQL_INSTANCE_NAME" != "" ] ; then
+#    	    SQL_INSTANCE_PARAM='-e use_cloud_sql=1'
+#	    echo "SQL instance: $SQL_INSTANCE_NAME"
+#	else
+#	    ## must be set anyway, for compatibility with posix shells
+#	    SQL_INSTANCE_PARAM=""
+#	fi
+        echo "Are you sure? [y/N]"
+        read answ
+        if [ "$answ" = "y" ] ; then
+#          ansible-playbook cluster_down.yml $SQL_INSTANCE_PARAM
+	   ansible-playbook cluster_down.yml
+          cat /dev/null > hosts.yml
+        fi
+      ;;
+
+    scale)
+      echo "Not implemented yet. Sorry."
+      exit 1
+      ;;
+
+    cleanup)
+      rm -Rf proxy
+      find ./ -name group_vars | xargs rm -rf {} \;
+      find ./ -name inventory | xargs rm -rf {} \;
+      ;;
+
+    *)
+      usage
+      exit 1
+      ;;
+  esac
