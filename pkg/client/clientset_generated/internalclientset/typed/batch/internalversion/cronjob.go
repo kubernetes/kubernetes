@@ -17,6 +17,7 @@ limitations under the License.
 package internalversion
 
 import (
+	v1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -42,6 +43,8 @@ type CronJobInterface interface {
 	List(opts v1.ListOptions) (*batch.CronJobList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *batch.CronJob, err error)
+	Instantiate(cronJobName string, cronJobManualInstantiation *v1beta1.CronJobManualInstantiation) (*v1beta1.CronJobManualInstantiation, error)
+
 	CronJobExpansion
 }
 
@@ -166,6 +169,20 @@ func (c *cronJobs) Patch(name string, pt types.PatchType, data []byte, subresour
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Do().
+		Into(result)
+	return
+}
+
+// Instantiate takes the representation of a cronJobManualInstantiation and creates it.  Returns the server's representation of the cronJobManualInstantiation, and an error, if there is any.
+func (c *cronJobs) Instantiate(cronJobName string, cronJobManualInstantiation *v1beta1.CronJobManualInstantiation) (result *v1beta1.CronJobManualInstantiation, err error) {
+	result = &v1beta1.CronJobManualInstantiation{}
+	err = c.client.Post().
+		Namespace(c.ns).
+		Resource("cronjobs").
+		Name(cronJobName).
+		SubResource("instantiate").
+		Body(cronJobManualInstantiation).
 		Do().
 		Into(result)
 	return

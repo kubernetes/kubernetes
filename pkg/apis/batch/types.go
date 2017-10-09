@@ -203,6 +203,7 @@ type JobCondition struct {
 }
 
 // +genclient
+// +genclient:method=Instantiate,verb=create,subresource=instantiate,input=k8s.io/api/batch/v1beta1.CronJobManualInstantiation,result=k8s.io/api/batch/v1beta1.CronJobManualInstantiation
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CronJob represents the configuration of a single cron job.
