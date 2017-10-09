@@ -203,6 +203,10 @@ func (o *Options) Validate(args []string) error {
 		return errors.New("no arguments are supported")
 	}
 
+	if errs := Validate(o.config); len(errs) != 0 {
+		return errs.ToAggregate()
+	}
+
 	return nil
 }
 
