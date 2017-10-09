@@ -210,7 +210,7 @@ func (t *dnsTestCommon) createUtilPod() {
 				{
 					Protocol:   "TCP",
 					Port:       servicePort,
-					TargetPort: intstr.FromInt(servicePort),
+					TargetPort: intstr.FromInt(int32(servicePort)),
 				},
 			},
 		},

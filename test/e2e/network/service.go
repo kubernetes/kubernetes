@@ -1145,7 +1145,7 @@ var _ = SIGDescribe("Services", func() {
 				Ports: []v1.ServicePort{{
 					Name:       "http",
 					Port:       int32(port),
-					TargetPort: intstr.FromInt(port),
+					TargetPort: intstr.FromInt(int32(port)),
 				}},
 			},
 		}
@@ -1520,7 +1520,7 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 				// Change service port to avoid collision with opened hostPorts
 				// in other tests that run in parallel.
 				if len(svc.Spec.Ports) != 0 {
-					svc.Spec.Ports[0].TargetPort = intstr.FromInt(int(svc.Spec.Ports[0].Port))
+					svc.Spec.Ports[0].TargetPort = intstr.FromInt(svc.Spec.Ports[0].Port)
 					svc.Spec.Ports[0].Port = 8081
 				}
 

@@ -123,7 +123,7 @@ func SetDefaults_Service(obj *v1.Service) {
 			sp.Protocol = v1.ProtocolTCP
 		}
 		if sp.TargetPort == intstr.FromInt(0) || sp.TargetPort == intstr.FromString("") {
-			sp.TargetPort = intstr.FromInt(int(sp.Port))
+			sp.TargetPort = intstr.FromInt(sp.Port)
 		}
 	}
 	// Defaults ExternalTrafficPolicy field for NodePort / LoadBalancer service

@@ -466,7 +466,7 @@ func TestExternalIPsNoEndpoint(t *testing.T) {
 				Name:       svcPortName.Port,
 				Port:       int32(svcPort),
 				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(svcPort),
+				TargetPort: intstr.FromInt(int32(svcPort)),
 			}}
 		}),
 	)
@@ -520,7 +520,7 @@ func TestExternalIPs(t *testing.T) {
 				Name:       svcPortName.Port,
 				Port:       int32(svcPort),
 				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(svcPort),
+				TargetPort: intstr.FromInt(int32(svcPort)),
 			}}
 		}),
 	)
@@ -759,7 +759,7 @@ func addTestPort(array []api.ServicePort, name string, protocol api.Protocol, po
 		Protocol:   protocol,
 		Port:       port,
 		NodePort:   nodeport,
-		TargetPort: intstr.FromInt(targetPort),
+		TargetPort: intstr.FromInt(int32(targetPort)),
 	}
 	return append(array, svcPort)
 }

@@ -36,7 +36,7 @@ func TestDaemonSetUpdatesPods(t *testing.T) {
 
 	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
 	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
-	intStr := intstr.FromInt(maxUnavailable)
+	intStr := intstr.FromInt(int32(maxUnavailable))
 	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
 	ds.Spec.TemplateGeneration++
 	manager.dsStore.Update(ds)
@@ -75,7 +75,7 @@ func TestDaemonSetUpdatesWhenNewPosIsNotReady(t *testing.T) {
 
 	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
 	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
-	intStr := intstr.FromInt(maxUnavailable)
+	intStr := intstr.FromInt(int32(maxUnavailable))
 	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
 	ds.Spec.TemplateGeneration++
 	manager.dsStore.Update(ds)
@@ -101,7 +101,7 @@ func TestDaemonSetUpdatesAllOldPodsNotReady(t *testing.T) {
 
 	ds.Spec.Template.Spec.Containers[0].Image = "foo2/bar2"
 	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
-	intStr := intstr.FromInt(maxUnavailable)
+	intStr := intstr.FromInt(int32(maxUnavailable))
 	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
 	ds.Spec.TemplateGeneration++
 	manager.dsStore.Update(ds)
@@ -126,7 +126,7 @@ func TestDaemonSetUpdatesNoTemplateChanged(t *testing.T) {
 	syncAndValidateDaemonSets(t, manager, ds, podControl, 5, 0, 0)
 
 	ds.Spec.UpdateStrategy.Type = extensions.RollingUpdateDaemonSetStrategyType
-	intStr := intstr.FromInt(maxUnavailable)
+	intStr := intstr.FromInt(int32(maxUnavailable))
 	ds.Spec.UpdateStrategy.RollingUpdate = &extensions.RollingUpdateDaemonSet{MaxUnavailable: &intStr}
 	manager.dsStore.Update(ds)
 

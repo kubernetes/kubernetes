@@ -897,13 +897,13 @@ func TestSetDefaultServicePort(t *testing.T) {
 	if out.Spec.Ports[0].Protocol != v1.ProtocolTCP {
 		t.Errorf("Expected protocol %s, got %s", v1.ProtocolTCP, out.Spec.Ports[0].Protocol)
 	}
-	if out.Spec.Ports[0].TargetPort != intstr.FromInt(int(in.Spec.Ports[0].Port)) {
+	if out.Spec.Ports[0].TargetPort != intstr.FromInt(in.Spec.Ports[0].Port) {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[0].Port, out.Spec.Ports[0].TargetPort)
 	}
 	if out.Spec.Ports[1].Protocol != v1.ProtocolTCP {
 		t.Errorf("Expected protocol %s, got %s", v1.ProtocolTCP, out.Spec.Ports[1].Protocol)
 	}
-	if out.Spec.Ports[1].TargetPort != intstr.FromInt(int(in.Spec.Ports[1].Port)) {
+	if out.Spec.Ports[1].TargetPort != intstr.FromInt(in.Spec.Ports[1].Port) {
 		t.Errorf("Expected port %v, got %v", in.Spec.Ports[1].Port, out.Spec.Ports[1].TargetPort)
 	}
 }

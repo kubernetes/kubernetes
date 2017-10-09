@@ -212,7 +212,7 @@ func createPortAndServiceSpec(servicePort int, targetServicePort int, nodePort i
 	servicePorts := []api.ServicePort{{Protocol: api.ProtocolTCP,
 		Port:       int32(servicePort),
 		Name:       servicePortName,
-		TargetPort: intstr.FromInt(targetServicePort)}}
+		TargetPort: intstr.FromInt(int32(targetServicePort))}}
 	serviceType := api.ServiceTypeClusterIP
 	if nodePort > 0 {
 		servicePorts[0].NodePort = int32(nodePort)

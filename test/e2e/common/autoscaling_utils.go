@@ -431,7 +431,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, internalCli
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{{
 				Port:       port,
-				TargetPort: intstr.FromInt(targetPort),
+				TargetPort: intstr.FromInt(int32(targetPort)),
 			}},
 
 			Selector: map[string]string{
@@ -485,7 +485,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, internalCli
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{{
 				Port:       port,
-				TargetPort: intstr.FromInt(targetPort),
+				TargetPort: intstr.FromInt(int32(targetPort)),
 			}},
 
 			Selector: map[string]string{

@@ -54,7 +54,7 @@ func TestComponentProbe(t *testing.T) {
 	}
 	for _, rt := range tests {
 		actual := ComponentProbe(rt.port, rt.path, rt.scheme)
-		if actual.Handler.HTTPGet.Port != intstr.FromInt(rt.port) {
+		if actual.Handler.HTTPGet.Port != intstr.FromInt(int32(rt.port)) {
 			t.Errorf(
 				"failed componentProbe:\n\texpected: %v\n\t  actual: %v",
 				rt.port,

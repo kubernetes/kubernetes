@@ -195,7 +195,7 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 		if portNum, err := strconv.Atoi(targetPortString); err != nil {
 			targetPort = intstr.FromString(targetPortString)
 		} else {
-			targetPort = intstr.FromInt(portNum)
+			targetPort = intstr.FromInt(int32(portNum))
 		}
 		// Use the same target-port for every port
 		for i := range service.Spec.Ports {
@@ -206,7 +206,7 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 		// should be the same as Port
 		for i := range service.Spec.Ports {
 			port := service.Spec.Ports[i].Port
-			service.Spec.Ports[i].TargetPort = intstr.FromInt(int(port))
+			service.Spec.Ports[i].TargetPort = intstr.FromInt(port)
 		}
 	}
 	if len(params["external-ip"]) > 0 {
