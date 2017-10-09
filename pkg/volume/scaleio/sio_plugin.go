@@ -27,9 +27,10 @@ import (
 )
 
 const (
-	sioName           = "scaleio"
-	sioPluginName     = "kubernetes.io/scaleio"
-	sioConfigFileName = "sioconf.dat"
+	sioName            = "scaleio"
+	sioPluginName      = "kubernetes.io/scaleio"
+	sioConfigFileName  = "sioconf.dat"
+	sioSecretNamespace = "scaleio"
 )
 
 type sioPlugin struct {
@@ -77,6 +78,8 @@ func (p *sioPlugin) RequiresRemount() bool {
 	return false
 }
 
+// NewMounter creates a scaleio mounter.
+// It assumes scaleio secret to be in kube-system ns.
 func (p *sioPlugin) NewMounter(
 	spec *volume.Spec,
 	pod *api.Pod,
@@ -91,7 +94,7 @@ func (p *sioPlugin) NewMounter(
 		pod:         pod,
 		spec:        spec,
 		source:      sioSource,
-		namespace:   pod.Namespace,
+		namespace:   sioSecretNamespace,
 		volSpecName: spec.Name(),
 		volName:     sioSource.VolumeName,
 		podUID:      pod.UID,
@@ -102,8 +105,6 @@ func (p *sioPlugin) NewMounter(
 }
 
 // NewUnmounter creates a representation of the volume to unmount
-// The specName param can be used to carry the namespace value (if needed) using format:
-// specName = [<namespace>nsSep]<somevalue> where the specname is pre-pended with the namespace
 func (p *sioPlugin) NewUnmounter(specName string, podUID types.UID) (volume.Unmounter, error) {
 	glog.V(4).Info(log("Unmounter for %s", specName))
 
@@ -155,6 +156,8 @@ func (p *sioPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 //****************************
 var _ volume.DeletableVolumePlugin = &sioPlugin{}
 
+// NewDeleter returns a new scaleio deleter.
+// It assumes scaleio secret to be in kube-system ns.
 func (p *sioPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	sioSource, err := getVolumeSourceFromSpec(spec)
 	if err != nil {
@@ -162,12 +165,10 @@ func (p *sioPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 		return nil, err
 	}
 
-	namespace := spec.PersistentVolume.Spec.ClaimRef.Namespace
-
 	return &sioVolume{
 		spec:        spec,
 		source:      sioSource,
-		namespace:   namespace,
+		namespace:   sioSecretNamespace,
 		volSpecName: spec.Name(),
 		volName:     sioSource.VolumeName,
 		plugin:      p,
@@ -180,6 +181,8 @@ func (p *sioPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 // *********************************
 var _ volume.ProvisionableVolumePlugin = &sioPlugin{}
 
+// NewProvisioner returns a new scaleio provisioner.
+// It assumes scaleio secret to be in kube-system ns.
 func (p *sioPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
 	glog.V(4).Info(log("creating Provisioner"))
 
@@ -189,13 +192,11 @@ func (p *sioPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisi
 		return nil, errors.New("option parameters missing")
 	}
 
-	namespace := options.PVC.Namespace
-
 	return &sioVolume{
 		configData:  configData,
 		plugin:      p,
 		options:     options,
-		namespace:   namespace,
+		namespace:   sioSecretNamespace,
 		volSpecName: options.PVName,
 	}, nil
 }
