@@ -76,6 +76,7 @@ func initTest(t *testing.T, nsPrefix string) *TestContext {
 		context.informerFactory.Extensions().V1beta1().ReplicaSets(),
 		context.informerFactory.Apps().V1beta1().StatefulSets(),
 		context.informerFactory.Core().V1().Services(),
+		context.informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		true,
 	)

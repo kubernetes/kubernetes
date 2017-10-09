@@ -27,6 +27,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -39,10 +40,12 @@ import (
 	appsinformers "k8s.io/client-go/informers/apps/v1beta1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
+	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	appslisters "k8s.io/client-go/listers/apps/v1beta1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
+	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/helper"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -93,6 +96,8 @@ type configFactory struct {
 	replicaSetLister extensionslisters.ReplicaSetLister
 	// a means to list all statefulsets
 	statefulSetLister appslisters.StatefulSetLister
+	// a means to list all PodDisruptionBudgets
+	pdbLister policylisters.PodDisruptionBudgetLister
 
 	// Close this to stop all reflectors
 	StopEverything chan struct{}
@@ -130,6 +135,7 @@ func NewConfigFactory(
 	replicaSetInformer extensionsinformers.ReplicaSetInformer,
 	statefulSetInformer appsinformers.StatefulSetInformer,
 	serviceInformer coreinformers.ServiceInformer,
+	pdbInformer policyinformers.PodDisruptionBudgetInformer,
 	hardPodAffinitySymmetricWeight int,
 	enableEquivalenceClassCache bool,
 ) scheduler.Configurator {
@@ -146,6 +152,7 @@ func NewConfigFactory(
 		controllerLister:               replicationControllerInformer.Lister(),
 		replicaSetLister:               replicaSetInformer.Lister(),
 		statefulSetLister:              statefulSetInformer.Lister(),
+		pdbLister:                      pdbInformer.Lister(),
 		schedulerCache:                 schedulerCache,
 		StopEverything:                 stopEverything,
 		schedulerName:                  schedulerName,
@@ -219,6 +226,15 @@ func NewConfigFactory(
 		},
 	)
 	c.nodeLister = nodeInformer.Lister()
+
+	pdbInformer.Informer().AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    c.addPDBToCache,
+			UpdateFunc: c.updatePDBInCache,
+			DeleteFunc: c.deletePDBFromCache,
+		},
+	)
+	c.pdbLister = pdbInformer.Lister()
 
 	// On add and delete of PVs, it will affect equivalence cache items
 	// related to persistent volume
@@ -651,6 +667,56 @@ func (c *configFactory) deleteNodeFromCache(obj interface{}) {
 	}
 	if c.enableEquivalenceClassCache {
 		c.equivalencePodCache.InvalidateAllCachedPredicateItemOfNode(node.GetName())
+	}
+}
+
+func (c *configFactory) addPDBToCache(obj interface{}) {
+	pdb, ok := obj.(*v1beta1.PodDisruptionBudget)
+	if !ok {
+		glog.Errorf("cannot convert to *v1beta1.PodDisruptionBudget: %v", obj)
+		return
+	}
+
+	if err := c.schedulerCache.AddPDB(pdb); err != nil {
+		glog.Errorf("scheduler cache AddPDB failed: %v", err)
+	}
+}
+
+func (c *configFactory) updatePDBInCache(oldObj, newObj interface{}) {
+	oldPDB, ok := oldObj.(*v1beta1.PodDisruptionBudget)
+	if !ok {
+		glog.Errorf("cannot convert oldObj to *v1beta1.PodDisruptionBudget: %v", oldObj)
+		return
+	}
+	newPDB, ok := newObj.(*v1beta1.PodDisruptionBudget)
+	if !ok {
+		glog.Errorf("cannot convert newObj to *v1beta1.PodDisruptionBudget: %v", newObj)
+		return
+	}
+
+	if err := c.schedulerCache.UpdatePDB(oldPDB, newPDB); err != nil {
+		glog.Errorf("scheduler cache UpdatePDB failed: %v", err)
+	}
+}
+
+func (c *configFactory) deletePDBFromCache(obj interface{}) {
+	var pdb *v1beta1.PodDisruptionBudget
+	switch t := obj.(type) {
+	case *v1beta1.PodDisruptionBudget:
+		pdb = t
+	case cache.DeletedFinalStateUnknown:
+		var ok bool
+		pdb, ok = t.Obj.(*v1beta1.PodDisruptionBudget)
+		if !ok {
+			glog.Errorf("cannot convert to *v1beta1.PodDisruptionBudget: %v", t.Obj)
+			return
+		}
+	default:
+		glog.Errorf("cannot convert to *v1beta1.PodDisruptionBudget: %v", t)
+		return
+	}
+	if err := c.schedulerCache.RemovePDB(pdb); err != nil {
+		glog.Errorf("scheduler cache RemovePDB failed: %v", err)
 	}
 }
 

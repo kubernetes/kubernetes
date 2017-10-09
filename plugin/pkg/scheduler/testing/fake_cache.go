@@ -18,6 +18,7 @@ package testing
 
 import (
 	"k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -64,6 +65,16 @@ func (f *FakeCache) RemoveNode(node *v1.Node) error { return nil }
 
 func (f *FakeCache) UpdateNodeNameToInfoMap(infoMap map[string]*schedulercache.NodeInfo) error {
 	return nil
+}
+
+func (f *FakeCache) AddPDB(pdb *policy.PodDisruptionBudget) error { return nil }
+
+func (f *FakeCache) UpdatePDB(oldPDB, newPDB *policy.PodDisruptionBudget) error { return nil }
+
+func (f *FakeCache) RemovePDB(pdb *policy.PodDisruptionBudget) error { return nil }
+
+func (f *FakeCache) ListPDBs(selector labels.Selector) ([]*policy.PodDisruptionBudget, error) {
+	return nil, nil
 }
 
 func (f *FakeCache) List(s labels.Selector) ([]*v1.Pod, error) { return nil, nil }

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/golang/glog"
+	policy "k8s.io/api/policy/v1beta1"
 )
 
 var (
@@ -55,6 +56,7 @@ type schedulerCache struct {
 	// a map from pod key to podState.
 	podStates map[string]*podState
 	nodes     map[string]*NodeInfo
+	pdbs      map[string]*policy.PodDisruptionBudget
 }
 
 type podState struct {
@@ -74,6 +76,7 @@ func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedul
 		nodes:       make(map[string]*NodeInfo),
 		assumedPods: make(map[string]bool),
 		podStates:   make(map[string]*podState),
+		pdbs:        make(map[string]*policy.PodDisruptionBudget),
 	}
 }
 
@@ -380,6 +383,39 @@ func (cache *schedulerCache) RemoveNode(node *v1.Node) error {
 		delete(cache.nodes, node.Name)
 	}
 	return nil
+}
+
+func (cache *schedulerCache) AddPDB(pdb *policy.PodDisruptionBudget) error {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	// Unconditionally update cache.
+	cache.pdbs[pdb.Name] = pdb
+	return nil
+}
+
+func (cache *schedulerCache) UpdatePDB(oldPDB, newPDB *policy.PodDisruptionBudget) error {
+	return cache.AddPDB(newPDB)
+}
+
+func (cache *schedulerCache) RemovePDB(pdb *policy.PodDisruptionBudget) error {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	delete(cache.pdbs, pdb.Name)
+	return nil
+}
+
+func (cache *schedulerCache) ListPDBs(selector labels.Selector) ([]*policy.PodDisruptionBudget, error) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	var pdbs []*policy.PodDisruptionBudget
+	for _, pdb := range cache.pdbs {
+		if selector.Matches(labels.Set(pdb.Labels)) {
+			pdbs = append(pdbs, pdb)
+		}
+	}
+	return pdbs, nil
 }
 
 func (cache *schedulerCache) run() {
