@@ -31,6 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
@@ -153,7 +154,7 @@ func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
 	}
 	if q, exists := rl[v1.ResourceCPU]; exists {
 		// CPU is defined in milli-cores.
-		val := MilliCPUToShares(q.MilliValue())
+		val := cmutil.MilliCPUToShares(q.MilliValue())
 		rc.CpuShares = &val
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.HugePages) {

@@ -117,8 +117,10 @@ go_test(
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
+        "//pkg/kubelet/cm/cgroupmanager:go_default_library",
         "//pkg/kubelet/cm/cpumanager:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",
+        "//pkg/kubelet/cm/types:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockershim/libdocker:go_default_library",
         "//pkg/kubelet/images:go_default_library",
@@ -158,6 +160,7 @@ go_test(
         "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "//pkg/kubelet/cm/helper:go_default_library",
             "//test/e2e/framework/metrics:go_default_library",
             "//test/utils:go_default_library",
             "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",

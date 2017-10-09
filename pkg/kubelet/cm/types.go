@@ -17,8 +17,13 @@ limitations under the License.
 package cm
 
 import (
+	"time"
+
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
 
 // ResourceConfig holds information about all the supported cgroup resource parameters.
@@ -90,12 +95,25 @@ type CgroupManager interface {
 	GetResourceStats(name CgroupName) (*ResourceStats, error)
 }
 
+// CgroupSubsystems holds information about the mounted cgroup subsystems
+type CgroupSubsystems struct {
+	// Cgroup subsystem mounts.
+	// e.g.: "/sys/fs/cgroup/cpu" -> ["cpu", "cpuacct"]
+	Mounts []libcontainercgroups.Mount
+
+	// Cgroup subsystem to their mount location.
+	// e.g.: "cpu" -> "/sys/fs/cgroup/cpu"
+	MountPoints map[string]string
+}
+
 // QOSContainersInfo stores the names of containers per qos
 type QOSContainersInfo struct {
 	Guaranteed string
 	BestEffort string
 	Burstable  string
 }
+
+type ActivePodsFunc func() []*v1.Pod
 
 // PodContainerManager stores and manages pod level containers
 // The Pod workers interact with the PodContainerManager to create and destroy
@@ -120,4 +138,28 @@ type PodContainerManager interface {
 
 	// GetAllPodsFromCgroups enumerates the set of pod uids to their associated cgroup based on state of cgroupfs system.
 	GetAllPodsFromCgroups() (map[types.UID]CgroupName, error)
+}
+
+type NodeConfig struct {
+	RuntimeCgroupsName    string
+	SystemCgroupsName     string
+	KubeletCgroupsName    string
+	ContainerRuntime      string
+	CgroupsPerQOS         bool
+	CgroupRoot            string
+	CgroupDriver          string
+	ProtectKernelDefaults bool
+	NodeAllocatableConfig
+	ExperimentalQOSReserved               map[v1.ResourceName]int64
+	ExperimentalCPUManagerPolicy          string
+	ExperimentalCPUManagerReconcilePeriod time.Duration
+}
+
+type NodeAllocatableConfig struct {
+	KubeReservedCgroupName   string
+	SystemReservedCgroupName string
+	EnforceNodeAllocatable   sets.String
+	KubeReserved             v1.ResourceList
+	SystemReserved           v1.ResourceList
+	HardEvictionThresholds   []evictionapi.Threshold
 }

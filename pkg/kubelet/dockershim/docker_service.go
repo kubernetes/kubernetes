@@ -33,7 +33,7 @@ import (
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
+	kubecgroupmanager "k8s.io/kubernetes/pkg/kubelet/cm/cgroupmanager"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/cm"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/errors"
@@ -389,7 +389,7 @@ func (ds *dockerService) GenerateExpectedCgroupParent(cgroupParent string) (stri
 		// docker will fail to launch the container because the name we provide will not be a valid slice.
 		// this is a very good thing.
 		if ds.cgroupDriver == "systemd" {
-			systemdCgroupParent, err := kubecm.ConvertCgroupFsNameToSystemd(cgroupParent)
+			systemdCgroupParent, err := kubecgroupmanager.ConvertCgroupFsNameToSystemd(cgroupParent)
 			if err != nil {
 				return "", err
 			}

@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cm
+package util
 
 import (
 	"reflect"
@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
 // getResourceList returns a ResourceList with the
@@ -60,7 +61,7 @@ func TestResourceConfigForPod(t *testing.T) {
 	guaranteedMemory := memoryQuantity.Value()
 	testCases := map[string]struct {
 		pod      *v1.Pod
-		expected *ResourceConfig
+		expected *cm.ResourceConfig
 	}{
 		"besteffort": {
 			pod: &v1.Pod{
@@ -72,7 +73,7 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			expected: &ResourceConfig{CpuShares: &minShares},
+			expected: &cm.ResourceConfig{CpuShares: &minShares},
 		},
 		"burstable-no-limits": {
 			pod: &v1.Pod{
@@ -84,7 +85,7 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			expected: &ResourceConfig{CpuShares: &burstableShares},
+			expected: &cm.ResourceConfig{CpuShares: &burstableShares},
 		},
 		"burstable-with-limits": {
 			pod: &v1.Pod{
@@ -96,7 +97,7 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			expected: &ResourceConfig{CpuShares: &burstableShares, CpuQuota: &burstableQuota, CpuPeriod: &burstablePeriod, Memory: &burstableMemory},
+			expected: &cm.ResourceConfig{CpuShares: &burstableShares, CpuQuota: &burstableQuota, CpuPeriod: &burstablePeriod, Memory: &burstableMemory},
 		},
 		"burstable-partial-limits": {
 			pod: &v1.Pod{
@@ -111,7 +112,7 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			expected: &ResourceConfig{CpuShares: &burstablePartialShares},
+			expected: &cm.ResourceConfig{CpuShares: &burstablePartialShares},
 		},
 		"guaranteed": {
 			pod: &v1.Pod{
@@ -123,7 +124,7 @@ func TestResourceConfigForPod(t *testing.T) {
 					},
 				},
 			},
-			expected: &ResourceConfig{CpuShares: &guaranteedShares, CpuQuota: &guaranteedQuota, CpuPeriod: &guaranteedPeriod, Memory: &guaranteedMemory},
+			expected: &cm.ResourceConfig{CpuShares: &guaranteedShares, CpuQuota: &guaranteedQuota, CpuPeriod: &guaranteedPeriod, Memory: &guaranteedMemory},
 		},
 	}
 	for testName, testCase := range testCases {

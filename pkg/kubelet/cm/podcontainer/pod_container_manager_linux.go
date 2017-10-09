@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cm
+package podcontainer
 
 import (
 	"fmt"
@@ -28,6 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
+	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
 const (
@@ -39,12 +41,12 @@ const (
 // management if qos Cgroup is enabled.
 type podContainerManagerImpl struct {
 	// qosContainersInfo hold absolute paths of the top level qos containers
-	qosContainersInfo QOSContainersInfo
+	qosContainersInfo cm.QOSContainersInfo
 	// Stores the mounted cgroup subsystems
-	subsystems *CgroupSubsystems
+	subsystems *cm.CgroupSubsystems
 	// cgroupManager is the cgroup Manager Object responsible for managing all
 	// pod cgroups.
-	cgroupManager CgroupManager
+	cgroupManager cm.CgroupManager
 }
 
 // Make sure that podContainerManagerImpl implements the PodContainerManager interface
@@ -73,9 +75,9 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 	alreadyExists := m.Exists(pod)
 	if !alreadyExists {
 		// Create the pod container
-		containerConfig := &CgroupConfig{
+		containerConfig := &cm.CgroupConfig{
 			Name:               podContainerName,
-			ResourceParameters: ResourceConfigForPod(pod),
+			ResourceParameters: cmutil.ResourceConfigForPod(pod),
 		}
 		if err := m.cgroupManager.Create(containerConfig); err != nil {
 			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
@@ -92,7 +94,7 @@ func (m *podContainerManagerImpl) EnsureExists(pod *v1.Pod) error {
 }
 
 // GetPodContainerName returns the CgroupName identifier, and its literal cgroupfs form on the host.
-func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, string) {
+func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (cm.CgroupName, string) {
 	podQOS := v1qos.GetPodQOS(pod)
 	// Get the parent QOS container name
 	var parentContainer string
@@ -107,7 +109,7 @@ func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, 
 	podContainer := podCgroupNamePrefix + string(pod.UID)
 
 	// Get the absolute path of the cgroup
-	cgroupName := (CgroupName)(path.Join(parentContainer, podContainer))
+	cgroupName := (cm.CgroupName)(path.Join(parentContainer, podContainer))
 	// Get the literal cgroupfs name
 	cgroupfsName := m.cgroupManager.Name(cgroupName)
 
@@ -116,7 +118,7 @@ func (m *podContainerManagerImpl) GetPodContainerName(pod *v1.Pod) (CgroupName, 
 
 // Scan through the whole cgroup directory and kill all processes either
 // attached to the pod cgroup or to a container cgroup under the pod cgroup
-func (m *podContainerManagerImpl) tryKillingCgroupProcesses(podCgroup CgroupName) error {
+func (m *podContainerManagerImpl) tryKillingCgroupProcesses(podCgroup cm.CgroupName) error {
 	pidsToKill := m.cgroupManager.Pids(podCgroup)
 	// No pids charged to the terminated pod cgroup return
 	if len(pidsToKill) == 0 {
@@ -152,7 +154,7 @@ func (m *podContainerManagerImpl) tryKillingCgroupProcesses(podCgroup CgroupName
 }
 
 // Destroy destroys the pod container cgroup paths
-func (m *podContainerManagerImpl) Destroy(podCgroup CgroupName) error {
+func (m *podContainerManagerImpl) Destroy(podCgroup cm.CgroupName) error {
 	// Try killing all the processes attached to the pod cgroup
 	if err := m.tryKillingCgroupProcesses(podCgroup); err != nil {
 		glog.V(3).Infof("failed to kill all the processes attached to the %v cgroups", podCgroup)
@@ -160,9 +162,9 @@ func (m *podContainerManagerImpl) Destroy(podCgroup CgroupName) error {
 	}
 
 	// Now its safe to remove the pod's cgroup
-	containerConfig := &CgroupConfig{
+	containerConfig := &cm.CgroupConfig{
 		Name:               podCgroup,
-		ResourceParameters: &ResourceConfig{},
+		ResourceParameters: &cm.ResourceConfig{},
 	}
 	if err := m.cgroupManager.Destroy(containerConfig); err != nil {
 		return fmt.Errorf("failed to delete cgroup paths for %v : %v", podCgroup, err)
@@ -171,15 +173,15 @@ func (m *podContainerManagerImpl) Destroy(podCgroup CgroupName) error {
 }
 
 // ReduceCPULimits reduces the CPU CFS values to the minimum amount of shares.
-func (m *podContainerManagerImpl) ReduceCPULimits(podCgroup CgroupName) error {
+func (m *podContainerManagerImpl) ReduceCPULimits(podCgroup cm.CgroupName) error {
 	return m.cgroupManager.ReduceCPULimits(podCgroup)
 }
 
 // GetAllPodsFromCgroups scans through all the subsystems of pod cgroups
 // Get list of pods whose cgroup still exist on the cgroup mounts
-func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
+func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]cm.CgroupName, error) {
 	// Map for storing all the found pods on the disk
-	foundPods := make(map[types.UID]CgroupName)
+	foundPods := make(map[types.UID]cm.CgroupName)
 	qosContainersList := [3]string{m.qosContainersInfo.BestEffort, m.qosContainersInfo.Burstable, m.qosContainersInfo.Guaranteed}
 	// Scan through all the subsystem mounts
 	// and through each QoS cgroup directory for each subsystem mount
@@ -188,7 +190,7 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 	for _, val := range m.subsystems.MountPoints {
 		for _, qosContainerName := range qosContainersList {
 			// get the subsystems QoS cgroup absolute name
-			qcConversion := m.cgroupManager.Name(CgroupName(qosContainerName))
+			qcConversion := m.cgroupManager.Name(cm.CgroupName(qosContainerName))
 			qc := path.Join(val, qcConversion)
 			dirInfo, err := ioutil.ReadDir(qc)
 			if err != nil {
@@ -235,7 +237,7 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 // enabled, so Exists() returns true always as the cgroupRoot
 // is expected to always exist.
 type podContainerManagerNoop struct {
-	cgroupRoot CgroupName
+	cgroupRoot cm.CgroupName
 }
 
 // Make sure that podContainerManagerStub implements the PodContainerManager interface
@@ -249,7 +251,7 @@ func (m *podContainerManagerNoop) EnsureExists(_ *v1.Pod) error {
 	return nil
 }
 
-func (m *podContainerManagerNoop) GetPodContainerName(_ *v1.Pod) (CgroupName, string) {
+func (m *podContainerManagerNoop) GetPodContainerName(_ *v1.Pod) (cm.CgroupName, string) {
 	return m.cgroupRoot, string(m.cgroupRoot)
 }
 
@@ -258,14 +260,14 @@ func (m *podContainerManagerNoop) GetPodContainerNameForDriver(_ *v1.Pod) string
 }
 
 // Destroy destroys the pod container cgroup paths
-func (m *podContainerManagerNoop) Destroy(_ CgroupName) error {
+func (m *podContainerManagerNoop) Destroy(_ cm.CgroupName) error {
 	return nil
 }
 
-func (m *podContainerManagerNoop) ReduceCPULimits(_ CgroupName) error {
+func (m *podContainerManagerNoop) ReduceCPULimits(_ cm.CgroupName) error {
 	return nil
 }
 
-func (m *podContainerManagerNoop) GetAllPodsFromCgroups() (map[types.UID]CgroupName, error) {
+func (m *podContainerManagerNoop) GetAllPodsFromCgroups() (map[types.UID]cm.CgroupName, error) {
 	return nil, nil
 }

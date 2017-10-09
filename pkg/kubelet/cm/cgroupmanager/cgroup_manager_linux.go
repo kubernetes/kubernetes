@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cm
+package cgroupmanager
 
 import (
 	"fmt"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -172,17 +173,6 @@ func (l *libcontainerAdapter) adaptName(cgroupName CgroupName, outputToCgroupFs 
 	return ConvertCgroupNameToSystemd(cgroupName, outputToCgroupFs)
 }
 
-// CgroupSubsystems holds information about the mounted cgroup subsystems
-type CgroupSubsystems struct {
-	// Cgroup subsystem mounts.
-	// e.g.: "/sys/fs/cgroup/cpu" -> ["cpu", "cpuacct"]
-	Mounts []libcontainercgroups.Mount
-
-	// Cgroup subsystem to their mount location.
-	// e.g.: "cpu" -> "/sys/fs/cgroup/cpu"
-	MountPoints map[string]string
-}
-
 // cgroupManagerImpl implements the CgroupManager interface.
 // Its a stateless object which can be used to
 // update,create or delete any number of cgroups
@@ -196,7 +186,7 @@ type cgroupManagerImpl struct {
 }
 
 // Make sure that cgroupManagerImpl implements the CgroupManager interface
-var _ CgroupManager = &cgroupManagerImpl{}
+var CgroupManager = &cgroupManagerImpl{}
 
 // NewCgroupManager is a factory method that returns a CgroupManager
 func NewCgroupManager(cs *CgroupSubsystems, cgroupDriver string) CgroupManager {
@@ -491,7 +481,7 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 			continue
 		}
 		// Get a list of pids that are still charged to the pod's cgroup
-		pids, err = getCgroupProcs(dir)
+		pids, err = cmutil.GetCgroupProcs(dir)
 		if err != nil {
 			continue
 		}
@@ -506,7 +496,7 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 			if !info.IsDir() {
 				return nil
 			}
-			pids, err = getCgroupProcs(path)
+			pids, err = cmutil.GetCgroupProcs(path)
 			if err != nil {
 				glog.V(4).Infof("cgroup manager encountered error getting procs for cgroup path %q: %v", path, err)
 				return filepath.SkipDir
@@ -527,7 +517,7 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 // ReduceCPULimits reduces the cgroup's cpu shares to the lowest possible value
 func (m *cgroupManagerImpl) ReduceCPULimits(cgroupName CgroupName) error {
 	// Set lowest possible CpuShares value for the cgroup
-	minimumCPUShares := uint64(MinShares)
+	minimumCPUShares := uint64(cmutil.MinShares)
 	resources := &ResourceConfig{
 		CpuShares: &minimumCPUShares,
 	}

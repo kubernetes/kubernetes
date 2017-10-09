@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cm
+package containerlifecycle
 
 import (
 	"k8s.io/api/core/v1"
@@ -53,5 +53,25 @@ func (i *internalContainerLifecycleImpl) PostStopContainer(containerID string) e
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
 		return i.cpuManager.RemoveContainer(containerID)
 	}
+	return nil
+}
+
+// Fake internal container lifecycle
+// TODO: Document this
+func NewFakeInternalContainerLifecycle() *fakeInternalContainerLifecycle {
+	return &fakeInternalContainerLifecycle{}
+}
+
+type fakeInternalContainerLifecycle struct{}
+
+func (f *fakeInternalContainerLifecycle) PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
+	return nil
+}
+
+func (f *fakeInternalContainerLifecycle) PreStopContainer(containerID string) error {
+	return nil
+}
+
+func (f *fakeInternalContainerLifecycle) PostStopContainer(containerID string) error {
 	return nil
 }

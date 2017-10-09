@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cm
+package cgroupmanager
 
 import (
 	"reflect"
@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
 func Test(t *testing.T) {
@@ -68,7 +69,7 @@ func Test(t *testing.T) {
 	for _, test := range tests {
 		m := kubeletconfig.ConfigurationMap{}
 		m.Set(test.input)
-		actual, err := ParseQOSReserved(m)
+		actual, err := cm.ParseQOSReserved(m)
 		if actual != nil && test.expected == nil {
 			t.Errorf("Unexpected success, input: %v, expected: %v, actual: %v, err: %v", test.input, test.expected, actual, err)
 		}

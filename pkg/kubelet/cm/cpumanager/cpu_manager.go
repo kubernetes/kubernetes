@@ -31,12 +31,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 )
-
-// ActivePodsFunc is a function that returns a list of pods to reconcile.
-type ActivePodsFunc func() []*v1.Pod
 
 type runtimeService interface {
 	UpdateContainerResources(id string, resources *runtimeapi.LinuxContainerResources) error
@@ -47,7 +45,7 @@ type policyName string
 // Manager interface provides methods for Kubelet to manage pod cpus.
 type Manager interface {
 	// Start is called during Kubelet initialization.
-	Start(activePods ActivePodsFunc, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService)
+	Start(activePods cm.ActivePodsFunc, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService)
 
 	// AddContainer is called between container create and container start
 	// so that initial CPU affinity settings can be written through to the
@@ -80,7 +78,7 @@ type manager struct {
 
 	// activePods is a method for listing active pods on the node
 	// so all the containers can be updated in the reconciliation loop.
-	activePods ActivePodsFunc
+	activePods cm.ActivePodsFunc
 
 	// podStatusProvider provides a method for obtaining pod statuses
 	// and the containerID of their containers
@@ -150,7 +148,7 @@ func NewManager(
 	return manager, nil
 }
 
-func (m *manager) Start(activePods ActivePodsFunc, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService) {
+func (m *manager) Start(activePods cm.ActivePodsFunc, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService) {
 	glog.Infof("[cpumanger] starting with %s policy", m.policy.Name())
 	glog.Infof("[cpumanger] reconciling every %v", m.reconcilePeriod)
 

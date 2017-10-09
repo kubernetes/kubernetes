@@ -22,7 +22,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	containermanager "k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
 // ValidateKubeletConfiguration validates `kc` and returns an error if it is invalid
@@ -91,9 +91,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	}
 	for _, val := range kc.EnforceNodeAllocatable {
 		switch val {
-		case containermanager.NodeAllocatableEnforcementKey:
-		case containermanager.SystemReservedEnforcementKey:
-		case containermanager.KubeReservedEnforcementKey:
+		case cm.NodeAllocatableEnforcementKey:
+		case cm.SystemReservedEnforcementKey:
+		case cm.KubeReservedEnforcementKey:
 			continue
 		default:
 			allErrors = append(allErrors, fmt.Errorf("Invalid option %q specified for EnforceNodeAllocatable (--enforce-node-allocatable) setting. Valid options are %q, %q or %q",
