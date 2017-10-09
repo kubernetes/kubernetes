@@ -5,15 +5,12 @@ go_library(
     srcs = [
         "daemonset.go",
         "deployment.go",
-        "deployment_expansion.go",
         "expansion_generated.go",
     ],
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/k8s.io/api/apps/v1:go_default_library",
-        "//vendor/k8s.io/api/apps/v1beta2:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
     ],
