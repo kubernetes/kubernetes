@@ -425,7 +425,7 @@ func (r *RollingUpdater) readyPods(oldRc, newRc *api.ReplicationController, minR
 		}
 		for _, pod := range pods.Items {
 			v1Pod := &v1.Pod{}
-			if err := apiv1.Convert_api_Pod_To_v1_Pod(&pod, v1Pod, nil); err != nil {
+			if err := apiv1.Convert_core_Pod_To_v1_Pod(&pod, v1Pod, nil); err != nil {
 				return 0, 0, err
 			}
 			// Do not count deleted pods as ready

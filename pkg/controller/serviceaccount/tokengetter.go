@@ -68,7 +68,7 @@ func (r *registryGetter) GetServiceAccount(namespace, name string) (*v1.ServiceA
 		return nil, err
 	}
 	v1ServiceAccount := v1.ServiceAccount{}
-	err = apiv1.Convert_api_ServiceAccount_To_v1_ServiceAccount(internalServiceAccount, &v1ServiceAccount, nil)
+	err = apiv1.Convert_core_ServiceAccount_To_v1_ServiceAccount(internalServiceAccount, &v1ServiceAccount, nil)
 	return &v1ServiceAccount, err
 
 }
@@ -79,7 +79,7 @@ func (r *registryGetter) GetSecret(namespace, name string) (*v1.Secret, error) {
 		return nil, err
 	}
 	v1Secret := v1.Secret{}
-	err = apiv1.Convert_api_Secret_To_v1_Secret(internalSecret, &v1Secret, nil)
+	err = apiv1.Convert_core_Secret_To_v1_Secret(internalSecret, &v1Secret, nil)
 	return &v1Secret, err
 
 }
