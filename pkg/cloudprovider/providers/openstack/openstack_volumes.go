@@ -374,7 +374,7 @@ func (os *OpenStack) DeleteVolume(volumeID string) error {
 	if err != nil {
 		glog.Errorf("Cannot delete volume %s: %v", volumeID, err)
 	}
-	return nil
+	return err
 
 }
 
