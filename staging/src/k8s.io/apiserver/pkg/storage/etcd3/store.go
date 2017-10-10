@@ -562,6 +562,14 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
 		}
 
+		// avoid small allocations for the result slice, since this can be called in many
+		// different contexts and we don't know how significantly the result will be filtered
+		if pred.Empty() {
+			growSlice(v, len(getResp.Kvs))
+		} else {
+			growSlice(v, 2048, len(getResp.Kvs))
+		}
+
 		// take items from the response until the bucket is full, filtering as we go
 		for _, kv := range getResp.Kvs {
 			if paging && int64(v.Len()) >= pred.Limit {
@@ -610,6 +618,37 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 
 	// no continuation
 	return s.versioner.UpdateList(listObj, uint64(returnedRV), "")
+}
+
+// growSlice takes a slice value and grows its capacity up
+// to the maximum of the passed sizes or maxCapacity, whichever
+// is smaller. Above maxCapacity decisions about allocation are left
+// to the Go runtime on append. This allows a caller to make an
+// educated guess about the potential size of the total list while
+// still avoiding overly aggressive initial allocation. If sizes
+// is empty maxCapacity will be used as the size to grow.
+func growSlice(v reflect.Value, maxCapacity int, sizes ...int) {
+	cap := v.Cap()
+	max := cap
+	for _, size := range sizes {
+		if size > max {
+			max = size
+		}
+	}
+	if len(sizes) == 0 || max > maxCapacity {
+		max = maxCapacity
+	}
+	if max <= cap {
+		return
+	}
+	if v.Len() > 0 {
+		extra := reflect.MakeSlice(v.Type(), 0, max)
+		reflect.Copy(extra, v)
+		v.Set(extra)
+	} else {
+		extra := reflect.MakeSlice(v.Type(), 0, max)
+		v.Set(extra)
+	}
 }
 
 // Watch implements storage.Interface.Watch.
