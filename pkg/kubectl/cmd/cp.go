@@ -84,30 +84,25 @@ type fileSpec struct {
 var errFileSpecDoesntMatchFormat = errors.New("Filespec must match the canonical format: [[namespace/]pod:]file/path")
 
 func extractFileSpec(arg string) (fileSpec, error) {
-	pieces := strings.Split(arg, ":")
-	if len(pieces) == 1 {
+	if i := strings.Index(arg, ":"); i == -1 {
 		return fileSpec{File: arg}, nil
-	}
-	if len(pieces) != 2 {
-		// FIXME Kubernetes can't copy files that contain a ':'
-		// character.
-		return fileSpec{}, errFileSpecDoesntMatchFormat
-	}
-	file := pieces[1]
-
-	pieces = strings.Split(pieces[0], "/")
-	if len(pieces) == 1 {
-		return fileSpec{
-			PodName: pieces[0],
-			File:    file,
-		}, nil
-	}
-	if len(pieces) == 2 {
-		return fileSpec{
-			PodNamespace: pieces[0],
-			PodName:      pieces[1],
-			File:         file,
-		}, nil
+	} else if i > 0 {
+		file := arg[i+1:]
+		pod := arg[:i]
+		pieces := strings.Split(pod, "/")
+		if len(pieces) == 1 {
+			return fileSpec{
+				PodName: pieces[0],
+				File:    file,
+			}, nil
+		}
+		if len(pieces) == 2 {
+			return fileSpec{
+				PodNamespace: pieces[0],
+				PodName:      pieces[1],
+				File:         file,
+			}, nil
+		}
 	}
 
 	return fileSpec{}, errFileSpecDoesntMatchFormat
@@ -125,6 +120,14 @@ func runCopy(f cmdutil.Factory, cmd *cobra.Command, out, cmderr io.Writer, args 
 	if err != nil {
 		return err
 	}
+
+	if len(srcSpec.PodName) != 0 && len(destSpec.PodName) != 0 {
+		if _, err := os.Stat(args[0]); err == nil {
+			return copyToPod(f, cmd, out, cmderr, fileSpec{File: args[0]}, destSpec)
+		}
+		return cmdutil.UsageErrorf(cmd, "src doesn't exist in local filesystem")
+	}
+
 	if len(srcSpec.PodName) != 0 {
 		return copyFromPod(f, cmd, cmderr, srcSpec, destSpec)
 	}
