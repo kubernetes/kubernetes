@@ -621,7 +621,7 @@ func (s *StatefulSetTester) WaitForStatusReadyReplicas(ss *apps.StatefulSet, exp
 				return false, nil
 			}
 			if ssGet.Status.ReadyReplicas != expectedReplicas {
-				Logf("Waiting for stateful set status to become %d, currently %d", expectedReplicas, ssGet.Status.Replicas)
+				Logf("Waiting for stateful set status.readyReplicas to become %d, currently %d", expectedReplicas, ssGet.Status.ReadyReplicas)
 				return false, nil
 			}
 			return true, nil
@@ -646,7 +646,7 @@ func (s *StatefulSetTester) WaitForStatusReplicas(ss *apps.StatefulSet, expected
 				return false, nil
 			}
 			if ssGet.Status.Replicas != expectedReplicas {
-				Logf("Waiting for stateful set status to become %d, currently %d", expectedReplicas, ssGet.Status.Replicas)
+				Logf("Waiting for stateful set status.replicas to become %d, currently %d", expectedReplicas, ssGet.Status.Replicas)
 				return false, nil
 			}
 			return true, nil
