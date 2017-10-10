@@ -28,12 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
+	schedulerutils "k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
 
 const (
@@ -588,27 +588,59 @@ func (ms *multiSorter) Less(i, j int) bool {
 	return ms.cmp[k](p1, p2) < 0
 }
 
-// qosComparator compares pods by QoS (BestEffort < Burstable < Guaranteed)
-func qosComparator(p1, p2 *v1.Pod) int {
-	qosP1 := v1qos.GetPodQOS(p1)
-	qosP2 := v1qos.GetPodQOS(p2)
-	// its a tie
-	if qosP1 == qosP2 {
+// priority compares pods by Priority, if priority is enabled.
+func priority(p1, p2 *v1.Pod) int {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
+		// If priority is not enabled, all pods are equal.
 		return 0
 	}
-	// if p1 is best effort, we know p2 is burstable or guaranteed
-	if qosP1 == v1.PodQOSBestEffort {
-		return -1
+	priority1 := schedulerutils.GetPodPriority(p1)
+	priority2 := schedulerutils.GetPodPriority(p2)
+	if priority1 == priority2 {
+		return 0
 	}
-	// we know p1 and p2 are not besteffort, so if p1 is burstable, p2 must be guaranteed
-	if qosP1 == v1.PodQOSBurstable {
-		if qosP2 == v1.PodQOSGuaranteed {
+	if priority1 > priority2 {
+		return 1
+	}
+	return -1
+}
+
+// exceedMemoryRequests compares whether or not pods' memory usage exceeds their requests
+func exceedMemoryRequests(stats statsFunc) cmpFunc {
+	return func(p1, p2 *v1.Pod) int {
+		p1Stats, found := stats(p1)
+		// if we have no usage stats for p1, we want p2 first
+		if !found {
+			return -1
+		}
+		// if we have no usage stats for p2, but p1 has usage, we want p1 first.
+		p2Stats, found := stats(p2)
+		if !found {
+			return 1
+		}
+		// if we cant get usage for p1 measured, we want p2 first
+		p1Usage, err := podMemoryUsage(p1Stats)
+		if err != nil {
+			return -1
+		}
+		// if we cant get usage for p2 measured, we want p1 first
+		p2Usage, err := podMemoryUsage(p2Stats)
+		if err != nil {
+			return 1
+		}
+		p1Memory := p1Usage[v1.ResourceMemory]
+		p2Memory := p2Usage[v1.ResourceMemory]
+		p1ExceedsRequests := p1Memory.Cmp(podMemoryRequest(p1)) == 1
+		p2ExceedsRequests := p2Memory.Cmp(podMemoryRequest(p2)) == 1
+		if p1ExceedsRequests == p2ExceedsRequests {
+			return 0
+		}
+		if p1ExceedsRequests && !p2ExceedsRequests {
+			// if p1 exceeds its requests, but p2 does not, then we want p2 first
 			return -1
 		}
 		return 1
 	}
-	// ok, p1 must be guaranteed.
-	return 1
 }
 
 // memory compares pods by largest consumer of memory relative to request.
@@ -700,14 +732,16 @@ func disk(stats statsFunc, fsStatsToMeasure []fsStatsType, diskResource v1.Resou
 }
 
 // rankMemoryPressure orders the input pods for eviction in response to memory pressure.
+// It ranks by whether or not the pod's usage exceeds its requests, then by priority, and
+// finally by memory usage above requests.
 func rankMemoryPressure(pods []*v1.Pod, stats statsFunc) {
-	orderedBy(qosComparator, memory(stats)).Sort(pods)
+	orderedBy(exceedMemoryRequests(stats), priority, memory(stats)).Sort(pods)
 }
 
 // rankDiskPressureFunc returns a rankFunc that measures the specified fs stats.
 func rankDiskPressureFunc(fsStatsToMeasure []fsStatsType, diskResource v1.ResourceName) rankFunc {
 	return func(pods []*v1.Pod, stats statsFunc) {
-		orderedBy(qosComparator, disk(stats, fsStatsToMeasure, diskResource)).Sort(pods)
+		orderedBy(priority, disk(stats, fsStatsToMeasure, diskResource)).Sort(pods)
 	}
 }
 

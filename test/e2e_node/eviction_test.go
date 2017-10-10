@@ -256,6 +256,49 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 	})
 })
 
+// PriorityEvictionOrdering tests that the node responds to node memory pressure by evicting pods.
+// This test tests that the guaranteed pod is never evicted, and that the lower-priority pod is evicted before
+// the higher priority pod.
+var _ = framework.KubeDescribe("PriorityEvictionOrdering [Slow] [Serial] [Disruptive] [Flaky]", func() {
+	f := framework.NewDefaultFramework("priority-eviction-ordering-test")
+	expectedNodeCondition := v1.NodeMemoryPressure
+	pressureTimeout := 10 * time.Minute
+	Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.FeatureGates[string(features.PodPriority)] = true
+			memoryConsumed := resource.MustParse("600Mi")
+			summary := eventuallyGetSummary()
+			availableBytes := *(summary.Node.Memory.AvailableBytes)
+			initialConfig.EvictionHard = fmt.Sprintf("memory.available<%d", availableBytes-uint64(memoryConsumed.Value()))
+			initialConfig.EvictionMinimumReclaim = ""
+		})
+		specs := []podEvictSpec{
+			{
+				evictionPriority: 2,
+				pod:              getMemhogPod("memory-hog-pod", "memory-hog", v1.ResourceRequirements{}),
+			},
+			{
+				evictionPriority: 1,
+				pod:              getMemhogPod("high-priority-memory-hog-pod", "high-priority-memory-hog", v1.ResourceRequirements{}),
+			},
+			{
+				evictionPriority: 0,
+				pod: getMemhogPod("guaranteed-pod", "guaranteed-pod", v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("300Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("300Mi"),
+					},
+				}),
+			},
+		}
+		systemPriority := int32(2147483647)
+		specs[1].pod.Spec.Priority = &systemPriority
+		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logMemoryMetrics, specs)
+	})
+})
+
 // Struct used by runEvictionTest that specifies the pod, and when that pod should be evicted, relative to other pods
 type podEvictSpec struct {
 	// P0 should never be evicted, P1 shouldn't evict before P2, etc.
