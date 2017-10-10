@@ -63,7 +63,6 @@ ${clientgen} "$@"
 ${clientgen} --output-base "${KUBE_ROOT}/vendor" --clientset-path="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${GV_DIRS_CSV}" "$@"
 
 listergen_internal_apis=(
-pkg/api
 $(
   cd ${KUBE_ROOT}
   find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort
@@ -84,7 +83,6 @@ listergen_external_apis_csv=$(IFS=,; echo "${listergen_external_apis[*]}")
 ${listergen} --output-base "${KUBE_ROOT}/vendor" --output-package "k8s.io/client-go/listers" --input-dirs "${listergen_external_apis_csv}" "$@"
 
 informergen_internal_apis=(
-pkg/api
 $(
   cd ${KUBE_ROOT}
   find pkg/apis -maxdepth 2 -name types.go | xargs -n1 dirname | sort
