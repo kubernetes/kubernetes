@@ -26,6 +26,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/proxy/apis:all-srcs",
         "//pkg/proxy/config:all-srcs",
         "//pkg/proxy/healthcheck:all-srcs",
         "//pkg/proxy/iptables:all-srcs",
