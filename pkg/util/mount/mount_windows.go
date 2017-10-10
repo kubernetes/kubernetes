@@ -84,12 +84,8 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 			`$Credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $User, $PWord`,
 			options[0], options[1])
 
-		driverLetter, err := getAvailableDriveLetter()
-		if err != nil {
-			return err
-		}
-		bindSource = driverLetter + ":"
-		cmdLine += fmt.Sprintf(";New-SmbGlobalMapping -LocalPath %s -RemotePath %s -Credential $Credential", bindSource, source)
+		bindSource = source
+		cmdLine += fmt.Sprintf(";New-SmbGlobalMapping -RemotePath %s -Credential $Credential", source)
 
 		if output, err := exec.Command("powershell", "/c", cmdLine).CombinedOutput(); err != nil {
 			// we don't return error here, even though New-SmbGlobalMapping failed, we still make it successful,
