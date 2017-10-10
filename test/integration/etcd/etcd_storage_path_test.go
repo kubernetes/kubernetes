@@ -180,6 +180,11 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 		expectedEtcdPath: "/registry/daemonsets/etcdstoragepathtestnamespace/ds6",
 		expectedGVK:      gvkP("extensions", "v1beta1", "DaemonSet"),
 	},
+	gvr("apps", "v1", "deployments"): {
+		stub:             `{"metadata": {"name": "deployment4"}, "spec": {"selector": {"matchLabels": {"f": "z"}}, "template": {"metadata": {"labels": {"f": "z"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container6"}]}}}}`,
+		expectedEtcdPath: "/registry/deployments/etcdstoragepathtestnamespace/deployment4",
+		expectedGVK:      gvkP("extensions", "v1", "Deployment"),
+	},
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/autoscaling/v1

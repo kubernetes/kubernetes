@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "daemonset.go",
+        "deployment.go",
         "interface.go",
     ],
     visibility = ["//visibility:public"],

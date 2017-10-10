@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "apps_client.go",
         "daemonset.go",
+        "deployment.go",
         "doc.go",
         "generated_expansion.go",
     ],

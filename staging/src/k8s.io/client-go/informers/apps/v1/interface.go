@@ -26,6 +26,8 @@ import (
 type Interface interface {
 	// DaemonSets returns a DaemonSetInformer.
 	DaemonSets() DaemonSetInformer
+	// Deployments returns a DeploymentInformer.
+	Deployments() DeploymentInformer
 }
 
 type version struct {
@@ -40,4 +42,9 @@ func New(f internalinterfaces.SharedInformerFactory) Interface {
 // DaemonSets returns a DaemonSetInformer.
 func (v *version) DaemonSets() DaemonSetInformer {
 	return &daemonSetInformer{factory: v.SharedInformerFactory}
+}
+
+// Deployments returns a DeploymentInformer.
+func (v *version) Deployments() DeploymentInformer {
+	return &deploymentInformer{factory: v.SharedInformerFactory}
 }

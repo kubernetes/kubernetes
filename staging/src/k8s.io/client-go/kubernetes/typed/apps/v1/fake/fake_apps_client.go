@@ -30,6 +30,10 @@ func (c *FakeAppsV1) DaemonSets(namespace string) v1.DaemonSetInterface {
 	return &FakeDaemonSets{c, namespace}
 }
 
+func (c *FakeAppsV1) Deployments(namespace string) v1.DeploymentInterface {
+	return &FakeDeployments{c, namespace}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeAppsV1) RESTClient() rest.Interface {
