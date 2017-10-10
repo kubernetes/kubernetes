@@ -912,6 +912,15 @@ function detect-subnetworks() {
   echo "${color_red}Could not find subnetwork with region ${REGION}, network ${NETWORK}, and project ${NETWORK_PROJECT}"
 }
 
+function delete-all-firewall-rules() {
+  if fws=$(gcloud compute firewall-rules list --project "${NETWORK_PROJECT}" --filter="network=${NETWORK}" --format="value(name)"); then
+    echo "Deleting firewall rules remaining in network ${NETWORK}: ${fws}"
+    delete-firewall-rules "$fws"
+  else
+    echo "Failed to list firewall rules from the network ${NETWORK}"
+  fi
+}
+
 function delete-firewall-rules() {
   for fw in $@; do
     if [[ -n $(gcloud compute firewall-rules --project "${NETWORK_PROJECT}" describe "${fw}" --format='value(name)' 2>/dev/null || true) ]]; then
@@ -1728,8 +1737,10 @@ function kube-down() {
       "${NETWORK}-default-internal"  # Pre-1.5 clusters
 
     if [[ "${KUBE_DELETE_NETWORK}" == "true" ]]; then
+      # Delete all remaining firewall rules in the network.
+      delete-all-firewall-rules || true
       delete-subnetworks || true
-      delete-network || true  # might fail if there are leaked firewall rules
+      delete-network || true  # might fail if there are leaked resources that reference the network
     fi
 
     # If there are no more remaining master replicas, we should update kubeconfig.
