@@ -941,10 +941,11 @@ func (gce *GCECloud) ensureStaticIP(name, serviceName, region, existingIP string
 	}
 
 	if err = gce.ReserveRegionAddress(addressObj, region); err != nil {
-		if !isHTTPErrorCode(err, http.StatusConflict) {
+		if !isHTTPErrorCode(err, http.StatusConflict) && !isHTTPErrorCode(err, http.StatusBadRequest) {
 			return "", false, fmt.Errorf("error creating gce static IP address: %v", err)
 		}
-		// StatusConflict == the IP exists already.
+		// StatusConflict = Address name is already used
+		// StatusBadRequest = IP is already used (Only for External addresses - not Internal addresses)
 		existed = true
 	}
 
