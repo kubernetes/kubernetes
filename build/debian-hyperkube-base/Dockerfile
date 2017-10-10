@@ -24,6 +24,7 @@ RUN echo CACHEBUST>/dev/null && clean-install \
     e2fsprogs \
     ebtables \
     ethtool \
+    kmod \
     ca-certificates \
     conntrack \
     util-linux \
