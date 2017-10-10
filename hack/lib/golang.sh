@@ -249,20 +249,6 @@ kube::golang::host_platform() {
   echo "$(go env GOHOSTOS)/$(go env GOHOSTARCH)"
 }
 
-kube::golang::current_platform() {
-  local os="${GOOS-}"
-  if [[ -z $os ]]; then
-    os=$(go env GOHOSTOS)
-  fi
-
-  local arch="${GOARCH-}"
-  if [[ -z $arch ]]; then
-    arch=$(go env GOHOSTARCH)
-  fi
-
-  echo "$os/$arch"
-}
-
 # Takes the platform name ($1) and sets the appropriate golang env variables
 # for that platform.
 kube::golang::set_platform_envs() {
