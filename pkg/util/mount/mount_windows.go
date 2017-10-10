@@ -256,20 +256,6 @@ func normalizeWindowsPath(path string) string {
 	return normalizedPath
 }
 
-func getAvailableDriveLetter() (string, error) {
-	cmd := "$used = Get-PSDrive | Select-Object -Expand Name | Where-Object { $_.Length -eq 1 }"
-	cmd += ";$drive = 67..90 | ForEach-Object { [string][char]$_ } | Where-Object { $used -notcontains $_ } | Select-Object -First 1;$drive"
-	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("getAvailableDriveLetter failed: %v, output: %q", err, string(output))
-	}
-
-	if len(output) == 0 {
-		return "", fmt.Errorf("azureMount: there is no available drive letter now")
-	}
-	return string(output)[:1], nil
-}
-
 // ValidateDiskNumber : disk number should be a number in [0, 99]
 func ValidateDiskNumber(disk string) error {
 	diskNum, err := strconv.Atoi(disk)
