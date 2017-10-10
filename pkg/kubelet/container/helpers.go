@@ -357,3 +357,13 @@ func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 	}
 	return
 }
+
+// MakeGPUDevices returns internal device info based on given nvidia GPU paths
+func MakeGPUDevices(nvidiaGPUPaths []string) []DeviceInfo {
+	var devices []DeviceInfo
+	for _, path := range nvidiaGPUPaths {
+		// Devices have to be mapped one to one because of nvidia CUDA library requirements.
+		devices = append(devices, DeviceInfo{PathOnHost: path, PathInContainer: path, Permissions: "mrw"})
+	}
+	return devices
+}
