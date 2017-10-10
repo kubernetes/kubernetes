@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/apiserver/pkg/admission/plugin/initialization"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/informers"
@@ -53,7 +54,8 @@ func NewAdmissionOptions() *AdmissionOptions {
 	options := &AdmissionOptions{
 		Plugins:                &admission.Plugins{},
 		PluginNames:            []string{},
-		RecommendedPluginOrder: []string{lifecycle.PluginName},
+		RecommendedPluginOrder: []string{lifecycle.PluginName, initialization.PluginName},
+		DefaultOffPlugins:      []string{initialization.PluginName},
 	}
 	server.RegisterAllAdmissionPlugins(options.Plugins)
 	return options

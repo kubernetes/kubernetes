@@ -183,7 +183,6 @@ pkg/credentialprovider/rancher
 pkg/features
 pkg/kubeapiserver
 pkg/kubeapiserver/admission
-pkg/kubeapiserver/admission/configuration
 pkg/kubeapiserver/authenticator
 pkg/kubeapiserver/authorizer
 pkg/kubeapiserver/authorizer/modes
@@ -450,7 +449,6 @@ plugin/cmd/kube-scheduler/app
 plugin/pkg/admission/antiaffinity
 plugin/pkg/admission/eventratelimit/apis/eventratelimit
 plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1
-plugin/pkg/admission/initialization
 plugin/pkg/admission/initialresources
 plugin/pkg/admission/limitranger
 plugin/pkg/admission/noderestriction
@@ -586,6 +584,8 @@ staging/src/k8s.io/apimachinery/pkg/util/validation
 staging/src/k8s.io/apimachinery/pkg/util/wait
 staging/src/k8s.io/apimachinery/pkg/util/yaml
 staging/src/k8s.io/apiserver/pkg/admission
+staging/src/k8s.io/apiserver/pkg/admission/configuration
+staging/src/k8s.io/apiserver/pkg/admission/plugin/initialization
 staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle
 staging/src/k8s.io/apiserver/pkg/apis/apiserver
 staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1
