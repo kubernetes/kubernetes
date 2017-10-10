@@ -42,7 +42,6 @@ import (
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
 	admissioninit "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 
 	// install the clientgo admission API for use with api registry
@@ -94,9 +93,6 @@ func NewGenericAdmissionWebhook() (*GenericAdmissionWebhook, error) {
 			admission.Delete,
 			admission.Update,
 		),
-		negotiatedSerializer: serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{
-			Serializer: api.Codecs.LegacyCodec(admissionv1alpha1.SchemeGroupVersion),
-		}),
 		serviceResolver: defaultServiceResolver{},
 	}, nil
 }
@@ -130,6 +126,15 @@ func (a *GenericAdmissionWebhook) SetServiceResolver(sr admissioninit.ServiceRes
 	}
 }
 
+// SetScheme sets a serializer(NegotiatedSerializer) which is derived from the scheme
+func (a *GenericAdmissionWebhook) SetScheme(scheme *runtime.Scheme) {
+	if scheme != nil {
+		a.negotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{
+			Serializer: serializer.NewCodecFactory(scheme).LegacyCodec(admissionv1alpha1.SchemeGroupVersion),
+		})
+	}
+}
+
 func (a *GenericAdmissionWebhook) SetClientCert(cert, key []byte) {
 	a.clientCert = cert
 	a.clientKey = key
@@ -145,6 +150,9 @@ func (a *GenericAdmissionWebhook) Validate() error {
 	}
 	if a.hookSource == nil {
 		return fmt.Errorf("the GenericAdmissionWebhook admission plugin requires a Kubernetes client to be provided")
+	}
+	if a.negotiatedSerializer == nil {
+		return fmt.Errorf("the GenericAdmissionWebhook admission plugin requires a runtime.Scheme to be provided to derive a serializer")
 	}
 	go a.hookSource.Run(wait.NeverStop)
 	return nil

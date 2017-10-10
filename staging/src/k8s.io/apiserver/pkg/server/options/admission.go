@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/initialization"
@@ -82,6 +83,7 @@ func (a *AdmissionOptions) ApplyTo(
 	serverIdentifyingClientCert []byte,
 	serverIdentifyingClientKey []byte,
 	clientConfig *rest.Config,
+	scheme *runtime.Scheme,
 	pluginInitializers ...admission.PluginInitializer,
 ) error {
 	pluginNames := a.PluginNames
@@ -98,7 +100,7 @@ func (a *AdmissionOptions) ApplyTo(
 	if err != nil {
 		return err
 	}
-	genericInitializer, err := initializer.New(clientset, informers, c.Authorizer, serverIdentifyingClientCert, serverIdentifyingClientKey)
+	genericInitializer, err := initializer.New(clientset, informers, c.Authorizer, serverIdentifyingClientCert, serverIdentifyingClientKey, scheme)
 	if err != nil {
 		return err
 	}
