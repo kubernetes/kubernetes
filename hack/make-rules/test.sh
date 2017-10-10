@@ -50,7 +50,6 @@ kube::test::find_dirs() {
           -o -path './bazel-*/*' \
           -o -path './_output/*' \
           -o -path './_gopath/*' \
-          -o -path './cmd/kubeadm/test/*' \
           -o -path './contrib/podex/*' \
           -o -path './output/*' \
           -o -path './release/*' \

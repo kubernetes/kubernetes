@@ -27,7 +27,7 @@ import (
 	genericfuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	kubeadmfuzzer "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/fuzzer"
+	kubeadmfuzzer "k8s.io/kubeadm/app/apis/kubeadm/fuzzer"
 	"k8s.io/kubernetes/pkg/api"
 	corefuzzer "k8s.io/kubernetes/pkg/api/fuzzer"
 	admissionregistrationfuzzer "k8s.io/kubernetes/pkg/apis/admissionregistration/fuzzer"

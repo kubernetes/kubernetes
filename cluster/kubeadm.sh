@@ -25,7 +25,7 @@ source "${KUBE_ROOT}/cluster/clientbin.sh"
 # If KUBEADM_PATH isn't set, gather up the list of likely places and use ls
 # to find the latest one.
 if [[ -z "${KUBEADM_PATH:-}" ]]; then
-  kubeadm=$( get_bin "kubeadm" "cmd/kubeadm" )
+  kubeadm=$( get_bin "kubeadm" "vendor/k8s.io/kubeadm" )
 
   if [[ ! -x "$kubeadm" ]]; then
     print_error "kubeadm"

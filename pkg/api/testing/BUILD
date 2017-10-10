@@ -13,7 +13,6 @@ go_library(
         "pod_specs.go",
     ],
     deps = [
-        "//cmd/kubeadm/app/apis/kubeadm/fuzzer:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/fuzzer:go_default_library",
         "//pkg/apis/admissionregistration/fuzzer:go_default_library",
@@ -36,6 +35,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
+        "//vendor/k8s.io/kubeadm/app/apis/kubeadm/fuzzer:go_default_library",
     ],
 )
 

@@ -41,7 +41,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	certutil "k8s.io/client-go/util/cert"
 	triple "k8s.io/client-go/util/cert/triple"
-	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	kubeconfigutil "k8s.io/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns"
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"

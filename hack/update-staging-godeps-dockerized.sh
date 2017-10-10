@@ -82,7 +82,7 @@ function updateGodepManifest() {
         # We keep the staging dependencies in here though to give the publisher bot a way to detect when the staging
         # dependencies changed. If they have changed, the bot will run a complete godep restore+save. If they didn't
         # it will avoid that step, which takes quite some time.
-        jq '.Deps |= map((select(.ImportPath | (startswith("k8s.io/'${repo}'/") or . == "k8s.io/'${repo}'")) | .Rev |= "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx") // .)' |
+        jq '.Deps |= map((select(.ImportPath | (startswith("k8s.io/kubernetes/") or startswith("k8s.io/'${repo}'/") or . == "k8s.io/'${repo}'")) | .Rev |= "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx") // .)' |
 
         # remove comments
         jq 'del(.Deps[].Comment)' |

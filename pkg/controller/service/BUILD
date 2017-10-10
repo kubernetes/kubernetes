@@ -13,7 +13,6 @@ go_library(
         "service_controller.go",
     ],
     deps = [
-        "//cmd/kubeadm/app/constants:go_default_library",
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
@@ -31,6 +30,7 @@ go_library(
         "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
         "//vendor/k8s.io/client-go/util/workqueue:go_default_library",
+        "//vendor/k8s.io/kubeadm/app/constants:go_default_library",
     ],
 )
 

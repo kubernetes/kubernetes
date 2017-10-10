@@ -27,8 +27,8 @@ kube::golang::server_targets() {
     cmd/kube-controller-manager
     cmd/cloud-controller-manager
     cmd/kubelet
-    cmd/kubeadm
     cmd/hyperkube
+    vendor/k8s.io/kubeadm
     vendor/k8s.io/kube-aggregator
     vendor/k8s.io/apiextensions-apiserver
     plugin/cmd/kube-scheduler

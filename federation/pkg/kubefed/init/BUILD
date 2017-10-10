@@ -10,7 +10,6 @@ go_library(
     name = "go_default_library",
     srcs = ["init.go"],
     deps = [
-        "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//federation/apis/federation:go_default_library",
         "//federation/pkg/dnsprovider/providers/coredns:go_default_library",
         "//federation/pkg/kubefed/util:go_default_library",
@@ -34,6 +33,7 @@ go_library(
         "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
         "//vendor/k8s.io/client-go/util/cert/triple:go_default_library",
+        "//vendor/k8s.io/kubeadm/app/util/kubeconfig:go_default_library",
     ],
 )
 
