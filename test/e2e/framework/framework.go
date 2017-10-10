@@ -381,6 +381,11 @@ func (f *Framework) WaitForPodTerminated(podName, reason string) error {
 	return waitForPodTerminatedInNamespace(f.ClientSet, podName, reason, f.Namespace.Name)
 }
 
+// WaitForPodNotFound waits for the pod to be completely terminated (not "Get-able").
+func (f *Framework) WaitForPodNotFound(podName string, timeout time.Duration) error {
+	return waitForPodNotFoundInNamespace(f.ClientSet, podName, f.Namespace.Name, timeout)
+}
+
 // WaitForPodRunning waits for the pod to run in the namespace.
 func (f *Framework) WaitForPodRunning(podName string) error {
 	return WaitForPodNameRunningInNamespace(f.ClientSet, podName, f.Namespace.Name)
