@@ -58,6 +58,7 @@ const (
 
 	// owner: @smarterclayton
 	// alpha: v1.8
+	// beta: v1.9
 	//
 	// Allow API clients to retrieve resource lists in chunks rather than
 	// all at once.
@@ -76,5 +77,5 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	AdvancedAuditing:        {Default: true, PreRelease: utilfeature.Beta},
 	APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
 	Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
-	APIListChunking:         {Default: false, PreRelease: utilfeature.Alpha},
+	APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
 }

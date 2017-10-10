@@ -9,6 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "aggregator.go",
+        "chunking.go",
         "custom_resource_definition.go",
         "etcd_failure.go",
         "framework.go",
@@ -58,6 +59,7 @@ go_library(
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
         "//vendor/k8s.io/client-go/util/retry:go_default_library",
+        "//vendor/k8s.io/client-go/util/workqueue:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1:go_default_library",
     ],
