@@ -21,7 +21,7 @@ set -o pipefail
 # generate-groups generates everything for a project with external types only, e.g. a project based
 # on CustomResourceDefinitions.
 
-if [ "$#" -le 4 ] || [ "${1}" == "--help" ]; then
+if [ "$#" -lt 4 ] || [ "${1}" == "--help" ]; then
   cat <<EOF
 Usage: $(basename $0) <generators> <output-package> <apis-package> <groups-versions> ...
 
