@@ -23,17 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/security/apparmor"
-	"k8s.io/kubernetes/pkg/util/maps"
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/interfaces"
 )
-
-// Strategy defines the interface for all AppArmor constraint strategies.
-type Strategy interface {
-	// Generate updates the annotations based on constraint rules. The updates are applied to a copy
-	// of the annotations, and returned.
-	Generate(annotations map[string]string, container *api.Container) (map[string]string, error)
-	// Validate ensures that the specified values fall within the range of the strategy.
-	Validate(pod *api.Pod, container *api.Container) field.ErrorList
-}
 
 type strategy struct {
 	defaultProfile  string
@@ -42,10 +33,10 @@ type strategy struct {
 	allowedProfilesString string
 }
 
-var _ Strategy = &strategy{}
+var _ interfaces.ContainerValidatorDefaulter = &strategy{}
 
 // NewStrategy creates a new strategy that enforces AppArmor profile constraints.
-func NewStrategy(pspAnnotations map[string]string) Strategy {
+func NewStrategy(pspAnnotations map[string]string) interfaces.ContainerValidatorDefaulter {
 	var allowedProfiles map[string]bool
 	if allowed, ok := pspAnnotations[apparmor.AllowedProfilesAnnotationKey]; ok {
 		profiles := strings.Split(allowed, ",")
@@ -61,50 +52,47 @@ func NewStrategy(pspAnnotations map[string]string) Strategy {
 	}
 }
 
-func (s *strategy) Generate(annotations map[string]string, container *api.Container) (map[string]string, error) {
-	copy := maps.CopySS(annotations)
+func (s *strategy) ValidateContainer(pod *api.Pod, container *api.Container, _ *api.SecurityContext) (*interfaces.ValidationResult, error) {
+	result := &interfaces.ValidationResult{}
 
-	if annotations[apparmor.ContainerAnnotationKeyPrefix+container.Name] != "" {
-		// Profile already set, nothing to do.
-		return copy, nil
+	fieldPath := field.NewPath("pod", "metadata", "annotations").Key(apparmor.ContainerAnnotationKeyPrefix + container.Name)
+	profile := apparmor.GetProfileNameFromPodAnnotations(pod.Annotations, container.Name)
+	switch {
+	case profile == "" && len(s.defaultProfile) > 0:
+		// Needs defaulting
+		result.Add(interfaces.RequiresDefaulting)
+
+	case s.allowedProfiles[profile]:
+		// Allowed
+		result.Add(interfaces.Allowed)
+
+	case len(s.allowedProfiles) == 0:
+		// Unconstrained
+		result.Add(interfaces.Allowed)
+
+	case profile == "":
+		// Missing required profile
+		result.Add(interfaces.Forbidden, field.Forbidden(fieldPath, "AppArmor profile must be set"))
+
+	default:
+		// Disallowed value
+		msg := fmt.Sprintf("%s is not an allowed profile. Allowed values: %q", profile, s.allowedProfilesString)
+		result.Add(interfaces.Forbidden, field.Forbidden(fieldPath, msg))
 	}
 
-	if s.defaultProfile == "" {
-		// No default set.
-		return copy, nil
-	}
-
-	if copy == nil {
-		copy = map[string]string{}
-	}
-	// Add the default profile.
-	copy[apparmor.ContainerAnnotationKeyPrefix+container.Name] = s.defaultProfile
-
-	return copy, nil
+	return result, nil
 }
 
-func (s *strategy) Validate(pod *api.Pod, container *api.Container) field.ErrorList {
-	if s.allowedProfiles == nil {
-		// Unrestricted: allow all.
+func (s *strategy) DefaultContainer(pod *api.Pod, container *api.Container) error {
+	if s.defaultProfile == "" {
 		return nil
 	}
-
-	allErrs := field.ErrorList{}
-	fieldPath := field.NewPath("pod", "metadata", "annotations").Key(apparmor.ContainerAnnotationKeyPrefix + container.Name)
-
-	profile := apparmor.GetProfileNameFromPodAnnotations(pod.Annotations, container.Name)
-	if profile == "" {
-		if len(s.allowedProfiles) > 0 {
-			allErrs = append(allErrs, field.Forbidden(fieldPath, "AppArmor profile must be set"))
-			return allErrs
-		}
+	if pod.Annotations[apparmor.ContainerAnnotationKeyPrefix+container.Name] != "" {
 		return nil
 	}
-
-	if !s.allowedProfiles[profile] {
-		msg := fmt.Sprintf("%s is not an allowed profile. Allowed values: %q", profile, s.allowedProfilesString)
-		allErrs = append(allErrs, field.Forbidden(fieldPath, msg))
+	if pod.Annotations == nil {
+		pod.Annotations = map[string]string{}
 	}
-
-	return allErrs
+	pod.Annotations[apparmor.ContainerAnnotationKeyPrefix+container.Name] = s.defaultProfile
+	return nil
 }
