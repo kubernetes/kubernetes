@@ -152,7 +152,7 @@ func parsePathGroupVersion(pgvString string) (gvPath string, gvString string) {
 func groupVersionPath(gvPath string, group string, version string) (path string) {
 	// special case for the core group
 	if group == "api" {
-		path = filepath.Join("../api", version)
+		path = filepath.Join("core", version)
 	} else {
 		path = filepath.Join(gvPath, group, version)
 	}
