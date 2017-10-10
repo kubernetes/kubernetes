@@ -18,7 +18,6 @@ package controller
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/golang/glog"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -29,98 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	controllertools "k8s.io/client-go/tools/controller"
 )
 
-type BaseControllerRefManager struct {
-	Controller metav1.Object
-	Selector   labels.Selector
-
-	canAdoptErr  error
-	canAdoptOnce sync.Once
-	CanAdoptFunc func() error
-}
-
-func (m *BaseControllerRefManager) CanAdopt() error {
-	m.canAdoptOnce.Do(func() {
-		if m.CanAdoptFunc != nil {
-			m.canAdoptErr = m.CanAdoptFunc()
-		}
-	})
-	return m.canAdoptErr
-}
-
-// ClaimObject tries to take ownership of an object for this controller.
-//
-// It will reconcile the following:
-//   * Adopt orphans if the match function returns true.
-//   * Release owned objects if the match function returns false.
-//
-// A non-nil error is returned if some form of reconciliation was attempted and
-// failed. Usually, controllers should try again later in case reconciliation
-// is still needed.
-//
-// If the error is nil, either the reconciliation succeeded, or no
-// reconciliation was necessary. The returned boolean indicates whether you now
-// own the object.
-//
-// No reconciliation will be attempted if the controller is being deleted.
-func (m *BaseControllerRefManager) ClaimObject(obj metav1.Object, match func(metav1.Object) bool, adopt, release func(metav1.Object) error) (bool, error) {
-	controllerRef := metav1.GetControllerOf(obj)
-	if controllerRef != nil {
-		if controllerRef.UID != m.Controller.GetUID() {
-			// Owned by someone else. Ignore.
-			return false, nil
-		}
-		if match(obj) {
-			// We already own it and the selector matches.
-			// Return true (successfully claimed) before checking deletion timestamp.
-			// We're still allowed to claim things we already own while being deleted
-			// because doing so requires taking no actions.
-			return true, nil
-		}
-		// Owned by us but selector doesn't match.
-		// Try to release, unless we're being deleted.
-		if m.Controller.GetDeletionTimestamp() != nil {
-			return false, nil
-		}
-		if err := release(obj); err != nil {
-			// If the pod no longer exists, ignore the error.
-			if errors.IsNotFound(err) {
-				return false, nil
-			}
-			// Either someone else released it, or there was a transient error.
-			// The controller should requeue and try again if it's still stale.
-			return false, err
-		}
-		// Successfully released.
-		return false, nil
-	}
-
-	// It's an orphan.
-	if m.Controller.GetDeletionTimestamp() != nil || !match(obj) {
-		// Ignore if we're being deleted or selector doesn't match.
-		return false, nil
-	}
-	if obj.GetDeletionTimestamp() != nil {
-		// Ignore if the object is being deleted
-		return false, nil
-	}
-	// Selector matches. Try to adopt.
-	if err := adopt(obj); err != nil {
-		// If the pod no longer exists, ignore the error.
-		if errors.IsNotFound(err) {
-			return false, nil
-		}
-		// Either someone else claimed it first, or there was a transient error.
-		// The controller should requeue and try again if it's still orphaned.
-		return false, err
-	}
-	// Successfully adopted.
-	return true, nil
-}
-
 type PodControllerRefManager struct {
-	BaseControllerRefManager
+	controllertools.BaseControllerRefManager
 	controllerKind schema.GroupVersionKind
 	podControl     PodControlInterface
 }
@@ -144,7 +56,7 @@ func NewPodControllerRefManager(
 	canAdopt func() error,
 ) *PodControllerRefManager {
 	return &PodControllerRefManager{
-		BaseControllerRefManager: BaseControllerRefManager{
+		BaseControllerRefManager: controllertools.BaseControllerRefManager{
 			Controller:   controller,
 			Selector:     selector,
 			CanAdoptFunc: canAdopt,
@@ -254,7 +166,7 @@ func (m *PodControllerRefManager) ReleasePod(pod *v1.Pod) error {
 // categories and accordingly adopt or release them. See comments on these functions
 // for more details.
 type ReplicaSetControllerRefManager struct {
-	BaseControllerRefManager
+	controllertools.BaseControllerRefManager
 	controllerKind schema.GroupVersionKind
 	rsControl      RSControlInterface
 }
@@ -278,7 +190,7 @@ func NewReplicaSetControllerRefManager(
 	canAdopt func() error,
 ) *ReplicaSetControllerRefManager {
 	return &ReplicaSetControllerRefManager{
-		BaseControllerRefManager: BaseControllerRefManager{
+		BaseControllerRefManager: controllertools.BaseControllerRefManager{
 			Controller:   controller,
 			Selector:     selector,
 			CanAdoptFunc: canAdopt,
@@ -366,30 +278,13 @@ func (m *ReplicaSetControllerRefManager) ReleaseReplicaSet(replicaSet *extension
 	return err
 }
 
-// RecheckDeletionTimestamp returns a CanAdopt() function to recheck deletion.
-//
-// The CanAdopt() function calls getObject() to fetch the latest value,
-// and denies adoption attempts if that object has a non-nil DeletionTimestamp.
-func RecheckDeletionTimestamp(getObject func() (metav1.Object, error)) func() error {
-	return func() error {
-		obj, err := getObject()
-		if err != nil {
-			return fmt.Errorf("can't recheck DeletionTimestamp: %v", err)
-		}
-		if obj.GetDeletionTimestamp() != nil {
-			return fmt.Errorf("%v/%v has just been deleted at %v", obj.GetNamespace(), obj.GetName(), obj.GetDeletionTimestamp())
-		}
-		return nil
-	}
-}
-
 // ControllerRevisionControllerRefManager is used to manage controllerRef of ControllerRevisions.
 // Three methods are defined on this object 1: Classify 2: AdoptControllerRevision and
 // 3: ReleaseControllerRevision which are used to classify the ControllerRevisions into appropriate
 // categories and accordingly adopt or release them. See comments on these functions
 // for more details.
 type ControllerRevisionControllerRefManager struct {
-	BaseControllerRefManager
+	controllertools.BaseControllerRefManager
 	controllerKind schema.GroupVersionKind
 	crControl      ControllerRevisionControlInterface
 }
@@ -413,7 +308,7 @@ func NewControllerRevisionControllerRefManager(
 	canAdopt func() error,
 ) *ControllerRevisionControllerRefManager {
 	return &ControllerRevisionControllerRefManager{
-		BaseControllerRefManager: BaseControllerRefManager{
+		BaseControllerRefManager: controllertools.BaseControllerRefManager{
 			Controller:   controller,
 			Selector:     selector,
 			CanAdoptFunc: canAdopt,
