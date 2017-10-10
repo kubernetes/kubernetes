@@ -17,8 +17,10 @@ limitations under the License.
 package kubectl
 
 import (
+	"k8s.io/api/apps/v1beta1"
 	clientappsv1beta1 "k8s.io/client-go/kubernetes/typed/apps/v1beta1"
 	clientextensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
+	"k8s.io/client-go/rest"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
@@ -35,5 +37,9 @@ func versionedAppsClientV1beta1(internalClient internalclientset.Interface) clie
 	if internalClient == nil {
 		return &clientappsv1beta1.AppsV1beta1Client{}
 	}
-	return clientappsv1beta1.New(internalClient.Apps().RESTClient())
+	config := &rest.Config{
+		Host:          "http://127.0.0.1:8080",
+		ContentConfig: rest.ContentConfig{GroupVersion: &v1beta1.SchemeGroupVersion},
+	}
+	return clientappsv1beta1.NewForConfigOrDie(config)
 }
