@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/apiconfig"
@@ -62,9 +63,12 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		errs = append(errs, err)
 	}
 
-	// Create/update RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
-	if err := nodebootstraptoken.AutoApproveNodeBootstrapTokens(client, k8sVersion); err != nil {
-		errs = append(errs, err)
+	// Not needed for 1.7 upgrades
+	if k8sVersion.AtLeast(constants.MinimumCSRAutoApprovalClusterRolesVersion) {
+		// Create/update RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
+		if err := nodebootstraptoken.AutoApproveNodeBootstrapTokens(client, k8sVersion); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	// Create/update RBAC rules that makes the 1.8.0+ nodes to rotate certificates and get their CSRs approved automatically
@@ -77,9 +81,12 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 	// if err := clusterinfo.CreateBootstrapConfigMapIfNotExists(client, kubeadmconstants.GetAdminKubeConfigPath()); err != nil {
 	// 	return err
 	//}
-	// Create/update RBAC rules that makes the cluster-info ConfigMap reachable
-	if err := clusterinfo.CreateClusterInfoRBACRules(client); err != nil {
-		errs = append(errs, err)
+	// Not needed for 1.7 upgrades
+	if k8sVersion.AtLeast(constants.UseEnableBootstrapTokenAuthFlagVersion) {
+		// Create/update RBAC rules that makes the cluster-info ConfigMap reachable
+		if err := clusterinfo.CreateClusterInfoRBACRules(client); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	// TODO: This call is deprecated
