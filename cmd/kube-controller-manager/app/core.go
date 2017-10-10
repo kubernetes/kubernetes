@@ -296,12 +296,16 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 }
 
 func startServiceAccountController(ctx ControllerContext) (bool, error) {
-	go serviceaccountcontroller.NewServiceAccountsController(
+	sac, err := serviceaccountcontroller.NewServiceAccountsController(
 		ctx.InformerFactory.Core().V1().ServiceAccounts(),
 		ctx.InformerFactory.Core().V1().Namespaces(),
 		ctx.ClientBuilder.ClientOrDie("service-account-controller"),
 		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
-	).Run(1, ctx.Stop)
+	)
+	if err != nil {
+		return false, fmt.Errorf("error creating service account controller: %v", err)
+	}
+	go sac.Run(1, ctx.Stop)
 	return true, nil
 }
 

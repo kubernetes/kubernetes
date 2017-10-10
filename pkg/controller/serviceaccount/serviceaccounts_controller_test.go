@@ -165,7 +165,7 @@ func TestServiceAccountCreation(t *testing.T) {
 		}
 		saInformer := informers.Core().V1().ServiceAccounts()
 		nsInformer := informers.Core().V1().Namespaces()
-		controller := NewServiceAccountsController(
+		controller, _ := NewServiceAccountsController(
 			saInformer,
 			nsInformer,
 			client,
