@@ -471,20 +471,22 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 
 			if err != nil {
 				glog.V(4).Infof("azureDisk - GetStorageAccount:%s err %s", storageAccountName, err.Error())
-				return false, err
+				return false, nil // error performing the query - retryable
 			}
 
 			if provisionState == storage.Succeeded {
 				return true, nil
 			}
 
-			glog.V(4).Infof("azureDisk - GetStorageAccount:%s not ready yet", storageAccountName)
-			// leave it for next loop/sync loop
-			return false, fmt.Errorf("azureDisk - Account %s has not been flagged Succeeded by ARM", storageAccountName)
+			glog.V(4).Infof("azureDisk - GetStorageAccount:%s not ready yet (not flagged Succeeded by ARM)", storageAccountName)
+			return false, nil // back off and see if the account becomes ready on next retry
 		})
 		// we have failed to ensure that account is ready for us to create
 		// the default vhd container
 		if err != nil {
+			if err == kwait.ErrWaitTimeout {
+				return fmt.Errorf("azureDisk - timed out waiting for storage account %s to become ready", storageAccountName)
+			}
 			return err
 		}
 	}
