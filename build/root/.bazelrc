@@ -14,6 +14,11 @@ build --sandbox_fake_username
 
 # rules_go@82483596ec203eb9c1849937636f4cbed83733eb has a typo that
 # inadvertently relies on comprehension variables leaking.
-# TODO(ixdy): Remove this default once rules_go is bumped.
+# TODO(ixdy): Remove these defaults once rules_go is bumped.
 # Ref kubernetes/kubernetes#52677
 build --incompatible_comprehension_variables_do_not_leak=false
+query --incompatible_comprehension_variables_do_not_leak=false
+
+# TODO(ixdy): remove the following once repo-infra is bumped.
+build --incompatible_disallow_set_constructor=false
+query --incompatible_disallow_set_constructor=false
