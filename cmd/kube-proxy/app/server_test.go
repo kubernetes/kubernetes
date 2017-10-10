@@ -31,8 +31,8 @@ import (
 	k8sRuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	"k8s.io/kubernetes/pkg/proxy/apis/proxyconfig"
+	"k8s.io/kubernetes/pkg/proxy/apis/proxyconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/iptables"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
@@ -140,7 +140,6 @@ func Test_getProxyMode(t *testing.T) {
 
 // TestNewOptionsFailures tests failure modes for NewOptions()
 func TestNewOptionsFailures(t *testing.T) {
-
 	// Create a fake scheme builder that generates an error
 	errString := fmt.Sprintf("Simulated error")
 	genError := func(scheme *k8sRuntime.Scheme) error {
@@ -150,8 +149,8 @@ func TestNewOptionsFailures(t *testing.T) {
 
 	simulatedErrorTest := func(target string) {
 		var addToScheme *func(s *k8sRuntime.Scheme) error
-		if target == "componentconfig" {
-			addToScheme = &componentconfig.AddToScheme
+		if target == "proxyconfig" {
+			addToScheme = &proxyconfig.AddToScheme
 		} else {
 			addToScheme = &v1alpha1.AddToScheme
 		}
@@ -166,7 +165,7 @@ func TestNewOptionsFailures(t *testing.T) {
 	}
 
 	// Simulate errors in calls to AddToScheme()
-	faultTargets := []string{"componentconfig", "v1alpha1"}
+	faultTargets := []string{"proxyconfig", "v1alpha1"}
 	for _, target := range faultTargets {
 		simulatedErrorTest(target)
 	}
@@ -185,7 +184,7 @@ func TestProxyServerWithCleanupAndExit(t *testing.T) {
 			t.Fatalf("Unexpected error with address %s: %v", addr, err)
 		}
 
-		options.config = &componentconfig.KubeProxyConfiguration{
+		options.config = &proxyconfig.KubeProxyConfiguration{
 			BindAddress: addr,
 		}
 		options.CleanupAndExit = true
@@ -198,7 +197,7 @@ func TestProxyServerWithCleanupAndExit(t *testing.T) {
 		assert.True(t, proxyserver.CleanupAndExit, "false CleanupAndExit, addr: %s", addr)
 
 		// Clean up config for next test case
-		configz.Delete("componentconfig")
+		configz.Delete("proxyconfig")
 	}
 }
 
@@ -242,7 +241,7 @@ func TestGetConntrackMax(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		cfg := componentconfig.KubeProxyConntrackConfiguration{
+		cfg := proxyconfig.KubeProxyConntrackConfiguration{
 			Min:        tc.min,
 			Max:        tc.max,
 			MaxPerCore: tc.maxPerCore,
@@ -263,7 +262,7 @@ func TestGetConntrackMax(t *testing.T) {
 // TestLoadConfig tests proper operation of loadConfig()
 func TestLoadConfig(t *testing.T) {
 
-	yamlTemplate := `apiVersion: componentconfig/v1alpha1
+	yamlTemplate := `apiVersion: proxyconfig/v1alpha1
 bindAddress: %s
 clientConnection:
   acceptContentTypes: "abc"
@@ -372,9 +371,9 @@ udpTimeoutMilliseconds: 123ms
 			// Surrounding double quotes will get stripped by the yaml parser.
 			expBindAddr = expBindAddr[1 : len(tc.bindAddress)-1]
 		}
-		expected := &componentconfig.KubeProxyConfiguration{
+		expected := &proxyconfig.KubeProxyConfiguration{
 			BindAddress: expBindAddr,
-			ClientConnection: componentconfig.ClientConnectionConfiguration{
+			ClientConnection: proxyconfig.ClientConnectionConfiguration{
 				AcceptContentTypes: "abc",
 				Burst:              100,
 				ContentType:        "content-type",
@@ -383,7 +382,7 @@ udpTimeoutMilliseconds: 123ms
 			},
 			ClusterCIDR:      tc.clusterCIDR,
 			ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Second},
-			Conntrack: componentconfig.KubeProxyConntrackConfiguration{
+			Conntrack: proxyconfig.KubeProxyConntrackConfiguration{
 				Max:                   4,
 				MaxPerCore:            2,
 				Min:                   1,
@@ -393,18 +392,18 @@ udpTimeoutMilliseconds: 123ms
 			FeatureGates:       "all",
 			HealthzBindAddress: tc.healthzBindAddress,
 			HostnameOverride:   "foo",
-			IPTables: componentconfig.KubeProxyIPTablesConfiguration{
+			IPTables: proxyconfig.KubeProxyIPTablesConfiguration{
 				MasqueradeAll: true,
 				MasqueradeBit: utilpointer.Int32Ptr(17),
 				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
 				SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
 			},
-			IPVS: componentconfig.KubeProxyIPVSConfiguration{
+			IPVS: proxyconfig.KubeProxyIPVSConfiguration{
 				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
 				SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
 			},
 			MetricsBindAddress: tc.metricsBindAddress,
-			Mode:               componentconfig.ProxyMode(tc.mode),
+			Mode:               proxyconfig.ProxyMode(tc.mode),
 			OOMScoreAdj:        utilpointer.Int32Ptr(17),
 			PortRange:          "2-7",
 			ResourceContainer:  "/foo",
@@ -440,7 +439,7 @@ func TestLoadConfigFailures(t *testing.T) {
 		{
 			name:   "Bad config type test",
 			config: "kind: KubeSchedulerConfiguration",
-			expErr: "unexpected config type",
+			expErr: "no kind",
 		},
 		{
 			name:   "Missing quotes around :: bindAddress",
@@ -448,7 +447,7 @@ func TestLoadConfigFailures(t *testing.T) {
 			expErr: "mapping values are not allowed in this context",
 		},
 	}
-	version := "apiVersion: componentconfig/v1alpha1"
+	version := "apiVersion: proxyconfig/v1alpha1"
 	for _, tc := range testCases {
 		options, _ := NewOptions()
 		config := fmt.Sprintf("%s\n%s", version, tc.config)

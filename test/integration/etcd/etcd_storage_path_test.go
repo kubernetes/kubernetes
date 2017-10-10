@@ -459,7 +459,6 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 
 	// k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1
 	gvr("componentconfig", "v1alpha1", "kubeschedulerconfigurations"), // not stored in etcd
-	gvr("componentconfig", "v1alpha1", "kubeproxyconfigurations"),     // not stored in etcd
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/extensions/v1beta1
