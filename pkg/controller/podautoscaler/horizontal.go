@@ -79,6 +79,9 @@ func UnsafeConvertToVersionVia(obj runtime.Object, externalVersion schema.GroupV
 	return objExt, err
 }
 
+// HorizontalController is responsible for the synchronizing HPA objects stored
+// in the system with the actual deployments/replication controllers they
+// control.
 type HorizontalController struct {
 	scaleNamespacer extensionsclient.ScalesGetter
 	hpaNamespacer   autoscalingclient.HorizontalPodAutoscalersGetter
@@ -98,6 +101,7 @@ type HorizontalController struct {
 	queue workqueue.RateLimitingInterface
 }
 
+// NewHorizontalController creates a new HorizontalController.
 func NewHorizontalController(
 	evtNamespacer v1core.EventsGetter,
 	scaleNamespacer extensionsclient.ScalesGetter,
@@ -138,6 +142,7 @@ func NewHorizontalController(
 	return hpaController
 }
 
+// Run begins watching and syncing.
 func (a *HorizontalController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer a.queue.ShutDown()

@@ -204,7 +204,7 @@ func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID s
 		}
 	}
 
-	volumeID, volumeAZ, errr := cloud.CreateVolume(name, volSizeGB, vtype, availability, c.options.CloudTags)
+	volumeID, volumeAZ, IgnoreVolumeAZ, errr := cloud.CreateVolume(name, volSizeGB, vtype, availability, c.options.CloudTags)
 	if errr != nil {
 		glog.V(2).Infof("Error creating cinder volume: %v", errr)
 		return "", 0, nil, "", errr
@@ -213,8 +213,9 @@ func (util *CinderDiskUtil) CreateVolume(c *cinderVolumeProvisioner) (volumeID s
 
 	// these are needed that pod is spawning to same AZ
 	volumeLabels = make(map[string]string)
-	volumeLabels[kubeletapis.LabelZoneFailureDomain] = volumeAZ
-
+	if IgnoreVolumeAZ == false {
+		volumeLabels[kubeletapis.LabelZoneFailureDomain] = volumeAZ
+	}
 	return volumeID, volSizeGB, volumeLabels, fstype, nil
 }
 

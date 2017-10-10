@@ -166,7 +166,8 @@ func (h *DevicePluginHandlerImpl) Allocate(pod *v1.Pod, container *v1.Container,
 		resource := string(k)
 		needed := int(v.Value())
 		glog.V(3).Infof("needs %d %s", needed, resource)
-		if !deviceplugin.IsDeviceName(k) || needed == 0 {
+		_, registeredResource := h.allDevices[resource]
+		if !registeredResource || needed == 0 {
 			continue
 		}
 		h.Lock()

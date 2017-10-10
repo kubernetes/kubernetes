@@ -100,6 +100,16 @@ ALLOCATE_NODE_CIDRS=true
 
 # Optional: Enable cluster autoscaler.
 ENABLE_KUBEMARK_CLUSTER_AUTOSCALER="${ENABLE_KUBEMARK_CLUSTER_AUTOSCALER:-false}"
+# When using Cluster Autoscaler, always start with one hollow-node replica.
+# NUM_NODES should not be specified by the user. Instead we use
+# NUM_NODES=KUBEMARK_AUTOSCALER_MAX_NODES. This gives other cluster components
+# (e.g. kubemark master, Heapster) enough resources to handle maximum cluster size.
+if [[ "${ENABLE_KUBEMARK_CLUSTER_AUTOSCALER}" == "true" ]]; then
+  NUM_REPLICAS=1
+  if [[ ! -z "$NUM_NODES" ]]; then
+    echo "WARNING: Using Cluster Autoscaler, ignoring NUM_NODES parameter. Set KUBEMARK_AUTOSCALER_MAX_NODES to specify maximum size of the cluster."
+  fi
+fi
 
 # Optional: set feature gates
 FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"

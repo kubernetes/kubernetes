@@ -94,12 +94,8 @@ var _ = SIGDescribe("ReplicaSet", func() {
 		testReplicaSetConditionCheck(f)
 	})
 
-	It("should adopt matching pods on creation", func() {
-		testRSAdoptMatchingOrphans(f)
-	})
-
-	It("should release no longer matching pods", func() {
-		testRSReleaseControlledNotMatching(f)
+	It("should adopt matching pods on creation and release no longer matching pods", func() {
+		testRSAdoptMatchingAndReleaseNotMatching(f)
 	})
 })
 
@@ -247,8 +243,8 @@ func testReplicaSetConditionCheck(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func testRSAdoptMatchingOrphans(f *framework.Framework) {
-	name := "pod-adoption"
+func testRSAdoptMatchingAndReleaseNotMatching(f *framework.Framework) {
+	name := "pod-adoption-release"
 	By(fmt.Sprintf("Given a Pod with a 'name' label %s is created", name))
 	p := f.PodClient().CreateSync(&v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -292,22 +288,12 @@ func testRSAdoptMatchingOrphans(f *framework.Framework) {
 		return false, nil
 	})
 	Expect(err).NotTo(HaveOccurred())
-}
-
-func testRSReleaseControlledNotMatching(f *framework.Framework) {
-	name := "pod-release"
-	By("Given a ReplicaSet is created")
-	replicas := int32(1)
-	rsSt := newRS(name, replicas, map[string]string{"name": name}, name, NginxImageName)
-	rsSt.Spec.Selector = &metav1.LabelSelector{MatchLabels: map[string]string{"name": name}}
-	rs, err := f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Create(rsSt)
-	Expect(err).NotTo(HaveOccurred())
 
 	By("When the matched label of one of its pods change")
 	pods, err := framework.PodsCreated(f.ClientSet, f.Namespace.Name, rs.Name, replicas)
 	Expect(err).NotTo(HaveOccurred())
 
-	p := pods.Items[0]
+	p = &pods.Items[0]
 	err = wait.PollImmediate(1*time.Second, 1*time.Minute, func() (bool, error) {
 		pod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(p.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())

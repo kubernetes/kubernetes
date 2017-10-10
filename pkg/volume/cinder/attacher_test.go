@@ -571,8 +571,8 @@ func (testcase *testcase) ShouldTrustDevicePath() bool {
 	return true
 }
 
-func (testcase *testcase) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, error) {
-	return "", "", errors.New("Not implemented")
+func (testcase *testcase) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, bool, error) {
+	return "", "", false, errors.New("Not implemented")
 }
 
 func (testcase *testcase) GetDevicePath(volumeID string) string {

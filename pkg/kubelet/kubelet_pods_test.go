@@ -223,6 +223,36 @@ func TestMakeMounts(t *testing.T) {
 			expectErr:      true,
 			expectedErrMsg: "unable to provision SubPath `no/backsteps/../allowed`: must not contain '..'",
 		},
+		"volume doesn't exist": {
+			podVolumes: kubecontainer.VolumeMap{},
+			container: v1.Container{
+				VolumeMounts: []v1.VolumeMount{
+					{
+						MountPath: "/mnt/path3",
+						Name:      "disk",
+						ReadOnly:  true,
+					},
+				},
+			},
+			expectErr:      true,
+			expectedErrMsg: "cannot find volume \"disk\" to mount into container \"\"",
+		},
+		"volume mounter is nil": {
+			podVolumes: kubecontainer.VolumeMap{
+				"disk": kubecontainer.VolumeInfo{},
+			},
+			container: v1.Container{
+				VolumeMounts: []v1.VolumeMount{
+					{
+						MountPath: "/mnt/path3",
+						Name:      "disk",
+						ReadOnly:  true,
+					},
+				},
+			},
+			expectErr:      true,
+			expectedErrMsg: "cannot find volume \"disk\" to mount into container \"\"",
+		},
 	}
 
 	for name, tc := range testCases {
