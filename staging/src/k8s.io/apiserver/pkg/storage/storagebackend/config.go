@@ -74,5 +74,6 @@ func NewDefaultConfig(prefix string, copier runtime.ObjectCopier, codec runtime.
 		Copier:             copier,
 		Codec:              codec,
 		CompactionInterval: DefaultCompactInterval,
+		Quorum:             true,
 	}
 }
