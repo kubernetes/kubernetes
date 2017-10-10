@@ -17,8 +17,8 @@ go_library(
         "//vendor/k8s.io/sample-apiserver/pkg/admission/wardleinitializer:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1:go_default_library",
         "//vendor/k8s.io/sample-apiserver/pkg/apiserver:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/client/clientset_generated/internalclientset:go_default_library",
-        "//vendor/k8s.io/sample-apiserver/pkg/client/informers_generated/internalversion:go_default_library",
+        "//vendor/k8s.io/sample-apiserver/pkg/client/clientset/internalversion:go_default_library",
+        "//vendor/k8s.io/sample-apiserver/pkg/client/informers/internalversion:go_default_library",
     ],
 )
 
