@@ -67,8 +67,7 @@ func startServiceController(ctx ControllerContext) (bool, error) {
 		ctx.Options.ClusterName,
 	)
 	if err != nil {
-		glog.Errorf("Failed to start service controller: %v", err)
-		return false, nil
+		return false, fmt.Errorf("error creating service controller: %v", err)
 	}
 	go serviceController.Run(ctx.Stop, int(ctx.Options.ConcurrentServiceSyncs))
 	return true, nil

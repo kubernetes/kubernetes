@@ -110,7 +110,9 @@ func New(
 	broadcaster.StartLogging(glog.Infof)
 
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("service_controller", kubeClient.Core().RESTClient().GetRateLimiter())
+		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("service_controller", kubeClient.Core().RESTClient().GetRateLimiter()); err != nil {
+			return nil, err
+		}
 	}
 
 	s := &ServiceController{
