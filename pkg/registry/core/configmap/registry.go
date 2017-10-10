@@ -78,7 +78,7 @@ func (s *storage) CreateConfigMap(ctx genericapirequest.Context, cfg *api.Config
 }
 
 func (s *storage) UpdateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap) (*api.ConfigMap, error) {
-	obj, _, err := s.Update(ctx, cfg.Name, rest.DefaultUpdatedObjectInfo(cfg, api.Scheme))
+	obj, _, err := s.Update(ctx, cfg.Name, rest.DefaultUpdatedObjectInfo(cfg))
 	if err != nil {
 		return nil, err
 	}

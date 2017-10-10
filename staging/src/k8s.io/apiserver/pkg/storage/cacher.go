@@ -54,8 +54,6 @@ type CacherConfig struct {
 	// An underlying storage.Versioner.
 	Versioner Versioner
 
-	Copier runtime.ObjectCopier
-
 	// The Cache will be caching objects of a given Type and assumes that they
 	// are all stored under ResourcePrefix directory in the underlying database.
 	Type           interface{}
@@ -161,8 +159,6 @@ type Cacher struct {
 	// Underlying storage.Interface.
 	storage Interface
 
-	copier runtime.ObjectCopier
-
 	// Expected type of objects in the underlying cache.
 	objectType reflect.Type
 
@@ -212,7 +208,6 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 	cacher := &Cacher{
 		ready:       newReady(),
 		storage:     config.Storage,
-		copier:      config.Copier,
 		objectType:  reflect.TypeOf(config.Type),
 		watchCache:  watchCache,
 		reflector:   cache.NewNamedReflector(reflectorName, listerWatcher, config.Type, watchCache, 0),
@@ -343,7 +338,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 	c.Lock()
 	defer c.Unlock()
 	forget := forgetWatcher(c, c.watcherIdx, triggerValue, triggerSupported)
-	watcher := newCacheWatcher(c.copier, watchRV, chanSize, initEvents, watchFilterFunction(key, pred), forget)
+	watcher := newCacheWatcher(watchRV, chanSize, initEvents, watchFilterFunction(key, pred), forget)
 
 	c.watchers.addWatcher(watcher, c.watcherIdx, triggerValue, triggerSupported)
 	c.watcherIdx++
@@ -778,7 +773,6 @@ func (c *errWatcher) Stop() {
 // cacherWatch implements watch.Interface
 type cacheWatcher struct {
 	sync.Mutex
-	copier  runtime.ObjectCopier
 	input   chan *watchCacheEvent
 	result  chan watch.Event
 	done    chan struct{}
@@ -787,9 +781,8 @@ type cacheWatcher struct {
 	forget  func(bool)
 }
 
-func newCacheWatcher(copier runtime.ObjectCopier, resourceVersion uint64, chanSize int, initEvents []*watchCacheEvent, filter watchFilterFunc, forget func(bool)) *cacheWatcher {
+func newCacheWatcher(resourceVersion uint64, chanSize int, initEvents []*watchCacheEvent, filter watchFilterFunc, forget func(bool)) *cacheWatcher {
 	watcher := &cacheWatcher{
-		copier:  copier,
 		input:   make(chan *watchCacheEvent, chanSize),
 		result:  make(chan watch.Event, chanSize),
 		done:    make(chan struct{}),

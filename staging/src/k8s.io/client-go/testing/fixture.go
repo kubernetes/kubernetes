@@ -59,7 +59,6 @@ type ObjectTracker interface {
 // ObjectScheme abstracts the implementation of common operations on objects.
 type ObjectScheme interface {
 	runtime.ObjectCreater
-	runtime.ObjectCopier
 	runtime.ObjectTyper
 }
 

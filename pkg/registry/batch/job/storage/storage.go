@@ -23,7 +23,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -54,7 +53,6 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against Jobs.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &batch.Job{} },
 		NewListFunc:              func() runtime.Object { return &batch.JobList{} },
 		PredicateFunc:            job.MatchJob,

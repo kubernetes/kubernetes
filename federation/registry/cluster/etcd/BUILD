@@ -12,7 +12,6 @@ go_library(
     deps = [
         "//federation/apis/federation:go_default_library",
         "//federation/registry/cluster:go_default_library",
-        "//pkg/api:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/registry/generic:go_default_library",

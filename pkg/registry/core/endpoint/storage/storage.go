@@ -35,7 +35,6 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against endpoints.
 func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
-		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &api.Endpoints{} },
 		NewListFunc:              func() runtime.Object { return &api.EndpointsList{} },
 		DefaultQualifiedResource: api.Resource("endpoints"),

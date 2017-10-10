@@ -66,7 +66,6 @@ type APIGroupVersion struct {
 	Typer           runtime.ObjectTyper
 	Creater         runtime.ObjectCreater
 	Convertor       runtime.ObjectConvertor
-	Copier          runtime.ObjectCopier
 	Defaulter       runtime.ObjectDefaulter
 	Linker          runtime.SelfLinker
 	UnsafeConvertor runtime.ObjectConvertor

@@ -114,7 +114,6 @@ func TestAddFlags(t *testing.T) {
 				ServerList: nil,
 				Prefix:     "/registry",
 				DeserializationCacheSize: 0,
-				Copier:             kapi.Scheme,
 				Quorum:             false,
 				KeyFile:            "/var/run/kubernetes/etcd.key",
 				CAFile:             "/var/run/kubernetes/etcdca.crt",

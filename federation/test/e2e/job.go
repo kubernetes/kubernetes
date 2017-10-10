@@ -34,7 +34,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 const (
@@ -221,8 +220,7 @@ func waitForJob(c *fedclientset.Clientset, namespace string, jobName string, clu
 }
 
 func verifyJob(fedJob, localJob *batchv1.Job) bool {
-	localJobObj, _ := api.Scheme.DeepCopy(localJob)
-	localJob = localJobObj.(*batchv1.Job)
+	localJob = localJob.DeepCopy()
 	localJob.Spec.ManualSelector = fedJob.Spec.ManualSelector
 	localJob.Spec.Completions = fedJob.Spec.Completions
 	localJob.Spec.Parallelism = fedJob.Spec.Parallelism

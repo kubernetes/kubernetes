@@ -155,7 +155,6 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/k8s.io/client-go/kubernetes/scheme:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//test/e2e/framework/metrics:go_default_library",

@@ -46,7 +46,7 @@ type WardleServerOptions struct {
 
 func NewWardleServerOptions(out, errOut io.Writer) *WardleServerOptions {
 	o := &WardleServerOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Scheme, apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
+		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Codecs.LegacyCodec(v1alpha1.SchemeGroupVersion)),
 		Admission:          genericoptions.NewAdmissionOptions(),
 
 		StdOut: out,

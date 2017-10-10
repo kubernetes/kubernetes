@@ -43,7 +43,7 @@ type CustomResourceDefinitionsServerOptions struct {
 
 func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomResourceDefinitionsServerOptions {
 	o := &CustomResourceDefinitionsServerOptions{
-		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Scheme, apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)),
+		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion)),
 
 		StdOut: out,
 		StdErr: errOut,
@@ -121,7 +121,6 @@ func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregi
 		DeleteCollectionWorkers: etcdOptions.DeleteCollectionWorkers,
 	}
 	ret.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
-	ret.StorageConfig.Copier = apiserver.UnstructuredCopier{}
 
 	return ret
 }

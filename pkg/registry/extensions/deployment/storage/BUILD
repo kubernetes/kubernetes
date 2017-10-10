@@ -34,7 +34,6 @@ go_library(
     name = "go_default_library",
     srcs = ["storage.go"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/validation:go_default_library",
         "//pkg/registry/extensions/deployment:go_default_library",

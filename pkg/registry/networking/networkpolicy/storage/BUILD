@@ -10,7 +10,6 @@ go_library(
     name = "go_default_library",
     srcs = ["storage.go"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/networking:go_default_library",
         "//pkg/registry/networking/networkpolicy:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

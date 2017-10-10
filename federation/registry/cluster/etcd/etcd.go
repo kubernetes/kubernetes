@@ -24,7 +24,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/federation/registry/cluster"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 type REST struct {
@@ -47,7 +46,6 @@ func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo 
 // NewREST returns a RESTStorage object that will work against clusters.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		Copier:                   api.Scheme,
 		NewFunc:                  func() runtime.Object { return &federation.Cluster{} },
 		NewListFunc:              func() runtime.Object { return &federation.ClusterList{} },
 		PredicateFunc:            cluster.MatchCluster,
