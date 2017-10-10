@@ -416,9 +416,9 @@ func (az *Cloud) ensurePublicIPExists(serviceName, pipName, domainNameLabel stri
 	glog.V(10).Infof("CreateOrUpdatePIPWithRetry(%q): end", *pip.Name)
 
 	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("PublicIPAddressesClient.Get(%q): start", *pip.Name)
-	pip, err = az.PublicIPAddressesClient.Get(az.ResourceGroup, *pip.Name, "")
-	glog.V(10).Infof("PublicIPAddressesClient.Get(%q): end", *pip.Name)
+	glog.V(10).Infof("PublicIPAddressesClient.Get(%s, %q): start", pipResourceGroup, *pip.Name)
+	pip, err = az.PublicIPAddressesClient.Get(pipResourceGroup, *pip.Name, "")
+	glog.V(10).Infof("PublicIPAddressesClient.Get(%s, %q): end", pipResourceGroup, *pip.Name)
 	if err != nil {
 		return nil, err
 	}

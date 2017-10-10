@@ -699,23 +699,3 @@ func (as *availabilitySet) EnsureBackendPoolDeleted(poolID, vmSetName string) er
 	// Do nothing for availability set.
 	return nil
 }
-
-// parseResourceGroupNameFromID parses the resource group name from a resource ID
-func parseResourceGroupNameFromID(resourceID string) (resourceGroupName string, err error) {
-	reg, err := regexp.Compile(`(?i)(.*?)/resourceGroups/(?P<rgname>\S+)/providers/(.*?)`)
-
-	if err != nil {
-		return "", err
-	}
-
-	matchNames := reg.SubexpNames()
-	matches := reg.FindStringSubmatch(resourceID)
-
-	for i := range matchNames {
-		if matchNames[i] == "rgname" {
-			return matches[i], nil
-		}
-	}
-
-	return "", fmt.Errorf("Invalid resource ID: %s", resourceID)
-}
