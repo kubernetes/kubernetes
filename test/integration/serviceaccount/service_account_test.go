@@ -419,7 +419,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 
 	// Start the service account and service account token controllers
 	stopCh := make(chan struct{})
-	tokenController := serviceaccountcontroller.NewTokensController(
+	tokenController, _ := serviceaccountcontroller.NewTokensController(
 		informers.Core().V1().ServiceAccounts(),
 		informers.Core().V1().Secrets(),
 		rootClientset,
