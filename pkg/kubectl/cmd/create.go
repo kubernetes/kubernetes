@@ -44,6 +44,7 @@ type CreateOptions struct {
 	Raw              string
 	Out              io.Writer
 	ErrOut           io.Writer
+	ignoreUnchanged  bool
 }
 
 var (
@@ -94,6 +95,7 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&options.EditBeforeCreate, "edit", options.EditBeforeCreate, "Edit the API resource before creating")
 	cmd.Flags().Bool("windows-line-endings", runtime.GOOS == "windows",
 		"Only relevant if --edit=true. Defaults to the line ending native to your platform.")
+	cmd.Flags().BoolVar(&options.ignoreUnchanged, "ignore-unchanged", false, "if set to true the exit code will be 0 on no differences apply to server")
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddDryRunFlag(cmd)
@@ -219,7 +221,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		return nil
 	})
 	if err != nil {
-		return err
+		return cmdutil.NoneIdempotentOperationErrorReturn(o.ignoreUnchanged, err)
 	}
 	if count == 0 {
 		return fmt.Errorf("no objects passed to create")
