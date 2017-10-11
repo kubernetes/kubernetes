@@ -146,6 +146,7 @@ HEAPSTER_MACHINE_TYPE="${HEAPSTER_MACHINE_TYPE:-}"
 # Set etcd image (e.g. gcr.io/google_containers/etcd) and version (e.g. 3.1.10) if you need
 # non-default version.
 ETCD_IMAGE="${TEST_ETCD_IMAGE:-}"
+ETCD_DOCKER_REPOSITORY="${TEST_ETCD_DOCKER_REPOSITORY:-}"
 ETCD_VERSION="${TEST_ETCD_VERSION:-}"
 
 # Default Log level for all components in test clusters and variables to override it in specific components.
