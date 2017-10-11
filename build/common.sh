@@ -317,6 +317,10 @@ function kube::build::has_docker() {
   which docker &> /dev/null
 }
 
+function kube::build::has_ip() {
+  ip -Version | grep 'iproute2' &> /dev/null
+}
+
 # Detect if a specific image exists
 #
 # $1 - image repo name
@@ -628,11 +632,15 @@ function kube::build::rsync_probe {
 # This will set the global var KUBE_RSYNC_ADDR to the effective port that the
 # rsync daemon can be reached out.
 function kube::build::start_rsyncd_container() {
+  IPTOOL=ifconfig
+  if kube::build::has_ip ; then
+    IPTOOL="ip address"
+  fi
   kube::build::stop_rsyncd_container
   V=3 kube::log::status "Starting rsyncd container"
   kube::build::run_build_command_ex \
     "${KUBE_RSYNC_CONTAINER_NAME}" -p 127.0.0.1:${KUBE_RSYNC_PORT}:${KUBE_CONTAINER_RSYNC_PORT} -d \
-    -e ALLOW_HOST="$(ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1')" \
+    -e ALLOW_HOST="$(${IPTOOL} | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1')" \
     -- /rsyncd.sh >/dev/null
 
   local mapped_port
