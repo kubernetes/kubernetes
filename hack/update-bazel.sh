@@ -37,5 +37,13 @@ touch "${KUBE_ROOT}/vendor/BUILD"
 gazelle fix \
     -build_file_name=BUILD,BUILD.bazel \
     -external=vendored \
+    -proto=legacy \
     -mode=fix
+# gazelle gets confused by our staging/ directory, prepending an extra
+# "k8s.io/kubernetes/staging/src" to the import path.
+# gazelle won't follow the symlinks in vendor/, so we can't just exclude
+# staging/. Instead we just fix the bad paths with sed.
+find staging -name BUILD -o -name BUILD.bazel | \
+  xargs sed -i 's|\(importpath = "\)k8s.io/kubernetes/staging/src/\(.*\)|\1\2|'
+
 kazel
