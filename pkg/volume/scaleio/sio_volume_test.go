@@ -38,7 +38,7 @@ var (
 	testSioSystem  = "sio"
 	testSioPD      = "default"
 	testSioVol     = "vol-0001"
-	testns         = "default"
+	testns         = "kube-system"
 	testSioVolName = fmt.Sprintf("%s%s%s", testns, "-", testSioVol)
 	podUID         = types.UID("sio-pod")
 )

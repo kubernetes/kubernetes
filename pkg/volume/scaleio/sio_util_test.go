@@ -194,7 +194,7 @@ func TestUtilAttachSecret(t *testing.T) {
 	for k, v := range config {
 		data[k] = v
 	}
-	if err := attachSecret(sioPlug, "default", data); err != nil {
+	if err := attachSecret(sioPlug, "kube-system", data); err != nil {
 		t.Errorf("failed to setupConfigData %v", err)
 	}
 	if data[confKey.username] == "" {
