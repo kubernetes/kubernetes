@@ -102,7 +102,6 @@ var _ = framework.KubeDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disru
 			kubeReserved.Sub(resource.MustParse("300Mi"))
 			initialConfig.KubeReserved = kubeletconfig.ConfigurationMap(map[string]string{string(v1.ResourceMemory): kubeReserved.String()})
 			initialConfig.EnforceNodeAllocatable = []string{cm.NodeAllocatableEnforcementKey}
-			initialConfig.ExperimentalNodeAllocatableIgnoreEvictionThreshold = false
 			initialConfig.CgroupsPerQOS = true
 		})
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logMemoryMetrics, []podEvictSpec{
@@ -133,7 +132,6 @@ var _ = framework.KubeDescribe("LocalStorageAllocatableEviction [Slow] [Serial] 
 			initialConfig.KubeReserved = kubeletconfig.ConfigurationMap(map[string]string{string(v1.ResourceEphemeralStorage): fmt.Sprintf("%d", availableBytes-diskConsumed)})
 			initialConfig.EnforceNodeAllocatable = []string{cm.NodeAllocatableEnforcementKey}
 			initialConfig.CgroupsPerQOS = true
-			initialConfig.ExperimentalNodeAllocatableIgnoreEvictionThreshold = false
 			initialConfig.FeatureGates[string(features.LocalStorageCapacityIsolation)] = true
 			// set evictionHard to be very small, so that only the allocatable eviction threshold triggers
 			initialConfig.EvictionHard = "nodefs.available<1"

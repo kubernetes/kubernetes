@@ -19,12 +19,12 @@ package kubemark
 import (
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	kubeletv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -109,13 +109,13 @@ func GetHollowKubeletConfig(
 	glog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
 
 	// Flags struct
-	f := &options.KubeletFlags{
-		RootDirectory:    testRootDir,
-		HostnameOverride: nodeName,
-		CloudProvider:    kubeletv1alpha1.AutoDetectCloudProvider,
-		// Use the default runtime options.
-		ContainerRuntimeOptions: *options.NewContainerRuntimeOptions(),
-	}
+	f := options.NewKubeletFlags()
+	f.RootDirectory = testRootDir
+	f.HostnameOverride = nodeName
+	f.MinimumGCAge = metav1.Duration{Duration: 1 * time.Minute}
+	f.MaxContainerCount = 100
+	f.MaxPerPodContainerCount = 2
+	f.RegisterSchedulable = true
 
 	// Config struct
 	c, err := options.NewKubeletConfiguration()
@@ -130,7 +130,6 @@ func GetHollowKubeletConfig(
 	c.PodManifestPath = manifestFilePath
 	c.FileCheckFrequency.Duration = 20 * time.Second
 	c.HTTPCheckFrequency.Duration = 20 * time.Second
-	c.MinimumGCAge.Duration = 1 * time.Minute
 	c.NodeStatusUpdateFrequency.Duration = 10 * time.Second
 	c.SyncFrequency.Duration = 10 * time.Second
 	c.EvictionPressureTransitionPeriod.Duration = 5 * time.Minute
@@ -153,11 +152,8 @@ func GetHollowKubeletConfig(
 	// what the "real" kubelet currently does, because there's no way to
 	// set promiscuous mode on docker0.
 	c.HairpinMode = kubeletconfig.HairpinVeth
-	c.MaxContainerCount = 100
 	c.MaxOpenFiles = 1024
-	c.MaxPerPodContainerCount = 2
 	c.RegisterNode = true
-	c.RegisterSchedulable = true
 	c.RegistryBurst = 10
 	c.RegistryPullQPS = 5.0
 	c.ResolverConfig = kubetypes.ResolvConfDefault
