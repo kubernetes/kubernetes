@@ -124,10 +124,17 @@ func (r *InstantiateREST) Create(ctx genericapirequest.Context, name string, obj
 		return nil, fmt.Errorf("got object of type %T, expected *batch.CronJob", sourceCronJobObj)
 	}
 
+	// add an extra label onto the created job to signal to the cronjob controller that it should adopt this job
+	jobLabels := make(map[string]string)
+	for _, key := range sourceCronJob.Spec.JobTemplate.Labels {
+		jobLabels[key] = sourceCronJob.Spec.JobTemplate.Labels[key]
+	}
+	jobLabels["createdByInstantiate"] = "yes"
+
 	job := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        fmt.Sprintf("%s-manual-%d", name, time.Now().Unix()),
-			Labels:      sourceCronJob.Spec.JobTemplate.Labels,
+			Labels:      jobLabels,
 			Annotations: sourceCronJob.Spec.JobTemplate.Annotations,
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(sourceCronJob, batch.SchemeGroupVersion.WithKind("CronJob")),

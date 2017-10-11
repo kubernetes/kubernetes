@@ -215,12 +215,24 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 		if !found && !IsJobFinished(&j) {
 			recorder.Eventf(sj, v1.EventTypeWarning, "UnexpectedJob", "Saw a job that the controller did not create or forgot: %v", j.Name)
 			// We found an unfinished job that has us as the parent, but it is not in our Active list.
-			// This could happen if we crashed right after creating the Job and before updating the status,
-			// or if our jobs list is newer than our sj status after a relist, or if someone intentionally created
-			// a job that they wanted us to adopt.
+			// This could happen if:
+			// * we crashed right after creating the Job and before updating the status
+			// * if our jobs list is newer than our sj status after a relist
+			// * if someone intentionally created a job that they wanted us to adopt
+			// * if a job was created via the instantiate subresource (will be labeled as createdByInstantiate=yes)
 
-			// TODO: maybe handle the adoption case?  Concurrency/suspend rules will not apply in that case, obviously, since we can't
-			// stop users from creating jobs if they have permission.  It is assumed that if a
+			// if the job was created via the instantiate subresource, adopt it
+			if createdByInstantiate, exists := j.Labels["createdByInstantiate"]; exists && createdByInstantiate == "yes" {
+				ref, err := getRef(&j)
+				if err != nil {
+					glog.V(2).Infof("Unable to make object reference for job for %s", nameForLog)
+				}
+				sj.Status.Active = append(sj.Status.Active, *ref)
+
+				// should we update LastScheduleTime, since this job was not scheduled?
+			}
+
+			// TODO: maybe handle the general adoption case?  Concurrency/suspend rules will not apply in that case, obviously, since we can't stop users from creating jobs if they have permission.  It is assumed that if a
 			// user has permission to create a job within a namespace, then they have permission to make any scheduledJob
 			// in the same namespace "adopt" that job.  ReplicaSets and their Pods work the same way.
 			// TBS: how to update sj.Status.LastScheduleTime if the adopted job is newer than any we knew about?
