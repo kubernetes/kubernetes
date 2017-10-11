@@ -1,7 +1,12 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-
-
-
+- [v1.9.0-alpha.1](#v190-alpha1)
+  - [Downloads for v1.9.0-alpha.1](#downloads-for-v190-alpha1)
+    - [Client Binaries](#client-binaries)
+    - [Server Binaries](#server-binaries)
+    - [Node Binaries](#node-binaries)
+  - [Changelog since v1.8.0-alpha.3](#changelog-since-v180-alpha3)
+    - [Action Required](#action-required)
+    - [Other notable changes](#other-notable-changes)
 <!-- END MUNGE: GENERATED_TOC -->
 
 <!-- NEW RELEASE NOTES ENTRY -->
