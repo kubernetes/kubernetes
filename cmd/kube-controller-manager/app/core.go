@@ -229,11 +229,15 @@ func startReplicationController(ctx ControllerContext) (bool, error) {
 }
 
 func startPodGCController(ctx ControllerContext) (bool, error) {
-	go podgc.NewPodGC(
+	gcc, err := podgc.NewPodGC(
 		ctx.ClientBuilder.ClientOrDie("pod-garbage-collector"),
 		ctx.InformerFactory.Core().V1().Pods(),
 		int(ctx.Options.TerminatedPodGCThreshold),
-	).Run(ctx.Stop)
+	)
+	if err != nil {
+		return false, fmt.Errorf("failed to start pod GC controller: %v", err)
+	}
+	go gcc.Run(ctx.Stop)
 	return true, nil
 }
 
