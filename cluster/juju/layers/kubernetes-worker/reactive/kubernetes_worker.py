@@ -822,7 +822,7 @@ def request_kubelet_and_proxy_credentials(kube_control):
     kube_control.set_auth_request(nodeuser)
 
 
-@when('kube-control.auth.available')
+@when('kube-control.connected')
 def catch_change_in_creds(kube_control):
     """Request a service restart in case credential updates were detected."""
     nodeuser = 'system:node:{}'.format(gethostname())

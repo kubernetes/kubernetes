@@ -26,6 +26,8 @@ import ipaddress
 
 import charms.leadership
 
+from shutil import move
+
 from shlex import split
 from subprocess import check_call
 from subprocess import check_output
@@ -61,6 +63,7 @@ os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 
 valid_auth_modes = ['rbac', 'none']
 
+
 def service_cidr():
     ''' Return the charm's service-cidr config '''
     db = unitdata.kv()
@@ -80,8 +83,39 @@ def reset_states_for_delivery():
     '''An upgrade charm event was triggered by Juju, react to that here.'''
     migrate_from_pre_snaps()
     install_snaps()
+    add_rbac_roles()
     set_state('reconfigure.authentication.setup')
     remove_state('authentication.setup')
+
+
+def add_rbac_roles():
+    '''Update the known_tokens file with proper groups.'''
+
+    tokens_fname = '/root/cdk/known_tokens.csv'
+    tokens_backup_fname = '/root/cdk/known_tokens.csv.backup'
+    move(tokens_fname, tokens_backup_fname)
+    with open(tokens_fname, 'w') as ftokens:
+        with open(tokens_backup_fname, 'r') as stream:
+            for line in stream:
+                record = line.strip().split(',')
+                # token, username, user, groups
+                if record[2] == 'admin' and len(record) == 3:
+                    towrite = '{0},{1},{2},"{3}"\n'.format(record[0],
+                                                           record[1],
+                                                           record[2],
+                                                           'system:masters')
+                    ftokens.write(towrite)
+                    continue
+                if record[2] == 'kube_proxy':
+                    towrite = '{0},{1},{2}\n'.format(record[0],
+                                                     'system:kube-proxy',
+                                                     'kube-proxy')
+                    ftokens.write(towrite)
+                    continue
+                if record[2] == 'kubelet' and record[1] == 'kubelet':
+                    continue
+
+                ftokens.write('{}'.format(line))
 
 
 def rename_file_idempotent(source, destination):
@@ -404,38 +438,43 @@ def send_cluster_dns_detail(kube_control):
     kube_control.set_dns(53, hookenv.config('dns_domain'), dns_ip)
 
 
-@when('kube-control.auth.requested')
+@when('kube-control.connected')
 @when('snap.installed.kubectl')
 @when('leadership.is_leader')
 def create_service_configs(kube_control):
     """Create the users for kubelet"""
+    should_restart = False
     # generate the username/pass for the requesting unit
     proxy_token = get_token('system:kube-proxy')
     if not proxy_token:
         setup_tokens(None, 'system:kube-proxy', 'kube-proxy')
         proxy_token = get_token('system:kube-proxy')
+        should_restart = True
 
     client_token = get_token('admin')
     if not client_token:
         setup_tokens(None, 'admin', 'admin', "system:masters")
         client_token = get_token('admin')
+        should_restart = True
 
     requests = kube_control.auth_user()
     for request in requests:
         username = request[1]['user']
         group = request[1]['group']
         kubelet_token = get_token(username)
-        if not kubelet_token:
+        if not kubelet_token and username and group:
             # Usernames have to be in the form of system:node:<hostname>
             userid = "kubelet-{}".format(request[0].split('/')[1])
             setup_tokens(None, username, userid, group)
             kubelet_token = get_token(username)
+            kube_control.sign_auth_request(request[0], username,
+                                           kubelet_token, proxy_token,
+                                           client_token)
+            should_restart = True
 
-        kube_control.sign_auth_request(request[0], username,
-                                       kubelet_token, proxy_token, client_token)
-
-    host.service_restart('snap.kube-apiserver.daemon')
-    remove_state('authentication.setup')
+    if should_restart:
+        host.service_restart('snap.kube-apiserver.daemon')
+        remove_state('authentication.setup')
 
 
 @when('kube-control.departed')
@@ -1113,7 +1152,9 @@ def setup_tokens(token, username, user, groups=None):
     with open(known_tokens, 'a') as stream:
         if groups:
             stream.write('{0},{1},{2},"{3}"\n'.format(token,
-                                                    username, user, groups))
+                                                      username,
+                                                      user,
+                                                      groups))
         else:
             stream.write('{0},{1},{2}\n'.format(token, username, user))
 

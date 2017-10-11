@@ -2,7 +2,6 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: nginx-ingress-serviceaccount
-  namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
@@ -60,7 +59,6 @@ apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: Role
 metadata:
   name: nginx-ingress-role
-  namespace: kube-system
 rules:
   - apiGroups:
       - ""
@@ -103,7 +101,6 @@ apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: RoleBinding
 metadata:
   name: nginx-ingress-role-nisa-binding
-  namespace: kube-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -111,7 +108,6 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: nginx-ingress-serviceaccount
-    namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
@@ -124,7 +120,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: nginx-ingress-serviceaccount
-    namespace: kube-system
+    namespace: default
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -135,7 +131,6 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   name: nginx-ingress-controller
-  namespace: kube-system
   labels:
     k8s-app: nginx-ingress-lb
 spec:
@@ -152,6 +147,7 @@ spec:
       # hostPort doesn't work with CNI, so we have to use hostNetwork instead
       # see https://github.com/kubernetes/kubernetes/issues/23920
       hostNetwork: true
+      serviceAccountName: nginx-ingress-serviceaccount
       containers:
       - image: {{ ingress_image }}
         name: nginx-ingress-lb
