@@ -33,7 +33,7 @@ import (
 func NewCmdPlan(parentFlags *cmdUpgradeFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "plan",
-		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable",
+		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable.",
 		Run: func(_ *cobra.Command, _ []string) {
 			// Ensure the user is root
 			err := runPreflightChecks(parentFlags.skipPreFlight)
@@ -83,7 +83,7 @@ func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer) {
 	for _, upgrade := range upgrades {
 
 		if upgrade.CanUpgradeKubelets() {
-			fmt.Fprintln(w, "Components that must be upgraded manually after you've upgraded the control plane with 'kubeadm upgrade apply':")
+			fmt.Fprintln(w, "Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':")
 			fmt.Fprintln(tabw, "COMPONENT\tCURRENT\tAVAILABLE")
 			firstPrinted := false
 
@@ -122,7 +122,7 @@ func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer) {
 		fmt.Fprintln(w, "")
 
 		if upgrade.Before.KubeadmVersion != upgrade.After.KubeadmVersion {
-			fmt.Fprintf(w, "Note: Before you can perform this upgrade, you have to update kubeadm to %s\n", upgrade.After.KubeadmVersion)
+			fmt.Fprintf(w, "Note: Before you can perform this upgrade, you have to update kubeadm to %s.\n", upgrade.After.KubeadmVersion)
 			fmt.Fprintln(w, "")
 		}
 
