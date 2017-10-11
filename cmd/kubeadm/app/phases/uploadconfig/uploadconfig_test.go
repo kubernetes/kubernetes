@@ -64,6 +64,7 @@ func TestUploadConfiguration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &kubeadmapi.MasterConfiguration{
 				KubernetesVersion: "1.7.3",
+				Token:             "1234567",
 			}
 			client := clientsetfake.NewSimpleClientset()
 			if tt.errOnCreate != nil {
@@ -107,6 +108,10 @@ func TestUploadConfiguration(t *testing.T) {
 
 				if decodedCfg.KubernetesVersion != cfg.KubernetesVersion {
 					t.Errorf("Decoded value doesn't match, decoded = %#v, expected = %#v", decodedCfg.KubernetesVersion, cfg.KubernetesVersion)
+				}
+
+				if decodedCfg.Token != "" {
+					t.Errorf("Decoded value contains token (sensitive info), decoded = %#v, expected = empty", decodedCfg.Token)
 				}
 			}
 		})
