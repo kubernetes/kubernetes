@@ -251,24 +251,40 @@ func (o *ImageOptions) Run() error {
 			continue
 		}
 
-		// patch the change
-		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
-		if err != nil {
-			allErrs = append(allErrs, fmt.Errorf("failed to patch image update to pod template: %v\n", err))
-			continue
-		}
-		info.Refresh(obj, true)
+		var obj runtime.Object
+		var err error
 
-		// record this change (for rollout history)
-		if o.Record || cmdutil.ContainsChangeCause(info) {
+		if cmdutil.ShouldRecord(o.Cmd, info) {
+			// patch and record the change(for rollout history)
+			obj, err = resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+			if err != nil {
+				allErrs = append(allErrs, fmt.Errorf("failed to patch image update to pod template: %v\n", err))
+				continue
+			}
+			info.Refresh(obj, true)
+
 			if patch, patchType, err := cmdutil.ChangeResourcePatch(info, o.ChangeCause); err == nil {
 				if obj, err = resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, patchType, patch); err != nil {
 					fmt.Fprintf(o.Err, "WARNING: changes to %s/%s can't be recorded: %v\n", info.Mapping.Resource, info.Name, err)
 				}
 			}
-		}
+			info.Refresh(obj, true)
+		} else {
+			// patch but NOT record the change
+			if patch, patchType, err := cmdutil.RemoveChangeResourcePatch(info); err == nil {
+				if obj, err = resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, patchType, patch); err != nil {
+					fmt.Fprintf(o.Err, "WARNING: unable to remove change-cause annotation in %s/%s: %v\n", info.Mapping.Resource, info.Name, err)
+				}
+			}
+			info.Refresh(obj, true)
 
-		info.Refresh(obj, true)
+			obj, err = resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
+			if err != nil {
+				allErrs = append(allErrs, fmt.Errorf("failed to patch image update to pod template: %v\n", err))
+				continue
+			}
+			info.Refresh(obj, true)
+		}
 
 		if len(o.Output) > 0 {
 			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, obj, o.Out); err != nil {

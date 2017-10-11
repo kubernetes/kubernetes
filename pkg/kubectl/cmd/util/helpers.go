@@ -542,6 +542,21 @@ func RecordChangeCause(obj runtime.Object, changeCause string) error {
 	return nil
 }
 
+// RemoveChangeCauseAnnotations remove change-cause annotation in input runtime object
+func RemoveChangeCauseAnnotations(obj runtime.Object) error {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+	annotations := accessor.GetAnnotations()
+	if annotations == nil {
+		return nil
+	}
+	delete(annotations, kubectl.ChangeCauseAnnotation)
+	accessor.SetAnnotations(annotations)
+	return nil
+}
+
 // ChangeResourcePatch creates a patch between the origin input resource info
 // and the annotated with change-cause input resource info.
 func ChangeResourcePatch(info *resource.Info, changeCause string) ([]byte, types.PatchType, error) {
@@ -556,6 +571,37 @@ func ChangeResourcePatch(info *resource.Info, changeCause string) ([]byte, types
 		return nil, types.StrategicMergePatchType, err
 	}
 	if err := RecordChangeCause(obj, changeCause); err != nil {
+		return nil, types.StrategicMergePatchType, err
+	}
+	newData, err := json.Marshal(obj)
+	if err != nil {
+		return nil, types.StrategicMergePatchType, err
+	}
+
+	switch obj := obj.(type) {
+	case *unstructured.Unstructured:
+		patch, err := jsonpatch.CreateMergePatch(oldData, newData)
+		return patch, types.MergePatchType, err
+	default:
+		patch, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, obj)
+		return patch, types.StrategicMergePatchType, err
+	}
+}
+
+// RemoveChangeResourcePatch craetes a patch between the origin input resource info
+// and the input resource info without change-cause annotation
+func RemoveChangeResourcePatch(info *resource.Info) ([]byte, types.PatchType, error) {
+	// Get a versioned object
+	obj, err := info.Mapping.ConvertToVersion(info.Object, info.Mapping.GroupVersionKind.GroupVersion())
+	if err != nil {
+		return nil, types.StrategicMergePatchType, err
+	}
+
+	oldData, err := json.Marshal(obj)
+	if err != nil {
+		return nil, types.StrategicMergePatchType, err
+	}
+	if err := RemoveChangeCauseAnnotations(obj); err != nil {
 		return nil, types.StrategicMergePatchType, err
 	}
 	newData, err := json.Marshal(obj)
