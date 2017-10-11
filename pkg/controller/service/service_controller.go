@@ -598,6 +598,10 @@ func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
 			return false
 		}
 
+		if _, hasExcludeBalancerLabel := node.Labels[constants.LabelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
+			return false
+		}
+
 		// If we have no info, don't accept
 		if len(node.Status.Conditions) == 0 {
 			return false
