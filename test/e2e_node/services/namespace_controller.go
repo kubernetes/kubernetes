@@ -17,6 +17,7 @@ limitations under the License.
 package services
 
 import (
+	"fmt"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -59,13 +60,16 @@ func (n *NamespaceController) Start() error {
 	clientPool := dynamic.NewClientPool(config, api.Registry.RESTMapper(), dynamic.LegacyAPIPathResolverFunc)
 	discoverResourcesFn := client.Discovery().ServerPreferredNamespacedResources
 	informerFactory := informers.NewSharedInformerFactory(client, ncResyncPeriod)
-	nc := namespacecontroller.NewNamespaceController(
+	nc, err := namespacecontroller.NewNamespaceController(
 		client,
 		clientPool,
 		discoverResourcesFn,
 		informerFactory.Core().V1().Namespaces(),
 		ncResyncPeriod, v1.FinalizerKubernetes,
 	)
+	if err != nil {
+		return fmt.Errorf("failed to create namespace controller : %v", err)
+	}
 	informerFactory.Start(n.stopCh)
 	go nc.Run(ncConcurrency, n.stopCh)
 	return nil
