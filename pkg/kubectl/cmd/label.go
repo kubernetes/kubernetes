@@ -232,7 +232,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 		}
 
 		var outputObj runtime.Object
-		dataChangeMsg := "not labeled"
+		dataChangeMsg := "no labels changed"
 		if o.dryrun || o.local || o.list {
 			err = labelFunc(info.Object, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
 			if err != nil {
@@ -270,7 +270,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 				return err
 			}
 			if !reflect.DeepEqual(oldData, newData) {
-				dataChangeMsg = "labeled"
+				dataChangeMsg = "labels updated"
 			}
 			patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
 			createdPatch := err == nil
