@@ -310,60 +310,6 @@
 <!-- NEW RELEASE NOTES ENTRY -->
 
 
-# v1.5.8
-
-[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.5/examples)
-
-## Downloads for v1.5.8
-
-
-filename | sha256 hash
--------- | -----------
-[kubernetes.tar.gz](https://dl.k8s.io/v1.5.8/kubernetes.tar.gz) | `6a3fad3dcc3c59f926e5c0110d16edfc323fdd5482c83102b3f8068b420702db`
-[kubernetes-src.tar.gz](https://dl.k8s.io/v1.5.8/kubernetes-src.tar.gz) | `0a1fea0278f77a7ede1f64c05e8c69ba5ea2a9403d579db2247963e7869ff9e5`
-
-### Client Binaries
-
-filename | sha256 hash
--------- | -----------
-[kubernetes-client-darwin-386.tar.gz](https://dl.k8s.io/v1.5.8/kubernetes-client-darwin-386.tar.gz) | `95061ccf35dfe1d9aac0dd55c542c8f1b04874892196b0b71185ba3ea61ec424`
-[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.5.8/kubernetes-client-darwin-amd64.tar.gz) | `37b14062a8f3701efa12cb2ae9eecef2831d31881990a15bbb526689b0fd2712`
-[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.5.8/kubernetes-client-linux-386.tar.gz) | `4c1b83462cc9c11144c957beca3479a16162ccd283462d3b6b2afcfa40550137`
-[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.5.8/kubernetes-client-linux-amd64.tar.gz) | `0baefc8e2c01bddf550764a77d6fb345df331bbc4f2f56efb036d3dd50b64562`
-[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.5.8/kubernetes-client-linux-arm64.tar.gz) | `f0fa7369d03b330bc655f5055e8527e7211936baf3277444947e3b7c9441568e`
-[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.5.8/kubernetes-client-linux-arm.tar.gz) | `40e1c8e89cc93ed072858afb80eac48524282f9d6a7d2510676ddb319458d0a5`
-[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.5.8/kubernetes-client-windows-386.tar.gz) | `8ca51905157ff3e9fff9bbd0930678c6c9ef885a14ae8580a1595aa56ac66284`
-[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.5.8/kubernetes-client-windows-amd64.tar.gz) | `b4120b9691a13188cf1328d364d7878f0b8d893636b58e3388291142a000e69f`
-
-### Server Binaries
-
-filename | sha256 hash
--------- | -----------
-[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.5.8/kubernetes-server-linux-amd64.tar.gz) | `7e17b17e967722546541fdaeead4dc40037ddce4107aa2b2a561ea577aa62101`
-[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.5.8/kubernetes-server-linux-arm64.tar.gz) | `2928098e581d2ffba2750222a238d4c4e93ab31efd09977d0447964d25cc14bd`
-[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.5.8/kubernetes-server-linux-arm.tar.gz) | `65b23196a1e55e2ab3893b9e147568aaa35cbf46bc588cb0913349a93b70678c`
-
-### Node Binaries
-
-filename | sha256 hash
--------- | -----------
-[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.5.8/kubernetes-node-linux-amd64.tar.gz) | `4d73ccd2ecac0f2e161f88e4d77004298d10a009f9b5fa0203fa7bff70a82e30`
-[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.5.8/kubernetes-node-linux-arm64.tar.gz) | `03244b9c4149d6153eb9459e3774a4a0257fd66d3532add5721223925b6fa26f`
-[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.5.8/kubernetes-node-linux-arm.tar.gz) | `d071b710ec898b5630c776f0f6f88f44c3c72e6494c235a7c5cd5807df8fb0cb`
-[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.5.8/kubernetes-node-windows-amd64.tar.gz) | `59448d44c86002386450c8804757bfd63f4c943670d7cf15e9221efa53ee0ef5`
-
-## Changelog since v1.5.7
-
-### Other notable changes
-
-* Update dnsmasq to the latest version. ([#53149](https://github.com/kubernetes/kubernetes/pull/53149), [@bowei](https://github.com/bowei))
-* On GCP platforms, e2e testing now logs which OS images the cluster was found to have. ([#48310](https://github.com/kubernetes/kubernetes/pull/48310), [@abgworrall](https://github.com/abgworrall))
-* Update cluster-proportional-autoscaler, etcd-empty-dir-cleanup, fluentd-gcp, and kube-addon-manager addons with refreshed base images containing fixes for CVE-2015-8271, CVE-2016-7543, CVE-2016-9841, CVE-2016-9843, CVE-2017-1000366, CVE-2017-2616, and CVE-2017-7507. ([#48011](https://github.com/kubernetes/kubernetes/pull/48011), [@ixdy](https://github.com/ixdy))
-* Bump GLBC version to 0.9.5 - fixes [loss of manually modified GCLB health check settings](https://github.com/kubernetes/kubernetes/issues/47559) upon upgrade from pre-1.6.4 to either 1.6.4 or 1.6.5. ([#47567](https://github.com/kubernetes/kubernetes/pull/47567), [@nicksardo](https://github.com/nicksardo))
-* Upgrade golang version to 1.7.6 ([#46408](https://github.com/kubernetes/kubernetes/pull/46408), [@cblecker](https://github.com/cblecker))
-
-
-
 # v1.7.7
 
 [Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.7/examples)
