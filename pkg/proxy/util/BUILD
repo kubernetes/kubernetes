@@ -4,7 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "conntrack.go",
-        "endpoints.go",
+        "ip.go",
         "port.go",
         "utils.go",
     ],
@@ -23,7 +23,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "conntrack_test.go",
-        "endpoints_test.go",
+        "ip_test.go",
         "port_test.go",
         "utils_test.go",
     ],

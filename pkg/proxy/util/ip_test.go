@@ -25,7 +25,7 @@ func TestIPPart(t *testing.T) {
 	const noError = ""
 
 	testCases := []struct {
-		endpoint      string
+		ipString      string
 		expectedIP    string
 		expectedError string
 	}{
@@ -39,13 +39,13 @@ func TestIPPart(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		ip := IPPart(tc.endpoint)
+		ip := IPPart(tc.ipString)
 		if tc.expectedError == noError {
 			if ip != tc.expectedIP {
-				t.Errorf("Unexpected IP for %s: Expected: %s, Got %s", tc.endpoint, tc.expectedIP, ip)
+				t.Errorf("Unexpected IP for %s: Expected: %s, Got %s", tc.ipString, tc.expectedIP, ip)
 			}
 		} else if ip != "" {
-			t.Errorf("Error did not occur for %s, expected: '%s' error", tc.endpoint, tc.expectedError)
+			t.Errorf("Error did not occur for %s, expected: '%s' error", tc.ipString, tc.expectedError)
 		}
 	}
 }

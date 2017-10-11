@@ -17,31 +17,12 @@ limitations under the License.
 package util
 
 import (
-	"net"
-
 	"k8s.io/apimachinery/pkg/types"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 
 	"github.com/golang/glog"
 )
-
-func IsLocalIP(ip string) (bool, error) {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return false, err
-	}
-	for i := range addrs {
-		intf, _, err := net.ParseCIDR(addrs[i].String())
-		if err != nil {
-			return false, err
-		}
-		if net.ParseIP(ip).Equal(intf) {
-			return true, nil
-		}
-	}
-	return false, nil
-}
 
 func ShouldSkipService(svcName types.NamespacedName, service *api.Service) bool {
 	// if ClusterIP is "None" or empty, skip proxying
