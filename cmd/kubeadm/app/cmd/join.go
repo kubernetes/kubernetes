@@ -24,6 +24,7 @@ import (
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
+	flag "github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	certutil "k8s.io/client-go/util/cert"
@@ -49,20 +50,8 @@ var (
 
 		Run 'kubectl get nodes' on the master to see this machine join.
 		`)
-)
 
-// NewCmdJoin returns "kubeadm join" command.
-func NewCmdJoin(out io.Writer) *cobra.Command {
-	cfg := &kubeadmapiext.NodeConfiguration{}
-	api.Scheme.Default(cfg)
-
-	var skipPreFlight bool
-	var cfgPath string
-
-	cmd := &cobra.Command{
-		Use:   "join <flags> [DiscoveryTokenAPIServers]",
-		Short: "Run this on any machine you wish to join an existing cluster",
-		Long: dedent.Dedent(`
+	joinLongDescription = dedent.Dedent(`
 		When joining a kubeadm initialized cluster, we need to establish
 		bidirectional trust. This is split into discovery (having the Node
 		trust the Kubernetes Master) and TLS bootstrap (having the Kubernetes
@@ -102,7 +91,21 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 
 		Often times the same token is used for both parts. In this case, the
 		--token flag can be used instead of specifying each token individually.
-		`),
+		`)
+)
+
+// NewCmdJoin returns "kubeadm join" command.
+func NewCmdJoin(out io.Writer) *cobra.Command {
+	cfg := &kubeadmapiext.NodeConfiguration{}
+	api.Scheme.Default(cfg)
+
+	var skipPreFlight bool
+	var cfgPath string
+
+	cmd := &cobra.Command{
+		Use:   "join [flags]",
+		Short: "Run this on any machine you wish to join an existing cluster",
+		Long:  joinLongDescription,
 		Run: func(cmd *cobra.Command, args []string) {
 			cfg.DiscoveryTokenAPIServers = args
 
@@ -117,39 +120,47 @@ func NewCmdJoin(out io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.PersistentFlags().StringVar(
-		&cfgPath, "config", cfgPath,
-		"Path to kubeadm config file.")
-
-	cmd.PersistentFlags().StringVar(
-		&cfg.DiscoveryFile, "discovery-file", "",
-		"A file or url from which to load cluster information.")
-	cmd.PersistentFlags().StringVar(
-		&cfg.DiscoveryToken, "discovery-token", "",
-		"A token used to validate cluster information fetched from the master.")
-	cmd.PersistentFlags().StringVar(
-		&cfg.NodeName, "node-name", "",
-		"Specify the node name.")
-	cmd.PersistentFlags().StringVar(
-		&cfg.TLSBootstrapToken, "tls-bootstrap-token", "",
-		"A token used for TLS bootstrapping.")
-	cmd.PersistentFlags().StringSliceVar(
-		&cfg.DiscoveryTokenCACertHashes, "discovery-token-ca-cert-hash", []string{},
-		"For token-based discovery, validate that the root CA public key matches this hash (format: \"<type>:<value>\").")
-	cmd.PersistentFlags().BoolVar(
-		&cfg.DiscoveryTokenUnsafeSkipCAVerification, "discovery-token-unsafe-skip-ca-verification", false,
-		"For token-based discovery, allow joining without --discovery-token-ca-cert-hash pinning.")
-
-	cmd.PersistentFlags().StringVar(
-		&cfg.Token, "token", "",
-		"Use this token for both discovery-token and tls-bootstrap-token.")
-
-	cmd.PersistentFlags().BoolVar(
-		&skipPreFlight, "skip-preflight-checks", false,
-		"Skip preflight checks normally run before modifying the system.",
-	)
+	AddJoinConfigFlags(cmd.PersistentFlags(), cfg)
+	AddJoinOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight)
 
 	return cmd
+}
+
+// AddJoinConfigFlags adds join flags bound to the config to the specified flagset
+func AddJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.NodeConfiguration) {
+	flagSet.StringVar(
+		&cfg.DiscoveryFile, "discovery-file", "",
+		"A file or url from which to load cluster information.")
+	flagSet.StringVar(
+		&cfg.DiscoveryToken, "discovery-token", "",
+		"A token used to validate cluster information fetched from the master.")
+	flagSet.StringVar(
+		&cfg.NodeName, "node-name", "",
+		"Specify the node name.")
+	flagSet.StringVar(
+		&cfg.TLSBootstrapToken, "tls-bootstrap-token", "",
+		"A token used for TLS bootstrapping.")
+	flagSet.StringSliceVar(
+		&cfg.DiscoveryTokenCACertHashes, "discovery-token-ca-cert-hash", []string{},
+		"For token-based discovery, validate that the root CA public key matches this hash (format: \"<type>:<value>\").")
+	flagSet.BoolVar(
+		&cfg.DiscoveryTokenUnsafeSkipCAVerification, "discovery-token-unsafe-skip-ca-verification", false,
+		"For token-based discovery, allow joining without --discovery-token-ca-cert-hash pinning.")
+	flagSet.StringVar(
+		&cfg.Token, "token", "",
+		"Use this token for both discovery-token and tls-bootstrap-token.")
+}
+
+// AddJoinOtherFlags adds join flags that are not bound to a configuration file to the given flagset
+func AddJoinOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight *bool) {
+	flagSet.StringVar(
+		cfgPath, "config", *cfgPath,
+		"Path to kubeadm config file.")
+
+	flagSet.BoolVar(
+		skipPreFlight, "skip-preflight-checks", false,
+		"Skip preflight checks normally run before modifying the system.",
+	)
 }
 
 // Join defines struct used by kubeadm join command
