@@ -60,6 +60,7 @@ federation/test/e2e
 federation/test/e2e/framework
 federation/test/e2e/upgrades
 federation/test/integration/framework
+pkg/api
 pkg/api/endpoints
 pkg/api/helper
 pkg/api/helper/qos

@@ -26,9 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/storage/names"
 	clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/core/v1"
 	fedframework "k8s.io/kubernetes/federation/test/e2e/framework"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -71,7 +71,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 			fedframework.SkipUnlessFederated(f.ClientSet)
 
 			nsName = createNamespace(f.FederationClientset.Core().Namespaces())
-			rsName := k8s_api_v1.SimpleNameGenerator.GenerateName(replicaSetNamePrefix)
+			rsName := names.SimpleNameGenerator.GenerateName(replicaSetNamePrefix)
 			replicaCount := int32(2)
 			rs := &v1beta1.ReplicaSet{
 				ObjectMeta: metav1.ObjectMeta{
@@ -123,7 +123,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 			// Create resources in the namespace.
 			event := v1.Event{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      k8s_api_v1.SimpleNameGenerator.GenerateName(eventNamePrefix),
+					Name:      names.SimpleNameGenerator.GenerateName(eventNamePrefix),
 					Namespace: nsName,
 				},
 				InvolvedObject: v1.ObjectReference{
@@ -199,7 +199,7 @@ func verifyNsCascadingDeletion(nsClient clientset.NamespaceInterface, clusters f
 func createNamespace(nsClient clientset.NamespaceInterface) string {
 	ns := v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: k8s_api_v1.SimpleNameGenerator.GenerateName(namespacePrefix),
+			Name: names.SimpleNameGenerator.GenerateName(namespacePrefix),
 		},
 	}
 	By(fmt.Sprintf("Creating namespace %s", ns.Name))

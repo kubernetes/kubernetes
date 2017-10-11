@@ -46,7 +46,6 @@ go_test(
     ],
     library = ":go_default_library",
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/util/hash:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -56,6 +55,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/storage/names:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//vendor/k8s.io/client-go/testing:go_default_library",
     ],

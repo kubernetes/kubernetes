@@ -30,6 +30,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+
+	// enforce that all types are installed
+	_ "k8s.io/kubernetes/pkg/api/testapi"
 )
 
 func TestPodLogOptions(t *testing.T) {
