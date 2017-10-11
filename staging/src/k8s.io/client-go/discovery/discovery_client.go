@@ -23,11 +23,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/emicklei/go-restful-swagger12"
 	"github.com/golang/protobuf/proto"
 	"github.com/googleapis/gnostic/OpenAPIv2"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,7 +46,6 @@ type DiscoveryInterface interface {
 	ServerGroupsInterface
 	ServerResourcesInterface
 	ServerVersionInterface
-	SwaggerSchemaInterface
 	OpenAPISchemaInterface
 }
 
@@ -90,12 +87,6 @@ type ServerResourcesInterface interface {
 type ServerVersionInterface interface {
 	// ServerVersion retrieves and parses the server's version (git version).
 	ServerVersion() (*version.Info, error)
-}
-
-// SwaggerSchemaInterface has a method to retrieve the swagger schema.
-type SwaggerSchemaInterface interface {
-	// SwaggerSchema retrieves and parses the swagger API schema the server supports.
-	SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error)
 }
 
 // OpenAPISchemaInterface has a method to retrieve the open API schema.
@@ -334,41 +325,6 @@ func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
 		return nil, fmt.Errorf("got '%s': %v", string(body), err)
 	}
 	return &info, nil
-}
-
-// SwaggerSchema retrieves and parses the swagger API schema the server supports.
-// TODO: Replace usages with Open API.  Tracked in https://github.com/kubernetes/kubernetes/issues/44589
-func (d *DiscoveryClient) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
-	if version.Empty() {
-		return nil, fmt.Errorf("groupVersion cannot be empty")
-	}
-
-	groupList, err := d.ServerGroups()
-	if err != nil {
-		return nil, err
-	}
-	groupVersions := metav1.ExtractGroupVersions(groupList)
-	// This check also takes care the case that kubectl is newer than the running endpoint
-	if stringDoesntExistIn(version.String(), groupVersions) {
-		return nil, fmt.Errorf("API version: %v is not supported by the server. Use one of: %v", version, groupVersions)
-	}
-	var path string
-	if len(d.LegacyPrefix) > 0 && version == v1.SchemeGroupVersion {
-		path = "/swaggerapi" + d.LegacyPrefix + "/" + version.Version
-	} else {
-		path = "/swaggerapi/apis/" + version.Group + "/" + version.Version
-	}
-
-	body, err := d.restClient.Get().AbsPath(path).Do().Raw()
-	if err != nil {
-		return nil, err
-	}
-	var schema swagger.ApiDeclaration
-	err = json.Unmarshal(body, &schema)
-	if err != nil {
-		return nil, fmt.Errorf("got '%s': %v", string(body), err)
-	}
-	return &schema, nil
 }
 
 // OpenAPISchema fetches the open api schema using a rest client and parses the proto.

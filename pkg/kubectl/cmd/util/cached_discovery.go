@@ -24,13 +24,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/emicklei/go-restful-swagger12"
 	"github.com/golang/glog"
 	"github.com/googleapis/gnostic/OpenAPIv2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
@@ -231,10 +229,6 @@ func (d *CachedDiscoveryClient) ServerPreferredNamespacedResources() ([]*metav1.
 
 func (d *CachedDiscoveryClient) ServerVersion() (*version.Info, error) {
 	return d.delegate.ServerVersion()
-}
-
-func (d *CachedDiscoveryClient) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
-	return d.delegate.SwaggerSchema(version)
 }
 
 func (d *CachedDiscoveryClient) OpenAPISchema() (*openapi_v2.Document, error) {

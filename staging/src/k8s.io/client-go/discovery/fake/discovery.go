@@ -19,10 +19,8 @@ package fake
 import (
 	"fmt"
 
-	"github.com/emicklei/go-restful-swagger12"
 	"github.com/googleapis/gnostic/OpenAPIv2"
 
-	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
@@ -85,19 +83,6 @@ func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 
 	versionInfo := kubeversion.Get()
 	return &versionInfo, nil
-}
-
-func (c *FakeDiscovery) SwaggerSchema(version schema.GroupVersion) (*swagger.ApiDeclaration, error) {
-	action := testing.ActionImpl{}
-	action.Verb = "get"
-	if version == v1.SchemeGroupVersion {
-		action.Resource = schema.GroupVersionResource{Resource: "/swaggerapi/api/" + version.Version}
-	} else {
-		action.Resource = schema.GroupVersionResource{Resource: "/swaggerapi/apis/" + version.Group + "/" + version.Version}
-	}
-
-	c.Invokes(action, nil)
-	return &swagger.ApiDeclaration{}, nil
 }
 
 func (c *FakeDiscovery) OpenAPISchema() (*openapi_v2.Document, error) {

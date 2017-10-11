@@ -23,10 +23,6 @@
 			"Rev": "ff4f55a206334ef123e4f79bbf348980da81ca46"
 		},
 		{
-			"ImportPath": "github.com/emicklei/go-restful-swagger12",
-			"Rev": "dcef7f55730566d41eae5db10e7d6981829720f6"
-		},
-		{
 			"ImportPath": "github.com/emicklei/go-restful/log",
 			"Rev": "ff4f55a206334ef123e4f79bbf348980da81ca46"
 		},
