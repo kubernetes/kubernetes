@@ -330,7 +330,6 @@ func (sched *Scheduler) scheduleOne() {
 	if err != nil {
 		return
 	}
-
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
 	go func() {
 		err := sched.bind(&assumedPod, &v1.Binding{

@@ -417,7 +417,7 @@ func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, used bool) {
 				// user does not explicitly set hostIP, default is 0.0.0.0
 				portHostIP := podPort.HostIP
 				if podPort.HostIP == "" {
-					portHostIP = "0.0.0.0"
+					portHostIP = util.DefaultBindAllHostIP
 				}
 
 				str := fmt.Sprintf("%s/%s/%d", portProtocol, portHostIP, podPort.HostPort)

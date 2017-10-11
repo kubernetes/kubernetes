@@ -228,7 +228,7 @@ func TestExpirePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[1]},
-			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": false, "TCP/127.0.0.1/8080": true},
+			usedPorts:           map[string]bool{"TCP/127.0.0.1/8080": true},
 		},
 	}}
 
@@ -277,7 +277,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[0]},
-			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true, "TCP/127.0.0.1/8080": false},
+			usedPorts:           map[string]bool{"TCP/127.0.0.1/80": true},
 		},
 	}}
 
@@ -332,7 +332,7 @@ func TestAddPodWillReplaceAssumed(t *testing.T) {
 				},
 				allocatableResource: &Resource{},
 				pods:                []*v1.Pod{updatedPod.DeepCopy()},
-				usedPorts:           map[int]bool{90: true},
+				usedPorts:           map[string]bool{"TCP/0.0.0.0/90": true},
 			},
 		},
 	}}

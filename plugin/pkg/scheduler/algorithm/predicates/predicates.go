@@ -903,42 +903,9 @@ func PodFitsHostPorts(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 
 	existingPorts := nodeInfo.UsedPorts()
 
-	// try to see whether two hostPorts will conflict or not
-	for existingPort := range existingPorts {
-		existingHostPortInfo := decode(existingPort)
-
-		if existingHostPortInfo.hostIP == "0.0.0.0" {
-			// loop through all the want hostPort to see if there exists a conflict
-			for wantPort := range wantPorts {
-				wantHostPortInfo := decode(wantPort)
-
-				// if there already exists one hostPort whose hostIP is 0.0.0.0, then the other want hostport (which has the same protocol and port) will not fit
-				if wantHostPortInfo.hostPort == existingHostPortInfo.hostPort && wantHostPortInfo.protocol == existingHostPortInfo.protocol {
-					return false, []algorithm.PredicateFailureReason{ErrPodNotFitsHostPorts}, nil
-				}
-			}
-		}
-	}
-
-	for wantPort := range wantPorts {
-		wantHostPortInfo := decode(wantPort)
-
-		if wantHostPortInfo.hostIP == "0.0.0.0" {
-			// loop through all the existing hostPort to see if there exists a conflict
-			for existingPort := range existingPorts {
-				existingHostPortInfo := decode(existingPort)
-
-				// if there already exists one hostPort whose hostIP may be 127.0.0.1, then a hostPort (which wants 0.0.0.0 hostIP and has the same protocol and port) will not fit
-				if wantHostPortInfo.hostPort == existingHostPortInfo.hostPort && wantHostPortInfo.protocol == existingHostPortInfo.protocol {
-					return false, []algorithm.PredicateFailureReason{ErrPodNotFitsHostPorts}, nil
-				}
-			}
-		} else {
-			// general check hostPort conflict procedure for hostIP is not 0.0.0.0
-			if wantPort != "" && existingPorts[wantPort] {
-				return false, []algorithm.PredicateFailureReason{ErrPodNotFitsHostPorts}, nil
-			}
-		}
+	// try to see whether existingPorts and  wantPorts will conflict or not
+	if portsConflict(existingPorts, wantPorts) {
+		return false, []algorithm.PredicateFailureReason{ErrPodNotFitsHostPorts}, nil
 	}
 
 	return true, nil, nil

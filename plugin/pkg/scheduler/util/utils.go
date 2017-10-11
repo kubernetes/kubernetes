@@ -24,6 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
+const DefaultBindAllHostIP = "0.0.0.0"
+
 // GetUsedPorts returns the used host ports of Pods: if 'port' was used, a 'port:true' pair
 // will be in the result; but it does not resolve port conflict.
 func GetUsedPorts(pods ...*v1.Pod) map[string]bool {
