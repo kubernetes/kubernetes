@@ -21,6 +21,7 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
@@ -58,11 +59,15 @@ func startReplicaSetController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicasets"}] {
 		return false, nil
 	}
-	go replicaset.NewReplicaSetController(
+	rsc, err := replicaset.NewReplicaSetController(
 		ctx.InformerFactory.Extensions().V1beta1().ReplicaSets(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("replicaset-controller"),
 		replicaset.BurstReplicas,
-	).Run(int(ctx.Options.ConcurrentRSSyncs), ctx.Stop)
+	)
+	if err != nil {
+		return false, fmt.Errorf("Failed to start replicaset controller: %v", err)
+	}
+	go rsc.Run(int(ctx.Options.ConcurrentRSSyncs), ctx.Stop)
 	return true, nil
 }

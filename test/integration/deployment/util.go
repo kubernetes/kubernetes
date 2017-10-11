@@ -98,7 +98,7 @@ func newDeployment(name, ns string, replicas int32) *v1beta1.Deployment {
 }
 
 // dcSetup sets up necessities for Deployment integration test, including master, apiserver, informers, and clientset
-func dcSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory, clientset.Interface) {
+func dcSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.ReplicaSetController, *deployment.DeploymentController, informers.SharedInformerFactory, clientset.Interface, error) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 
@@ -116,13 +116,16 @@ func dcSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replicaset.R
 		informers.Core().V1().Pods(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "deployment-controller")),
 	)
-	rm := replicaset.NewReplicaSetController(
+	rm, err := replicaset.NewReplicaSetController(
 		informers.Extensions().V1beta1().ReplicaSets(),
 		informers.Core().V1().Pods(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "replicaset-controller")),
 		replicaset.BurstReplicas,
 	)
-	return s, closeFn, rm, dc, informers, clientSet
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, err
+	}
+	return s, closeFn, rm, dc, informers, clientSet, nil
 }
 
 // dcSimpleSetup sets up necessities for Deployment integration test, including master, apiserver,
