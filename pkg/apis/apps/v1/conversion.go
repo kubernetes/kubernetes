@@ -17,9 +17,11 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
 	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -41,6 +43,10 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_v1_DaemonSetSpec_To_extensions_DaemonSetSpec,
 		Convert_extensions_DaemonSetUpdateStrategy_To_v1_DaemonSetUpdateStrategy,
 		Convert_v1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy,
+		Convert_extensions_ReplicaSetSpec_To_v1_ReplicaSetSpec,
+		Convert_v1_ReplicaSetSpec_To_extensions_ReplicaSetSpec,
+		Convert_extensions_ScaleStatus_To_v1_ScaleStatus,
+		Convert_v1_ScaleStatus_To_extensions_ScaleStatus,
 	)
 	if err != nil {
 		return err
@@ -153,6 +159,75 @@ func Convert_v1_DaemonSetUpdateStrategy_To_extensions_DaemonSetUpdateStrategy(in
 		if err := Convert_v1_RollingUpdateDaemonSet_To_extensions_RollingUpdateDaemonSet(in.RollingUpdate, out.RollingUpdate, s); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func Convert_extensions_ReplicaSetSpec_To_v1_ReplicaSetSpec(in *extensions.ReplicaSetSpec, out *appsv1.ReplicaSetSpec, s conversion.Scope) error {
+	out.Replicas = new(int32)
+	*out.Replicas = int32(in.Replicas)
+	out.MinReadySeconds = in.MinReadySeconds
+	out.Selector = in.Selector
+	if err := k8s_api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_ReplicaSetSpec_To_extensions_ReplicaSetSpec(in *appsv1.ReplicaSetSpec, out *extensions.ReplicaSetSpec, s conversion.Scope) error {
+	if in.Replicas != nil {
+		out.Replicas = *in.Replicas
+	}
+	out.MinReadySeconds = in.MinReadySeconds
+	out.Selector = in.Selector
+	if err := k8s_api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_extensions_ScaleStatus_To_v1_ScaleStatus(in *extensions.ScaleStatus, out *appsv1.ScaleStatus, s conversion.Scope) error {
+	out.Replicas = int32(in.Replicas)
+
+	out.Selector = nil
+	out.TargetSelector = ""
+	if in.Selector != nil {
+		if in.Selector.MatchExpressions == nil || len(in.Selector.MatchExpressions) == 0 {
+			out.Selector = in.Selector.MatchLabels
+		}
+
+		selector, err := metav1.LabelSelectorAsSelector(in.Selector)
+		if err != nil {
+			return fmt.Errorf("invalid label selector: %v", err)
+		}
+		out.TargetSelector = selector.String()
+	}
+	return nil
+}
+
+func Convert_v1_ScaleStatus_To_extensions_ScaleStatus(in *appsv1.ScaleStatus, out *extensions.ScaleStatus, s conversion.Scope) error {
+	out.Replicas = in.Replicas
+
+	// Normally when 2 fields map to the same internal value we favor the old field, since
+	// old clients can't be expected to know about new fields but clients that know about the
+	// new field can be expected to know about the old field (though that's not quite true, due
+	// to kubectl apply). However, these fields are readonly, so any non-nil value should work.
+	if in.TargetSelector != "" {
+		labelSelector, err := metav1.ParseToLabelSelector(in.TargetSelector)
+		if err != nil {
+			out.Selector = nil
+			return fmt.Errorf("failed to parse target selector: %v", err)
+		}
+		out.Selector = labelSelector
+	} else if in.Selector != nil {
+		out.Selector = new(metav1.LabelSelector)
+		selector := make(map[string]string)
+		for key, val := range in.Selector {
+			selector[key] = val
+		}
+		out.Selector.MatchLabels = selector
+	} else {
+		out.Selector = nil
 	}
 	return nil
 }

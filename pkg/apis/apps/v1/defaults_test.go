@@ -23,6 +23,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -163,6 +164,106 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 		if !apiequality.Semantic.DeepEqual(got.Spec, expected.Spec) {
 			t.Errorf("(%d) got different than expected\ngot:\n\t%+v\nexpected:\n\t%+v", i, got.Spec, expected.Spec)
 		}
+	}
+}
+
+func TestSetDefaultReplicaSetReplicas(t *testing.T) {
+	tests := []struct {
+		rs             appsv1.ReplicaSet
+		expectReplicas int32
+	}{
+		{
+			rs: appsv1.ReplicaSet{
+				Spec: appsv1.ReplicaSetSpec{
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "bar",
+							},
+						},
+					},
+				},
+			},
+			expectReplicas: 1,
+		},
+		{
+			rs: appsv1.ReplicaSet{
+				Spec: appsv1.ReplicaSetSpec{
+					Replicas: newInt32(0),
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "bar",
+							},
+						},
+					},
+				},
+			},
+			expectReplicas: 0,
+		},
+		{
+			rs: appsv1.ReplicaSet{
+				Spec: appsv1.ReplicaSetSpec{
+					Replicas: newInt32(3),
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "bar",
+							},
+						},
+					},
+				},
+			},
+			expectReplicas: 3,
+		},
+	}
+
+	for _, test := range tests {
+		rs := &test.rs
+		obj2 := roundTrip(t, runtime.Object(rs))
+		rs2, ok := obj2.(*appsv1.ReplicaSet)
+		if !ok {
+			t.Errorf("unexpected object: %v", rs2)
+			t.FailNow()
+		}
+		if rs2.Spec.Replicas == nil {
+			t.Errorf("unexpected nil Replicas")
+		} else if test.expectReplicas != *rs2.Spec.Replicas {
+			t.Errorf("expected: %d replicas, got: %d", test.expectReplicas, *rs2.Spec.Replicas)
+		}
+	}
+}
+
+func TestDefaultRequestIsNotSetForReplicaSet(t *testing.T) {
+	s := v1.PodSpec{}
+	s.Containers = []v1.Container{
+		{
+			Resources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceCPU: resource.MustParse("100m"),
+				},
+			},
+		},
+	}
+	rs := &appsv1.ReplicaSet{
+		Spec: appsv1.ReplicaSetSpec{
+			Replicas: newInt32(3),
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				},
+				Spec: s,
+			},
+		},
+	}
+	output := roundTrip(t, runtime.Object(rs))
+	rs2 := output.(*appsv1.ReplicaSet)
+	defaultRequest := rs2.Spec.Template.Spec.Containers[0].Resources.Requests
+	requestValue := defaultRequest[v1.ResourceCPU]
+	if requestValue.String() != "0" {
+		t.Errorf("Expected 0 request value, got: %s", requestValue.String())
 	}
 }
 

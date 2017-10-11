@@ -180,6 +180,11 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 		expectedEtcdPath: "/registry/daemonsets/etcdstoragepathtestnamespace/ds6",
 		expectedGVK:      gvkP("extensions", "v1beta1", "DaemonSet"),
 	},
+	gvr("apps", "v1", "replicasets"): {
+		stub:             `{"metadata": {"name": "rs3"}, "spec": {"selector": {"matchLabels": {"g": "h"}}, "template": {"metadata": {"labels": {"g": "h"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container4"}]}}}}`,
+		expectedEtcdPath: "/registry/replicasets/etcdstoragepathtestnamespace/rs3",
+		expectedGVK:      gvkP("extensions", "v1beta1", "ReplicaSet"),
+	},
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/autoscaling/v1
@@ -429,6 +434,10 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 
 	// k8s.io/kubernetes/pkg/apis/apps/v1beta2
 	gvr("apps", "v1beta2", "scales"), // not stored in etcd, part of kapiv1.ReplicationController
+	// --
+
+	// k8s.io/kubernetes/pkg/apis/apps/v1
+	gvr("apps", "v1", "scales"), // not stored in etcd, part of kapiv1.ReplicationController
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/batch/v1beta1

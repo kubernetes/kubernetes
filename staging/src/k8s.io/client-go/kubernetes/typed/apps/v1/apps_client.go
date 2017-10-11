@@ -26,6 +26,8 @@ import (
 type AppsV1Interface interface {
 	RESTClient() rest.Interface
 	DaemonSetsGetter
+	ReplicaSetsGetter
+	ScalesGetter
 }
 
 // AppsV1Client is used to interact with features provided by the apps group.
@@ -35,6 +37,14 @@ type AppsV1Client struct {
 
 func (c *AppsV1Client) DaemonSets(namespace string) DaemonSetInterface {
 	return newDaemonSets(c, namespace)
+}
+
+func (c *AppsV1Client) ReplicaSets(namespace string) ReplicaSetInterface {
+	return newReplicaSets(c, namespace)
+}
+
+func (c *AppsV1Client) Scales(namespace string) ScaleInterface {
+	return newScales(c, namespace)
 }
 
 // NewForConfig creates a new AppsV1Client for the given config.
