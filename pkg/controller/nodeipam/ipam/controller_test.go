@@ -20,8 +20,8 @@ import (
 	"net"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/controller/node/ipam/cidrset"
-	"k8s.io/kubernetes/pkg/controller/node/ipam/test"
+	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
+	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/test"
 )
 
 func TestOccupyServiceCIDR(t *testing.T) {

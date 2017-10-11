@@ -37,8 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
-	"k8s.io/kubernetes/pkg/controller/node"
-	"k8s.io/kubernetes/pkg/controller/node/ipam"
+	"k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
@@ -85,29 +84,24 @@ func TestTaintNodeByCondition(t *testing.T) {
 	controllerCh := make(chan struct{})
 	defer close(controllerCh)
 
-	// Start NodeController for taint.
-	nc, err := node.NewNodeController(
+	// Start NodeLifecycleController for taint.
+	nc, err := nodelifecycle.NewNodeLifecycleController(
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
 		informers.Extensions().V1beta1().DaemonSets(),
 		nil, // CloudProvider
 		clientset,
+		time.Second, // Node monitor grace period
+		time.Second, // Node startup grace period
+		time.Second, // Node monitor period
 		time.Second, // Pod eviction timeout
 		100,         // Eviction limiter QPS
 		100,         // Secondary eviction limiter QPS
 		100,         // Large cluster threshold
 		100,         // Unhealthy zone threshold
-		time.Second, // Node monitor grace period
-		time.Second, // Node startup grace period
-		time.Second, // Node monitor period
-		nil,         // Cluster CIDR
-		nil,         // Service CIDR
-		0,           // Node CIDR mask size
-		false,       // Allocate node CIDRs
-		ipam.RangeAllocatorType, // Allocator type
-		true, // Run taint manger
-		true, // Enabled taint based eviction
-		true, // Enabled TaintNodeByCondition feature
+		true,        // Run taint manager
+		true,        // Use taint based evictions
+		true,        // Enabled TaintNodeByCondition feature
 	)
 	if err != nil {
 		t.Errorf("Failed to create node controller: %v", err)

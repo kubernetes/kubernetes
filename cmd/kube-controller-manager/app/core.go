@@ -41,8 +41,9 @@ import (
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
-	nodecontroller "k8s.io/kubernetes/pkg/controller/node"
-	"k8s.io/kubernetes/pkg/controller/node/ipam"
+	nodeipamcontroller "k8s.io/kubernetes/pkg/controller/nodeipam"
+	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
+	lifecyclecontroller "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/controller/podgc"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
@@ -77,7 +78,7 @@ func startServiceController(ctx ControllerContext) (bool, error) {
 	return true, nil
 }
 
-func startNodeController(ctx ControllerContext) (bool, error) {
+func startNodeIpamController(ctx ControllerContext) (bool, error) {
 	var clusterCIDR *net.IPNet = nil
 	var serviceCIDR *net.IPNet = nil
 	if ctx.Options.AllocateNodeCIDRs {
@@ -97,25 +98,38 @@ func startNodeController(ctx ControllerContext) (bool, error) {
 		}
 	}
 
-	nodeController, err := nodecontroller.NewNodeController(
-		ctx.InformerFactory.Core().V1().Pods(),
+	nodeIpamController, err := nodeipamcontroller.NewNodeIpamController(
 		ctx.InformerFactory.Core().V1().Nodes(),
-		ctx.InformerFactory.Extensions().V1beta1().DaemonSets(),
 		ctx.Cloud,
 		ctx.ClientBuilder.ClientOrDie("node-controller"),
-		ctx.Options.PodEvictionTimeout.Duration,
-		ctx.Options.NodeEvictionRate,
-		ctx.Options.SecondaryNodeEvictionRate,
-		ctx.Options.LargeClusterSizeThreshold,
-		ctx.Options.UnhealthyZoneThreshold,
-		ctx.Options.NodeMonitorGracePeriod.Duration,
-		ctx.Options.NodeStartupGracePeriod.Duration,
-		ctx.Options.NodeMonitorPeriod.Duration,
 		clusterCIDR,
 		serviceCIDR,
 		int(ctx.Options.NodeCIDRMaskSize),
 		ctx.Options.AllocateNodeCIDRs,
 		ipam.CIDRAllocatorType(ctx.Options.CIDRAllocatorType),
+	)
+	if err != nil {
+		return true, err
+	}
+	go nodeIpamController.Run(ctx.Stop)
+	return true, nil
+}
+
+func startNodeLifecycleController(ctx ControllerContext) (bool, error) {
+	lifecycleController, err := lifecyclecontroller.NewNodeLifecycleController(
+		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.InformerFactory.Core().V1().Nodes(),
+		ctx.InformerFactory.Extensions().V1beta1().DaemonSets(),
+		ctx.Cloud,
+		ctx.ClientBuilder.ClientOrDie("node-controller"),
+		ctx.Options.NodeMonitorPeriod.Duration,
+		ctx.Options.NodeStartupGracePeriod.Duration,
+		ctx.Options.NodeMonitorGracePeriod.Duration,
+		ctx.Options.PodEvictionTimeout.Duration,
+		ctx.Options.NodeEvictionRate,
+		ctx.Options.SecondaryNodeEvictionRate,
+		ctx.Options.LargeClusterSizeThreshold,
+		ctx.Options.UnhealthyZoneThreshold,
 		ctx.Options.EnableTaintManager,
 		utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions),
 		utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition),
@@ -123,7 +137,7 @@ func startNodeController(ctx ControllerContext) (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	go nodeController.Run(ctx.Stop)
+	go lifecycleController.Run(ctx.Stop)
 	return true, nil
 }
 

@@ -25,7 +25,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/controller/node/ipam/cidrset"
+	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 )
 
 const (
