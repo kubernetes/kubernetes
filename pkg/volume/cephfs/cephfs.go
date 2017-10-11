@@ -19,6 +19,8 @@ package cephfs
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"path"
 	"strings"
 
 	"github.com/golang/glog"
@@ -146,6 +148,7 @@ func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 			mounter:      mounter,
 			plugin:       plugin,
 			mountOptions: volume.MountOptionFromSpec(spec),
+			fuse:         cephvs.Fuse,
 		},
 	}, nil
 }
@@ -191,6 +194,7 @@ type cephfs struct {
 	plugin      *cephfsPlugin
 	volume.MetricsNil
 	mountOptions []string
+	fuse        bool
 }
 
 type cephfsMounter struct {
@@ -231,6 +235,28 @@ func (cephfsVolume *cephfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 	os.MkdirAll(dir, 0750)
 
+	if cephfsVolume.fuse {
+		glog.V(4).Infof("CephFS mount using fuse!!!")
+
+		err = cephfsVolume.execFuseMount(dir)
+		if err == nil {
+			return nil
+		}
+
+		// cleanup upon failure
+		keyringPath := cephfsVolume.GetKeyringPath()
+		_, StatErr := os.Stat(keyringPath)
+		if !os.IsNotExist(StatErr) {
+			os.RemoveAll(keyringPath)
+		}
+		util.UnmountPath(dir, cephfsVolume.mounter)
+
+		// return error
+		return err
+	}
+
+	glog.V(4).Infof("CephFS mount!!!")
+
 	err = cephfsVolume.execMount(dir)
 	if err == nil {
 		return nil
@@ -255,6 +281,11 @@ func (cephfsVolume *cephfsUnmounter) TearDown() error {
 
 // TearDownAt unmounts the bind mount
 func (cephfsVolume *cephfsUnmounter) TearDownAt(dir string) error {
+	glog.V(4).Infof("TearDownAt: dir: %q ", dir)
+	if strings.Contains(dir, "~keyring") {
+		return os.RemoveAll(dir)
+	}
+
 	return util.UnmountPath(dir, cephfsVolume.mounter)
 }
 
@@ -262,6 +293,14 @@ func (cephfsVolume *cephfsUnmounter) TearDownAt(dir string) error {
 func (cephfsVolume *cephfs) GetPath() string {
 	name := cephfsPluginName
 	return cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, utilstrings.EscapeQualifiedNameForDisk(name), cephfsVolume.volName)
+}
+
+// GateKeyringPath creates cephfuse keyring path
+func (cephfsVolume *cephfs) GetKeyringPath() string {
+	name := cephfsPluginName
+	volumeDir := cephfsVolume.plugin.host.GetPodVolumeDir(cephfsVolume.podUID, utilstrings.EscapeQualifiedNameForDisk(name), cephfsVolume.volName)
+	volumeKeyringDir := volumeDir + "~keyring"
+	return volumeKeyringDir
 }
 
 func (cephfsVolume *cephfs) execMount(mountpoint string) error {
@@ -294,6 +333,81 @@ func (cephfsVolume *cephfs) execMount(mountpoint string) error {
 	mountOptions := volume.JoinMountOptions(cephfsVolume.mountOptions, opt)
 	if err := cephfsVolume.mounter.Mount(src, mountpoint, "ceph", mountOptions); err != nil {
 		return fmt.Errorf("CephFS: mount failed: %v", err)
+	}
+
+	return nil
+}
+
+func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
+	// cephfs keyring file.
+	keyring_file := ""
+	// override secretfile if secret is provided
+	if cephfsVolume.secret != "" {
+		glog.Errorf("fuse:begin")
+
+		keyringPath := cephfsVolume.GetKeyringPath()
+		//glog.Errorf("fuse:volumeSecretDir:%s", volumeSecretDir)
+		os.MkdirAll(keyringPath, 0750)
+
+		payload := make(map[string]util.FileProjection, 1)
+		var fileProjection util.FileProjection
+
+		keyring := fmt.Sprintf("[client.%s]\n", cephfsVolume.id) + "key = " + cephfsVolume.secret
+		//glog.Errorfs("fuse:keyring:%s",keyring)
+		fileProjection.Data = []byte(keyring)
+		fileProjection.Mode = int32(0644)
+		fileName := cephfsVolume.id + ".keyring"
+		//glog.Errorf("fuse:secret:%s; secretfileName:%s", cephfsVolume.secret, fileName)
+		payload[fileName] = fileProjection
+		//glog.Errorf("fuse:payload")
+
+		writerContext := fmt.Sprintf("cephfuse:%v.keyring", cephfsVolume.id)
+		//glog.Errorf("fuse:writerContext:%s", writerContext)
+		writer, err := util.NewAtomicWriter(keyringPath, writerContext)
+		if err != nil {
+			glog.Errorf("Error creating atomic writer: %v", err)
+			return err
+		}
+
+		err = writer.Write(payload)
+		if err != nil {
+			glog.Errorf("Error writing payload to dir: %v", err)
+			return err
+		}
+
+		keyring_file = path.Join(keyringPath, fileName)
+
+	} else {
+		keyring_file = cephfsVolume.secret_file
+	}
+
+	// build src like mon1:6789,mon2:6789,mon3:6789:/
+	hosts := cephfsVolume.mon
+	l := len(hosts)
+	// pass all monitors and let ceph randomize and fail over
+	i := 0
+	src := ""
+	for i = 0; i < l-1; i++ {
+		src += hosts[i] + ","
+	}
+	src += hosts[i]
+	//glog.Errorf("fuse:src:%s", src)
+
+	mountArgs := []string{}
+	mountArgs = append(mountArgs, "-k")
+	mountArgs = append(mountArgs, keyring_file)
+	mountArgs = append(mountArgs, "-m")
+	mountArgs = append(mountArgs, src)
+	mountArgs = append(mountArgs, mountpoint)
+	mountArgs = append(mountArgs, "-r")
+	mountArgs = append(mountArgs, cephfsVolume.path)
+
+	glog.V(4).Infof("Mounting cmd ceph-fuse with arguments (%s)", mountArgs)
+	command := exec.Command("ceph-fuse", mountArgs...)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		fmt.Errorf("Ceph-fuse failed: %v\narguments: %s\nOutput: %s\n", err, mountArgs, string(output))
+		return fmt.Errorf("Ceph-fuse failed: %v\narguments: %s\nOutput: %s\n", err, mountArgs, string(output))
 	}
 
 	return nil
