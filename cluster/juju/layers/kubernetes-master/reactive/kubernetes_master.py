@@ -159,6 +159,7 @@ def install_snaps():
     set_state('kubernetes-master.snaps.installed')
     remove_state('kubernetes-master.components.started')
 
+
 @when('config.changed.channel')
 def channel_changed():
     install_snaps()
@@ -444,7 +445,6 @@ def send_data(tls):
     kubernetes_service_ip = get_kubernetes_service_ip()
 
     domain = hookenv.config('dns_domain')
-
     # Create SANs that the tls layer will add to the server cert.
     sans = [
         hookenv.unit_public_ip(),
