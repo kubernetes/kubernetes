@@ -47,3 +47,32 @@ func SetDefaults_DaemonSet(obj *appsv1.DaemonSet) {
 		*obj.Spec.RevisionHistoryLimit = 10
 	}
 }
+
+func SetDefaults_StatefulSet(obj *appsv1.StatefulSet) {
+	if len(obj.Spec.PodManagementPolicy) == 0 {
+		obj.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
+	}
+
+	if obj.Spec.UpdateStrategy.Type == "" {
+		obj.Spec.UpdateStrategy.Type = appsv1.RollingUpdateStatefulSetStrategyType
+
+		// UpdateStrategy.RollingUpdate will take default values below.
+		obj.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{}
+	}
+
+	if obj.Spec.UpdateStrategy.Type == appsv1.RollingUpdateStatefulSetStrategyType &&
+		obj.Spec.UpdateStrategy.RollingUpdate != nil &&
+		obj.Spec.UpdateStrategy.RollingUpdate.Partition == nil {
+		obj.Spec.UpdateStrategy.RollingUpdate.Partition = new(int32)
+		*obj.Spec.UpdateStrategy.RollingUpdate.Partition = 0
+	}
+
+	if obj.Spec.Replicas == nil {
+		obj.Spec.Replicas = new(int32)
+		*obj.Spec.Replicas = 1
+	}
+	if obj.Spec.RevisionHistoryLimit == nil {
+		obj.Spec.RevisionHistoryLimit = new(int32)
+		*obj.Spec.RevisionHistoryLimit = 10
+	}
+}

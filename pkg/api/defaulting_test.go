@@ -74,6 +74,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "apps", Version: "v1beta1", Kind: "StatefulSetList"}:                              {},
 		{Group: "apps", Version: "v1beta2", Kind: "StatefulSet"}:                                  {},
 		{Group: "apps", Version: "v1beta2", Kind: "StatefulSetList"}:                              {},
+		{Group: "apps", Version: "v1", Kind: "StatefulSet"}:                                       {},
+		{Group: "apps", Version: "v1", Kind: "StatefulSetList"}:                                   {},
 		{Group: "autoscaling", Version: "v1", Kind: "HorizontalPodAutoscaler"}:                    {},
 		{Group: "autoscaling", Version: "v1", Kind: "HorizontalPodAutoscalerList"}:                {},
 		{Group: "autoscaling", Version: "v2beta1", Kind: "HorizontalPodAutoscaler"}:               {},
