@@ -21,6 +21,7 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
@@ -30,11 +31,15 @@ func startJobController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}] {
 		return false, nil
 	}
-	go job.NewJobController(
+	jobController, err := job.NewJobController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Batch().V1().Jobs(),
 		ctx.ClientBuilder.ClientOrDie("job-controller"),
-	).Run(int(ctx.Options.ConcurrentJobSyncs), ctx.Stop)
+	)
+	if err != nil {
+		return false, fmt.Errorf("failed to start job controller : %v", err)
+	}
+	go jobController.Run(int(ctx.Options.ConcurrentJobSyncs), ctx.Stop)
 	return true, nil
 }
 
