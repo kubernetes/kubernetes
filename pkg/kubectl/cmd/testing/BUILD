@@ -24,7 +24,6 @@ go_library(
         "//pkg/kubectl/resource:go_default_library",
         "//pkg/kubectl/validation:go_default_library",
         "//pkg/printers:go_default_library",
-        "//vendor/github.com/emicklei/go-restful-swagger12:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",

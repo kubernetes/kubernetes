@@ -321,7 +321,6 @@ func NewUnsecuredEtcd3TestClientServer(t *testing.T, scheme *runtime.Scheme) (*E
 		Prefix:                   etcdtest.PathPrefix(),
 		ServerList:               server.V3Client.Endpoints(),
 		DeserializationCacheSize: etcdtest.DeserializationCacheSize,
-		Copier: scheme,
 		Paging: true,
 	}
 	return server, config

@@ -491,12 +491,7 @@ func (s *podStorage) MergedState() interface{} {
 	pods := make([]*v1.Pod, 0)
 	for _, sourcePods := range s.pods {
 		for _, podRef := range sourcePods {
-			pod, err := api.Scheme.Copy(podRef)
-			if err != nil {
-				glog.Errorf("unable to copy pod: %v", err)
-				continue
-			}
-			pods = append(pods, pod.(*v1.Pod))
+			pods = append(pods, podRef.DeepCopy())
 		}
 	}
 	return pods
@@ -506,12 +501,7 @@ func copyPods(sourcePods []*v1.Pod) []*v1.Pod {
 	pods := []*v1.Pod{}
 	for _, source := range sourcePods {
 		// Use a deep copy here just in case
-		pod, err := api.Scheme.Copy(source)
-		if err != nil {
-			glog.Errorf("unable to copy pod: %v", err)
-			continue
-		}
-		pods = append(pods, pod.(*v1.Pod))
+		pods = append(pods, source.DeepCopy())
 	}
 	return pods
 }

@@ -77,7 +77,7 @@ var _ = SIGDescribe("Job", func() {
 		// Worst case analysis: 15 failures, each taking 1 minute to
 		// run due to some slowness, 1 in 2^15 chance of happening,
 		// causing test flake.  Should be very rare.
-		job := framework.NewTestJob("randomlySucceedOrFail", "rand-non-local", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job := framework.NewTestJob("randomlySucceedOrFail", "rand-non-local", v1.RestartPolicyNever, parallelism, completions, nil, 999)
 		job, err := framework.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		Expect(err).NotTo(HaveOccurred())
 

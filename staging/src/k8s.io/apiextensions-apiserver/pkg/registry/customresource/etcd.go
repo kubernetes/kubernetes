@@ -30,9 +30,8 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against API services.
-func NewREST(resource schema.GroupResource, listKind schema.GroupVersionKind, copier runtime.ObjectCopier, strategy customResourceDefinitionStorageStrategy, optsGetter generic.RESTOptionsGetter) *REST {
+func NewREST(resource schema.GroupResource, listKind schema.GroupVersionKind, strategy customResourceDefinitionStorageStrategy, optsGetter generic.RESTOptionsGetter) *REST {
 	store := &genericregistry.Store{
-		Copier:  copier,
 		NewFunc: func() runtime.Object { return &unstructured.Unstructured{} },
 		NewListFunc: func() runtime.Object {
 			// lists are never stored, only manufactured, so stomp in the right kind

@@ -18,13 +18,7 @@ package util
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"os"
-	"os/user"
-	"path"
 	"sort"
 	"strings"
 	"testing"
@@ -46,12 +40,10 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
 func TestNewFactoryDefaultFlagBindings(t *testing.T) {
@@ -227,208 +219,6 @@ func TestFlagUnderscoreRenaming(t *testing.T) {
 	// In case of failure of this test check this PR: spf13/pflag#23
 	if factory.FlagSet().Lookup("valid_flag").Name != "valid-flag" {
 		t.Fatalf("Expected flag name to be valid-flag, got %s", factory.FlagSet().Lookup("valid_flag").Name)
-	}
-}
-
-func loadSchemaForTest() (validation.Schema, error) {
-	pathToSwaggerSpec := "../../../../api/swagger-spec/" + api.Registry.GroupOrDie(api.GroupName).GroupVersion.Version + ".json"
-	data, err := ioutil.ReadFile(pathToSwaggerSpec)
-	if err != nil {
-		return nil, err
-	}
-	return validation.NewSwaggerSchemaFromBytes(data, nil)
-}
-
-func header() http.Header {
-	header := http.Header{}
-	header.Set("Content-Type", runtime.ContentTypeJSON)
-	return header
-}
-
-func TestRefetchSchemaWhenValidationFails(t *testing.T) {
-	schema, err := loadSchemaForTest()
-	if err != nil {
-		t.Errorf("Error loading schema: %v", err)
-		t.FailNow()
-	}
-	output, err := json.Marshal(schema)
-	if err != nil {
-		t.Errorf("Error serializing schema: %v", err)
-		t.FailNow()
-	}
-	requests := map[string]int{}
-
-	c := &manualfake.RESTClient{
-		APIRegistry:          api.Registry,
-		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
-		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
-				requests[p] = requests[p] + 1
-				return &http.Response{StatusCode: 200, Header: header(), Body: ioutil.NopCloser(bytes.NewBuffer(output))}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-				return nil, nil
-			}
-		}),
-	}
-	dir, err := ioutil.TempDir("", "schemaCache")
-	if err != nil {
-		t.Fatalf("Error getting tempDir: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
-	fullDir, err := substituteUserHome(dir)
-	if err != nil {
-		t.Errorf("Error getting fullDir: %v", err)
-		t.FailNow()
-	}
-	cacheFile := path.Join(fullDir, "foo", "bar", schemaFileName)
-	err = writeSchemaFile(output, fullDir, cacheFile, "foo", "bar")
-	if err != nil {
-		t.Errorf("Error building old cache schema: %v", err)
-		t.FailNow()
-	}
-
-	obj := &extensions.Deployment{}
-	data, err := runtime.Encode(testapi.Extensions.Codec(), obj)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		t.FailNow()
-	}
-
-	// Re-get request, should use HTTP and write
-	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil); err != nil {
-		t.Errorf("unexpected error validating: %v", err)
-	}
-	if requests["/swaggerapi/foo/bar"] != 1 {
-		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/bar"])
-	}
-}
-
-func TestValidateCachesSchema(t *testing.T) {
-	schema, err := loadSchemaForTest()
-	if err != nil {
-		t.Errorf("Error loading schema: %v", err)
-		t.FailNow()
-	}
-	output, err := json.Marshal(schema)
-	if err != nil {
-		t.Errorf("Error serializing schema: %v", err)
-		t.FailNow()
-	}
-	requests := map[string]int{}
-
-	c := &manualfake.RESTClient{
-		APIRegistry:          api.Registry,
-		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
-		Client: manualfake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case strings.HasPrefix(p, "/swaggerapi") && m == "GET":
-				requests[p] = requests[p] + 1
-				return &http.Response{StatusCode: 200, Header: header(), Body: ioutil.NopCloser(bytes.NewBuffer(output))}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-				return nil, nil
-			}
-		}),
-	}
-	dir, err := ioutil.TempDir("", "schemaCache")
-	if err != nil {
-		t.Fatalf("Error getting tempDir: %v", err)
-	}
-	defer os.RemoveAll(dir)
-
-	obj := &api.Pod{}
-	data, err := runtime.Encode(testapi.Default.Codec(), obj)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		t.FailNow()
-	}
-
-	// Initial request, should use HTTP and write
-	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil); err != nil {
-		t.Errorf("unexpected error validating: %v", err)
-	}
-	if _, err := os.Stat(path.Join(dir, "foo", "bar", schemaFileName)); err != nil {
-		t.Errorf("unexpected missing cache file: %v", err)
-	}
-	if requests["/swaggerapi/foo/bar"] != 1 {
-		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/bar"])
-	}
-
-	// Same version and group, should skip HTTP
-	if getSchemaAndValidate(c, data, "foo", "bar", dir, nil); err != nil {
-		t.Errorf("unexpected error validating: %v", err)
-	}
-	if requests["/swaggerapi/foo/bar"] != 2 {
-		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/bar"])
-	}
-
-	// Different API group, should go to HTTP and write
-	if getSchemaAndValidate(c, data, "foo", "baz", dir, nil); err != nil {
-		t.Errorf("unexpected error validating: %v", err)
-	}
-	if _, err := os.Stat(path.Join(dir, "foo", "baz", schemaFileName)); err != nil {
-		t.Errorf("unexpected missing cache file: %v", err)
-	}
-	if requests["/swaggerapi/foo/baz"] != 1 {
-		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/baz"])
-	}
-
-	// Different version, should go to HTTP and write
-	if getSchemaAndValidate(c, data, "foo2", "bar", dir, nil); err != nil {
-		t.Errorf("unexpected error validating: %v", err)
-	}
-	if _, err := os.Stat(path.Join(dir, "foo2", "bar", schemaFileName)); err != nil {
-		t.Errorf("unexpected missing cache file: %v", err)
-	}
-	if requests["/swaggerapi/foo2/bar"] != 1 {
-		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo2/bar"])
-	}
-
-	// No cache dir, should go straight to HTTP and not write
-	if getSchemaAndValidate(c, data, "foo", "blah", "", nil); err != nil {
-		t.Errorf("unexpected error validating: %v", err)
-	}
-	if requests["/swaggerapi/foo/blah"] != 1 {
-		t.Errorf("expected 1 schema request, saw: %d", requests["/swaggerapi/foo/blah"])
-	}
-	if _, err := os.Stat(path.Join(dir, "foo", "blah", schemaFileName)); err == nil || !os.IsNotExist(err) {
-		t.Errorf("unexpected cache file error: %v", err)
-	}
-}
-
-func TestSubstitueUser(t *testing.T) {
-	usr, err := user.Current()
-	if err != nil {
-		t.Logf("SKIPPING TEST: unexpected error: %v", err)
-		return
-	}
-	tests := []struct {
-		input     string
-		expected  string
-		expectErr bool
-	}{
-		{input: "~/foo", expected: path.Join(os.Getenv("HOME"), "foo")},
-		{input: "~" + usr.Username + "/bar", expected: usr.HomeDir + "/bar"},
-		{input: "/foo/bar", expected: "/foo/bar"},
-		{input: "~doesntexit/bar", expectErr: true},
-	}
-	for _, test := range tests {
-		output, err := substituteUserHome(test.input)
-		if test.expectErr {
-			if err == nil {
-				t.Error("unexpected non-error")
-			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if output != test.expected {
-			t.Errorf("expected: %s, saw: %s", test.expected, output)
-		}
 	}
 }
 

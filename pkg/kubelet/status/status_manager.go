@@ -22,7 +22,6 @@ import (
 	"time"
 
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -163,10 +162,8 @@ func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 	// Make sure we're caching a deep copy.
-	status, err := copyStatus(&status)
-	if err != nil {
-		return
-	}
+	status = *status.DeepCopy()
+
 	// Force a status update if deletion timestamp is set. This is necessary
 	// because if the pod is in the non-running state, the pod worker still
 	// needs to be able to trigger an update and/or deletion.
@@ -205,10 +202,7 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 	}
 
 	// Make sure we're not updating the cached version.
-	status, err := copyStatus(&oldStatus.status)
-	if err != nil {
-		return
-	}
+	status := *oldStatus.status.DeepCopy()
 	containerStatus, _, _ = findContainerStatus(&status, containerID.String())
 	containerStatus.Ready = ready
 
@@ -256,10 +250,7 @@ func (m *manager) TerminatePod(pod *v1.Pod) {
 	if cachedStatus, ok := m.podStatuses[pod.UID]; ok {
 		oldStatus = &cachedStatus.status
 	}
-	status, err := copyStatus(oldStatus)
-	if err != nil {
-		return
-	}
+	status := *oldStatus.DeepCopy()
 	for i := range status.ContainerStatuses {
 		status.ContainerStatuses[i].State = v1.ContainerState{
 			Terminated: &v1.ContainerStateTerminated{},
@@ -513,13 +504,10 @@ func (m *manager) needsReconcile(uid types.UID, status v1.PodStatus) bool {
 		pod = mirrorPod
 	}
 
-	podStatus, err := copyStatus(&pod.Status)
-	if err != nil {
-		return false
-	}
-	normalizeStatus(pod, &podStatus)
+	podStatus := pod.Status.DeepCopy()
+	normalizeStatus(pod, podStatus)
 
-	if isStatusEqual(&podStatus, &status) {
+	if isStatusEqual(podStatus, &status) {
 		// If the status from the source is the same with the cached status,
 		// reconcile is not needed. Just return.
 		return false
@@ -585,14 +573,4 @@ func normalizeStatus(pod *v1.Pod, status *v1.PodStatus) *v1.PodStatus {
 	// Sort the container statuses, so that the order won't affect the result of comparison
 	kubetypes.SortInitContainerStatuses(pod, status.InitContainerStatuses)
 	return status
-}
-
-func copyStatus(source *v1.PodStatus) (v1.PodStatus, error) {
-	clone, err := scheme.Scheme.DeepCopy(source)
-	if err != nil {
-		glog.Errorf("Failed to clone status %+v: %v", source, err)
-		return v1.PodStatus{}, err
-	}
-	status := *clone.(*v1.PodStatus)
-	return status, nil
 }

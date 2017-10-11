@@ -336,8 +336,8 @@ func (dsw *desiredStateOfWorld) VolumeExists(
 func (dsw *desiredStateOfWorld) SetMultiAttachError(
 	volumeName v1.UniqueVolumeName,
 	nodeName k8stypes.NodeName) {
-	dsw.RLock()
-	defer dsw.RUnlock()
+	dsw.Lock()
+	defer dsw.Unlock()
 
 	nodeObj, nodeExists := dsw.nodesManaged[nodeName]
 	if nodeExists {

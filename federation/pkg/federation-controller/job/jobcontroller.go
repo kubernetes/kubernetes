@@ -392,11 +392,11 @@ func (fjc *FederationJobController) reconcileJob(key string) (reconciliationStat
 	}
 
 	// Create a copy before modifying the obj to prevent race condition with other readers of obj from store.
-	obj, err := api.Scheme.DeepCopy(objFromStore)
-	fjob, ok := obj.(*batchv1.Job)
-	if err != nil || !ok {
+	fjob, ok := objFromStore.(*batchv1.Job)
+	if !ok {
 		return statusError, err
 	}
+	fjob = fjob.DeepCopy()
 
 	// delete job
 	if fjob.DeletionTimestamp != nil {

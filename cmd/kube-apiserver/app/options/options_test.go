@@ -103,7 +103,8 @@ func TestAddFlags(t *testing.T) {
 			MinRequestTimeout:           1800,
 		},
 		Admission: &apiserveroptions.AdmissionOptions{
-			RecommendedPluginOrder: []string{"NamespaceLifecycle"},
+			RecommendedPluginOrder: []string{"NamespaceLifecycle", "Initializers"},
+			DefaultOffPlugins:      []string{"Initializers"},
 			PluginNames:            []string{"AlwaysDeny"},
 			ConfigFile:             "/admission-control-config",
 			Plugins:                s.Admission.Plugins,
@@ -114,7 +115,6 @@ func TestAddFlags(t *testing.T) {
 				ServerList: nil,
 				Prefix:     "/registry",
 				DeserializationCacheSize: 0,
-				Copier:             kapi.Scheme,
 				Quorum:             false,
 				KeyFile:            "/var/run/kubernetes/etcd.key",
 				CAFile:             "/var/run/kubernetes/etcdca.crt",

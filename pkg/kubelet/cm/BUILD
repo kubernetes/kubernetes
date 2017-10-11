@@ -51,7 +51,6 @@ go_library(
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "//pkg/api:go_default_library",
             "//pkg/api/v1/helper:go_default_library",
             "//pkg/api/v1/helper/qos:go_default_library",
             "//pkg/api/v1/resource:go_default_library",

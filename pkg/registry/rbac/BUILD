@@ -13,7 +13,6 @@ go_library(
         "helpers.go",
     ],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",

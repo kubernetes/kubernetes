@@ -1445,6 +1445,23 @@ func waitForPodTerminatedInNamespace(c clientset.Interface, podName, reason, nam
 	})
 }
 
+// waitForPodNotFoundInNamespace returns an error if it takes too long for the pod to fully terminate.
+// Unlike `waitForPodTerminatedInNamespace`, the pod's Phase and Reason are ignored. If the pod Get
+// api returns IsNotFound then the wait stops and nil is returned. If the Get api returns an error other
+// than "not found" then that error is returned and the wait stops.
+func waitForPodNotFoundInNamespace(c clientset.Interface, podName, ns string, timeout time.Duration) error {
+	return wait.PollImmediate(Poll, timeout, func() (bool, error) {
+		_, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
+		if apierrs.IsNotFound(err) {
+			return true, nil // done
+		}
+		if err != nil {
+			return true, err // stop wait with error
+		}
+		return false, nil
+	})
+}
+
 // waitForPodSuccessInNamespaceTimeout returns nil if the pod reached state success, or an error if it reached failure or ran too long.
 func waitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName string, namespace string, timeout time.Duration) error {
 	return WaitForPodCondition(c, namespace, podName, "success or failure", timeout, func(pod *v1.Pod) (bool, error) {

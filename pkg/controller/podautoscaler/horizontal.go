@@ -57,28 +57,6 @@ var (
 	scaleUpLimitMinimum = 4.0
 )
 
-func calculateScaleUpLimit(currentReplicas int32) int32 {
-	return int32(math.Max(scaleUpLimitFactor*float64(currentReplicas), scaleUpLimitMinimum))
-}
-
-// UnsafeConvertToVersionVia is like api.Scheme.UnsafeConvertToVersion, but it does so via an internal version first.
-// We use it since working with v2alpha1 is convenient here, but we want to use the v1 client (and
-// can't just use the internal version).  Note that conversion mutates the object, so you need to deepcopy
-// *before* you call this if the input object came out of a shared cache.
-func UnsafeConvertToVersionVia(obj runtime.Object, externalVersion schema.GroupVersion) (runtime.Object, error) {
-	objInt, err := api.Scheme.UnsafeConvertToVersion(obj, schema.GroupVersion{Group: externalVersion.Group, Version: runtime.APIVersionInternal})
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert the given object to the internal version: %v", err)
-	}
-
-	objExt, err := api.Scheme.UnsafeConvertToVersion(objInt, externalVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert the given object back to the external version: %v", err)
-	}
-
-	return objExt, err
-}
-
 // HorizontalController is responsible for the synchronizing HPA objects stored
 // in the system with the actual deployments/replication controllers they
 // control.
@@ -365,7 +343,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	// make a copy so that we never mutate the shared informer cache (conversion can mutate the object)
 	hpav1 := hpav1Shared.DeepCopy()
 	// then, convert to autoscaling/v2, which makes our lives easier when calculating metrics
-	hpaRaw, err := UnsafeConvertToVersionVia(hpav1, autoscalingv2.SchemeGroupVersion)
+	hpaRaw, err := unsafeConvertToVersionVia(hpav1, autoscalingv2.SchemeGroupVersion)
 	if err != nil {
 		a.eventRecorder.Event(hpav1, v1.EventTypeWarning, "FailedConvertHPA", err.Error())
 		return fmt.Errorf("failed to convert the given HPA to %s: %v", autoscalingv2.SchemeGroupVersion.String(), err)
@@ -577,7 +555,7 @@ func (a *HorizontalController) updateStatusIfNeeded(oldStatus *autoscalingv2.Hor
 // updateStatus actually does the update request for the status of the given HPA
 func (a *HorizontalController) updateStatus(hpa *autoscalingv2.HorizontalPodAutoscaler) error {
 	// convert back to autoscalingv1
-	hpaRaw, err := UnsafeConvertToVersionVia(hpa, autoscalingv1.SchemeGroupVersion)
+	hpaRaw, err := unsafeConvertToVersionVia(hpa, autoscalingv1.SchemeGroupVersion)
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedConvertHPA", err.Error())
 		return fmt.Errorf("failed to convert the given HPA to %s: %v", autoscalingv2.SchemeGroupVersion.String(), err)
@@ -591,6 +569,24 @@ func (a *HorizontalController) updateStatus(hpa *autoscalingv2.HorizontalPodAuto
 	}
 	glog.V(2).Infof("Successfully updated status for %s", hpa.Name)
 	return nil
+}
+
+// unsafeConvertToVersionVia is like api.Scheme.UnsafeConvertToVersion, but it does so via an internal version first.
+// We use it since working with v2alpha1 is convenient here, but we want to use the v1 client (and
+// can't just use the internal version).  Note that conversion mutates the object, so you need to deepcopy
+// *before* you call this if the input object came out of a shared cache.
+func unsafeConvertToVersionVia(obj runtime.Object, externalVersion schema.GroupVersion) (runtime.Object, error) {
+	objInt, err := api.Scheme.UnsafeConvertToVersion(obj, schema.GroupVersion{Group: externalVersion.Group, Version: runtime.APIVersionInternal})
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert the given object to the internal version: %v", err)
+	}
+
+	objExt, err := api.Scheme.UnsafeConvertToVersion(objInt, externalVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert the given object back to the external version: %v", err)
+	}
+
+	return objExt, err
 }
 
 // setCondition sets the specific condition type on the given HPA to the specified value with the given reason
@@ -630,4 +626,8 @@ func setConditionInList(inputList []autoscalingv2.HorizontalPodAutoscalerConditi
 	existingCond.Message = fmt.Sprintf(message, args...)
 
 	return resList
+}
+
+func calculateScaleUpLimit(currentReplicas int32) int32 {
+	return int32(math.Max(scaleUpLimitFactor*float64(currentReplicas), scaleUpLimitMinimum))
 }

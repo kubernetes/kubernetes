@@ -12,7 +12,6 @@ go_library(
         "validation.go",
     ],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/options:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",

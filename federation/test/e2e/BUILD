@@ -29,7 +29,6 @@ go_library(
         "//federation/pkg/federation-controller/util:go_default_library",
         "//federation/test/e2e/framework:go_default_library",
         "//federation/test/e2e/upgrades:go_default_library",
-        "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//test/e2e/chaosmonkey:go_default_library",

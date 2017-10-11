@@ -214,6 +214,7 @@ func TestAdmit(t *testing.T) {
 	for name, tt := range table {
 		wh.hookSource = &tt.hookSource
 		wh.serviceResolver = fakeServiceResolver{base: *serverURL, path: tt.path}
+		wh.SetScheme(api.Scheme)
 
 		err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, name, resource, subResource, operation, &userInfo))
 		if tt.expectAllow != (err == nil) {

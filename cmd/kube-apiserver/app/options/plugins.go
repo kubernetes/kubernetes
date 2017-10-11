@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/exec"
 	"k8s.io/kubernetes/plugin/pkg/admission/gc"
 	"k8s.io/kubernetes/plugin/pkg/admission/imagepolicy"
-	"k8s.io/kubernetes/plugin/pkg/admission/initialization"
 	"k8s.io/kubernetes/plugin/pkg/admission/initialresources"
 	"k8s.io/kubernetes/plugin/pkg/admission/limitranger"
 	"k8s.io/kubernetes/plugin/pkg/admission/namespace/autoprovision"
@@ -65,7 +64,6 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	exec.Register(plugins)
 	gc.Register(plugins)
 	imagepolicy.Register(plugins)
-	initialization.Register(plugins)
 	initialresources.Register(plugins)
 	limitranger.Register(plugins)
 	autoprovision.Register(plugins)

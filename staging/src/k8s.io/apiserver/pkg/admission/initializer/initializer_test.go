@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -28,12 +29,27 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
+// TestWantsScheme ensures that the scheme is injected when
+// the WantsScheme interface is implemented by a plugin.
+func TestWantsScheme(t *testing.T) {
+	scheme := runtime.NewScheme()
+	target, err := initializer.New(nil, nil, nil, nil, nil, scheme)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantSchemeAdmission := &WantSchemeAdmission{}
+	target.Initialize(wantSchemeAdmission)
+	if wantSchemeAdmission.scheme != scheme {
+		t.Errorf("expected scheme to be initialized")
+	}
+}
+
 // TestWantsAuthorizer ensures that the authorizer is injected
 // when the WantsAuthorizer interface is implemented by a plugin.
 func TestWantsAuthorizer(t *testing.T) {
-	target, err := initializer.New(nil, nil, &TestAuthorizer{}, nil, nil)
+	target, err := initializer.New(nil, nil, &TestAuthorizer{}, nil, nil, nil)
 	if err != nil {
-		t.Fatalf("expected to create an instance of initializer but got an error = %s", err.Error())
+		t.Fatal(err)
 	}
 	wantAuthorizerAdmission := &WantAuthorizerAdmission{}
 	target.Initialize(wantAuthorizerAdmission)
@@ -46,9 +62,9 @@ func TestWantsAuthorizer(t *testing.T) {
 // when the WantsExternalKubeClientSet interface is implemented by a plugin.
 func TestWantsExternalKubeClientSet(t *testing.T) {
 	cs := &fake.Clientset{}
-	target, err := initializer.New(cs, nil, &TestAuthorizer{}, nil, nil)
+	target, err := initializer.New(cs, nil, &TestAuthorizer{}, nil, nil, nil)
 	if err != nil {
-		t.Fatalf("expected to create an instance of initializer but got an error = %s", err.Error())
+		t.Fatal(err)
 	}
 	wantExternalKubeClientSet := &WantExternalKubeClientSet{}
 	target.Initialize(wantExternalKubeClientSet)
@@ -62,9 +78,9 @@ func TestWantsExternalKubeClientSet(t *testing.T) {
 func TestWantsExternalKubeInformerFactory(t *testing.T) {
 	cs := &fake.Clientset{}
 	sf := informers.NewSharedInformerFactory(cs, time.Duration(1)*time.Second)
-	target, err := initializer.New(cs, sf, &TestAuthorizer{}, nil, nil)
+	target, err := initializer.New(cs, sf, &TestAuthorizer{}, nil, nil, nil)
 	if err != nil {
-		t.Fatalf("expected to create an instance of initializer but got an error = %s", err.Error())
+		t.Fatal(err)
 	}
 	wantExternalKubeInformerFactory := &WantExternalKubeInformerFactory{}
 	target.Initialize(wantExternalKubeInformerFactory)
@@ -76,9 +92,9 @@ func TestWantsExternalKubeInformerFactory(t *testing.T) {
 // TestWantsClientCert ensures that the client certificate and key are injected
 // when the WantsClientCert interface is implemented by a plugin.
 func TestWantsClientCert(t *testing.T) {
-	target, err := initializer.New(nil, nil, nil, []byte("cert"), []byte("key"))
+	target, err := initializer.New(nil, nil, nil, []byte("cert"), []byte("key"), nil)
 	if err != nil {
-		t.Fatalf("expected to create an instance of initializer but got an error = %s", err.Error())
+		t.Fatal(err)
 	}
 	wantClientCert := &clientCertWanter{}
 	target.Initialize(wantClientCert)
@@ -144,3 +160,16 @@ func (s *clientCertWanter) SetClientCert(cert, key []byte)     { s.gotCert, s.go
 func (s *clientCertWanter) Admit(a admission.Attributes) error { return nil }
 func (s *clientCertWanter) Handles(o admission.Operation) bool { return false }
 func (s *clientCertWanter) Validate() error                    { return nil }
+
+// WantSchemeAdmission is a test stub that fulfills the WantsScheme interface.
+type WantSchemeAdmission struct {
+	scheme *runtime.Scheme
+}
+
+func (self *WantSchemeAdmission) SetScheme(s *runtime.Scheme)        { self.scheme = s }
+func (self *WantSchemeAdmission) Admit(a admission.Attributes) error { return nil }
+func (self *WantSchemeAdmission) Handles(o admission.Operation) bool { return false }
+func (self *WantSchemeAdmission) Validate() error                    { return nil }
+
+var _ admission.Interface = &WantSchemeAdmission{}
+var _ initializer.WantsScheme = &WantSchemeAdmission{}

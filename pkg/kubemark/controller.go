@@ -31,7 +31,6 @@ import (
 	kubeclient "k8s.io/client-go/kubernetes"
 	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"
@@ -221,15 +220,12 @@ func (kubemarkController *KubemarkController) GetNodeGroupForNode(node string) (
 }
 
 func (kubemarkController *KubemarkController) addNodeToNodeGroup(nodeGroup string) error {
-	templateCopy, err := api.Scheme.Copy(kubemarkController.nodeTemplate)
-	if err != nil {
-		return err
-	}
-	node := templateCopy.(*apiv1.ReplicationController)
+	node := kubemarkController.nodeTemplate.DeepCopy()
 	node.Name = fmt.Sprintf("%s-%d", nodeGroup, kubemarkController.rand.Int63())
 	node.Labels = map[string]string{nodeGroupLabel: nodeGroup, "name": node.Name}
 	node.Spec.Template.Labels = node.Labels
 
+	var err error
 	for i := 0; i < numRetries; i++ {
 		_, err = kubemarkController.externalCluster.client.CoreV1().ReplicationControllers(node.Namespace).Create(node)
 		if err == nil {

@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/api/admissionregistration/v1alpha1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation"
@@ -32,17 +33,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/configuration"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubeapiserver/admission/configuration"
+)
+
+const (
+	// Name of admission plug-in
+	PluginName = "Initializers"
 )
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("Initializers", func(config io.Reader) (admission.Interface, error) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		return NewInitializer(), nil
 	})
 }
@@ -183,8 +188,13 @@ func (i *initializer) Admit(a admission.Attributes) (err error) {
 			// Mirror pods are exempt from initialization because they are created and initialized
 			// on the Kubelet before they appear in the API.
 			// TODO: once this moves to REST storage layer, this becomes a pod specific concern
-			if pod, ok := a.GetObject().(*api.Pod); ok && pod != nil {
-				if _, isMirror := pod.Annotations[api.MirrorPodAnnotationKey]; isMirror {
+			if a.GetKind().GroupKind() == v1.SchemeGroupVersion.WithKind("Pod").GroupKind() {
+				accessor, err := meta.Accessor(a.GetObject())
+				if err != nil {
+					return err
+				}
+				annotations := accessor.GetAnnotations()
+				if _, isMirror := annotations[v1.MirrorPodAnnotationKey]; isMirror {
 					return nil
 				}
 			}
