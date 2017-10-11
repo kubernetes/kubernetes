@@ -49,6 +49,22 @@ func GetDatacenter(ctx context.Context, connection *VSphereConnection, datacente
 	return &dc, nil
 }
 
+// GetDatacenter returns all the DataCenter Objects
+func GetAllDatacenter(ctx context.Context, connection *VSphereConnection) ([]*Datacenter, error) {
+	var dc []*Datacenter
+	finder := find.NewFinder(connection.GoVmomiClient.Client, true)
+	datacenters, err := finder.DatacenterList(ctx, "*")
+	if err != nil {
+		glog.Errorf("Failed to find the datacenter. err: %+v", err)
+		return nil, err
+	}
+	for _, datacenter := range datacenters {
+		dc = append(dc, &(Datacenter{datacenter}))
+	}
+
+	return dc, nil
+}
+
 // GetVMByUUID gets the VM object from the given vmUUID
 func (dc *Datacenter) GetVMByUUID(ctx context.Context, vmUUID string) (*VirtualMachine, error) {
 	s := object.NewSearchIndex(dc.Client())

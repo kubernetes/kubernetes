@@ -63,7 +63,6 @@ func GetVSphere() (*VSphere, error) {
 			VCenterPort:       cfg.Global.VCenterPort,
 			Datacenters:       cfg.Global.Datacenters,
 			RoundTripperCount: cfg.Global.RoundTripperCount,
-			InsecureFlag:      cfg.Global.InsecureFlag,
 		},
 	}
 	vsphereInsMap := make(map[string]*VSphereInstance)
@@ -263,7 +262,7 @@ func getPbmCompatibleDatastore(ctx context.Context, client *vim25.Client, storag
 
 func (vs *VSphere) setVMOptions(ctx context.Context, dc *vclib.Datacenter) (*vclib.VMOptions, error) {
 	var vmOptions vclib.VMOptions
-	nodeInfo, err := vs.nodeManager.getNodeInfo(convertToK8sType(vs.hostName))
+	nodeInfo, err := vs.nodeManager.GetNodeInfo(convertToK8sType(vs.hostName))
 	if err != nil {
 		return nil, err
 	}
