@@ -7,7 +7,6 @@ cmd/kube-proxy/app
 cmd/kubeadm/app
 cmd/kubeadm/app/apis/kubeadm
 cmd/kubeadm/app/apis/kubeadm/v1alpha1
-cmd/kubectl/app
 cmd/kubelet/app
 cmd/kubelet/app/options
 cmd/kubemark
