@@ -107,7 +107,7 @@ func getControlPlaneSubCommands(outDir, defaultKubernetesVersion string) []*cobr
 			cmd.Flags().StringVar(&cfg.Networking.PodSubnet, "pod-network-cidr", cfg.Networking.PodSubnet, "The range of IP addresses used for the pod network.")
 		}
 
-		cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to kubeadm config file (WARNING: Usage of a configuration file is experimental)")
+		cmd.Flags().StringVar(&cfgPath, "config", cfgPath, "Path to a kubeadm config file. WARNING: Usage of a configuration file is experimental!")
 
 		subCmds = append(subCmds, cmd)
 	}
