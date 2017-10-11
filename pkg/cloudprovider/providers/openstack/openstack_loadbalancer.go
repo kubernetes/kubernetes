@@ -372,7 +372,7 @@ func popMember(members []v2pools.Member, addr string, port int) []v2pools.Member
 }
 
 func getSecurityGroupName(clusterName string, service *v1.Service) string {
-	return fmt.Sprintf("lb-sg-%s-%v", clusterName, service.Name)
+	return fmt.Sprintf("lb-sg-%s-%s-%s", clusterName, service.Namespace, service.Name)
 }
 
 func getSecurityGroupRules(client *gophercloud.ServiceClient, opts rules.ListOpts) ([]rules.SecGroupRule, error) {
