@@ -79,7 +79,8 @@ func NewCmdSelector(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "selector (-f FILENAME | TYPE NAME) EXPRESSIONS [--resource-version=version]",
+		Use: "selector (-f FILENAME | TYPE NAME) EXPRESSIONS [--resource-version=version]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Set the selector on a resource"),
 		Long:    fmt.Sprintf(selectorLong, validation.LabelValueMaxLength),
 		Example: selectorExample,

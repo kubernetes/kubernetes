@@ -69,7 +69,8 @@ func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
-		Use:     "undo (TYPE NAME | TYPE/NAME) [flags]",
+		Use: "undo (TYPE NAME | TYPE/NAME) [flags]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Undo a previous rollout"),
 		Long:    undo_long,
 		Example: undo_example,

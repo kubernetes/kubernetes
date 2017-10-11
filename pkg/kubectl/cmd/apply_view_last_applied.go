@@ -60,7 +60,8 @@ var (
 func NewCmdApplyViewLastApplied(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	options := &ViewLastAppliedOptions{Out: out, ErrOut: err}
 	cmd := &cobra.Command{
-		Use:     "view-last-applied (TYPE [NAME | -l label] | TYPE/NAME | -f FILENAME)",
+		Use: "view-last-applied (TYPE [NAME | -l label] | TYPE/NAME | -f FILENAME)",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("View latest last-applied-configuration annotations of a resource/object"),
 		Long:    applyViewLastAppliedLong,
 		Example: applyViewLastAppliedExample,

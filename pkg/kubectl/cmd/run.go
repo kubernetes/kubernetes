@@ -96,7 +96,8 @@ type RunObject struct {
 
 func NewCmdRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "run NAME --image=image [--env=\"key=value\"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
+		Use: "run NAME --image=image [--env=\"key=value\"] [--port=port] [--replicas=replicas] [--dry-run=bool] [--overrides=inline-json] [--command] -- [COMMAND] [args...]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Run a particular image on the cluster"),
 		Long:    runLong,
 		Example: runExample,

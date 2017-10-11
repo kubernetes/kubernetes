@@ -98,7 +98,8 @@ func NewCmdResources(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.
 	}
 
 	cmd := &cobra.Command{
-		Use:     "resources (-f FILENAME | TYPE NAME)  ([--limits=LIMITS & --requests=REQUESTS]",
+		Use: "resources (-f FILENAME | TYPE NAME)  ([--limits=LIMITS & --requests=REQUESTS]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Update resource requests/limits on objects with pod templates"),
 		Long:    fmt.Sprintf(resources_long, strings.Join(resourceTypesWithPodTemplate, ", ")),
 		Example: resources_example,

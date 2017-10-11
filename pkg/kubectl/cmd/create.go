@@ -65,7 +65,8 @@ func NewCmdCreate(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	var options CreateOptions
 
 	cmd := &cobra.Command{
-		Use:     "create -f FILENAME",
+		Use: "create -f FILENAME",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Create a resource from a file or from stdin."),
 		Long:    createLong,
 		Example: createExample,

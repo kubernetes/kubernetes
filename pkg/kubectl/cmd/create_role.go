@@ -121,7 +121,8 @@ func NewCmdCreateRole(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 		Out: cmdOut,
 	}
 	cmd := &cobra.Command{
-		Use:     "role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename] [--dry-run]",
+		Use: "role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename] [--dry-run]",
+		DisableFlagsInUseLine: true,
 		Short:   roleLong,
 		Long:    roleLong,
 		Example: roleExample,

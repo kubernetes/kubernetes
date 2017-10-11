@@ -97,7 +97,8 @@ func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "completion SHELL",
+		Use: "completion SHELL",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Output shell completion code for the specified shell (bash or zsh)"),
 		Long:    completion_long,
 		Example: completion_example,

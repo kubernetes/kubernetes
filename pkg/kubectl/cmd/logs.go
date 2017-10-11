@@ -89,7 +89,8 @@ type LogsOptions struct {
 func NewCmdLogs(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	o := &LogsOptions{}
 	cmd := &cobra.Command{
-		Use:     "logs [-f] [-p] (POD | TYPE/NAME) [-c CONTAINER]",
+		Use: "logs [-f] [-p] (POD | TYPE/NAME) [-c CONTAINER]",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Print the logs for a container in a pod"),
 		Long:    "Print the logs for a container in a pod or specified resource. If the pod has only one container, the container name is optional.",
 		Example: logsExample,

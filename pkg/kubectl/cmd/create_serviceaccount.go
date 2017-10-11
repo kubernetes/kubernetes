@@ -39,11 +39,12 @@ var (
 // NewCmdCreateServiceAccount is a macro command to create a new service account
 func NewCmdCreateServiceAccount(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "serviceaccount NAME [--dry-run]",
-		Aliases: []string{"sa"},
-		Short:   i18n.T("Create a service account with the specified name"),
-		Long:    serviceAccountLong,
-		Example: serviceAccountExample,
+		Use: "serviceaccount NAME [--dry-run]",
+		DisableFlagsInUseLine: true,
+		Aliases:               []string{"sa"},
+		Short:                 i18n.T("Create a service account with the specified name"),
+		Long:                  serviceAccountLong,
+		Example:               serviceAccountExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := CreateServiceAccount(f, cmdOut, cmd, args)
 			cmdutil.CheckErr(err)

@@ -76,7 +76,8 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, out, errOut io.Writer) *cobra
 	}
 
 	cmd := &cobra.Command{
-		Use:     "edit-last-applied (RESOURCE/NAME | -f FILENAME)",
+		Use: "edit-last-applied (RESOURCE/NAME | -f FILENAME)",
+		DisableFlagsInUseLine: true,
 		Short:   "Edit latest last-applied-configuration annotations of a resource/object",
 		Long:    applyEditLastAppliedLong,
 		Example: applyEditLastAppliedExample,

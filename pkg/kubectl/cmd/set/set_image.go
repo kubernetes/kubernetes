@@ -92,7 +92,8 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:     "image (-f FILENAME | TYPE NAME) CONTAINER_NAME_1=CONTAINER_IMAGE_1 ... CONTAINER_NAME_N=CONTAINER_IMAGE_N",
+		Use: "image (-f FILENAME | TYPE NAME) CONTAINER_NAME_1=CONTAINER_IMAGE_1 ... CONTAINER_NAME_N=CONTAINER_IMAGE_N",
+		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Update image of a pod template"),
 		Long:    image_long,
 		Example: image_example,
