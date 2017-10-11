@@ -43,13 +43,13 @@ type SystemdInitSystem struct{}
 
 func (sysd SystemdInitSystem) ServiceStart(service string) error {
 	args := []string{"start", service}
-	_, err := exec.Command("systemctl", args...).Output()
+	err := exec.Command("systemctl", args...).Run()
 	return err
 }
 
 func (sysd SystemdInitSystem) ServiceStop(service string) error {
 	args := []string{"stop", service}
-	_, err := exec.Command("systemctl", args...).Output()
+	err := exec.Command("systemctl", args...).Run()
 	return err
 }
 
@@ -65,7 +65,7 @@ func (sysd SystemdInitSystem) ServiceExists(service string) bool {
 
 func (sysd SystemdInitSystem) ServiceIsEnabled(service string) bool {
 	args := []string{"is-enabled", service}
-	_, err := exec.Command("systemctl", args...).Output()
+	err := exec.Command("systemctl", args...).Run()
 	if err != nil {
 		return false
 	}
@@ -86,7 +86,52 @@ func (sysd SystemdInitSystem) ServiceIsActive(service string) bool {
 	return false
 }
 
-// getInitSystem returns an InitSystem for the current system, or nil
+// WindowsInitSystem is the windows implementation of InitSystem
+type WindowsInitSystem struct{}
+
+func (sysd WindowsInitSystem) ServiceStart(service string) error {
+	args := []string{"Start-Service", service}
+	err := exec.Command("powershell", args...).Run()
+	return err
+}
+
+func (sysd WindowsInitSystem) ServiceStop(service string) error {
+	args := []string{"Stop-Service", service}
+	err := exec.Command("powershell", args...).Run()
+	return err
+}
+
+func (sysd WindowsInitSystem) ServiceExists(service string) bool {
+	args := []string{"Get-Service", service}
+	err := exec.Command("powershell", args...).Run()
+	if err != nil {
+		return false
+	}
+	return true
+
+}
+
+func (sysd WindowsInitSystem) ServiceIsEnabled(service string) bool {
+	args := []string{"Get-Service", service + "| select -property starttype"}
+	outBytes, _ := exec.Command("powershell", args...).Output()
+	output := strings.TrimSpace(string(outBytes))
+	if strings.Contains(output, "Automatic") {
+		return true
+	}
+	return false
+}
+
+func (sysd WindowsInitSystem) ServiceIsActive(service string) bool {
+	args := []string{"Get-Service", service + "| select -property status"}
+	outBytes, _ := exec.Command("powershell", args...).Output()
+	output := strings.TrimSpace(string(outBytes))
+	if strings.Contains(output, "Running") {
+		return true
+	}
+	return false
+}
+
+// GetInitSystem returns an InitSystem for the current system, or nil
 // if we cannot detect a supported init system for pre-flight checks.
 // This indicates we will skip init system checks, not an error.
 func GetInitSystem() (InitSystem, error) {
@@ -94,6 +139,10 @@ func GetInitSystem() (InitSystem, error) {
 	_, err := exec.LookPath("systemctl")
 	if err == nil {
 		return &SystemdInitSystem{}, nil
+	}
+	_, err = exec.LookPath("wininit.exe")
+	if err == nil {
+		return &WindowsInitSystem{}, nil
 	}
 	return nil, fmt.Errorf("no supported init system detected, skipping checking for services")
 }

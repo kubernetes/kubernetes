@@ -28,6 +28,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -166,18 +167,8 @@ func (poc PortOpenCheck) Check() (warnings, errors []error) {
 	return nil, errors
 }
 
-// IsRootCheck verifies user is root
-type IsRootCheck struct{}
-
-// Check validates if an user has root privileges.
-func (irc IsRootCheck) Check() (warnings, errors []error) {
-	errors = []error{}
-	if os.Getuid() != 0 {
-		errors = append(errors, fmt.Errorf("user is not running as root"))
-	}
-
-	return nil, errors
-}
+// IsPrivilegedUserCheck verifies user is privileged (linux - root, windows - Administrator)
+type IsPrivilegedUserCheck struct{}
 
 // DirAvailableCheck checks if the given directory either does not exist, or is empty.
 type DirAvailableCheck struct {
@@ -438,12 +429,16 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 
 	var errs []error
 	var warns []error
-	// All the validators we'd like to run:
+	// All the common validators we'd like to run:
 	var validators = []system.Validator{
-		&system.OSValidator{Reporter: reporter},
 		&system.KernelValidator{Reporter: reporter},
-		&system.CgroupsValidator{Reporter: reporter},
-		&system.DockerValidator{Reporter: reporter},
+		&system.DockerValidator{Reporter: reporter}}
+
+	if runtime.GOOS == "linux" {
+		//add linux validators
+		validators = append(validators,
+			&system.OSValidator{Reporter: reporter},
+			&system.CgroupsValidator{Reporter: reporter})
 	}
 
 	// Run all validators
@@ -691,7 +686,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 	checks := []Checker{
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
 		SystemVerificationCheck{},
-		IsRootCheck{},
+		IsPrivilegedUserCheck{},
 		HostnameCheck{nodeName: cfg.NodeName},
 		KubeletVersionCheck{},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
@@ -774,7 +769,7 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 
 	checks := []Checker{
 		SystemVerificationCheck{},
-		IsRootCheck{},
+		IsPrivilegedUserCheck{},
 		HostnameCheck{cfg.NodeName},
 		KubeletVersionCheck{},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
@@ -783,17 +778,21 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
 		FileAvailableCheck{Path: cfg.CACertPath},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
-		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
-		SwapCheck{},
-		InPathCheck{executable: "ip", mandatory: true},
-		InPathCheck{executable: "iptables", mandatory: true},
-		InPathCheck{executable: "mount", mandatory: true},
-		InPathCheck{executable: "nsenter", mandatory: true},
-		InPathCheck{executable: "ebtables", mandatory: false},
-		InPathCheck{executable: "ethtool", mandatory: false},
-		InPathCheck{executable: "socat", mandatory: false},
-		InPathCheck{executable: "tc", mandatory: false},
-		InPathCheck{executable: "touch", mandatory: false},
+	}
+	//non-windows checks
+	if runtime.GOOS == "linux" {
+		checks = append(checks,
+			FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
+			SwapCheck{},
+			InPathCheck{executable: "ip", mandatory: true},
+			InPathCheck{executable: "iptables", mandatory: true},
+			InPathCheck{executable: "mount", mandatory: true},
+			InPathCheck{executable: "nsenter", mandatory: true},
+			InPathCheck{executable: "ebtables", mandatory: false},
+			InPathCheck{executable: "ethtool", mandatory: false},
+			InPathCheck{executable: "socat", mandatory: false},
+			InPathCheck{executable: "tc", mandatory: false},
+			InPathCheck{executable: "touch", mandatory: false})
 	}
 
 	if len(cfg.DiscoveryTokenAPIServers) > 0 {
@@ -808,10 +807,10 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 	return RunChecks(checks, os.Stderr)
 }
 
-// RunRootCheckOnly initializes cheks slice of structs and call RunChecks
+// RunRootCheckOnly initializes checks slice of structs and call RunChecks
 func RunRootCheckOnly() error {
 	checks := []Checker{
-		IsRootCheck{},
+		IsPrivilegedUserCheck{},
 	}
 
 	return RunChecks(checks, os.Stderr)

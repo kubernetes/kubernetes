@@ -10,8 +10,14 @@ go_library(
     name = "go_default_library",
     srcs = [
         "checks.go",
+        "checks_unix.go",
         "utils.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows_amd64": [
+            "checks_windows.go",
+        ],
+        "//conditions:default": [],
+    }),
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/preflight",
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
