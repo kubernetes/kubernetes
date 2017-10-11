@@ -374,11 +374,11 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	// we kill at most a single pod during each eviction interval
 	for i := range activePods {
 		pod := activePods[i]
-		// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
+		// If the pod is marked as static or critical (support for critical pod annotations is also enabled),
 		// do not evict such pods. Static pods are not re-admitted after evictions.
 		// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
-		if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
-			kubelettypes.IsCriticalPod(pod) && kubepod.IsStaticPod(pod) {
+		if (utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
+			kubelettypes.IsCriticalPod(pod)) || kubepod.IsStaticPod(pod) {
 			continue
 		}
 		status := v1.PodStatus{
@@ -561,9 +561,9 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(podStats statsapi.P
 }
 
 func (m *managerImpl) evictPod(pod *v1.Pod, resourceName v1.ResourceName, evictMsg string) bool {
-	if utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
-		kubelettypes.IsCriticalPod(pod) && kubepod.IsStaticPod(pod) {
-		glog.Errorf("eviction manager: cannot evict a critical pod %s", format.Pod(pod))
+	if (utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
+		kubelettypes.IsCriticalPod(pod)) || kubepod.IsStaticPod(pod) {
+		glog.Errorf("eviction manager: cannot evict a critical or static pod %s", format.Pod(pod))
 		return false
 	}
 	status := v1.PodStatus{
