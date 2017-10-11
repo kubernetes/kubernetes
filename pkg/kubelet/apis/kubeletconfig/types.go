@@ -331,9 +331,8 @@ type KubeletConfiguration struct {
 	// Whitelist of unsafe sysctls or sysctl patterns (ending in *).
 	// +optional
 	AllowedUnsafeSysctls []string
-	// featureGates is a string of comma-separated key=value pairs that describe feature
-	// gates for alpha/experimental features.
-	FeatureGates string
+	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
+	FeatureGates map[string]bool
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	FailSwapOn bool
 	// This flag, if set, enables a check prior to mount operations to verify that the required components

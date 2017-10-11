@@ -317,9 +317,8 @@ type KubeletConfiguration struct {
 	// Resource isolation might be lacking and pod might influence each other on the same node.
 	// +optional
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
-	// featureGates is a string of comma-separated key=value pairs that describe feature
-	// gates for alpha/experimental features.
-	FeatureGates string `json:"featureGates,omitempty"`
+	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
+	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	FailSwapOn bool `json:"failSwapOn,omitempty"`
 	// This flag, if set, enables a check prior to mount operations to verify that the required components

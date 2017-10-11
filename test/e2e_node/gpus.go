@@ -24,14 +24,13 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
-
-const acceleratorsFeatureGate = "Accelerators=true"
 
 func getGPUsAvailable(f *framework.Framework) int64 {
 	nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
@@ -91,14 +90,11 @@ var _ = framework.KubeDescribe("GPU [Serial]", func() {
 				}
 			}()
 
+			// Enable Accelerators
 			oldCfg, err = getCurrentKubeletConfig()
 			framework.ExpectNoError(err)
 			newCfg := oldCfg.DeepCopy()
-			if newCfg.FeatureGates != "" {
-				newCfg.FeatureGates = fmt.Sprintf("%s,%s", acceleratorsFeatureGate, newCfg.FeatureGates)
-			} else {
-				newCfg.FeatureGates = acceleratorsFeatureGate
-			}
+			newCfg.FeatureGates[string(features.Accelerators)] = true
 			framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
 
 			By("Waiting for GPUs to become available on the local node")
