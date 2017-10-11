@@ -105,6 +105,31 @@ func hasAll(set, contains []string) bool {
 	return true
 }
 
+func resourceCoversAll(setResources, coversResources []string) bool {
+	// if we have a star or an exact match on all resources, then we match
+	if has(setResources, rbac.ResourceAll) || hasAll(setResources, coversResources) {
+		return true
+	}
+
+	for _, path := range coversResources {
+		// if we have an exact match, then we match.
+		if has(setResources, path) {
+			continue
+		}
+		// if we're not a subresource, then we definitely don't match.  fail.
+		if !strings.Contains(path, "/") {
+			return false
+		}
+		tokens := strings.SplitN(path, "/", 2)
+		resourceToCheck := "*/" + tokens[1]
+		if !has(setResources, resourceToCheck) {
+			return false
+		}
+	}
+
+	return true
+}
+
 func nonResourceURLsCoversAll(set, covers []string) bool {
 	for _, path := range covers {
 		covered := false
@@ -133,7 +158,7 @@ func nonResourceURLCovers(ownerPath, subPath string) bool {
 func ruleCovers(ownerRule, subRule rbac.PolicyRule) bool {
 	verbMatches := has(ownerRule.Verbs, rbac.VerbAll) || hasAll(ownerRule.Verbs, subRule.Verbs)
 	groupMatches := has(ownerRule.APIGroups, rbac.APIGroupAll) || hasAll(ownerRule.APIGroups, subRule.APIGroups)
-	resourceMatches := has(ownerRule.Resources, rbac.ResourceAll) || hasAll(ownerRule.Resources, subRule.Resources)
+	resourceMatches := resourceCoversAll(ownerRule.Resources, subRule.Resources)
 	nonResourceURLMatches := nonResourceURLsCoversAll(ownerRule.NonResourceURLs, subRule.NonResourceURLs)
 
 	resourceNameMatches := false

@@ -70,3 +70,108 @@ func TestHelpersRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+func TestResourceMatches(t *testing.T) {
+	tests := []struct {
+		name                      string
+		ruleResources             []string
+		combinedRequestedResource string
+		requestedSubresource      string
+		expected                  bool
+	}{
+		{
+			name:                      "all matches 01",
+			ruleResources:             []string{"*"},
+			combinedRequestedResource: "foo",
+			expected:                  true,
+		},
+		{
+			name:                      "checks all rules",
+			ruleResources:             []string{"doesn't match", "*"},
+			combinedRequestedResource: "foo",
+			expected:                  true,
+		},
+		{
+			name:                      "matches exact rule",
+			ruleResources:             []string{"foo/bar"},
+			combinedRequestedResource: "foo/bar",
+			requestedSubresource:      "bar",
+			expected:                  true,
+		},
+		{
+			name:                      "matches exact rule 02",
+			ruleResources:             []string{"foo/bar"},
+			combinedRequestedResource: "foo",
+			expected:                  false,
+		},
+		{
+			name:                      "matches subresource",
+			ruleResources:             []string{"*/scale"},
+			combinedRequestedResource: "foo/scale",
+			requestedSubresource:      "scale",
+			expected:                  true,
+		},
+		{
+			name:                      "doesn't match partial subresource hit",
+			ruleResources:             []string{"foo/bar", "*/other"},
+			combinedRequestedResource: "foo/other/segment",
+			requestedSubresource:      "other/segment",
+			expected:                  false,
+		},
+		{
+			name:                      "matches subresource with multiple slashes",
+			ruleResources:             []string{"*/other/segment"},
+			combinedRequestedResource: "foo/other/segment",
+			requestedSubresource:      "other/segment",
+			expected:                  true,
+		},
+		{
+			name:                      "doesn't fail on empty",
+			ruleResources:             []string{""},
+			combinedRequestedResource: "foo/other/segment",
+			requestedSubresource:      "other/segment",
+			expected:                  false,
+		},
+		{
+			name:                      "doesn't fail on slash",
+			ruleResources:             []string{"/"},
+			combinedRequestedResource: "foo/other/segment",
+			requestedSubresource:      "other/segment",
+			expected:                  false,
+		},
+		{
+			name:                      "doesn't fail on missing subresource",
+			ruleResources:             []string{"*/"},
+			combinedRequestedResource: "foo/other/segment",
+			requestedSubresource:      "other/segment",
+			expected:                  false,
+		},
+		{
+			name:                      "doesn't match on not star",
+			ruleResources:             []string{"*something/other/segment"},
+			combinedRequestedResource: "foo/other/segment",
+			requestedSubresource:      "other/segment",
+			expected:                  false,
+		},
+		{
+			name:                      "doesn't match on something else",
+			ruleResources:             []string{"something/other/segment"},
+			combinedRequestedResource: "foo/other/segment",
+			requestedSubresource:      "other/segment",
+			expected:                  false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rule := &rbac.PolicyRule{
+				Resources: tc.ruleResources,
+			}
+			actual := rbac.ResourceMatches(rule, tc.combinedRequestedResource, tc.requestedSubresource)
+			if tc.expected != actual {
+				t.Errorf("expected %v, got %v", tc.expected, actual)
+			}
+
+		})
+	}
+}
