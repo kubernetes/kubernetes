@@ -1726,9 +1726,6 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 							CreationTimestamp: metav1.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						},
 						Status: v1.NodeStatus{
-							NodeInfo: v1.NodeSystemInfo{
-								KubeletVersion: "v1.2.0",
-							},
 							Conditions: []v1.NodeCondition{
 								{
 									Type:   v1.NodeReady,
@@ -1752,9 +1749,6 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 			},
 			timeToPass: 1 * time.Minute,
 			newNodeStatus: v1.NodeStatus{
-				NodeInfo: v1.NodeSystemInfo{
-					KubeletVersion: "v1.2.0",
-				},
 				Conditions: []v1.NodeCondition{
 					{
 						Type:   v1.NodeReady,
