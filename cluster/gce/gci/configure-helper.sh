@@ -1610,6 +1610,10 @@ function start-kube-controller-manager {
   if [[ -n "${CLUSTER_SIGNING_DURATION:-}" ]]; then
     params+=" --experimental-cluster-signing-duration=$CLUSTER_SIGNING_DURATION"
   fi
+  # disable using HPA metrics REST clients if metrics-server isn't enabled
+  if [[ "${ENABLE_METRICS_SERVER:-}" != "true" ]]; then
+    params+=" --horizontal-pod-autoscaler-use-rest-clients=false"
+  fi
 
   local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
   local container_env=""
