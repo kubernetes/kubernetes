@@ -35,7 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/pkg/kubelet/util/csr"
+	"k8s.io/client-go/util/certificate/csr"
 )
 
 // certificateWaitBackoff controls the amount and timing of retries when the

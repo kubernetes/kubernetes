@@ -9,9 +9,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["csr.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/util/csr",
+    importpath = "k8s.io/client-go/util/certificate/csr",
     deps = [
-        "//pkg/apis/certificates/v1beta1:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/certificates/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -43,7 +42,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["csr_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/util/csr",
+    importpath = "k8s.io/client-go/util/certificate/csr",
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/api/certificates/v1beta1:go_default_library",

@@ -22,7 +22,6 @@ go_library(
     srcs = ["bootstrap.go"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/certificate/bootstrap",
     deps = [
-        "//pkg/kubelet/util/csr:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
@@ -32,6 +31,7 @@ go_library(
         "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
         "//vendor/k8s.io/client-go/transport:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
+        "//vendor/k8s.io/client-go/util/certificate/csr:go_default_library",
     ],
 )
 

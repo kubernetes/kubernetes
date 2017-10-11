@@ -19,13 +19,14 @@ package csr
 import (
 	"crypto"
 	"crypto/sha512"
+	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
+	"encoding/pem"
 	"fmt"
+	"github.com/golang/glog"
 	"reflect"
 	"time"
-
-	"github.com/golang/glog"
 
 	certificates "k8s.io/api/certificates/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,7 +39,6 @@ import (
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	certutil "k8s.io/client-go/util/cert"
-	certhelper "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 )
 
 // RequestNodeCertificate will create a certificate signing request for a node
@@ -200,11 +200,11 @@ func digestedName(privateKeyData []byte, subject *pkix.Name, usages []certificat
 
 // ensureCompatible ensures that a CSR object is compatible with an original CSR
 func ensureCompatible(new, orig *certificates.CertificateSigningRequest, privateKey interface{}) error {
-	newCsr, err := certhelper.ParseCSR(new)
+	newCsr, err := ParseCSR(new)
 	if err != nil {
 		return fmt.Errorf("unable to parse new csr: %v", err)
 	}
-	origCsr, err := certhelper.ParseCSR(orig)
+	origCsr, err := ParseCSR(orig)
 	if err != nil {
 		return fmt.Errorf("unable to parse original csr: %v", err)
 	}
@@ -243,4 +243,19 @@ func formatError(format string, err error) error {
 		return se
 	}
 	return fmt.Errorf(format, err)
+}
+
+// ParseCSR extracts the CSR from the API object and decodes it.
+func ParseCSR(obj *certificates.CertificateSigningRequest) (*x509.CertificateRequest, error) {
+	// extract PEM from request object
+	pemBytes := obj.Spec.Request
+	block, _ := pem.Decode(pemBytes)
+	if block == nil || block.Type != "CERTIFICATE REQUEST" {
+		return nil, fmt.Errorf("PEM block type must be CERTIFICATE REQUEST")
+	}
+	csr, err := x509.ParseCertificateRequest(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	return csr, nil
 }
