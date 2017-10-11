@@ -24,8 +24,13 @@ import (
 
 // FakeCache is used for testing
 type FakeCache struct {
-	AssumeFunc func(*v1.Pod)
-	ForgetFunc func(*v1.Pod)
+	AssumeFunc       func(*v1.Pod)
+	ForgetFunc       func(*v1.Pod)
+	IsAssumedPodFunc func(*v1.Pod) bool
+}
+
+func (f *FakeCache) IsAssumedPod(pod *v1.Pod) (bool, error) {
+	return f.IsAssumedPodFunc(pod), nil
 }
 
 func (f *FakeCache) AssumePod(pod *v1.Pod) error {

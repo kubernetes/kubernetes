@@ -116,6 +116,7 @@ func TestScheduler(t *testing.T) {
 
 	table := []struct {
 		injectBindError  error
+		isAssumedPod     bool
 		sendPod          *v1.Pod
 		algo             algorithm.ScheduleAlgorithm
 		expectErrorPod   *v1.Pod
@@ -151,6 +152,12 @@ func TestScheduler(t *testing.T) {
 			sendPod:     deletingPod("foo"),
 			algo:        mockScheduler{"", nil},
 			eventReason: "FailedScheduling",
+		}, {
+			// No events or errors should be emitted since the already assumed
+			// pod will be skipped scheduling.
+			isAssumedPod: true,
+			sendPod:      podWithID("foo", ""),
+			algo:         mockScheduler{"", errS},
 		},
 	}
 
@@ -168,6 +175,9 @@ func TestScheduler(t *testing.T) {
 					},
 					AssumeFunc: func(pod *v1.Pod) {
 						gotAssumedPod = pod
+					},
+					IsAssumedPodFunc: func(pod *v1.Pod) bool {
+						return item.isAssumedPod
 					},
 				},
 				NodeLister: schedulertesting.FakeNodeLister(
@@ -199,7 +209,9 @@ func TestScheduler(t *testing.T) {
 			close(called)
 		})
 		s.scheduleOne()
-		<-called
+		if item.eventReason != "" {
+			<-called
+		}
 		if e, a := item.expectAssumedPod, gotAssumedPod; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v: assumed pod: wanted %v, got %v", i, e, a)
 		}
