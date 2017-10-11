@@ -72,5 +72,6 @@ func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
 		DeserializationCacheSize: 0,
 		Codec:              codec,
 		CompactionInterval: DefaultCompactInterval,
+		Quorum:             true,
 	}
 }
