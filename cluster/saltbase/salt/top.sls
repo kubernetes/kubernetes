@@ -40,6 +40,7 @@ base:
 {% if pillar.get('network_policy_provider', '').lower() == 'calico' %}
     - calico.node
 {% endif %}
+    - mount-propagation
 
   'roles:kubernetes-master':
     - match: grain
