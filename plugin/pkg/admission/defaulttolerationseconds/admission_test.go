@@ -37,6 +37,7 @@ func TestForgivenessAdmission(t *testing.T) {
 		description  string
 		requestedPod api.Pod
 		expectedPod  api.Pod
+		op           admission.Operation
 	}{
 		{
 			description: "pod has no tolerations, expect add tolerations for `notReady:NoExecute` and `unreachable:NoExecute`",
@@ -240,6 +241,27 @@ func TestForgivenessAdmission(t *testing.T) {
 			},
 		},
 		{
+			description: "pod specified toleration for taint `unreachable`, but is an update, no change",
+			op:          admission.Update,
+			requestedPod: api.Pod{
+				Spec: api.PodSpec{
+					Tolerations: []api.Toleration{
+						{Operator: api.TolerationOpExists, TolerationSeconds: genTolerationSeconds(700)},
+					},
+				},
+			},
+			expectedPod: api.Pod{
+				Spec: api.PodSpec{
+					Tolerations: []api.Toleration{
+						{
+							Operator:          api.TolerationOpExists,
+							TolerationSeconds: genTolerationSeconds(700),
+						},
+					},
+				},
+			},
+		},
+		{
 			description: "pod has wildcard toleration for all kind of taints, expect no change",
 			requestedPod: api.Pod{
 				Spec: api.PodSpec{
@@ -262,7 +284,7 @@ func TestForgivenessAdmission(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := handler.Admit(admission.NewAttributesRecord(&test.requestedPod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
+		err := handler.Admit(admission.NewAttributesRecord(&test.requestedPod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", test.op, nil))
 		if err != nil {
 			t.Errorf("[%s]: unexpected error %v for pod %+v", test.description, err, test.requestedPod)
 		}

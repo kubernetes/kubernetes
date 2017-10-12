@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
@@ -75,6 +77,11 @@ func (p *plugin) Admit(attributes admission.Attributes) (err error) {
 	pod, ok := attributes.GetObject().(*api.Pod)
 	if !ok {
 		return errors.NewBadRequest(fmt.Sprintf("expected *api.Pod but got %T", attributes.GetObject()))
+	}
+	// already scheduled pods cannot be mutated
+	if attributes.GetOperation() == admission.Update {
+		glog.V(5).Infof("will not mutate scheduled pod %s in project %s", pod.Name, attributes.GetNamespace())
+		return nil
 	}
 
 	tolerations := pod.Spec.Tolerations

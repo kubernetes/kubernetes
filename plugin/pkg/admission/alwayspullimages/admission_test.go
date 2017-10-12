@@ -17,6 +17,7 @@ limitations under the License.
 package alwayspullimages
 
 import (
+	"reflect"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,6 +61,37 @@ func TestAdmission(t *testing.T) {
 		if c.ImagePullPolicy != api.PullAlways {
 			t.Errorf("Container %v: expected pull always, got %v", c, c.ImagePullPolicy)
 		}
+	}
+}
+
+func TestAdmissionUnlessCreate(t *testing.T) {
+	namespace := "test"
+	handler := &alwaysPullImages{}
+	pod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: namespace},
+		Spec: api.PodSpec{
+			InitContainers: []api.Container{
+				{Name: "init1", Image: "image"},
+				{Name: "init2", Image: "image", ImagePullPolicy: api.PullNever},
+				{Name: "init3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
+				{Name: "init4", Image: "image", ImagePullPolicy: api.PullAlways},
+			},
+			Containers: []api.Container{
+				{Name: "ctr1", Image: "image"},
+				{Name: "ctr2", Image: "image", ImagePullPolicy: api.PullNever},
+				{Name: "ctr3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
+				{Name: "ctr4", Image: "image", ImagePullPolicy: api.PullAlways},
+			},
+		},
+	}
+	copied, _ := api.Scheme.Copy(pod)
+	original := copied.(*api.Pod)
+	err := handler.Admit(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
+	if err != nil {
+		t.Errorf("Unexpected error returned from admission handler")
+	}
+	if !reflect.DeepEqual(copied, original) {
+		t.Fatalf("Scheduled pod should not be modified on update")
 	}
 }
 
