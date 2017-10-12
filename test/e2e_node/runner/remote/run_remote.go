@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -50,6 +51,7 @@ var instanceNamePrefix = flag.String("instance-name-prefix", "", "prefix for ins
 var zone = flag.String("zone", "", "gce zone the hosts live in")
 var project = flag.String("project", "", "gce project the hosts live in")
 var imageConfigFile = flag.String("image-config-file", "", "yaml file describing images to run")
+var imageConfigDir = flag.String("image-config-dir", "", "(optional)path to image config files")
 var imageProject = flag.String("image-project", "", "gce project the hosts live in")
 var images = flag.String("images", "", "images to test")
 var hosts = flag.String("hosts", "", "hosts to test")
@@ -204,8 +206,13 @@ func main() {
 		images: make(map[string]internalGCEImage),
 	}
 	if *imageConfigFile != "" {
+		configPath := *imageConfigFile
+		if *imageConfigDir != "" {
+			configPath = filepath.Join(*imageConfigDir, *imageConfigFile)
+		}
+
 		// parse images
-		imageConfigData, err := ioutil.ReadFile(*imageConfigFile)
+		imageConfigData, err := ioutil.ReadFile(configPath)
 		if err != nil {
 			glog.Fatalf("Could not read image config file provided: %v", err)
 		}
@@ -723,9 +730,13 @@ func parseInstanceMetadata(str string) map[string]string {
 			glog.Fatalf("Invalid instance metadata: %q", s)
 			continue
 		}
-		v, err := ioutil.ReadFile(kp[1])
+		metaPath := kp[1]
+		if *imageConfigDir != "" {
+			metaPath = filepath.Join(*imageConfigDir, metaPath)
+		}
+		v, err := ioutil.ReadFile(metaPath)
 		if err != nil {
-			glog.Fatalf("Failed to read metadata file %q: %v", kp[1], err)
+			glog.Fatalf("Failed to read metadata file %q: %v", metaPath, err)
 			continue
 		}
 		metadata[kp[0]] = string(v)
