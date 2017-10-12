@@ -86,12 +86,13 @@ readonly KUBE_CONTAINER_RSYNC_PORT=8730
 # $1 - server architecture
 kube::build::get_docker_wrapped_binaries() {
   debian_iptables_version=v8
+  debian_hyperkube_version=0.3
   ### If you change any of these lists, please also update DOCKERIZED_BINARIES
   ### in build/BUILD.
   case $1 in
     "amd64")
         local targets=(
-          cloud-controller-manager,busybox
+          cloud-controller-manager,gcr.io/google-containers/debian-hyperkube-base-amd64:${debian_hyperkube_version}
           kube-apiserver,busybox
           kube-controller-manager,busybox
           kube-scheduler,busybox
@@ -100,7 +101,7 @@ kube::build::get_docker_wrapped_binaries() {
         );;
     "arm")
         local targets=(
-          cloud-controller-manager,arm32v7/busybox
+          cloud-controller-manager,gcr.io/google-containers/debian-hyperkube-base-arm:${debian_hyperkube_version}
           kube-apiserver,arm32v7/busybox
           kube-controller-manager,arm32v7/busybox
           kube-scheduler,arm32v7/busybox
@@ -109,7 +110,7 @@ kube::build::get_docker_wrapped_binaries() {
         );;
     "arm64")
         local targets=(
-          cloud-controller-manager,arm64v8/busybox
+          cloud-controller-manager,gcr.io/google-containers/debian-hyperkube-base-arm64:${debian_hyperkube_version}
           kube-apiserver,arm64v8/busybox
           kube-controller-manager,arm64v8/busybox
           kube-scheduler,arm64v8/busybox
@@ -118,7 +119,7 @@ kube::build::get_docker_wrapped_binaries() {
         );;
     "ppc64le")
         local targets=(
-          cloud-controller-manager,ppc64le/busybox
+          cloud-controller-manager,gcr.io/google-containers/debian-hyperkube-base-ppc64le:${debian_hyperkube_version}
           kube-apiserver,ppc64le/busybox
           kube-controller-manager,ppc64le/busybox
           kube-scheduler,ppc64le/busybox
@@ -127,7 +128,7 @@ kube::build::get_docker_wrapped_binaries() {
         );;
     "s390x")
         local targets=(
-          cloud-controller-manager,s390x/busybox
+          cloud-controller-manager,gcr.io/google-containers/debian-hyperkube-base-s390x:${debian_hyperkube_version}
           kube-apiserver,s390x/busybox
           kube-controller-manager,s390x/busybox
           kube-scheduler,s390x/busybox
