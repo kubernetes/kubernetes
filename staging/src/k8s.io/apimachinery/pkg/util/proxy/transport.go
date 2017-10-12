@@ -131,23 +131,23 @@ func (rt *Transport) WrappedRoundTripper() http.RoundTripper {
 
 // rewriteURL rewrites a single URL to go through the proxy, if the URL refers
 // to the same host as sourceURL, which is the page on which the target URL
-// occurred, or if the URL matches the sourceHost. If any error occurs (e.g.
+// occurred, or if the URL matches the sourceRequestHost. If any error occurs (e.g.
 // parsing), it returns targetURL.
-func (t *Transport) rewriteURL(targetURL string, sourceURL *url.URL, sourceHost string) string {
+func (t *Transport) rewriteURL(targetURL string, sourceURL *url.URL, sourceRequestHost string) string {
 	url, err := url.Parse(targetURL)
 	if err != nil {
 		return targetURL
 	}
 
-	isDifferentHost := url.Host != "" && url.Host != sourceURL.Host && url.Host != sourceHost
+	isDifferentHost := url.Host != "" && url.Host != sourceURL.Host && url.Host != sourceRequestHost
 	isRelative := !strings.HasPrefix(url.Path, "/")
 	if isDifferentHost || isRelative {
 		return targetURL
 	}
 
 	// Do not rewrite scheme and host if the Transport has empty scheme and host
-	// when targetURL already contains the sourceHost
-	if !(url.Host == sourceHost && t.Scheme == "" && t.Host == "") {
+	// when targetURL already contains the sourceRequestHost
+	if !(url.Host == sourceRequestHost && t.Scheme == "" && t.Host == "") {
 		url.Scheme = t.Scheme
 		url.Host = t.Host
 	}
