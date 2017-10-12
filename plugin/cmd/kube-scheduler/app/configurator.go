@@ -56,22 +56,22 @@ func createRecorder(kubecli *clientset.Clientset, s *options.SchedulerServer) re
 	return eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: s.SchedulerName})
 }
 
-func createClient(s *options.SchedulerServer) (*clientset.Clientset, error) {
+func createClients(s *options.SchedulerServer) (*clientset.Clientset, *clientset.Clientset, error) {
 	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
 	if err != nil {
-		return nil, fmt.Errorf("unable to build config from flags: %v", err)
+		return nil, nil, fmt.Errorf("unable to build config from flags: %v", err)
 	}
 
 	kubeconfig.ContentType = s.ContentType
 	// Override kubeconfig qps/burst settings from flags
 	kubeconfig.QPS = s.KubeAPIQPS
 	kubeconfig.Burst = int(s.KubeAPIBurst)
-
-	cli, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, "leader-election"))
+	kubeClient, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, "scheduler"))
 	if err != nil {
-		return nil, fmt.Errorf("invalid API configuration: %v", err)
+		glog.Fatalf("Invalid API configuration: %v", err)
 	}
-	return cli, nil
+	leaderElectionClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "leader-election"))
+	return kubeClient, leaderElectionClient, nil
 }
 
 // CreateScheduler encapsulates the entire creation of a runnable scheduler.
