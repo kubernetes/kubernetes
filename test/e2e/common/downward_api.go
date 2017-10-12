@@ -187,6 +187,29 @@ var _ = framework.KubeDescribe("Downward API", func() {
 
 		testDownwardAPIUsingPod(f, pod, env, expectations)
 	})
+
+	It("should provide pod UID as env vars [Conformance]", func() {
+		framework.SkipUnlessServerVersionGTE(hostIPVersion, f.ClientSet.Discovery())
+		podUID := uuid.NewUUID()
+		podName := "downward-api-" + string(podUID)
+		env := []v1.EnvVar{
+			{
+				Name: "POD_UID",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "metadata.uid",
+					},
+				},
+			},
+		}
+
+		expectations := []string{
+			fmt.Sprintf("POD_UID=%v", podUID),
+		}
+
+		testDownwardAPI(f, podName, env, expectations)
+	})
 })
 
 func testDownwardAPI(f *framework.Framework, podName string, env []v1.EnvVar, expectations []string) {
