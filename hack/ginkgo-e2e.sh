@@ -148,7 +148,6 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   --network="${KUBE_GCE_NETWORK:-${KUBE_GKE_NETWORK:-e2e}}" \
   --node-tag="${NODE_TAG:-}" \
   --master-tag="${MASTER_TAG:-}" \
-  --federated-kube-context="${FEDERATION_KUBE_CONTEXT:-e2e-federation}" \
   ${KUBE_CONTAINER_RUNTIME:+"--container-runtime=${KUBE_CONTAINER_RUNTIME}"} \
   ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
   ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \

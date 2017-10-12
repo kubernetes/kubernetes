@@ -37,7 +37,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -103,11 +102,6 @@ type ClientAccessFactory interface {
 	// just directions to the server. People use this to build RESTMappers on top of
 	BareClientConfig() (*restclient.Config, error)
 
-	// TODO this should probably be removed and collapsed into whatever we want to use long term
-	// probably returning a restclient for a version and leaving contruction up to someone else
-	FederationClientSetForVersion(version *schema.GroupVersion) (fedclientset.Interface, error)
-	// TODO remove this should be rolled into restclient with the right version
-	FederationClientForVersion(version *schema.GroupVersion) (*restclient.RESTClient, error)
 	// TODO remove.  This should be rolled into `ClientSet`
 	ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error)
 	// TODO remove.  This should be rolled into `ClientConfig`

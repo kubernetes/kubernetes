@@ -184,13 +184,6 @@ kube::util::gen-docs() {
   "${genkubedocs}" "${dest}/docs/admin/" "kube-scheduler"
   "${genkubedocs}" "${dest}/docs/admin/" "kubelet"
 
-  # We don't really need federation-apiserver and federation-controller-manager
-  # binaries to generate the docs. We just pass their names to decide which docs
-  # to generate. The actual binary for running federation is hyperkube.
-  "${genfeddocs}" "${dest}/docs/admin/" "federation-apiserver"
-  "${genfeddocs}" "${dest}/docs/admin/" "federation-controller-manager"
-  "${genfeddocs}" "${dest}/docs/admin/" "kubefed"
-
   mkdir -p "${dest}/docs/man/man1/"
   "${genman}" "${dest}/docs/man/man1/" "kube-apiserver"
   "${genman}" "${dest}/docs/man/man1/" "kube-controller-manager"
@@ -274,9 +267,6 @@ kube::util::group-version-to-pkg-path() {
     # both group and version are "", this occurs when we generate deep copies for internal objects of the legacy v1 API.
     __internal)
       echo "pkg/api"
-      ;;
-    federation/v1beta1)
-      echo "federation/apis/federation/v1beta1"
       ;;
     meta/v1)
       echo "vendor/k8s.io/apimachinery/pkg/apis/meta/v1"

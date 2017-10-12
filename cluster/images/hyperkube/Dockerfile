@@ -22,8 +22,6 @@ FROM BASEIMAGE
 # RUN /hyperkube --make-symlinks
 RUN ln -s /hyperkube /apiserver \
  && ln -s /hyperkube /controller-manager \
- && ln -s /hyperkube /federation-apiserver \
- && ln -s /hyperkube /federation-controller-manager \
  && ln -s /hyperkube /kubectl \
  && ln -s /hyperkube /kubelet \
  && ln -s /hyperkube /proxy \
@@ -31,8 +29,6 @@ RUN ln -s /hyperkube /apiserver \
   && ln -s /hyperkube /aggerator \
  && ln -s /hyperkube /usr/local/bin/kube-apiserver \
  && ln -s /hyperkube /usr/local/bin/kube-controller-manager \
- && ln -s /hyperkube /usr/local/bin/federation-apiserver \
- && ln -s /hyperkube /usr/local/bin/federation-controller-manager \
  && ln -s /hyperkube /usr/local/bin/kubectl \
  && ln -s /hyperkube /usr/local/bin/kubelet \
  && ln -s /hyperkube /usr/local/bin/kube-proxy \
