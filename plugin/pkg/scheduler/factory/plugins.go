@@ -43,7 +43,7 @@ type PluginFactoryArgs struct {
 	NodeInfo                       predicates.NodeInfo
 	PVInfo                         predicates.PersistentVolumeInfo
 	PVCInfo                        predicates.PersistentVolumeClaimInfo
-	HardPodAffinitySymmetricWeight int
+	HardPodAffinitySymmetricWeight int32
 }
 
 // MetadataProducerFactory produces MetadataProducer from the given args.

@@ -54,7 +54,7 @@ func autoConvert_v1alpha1_ClientConnectionConfiguration_To_kubeproxyconfig_Clien
 	out.AcceptContentTypes = in.AcceptContentTypes
 	out.ContentType = in.ContentType
 	out.QPS = in.QPS
-	out.Burst = in.Burst
+	out.Burst = int32(in.Burst)
 	return nil
 }
 
@@ -68,7 +68,7 @@ func autoConvert_kubeproxyconfig_ClientConnectionConfiguration_To_v1alpha1_Clien
 	out.AcceptContentTypes = in.AcceptContentTypes
 	out.ContentType = in.ContentType
 	out.QPS = in.QPS
-	out.Burst = in.Burst
+	out.Burst = int(in.Burst)
 	return nil
 }
 

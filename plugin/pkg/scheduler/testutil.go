@@ -55,7 +55,7 @@ func (fc *FakeConfigurator) GetPredicates(predicateKeys sets.String) (map[string
 }
 
 // GetHardPodAffinitySymmetricWeight is not implemented yet.
-func (fc *FakeConfigurator) GetHardPodAffinitySymmetricWeight() int {
+func (fc *FakeConfigurator) GetHardPodAffinitySymmetricWeight() int32 {
 	panic("not implemented")
 }
 

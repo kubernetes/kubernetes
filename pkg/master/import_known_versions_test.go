@@ -99,7 +99,7 @@ func ensureNoTags(t *testing.T, gvk schema.GroupVersionKind, tp reflect.Type, pa
 	case reflect.Map, reflect.Slice, reflect.Ptr:
 		ensureNoTags(t, gvk, tp.Elem(), parents)
 
-	case reflect.String, reflect.Bool, reflect.Float32, reflect.Int, reflect.Int32, reflect.Int64, reflect.Uint8, reflect.Uintptr, reflect.Uint32, reflect.Uint64, reflect.Interface:
+	case reflect.String, reflect.Bool, reflect.Float32, reflect.Int32, reflect.Int64, reflect.Uint8, reflect.Uintptr, reflect.Uint32, reflect.Uint64, reflect.Interface:
 		// no-op
 
 	case reflect.Struct:
