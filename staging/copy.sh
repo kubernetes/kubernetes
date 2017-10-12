@@ -150,7 +150,30 @@ echo "rewriting Godeps.json"
 # The entries for k8s.io/apimahcinery are not removed from Godeps.json, though
 # they contain the invalid commit revision. The publish robot will set the
 # correct commit revision.
-go run "${KUBE_ROOT}/staging/godeps-json-updater.go" --godeps-file="${CLIENT_REPO_TEMP}/Godeps/Godeps.json" --override-import-path="${CLIENT_REPO_FROM_SRC}" --ignored-prefixes="k8s.io/client-go,k8s.io/kubernetes" --rewritten-prefixes="k8s.io/apimachinery"
+GUNEXPAND=unexpand
+if ! (${GUNEXPAND} --version 2>&1 | grep -q GNU); then
+  GUNEXPAND=gunexpand
+fi
+for repo in $(ls -1 ${KUBE_ROOT}/staging/src/k8s.io); do
+  # remove staging prefix
+  jq '.Deps |= map(.ImportPath |= ltrimstr("k8s.io/kubernetes/staging/src/"))' ${CLIENT_REPO_TEMP}/Godeps/Godeps.json |
+
+  # x-out staging repo revisions. They will only be known when the publisher bot has created the final export.
+  # We keep the staging dependencies in here though to give the publisher bot a way to detect when the staging
+  # dependencies changed. If they have changed, the bot will run a complete godep restore+save. If they didn't
+
+  # it will avoid that step, which takes quite some time.
+  jq '.Deps |= map((select(.ImportPath | (startswith("k8s.io/'${repo}'/") or . == "k8s.io/'${repo}'")) | .Rev |= "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx") // .)' |
+
+  # remove comments
+  jq 'del(.Deps[].Comment)' > ${CLIENT_REPO_TEMP}/Godeps/Godeps.json.out
+
+  mv ${CLIENT_REPO_TEMP}/Godeps/Godeps.json.out ${CLIENT_REPO_TEMP}/Godeps/Godeps.json
+done
+jq '.Deps |= ([.[] | select(.ImportPath | startswith("k8s.io/kubernetes/") | not)])' ${CLIENT_REPO_TEMP}/Godeps/Godeps.json |
+  # format with tabs
+  ${GUNEXPAND} --first-only --tabs=2 > ${CLIENT_REPO_TEMP}/Godeps/Godeps.json.out
+mv ${CLIENT_REPO_TEMP}/Godeps/Godeps.json.out ${CLIENT_REPO_TEMP}/Godeps/Godeps.json
 
 echo "rewriting imports"
 grep -Rl "\"${MAIN_REPO_FROM_SRC}" "${CLIENT_REPO_TEMP}" | \
