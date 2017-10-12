@@ -31,7 +31,7 @@ import (
 
 var hostIPVersion = utilversion.MustParseSemantic("v1.8.0")
 
-var _ = framework.KubeDescribe("Downward API", func() {
+var _ = Describe("[sig-api-machinery] Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
 	It("should provide pod name and namespace as env vars [Conformance]", func() {
