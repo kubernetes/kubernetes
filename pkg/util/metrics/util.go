@@ -37,13 +37,13 @@ var (
 	rateLimiterMetrics = make(map[string]prometheus.Gauge)
 )
 
-func registerRateLimiterMetric(ownerName string) error {
+func registerRateLimiterMetric(ownerName string) (bool, error) {
 	metricsLock.Lock()
 	defer metricsLock.Unlock()
 
 	if _, ok := rateLimiterMetrics[ownerName]; ok {
-		glog.Errorf("Metric for %v already registered", ownerName)
-		return fmt.Errorf("Metric for %v already registered", ownerName)
+		glog.Errorf("Rate Limiter Metric for %v already registered", ownerName)
+		return false, nil
 	}
 	metric := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:      "rate_limiter_use",
@@ -52,22 +52,24 @@ func registerRateLimiterMetric(ownerName string) error {
 	})
 	rateLimiterMetrics[ownerName] = metric
 	if err := prometheus.Register(metric); err != nil {
-		return fmt.Errorf("error registering rate limiter usage metric: %v", err)
+		return false, fmt.Errorf("error registering rate limiter usage metric: %v", err)
 	}
-	return nil
+	return true, nil
 }
 
 // RegisterMetricAndTrackRateLimiterUsage registers a metric ownerName_rate_limiter_use in prometheus to track
 // how much used rateLimiter is and starts a goroutine that updates this metric every updatePeriod
 func RegisterMetricAndTrackRateLimiterUsage(ownerName string, rateLimiter flowcontrol.RateLimiter) error {
-	err := registerRateLimiterMetric(ownerName)
+	registered, err := registerRateLimiterMetric(ownerName)
 	if err != nil {
 		return err
 	}
-	go wait.Forever(func() {
-		metricsLock.Lock()
-		defer metricsLock.Unlock()
-		rateLimiterMetrics[ownerName].Set(rateLimiter.Saturation())
-	}, updatePeriod)
+	if registered {
+		go wait.Forever(func() {
+			metricsLock.Lock()
+			defer metricsLock.Unlock()
+			rateLimiterMetrics[ownerName].Set(rateLimiter.Saturation())
+		}, updatePeriod)
+	}
 	return nil
 }
