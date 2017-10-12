@@ -160,10 +160,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -187,10 +184,7 @@ func TestSyncEndpointsExistingNilSubsets(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -214,10 +208,7 @@ func TestSyncEndpointsExistingEmptySubsets(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -241,10 +232,7 @@ func TestSyncEndpointsNewNoSubsets(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
@@ -260,10 +248,7 @@ func TestCheckLeftoverEndpoints(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, _ := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -289,10 +274,7 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -333,10 +315,7 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -377,10 +356,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -417,10 +393,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -457,10 +430,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -498,10 +468,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 	ns := "bar"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -541,10 +508,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			ResourceVersion: "1",
@@ -572,10 +536,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	addPods(endpoints.podStore, ns, 3, 2, 0)
 	addPods(endpoints.podStore, "blah", 5, 2, 0) // make sure these aren't found!
 	endpoints.serviceStore.Add(&v1.Service{
@@ -616,10 +577,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	addPods(endpoints.podStore, ns, 3, 2, 0)
 	serviceLabels := map[string]string{"foo": "bar"}
 	endpoints.serviceStore.Add(&v1.Service{
@@ -665,10 +623,7 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 	ns := "bar"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -731,10 +686,7 @@ func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
 			ns := "other"
 			testServer, endpointsHandler := makeTestServer(t, ns)
 			defer testServer.Close()
-			endpoints, err := newController(testServer.URL)
-			if err != nil {
-				t.Errorf("Failed to create endpoint controller: %v", err)
-			}
+			endpoints, _ := newController(testServer.URL)
 			addPods(endpoints.podStore, ns, 1, 1, 0)
 			service := &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
@@ -774,10 +726,7 @@ func TestSyncEndpointsHeadlessService(t *testing.T) {
 	ns := "headless"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -818,10 +767,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseFail
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -857,10 +803,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseSucc
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -896,10 +839,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyOnFailureAndPhase
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints, err := newController(testServer.URL)
-	if err != nil {
-		t.Errorf("Failed to create endpoint controller: %v", err)
-	}
+	endpoints, _ := newController(testServer.URL)
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
