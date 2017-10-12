@@ -22,6 +22,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,7 +30,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/client-go/kubernetes/scheme"
 )
 
 // ErrMatchFunc can be used to filter errors that may not be true failures.
@@ -163,11 +164,16 @@ func (r *Result) Object() (runtime.Object, error) {
 	if len(versions) == 1 {
 		version = versions.List()[0]
 	}
-	return &api.List{
+
+	e := []runtime.RawExtension{}
+	for _, o := range objects {
+		e = append(e, runtime.RawExtension{Object: o})
+	}
+	return &v1.List{
 		ListMeta: metav1.ListMeta{
 			ResourceVersion: version,
 		},
-		Items: objects,
+		Items: e,
 	}, err
 }
 
@@ -236,8 +242,12 @@ func AsVersionedObject(infos []*Info, forceList bool, version schema.GroupVersio
 	if len(objects) == 1 && !forceList {
 		object = objects[0]
 	} else {
-		object = &api.List{Items: objects}
-		converted, err := TryConvert(api.Scheme, object, version, api.Registry.GroupOrDie(api.GroupName).GroupVersion)
+		e := []runtime.RawExtension{}
+		for _, o := range objects {
+			e = append(e, runtime.RawExtension{Object: o})
+		}
+		object = &v1.List{Items: e}
+		converted, err := TryConvert(scheme.Scheme, object, version, schema.GroupVersion{"", "v1"})
 		if err != nil {
 			return nil, err
 		}
@@ -268,7 +278,8 @@ func AsVersionedObjects(infos []*Info, version schema.GroupVersion, encoder runt
 		// objects that are not part of api.Scheme must be converted to JSON
 		// TODO: convert to map[string]interface{}, attach to runtime.Unknown?
 		if !version.Empty() {
-			if _, _, err := api.Scheme.ObjectKinds(info.Object); runtime.IsNotRegisteredError(err) {
+			var o runtime.Object = info.Object
+			if _, _, err := scheme.Scheme.ObjectKinds(o); runtime.IsNotRegisteredError(err) {
 				// TODO: ideally this would encode to version, but we don't expose multiple codecs here.
 				data, err := runtime.Encode(encoder, info.Object)
 				if err != nil {
