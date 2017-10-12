@@ -9,6 +9,7 @@ go_library(
         "foreach.go",
         "msg.go",
     ],
+    importpath = "github.com/gogo/protobuf/vanity",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",

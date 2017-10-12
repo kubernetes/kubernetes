@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["helpers_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/apis/extensions",
     library = ":go_default_library",
 )
 
@@ -21,6 +22,7 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/apis/extensions",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/networking:go_default_library",

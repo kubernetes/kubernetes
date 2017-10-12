@@ -6,6 +6,7 @@ go_library(
         "client.go",
         "pbm_util.go",
     ],
+    importpath = "github.com/vmware/govmomi/pbm",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/vmware/govmomi/pbm/methods:go_default_library",

@@ -13,6 +13,7 @@ go_library(
         "synchronized_after_suite_node.go",
         "synchronized_before_suite_node.go",
     ],
+    importpath = "github.com/onsi/ginkgo/internal/leafnodes",
     visibility = ["//vendor/github.com/onsi/ginkgo:__subpackages__"],
     deps = [
         "//vendor/github.com/onsi/ginkgo/internal/codelocation:go_default_library",

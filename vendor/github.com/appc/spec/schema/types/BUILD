@@ -30,6 +30,7 @@ go_library(
         "uuid.go",
         "volume.go",
     ],
+    importpath = "github.com/appc/spec/schema/types",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/appc/spec/schema/common:go_default_library",

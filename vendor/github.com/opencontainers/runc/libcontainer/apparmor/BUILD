@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = ["apparmor_disabled.go"],
     cgo = True,
+    importpath = "github.com/opencontainers/runc/libcontainer/apparmor",
     visibility = ["//visibility:public"],
 )
 

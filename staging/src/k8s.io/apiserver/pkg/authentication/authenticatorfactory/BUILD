@@ -12,6 +12,7 @@ go_library(
         "loopback.go",
         "requestheader.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/authentication/authenticatorfactory",
     deps = [
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",

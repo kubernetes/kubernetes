@@ -6,6 +6,7 @@ go_library(
         "util.go",
         "vhd.go",
     ],
+    importpath = "github.com/rubiojr/go-vhd/vhd",
     visibility = ["//visibility:public"],
 )
 

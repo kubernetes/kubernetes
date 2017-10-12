@@ -12,6 +12,7 @@ go_library(
         "doc.go",
         "kubeconfig.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
@@ -40,6 +41,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["kubeconfig_test.go"],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig",
     library = ":go_default_library",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",

@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["simple_testclient.go"],
+    importpath = "k8s.io/kubernetes/pkg/client/unversioned/testclient/simple",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",

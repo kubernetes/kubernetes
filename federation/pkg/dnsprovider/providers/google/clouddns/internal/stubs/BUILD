@@ -25,6 +25,7 @@ go_library(
         "rrsets_service.go",
         "service.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/stubs",
     deps = [
         "//federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces:go_default_library",
         "//federation/pkg/dnsprovider/rrstype:go_default_library",

@@ -12,6 +12,7 @@ go_library(
         "vsphere.go",
         "vsphere_util.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere",
     deps = [
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/cloudprovider:go_default_library",
@@ -33,6 +34,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["vsphere_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere",
     library = ":go_default_library",
     deps = [
         "//pkg/cloudprovider:go_default_library",

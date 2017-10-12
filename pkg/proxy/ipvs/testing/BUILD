@@ -15,6 +15,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/proxy/ipvs/testing",
     tags = ["automanaged"],
 )
 

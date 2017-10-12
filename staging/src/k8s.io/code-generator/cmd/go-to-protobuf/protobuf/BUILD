@@ -17,6 +17,7 @@ go_library(
         "parser.go",
         "tags.go",
     ],
+    importpath = "k8s.io/code-generator/cmd/go-to-protobuf/protobuf",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
@@ -32,6 +33,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["namer_test.go"],
+    importpath = "k8s.io/code-generator/cmd/go-to-protobuf/protobuf",
     library = ":go_default_library",
 )
 

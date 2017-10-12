@@ -9,6 +9,7 @@ go_library(
         "doc.go",
         "verifiers.go",
     ],
+    importpath = "github.com/opencontainers/go-digest",
     visibility = ["//visibility:public"],
 )
 

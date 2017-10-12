@@ -10,6 +10,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/util/nsenter",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/k8s.io/utils/exec:go_default_library",

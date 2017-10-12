@@ -19,6 +19,7 @@ go_library(
         "secrets.go",
         "services.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/quota/evaluator/core",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/helper:go_default_library",
@@ -54,6 +55,7 @@ go_test(
         "pods_test.go",
         "services_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/quota/evaluator/core",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

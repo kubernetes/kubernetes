@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["abac.go"],
+    importpath = "k8s.io/kubernetes/pkg/auth/authorizer/abac",
     deps = [
         "//pkg/apis/abac:go_default_library",
         "//pkg/apis/abac/latest:go_default_library",
@@ -34,6 +35,7 @@ go_test(
     data = [
         ":example_policy",
     ],
+    importpath = "k8s.io/kubernetes/pkg/auth/authorizer/abac",
     library = ":go_default_library",
     deps = [
         "//pkg/apis/abac:go_default_library",

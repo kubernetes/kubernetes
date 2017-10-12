@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["disruption.go"],
+    importpath = "k8s.io/kubernetes/pkg/controller/disruption",
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/controller:go_default_library",
@@ -44,6 +45,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["disruption_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/controller/disruption",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

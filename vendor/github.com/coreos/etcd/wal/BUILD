@@ -18,6 +18,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/coreos/etcd/wal",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/pkg/crc:go_default_library",

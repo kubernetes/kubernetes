@@ -6,6 +6,7 @@ go_library(
         "client.go",
         "request.go",
     ],
+    importpath = "github.com/libopenstorage/openstorage/api/client",
     visibility = ["//visibility:public"],
 )
 

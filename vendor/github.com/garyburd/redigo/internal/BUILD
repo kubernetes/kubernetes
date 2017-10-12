@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["commandinfo.go"],
+    importpath = "github.com/garyburd/redigo/internal",
     visibility = ["//visibility:public"],
 )
 

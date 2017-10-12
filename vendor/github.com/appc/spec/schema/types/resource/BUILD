@@ -9,6 +9,7 @@ go_library(
         "scale_int.go",
         "suffix.go",
     ],
+    importpath = "github.com/appc/spec/schema/types/resource",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/spf13/pflag:go_default_library",

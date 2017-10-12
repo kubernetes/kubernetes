@@ -7,6 +7,7 @@ go_library(
         "error.go",
         "mapstructure.go",
     ],
+    importpath = "github.com/mitchellh/mapstructure",
     visibility = ["//visibility:public"],
 )
 

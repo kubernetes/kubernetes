@@ -16,6 +16,7 @@ go_library(
         "master.go",
         "services.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/master",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
@@ -114,6 +115,7 @@ go_test(
         "master_test.go",
     ],
     features = ["-race"],
+    importpath = "k8s.io/kubernetes/pkg/master",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

@@ -58,6 +58,7 @@ go_library(
         "virtual_machine.go",
         "vmware_distributed_virtual_switch.go",
     ],
+    importpath = "github.com/vmware/govmomi/object",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/vmware/govmomi/property:go_default_library",

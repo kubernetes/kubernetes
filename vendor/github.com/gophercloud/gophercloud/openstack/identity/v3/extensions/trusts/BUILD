@@ -7,6 +7,7 @@ go_library(
         "requests.go",
         "results.go",
     ],
+    importpath = "github.com/gophercloud/gophercloud/openstack/identity/v3/extensions/trusts",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/gophercloud/gophercloud/openstack/identity/v3/tokens:go_default_library"],
 )

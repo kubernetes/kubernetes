@@ -12,6 +12,7 @@ go_library(
         "import_tracker.go",
         "snippet_writer.go",
     ],
+    importpath = "k8s.io/gengo/generator",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",

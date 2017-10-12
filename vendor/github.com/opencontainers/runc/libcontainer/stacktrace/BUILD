@@ -7,6 +7,7 @@ go_library(
         "frame.go",
         "stacktrace.go",
     ],
+    importpath = "github.com/opencontainers/runc/libcontainer/stacktrace",
     visibility = ["//visibility:public"],
 )
 

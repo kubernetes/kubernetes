@@ -9,6 +9,7 @@ go_library(
         "sender.go",
         "token.go",
     ],
+    importpath = "github.com/Azure/go-autorest/autorest/adal",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/dgrijalva/jwt-go:go_default_library"],
 )

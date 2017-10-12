@@ -7,6 +7,7 @@ go_library(
         "error.go",
         "lexer.go",
     ],
+    importpath = "github.com/mailru/easyjson/jlexer",
     visibility = ["//visibility:public"],
 )
 

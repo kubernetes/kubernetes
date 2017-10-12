@@ -12,6 +12,7 @@ go_library(
         "config.go",
         "doc.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/proxy/config",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion/core/internalversion:go_default_library",
@@ -29,6 +30,7 @@ go_test(
         "api_test.go",
         "config_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/proxy/config",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

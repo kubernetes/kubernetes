@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["patch_test.go"],
+    importpath = "k8s.io/apimachinery/pkg/util/strategicpatch",
     library = ":go_default_library",
     deps = [
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
@@ -22,6 +23,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["patch.go"],
+    importpath = "k8s.io/apimachinery/pkg/util/strategicpatch",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/mergepatch:go_default_library",

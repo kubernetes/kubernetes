@@ -38,6 +38,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "golang.org/x/crypto/curve25519",
     visibility = ["//visibility:public"],
 )
 

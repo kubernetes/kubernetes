@@ -19,6 +19,7 @@ go_library(
         "namespace.go",
         "table_conversion.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e/apimachinery",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1/pod:go_default_library",

@@ -12,6 +12,7 @@ go_library(
         "doc.go",
         "strategy.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/persistentvolumeclaim",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/validation:go_default_library",
@@ -29,6 +30,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["strategy_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/persistentvolumeclaim",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

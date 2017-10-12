@@ -6,6 +6,7 @@ go_library(
         "fake_writer.go",
         "writer.go",
     ],
+    importpath = "github.com/onsi/ginkgo/internal/writer",
     visibility = ["//vendor/github.com/onsi/ginkgo:__subpackages__"],
 )
 

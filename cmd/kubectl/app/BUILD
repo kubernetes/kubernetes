@@ -6,6 +6,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["kubectl.go"],
+    importpath = "k8s.io/kubernetes/cmd/kubectl/app",
     visibility = [
         "//build/visible_to:cmd_kubectl_app_CONSUMERS",
     ],

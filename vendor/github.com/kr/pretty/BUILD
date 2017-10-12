@@ -8,6 +8,7 @@ go_library(
         "pretty.go",
         "zero.go",
     ],
+    importpath = "github.com/kr/pretty",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/kr/text:go_default_library"],
 )

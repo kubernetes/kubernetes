@@ -12,6 +12,7 @@ go_library(
         "apiextensions.go",
         "server.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kube-apiserver/app",
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//pkg/api:go_default_library",

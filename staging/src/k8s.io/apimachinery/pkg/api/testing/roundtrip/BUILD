@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["roundtrip.go"],
+    importpath = "k8s.io/apimachinery/pkg/api/testing/roundtrip",
     deps = [
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/golang/protobuf/proto:go_default_library",

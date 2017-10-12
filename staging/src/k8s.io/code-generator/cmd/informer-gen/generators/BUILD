@@ -19,6 +19,7 @@ go_library(
         "types.go",
         "versioninterface.go",
     ],
+    importpath = "k8s.io/code-generator/cmd/informer-gen/generators",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",

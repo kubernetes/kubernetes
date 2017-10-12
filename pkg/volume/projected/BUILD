@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["projected_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/volume/projected",
     library = ":go_default_library",
     deps = [
         "//pkg/volume:go_default_library",
@@ -26,6 +27,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["projected.go"],
+    importpath = "k8s.io/kubernetes/pkg/volume/projected",
     deps = [
         "//pkg/util/strings:go_default_library",
         "//pkg/volume:go_default_library",

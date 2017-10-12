@@ -24,6 +24,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/kubelet/cadvisor",
     deps = [
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
@@ -61,6 +62,7 @@ go_test(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/kubelet/cadvisor",
     library = ":go_default_library",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [

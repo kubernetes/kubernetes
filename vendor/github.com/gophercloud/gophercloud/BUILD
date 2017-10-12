@@ -13,6 +13,7 @@ go_library(
         "service_client.go",
         "util.go",
     ],
+    importpath = "github.com/gophercloud/gophercloud",
     visibility = ["//visibility:public"],
 )
 

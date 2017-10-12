@@ -14,6 +14,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/coreos/etcd/mvcc/backend",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/boltdb/bolt:go_default_library",

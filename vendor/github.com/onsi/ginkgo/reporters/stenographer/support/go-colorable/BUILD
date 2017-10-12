@@ -11,6 +11,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable",
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:windows_amd64": [

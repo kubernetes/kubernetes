@@ -6,6 +6,7 @@ go_library(
         "path.go",
         "service.go",
     ],
+    importpath = "github.com/miekg/coredns/middleware/etcd/msg",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/miekg/dns:go_default_library"],
 )

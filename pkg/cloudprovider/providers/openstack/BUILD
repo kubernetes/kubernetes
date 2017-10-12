@@ -18,6 +18,7 @@ go_library(
         "openstack_routes.go",
         "openstack_volumes.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/openstack",
     deps = [
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/api/v1/service:go_default_library",
@@ -70,6 +71,7 @@ go_test(
         "openstack_routes_test.go",
         "openstack_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/openstack",
     library = ":go_default_library",
     deps = [
         "//pkg/cloudprovider:go_default_library",

@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["bootstrap_test.go"],
+    importpath = "k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
@@ -24,6 +25,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["bootstrap.go"],
+    importpath = "k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/bootstrap/api:go_default_library",

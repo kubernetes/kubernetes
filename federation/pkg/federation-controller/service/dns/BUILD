@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["dns_test.go"],
+    importpath = "k8s.io/kubernetes/federation/pkg/federation-controller/service/dns",
     library = ":go_default_library",
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
@@ -25,6 +26,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["dns.go"],
+    importpath = "k8s.io/kubernetes/federation/pkg/federation-controller/service/dns",
     deps = [
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//federation/pkg/dnsprovider:go_default_library",

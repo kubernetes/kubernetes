@@ -14,6 +14,7 @@ go_library(
         "fuzzer.go",
         "pod_specs.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/api/testing",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm/fuzzer:go_default_library",
         "//pkg/api:go_default_library",
@@ -70,6 +71,7 @@ go_test(
         "serialization_test.go",
         "unstructured_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/api/testing",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

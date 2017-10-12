@@ -13,6 +13,7 @@ go_library(
         "storageos.go",
         "storageos_util.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/storageos",
     deps = [
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",
@@ -36,6 +37,7 @@ go_test(
         "storageos_test.go",
         "storageos_util_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/storageos",
     library = ":go_default_library",
     deps = [
         "//pkg/util/mount:go_default_library",

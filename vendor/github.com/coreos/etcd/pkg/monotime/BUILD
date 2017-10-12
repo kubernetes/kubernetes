@@ -7,6 +7,7 @@ go_library(
         "monotime.go",
         "nanotime.go",
     ],
+    importpath = "github.com/coreos/etcd/pkg/monotime",
     visibility = ["//visibility:public"],
 )
 

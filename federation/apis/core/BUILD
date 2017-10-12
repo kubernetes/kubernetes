@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["register.go"],
+    importpath = "k8s.io/kubernetes/federation/apis/core",
     deps = [
         "//pkg/api:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",

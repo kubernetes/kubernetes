@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["gc_admission.go"],
+    importpath = "k8s.io/kubernetes/plugin/pkg/admission/gc",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
@@ -24,6 +25,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["gc_admission_test.go"],
+    importpath = "k8s.io/kubernetes/plugin/pkg/admission/gc",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

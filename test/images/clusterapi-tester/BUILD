@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "clusterapi-tester",
+    importpath = "k8s.io/kubernetes/test/images/clusterapi-tester",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["clusterapi-tester.go"],
+    importpath = "k8s.io/kubernetes/test/images/clusterapi-tester",
     deps = [
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

@@ -12,6 +12,7 @@ go_test(
         "admission_test.go",
         "merge_test.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/plugin/pkg/admission/schedulingpolicy",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
@@ -33,6 +34,7 @@ go_library(
         "merge.go",
         "query.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/plugin/pkg/admission/schedulingpolicy",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/ref:go_default_library",

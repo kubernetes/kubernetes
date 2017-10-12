@@ -8,6 +8,7 @@ go_library(
         "server.go",
         "stats.go",
     ],
+    importpath = "github.com/coreos/etcd/etcdserver/stats",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/raft:go_default_library",

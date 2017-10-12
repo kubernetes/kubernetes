@@ -20,6 +20,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "golang.org/x/crypto/poly1305",
     visibility = ["//visibility:public"],
 )
 

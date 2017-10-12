@@ -13,6 +13,7 @@ go_library(
         "types.go",
         "validation.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation",
     deps = [
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
@@ -29,6 +30,7 @@ go_test(
         "validation_test.go",
     ],
     data = ["//api/openapi-spec:swagger-spec"],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation_test",
     deps = [
         ":go_default_library",
         "//pkg/api/testapi:go_default_library",

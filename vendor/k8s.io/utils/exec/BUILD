@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "exec.go",
     ],
+    importpath = "k8s.io/utils/exec",
     visibility = ["//visibility:public"],
 )
 

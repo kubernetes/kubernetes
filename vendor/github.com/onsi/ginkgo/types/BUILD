@@ -7,6 +7,7 @@ go_library(
         "synchronization.go",
         "types.go",
     ],
+    importpath = "github.com/onsi/ginkgo/types",
     visibility = ["//visibility:public"],
 )
 

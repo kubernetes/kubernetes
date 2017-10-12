@@ -6,6 +6,7 @@ go_library(
         "context.go",
         "doc.go",
     ],
+    importpath = "github.com/gorilla/context",
     visibility = ["//visibility:public"],
 )
 

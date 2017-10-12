@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["portworx_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/volume/portworx",
     library = ":go_default_library",
     deps = [
         "//pkg/util/mount:go_default_library",
@@ -27,6 +28,7 @@ go_library(
         "portworx.go",
         "portworx_util.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/portworx",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/util/mount:go_default_library",

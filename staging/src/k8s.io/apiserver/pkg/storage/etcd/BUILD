@@ -13,6 +13,7 @@ go_test(
         "etcd_helper_test.go",
         "etcd_watcher_test.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/storage/etcd",
     library = ":go_default_library",
     deps = [
         "//vendor/github.com/coreos/etcd/client:go_default_library",
@@ -46,6 +47,7 @@ go_library(
         "etcd_helper.go",
         "etcd_watcher.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/storage/etcd",
     deps = [
         "//vendor/github.com/coreos/etcd/client:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

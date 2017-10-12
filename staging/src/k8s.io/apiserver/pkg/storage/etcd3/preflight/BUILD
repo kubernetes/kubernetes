@@ -9,11 +9,13 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["checks.go"],
+    importpath = "k8s.io/apiserver/pkg/storage/etcd3/preflight",
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["checks_test.go"],
+    importpath = "k8s.io/apiserver/pkg/storage/etcd3/preflight",
     library = ":go_default_library",
     deps = ["//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library"],
 )

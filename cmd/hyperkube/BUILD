@@ -10,6 +10,7 @@ load("//pkg/version:def.bzl", "version_x_defs")
 
 go_binary(
     name = "hyperkube",
+    importpath = "k8s.io/kubernetes/cmd/hyperkube",
     library = ":go_default_library",
     x_defs = version_x_defs(),
 )
@@ -17,6 +18,7 @@ go_binary(
 go_test(
     name = "go_default_test",
     srcs = ["hyperkube_test.go"],
+    importpath = "k8s.io/kubernetes/cmd/hyperkube",
     library = ":go_default_library",
     deps = [
         "//vendor/github.com/spf13/cobra:go_default_library",
@@ -41,6 +43,7 @@ go_library(
         "main.go",
         "server.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/hyperkube",
     deps = [
         "//cmd/kube-apiserver/app:go_default_library",
         "//cmd/kube-apiserver/app/options:go_default_library",

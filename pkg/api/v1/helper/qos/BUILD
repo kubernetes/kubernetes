@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["qos_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/api/v1/helper/qos",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
@@ -23,6 +24,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["qos.go"],
+    importpath = "k8s.io/kubernetes/pkg/api/v1/helper/qos",
     deps = [
         "//pkg/api/v1/helper:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

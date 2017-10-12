@@ -8,6 +8,7 @@ go_library(
         "parser.go",
         "types.go",
     ],
+    importpath = "github.com/Nvveen/Gotty",
     visibility = ["//visibility:public"],
 )
 

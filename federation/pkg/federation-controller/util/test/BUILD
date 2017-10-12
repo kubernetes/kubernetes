@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["test_helper.go"],
+    importpath = "k8s.io/kubernetes/federation/pkg/federation-controller/util/test",
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/pkg/federation-controller/util:go_default_library",

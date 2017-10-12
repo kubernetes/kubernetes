@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = ["cleaner.go"],
+    importpath = "k8s.io/kubernetes/pkg/controller/certificates/cleaner",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
@@ -34,6 +35,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["cleaner_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/controller/certificates/cleaner",
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/api/certificates/v1beta1:go_default_library",

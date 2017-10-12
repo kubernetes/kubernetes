@@ -6,6 +6,7 @@ go_library(
         "fileutils.go",
         "idtools.go",
     ],
+    importpath = "github.com/mrunalp/fileutils",
     visibility = ["//visibility:public"],
 )
 

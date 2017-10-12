@@ -24,6 +24,7 @@ go_library(
         "vcs.go",
         "version.go",
     ],
+    importpath = "github.com/tools/godep",
     visibility = ["//visibility:private"],
     deps = [
         "//vendor/github.com/kr/fs:go_default_library",
@@ -35,6 +36,7 @@ go_library(
 
 go_binary(
     name = "godep",
+    importpath = "github.com/tools/godep",
     library = ":go_default_library",
     visibility = ["//visibility:public"],
 )

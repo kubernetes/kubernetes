@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "guestbook-go",
+    importpath = "k8s.io/kubernetes/examples/guestbook-go",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
+    importpath = "k8s.io/kubernetes/examples/guestbook-go",
     deps = [
         "//vendor/github.com/codegangsta/negroni:go_default_library",
         "//vendor/github.com/gorilla/mux:go_default_library",

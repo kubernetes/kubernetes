@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["exec.go"],
+    importpath = "k8s.io/client-go/util/exec",
 )
 
 filegroup(

@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "federation-apiserver",
+    importpath = "k8s.io/kubernetes/federation/cmd/federation-apiserver",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["apiserver.go"],
+    importpath = "k8s.io/kubernetes/federation/cmd/federation-apiserver",
     deps = [
         "//federation/cmd/federation-apiserver/app:go_default_library",
         "//federation/cmd/federation-apiserver/app/options:go_default_library",

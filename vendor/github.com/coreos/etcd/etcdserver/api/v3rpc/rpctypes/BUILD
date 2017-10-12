@@ -7,6 +7,7 @@ go_library(
         "error.go",
         "md.go",
     ],
+    importpath = "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/google.golang.org/grpc:go_default_library",

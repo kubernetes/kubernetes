@@ -12,6 +12,7 @@ go_library(
         "factory.go",
         "plugins.go",
     ],
+    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/factory",
     deps = [
         "//pkg/api/helper:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
@@ -53,6 +54,7 @@ go_test(
         "factory_test.go",
         "plugins_test.go",
     ],
+    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/factory",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

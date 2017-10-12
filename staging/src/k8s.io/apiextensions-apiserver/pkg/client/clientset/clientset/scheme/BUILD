@@ -11,6 +11,7 @@ go_library(
         "doc.go",
         "register.go",
     ],
+    importpath = "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme",
     deps = [
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

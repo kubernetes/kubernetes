@@ -7,6 +7,7 @@ go_library(
         "error.go",
         "http.go",
     ],
+    importpath = "github.com/cloudflare/cfssl/errors",
     visibility = ["//visibility:public"],
 )
 

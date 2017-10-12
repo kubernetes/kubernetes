@@ -25,6 +25,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "golang.org/x/sys/windows",
     visibility = ["//visibility:public"],
 )
 

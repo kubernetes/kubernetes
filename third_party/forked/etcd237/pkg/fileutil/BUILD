@@ -16,6 +16,7 @@ go_test(
         "preallocate_test.go",
         "purge_test.go",
     ],
+    importpath = "k8s.io/kubernetes/third_party/forked/etcd237/pkg/fileutil",
     library = ":go_default_library",
 )
 
@@ -38,6 +39,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/third_party/forked/etcd237/pkg/fileutil",
     deps = ["//vendor/github.com/coreos/pkg/capnslog:go_default_library"],
 )
 

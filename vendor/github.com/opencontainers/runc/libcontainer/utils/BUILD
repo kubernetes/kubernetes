@@ -11,6 +11,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/opencontainers/runc/libcontainer/utils",
     visibility = ["//visibility:public"],
     deps = ["//vendor/golang.org/x/sys/unix:go_default_library"],
 )

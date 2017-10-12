@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["manifest.go"],
+    importpath = "k8s.io/kubernetes/test/e2e/manifest",
     deps = [
         "//pkg/api:go_default_library",
         "//test/e2e/generated:go_default_library",

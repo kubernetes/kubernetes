@@ -17,6 +17,7 @@ go_library(
         "fake_secret.go",
         "fake_service.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/core/v1/fake",
     deps = [
         "//federation/client/clientset_generated/federation_clientset/typed/core/v1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

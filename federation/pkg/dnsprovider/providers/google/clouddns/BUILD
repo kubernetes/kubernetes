@@ -17,6 +17,7 @@ go_library(
         "zone.go",
         "zones.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns",
     deps = [
         "//federation/pkg/dnsprovider:go_default_library",
         "//federation/pkg/dnsprovider/providers/google/clouddns/internal:go_default_library",
@@ -37,6 +38,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["clouddns_test.go"],
+    importpath = "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns",
     library = ":go_default_library",
     deps = [
         "//federation/pkg/dnsprovider:go_default_library",

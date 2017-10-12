@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["node_authorizer_test.go"],
+    importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer/node",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
@@ -27,6 +28,7 @@ go_library(
         "graph_populator.go",
         "node_authorizer.go",
     ],
+    importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer/node",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/persistentvolume:go_default_library",

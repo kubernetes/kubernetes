@@ -17,6 +17,7 @@ go_library(
         "srv.go",
         "util.go",
     ],
+    importpath = "github.com/coreos/etcd/client",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/pkg/pathutil:go_default_library",

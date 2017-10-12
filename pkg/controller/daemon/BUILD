@@ -13,6 +13,7 @@ go_library(
         "doc.go",
         "update.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/daemon",
     deps = [
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
@@ -64,6 +65,7 @@ go_test(
         "daemon_controller_test.go",
         "update_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/daemon",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

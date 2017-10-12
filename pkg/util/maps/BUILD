@@ -11,6 +11,7 @@ go_library(
         "doc.go",
         "string.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/util/maps",
 )
 
 filegroup(

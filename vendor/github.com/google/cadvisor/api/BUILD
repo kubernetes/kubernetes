@@ -6,6 +6,7 @@ go_library(
         "handler.go",
         "versions.go",
     ],
+    importpath = "github.com/google/cadvisor/api",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",

@@ -6,6 +6,7 @@ go_library(
         "semver.go",
         "sort.go",
     ],
+    importpath = "github.com/coreos/go-semver/semver",
     visibility = ["//visibility:public"],
 )
 

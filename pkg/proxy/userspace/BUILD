@@ -22,6 +22,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/proxy/userspace",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/helper:go_default_library",
@@ -48,6 +49,7 @@ go_test(
         "proxier_test.go",
         "roundrobin_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/proxy/userspace",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

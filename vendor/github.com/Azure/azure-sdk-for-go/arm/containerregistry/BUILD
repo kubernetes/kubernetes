@@ -9,6 +9,7 @@ go_library(
         "registries.go",
         "version.go",
     ],
+    importpath = "github.com/Azure/azure-sdk-for-go/arm/containerregistry",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",

@@ -12,6 +12,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/vmware/photon-controller-go-sdk/photon/lightwave",
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:windows_amd64": [

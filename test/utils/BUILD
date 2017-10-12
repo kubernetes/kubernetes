@@ -16,6 +16,7 @@ go_library(
         "runners.go",
         "tmpdir.go",
     ],
+    importpath = "k8s.io/kubernetes/test/utils",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1/pod:go_default_library",

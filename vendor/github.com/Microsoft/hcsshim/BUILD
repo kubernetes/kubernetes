@@ -40,6 +40,7 @@ go_library(
         "zhcsshim.go",
     ],
     cgo = True,
+    importpath = "github.com/Microsoft/hcsshim",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/Microsoft/go-winio:go_default_library",

@@ -8,6 +8,7 @@ go_library(
         "handler.go",
         "helpers.go",
     ],
+    importpath = "github.com/google/cadvisor/container/rkt",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/blang/semver:go_default_library",

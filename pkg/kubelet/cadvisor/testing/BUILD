@@ -11,6 +11,7 @@ go_library(
         "cadvisor_fake.go",
         "cadvisor_mock.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing",
     deps = [
         "//pkg/kubelet/cadvisor:go_default_library",
         "//vendor/github.com/google/cadvisor/events:go_default_library",

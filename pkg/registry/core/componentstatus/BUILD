@@ -13,6 +13,7 @@ go_library(
         "rest.go",
         "validator.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/componentstatus",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/probe:go_default_library",
@@ -32,6 +33,7 @@ go_test(
         "rest_test.go",
         "validator_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/componentstatus",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

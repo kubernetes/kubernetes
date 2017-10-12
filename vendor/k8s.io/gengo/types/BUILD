@@ -8,6 +8,7 @@ go_library(
         "flatten.go",
         "types.go",
     ],
+    importpath = "k8s.io/gengo/types",
     visibility = ["//visibility:public"],
 )
 

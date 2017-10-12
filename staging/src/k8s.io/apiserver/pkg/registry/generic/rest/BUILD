@@ -12,6 +12,7 @@ go_test(
         "response_checker_test.go",
         "streamer_test.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/registry/generic/rest",
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -27,6 +28,7 @@ go_library(
         "response_checker.go",
         "streamer.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/registry/generic/rest",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

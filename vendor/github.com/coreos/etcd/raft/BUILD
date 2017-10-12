@@ -16,6 +16,7 @@ go_library(
         "storage.go",
         "util.go",
     ],
+    importpath = "github.com/coreos/etcd/raft",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/raft/raftpb:go_default_library",

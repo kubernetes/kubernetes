@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["storage_certificates.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/certificates/rest",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/certificates:go_default_library",

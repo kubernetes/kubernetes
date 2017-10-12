@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["purell.go"],
+    importpath = "github.com/PuerkitoBio/purell",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/PuerkitoBio/urlesc:go_default_library",

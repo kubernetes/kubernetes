@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["resttest.go"],
+    importpath = "k8s.io/apiserver/pkg/registry/rest/resttest",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["hash_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/util/hash",
     library = ":go_default_library",
     deps = ["//pkg/api:go_default_library"],
 )
@@ -16,6 +17,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["hash.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/util/hash",
     deps = ["//pkg/api:go_default_library"],
 )
 

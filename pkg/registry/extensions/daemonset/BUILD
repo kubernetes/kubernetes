@@ -12,6 +12,7 @@ go_library(
         "doc.go",
         "strategy.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/registry/extensions/daemonset",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/pod:go_default_library",
@@ -33,6 +34,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["strategy_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/extensions/daemonset",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

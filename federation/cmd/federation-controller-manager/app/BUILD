@@ -12,6 +12,7 @@ go_library(
         "controllermanager.go",
         "plugins.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/cmd/federation-controller-manager/app",
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
@@ -54,6 +55,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["controllermanager_test.go"],
+    importpath = "k8s.io/kubernetes/federation/cmd/federation-controller-manager/app",
     library = ":go_default_library",
     deps = [
         "//federation/pkg/federation-controller/ingress:go_default_library",

@@ -11,6 +11,7 @@ go_library(
         "client.go",
         "interfaces.go",
     ],
+    importpath = "k8s.io/metrics/pkg/client/custom_metrics",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

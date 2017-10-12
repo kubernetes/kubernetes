@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["etcd.go"],
+    importpath = "k8s.io/kube-aggregator/pkg/registry/apiservice/etcd",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",

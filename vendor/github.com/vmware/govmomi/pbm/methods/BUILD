@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["methods.go"],
+    importpath = "github.com/vmware/govmomi/pbm/methods",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/vmware/govmomi/pbm/types:go_default_library",

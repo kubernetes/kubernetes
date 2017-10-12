@@ -18,6 +18,7 @@ go_library(
         "zz_generated.deepcopy.go",
         "zz_generated.defaults.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/apis/audit/v1beta1",
     deps = [
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/k8s.io/api/authentication/v1:go_default_library",
@@ -53,6 +54,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["conversion_test.go"],
+    importpath = "k8s.io/apiserver/pkg/apis/audit/v1beta1",
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

@@ -11,6 +11,7 @@ go_library(
         "doc.go",
         "user.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/authentication/user",
 )
 
 filegroup(

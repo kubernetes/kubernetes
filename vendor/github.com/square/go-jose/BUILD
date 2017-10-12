@@ -15,6 +15,7 @@ go_library(
         "symmetric.go",
         "utils.go",
     ],
+    importpath = "github.com/square/go-jose",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/square/go-jose/cipher:go_default_library",

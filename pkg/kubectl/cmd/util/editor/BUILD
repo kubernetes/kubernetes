@@ -10,6 +10,7 @@ go_library(
         "editoptions.go",
         "editor.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/editor",
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_util_editor_CONSUMERS",
     ],
@@ -40,6 +41,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["editor_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/editor",
     library = ":go_default_library",
 )
 

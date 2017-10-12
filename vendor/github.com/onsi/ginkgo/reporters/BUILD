@@ -9,6 +9,7 @@ go_library(
         "reporter.go",
         "teamcity_reporter.go",
     ],
+    importpath = "github.com/onsi/ginkgo/reporters",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",

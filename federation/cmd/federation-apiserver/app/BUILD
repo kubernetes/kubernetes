@@ -17,6 +17,7 @@ go_library(
         "plugins.go",
         "server.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/cmd/federation-apiserver/app",
     deps = [
         "//federation/apis/core:go_default_library",
         "//federation/apis/core/install:go_default_library",

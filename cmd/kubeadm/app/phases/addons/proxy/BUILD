@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["proxy_test.go"],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy",
     library = ":go_default_library",
     deps = [
         "//cmd/kubeadm/app/util:go_default_library",
@@ -26,6 +27,7 @@ go_library(
         "manifests.go",
         "proxy.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",

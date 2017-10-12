@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["compatibility_tester.go"],
+    importpath = "k8s.io/kubernetes/pkg/api/testing/compat",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/printers:go_default_library",

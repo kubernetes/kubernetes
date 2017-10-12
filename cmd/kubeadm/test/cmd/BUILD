@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/test/cmd",
     deps = ["//vendor/github.com/spf13/cobra:go_default_library"],
 )
 
@@ -23,6 +24,7 @@ go_test(
     ],
     args = ["--kubeadm-path=../../kubeadm"],
     data = ["//cmd/kubeadm"],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/test/cmd",
     library = ":go_default_library",
     tags = [
         "integration",

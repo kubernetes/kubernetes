@@ -18,6 +18,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/Microsoft/go-winio",
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:windows_amd64": [

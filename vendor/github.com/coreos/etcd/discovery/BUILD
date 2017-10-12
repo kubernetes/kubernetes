@@ -6,6 +6,7 @@ go_library(
         "discovery.go",
         "srv.go",
     ],
+    importpath = "github.com/coreos/etcd/discovery",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/client:go_default_library",

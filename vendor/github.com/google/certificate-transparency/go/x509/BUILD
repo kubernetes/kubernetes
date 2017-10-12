@@ -36,6 +36,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/google/certificate-transparency/go/x509",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/google/certificate-transparency/go/asn1:go_default_library",

@@ -15,6 +15,7 @@ go_library(
         "rest.go",
         "strategy.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/service",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/helper:go_default_library",
@@ -48,6 +49,7 @@ go_test(
         "rest_test.go",
         "strategy_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/service",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

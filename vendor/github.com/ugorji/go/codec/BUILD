@@ -28,6 +28,7 @@ go_library(
         "simple.go",
         "time.go",
     ],
+    importpath = "github.com/ugorji/go/codec",
     visibility = ["//visibility:public"],
 )
 

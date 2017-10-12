@@ -11,6 +11,7 @@ go_library(
         "clientset.go",
         "doc.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset",
     deps = [
         "//pkg/client/clientset_generated/internalclientset/typed/admissionregistration/internalversion:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/apps/internalversion:go_default_library",

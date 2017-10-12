@@ -13,6 +13,7 @@ go_library(
         "replenishment_controller.go",
         "resource_quota_controller.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/resourcequota",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
@@ -46,6 +47,7 @@ go_test(
         "replenishment_controller_test.go",
         "resource_quota_controller_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/resourcequota",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

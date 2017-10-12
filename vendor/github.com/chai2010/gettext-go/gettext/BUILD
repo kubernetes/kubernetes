@@ -12,6 +12,7 @@ go_library(
         "local.go",
         "tr.go",
     ],
+    importpath = "github.com/chai2010/gettext-go/gettext",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/chai2010/gettext-go/gettext/mo:go_default_library",

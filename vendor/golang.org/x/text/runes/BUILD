@@ -6,6 +6,7 @@ go_library(
         "cond.go",
         "runes.go",
     ],
+    importpath = "golang.org/x/text/runes",
     visibility = ["//visibility:public"],
     deps = ["//vendor/golang.org/x/text/transform:go_default_library"],
 )

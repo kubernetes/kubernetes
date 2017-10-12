@@ -6,6 +6,7 @@ go_library(
         "handlers.go",
         "param_validator.go",
     ],
+    importpath = "github.com/aws/aws-sdk-go/aws/corehandlers",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",

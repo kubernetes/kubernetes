@@ -18,6 +18,7 @@ go_library(
         "watch_ranges.go",
         "watcher.go",
     ],
+    importpath = "github.com/coreos/etcd/proxy/grpcproxy",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",

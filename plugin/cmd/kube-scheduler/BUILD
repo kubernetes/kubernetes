@@ -15,6 +15,7 @@ go_binary(
         "-extldflags",
         "-static",
     ],
+    importpath = "k8s.io/kubernetes/plugin/cmd/kube-scheduler",
     library = ":go_default_library",
     x_defs = version_x_defs(),
 )
@@ -22,6 +23,7 @@ go_binary(
 go_library(
     name = "go_default_library",
     srcs = ["scheduler.go"],
+    importpath = "k8s.io/kubernetes/plugin/cmd/kube-scheduler",
     deps = [
         "//pkg/version/verflag:go_default_library",
         "//plugin/cmd/kube-scheduler/app:go_default_library",

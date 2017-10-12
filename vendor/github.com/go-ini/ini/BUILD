@@ -6,6 +6,7 @@ go_library(
         "ini.go",
         "struct.go",
     ],
+    importpath = "github.com/go-ini/ini",
     visibility = ["//visibility:public"],
 )
 

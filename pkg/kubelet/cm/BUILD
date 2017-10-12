@@ -29,6 +29,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/kubelet/cm",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/features:go_default_library",
@@ -90,6 +91,7 @@ go_test(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/kubelet/cm",
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/deviceplugin/v1alpha1:go_default_library",

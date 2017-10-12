@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "mounter",
+    importpath = "k8s.io/kubernetes/cluster/gce/gci/mounter",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["mounter.go"],
+    importpath = "k8s.io/kubernetes/cluster/gce/gci/mounter",
 )
 
 filegroup(

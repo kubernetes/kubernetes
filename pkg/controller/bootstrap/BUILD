@@ -15,6 +15,7 @@ go_test(
         "tokencleaner_test.go",
         "util_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/bootstrap",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
@@ -39,6 +40,7 @@ go_library(
         "tokencleaner.go",
         "util.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/bootstrap",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/bootstrap/api:go_default_library",

@@ -8,6 +8,7 @@ go_library(
         "descriptor_gostring.gen.go",
         "helper.go",
     ],
+    importpath = "github.com/gogo/protobuf/protoc-gen-gogo/descriptor",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/gogo/protobuf/proto:go_default_library"],
 )

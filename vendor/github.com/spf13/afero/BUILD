@@ -25,6 +25,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/spf13/afero",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/pkg/sftp:go_default_library",

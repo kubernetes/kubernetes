@@ -7,6 +7,7 @@ go_library(
         "size.go",
         "ulimit.go",
     ],
+    importpath = "github.com/docker/go-units",
     visibility = ["//visibility:public"],
 )
 

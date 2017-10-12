@@ -27,6 +27,7 @@ go_library(
         "timestamp.go",
         "timestamp_gogo.go",
     ],
+    importpath = "github.com/gogo/protobuf/proto",
     visibility = ["//visibility:public"],
 )
 

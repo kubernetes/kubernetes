@@ -13,6 +13,7 @@ go_test(
         "deployment_test.go",
         "main_test.go",
     ],
+    importpath = "k8s.io/kubernetes/test/integration/deployment",
     library = ":go_default_library",
     tags = ["integration"],
     deps = [
@@ -28,6 +29,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
+    importpath = "k8s.io/kubernetes/test/integration/deployment",
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/controller/deployment:go_default_library",

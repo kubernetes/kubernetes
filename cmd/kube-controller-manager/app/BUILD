@@ -21,6 +21,7 @@ go_library(
         "plugins.go",
         "policy.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kube-controller-manager/app",
     deps = [
         "//cmd/kube-controller-manager/app/options:go_default_library",
         "//pkg/api:go_default_library",
@@ -151,6 +152,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["controller_manager_test.go"],
+    importpath = "k8s.io/kubernetes/cmd/kube-controller-manager/app",
     library = ":go_default_library",
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

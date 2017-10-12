@@ -14,6 +14,7 @@ go_library(
         "fake_poddisruptionbudget.go",
         "fake_policy_client.go",
     ],
+    importpath = "k8s.io/client-go/kubernetes/typed/policy/v1beta1/fake",
     deps = [
         "//vendor/k8s.io/api/policy/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

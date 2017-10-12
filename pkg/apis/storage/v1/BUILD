@@ -14,6 +14,7 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/apis/storage/v1",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/storage:go_default_library",

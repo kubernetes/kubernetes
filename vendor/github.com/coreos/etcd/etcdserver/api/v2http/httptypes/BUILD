@@ -6,6 +6,7 @@ go_library(
         "errors.go",
         "member.go",
     ],
+    importpath = "github.com/coreos/etcd/etcdserver/api/v2http/httptypes",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/pkg/types:go_default_library",

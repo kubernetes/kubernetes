@@ -21,6 +21,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/storageos/go-api",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/gorilla/websocket:go_default_library",

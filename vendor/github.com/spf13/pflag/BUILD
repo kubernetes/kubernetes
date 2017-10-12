@@ -30,6 +30,7 @@ go_library(
         "uint8.go",
         "uint_slice.go",
     ],
+    importpath = "github.com/spf13/pflag",
     visibility = ["//visibility:public"],
 )
 

@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["common.go"],
+    importpath = "github.com/appc/spec/schema/common",
     visibility = ["//visibility:public"],
 )
 

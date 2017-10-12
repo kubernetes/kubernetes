@@ -8,6 +8,7 @@ go_library(
         "credentials_util_go18.go",
         "credentials_util_pre_go17.go",
     ],
+    importpath = "google.golang.org/grpc/credentials",
     visibility = ["//visibility:public"],
     deps = ["//vendor/golang.org/x/net/context:go_default_library"],
 )

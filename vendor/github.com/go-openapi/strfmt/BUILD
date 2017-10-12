@@ -10,6 +10,7 @@ go_library(
         "format.go",
         "time.go",
     ],
+    importpath = "github.com/go-openapi/strfmt",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/asaskevich/govalidator:go_default_library",

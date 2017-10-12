@@ -14,6 +14,7 @@ go_library(
         "glusterfs_minmax.go",
         "glusterfs_util.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/glusterfs",
     deps = [
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/util/mount:go_default_library",
@@ -41,6 +42,7 @@ go_test(
         "glusterfs_minmax_test.go",
         "glusterfs_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/glusterfs",
     library = ":go_default_library",
     deps = [
         "//pkg/util/mount:go_default_library",

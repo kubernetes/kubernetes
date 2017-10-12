@@ -6,6 +6,7 @@ go_library(
         "common.go",
         "doc.go",
     ],
+    importpath = "k8s.io/kube-openapi/pkg/common",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/emicklei/go-restful:go_default_library",

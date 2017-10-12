@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "port-forward-tester",
+    importpath = "k8s.io/kubernetes/test/images/port-forward-tester",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["portforwardtester.go"],
+    importpath = "k8s.io/kubernetes/test/images/port-forward-tester",
 )
 
 filegroup(

@@ -12,6 +12,7 @@ go_library(
         "time.go",
         "types.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/api/unversioned",
     deps = [
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",

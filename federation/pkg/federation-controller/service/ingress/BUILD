@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["ingress.go"],
+    importpath = "k8s.io/kubernetes/federation/pkg/federation-controller/service/ingress",
     deps = [
         "//federation/apis/federation:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

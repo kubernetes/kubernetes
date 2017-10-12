@@ -31,6 +31,7 @@ go_library(
         "vsphere_volume_placement.go",
         "vsphere_volume_vsan_policy.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e/storage",
     deps = [
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1/helper:go_default_library",

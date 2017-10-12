@@ -25,6 +25,7 @@ go_library(
         "tag.go",
         "xml_object.go",
     ],
+    importpath = "github.com/go-openapi/spec",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/go-openapi/jsonpointer:go_default_library",

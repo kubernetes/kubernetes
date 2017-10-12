@@ -10,6 +10,7 @@ go_library(
         "summary.go",
         "volume_stat_calculator.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/server/stats",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
@@ -34,6 +35,7 @@ go_test(
         "summary_test.go",
         "volume_stat_calculator_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/server/stats",
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",

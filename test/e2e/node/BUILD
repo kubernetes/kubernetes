@@ -9,6 +9,7 @@ go_library(
         "kubelet_perf.go",
         "security_context.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e/node",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/testapi:go_default_library",

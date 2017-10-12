@@ -14,6 +14,7 @@ go_library(
         "stringwriter.go",
         "toc.go",
     ],
+    importpath = "github.com/jteeuwen/go-bindata",
     visibility = ["//visibility:public"],
 )
 

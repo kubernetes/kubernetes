@@ -10,6 +10,7 @@ go_library(
         "stats.go",
         "types.go",
     ],
+    importpath = "github.com/docker/engine-api/types",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/docker/engine-api/types/container:go_default_library",

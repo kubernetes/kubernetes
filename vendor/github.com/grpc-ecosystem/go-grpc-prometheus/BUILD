@@ -9,6 +9,7 @@ go_library(
         "server_reporter.go",
         "util.go",
     ],
+    importpath = "github.com/grpc-ecosystem/go-grpc-prometheus",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",

@@ -11,6 +11,7 @@ go_library(
         "client.go",
         "cr.go",
     ],
+    importpath = "k8s.io/apiextensions-apiserver/examples/client-go/client",
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/examples/client-go/apis/cr/v1:go_default_library",

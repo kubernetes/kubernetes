@@ -10,6 +10,7 @@ go_library(
         "stream.go",
         "tags.go",
     ],
+    importpath = "github.com/square/go-jose/json",
     visibility = ["//visibility:public"],
 )
 
