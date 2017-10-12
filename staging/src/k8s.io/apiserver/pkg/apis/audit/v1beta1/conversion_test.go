@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	"reflect"
@@ -36,63 +36,6 @@ func init() {
 		&auditinternal.Event{},
 	)
 	RegisterConversions(scheme)
-}
-
-func TestConversionObjectReference(t *testing.T) {
-	scheme.Log(t)
-
-	testcases := []struct {
-		desc     string
-		old      *ObjectReference
-		expected *auditinternal.ObjectReference
-	}{
-		{
-			"core group",
-			&ObjectReference{
-				APIVersion: "/v1",
-			},
-			&auditinternal.ObjectReference{
-				APIVersion: "v1",
-				APIGroup:   "",
-			},
-		},
-		{
-			"other groups",
-			&ObjectReference{
-				APIVersion: "rbac.authorization.k8s.io/v1beta1",
-			},
-			&auditinternal.ObjectReference{
-				APIVersion: "v1beta1",
-				APIGroup:   "rbac.authorization.k8s.io",
-			},
-		},
-		{
-			"all empty",
-			&ObjectReference{},
-			&auditinternal.ObjectReference{},
-		},
-		{
-			"invalid apiversion should not cause painc",
-			&ObjectReference{
-				APIVersion: "invalid version without slash",
-			},
-			&auditinternal.ObjectReference{
-				APIVersion: "invalid version without slash",
-				APIGroup:   "",
-			},
-		},
-	}
-	for _, tc := range testcases {
-		t.Run(tc.desc, func(t *testing.T) {
-			internal := &auditinternal.ObjectReference{}
-			if err := scheme.Convert(tc.old, internal, nil); err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if !reflect.DeepEqual(internal, tc.expected) {
-				t.Errorf("expected\n\t%#v, got \n\t%#v", tc.expected, internal)
-			}
-		})
-	}
 }
 
 func TestConversionEventToInternal(t *testing.T) {
