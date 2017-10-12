@@ -21,12 +21,20 @@ go_library(
     srcs = [
         "cert.go",
         "csr.go",
+        "entropy.go",
+        "entropy_other.go",
         "io.go",
         "pem.go",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "entropy_linux.go",
+        ],
+        "//conditions:default": [],
+    }),
     data = [
         "testdata/dontUseThisKey.pem",
     ],
+    deps = ["//vendor/github.com/golang/glog:go_default_library"],
 )
 
 filegroup(
