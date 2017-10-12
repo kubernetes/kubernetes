@@ -153,12 +153,14 @@ if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
 	NODE_LABELS="${NODE_LABELS},projectcalico.org/ds-ready=true"
 fi
 
-# Currently, ENABLE_METADATA_PROXY supports only "simple".  In the future, we
-# may add other options.
-ENABLE_METADATA_PROXY="${ENABLE_METADATA_PROXY:-}"
-# Apply the right node label if metadata proxy is on.
-if [[ ${ENABLE_METADATA_PROXY:-} == "simple" ]]; then
-        NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
+# Enable metadata concealment by firewalling pod traffic to the metadata server
+# and run a proxy daemonset on nodes.
+#
+# TODO(#8867) Enable by default.
+ENABLE_METADATA_CONCEALMENT="${ENABLE_METADATA_CONCEALMENT:-false}" # true, false
+# Apply the right node label if metadata concealment is on.
+if [[ ${ENABLE_METADATA_CONCEALMENT:-} == "true" ]]; then
+  NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
 fi
 
 # Optional: Enable node logging.

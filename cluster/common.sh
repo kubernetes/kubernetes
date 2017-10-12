@@ -752,14 +752,9 @@ EOF
 ENABLE_CUSTOM_METRICS: $(yaml-quote ${ENABLE_CUSTOM_METRICS})
 EOF
   fi
-  if [ -n "${ENABLE_METADATA_PROXY:-}" ]; then
+  if [ -n "${ENABLE_METADATA_CONCEALMENT:-}" ]; then
     cat >>$file <<EOF
-ENABLE_METADATA_PROXY: $(yaml-quote ${ENABLE_METADATA_PROXY})
-EOF
-  fi
-  if [ -n "${KUBE_FIREWALL_METADATA_SERVER:-}" ]; then
-    cat >>$file <<EOF
-KUBE_FIREWALL_METADATA_SERVER: $(yaml-quote ${KUBE_FIREWALL_METADATA_SERVER})
+ENABLE_METADATA_CONCEALMENT: $(yaml-quote ${ENABLE_METADATA_CONCEALMENT})
 EOF
   fi
   if [ -n "${FEATURE_GATES:-}" ]; then
