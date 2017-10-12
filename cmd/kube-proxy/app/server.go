@@ -27,7 +27,6 @@ import (
 	"net/http/pprof"
 	"os"
 	goruntime "runtime"
-	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -49,7 +48,6 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
@@ -100,14 +98,6 @@ type Options struct {
 	// config is the proxy server's configuration object.
 	config *componentconfig.KubeProxyConfiguration
 
-	// The fields below here are placeholders for flags that can't be directly mapped into
-	// componentconfig.KubeProxyConfiguration.
-	//
-	// TODO remove these fields once the deprecated flags are removed.
-
-	// healthzPort is the port to be used by the healthz server.
-	healthzPort int32
-
 	scheme *runtime.Scheme
 	codecs serializer.CodecFactory
 }
@@ -120,17 +110,12 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 	fs.MarkDeprecated("cleanup-iptables", "This flag is replaced by --cleanup.")
 	fs.BoolVar(&options.CleanupAndExit, "cleanup", options.CleanupAndExit, "If true cleanup iptables and ipvs rules and exit.")
 
-	// All flags below here are deprecated and will eventually be removed.
-
-	fs.Int32Var(&options.healthzPort, "healthz-port", options.healthzPort, "The port to bind the health check server. Use 0 to disable.")
-
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
 
 func NewOptions() (*Options, error) {
 	o := &Options{
-		config:      new(componentconfig.KubeProxyConfiguration),
-		healthzPort: ports.ProxyHealthzPort,
+		config: new(componentconfig.KubeProxyConfiguration),
 	}
 
 	o.scheme = runtime.NewScheme()
@@ -144,16 +129,6 @@ func NewOptions() (*Options, error) {
 	}
 
 	return o, nil
-}
-
-// Complete completes all the required options.
-func (o *Options) Complete() error {
-	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
-		glog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
-		o.applyDeprecatedHealthzPortToConfig()
-	}
-
-	return nil
 }
 
 // Validate validates all the required options.
@@ -224,26 +199,6 @@ func (o *Options) writeConfigFile() error {
 	return nil
 }
 
-// applyDeprecatedHealthzPortToConfig sets o.config.HealthzBindAddress from
-// flags passed on the command line based on the following rules:
-//
-// 1. If --healthz-port is 0, disable the healthz server.
-// 2. Otherwise, use the value of --healthz-port for the port portion of
-//    o.config.HealthzBindAddress
-func (o *Options) applyDeprecatedHealthzPortToConfig() {
-	if o.healthzPort == 0 {
-		o.config.HealthzBindAddress = ""
-		return
-	}
-
-	index := strings.Index(o.config.HealthzBindAddress, ":")
-	if index != -1 {
-		o.config.HealthzBindAddress = o.config.HealthzBindAddress[0:index]
-	}
-
-	o.config.HealthzBindAddress = fmt.Sprintf("%s:%d", o.config.HealthzBindAddress, o.healthzPort)
-}
-
 // loadConfigFromFile loads the contents of file and decodes it as a
 // KubeProxyConfiguration object.
 func (o *Options) loadConfigFromFile(file string) (*componentconfig.KubeProxyConfiguration, error) {
@@ -304,7 +259,6 @@ addon that provides cluster DNS for these cluster IPs. The user must create a se
 with the apiserver API to configure the proxy.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			verflag.PrintAndExitIfRequested()
-			cmdutil.CheckErr(opts.Complete())
 			cmdutil.CheckErr(opts.Validate(args))
 			cmdutil.CheckErr(opts.Run())
 		},
