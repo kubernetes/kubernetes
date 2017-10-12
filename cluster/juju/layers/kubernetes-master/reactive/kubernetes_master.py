@@ -356,7 +356,7 @@ def start_master(etcd):
                        'Configuring the Kubernetes master services.')
     freeze_service_cidr()
     if not etcd.get_connection_string():
-        # etcd is not returning a connection string. This hapens when
+        # etcd is not returning a connection string. This happens when
         # the master unit disconnects from etcd and is ready to terminate.
         # No point in trying to start master services and fail. Just return.
         return
@@ -457,6 +457,12 @@ def send_data(tls):
         'kubernetes.default.svc',
         'kubernetes.default.svc.{0}'.format(domain)
     ]
+
+    # maybe they have extra names they want as SANs
+    extra_sans = hookenv.config('extra_sans')
+    if extra_sans:
+      sans.extend(extra_sans.split())
+
     # Create a path safe name by removing path characters from the unit name.
     certificate_name = hookenv.local_unit().replace('/', '_')
     # Request a server cert with this information.
