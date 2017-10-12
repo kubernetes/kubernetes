@@ -1764,6 +1764,12 @@ function start-kube-addons {
   # prep addition kube-up specific rbac objects
   setup-addon-manifests "addons" "rbac"
 
+  if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
+      setup-addon-manifests "addons" "podsecuritypolicies"
+      # Setup the bindings for gce.
+      setup-addon-manifests "addons" "podsecuritypolicies-rbac/gce"
+  fi
+
   # Set up manifests of other addons.
   if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" ]]; then
     prepare-kube-proxy-manifest-variables "$src_dir/kube-proxy/kube-proxy-ds.yaml"

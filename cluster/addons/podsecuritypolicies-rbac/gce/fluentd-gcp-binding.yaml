@@ -1,0 +1,17 @@
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  name: system:podsecuritypolicy:fluentd-gcp
+  namespace: kube-system
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/cluster-service: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: system:podsecuritypolicy:fluentd-gcp
+subjects:
+- kind: ServiceAccount
+  # TODO: fluentd-gcp should run with a custom service account.
+  name: default
+  namespace: kube-system
