@@ -69,7 +69,6 @@ pkg/api/testapi
 pkg/api/testing
 pkg/api/testing/compat
 pkg/api/unversioned
-pkg/api/util
 pkg/api/v1/endpoints
 pkg/api/v1/helper
 pkg/api/v1/helper/qos
