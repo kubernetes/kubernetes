@@ -160,7 +160,10 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	testServer, endpointsHandler := makeTestServer(t, ns)
 	defer testServer.Close()
-	endpoints := newController(testServer.URL)
+	endpoints, err := newController(testServer.URL)
+	if err != nil {
+		t.Errorf("Failed to create endpoint controller: %v", err)
+	}
 	endpoints.endpointsStore.Add(&v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
