@@ -185,6 +185,14 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 	)
 	flagSet.StringVar(featureGatesString, "feature-gates", *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
 		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))
+	flagSet.StringVar(
+		&cfg.UnifiedControlPlaneImage, "unified-control-plane-image", cfg.UnifiedControlPlaneImage,
+		"Specify the unfied control plane image.",
+	)
+	flagSet.StringVar(
+		&cfg.Etcd.Image, "etcd-image", cfg.Etcd.Image,
+		"Specify the etcd image.",
+	)
 }
 
 // AddInitOtherFlags adds init flags that are not bound to a configuration file to the given flagset
