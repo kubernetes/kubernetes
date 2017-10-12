@@ -40,10 +40,7 @@ const (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// A configuration field should go in KubeletFlags instead of KubeletConfiguration if
-// its value cannot be safely shared between nodes at the same time (e.g. a hostname)
-// In general, please try to avoid adding flags or configuration fields,
-// we already have a confusingly large amount of them.
+// KubeletConfiguration contains the configuration for the Kubelet
 type KubeletConfiguration struct {
 	metav1.TypeMeta
 
@@ -60,8 +57,7 @@ type KubeletConfiguration struct {
 	HTTPCheckFrequency metav1.Duration
 	// manifestURL is the URL for accessing the container manifest
 	ManifestURL string
-	// manifestURLHeader is the HTTP header to use when accessing the manifest
-	// URL, with the key separated from the value with a ':', as in 'key:value'
+	// manifestURLHeader is a map of slices with HTTP headers to use when accessing the manifestURL
 	ManifestURLHeader map[string][]string
 	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
 	// for all interfaces)
@@ -75,10 +71,9 @@ type KubeletConfiguration struct {
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate
 	// and key are generated for the public address and saved to the directory
-	// passed to certDir.
+	// passed to the Kubelet's --cert-dir flag.
 	TLSCertFile string
-	// tlsPrivateKeyFile is the file containing x509 private key matching
-	// tlsCertFile.
+	// tlsPrivateKeyFile is the file containing x509 private key matching tlsCertFile
 	TLSPrivateKeyFile string
 	// TLSCipherSuites is the list of allowed cipher suites for the server.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
@@ -90,19 +85,19 @@ type KubeletConfiguration struct {
 	Authentication KubeletAuthentication
 	// authorization specifies how requests to the Kubelet's server are authorized
 	Authorization KubeletAuthorization
-	// registryPullQPS is the limit of registry pulls per second. If 0,
-	// unlimited. Set to 0 for no limit. Defaults to 5.0.
+	// registryPullQPS is the limit of registry pulls per second.
+	// Set to 0 for no limit.
 	RegistryPullQPS int32
-	// registryBurst is the maximum size of a bursty pulls, temporarily allows
-	// pulls to burst to this number, while still not exceeding registryQps.
-	// Only used if registryQPS > 0.
+	// registryBurst is the maximum size of bursty pulls, temporarily allows
+	// pulls to burst to this number, while still not exceeding registryPullQPS.
+	// Only used if registryPullQPS > 0.
 	RegistryBurst int32
 	// eventRecordQPS is the maximum event creations per second. If 0, there
 	// is no limit enforced.
 	EventRecordQPS int32
-	// eventBurst is the maximum size of a bursty event records, temporarily
-	// allows event records to burst to this number, while still not exceeding
-	// event-qps. Only used if eventQps > 0
+	// eventBurst is the maximum size of a burst of event creations, temporarily
+	// allows event creations to burst to this number, while still not exceeding
+	// eventRecordQPS. Only used if eventRecordQPS > 0.
 	EventBurst int32
 	// enableDebuggingHandlers enables server endpoints for log collection
 	// and local running of containers and commands
@@ -111,8 +106,7 @@ type KubeletConfiguration struct {
 	EnableContentionProfiling bool
 	// healthzPort is the port of the localhost healthz endpoint (set to 0 to disable)
 	HealthzPort int32
-	// healthzBindAddress is the IP address for the healthz server to serve
-	// on.
+	// healthzBindAddress is the IP address for the healthz server to serve on
 	HealthzBindAddress string
 	// oomScoreAdj is The oom-score-adj value for kubelet process. Values
 	// must be within the range [-1000, 1000].
@@ -121,9 +115,9 @@ type KubeletConfiguration struct {
 	// configure all containers to search this domain in addition to the
 	// host's search domains.
 	ClusterDomain string
-	// clusterDNS is a list of IP address for a cluster DNS server.  If set,
+	// clusterDNS is a list of IP addresses for a cluster DNS server. If set,
 	// kubelet will configure all containers to use this for DNS resolution
-	// instead of the host's DNS servers
+	// instead of the host's DNS servers.
 	ClusterDNS []string
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
@@ -136,43 +130,41 @@ type KubeletConfiguration struct {
 	// garbage collected.
 	ImageMinimumGCAge metav1.Duration
 	// imageGCHighThresholdPercent is the percent of disk usage after which
-	// image garbage collection is always run.
+	// image garbage collection is always run. The percent is calculated as
+	// this field value out of 100.
 	ImageGCHighThresholdPercent int32
 	// imageGCLowThresholdPercent is the percent of disk usage before which
 	// image garbage collection is never run. Lowest disk usage to garbage
-	// collect to.
+	// collect to. The percent is calculated as this field value out of 100.
 	ImageGCLowThresholdPercent int32
 	// How frequently to calculate and cache volume disk usage for all pods
 	VolumeStatsAggPeriod metav1.Duration
-	// KubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
-	// +optional
+	// KubeletCgroups is the absolute name of cgroups to isolate the kubelet in
 	KubeletCgroups string
-	// Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes
-	// And all Burstable and BestEffort pods are brought up under their
-	// specific top level QoS cgroup.
-	// +optional
-	CgroupsPerQOS bool
-	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
-	// +optional
-	CgroupDriver string
 	// SystemCgroups is absolute name of cgroups in which to place
 	// all non-kernel processes that are not already in a container. Empty
 	// for no container. Rolling back the flag requires a reboot.
-	// +optional
 	SystemCgroups string
 	// CgroupRoot is the root cgroup to use for pods.
 	// If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
-	// +optional
 	CgroupRoot string
+	// Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes
+	// And all Burstable and BestEffort pods are brought up under their
+	// specific top level QoS cgroup.
+	CgroupsPerQOS bool
+	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
+	CgroupDriver string
 	// CPUManagerPolicy is the name of the policy to use.
+	// Requires the CPUManager feature gate to be enabled.
 	CPUManagerPolicy string
 	// CPU Manager reconciliation period.
+	// Requires the CPUManager feature gate to be enabled.
 	CPUManagerReconcilePeriod metav1.Duration
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
-	// +optional
 	RuntimeRequestTimeout metav1.Duration
-	// How should the kubelet configure the container bridge for hairpin packets.
+	// hairpinMode specifies how the Kubelet should configure the container
+	// bridge for hairpin packets.
 	// Setting this flag allows endpoints in a Service to loadbalance back to
 	// themselves if they should try to access their own Service. Values:
 	//   "promiscuous-bridge": make the container bridge promiscuous.
@@ -191,7 +183,7 @@ type KubeletConfiguration struct {
 	// ResolverConfig is the resolver configuration file used as the basis
 	// for the container DNS resolution configuration.
 	ResolverConfig string
-	// cpuCFSQuota is Enable CPU CFS quota enforcement for containers that
+	// cpuCFSQuota enables CPU CFS quota enforcement for containers that
 	// specify CPU limits
 	CPUCFSQuota bool
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
@@ -203,52 +195,48 @@ type KubeletConfiguration struct {
 	// kubeAPIBurst is the burst to allow while talking with kubernetes
 	// apiserver
 	KubeAPIBurst int32
-	// serializeImagePulls when enabled, tells the Kubelet to pull images one
-	// at a time. We recommend *not* changing the default value on nodes that
-	// run docker daemon with version  < 1.9 or an Aufs storage backend.
-	// Issue #10959 has more details.
+	// serializeImagePulls when enabled, tells the Kubelet to pull images one at a time.
 	SerializeImagePulls bool
 	// Map of signal names to quantities that defines hard eviction thresholds. For example: {"memory.available": "300Mi"}.
-	// +optional
 	EvictionHard map[string]string
 	// Map of signal names to quantities that defines soft eviction thresholds.  For example: {"memory.available": "300Mi"}.
-	// +optional
 	EvictionSoft map[string]string
 	// Map of signal names to quantities that defines grace periods for each soft eviction signal. For example: {"memory.available": "30s"}.
-	// +optional
 	EvictionSoftGracePeriod map[string]string
 	// Duration for which the kubelet has to wait before transitioning out of an eviction pressure condition.
-	// +optional
 	EvictionPressureTransitionPeriod metav1.Duration
 	// Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
-	// +optional
 	EvictionMaxPodGracePeriod int32
 	// Map of signal names to quantities that defines minimum reclaims, which describe the minimum
 	// amount of a given resource the kubelet will reclaim when performing a pod eviction while
 	// that resource is under pressure. For example: {"imagefs.available": "2Gi"}
-	// +optional
 	EvictionMinimumReclaim map[string]string
-	// Maximum number of pods per core. Cannot exceed MaxPods
+	// podsPerCore is the maximum number of pods per core. Cannot exceed MaxPods.
+	// If 0, this field is ignored.
 	PodsPerCore int32
 	// enableControllerAttachDetach enables the Attach/Detach controller to
 	// manage attachment/detachment of volumes scheduled to this node, and
 	// disables kubelet from executing any attach/detach operations
 	EnableControllerAttachDetach bool
-	// Default behaviour for kernel tuning
+	// protectKernelDefaults, if true, causes the Kubelet to error if kernel
+	// flags are not as it expects. Otherwise the Kubelet will attempt to modify
+	// kernel flags to match its expectation.
 	ProtectKernelDefaults bool
 	// If true, Kubelet ensures a set of iptables rules are present on host.
 	// These rules will serve as utility for various components, e.g. kube-proxy.
 	// The rules will be created based on IPTablesMasqueradeBit and IPTablesDropBit.
 	MakeIPTablesUtilChains bool
-	// iptablesMasqueradeBit is the bit of the iptables fwmark space to use for SNAT
-	// Values must be within the range [0, 31].
-	// Warning: Please match the value of corresponding parameter in kube-proxy
+	// iptablesMasqueradeBit is the bit of the iptables fwmark space to mark for SNAT
+	// Values must be within the range [0, 31]. Must be different from other mark bits.
+	// Warning: Please match the value of the corresponding parameter in kube-proxy.
 	// TODO: clean up IPTablesMasqueradeBit in kube-proxy
 	IPTablesMasqueradeBit int32
-	// iptablesDropBit is the bit of the iptables fwmark space to use for dropping packets. Kubelet will ensure iptables mark and drop rules.
-	// Values must be within the range [0, 31]. Must be different from IPTablesMasqueradeBit
+	// iptablesDropBit is the bit of the iptables fwmark space to mark for dropping packets.
+	// Values must be within the range [0, 31]. Must be different from other mark bits.
 	IPTablesDropBit int32
-	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
+	// featureGates is a map of feature names to bools that enable or disable alpha/experimental
+	// features. This field modifies piecemeal the built-in default values from
+	// "k8s.io/kubernetes/pkg/features/kube_features.go".
 	FeatureGates map[string]bool
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	FailSwapOn bool
@@ -257,12 +245,12 @@ type KubeletConfiguration struct {
 
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
 	// that describe resources reserved for non-kubernetes components.
-	// Currently only cpu and memory are supported. [default=none]
+	// Currently only cpu and memory are supported.
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	SystemReserved map[string]string
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
 	// that describe resources reserved for kubernetes system components.
-	// Currently cpu, memory and local ephemeral storage for root file system are supported. [default=none]
+	// Currently cpu, memory and local ephemeral storage for root file system are supported.
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
 	KubeReserved map[string]string
 	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.

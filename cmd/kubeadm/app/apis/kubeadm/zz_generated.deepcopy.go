@@ -23,7 +23,7 @@ package kubeadm
 import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	kubeletconfig_v1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	v1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	v1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 )
 
@@ -154,7 +154,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		if *in == nil {
 			*out = nil
 		} else {
-			*out = new(kubeletconfig_v1alpha1.KubeletConfiguration)
+			*out = new(v1beta1.KubeletConfiguration)
 			(*in).DeepCopyInto(*out)
 		}
 	}

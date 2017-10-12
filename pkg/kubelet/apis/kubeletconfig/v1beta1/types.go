@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,136 +40,222 @@ const (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// A configuration field should go in KubeletFlags instead of KubeletConfiguration if
-// its value cannot be safely shared between nodes at the same time (e.g. a hostname)
-// In general, please try to avoid adding flags or configuration fields,
-// we already have a confusingly large amount of them.
+// KubeletConfiguration contains the configuration for the Kubelet
 type KubeletConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// podManifestPath is the path to the directory containing pod manifests to
-	// run, or the path to a single manifest file
-	PodManifestPath string `json:"podManifestPath"`
+	// run, or the path to a single manifest file.
+	// Default: ""
+	// +optional
+	PodManifestPath string `json:"podManifestPath,omitempty"`
 	// syncFrequency is the max period between synchronizing running
-	// containers and config
-	SyncFrequency metav1.Duration `json:"syncFrequency"`
+	// containers and config.
+	// Default: "1m"
+	// +optional
+	SyncFrequency metav1.Duration `json:"syncFrequency,omitempty"`
 	// fileCheckFrequency is the duration between checking config files for
 	// new data
-	FileCheckFrequency metav1.Duration `json:"fileCheckFrequency"`
+	// Default: "20s"
+	// +optional
+	FileCheckFrequency metav1.Duration `json:"fileCheckFrequency,omitempty"`
 	// httpCheckFrequency is the duration between checking http for new data
-	HTTPCheckFrequency metav1.Duration `json:"httpCheckFrequency"`
+	// Default: "20s"
+	// +optional
+	HTTPCheckFrequency metav1.Duration `json:"httpCheckFrequency,omitempty"`
 	// manifestURL is the URL for accessing the container manifest
-	ManifestURL string `json:"manifestURL"`
-	// manifestURLHeader is the HTTP header to use when accessing the manifest
-	// URL, with the key separated from the value with a ':', as in 'key:value'
-	ManifestURLHeader map[string][]string `json:"manifestURLHeader"`
+	// Default: ""
+	// +optional
+	ManifestURL string `json:"manifestURL,omitempty"`
+	// manifestURLHeader is a map of slices with HTTP headers to use when accessing the manifestURL
+	// Default: nil
+	// +optional
+	ManifestURLHeader map[string][]string `json:"manifestURLHeader,omitempty"`
 	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
-	// for all interfaces)
-	Address string `json:"address"`
+	// for all interfaces).
+	// Default: "0.0.0.0"
+	// +optional
+	Address string `json:"address,omitempty"`
 	// port is the port for the Kubelet to serve on.
-	Port int32 `json:"port"`
+	// Default: 10250
+	// +optional
+	Port int32 `json:"port,omitempty"`
 	// readOnlyPort is the read-only port for the Kubelet to serve on with
-	// no authentication/authorization. Disabled (set to 0) by default.
-	ReadOnlyPort int32 `json:"readOnlyPort"`
+	// no authentication/authorization.
+	// Default: 0 (disabled)
+	// +optional
+	ReadOnlyPort int32 `json:"readOnlyPort,omitempty"`
 	// tlsCertFile is the file containing x509 Certificate for HTTPS.  (CA cert,
 	// if any, concatenated after server cert). If tlsCertFile and
 	// tlsPrivateKeyFile are not provided, a self-signed certificate
 	// and key are generated for the public address and saved to the directory
-	// passed to certDir.
-	TLSCertFile string `json:"tlsCertFile"`
-	// tlsPrivateKeyFile is the file containing x509 private key matching
-	// tlsCertFile.
-	TLSPrivateKeyFile string `json:"tlsPrivateKeyFile"`
+	// passed to the Kubelet's --cert-dir flag.
+	// Default: ""
+	// +optional
+	TLSCertFile string `json:"tlsCertFile,omitempty"`
+	// tlsPrivateKeyFile is the file containing x509 private key matching tlsCertFile
+	// Default: ""
+	// +optional
+	TLSPrivateKeyFile string `json:"tlsPrivateKeyFile,omitempty"`
 	// TLSCipherSuites is the list of allowed cipher suites for the server.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
-	TLSCipherSuites []string `json:"tlsCipherSuites"`
+	// Default: nil
+	// +optional
+	TLSCipherSuites []string `json:"tlsCipherSuites,omitempty"`
 	// TLSMinVersion is the minimum TLS version supported.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
-	TLSMinVersion string `json:"tlsMinVersion"`
+	// Default: ""
+	// +optional
+	TLSMinVersion string `json:"tlsMinVersion,omitempty"`
 	// authentication specifies how requests to the Kubelet's server are authenticated
+	// Defaults:
+	//   anonymous:
+	//     enabled: false
+	//   webhook:
+	//     enabled: true
+	//     cacheTTL: "2m"
+	// +optional
 	Authentication KubeletAuthentication `json:"authentication"`
 	// authorization specifies how requests to the Kubelet's server are authorized
+	// Defaults:
+	//   mode: Webhook
+	//   webhook:
+	//     cacheAuthorizedTTL: "5m"
+	//     cacheUnauthorizedTTL: "30s"
+	// +optional
 	Authorization KubeletAuthorization `json:"authorization"`
-	// registryPullQPS is the limit of registry pulls per second. If 0,
-	// unlimited. Set to 0 for no limit. Defaults to 5.0.
-	RegistryPullQPS *int32 `json:"registryPullQPS"`
-	// registryBurst is the maximum size of a bursty pulls, temporarily allows
-	// pulls to burst to this number, while still not exceeding registryQps.
-	// Only used if registryQPS > 0.
-	RegistryBurst int32 `json:"registryBurst"`
+	// registryPullQPS is the limit of registry pulls per second.
+	// Set to 0 for no limit.
+	// Default: 5
+	// +optional
+	RegistryPullQPS *int32 `json:"registryPullQPS,omitempty"`
+	// registryBurst is the maximum size of bursty pulls, temporarily allows
+	// pulls to burst to this number, while still not exceeding registryPullQPS.
+	// Only used if registryPullQPS > 0.
+	// Default: 10
+	// +optional
+	RegistryBurst int32 `json:"registryBurst,omitempty"`
 	// eventRecordQPS is the maximum event creations per second. If 0, there
 	// is no limit enforced.
-	EventRecordQPS *int32 `json:"eventRecordQPS"`
-	// eventBurst is the maximum size of a bursty event records, temporarily
-	// allows event records to burst to this number, while still not exceeding
-	// event-qps. Only used if eventQps > 0
-	EventBurst int32 `json:"eventBurst"`
+	// Default: 5
+	// +optional
+	EventRecordQPS *int32 `json:"eventRecordQPS,omitempty"`
+	// eventBurst is the maximum size of a burst of event creations, temporarily
+	// allows event creations to burst to this number, while still not exceeding
+	// eventRecordQPS. Only used if eventRecordQPS > 0.
+	// Default: 10
+	// +optional
+	EventBurst int32 `json:"eventBurst,omitempty"`
 	// enableDebuggingHandlers enables server endpoints for log collection
 	// and local running of containers and commands
-	EnableDebuggingHandlers *bool `json:"enableDebuggingHandlers"`
+	// Default: true
+	// +optional
+	EnableDebuggingHandlers *bool `json:"enableDebuggingHandlers,omitempty"`
 	// enableContentionProfiling enables lock contention profiling, if enableDebuggingHandlers is true.
-	EnableContentionProfiling bool `json:"enableContentionProfiling"`
+	// Default: false
+	// +optional
+	EnableContentionProfiling bool `json:"enableContentionProfiling,omitempty"`
 	// healthzPort is the port of the localhost healthz endpoint (set to 0 to disable)
-	HealthzPort *int32 `json:"healthzPort"`
-	// healthzBindAddress is the IP address for the healthz server to serve
-	// on.
-	HealthzBindAddress string `json:"healthzBindAddress"`
+	// Default: 10248
+	// +optional
+	HealthzPort *int32 `json:"healthzPort,omitempty"`
+	// healthzBindAddress is the IP address for the healthz server to serve on
+	// Default: "127.0.0.1"
+	// +optional
+	HealthzBindAddress string `json:"healthzBindAddress,omitempty"`
 	// oomScoreAdj is The oom-score-adj value for kubelet process. Values
 	// must be within the range [-1000, 1000].
-	OOMScoreAdj *int32 `json:"oomScoreAdj"`
+	// Default: -999
+	// +optional
+	OOMScoreAdj *int32 `json:"oomScoreAdj,omitempty"`
 	// clusterDomain is the DNS domain for this cluster. If set, kubelet will
 	// configure all containers to search this domain in addition to the
 	// host's search domains.
-	ClusterDomain string `json:"clusterDomain"`
-	// clusterDNS is a list of IP address for the cluster DNS server.  If set,
+	// Default: ""
+	// +optional
+	ClusterDomain string `json:"clusterDomain,omitempty"`
+	// clusterDNS is a list of IP addresses for the cluster DNS server. If set,
 	// kubelet will configure all containers to use this for DNS resolution
-	// instead of the host's DNS servers
-	ClusterDNS []string `json:"clusterDNS"`
+	// instead of the host's DNS servers.
+	// Default: nil
+	// +optional
+	ClusterDNS []string `json:"clusterDNS,omitempty"`
 	// streamingConnectionIdleTimeout is the maximum time a streaming connection
 	// can be idle before the connection is automatically closed.
-	StreamingConnectionIdleTimeout metav1.Duration `json:"streamingConnectionIdleTimeout"`
+	// Default: "4h"
+	// +optional
+	StreamingConnectionIdleTimeout metav1.Duration `json:"streamingConnectionIdleTimeout,omitempty"`
 	// nodeStatusUpdateFrequency is the frequency that kubelet posts node
 	// status to master. Note: be cautious when changing the constant, it
 	// must work with nodeMonitorGracePeriod in nodecontroller.
-	NodeStatusUpdateFrequency metav1.Duration `json:"nodeStatusUpdateFrequency"`
+	// Default: "10s"
+	// +optional
+	NodeStatusUpdateFrequency metav1.Duration `json:"nodeStatusUpdateFrequency,omitempty"`
 	// imageMinimumGCAge is the minimum age for an unused image before it is
 	// garbage collected.
-	ImageMinimumGCAge metav1.Duration `json:"imageMinimumGCAge"`
+	// Default: "2m"
+	// +optional
+	ImageMinimumGCAge metav1.Duration `json:"imageMinimumGCAge,omitempty"`
 	// imageGCHighThresholdPercent is the percent of disk usage after which
 	// image garbage collection is always run. The percent is calculated as
 	// this field value out of 100.
-	ImageGCHighThresholdPercent *int32 `json:"imageGCHighThresholdPercent"`
+	// Default: 85
+	// +optional
+	ImageGCHighThresholdPercent *int32 `json:"imageGCHighThresholdPercent,omitempty"`
 	// imageGCLowThresholdPercent is the percent of disk usage before which
 	// image garbage collection is never run. Lowest disk usage to garbage
 	// collect to. The percent is calculated as this field value out of 100.
-	ImageGCLowThresholdPercent *int32 `json:"imageGCLowThresholdPercent"`
+	// Default: 80
+	// +optional
+	ImageGCLowThresholdPercent *int32 `json:"imageGCLowThresholdPercent,omitempty"`
 	// How frequently to calculate and cache volume disk usage for all pods
-	VolumeStatsAggPeriod metav1.Duration `json:"volumeStatsAggPeriod"`
-	// kubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
-	KubeletCgroups string `json:"kubeletCgroups"`
+	// Default: "1m"
+	// +optional
+	VolumeStatsAggPeriod metav1.Duration `json:"volumeStatsAggPeriod,omitempty"`
+	// kubeletCgroups is the absolute name of cgroups to isolate the kubelet in
+	// Default: ""
+	// +optional
+	KubeletCgroups string `json:"kubeletCgroups,omitempty"`
 	// systemCgroups is absolute name of cgroups in which to place
 	// all non-kernel processes that are not already in a container. Empty
 	// for no container. Rolling back the flag requires a reboot.
-	SystemCgroups string `json:"systemCgroups"`
+	// Default: ""
+	// +optional
+	SystemCgroups string `json:"systemCgroups,omitempty"`
 	// cgroupRoot is the root cgroup to use for pods. This is handled by the
 	// container runtime on a best effort basis.
-	CgroupRoot string `json:"cgroupRoot"`
+	// Default: ""
+	// +optional
+	CgroupRoot string `json:"cgroupRoot,omitempty"`
 	// Enable QoS based Cgroup hierarchy: top level cgroups for QoS Classes
 	// And all Burstable and BestEffort pods are brought up under their
 	// specific top level QoS cgroup.
 	// +optional
+	// Default: true
+	// +optional
 	CgroupsPerQOS *bool `json:"cgroupsPerQOS,omitempty"`
 	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
 	// +optional
+	// Default: "cgroupfs"
+	// +optional
 	CgroupDriver string `json:"cgroupDriver,omitempty"`
 	// CPUManagerPolicy is the name of the policy to use.
-	CPUManagerPolicy string `json:"cpuManagerPolicy"`
+	// Requires the CPUManager feature gate to be enabled.
+	// Default: "none"
+	// +optional
+	CPUManagerPolicy string `json:"cpuManagerPolicy,omitempty"`
 	// CPU Manager reconciliation period.
-	CPUManagerReconcilePeriod metav1.Duration `json:"cpuManagerReconcilePeriod"`
+	// Requires the CPUManager feature gate to be enabled.
+	// Default: "10s"
+	// +optional
+	CPUManagerReconcilePeriod metav1.Duration `json:"cpuManagerReconcilePeriod,omitempty"`
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
-	RuntimeRequestTimeout metav1.Duration `json:"runtimeRequestTimeout"`
-	// How should the kubelet configure the container bridge for hairpin packets.
+	// Default: "2m"
+	// +optional
+	RuntimeRequestTimeout metav1.Duration `json:"runtimeRequestTimeout,omitempty"`
+	// hairpinMode specifies how the Kubelet should configure the container
+	// bridge for hairpin packets.
 	// Setting this flag allows endpoints in a Service to loadbalance back to
 	// themselves if they should try to access their own Service. Values:
 	//   "promiscuous-bridge": make the container bridge promiscuous.
@@ -177,100 +263,166 @@ type KubeletConfiguration struct {
 	//   "none":               do nothing.
 	// Generally, one must set --hairpin-mode=hairpin-veth to achieve hairpin NAT,
 	// because promiscuous-bridge assumes the existence of a container bridge named cbr0.
-	HairpinMode string `json:"hairpinMode"`
+	// Default: "promiscuous-bridge"
+	// +optional
+	HairpinMode string `json:"hairpinMode,omitempty"`
 	// maxPods is the number of pods that can run on this Kubelet.
-	MaxPods int32 `json:"maxPods"`
+	// Default: 110
+	// +optional
+	MaxPods int32 `json:"maxPods,omitempty"`
 	// The CIDR to use for pod IP addresses, only used in standalone mode.
 	// In cluster mode, this is obtained from the master.
-	PodCIDR string `json:"podCIDR"`
+	// Default: ""
+	// +optional
+	PodCIDR string `json:"podCIDR,omitempty"`
 	// PodPidsLimit is the maximum number of pids in any pod.
-	PodPidsLimit *int64 `json:"podPidsLimit"`
+	// Requires the SupportPodPidsLimit feature gate to be enabled.
+	// Default: -1
+	// +optional
+	PodPidsLimit *int64 `json:"podPidsLimit,omitempty"`
 	// ResolverConfig is the resolver configuration file used as the basis
 	// for the container DNS resolution configuration.
-	ResolverConfig string `json:"resolvConf"`
-	// cpuCFSQuota is Enable CPU CFS quota enforcement for containers that
-	// specify CPU limits
-	CPUCFSQuota *bool `json:"cpuCFSQuota"`
+	// Default: "/etc/resolv.conf"
+	// +optional
+	ResolverConfig string `json:"resolvConf,omitempty"`
+	// cpuCFSQuota enables CPU CFS quota enforcement for containers that
+	// specify CPU limits.
+	// Default: true
+	// +optional
+	CPUCFSQuota *bool `json:"cpuCFSQuota,omitempty"`
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
-	MaxOpenFiles int64 `json:"maxOpenFiles"`
+	// Default: 1000000
+	// +optional
+	MaxOpenFiles int64 `json:"maxOpenFiles,omitempty"`
 	// contentType is contentType of requests sent to apiserver.
-	ContentType string `json:"contentType"`
+	// Default: "application/vnd.kubernetes.protobuf"
+	// +optional
+	ContentType string `json:"contentType,omitempty"`
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver
-	KubeAPIQPS *int32 `json:"kubeAPIQPS"`
-	// kubeAPIBurst is the burst to allow while talking with kubernetes
-	// apiserver
-	KubeAPIBurst int32 `json:"kubeAPIBurst"`
+	// Default: 5
+	// +optional
+	KubeAPIQPS *int32 `json:"kubeAPIQPS,omitempty"`
+	// kubeAPIBurst is the burst to allow while talking with kubernetes apiserver
+	// Default: 10
+	// +optional
+	KubeAPIBurst int32 `json:"kubeAPIBurst,omitempty"`
 	// serializeImagePulls when enabled, tells the Kubelet to pull images one
 	// at a time. We recommend *not* changing the default value on nodes that
 	// run docker daemon with version  < 1.9 or an Aufs storage backend.
 	// Issue #10959 has more details.
-	SerializeImagePulls *bool `json:"serializeImagePulls"`
+	// Default: true
+	// +optional
+	SerializeImagePulls *bool `json:"serializeImagePulls,omitempty"`
 	// Map of signal names to quantities that defines hard eviction thresholds. For example: {"memory.available": "300Mi"}.
+	// To explicitly disable, pass a 0% or 100% threshold on an arbitrary resource.
+	// Default:
+	//   memory.available:  "100Mi"
+	//   nodefs.available:  "10%"
+	//   nodefs.inodesFree: "5%"
+	//   imagefs.available: "15%"
 	// +optional
 	EvictionHard map[string]string `json:"evictionHard,omitempty"`
 	// Map of signal names to quantities that defines soft eviction thresholds.  For example: {"memory.available": "300Mi"}.
+	// Default: nil
 	// +optional
 	EvictionSoft map[string]string `json:"evictionSoft,omitempty"`
 	// Map of signal names to quantities that defines grace periods for each soft eviction signal. For example: {"memory.available": "30s"}.
+	// Default: nil
 	// +optional
-	EvictionSoftGracePeriod map[string]string `json:"evictionSoftGracePeriod"`
+	EvictionSoftGracePeriod map[string]string `json:"evictionSoftGracePeriod,omitempty"`
 	// Duration for which the kubelet has to wait before transitioning out of an eviction pressure condition.
-	EvictionPressureTransitionPeriod metav1.Duration `json:"evictionPressureTransitionPeriod"`
+	// Default: "5m"
+	// +optional
+	EvictionPressureTransitionPeriod metav1.Duration `json:"evictionPressureTransitionPeriod,omitempty"`
 	// Maximum allowed grace period (in seconds) to use when terminating pods in response to a soft eviction threshold being met.
-	EvictionMaxPodGracePeriod int32 `json:"evictionMaxPodGracePeriod"`
+	// Default: 0
+	// +optional
+	EvictionMaxPodGracePeriod int32 `json:"evictionMaxPodGracePeriod,omitempty"`
 	// Map of signal names to quantities that defines minimum reclaims, which describe the minimum
 	// amount of a given resource the kubelet will reclaim when performing a pod eviction while
 	// that resource is under pressure. For example: {"imagefs.available": "2Gi"}
 	// +optional
-	EvictionMinimumReclaim map[string]string `json:"evictionMinimumReclaim"`
-	// Maximum number of pods per core. Cannot exceed MaxPods
-	PodsPerCore int32 `json:"podsPerCore"`
+	// Default: nil
+	// +optional
+	EvictionMinimumReclaim map[string]string `json:"evictionMinimumReclaim,omitempty"`
+	// podsPerCore is the maximum number of pods per core. Cannot exceed MaxPods.
+	// If 0, this field is ignored.
+	// Default: 0
+	// +optional
+	PodsPerCore int32 `json:"podsPerCore,omitempty"`
 	// enableControllerAttachDetach enables the Attach/Detach controller to
 	// manage attachment/detachment of volumes scheduled to this node, and
 	// disables kubelet from executing any attach/detach operations
-	EnableControllerAttachDetach *bool `json:"enableControllerAttachDetach"`
-	// Default behaviour for kernel tuning
-	ProtectKernelDefaults bool `json:"protectKernelDefaults"`
+	// Default: true
+	// +optional
+	EnableControllerAttachDetach *bool `json:"enableControllerAttachDetach,omitempty"`
+	// protectKernelDefaults, if true, causes the Kubelet to error if kernel
+	// flags are not as it expects. Otherwise the Kubelet will attempt to modify
+	// kernel flags to match its expectation.
+	// Default: false
+	// +optional
+	ProtectKernelDefaults bool `json:"protectKernelDefaults,omitempty"`
 	// If true, Kubelet ensures a set of iptables rules are present on host.
 	// These rules will serve as utility rules for various components, e.g. KubeProxy.
 	// The rules will be created based on IPTablesMasqueradeBit and IPTablesDropBit.
-	MakeIPTablesUtilChains *bool `json:"makeIPTablesUtilChains"`
+	// Default: true
+	// +optional
+	MakeIPTablesUtilChains *bool `json:"makeIPTablesUtilChains,omitempty"`
 	// iptablesMasqueradeBit is the bit of the iptables fwmark space to mark for SNAT
 	// Values must be within the range [0, 31]. Must be different from other mark bits.
-	// Warning: Please match the value of corresponding parameter in kube-proxy
+	// Warning: Please match the value of the corresponding parameter in kube-proxy.
 	// TODO: clean up IPTablesMasqueradeBit in kube-proxy
-	IPTablesMasqueradeBit *int32 `json:"iptablesMasqueradeBit"`
+	// Default: 14
+	// +optional
+	IPTablesMasqueradeBit *int32 `json:"iptablesMasqueradeBit,omitempty"`
 	// iptablesDropBit is the bit of the iptables fwmark space to mark for dropping packets.
 	// Values must be within the range [0, 31]. Must be different from other mark bits.
-	IPTablesDropBit *int32 `json:"iptablesDropBit"`
-	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
+	// Default: 15
+	// +optional
+	IPTablesDropBit *int32 `json:"iptablesDropBit,omitempty"`
+	// featureGates is a map of feature names to bools that enable or disable alpha/experimental
+	// features. This field modifies piecemeal the built-in default values from
+	// "k8s.io/kubernetes/pkg/features/kube_features.go".
+	// Default: nil
+	// +optional
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
-	// Tells the Kubelet to fail to start if swap is enabled on the node.
+	// failSwapOn tells the Kubelet to fail to start if swap is enabled on the node.
+	// Default: true
+	// +optional
 	FailSwapOn *bool `json:"failSwapOn,omitempty"`
 
 	/* following flags are meant for Node Allocatable */
 
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
 	// that describe resources reserved for non-kubernetes components.
-	// Currently only cpu and memory are supported. [default=none]
+	// Currently only cpu and memory are supported.
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
-	SystemReserved map[string]string `json:"systemReserved"`
+	// Default: nil
+	// +optional
+	SystemReserved map[string]string `json:"systemReserved,omitempty"`
 	// A set of ResourceName=ResourceQuantity (e.g. cpu=200m,memory=150G) pairs
 	// that describe resources reserved for kubernetes system components.
-	// Currently cpu, memory and local storage for root file system are supported. [default=none]
+	// Currently cpu, memory and local storage for root file system are supported.
 	// See http://kubernetes.io/docs/user-guide/compute-resources for more detail.
-	KubeReserved map[string]string `json:"kubeReserved"`
-
+	// Default: nil
+	// +optional
+	KubeReserved map[string]string `json:"kubeReserved,omitempty"`
 	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
+	// Default: ""
+	// +optional
 	SystemReservedCgroup string `json:"systemReservedCgroup,omitempty"`
 	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `KubeReserved` compute resource reservation for Kubernetes node system daemons.
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
+	// Default: ""
+	// +optional
 	KubeReservedCgroup string `json:"kubeReservedCgroup,omitempty"`
 	// This flag specifies the various Node Allocatable enforcements that Kubelet needs to perform.
 	// This flag accepts a list of options. Acceptable options are `none`, `pods`, `system-reserved` & `kube-reserved`.
 	// If `none` is specified, no other options may be specified.
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
+	// Default: ["pods"]
+	// +optional
 	EnforceNodeAllocatable []string `json:"enforceNodeAllocatable,omitempty"`
 }
 
@@ -287,25 +439,32 @@ type KubeletAuthorization struct {
 	// mode is the authorization mode to apply to requests to the kubelet server.
 	// Valid values are AlwaysAllow and Webhook.
 	// Webhook mode uses the SubjectAccessReview API to determine authorization.
-	Mode KubeletAuthorizationMode `json:"mode"`
+	// +optional
+	Mode KubeletAuthorizationMode `json:"mode,omitempty"`
 
 	// webhook contains settings related to Webhook authorization.
+	// +optional
 	Webhook KubeletWebhookAuthorization `json:"webhook"`
 }
 
 type KubeletWebhookAuthorization struct {
 	// cacheAuthorizedTTL is the duration to cache 'authorized' responses from the webhook authorizer.
-	CacheAuthorizedTTL metav1.Duration `json:"cacheAuthorizedTTL"`
+	// +optional
+	CacheAuthorizedTTL metav1.Duration `json:"cacheAuthorizedTTL,omitempty"`
 	// cacheUnauthorizedTTL is the duration to cache 'unauthorized' responses from the webhook authorizer.
-	CacheUnauthorizedTTL metav1.Duration `json:"cacheUnauthorizedTTL"`
+	// +optional
+	CacheUnauthorizedTTL metav1.Duration `json:"cacheUnauthorizedTTL,omitempty"`
 }
 
 type KubeletAuthentication struct {
 	// x509 contains settings related to x509 client certificate authentication
+	// +optional
 	X509 KubeletX509Authentication `json:"x509"`
 	// webhook contains settings related to webhook bearer token authentication
+	// +optional
 	Webhook KubeletWebhookAuthentication `json:"webhook"`
 	// anonymous contains settings related to anonymous authentication
+	// +optional
 	Anonymous KubeletAnonymousAuthentication `json:"anonymous"`
 }
 
@@ -313,19 +472,23 @@ type KubeletX509Authentication struct {
 	// clientCAFile is the path to a PEM-encoded certificate bundle. If set, any request presenting a client certificate
 	// signed by one of the authorities in the bundle is authenticated with a username corresponding to the CommonName,
 	// and groups corresponding to the Organization in the client certificate.
-	ClientCAFile string `json:"clientCAFile"`
+	// +optional
+	ClientCAFile string `json:"clientCAFile,omitempty"`
 }
 
 type KubeletWebhookAuthentication struct {
 	// enabled allows bearer token authentication backed by the tokenreviews.authentication.k8s.io API
-	Enabled *bool `json:"enabled"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
 	// cacheTTL enables caching of authentication results
-	CacheTTL metav1.Duration `json:"cacheTTL"`
+	// +optional
+	CacheTTL metav1.Duration `json:"cacheTTL,omitempty"`
 }
 
 type KubeletAnonymousAuthentication struct {
 	// enabled allows anonymous requests to the kubelet server.
 	// Requests that are not rejected by another authentication method are treated as anonymous requests.
 	// Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated.
-	Enabled *bool `json:"enabled"`
+	// +optional
+	Enabled *bool `json:"enabled,omitempty"`
 }

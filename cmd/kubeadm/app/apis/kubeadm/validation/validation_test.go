@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
@@ -568,7 +568,7 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 
 func TestValidateKubeletConfiguration(t *testing.T) {
 	successCase := &kubeadm.KubeletConfiguration{
-		BaseConfig: &kubeletconfigv1alpha1.KubeletConfiguration{
+		BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
 			CgroupsPerQOS:               utilpointer.BoolPtr(true),
 			EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved"},
 			SystemCgroups:               "",
@@ -598,7 +598,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 	}
 
 	errorCase := &kubeadm.KubeletConfiguration{
-		BaseConfig: &kubeletconfigv1alpha1.KubeletConfiguration{
+		BaseConfig: &kubeletconfigv1beta1.KubeletConfiguration{
 			CgroupsPerQOS:               utilpointer.BoolPtr(false),
 			EnforceNodeAllocatable:      []string{"pods", "system-reserved", "kube-reserved", "illegal-key"},
 			SystemCgroups:               "/",

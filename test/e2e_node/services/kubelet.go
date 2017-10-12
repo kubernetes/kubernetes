@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/builder"
 )
@@ -357,7 +357,7 @@ func addKubeletConfigFlags(cmdArgs *[]string, kc *kubeletconfig.KubeletConfigura
 // writeKubeletConfigFile writes the kubelet config file based on the args and returns the filename
 func writeKubeletConfigFile(internal *kubeletconfig.KubeletConfiguration, path string) error {
 	// extract the KubeletConfiguration and convert to versioned
-	versioned := &v1alpha1.KubeletConfiguration{}
+	versioned := &v1beta1.KubeletConfiguration{}
 	scheme, _, err := scheme.NewSchemeAndCodecs()
 	if err != nil {
 		return err
@@ -397,7 +397,7 @@ func newKubeletConfigJSONEncoder() (runtime.Encoder, error) {
 	if !ok {
 		return nil, fmt.Errorf("unsupported media type %q", mediaType)
 	}
-	return kubeletCodecs.EncoderForVersion(info.Serializer, v1alpha1.SchemeGroupVersion), nil
+	return kubeletCodecs.EncoderForVersion(info.Serializer, v1beta1.SchemeGroupVersion), nil
 }
 
 // createPodManifestDirectory creates pod manifest directory.

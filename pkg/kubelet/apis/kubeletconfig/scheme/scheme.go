@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
-	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 )
 
 // Utility functions for the Kubelet's kubeletconfig API group
@@ -32,7 +32,7 @@ func NewSchemeAndCodecs() (*runtime.Scheme, *serializer.CodecFactory, error) {
 	if err := kubeletconfig.AddToScheme(scheme); err != nil {
 		return nil, nil, err
 	}
-	if err := v1alpha1.AddToScheme(scheme); err != nil {
+	if err := v1beta1.AddToScheme(scheme); err != nil {
 		return nil, nil, err
 	}
 	codecs := serializer.NewCodecFactory(scheme)

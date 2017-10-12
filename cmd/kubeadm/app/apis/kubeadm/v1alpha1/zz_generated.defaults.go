@@ -22,7 +22,7 @@ package v1alpha1
 
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	kubeletconfig_v1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
+	v1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	kubeproxyconfig_v1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
 )
 
@@ -41,7 +41,7 @@ func SetObjectDefaults_MasterConfiguration(in *MasterConfiguration) {
 		kubeproxyconfig_v1alpha1.SetDefaults_KubeProxyConfiguration(in.KubeProxy.Config)
 	}
 	if in.KubeletConfiguration.BaseConfig != nil {
-		kubeletconfig_v1alpha1.SetDefaults_KubeletConfiguration(in.KubeletConfiguration.BaseConfig)
+		v1beta1.SetDefaults_KubeletConfiguration(in.KubeletConfiguration.BaseConfig)
 	}
 }
 
