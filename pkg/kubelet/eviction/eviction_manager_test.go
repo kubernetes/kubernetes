@@ -1431,6 +1431,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 
 // TestAllocatableNodeFsPressure
 func TestAllocatableNodeFsPressure(t *testing.T) {
+	utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=True")
 	podMaker := makePodWithDiskStats
 	summaryStatsMaker := makeDiskStats
 
@@ -1583,6 +1584,7 @@ func TestAllocatableNodeFsPressure(t *testing.T) {
 }
 
 func TestNodeReclaimForAllocatableFuncs(t *testing.T) {
+	utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=True")
 	podMaker := makePodWithDiskStats
 	summaryStatsMaker := makeDiskStats
 	podsToMake := []podToMake{
