@@ -3500,17 +3500,21 @@ run_clusterroles_tests() {
   kube::test::get_object_assert clusterrole/url-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:'
   kube::test::get_object_assert clusterrole/url-reader "{{range.rules}}{{range.nonResourceURLs}}{{.}}:{{end}}{{end}}" '/logs/\*:/healthz/\*:'
 
-  # test `kubectl create rolebinding/clusterrolebinding`
-  # test `kubectl set subject rolebinding/clusterrolebinding`
+  # test `kubectl create clusterrolebinding`
+  # test `kubectl set subject clusterrolebinding`
   kubectl create "${kube_flags[@]}" clusterrolebinding super-admin --clusterrole=admin --user=super-admin
   kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:'
   kubectl set subject "${kube_flags[@]}" clusterrolebinding super-admin --user=foo
   kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:foo:'
+  kubectl create "${kube_flags[@]}" clusterrolebinding multi-users --clusterrole=admin --user=user-1 --user=user-2
+  kube::test::get_object_assert clusterrolebinding/multi-users "{{range.subjects}}{{.name}}:{{end}}" 'user-1:user-2:'
 
   kubectl create "${kube_flags[@]}" clusterrolebinding super-group --clusterrole=admin --group=the-group
   kube::test::get_object_assert clusterrolebinding/super-group "{{range.subjects}}{{.name}}:{{end}}" 'the-group:'
   kubectl set subject "${kube_flags[@]}" clusterrolebinding super-group --group=foo
   kube::test::get_object_assert clusterrolebinding/super-group "{{range.subjects}}{{.name}}:{{end}}" 'the-group:foo:'
+  kubectl create "${kube_flags[@]}" clusterrolebinding multi-groups --clusterrole=admin --group=group-1 --group=group-2
+  kube::test::get_object_assert clusterrolebinding/multi-groups "{{range.subjects}}{{.name}}:{{end}}" 'group-1:group-2:'
 
   kubectl create "${kube_flags[@]}" clusterrolebinding super-sa --clusterrole=admin --serviceaccount=otherns:sa-name
   kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.namespace}}:{{end}}" 'otherns:'
@@ -3518,13 +3522,17 @@ run_clusterroles_tests() {
   kubectl set subject "${kube_flags[@]}" clusterrolebinding super-sa --serviceaccount=otherfoo:foo
   kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.namespace}}:{{end}}" 'otherns:otherfoo:'
   kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:'
-
+ 
+  # test `kubectl create rolebinding`
+  # test `kubectl set subject rolebinding`
   kubectl create "${kube_flags[@]}" rolebinding admin --clusterrole=admin --user=default-admin
+  kube::test::get_object_assert rolebinding/admin "{{.roleRef.kind}}" 'ClusterRole'
   kube::test::get_object_assert rolebinding/admin "{{range.subjects}}{{.name}}:{{end}}" 'default-admin:'
   kubectl set subject "${kube_flags[@]}" rolebinding admin --user=foo
   kube::test::get_object_assert rolebinding/admin "{{range.subjects}}{{.name}}:{{end}}" 'default-admin:foo:'
 
   kubectl create "${kube_flags[@]}" rolebinding localrole --role=localrole --group=the-group
+  kube::test::get_object_assert rolebinding/localrole "{{.roleRef.kind}}" 'Role'
   kube::test::get_object_assert rolebinding/localrole "{{range.subjects}}{{.name}}:{{end}}" 'the-group:'
   kubectl set subject "${kube_flags[@]}" rolebinding localrole --group=foo
   kube::test::get_object_assert rolebinding/localrole "{{range.subjects}}{{.name}}:{{end}}" 'the-group:foo:'
