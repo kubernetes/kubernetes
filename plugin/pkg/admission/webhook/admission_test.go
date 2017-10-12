@@ -144,6 +144,9 @@ func TestAdmit(t *testing.T) {
 		},
 	}}
 
+	policyFail := registrationv1alpha1.Fail
+	policyIgnore := registrationv1alpha1.Ignore
+
 	table := map[string]test{
 		"no match": {
 			hookSource: fakeHookSource{
@@ -194,6 +197,28 @@ func TestAdmit(t *testing.T) {
 		"match & fail (but allow because fail open)": {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
+					Name:          "internalErr A",
+					ClientConfig:  ccfg,
+					Rules:         matchEverythingRules,
+					FailurePolicy: &policyIgnore,
+				}, {
+					Name:          "internalErr B",
+					ClientConfig:  ccfg,
+					Rules:         matchEverythingRules,
+					FailurePolicy: &policyIgnore,
+				}, {
+					Name:          "internalErr C",
+					ClientConfig:  ccfg,
+					Rules:         matchEverythingRules,
+					FailurePolicy: &policyIgnore,
+				}},
+			},
+			path:        "internalErr",
+			expectAllow: true,
+		},
+		"match & fail (but allow because fail open on nil)": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
 					Name:         "internalErr A",
 					ClientConfig: ccfg,
 					Rules:        matchEverythingRules,
@@ -210,23 +235,47 @@ func TestAdmit(t *testing.T) {
 			path:        "internalErr",
 			expectAllow: true,
 		},
+		"match & fail (but fail because fail closed)": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
+					Name:          "internalErr A",
+					ClientConfig:  ccfg,
+					Rules:         matchEverythingRules,
+					FailurePolicy: &policyFail,
+				}, {
+					Name:          "internalErr B",
+					ClientConfig:  ccfg,
+					Rules:         matchEverythingRules,
+					FailurePolicy: &policyFail,
+				}, {
+					Name:          "internalErr C",
+					ClientConfig:  ccfg,
+					Rules:         matchEverythingRules,
+					FailurePolicy: &policyFail,
+				}},
+			},
+			path:        "internalErr",
+			expectAllow: false,
+		},
 	}
 
 	for name, tt := range table {
-		wh.hookSource = &tt.hookSource
-		wh.serviceResolver = fakeServiceResolver{base: *serverURL, path: tt.path}
-		wh.SetScheme(legacyscheme.Scheme)
+		t.Run(name, func(t *testing.T) {
+			wh.hookSource = &tt.hookSource
+			wh.serviceResolver = fakeServiceResolver{base: *serverURL, path: tt.path}
+			wh.SetScheme(legacyscheme.Scheme)
 
-		err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, name, resource, subResource, operation, &userInfo))
-		if tt.expectAllow != (err == nil) {
-			t.Errorf("%q: expected allowed=%v, but got err=%v", name, tt.expectAllow, err)
-		}
-		// ErrWebhookRejected is not an error for our purposes
-		if tt.errorContains != "" {
-			if err == nil || !strings.Contains(err.Error(), tt.errorContains) {
-				t.Errorf("%q: expected an error saying %q, but got %v", name, tt.errorContains, err)
+			err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, name, resource, subResource, operation, &userInfo))
+			if tt.expectAllow != (err == nil) {
+				t.Errorf("expected allowed=%v, but got err=%v", tt.expectAllow, err)
 			}
-		}
+			// ErrWebhookRejected is not an error for our purposes
+			if tt.errorContains != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf(" expected an error saying %q, but got %v", tt.errorContains, err)
+				}
+			}
+		})
 	}
 }
 
