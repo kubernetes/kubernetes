@@ -54,6 +54,7 @@ go_test(
     srcs = ["conversion_test.go"],
     library = ":go_default_library",
     deps = [
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/apis/audit:go_default_library",
