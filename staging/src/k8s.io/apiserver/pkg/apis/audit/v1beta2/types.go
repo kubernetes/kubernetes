@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package audit
+package v1beta2
 
 import (
+	authnv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -27,13 +28,6 @@ const (
 	// Header to hold the audit ID as the request is propagated through the serving hierarchy. The
 	// Audit-ID header should be set by the first server to receive the request (e.g. the federation
 	// server or kube-aggregator).
-	//
-	// Audit ID is also returned to client by http response header.
-	// It's not guaranteed Audit-Id http header is sent for all requests. When kube-apiserver didn't
-	// audit the events according to the audit policy, no Audit-ID is returned. Also, for request to
-	// pods/exec, pods/attach, pods/proxy, kube-apiserver works like a proxy and redirect the request
-	// to kubelet node, users will only get http headers sent from kubelet node, so no Audit-ID is
-	// sent when users run command like "kubectl exec" or "kubectl attach".
 	HeaderAuditID = "Audit-ID"
 )
 
@@ -68,7 +62,7 @@ const (
 	// The stage for events generated once the response body has been completed, and no more bytes
 	// will be sent.
 	StageResponseComplete = "ResponseComplete"
-	// The stage for events generated when a panic occurred.
+	// The stage for events generated when a panic occured.
 	StagePanic = "Panic"
 )
 
@@ -76,66 +70,67 @@ const (
 
 // Event captures all the information that can be included in an API audit log.
 type Event struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 
 	// AuditLevel at which event was generated
-	Level Level
+	Level Level `json:"level" protobuf:"bytes,1,opt,name=level,casttype=Level"`
 
 	// Unique audit ID, generated for each request.
-	AuditID types.UID
+	AuditID types.UID `json:"auditID" protobuf:"bytes,2,opt,name=auditID,casttype=k8s.io/apimachinery/pkg/types.UID"`
 	// Stage of the request handling when this event instance was generated.
-	Stage Stage
+	Stage Stage `json:"stage" protobuf:"bytes,3,opt,name=stage,casttype=Stage"`
 
 	// RequestURI is the request URI as sent by the client to a server.
-	RequestURI string
+	RequestURI string `json:"requestURI" protobuf:"bytes,4,opt,name=requestURI"`
 	// Verb is the kubernetes verb associated with the request.
 	// For non-resource requests, this is the lower-cased HTTP method.
-	Verb string
+	Verb string `json:"verb" protobuf:"bytes,5,opt,name=verb"`
 	// Authenticated user information.
-	User UserInfo
+	User authnv1.UserInfo `json:"user" protobuf:"bytes,6,opt,name=user"`
 	// Impersonated user information.
 	// +optional
-	ImpersonatedUser *UserInfo
+	ImpersonatedUser *authnv1.UserInfo `json:"impersonatedUser,omitempty" protobuf:"bytes,7,opt,name=impersonatedUser"`
 	// Source IPs, from where the request originated and intermediate proxies.
 	// +optional
-	SourceIPs []string
+	SourceIPs []string `json:"sourceIPs,omitempty" protobuf:"bytes,8,rep,name=sourceIPs"`
 	// Object reference this request is targeted at.
 	// Does not apply for List-type requests, or non-resource requests.
 	// +optional
-	ObjectRef *ObjectReference
+	ObjectRef *ObjectReference `json:"objectRef,omitempty" protobuf:"bytes,9,opt,name=objectRef"`
 	// The response status, populated even when the ResponseObject is not a Status type.
-	// For successful responses, this will only include the Code. For non-status type
-	// error responses, this will be auto-populated with the error Message.
+	// For successful responses, this will only include the Code and StatusSuccess.
+	// For non-status type error responses, this will be auto-populated with the error Message.
 	// +optional
-	ResponseStatus *metav1.Status
+	ResponseStatus *metav1.Status `json:"responseStatus,omitempty" protobuf:"bytes,10,opt,name=responseStatus"`
 
 	// API object from the request, in JSON format. The RequestObject is recorded as-is in the request
 	// (possibly re-encoded as JSON), prior to version conversion, defaulting, admission or
 	// merging. It is an external versioned object type, and may not be a valid object on its own.
 	// Omitted for non-resource requests.  Only logged at Request Level and higher.
 	// +optional
-	RequestObject *runtime.Unknown
+	RequestObject *runtime.Unknown `json:"requestObject,omitempty" protobuf:"bytes,11,opt,name=requestObject"`
 	// API object returned in the response, in JSON. The ResponseObject is recorded after conversion
-	// to the external type, and serialized as JSON. Omitted for non-resource requests.  Only logged
+	// to the external type, and serialized as JSON.  Omitted for non-resource requests.  Only logged
 	// at Response Level.
 	// +optional
-	ResponseObject *runtime.Unknown
-
+	ResponseObject *runtime.Unknown `json:"responseObject,omitempty" protobuf:"bytes,12,opt,name=responseObject"`
 	// Time the request reached the apiserver.
-	RequestReceivedTimestamp metav1.MicroTime
+	// +optional
+	RequestReceivedTimestamp metav1.MicroTime `json:"requestReceivedTimestamp" protobuf:"bytes,13,opt,name=requestReceivedTimestamp"`
 	// Time the request reached current audit stage.
-	StageTimestamp metav1.MicroTime
+	// +optional
+	StageTimestamp metav1.MicroTime `json:"stageTimestamp" protobuf:"bytes,14,opt,name=stageTimestamp"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // EventList is a list of audit Events.
 type EventList struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 	// +optional
-	metav1.ListMeta
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	Items []Event
+	Items []Event `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -143,49 +138,49 @@ type EventList struct {
 // Policy defines the configuration of audit logging, and the rules for how different request
 // categories are logged.
 type Policy struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 	// ObjectMeta is included for interoperability with API infrastructure.
 	// +optional
-	metav1.ObjectMeta
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Rules specify the audit Level a request should be recorded at.
 	// A request may match multiple rules, in which case the FIRST matching rule is used.
 	// The default audit level is None, but can be overridden by a catch-all rule at the end of the list.
 	// PolicyRules are strictly ordered.
-	Rules []PolicyRule
+	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PolicyList is a list of audit Policies.
 type PolicyList struct {
-	metav1.TypeMeta
+	metav1.TypeMeta `json:",inline"`
 	// +optional
-	metav1.ListMeta
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	Items []Policy
+	Items []Policy `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // PolicyRule maps requests based off metadata to an audit Level.
 // Requests must match the rules of every field (an intersection of rules).
 type PolicyRule struct {
 	// The Level that requests matching this rule are recorded at.
-	Level Level
+	Level Level `json:"level" protobuf:"bytes,1,opt,name=level,casttype=Level"`
 
 	// The users (by authenticated user name) this rule applies to.
 	// An empty list implies every user.
 	// +optional
-	Users []string
+	Users []string `json:"users,omitempty" protobuf:"bytes,2,rep,name=users"`
 	// The user groups this rule applies to. A user is considered matching
 	// if it is a member of any of the UserGroups.
 	// An empty list implies every user group.
 	// +optional
-	UserGroups []string
+	UserGroups []string `json:"userGroups,omitempty" protobuf:"bytes,3,rep,name=userGroups"`
 
 	// The verbs that match this rule.
 	// An empty list implies every verb.
 	// +optional
-	Verbs []string
+	Verbs []string `json:"verbs,omitempty" protobuf:"bytes,4,rep,name=verbs"`
 
 	// Rules can apply to API resources (such as "pods" or "secrets"),
 	// non-resource URL paths (such as "/api"), or neither, but not both.
@@ -193,12 +188,12 @@ type PolicyRule struct {
 
 	// Resources that this rule matches. An empty list implies all kinds in all API groups.
 	// +optional
-	Resources []GroupResources
+	Resources []GroupResources `json:"resources,omitempty" protobuf:"bytes,5,rep,name=resources"`
 	// Namespaces that this rule matches.
 	// The empty string "" matches non-namespaced resources.
 	// An empty list implies every namespace.
 	// +optional
-	Namespaces []string
+	Namespaces []string `json:"namespaces,omitempty" protobuf:"bytes,6,rep,name=namespaces"`
 
 	// NonResourceURLs is a set of URL paths that should be audited.
 	// *s are allowed, but only as the full, final step in the path.
@@ -206,11 +201,11 @@ type PolicyRule struct {
 	//  "/metrics" - Log requests for apiserver metrics
 	//  "/healthz*" - Log all health checks
 	// +optional
-	NonResourceURLs []string
+	NonResourceURLs []string `json:"nonResourceURLs,omitempty" protobuf:"bytes,7,rep,name=nonResourceURLs"`
 
 	// OmitStages specify events generated in which stages will not be emitted to backend.
 	// An empty list means no restrictions will apply.
-	OmitStages []Stage
+	OmitStages []Stage `json:"omitStages,omitempty" protobuf:"bytes,8,rep,name=omitStages"`
 }
 
 // GroupResources represents resource kinds in an API group.
@@ -218,57 +213,39 @@ type GroupResources struct {
 	// Group is the name of the API group that contains the resources.
 	// The empty string represents the core API group.
 	// +optional
-	Group string
+	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
 	// Resources is a list of resources within the API group. Subresources are
 	// matched using a "/" to indicate the subresource. For example, "pods/log"
 	// would match request to the log subresource of pods. The top level resource
 	// does not match subresources, "pods" doesn't match "pods/log".
 	// +optional
-	Resources []string
+	Resources []string `json:"resources,omitempty" protobuf:"bytes,2,rep,name=resources"`
 	// ResourceNames is a list of resource instance names that the policy matches.
 	// Using this field requires Resources to be specified.
 	// An empty list implies that every instance of the resource is matched.
 	// +optional
-	ResourceNames []string
+	ResourceNames []string `json:"resourceNames,omitempty" protobuf:"bytes,3,rep,name=resourceNames"`
 }
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
 type ObjectReference struct {
 	// +optional
-	Resource string
+	Resource string `json:"resource,omitempty" protobuf:"bytes,1,opt,name=resource"`
 	// +optional
-	Namespace string
+	Namespace string `json:"namespace,omitempty" protobuf:"bytes,2,opt,name=namespace"`
 	// +optional
-	Name string
+	Name string `json:"name,omitempty" protobuf:"bytes,3,opt,name=name"`
 	// +optional
-	UID types.UID
+	UID types.UID `json:"uid,omitempty" protobuf:"bytes,4,opt,name=uid,casttype=k8s.io/apimachinery/pkg/types.UID"`
 	// APIGroup is the name of the API group that contains the referred object.
 	// The empty string represents the core API group.
 	// +optional
-	APIGroup string
+	APIGroup string `json:"apiGroup,omitempty" protobuf:"bytes,5,opt,name=apiGroup"`
 	// APIVersion is the version of the API group that contains the referred object.
 	// +optional
-	APIVersion string
+	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,6,opt,name=apiVersion"`
 	// +optional
-	ResourceVersion string
+	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,7,opt,name=resourceVersion"`
 	// +optional
-	Subresource string
+	Subresource string `json:"subresource,omitempty" protobuf:"bytes,8,opt,name=subresource"`
 }
-
-// UserInfo holds the information about the user needed to implement the
-// user.Info interface.
-type UserInfo struct {
-	// The name that uniquely identifies this user among all active users.
-	Username string
-	// A unique value that identifies this user across time. If this user is
-	// deleted and another user by the same name is added, they will have
-	// different UIDs.
-	UID string
-	// The names of groups this user is a part of.
-	Groups []string
-	// Any additional information provided by the authenticator.
-	Extra map[string]ExtraValue
-}
-
-// ExtraValue masks the value so protobuf can generate
-type ExtraValue []string

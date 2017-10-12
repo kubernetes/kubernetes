@@ -35,12 +35,15 @@ option go_package = "v1beta1";
 message Event {
   // ObjectMeta is included for interoperability with API infrastructure.
   // +optional
+  // DEPRECATED: Use StageTimestamp which supports micro second instead of ObjectMeta.CreateTimestamp
+  // and the rest of the object is not used
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // AuditLevel at which event was generated
   optional string level = 2;
 
   // Time the request reached the apiserver.
+  // DEPRECATED: Use RequestReceivedTimestamp which supports micro second instead.
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time timestamp = 3;
 
   // Unique audit ID, generated for each request.
@@ -90,6 +93,14 @@ message Event {
   // at Response Level.
   // +optional
   optional k8s.io.apimachinery.pkg.runtime.Unknown responseObject = 14;
+
+  // Time the request reached the apiserver.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime requestReceivedTimestamp = 15;
+
+  // Time the request reached current audit stage.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime stageTimestamp = 16;
 }
 
 // EventList is a list of audit Events.
