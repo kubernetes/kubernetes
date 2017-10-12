@@ -190,7 +190,7 @@ func TestProxyServerWithCleanupAndExit(t *testing.T) {
 		}
 		options.CleanupAndExit = true
 
-		proxyserver, err := NewProxyServer(options.config, options.CleanupAndExit, options.scheme, options.master)
+		proxyserver, err := NewProxyServer(options.config, options.CleanupAndExit, options.scheme)
 
 		assert.Nil(t, err, "unexpected error in NewProxyServer, addr: %s", addr)
 		assert.NotNil(t, proxyserver, "nil proxy server obj, addr: %s", addr)

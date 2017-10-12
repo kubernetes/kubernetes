@@ -42,7 +42,6 @@ import (
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -106,8 +105,6 @@ type Options struct {
 	//
 	// TODO remove these fields once the deprecated flags are removed.
 
-	// master is used to override the kubeconfig's URL to the apiserver.
-	master string
 	// healthzPort is the port to be used by the healthz server.
 	healthzPort int32
 
@@ -125,7 +122,6 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 
 	// All flags below here are deprecated and will eventually be removed.
 
-	fs.StringVar(&options.master, "master", options.master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.Int32Var(&options.healthzPort, "healthz-port", options.healthzPort, "The port to bind the health check server. Use 0 to disable.")
 
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
@@ -190,7 +186,7 @@ func (o *Options) Run() error {
 		}
 	}
 
-	proxyServer, err := NewProxyServer(config, o.CleanupAndExit, o.scheme, o.master)
+	proxyServer, err := NewProxyServer(config, o.CleanupAndExit, o.scheme)
 	if err != nil {
 		return err
 	}
@@ -353,18 +349,16 @@ type ProxyServer struct {
 	HealthzServer          *healthcheck.HealthzServer
 }
 
-// createClients creates a kube client and an event client from the given config and masterOverride.
-// TODO remove masterOverride when CLI flags are removed.
-func createClients(config componentconfig.ClientConnectionConfiguration, masterOverride string) (clientset.Interface, v1core.EventsGetter, error) {
-	if len(config.KubeConfigFile) == 0 && len(masterOverride) == 0 {
-		glog.Warningf("Neither --kubeconfig nor --master was specified. Using default API client. This might not work.")
+// createClients creates a kube client and an event client from the given config.
+func createClients(config componentconfig.ClientConnectionConfiguration) (clientset.Interface, v1core.EventsGetter, error) {
+	if len(config.KubeConfigFile) == 0 {
+		glog.Warningf("--kubeconfig was not specified. Using default API client. This might not work.")
 	}
 
-	// This creates a client, first loading any specified kubeconfig
-	// file, and then overriding the Master flag, if non-empty.
+	// This creates a client loading any specified kubeconfig file
 	kubeConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: config.KubeConfigFile},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterOverride}}).ClientConfig()
+		&clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
 		return nil, nil, err
 	}
