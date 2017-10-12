@@ -10,7 +10,9 @@ options:
   extra_sans:
     type: string
     default:
-    description: Extra SAN entries to add to the certificate created for the master nodes
+    description: |
+      Space-separated list of extra SAN entries to add to the x509 certificate
+      created for the master nodes.
   service-cidr:
     type: string
     default: 10.152.183.0/24
