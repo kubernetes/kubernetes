@@ -214,16 +214,15 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 	if err != nil {
 		return err
 	}
-	resourcesList, err := clientset.Discovery().ServerResources()
-	// ServerResources ignores errors for old servers do not expose discovery
-	if err != nil {
-		return fmt.Errorf("failed to discover supported resources: %v", err)
-	}
 
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
 	schedule := cmdutil.GetFlagString(cmd, "schedule")
 	if len(schedule) != 0 && len(generatorName) == 0 {
-		if cmdutil.Contains(resourcesList, batchv1beta1.SchemeGroupVersion.WithResource("cronjobs")) {
+		hasResource, err := cmdutil.HasResource(clientset.Discovery(), batchv1beta1.SchemeGroupVersion.WithResource("cronjobs"))
+		if err != nil {
+			return err
+		}
+		if hasResource {
 			generatorName = cmdutil.CronJobV1Beta1GeneratorName
 		} else {
 			generatorName = cmdutil.CronJobV2Alpha1GeneratorName
@@ -234,13 +233,21 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		case api.RestartPolicyAlways:
 			// TODO: we need to deprecate this along with extensions/v1beta1.Deployments
 			// in favor of the new generator for apps/v1beta1.Deployments
-			if cmdutil.Contains(resourcesList, extensionsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
+			hasResource, err := cmdutil.HasResource(clientset.Discovery(), extensionsv1beta1.SchemeGroupVersion.WithResource("deployments"))
+			if err != nil {
+				return err
+			}
+			if hasResource {
 				generatorName = cmdutil.DeploymentV1Beta1GeneratorName
 			} else {
 				generatorName = cmdutil.RunV1GeneratorName
 			}
 		case api.RestartPolicyOnFailure:
-			if cmdutil.Contains(resourcesList, batchv1.SchemeGroupVersion.WithResource("jobs")) {
+			hasResource, err := cmdutil.HasResource(clientset.Discovery(), batchv1.SchemeGroupVersion.WithResource("jobs"))
+			if err != nil {
+				return err
+			}
+			if hasResource {
 				generatorName = cmdutil.JobV1GeneratorName
 			} else {
 				generatorName = cmdutil.RunPodV1GeneratorName
@@ -250,7 +257,10 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		}
 	}
 
-	generatorName = cmdutil.FallbackGeneratorNameIfNecessary(generatorName, resourcesList, cmdErr)
+	generatorName, err = cmdutil.FallbackGeneratorNameIfNecessary(generatorName, clientset.Discovery(), cmdErr)
+	if err != nil {
+		return err
+	}
 
 	generators := f.Generators("run")
 	generator, found := generators[generatorName]
