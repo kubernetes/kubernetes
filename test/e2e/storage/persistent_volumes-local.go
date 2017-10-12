@@ -146,22 +146,6 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			cleanupLocalVolume(config, testVol)
 		})
 
-		It("should be able to mount and read from the volume using one-command containers", func() {
-			By("Creating a pod to read from the PV")
-			readCmd := createReadCmd(volumeDir, testFile)
-			podSpec := makeLocalPod(config, testVol, readCmd)
-			//testFileContent was written during setupLocalVolume
-			f.TestContainerOutput("pod reads PV", podSpec, 0, []string{testFileContent})
-		})
-
-		It("should be able to mount and write to the volume using one-command containers", func() {
-			By("Creating a pod to write to the PV")
-			writeCmd, readCmd := createWriteAndReadCmds(volumeDir, testFile, testVol.hostDir /*writeTestFileContent*/)
-			writeThenReadCmd := fmt.Sprintf("%s;%s", writeCmd, readCmd)
-			podSpec := makeLocalPod(config, testVol, writeThenReadCmd)
-			f.TestContainerOutput("pod writes to PV", podSpec, 0, []string{testVol.hostDir})
-		})
-
 		It("should be able to mount volume and read from pod1", func() {
 			By("Creating pod1")
 			pod1, pod1Err := createLocalPod(config, testVol)
@@ -212,18 +196,6 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 
 		AfterEach(func() {
 			cleanupLocalVolume(config, testVol)
-		})
-
-		It("should be able to mount volume, write from pod1, and read from pod2 using one-command containers", func() {
-			By("Creating pod1 to write to the PV")
-			writeCmd, readCmd := createWriteAndReadCmds(volumeDir, testFile, testVol.hostDir /*writeTestFileContent*/)
-			writeThenReadCmd := fmt.Sprintf("%s;%s", writeCmd, readCmd)
-			podSpec1 := makeLocalPod(config, testVol, writeThenReadCmd)
-			f.TestContainerOutput("pod writes to PV", podSpec1, 0, []string{testVol.hostDir})
-
-			By("Creating pod2 to read from the PV")
-			podSpec2 := makeLocalPod(config, testVol, readCmd)
-			f.TestContainerOutput("pod reads PV", podSpec2, 0, []string{testVol.hostDir})
 		})
 	})
 
@@ -289,7 +261,7 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			reason:  "FailedScheduling",
 			pattern: make([]string, 2)}
 		ep.pattern = append(ep.pattern, "MatchNodeSelector")
-		ep.pattern = append(ep.pattern, "No nodes are available")
+		ep.pattern = append(ep.pattern, "NoVolumeNodeConflict")
 		for _, testVolType := range LocalVolumeTypes {
 
 			It("should not be able to mount due to different NodeAffinity", func() {
