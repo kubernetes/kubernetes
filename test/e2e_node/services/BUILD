@@ -12,6 +12,7 @@ go_library(
         "etcd.go",
         "internal_services.go",
         "kubelet.go",
+        "logs.go",
         "namespace_controller.go",
         "server.go",
         "services.go",

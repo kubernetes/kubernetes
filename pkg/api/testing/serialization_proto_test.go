@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api_test
+package testing
 
 import (
 	"bytes"
@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
-	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 	_ "k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
@@ -98,7 +97,7 @@ func fieldsHaveProtobufTags(obj reflect.Type) error {
 
 func TestProtobufRoundTrip(t *testing.T) {
 	obj := &v1.Pod{}
-	fuzzer.FuzzerFor(kapitesting.FuzzerFuncs, rand.NewSource(benchmarkSeed), api.Codecs).Fuzz(obj)
+	fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), api.Codecs).Fuzz(obj)
 	// InitContainers are turned into annotations by conversion.
 	obj.Spec.InitContainers = nil
 	obj.Status.InitContainerStatuses = nil

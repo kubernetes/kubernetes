@@ -235,7 +235,7 @@ func newAuthenticatorFromBasicAuthFile(basicAuthFile string) (authenticator.Requ
 	return basicauth.New(basicAuthenticator), nil
 }
 
-// newAuthenticatorFromTokenFile returns an authenticator.Request or an error
+// newAuthenticatorFromTokenFile returns an authenticator.Token or an error
 func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Token, error) {
 	tokenAuthenticator, err := tokenfile.NewCSV(tokenAuthFile)
 	if err != nil {
@@ -245,7 +245,7 @@ func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Token, e
 	return tokenAuthenticator, nil
 }
 
-// newAuthenticatorFromOIDCIssuerURL returns an authenticator.Request or an error.
+// newAuthenticatorFromOIDCIssuerURL returns an authenticator.Token or an error.
 func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClaim, usernamePrefix, groupsClaim, groupsPrefix string) (authenticator.Token, error) {
 	const noUsernamePrefix = "-"
 
@@ -278,7 +278,7 @@ func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClai
 	return tokenAuthenticator, nil
 }
 
-// newServiceAccountAuthenticator returns an authenticator.Request or an error
+// newServiceAccountAuthenticator returns an authenticator.Token or an error
 func newServiceAccountAuthenticator(keyfiles []string, lookup bool, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Token, error) {
 	allPublicKeys := []interface{}{}
 	for _, keyfile := range keyfiles {

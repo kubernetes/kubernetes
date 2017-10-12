@@ -89,6 +89,14 @@ message Event {
   // at Response Level.
   // +optional
   optional k8s.io.apimachinery.pkg.runtime.Unknown responseObject = 14;
+
+  // Time the request reached the apiserver.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime requestReceivedTimestamp = 15;
+
+  // Time the request reached current audit stage.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.MicroTime stageTimestamp = 16;
 }
 
 // EventList is a list of audit Events.

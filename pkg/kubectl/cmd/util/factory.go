@@ -223,6 +223,11 @@ type ObjectMappingFactory interface {
 	// AttachablePodForObject returns the pod to which to attach given an object.
 	AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error)
 
+	// ApproximatePodTemplateForObject returns a pod template object for the provided source.
+	// It may return both an error and a object. It attempt to return the best possible template
+	// available at the current time.
+	ApproximatePodTemplateForObject(runtime.Object) (*api.PodTemplateSpec, error)
+
 	// Returns a schema that can validate objects stored on disk.
 	Validator(validate bool) (validation.Schema, error)
 	// OpenAPISchema returns the schema openapi schema definiton

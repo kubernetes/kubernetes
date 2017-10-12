@@ -217,16 +217,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			**out = **in
 		}
 	}
-	out.MinimumGCAge = in.MinimumGCAge
-	if in.MaxContainerCount != nil {
-		in, out := &in.MaxContainerCount, &out.MaxContainerCount
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(int32)
-			**out = **in
-		}
-	}
 	if in.CAdvisorPort != nil {
 		in, out := &in.CAdvisorPort, &out.CAdvisorPort
 		if *in == nil {
@@ -319,24 +309,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			**out = **in
 		}
 	}
-	if in.Containerized != nil {
-		in, out := &in.Containerized, &out.Containerized
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
-	}
-	if in.RegisterSchedulable != nil {
-		in, out := &in.RegisterSchedulable, &out.RegisterSchedulable
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
-	}
 	if in.RegisterWithTaints != nil {
 		in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
 		*out = make([]core_v1.Taint, len(*in))
@@ -379,15 +351,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		}
 	}
 	out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
-	if in.ExperimentalKernelMemcgNotification != nil {
-		in, out := &in.ExperimentalKernelMemcgNotification, &out.ExperimentalKernelMemcgNotification
-		if *in == nil {
-			*out = nil
-		} else {
-			*out = new(bool)
-			**out = **in
-		}
-	}
 	if in.EnableControllerAttachDetach != nil {
 		in, out := &in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach
 		if *in == nil {
@@ -395,13 +358,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		} else {
 			*out = new(bool)
 			**out = **in
-		}
-	}
-	if in.ExperimentalQOSReserved != nil {
-		in, out := &in.ExperimentalQOSReserved, &out.ExperimentalQOSReserved
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
 		}
 	}
 	if in.MakeIPTablesUtilChains != nil {
@@ -430,11 +386,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 			*out = new(int32)
 			**out = **in
 		}
-	}
-	if in.AllowedUnsafeSysctls != nil {
-		in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
-		*out = make([]string, len(*in))
-		copy(*out, *in)
 	}
 	if in.FeatureGates != nil {
 		in, out := &in.FeatureGates, &out.FeatureGates
