@@ -144,7 +144,7 @@ func (s *EtcdOptions) AddFlags(fs *pflag.FlagSet) {
 		"SSL Certificate Authority file used to secure etcd communication.")
 
 	fs.BoolVar(&s.StorageConfig.Quorum, "etcd-quorum-read", s.StorageConfig.Quorum,
-		"If true, enable quorum read.")
+		"If true, enable quorum read. Required for HA configurations, otherwise you will have consistency issues.")
 
 	fs.StringVar(&s.EncryptionProviderConfigFilepath, "experimental-encryption-provider-config", s.EncryptionProviderConfigFilepath,
 		"The file containing configuration for encryption providers to be used for storing secrets in etcd")
