@@ -309,14 +309,12 @@ func NewNodeController(
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			nc.maybeDeleteTerminatingPod(obj)
 			pod := obj.(*v1.Pod)
 			if nc.taintManager != nil {
 				nc.taintManager.PodUpdated(nil, pod)
 			}
 		},
 		UpdateFunc: func(prev, obj interface{}) {
-			nc.maybeDeleteTerminatingPod(obj)
 			prevPod := prev.(*v1.Pod)
 			newPod := obj.(*v1.Pod)
 			if nc.taintManager != nil {
@@ -1194,57 +1192,5 @@ func (nc *Controller) ComputeZoneState(nodeReadyConditions []*v1.NodeCondition) 
 		return notReadyNodes, statePartialDisruption
 	default:
 		return notReadyNodes, stateNormal
-	}
-}
-
-// maybeDeleteTerminatingPod non-gracefully deletes pods that are terminating
-// that should not be gracefully terminated.
-func (nc *Controller) maybeDeleteTerminatingPod(obj interface{}) {
-	pod, ok := obj.(*v1.Pod)
-	if !ok {
-		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
-		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %#v", obj)
-			return
-		}
-		pod, ok = tombstone.Obj.(*v1.Pod)
-		if !ok {
-			glog.Errorf("Tombstone contained object that is not a Pod %#v", obj)
-			return
-		}
-	}
-
-	// consider only terminating pods
-	if pod.DeletionTimestamp == nil {
-		return
-	}
-
-	node, err := nc.nodeLister.Get(pod.Spec.NodeName)
-	// if there is no such node, do nothing and let the podGC clean it up.
-	if apierrors.IsNotFound(err) {
-		return
-	}
-	if err != nil {
-		// this can only happen if the Store.KeyFunc has a problem creating
-		// a key for the pod. If it happens once, it will happen again so
-		// don't bother requeuing the pod.
-		utilruntime.HandleError(err)
-		return
-	}
-
-	// delete terminating pods that have been scheduled on
-	// nodes that do not support graceful termination
-	// TODO(mikedanese): this can be removed when we no longer
-	// guarantee backwards compatibility of master API to kubelets with
-	// versions less than 1.1.0
-	v, err := utilversion.ParseSemantic(node.Status.NodeInfo.KubeletVersion)
-	if err != nil {
-		glog.V(0).Infof("Couldn't parse version %q of node: %v", node.Status.NodeInfo.KubeletVersion, err)
-		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
-		return
-	}
-	if v.LessThan(gracefulDeletionVersion) {
-		utilruntime.HandleError(nc.forcefullyDeletePod(pod))
-		return
 	}
 }

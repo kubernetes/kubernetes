@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api_test
+package testing
 
 import (
 	"io/ioutil"
@@ -27,11 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	kapitesting "k8s.io/kubernetes/pkg/api/testing"
 )
 
 func BenchmarkPodConversion(b *testing.B) {
-	apiObjectFuzzer := fuzzer.FuzzerFor(kapitesting.FuzzerFuncs, rand.NewSource(benchmarkSeed), api.Codecs)
+	apiObjectFuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), api.Codecs)
 	items := make([]api.Pod, 4)
 	for i := range items {
 		apiObjectFuzzer.Fuzz(&items[i])

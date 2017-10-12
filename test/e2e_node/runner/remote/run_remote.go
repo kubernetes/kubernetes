@@ -61,6 +61,33 @@ var gubernator = flag.Bool("gubernator", false, "If true, output Gubernator link
 var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
 var systemSpecName = flag.String("system-spec-name", "", "The name of the system spec used for validating the image in the node conformance test. The specs are at test/e2e_node/system/specs/. If unspecified, the default built-in spec (system.DefaultSpec) will be used.")
 
+// envs is the type used to collect all node envs. The key is the env name,
+// and the value is the env value
+type envs map[string]string
+
+// String function of flag.Value
+func (e *envs) String() string {
+	return fmt.Sprint(*e)
+}
+
+// Set function of flag.Value
+func (e *envs) Set(value string) error {
+	kv := strings.SplitN(value, "=", 2)
+	if len(kv) != 2 {
+		return fmt.Errorf("invalid env string")
+	}
+	emap := *e
+	emap[kv[0]] = kv[1]
+	return nil
+}
+
+// nodeEnvs is the node envs from the flag `node-env`.
+var nodeEnvs = make(envs)
+
+func init() {
+	flag.Var(&nodeEnvs, "node-env", "An environment variable passed to instance as metadata, e.g. when '--node-env=PATH=/usr/bin' is specified, there will be an extra instance metadata 'PATH=/usr/bin'.")
+}
+
 const (
 	defaultMachine                = "n1-standard-1"
 	acceleratorTypeResourceFormat = "https://www.googleapis.com/compute/beta/projects/%s/zones/%s/acceleratorTypes/%s"
@@ -584,6 +611,8 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 		if len(externalIp) > 0 {
 			remote.AddHostnameIp(name, externalIp)
 		}
+		// TODO(random-liu): Remove the docker version check. Use some other command to check
+		// instance readiness.
 		var output string
 		output, err = remote.SSH(name, "docker", "version")
 		if err != nil {
@@ -700,6 +729,9 @@ func parseInstanceMetadata(str string) map[string]string {
 			continue
 		}
 		metadata[kp[0]] = string(v)
+	}
+	for k, v := range nodeEnvs {
+		metadata[k] = v
 	}
 	return metadata
 }

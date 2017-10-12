@@ -128,8 +128,9 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--slice=runtime.slice", "--remain-after-exit", builder.GetKubeletServerBin())
 		killCommand = exec.Command("systemctl", "kill", unitName)
 		restartCommand = exec.Command("systemctl", "restart", unitName)
-		e.logFiles["kubelet.log"] = logFileData{
-			journalctlCommand: []string{"-u", unitName},
+		e.logs["kubelet.log"] = LogFileData{
+			Name:              "kubelet.log",
+			JournalctlCommand: []string{"-u", unitName},
 		}
 		cmdArgs = append(cmdArgs,
 			"--kubelet-cgroups=/kubelet.slice",
@@ -138,6 +139,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	} else {
 		cmdArgs = append(cmdArgs, builder.GetKubeletServerBin())
 		cmdArgs = append(cmdArgs,
+			// TODO(random-liu): Get rid of this docker specific thing.
 			"--runtime-cgroups=/docker-daemon",
 			"--kubelet-cgroups=/kubelet",
 			"--cgroup-root=/",

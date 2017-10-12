@@ -326,7 +326,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		leaveStdinOpen := cmdutil.GetFlagBool(cmd, "leave-stdin-open")
 		waitForExitCode := !leaveStdinOpen && restartPolicy == api.RestartPolicyNever
 		if waitForExitCode {
-			pod, err = waitForPodTerminated(clientset.Core(), attachablePod.Namespace, attachablePod.Name)
+			pod, err = waitForPod(clientset.Core(), attachablePod.Namespace, attachablePod.Name, conditions.PodCompleted)
 			if err != nil {
 				return err
 			}
@@ -416,33 +416,17 @@ func waitForPod(podClient coreclient.PodsGetter, ns, name string, exitCondition 
 		}
 		return err
 	})
+
+	// Fix generic not found error.
+	if err != nil && errors.IsNotFound(err) {
+		err = errors.NewNotFound(api.Resource("pods"), name)
+	}
+
 	return result, err
 }
 
-func waitForPodRunning(podClient coreclient.PodsGetter, ns, name string) (*api.Pod, error) {
-	pod, err := waitForPod(podClient, ns, name, conditions.PodRunningAndReady)
-
-	// fix generic not found error with empty name in PodRunningAndReady
-	if err != nil && errors.IsNotFound(err) {
-		return nil, errors.NewNotFound(api.Resource("pods"), name)
-	}
-
-	return pod, err
-}
-
-func waitForPodTerminated(podClient coreclient.PodsGetter, ns, name string) (*api.Pod, error) {
-	pod, err := waitForPod(podClient, ns, name, conditions.PodCompleted)
-
-	// fix generic not found error with empty name in PodCompleted
-	if err != nil && errors.IsNotFound(err) {
-		return nil, errors.NewNotFound(api.Resource("pods"), name)
-	}
-
-	return pod, err
-}
-
 func handleAttachPod(f cmdutil.Factory, podClient coreclient.PodsGetter, ns, name string, opts *AttachOptions) error {
-	pod, err := waitForPodRunning(podClient, ns, name)
+	pod, err := waitForPod(podClient, ns, name, conditions.PodRunningAndReady)
 	if err != nil && err != conditions.ErrPodCompleted {
 		return err
 	}

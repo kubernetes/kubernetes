@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"archive/tar"
+	"bytes"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -134,11 +135,44 @@ func runCopy(f cmdutil.Factory, cmd *cobra.Command, out, cmderr io.Writer, args 
 	return cmdutil.UsageErrorf(cmd, "One of src or dest must be a remote file specification")
 }
 
+// checkDestinationIsDir receives a destination fileSpec and
+// determines if the provided destination path exists on the
+// pod. If the destination path does not exist or is _not_ a
+// directory, an error is returned with the exit code received.
+func checkDestinationIsDir(dest fileSpec, f cmdutil.Factory, cmd *cobra.Command) error {
+	options := &ExecOptions{
+		StreamOptions: StreamOptions{
+			Out: bytes.NewBuffer([]byte{}),
+			Err: bytes.NewBuffer([]byte{}),
+
+			Namespace: dest.PodNamespace,
+			PodName:   dest.PodName,
+		},
+
+		Command:  []string{"test", "-d", dest.File},
+		Executor: &DefaultRemoteExecutor{},
+	}
+
+	return execute(f, cmd, options)
+}
+
 func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, src, dest fileSpec) error {
 	reader, writer := io.Pipe()
+
+	// strip trailing slash (if any)
+	if strings.HasSuffix(string(dest.File[len(dest.File)-1]), "/") {
+		dest.File = dest.File[:len(dest.File)-1]
+	}
+
+	if err := checkDestinationIsDir(dest, f, cmd); err == nil {
+		// If no error, dest.File was found to be a directory.
+		// Copy specified src into it
+		dest.File = dest.File + "/" + path.Base(src.File)
+	}
+
 	go func() {
 		defer writer.Close()
-		err := makeTar(src.File, writer)
+		err := makeTar(src.File, dest.File, writer)
 		cmdutil.CheckErr(err)
 	}()
 
@@ -192,17 +226,18 @@ func copyFromPod(f cmdutil.Factory, cmd *cobra.Command, cmderr io.Writer, src, d
 	return untarAll(reader, dest.File, prefix)
 }
 
-func makeTar(filepath string, writer io.Writer) error {
+func makeTar(srcPath, destPath string, writer io.Writer) error {
 	// TODO: use compression here?
 	tarWriter := tar.NewWriter(writer)
 	defer tarWriter.Close()
 
-	filepath = path.Clean(filepath)
-	return recursiveTar(path.Dir(filepath), path.Base(filepath), tarWriter)
+	srcPath = path.Clean(srcPath)
+	destPath = path.Clean(destPath)
+	return recursiveTar(path.Dir(srcPath), path.Base(srcPath), path.Dir(destPath), path.Base(destPath), tarWriter)
 }
 
-func recursiveTar(base, file string, tw *tar.Writer) error {
-	filepath := path.Join(base, file)
+func recursiveTar(srcBase, srcFile, destBase, destFile string, tw *tar.Writer) error {
+	filepath := path.Join(srcBase, srcFile)
 	stat, err := os.Stat(filepath)
 	if err != nil {
 		return err
@@ -213,7 +248,7 @@ func recursiveTar(base, file string, tw *tar.Writer) error {
 			return err
 		}
 		for _, f := range files {
-			if err := recursiveTar(base, path.Join(file, f.Name()), tw); err != nil {
+			if err := recursiveTar(srcBase, path.Join(srcFile, f.Name()), destBase, path.Join(destFile, f.Name()), tw); err != nil {
 				return err
 			}
 		}
@@ -223,7 +258,7 @@ func recursiveTar(base, file string, tw *tar.Writer) error {
 	if err != nil {
 		return err
 	}
-	hdr.Name = file
+	hdr.Name = destFile
 	if err := tw.WriteHeader(hdr); err != nil {
 		return err
 	}

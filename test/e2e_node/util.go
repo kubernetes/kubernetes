@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
@@ -123,7 +124,11 @@ func isKubeletConfigEnabled(f *framework.Framework) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("could not determine whether 'DynamicKubeletConfig' feature is enabled, err: %v", err)
 	}
-	return strings.Contains(cfgz.FeatureGates, "DynamicKubeletConfig=true"), nil
+	v, ok := cfgz.FeatureGates[string(features.DynamicKubeletConfig)]
+	if !ok {
+		return false, nil
+	}
+	return v, nil
 }
 
 // Creates or updates the configmap for KubeletConfiguration, waits for the Kubelet to restart

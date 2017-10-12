@@ -12,7 +12,6 @@ go_library(
         "conversion.go",
         "defaults.go",
         "doc.go",
-        "generate.go",
         "register.go",
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
@@ -30,7 +29,6 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/rand:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
@@ -38,16 +36,13 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = [
-        "backward_compatibility_test.go",
         "conversion_test.go",
         "defaults_test.go",
     ],
     deps = [
         ":go_default_library",
         "//pkg/api:go_default_library",
-        "//pkg/api/install:go_default_library",
-        "//pkg/api/testing/compat:go_default_library",
-        "//pkg/api/validation:go_default_library",
+        "//pkg/api/testapi:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
@@ -55,7 +50,6 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
     ],
 )
 

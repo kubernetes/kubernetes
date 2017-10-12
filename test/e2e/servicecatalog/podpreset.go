@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	settings "k8s.io/api/settings/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/watch"
@@ -73,6 +74,9 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		}
 
 		_, err := createPodPreset(f.ClientSet, f.Namespace.Name, pip)
+		if errors.IsNotFound(err) {
+			framework.Skipf("podpresets requires k8s.io/api/settings/v1alpha1 to be enabled")
+		}
 		Expect(err).NotTo(HaveOccurred())
 
 		By("creating the pod")
@@ -178,6 +182,9 @@ var _ = SIGDescribe("[Feature:PodPreset] PodPreset", func() {
 		}
 
 		_, err := createPodPreset(f.ClientSet, f.Namespace.Name, pip)
+		if errors.IsNotFound(err) {
+			framework.Skipf("podpresets requires k8s.io/api/settings/v1alpha1 to be enabled")
+		}
 		Expect(err).NotTo(HaveOccurred())
 
 		By("creating the pod")

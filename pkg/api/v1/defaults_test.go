@@ -28,6 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
+
+	// enforce that all types are installed
+	_ "k8s.io/kubernetes/pkg/api/testapi"
 )
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
