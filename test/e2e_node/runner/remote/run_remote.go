@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -50,6 +51,7 @@ var instanceNamePrefix = flag.String("instance-name-prefix", "", "prefix for ins
 var zone = flag.String("zone", "", "gce zone the hosts live in")
 var project = flag.String("project", "", "gce project the hosts live in")
 var imageConfigFile = flag.String("image-config-file", "", "yaml file describing images to run")
+var imageConfigDir = flag.String("image-config-dir", "", "(optional)path to image config files")
 var imageProject = flag.String("image-project", "", "gce project the hosts live in")
 var images = flag.String("images", "", "images to test")
 var hosts = flag.String("hosts", "", "hosts to test")
@@ -60,6 +62,33 @@ var instanceMetadata = flag.String("instance-metadata", "", "key/value metadata 
 var gubernator = flag.Bool("gubernator", false, "If true, output Gubernator link to view logs")
 var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
 var systemSpecName = flag.String("system-spec-name", "", "The name of the system spec used for validating the image in the node conformance test. The specs are at test/e2e_node/system/specs/. If unspecified, the default built-in spec (system.DefaultSpec) will be used.")
+
+// envs is the type used to collect all node envs. The key is the env name,
+// and the value is the env value
+type envs map[string]string
+
+// String function of flag.Value
+func (e *envs) String() string {
+	return fmt.Sprint(*e)
+}
+
+// Set function of flag.Value
+func (e *envs) Set(value string) error {
+	kv := strings.SplitN(value, "=", 2)
+	if len(kv) != 2 {
+		return fmt.Errorf("invalid env string")
+	}
+	emap := *e
+	emap[kv[0]] = kv[1]
+	return nil
+}
+
+// nodeEnvs is the node envs from the flag `node-env`.
+var nodeEnvs = make(envs)
+
+func init() {
+	flag.Var(&nodeEnvs, "node-env", "An environment variable passed to instance as metadata, e.g. when '--node-env=PATH=/usr/bin' is specified, there will be an extra instance metadata 'PATH=/usr/bin'.")
+}
 
 const (
 	defaultMachine                = "n1-standard-1"
@@ -177,8 +206,13 @@ func main() {
 		images: make(map[string]internalGCEImage),
 	}
 	if *imageConfigFile != "" {
+		configPath := *imageConfigFile
+		if *imageConfigDir != "" {
+			configPath = filepath.Join(*imageConfigDir, *imageConfigFile)
+		}
+
 		// parse images
-		imageConfigData, err := ioutil.ReadFile(*imageConfigFile)
+		imageConfigData, err := ioutil.ReadFile(configPath)
 		if err != nil {
 			glog.Fatalf("Could not read image config file provided: %v", err)
 		}
@@ -584,6 +618,8 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 		if len(externalIp) > 0 {
 			remote.AddHostnameIp(name, externalIp)
 		}
+		// TODO(random-liu): Remove the docker version check. Use some other command to check
+		// instance readiness.
 		var output string
 		output, err = remote.SSH(name, "docker", "version")
 		if err != nil {
@@ -694,12 +730,19 @@ func parseInstanceMetadata(str string) map[string]string {
 			glog.Fatalf("Invalid instance metadata: %q", s)
 			continue
 		}
-		v, err := ioutil.ReadFile(kp[1])
+		metaPath := kp[1]
+		if *imageConfigDir != "" {
+			metaPath = filepath.Join(*imageConfigDir, metaPath)
+		}
+		v, err := ioutil.ReadFile(metaPath)
 		if err != nil {
-			glog.Fatalf("Failed to read metadata file %q: %v", kp[1], err)
+			glog.Fatalf("Failed to read metadata file %q: %v", metaPath, err)
 			continue
 		}
 		metadata[kp[0]] = string(v)
+	}
+	for k, v := range nodeEnvs {
+		metadata[k] = v
 	}
 	return metadata
 }

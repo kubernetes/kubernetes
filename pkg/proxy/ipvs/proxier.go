@@ -478,10 +478,7 @@ func (e *endpointsInfo) String() string {
 
 // IPPart returns just the IP part of the endpoint.
 func (e *endpointsInfo) IPPart() string {
-	if index := strings.Index(e.endpoint, ":"); index != -1 {
-		return e.endpoint[0:index]
-	}
-	return e.endpoint
+	return utilproxy.IPPart(e.endpoint)
 }
 
 type endpointServicePair struct {
@@ -1262,7 +1259,7 @@ func (proxier *Proxier) syncProxyRules() {
 func (proxier *Proxier) deleteEndpointConnections(connectionMap map[endpointServicePair]bool) {
 	for epSvcPair := range connectionMap {
 		if svcInfo, ok := proxier.serviceMap[epSvcPair.servicePortName]; ok && svcInfo.protocol == api.ProtocolUDP {
-			endpointIP := epSvcPair.endpoint[0:strings.Index(epSvcPair.endpoint, ":")]
+			endpointIP := utilproxy.IPPart(epSvcPair.endpoint)
 			err := utilproxy.ClearUDPConntrackForPeers(proxier.exec, svcInfo.clusterIP.String(), endpointIP)
 			if err != nil {
 				glog.Errorf("Failed to delete %s endpoint connections, error: %v", epSvcPair.servicePortName.String(), err)

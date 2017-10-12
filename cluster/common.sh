@@ -830,6 +830,12 @@ EOF
 ETCD_IMAGE: $(yaml-quote ${ETCD_IMAGE})
 EOF
     fi
+    # ETCD_DOCKER_REPOSITORY (if set) allows to use a custom etcd docker repository to pull the etcd image from.
+    if [ -n "${ETCD_DOCKER_REPOSITORY:-}" ]; then
+      cat >>$file <<EOF
+ETCD_DOCKER_REPOSITORY: $(yaml-quote ${ETCD_DOCKER_REPOSITORY})
+EOF
+    fi
     # ETCD_VERSION (if set) allows you to use custom version of etcd.
     # The main purpose of using it may be rollback of etcd v3 API,
     # where we need 3.0.* image, but are rolling back to 2.3.7.

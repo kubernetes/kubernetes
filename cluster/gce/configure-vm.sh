@@ -482,6 +482,11 @@ EOF
 etcd_docker_tag: '$(echo "$ETCD_IMAGE" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${ETCD_DOCKER_REPOSITORY:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+etcd_docker_repository: '$(echo "$ETCD_DOCKER_REPOSITORY" | sed -e "s/'/''/g")'
+EOF
+    fi
     if [ -n "${ETCD_VERSION:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 etcd_version: '$(echo "$ETCD_VERSION" | sed -e "s/'/''/g")'

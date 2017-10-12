@@ -7,7 +7,6 @@ cmd/kube-proxy/app
 cmd/kubeadm/app
 cmd/kubeadm/app/apis/kubeadm
 cmd/kubeadm/app/apis/kubeadm/v1alpha1
-cmd/kubectl/app
 cmd/kubelet/app
 cmd/kubelet/app/options
 cmd/kubemark
@@ -61,6 +60,7 @@ federation/test/e2e
 federation/test/e2e/framework
 federation/test/e2e/upgrades
 federation/test/integration/framework
+pkg/api
 pkg/api/endpoints
 pkg/api/helper
 pkg/api/helper/qos

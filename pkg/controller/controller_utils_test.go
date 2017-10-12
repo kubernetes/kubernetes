@@ -22,7 +22,6 @@ import (
 	"math"
 	"math/rand"
 	"net/http/httptest"
-	"reflect"
 	"sort"
 	"sync"
 	"testing"
@@ -47,6 +46,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/securitycontext"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // NewFakeControllerExpectationsLookup creates a fake store for PodExpectations.
@@ -171,9 +172,8 @@ func TestControllerExpectations(t *testing.T) {
 
 	// RC fires off adds and deletes at apiserver, then sets expectations
 	rcKey, err := KeyFunc(rc)
-	if err != nil {
-		t.Errorf("Couldn't get key for object %#v: %v", rc, err)
-	}
+	assert.NoError(t, err, "Couldn't get key for object %#v: %v", rc, err)
+
 	e.SetExpectations(rcKey, adds, dels)
 	var wg sync.WaitGroup
 	for i := 0; i < adds+1; i++ {
@@ -188,9 +188,8 @@ func TestControllerExpectations(t *testing.T) {
 	wg.Wait()
 
 	// There are still delete expectations
-	if e.SatisfiedExpectations(rcKey) {
-		t.Errorf("Rc will sync before expectations are met")
-	}
+	assert.False(t, e.SatisfiedExpectations(rcKey), "Rc will sync before expectations are met")
+
 	for i := 0; i < dels+1; i++ {
 		wg.Add(1)
 		go func() {
@@ -201,34 +200,29 @@ func TestControllerExpectations(t *testing.T) {
 	wg.Wait()
 
 	// Expectations have been surpassed
-	if podExp, exists, err := e.GetExpectations(rcKey); err == nil && exists {
-		add, del := podExp.GetExpectations()
-		if add != -1 || del != -1 {
-			t.Errorf("Unexpected pod expectations %#v", podExp)
-		}
-	} else {
-		t.Errorf("Could not get expectations for rc, exists %v and err %v", exists, err)
-	}
-	if !e.SatisfiedExpectations(rcKey) {
-		t.Errorf("Expectations are met but the rc will not sync")
-	}
+	podExp, exists, err := e.GetExpectations(rcKey)
+	assert.NoError(t, err, "Could not get expectations for rc, exists %v and err %v", exists, err)
+	assert.True(t, exists, "Could not get expectations for rc, exists %v and err %v", exists, err)
+
+	add, del := podExp.GetExpectations()
+	assert.Equal(t, int64(-1), add, "Unexpected pod expectations %#v", podExp)
+	assert.Equal(t, int64(-1), del, "Unexpected pod expectations %#v", podExp)
+	assert.True(t, e.SatisfiedExpectations(rcKey), "Expectations are met but the rc will not sync")
 
 	// Next round of rc sync, old expectations are cleared
 	e.SetExpectations(rcKey, 1, 2)
-	if podExp, exists, err := e.GetExpectations(rcKey); err == nil && exists {
-		add, del := podExp.GetExpectations()
-		if add != 1 || del != 2 {
-			t.Errorf("Unexpected pod expectations %#v", podExp)
-		}
-	} else {
-		t.Errorf("Could not get expectations for rc, exists %v and err %v", exists, err)
-	}
+	podExp, exists, err = e.GetExpectations(rcKey)
+	assert.NoError(t, err, "Could not get expectations for rc, exists %v and err %v", exists, err)
+	assert.True(t, exists, "Could not get expectations for rc, exists %v and err %v", exists, err)
+	add, del = podExp.GetExpectations()
+
+	assert.Equal(t, int64(1), add, "Unexpected pod expectations %#v", podExp)
+	assert.Equal(t, int64(2), del, "Unexpected pod expectations %#v", podExp)
 
 	// Expectations have expired because of ttl
 	fakeClock.Step(ttl + 1)
-	if !e.SatisfiedExpectations(rcKey) {
-		t.Errorf("Expectations should have expired but didn't")
-	}
+	assert.True(t, e.SatisfiedExpectations(rcKey),
+		"Expectations should have expired but didn't")
 }
 
 func TestUIDExpectations(t *testing.T) {
@@ -266,19 +260,20 @@ func TestUIDExpectations(t *testing.T) {
 		rcKeys[i], rcKeys[j] = rcKeys[j], rcKeys[i]
 	}
 	for _, rcKey := range rcKeys {
-		if uidExp.SatisfiedExpectations(rcKey) {
-			t.Errorf("Controller %v satisfied expectations before deletion", rcKey)
-		}
+		assert.False(t, uidExp.SatisfiedExpectations(rcKey),
+			"Controller %v satisfied expectations before deletion", rcKey)
+
 		for _, p := range rcToPods[rcKey] {
 			uidExp.DeletionObserved(rcKey, p)
 		}
-		if !uidExp.SatisfiedExpectations(rcKey) {
-			t.Errorf("Controller %v didn't satisfy expectations after deletion", rcKey)
-		}
+
+		assert.True(t, uidExp.SatisfiedExpectations(rcKey),
+			"Controller %v didn't satisfy expectations after deletion", rcKey)
+
 		uidExp.DeleteExpectations(rcKey)
-		if uidExp.GetUIDs(rcKey) != nil {
-			t.Errorf("Failed to delete uid expectations for %v", rcKey)
-		}
+
+		assert.Nil(t, uidExp.GetUIDs(rcKey),
+			"Failed to delete uid expectations for %v", rcKey)
 	}
 }
 
@@ -301,9 +296,8 @@ func TestCreatePods(t *testing.T) {
 	controllerSpec := newReplicationController(1)
 
 	// Make sure createReplica sends a POST to the apiserver with a pod from the controllers pod template
-	if err := podControl.CreatePods(ns, controllerSpec.Spec.Template, controllerSpec); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	err := podControl.CreatePods(ns, controllerSpec.Spec.Template, controllerSpec)
+	assert.NoError(t, err, "unexpected error: %v", err)
 
 	expectedPod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -314,14 +308,10 @@ func TestCreatePods(t *testing.T) {
 	}
 	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath("pods", metav1.NamespaceDefault, ""), "POST", nil)
 	var actualPod = &v1.Pod{}
-	err := json.Unmarshal([]byte(fakeHandler.RequestBody), actualPod)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if !apiequality.Semantic.DeepDerivative(&expectedPod, actualPod) {
-		t.Logf("Body: %s", fakeHandler.RequestBody)
-		t.Errorf("Unexpected mismatch.  Expected\n %#v,\n Got:\n %#v", &expectedPod, actualPod)
-	}
+	err = json.Unmarshal([]byte(fakeHandler.RequestBody), actualPod)
+	assert.NoError(t, err, "unexpected error: %v", err)
+	assert.True(t, apiequality.Semantic.DeepDerivative(&expectedPod, actualPod),
+		"Body: %s", fakeHandler.RequestBody)
 }
 
 func TestActivePodFiltering(t *testing.T) {
@@ -344,9 +334,11 @@ func TestActivePodFiltering(t *testing.T) {
 	for _, pod := range got {
 		gotNames.Insert(pod.Name)
 	}
-	if expectedNames.Difference(gotNames).Len() != 0 || gotNames.Difference(expectedNames).Len() != 0 {
-		t.Errorf("expected %v, got %v", expectedNames.List(), gotNames.List())
-	}
+
+	assert.Equal(t, 0, expectedNames.Difference(gotNames).Len(),
+		"expected %v, got %v", expectedNames.List(), gotNames.List())
+	assert.Equal(t, 0, gotNames.Difference(expectedNames).Len(),
+		"expected %v, got %v", expectedNames.List(), gotNames.List())
 }
 
 func TestSortingActivePods(t *testing.T) {
@@ -420,9 +412,7 @@ func TestSortingActivePods(t *testing.T) {
 		sort.Sort(ActivePods(randomizedPods))
 		actual := getOrder(randomizedPods)
 
-		if !reflect.DeepEqual(actual, expected) {
-			t.Errorf("expected %v, got %v", expected, actual)
-		}
+		assert.EqualValues(t, expected, actual, "expected %v, got %v", expected, actual)
 	}
 }
 
@@ -443,9 +433,10 @@ func TestActiveReplicaSetsFiltering(t *testing.T) {
 		gotNames.Insert(rs.Name)
 	}
 
-	if expectedNames.Difference(gotNames).Len() != 0 || gotNames.Difference(expectedNames).Len() != 0 {
-		t.Errorf("expected %v, got %v", expectedNames.List(), gotNames.List())
-	}
+	assert.Equal(t, 0, expectedNames.Difference(gotNames).Len(),
+		"expected %v, got %v", expectedNames.List(), gotNames.List())
+	assert.Equal(t, 0, gotNames.Difference(expectedNames).Len(),
+		"expected %v, got %v", expectedNames.List(), gotNames.List())
 }
 
 func int64P(num int64) *int64 {
@@ -480,9 +471,7 @@ func TestComputeHash(t *testing.T) {
 		hash := ComputeHash(test.template, test.collisionCount)
 		otherHash := ComputeHash(test.template, test.otherCollisionCount)
 
-		if hash == otherHash {
-			t.Errorf("expected different hashes but got the same: %d", hash)
-		}
+		assert.NotEqual(t, hash, otherHash, "expected different hashes but got the same: %d", hash)
 	}
 }
 
@@ -646,20 +635,17 @@ func TestRemoveTaintOffNode(t *testing.T) {
 	}
 	for _, test := range tests {
 		node, _ := test.nodeHandler.Get(test.nodeName, metav1.GetOptions{})
-		if err := RemoveTaintOffNode(test.nodeHandler, test.nodeName, node, test.taintsToRemove...); err != nil {
-			t.Errorf("%s: RemoveTaintOffNode() error = %v", test.name, err)
-		}
+		err := RemoveTaintOffNode(test.nodeHandler, test.nodeName, node, test.taintsToRemove...)
+		assert.NoError(t, err, "%s: RemoveTaintOffNode() error = %v", test.name, err)
 
 		node, _ = test.nodeHandler.Get(test.nodeName, metav1.GetOptions{})
-		if !reflect.DeepEqual(node.Spec.Taints, test.expectedTaints) {
-			t.Errorf("%s: failed to remove taint off node: expected %+v, got %+v",
-				test.name, test.expectedTaints, node.Spec.Taints)
-		}
+		assert.EqualValues(t, test.expectedTaints, node.Spec.Taints,
+			"%s: failed to remove taint off node: expected %+v, got %+v",
+			test.name, test.expectedTaints, node.Spec.Taints)
 
-		if test.nodeHandler.RequestCount != test.requestCount {
-			t.Errorf("%s: unexpected request count: expected %+v, got %+v",
-				test.name, test.requestCount, test.nodeHandler.RequestCount)
-		}
+		assert.Equal(t, test.requestCount, test.nodeHandler.RequestCount,
+			"%s: unexpected request count: expected %+v, got %+v",
+			test.name, test.requestCount, test.nodeHandler.RequestCount)
 	}
 }
 
@@ -824,19 +810,16 @@ func TestAddOrUpdateTaintOnNode(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if err := AddOrUpdateTaintOnNode(test.nodeHandler, test.nodeName, test.taintsToAdd...); err != nil {
-			t.Errorf("%s: AddOrUpdateTaintOnNode() error = %v", test.name, err)
-		}
+		err := AddOrUpdateTaintOnNode(test.nodeHandler, test.nodeName, test.taintsToAdd...)
+		assert.NoError(t, err, "%s: AddOrUpdateTaintOnNode() error = %v", test.name, err)
 
 		node, _ := test.nodeHandler.Get(test.nodeName, metav1.GetOptions{})
-		if !reflect.DeepEqual(node.Spec.Taints, test.expectedTaints) {
-			t.Errorf("%s: failed to add taint to node: expected %+v, got %+v",
-				test.name, test.expectedTaints, node.Spec.Taints)
-		}
+		assert.EqualValues(t, test.expectedTaints, node.Spec.Taints,
+			"%s: failed to add taint to node: expected %+v, got %+v",
+			test.name, test.expectedTaints, node.Spec.Taints)
 
-		if test.nodeHandler.RequestCount != test.requestCount {
-			t.Errorf("%s: unexpected request count: expected %+v, got %+v",
-				test.name, test.requestCount, test.nodeHandler.RequestCount)
-		}
+		assert.Equal(t, test.requestCount, test.nodeHandler.RequestCount,
+			"%s: unexpected request count: expected %+v, got %+v",
+			test.name, test.requestCount, test.nodeHandler.RequestCount)
 	}
 }

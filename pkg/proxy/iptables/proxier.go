@@ -166,26 +166,9 @@ type endpointsInfo struct {
 	chainName utiliptables.Chain
 }
 
-// Returns just the IP part of an IP or IP:port or endpoint string. If the IP
-// part is an IPv6 address enclosed in brackets (e.g. "[fd00:1::5]:9999"),
-// then the brackets are stripped as well.
-func ipPart(s string) string {
-	if ip := net.ParseIP(s); ip != nil {
-		// IP address without port
-		return s
-	}
-	// Must be IP:port
-	ip, _, err := net.SplitHostPort(s)
-	if err != nil {
-		glog.Errorf("Error parsing '%s': %v", s, err)
-		return ""
-	}
-	return ip
-}
-
-// Returns just the IP part of the endpoint.
+// IPPart returns just the IP part of the endpoint.
 func (e *endpointsInfo) IPPart() string {
-	return ipPart(e.endpoint)
+	return utilproxy.IPPart(e.endpoint)
 }
 
 // Returns the endpoint chain name for a given endpointsInfo.
@@ -944,7 +927,7 @@ type endpointServicePair struct {
 }
 
 func (esp *endpointServicePair) IPPart() string {
-	return ipPart(esp.endpoint)
+	return utilproxy.IPPart(esp.endpoint)
 }
 
 // After a UDP endpoint has been removed, we must flush any pending conntrack entries to it, or else we
@@ -953,23 +936,13 @@ func (esp *endpointServicePair) IPPart() string {
 func (proxier *Proxier) deleteEndpointConnections(connectionMap map[endpointServicePair]bool) {
 	for epSvcPair := range connectionMap {
 		if svcInfo, ok := proxier.serviceMap[epSvcPair.servicePortName]; ok && svcInfo.protocol == api.ProtocolUDP {
-			endpointIP := epSvcPair.endpoint[0:strings.Index(epSvcPair.endpoint, ":")]
+			endpointIP := utilproxy.IPPart(epSvcPair.endpoint)
 			err := utilproxy.ClearUDPConntrackForPeers(proxier.exec, svcInfo.clusterIP.String(), endpointIP)
 			if err != nil {
 				glog.Errorf("Failed to delete %s endpoint connections, error: %v", epSvcPair.servicePortName.String(), err)
 			}
 		}
 	}
-}
-
-// hostAddress returns a host address of the form <ip-address>/32 for
-// IPv4 and <ip-address>/128 for IPv6
-func hostAddress(ip net.IP) string {
-	len := 32
-	if ip.To4() == nil {
-		len = 128
-	}
-	return fmt.Sprintf("%s/%d", ip.String(), len)
 }
 
 // This is where all of the iptables-save/restore calls happen.
@@ -1189,7 +1162,7 @@ func (proxier *Proxier) syncProxyRules() {
 			"-A", string(kubeServicesChain),
 			"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcNameString),
 			"-m", protocol, "-p", protocol,
-			"-d", hostAddress(svcInfo.clusterIP),
+			"-d", utilproxy.ToCIDR(svcInfo.clusterIP),
 			"--dport", strconv.Itoa(svcInfo.port),
 		)
 		if proxier.masqueradeAll {
@@ -1243,7 +1216,7 @@ func (proxier *Proxier) syncProxyRules() {
 				"-A", string(kubeServicesChain),
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s external IP"`, svcNameString),
 				"-m", protocol, "-p", protocol,
-				"-d", hostAddress(net.ParseIP(externalIP)),
+				"-d", utilproxy.ToCIDR(net.ParseIP(externalIP)),
 				"--dport", strconv.Itoa(svcInfo.port),
 			)
 			// We have to SNAT packets to external IPs.
@@ -1269,7 +1242,7 @@ func (proxier *Proxier) syncProxyRules() {
 					"-A", string(kubeServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
 					"-m", protocol, "-p", protocol,
-					"-d", hostAddress(net.ParseIP(externalIP)),
+					"-d", utilproxy.ToCIDR(net.ParseIP(externalIP)),
 					"--dport", strconv.Itoa(svcInfo.port),
 					"-j", "REJECT",
 				)
@@ -1295,7 +1268,7 @@ func (proxier *Proxier) syncProxyRules() {
 					"-A", string(kubeServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
 					"-m", protocol, "-p", protocol,
-					"-d", hostAddress(net.ParseIP(ingress.IP)),
+					"-d", utilproxy.ToCIDR(net.ParseIP(ingress.IP)),
 					"--dport", strconv.Itoa(svcInfo.port),
 				)
 				// jump to service firewall chain
@@ -1333,7 +1306,7 @@ func (proxier *Proxier) syncProxyRules() {
 					// loadbalancer's backend hosts. In this case, request will not hit the loadbalancer but loop back directly.
 					// Need to add the following rule to allow request on host.
 					if allowFromNode {
-						writeLine(proxier.natRules, append(args, "-s", hostAddress(net.ParseIP(ingress.IP)), "-j", string(chosenChain))...)
+						writeLine(proxier.natRules, append(args, "-s", utilproxy.ToCIDR(net.ParseIP(ingress.IP)), "-j", string(chosenChain))...)
 					}
 				}
 
@@ -1417,7 +1390,7 @@ func (proxier *Proxier) syncProxyRules() {
 				"-A", string(kubeServicesChain),
 				"-m", "comment", "--comment", fmt.Sprintf(`"%s has no endpoints"`, svcNameString),
 				"-m", protocol, "-p", protocol,
-				"-d", hostAddress(svcInfo.clusterIP),
+				"-d", utilproxy.ToCIDR(svcInfo.clusterIP),
 				"--dport", strconv.Itoa(svcInfo.port),
 				"-j", "REJECT",
 			)
@@ -1489,7 +1462,7 @@ func (proxier *Proxier) syncProxyRules() {
 			)
 			// Handle traffic that loops back to the originator with SNAT.
 			writeLine(proxier.natRules, append(args,
-				"-s", hostAddress(net.ParseIP(epIP)),
+				"-s", utilproxy.ToCIDR(net.ParseIP(epIP)),
 				"-j", string(KubeMarkMasqChain))...)
 			// Update client-affinity lists.
 			if svcInfo.sessionAffinityType == api.ServiceAffinityClientIP {

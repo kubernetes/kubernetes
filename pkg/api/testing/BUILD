@@ -3,12 +3,14 @@ package(default_visibility = ["//visibility:public"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
     name = "go_default_library",
     srcs = [
         "conversion.go",
+        "doc.go",
         "fuzzer.go",
         "pod_specs.go",
     ],
@@ -53,4 +55,53 @@ filegroup(
         "//pkg/api/testing/compat:all-srcs",
     ],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = [
+        "backward_compatibility_test.go",
+        "conversion_test.go",
+        "copy_test.go",
+        "deep_copy_test.go",
+        "defaulting_test.go",
+        "meta_test.go",
+        "serialization_proto_test.go",
+        "serialization_test.go",
+        "unstructured_test.go",
+    ],
+    library = ":go_default_library",
+    deps = [
+        "//pkg/api:go_default_library",
+        "//pkg/api/install:go_default_library",
+        "//pkg/api/testapi:go_default_library",
+        "//pkg/api/testing/compat:go_default_library",
+        "//pkg/api/v1:go_default_library",
+        "//pkg/api/validation:go_default_library",
+        "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/extensions/v1beta1:go_default_library",
+        "//vendor/github.com/gogo/protobuf/proto:go_default_library",
+        "//vendor/github.com/golang/protobuf/proto:go_default_library",
+        "//vendor/github.com/google/gofuzz:go_default_library",
+        "//vendor/github.com/json-iterator/go:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/testing/fuzzer:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/conversion/unstructured:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/protobuf:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/runtime/serializer/streaming:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
+    ],
 )
