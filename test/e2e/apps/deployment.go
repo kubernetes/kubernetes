@@ -516,7 +516,9 @@ func ensureReplicas(rs *extensions.ReplicaSet, replicas int32) {
 
 // testRollbackDeployment tests that a deployment is created (revision 1) and updated (revision 2), and
 // then rollback to revision 1 (should update template to revision 1, and then update revision 1 to 3),
-// and then rollback to last revision.
+// and then rollback to last revision (which is revision 4 that comes from revision 2).
+// Then rollback the deployment to revision 10 (doesn't exist in history) should fail.
+// Finally, rollback current deployment (revision 4) to revision 4 should be no-op.
 func testRollbackDeployment(f *framework.Framework) {
 	ns := f.Namespace.Name
 	c := f.ClientSet
@@ -615,6 +617,40 @@ func testRollbackDeployment(f *framework.Framework) {
 	// Current newRS annotation should be "update", after the rollback
 	err = framework.CheckNewRSAnnotations(c, ns, deploymentName, updateAnnotation)
 	Expect(err).NotTo(HaveOccurred())
+
+	// 5. Update the deploymentRollback to rollback to revision 10
+	//    Since there's no revision 10 in history, it should stay as revision 4
+	revision = 10
+	framework.Logf("rolling back deployment %s to revision %d", deploymentName, revision)
+	rollback = newDeploymentRollback(deploymentName, nil, revision)
+	err = c.Extensions().Deployments(ns).Rollback(rollback)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Wait for the deployment to start rolling back
+	err = framework.WaitForDeploymentRollbackCleared(c, ns, deploymentName)
+	Expect(err).NotTo(HaveOccurred())
+	// TODO: report RollbackRevisionNotFound in deployment status and check it here
+
+	// The pod template shouldn't change since there's no revision 10
+	// Check if it's still revision 4 and still has the old pod template
+	checkDeploymentRevision(c, ns, deploymentName, "4", updatedDeploymentImageName, updatedDeploymentImage)
+
+	// 6. Update the deploymentRollback to rollback to revision 4
+	//    Since it's already revision 4, it should be no-op
+	revision = 4
+	framework.Logf("rolling back deployment %s to revision %d", deploymentName, revision)
+	rollback = newDeploymentRollback(deploymentName, nil, revision)
+	err = c.Extensions().Deployments(ns).Rollback(rollback)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Wait for the deployment to start rolling back
+	err = framework.WaitForDeploymentRollbackCleared(c, ns, deploymentName)
+	Expect(err).NotTo(HaveOccurred())
+	// TODO: report RollbackTemplateUnchanged in deployment status and check it here
+
+	// The pod template shouldn't change since it's already revision 4
+	// Check if it's still revision 4 and still has the old pod template
+	checkDeploymentRevision(c, ns, deploymentName, "4", updatedDeploymentImageName, updatedDeploymentImage)
 }
 
 // testRollbackDeploymentRSNoRevision tests that deployment supports rollback even when there's old replica set without revision.
@@ -722,39 +758,6 @@ func testRollbackDeploymentRSNoRevision(f *framework.Framework) {
 	err = framework.WaitForDeploymentStatus(c, deployment)
 	Expect(err).NotTo(HaveOccurred())
 
-	// 5. Update the deploymentRollback to rollback to revision 10
-	//    Since there's no revision 10 in history, it should stay as revision 3
-	revision = 10
-	framework.Logf("rolling back deployment %s to revision %d", deploymentName, revision)
-	rollback = newDeploymentRollback(deploymentName, nil, revision)
-	err = c.Extensions().Deployments(ns).Rollback(rollback)
-	Expect(err).NotTo(HaveOccurred())
-
-	// Wait for the deployment to start rolling back
-	err = framework.WaitForDeploymentRollbackCleared(c, ns, deploymentName)
-	Expect(err).NotTo(HaveOccurred())
-	// TODO: report RollbackRevisionNotFound in deployment status and check it here
-
-	// The pod template shouldn't change since there's no revision 10
-	// Check if it's still revision 3 and still has the old pod template
-	checkDeploymentRevision(c, ns, deploymentName, "3", deploymentImageName, deploymentImage)
-
-	// 6. Update the deploymentRollback to rollback to revision 3
-	//    Since it's already revision 3, it should be no-op
-	revision = 3
-	framework.Logf("rolling back deployment %s to revision %d", deploymentName, revision)
-	rollback = newDeploymentRollback(deploymentName, nil, revision)
-	err = c.Extensions().Deployments(ns).Rollback(rollback)
-	Expect(err).NotTo(HaveOccurred())
-
-	// Wait for the deployment to start rolling back
-	err = framework.WaitForDeploymentRollbackCleared(c, ns, deploymentName)
-	Expect(err).NotTo(HaveOccurred())
-	// TODO: report RollbackTemplateUnchanged in deployment status and check it here
-
-	// The pod template shouldn't change since it's already revision 3
-	// Check if it's still revision 3 and still has the old pod template
-	checkDeploymentRevision(c, ns, deploymentName, "3", deploymentImageName, deploymentImage)
 }
 
 func testDeploymentLabelAdopted(f *framework.Framework) {
