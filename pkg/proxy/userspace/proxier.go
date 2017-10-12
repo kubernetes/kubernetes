@@ -35,7 +35,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/iptables"
 	utilexec "k8s.io/utils/exec"
 )
@@ -123,7 +123,7 @@ type portMapKey struct {
 }
 
 func (k *portMapKey) String() string {
-	return fmt.Sprintf("%s:%d/%s", k.ip, k.port, k.protocol)
+	return fmt.Sprintf("%s/%s", net.JoinHostPort(k.ip, strconv.Itoa(k.port)), k.protocol)
 }
 
 // A value for the portMap
@@ -162,6 +162,9 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.In
 // the ProxySocket constructor provided, however, instead of constructing the
 // default ProxySockets.
 func NewCustomProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, exec utilexec.Interface, pr utilnet.PortRange, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration, makeProxySocket ProxySocketFunc) (*Proxier, error) {
+	if listenIP == nil {
+		return nil, fmt.Errorf("invalid listen ip for kube-proxy")
+	}
 	if listenIP.Equal(localhostIPv4) || listenIP.Equal(localhostIPv6) {
 		return nil, ErrProxyOnLocalhost
 	}
@@ -170,7 +173,7 @@ func NewCustomProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptab
 	// try to find a suitable host IP address from network interfaces.
 	var err error
 	hostIP := listenIP
-	if hostIP.Equal(net.IPv4zero) {
+	if hostIP.Equal(net.IPv4zero) || hostIP.Equal(net.IPv6zero) {
 		hostIP, err = utilnet.ChooseHostInterface()
 		if err != nil {
 			return nil, fmt.Errorf("failed to select a host interface: %v", err)
@@ -435,7 +438,7 @@ func (proxier *Proxier) mergeService(service *api.Service) sets.String {
 		}
 
 		serviceIP := net.ParseIP(service.Spec.ClusterIP)
-		glog.V(1).Infof("Adding new service %q at %s:%d/%s", serviceName, serviceIP, servicePort.Port, servicePort.Protocol)
+		glog.V(1).Infof("Adding new service %q at %s/%s", serviceName, net.JoinHostPort(serviceIP.String(), strconv.Itoa(int(servicePort.Port))), servicePort.Protocol)
 		info, err = proxier.addServiceOnPort(serviceName, servicePort.Protocol, proxyPort, proxier.udpIdleTimeout)
 		if err != nil {
 			glog.Errorf("Failed to start proxy for %q: %v", serviceName, err)
@@ -504,7 +507,7 @@ func (proxier *Proxier) unmergeService(service *api.Service, existingPorts sets.
 		proxier.loadBalancer.DeleteService(serviceName)
 	}
 	for _, svcIP := range staleUDPServices.UnsortedList() {
-		if err := utilproxy.ClearUDPConntrackForIP(proxier.exec, svcIP); err != nil {
+		if err := proxyutil.ClearUDPConntrackForIP(proxier.exec, svcIP); err != nil {
 			glog.Errorf("Failed to delete stale service IP %s connections, error: %v", svcIP, err)
 		}
 	}
@@ -586,7 +589,7 @@ func (proxier *Proxier) openPortal(service proxy.ServicePortName, info *ServiceI
 }
 
 func (proxier *Proxier) openOnePortal(portal portal, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) error {
-	if local, err := utilproxy.IsLocalIP(portal.ip.String()); err != nil {
+	if local, err := proxyutil.IsLocalIP(portal.ip.String()); err != nil {
 		return fmt.Errorf("can't determine if IP %s is local, assuming not: %v", portal.ip, err)
 	} else if local {
 		err := proxier.claimNodePort(portal.ip, portal.port, protocol, name)
@@ -597,13 +600,14 @@ func (proxier *Proxier) openOnePortal(portal portal, protocol api.Protocol, prox
 
 	// Handle traffic from containers.
 	args := proxier.iptablesContainerPortalArgs(portal.ip, portal.isExternal, false, portal.port, protocol, proxyIP, proxyPort, name)
+	portalAddress := net.JoinHostPort(portal.ip.String(), strconv.Itoa(portal.port))
 	existed, err := proxier.iptables.EnsureRule(iptables.Append, iptables.TableNAT, iptablesContainerPortalChain, args...)
 	if err != nil {
 		glog.Errorf("Failed to install iptables %s rule for service %q, args:%v", iptablesContainerPortalChain, name, args)
 		return err
 	}
 	if !existed {
-		glog.V(3).Infof("Opened iptables from-containers portal for service %q on %s %s:%d", name, protocol, portal.ip, portal.port)
+		glog.V(3).Infof("Opened iptables from-containers portal for service %q on %s %s", name, protocol, portalAddress)
 	}
 	if portal.isExternal {
 		args := proxier.iptablesContainerPortalArgs(portal.ip, false, true, portal.port, protocol, proxyIP, proxyPort, name)
@@ -613,7 +617,7 @@ func (proxier *Proxier) openOnePortal(portal portal, protocol api.Protocol, prox
 			return err
 		}
 		if !existed {
-			glog.V(3).Infof("Opened iptables from-containers portal for service %q on %s %s:%d for local traffic", name, protocol, portal.ip, portal.port)
+			glog.V(3).Infof("Opened iptables from-containers portal for service %q on %s %s for local traffic", name, protocol, portalAddress)
 		}
 
 		args = proxier.iptablesHostPortalArgs(portal.ip, true, portal.port, protocol, proxyIP, proxyPort, name)
@@ -623,7 +627,7 @@ func (proxier *Proxier) openOnePortal(portal portal, protocol api.Protocol, prox
 			return err
 		}
 		if !existed {
-			glog.V(3).Infof("Opened iptables from-host portal for service %q on %s %s:%d for dst-local traffic", name, protocol, portal.ip, portal.port)
+			glog.V(3).Infof("Opened iptables from-host portal for service %q on %s %s for dst-local traffic", name, protocol, portalAddress)
 		}
 		return nil
 	}
@@ -636,7 +640,7 @@ func (proxier *Proxier) openOnePortal(portal portal, protocol api.Protocol, prox
 		return err
 	}
 	if !existed {
-		glog.V(3).Infof("Opened iptables from-host portal for service %q on %s %s:%d", name, protocol, portal.ip, portal.port)
+		glog.V(3).Infof("Opened iptables from-host portal for service %q on %s %s", name, protocol, portalAddress)
 	}
 	return nil
 }
@@ -764,7 +768,7 @@ func (proxier *Proxier) closePortal(service proxy.ServicePortName, info *Service
 func (proxier *Proxier) closeOnePortal(portal portal, protocol api.Protocol, proxyIP net.IP, proxyPort int, name proxy.ServicePortName) []error {
 	el := []error{}
 
-	if local, err := utilproxy.IsLocalIP(portal.ip.String()); err != nil {
+	if local, err := proxyutil.IsLocalIP(portal.ip.String()); err != nil {
 		el = append(el, fmt.Errorf("can't determine if IP %s is local, assuming not: %v", portal.ip, err))
 	} else if local {
 		if err := proxier.releaseNodePort(portal.ip, portal.port, protocol, name); err != nil {
@@ -964,7 +968,7 @@ func iptablesCommonPortalArgs(destIP net.IP, addPhysicalInterfaceMatch bool, add
 	}
 
 	if destIP != nil {
-		args = append(args, "-d", fmt.Sprintf("%s/32", destIP.String()))
+		args = append(args, "-d", proxyutil.ToCIDR(destIP))
 	}
 
 	if addPhysicalInterfaceMatch {
