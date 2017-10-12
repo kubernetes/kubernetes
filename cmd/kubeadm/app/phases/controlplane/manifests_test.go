@@ -41,7 +41,7 @@ func TestGetStaticPodSpecs(t *testing.T) {
 
 	// Creates a Master Configuration
 	cfg := &kubeadmapi.MasterConfiguration{
-		KubernetesVersion: "v1.7.0",
+		KubernetesVersion: "v1.8.0",
 	}
 
 	// Executes GetStaticPodSpecs
@@ -113,7 +113,7 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 
 		// Creates a Master Configuration
 		cfg := &kubeadmapi.MasterConfiguration{
-			KubernetesVersion: "v1.7.0",
+			KubernetesVersion: "v1.8.0",
 		}
 
 		// Execute createStaticPodFunction
@@ -143,7 +143,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				API:               kubeadmapi.API{BindPort: 123, AdvertiseAddress: "1.2.3.4"},
 				Networking:        kubeadmapi.Networking{ServiceSubnet: "bar"},
 				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.7.0",
+				KubernetesVersion: "v1.8.0",
 			},
 			expected: []string{
 				"kube-apiserver",
@@ -156,10 +156,10 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--tls-private-key-file=" + testCertsDir + "/apiserver.key",
 				"--kubelet-client-certificate=" + testCertsDir + "/apiserver-kubelet-client.crt",
 				"--kubelet-client-key=" + testCertsDir + "/apiserver-kubelet-client.key",
+				"--enable-bootstrap-token-auth=true",
 				"--secure-port=123",
 				"--allow-privileged=true",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
-				"--experimental-bootstrap-token-auth=true",
 				"--proxy-client-cert-file=/var/lib/certs/front-proxy-client.crt",
 				"--proxy-client-key-file=/var/lib/certs/front-proxy-client.key",
 				"--requestheader-username-headers=X-Remote-User",
@@ -211,7 +211,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				API:               kubeadmapi.API{BindPort: 123, AdvertiseAddress: "4.3.2.1"},
 				Networking:        kubeadmapi.Networking{ServiceSubnet: "bar"},
 				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.7.1",
+				KubernetesVersion: "v1.8.1",
 			},
 			expected: []string{
 				"kube-apiserver",
@@ -224,10 +224,10 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--tls-private-key-file=" + testCertsDir + "/apiserver.key",
 				"--kubelet-client-certificate=" + testCertsDir + "/apiserver-kubelet-client.crt",
 				"--kubelet-client-key=" + testCertsDir + "/apiserver-kubelet-client.key",
+				"--enable-bootstrap-token-auth=true",
 				"--secure-port=123",
 				"--allow-privileged=true",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
-				"--experimental-bootstrap-token-auth=true",
 				"--proxy-client-cert-file=/var/lib/certs/front-proxy-client.crt",
 				"--proxy-client-key-file=/var/lib/certs/front-proxy-client.key",
 				"--requestheader-username-headers=X-Remote-User",
@@ -246,7 +246,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				Networking:        kubeadmapi.Networking{ServiceSubnet: "bar"},
 				Etcd:              kubeadmapi.Etcd{CertFile: "fiz", KeyFile: "faz"},
 				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.7.2",
+				KubernetesVersion: "v1.8.0",
 			},
 			expected: []string{
 				"kube-apiserver",
@@ -259,10 +259,10 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--tls-private-key-file=" + testCertsDir + "/apiserver.key",
 				"--kubelet-client-certificate=" + testCertsDir + "/apiserver-kubelet-client.crt",
 				"--kubelet-client-key=" + testCertsDir + "/apiserver-kubelet-client.key",
+				"--enable-bootstrap-token-auth=true",
 				"--secure-port=123",
 				"--allow-privileged=true",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
-				"--experimental-bootstrap-token-auth=true",
 				"--proxy-client-cert-file=/var/lib/certs/front-proxy-client.crt",
 				"--proxy-client-key-file=/var/lib/certs/front-proxy-client.key",
 				"--requestheader-username-headers=X-Remote-User",
@@ -283,7 +283,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				Networking:        kubeadmapi.Networking{ServiceSubnet: "bar"},
 				Etcd:              kubeadmapi.Etcd{CertFile: "fiz", KeyFile: "faz"},
 				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.7.3",
+				KubernetesVersion: "v1.8.3",
 			},
 			expected: []string{
 				"kube-apiserver",
@@ -296,10 +296,10 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--tls-private-key-file=" + testCertsDir + "/apiserver.key",
 				"--kubelet-client-certificate=" + testCertsDir + "/apiserver-kubelet-client.crt",
 				"--kubelet-client-key=" + testCertsDir + "/apiserver-kubelet-client.key",
+				"--enable-bootstrap-token-auth=true",
 				fmt.Sprintf("--secure-port=%d", 123),
 				"--allow-privileged=true",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
-				"--experimental-bootstrap-token-auth=true",
 				"--proxy-client-cert-file=/var/lib/certs/front-proxy-client.crt",
 				"--proxy-client-key-file=/var/lib/certs/front-proxy-client.key",
 				"--requestheader-username-headers=X-Remote-User",
@@ -320,7 +320,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				Networking:        kubeadmapi.Networking{ServiceSubnet: "bar"},
 				Etcd:              kubeadmapi.Etcd{CertFile: "fiz", KeyFile: "faz"},
 				CertificatesDir:   testCertsDir,
-				KubernetesVersion: "v1.7.0",
+				KubernetesVersion: "v1.8.0",
 			},
 			expected: []string{
 				"kube-apiserver",
@@ -333,10 +333,10 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--tls-private-key-file=" + testCertsDir + "/apiserver.key",
 				"--kubelet-client-certificate=" + testCertsDir + "/apiserver-kubelet-client.crt",
 				"--kubelet-client-key=" + testCertsDir + "/apiserver-kubelet-client.key",
+				"--enable-bootstrap-token-auth=true",
 				fmt.Sprintf("--secure-port=%d", 123),
 				"--allow-privileged=true",
 				"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
-				"--experimental-bootstrap-token-auth=true",
 				"--proxy-client-cert-file=/var/lib/certs/front-proxy-client.crt",
 				"--proxy-client-key-file=/var/lib/certs/front-proxy-client.key",
 				"--requestheader-username-headers=X-Remote-User",

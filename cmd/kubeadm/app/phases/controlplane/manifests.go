@@ -148,6 +148,7 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 		"tls-private-key-file":            filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKeyName),
 		"kubelet-client-certificate":      filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientCertName),
 		"kubelet-client-key":              filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientKeyName),
+		"enable-bootstrap-token-auth":     "true",
 		"secure-port":                     fmt.Sprintf("%d", cfg.API.BindPort),
 		"allow-privileged":                "true",
 		"kubelet-preferred-address-types": "InternalIP,ExternalIP,Hostname",
@@ -163,13 +164,6 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 	}
 
 	command := []string{"kube-apiserver"}
-
-	// Note: Mutating defaultArguments dynamically must happen before the BuildArgumentListFromMap call below
-	if k8sVersion.AtLeast(kubeadmconstants.UseEnableBootstrapTokenAuthFlagVersion) {
-		defaultArguments["enable-bootstrap-token-auth"] = "true"
-	} else {
-		defaultArguments["experimental-bootstrap-token-auth"] = "true"
-	}
 
 	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.APIServerExtraArgs)...)
 	command = append(command, getAuthzParameters(cfg.AuthorizationModes)...)
