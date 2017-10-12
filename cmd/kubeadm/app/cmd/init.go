@@ -73,7 +73,7 @@ var (
 
 		You should now deploy a pod network to the cluster.
 		Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
-		  http://kubernetes.io/docs/admin/addons/
+		  https://kubernetes.io/docs/concepts/cluster-administration/addons/
 
 		You can now join any number of machines by running the following on each node
 		as root:
