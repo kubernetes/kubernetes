@@ -11093,7 +11093,7 @@
       "$ref": "#/definitions/io.k8s.api.core.v1.ResourceRequirements"
      },
      "securityContext": {
-      "description": "Security options the pod should run with. More info: https://kubernetes.io/docs/concepts/policy/security-context/ More info: https://git.k8s.io/community/contributors/design-proposals/security_context.md",
+      "description": "Security options the pod should run with. More info: https://kubernetes.io/docs/concepts/policy/security-context/ More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
       "$ref": "#/definitions/io.k8s.api.core.v1.SecurityContext"
      },
      "stdin": {
@@ -11863,7 +11863,7 @@
     "description": "NamespaceSpec describes the attributes on a Namespace.",
     "properties": {
      "finalizers": {
-      "description": "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: https://git.k8s.io/community/contributors/design-proposals/namespaces.md#finalizers",
+      "description": "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/",
       "type": "array",
       "items": {
        "type": "string"
@@ -11875,7 +11875,7 @@
     "description": "NamespaceStatus is information about the current status of a Namespace.",
     "properties": {
      "phase": {
-      "description": "Phase is the current lifecycle phase of the namespace. More info: https://git.k8s.io/community/contributors/design-proposals/namespaces.md#phases",
+      "description": "Phase is the current lifecycle phase of the namespace. More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/",
       "type": "string"
      }
     }

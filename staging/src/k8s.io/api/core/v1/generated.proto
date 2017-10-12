@@ -565,7 +565,7 @@ message Container {
 
   // Security options the pod should run with.
   // More info: https://kubernetes.io/docs/concepts/policy/security-context/
-  // More info: https://git.k8s.io/community/contributors/design-proposals/security_context.md
+  // More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
   // +optional
   optional SecurityContext securityContext = 15;
 
@@ -1442,7 +1442,7 @@ message LimitRangeList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of LimitRange objects.
-  // More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_limit_range.md
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
   repeated LimitRange items = 2;
 }
 
@@ -1593,7 +1593,7 @@ message NamespaceList {
 // NamespaceSpec describes the attributes on a Namespace.
 message NamespaceSpec {
   // Finalizers is an opaque list of values that must be empty to permanently remove object from storage.
-  // More info: https://git.k8s.io/community/contributors/design-proposals/namespaces.md#finalizers
+  // More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/
   // +optional
   repeated string finalizers = 1;
 }
@@ -1601,7 +1601,7 @@ message NamespaceSpec {
 // NamespaceStatus is information about the current status of a Namespace.
 message NamespaceStatus {
   // Phase is the current lifecycle phase of the namespace.
-  // More info: https://git.k8s.io/community/contributors/design-proposals/namespaces.md#phases
+  // More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/
   // +optional
   optional string phase = 1;
 }
@@ -3377,14 +3377,14 @@ message ResourceQuotaList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of ResourceQuota objects.
-  // More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md
+  // More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
   repeated ResourceQuota items = 2;
 }
 
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota.
 message ResourceQuotaSpec {
   // Hard is the set of desired hard limits for each named resource.
-  // More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md
+  // More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> hard = 1;
 
@@ -3397,7 +3397,7 @@ message ResourceQuotaSpec {
 // ResourceQuotaStatus defines the enforced hard limits and observed use.
 message ResourceQuotaStatus {
   // Hard is the set of enforced hard limits for each named resource.
-  // More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md
+  // More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> hard = 1;
 

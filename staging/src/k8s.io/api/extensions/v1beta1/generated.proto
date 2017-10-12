@@ -1016,7 +1016,7 @@ message SELinuxStrategyOptions {
   optional string rule = 1;
 
   // seLinuxOptions required to run as; required for MustRunAs
-  // More info: https://git.k8s.io/community/contributors/design-proposals/security_context.md
+  // More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
   // +optional
   optional k8s.io.api.core.v1.SELinuxOptions seLinuxOptions = 2;
 }
