@@ -759,3 +759,13 @@ func (vs *VSphere) DeleteVolume(vmDiskPath string) error {
 func (vs *VSphere) HasClusterID() bool {
 	return true
 }
+
+// Notification handler when node is registered.
+func (vs *VSphere) NodeRegistered(node *v1.Node) {
+	glog.V(4).Infof("Node Registered: %+v", node)
+}
+
+// Notification handler when node is unregistered.
+func (vs *VSphere) NodeUnregistered(node *v1.Node) {
+	glog.V(4).Infof("Node Unregistered: %+v", node)
+}
