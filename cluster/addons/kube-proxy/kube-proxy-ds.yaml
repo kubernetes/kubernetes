@@ -30,7 +30,7 @@ spec:
         beta.kubernetes.io/kube-proxy-ds-ready: "true"
       initContainers:
       - name: touch-lock
-        image: busybox
+        image: gcr.io/google_containers/busybox:1.27
         command: ['/bin/touch', '/run/xtables.lock']
         securityContext:
           privileged: true
