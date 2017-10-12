@@ -449,6 +449,10 @@ func (f *FakeFactory) AttachablePodForObject(ob runtime.Object, timeout time.Dur
 	return nil, nil
 }
 
+func (f *FakeFactory) ApproximatePodTemplateForObject(obj runtime.Object) (*api.PodTemplateSpec, error) {
+	return f.ApproximatePodTemplateForObject(obj)
+}
+
 func (f *FakeFactory) UpdatePodSpecForObject(obj runtime.Object, fn func(*api.PodSpec) error) (bool, error) {
 	return false, nil
 }
@@ -711,6 +715,10 @@ func (f *fakeAPIFactory) AttachablePodForObject(object runtime.Object, timeout t
 		}
 		return nil, fmt.Errorf("cannot attach to %v: not implemented", gvks[0])
 	}
+}
+
+func (f *fakeAPIFactory) ApproximatePodTemplateForObject(obj runtime.Object) (*api.PodTemplateSpec, error) {
+	return f.Factory.ApproximatePodTemplateForObject(obj)
 }
 
 func (f *fakeAPIFactory) Validator(validate bool) (validation.Schema, error) {
