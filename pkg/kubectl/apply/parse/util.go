@@ -18,11 +18,12 @@ package parse
 
 import (
 	"fmt"
+	"reflect"
+	"strings"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/kubectl/apply"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-	"reflect"
-	"strings"
 )
 
 // nilSafeLookup returns the value from the map if the map is non-nil
@@ -152,9 +153,11 @@ func getGroupVersionKind(config map[string]interface{}) (schema.GroupVersionKind
 		if !ok {
 			return gvk, fmt.Errorf("Expected string for apiVersion, found %T", gv)
 		}
-		groupversion := strings.Split(casted, "/")
-		gvk.Group = groupversion[0]
-		gvk.Version = groupversion[1]
+		s := strings.Split(casted, "/")
+		if len(s) != 1 {
+			gvk.Group = s[0]
+		}
+		gvk.Version = s[len(s)-1]
 	} else {
 		return gvk, fmt.Errorf("Missing apiVersion in Kind %v", config)
 	}
