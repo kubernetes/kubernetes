@@ -135,8 +135,9 @@ if [ $remote = true ] ; then
     --hosts="$hosts" --images="$images" --cleanup="$cleanup" \
     --results-dir="$artifacts" --ginkgo-flags="$ginkgoflags" \
     --image-project="$image_project" --instance-name-prefix="$instance_prefix" \
-    --delete-instances="$delete_instances" --test_args="$test_args" --instance-metadata="$metadata" \
-    --image-config-file="$image_config_file" --system-spec-name="$system_spec_name" \
+    --delete-instances="$delete_instances" \
+    --test_args="$test_args --container-runtime=${runtime} --container-runtime-endpoint=${container_runtime_endpoint} --image-service-endpoint=${image_service_endpoint}" \
+    --instance-metadata="$metadata" --image-config-file="$image_config_file" --system-spec-name="$system_spec_name" \
     2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
 
@@ -150,17 +151,6 @@ else
   # Do not use any network plugin by default. User could override the flags with
   # test_args.
   test_args='--kubelet-flags="--network-plugin= --cni-bin-dir=" '$test_args
-
-  # Runtime flags
-  test_args='--kubelet-flags="--container-runtime='$runtime'" '$test_args
-  if [[ $runtime == "remote" ]] ; then
-      if [[ ! -z $container_runtime_endpoint ]] ; then
-	      test_args='--kubelet-flags="--container-runtime-endpoint='$container_runtime_endpoint'" '$test_args
-      fi
-      if [[ ! -z $image_service_endpoint ]] ; then
-	      test_args='--kubelet-flags="--image-service-endpoint='$image_service_endpoint'" '$test_args
-      fi
-  fi
 
   # Test using the host the script was run on
   # Provided for backwards compatibility
