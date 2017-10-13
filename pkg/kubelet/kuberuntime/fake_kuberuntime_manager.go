@@ -56,6 +56,21 @@ func (f *fakePodGetter) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
 	return pod, found
 }
 
+type fakePodStateProvider struct {
+	runningPods map[types.UID]struct{}
+}
+
+func newFakePodStateProvider() *fakePodStateProvider {
+	return &fakePodStateProvider{
+		runningPods: make(map[types.UID]struct{}),
+	}
+}
+
+func (f *fakePodStateProvider) IsPodTerminated(uid types.UID) bool {
+	_, found := f.runningPods[uid]
+	return !found
+}
+
 func NewFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, keyring credentialprovider.DockerKeyring) (*kubeGenericRuntimeManager, error) {
 	recorder := &record.FakeRecorder{}
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
@@ -76,7 +91,7 @@ func NewFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		return nil, err
 	}
 
-	kubeRuntimeManager.containerGC = NewContainerGC(runtimeService, newFakePodGetter(), kubeRuntimeManager)
+	kubeRuntimeManager.containerGC = NewContainerGC(runtimeService, newFakePodGetter(), newFakePodStateProvider(), kubeRuntimeManager)
 	kubeRuntimeManager.runtimeName = typedVersion.RuntimeName
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),

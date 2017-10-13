@@ -69,6 +69,11 @@ type podGetter interface {
 	GetPodByUID(kubetypes.UID) (*v1.Pod, bool)
 }
 
+// podStateProvider can determine if a pod is deleted ir terminated
+type podStateProvider interface {
+	IsPodTerminated(kubetypes.UID) bool
+}
+
 type kubeGenericRuntimeManager struct {
 	runtimeName         string
 	recorder            record.EventRecorder
@@ -120,6 +125,7 @@ func NewKubeGenericRuntimeManager(
 	containerRefManager *kubecontainer.RefManager,
 	machineInfo *cadvisorapi.MachineInfo,
 	podGetter podGetter,
+	podStateProvider podStateProvider,
 	osInterface kubecontainer.OSInterface,
 	runtimeHelper kubecontainer.RuntimeHelper,
 	httpClient types.HttpGetter,
@@ -182,7 +188,7 @@ func NewKubeGenericRuntimeManager(
 		imagePullQPS,
 		imagePullBurst)
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(httpClient, kubeRuntimeManager, kubeRuntimeManager)
-	kubeRuntimeManager.containerGC = NewContainerGC(runtimeService, podGetter, kubeRuntimeManager)
+	kubeRuntimeManager.containerGC = NewContainerGC(runtimeService, podGetter, podStateProvider, kubeRuntimeManager)
 
 	kubeRuntimeManager.versionCache = cache.NewObjectCache(
 		func() (interface{}, error) {
