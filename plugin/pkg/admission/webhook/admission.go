@@ -242,20 +242,21 @@ func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Exte
 	if err != nil {
 		return &ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
-	if err := client.Post().Context(ctx).Body(&request).Do().Into(&request); err != nil {
+	response := &admissionv1alpha1.AdmissionReview{}
+	if err := client.Post().Context(ctx).Body(&request).Do().Into(response); err != nil {
 		return &ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 
-	if request.Status.Allowed {
+	if response.Status.Allowed {
 		return nil
 	}
 
-	if request.Status.Result == nil {
+	if response.Status.Result == nil {
 		return fmt.Errorf("admission webhook %q denied the request without explanation", h.Name)
 	}
 
 	return &apierrors.StatusError{
-		ErrStatus: *request.Status.Result,
+		ErrStatus: *response.Status.Result,
 	}
 }
 
