@@ -71,7 +71,8 @@ const (
 	FreeDiskSpaceFailed = "FreeDiskSpaceFailed"
 
 	// Probe event reason list
-	ContainerUnhealthy = "Unhealthy"
+	ContainerUnhealthy   = "Unhealthy"
+	ContainerTurnHealthy = "TurnHealthy"
 
 	// Pod worker event reason list
 	FailedSync = "FailedSync"
