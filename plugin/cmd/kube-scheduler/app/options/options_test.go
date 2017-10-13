@@ -21,11 +21,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/pflag"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+
+	"github.com/spf13/pflag"
 )
 
 func TestAddFlags(t *testing.T) {
@@ -42,21 +42,21 @@ func TestAddFlags(t *testing.T) {
 		"--kube-api-burst=80",
 		"--kube-api-content-type=application/vnd.kubernetes.protobuf",
 		"--kube-api-qps=40.0",
-		"--kubeconfig=/foo/bar",
+		"--kubeconfig=/foo/bar/kubeconfig",
 		"--leader-elect=true",
 		"--leader-elect-lease-duration=20s",
 		"--leader-elect-renew-deadline=15s",
 		"--leader-elect-resource-lock=endpoints",
 		"--leader-elect-retry-period=3s",
-		"--lock-object-name=foo",
-		"--lock-object-namespace=bar",
+		"--lock-object-name=test-lock-object-name",
+		"--lock-object-namespace=test-lock-object-ns",
 		"--master=192.168.4.20",
-		"--policy-config-file=/foo/bar",
-		"--policy-configmap=foo",
-		"--policy-configmap-namespace=bar",
+		"--policy-config-file=/foo/bar/policyconfig",
+		"--policy-configmap=test-policy-configmap",
+		"--policy-configmap-namespace=test-policy-configmap-ns",
 		"--port=10000",
 		"--profiling=false",
-		"--scheduler-name=foo",
+		"--scheduler-name=test-scheduler-name",
 		"--use-legacy-policy-config=true",
 	}
 
@@ -67,14 +67,14 @@ func TestAddFlags(t *testing.T) {
 			Port:                      10000,
 			Address:                   "192.168.4.20",
 			AlgorithmProvider:         "FooProvider",
-			PolicyConfigFile:          "/foo/bar",
+			PolicyConfigFile:          "/foo/bar/policyconfig",
 			EnableContentionProfiling: true,
 			EnableProfiling:           false,
 
 			ContentType:   "application/vnd.kubernetes.protobuf",
 			KubeAPIQPS:    40.0,
 			KubeAPIBurst:  80,
-			SchedulerName: "foo",
+			SchedulerName: "test-scheduler-name",
 			LeaderElection: componentconfig.LeaderElectionConfiguration{
 				ResourceLock:  "endpoints",
 				LeaderElect:   true,
@@ -83,17 +83,17 @@ func TestAddFlags(t *testing.T) {
 				RetryPeriod:   metav1.Duration{Duration: 3 * time.Second},
 			},
 
-			LockObjectNamespace: "bar",
-			LockObjectName:      "foo",
+			LockObjectNamespace: "test-lock-object-ns",
+			LockObjectName:      "test-lock-object-name",
 
-			PolicyConfigMapName:      "foo",
-			PolicyConfigMapNamespace: "bar",
+			PolicyConfigMapName:      "test-policy-configmap",
+			PolicyConfigMapNamespace: "test-policy-configmap-ns",
 			UseLegacyPolicyConfig:    true,
 
 			HardPodAffinitySymmetricWeight: 0,
 			FailureDomains:                 "kubernetes.io/hostname",
 		},
-		Kubeconfig: "/foo/bar",
+		Kubeconfig: "/foo/bar/kubeconfig",
 		Master:     "192.168.4.20",
 	}
 
