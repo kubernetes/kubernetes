@@ -125,6 +125,11 @@ func (c *podSecurityPolicyPlugin) Admit(a admission.Attributes) error {
 		return nil
 	}
 
+	// Ignore mirror pods, as they are run regardless of the admission decision.
+	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
+		return nil
+	}
+
 	// get all constraints that are usable by the user
 	glog.V(4).Infof("getting pod security policies for pod %s (generate: %s)", pod.Name, pod.GenerateName)
 	var saInfo user.Info

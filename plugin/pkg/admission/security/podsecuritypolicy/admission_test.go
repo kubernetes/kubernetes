@@ -48,11 +48,12 @@ const defaultContainerName = "test-c"
 // an authorizer that always returns true.
 func NewTestAdmission(lister extensionslisters.PodSecurityPolicyLister) kadmission.Interface {
 	return &podSecurityPolicyPlugin{
-		Handler:         kadmission.NewHandler(kadmission.Create),
-		strategyFactory: kpsp.NewSimpleStrategyFactory(),
-		pspMatcher:      getMatchingPolicies,
-		authz:           &TestAuthorizer{},
-		lister:          lister,
+		Handler:          kadmission.NewHandler(kadmission.Create),
+		strategyFactory:  kpsp.NewSimpleStrategyFactory(),
+		pspMatcher:       getMatchingPolicies,
+		authz:            &TestAuthorizer{},
+		lister:           lister,
+		failOnNoPolicies: true,
 	}
 }
 
@@ -249,6 +250,15 @@ func TestAdmitPrivileged(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestAdmitMirrorPod(t *testing.T) {
+	nonMirrorPod := goodPod()
+	testPSPAdmit("non-mirror pod", nil, nonMirrorPod, false, "", t)
+
+	mirrorPod := goodPod()
+	mirrorPod.Annotations[kapi.MirrorPodAnnotationKey] = "true"
+	testPSPAdmit("mirror pod", nil, mirrorPod, true, "", t)
 }
 
 func TestAdmitCaps(t *testing.T) {
@@ -1792,4 +1802,8 @@ func userIDPtr(i int) *int64 {
 func groupIDPtr(i int) *int64 {
 	groupID := int64(i)
 	return &groupID
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
