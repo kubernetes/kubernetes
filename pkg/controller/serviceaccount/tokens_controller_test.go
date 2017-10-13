@@ -73,7 +73,7 @@ func tokenSecretReferences() []v1.ObjectReference {
 
 // addTokenSecretReference adds a reference to the ServiceAccountToken that will be created
 func addTokenSecretReference(refs []v1.ObjectReference) []v1.ObjectReference {
-	return addNamedTokenSecretReference(refs, "default-token-stdpg")
+	return addNamedTokenSecretReference(refs, "default-token-xn8fg")
 }
 
 // addNamedTokenSecretReference adds a reference to the named ServiceAccountToken
@@ -118,9 +118,9 @@ func opaqueSecret() *v1.Secret {
 }
 
 // createdTokenSecret returns the ServiceAccountToken secret posted when creating a new token secret.
-// Named "default-token-stdpg", since that is the first generated name after rand.Seed(1)
+// Named "default-token-xn8fg", since that is the first generated name after rand.Seed(1)
 func createdTokenSecret(overrideName ...string) *v1.Secret {
-	return namedCreatedTokenSecret("default-token-stdpg")
+	return namedCreatedTokenSecret("default-token-xn8fg")
 }
 
 // namedTokenSecret returns the ServiceAccountToken secret posted when creating a new token secret with the given name.
@@ -264,12 +264,12 @@ func TestTokenCreation(t *testing.T) {
 
 				// Attempt 2
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
-				core.NewCreateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, namedCreatedTokenSecret("default-token-jk9rt")),
+				core.NewCreateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, namedCreatedTokenSecret("default-token-txhzt")),
 
 				// Attempt 3
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
-				core.NewCreateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, namedCreatedTokenSecret("default-token-684pg")),
-				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, serviceAccount(addNamedTokenSecretReference(emptySecretReferences(), "default-token-684pg"))),
+				core.NewCreateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, namedCreatedTokenSecret("default-token-vnmz7")),
+				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, serviceAccount(addNamedTokenSecretReference(emptySecretReferences(), "default-token-vnmz7"))),
 			},
 		},
 		"new serviceaccount with no secrets encountering unending create error": {
@@ -293,10 +293,10 @@ func TestTokenCreation(t *testing.T) {
 				core.NewCreateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, createdTokenSecret()),
 				// Retry 1
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
-				core.NewCreateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, namedCreatedTokenSecret("default-token-jk9rt")),
+				core.NewCreateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, namedCreatedTokenSecret("default-token-txhzt")),
 				// Retry 2
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
-				core.NewCreateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, namedCreatedTokenSecret("default-token-684pg")),
+				core.NewCreateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, namedCreatedTokenSecret("default-token-vnmz7")),
 			},
 		},
 		"new serviceaccount with missing secrets": {
