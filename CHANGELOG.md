@@ -454,7 +454,7 @@ pipeline.
 the efficient and reliable management of multiple Kubernetes clusters,
 and applications that run in and across multiple clusters.
 
-For the 1.8 release, SIG Multicluster focussed on expanding the set of
+For the 1.8 release, SIG Multicluster focused on expanding the set of
 Kubernetes primitives that our Cluster Federation control plane
 supports, expanding the number of approaches taken to multi-cluster
 management (beyond our initial Federation approach), and preparing
