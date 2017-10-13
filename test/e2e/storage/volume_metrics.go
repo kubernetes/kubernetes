@@ -100,7 +100,7 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 		backoff := wait.Backoff{
 			Duration: 10 * time.Second,
 			Factor:   1.2,
-			Steps:    3,
+			Steps:    21,
 		}
 
 		updatedStorageMetrics := make(map[string]int64)
@@ -113,7 +113,11 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 				return false, err
 			}
 			updatedStorageMetrics = getControllerStorageMetrics(updatedMetrics)
-			if len(updatedStorageMetrics) == 0 {
+			metricCount := len(updatedStorageMetrics)
+			// Usually a pod deletion does not mean immediate volume detach
+			// we will have to retry to verify volume_detach metrics
+			_, detachMetricFound := updatedStorageMetrics["volume_detach"]
+			if metricCount < 3 || !detachMetricFound {
 				framework.Logf("Volume metrics not collected yet, going to retry")
 				return false, nil
 			}
