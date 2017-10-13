@@ -3503,10 +3503,8 @@ run_kubectl_local_proxy_tests() {
 
   kube::log::status "Testing kubectl local proxy"
 
-  # Make sure the UI can be proxied
   start-proxy
-  check-curl-proxy-code /ui 307
-  check-curl-proxy-code /api/ui 404
+  check-curl-proxy-code /api/kubernetes 404
   check-curl-proxy-code /api/v1/namespaces 200
   if kube::test::if_supports_resource "${metrics}" ; then
     check-curl-proxy-code /metrics 200
@@ -3524,7 +3522,8 @@ run_kubectl_local_proxy_tests() {
 
   # Custom paths let you see everything.
   start-proxy /custom
-  check-curl-proxy-code /custom/ui 307
+  check-curl-proxy-code /custom/api/kubernetes 404
+  check-curl-proxy-code /custom/api/v1/namespaces 200
   if kube::test::if_supports_resource "${metrics}" ; then
     check-curl-proxy-code /custom/metrics 200
   fi
