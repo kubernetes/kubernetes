@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"
+	"github.com/juju/ratelimit"
 )
 
 type CertificateController struct {
@@ -61,8 +62,12 @@ func NewCertificateController(
 
 	cc := &CertificateController{
 		kubeClient: kubeClient,
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "certificate"),
-		handler:    handler,
+		queue: workqueue.NewNamedRateLimitingQueue(workqueue.NewMaxOfRateLimiter(
+			workqueue.NewItemExponentialFailureRateLimiter(200*time.Millisecond, 1000*time.Second),
+			// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
+			&workqueue.BucketRateLimiter{Bucket: ratelimit.NewBucketWithRate(float64(10), int64(100))},
+		), "certificate"),
+		handler: handler,
 	}
 
 	// Manage the addition/update of certificate requests
