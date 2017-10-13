@@ -51,8 +51,8 @@ function cleanup {
 # Delete temporary directories on exit
 trap cleanup EXIT
 
-mkdir ${RKT_DIR}
-mkdir ${ACI_DIR}
+mkdir -p ${RKT_DIR}
+mkdir -p ${ACI_DIR}
 
 # Download rkt
 cd ${DOWNLOAD_DIR}
