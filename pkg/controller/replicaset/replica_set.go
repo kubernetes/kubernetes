@@ -273,7 +273,7 @@ func (rsc *ReplicaSetController) getAffectedRSsByPodCreation(obj interface{}) []
 	if pod.DeletionTimestamp != nil {
 		// on a restart of the controller manager, it's possible a new pod shows up in a state that
 		// is already pending deletion. Prevent the pod from being a creation observation.
-		return getAffectedRSsByPodDeletion(pod)
+		return rsc.getAffectedRSsByPodDeletion(obj)
 	}
 
 	// If it has a ControllerRef, that's all that matters.
@@ -294,10 +294,9 @@ func (rsc *ReplicaSetController) getAffectedRSsByPodCreation(obj interface{}) []
 
 	// Otherwise, it's an orphan. Get a list of all matching ReplicaSets and sync
 	// them to see if anyone wants to adopt it.
-	glog.V(4).Infof("Orphan Pod %s created: %#v.", pod.Name, pod
+	glog.V(4).Infof("Orphan Pod %s created: %#v.", pod.Name, pod)
 	return rsc.getPodReplicaSets(pod)
 }
-
 
 // When a pod is updated, figure out what replica set/s manage it and wake them
 // up. If the labels of the pod have changed we need to awaken both the old
@@ -378,12 +377,13 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 // up. If the labels of the pod have changed we need to awaken both the old
 // and new replica set. old and cur must be *v1.Pod types.
 func (rsc *ReplicaSetController) getAffectedRSsByPodUpdate(old, cur interface{}) []*extensions.ReplicaSet {
+	var rss []*extensions.ReplicaSet
 	curPod := cur.(*v1.Pod)
 	oldPod := old.(*v1.Pod)
 	if curPod.ResourceVersion == oldPod.ResourceVersion {
 		// Periodic resync will send update events for all known pods.
 		// Two different versions of the same pod will always have different RVs.
-		return
+		return rss
 	}
 
 	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
@@ -393,15 +393,17 @@ func (rsc *ReplicaSetController) getAffectedRSsByPodUpdate(old, cur interface{})
 		// for modification of the deletion timestamp and expect an rs to create more replicas asap, not wait
 		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
 		// an rs never initiates a phase change, and so is never asleep waiting for the same.
-		rss := getAffectedRSsByPodDeletion(curPod)
+		rss = rsc.getAffectedRSsByPodDeletion(cur)
 		if labelChanged {
 			// we don't need to check the oldPod.DeletionTimestamp because DeletionTimestamp cannot be unset.
-			rss = append(rss, getAffectedRSsByPodDeletion(oldPod))
+			affectedRSs := rsc.getAffectedRSsByPodDeletion(old)
+			for _, rs := range affectedRSs {
+				rss = append(rss, rs)
+			}
 		}
 		return rss
 	}
 
-	var rss *[]extensions.ReplicaSet
 	curControllerRef := metav1.GetControllerOf(curPod)
 	oldControllerRef := metav1.GetControllerOf(oldPod)
 	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
@@ -433,7 +435,7 @@ func (rsc *ReplicaSetController) getAffectedRSsByPodUpdate(old, cur interface{})
 			// See https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info.
 			rsc.enqueueReplicaSetAfter(rs, (time.Duration(rs.Spec.MinReadySeconds)*time.Second)+time.Second)
 		}
-		return
+		return rss
 	}
 
 	// Otherwise, it's an orphan. If anything changed, sync matching controllers
@@ -444,12 +446,13 @@ func (rsc *ReplicaSetController) getAffectedRSsByPodUpdate(old, cur interface{})
 			return rss
 		}
 		glog.V(4).Infof("Orphan Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
-		rss = append(rss, matchingRSs)
+		for _, rs := range matchingRSs {
+			rss = append(rss, rs)
+		}
 	}
 
 	return rss
 }
-
 
 // When a pod is deleted, enqueue the replica set that manages the pod and update its expectations.
 // obj could be an *v1.Pod, or a DeletionFinalStateUnknown marker item.
@@ -489,6 +492,47 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 	glog.V(4).Infof("Pod %s/%s deleted through %v, timestamp %+v: %#v.", pod.Namespace, pod.Name, utilruntime.GetCaller(), pod.DeletionTimestamp, pod)
 	rsc.expectations.DeletionObserved(rsKey, controller.PodKey(pod))
 	rsc.enqueueReplicaSet(rs)
+}
+
+// When a pod is deleted, enqueue the replica set that manages the pod and update its expectations.
+// obj could be an *v1.Pod, or a DeletionFinalStateUnknown marker item.
+func (rsc *ReplicaSetController) getAffectedRSsByPodDeletion(obj interface{}) []*extensions.ReplicaSet {
+	var rss []*extensions.ReplicaSet
+	pod, ok := obj.(*v1.Pod)
+
+	// When a delete is dropped, the relist will notice a pod in the store not
+	// in the list, leading to the insertion of a tombstone object which contains
+	// the deleted key/value. Note that this value might be stale. If the pod
+	// changed labels the new ReplicaSet will not be woken up till the periodic resync.
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
+			return rss
+		}
+		pod, ok = tombstone.Obj.(*v1.Pod)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", obj))
+			return rss
+		}
+	}
+
+	controllerRef := metav1.GetControllerOf(pod)
+	if controllerRef == nil {
+		// No controller should care about orphans being deleted.
+		return rss
+	}
+	rs := rsc.resolveControllerRef(pod.Namespace, controllerRef)
+	if rs == nil {
+		return rss
+	}
+	rsKey, err := controller.KeyFunc(rs)
+	if err != nil {
+		return rss
+	}
+	glog.V(4).Infof("Pod %s/%s deleted through %v, timestamp %+v: %#v.", pod.Namespace, pod.Name, utilruntime.GetCaller(), pod.DeletionTimestamp, pod)
+	rsc.expectations.DeletionObserved(rsKey, controller.PodKey(pod))
+	return append(rss, rs)
 }
 
 // obj could be an *extensions.ReplicaSet, or a DeletionFinalStateUnknown marker item.
