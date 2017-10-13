@@ -16,6 +16,7 @@ docker_push(
     repository = "$(PROJECT)/kubemark",
     stamp = True,
     tag = "latest",
+    tags = ["manual"],
 )
 
 filegroup(
