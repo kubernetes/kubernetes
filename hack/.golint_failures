@@ -716,6 +716,7 @@ staging/src/k8s.io/client-go/plugin/pkg/client/auth/oidc
 staging/src/k8s.io/client-go/rest
 staging/src/k8s.io/client-go/rest/fake
 staging/src/k8s.io/client-go/scale
+staging/src/k8s.io/client-go/scale/fake
 staging/src/k8s.io/client-go/scale/scheme
 staging/src/k8s.io/client-go/scale/scheme/autoscalingv1
 staging/src/k8s.io/client-go/scale/scheme/extensionsint
