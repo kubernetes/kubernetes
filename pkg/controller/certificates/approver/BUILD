@@ -28,6 +28,7 @@ go_library(
         "//pkg/apis/certificates/v1beta1:go_default_library",
         "//pkg/controller/certificates:go_default_library",
         "//pkg/features:go_default_library",
+        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/authorization/v1beta1:go_default_library",
         "//vendor/k8s.io/api/certificates/v1beta1:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/feature:go_default_library",

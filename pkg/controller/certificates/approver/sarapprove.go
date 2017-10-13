@@ -23,6 +23,8 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/golang/glog"
+
 	authorization "k8s.io/api/authorization/v1beta1"
 	capi "k8s.io/api/certificates/v1beta1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -113,9 +115,9 @@ func (a *sarApprover) handle(csr *capi.CertificateSigningRequest) error {
 			return nil
 		}
 	}
-
+	// If authorize fail, should not retry
 	if len(tried) != 0 {
-		return fmt.Errorf("recognized csr %q as %v but subject access review was not approved", csr.Name, tried)
+		glog.Infof("recognized csr %q as %v but subject access review was not approved", csr.Name, tried)
 	}
 
 	return nil
