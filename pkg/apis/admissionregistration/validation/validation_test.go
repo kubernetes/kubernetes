@@ -480,7 +480,7 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 						}(),
 					},
 				}),
-			expectedError: `failurePolicy: Unsupported value: "Fail": supported values: Ignore`,
+			expectedError: `failurePolicy: Unsupported value: "Fail": supported values: "Ignore"`,
 		},
 	}
 	for _, test := range tests {

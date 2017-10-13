@@ -214,6 +214,25 @@ function create-and-upload-hollow-node-image {
   echo "Created and uploaded the kubemark hollow-node image to docker registry."
 }
 
+# Use bazel rule to create a docker image for hollow-node and upload
+# it to the appropriate docker container registry for the cloud provider.
+function create-and-upload-hollow-node-image-bazel {
+  RETRIES=3
+  for attempt in $(seq 1 ${RETRIES}); do
+    if ! bazel run //cluster/images/kubemark:push --define PROJECT="${PROJECT}"; then
+      if [[ $((attempt)) -eq "${RETRIES}" ]]; then
+        echo "${color_red}Image push failed. Exiting.${color_norm}"
+        exit 1
+      fi
+      echo -e "${color_yellow}Make attempt $(($attempt)) failed. Retrying.${color_norm}" >& 2
+      sleep $(($attempt * 5))
+    else
+      break
+    fi
+  done
+  echo "Created and uploaded the kubemark hollow-node image to docker registry."
+}
+
 # Generate secret and configMap for the hollow-node pods to work, prepare
 # manifests of the hollow-node and heapster replication controllers from
 # templates, and finally create these resources through kubectl.
@@ -439,7 +458,11 @@ start-master-components
 # Setup for hollow-nodes.
 echo ""
 echo -e "${color_yellow}STARTING SETUP FOR HOLLOW-NODES${color_norm}"
-create-and-upload-hollow-node-image
+if [[ "${KUBEMARK_BAZEL_BUILD:-}" =~ ^[yY]$ ]]; then
+  create-and-upload-hollow-node-image-bazel
+else
+  create-and-upload-hollow-node-image
+fi
 create-kube-hollow-node-resources
 wait-for-hollow-nodes-to-run-or-timeout
 

@@ -63,7 +63,7 @@ func AllowBootstrapTokensToPostCSRs(client clientset.Interface, k8sVersion *vers
 		Subjects: []rbac.Subject{
 			{
 				Kind: rbac.GroupKind,
-				Name: constants.GetNodeBootstrapTokenAuthGroup(k8sVersion),
+				Name: constants.NodeBootstrapTokenAuthGroup,
 			},
 		},
 	})
@@ -87,7 +87,7 @@ func AutoApproveNodeBootstrapTokens(client clientset.Interface, k8sVersion *vers
 		Subjects: []rbac.Subject{
 			{
 				Kind: "Group",
-				Name: constants.GetNodeBootstrapTokenAuthGroup(k8sVersion),
+				Name: constants.NodeBootstrapTokenAuthGroup,
 			},
 		},
 	})

@@ -24,7 +24,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
@@ -112,8 +111,10 @@ func getObjectKind(object interface{}) (schema.GroupVersionKind, error) {
 	if _, ok := apiVersion.(string); !ok {
 		return schema.GroupVersionKind{}, errors.New("apiVersion isn't string type")
 	}
-	version := apiutil.GetVersion(apiVersion.(string))
-	group := apiutil.GetGroup(apiVersion.(string))
+	gv, err := schema.ParseGroupVersion(apiVersion.(string))
+	if err != nil {
+		return schema.GroupVersionKind{}, err
+	}
 	kind := fields["kind"]
 	if kind == nil {
 		return schema.GroupVersionKind{}, errors.New("kind not set")
@@ -122,5 +123,5 @@ func getObjectKind(object interface{}) (schema.GroupVersionKind, error) {
 		return schema.GroupVersionKind{}, errors.New("kind isn't string type")
 	}
 
-	return schema.GroupVersionKind{Group: group, Version: version, Kind: kind.(string)}, nil
+	return schema.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind.(string)}, nil
 }

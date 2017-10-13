@@ -174,12 +174,34 @@ func (pfct preflightCheckTest) Check() (warning, errors []error) {
 
 func TestRunInitMasterChecks(t *testing.T) {
 	var tests = []struct {
+		name     string
 		cfg      *kubeadmapi.MasterConfiguration
 		expected bool
 	}{
-		{
+		{name: "Test valid advertised address",
 			cfg: &kubeadmapi.MasterConfiguration{
 				API: kubeadmapi.API{AdvertiseAddress: "foo"},
+			},
+			expected: false,
+		},
+		{
+			name: "Test CA file exists if specfied",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{CAFile: "/foo"},
+			},
+			expected: false,
+		},
+		{
+			name: "Test Cert file exists if specfied",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{CertFile: "/foo"},
+			},
+			expected: false,
+		},
+		{
+			name: "Test Key file exists if specfied",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{CertFile: "/foo"},
 			},
 			expected: false,
 		},
@@ -189,9 +211,10 @@ func TestRunInitMasterChecks(t *testing.T) {
 		actual := RunInitMasterChecks(rt.cfg)
 		if (actual == nil) != rt.expected {
 			t.Errorf(
-				"failed RunInitMasterChecks:\n\texpected: %t\n\t  actual: %t",
+				"failed RunInitMasterChecks:\n\texpected: %t\n\t  actual: %t\n\t error: %v",
 				rt.expected,
-				(actual != nil),
+				(actual == nil),
+				actual,
 			)
 		}
 	}

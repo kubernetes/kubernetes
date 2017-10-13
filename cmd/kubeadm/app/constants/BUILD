@@ -32,5 +32,4 @@ go_test(
     name = "go_default_test",
     srcs = ["constants_test.go"],
     library = ":go_default_library",
-    deps = ["//pkg/util/version:go_default_library"],
 )

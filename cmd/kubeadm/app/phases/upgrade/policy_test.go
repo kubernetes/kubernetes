@@ -64,7 +64,7 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			newK8sVersion:         "v1.8.3",
 			expectedSkippableErrs: 1,
 		},
-		{ // new version must be higher than v1.7.0
+		{ // new version must be higher than v1.8.0
 			vg: &fakeVersionGetter{
 				clusterVersion: "v1.8.3",
 				kubeletVersion: "v1.8.3",

@@ -18,8 +18,6 @@ package constants
 
 import (
 	"testing"
-
-	"k8s.io/kubernetes/pkg/util/version"
 )
 
 func TestGetStaticPodDirectory(t *testing.T) {
@@ -106,51 +104,6 @@ func TestAddSelfHostedPrefix(t *testing.T) {
 		if actual != rt.expected {
 			t.Errorf(
 				"failed AddSelfHostedPrefix:\n\texpected: %s\n\t  actual: %s",
-				rt.expected,
-				actual,
-			)
-		}
-	}
-}
-
-func TestGetNodeBootstrapTokenAuthGroup(t *testing.T) {
-	var tests = []struct {
-		k8sVersion, expected string
-	}{
-		{
-			k8sVersion: "v1.7.0",
-			expected:   "system:bootstrappers",
-		},
-		{
-			k8sVersion: "v1.7.8",
-			expected:   "system:bootstrappers",
-		},
-		{
-			k8sVersion: "v1.8.0-alpha.3",
-			expected:   "system:bootstrappers",
-		},
-		{
-			k8sVersion: "v1.8.0-beta.0",
-			expected:   "system:bootstrappers:kubeadm:default-node-token",
-		},
-		{
-			k8sVersion: "v1.8.0-rc.1",
-			expected:   "system:bootstrappers:kubeadm:default-node-token",
-		},
-		{
-			k8sVersion: "v1.8.0",
-			expected:   "system:bootstrappers:kubeadm:default-node-token",
-		},
-		{
-			k8sVersion: "v1.8.9",
-			expected:   "system:bootstrappers:kubeadm:default-node-token",
-		},
-	}
-	for _, rt := range tests {
-		actual := GetNodeBootstrapTokenAuthGroup(version.MustParseSemantic(rt.k8sVersion))
-		if actual != rt.expected {
-			t.Errorf(
-				"failed GetNodeBootstrapTokenAuthGroup:\n\texpected: %s\n\t  actual: %s",
 				rt.expected,
 				actual,
 			)

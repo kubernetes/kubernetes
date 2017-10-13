@@ -32,6 +32,10 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+// defaultRequestTimeout is set for all webhook request. This is the absolute
+// timeout of the HTTP request, including reading the response body.
+const defaultRequestTimeout = 30 * time.Second
+
 type GenericWebhook struct {
 	RestClient     *rest.RESTClient
 	initialBackoff time.Duration
@@ -39,6 +43,10 @@ type GenericWebhook struct {
 
 // NewGenericWebhook creates a new GenericWebhook from the provided kubeconfig file.
 func NewGenericWebhook(registry *registered.APIRegistrationManager, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff time.Duration) (*GenericWebhook, error) {
+	return newGenericWebhook(registry, codecFactory, kubeConfigFile, groupVersions, initialBackoff, defaultRequestTimeout)
+}
+
+func newGenericWebhook(registry *registered.APIRegistrationManager, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff, requestTimeout time.Duration) (*GenericWebhook, error) {
 	for _, groupVersion := range groupVersions {
 		if !registry.IsEnabledVersion(groupVersion) {
 			return nil, fmt.Errorf("webhook plugin requires enabling extension resource: %s", groupVersion)
@@ -53,6 +61,14 @@ func NewGenericWebhook(registry *registered.APIRegistrationManager, codecFactory
 	if err != nil {
 		return nil, err
 	}
+
+	// Kubeconfigs can't set a timeout, this can only be set through a command line flag.
+	//
+	// https://github.com/kubernetes/client-go/blob/master/tools/clientcmd/overrides.go
+	//
+	// Set this to something reasonable so request to webhooks don't hang forever.
+	clientConfig.Timeout = requestTimeout
+
 	codec := codecFactory.LegacyCodec(groupVersions...)
 	clientConfig.ContentConfig.NegotiatedSerializer = runtimeserializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 
@@ -60,8 +76,6 @@ func NewGenericWebhook(registry *registered.APIRegistrationManager, codecFactory
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO(ericchiang): Can we ensure remote service is reachable?
 
 	return &GenericWebhook{restClient, initialBackoff}, nil
 }
