@@ -4165,6 +4165,14 @@ run_kubectl_all_namespace_tests() {
   # Post-condition: valid-pod doesn't exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
+  ### Verify flag all-namespaces is ignored for rootScoped resources
+  # Pre-condition: node exists
+  kube::test::get_object_assert nodes "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:'
+  # Command
+  output_message=$(kubectl get nodes --all-namespaces 2>&1)
+  # Post-condition: output with no NAMESPACE field
+  kube::test::if_has_not_string "${output_message}" "NAMESPACE"
+
   set +o nounset
   set +o errexit
 }
@@ -4846,7 +4854,9 @@ runTests() {
   ############################
 
   if kube::test::if_supports_resource "${pods}" ; then
-    record_command run_kubectl_all_namespace_tests
+    if kube::test::if_supports_resource "${nodes}" ; then
+      record_command run_kubectl_all_namespace_tests
+    fi
   fi
 
   ################
