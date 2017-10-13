@@ -1474,6 +1474,10 @@ func (kl *Kubelet) GetClusterDNS(pod *v1.Pod) ([]string, []string, bool, error) 
 //
 // If any step of this workflow errors, the error is returned, and is repeated
 // on the next syncPod call.
+//
+// This operation writes all events that are dispatched in order to provide
+// the most accurate information possible about an error situation to aid debugging.
+// Callers should not throw an event if this operation returns an error.
 func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	// pull out the required options
 	pod := o.pod
@@ -1491,6 +1495,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		kl.statusManager.SetPodStatus(pod, apiPodStatus)
 		// we kill the pod with the specified grace period since this is a termination
 		if err := kl.killPod(pod, nil, podStatus, killPodOptions.PodTerminationGracePeriodSecondsOverride); err != nil {
+			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
 			// there was an error killing the pod, so we return that error directly
 			utilruntime.HandleError(err)
 			return err
@@ -1557,6 +1562,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	if !runnable.Admit || pod.DeletionTimestamp != nil || apiPodStatus.Phase == v1.PodFailed {
 		var syncErr error
 		if err := kl.killPod(pod, nil, podStatus, nil); err != nil {
+			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
 			syncErr = fmt.Errorf("error killing pod: %v", err)
 			utilruntime.HandleError(syncErr)
 		} else {
@@ -1571,6 +1577,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 
 	// If the network plugin is not ready, only start the pod if it uses the host network
 	if rs := kl.runtimeState.networkErrors(); len(rs) != 0 && !kubecontainer.IsHostNetworkPod(pod) {
+		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.NetworkNotReady, "network is not ready: %v", rs)
 		return fmt.Errorf("network is not ready: %v", rs)
 	}
 
@@ -1613,6 +1620,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 					glog.V(2).Infof("Failed to update QoS cgroups while syncing pod: %v", err)
 				}
 				if err := pcm.EnsureExists(pod); err != nil {
+					kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToCreatePodContainer, "unable to ensure pod container exists: %v", err)
 					return fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
 				}
 			}
@@ -1650,6 +1658,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 
 	// Make data directories for the pod
 	if err := kl.makePodDataDirs(pod); err != nil {
+		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToMakePodDataDirectories, "error making pod data directories: %v", err)
 		glog.Errorf("Unable to make pod data directories for pod %q: %v", format.Pod(pod), err)
 		return err
 	}
@@ -1671,6 +1680,8 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	result := kl.containerRuntime.SyncPod(pod, apiPodStatus, podStatus, pullSecrets, kl.backOff)
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
+		// Do not record an event here, as we keep all event logging for sync pod failures
+		// local to container runtime so we get better errors
 		return err
 	}
 
