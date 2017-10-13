@@ -33,7 +33,6 @@ type ServiceCommonGeneratorV1 struct {
 	TCP          []string
 	Type         v1.ServiceType
 	ClusterIP    string
-	NodePort     int
 	ExternalName string
 }
 
@@ -65,7 +64,6 @@ func (ServiceNodePortGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
 		{"tcp", true},
-		{"nodeport", true},
 	}
 }
 func (ServiceLoadBalancerGeneratorV1) ParamNames() []GeneratorParam {
@@ -219,7 +217,7 @@ func (s ServiceCommonGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 			Port:       port,
 			TargetPort: targetPort,
 			Protocol:   v1.Protocol("TCP"),
-			NodePort:   int32(s.NodePort),
+			NodePort:   0,
 		})
 	}
 
