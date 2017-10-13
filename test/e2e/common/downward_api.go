@@ -29,7 +29,10 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var hostIPVersion = utilversion.MustParseSemantic("v1.8.0")
+var (
+	hostIPVersion = utilversion.MustParseSemantic("v1.8.0")
+	podUIDVersion = utilversion.MustParseSemantic("v1.8.0")
+)
 
 var _ = framework.KubeDescribe("Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
@@ -189,7 +192,7 @@ var _ = framework.KubeDescribe("Downward API", func() {
 	})
 
 	It("should provide pod UID as env vars [Conformance]", func() {
-		framework.SkipUnlessServerVersionGTE(hostIPVersion, f.ClientSet.Discovery())
+		framework.SkipUnlessServerVersionGTE(podUIDVersion, f.ClientSet.Discovery())
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
