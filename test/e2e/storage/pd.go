@@ -46,6 +46,7 @@ const (
 	nodeStatusTimeout   = 10 * time.Minute
 	nodeStatusPollTime  = 1 * time.Second
 	maxReadRetry        = 3
+	minNodes            = 2
 )
 
 var _ = SIGDescribe("Pod Disks", func() {
@@ -59,355 +60,256 @@ var _ = SIGDescribe("Pod Disks", func() {
 	f := framework.NewDefaultFramework("pod-disks")
 
 	BeforeEach(func() {
-		framework.SkipUnlessNodeCountIsAtLeast(2)
+		framework.SkipUnlessNodeCountIsAtLeast(minNodes)
 
 		podClient = f.ClientSet.Core().Pods(f.Namespace.Name)
 		nodeClient = f.ClientSet.Core().Nodes()
 		nodes = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-
-		Expect(len(nodes.Items)).To(BeNumerically(">=", 2), "Requires at least 2 nodes")
-
+		Expect(len(nodes.Items)).To(BeNumerically(">=", minNodes), fmt.Sprintf("Requires at least %d nodes", minNodes))
 		host0Name = types.NodeName(nodes.Items[0].ObjectMeta.Name)
 		host1Name = types.NodeName(nodes.Items[1].ObjectMeta.Name)
 
 		mathrand.Seed(time.Now().UTC().UnixNano())
 	})
 
-	It("should schedule a pod w/ a RW PD, ungracefully remove it, then schedule it on another host [Slow]", func() {
-		framework.SkipUnlessProviderIs("gce", "gke", "aws")
-
-		By("creating PD")
-		diskName, err := framework.CreatePDWithRetry()
-		framework.ExpectNoError(err, "Error creating PD")
-
-		host0Pod := testPDPod([]string{diskName}, host0Name, false /* readOnly */, 1 /* numContainers */)
-		host1Pod := testPDPod([]string{diskName}, host1Name, false /* readOnly */, 1 /* numContainers */)
-		containerName := "mycontainer"
-
-		defer func() {
-			// Teardown pods, PD. Ignore errors.
-			// Teardown should do nothing unless test failed.
-			By("cleaning up PD-RW test environment")
-			podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0))
-			podClient.Delete(host1Pod.Name, metav1.NewDeleteOptions(0))
-			detachAndDeletePDs(diskName, []types.NodeName{host0Name, host1Name})
-		}()
-
-		By("submitting host0Pod to kubernetes")
-		_, err = podClient.Create(host0Pod)
-		framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
-
-		framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
-
-		testFile := "/testpd1/tracker"
-		testFileContents := fmt.Sprintf("%v", mathrand.Int())
-
-		framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
-		framework.Logf("Wrote value: %v", testFileContents)
-
-		// Verify that disk shows up for in node 1's VolumeInUse list
-		framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* shouldExist */))
-
-		By("deleting host0Pod")
-		// Delete pod with 0 grace period
-		framework.ExpectNoError(podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0)), "Failed to delete host0Pod")
-
-		By("submitting host1Pod to kubernetes")
-		_, err = podClient.Create(host1Pod)
-		framework.ExpectNoError(err, "Failed to create host1Pod")
-
-		framework.ExpectNoError(f.WaitForPodRunningSlow(host1Pod.Name))
-
-		verifyPDContentsViaContainer(f, host1Pod.Name, containerName, map[string]string{testFile: testFileContents})
-
-		// Verify that disk is removed from node 1's VolumeInUse list
-		framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, false /* shouldExist */))
-
-		By("deleting host1Pod")
-		framework.ExpectNoError(podClient.Delete(host1Pod.Name, metav1.NewDeleteOptions(0)), "Failed to delete host1Pod")
-
-		By("Test completed successfully, waiting for PD to safely detach")
-		waitForPDDetach(diskName, host0Name)
-		waitForPDDetach(diskName, host1Name)
-
-		return
-	})
-
-	It("Should schedule a pod w/ a RW PD, gracefully remove it, then schedule it on another host [Slow]", func() {
-		framework.SkipUnlessProviderIs("gce", "gke", "aws")
-
-		By("creating PD")
-		diskName, err := framework.CreatePDWithRetry()
-		framework.ExpectNoError(err, "Error creating PD")
-
-		host0Pod := testPDPod([]string{diskName}, host0Name, false /* readOnly */, 1 /* numContainers */)
-		host1Pod := testPDPod([]string{diskName}, host1Name, false /* readOnly */, 1 /* numContainers */)
-		containerName := "mycontainer"
-
-		defer func() {
-			// Teardown pods, PD. Ignore errors.
-			// Teardown should do nothing unless test failed.
-			By("cleaning up PD-RW test environment")
-			podClient.Delete(host0Pod.Name, &metav1.DeleteOptions{})
-			podClient.Delete(host1Pod.Name, &metav1.DeleteOptions{})
-			detachAndDeletePDs(diskName, []types.NodeName{host0Name, host1Name})
-		}()
-
-		By("submitting host0Pod to kubernetes")
-		_, err = podClient.Create(host0Pod)
-		framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
-
-		framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
-
-		testFile := "/testpd1/tracker"
-		testFileContents := fmt.Sprintf("%v", mathrand.Int())
-
-		framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
-		framework.Logf("Wrote value: %v", testFileContents)
-
-		// Verify that disk shows up for in node 1's VolumeInUse list
-		framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* shouldExist */))
-
-		By("deleting host0Pod")
-		// Delete pod with default grace period 30s
-		framework.ExpectNoError(podClient.Delete(host0Pod.Name, &metav1.DeleteOptions{}), "Failed to delete host0Pod")
-
-		By("submitting host1Pod to kubernetes")
-		_, err = podClient.Create(host1Pod)
-		framework.ExpectNoError(err, "Failed to create host1Pod")
-
-		framework.ExpectNoError(f.WaitForPodRunningSlow(host1Pod.Name))
-
-		verifyPDContentsViaContainer(f, host1Pod.Name, containerName, map[string]string{testFile: testFileContents})
-
-		// Verify that disk is removed from node 1's VolumeInUse list
-		framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, false /* shouldExist */))
-
-		By("deleting host1Pod")
-		framework.ExpectNoError(podClient.Delete(host1Pod.Name, &metav1.DeleteOptions{}), "Failed to delete host1Pod")
-
-		By("Test completed successfully, waiting for PD to safely detach")
-		waitForPDDetach(diskName, host0Name)
-		waitForPDDetach(diskName, host1Name)
-
-		return
-	})
-
-	It("should schedule a pod w/ a readonly PD on two hosts, then remove both ungracefully. [Slow]", func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
-
-		By("creating PD")
-		diskName, err := framework.CreatePDWithRetry()
-		framework.ExpectNoError(err, "Error creating PD")
-
-		rwPod := testPDPod([]string{diskName}, host0Name, false /* readOnly */, 1 /* numContainers */)
-		host0ROPod := testPDPod([]string{diskName}, host0Name, true /* readOnly */, 1 /* numContainers */)
-		host1ROPod := testPDPod([]string{diskName}, host1Name, true /* readOnly */, 1 /* numContainers */)
-
-		defer func() {
-			By("cleaning up PD-RO test environment")
-			// Teardown pods, PD. Ignore errors.
-			// Teardown should do nothing unless test failed.
-			podClient.Delete(rwPod.Name, metav1.NewDeleteOptions(0))
-			podClient.Delete(host0ROPod.Name, metav1.NewDeleteOptions(0))
-			podClient.Delete(host1ROPod.Name, metav1.NewDeleteOptions(0))
-			detachAndDeletePDs(diskName, []types.NodeName{host0Name, host1Name})
-		}()
-
-		By("submitting rwPod to ensure PD is formatted")
-		_, err = podClient.Create(rwPod)
-		framework.ExpectNoError(err, "Failed to create rwPod")
-		framework.ExpectNoError(f.WaitForPodRunningSlow(rwPod.Name))
-		// Delete pod with 0 grace period
-		framework.ExpectNoError(podClient.Delete(rwPod.Name, metav1.NewDeleteOptions(0)), "Failed to delete host0Pod")
-		framework.ExpectNoError(waitForPDDetach(diskName, host0Name))
-
-		By("submitting host0ROPod to kubernetes")
-		_, err = podClient.Create(host0ROPod)
-		framework.ExpectNoError(err, "Failed to create host0ROPod")
-
-		By("submitting host1ROPod to kubernetes")
-		_, err = podClient.Create(host1ROPod)
-		framework.ExpectNoError(err, "Failed to create host1ROPod")
-
-		framework.ExpectNoError(f.WaitForPodRunningSlow(host0ROPod.Name))
-
-		framework.ExpectNoError(f.WaitForPodRunningSlow(host1ROPod.Name))
-
-		By("deleting host0ROPod")
-		framework.ExpectNoError(podClient.Delete(host0ROPod.Name, metav1.NewDeleteOptions(0)), "Failed to delete host0ROPod")
-
-		By("deleting host1ROPod")
-		framework.ExpectNoError(podClient.Delete(host1ROPod.Name, metav1.NewDeleteOptions(0)), "Failed to delete host1ROPod")
-
-		By("Test completed successfully, waiting for PD to safely detach")
-		waitForPDDetach(diskName, host0Name)
-		waitForPDDetach(diskName, host1Name)
-	})
-
-	It("Should schedule a pod w/ a readonly PD on two hosts, then remove both gracefully. [Slow]", func() {
-		framework.SkipUnlessProviderIs("gce", "gke")
-
-		By("creating PD")
-		diskName, err := framework.CreatePDWithRetry()
-		framework.ExpectNoError(err, "Error creating PD")
-
-		rwPod := testPDPod([]string{diskName}, host0Name, false /* readOnly */, 1 /* numContainers */)
-		host0ROPod := testPDPod([]string{diskName}, host0Name, true /* readOnly */, 1 /* numContainers */)
-		host1ROPod := testPDPod([]string{diskName}, host1Name, true /* readOnly */, 1 /* numContainers */)
-
-		defer func() {
-			By("cleaning up PD-RO test environment")
-			// Teardown pods, PD. Ignore errors.
-			// Teardown should do nothing unless test failed.
-			podClient.Delete(rwPod.Name, &metav1.DeleteOptions{})
-			podClient.Delete(host0ROPod.Name, &metav1.DeleteOptions{})
-			podClient.Delete(host1ROPod.Name, &metav1.DeleteOptions{})
-			detachAndDeletePDs(diskName, []types.NodeName{host0Name, host1Name})
-		}()
-
-		By("submitting rwPod to ensure PD is formatted")
-		_, err = podClient.Create(rwPod)
-		framework.ExpectNoError(err, "Failed to create rwPod")
-		framework.ExpectNoError(f.WaitForPodRunningSlow(rwPod.Name))
-		// Delete pod with default grace period 30s
-		framework.ExpectNoError(podClient.Delete(rwPod.Name, &metav1.DeleteOptions{}), "Failed to delete host0Pod")
-		framework.ExpectNoError(waitForPDDetach(diskName, host0Name))
-
-		By("submitting host0ROPod to kubernetes")
-		_, err = podClient.Create(host0ROPod)
-		framework.ExpectNoError(err, "Failed to create host0ROPod")
-
-		By("submitting host1ROPod to kubernetes")
-		_, err = podClient.Create(host1ROPod)
-		framework.ExpectNoError(err, "Failed to create host1ROPod")
-
-		framework.ExpectNoError(f.WaitForPodRunningSlow(host0ROPod.Name))
-
-		framework.ExpectNoError(f.WaitForPodRunningSlow(host1ROPod.Name))
-
-		By("deleting host0ROPod")
-		framework.ExpectNoError(podClient.Delete(host0ROPod.Name, &metav1.DeleteOptions{}), "Failed to delete host0ROPod")
-
-		By("deleting host1ROPod")
-		framework.ExpectNoError(podClient.Delete(host1ROPod.Name, &metav1.DeleteOptions{}), "Failed to delete host1ROPod")
-
-		By("Test completed successfully, waiting for PD to safely detach")
-		waitForPDDetach(diskName, host0Name)
-		waitForPDDetach(diskName, host1Name)
-	})
-
-	It("should schedule a pod w/ a RW PD shared between multiple containers, write to PD, delete pod, verify contents, and repeat in rapid succession [Slow]", func() {
-		framework.SkipUnlessProviderIs("gce", "gke", "aws")
-
-		By("creating PD")
-		diskName, err := framework.CreatePDWithRetry()
-		framework.ExpectNoError(err, "Error creating PD")
-		numContainers := 4
-		var host0Pod *v1.Pod
-
-		defer func() {
-			By("cleaning up PD-RW test environment")
-			// Teardown pods, PD. Ignore errors.
-			// Teardown should do nothing unless test failed.
-			if host0Pod != nil {
-				podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0))
-			}
-			detachAndDeletePDs(diskName, []types.NodeName{host0Name})
-		}()
-
-		fileAndContentToVerify := make(map[string]string)
-		for i := 0; i < 3; i++ {
-			framework.Logf("PD Read/Writer Iteration #%v", i)
-			By("submitting host0Pod to kubernetes")
-			host0Pod = testPDPod([]string{diskName}, host0Name, false /* readOnly */, numContainers)
-			_, err = podClient.Create(host0Pod)
-			framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
-
-			framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
-
-			// randomly select a container and read/verify pd contents from it
-			containerName := fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
-			verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
-
-			// Randomly select a container to write a file to PD from
-			containerName = fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
-			testFile := fmt.Sprintf("/testpd1/tracker%v", i)
-			testFileContents := fmt.Sprintf("%v", mathrand.Int())
-			fileAndContentToVerify[testFile] = testFileContents
-			framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
-			framework.Logf("Wrote value: \"%v\" to PD %q from pod %q container %q", testFileContents, diskName, host0Pod.Name, containerName)
-
-			// Randomly select a container and read/verify pd contents from it
-			containerName = fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
-			verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
-
-			By("deleting host0Pod")
-			framework.ExpectNoError(podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0)), "Failed to delete host0Pod")
+	Context("schedule a pod w/ a RW PD, delete pod, schedule it on another host, verify PD contents [Slow]", func() {
+		type testT struct {
+			descr     string                // It description
+			deleteOpt *metav1.DeleteOptions // pod delete option
+		}
+		tests := []testT{
+			{
+				descr:     "immediate (0)",
+				deleteOpt: metav1.NewDeleteOptions(0),
+			},
+			{
+				descr:     "the default (30s)",
+				deleteOpt: &metav1.DeleteOptions{}, // default per provider
+			},
 		}
 
-		By("Test completed successfully, waiting for PD to safely detach")
-		waitForPDDetach(diskName, host0Name)
+		for _, t := range tests {
+			It(fmt.Sprintf("when pod delete grace period is %s", t.descr), func() {
+				framework.SkipUnlessProviderIs("gce", "gke", "aws")
+
+				By("creating PD")
+				diskName, err := framework.CreatePDWithRetry()
+				framework.ExpectNoError(err, "Error creating PD")
+
+				By("creating host0Pod on node0")
+				host0Pod := testPDPod([]string{diskName}, host0Name, false /* readOnly */, 1 /* numContainers */)
+				host1Pod := testPDPod([]string{diskName}, host1Name, false /* readOnly */, 1 /* numContainers */)
+
+				podDelOpt := t.deleteOpt
+				defer func() {
+					// Teardown should do nothing unless test failed
+					By("defer: cleaning up PD-RW test environment")
+					framework.Logf("defer cleanup errors can usually be ignored")
+					podClient.Delete(host0Pod.Name, podDelOpt)
+					podClient.Delete(host1Pod.Name, podDelOpt)
+					detachAndDeletePDs(diskName, []types.NodeName{host0Name, host1Name})
+				}()
+
+				_, err = podClient.Create(host0Pod)
+				framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
+				framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
+				framework.Logf(fmt.Sprintf("host0Pod: %q, node0: %q", host0Pod.Name, host0Name))
+
+				By("writing content to host0Pod on node0")
+				containerName := "mycontainer"
+				testFile := "/testpd1/tracker"
+				testFileContents := fmt.Sprintf("%v", mathrand.Int())
+				framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
+				framework.Logf(fmt.Sprintf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name))
+
+				By("verifying PD is present in node0's VolumeInUse list")
+				framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* shouldExist */))
+
+				By("deleting host0Pod")
+				framework.ExpectNoError(podClient.Delete(host0Pod.Name, podDelOpt), "Failed to delete host0Pod")
+				framework.Logf(fmt.Sprintf("deleted host0Pod %q", host0Pod.Name))
+
+				By("creating host1Pod on node1")
+				_, err = podClient.Create(host1Pod)
+				framework.ExpectNoError(err, "Failed to create host1Pod")
+				framework.ExpectNoError(f.WaitForPodRunningSlow(host1Pod.Name))
+				framework.Logf(fmt.Sprintf("host1Pod: %q, node1: %q", host1Pod.Name, host1Name))
+
+				By("verifying PD contents in host1Pod")
+				verifyPDContentsViaContainer(f, host1Pod.Name, containerName, map[string]string{testFile: testFileContents})
+				framework.Logf(fmt.Sprintf("verified PD contents in pod %q", host1Pod.Name))
+
+				By("verifying PD is removed from node1")
+				framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, false /* shouldExist */))
+				framework.Logf(fmt.Sprintf("PD %q removed from node %q's VolumeInUse list", diskName, host1Pod.Name))
+
+				By("deleting host1Pod")
+				framework.ExpectNoError(podClient.Delete(host1Pod.Name, podDelOpt), "Failed to delete host1Pod")
+				framework.Logf(fmt.Sprintf("deleted host1Pod %q", host1Pod.Name))
+
+				By("Test completed successfully, waiting for PD to detach from both nodes")
+				waitForPDDetach(diskName, host0Name)
+				waitForPDDetach(diskName, host1Name)
+			})
+		}
 	})
 
-	It("should schedule a pod w/two RW PDs both mounted to one container, write to PD, verify contents, delete pod, recreate pod, verify contents, and repeat in rapid succession [Slow]", func() {
-		framework.SkipUnlessProviderIs("gce", "gke", "aws")
-
-		By("creating PD1")
-		disk1Name, err := framework.CreatePDWithRetry()
-		framework.ExpectNoError(err, "Error creating PD1")
-		By("creating PD2")
-		disk2Name, err := framework.CreatePDWithRetry()
-		framework.ExpectNoError(err, "Error creating PD2")
-		var host0Pod *v1.Pod
-
-		defer func() {
-			By("cleaning up PD-RW test environment")
-			// Teardown pods, PD. Ignore errors.
-			// Teardown should do nothing unless test failed.
-			if host0Pod != nil {
-				podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0))
-			}
-			detachAndDeletePDs(disk1Name, []types.NodeName{host0Name})
-			detachAndDeletePDs(disk2Name, []types.NodeName{host0Name})
-		}()
-
-		containerName := "mycontainer"
-		fileAndContentToVerify := make(map[string]string)
-		for i := 0; i < 3; i++ {
-			framework.Logf("PD Read/Writer Iteration #%v", i)
-			By("submitting host0Pod to kubernetes")
-			host0Pod = testPDPod([]string{disk1Name, disk2Name}, host0Name, false /* readOnly */, 1 /* numContainers */)
-			_, err = podClient.Create(host0Pod)
-			framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
-
-			framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
-
-			// Read/verify pd contents for both disks from container
-			verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
-
-			// Write a file to both PDs from container
-			testFilePD1 := fmt.Sprintf("/testpd1/tracker%v", i)
-			testFilePD2 := fmt.Sprintf("/testpd2/tracker%v", i)
-			testFilePD1Contents := fmt.Sprintf("%v", mathrand.Int())
-			testFilePD2Contents := fmt.Sprintf("%v", mathrand.Int())
-			fileAndContentToVerify[testFilePD1] = testFilePD1Contents
-			fileAndContentToVerify[testFilePD2] = testFilePD2Contents
-			framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFilePD1, testFilePD1Contents))
-			framework.Logf("Wrote value: \"%v\" to PD1 (%q) from pod %q container %q", testFilePD1Contents, disk1Name, host0Pod.Name, containerName)
-			framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFilePD2, testFilePD2Contents))
-			framework.Logf("Wrote value: \"%v\" to PD2 (%q) from pod %q container %q", testFilePD2Contents, disk2Name, host0Pod.Name, containerName)
-
-			// Read/verify pd contents for both disks from container
-			verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
-
-			By("deleting host0Pod")
-			framework.ExpectNoError(podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0)), "Failed to delete host0Pod")
+	Context("schedule a pod w/ a readonly PD on two hosts, then delete both pods. [Slow]", func() {
+		type testT struct {
+			descr     string                // It description
+			deleteOpt *metav1.DeleteOptions // pod delete option
+		}
+		tests := []testT{
+			{
+				descr:     "immediate (0)",
+				deleteOpt: metav1.NewDeleteOptions(0),
+			},
+			{
+				descr:     "the default (30s)",
+				deleteOpt: &metav1.DeleteOptions{}, // default per provider
+			},
 		}
 
-		By("Test completed successfully, waiting for PD to safely detach")
-		waitForPDDetach(disk1Name, host0Name)
-		waitForPDDetach(disk2Name, host0Name)
+		for _, t := range tests {
+			It(fmt.Sprintf("when pod delete grace period is %s", t.descr), func() {
+				framework.SkipUnlessProviderIs("gce", "gke")
+
+				By("creating PD")
+				diskName, err := framework.CreatePDWithRetry()
+				framework.ExpectNoError(err, "Error creating PD")
+
+				rwPod := testPDPod([]string{diskName}, host0Name, false /* readOnly */, 1 /* numContainers */)
+				host0ROPod := testPDPod([]string{diskName}, host0Name, true /* readOnly */, 1 /* numContainers */)
+				host1ROPod := testPDPod([]string{diskName}, host1Name, true /* readOnly */, 1 /* numContainers */)
+
+				podDelOpt := t.deleteOpt
+				defer func() {
+					// Teardown should do nothing unless test failed.
+					By("defer: cleaning up PD-RO test environment")
+					framework.Logf("defer cleanup errors can usually be ignored")
+					podClient.Delete(rwPod.Name, podDelOpt)
+					podClient.Delete(host0ROPod.Name, podDelOpt)
+					podClient.Delete(host1ROPod.Name, podDelOpt)
+					detachAndDeletePDs(diskName, []types.NodeName{host0Name, host1Name})
+				}()
+
+				By("creating rwPod to ensure PD is formatted")
+				_, err = podClient.Create(rwPod)
+				framework.ExpectNoError(err, "Failed to create rwPod")
+				framework.ExpectNoError(f.WaitForPodRunningSlow(rwPod.Name))
+
+				By("deleting the rwPod")
+				framework.ExpectNoError(podClient.Delete(rwPod.Name, metav1.NewDeleteOptions(0)), "Failed to delete rwPod")
+				framework.Logf(fmt.Sprintf("deleted rwPod %q", rwPod.Name))
+
+				By("waiting for PD to detach")
+				framework.ExpectNoError(waitForPDDetach(diskName, host0Name))
+
+				By("creating host0ROPod on node0")
+				_, err = podClient.Create(host0ROPod)
+				framework.ExpectNoError(err, "Failed to create host0ROPod")
+				By("creating host1ROPod on node1")
+				_, err = podClient.Create(host1ROPod)
+				framework.ExpectNoError(err, "Failed to create host1ROPod")
+				framework.ExpectNoError(f.WaitForPodRunningSlow(host0ROPod.Name))
+				framework.ExpectNoError(f.WaitForPodRunningSlow(host1ROPod.Name))
+
+				By("deleting host0ROPod")
+				framework.ExpectNoError(podClient.Delete(host0ROPod.Name, podDelOpt), "Failed to delete host0ROPod")
+				framework.Logf(fmt.Sprintf("deleted host0ROPod %q", host0ROPod.Name))
+				By("deleting host1ROPod")
+				framework.ExpectNoError(podClient.Delete(host1ROPod.Name, podDelOpt), "Failed to delete host1ROPod")
+				framework.Logf(fmt.Sprintf("deleted host1ROPod %q", host1ROPod.Name))
+
+				By("Test completed successfully, waiting for PD to detach from both nodes")
+				waitForPDDetach(diskName, host0Name)
+				waitForPDDetach(diskName, host1Name)
+			})
+		}
+	})
+
+	Context("schedule a pod w/ RW PD(s) mounted to 1 or more containers, write to PD, verify content, delete pod, and repeat in rapid succession [Slow]", func() {
+		var diskNames []string
+		type testT struct {
+			numContainers int
+			numPDs        int
+		}
+		tests := []testT{
+			{
+				numContainers: 4,
+				numPDs:        1,
+			},
+			{
+				numContainers: 1,
+				numPDs:        2,
+			},
+		}
+
+		for _, t := range tests {
+			numPDs := t.numPDs
+			numContainers := t.numContainers
+
+			It(fmt.Sprintf("using %d containers and %d PDs", numContainers, numPDs), func() {
+				framework.SkipUnlessProviderIs("gce", "gke", "aws")
+				var host0Pod *v1.Pod
+				var err error
+				fileAndContentToVerify := make(map[string]string)
+
+				By(fmt.Sprintf("creating %d PD(s)", numPDs))
+				for i := 0; i < numPDs; i++ {
+					name, err := framework.CreatePDWithRetry()
+					framework.ExpectNoError(err, fmt.Sprintf("Error creating PD %d", i))
+					diskNames = append(diskNames, name)
+				}
+
+				defer func() {
+					// Teardown should do nothing unless test failed.
+					By("defer: cleaning up PD-RW test environment")
+					framework.Logf("defer cleanup errors can usually be ignored")
+					if host0Pod != nil {
+						podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0))
+					}
+					for _, diskName := range diskNames {
+						detachAndDeletePDs(diskName, []types.NodeName{host0Name})
+					}
+				}()
+
+				for i := 0; i < 3; i++ { // "rapid" repeat loop
+					framework.Logf("PD Read/Writer Iteration #%v", i)
+					By(fmt.Sprintf("creating host0Pod with %d containers on node0", numContainers))
+					host0Pod = testPDPod(diskNames, host0Name, false /* readOnly */, numContainers)
+					_, err = podClient.Create(host0Pod)
+					framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
+					framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
+
+					By(fmt.Sprintf("writing %d file(s) via a container", numPDs))
+					containerName := "mycontainer"
+					if numContainers > 1 {
+						containerName = fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
+					}
+					for x := 1; x <= numPDs; x++ {
+						testFile := fmt.Sprintf("/testpd%d/tracker%d", x, i)
+						testFileContents := fmt.Sprintf("%v", mathrand.Int())
+						fileAndContentToVerify[testFile] = testFileContents
+						framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
+						framework.Logf(fmt.Sprintf("wrote %q to file %q in pod %q (container %q) on node %q", testFileContents, testFile, host0Pod.Name, containerName, host0Name))
+					}
+
+					By("verifying PD contents via a container")
+					if numContainers > 1 {
+						containerName = fmt.Sprintf("mycontainer%v", mathrand.Intn(numContainers)+1)
+					}
+					verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
+
+					By("deleting host0Pod")
+					framework.ExpectNoError(podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0)), "Failed to delete host0Pod")
+				}
+				By(fmt.Sprintf("Test completed successfully, waiting for %d PD(s) to detach from node0", numPDs))
+				for _, diskName := range diskNames {
+					waitForPDDetach(diskName, host0Name)
+				}
+			})
+		}
 	})
 
 	It("should be able to detach from a node which was deleted [Slow] [Disruptive]", func() {
@@ -416,16 +318,16 @@ var _ = SIGDescribe("Pod Disks", func() {
 		initialGroupSize, err := framework.GroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup)
 		framework.ExpectNoError(err, "Error getting group size")
 
-		By("Creating a pd")
+		By("creating a pd")
 		diskName, err := framework.CreatePDWithRetry()
 		framework.ExpectNoError(err, "Error creating a pd")
 
 		host0Pod := testPDPod([]string{diskName}, host0Name, false, 1)
-
 		containerName := "mycontainer"
 
 		defer func() {
-			By("Cleaning up PD-RW test env")
+			By("defer: cleaning up PD-RW test env")
+			framework.Logf("defer cleanup errors can usually be ignored")
 			podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0))
 			detachAndDeletePDs(diskName, []types.NodeName{host0Name})
 			framework.WaitForNodeToBeReady(f.ClientSet, string(host0Name), nodeStatusTimeout)
@@ -434,48 +336,46 @@ var _ = SIGDescribe("Pod Disks", func() {
 			Expect(len(nodes.Items)).To(Equal(initialGroupSize), "Requires node count to return to initial group size.")
 		}()
 
-		By("submitting host0Pod to kubernetes")
+		By("creating host0Pod on node0")
 		_, err = podClient.Create(host0Pod)
-		framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0pod: %v", err))
-
+		framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 		framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
 
+		By("writing content to host0Pod")
 		testFile := "/testpd1/tracker"
 		testFileContents := fmt.Sprintf("%v", mathrand.Int())
-
 		framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
-		framework.Logf("Wrote value: %v", testFileContents)
+		framework.Logf(fmt.Sprintf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name))
 
-		// Verify that disk shows up in node 0's volumeInUse list
+		By("verifying PD is present in node0's VolumeInUse list")
 		framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* should exist*/))
 
+		By("getting gce instances")
 		gceCloud, err := framework.GetGCECloud()
 		framework.ExpectNoError(err, fmt.Sprintf("Unable to create gcloud client err=%v", err))
-
 		output, err := gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
 		framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
 		Expect(true, strings.Contains(string(output), string(host0Name)))
 
 		By("deleting host0")
 		resp, err := gceCloud.DeleteInstance(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone, string(host0Name))
-		framework.ExpectNoError(err, fmt.Sprintf("Failed to delete host0pod: err=%v response=%#v", err, resp))
-
+		framework.ExpectNoError(err, fmt.Sprintf("Failed to delete host0Pod: err=%v response=%#v", err, resp))
 		output, err = gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
 		framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
 		Expect(false, strings.Contains(string(output), string(host0Name)))
 
-		// The disk should be detached from host0 on it's deletion
-		By("Waiting for pd to detach from host0")
+		By("waiting for pd to detach from host0")
 		waitForPDDetach(diskName, host0Name)
 		framework.ExpectNoError(framework.WaitForGroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup, int32(initialGroupSize)), "Unable to get back the cluster to inital size")
-		return
 	})
 
 	It("should be able to detach from a node whose api object was deleted [Slow] [Disruptive]", func() {
 		framework.SkipUnlessProviderIs("gce")
+
 		initialGroupSize, err := framework.GroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup)
 		framework.ExpectNoError(err, "Error getting group size")
-		By("Creating a pd")
+
+		By("creating a pd")
 		diskName, err := framework.CreatePDWithRetry()
 		framework.ExpectNoError(err, "Error creating a pd")
 
@@ -483,8 +383,10 @@ var _ = SIGDescribe("Pod Disks", func() {
 		originalCount := len(nodes.Items)
 		containerName := "mycontainer"
 		nodeToDelete := &nodes.Items[0]
+
 		defer func() {
-			By("Cleaning up PD-RW test env")
+			By("defer: cleaning up PD-RW test env")
+			framework.Logf("defer cleanup errors can usually be ignored")
 			detachAndDeletePDs(diskName, []types.NodeName{host0Name})
 			nodeToDelete.ObjectMeta.SetResourceVersion("0")
 			// need to set the resource version or else the Create() fails
@@ -497,27 +399,24 @@ var _ = SIGDescribe("Pod Disks", func() {
 			Expect(len(nodes.Items)).To(Equal(originalCount), "Requires node count to return to original node count.")
 		}()
 
-		By("submitting host0Pod to kubernetes")
+		By("creating host0Pod on node0")
 		_, err = podClient.Create(host0Pod)
-		framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0pod: %v", err))
-
+		framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod %q: %v", host0Pod.Name, err))
 		framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
 
+		By("writing content to host0Pod")
 		testFile := "/testpd1/tracker"
 		testFileContents := fmt.Sprintf("%v", mathrand.Int())
-
 		framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
-		framework.Logf("Wrote value: %v", testFileContents)
+		framework.Logf(fmt.Sprintf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name))
 
-		// Verify that disk shows up in node 0's volumeInUse list
+		By("verifying PD is present in node0's VolumeInUse list")
 		framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* should exist*/))
 
-		By("deleting api object of host0")
+		By("deleting host0 api object")
 		framework.ExpectNoError(nodeClient.Delete(string(host0Name), metav1.NewDeleteOptions(0)), "Unable to delete host0")
-
-		By("deleting host0pod")
+		By("deleting host0Pod")
 		framework.ExpectNoError(podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0)), "Unable to delete host0Pod")
-		// The disk should be detached from host0 on its deletion
 		By("Waiting for pd to detach from host0")
 		framework.ExpectNoError(waitForPDDetach(diskName, host0Name), "Timed out waiting for detach pd")
 	})
