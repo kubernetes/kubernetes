@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+
+	netutil "k8s.io/apimachinery/pkg/util/net"
 )
 
 var (
@@ -131,7 +133,8 @@ func splitVersion(version string) (string, string, error) {
 
 // Internal helper: return content of URL
 func fetchFromURL(url string) (string, error) {
-	resp, err := http.Get(url)
+	client := &http.Client{Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
+	resp, err := client.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("unable to get URL %q: %s", url, err.Error())
 	}
