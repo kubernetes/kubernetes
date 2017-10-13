@@ -58,9 +58,7 @@ func TestListVolumesForPod(t *testing.T) {
 	})
 
 	stopCh := runVolumeManager(kubelet)
-	defer func() {
-		close(stopCh)
-	}()
+	defer close(stopCh)
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
 	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
@@ -142,9 +140,7 @@ func TestPodVolumesExist(t *testing.T) {
 	}
 
 	stopCh := runVolumeManager(kubelet)
-	defer func() {
-		close(stopCh)
-	}()
+	defer close(stopCh)
 
 	kubelet.podManager.SetPods(pods)
 	for _, pod := range pods {
@@ -177,9 +173,7 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 	})
 
 	stopCh := runVolumeManager(kubelet)
-	defer func() {
-		close(stopCh)
-	}()
+	defer close(stopCh)
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
 	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
@@ -223,9 +217,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	})
 
 	stopCh := runVolumeManager(kubelet)
-	defer func() {
-		close(stopCh)
-	}()
+	defer close(stopCh)
 
 	// Add pod
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
@@ -312,9 +304,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 	})
 
 	stopCh := runVolumeManager(kubelet)
-	defer func() {
-		close(stopCh)
-	}()
+	defer close(stopCh)
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
 
@@ -381,9 +371,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 	})
 
 	stopCh := runVolumeManager(kubelet)
-	defer func() {
-		close(stopCh)
-	}()
+	defer close(stopCh)
 
 	// Add pod
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
