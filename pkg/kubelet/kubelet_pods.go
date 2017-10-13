@@ -743,6 +743,16 @@ func (kl *Kubelet) podIsTerminated(pod *v1.Pod) bool {
 	return status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(status.ContainerStatuses))
 }
 
+// IsPodTerminated returns trus if the pod with the provided UID is in a terminated state ("Failed" or "Succeeded")
+// or if the pod has been deleted or removed
+func (kl *Kubelet) IsPodTerminated(uid types.UID) bool {
+	pod, podFound := kl.podManager.GetPodByUID(uid)
+	if !podFound {
+		return true
+	}
+	return kl.podIsTerminated(pod)
+}
+
 // PodResourcesAreReclaimed returns true if all required node-level resources that a pod was consuming have
 // been reclaimed by the kubelet.  Reclaiming resources is a prerequisite to deleting a pod from the API server.
 func (kl *Kubelet) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool {
