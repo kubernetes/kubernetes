@@ -376,7 +376,8 @@ func TestValidateProxyMode(t *testing.T) {
 		kubeproxyconfig.ProxyModeUserspace,
 		kubeproxyconfig.ProxyModeIPTables,
 		kubeproxyconfig.ProxyModeIPVS,
-		kubeproxyconfig.ProxyMode(""),
+		componentconfig.ProxyModeKernelspace,
+		componentconfig.ProxyMode(""),
 	}
 
 	for _, successCase := range successCases {
