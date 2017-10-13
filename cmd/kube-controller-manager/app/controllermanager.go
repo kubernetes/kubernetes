@@ -348,6 +348,7 @@ func NewControllerInitializers() map[string]InitFunc {
 	controllers["cronjob"] = startCronJobController
 	controllers["csrsigning"] = startCSRSigningController
 	controllers["csrapproving"] = startCSRApprovingController
+	controllers["csrcleaner"] = startCSRCleanerController
 	controllers["ttl"] = startTTLController
 	controllers["bootstrapsigner"] = startBootstrapSignerController
 	controllers["tokencleaner"] = startTokenCleanerController
