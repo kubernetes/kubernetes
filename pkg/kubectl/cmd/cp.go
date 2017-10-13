@@ -82,7 +82,10 @@ type fileSpec struct {
 	File         string
 }
 
-var errFileSpecDoesntMatchFormat = errors.New("Filespec must match the canonical format: [[namespace/]pod:]file/path")
+var (
+	errFileSpecDoesntMatchFormat = errors.New("Filespec must match the canonical format: [[namespace/]pod:]file/path")
+	errFileCannotBeEmpty         = errors.New("Filepath can not be empty")
+)
 
 func extractFileSpec(arg string) (fileSpec, error) {
 	pieces := strings.Split(arg, ":")
@@ -157,6 +160,9 @@ func checkDestinationIsDir(dest fileSpec, f cmdutil.Factory, cmd *cobra.Command)
 }
 
 func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, src, dest fileSpec) error {
+	if len(src.File) == 0 {
+		return errFileCannotBeEmpty
+	}
 	reader, writer := io.Pipe()
 
 	// strip trailing slash (if any)
@@ -201,6 +207,9 @@ func copyToPod(f cmdutil.Factory, cmd *cobra.Command, stdout, stderr io.Writer, 
 }
 
 func copyFromPod(f cmdutil.Factory, cmd *cobra.Command, cmderr io.Writer, src, dest fileSpec) error {
+	if len(dest.File) == 0 {
+		return errFileCannotBeEmpty
+	}
 	reader, outStream := io.Pipe()
 	options := &ExecOptions{
 		StreamOptions: StreamOptions{
