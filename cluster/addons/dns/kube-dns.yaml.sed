@@ -87,7 +87,9 @@ spec:
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
                 matchExpressions:
                   - key: k8s-app
                     operator: In
