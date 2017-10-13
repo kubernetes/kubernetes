@@ -23,6 +23,8 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
@@ -37,7 +39,8 @@ import (
 // InsecureServingInfo *ServingInfo
 
 func BuildInsecureHandlerChain(apiHandler http.Handler, c *server.Config) http.Handler {
-	handler := apiHandler
+	handler := genericapifilters.WithAuthorization(apiHandler, c.RequestContextMapper, &insecureAuthorizer{c.Authorizer}, c.Serializer)
+	handler = genericapifilters.WithImpersonation(handler, c.RequestContextMapper, authorizerfactory.NewAlwaysAllowAuthorizer(), c.Serializer)
 	if utilfeature.DefaultFeatureGate.Enabled(features.AdvancedAuditing) {
 		handler = genericapifilters.WithAudit(handler, c.RequestContextMapper, c.AuditBackend, c.AuditPolicyChecker, c.LongRunningFunc)
 	} else {
@@ -131,4 +134,25 @@ func (insecureSuperuser) AuthenticateRequest(req *http.Request) (user.Info, bool
 		Name:   "system:unsecured",
 		Groups: []string{user.SystemPrivilegedGroup, user.AllAuthenticated},
 	}, true, nil
+}
+
+// insecureAuthorizer implements authorizer.Authorizer and always allows the super user. It
+// ignores any other users, deferring to the wrapped Authorizer. This lets the wrapped
+// authorizer handle impersionation requests where the user name changes between authentication
+// and authorization.
+type insecureAuthorizer struct {
+	a authorizer.Authorizer
+}
+
+func (i *insecureAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
+	if i.a == nil {
+		// No underlying authorizer was set. Default to allow all.
+		return true, "", nil
+	}
+	for _, group := range a.GetUser().GetGroups() {
+		if group == user.SystemPrivilegedGroup {
+			return true, "", nil
+		}
+	}
+	return i.a.Authorize(a)
 }
