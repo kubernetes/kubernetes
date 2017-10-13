@@ -65,6 +65,7 @@ func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createV
 
 	selfSAR.Status = authorizationapi.SubjectAccessReviewStatus{
 		Allowed: (decision == authorizer.DecisionAllow),
+		Denied:  (decision == authorizer.DecisionDeny),
 		Reason:  reason,
 	}
 	if evaluationErr != nil {
