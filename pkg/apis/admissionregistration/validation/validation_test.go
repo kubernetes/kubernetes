@@ -214,6 +214,31 @@ func TestValidateInitializerConfiguration(t *testing.T) {
 				}),
 			expectedError: ` "a/b": must not specify subresources`,
 		},
+		{
+			name: "valid namespaceSelector",
+			config: getInitializerConfiguration(
+				[]admissionregistration.Initializer{
+					{
+						Name: "initializer.k8s.io",
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"namespace": "d"},
+						},
+					},
+				}),
+		},
+		{
+			name: "invalid namespaceSelector",
+			config: getInitializerConfiguration(
+				[]admissionregistration.Initializer{
+					{
+						Name: "initializer.k8s.io",
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"namespace=Equals": "b"},
+						},
+					},
+				}),
+			expectedError: `initializers[0].namespaceSelector.matchLabels: Invalid value: "namespace=Equals": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`,
+		},
 	}
 
 	for _, test := range tests {

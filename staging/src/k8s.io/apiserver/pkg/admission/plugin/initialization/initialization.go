@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -202,7 +203,7 @@ func (i *initializer) Admit(a admission.Attributes) (err error) {
 				}
 			}
 
-			names := findInitializers(config, a.GetResource())
+			names := findInitializers(config, a.GetResource(), a.GetNamespace())
 			if len(names) == 0 {
 				glog.V(5).Infof("No initializers needed")
 				return nil
@@ -301,9 +302,20 @@ func newInitializers(names []string) *metav1.Initializers {
 
 // findInitializers returns the list of initializer names that apply to a config. It returns an empty list
 // if no initializers apply.
-func findInitializers(initializers *v1alpha1.InitializerConfiguration, gvr schema.GroupVersionResource) []string {
+func findInitializers(initializers *v1alpha1.InitializerConfiguration, gvr schema.GroupVersionResource, namespace string) []string {
 	var names []string
 	for _, init := range initializers.Initializers {
+		if init.NamespaceSelector != nil {
+			namespaceWhitelist, err := metav1.LabelSelectorAsSelector(init.NamespaceSelector)
+			if err != nil {
+				continue
+			}
+
+			if namespaceWhitelist.Empty() || !namespaceWhitelist.Matches(labels.Set(map[string]string{"namespace": namespace})) {
+				continue
+			}
+		}
+
 		if !matchRule(init.Rules, gvr) {
 			continue
 		}

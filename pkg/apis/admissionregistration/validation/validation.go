@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	genericvalidation "k8s.io/apimachinery/pkg/api/validation"
+	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -39,6 +40,10 @@ func validateInitializer(initializer *admissionregistration.Initializer, fldPath
 	var allErrors field.ErrorList
 	// initlializer.Name must be fully qualified
 	allErrors = append(allErrors, validation.IsFullyQualifiedName(fldPath.Child("name"), initializer.Name)...)
+
+	if initializer.NamespaceSelector != nil {
+		allErrors = append(allErrors, unversionedvalidation.ValidateLabelSelector(initializer.NamespaceSelector, fldPath.Child("namespaceSelector"))...)
+	}
 
 	for i, rule := range initializer.Rules {
 		notAllowSubresources := false

@@ -31,14 +31,15 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
-func newInitializer(name string, rules ...v1alpha1.Rule) *v1alpha1.InitializerConfiguration {
-	return addInitializer(&v1alpha1.InitializerConfiguration{}, name, rules...)
+func newInitializer(name string, namespaceSelector *metav1.LabelSelector, rules ...v1alpha1.Rule) *v1alpha1.InitializerConfiguration {
+	return addInitializer(&v1alpha1.InitializerConfiguration{}, name, namespaceSelector, rules...)
 }
 
-func addInitializer(base *v1alpha1.InitializerConfiguration, name string, rules ...v1alpha1.Rule) *v1alpha1.InitializerConfiguration {
+func addInitializer(base *v1alpha1.InitializerConfiguration, name string, namespaceSelector *metav1.LabelSelector, rules ...v1alpha1.Rule) *v1alpha1.InitializerConfiguration {
 	base.Initializers = append(base.Initializers, v1alpha1.Initializer{
-		Name:  name,
-		Rules: rules,
+		Name:              name,
+		Rules:             rules,
+		NamespaceSelector: namespaceSelector,
 	})
 	return base
 }
@@ -47,6 +48,7 @@ func TestFindInitializers(t *testing.T) {
 	type args struct {
 		initializers *v1alpha1.InitializerConfiguration
 		gvr          schema.GroupVersionResource
+		namespace    string
 	}
 	tests := []struct {
 		name string
@@ -57,14 +59,14 @@ func TestFindInitializers(t *testing.T) {
 			name: "empty",
 			args: args{
 				gvr:          schema.GroupVersionResource{},
-				initializers: newInitializer("1"),
+				initializers: newInitializer("1", nil),
 			},
 		},
 		{
 			name: "everything",
 			args: args{
 				gvr:          schema.GroupVersionResource{},
-				initializers: newInitializer("1", v1alpha1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}}),
+				initializers: newInitializer("1", nil, v1alpha1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*"}}),
 			},
 			want: []string{"1"},
 		},
@@ -72,7 +74,7 @@ func TestFindInitializers(t *testing.T) {
 			name: "empty group",
 			args: args{
 				gvr:          schema.GroupVersionResource{},
-				initializers: newInitializer("1", v1alpha1.Rule{APIGroups: []string{""}, APIVersions: []string{"*"}, Resources: []string{"*"}}),
+				initializers: newInitializer("1", nil, v1alpha1.Rule{APIGroups: []string{""}, APIVersions: []string{"*"}, Resources: []string{"*"}}),
 			},
 			want: []string{"1"},
 		},
@@ -81,8 +83,8 @@ func TestFindInitializers(t *testing.T) {
 			args: args{
 				gvr: schema.GroupVersionResource{Resource: "pods"},
 				initializers: addInitializer(
-					newInitializer("1", v1alpha1.Rule{APIGroups: []string{""}, APIVersions: []string{"*"}, Resources: []string{"pods"}}),
-					"2", v1alpha1.Rule{APIGroups: []string{""}, APIVersions: []string{"*"}, Resources: []string{"pods"}},
+					newInitializer("1", nil, v1alpha1.Rule{APIGroups: []string{""}, APIVersions: []string{"*"}, Resources: []string{"pods"}}),
+					"2", nil, v1alpha1.Rule{APIGroups: []string{""}, APIVersions: []string{"*"}, Resources: []string{"pods"}},
 				),
 			},
 			want: []string{"1", "2"},
@@ -91,14 +93,35 @@ func TestFindInitializers(t *testing.T) {
 			name: "multiple matches",
 			args: args{
 				gvr:          schema.GroupVersionResource{Resource: "pods"},
-				initializers: newInitializer("1", v1alpha1.Rule{APIGroups: []string{""}, APIVersions: []string{"*"}, Resources: []string{"pods"}}),
+				initializers: newInitializer("1", nil, v1alpha1.Rule{APIGroups: []string{""}, APIVersions: []string{"*"}, Resources: []string{"pods"}}),
 			},
 			want: []string{"1"},
+		},
+		{
+			name: "empty group with namespaceSelector",
+			args: args{
+				gvr:          schema.GroupVersionResource{},
+				initializers: newInitializer("1", &metav1.LabelSelector{MatchLabels: map[string]string{"namespace": "bar"}}, v1alpha1.Rule{APIGroups: []string{""}, APIVersions: []string{"*"}, Resources: []string{"*"}}),
+				namespace:    "bar",
+			},
+			want: []string{"1"},
+		},
+		{
+			name: "pod with namespaceSelector",
+			args: args{
+				gvr: schema.GroupVersionResource{Resource: "pods"},
+				initializers: addInitializer(
+					newInitializer("1", &metav1.LabelSelector{MatchLabels: map[string]string{"namespace": "foo"}}, v1alpha1.Rule{APIGroups: []string{""}, APIVersions: []string{"*"}, Resources: []string{"pods"}}),
+					"2", &metav1.LabelSelector{MatchLabels: map[string]string{"namespace": "bar"}}, v1alpha1.Rule{APIGroups: []string{""}, APIVersions: []string{"*"}, Resources: []string{"pods"}},
+				),
+				namespace: "bar",
+			},
+			want: []string{"2"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := findInitializers(tt.args.initializers, tt.args.gvr); !reflect.DeepEqual(got, tt.want) {
+			if got := findInitializers(tt.args.initializers, tt.args.gvr, tt.args.namespace); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("findInitializers() = %v, want %v", got, tt.want)
 			}
 		})
