@@ -360,7 +360,7 @@ func TestSampleAPIServer(f *framework.Framework, image string) {
 	// kubectl get deployments -n <aggregated-api-namespace> && status == Running
 	// NOTE: aggregated apis should generally be set up in there own namespace (<aggregated-api-namespace>). As the test framework
 	// is setting up a new namespace, we are just using that.
-	err = framework.WaitForDeploymentStatusValid(client, deployment)
+	err = framework.WaitForDeploymentComplete(client, deployment)
 
 	// We seem to need to do additional waiting until the extension api service is actually up.
 	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {

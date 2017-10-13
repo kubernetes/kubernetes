@@ -70,7 +70,6 @@ go_library(
         "//pkg/master/ports:go_default_library",
         "//pkg/ssh:go_default_library",
         "//pkg/util/file:go_default_library",
-        "//pkg/util/labels:go_default_library",
         "//pkg/util/system:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//pkg/util/version:go_default_library",
