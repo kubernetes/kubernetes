@@ -821,7 +821,8 @@ type PodSecurityPolicySpec struct {
 	Privileged bool
 	// DefaultAddCapabilities is the default set of capabilities that will be added to the container
 	// unless the pod spec specifically drops the capability.  You may not list a capability in both
-	// DefaultAddCapabilities and RequiredDropCapabilities.
+	// DefaultAddCapabilities and RequiredDropCapabilities. Capabilities added here are implicitly
+	// allowed, and need not be included in the AllowedCapabilities list.
 	// +optional
 	DefaultAddCapabilities []api.Capability
 	// RequiredDropCapabilities are the capabilities that will be dropped from the container.  These
