@@ -111,9 +111,6 @@ type podWorkers struct {
 	// Currently all update request for a given pod coming when another
 	// update of this pod is being processed are ignored.
 	isWorking map[types.UID]bool
-	// Tracks the last undelivered work item for this pod - a work item is
-	// undelivered if it comes in while the worker is working.
-	lastUndeliveredWorkUpdate map[types.UID]UpdatePodOptions
 
 	workQueue queue.WorkQueue
 
@@ -138,57 +135,61 @@ type podWorkers struct {
 func newPodWorkers(syncPodFn syncPodFnType, recorder record.EventRecorder, workQueue queue.WorkQueue,
 	resyncInterval, backOffPeriod time.Duration, podCache kubecontainer.Cache) *podWorkers {
 	return &podWorkers{
-		podUpdates:                map[types.UID]chan UpdatePodOptions{},
-		isWorking:                 map[types.UID]bool{},
-		lastUndeliveredWorkUpdate: map[types.UID]UpdatePodOptions{},
-		syncPodFn:                 syncPodFn,
-		recorder:                  recorder,
-		workQueue:                 workQueue,
-		resyncInterval:            resyncInterval,
-		backOffPeriod:             backOffPeriod,
-		podCache:                  podCache,
+		podUpdates:     map[types.UID]chan UpdatePodOptions{},
+		isWorking:      map[types.UID]bool{},
+		syncPodFn:      syncPodFn,
+		recorder:       recorder,
+		workQueue:      workQueue,
+		resyncInterval: resyncInterval,
+		backOffPeriod:  backOffPeriod,
+		podCache:       podCache,
 	}
 }
 
-func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
+func (p *podWorkers) managePodLoop(uid types.UID, podUpdates <-chan UpdatePodOptions) {
 	var lastSyncTime time.Time
-	for update := range podUpdates {
-		err := func() error {
-			podUID := update.Pod.UID
-			// This is a blocking call that would return only if the cache
-			// has an entry for the pod that is newer than minRuntimeCache
-			// Time. This ensures the worker doesn't start syncing until
-			// after the cache is at least newer than the finished time of
-			// the previous sync.
-			status, err := p.podCache.GetNewerThan(podUID, lastSyncTime)
-			if err != nil {
+
+	for {
+		select {
+		case update := <-podUpdates:
+			err := func() error {
+				// This is a blocking call that would return only if the cache
+				// has an entry for the pod that is newer than minRuntimeCache
+				// Time. This ensures the worker doesn't start syncing until
+				// after the cache is at least newer than the finished time of
+				// the previous sync.
+				status, err := p.podCache.GetNewerThan(uid, lastSyncTime)
+				if err != nil {
+					return err
+				}
+				err = p.syncPodFn(syncPodOptions{
+					mirrorPod:      update.MirrorPod,
+					pod:            update.Pod,
+					podStatus:      status,
+					killPodOptions: update.KillPodOptions,
+					updateType:     update.UpdateType,
+				})
+				lastSyncTime = time.Now()
 				return err
+			}()
+			// notify the call-back function if the operation succeeded or not
+			if update.OnCompleteFunc != nil {
+				update.OnCompleteFunc(err)
 			}
-			err = p.syncPodFn(syncPodOptions{
-				mirrorPod:      update.MirrorPod,
-				pod:            update.Pod,
-				podStatus:      status,
-				killPodOptions: update.KillPodOptions,
-				updateType:     update.UpdateType,
-			})
-			lastSyncTime = time.Now()
-			return err
-		}()
-		// notify the call-back function if the operation succeeded or not
-		if update.OnCompleteFunc != nil {
-			update.OnCompleteFunc(err)
+			if err != nil {
+				glog.Errorf("Error syncing pod %s (%q), skipping: %v", uid, format.Pod(update.Pod), err)
+				// if we failed sync, we throw more specific events for why it happened.
+				// as a result, i question the value of this event.
+				// TODO: determine if we can remove this in a future release.
+				// do not include descriptive text that can vary on why it failed so in a pathological
+				// scenario, kubelet does not create enough discrete events that miss default aggregation
+				// window.
+				p.recorder.Eventf(update.Pod, v1.EventTypeWarning, events.FailedSync, "Error syncing pod")
+			}
+			p.wrapUp(uid, err)
+		default:
+			p.finishWork(uid)
 		}
-		if err != nil {
-			glog.Errorf("Error syncing pod %s (%q), skipping: %v", update.Pod.UID, format.Pod(update.Pod), err)
-			// if we failed sync, we throw more specific events for why it happened.
-			// as a result, i question the value of this event.
-			// TODO: determine if we can remove this in a future release.
-			// do not include descriptive text that can vary on why it failed so in a pathological
-			// scenario, kubelet does not create enough discrete events that miss default aggregation
-			// window.
-			p.recorder.Eventf(update.Pod, v1.EventTypeWarning, events.FailedSync, "Error syncing pod")
-		}
-		p.wrapUp(update.Pod.UID, err)
 	}
 }
 
@@ -204,11 +205,10 @@ func (p *podWorkers) UpdatePod(options *UpdatePodOptions) {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
 	if podUpdates, exists = p.podUpdates[uid]; !exists {
-		// We need to have a buffer here, because checkForUpdates() method that
-		// puts an update into channel is called from the same goroutine where
-		// the channel is consumed. However, it is guaranteed that in such case
-		// the channel is empty, so buffer of size 1 is enough.
-		podUpdates = make(chan UpdatePodOptions, 1)
+		// We need to have a buffer here, because sometimes podWorkers can't consume a burst
+		// of events from the same pod, it will miss some import event that causing undefined
+		// behavior, so we set the size of buffer to 64.
+		podUpdates = make(chan UpdatePodOptions, 64)
 		p.podUpdates[uid] = podUpdates
 
 		// Creating a new pod worker either means this is a new pod, or that the
@@ -217,18 +217,15 @@ func (p *podWorkers) UpdatePod(options *UpdatePodOptions) {
 		// comment in syncPod.
 		go func() {
 			defer runtime.HandleCrash()
-			p.managePodLoop(podUpdates)
+			p.managePodLoop(uid, podUpdates)
 		}()
 	}
-	if !p.isWorking[pod.UID] {
-		p.isWorking[pod.UID] = true
-		podUpdates <- *options
-	} else {
-		// if a request to kill a pod is pending, we do not let anything overwrite that request.
-		update, found := p.lastUndeliveredWorkUpdate[pod.UID]
-		if !found || update.UpdateType != kubetypes.SyncPodKill {
-			p.lastUndeliveredWorkUpdate[pod.UID] = *options
-		}
+
+	p.isWorking[pod.UID] = true
+	select {
+	case podUpdates <- *options:
+	default:
+		glog.V(2).Infof("Lost update event: %v", *options)
 	}
 }
 
@@ -236,14 +233,9 @@ func (p *podWorkers) removeWorker(uid types.UID) {
 	if ch, ok := p.podUpdates[uid]; ok {
 		close(ch)
 		delete(p.podUpdates, uid)
-		// If there is an undelivered work update for this pod we need to remove it
-		// since per-pod goroutine won't be able to put it to the already closed
-		// channel when it finish processing the current work update.
-		if _, cached := p.lastUndeliveredWorkUpdate[uid]; cached {
-			delete(p.lastUndeliveredWorkUpdate, uid)
-		}
 	}
 }
+
 func (p *podWorkers) ForgetWorker(uid types.UID) {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
@@ -270,18 +262,12 @@ func (p *podWorkers) wrapUp(uid types.UID, syncErr error) {
 		// Error occurred during the sync; back off and then retry.
 		p.workQueue.Enqueue(uid, wait.Jitter(p.backOffPeriod, workerBackOffPeriodJitterFactor))
 	}
-	p.checkForUpdates(uid)
 }
 
-func (p *podWorkers) checkForUpdates(uid types.UID) {
+func (p *podWorkers) finishWork(uid types.UID) {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
-	if workUpdate, exists := p.lastUndeliveredWorkUpdate[uid]; exists {
-		p.podUpdates[uid] <- workUpdate
-		delete(p.lastUndeliveredWorkUpdate, uid)
-	} else {
-		p.isWorking[uid] = false
-	}
+	p.isWorking[uid] = false
 }
 
 // killPodNow returns a KillPodFunc that can be used to kill a pod.

@@ -91,6 +91,9 @@ func createPodWorkers() (*podWorkers, map[types.UID][]syncPodRecord) {
 			func() {
 				lock.Lock()
 				defer lock.Unlock()
+				if options.pod == nil {
+					return
+				}
 				pod := options.pod
 				processed[pod.UID] = append(processed[pod.UID], syncPodRecord{
 					name:       pod.Name,
@@ -129,11 +132,16 @@ func TestUpdatePod(t *testing.T) {
 	podWorkers, processed := createPodWorkers()
 
 	// Check whether all pod updates will be processed.
+	// For example:
+	// Pod 0 should receive 0
+	// Pod 1 should receive 0 1
+	// Pod 2 should receive 0 1 2
+	// ...
 	numPods := 20
 	for i := 0; i < numPods; i++ {
-		for j := i; j < numPods; j++ {
+		for j := 0; j < i+1; j++ {
 			podWorkers.UpdatePod(&UpdatePodOptions{
-				Pod:        newPod(string(j), string(i)),
+				Pod:        newPod(string(i), string(j)),
 				UpdateType: kubetypes.SyncPodCreate,
 			})
 		}
@@ -146,19 +154,18 @@ func TestUpdatePod(t *testing.T) {
 	}
 	for i := 0; i < numPods; i++ {
 		uid := types.UID(i)
-		if len(processed[uid]) < 1 || len(processed[uid]) > i+1 {
-			t.Errorf("Pod %v processed %v times", i, len(processed[uid]))
+
+		expected := i + 1
+		if expected != len(processed[uid]) {
+			t.Errorf("Pod %v: should process %v times, but only process %v times", i, expected, len(processed[uid]))
 			continue
 		}
 
-		first := 0
-		last := len(processed[uid]) - 1
-		if processed[uid][first].name != string(0) {
-			t.Errorf("Pod %v: incorrect order %v, %v", i, first, processed[uid][first])
-
-		}
-		if processed[uid][last].name != string(i) {
-			t.Errorf("Pod %v: incorrect order %v, %v", i, last, processed[uid][last])
+		for j := 0; j < expected; j++ {
+			if processed[uid][j].name != string(j) {
+				t.Errorf("Pod %v: incorrect order %v, %x", i, j, processed[uid][j].name)
+				continue
+			}
 		}
 	}
 }
