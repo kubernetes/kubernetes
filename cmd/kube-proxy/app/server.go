@@ -82,15 +82,6 @@ const (
 	proxyModeKernelspace = "kernelspace"
 )
 
-// checkKnownProxyMode returns true if proxyMode is valid.
-func checkKnownProxyMode(proxyMode string) bool {
-	switch proxyMode {
-	case "", proxyModeUserspace, proxyModeIPTables, proxyModeIPVS, proxyModeKernelspace:
-		return true
-	}
-	return false
-}
-
 // Options contains everything necessary to create and run a proxy server.
 type Options struct {
 	// ConfigFile is the location of the proxy server's configuration file.
