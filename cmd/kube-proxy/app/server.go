@@ -27,7 +27,6 @@ import (
 	"net/http/pprof"
 	"os"
 	goruntime "runtime"
-	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -42,7 +41,6 @@ import (
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
@@ -50,8 +48,6 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
-	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
@@ -63,7 +59,6 @@ import (
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
-	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 	"k8s.io/kubernetes/pkg/util/resourcecontainer"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
@@ -94,16 +89,6 @@ type Options struct {
 	// config is the proxy server's configuration object.
 	config *componentconfig.KubeProxyConfiguration
 
-	// The fields below here are placeholders for flags that can't be directly mapped into
-	// componentconfig.KubeProxyConfiguration.
-	//
-	// TODO remove these fields once the deprecated flags are removed.
-
-	// master is used to override the kubeconfig's URL to the apiserver.
-	master string
-	// healthzPort is the port to be used by the healthz server.
-	healthzPort int32
-
 	scheme *runtime.Scheme
 	codecs serializer.CodecFactory
 }
@@ -116,53 +101,12 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 	fs.MarkDeprecated("cleanup-iptables", "This flag is replaced by --cleanup.")
 	fs.BoolVar(&options.CleanupAndExit, "cleanup", options.CleanupAndExit, "If true cleanup iptables and ipvs rules and exit.")
 
-	// All flags below here are deprecated and will eventually be removed.
-
-	fs.Var(componentconfig.IPVar{Val: &options.config.BindAddress}, "bind-address", "The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)")
-	fs.StringVar(&options.master, "master", options.master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
-	fs.Int32Var(&options.healthzPort, "healthz-port", options.healthzPort, "The port to bind the health check server. Use 0 to disable.")
-	fs.Var(componentconfig.IPVar{Val: &options.config.HealthzBindAddress}, "healthz-bind-address", "The IP address and port for the health check server to serve on (set to 0.0.0.0 for all interfaces)")
-	fs.Var(componentconfig.IPVar{Val: &options.config.MetricsBindAddress}, "metrics-bind-address", "The IP address and port for the metrics server to serve on (set to 0.0.0.0 for all interfaces)")
-	fs.Int32Var(options.config.OOMScoreAdj, "oom-score-adj", utilpointer.Int32PtrDerefOr(options.config.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
-	fs.StringVar(&options.config.ResourceContainer, "resource-container", options.config.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
-	fs.MarkDeprecated("resource-container", "This feature will be removed in a later release.")
-	fs.StringVar(&options.config.ClientConnection.KubeConfigFile, "kubeconfig", options.config.ClientConnection.KubeConfigFile, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
-	fs.Var(componentconfig.PortRangeVar{Val: &options.config.PortRange}, "proxy-port-range", "Range of host ports (beginPort-endPort, inclusive) that may be consumed in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.")
-	fs.StringVar(&options.config.HostnameOverride, "hostname-override", options.config.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
-	fs.Var(&options.config.Mode, "proxy-mode", "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster) or 'ipvs'(experimental)'. If blank, use the best-available proxy (currently iptables).  If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
-	fs.Int32Var(options.config.IPTables.MasqueradeBit, "iptables-masquerade-bit", utilpointer.Int32PtrDerefOr(options.config.IPTables.MasqueradeBit, 14), "If using the pure iptables proxy, the bit of the fwmark space to mark packets requiring SNAT with.  Must be within the range [0, 31].")
-	fs.DurationVar(&options.config.IPTables.SyncPeriod.Duration, "iptables-sync-period", options.config.IPTables.SyncPeriod.Duration, "The maximum interval of how often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
-	fs.DurationVar(&options.config.IPTables.MinSyncPeriod.Duration, "iptables-min-sync-period", options.config.IPTables.MinSyncPeriod.Duration, "The minimum interval of how often the iptables rules can be refreshed as endpoints and services change (e.g. '5s', '1m', '2h22m').")
-	fs.DurationVar(&options.config.IPVS.SyncPeriod.Duration, "ipvs-sync-period", options.config.IPVS.SyncPeriod.Duration, "The maximum interval of how often ipvs rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
-	fs.DurationVar(&options.config.IPVS.MinSyncPeriod.Duration, "ipvs-min-sync-period", options.config.IPVS.MinSyncPeriod.Duration, "The minimum interval of how often the ipvs rules can be refreshed as endpoints and services change (e.g. '5s', '1m', '2h22m').")
-	fs.DurationVar(&options.config.ConfigSyncPeriod.Duration, "config-sync-period", options.config.ConfigSyncPeriod.Duration, "How often configuration from the apiserver is refreshed.  Must be greater than 0.")
-	fs.BoolVar(&options.config.IPTables.MasqueradeAll, "masquerade-all", options.config.IPTables.MasqueradeAll, "If using the pure iptables proxy, SNAT all traffic sent via Service cluster IPs (this not commonly needed)")
-	fs.StringVar(&options.config.ClusterCIDR, "cluster-cidr", options.config.ClusterCIDR, "The CIDR range of pods in the cluster. When configured, traffic sent to a Service cluster IP from outside this range will be masqueraded and traffic sent from pods to an external LoadBalancer IP will be directed to the respective cluster IP instead")
-	fs.StringVar(&options.config.ClientConnection.ContentType, "kube-api-content-type", options.config.ClientConnection.ContentType, "Content type of requests sent to apiserver.")
-	fs.Float32Var(&options.config.ClientConnection.QPS, "kube-api-qps", options.config.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver")
-	fs.IntVar(&options.config.ClientConnection.Burst, "kube-api-burst", options.config.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver")
-	fs.DurationVar(&options.config.UDPIdleTimeout.Duration, "udp-timeout", options.config.UDPIdleTimeout.Duration, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace")
-	fs.Int32Var(&options.config.Conntrack.Max, "conntrack-max", options.config.Conntrack.Max,
-		"Maximum number of NAT connections to track (0 to leave as-is). This overrides conntrack-max-per-core and conntrack-min.")
-	fs.MarkDeprecated("conntrack-max", "This feature will be removed in a later release.")
-	fs.Int32Var(&options.config.Conntrack.MaxPerCore, "conntrack-max-per-core", options.config.Conntrack.MaxPerCore,
-		"Maximum number of NAT connections to track per CPU core (0 to leave the limit as-is and ignore conntrack-min).")
-	fs.Int32Var(&options.config.Conntrack.Min, "conntrack-min", options.config.Conntrack.Min,
-		"Minimum number of conntrack entries to allocate, regardless of conntrack-max-per-core (set conntrack-max-per-core=0 to leave the limit as-is).")
-	fs.DurationVar(&options.config.Conntrack.TCPEstablishedTimeout.Duration, "conntrack-tcp-timeout-established", options.config.Conntrack.TCPEstablishedTimeout.Duration, "Idle timeout for established TCP connections (0 to leave as-is)")
-	fs.DurationVar(
-		&options.config.Conntrack.TCPCloseWaitTimeout.Duration, "conntrack-tcp-timeout-close-wait",
-		options.config.Conntrack.TCPCloseWaitTimeout.Duration,
-		"NAT timeout for TCP connections in the CLOSE_WAIT state")
-	fs.BoolVar(&options.config.EnableProfiling, "profiling", options.config.EnableProfiling, "If true enables profiling via web interface on /debug/pprof handler.")
-	fs.StringVar(&options.config.IPVS.Scheduler, "ipvs-scheduler", options.config.IPVS.Scheduler, "The ipvs scheduler type when proxy mode is ipvs")
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
 
 func NewOptions() (*Options, error) {
 	o := &Options{
-		config:      new(componentconfig.KubeProxyConfiguration),
-		healthzPort: ports.ProxyHealthzPort,
+		config: new(componentconfig.KubeProxyConfiguration),
 	}
 
 	o.scheme = runtime.NewScheme()
@@ -176,16 +120,6 @@ func NewOptions() (*Options, error) {
 	}
 
 	return o, nil
-}
-
-// Complete completes all the required options.
-func (o *Options) Complete() error {
-	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
-		glog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
-		o.applyDeprecatedHealthzPortToConfig()
-	}
-
-	return nil
 }
 
 // Validate validates all the required options.
@@ -218,7 +152,7 @@ func (o *Options) Run() error {
 		}
 	}
 
-	proxyServer, err := NewProxyServer(config, o.CleanupAndExit, o.scheme, o.master)
+	proxyServer, err := NewProxyServer(config, o.CleanupAndExit, o.scheme)
 	if err != nil {
 		return err
 	}
@@ -254,26 +188,6 @@ func (o *Options) writeConfigFile() error {
 	glog.Infof("Wrote configuration to: %s\n", o.WriteConfigTo)
 
 	return nil
-}
-
-// applyDeprecatedHealthzPortToConfig sets o.config.HealthzBindAddress from
-// flags passed on the command line based on the following rules:
-//
-// 1. If --healthz-port is 0, disable the healthz server.
-// 2. Otherwise, use the value of --healthz-port for the port portion of
-//    o.config.HealthzBindAddress
-func (o *Options) applyDeprecatedHealthzPortToConfig() {
-	if o.healthzPort == 0 {
-		o.config.HealthzBindAddress = ""
-		return
-	}
-
-	index := strings.Index(o.config.HealthzBindAddress, ":")
-	if index != -1 {
-		o.config.HealthzBindAddress = o.config.HealthzBindAddress[0:index]
-	}
-
-	o.config.HealthzBindAddress = fmt.Sprintf("%s:%d", o.config.HealthzBindAddress, o.healthzPort)
 }
 
 // loadConfigFromFile loads the contents of file and decodes it as a
@@ -336,7 +250,6 @@ addon that provides cluster DNS for these cluster IPs. The user must create a se
 with the apiserver API to configure the proxy.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			verflag.PrintAndExitIfRequested()
-			cmdutil.CheckErr(opts.Complete())
 			cmdutil.CheckErr(opts.Validate(args))
 			cmdutil.CheckErr(opts.Run())
 		},
@@ -381,18 +294,16 @@ type ProxyServer struct {
 	HealthzServer          *healthcheck.HealthzServer
 }
 
-// createClients creates a kube client and an event client from the given config and masterOverride.
-// TODO remove masterOverride when CLI flags are removed.
-func createClients(config componentconfig.ClientConnectionConfiguration, masterOverride string) (clientset.Interface, v1core.EventsGetter, error) {
-	if len(config.KubeConfigFile) == 0 && len(masterOverride) == 0 {
-		glog.Warningf("Neither --kubeconfig nor --master was specified. Using default API client. This might not work.")
+// createClients creates a kube client and an event client from the given config.
+func createClients(config componentconfig.ClientConnectionConfiguration) (clientset.Interface, v1core.EventsGetter, error) {
+	if len(config.KubeConfigFile) == 0 {
+		glog.Warningf("--kubeconfig was not specified. Using default API client. This might not work.")
 	}
 
-	// This creates a client, first loading any specified kubeconfig
-	// file, and then overriding the Master flag, if non-empty.
+	// This creates a client loading any specified kubeconfig file
 	kubeConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: config.KubeConfigFile},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterOverride}}).ClientConfig()
+		&clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
 		return nil, nil, err
 	}

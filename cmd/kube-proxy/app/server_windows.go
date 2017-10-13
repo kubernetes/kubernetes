@@ -46,7 +46,7 @@ import (
 )
 
 // NewProxyServer returns a new ProxyServer.
-func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndExit bool, scheme *runtime.Scheme, master string) (*ProxyServer, error) {
+func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndExit bool, scheme *runtime.Scheme) (*ProxyServer, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
 	}
@@ -62,7 +62,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 		return &ProxyServer{CleanupAndExit: cleanupAndExit}, nil
 	}
 
-	client, eventClient, err := createClients(config.ClientConnection, master)
+	client, eventClient, err := createClients(config.ClientConnection)
 	if err != nil {
 		return nil, err
 	}
