@@ -65,8 +65,7 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 		testDownwardAPI(f, podName, env, expectations)
 	})
 
-	It("should provide pod and host IP as an env var [Conformance]", func() {
-		framework.SkipUnlessServerVersionGTE(hostIPVersion, f.ClientSet.Discovery())
+	It("should provide pod IP as an env var [Conformance]", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -78,6 +77,19 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 					},
 				},
 			},
+		}
+
+		expectations := []string{
+			"POD_IP=(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)",
+		}
+
+		testDownwardAPI(f, podName, env, expectations)
+	})
+
+	It("should provide host IP as an env var [Conformance]", func() {
+		framework.SkipUnlessServerVersionGTE(hostIPVersion, f.ClientSet.Discovery())
+		podName := "downward-api-" + string(uuid.NewUUID())
+		env := []v1.EnvVar{
 			{
 				Name: "HOST_IP",
 				ValueFrom: &v1.EnvVarSource{
@@ -90,7 +102,6 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 		}
 
 		expectations := []string{
-			"POD_IP=(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)",
 			"HOST_IP=(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)",
 		}
 
