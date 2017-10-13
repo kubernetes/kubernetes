@@ -642,6 +642,11 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, _ v1.PodStatus, podStat
 
 		podSandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandboxID)
 		if err != nil {
+			ref, err := ref.GetReference(api.Scheme, pod)
+			if err != nil {
+				glog.Errorf("Couldn't make a ref to pod %q: '%v'", format.Pod(pod), err)
+			}
+			m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedStatusPodSandBox, "Unable to get pod sandbox status: %v", err)
 			glog.Errorf("Failed to get pod sandbox status: %v; Skipping pod %q", err, format.Pod(pod))
 			result.Fail(err)
 			return
