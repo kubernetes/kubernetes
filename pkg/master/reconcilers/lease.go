@@ -24,6 +24,7 @@ https://github.com/openshift/origin/blob/bb340c5dd5ff72718be86fb194dedc0faed7f4c
 import (
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
@@ -44,6 +45,9 @@ type Leases interface {
 
 	// UpdateLease adds or refreshes a master's lease
 	UpdateLease(ip string) error
+
+	// RemoveLease removes a master's lease
+	RemoveLease(ip string) error
 }
 
 type storageLeases struct {
@@ -96,6 +100,11 @@ func (s *storageLeases) UpdateLease(ip string) error {
 	})
 }
 
+// RemoveLease removes the lease on a master IP in storage
+func (s *storageLeases) RemoveLease(ip string) error {
+	return s.storage.Delete(apirequest.NewDefaultContext(), s.baseKey+"/"+ip, &api.Endpoints{}, nil)
+}
+
 // NewLeases creates a new etcd-based Leases implementation.
 func NewLeases(storage storage.Interface, baseKey string, leaseTime time.Duration) Leases {
 	return &storageLeases{
@@ -106,15 +115,18 @@ func NewLeases(storage storage.Interface, baseKey string, leaseTime time.Duratio
 }
 
 type leaseEndpointReconciler struct {
-	endpointRegistry endpoint.Registry
-	masterLeases     Leases
+	endpointRegistry      endpoint.Registry
+	masterLeases          Leases
+	stopReconcilingCalled bool
+	reconcilingLock       sync.Mutex
 }
 
 // NewLeaseEndpointReconciler creates a new LeaseEndpoint reconciler
 func NewLeaseEndpointReconciler(endpointRegistry endpoint.Registry, masterLeases Leases) EndpointReconciler {
 	return &leaseEndpointReconciler{
-		endpointRegistry: endpointRegistry,
-		masterLeases:     masterLeases,
+		endpointRegistry:      endpointRegistry,
+		masterLeases:          masterLeases,
+		stopReconcilingCalled: false,
 	}
 }
 
@@ -126,7 +138,12 @@ func NewLeaseEndpointReconciler(endpointRegistry endpoint.Registry, masterLeases
 // different from the directory listing, and update the endpoints object
 // accordingly.
 func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
-	ctx := apirequest.NewDefaultContext()
+	r.reconcilingLock.Lock()
+	defer r.reconcilingLock.Unlock()
+
+	if r.stopReconcilingCalled {
+		return nil
+	}
 
 	// Refresh the TTL on our key, independently of whether any error or
 	// update conflict happens below. This makes sure that at least some of
@@ -134,6 +151,12 @@ func (r *leaseEndpointReconciler) ReconcileEndpoints(serviceName string, ip net.
 	if err := r.masterLeases.UpdateLease(ip.String()); err != nil {
 		return err
 	}
+
+	return r.doReconcile(serviceName, endpointPorts, reconcilePorts)
+}
+
+func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts []api.EndpointPort, reconcilePorts bool) error {
+	ctx := apirequest.NewDefaultContext()
 
 	// Retrieve the current list of endpoints...
 	e, err := r.endpointRegistry.GetEndpoints(ctx, serviceName, &metav1.GetOptions{})
@@ -248,4 +271,16 @@ func checkEndpointSubsetFormatWithLease(e *api.Endpoints, expectedIPs []string, 
 	}
 
 	return true, ipsCorrect, portsCorrect
+}
+
+func (r *leaseEndpointReconciler) StopReconciling(serviceName string, ip net.IP, endpointPorts []api.EndpointPort) error {
+	r.reconcilingLock.Lock()
+	defer r.reconcilingLock.Unlock()
+	r.stopReconcilingCalled = true
+
+	if err := r.masterLeases.RemoveLease(ip.String()); err != nil {
+		return err
+	}
+
+	return r.doReconcile(serviceName, endpointPorts, true)
 }
