@@ -65,20 +65,20 @@ through the API as necessary.`,
 
 // Run runs the specified SchedulerServer.  This should never exit.
 func Run(s *options.SchedulerServer) error {
-	kubecli, err := createClient(s)
+	kubeClient, leaderElectionClient, err := createClients(s)
 	if err != nil {
 		return fmt.Errorf("unable to create kube client: %v", err)
 	}
 
-	recorder := createRecorder(kubecli, s)
+	recorder := createRecorder(kubeClient, s)
 
-	informerFactory := informers.NewSharedInformerFactory(kubecli, 0)
+	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 	// cache only non-terminal pods
-	podInformer := factory.NewPodInformer(kubecli, 0)
+	podInformer := factory.NewPodInformer(kubeClient, 0)
 
 	sched, err := CreateScheduler(
 		s,
-		kubecli,
+		kubeClient,
 		informerFactory.Core().V1().Nodes(),
 		podInformer,
 		informerFactory.Core().V1().PersistentVolumes(),
@@ -121,7 +121,7 @@ func Run(s *options.SchedulerServer) error {
 	rl, err := resourcelock.New(s.LeaderElection.ResourceLock,
 		s.LockObjectNamespace,
 		s.LockObjectName,
-		kubecli,
+		leaderElectionClient,
 		resourcelock.ResourceLockConfig{
 			Identity:      id,
 			EventRecorder: recorder,
