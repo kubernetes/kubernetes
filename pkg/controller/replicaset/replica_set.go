@@ -266,6 +266,39 @@ func (rsc *ReplicaSetController) addPod(obj interface{}) {
 	}
 }
 
+// When a pod is created, obtain the affected replicaset that should be enqueued to the workqueue.
+func (rsc *ReplicaSetController) getAffectedRSsByPodCreation(obj interface{}) []*extensions.ReplicaSet {
+	pod := obj.(*v1.Pod)
+
+	if pod.DeletionTimestamp != nil {
+		// on a restart of the controller manager, it's possible a new pod shows up in a state that
+		// is already pending deletion. Prevent the pod from being a creation observation.
+		return getAffectedRSsByPodDeletion(pod)
+	}
+
+	// If it has a ControllerRef, that's all that matters.
+	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil {
+		rs := rsc.resolveControllerRef(pod.Namespace, controllerRef)
+		var rss []*extensions.ReplicaSet
+		if rs == nil {
+			return rss
+		}
+		rsKey, err := controller.KeyFunc(rs)
+		if err != nil {
+			return rss
+		}
+		glog.V(4).Infof("Pod %s created: %#v.", pod.Name, pod)
+		rsc.expectations.CreationObserved(rsKey)
+		return append(rss, rs)
+	}
+
+	// Otherwise, it's an orphan. Get a list of all matching ReplicaSets and sync
+	// them to see if anyone wants to adopt it.
+	glog.V(4).Infof("Orphan Pod %s created: %#v.", pod.Name, pod
+	return rsc.getPodReplicaSets(pod)
+}
+
+
 // When a pod is updated, figure out what replica set/s manage it and wake them
 // up. If the labels of the pod have changed we need to awaken both the old
 // and new replica set. old and cur must be *v1.Pod types.
@@ -340,6 +373,83 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 		}
 	}
 }
+
+// When a pod is updated, figure out what replica set/s manage it and wake them
+// up. If the labels of the pod have changed we need to awaken both the old
+// and new replica set. old and cur must be *v1.Pod types.
+func (rsc *ReplicaSetController) getAffectedRSsByPodUpdate(old, cur interface{}) []*extensions.ReplicaSet {
+	curPod := cur.(*v1.Pod)
+	oldPod := old.(*v1.Pod)
+	if curPod.ResourceVersion == oldPod.ResourceVersion {
+		// Periodic resync will send update events for all known pods.
+		// Two different versions of the same pod will always have different RVs.
+		return
+	}
+
+	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
+	if curPod.DeletionTimestamp != nil {
+		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
+		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
+		// for modification of the deletion timestamp and expect an rs to create more replicas asap, not wait
+		// until the kubelet actually deletes the pod. This is different from the Phase of a pod changing, because
+		// an rs never initiates a phase change, and so is never asleep waiting for the same.
+		rss := getAffectedRSsByPodDeletion(curPod)
+		if labelChanged {
+			// we don't need to check the oldPod.DeletionTimestamp because DeletionTimestamp cannot be unset.
+			rss = append(rss, getAffectedRSsByPodDeletion(oldPod))
+		}
+		return rss
+	}
+
+	var rss *[]extensions.ReplicaSet
+	curControllerRef := metav1.GetControllerOf(curPod)
+	oldControllerRef := metav1.GetControllerOf(oldPod)
+	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
+	if controllerRefChanged && oldControllerRef != nil {
+		// The ControllerRef was changed. Sync the old controller, if any.
+		if rs := rsc.resolveControllerRef(oldPod.Namespace, oldControllerRef); rs != nil {
+			rss = append(rss, rs)
+		}
+	}
+
+	// If it has a ControllerRef, that's all that matters.
+	if curControllerRef != nil {
+		rs := rsc.resolveControllerRef(curPod.Namespace, curControllerRef)
+		if rs == nil {
+			return rss
+		}
+		glog.V(4).Infof("Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
+		rss = append(rss, rs)
+		// TODO: MinReadySeconds in the Pod will generate an Available condition to be added in
+		// the Pod status which in turn will trigger a requeue of the owning replica set thus
+		// having its status updated with the newly available replica. For now, we can fake the
+		// update by resyncing the controller MinReadySeconds after the it is requeued because
+		// a Pod transitioned to Ready.
+		// Note that this still suffers from #29229, we are just moving the problem one level
+		// "closer" to kubelet (from the deployment to the replica set controller).
+		if !podutil.IsPodReady(oldPod) && podutil.IsPodReady(curPod) && rs.Spec.MinReadySeconds > 0 {
+			glog.V(2).Infof("ReplicaSet %q will be enqueued after %ds for availability check", rs.Name, rs.Spec.MinReadySeconds)
+			// Add a second to avoid milliseconds skew in AddAfter.
+			// See https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info.
+			rsc.enqueueReplicaSetAfter(rs, (time.Duration(rs.Spec.MinReadySeconds)*time.Second)+time.Second)
+		}
+		return
+	}
+
+	// Otherwise, it's an orphan. If anything changed, sync matching controllers
+	// to see if anyone wants to adopt it now.
+	if labelChanged || controllerRefChanged {
+		matchingRSs := rsc.getPodReplicaSets(curPod)
+		if len(matchingRSs) == 0 {
+			return rss
+		}
+		glog.V(4).Infof("Orphan Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
+		rss = append(rss, matchingRSs)
+	}
+
+	return rss
+}
+
 
 // When a pod is deleted, enqueue the replica set that manages the pod and update its expectations.
 // obj could be an *v1.Pod, or a DeletionFinalStateUnknown marker item.
