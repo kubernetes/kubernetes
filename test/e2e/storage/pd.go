@@ -79,7 +79,7 @@ var _ = SIGDescribe("Pod Disks", func() {
 		}
 		tests := []testT{
 			{
-				descr:     "immediate (0)",
+				descr:     "immediate (0s)",
 				deleteOpt: metav1.NewDeleteOptions(0),
 			},
 			{
@@ -109,43 +109,42 @@ var _ = SIGDescribe("Pod Disks", func() {
 					podClient.Delete(host1Pod.Name, podDelOpt)
 					detachAndDeletePDs(diskName, []types.NodeName{host0Name, host1Name})
 				}()
-
 				_, err = podClient.Create(host0Pod)
 				framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 				framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
-				framework.Logf(fmt.Sprintf("host0Pod: %q, node0: %q", host0Pod.Name, host0Name))
+				framework.Logf("host0Pod: %q, node0: %q", host0Pod.Name, host0Name)
 
 				By("writing content to host0Pod on node0")
 				containerName := "mycontainer"
 				testFile := "/testpd1/tracker"
 				testFileContents := fmt.Sprintf("%v", mathrand.Int())
 				framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
-				framework.Logf(fmt.Sprintf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name))
+				framework.Logf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name)
 
 				By("verifying PD is present in node0's VolumeInUse list")
 				framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* shouldExist */))
 
 				By("deleting host0Pod")
 				framework.ExpectNoError(podClient.Delete(host0Pod.Name, podDelOpt), "Failed to delete host0Pod")
-				framework.Logf(fmt.Sprintf("deleted host0Pod %q", host0Pod.Name))
+				framework.Logf("deleted host0Pod %q", host0Pod.Name)
 
 				By("creating host1Pod on node1")
 				_, err = podClient.Create(host1Pod)
 				framework.ExpectNoError(err, "Failed to create host1Pod")
 				framework.ExpectNoError(f.WaitForPodRunningSlow(host1Pod.Name))
-				framework.Logf(fmt.Sprintf("host1Pod: %q, node1: %q", host1Pod.Name, host1Name))
+				framework.Logf("host1Pod: %q, node1: %q", host1Pod.Name, host1Name)
 
 				By("verifying PD contents in host1Pod")
 				verifyPDContentsViaContainer(f, host1Pod.Name, containerName, map[string]string{testFile: testFileContents})
-				framework.Logf(fmt.Sprintf("verified PD contents in pod %q", host1Pod.Name))
+				framework.Logf("verified PD contents in pod %q", host1Pod.Name)
 
 				By("verifying PD is removed from node1")
 				framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, false /* shouldExist */))
-				framework.Logf(fmt.Sprintf("PD %q removed from node %q's VolumeInUse list", diskName, host1Pod.Name))
+				framework.Logf("PD %q removed from node %q's VolumeInUse list", diskName, host1Pod.Name)
 
 				By("deleting host1Pod")
 				framework.ExpectNoError(podClient.Delete(host1Pod.Name, podDelOpt), "Failed to delete host1Pod")
-				framework.Logf(fmt.Sprintf("deleted host1Pod %q", host1Pod.Name))
+				framework.Logf("deleted host1Pod %q", host1Pod.Name)
 
 				By("Test completed successfully, waiting for PD to detach from both nodes")
 				waitForPDDetach(diskName, host0Name)
@@ -161,7 +160,7 @@ var _ = SIGDescribe("Pod Disks", func() {
 		}
 		tests := []testT{
 			{
-				descr:     "immediate (0)",
+				descr:     "immediate (0s)",
 				deleteOpt: metav1.NewDeleteOptions(0),
 			},
 			{
@@ -200,7 +199,7 @@ var _ = SIGDescribe("Pod Disks", func() {
 
 				By("deleting the rwPod")
 				framework.ExpectNoError(podClient.Delete(rwPod.Name, metav1.NewDeleteOptions(0)), "Failed to delete rwPod")
-				framework.Logf(fmt.Sprintf("deleted rwPod %q", rwPod.Name))
+				framework.Logf("deleted rwPod %q", rwPod.Name)
 
 				By("waiting for PD to detach")
 				framework.ExpectNoError(waitForPDDetach(diskName, host0Name))
@@ -216,10 +215,10 @@ var _ = SIGDescribe("Pod Disks", func() {
 
 				By("deleting host0ROPod")
 				framework.ExpectNoError(podClient.Delete(host0ROPod.Name, podDelOpt), "Failed to delete host0ROPod")
-				framework.Logf(fmt.Sprintf("deleted host0ROPod %q", host0ROPod.Name))
+				framework.Logf("deleted host0ROPod %q", host0ROPod.Name)
 				By("deleting host1ROPod")
 				framework.ExpectNoError(podClient.Delete(host1ROPod.Name, podDelOpt), "Failed to delete host1ROPod")
-				framework.Logf(fmt.Sprintf("deleted host1ROPod %q", host1ROPod.Name))
+				framework.Logf("deleted host1ROPod %q", host1ROPod.Name)
 
 				By("Test completed successfully, waiting for PD to detach from both nodes")
 				waitForPDDetach(diskName, host0Name)
@@ -292,7 +291,7 @@ var _ = SIGDescribe("Pod Disks", func() {
 						testFileContents := fmt.Sprintf("%v", mathrand.Int())
 						fileAndContentToVerify[testFile] = testFileContents
 						framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
-						framework.Logf(fmt.Sprintf("wrote %q to file %q in pod %q (container %q) on node %q", testFileContents, testFile, host0Pod.Name, containerName, host0Name))
+						framework.Logf("wrote %q to file %q in pod %q (container %q) on node %q", testFileContents, testFile, host0Pod.Name, containerName, host0Name)
 					}
 
 					By("verifying PD contents via a container")
@@ -345,7 +344,7 @@ var _ = SIGDescribe("Pod Disks", func() {
 		testFile := "/testpd1/tracker"
 		testFileContents := fmt.Sprintf("%v", mathrand.Int())
 		framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
-		framework.Logf(fmt.Sprintf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name))
+		framework.Logf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name)
 
 		By("verifying PD is present in node0's VolumeInUse list")
 		framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* should exist*/))
@@ -408,7 +407,7 @@ var _ = SIGDescribe("Pod Disks", func() {
 		testFile := "/testpd1/tracker"
 		testFileContents := fmt.Sprintf("%v", mathrand.Int())
 		framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
-		framework.Logf(fmt.Sprintf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name))
+		framework.Logf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name)
 
 		By("verifying PD is present in node0's VolumeInUse list")
 		framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* should exist*/))
@@ -462,59 +461,62 @@ func detachPD(nodeName types.NodeName, pdName string) error {
 		if err != nil {
 			return err
 		}
-
 		err = gceCloud.DetachDisk(pdName, nodeName)
 		if err != nil {
 			if gerr, ok := err.(*googleapi.Error); ok && strings.Contains(gerr.Message, "Invalid value for field 'disk'") {
 				// PD already detached, ignore error.
 				return nil
 			}
-
 			framework.Logf("Error detaching PD %q: %v", pdName, err)
 		}
-
 		return err
+
 	} else if framework.TestContext.Provider == "aws" {
 		client := ec2.New(session.New())
-
 		tokens := strings.Split(pdName, "/")
 		awsVolumeID := tokens[len(tokens)-1]
-
 		request := ec2.DetachVolumeInput{
 			VolumeId: aws.String(awsVolumeID),
 		}
-
 		_, err := client.DetachVolume(&request)
 		if err != nil {
 			return fmt.Errorf("error detaching EBS volume: %v", err)
 		}
 		return nil
+
 	} else {
 		return fmt.Errorf("Provider does not support volume detaching")
 	}
 }
 
+// Returns pod spec suitable for api Create call. Handles gce, gke and aws providers only and
+// escapes if a different provider is supplied.
+// The first container name is hard-coded to "mycontainer". Subsequent containers are named:
+// "mycontainer<number> where <number> is 1..numContainers. Note if there is only one container it's
+// name has no number.
+// Container's volumeMounts are hard-coded to "/testpd<number>" where <number> is 1..len(diskNames).
 func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, numContainers int) *v1.Pod {
+	// escape if not a supported provider
+	if !(framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" ||
+		framework.TestContext.Provider == "aws") {
+		framework.Failf(fmt.Sprintf("func `testPDPod` only supports gce, gke, and aws providers, not %v", framework.TestContext.Provider))
+	}
+
 	containers := make([]v1.Container, numContainers)
 	for i := range containers {
 		containers[i].Name = "mycontainer"
 		if numContainers > 1 {
 			containers[i].Name = fmt.Sprintf("mycontainer%v", i+1)
 		}
-
 		containers[i].Image = imageutils.GetBusyBoxImage()
-
 		containers[i].Command = []string{"sleep", "6000"}
-
 		containers[i].VolumeMounts = make([]v1.VolumeMount, len(diskNames))
 		for k := range diskNames {
 			containers[i].VolumeMounts[k].Name = fmt.Sprintf("testpd%v", k+1)
 			containers[i].VolumeMounts[k].MountPath = fmt.Sprintf("/testpd%v", k+1)
 		}
-
 		containers[i].Resources.Limits = v1.ResourceList{}
 		containers[i].Resources.Limits[v1.ResourceCPU] = *resource.NewQuantity(int64(0), resource.DecimalSI)
-
 	}
 
 	pod := &v1.Pod{
@@ -531,10 +533,18 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 		},
 	}
 
-	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
-		pod.Spec.Volumes = make([]v1.Volume, len(diskNames))
-		for k, diskName := range diskNames {
-			pod.Spec.Volumes[k].Name = fmt.Sprintf("testpd%v", k+1)
+	pod.Spec.Volumes = make([]v1.Volume, len(diskNames))
+	for k, diskName := range diskNames {
+		pod.Spec.Volumes[k].Name = fmt.Sprintf("testpd%v", k+1)
+		if framework.TestContext.Provider == "aws" {
+			pod.Spec.Volumes[k].VolumeSource = v1.VolumeSource{
+				AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+					VolumeID: diskName,
+					FSType:   "ext4",
+					ReadOnly: readOnly,
+				},
+			}
+		} else { // "gce" or "gke"
 			pod.Spec.Volumes[k].VolumeSource = v1.VolumeSource{
 				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 					PDName:   diskName,
@@ -543,22 +553,7 @@ func testPDPod(diskNames []string, targetNode types.NodeName, readOnly bool, num
 				},
 			}
 		}
-	} else if framework.TestContext.Provider == "aws" {
-		pod.Spec.Volumes = make([]v1.Volume, len(diskNames))
-		for k, diskName := range diskNames {
-			pod.Spec.Volumes[k].Name = fmt.Sprintf("testpd%v", k+1)
-			pod.Spec.Volumes[k].VolumeSource = v1.VolumeSource{
-				AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
-					VolumeID: diskName,
-					FSType:   "ext4",
-					ReadOnly: readOnly,
-				},
-			}
-		}
-	} else {
-		panic("Unknown provider: " + framework.TestContext.Provider)
 	}
-
 	return pod
 }
 
@@ -570,26 +565,21 @@ func waitForPDDetach(diskName string, nodeName types.NodeName) error {
 		if err != nil {
 			return err
 		}
-
 		for start := time.Now(); time.Since(start) < gcePDDetachTimeout; time.Sleep(gcePDDetachPollTime) {
 			diskAttached, err := gceCloud.DiskIsAttached(diskName, nodeName)
 			if err != nil {
 				framework.Logf("Error waiting for PD %q to detach from node %q. 'DiskIsAttached(...)' failed with %v", diskName, nodeName, err)
 				return err
 			}
-
 			if !diskAttached {
 				// Specified disk does not appear to be attached to specified node
 				framework.Logf("GCE PD %q appears to have successfully detached from %q.", diskName, nodeName)
 				return nil
 			}
-
 			framework.Logf("Waiting for GCE PD %q to detach from %q.", diskName, nodeName)
 		}
-
 		return fmt.Errorf("Gave up waiting for GCE PD %q to detach from %q after %v", diskName, nodeName, gcePDDetachTimeout)
 	}
-
 	return nil
 }
 
@@ -614,42 +604,28 @@ func waitForPDInVolumesInUse(
 	if !shouldExist {
 		logStr = "to NOT contain"
 	}
-	framework.Logf(
-		"Waiting for node %s's VolumesInUse Status %s PD %q",
-		nodeName, logStr, diskName)
+	framework.Logf("Waiting for node %s's VolumesInUse Status %s PD %q", nodeName, logStr, diskName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(nodeStatusPollTime) {
 		nodeObj, err := nodeClient.Get(string(nodeName), metav1.GetOptions{})
 		if err != nil || nodeObj == nil {
-			framework.Logf(
-				"Failed to fetch node object %q from API server. err=%v",
-				nodeName, err)
+			framework.Logf("Failed to fetch node object %q from API server. err=%v", nodeName, err)
 			continue
 		}
-
 		exists := false
 		for _, volumeInUse := range nodeObj.Status.VolumesInUse {
 			volumeInUseStr := string(volumeInUse)
 			if strings.Contains(volumeInUseStr, diskName) {
 				if shouldExist {
-					framework.Logf(
-						"Found PD %q in node %q's VolumesInUse Status: %q",
-						diskName, nodeName, volumeInUseStr)
+					framework.Logf("Found PD %q in node %q's VolumesInUse Status: %q", diskName, nodeName, volumeInUseStr)
 					return nil
 				}
-
 				exists = true
 			}
 		}
-
 		if !shouldExist && !exists {
-			framework.Logf(
-				"Verified PD %q does not exist in node %q's VolumesInUse Status.",
-				diskName, nodeName)
+			framework.Logf("Verified PD %q does not exist in node %q's VolumesInUse Status.", diskName, nodeName)
 			return nil
 		}
 	}
-
-	return fmt.Errorf(
-		"Timed out waiting for node %s VolumesInUse Status %s diskName %q",
-		nodeName, logStr, diskName)
+	return fmt.Errorf("Timed out waiting for node %s VolumesInUse Status %s diskName %q", nodeName, logStr, diskName)
 }
