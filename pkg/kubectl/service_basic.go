@@ -63,7 +63,7 @@ func (ServiceClusterIPGeneratorV1) ParamNames() []GeneratorParam {
 func (ServiceNodePortGeneratorV1) ParamNames() []GeneratorParam {
 	return []GeneratorParam{
 		{"name", true},
-		{"tcp", true},
+		{"ports", true},
 	}
 }
 func (ServiceLoadBalancerGeneratorV1) ParamNames() []GeneratorParam {
@@ -80,15 +80,15 @@ func (ServiceExternalNameGeneratorV1) ParamNames() []GeneratorParam {
 	}
 }
 
-func parsePorts(portString string) (int32, intstr.IntOrString, error) {
+func parsePorts(portString string) (int32, intstr.IntOrString, int32, error) {
 	portStringSlice := strings.Split(portString, ":")
 
 	port, err := strconv.Atoi(portStringSlice[0])
 	if err != nil {
-		return 0, intstr.FromInt(0), err
+		return 0, intstr.FromInt(0), 0, err
 	}
 	if len(portStringSlice) == 1 {
-		return int32(port), intstr.FromInt(int(port)), nil
+		return int32(port), intstr.FromInt(int(port)), 0, nil
 	}
 
 	var targetPort intstr.IntOrString
@@ -97,7 +97,16 @@ func parsePorts(portString string) (int32, intstr.IntOrString, error) {
 	} else {
 		targetPort = intstr.FromInt(portNum)
 	}
-	return int32(port), targetPort, nil
+
+	nodePort := 0
+	if len(portStringSlice) == 3 {
+		nodePort, err = strconv.Atoi(portStringSlice[2])
+		if err != nil {
+			return 0, intstr.FromInt(0), 0, err
+		}
+	}
+
+	return int32(port), targetPort, int32(nodePort), nil
 }
 
 func (s ServiceCommonGeneratorV1) GenerateCommon(params map[string]interface{}) error {
@@ -206,7 +215,7 @@ func (s ServiceCommonGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	}
 	ports := []v1.ServicePort{}
 	for _, tcpString := range s.TCP {
-		port, targetPort, err := parsePorts(tcpString)
+		port, targetPort, nodePort, err := parsePorts(tcpString)
 		if err != nil {
 			return nil, err
 		}
@@ -217,7 +226,7 @@ func (s ServiceCommonGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 			Port:       port,
 			TargetPort: targetPort,
 			Protocol:   v1.Protocol("TCP"),
-			NodePort:   0,
+			NodePort:   nodePort,
 		})
 	}
 
