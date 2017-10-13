@@ -25,6 +25,15 @@ import (
 
 type ContainerCpuAssignment map[string]cpuset.CPUSet
 
+func (as ContainerCpuAssignment) DeepCopy() ContainerCpuAssignment {
+	ret := make(ContainerCpuAssignment)
+	for key, val := range as {
+		ret[key] = val
+	}
+	return ret
+}
+
+
 type stateMemory struct {
 	sync.RWMutex
 	assignments   ContainerCpuAssignment
@@ -61,7 +70,7 @@ func (s *stateMemory) GetCPUSet(containerID string) (cpuset.CPUSet, bool) {
 func (s *stateMemory) GetAllCPUSets() ContainerCpuAssignment {
 	s.RLock()
 	defer s.RUnlock()
-	return s.assignments
+	return s.assignments.DeepCopy()
 }
 
 func (s *stateMemory) GetDefaultCPUSet() cpuset.CPUSet {
