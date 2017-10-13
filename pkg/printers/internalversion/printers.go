@@ -365,6 +365,7 @@ func AddHandlers(h printers.PrintHandler) {
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Status", Type: "string", Description: "Status of the cluster"},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+		{Name: "Labels", Type: "string", Description: "The labels of the cluster"},
 	}
 	h.TableHandler(clusterColumnDefinitions, printCluster)
 	h.TableHandler(clusterColumnDefinitions, printClusterList)
@@ -764,6 +765,9 @@ func printCluster(obj *federation.Cluster, options printers.PrintOptions) ([]met
 		statuses = append(statuses, "Unknown")
 	}
 	row.Cells = append(row.Cells, obj.Name, strings.Join(statuses, ","), translateTimestamp(obj.CreationTimestamp))
+	if options.ShowLabels {
+		row.Cells = append(row.Cells, labels.FormatLabels(obj.Labels))
+	}
 	return []metav1alpha1.TableRow{row}, nil
 }
 

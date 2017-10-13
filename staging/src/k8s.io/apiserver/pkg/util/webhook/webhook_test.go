@@ -428,6 +428,65 @@ func TestTLSConfig(t *testing.T) {
 	}
 }
 
+func TestRequestTimeout(t *testing.T) {
+	done := make(chan struct{})
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		<-done
+		return
+	}
+
+	// Create and start a simple HTTPS server
+	server, err := newTestServer(clientCert, clientKey, caCert, handler)
+	if err != nil {
+		t.Errorf("failed to create server: %v", err)
+		return
+	}
+	defer server.Close()
+	defer close(done) // done channel must be closed before server is.
+
+	// Create a Kubernetes client configuration file
+	configFile, err := newKubeConfigFile(v1.Config{
+		Clusters: []v1.NamedCluster{
+			{
+				Cluster: v1.Cluster{
+					Server: server.URL,
+					CertificateAuthorityData: caCert,
+				},
+			},
+		},
+		AuthInfos: []v1.NamedAuthInfo{
+			{
+				AuthInfo: v1.AuthInfo{
+					ClientCertificateData: clientCert,
+					ClientKeyData:         clientKey,
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Errorf("failed to create the client config file: %v", err)
+		return
+	}
+	defer os.Remove(configFile)
+
+	var requestTimeout = 10 * time.Millisecond
+
+	wh, err := newGenericWebhook(registered.NewOrDie(""), scheme.Codecs, configFile, groupVersions, retryBackoff, requestTimeout)
+	if err != nil {
+		t.Fatalf("failed to create the webhook: %v", err)
+	}
+
+	resultCh := make(chan rest.Result)
+
+	go func() { resultCh <- wh.RestClient.Get().Do() }()
+	select {
+	case <-time.After(time.Second * 5):
+		t.Errorf("expected request to timeout after %s", requestTimeout)
+	case <-resultCh:
+	}
+}
+
 // TestWithExponentialBackoff ensures that the webhook's exponential backoff support works as expected
 func TestWithExponentialBackoff(t *testing.T) {
 	count := 0 // To keep track of the requests

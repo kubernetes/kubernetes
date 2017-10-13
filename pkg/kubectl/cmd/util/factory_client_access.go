@@ -34,6 +34,7 @@ import (
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -582,24 +583,30 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 // know.
 func FallbackGeneratorNameIfNecessary(
 	generatorName string,
-	resourcesList []*metav1.APIResourceList,
+	discoveryClient discovery.DiscoveryInterface,
 	cmdErr io.Writer,
-) string {
+) (string, error) {
 	switch generatorName {
 	case DeploymentBasicAppsV1Beta1GeneratorName:
-		if !Contains(resourcesList, appsv1beta1.SchemeGroupVersion.WithResource("deployments")) {
+		hasResource, err := HasResource(discoveryClient, appsv1beta1.SchemeGroupVersion.WithResource("deployments"))
+		if err != nil {
+			return "", err
+		}
+		if !hasResource {
 			warning(cmdErr, DeploymentBasicAppsV1Beta1GeneratorName, DeploymentBasicV1Beta1GeneratorName)
-
-			return DeploymentBasicV1Beta1GeneratorName
+			return DeploymentBasicV1Beta1GeneratorName, nil
 		}
 	case CronJobV2Alpha1GeneratorName:
-		if !Contains(resourcesList, batchv2alpha1.SchemeGroupVersion.WithResource("cronjobs")) {
+		hasResource, err := HasResource(discoveryClient, batchv2alpha1.SchemeGroupVersion.WithResource("cronjobs"))
+		if err != nil {
+			return "", err
+		}
+		if !hasResource {
 			warning(cmdErr, CronJobV2Alpha1GeneratorName, JobV1GeneratorName)
-
-			return JobV1GeneratorName
+			return JobV1GeneratorName, nil
 		}
 	}
-	return generatorName
+	return generatorName, nil
 }
 
 func warning(cmdErr io.Writer, newGeneratorName, oldGeneratorName string) {
@@ -609,6 +616,24 @@ func warning(cmdErr io.Writer, newGeneratorName, oldGeneratorName string) {
 		newGeneratorName,
 		oldGeneratorName,
 	)
+}
+
+func HasResource(client discovery.DiscoveryInterface, resource schema.GroupVersionResource) (bool, error) {
+	resources, err := client.ServerResourcesForGroupVersion(resource.GroupVersion().String())
+	if apierrors.IsNotFound(err) {
+		// entire group is missing
+		return false, nil
+	}
+	if err != nil {
+		// other errors error
+		return false, fmt.Errorf("failed to discover supported resources: %v", err)
+	}
+	for _, serverResource := range resources.APIResources {
+		if serverResource.Name == resource.Resource {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func Contains(resourcesList []*metav1.APIResourceList, resource schema.GroupVersionResource) bool {

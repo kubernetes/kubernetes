@@ -165,3 +165,11 @@ func TestErrListFilter(t *testing.T) {
 		t.Errorf("should filter")
 	}
 }
+
+func TestNotSupported(t *testing.T) {
+	notSupported := NotSupported(NewPath("f"), "v", []string{"a", "b", "c"})
+	expected := `Unsupported value: "v": supported values: "a", "b", "c"`
+	if notSupported.ErrorBody() != expected {
+		t.Errorf("Expected: %s\n, but got: %s\n", expected, notSupported.ErrorBody())
+	}
+}

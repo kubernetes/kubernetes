@@ -812,43 +812,21 @@ func isAutoscalerEnabled(expectedMaxNodeCountInTargetPool int) (bool, error) {
 }
 
 func enableAutoscaler(nodePool string, minCount, maxCount int) error {
-	if nodePool == "default-pool" {
-		glog.Infof("Using gcloud to enable autoscaling for pool %s", nodePool)
+	glog.Infof("Using gcloud to enable autoscaling for pool %s", nodePool)
 
-		output, err := execCmd("gcloud", "alpha", "container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
-			"--enable-autoscaling",
-			"--min-nodes="+strconv.Itoa(minCount),
-			"--max-nodes="+strconv.Itoa(maxCount),
-			"--node-pool="+nodePool,
-			"--project="+framework.TestContext.CloudConfig.ProjectID,
-			"--zone="+framework.TestContext.CloudConfig.Zone).CombinedOutput()
+	output, err := execCmd("gcloud", "container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
+		"--enable-autoscaling",
+		"--min-nodes="+strconv.Itoa(minCount),
+		"--max-nodes="+strconv.Itoa(maxCount),
+		"--node-pool="+nodePool,
+		"--project="+framework.TestContext.CloudConfig.ProjectID,
+		"--zone="+framework.TestContext.CloudConfig.Zone).CombinedOutput()
 
-		if err != nil {
-			glog.Errorf("Failed config update result: %s", output)
-			return fmt.Errorf("Failed to enable autoscaling: %v", err)
-		}
-		glog.Infof("Config update result: %s", output)
-	} else {
-		glog.Infof("Using direct api access to enable autoscaling for pool %s", nodePool)
-		updateRequest := "{" +
-			" \"update\": {" +
-			"  \"desiredNodePoolId\": \"" + nodePool + "\"," +
-			"  \"desiredNodePoolAutoscaling\": {" +
-			"   \"enabled\": \"true\"," +
-			"   \"minNodeCount\": \"" + strconv.Itoa(minCount) + "\"," +
-			"   \"maxNodeCount\": \"" + strconv.Itoa(maxCount) + "\"" +
-			"  }" +
-			" }" +
-			"}"
-
-		url := getGKEClusterURL()
-		glog.Infof("Using gke api url %s", url)
-		putResult, err := doPut(url, updateRequest)
-		if err != nil {
-			return fmt.Errorf("Failed to put %s: %v", url, err)
-		}
-		glog.Infof("Config update result: %s", putResult)
+	if err != nil {
+		glog.Errorf("Failed config update result: %s", output)
+		return fmt.Errorf("Failed to enable autoscaling: %v", err)
 	}
+	glog.Infof("Config update result: %s", output)
 
 	var finalErr error
 	for startTime := time.Now(); startTime.Add(gkeUpdateTimeout).After(time.Now()); time.Sleep(30 * time.Second) {
@@ -862,41 +840,19 @@ func enableAutoscaler(nodePool string, minCount, maxCount int) error {
 }
 
 func disableAutoscaler(nodePool string, minCount, maxCount int) error {
+	glog.Infof("Using gcloud to disable autoscaling for pool %s", nodePool)
 
-	if nodePool == "default-pool" {
-		glog.Infof("Using gcloud to disable autoscaling for pool %s", nodePool)
+	output, err := execCmd("gcloud", "container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
+		"--no-enable-autoscaling",
+		"--node-pool="+nodePool,
+		"--project="+framework.TestContext.CloudConfig.ProjectID,
+		"--zone="+framework.TestContext.CloudConfig.Zone).CombinedOutput()
 
-		output, err := execCmd("gcloud", "alpha", "container", "clusters", "update", framework.TestContext.CloudConfig.Cluster,
-			"--no-enable-autoscaling",
-			"--node-pool="+nodePool,
-			"--project="+framework.TestContext.CloudConfig.ProjectID,
-			"--zone="+framework.TestContext.CloudConfig.Zone).CombinedOutput()
-
-		if err != nil {
-			glog.Errorf("Failed config update result: %s", output)
-			return fmt.Errorf("Failed to disable autoscaling: %v", err)
-		}
-		glog.Infof("Config update result: %s", output)
-
-	} else {
-		glog.Infof("Using direct api access to disable autoscaling for pool %s", nodePool)
-		updateRequest := "{" +
-			" \"update\": {" +
-			"  \"desiredNodePoolId\": \"" + nodePool + "\"," +
-			"  \"desiredNodePoolAutoscaling\": {" +
-			"   \"enabled\": \"false\"," +
-			"  }" +
-			" }" +
-			"}"
-
-		url := getGKEClusterURL()
-		glog.Infof("Using gke api url %s", url)
-		putResult, err := doPut(url, updateRequest)
-		if err != nil {
-			return fmt.Errorf("Failed to put %s: %v", url, err)
-		}
-		glog.Infof("Config update result: %s", putResult)
+	if err != nil {
+		glog.Errorf("Failed config update result: %s", output)
+		return fmt.Errorf("Failed to disable autoscaling: %v", err)
 	}
+	glog.Infof("Config update result: %s", output)
 
 	var finalErr error
 	for startTime := time.Now(); startTime.Add(gkeUpdateTimeout).After(time.Now()); time.Sleep(30 * time.Second) {

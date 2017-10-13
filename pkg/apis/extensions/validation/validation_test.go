@@ -1169,7 +1169,7 @@ func TestValidateDeployment(t *testing.T) {
 	// must have valid strategy type
 	invalidStrategyDeployment := validDeployment()
 	invalidStrategyDeployment.Spec.Strategy.Type = extensions.DeploymentStrategyType("randomType")
-	errorCases["supported values: Recreate, RollingUpdate"] = invalidStrategyDeployment
+	errorCases[`supported values: "Recreate", "RollingUpdate"`] = invalidStrategyDeployment
 
 	// rollingUpdate should be nil for recreate.
 	invalidRecreateDeployment := validDeployment()
@@ -2532,42 +2532,42 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		"no user options": {
 			psp:         noUserOptions,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: "supported values: MustRunAs, MustRunAsNonRoot, RunAsAny",
+			errorDetail: `supported values: "MustRunAs", "MustRunAsNonRoot", "RunAsAny"`,
 		},
 		"no selinux options": {
 			psp:         noSELinuxOptions,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: "supported values: MustRunAs, RunAsAny",
+			errorDetail: `supported values: "MustRunAs", "RunAsAny"`,
 		},
 		"no fsgroup options": {
 			psp:         noFSGroupOptions,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: "supported values: MustRunAs, RunAsAny",
+			errorDetail: `supported values: "MustRunAs", "RunAsAny"`,
 		},
 		"no sup group options": {
 			psp:         noSupplementalGroupsOptions,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: "supported values: MustRunAs, RunAsAny",
+			errorDetail: `supported values: "MustRunAs", "RunAsAny"`,
 		},
 		"invalid user strategy type": {
 			psp:         invalidUserStratType,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: "supported values: MustRunAs, MustRunAsNonRoot, RunAsAny",
+			errorDetail: `supported values: "MustRunAs", "MustRunAsNonRoot", "RunAsAny"`,
 		},
 		"invalid selinux strategy type": {
 			psp:         invalidSELinuxStratType,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: "supported values: MustRunAs, RunAsAny",
+			errorDetail: `supported values: "MustRunAs", "RunAsAny"`,
 		},
 		"invalid sup group strategy type": {
 			psp:         invalidSupGroupStratType,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: "supported values: MustRunAs, RunAsAny",
+			errorDetail: `supported values: "MustRunAs", "RunAsAny"`,
 		},
 		"invalid fs group strategy type": {
 			psp:         invalidFSGroupStratType,
 			errorType:   field.ErrorTypeNotSupported,
-			errorDetail: "supported values: MustRunAs, RunAsAny",
+			errorDetail: `supported values: "MustRunAs", "RunAsAny"`,
 		},
 		"invalid uid": {
 			psp:         invalidUIDPSP,

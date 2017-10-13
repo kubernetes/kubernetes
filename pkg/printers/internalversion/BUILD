@@ -15,6 +15,7 @@ go_test(
     ],
     library = ":go_default_library",
     deps = [
+        "//federation/apis/federation:go_default_library",
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset/fake:go_default_library",
         "//pkg/api:go_default_library",
