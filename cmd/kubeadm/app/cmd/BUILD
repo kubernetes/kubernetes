@@ -29,7 +29,6 @@ go_library(
         "//cmd/kubeadm/app/discovery:go_default_library",
         "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/images:go_default_library",
-        "//cmd/kubeadm/app/node:go_default_library",
         "//cmd/kubeadm/app/phases/addons/dns:go_default_library",
         "//cmd/kubeadm/app/phases/addons/proxy:go_default_library",
         "//cmd/kubeadm/app/phases/bootstraptoken/clusterinfo:go_default_library",
