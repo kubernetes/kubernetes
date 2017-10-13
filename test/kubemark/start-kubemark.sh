@@ -192,9 +192,16 @@ function start-master-components {
 function create-and-upload-hollow-node-image {
   authenticate-docker
   KUBEMARK_IMAGE_REGISTRY="${KUBEMARK_IMAGE_REGISTRY:-${CONTAINER_REGISTRY}/${PROJECT}}"
-  if [[ "${KUBEMARK_BAZEL_BUILD:-}" =~ ^[yY]$ ]]; then
+  #if [[ "${KUBEMARK_BAZEL_BUILD:-}" =~ ^[yY]$ ]]; then
+  if true then
+    CURR_DIR=`pwd`
+    pwd
+    cd "${KUBE_ROOT}"
+    ls
+    pwd
     # Build+push the image through bazel.
-    build_cmd=("bazel" "run" "//cluster/images/kubemark:push" "--define" "REGISTRY=${KUBEMARK_IMAGE_REGISTRY}" "--define" "IMAGE_TAG=${KUBEMARK_IMAGE_TAG}")
+    echo "bazel run //cluster/images/kubemark:push --define PROJECT="${PROJECT}" --test_output=errors"
+    build_cmd=("bazel" "run" "//cluster/images/kubemark:push" "--define" "REGISTRY=${KUBEMARK_IMAGE_REGISTRY}" "--define" "IMAGE_TAG=${KUBEMARK_IMAGE_TAG}" "--test_output=errors")
     run-cmd-with-retries "${build_cmd[@]}"
   else
     # Build+push the image through makefile.
