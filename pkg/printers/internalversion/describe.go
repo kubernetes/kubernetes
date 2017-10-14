@@ -950,6 +950,26 @@ func printScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, w PrefixWriter) {
 		sio.Gateway, sio.System, sio.ProtectionDomain, sio.StoragePool, sio.StorageMode, sio.VolumeName, sio.FSType, sio.ReadOnly)
 }
 
+func printScaleIOPersistentVolumeSource(sio *api.ScaleIOPersistentVolumeSource, w PrefixWriter) {
+	var secretNS, secretName string
+	if sio.SecretRef != nil {
+		secretName = sio.SecretRef.Name
+		secretNS = sio.SecretRef.Namespace
+	}
+	w.Write(LEVEL_2, "Type:\tScaleIO (a persistent volume backed by a block device in ScaleIO)\n"+
+		"    Gateway:\t%v\n"+
+		"    System:\t%v\n"+
+		"    Protection Domain:\t%v\n"+
+		"    Storage Pool:\t%v\n"+
+		"    Storage Mode:\t%v\n"+
+		"    VolumeName:\t%v\n"+
+		"    SecretName:\t%v\n"+
+		"    SecretNamespace:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		sio.Gateway, sio.System, sio.ProtectionDomain, sio.StoragePool, sio.StorageMode, sio.VolumeName, secretName, secretNS, sio.FSType, sio.ReadOnly)
+}
+
 func printLocalVolumeSource(ls *api.LocalVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tLocalVolume (a persistent volume backed by local storage on a node)\n"+
 		"    Path:\t%v\n",
@@ -1115,7 +1135,7 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		case pv.Spec.PortworxVolume != nil:
 			printPortworxVolumeSource(pv.Spec.PortworxVolume, w)
 		case pv.Spec.ScaleIO != nil:
-			printScaleIOVolumeSource(pv.Spec.ScaleIO, w)
+			printScaleIOPersistentVolumeSource(pv.Spec.ScaleIO, w)
 		case pv.Spec.Local != nil:
 			printLocalVolumeSource(pv.Spec.Local, w)
 		case pv.Spec.CephFS != nil:
