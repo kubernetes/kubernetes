@@ -70,9 +70,9 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			   and the latter is the Token Secret, which must be kept private at all circumstances.
 			 - The name of the Secret must be named "bootstrap-token-(token-id)".
 
-			You can read more about Bootstrap Tokens in this proposal:
+			You can read more about Bootstrap Tokens here:
 
-			  https://git.k8s.io/community/contributors/design-proposals/bootstrap-discovery.md
+			  https://kubernetes.io/docs/admin/bootstrap-tokens/
 		`),
 
 		// Without this callback, if a user runs just the "token"
