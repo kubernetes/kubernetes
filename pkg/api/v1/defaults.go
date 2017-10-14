@@ -357,13 +357,16 @@ func SetDefaults_RBDVolumeSource(obj *RBDVolumeSource) {
 	}
 }
 
-func SetDefaults_ScaleIOVolumeSource(obj *ScaleIOVolumeSource) {
-	if obj.ProtectionDomain == "" {
-		obj.ProtectionDomain = "default"
+func SetDefaults_ScaleIOVolumeSource(obj *v1.ScaleIOVolumeSource) {
+	if obj.StorageMode == "" {
+		obj.StorageMode = "ThinProvisioned"
 	}
-	if obj.StoragePool == "" {
-		obj.StoragePool = "default"
+	if obj.FSType == "" {
+		obj.FSType = "xfs"
 	}
+}
+
+func SetDefaults_ScaleIOPersistentVolumeSource(obj *v1.ScaleIOPersistentVolumeSource) {
 	if obj.StorageMode == "" {
 		obj.StorageMode = "ThinProvisioned"
 	}
