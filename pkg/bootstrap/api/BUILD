@@ -14,7 +14,10 @@ go_library(
         "types.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/bootstrap/api",
-    deps = ["//vendor/k8s.io/api/core/v1:go_default_library"],
+    deps = [
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+    ],
 )
 
 filegroup(

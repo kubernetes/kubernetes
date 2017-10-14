@@ -50,3 +50,27 @@ func TestValidateBootstrapGroupName(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateUsages(t *testing.T) {
+	tests := []struct {
+		name  string
+		input []string
+		valid bool
+	}{
+		{"valid of signing", []string{"signing"}, true},
+		{"valid of authentication", []string{"authentication"}, true},
+		{"all valid", []string{"authentication", "signing"}, true},
+		{"single invalid", []string{"authentication", "foo"}, false},
+		{"all invalid", []string{"foo", "bar"}, false},
+	}
+
+	for _, test := range tests {
+		err := ValidateUsages(test.input)
+		if err != nil && test.valid {
+			t.Errorf("test %q: ValidateUsages(%v) returned unexpected error: %v", test.name, test.input, err)
+		}
+		if err == nil && !test.valid {
+			t.Errorf("test %q: ValidateUsages(%v) was supposed to return an error but didn't", test.name, test.input)
+		}
+	}
+}
