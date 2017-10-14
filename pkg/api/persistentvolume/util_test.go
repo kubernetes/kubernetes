@@ -31,34 +31,75 @@ func TestPVSecrets(t *testing.T) {
 	// Stub containing all possible secret references in a PV.
 	// The names of the referenced secrets match struct paths detected by reflection.
 	pvs := []*api.PersistentVolume{
-		{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{
-			AzureFile: &api.AzureFileVolumeSource{
-				SecretName: "Spec.PersistentVolumeSource.AzureFile.SecretName"}}}},
-		{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{
-			CephFS: &api.CephFSVolumeSource{
-				SecretRef: &api.LocalObjectReference{
-					Name: "Spec.PersistentVolumeSource.CephFS.SecretRef"}}}}},
-		{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{
-			FlexVolume: &api.FlexVolumeSource{
-				SecretRef: &api.LocalObjectReference{
-					Name: "Spec.PersistentVolumeSource.FlexVolume.SecretRef"}}}}},
-		{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{
-			RBD: &api.RBDVolumeSource{
-				SecretRef: &api.LocalObjectReference{
-					Name: "Spec.PersistentVolumeSource.RBD.SecretRef"}}}}},
-		{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{
-			ScaleIO: &api.ScaleIOVolumeSource{
-				SecretRef: &api.LocalObjectReference{
-					Name: "Spec.PersistentVolumeSource.ScaleIO.SecretRef"}}}}},
-		{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{
-			ISCSI: &api.ISCSIVolumeSource{
-				SecretRef: &api.LocalObjectReference{
-					Name: "Spec.PersistentVolumeSource.ISCSI.SecretRef"}}}}},
-		{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{
-			StorageOS: &api.StorageOSPersistentVolumeSource{
-				SecretRef: &api.ObjectReference{
-					Name:      "Spec.PersistentVolumeSource.StorageOS.SecretRef",
-					Namespace: "Spec.PersistentVolumeSource.StorageOS.SecretRef"}}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				AzureFile: &api.AzureFilePersistentVolumeSource{
+					SecretName: "Spec.PersistentVolumeSource.AzureFile.SecretName"}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				AzureFile: &api.AzureFilePersistentVolumeSource{
+					SecretName:      "Spec.PersistentVolumeSource.AzureFile.SecretName",
+					SecretNamespace: &secretNamespace}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				CephFS: &api.CephFSPersistentVolumeSource{
+					SecretRef: &api.SecretReference{
+						Name:      "Spec.PersistentVolumeSource.CephFS.SecretRef",
+						Namespace: "cephfs"}}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				CephFS: &api.CephFSPersistentVolumeSource{
+					SecretRef: &api.SecretReference{
+						Name: "Spec.PersistentVolumeSource.CephFS.SecretRef"}}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				FlexVolume: &api.FlexVolumeSource{
+					SecretRef: &api.LocalObjectReference{
+						Name: "Spec.PersistentVolumeSource.FlexVolume.SecretRef"}}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				RBD: &api.RBDPersistentVolumeSource{
+					SecretRef: &api.SecretReference{
+						Name: "Spec.PersistentVolumeSource.RBD.SecretRef"}}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				RBD: &api.RBDPersistentVolumeSource{
+					SecretRef: &api.SecretReference{
+						Name:      "Spec.PersistentVolumeSource.RBD.SecretRef",
+						Namespace: "rbdns"}}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				ScaleIO: &api.ScaleIOPersistentVolumeSource{
+					SecretRef: &api.SecretReference{
+						Name: "Spec.PersistentVolumeSource.ScaleIO.SecretRef"}}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				ScaleIO: &api.ScaleIOPersistentVolumeSource{
+					SecretRef: &api.SecretReference{
+						Name:      "Spec.PersistentVolumeSource.ScaleIO.SecretRef",
+						Namespace: "scaleions"}}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				ISCSI: &api.ISCSIVolumeSource{
+					SecretRef: &api.LocalObjectReference{
+						Name: "Spec.PersistentVolumeSource.ISCSI.SecretRef"}}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				StorageOS: &api.StorageOSPersistentVolumeSource{
+					SecretRef: &api.ObjectReference{
+						Name:      "Spec.PersistentVolumeSource.StorageOS.SecretRef",
+						Namespace: "storageosns"}}}}},
 	}
 
 	extractedNames := sets.NewString()
@@ -108,8 +149,18 @@ func TestPVSecrets(t *testing.T) {
 		t.Error("Extra secret names extracted. Verify VisitPVSecretNames() is correctly extracting secret names")
 	}
 
-	expectedSecretNamespaces := sets.NewString(
-		"Spec.PersistentVolumeSource.StorageOS.SecretRef",
+	expectedNamespacedNames := sets.NewString(
+		"claimrefns/Spec.PersistentVolumeSource.AzureFile.SecretName",
+		"Spec.PersistentVolumeSource.AzureFile.SecretNamespace/Spec.PersistentVolumeSource.AzureFile.SecretName",
+		"claimrefns/Spec.PersistentVolumeSource.CephFS.SecretRef",
+		"cephfs/Spec.PersistentVolumeSource.CephFS.SecretRef",
+		"claimrefns/Spec.PersistentVolumeSource.FlexVolume.SecretRef",
+		"claimrefns/Spec.PersistentVolumeSource.RBD.SecretRef",
+		"rbdns/Spec.PersistentVolumeSource.RBD.SecretRef",
+		"claimrefns/Spec.PersistentVolumeSource.ScaleIO.SecretRef",
+		"scaleions/Spec.PersistentVolumeSource.ScaleIO.SecretRef",
+		"claimrefns/Spec.PersistentVolumeSource.ISCSI.SecretRef",
+		"storageosns/Spec.PersistentVolumeSource.StorageOS.SecretRef",
 	)
 
 	if len(expectedSecretNamespaces.Difference(extractedNamespaces)) > 0 {
