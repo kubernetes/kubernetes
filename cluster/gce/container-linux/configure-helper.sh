@@ -385,30 +385,6 @@ current-context: service-account-context
 EOF
 }
 
-function create-kubeproxy-serviceaccount-kubeconfig {
-  echo "Creating kube-proxy serviceaccount kubeconfig file"
-  cat <<EOF >/var/lib/kube-proxy/kubeconfig
-apiVersion: v1
-kind: Config
-clusters:
-- cluster:
-    certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-    server: https://${KUBERNETES_MASTER_NAME}
-  name: default
-contexts:
-- context:
-    cluster: default
-    namespace: default
-    user: default
-  name: default
-current-context: default
-users:
-- name: default
-  user:
-    tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-EOF
-}
-
 function create-kubecontrollermanager-kubeconfig {
   echo "Creating kube-controller-manager kubeconfig file"
   mkdir -p /etc/srv/kubernetes/kube-controller-manager
@@ -719,6 +695,7 @@ function prepare-kube-proxy-manifest-variables {
   sed -i -e "s@{{pod_priority}}@${pod_priority}@g" ${src_file}
   sed -i -e "s@{{ cpurequest }}@100m@g" ${src_file}
   sed -i -e "s@{{api_servers_with_port}}@${api_servers}@g" ${src_file}
+  sed -i -e "s@{{kubernetes_service_host_env_value}}@${KUBERNETES_MASTER_NAME}@g" ${src_file}
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
     sed -i -e "s@{{cluster_cidr}}@--cluster-cidr=${CLUSTER_IP_RANGE}@g" ${src_file}
   fi
@@ -1499,8 +1476,6 @@ else
   create-kubelet-kubeconfig "https://${KUBERNETES_MASTER_NAME}"
   if [[ "${KUBE_PROXY_DAEMONSET:-}" != "true" ]]; then
     create-kubeproxy-user-kubeconfig
-  else
-    create-kubeproxy-serviceaccount-kubeconfig
   fi
 fi
 
