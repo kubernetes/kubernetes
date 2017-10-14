@@ -21,7 +21,7 @@ REGISTRY?=gcr.io/google-containers
 ARCH?=amd64
 HYPERKUBE_BIN?=_output/dockerized/bin/linux/$(ARCH)/hyperkube
 
-BASEIMAGE=gcr.io/google-containers/debian-hyperkube-base-$(ARCH):0.3
+BASEIMAGE=gcr.io/google-containers/debian-hyperkube-base-$(ARCH):0.4
 TEMP_DIR:=$(shell mktemp -d -t hyperkubeXXXXXX)
 
 all: build
