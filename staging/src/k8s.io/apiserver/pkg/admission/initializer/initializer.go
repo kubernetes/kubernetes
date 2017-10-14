@@ -33,6 +33,7 @@ type pluginInitializer struct {
 	// serverIdentifyingClientKey private key for the client certificate used when calling out to admission plugins
 	serverIdentifyingClientKey []byte
 	scheme                     *runtime.Scheme
+	serviceResolver            ServiceResolver
 }
 
 // New creates an instance of admission plugins initializer.
@@ -44,6 +45,7 @@ func New(
 	serverIdentifyingClientCert,
 	serverIdentifyingClientKey []byte,
 	scheme *runtime.Scheme,
+	serviceResolver ServiceResolver,
 ) (pluginInitializer, error) {
 	return pluginInitializer{
 		externalClient:              extClientset,
@@ -51,7 +53,8 @@ func New(
 		authorizer:                  authz,
 		serverIdentifyingClientCert: serverIdentifyingClientCert,
 		serverIdentifyingClientKey:  serverIdentifyingClientKey,
-		scheme: scheme,
+		scheme:          scheme,
+		serviceResolver: serviceResolver,
 	}, nil
 }
 
@@ -76,6 +79,10 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 
 	if wants, ok := plugin.(WantsScheme); ok {
 		wants.SetScheme(i.scheme)
+	}
+
+	if wants, ok := plugin.(WantsServiceResolver); ok {
+		wants.SetServiceResolver(i.serviceResolver)
 	}
 }
 

@@ -12,7 +12,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/admission/install:go_default_library",
-        "//pkg/kubeapiserver/admission:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/admission/v1alpha1:go_default_library",
         "//vendor/k8s.io/api/admissionregistration/v1alpha1:go_default_library",

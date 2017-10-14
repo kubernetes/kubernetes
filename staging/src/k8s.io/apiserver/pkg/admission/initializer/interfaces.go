@@ -17,6 +17,8 @@ limitations under the License.
 package initializer
 
 import (
+	"net/url"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -53,4 +55,16 @@ type WantsClientCert interface {
 type WantsScheme interface {
 	SetScheme(*runtime.Scheme)
 	admission.Validator
+}
+
+// WantsServiceResolver defines a fuction that accepts a ServiceResolver for
+// admission plugins that need to make calls to services.
+type WantsServiceResolver interface {
+	SetServiceResolver(ServiceResolver)
+}
+
+// ServiceResolver knows how to convert a service reference into an actual
+// location.
+type ServiceResolver interface {
+	ResolveEndpoint(namespace, name string) (*url.URL, error)
 }
