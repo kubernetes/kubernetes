@@ -152,7 +152,16 @@ func ClusterRoles() []rbac.ClusterRole {
 			// a role which provides just enough power to determine if the server is ready and discover API versions for negotiation
 			ObjectMeta: metav1.ObjectMeta{Name: "system:discovery"},
 			Rules: []rbac.PolicyRule{
-				rbac.NewRule("get").URLs("/healthz", "/version", "/swaggerapi", "/swaggerapi/*", "/api", "/api/*", "/apis", "/apis/*").RuleOrDie(),
+				rbac.NewRule("get").URLs(
+					"/healthz", "/version",
+					// remove once swagger 1.2 support is removed
+					"/swaggerapi", "/swaggerapi/*",
+					// do not expand this pattern for openapi discovery docs
+					// move to a single openapi endpoint that takes accept/accept-encoding headers
+					"/swagger.json", "/swagger-2.0.0.pb-v1",
+					"/api", "/api/*",
+					"/apis", "/apis/*",
+				).RuleOrDie(),
 			},
 		},
 		{
