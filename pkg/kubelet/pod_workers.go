@@ -162,6 +162,9 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 			// the previous sync.
 			status, err := p.podCache.GetNewerThan(podUID, lastSyncTime)
 			if err != nil {
+				// This is the legacy event thrown by manage pod loop
+				// all other events are now dispatched from syncPodFn
+				p.recorder.Eventf(update.Pod, v1.EventTypeWarning, events.FailedSync, "error determining status: %v", err)
 				return err
 			}
 			err = p.syncPodFn(syncPodOptions{
@@ -179,14 +182,8 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 			update.OnCompleteFunc(err)
 		}
 		if err != nil {
+			// IMPORTANT: we do not log errors here, the syncPodFn is responsible for logging errors
 			glog.Errorf("Error syncing pod %s (%q), skipping: %v", update.Pod.UID, format.Pod(update.Pod), err)
-			// if we failed sync, we throw more specific events for why it happened.
-			// as a result, i question the value of this event.
-			// TODO: determine if we can remove this in a future release.
-			// do not include descriptive text that can vary on why it failed so in a pathological
-			// scenario, kubelet does not create enough discrete events that miss default aggregation
-			// window.
-			p.recorder.Eventf(update.Pod, v1.EventTypeWarning, events.FailedSync, "Error syncing pod")
 		}
 		p.wrapUp(update.Pod.UID, err)
 	}

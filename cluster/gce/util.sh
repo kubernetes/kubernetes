@@ -783,7 +783,7 @@ function create-network() {
     gcloud compute networks create --project "${NETWORK_PROJECT}" "${NETWORK}" --mode="${network_mode}"
   else
     PREEXISTING_NETWORK=true
-    PREEXISTING_NETWORK_MODE="$(gcloud compute networks list ${NETWORK} --project ${NETWORK_PROJECT} --format='value(x_gcloud_mode)' || true)"
+    PREEXISTING_NETWORK_MODE="$(gcloud compute networks list --filter="name=('${NETWORK}')" --project ${NETWORK_PROJECT} --format='value(x_gcloud_subnet_mode)' || true)"
     echo "Found existing network ${NETWORK} in ${PREEXISTING_NETWORK_MODE} mode."
   fi
 
@@ -946,8 +946,8 @@ function delete-network() {
 function delete-subnetworks() {
   if [[ ${ENABLE_IP_ALIASES:-} != "true" ]]; then
     # If running in custom mode network we need to delete subnets
-    mode="$(gcloud compute networks list ${NETWORK} --project ${NETWORK_PROJECT} --format='value(x_gcloud_mode)' || true)"
-    if [[ "${mode}" == "custom" ]]; then
+    mode="$(gcloud compute networks list --filter="name=('${NETWORK}')" --project ${NETWORK_PROJECT} --format='value(x_gcloud_subnet_mode)' || true)"
+    if [[ "${mode}" == "CUSTOM" ]]; then
       if [[ "${ENABLE_BIG_CLUSTER_SUBNETS}" = "true" ]]; then
         echo "Deleting default subnets..."
         # This value should be kept in sync with number of regions.

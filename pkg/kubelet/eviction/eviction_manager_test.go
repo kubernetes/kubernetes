@@ -33,6 +33,12 @@ import (
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
+const (
+	lowPriority     = -1
+	defaultPriority = 0
+	highPriority    = 1
+)
+
 // mockPodKiller is used to testing which pod is killed
 type mockPodKiller struct {
 	pod                 *v1.Pod
@@ -99,16 +105,16 @@ func (m *mockDiskGC) DeleteAllUnusedContainers() error {
 	return m.err
 }
 
-func makePodWithMemoryStats(name string, requests v1.ResourceList, limits v1.ResourceList, memoryWorkingSet string) (*v1.Pod, statsapi.PodStats) {
-	pod := newPod(name, []v1.Container{
+func makePodWithMemoryStats(name string, priority int32, requests v1.ResourceList, limits v1.ResourceList, memoryWorkingSet string) (*v1.Pod, statsapi.PodStats) {
+	pod := newPod(name, priority, []v1.Container{
 		newContainer(name, requests, limits),
 	}, nil)
 	podStats := newPodMemoryStats(pod, resource.MustParse(memoryWorkingSet))
 	return pod, podStats
 }
 
-func makePodWithDiskStats(name string, requests v1.ResourceList, limits v1.ResourceList, rootFsUsed, logsUsed, perLocalVolumeUsed string) (*v1.Pod, statsapi.PodStats) {
-	pod := newPod(name, []v1.Container{
+func makePodWithDiskStats(name string, priority int32, requests v1.ResourceList, limits v1.ResourceList, rootFsUsed, logsUsed, perLocalVolumeUsed string) (*v1.Pod, statsapi.PodStats) {
+	pod := newPod(name, priority, []v1.Container{
 		newContainer(name, requests, limits),
 	}, nil)
 	podStats := newPodDiskStats(pod, parseQuantity(rootFsUsed), parseQuantity(logsUsed), parseQuantity(perLocalVolumeUsed))
@@ -164,6 +170,7 @@ func makeDiskStats(rootFsAvailableBytes, imageFsAvailableBytes string, podStats 
 
 type podToMake struct {
 	name                     string
+	priority                 int32
 	requests                 v1.ResourceList
 	limits                   v1.ResourceList
 	memoryWorkingSet         string
@@ -177,24 +184,24 @@ type podToMake struct {
 
 // TestMemoryPressure
 func TestMemoryPressure(t *testing.T) {
+	enablePodPriority(true)
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	podsToMake := []podToMake{
-		{name: "guaranteed-low", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), memoryWorkingSet: "200Mi"},
-		{name: "guaranteed-high", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), memoryWorkingSet: "800Mi"},
-		{name: "burstable-low", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), memoryWorkingSet: "300Mi"},
-		{name: "burstable-high", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), memoryWorkingSet: "800Mi"},
-		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "300Mi"},
-		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "500Mi"},
+		{name: "guaranteed-low-priority-high-usage", priority: lowPriority, requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), memoryWorkingSet: "900Mi"},
+		{name: "burstable-below-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), memoryWorkingSet: "50Mi"},
+		{name: "burstable-above-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), memoryWorkingSet: "400Mi"},
+		{name: "best-effort-high-priority-high-usage", priority: highPriority, requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "400Mi"},
+		{name: "best-effort-low-priority-low-usage", priority: lowPriority, requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "100Mi"},
 	}
 	pods := []*v1.Pod{}
 	podStats := map[*v1.Pod]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
-		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
 		pods = append(pods, pod)
 		podStats[pod] = podStat
 	}
-	podToEvict := pods[5]
+	podToEvict := pods[4]
 	activePodsFunc := func() []*v1.Pod {
 		return pods
 	}
@@ -241,8 +248,8 @@ func TestMemoryPressure(t *testing.T) {
 	}
 
 	// create a best effort pod to test admission
-	bestEffortPodToAdmit, _ := podMaker("best-admit", newResourceList("", ""), newResourceList("", ""), "0Gi")
-	burstablePodToAdmit, _ := podMaker("burst-admit", newResourceList("100m", "100Mi"), newResourceList("200m", "200Mi"), "0Gi")
+	bestEffortPodToAdmit, _ := podMaker("best-admit", defaultPriority, newResourceList("", ""), newResourceList("", ""), "0Gi")
+	burstablePodToAdmit, _ := podMaker("burst-admit", defaultPriority, newResourceList("100m", "100Mi"), newResourceList("200m", "200Mi"), "0Gi")
 
 	// synchronize
 	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
@@ -395,24 +402,24 @@ func parseQuantity(value string) resource.Quantity {
 }
 
 func TestDiskPressureNodeFs(t *testing.T) {
+	enablePodPriority(true)
 	podMaker := makePodWithDiskStats
 	summaryStatsMaker := makeDiskStats
 	podsToMake := []podToMake{
-		{name: "guaranteed-low", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsUsed: "200Mi"},
-		{name: "guaranteed-high", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsUsed: "800Mi"},
-		{name: "burstable-low", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), logsFsUsed: "300Mi"},
-		{name: "burstable-high", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), rootFsUsed: "800Mi"},
-		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), perLocalVolumeUsed: "300Mi"},
-		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "500Mi"},
+		{name: "low-priority-high-usage", priority: lowPriority, requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsUsed: "900Mi"},
+		{name: "below-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), logsFsUsed: "50Mi"},
+		{name: "above-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), rootFsUsed: "400Mi"},
+		{name: "high-priority-high-usage", priority: highPriority, requests: newResourceList("", ""), limits: newResourceList("", ""), perLocalVolumeUsed: "400Mi"},
+		{name: "low-priority-low-usage", priority: lowPriority, requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "100Mi"},
 	}
 	pods := []*v1.Pod{}
 	podStats := map[*v1.Pod]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
-		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed)
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed)
 		pods = append(pods, pod)
 		podStats[pod] = podStat
 	}
-	podToEvict := pods[5]
+	podToEvict := pods[0]
 	activePodsFunc := func() []*v1.Pod {
 		return pods
 	}
@@ -460,7 +467,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	}
 
 	// create a best effort pod to test admission
-	podToAdmit, _ := podMaker("pod-to-admit", newResourceList("", ""), newResourceList("", ""), "0Gi", "0Gi", "0Gi")
+	podToAdmit, _ := podMaker("pod-to-admit", defaultPriority, newResourceList("", ""), newResourceList("", ""), "0Gi", "0Gi", "0Gi")
 
 	// synchronize
 	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
@@ -594,24 +601,24 @@ func TestDiskPressureNodeFs(t *testing.T) {
 
 // TestMinReclaim verifies that min-reclaim works as desired.
 func TestMinReclaim(t *testing.T) {
+	enablePodPriority(true)
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	podsToMake := []podToMake{
-		{name: "guaranteed-low", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), memoryWorkingSet: "200Mi"},
-		{name: "guaranteed-high", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), memoryWorkingSet: "800Mi"},
-		{name: "burstable-low", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), memoryWorkingSet: "300Mi"},
-		{name: "burstable-high", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), memoryWorkingSet: "800Mi"},
-		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "300Mi"},
-		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "500Mi"},
+		{name: "guaranteed-low-priority-high-usage", priority: lowPriority, requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), memoryWorkingSet: "900Mi"},
+		{name: "burstable-below-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), memoryWorkingSet: "50Mi"},
+		{name: "burstable-above-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), memoryWorkingSet: "400Mi"},
+		{name: "best-effort-high-priority-high-usage", priority: highPriority, requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "400Mi"},
+		{name: "best-effort-low-priority-low-usage", priority: lowPriority, requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "100Mi"},
 	}
 	pods := []*v1.Pod{}
 	podStats := map[*v1.Pod]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
-		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
 		pods = append(pods, pod)
 		podStats[pod] = podStat
 	}
-	podToEvict := pods[5]
+	podToEvict := pods[4]
 	activePodsFunc := func() []*v1.Pod {
 		return pods
 	}
@@ -734,24 +741,24 @@ func TestMinReclaim(t *testing.T) {
 }
 
 func TestNodeReclaimFuncs(t *testing.T) {
+	enablePodPriority(true)
 	podMaker := makePodWithDiskStats
 	summaryStatsMaker := makeDiskStats
 	podsToMake := []podToMake{
-		{name: "guaranteed-low", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsUsed: "200Mi"},
-		{name: "guaranteed-high", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsUsed: "800Mi"},
-		{name: "burstable-low", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), rootFsUsed: "300Mi"},
-		{name: "burstable-high", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), rootFsUsed: "800Mi"},
-		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "300Mi"},
-		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "500Mi"},
+		{name: "low-priority-high-usage", priority: lowPriority, requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsUsed: "900Mi"},
+		{name: "below-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), logsFsUsed: "50Mi"},
+		{name: "above-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), rootFsUsed: "400Mi"},
+		{name: "high-priority-high-usage", priority: highPriority, requests: newResourceList("", ""), limits: newResourceList("", ""), perLocalVolumeUsed: "400Mi"},
+		{name: "low-priority-low-usage", priority: lowPriority, requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "100Mi"},
 	}
 	pods := []*v1.Pod{}
 	podStats := map[*v1.Pod]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
-		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed)
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed)
 		pods = append(pods, pod)
 		podStats[pod] = podStat
 	}
-	podToEvict := pods[5]
+	podToEvict := pods[0]
 	activePodsFunc := func() []*v1.Pod {
 		return pods
 	}
@@ -908,8 +915,9 @@ func TestNodeReclaimFuncs(t *testing.T) {
 }
 
 func TestInodePressureNodeFsInodes(t *testing.T) {
-	podMaker := func(name string, requests v1.ResourceList, limits v1.ResourceList, rootInodes, logInodes, volumeInodes string) (*v1.Pod, statsapi.PodStats) {
-		pod := newPod(name, []v1.Container{
+	enablePodPriority(true)
+	podMaker := func(name string, priority int32, requests v1.ResourceList, limits v1.ResourceList, rootInodes, logInodes, volumeInodes string) (*v1.Pod, statsapi.PodStats) {
+		pod := newPod(name, priority, []v1.Container{
 			newContainer(name, requests, limits),
 		}, nil)
 		podStats := newPodInodeStats(pod, parseQuantity(rootInodes), parseQuantity(logInodes), parseQuantity(volumeInodes))
@@ -935,21 +943,20 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 		return result
 	}
 	podsToMake := []podToMake{
-		{name: "guaranteed-low", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsInodesUsed: "200Mi"},
-		{name: "guaranteed-high", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsInodesUsed: "800Mi"},
-		{name: "burstable-low", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), rootFsInodesUsed: "300Mi"},
-		{name: "burstable-high", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), rootFsInodesUsed: "800Mi"},
-		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsInodesUsed: "300Mi"},
-		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsInodesUsed: "800Mi"},
+		{name: "low-priority-high-usage", priority: lowPriority, requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsInodesUsed: "900Mi"},
+		{name: "below-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), rootFsInodesUsed: "50Mi"},
+		{name: "above-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), rootFsInodesUsed: "400Mi"},
+		{name: "high-priority-high-usage", priority: highPriority, requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsInodesUsed: "400Mi"},
+		{name: "low-priority-low-usage", priority: lowPriority, requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsInodesUsed: "100Mi"},
 	}
 	pods := []*v1.Pod{}
 	podStats := map[*v1.Pod]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
-		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.rootFsInodesUsed, podToMake.logsFsInodesUsed, podToMake.perLocalVolumeInodesUsed)
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.rootFsInodesUsed, podToMake.logsFsInodesUsed, podToMake.perLocalVolumeInodesUsed)
 		pods = append(pods, pod)
 		podStats[pod] = podStat
 	}
-	podToEvict := pods[5]
+	podToEvict := pods[0]
 	activePodsFunc := func() []*v1.Pod {
 		return pods
 	}
@@ -997,7 +1004,7 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 	}
 
 	// create a best effort pod to test admission
-	podToAdmit, _ := podMaker("pod-to-admit", newResourceList("", ""), newResourceList("", ""), "0", "0", "0")
+	podToAdmit, _ := podMaker("pod-to-admit", defaultPriority, newResourceList("", ""), newResourceList("", ""), "0", "0", "0")
 
 	// synchronize
 	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
@@ -1131,15 +1138,16 @@ func TestInodePressureNodeFsInodes(t *testing.T) {
 
 // TestCriticalPodsAreNotEvicted
 func TestCriticalPodsAreNotEvicted(t *testing.T) {
+	enablePodPriority(true)
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	podsToMake := []podToMake{
-		{name: "critical", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), memoryWorkingSet: "800Mi"},
+		{name: "critical", priority: defaultPriority, requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), memoryWorkingSet: "800Mi"},
 	}
 	pods := []*v1.Pod{}
 	podStats := map[*v1.Pod]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
-		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
 		pods = append(pods, pod)
 		podStats[pod] = podStat
 	}
@@ -1266,25 +1274,25 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 
 // TestAllocatableMemoryPressure
 func TestAllocatableMemoryPressure(t *testing.T) {
+	enablePodPriority(true)
 	podMaker := makePodWithMemoryStats
 	summaryStatsMaker := makeMemoryStats
 	constantCapacity := "4Gi"
 	podsToMake := []podToMake{
-		{name: "guaranteed-low", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), memoryWorkingSet: "200Mi"},
-		{name: "guaranteed-high", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), memoryWorkingSet: "400Mi"},
-		{name: "burstable-low", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), memoryWorkingSet: "300Mi"},
-		{name: "burstable-high", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), memoryWorkingSet: "500Mi"},
-		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "100Mi"},
-		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "200Mi"},
+		{name: "guaranteed-low-priority-high-usage", priority: lowPriority, requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), memoryWorkingSet: "900Mi"},
+		{name: "burstable-below-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), memoryWorkingSet: "50Mi"},
+		{name: "burstable-above-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), memoryWorkingSet: "400Mi"},
+		{name: "best-effort-high-priority-high-usage", priority: highPriority, requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "400Mi"},
+		{name: "best-effort-low-priority-low-usage", priority: lowPriority, requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "100Mi"},
 	}
 	pods := []*v1.Pod{}
 	podStats := map[*v1.Pod]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
-		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
 		pods = append(pods, pod)
 		podStats[pod] = podStat
 	}
-	podToEvict := pods[5]
+	podToEvict := pods[4]
 	activePodsFunc := func() []*v1.Pod {
 		return pods
 	}
@@ -1324,8 +1332,8 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	}
 
 	// create a best effort pod to test admission
-	bestEffortPodToAdmit, _ := podMaker("best-admit", newResourceList("", ""), newResourceList("", ""), "0Gi")
-	burstablePodToAdmit, _ := podMaker("burst-admit", newResourceList("100m", "100Mi"), newResourceList("200m", "200Mi"), "0Gi")
+	bestEffortPodToAdmit, _ := podMaker("best-admit", defaultPriority, newResourceList("", ""), newResourceList("", ""), "0Gi")
+	burstablePodToAdmit, _ := podMaker("burst-admit", defaultPriority, newResourceList("100m", "100Mi"), newResourceList("200m", "200Mi"), "0Gi")
 
 	// synchronize
 	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
@@ -1345,7 +1353,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 
 	// induce memory pressure!
 	fakeClock.Step(1 * time.Minute)
-	pod, podStat := podMaker("guaranteed-high-2", newResourceList("100m", "1Gi"), newResourceList("100m", "1Gi"), "1Gi")
+	pod, podStat := podMaker("guaranteed-high-2", defaultPriority, newResourceList("100m", "1Gi"), newResourceList("100m", "1Gi"), "1Gi")
 	podStats[pod] = podStat
 	summaryProvider.result = summaryStatsMaker(constantCapacity, podStats)
 	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
@@ -1432,25 +1440,25 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 // TestAllocatableNodeFsPressure
 func TestAllocatableNodeFsPressure(t *testing.T) {
 	utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=True")
+	enablePodPriority(true)
 	podMaker := makePodWithDiskStats
 	summaryStatsMaker := makeDiskStats
 
 	podsToMake := []podToMake{
-		{name: "guaranteed-low", requests: newEphemeralStorageResourceList("200Mi", "100m", "1Gi"), limits: newEphemeralStorageResourceList("200Mi", "100m", "1Gi"), rootFsUsed: "200Mi"},
-		{name: "guaranteed-high", requests: newEphemeralStorageResourceList("800Mi", "100m", "1Gi"), limits: newEphemeralStorageResourceList("800Mi", "100m", "1Gi"), rootFsUsed: "800Mi"},
-		{name: "burstable-low", requests: newEphemeralStorageResourceList("300Mi", "100m", "100Mi"), limits: newEphemeralStorageResourceList("300Mi", "200m", "1Gi"), logsFsUsed: "300Mi"},
-		{name: "burstable-high", requests: newEphemeralStorageResourceList("800Mi", "100m", "100Mi"), limits: newEphemeralStorageResourceList("800Mi", "200m", "1Gi"), rootFsUsed: "800Mi"},
-		{name: "best-effort-low", requests: newEphemeralStorageResourceList("300Mi", "", ""), limits: newEphemeralStorageResourceList("300Mi", "", ""), logsFsUsed: "300Mi"},
-		{name: "best-effort-high", requests: newEphemeralStorageResourceList("800Mi", "", ""), limits: newEphemeralStorageResourceList("800Mi", "", ""), rootFsUsed: "800Mi"},
+		{name: "low-priority-high-usage", priority: lowPriority, requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsUsed: "900Mi"},
+		{name: "below-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), logsFsUsed: "50Mi"},
+		{name: "above-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "2Gi"), rootFsUsed: "1750Mi"},
+		{name: "high-priority-high-usage", priority: highPriority, requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "400Mi"},
+		{name: "low-priority-low-usage", priority: lowPriority, requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "100Mi"},
 	}
 	pods := []*v1.Pod{}
 	podStats := map[*v1.Pod]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
-		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed)
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed)
 		pods = append(pods, pod)
 		podStats[pod] = podStat
 	}
-	podToEvict := pods[5]
+	podToEvict := pods[0]
 	activePodsFunc := func() []*v1.Pod {
 		return pods
 	}
@@ -1490,8 +1498,8 @@ func TestAllocatableNodeFsPressure(t *testing.T) {
 	}
 
 	// create a best effort pod to test admission
-	bestEffortPodToAdmit, _ := podMaker("best-admit", newEphemeralStorageResourceList("", "", ""), newEphemeralStorageResourceList("", "", ""), "0Gi", "", "")
-	burstablePodToAdmit, _ := podMaker("burst-admit", newEphemeralStorageResourceList("1Gi", "", ""), newEphemeralStorageResourceList("1Gi", "", ""), "1Gi", "", "")
+	bestEffortPodToAdmit, _ := podMaker("best-admit", defaultPriority, newEphemeralStorageResourceList("", "", ""), newEphemeralStorageResourceList("", "", ""), "0Gi", "", "")
+	burstablePodToAdmit, _ := podMaker("burst-admit", defaultPriority, newEphemeralStorageResourceList("1Gi", "", ""), newEphemeralStorageResourceList("1Gi", "", ""), "1Gi", "", "")
 
 	// synchronize
 	manager.synchronize(diskInfoProvider, activePodsFunc, capacityProvider)
@@ -1511,7 +1519,7 @@ func TestAllocatableNodeFsPressure(t *testing.T) {
 
 	// induce disk pressure!
 	fakeClock.Step(1 * time.Minute)
-	pod, podStat := podMaker("guaranteed-high-2", newEphemeralStorageResourceList("2000Mi", "100m", "1Gi"), newEphemeralStorageResourceList("2000Mi", "100m", "1Gi"), "2000Mi", "", "")
+	pod, podStat := podMaker("guaranteed-high-2", defaultPriority, newEphemeralStorageResourceList("2000Mi", "100m", "1Gi"), newEphemeralStorageResourceList("2000Mi", "100m", "1Gi"), "2000Mi", "", "")
 	podStats[pod] = podStat
 	pods = append(pods, pod)
 	summaryProvider.result = summaryStatsMaker("6Gi", "6Gi", podStats)
@@ -1585,24 +1593,24 @@ func TestAllocatableNodeFsPressure(t *testing.T) {
 
 func TestNodeReclaimForAllocatableFuncs(t *testing.T) {
 	utilfeature.DefaultFeatureGate.Set("LocalStorageCapacityIsolation=True")
+	enablePodPriority(true)
 	podMaker := makePodWithDiskStats
 	summaryStatsMaker := makeDiskStats
 	podsToMake := []podToMake{
-		{name: "guaranteed-low", requests: newEphemeralStorageResourceList("200Mi", "100m", "1Gi"), limits: newEphemeralStorageResourceList("200Mi", "100m", "1Gi"), rootFsUsed: "200Mi"},
-		{name: "guaranteed-high", requests: newEphemeralStorageResourceList("800Mi", "100m", "1Gi"), limits: newEphemeralStorageResourceList("800Mi", "100m", "1Gi"), rootFsUsed: "800Mi"},
-		{name: "burstable-low", requests: newEphemeralStorageResourceList("300Mi", "100m", "100Mi"), limits: newEphemeralStorageResourceList("300Mi", "200m", "1Gi"), logsFsUsed: "300Mi"},
-		{name: "burstable-high", requests: newEphemeralStorageResourceList("800Mi", "100m", "100Mi"), limits: newEphemeralStorageResourceList("800Mi", "200m", "1Gi"), rootFsUsed: "800Mi"},
-		{name: "best-effort-low", requests: newEphemeralStorageResourceList("300Mi", "", ""), limits: newEphemeralStorageResourceList("300Mi", "", ""), logsFsUsed: "300Mi"},
-		{name: "best-effort-high", requests: newEphemeralStorageResourceList("800Mi", "", ""), limits: newEphemeralStorageResourceList("800Mi", "", ""), rootFsUsed: "800Mi"},
+		{name: "low-priority-high-usage", priority: lowPriority, requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsUsed: "900Mi"},
+		{name: "below-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), logsFsUsed: "50Mi"},
+		{name: "above-requests", priority: defaultPriority, requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "2Gi"), rootFsUsed: "1750Mi"},
+		{name: "high-priority-high-usage", priority: highPriority, requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "400Mi"},
+		{name: "low-priority-low-usage", priority: lowPriority, requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "100Mi"},
 	}
 	pods := []*v1.Pod{}
 	podStats := map[*v1.Pod]statsapi.PodStats{}
 	for _, podToMake := range podsToMake {
-		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed)
+		pod, podStat := podMaker(podToMake.name, podToMake.priority, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed)
 		pods = append(pods, pod)
 		podStats[pod] = podStat
 	}
-	podToEvict := pods[5]
+	podToEvict := pods[0]
 	activePodsFunc := func() []*v1.Pod {
 		return pods
 	}
@@ -1653,7 +1661,7 @@ func TestNodeReclaimForAllocatableFuncs(t *testing.T) {
 	// induce hard threshold
 	fakeClock.Step(1 * time.Minute)
 
-	pod, podStat := podMaker("guaranteed-high-2", newEphemeralStorageResourceList("2000Mi", "100m", "1Gi"), newEphemeralStorageResourceList("2000Mi", "100m", "1Gi"), "2000Mi", "", "")
+	pod, podStat := podMaker("guaranteed-high-2", defaultPriority, newEphemeralStorageResourceList("2000Mi", "100m", "1Gi"), newEphemeralStorageResourceList("2000Mi", "100m", "1Gi"), "2000Mi", "", "")
 	podStats[pod] = podStat
 	pods = append(pods, pod)
 	summaryProvider.result = summaryStatsMaker("6Gi", "6Gi", podStats)
