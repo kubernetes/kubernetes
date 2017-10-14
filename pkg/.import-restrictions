@@ -1,0 +1,13 @@
+{
+	"Rules": [
+	  {
+		"SelectorRegexp": "k8s[.]io/kubernetes",
+		"AllowedPrefixes": [
+		    ""
+		],
+		"ForbiddenPrefixes": [
+			"k8s.io/kubernetes/cmd"
+		]
+	  }
+	]
+}

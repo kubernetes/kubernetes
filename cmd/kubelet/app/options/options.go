@@ -34,14 +34,8 @@ import (
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1alpha1"
 	kubeletconfigvalidation "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/validation"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
-)
-
-const (
-	DefaultKubeletPodsDirName       = "pods"
-	DefaultKubeletVolumesDirName    = "volumes"
-	DefaultKubeletPluginsDirName    = "plugins"
-	DefaultKubeletContainersDirName = "containers"
 )
 
 // A configuration field should go in KubeletFlags instead of KubeletConfiguration if any of these are true:
@@ -79,7 +73,7 @@ type KubeletFlags struct {
 	ProviderID string
 
 	// Container-runtime-specific options.
-	ContainerRuntimeOptions
+	config.ContainerRuntimeOptions
 
 	// certDirectory is the directory where the TLS certs are located (by
 	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
