@@ -17,6 +17,8 @@ limitations under the License.
 package gce
 
 import (
+	"context"
+
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	compute "google.golang.org/api/compute/v1"
 )
@@ -70,11 +72,14 @@ func (gce *GCECloud) GetGlobalForwardingRule(name string) (*compute.ForwardingRu
 }
 
 // ListGlobalForwardingRules lists all GlobalForwardingRules in the project.
-func (gce *GCECloud) ListGlobalForwardingRules() (*compute.ForwardingRuleList, error) {
+func (gce *GCECloud) ListGlobalForwardingRules() ([]*compute.ForwardingRule, error) {
 	mc := newForwardingRuleMetricContext("list", "")
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.GlobalForwardingRules.List(gce.projectID).Do()
-	return v, mc.Observe(err)
+	forwardingRules := []*compute.ForwardingRule{}
+	err := gce.service.GlobalForwardingRules.List(gce.projectID).Pages(context.Background(), func(res *compute.ForwardingRuleList) error {
+		forwardingRules = append(forwardingRules, res.Items...)
+		return nil
+	})
+	return forwardingRules, mc.Observe(err)
 }
 
 // GetRegionForwardingRule returns the RegionalForwardingRule by name & region.
@@ -92,19 +97,26 @@ func (gce *GCECloud) GetAlphaRegionForwardingRule(name, region string) (*compute
 }
 
 // ListRegionForwardingRules lists all RegionalForwardingRules in the project & region.
-func (gce *GCECloud) ListRegionForwardingRules(region string) (*compute.ForwardingRuleList, error) {
+func (gce *GCECloud) ListRegionForwardingRules(region string) ([]*compute.ForwardingRule, error) {
 	mc := newForwardingRuleMetricContext("list", region)
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.ForwardingRules.List(gce.projectID, region).Do()
-	return v, mc.Observe(err)
+	forwardingRules := []*compute.ForwardingRule{}
+	err := gce.service.ForwardingRules.List(gce.projectID, region).Pages(context.Background(), func(res *compute.ForwardingRuleList) error {
+		forwardingRules = append(forwardingRules, res.Items...)
+		return nil
+	})
+	return forwardingRules, mc.Observe(err)
 }
 
-// ListRegionForwardingRules lists all RegionalForwardingRules in the project & region.
-func (gce *GCECloud) ListAlphaRegionForwardingRules(region string) (*computealpha.ForwardingRuleList, error) {
+// ListAlphaRegionForwardingRules lists all RegionalForwardingRules in the project & region.
+func (gce *GCECloud) ListAlphaRegionForwardingRules(region string) ([]*computealpha.ForwardingRule, error) {
 	mc := newForwardingRuleMetricContextWithVersion("list", region, computeAlphaVersion)
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.serviceAlpha.ForwardingRules.List(gce.projectID, region).Do()
-	return v, mc.Observe(err)
+	forwardingRules := []*computealpha.ForwardingRule{}
+	err := gce.serviceAlpha.ForwardingRules.List(gce.projectID, region).Pages(context.Background(), func(res *computealpha.ForwardingRuleList) error {
+		forwardingRules = append(forwardingRules, res.Items...)
+		return nil
+	})
+
+	return forwardingRules, mc.Observe(err)
 }
 
 // CreateRegionForwardingRule creates and returns a
