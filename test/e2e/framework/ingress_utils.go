@@ -541,8 +541,8 @@ func (cont *GCEIngressController) deleteSSLCertificate(del bool) (msg string) {
 		}
 		return fmt.Sprintf("Failed to list ssl certificates: %v", err)
 	}
-	if len(sslList.Items) != 0 {
-		for _, s := range sslList.Items {
+	if len(sslList) != 0 {
+		for _, s := range sslList {
 			if !cont.canDelete(s.Name, s.CreationTimestamp, del) {
 				continue
 			}
