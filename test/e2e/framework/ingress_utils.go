@@ -512,10 +512,10 @@ func (cont *GCEIngressController) deleteHTTPHealthCheck(del bool) (msg string) {
 		}
 		return fmt.Sprintf("Failed to list HTTP health checks: %v", err)
 	}
-	if len(hcList.Items) == 0 {
+	if len(hcList) == 0 {
 		return msg
 	}
-	for _, hc := range hcList.Items {
+	for _, hc := range hcList {
 		if !cont.canDelete(hc.Name, hc.CreationTimestamp, del) {
 			continue
 		}

@@ -17,6 +17,8 @@ limitations under the License.
 package gce
 
 import (
+	"context"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/master/ports"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
@@ -92,11 +94,14 @@ func (gce *GCECloud) CreateHttpHealthCheck(hc *compute.HttpHealthCheck) error {
 }
 
 // ListHttpHealthChecks lists all HttpHealthChecks in the project.
-func (gce *GCECloud) ListHttpHealthChecks() (*compute.HttpHealthCheckList, error) {
+func (gce *GCECloud) ListHttpHealthChecks() ([]*compute.HttpHealthCheck, error) {
 	mc := newHealthcheckMetricContext("list_legacy")
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.HttpHealthChecks.List(gce.projectID).Do()
-	return v, mc.Observe(err)
+	httpHealthChecks := []*compute.HttpHealthCheck{}
+	err := gce.service.HttpHealthChecks.List(gce.projectID).Pages(context.Background(), func(res *compute.HttpHealthCheckList) error {
+		httpHealthChecks = append(httpHealthChecks, res.Items...)
+		return nil
+	})
+	return httpHealthChecks, mc.Observe(err)
 }
 
 // Legacy HTTPS Health Checks
@@ -144,11 +149,14 @@ func (gce *GCECloud) CreateHttpsHealthCheck(hc *compute.HttpsHealthCheck) error 
 }
 
 // ListHttpsHealthChecks lists all HttpsHealthChecks in the project.
-func (gce *GCECloud) ListHttpsHealthChecks() (*compute.HttpsHealthCheckList, error) {
+func (gce *GCECloud) ListHttpsHealthChecks() ([]*compute.HttpsHealthCheck, error) {
 	mc := newHealthcheckMetricContext("list_legacy")
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.HttpsHealthChecks.List(gce.projectID).Do()
-	return v, mc.Observe(err)
+	httpsHealthChecks := []*compute.HttpsHealthCheck{}
+	err := gce.service.HttpsHealthChecks.List(gce.projectID).Pages(context.Background(), func(res *compute.HttpsHealthCheckList) error {
+		httpsHealthChecks = append(httpsHealthChecks, res.Items...)
+		return nil
+	})
+	return httpsHealthChecks, mc.Observe(err)
 }
 
 // Generic HealthCheck
@@ -223,11 +231,14 @@ func (gce *GCECloud) CreateAlphaHealthCheck(hc *computealpha.HealthCheck) error 
 }
 
 // ListHealthChecks lists all HealthCheck in the project.
-func (gce *GCECloud) ListHealthChecks() (*compute.HealthCheckList, error) {
+func (gce *GCECloud) ListHealthChecks() ([]*compute.HealthCheck, error) {
 	mc := newHealthcheckMetricContext("list")
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.HealthChecks.List(gce.projectID).Do()
-	return v, mc.Observe(err)
+	healthChecks := []*compute.HealthCheck{}
+	err := gce.service.HealthChecks.List(gce.projectID).Pages(context.Background(), func(res *compute.HealthCheckList) error {
+		healthChecks = append(healthChecks, res.Items...)
+		return nil
+	})
+	return healthChecks, mc.Observe(err)
 }
 
 // GetNodesHealthCheckPort returns the health check port used by the GCE load
