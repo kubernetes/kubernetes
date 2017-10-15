@@ -453,10 +453,10 @@ func (cont *GCEIngressController) deleteURLMap(del bool) (msg string) {
 		}
 		return fmt.Sprintf("Failed to list url maps: %v", err)
 	}
-	if len(umList.Items) == 0 {
+	if len(umList) == 0 {
 		return msg
 	}
-	for _, um := range umList.Items {
+	for _, um := range umList {
 		if !cont.canDelete(um.Name, um.CreationTimestamp, del) {
 			continue
 		}
