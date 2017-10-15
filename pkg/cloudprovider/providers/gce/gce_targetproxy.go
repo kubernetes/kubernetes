@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"net/http"
 
 	compute "google.golang.org/api/compute/v1"
@@ -68,11 +69,14 @@ func (gce *GCECloud) DeleteTargetHttpProxy(name string) error {
 }
 
 // ListTargetHttpProxies lists all TargetHttpProxies in the project.
-func (gce *GCECloud) ListTargetHttpProxies() (*compute.TargetHttpProxyList, error) {
+func (gce *GCECloud) ListTargetHttpProxies() ([]*compute.TargetHttpProxy, error) {
 	mc := newTargetProxyMetricContext("list")
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.TargetHttpProxies.List(gce.projectID).Do()
-	return v, mc.Observe(err)
+	targetHttpProxies := []*compute.TargetHttpProxy{}
+	err := gce.service.TargetHttpProxies.List(gce.projectID).Pages(context.Background(), func(res *compute.TargetHttpProxyList) error {
+		targetHttpProxies = append(targetHttpProxies, res.Items...)
+		return nil
+	})
+	return targetHttpProxies, mc.Observe(err)
 }
 
 // TargetHttpsProxy management
@@ -130,9 +134,12 @@ func (gce *GCECloud) DeleteTargetHttpsProxy(name string) error {
 }
 
 // ListTargetHttpsProxies lists all TargetHttpsProxies in the project.
-func (gce *GCECloud) ListTargetHttpsProxies() (*compute.TargetHttpsProxyList, error) {
+func (gce *GCECloud) ListTargetHttpsProxies() ([]*compute.TargetHttpsProxy, error) {
 	mc := newTargetProxyMetricContext("list")
-	// TODO: use PageToken to list all not just the first 500
-	v, err := gce.service.TargetHttpsProxies.List(gce.projectID).Do()
-	return v, mc.Observe(err)
+	targetHttpsProxies := []*compute.TargetHttpsProxy{}
+	err := gce.service.TargetHttpsProxies.List(gce.projectID).Pages(context.Background(), func(res *compute.TargetHttpsProxyList) error {
+		targetHttpsProxies = append(targetHttpsProxies, res.Items...)
+		return nil
+	})
+	return targetHttpsProxies, mc.Observe(err)
 }
