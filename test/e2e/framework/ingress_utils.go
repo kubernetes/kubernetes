@@ -571,10 +571,10 @@ func (cont *GCEIngressController) deleteInstanceGroup(del bool) (msg string) {
 		}
 		return fmt.Sprintf("Failed to list instance groups: %v", err)
 	}
-	if len(igList.Items) == 0 {
+	if len(igList) == 0 {
 		return msg
 	}
-	for _, ig := range igList.Items {
+	for _, ig := range igList {
 		if !cont.canDelete(ig.Name, ig.CreationTimestamp, del) {
 			continue
 		}
