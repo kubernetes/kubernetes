@@ -17,6 +17,7 @@ limitations under the License.
 package gce
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"path"
@@ -34,40 +35,22 @@ func newRoutesMetricContext(request string) *metricContext {
 
 func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 	var routes []*cloudprovider.Route
-	pageToken := ""
-	page := 0
-	for ; page == 0 || (pageToken != "" && page < maxPages); page++ {
-		mc := newRoutesMetricContext("list_page")
-		listCall := gce.service.Routes.List(gce.NetworkProjectID())
-
-		prefix := truncateClusterName(clusterName)
-		// Filter for routes starting with clustername AND belonging to the
-		// relevant gcp network AND having description = "k8s-node-route".
-		filter := "(name eq " + prefix + "-.*) "
-		filter = filter + "(network eq " + gce.NetworkURL() + ") "
-		filter = filter + "(description eq " + k8sNodeRouteTag + ")"
-		listCall = listCall.Filter(filter)
-		if pageToken != "" {
-			listCall = listCall.PageToken(pageToken)
-		}
-		res, err := listCall.Do()
-		mc.Observe(err)
-		if err != nil {
-			glog.Errorf("Error getting routes from GCE: %v", err)
-			return nil, err
-		}
-		pageToken = res.NextPageToken
+	mc := newRoutesMetricContext("list")
+	// Filter for routes starting with clustername AND belonging to the
+	// relevant gcp network AND having description = "k8s-node-route".
+	filter := "(name eq " + truncateClusterName(clusterName) + "-.*) "
+	filter = filter + "(network eq " + gce.NetworkURL() + ") "
+	filter = filter + "(description eq " + k8sNodeRouteTag + ")"
+	err := gce.service.Routes.List(gce.NetworkProjectID()).Filter(filter).Pages(context.Background(), func(res *compute.RouteList) error {
 		for _, r := range res.Items {
 			target := path.Base(r.NextHopInstance)
 			// TODO: Should we lastComponent(target) this?
 			targetNodeName := types.NodeName(target) // NodeName == Instance Name on GCE
 			routes = append(routes, &cloudprovider.Route{Name: r.Name, TargetNode: targetNodeName, DestinationCIDR: r.DestRange})
 		}
-	}
-	if page >= maxPages {
-		glog.Errorf("ListRoutes exceeded maxPages=%d for Routes.List; truncating.", maxPages)
-	}
-	return routes, nil
+		return nil
+	})
+	return routes, mc.Observe(err)
 }
 
 func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *cloudprovider.Route) error {
