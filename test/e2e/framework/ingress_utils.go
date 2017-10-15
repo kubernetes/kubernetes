@@ -482,11 +482,11 @@ func (cont *GCEIngressController) deleteBackendService(del bool) (msg string) {
 		}
 		return fmt.Sprintf("Failed to list backend services: %v", err)
 	}
-	if len(beList.Items) == 0 {
+	if len(beList) == 0 {
 		Logf("No backend services found")
 		return msg
 	}
-	for _, be := range beList.Items {
+	for _, be := range beList {
 		if !cont.canDelete(be.Name, be.CreationTimestamp, del) {
 			continue
 		}
@@ -740,7 +740,7 @@ func (cont *GCEIngressController) backendMode(nodeports []string, keyword string
 	}
 
 	matchingBackendService := 0
-	for _, bs := range beList.Items {
+	for _, bs := range beList {
 		match := false
 		for _, np := range nodeports {
 			// Warning: This assumes backend service naming convention includes nodeport in the name
