@@ -58,8 +58,10 @@ func Validate(config *componentconfig.KubeProxyConfiguration) field.ErrorList {
 	allErrs = append(allErrs, validateHostPort(config.HealthzBindAddress, newPath.Child("HealthzBindAddress"))...)
 	allErrs = append(allErrs, validateHostPort(config.MetricsBindAddress, newPath.Child("MetricsBindAddress"))...)
 
-	if _, _, err := net.ParseCIDR(config.ClusterCIDR); err != nil {
-		allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "must be a valid CIDR block (e.g. 10.100.0.0/16)"))
+	if config.ClusterCIDR != "" {
+		if _, _, err := net.ParseCIDR(config.ClusterCIDR); err != nil {
+			allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "must be a valid CIDR block (e.g. 10.100.0.0/16)"))
+		}
 	}
 
 	if _, err := utilnet.ParsePortRange(config.PortRange); err != nil {

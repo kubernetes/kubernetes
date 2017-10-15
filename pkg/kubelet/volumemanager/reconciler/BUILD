@@ -10,7 +10,7 @@ go_library(
     name = "go_default_library",
     srcs = ["reconciler.go"],
     deps = [
-        "//cmd/kubelet/app/options:go_default_library",
+        "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/volumemanager/cache:go_default_library",
         "//pkg/util/file:go_default_library",
         "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",

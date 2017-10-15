@@ -242,7 +242,7 @@ func (t *dnsTestCommon) createDNSServer(aRecords map[string]string) {
 			Containers: []v1.Container{
 				{
 					Name:  "dns",
-					Image: "gcr.io/google_containers/k8s-dns-dnsmasq-amd64:1.13.0",
+					Image: "gcr.io/google_containers/k8s-dns-dnsmasq-amd64:1.14.5",
 					Command: []string{
 						"/usr/sbin/dnsmasq",
 						"-u", "root",

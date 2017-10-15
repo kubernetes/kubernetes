@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -1573,6 +1574,7 @@ func TestPrintPodTable(t *testing.T) {
 		}
 	}
 }
+
 func TestPrintPod(t *testing.T) {
 	tests := []struct {
 		pod    api.Pod
@@ -3129,5 +3131,126 @@ func TestPrintStorageClass(t *testing.T) {
 			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
+	}
+}
+
+func TestPrintCluster(t *testing.T) {
+	tests := []struct {
+		cluster    federation.Cluster
+		expect     []metav1alpha1.TableRow
+		showLabels bool
+	}{
+		{
+			federation.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "cluster1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+			},
+			[]metav1alpha1.TableRow{{Cells: []interface{}{"cluster1", "Unknown", "0s"}}},
+			false,
+		},
+		{
+			federation.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "cluster2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+					Labels:            map[string]string{"label1": "", "label2": "cluster"},
+				},
+				Status: federation.ClusterStatus{
+					Conditions: []federation.ClusterCondition{
+						{
+							Status: api.ConditionTrue,
+							Type:   federation.ClusterReady,
+						},
+						{
+							Status: api.ConditionFalse,
+							Type:   federation.ClusterOffline,
+						},
+					},
+				},
+			},
+			[]metav1alpha1.TableRow{{Cells: []interface{}{"cluster2", "Ready,NotOffline", "0s", "label1=,label2=cluster"}}},
+			true,
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printCluster(&test.cluster, printers.PrintOptions{ShowLabels: test.showLabels})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expect, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expect, rows))
+		}
+	}
+}
+
+func TestPrintClusterList(t *testing.T) {
+	tests := []struct {
+		clusters   federation.ClusterList
+		expect     []metav1alpha1.TableRow
+		showLabels bool
+	}{
+		// Test podList's pod: name, num of containers, restarts, container ready status
+		{
+			federation.ClusterList{
+				Items: []federation.Cluster{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "cluster1",
+							CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+						},
+						Status: federation.ClusterStatus{
+							Conditions: []federation.ClusterCondition{
+								{
+									Status: api.ConditionTrue,
+									Type:   federation.ClusterReady,
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:              "cluster2",
+							CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+							Labels:            map[string]string{"label1": "", "label2": "cluster2"},
+						},
+						Status: federation.ClusterStatus{
+							Conditions: []federation.ClusterCondition{
+								{
+									Status: api.ConditionTrue,
+									Type:   federation.ClusterReady,
+								},
+								{
+									Status: api.ConditionFalse,
+									Type:   federation.ClusterOffline,
+								},
+							},
+						},
+					},
+				},
+			},
+			[]metav1alpha1.TableRow{{Cells: []interface{}{"cluster1", "Ready", "0s", "<none>"}},
+				{Cells: []interface{}{"cluster2", "Ready,NotOffline", "0s", "label1=,label2=cluster2"}}},
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		rows, err := printClusterList(&test.clusters, printers.PrintOptions{ShowLabels: test.showLabels})
+
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expect, rows) {
+			t.Errorf("mismatch: %s", diff.ObjectReflectDiff(test.expect, rows))
+		}
 	}
 }

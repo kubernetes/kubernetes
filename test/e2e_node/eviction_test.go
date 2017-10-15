@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -101,7 +102,6 @@ var _ = framework.KubeDescribe("MemoryAllocatableEviction [Slow] [Serial] [Disru
 			kubeReserved.Sub(resource.MustParse("300Mi"))
 			initialConfig.KubeReserved = kubeletconfig.ConfigurationMap(map[string]string{string(v1.ResourceMemory): kubeReserved.String()})
 			initialConfig.EnforceNodeAllocatable = []string{cm.NodeAllocatableEnforcementKey}
-			initialConfig.ExperimentalNodeAllocatableIgnoreEvictionThreshold = false
 			initialConfig.CgroupsPerQOS = true
 		})
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logMemoryMetrics, []podEvictSpec{
@@ -132,11 +132,7 @@ var _ = framework.KubeDescribe("LocalStorageAllocatableEviction [Slow] [Serial] 
 			initialConfig.KubeReserved = kubeletconfig.ConfigurationMap(map[string]string{string(v1.ResourceEphemeralStorage): fmt.Sprintf("%d", availableBytes-diskConsumed)})
 			initialConfig.EnforceNodeAllocatable = []string{cm.NodeAllocatableEnforcementKey}
 			initialConfig.CgroupsPerQOS = true
-			initialConfig.ExperimentalNodeAllocatableIgnoreEvictionThreshold = false
-			if initialConfig.FeatureGates != "" {
-				initialConfig.FeatureGates += ","
-			}
-			initialConfig.FeatureGates += "LocalStorageCapacityIsolation=true"
+			initialConfig.FeatureGates[string(features.LocalStorageCapacityIsolation)] = true
 			// set evictionHard to be very small, so that only the allocatable eviction threshold triggers
 			initialConfig.EvictionHard = "nodefs.available<1"
 			initialConfig.EvictionMinimumReclaim = ""
@@ -221,10 +217,7 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 	evictionTestTimeout := 10 * time.Minute
 	Context(fmt.Sprintf(testContextFmt, "evictions due to pod local storage violations"), func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			if initialConfig.FeatureGates != "" {
-				initialConfig.FeatureGates += ","
-			}
-			initialConfig.FeatureGates += "LocalStorageCapacityIsolation=true"
+			initialConfig.FeatureGates[string(features.LocalStorageCapacityIsolation)] = true
 			initialConfig.EvictionHard = ""
 		})
 		sizeLimit := resource.MustParse("100Mi")
@@ -260,6 +253,49 @@ var _ = framework.KubeDescribe("LocalStorageCapacityIsolationEviction [Slow] [Se
 				}, v1.ResourceRequirements{}),
 			},
 		})
+	})
+})
+
+// PriorityEvictionOrdering tests that the node responds to node memory pressure by evicting pods.
+// This test tests that the guaranteed pod is never evicted, and that the lower-priority pod is evicted before
+// the higher priority pod.
+var _ = framework.KubeDescribe("PriorityEvictionOrdering [Slow] [Serial] [Disruptive] [Flaky]", func() {
+	f := framework.NewDefaultFramework("priority-eviction-ordering-test")
+	expectedNodeCondition := v1.NodeMemoryPressure
+	pressureTimeout := 10 * time.Minute
+	Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
+		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.FeatureGates[string(features.PodPriority)] = true
+			memoryConsumed := resource.MustParse("600Mi")
+			summary := eventuallyGetSummary()
+			availableBytes := *(summary.Node.Memory.AvailableBytes)
+			initialConfig.EvictionHard = fmt.Sprintf("memory.available<%d", availableBytes-uint64(memoryConsumed.Value()))
+			initialConfig.EvictionMinimumReclaim = ""
+		})
+		specs := []podEvictSpec{
+			{
+				evictionPriority: 2,
+				pod:              getMemhogPod("memory-hog-pod", "memory-hog", v1.ResourceRequirements{}),
+			},
+			{
+				evictionPriority: 1,
+				pod:              getMemhogPod("high-priority-memory-hog-pod", "high-priority-memory-hog", v1.ResourceRequirements{}),
+			},
+			{
+				evictionPriority: 0,
+				pod: getMemhogPod("guaranteed-pod", "guaranteed-pod", v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("300Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceMemory: resource.MustParse("300Mi"),
+					},
+				}),
+			},
+		}
+		systemPriority := int32(2147483647)
+		specs[1].pod.Spec.Priority = &systemPriority
+		runEvictionTest(f, pressureTimeout, expectedNodeCondition, logMemoryMetrics, specs)
 	})
 })
 

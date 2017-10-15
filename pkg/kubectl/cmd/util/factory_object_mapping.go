@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"sort"
 	"sync"
 	"time"
@@ -349,6 +350,28 @@ func (f *ring1Factory) StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusVi
 		return nil, err
 	}
 	return kubectl.StatusViewerFor(mapping.GroupVersionKind.GroupKind(), clientset)
+}
+
+func (f *ring1Factory) ApproximatePodTemplateForObject(object runtime.Object) (*api.PodTemplateSpec, error) {
+	switch t := object.(type) {
+	case *api.Pod:
+		return &api.PodTemplateSpec{
+			ObjectMeta: t.ObjectMeta,
+			Spec:       t.Spec,
+		}, nil
+	case *api.ReplicationController:
+		return t.Spec.Template, nil
+	case *extensions.ReplicaSet:
+		return &t.Spec.Template, nil
+	case *extensions.DaemonSet:
+		return &t.Spec.Template, nil
+	case *extensions.Deployment:
+		return &t.Spec.Template, nil
+	case *batch.Job:
+		return &t.Spec.Template, nil
+	}
+
+	return nil, fmt.Errorf("unable to extract pod template from type %v", reflect.TypeOf(object))
 }
 
 func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error) {

@@ -185,6 +185,7 @@ func updateOSSpecificKubeletFlags(args, host, workspace string) (string, error) 
 // RunTest runs test on the node.
 func (n *NodeE2ERemote) RunTest(host, workspace, results, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName string, timeout time.Duration) (string, error) {
 	// Install the cni plugins and add a basic CNI configuration.
+	// TODO(random-liu): Do this in cloud init after we remove containervm test.
 	if err := setupCNI(host, workspace); err != nil {
 		return "", err
 	}

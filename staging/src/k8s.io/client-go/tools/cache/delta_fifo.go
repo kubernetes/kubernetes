@@ -539,6 +539,10 @@ func (f *DeltaFIFO) Resync() error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
+	if f.knownObjects == nil {
+		return nil
+	}
+
 	keys := f.knownObjects.ListKeys()
 	for _, k := range keys {
 		if err := f.syncKeyLocked(k); err != nil {

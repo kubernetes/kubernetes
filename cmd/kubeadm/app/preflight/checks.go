@@ -676,6 +676,15 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		)
 	} else {
 		// Only check etcd version when external endpoints are specified
+		if cfg.Etcd.CAFile != "" {
+			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.CAFile})
+		}
+		if cfg.Etcd.CertFile != "" {
+			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.CertFile})
+		}
+		if cfg.Etcd.KeyFile != "" {
+			checks = append(checks, FileExistingCheck{Path: cfg.Etcd.KeyFile})
+		}
 		checks = append(checks,
 			ExternalEtcdVersionCheck{Etcd: cfg.Etcd},
 		)

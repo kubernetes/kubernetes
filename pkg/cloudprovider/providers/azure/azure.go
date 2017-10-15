@@ -285,7 +285,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		az.operationPollRateLimiter = flowcontrol.NewTokenBucketRateLimiter(
 			az.CloudProviderRateLimitQPS,
 			az.CloudProviderRateLimitBucket)
-		glog.V(2).Infof("Azure cloudprovider using rate limit config: QPS=%d, bucket=%d",
+		glog.V(2).Infof("Azure cloudprovider using rate limit config: QPS=%g, bucket=%d",
 			az.CloudProviderRateLimitQPS,
 			az.CloudProviderRateLimitBucket)
 	} else {

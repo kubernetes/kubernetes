@@ -154,7 +154,6 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	out.MinimumGCAge = in.MinimumGCAge
 	if in.ClusterDNS != nil {
 		in, out := &in.ClusterDNS, &out.ClusterDNS
 		*out = make([]string, len(*in))
@@ -181,17 +180,12 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		}
 	}
 	out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
-	if in.ExperimentalQOSReserved != nil {
-		in, out := &in.ExperimentalQOSReserved, &out.ExperimentalQOSReserved
-		*out = make(ConfigurationMap, len(*in))
+	if in.FeatureGates != nil {
+		in, out := &in.FeatureGates, &out.FeatureGates
+		*out = make(map[string]bool, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}
-	}
-	if in.AllowedUnsafeSysctls != nil {
-		in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
-		*out = make([]string, len(*in))
-		copy(*out, *in)
 	}
 	if in.SystemReserved != nil {
 		in, out := &in.SystemReserved, &out.SystemReserved

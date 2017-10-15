@@ -40,22 +40,6 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.MasterC
 		errs = append(errs, err)
 	}
 
-	// Handle Bootstrap Tokens graduating to from alpha to beta in the v1.7 -> v1.8 upgrade
-	// That transition requires two minor changes
-
-	// Remove the old ClusterRoleBinding for approving if it already exists due to the reasons outlined in the comment below
-	if err := deleteOldApprovalClusterRoleBindingIfExists(client, k8sVersion); err != nil {
-		errs = append(errs, err)
-	}
-	// Upgrade the Bootstrap Tokens' authentication group
-	if err := upgradeBootstrapTokens(client, k8sVersion); err != nil {
-		errs = append(errs, err)
-	}
-	// Upgrade the cluster-info RBAC rules
-	if err := deleteWronglyNamedClusterInfoRBACRules(client, k8sVersion); err != nil {
-		errs = append(errs, err)
-	}
-
 	// Create/update RBAC rules that makes the bootstrap tokens able to post CSRs
 	if err := nodebootstraptoken.AllowBootstrapTokensToPostCSRs(client, k8sVersion); err != nil {
 		errs = append(errs, err)
