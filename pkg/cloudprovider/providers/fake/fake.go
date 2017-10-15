@@ -141,6 +141,7 @@ func (f *FakeCloud) Routes() (cloudprovider.Routes, bool) {
 
 // GetLoadBalancer is a stub implementation of LoadBalancer.GetLoadBalancer.
 func (f *FakeCloud) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (*v1.LoadBalancerStatus, bool, error) {
+	f.addCall("get")
 	status := &v1.LoadBalancerStatus{}
 	status.Ingress = []v1.LoadBalancerIngress{{IP: f.ExternalIP.String()}}
 

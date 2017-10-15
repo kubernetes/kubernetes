@@ -19,7 +19,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"reflect"
@@ -27,6 +26,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -44,9 +44,14 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/metrics"
+	"k8s.io/kubernetes/pkg/util/slice"
+
+	serviceutil "k8s.io/kubernetes/pkg/util/service"
 )
 
 const (
+	serviceLoadBalancerFinalizer = "kubernetes.io/service-load-balancer"
+
 	// Interval of synchronizing service status from apiserver
 	serviceSyncPeriod = 30 * time.Second
 	// Interval of synchronizing node status from apiserver
@@ -70,16 +75,6 @@ const (
 	LabelNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
 )
 
-type cachedService struct {
-	// The cached state of the service
-	state *v1.Service
-}
-
-type serviceCache struct {
-	mu         sync.Mutex // protects serviceMap
-	serviceMap map[string]*cachedService
-}
-
 // ServiceController keeps cloud provider service resources
 // (like load balancers) in sync with the registry.
 type ServiceController struct {
@@ -89,7 +84,6 @@ type ServiceController struct {
 	kubeClient          clientset.Interface
 	clusterName         string
 	balancer            cloudprovider.LoadBalancer
-	cache               *serviceCache
 	serviceLister       corelisters.ServiceLister
 	serviceListerSynced cache.InformerSynced
 	eventBroadcaster    record.EventBroadcaster
@@ -125,7 +119,6 @@ func New(
 		knownHosts:       []*v1.Node{},
 		kubeClient:       kubeClient,
 		clusterName:      clusterName,
-		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
 		eventBroadcaster: broadcaster,
 		eventRecorder:    recorder,
 		nodeLister:       nodeInformer.Lister(),
@@ -139,11 +132,11 @@ func New(
 			UpdateFunc: func(old, cur interface{}) {
 				oldSvc, ok1 := old.(*v1.Service)
 				curSvc, ok2 := cur.(*v1.Service)
-				if ok1 && ok2 && s.needsUpdate(oldSvc, curSvc) {
+				if ok1 && ok2 && (s.needsUpdate(oldSvc, curSvc) || isDeletionCandidate(curSvc)) {
 					s.enqueueService(cur)
 				}
 			},
-			DeleteFunc: s.enqueueService,
+			// Deletion is handled via finalizers so DeleteFunc isn't required.
 		},
 		serviceSyncPeriod,
 	)
@@ -238,18 +231,9 @@ func (s *ServiceController) init() error {
 // Returns an error if processing the service update failed, along with a time.Duration
 // indicating whether processing should be retried; zero means no-retry; otherwise
 // we should retry in that Duration.
-func (s *ServiceController) processServiceUpdate(cachedService *cachedService, service *v1.Service, key string) error {
-	if cachedService.state != nil {
-		if cachedService.state.UID != service.UID {
-			err := s.processLoadBalancerDelete(cachedService, key)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	// cache the service, we need the info for service deletion
-	cachedService.state = service
-	err := s.createLoadBalancerIfNeeded(key, service)
+func (s *ServiceController) processServiceUpdate(service *v1.Service, key string) error {
+
+	err := s.createLoadBalancerIfNeeded(service, key)
 	if err != nil {
 		eventType := "CreatingLoadBalancerFailed"
 		message := "Error creating load balancer (will retry): "
@@ -261,18 +245,13 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 		s.eventRecorder.Event(service, v1.EventTypeWarning, eventType, message)
 		return err
 	}
-	// Always update the cache upon success.
-	// NOTE: Since we update the cached service if and only if we successfully
-	// processed it, a cached service being nil implies that it hasn't yet
-	// been successfully processed.
-	s.cache.set(key, cachedService)
 
 	return nil
 }
 
 // Returns whatever error occurred along with a boolean indicator of whether it
 // should be retried.
-func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.Service) error {
+func (s *ServiceController) createLoadBalancerIfNeeded(service *v1.Service, key string) error {
 	// Note: It is safe to just call EnsureLoadBalancer.  But, on some clouds that requires a delete & create,
 	// which may involve service interruption.  Also, we would like user-friendly events.
 
@@ -286,21 +265,18 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 		if err != nil {
 			return fmt.Errorf("error getting LB for service %s: %v", key, err)
 		}
+
 		if exists {
-			glog.Infof("Deleting existing load balancer for service %s that no longer needs a load balancer.", key)
-			s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
-			if err := s.balancer.EnsureLoadBalancerDeleted(context.TODO(), s.clusterName, service); err != nil {
+			err := s.processLoadBalancerDelete(service, key)
+			if err != nil {
 				return err
 			}
-			s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletedLoadBalancer", "Deleted load balancer")
 		}
-
 		newState = &v1.LoadBalancerStatus{}
 	} else {
 		glog.V(2).Infof("Ensuring LB for service %s", key)
 
 		// TODO: We could do a dry-run here if wanted to avoid the spurious cloud-calls & events when we restart
-
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuringLoadBalancer", "Ensuring load balancer")
 		newState, err = s.ensureLoadBalancer(service)
 		if err != nil {
@@ -309,52 +285,22 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuredLoadBalancer", "Ensured load balancer")
 	}
 
-	// Write the state if changed
-	// TODO: Be careful here ... what if there were other changes to the service?
+	// If there are any changes to the status then patch the service.
 	if !v1helper.LoadBalancerStatusEqual(previousState, newState) {
 		// Make a copy so we don't mutate the shared informer cache
-		service = service.DeepCopy()
+		updated := service.DeepCopy()
+		updated.Status.LoadBalancer = *newState
 
-		// Update the status on the copy
-		service.Status.LoadBalancer = *newState
-
-		if err := s.persistUpdate(service); err != nil {
-			runtime.HandleError(fmt.Errorf("failed to persist service %q updated status to apiserver, even after retries. Giving up: %v", key, err))
-			return nil
+		_, err := serviceutil.PatchStatus(s.kubeClient.CoreV1(), service, updated)
+		if err != nil {
+			return fmt.Errorf("Failed to patch status: %v", err)
 		}
+		glog.V(2).Infof("Successfully updated load balancer service %q", key)
 	} else {
-		glog.V(2).Infof("Not persisting unchanged LoadBalancerStatus for service %s to registry.", key)
+		glog.V(4).Infof("Not persisting unchanged LoadBalancerStatus for service %s to registry.", key)
 	}
 
 	return nil
-}
-
-func (s *ServiceController) persistUpdate(service *v1.Service) error {
-	var err error
-	for i := 0; i < clientRetryCount; i++ {
-		_, err = s.kubeClient.CoreV1().Services(service.Namespace).UpdateStatus(service)
-		if err == nil {
-			return nil
-		}
-		// If the object no longer exists, we don't want to recreate it. Just bail
-		// out so that we can process the delete, which we should soon be receiving
-		// if we haven't already.
-		if errors.IsNotFound(err) {
-			glog.Infof("Not persisting update to service '%s/%s' that no longer exists: %v",
-				service.Namespace, service.Name, err)
-			return nil
-		}
-		// TODO: Try to resolve the conflict if the change was unrelated to load
-		// balancer status. For now, just pass it up the stack.
-		if errors.IsConflict(err) {
-			return fmt.Errorf("not persisting update to service '%s/%s' that has been changed since we received it: %v",
-				service.Namespace, service.Name, err)
-		}
-		glog.Warningf("Failed to persist updated LoadBalancerStatus to service '%s/%s' after creating its load balancer: %v",
-			service.Namespace, service.Name, err)
-		time.Sleep(clientRetryInterval)
-	}
-	return err
 }
 
 func (s *ServiceController) ensureLoadBalancer(service *v1.Service) (*v1.LoadBalancerStatus, error) {
@@ -374,70 +320,6 @@ func (s *ServiceController) ensureLoadBalancer(service *v1.Service) (*v1.LoadBal
 	return s.balancer.EnsureLoadBalancer(context.TODO(), s.clusterName, service, nodes)
 }
 
-// ListKeys implements the interface required by DeltaFIFO to list the keys we
-// already know about.
-func (s *serviceCache) ListKeys() []string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	keys := make([]string, 0, len(s.serviceMap))
-	for k := range s.serviceMap {
-		keys = append(keys, k)
-	}
-	return keys
-}
-
-// GetByKey returns the value stored in the serviceMap under the given key
-func (s *serviceCache) GetByKey(key string) (interface{}, bool, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if v, ok := s.serviceMap[key]; ok {
-		return v, true, nil
-	}
-	return nil, false, nil
-}
-
-// ListKeys implements the interface required by DeltaFIFO to list the keys we
-// already know about.
-func (s *serviceCache) allServices() []*v1.Service {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	services := make([]*v1.Service, 0, len(s.serviceMap))
-	for _, v := range s.serviceMap {
-		services = append(services, v.state)
-	}
-	return services
-}
-
-func (s *serviceCache) get(serviceName string) (*cachedService, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	service, ok := s.serviceMap[serviceName]
-	return service, ok
-}
-
-func (s *serviceCache) getOrCreate(serviceName string) *cachedService {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	service, ok := s.serviceMap[serviceName]
-	if !ok {
-		service = &cachedService{}
-		s.serviceMap[serviceName] = service
-	}
-	return service
-}
-
-func (s *serviceCache) set(serviceName string, service *cachedService) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.serviceMap[serviceName] = service
-}
-
-func (s *serviceCache) delete(serviceName string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	delete(s.serviceMap, serviceName)
-}
-
 func (s *ServiceController) needsUpdate(oldService *v1.Service, newService *v1.Service) bool {
 	if !wantsLoadBalancer(oldService) && !wantsLoadBalancer(newService) {
 		return false
@@ -447,13 +329,16 @@ func (s *ServiceController) needsUpdate(oldService *v1.Service, newService *v1.S
 			oldService.Spec.Type, newService.Spec.Type)
 		return true
 	}
-
+	if !hasFinalizer(newService) && newService.DeletionTimestamp == nil {
+		// We need to update the service to add the finalizer if it's missing.
+		// This should only happen while upgrading pre-finalizer services.
+		return true
+	}
 	if wantsLoadBalancer(newService) && !reflect.DeepEqual(oldService.Spec.LoadBalancerSourceRanges, newService.Spec.LoadBalancerSourceRanges) {
 		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "LoadBalancerSourceRanges", "%v -> %v",
 			oldService.Spec.LoadBalancerSourceRanges, newService.Spec.LoadBalancerSourceRanges)
 		return true
 	}
-
 	if !portsEqualForLB(oldService, newService) || oldService.Spec.SessionAffinity != newService.Spec.SessionAffinity {
 		return true
 	}
@@ -636,9 +521,22 @@ func (s *ServiceController) nodeSyncLoop() {
 	glog.Infof("Detected change in list of current cluster nodes. New node set: %v",
 		nodeNames(newHosts))
 
-	// Try updating all services, and save the ones that fail to try again next
-	// round.
-	s.servicesToUpdate = s.cache.allServices()
+	// Try updating all services, and save the ones that fail to try again next round.
+	services, err := s.serviceLister.List(labels.Everything())
+	if err != nil {
+		glog.Errorf("Failed to retrieve services from lister: %v", err)
+		return
+	}
+
+	// Filter out services that don't have load balancers already created since we can't update
+	// the hosts of a load balancer if the service doesn't have a load balancer.
+	s.servicesToUpdate = []*v1.Service{}
+	for _, svc := range services {
+		if len(svc.Status.LoadBalancer.Ingress) > 0 {
+			s.servicesToUpdate = append(s.servicesToUpdate, svc)
+		}
+	}
+
 	numServices := len(s.servicesToUpdate)
 	s.servicesToUpdate = s.updateLoadBalancerHosts(s.servicesToUpdate, newHosts)
 	glog.Infof("Successfully updated %d out of %d load balancers to direct traffic to the updated set of nodes",
@@ -708,7 +606,6 @@ func loadBalancerIPsAreEqual(oldService, newService *v1.Service) bool {
 // invoked concurrently with the same key.
 func (s *ServiceController) syncService(key string) error {
 	startTime := time.Now()
-	var cachedService *cachedService
 	defer func() {
 		glog.V(4).Infof("Finished syncing service %q (%v)", key, time.Since(startTime))
 	}()
@@ -720,47 +617,104 @@ func (s *ServiceController) syncService(key string) error {
 
 	// service holds the latest service info from apiserver
 	service, err := s.serviceLister.Services(namespace).Get(name)
-	switch {
-	case errors.IsNotFound(err):
-		// service absence in store means watcher caught the deletion, ensure LB info is cleaned
-		glog.Infof("Service has been deleted %v. Attempting to cleanup load balancer resources", key)
-		err = s.processServiceDeletion(key)
-	case err != nil:
-		glog.Infof("Unable to retrieve service %v from store: %v", key, err)
-	default:
-		cachedService = s.cache.getOrCreate(key)
-		err = s.processServiceUpdate(cachedService, service, key)
+	if errors.IsNotFound(err) {
+		glog.V(2).Infof("Service %q has been deleted", key)
+		return nil
 	}
 
-	return err
+	if err != nil {
+		glog.Infof("Unable to retrieve service %v from store: %v", key, err)
+		return err
+	}
+
+	if isDeletionCandidate(service) {
+		err := s.processServiceDeletion(service, key)
+		if err != nil {
+			return err
+		}
+
+		service, err = s.removeFinalizer(service)
+		if err != nil {
+			return err
+		}
+
+		// The service and all external resources, if applicable, have been removed.
+		return nil
+	}
+
+	if needToAddFinalizer(service) {
+		service, err = s.addFinalizer(service)
+		if err != nil {
+			return err
+		}
+
+		// Continue processing the service now that it has been updated with the finalizer.
+	}
+
+	return s.processServiceUpdate(service, key)
 }
 
 // Returns an error if processing the service deletion failed, along with a time.Duration
 // indicating whether processing should be retried; zero means no-retry; otherwise
 // we should retry after that Duration.
-func (s *ServiceController) processServiceDeletion(key string) error {
-	cachedService, ok := s.cache.get(key)
-	if !ok {
-		glog.Errorf("service %s not in cache even though the watcher thought it was. Ignoring the deletion", key)
-		return nil
-	}
-	return s.processLoadBalancerDelete(cachedService, key)
+func (s *ServiceController) processServiceDeletion(service *v1.Service, key string) error {
+	return s.processLoadBalancerDelete(service, key)
 }
 
-func (s *ServiceController) processLoadBalancerDelete(cachedService *cachedService, key string) error {
-	service := cachedService.state
-	// delete load balancer info only if the service type is LoadBalancer
-	if !wantsLoadBalancer(service) {
-		return nil
-	}
+func (s *ServiceController) processLoadBalancerDelete(service *v1.Service, key string) error {
+	glog.Infof("Deleting existing load balancer for service %s that no longer needs a load balancer.", key)
 	s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
 	err := s.balancer.EnsureLoadBalancerDeleted(context.TODO(), s.clusterName, service)
 	if err != nil {
 		s.eventRecorder.Eventf(service, v1.EventTypeWarning, "DeletingLoadBalancerFailed", "Error deleting load balancer (will retry): %v", err)
 		return err
 	}
+
 	s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletedLoadBalancer", "Deleted load balancer")
-	s.cache.delete(key)
 
 	return nil
+}
+
+func (s *ServiceController) addFinalizer(svc *v1.Service) (*v1.Service, error) {
+	if hasFinalizer(svc) {
+		return svc, nil
+	}
+
+	updated := svc.DeepCopy()
+	updated.ObjectMeta.Finalizers = append(svc.ObjectMeta.Finalizers, serviceLoadBalancerFinalizer)
+
+	svc, err := serviceutil.Patch(s.kubeClient.CoreV1(), svc, updated)
+	if err != nil {
+		return nil, err
+	}
+
+	return svc, nil
+}
+
+func (s *ServiceController) removeFinalizer(svc *v1.Service) (*v1.Service, error) {
+	if !hasFinalizer(svc) {
+		return svc, nil
+	}
+
+	updated := svc.DeepCopy()
+	updated.ObjectMeta.Finalizers = slice.RemoveString(svc.ObjectMeta.Finalizers, serviceLoadBalancerFinalizer, nil)
+
+	svc, err := serviceutil.Patch(s.kubeClient.CoreV1(), svc, updated)
+	if err != nil {
+		return nil, err
+	}
+
+	return svc, nil
+}
+
+func hasFinalizer(svc *v1.Service) bool {
+	return slice.ContainsString(svc.ObjectMeta.Finalizers, serviceLoadBalancerFinalizer, nil)
+}
+
+func isDeletionCandidate(svc *v1.Service) bool {
+	return svc.ObjectMeta.DeletionTimestamp != nil && hasFinalizer(svc)
+}
+
+func needToAddFinalizer(svc *v1.Service) bool {
+	return svc.ObjectMeta.DeletionTimestamp == nil && !hasFinalizer(svc)
 }
