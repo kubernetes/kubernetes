@@ -106,7 +106,7 @@ type Rule struct {
 type FailurePolicyType string
 
 const (
-	// Ignore means the initilizer is removed from the initializers list of an
+	// Ignore means the initializer is removed from the initializers list of an
 	// object if the initializer is timed out.
 	Ignore FailurePolicyType = "Ignore"
 	// For 1.7, only "Ignore" is allowed. "Fail" will be allowed when the
