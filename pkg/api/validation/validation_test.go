@@ -2720,6 +2720,31 @@ func TestValidateVolumes(t *testing.T) {
 			errtype:  field.ErrorTypeRequired,
 			errfield: "scaleIO.system",
 		},
+		// PVC
+		{
+			name: "valid pvc volume",
+			vol: api.Volume{
+				Name: "pvc-volume",
+				VolumeSource: api.VolumeSource{
+					PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+						ClaimName: "abc",
+					},
+				},
+			},
+		},
+		{
+			name: "invalid pvc volume with claimName > 63",
+			vol: api.Volume{
+				Name: "pvc-volume",
+				VolumeSource: api.VolumeSource{
+					PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{
+						ClaimName: strings.Repeat("a", 64),
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "persistentVolumeClaim.claimName",
+		},
 	}
 
 	for i, tc := range testCases {
