@@ -57,7 +57,6 @@ import (
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/integer"
-	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/features"
@@ -197,7 +196,7 @@ type Bootstrap interface {
 // Builder creates and initializes a Kubelet instance
 type Builder func(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *Dependencies,
-	crOptions *options.ContainerRuntimeOptions,
+	crOptions *config.ContainerRuntimeOptions,
 	hostnameOverride string,
 	nodeIP string,
 	providerID string,
@@ -318,7 +317,7 @@ func getRuntimeAndImageServices(remoteRuntimeEndpoint string, remoteImageEndpoin
 // No initialization of Kubelet and its modules should happen here.
 func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *Dependencies,
-	crOptions *options.ContainerRuntimeOptions,
+	crOptions *config.ContainerRuntimeOptions,
 	hostnameOverride string,
 	nodeIP string,
 	providerID string,

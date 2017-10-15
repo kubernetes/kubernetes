@@ -90,7 +90,7 @@ func TestAddFlags(t *testing.T) {
 
 	// This is a snapshot of expected options parsed by args.
 	expected := &ServerRunOptions{
-		ServiceNodePortRange:   DefaultServiceNodePortRange,
+		ServiceNodePortRange:   kubeoptions.DefaultServiceNodePortRange,
 		MasterCount:            5,
 		EndpointReconcilerType: string(reconcilers.MasterCountReconcilerType),
 		AllowPrivileged:        false,

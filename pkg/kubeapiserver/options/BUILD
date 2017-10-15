@@ -13,6 +13,7 @@ go_library(
         "authentication.go",
         "authorization.go",
         "cloudprovider.go",
+        "options.go",
         "serving.go",
         "storage_versions.go",
     ],

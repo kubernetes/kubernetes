@@ -38,9 +38,6 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// DefaultServiceNodePortRange is the default port range for NodePort services.
-var DefaultServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
-
 // ServerRunOptions runs a kubernetes api server.
 type ServerRunOptions struct {
 	GenericServerRunOptions *genericoptions.ServerRunOptions
@@ -114,7 +111,7 @@ func NewServerRunOptions() *ServerRunOptions {
 			EnableHttps: true,
 			HTTPTimeout: time.Duration(5) * time.Second,
 		},
-		ServiceNodePortRange: DefaultServiceNodePortRange,
+		ServiceNodePortRange: kubeoptions.DefaultServiceNodePortRange,
 	}
 	// Overwrite the default for storage data format.
 	s.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"

@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/discovery"
-	kubeadmnode "k8s.io/kubernetes/cmd/kubeadm/app/node"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -218,29 +217,7 @@ func (j *Join) Run(out io.Writer) error {
 		return err
 	}
 
-	client, err := kubeconfigutil.ToClientSet(cfg)
-	if err != nil {
-		return err
-	}
-	if err := kubeadmnode.ValidateAPIServer(client); err != nil {
-		return err
-	}
-
 	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletBootstrapKubeConfigFileName)
-
-	// Depending on the kubelet version, we might perform the TLS bootstrap or not
-	kubeletVersion, err := preflight.GetKubeletVersion()
-	// In case the command executed successfully and returned v1.7-something, we'll perform TLS Bootstrapping
-	// Otherwise, just assume v1.8
-	// TODO: In the beginning of the v1.9 cycle, we can remove the logic as we then don't support v1.7 anymore
-	if err == nil && kubeletVersion.Major() == 1 && kubeletVersion.Minor() == 7 {
-		hostname := nodeutil.GetHostname(j.cfg.NodeName)
-		if err := kubeadmnode.PerformTLSBootstrap(cfg, hostname); err != nil {
-			return err
-		}
-		// As we now performed the TLS Bootstrap, change the filepath to be kubelet.conf instead of bootstrap-kubelet.conf
-		kubeconfigFile = filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)
-	}
 
 	// Write the bootstrap kubelet config file or the TLS-Boostrapped kubelet config file down to disk
 	if err := kubeconfigutil.WriteToDisk(kubeconfigFile, cfg); err != nil {

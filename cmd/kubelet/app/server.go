@@ -766,7 +766,7 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 
 func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *kubelet.Dependencies,
-	crOptions *options.ContainerRuntimeOptions,
+	crOptions *config.ContainerRuntimeOptions,
 	hostnameOverride string,
 	nodeIP string,
 	providerID string,
