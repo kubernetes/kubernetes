@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -132,7 +131,8 @@ const (
 	DefaultTokenDuration = 24 * time.Hour
 
 	// LabelNodeRoleMaster specifies that a node is a master
-	LabelNodeRoleMaster = service.LabelNodeRoleMaster
+	// This is a duplicate definition of the constant in pkg/controller/service/service_controller.go
+	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
 
 	// MasterConfigurationConfigMap specifies in what ConfigMap in the kube-system namespace the `kubeadm init` configuration should be stored
 	MasterConfigurationConfigMap = "kubeadm-config"
