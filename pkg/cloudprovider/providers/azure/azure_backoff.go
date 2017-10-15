@@ -328,11 +328,11 @@ func (az *Cloud) CreateOrUpdateInterfaceWithRetry(nic network.Interface) error {
 func (az *Cloud) DeletePublicIPWithRetry(pipName string) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
-		glog.V(10).Infof("PublicIPAddressesClient.Delete(%s): start", pipName)
-		respChan, errChan := az.PublicIPAddressesClient.Delete(az.ResourceGroup, pipName, nil)
+		glog.V(10).Infof("PublicIPAddressesClient.Delete(%s, %s): start", pipResourceGroup, pipName)
+		respChan, errChan := az.PublicIPAddressesClient.Delete(pipResourceGroup, pipName, nil)
 		resp := <-respChan
 		err := <-errChan
-		glog.V(10).Infof("PublicIPAddressesClient.Delete(%s): end", pipName)
+		glog.V(10).Infof("PublicIPAddressesClient.Delete(%s, %s): end", pipResourceGroup, pipName)
 		return processRetryResponse(resp, err)
 	})
 }
