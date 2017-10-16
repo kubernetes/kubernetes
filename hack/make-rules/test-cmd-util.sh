@@ -1084,6 +1084,18 @@ run_kubectl_apply_tests() {
   # cleanup
   kubectl delete svc prune-svc 2>&1 "${kube_flags[@]}"
 
+  ## kubectl apply --error-unchanged=true
+  # Pre-Condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command: apply a pod "test-pod" (doesn't exist) should create this pod
+  kubectl apply -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  # Post-Condition: pod "test-pod" is created
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+  # apply with no change but --error-unchanged=true should return 2
+  ! kubectl apply --error-unchanged=true -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  # Clean up
+  kubectl delete pods test-pod "${kube_flags[@]}"
+
   set +o nounset
   set +o errexit
 }
@@ -1319,6 +1331,20 @@ run_kubectl_run_tests() {
   kube::test::get_object_assert cronjobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
   # Clean up
   kubectl delete cronjobs pi "${kube_flags[@]}"
+
+  ## kubectl run with --ignore-unchanged
+  # Pre-Condition: no Job exists
+  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl run pi --generator=job/v1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
+  # Post-Condition: Job "pi" is created
+  kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
+  # Command run again with --ignore-unchanged should be no error
+  kubectl run pi --ignore-unchanged=true --generator=job/v1 "--image=$IMAGE_PERL" --restart=OnFailure -- perl -Mbignum=bpi -wle 'print bpi(20)' "${kube_flags[@]}"
+  # Clean up
+  kubectl delete jobs pi "${kube_flags[@]}"
+  # Post-condition: no pods exist.
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
   set +o nounset
   set +o errexit
@@ -3902,6 +3928,18 @@ run_kubectl_create_error_tests() {
   [ "$( kubectl convert -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -o json | kubectl create "${kube_flags[@]}" --raw /api/v1/namespaces -f - --v=8 2>&1 | grep 'cannot be handled as a Namespace: converting (v1.Pod)')" ]
 
   [ "$( kubectl create "${kube_flags[@]}" --raw /api/v1/namespaces -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml --edit 2>&1 | grep 'raw and --edit are mutually exclusive')" ]
+
+  ## kubectl create --ignore-unchanged
+  # Pre-Condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command: create a pod "test-pod" (doesn't exist) should create this pod
+  kubectl create -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  # Post-Condition: pod "test-pod" is created
+  kube::test::get_object_assert 'pods test-pod' "{{${labels_field}.name}}" 'test-pod-label'
+  # create again with --ignore-unchanged=true should return 0, no errors
+  kubectl create --ignore-unchanged=true -f hack/testdata/pod.yaml "${kube_flags[@]}"
+  # Clean up
+  kubectl delete pods test-pod "${kube_flags[@]}"
 
   set +o nounset
   set +o errexit
