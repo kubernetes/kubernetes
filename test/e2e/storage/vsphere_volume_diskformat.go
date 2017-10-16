@@ -52,7 +52,7 @@ import (
 	11. Delete PVC, PV and Storage Class
 */
 
-var _ = SIGDescribe("Volume Disk Format", func() {
+var _ = SIGDescribe("Volume Disk Format [Feature:vsphere]", func() {
 	f := framework.NewDefaultFramework("volume-disk-format")
 	var (
 		client            clientset.Interface
@@ -114,7 +114,7 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	By("Creating PVC using the Storage Class")
-	pvclaimSpec := getVSphereClaimSpecWithStorageClassAnnotation(namespace, storageclass)
+	pvclaimSpec := getVSphereClaimSpecWithStorageClassAnnotation(namespace, "2Gi", storageclass)
 	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Create(pvclaimSpec)
 	Expect(err).NotTo(HaveOccurred())
 

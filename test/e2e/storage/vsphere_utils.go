@@ -207,7 +207,7 @@ func getVSphereStorageClassSpec(name string, scParameters map[string]string) *st
 	return sc
 }
 
-func getVSphereClaimSpecWithStorageClassAnnotation(ns string, storageclass *storage.StorageClass) *v1.PersistentVolumeClaim {
+func getVSphereClaimSpecWithStorageClassAnnotation(ns string, diskSize string, storageclass *storage.StorageClass) *v1.PersistentVolumeClaim {
 	scAnnotation := make(map[string]string)
 	scAnnotation[v1.BetaStorageClassAnnotation] = storageclass.Name
 
@@ -223,7 +223,7 @@ func getVSphereClaimSpecWithStorageClassAnnotation(ns string, storageclass *stor
 			},
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): resource.MustParse("2Gi"),
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse(diskSize),
 				},
 			},
 		},
