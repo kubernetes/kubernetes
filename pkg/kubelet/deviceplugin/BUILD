@@ -18,7 +18,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/deviceplugin",
     deps = [
         "//pkg/api/v1/helper:go_default_library",
-        "//pkg/kubelet/apis/deviceplugin/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/deviceplugin/v1alpha:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
@@ -49,7 +49,7 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/kubelet/deviceplugin",
     library = ":go_default_library",
     deps = [
-        "//pkg/kubelet/apis/deviceplugin/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/deviceplugin/v1alpha:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],
 )

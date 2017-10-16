@@ -34,7 +34,7 @@ go_library(
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/cri:go_default_library",
-        "//pkg/kubelet/apis/deviceplugin/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/deviceplugin/v1alpha:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/cm/cpumanager:go_default_library",
@@ -94,7 +94,7 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/kubelet/cm",
     library = ":go_default_library",
     deps = [
-        "//pkg/kubelet/apis/deviceplugin/v1alpha1:go_default_library",
+        "//pkg/kubelet/apis/deviceplugin/v1alpha:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
