@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 func TestGroupVersions(t *testing.T) {
@@ -50,7 +50,7 @@ func TestGroupVersions(t *testing.T) {
 		t.Errorf("No additional unnamespaced groups should be created")
 	}
 
-	for _, gv := range api.Registry.RegisteredGroupVersions() {
+	for _, gv := range legacyscheme.Registry.RegisteredGroupVersions() {
 		if !strings.HasSuffix(gv.Group, ".k8s.io") && !legacyUnsuffixedGroups.Has(gv.Group) {
 			t.Errorf("Group %s does not have the standard kubernetes API group suffix of .k8s.io", gv.Group)
 		}
@@ -58,7 +58,7 @@ func TestGroupVersions(t *testing.T) {
 }
 
 func TestTypeTags(t *testing.T) {
-	for gvk, knownType := range api.Scheme.AllKnownTypes() {
+	for gvk, knownType := range legacyscheme.Scheme.AllKnownTypes() {
 		if gvk.Version == runtime.APIVersionInternal {
 			ensureNoTags(t, gvk, knownType, nil)
 		} else {

@@ -34,6 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
@@ -274,12 +275,12 @@ func TestAdmitPrivileged(t *testing.T) {
 
 func defaultPod(t *testing.T, pod *kapi.Pod) *kapi.Pod {
 	v1Pod := &v1.Pod{}
-	if err := kapi.Scheme.Convert(pod, v1Pod, nil); err != nil {
+	if err := legacyscheme.Scheme.Convert(pod, v1Pod, nil); err != nil {
 		t.Fatal(err)
 	}
-	kapi.Scheme.Default(v1Pod)
+	legacyscheme.Scheme.Default(v1Pod)
 	apiPod := &kapi.Pod{}
-	if err := kapi.Scheme.Convert(v1Pod, apiPod, nil); err != nil {
+	if err := legacyscheme.Scheme.Convert(v1Pod, apiPod, nil); err != nil {
 		t.Fatal(err)
 	}
 	return apiPod

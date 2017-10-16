@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/rbac/v1"
 
@@ -53,13 +53,13 @@ func TestHelpersRoundTrip(t *testing.T) {
 	}
 
 	for _, internalObj := range []runtime.Object{&rb, &rbcr, &crb, role, clusterRole} {
-		v1Obj, err := api.Scheme.ConvertToVersion(internalObj, v1.SchemeGroupVersion)
+		v1Obj, err := legacyscheme.Scheme.ConvertToVersion(internalObj, v1.SchemeGroupVersion)
 		if err != nil {
 			t.Errorf("err on %T: %v", internalObj, err)
 			continue
 		}
-		api.Scheme.Default(v1Obj)
-		roundTrippedObj, err := api.Scheme.ConvertToVersion(v1Obj, rbac.SchemeGroupVersion)
+		legacyscheme.Scheme.Default(v1Obj)
+		roundTrippedObj, err := legacyscheme.Scheme.ConvertToVersion(v1Obj, rbac.SchemeGroupVersion)
 		if err != nil {
 			t.Errorf("err on %T: %v", internalObj, err)
 			continue

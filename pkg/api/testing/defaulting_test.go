@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 type orderedGroupVersionKinds []schema.GroupVersionKind
@@ -157,7 +157,7 @@ func TestDefaulting(t *testing.T) {
 		},
 	)
 
-	scheme := api.Scheme
+	scheme := legacyscheme.Scheme
 	var testTypes orderedGroupVersionKinds
 	for gvk := range scheme.AllKnownTypes() {
 		if gvk.Version == runtime.APIVersionInternal {
@@ -216,7 +216,7 @@ func BenchmarkPodDefaulting(b *testing.B) {
 		f.Fuzz(&items[i])
 	}
 
-	scheme := api.Scheme
+	scheme := legacyscheme.Scheme
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		pod := &items[i%len(items)]

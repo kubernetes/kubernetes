@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -101,7 +102,7 @@ type ServiceController struct {
 func New(federationClient fedclientset.Interface) *ServiceController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(federationClient))
-	recorder := broadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: UserAgentName})
+	recorder := broadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: UserAgentName})
 
 	s := &ServiceController{
 		federationClient:      federationClient,

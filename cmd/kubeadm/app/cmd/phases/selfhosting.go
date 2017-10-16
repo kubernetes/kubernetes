@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // NewCmdSelfhosting returns the self-hosting Cobra command
@@ -54,7 +54,7 @@ func getSelfhostingSubCommand() *cobra.Command {
 
 	cfg := &kubeadmapiext.MasterConfiguration{}
 	// Default values for the cobra help text
-	api.Scheme.Default(cfg)
+	legacyscheme.Scheme.Default(cfg)
 
 	var cfgPath, kubeConfigFile, featureGatesString string
 

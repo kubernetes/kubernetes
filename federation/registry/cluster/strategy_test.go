@@ -27,6 +27,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 
 	// install all api groups for testing
@@ -159,7 +160,7 @@ func TestMatchCluster(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		api.Registry.GroupOrDie(federation.GroupName).GroupVersion.String(),
+		legacyscheme.Registry.GroupOrDie(federation.GroupName).GroupVersion.String(),
 		"Cluster",
 		ClusterToSelectableFields(&federation.Cluster{}),
 		nil,
