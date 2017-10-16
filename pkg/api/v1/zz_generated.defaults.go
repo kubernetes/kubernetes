@@ -138,7 +138,7 @@ func SetObjectDefaults_PersistentVolume(in *PersistentVolume) {
 		SetDefaults_AzureDiskVolumeSource(in.Spec.PersistentVolumeSource.AzureDisk)
 	}
 	if in.Spec.PersistentVolumeSource.ScaleIO != nil {
-		SetDefaults_ScaleIOVolumeSource(in.Spec.PersistentVolumeSource.ScaleIO)
+		SetDefaults_ScaleIOPersistentVolumeSource(in.Spec.PersistentVolumeSource.ScaleIO)
 	}
 }
 
