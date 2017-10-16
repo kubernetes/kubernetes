@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["downwardapi.go"],
+    importpath = "k8s.io/kubernetes/pkg/volume/downwardapi",
     deps = [
         "//pkg/api/v1/resource:go_default_library",
         "//pkg/fieldpath:go_default_library",
@@ -25,6 +26,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["downwardapi_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/volume/downwardapi",
     library = ":go_default_library",
     deps = [
         "//pkg/fieldpath:go_default_library",

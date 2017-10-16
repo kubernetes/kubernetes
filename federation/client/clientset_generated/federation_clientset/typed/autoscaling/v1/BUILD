@@ -13,6 +13,7 @@ go_library(
         "generated_expansion.go",
         "horizontalpodautoscaler.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/autoscaling/v1",
     deps = [
         "//federation/client/clientset_generated/federation_clientset/scheme:go_default_library",
         "//vendor/k8s.io/api/autoscaling/v1:go_default_library",

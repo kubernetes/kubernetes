@@ -9,6 +9,7 @@ go_library(
         "fake.go",
         "zz_generated.deepcopy.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/testing",
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_testing_CONSUMERS",
     ],

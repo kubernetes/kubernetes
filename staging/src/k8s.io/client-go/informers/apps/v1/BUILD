@@ -6,6 +6,7 @@ go_library(
         "daemonset.go",
         "interface.go",
     ],
+    importpath = "k8s.io/client-go/informers/apps/v1",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/k8s.io/api/apps/v1:go_default_library",

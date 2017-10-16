@@ -21,6 +21,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "golang.org/x/crypto/salsa20/salsa",
     visibility = ["//visibility:public"],
 )
 

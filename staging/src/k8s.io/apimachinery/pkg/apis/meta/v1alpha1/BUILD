@@ -18,6 +18,7 @@ go_library(
         "zz_generated.deepcopy.go",
         "zz_generated.defaults.go",
     ],
+    importpath = "k8s.io/apimachinery/pkg/apis/meta/v1alpha1",
     deps = [
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

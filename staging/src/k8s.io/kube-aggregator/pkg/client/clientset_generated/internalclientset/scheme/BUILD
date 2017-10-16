@@ -11,6 +11,7 @@ go_library(
         "doc.go",
         "register.go",
     ],
+    importpath = "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/scheme",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",

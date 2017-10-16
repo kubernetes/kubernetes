@@ -7,6 +7,7 @@ go_library(
         "cluster.go",
         "doc.go",
     ],
+    importpath = "github.com/coreos/etcd/etcdserver/api",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/etcdserver/membership:go_default_library",

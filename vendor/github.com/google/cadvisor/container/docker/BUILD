@@ -8,6 +8,7 @@ go_library(
         "factory.go",
         "handler.go",
     ],
+    importpath = "github.com/google/cadvisor/container/docker",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/blang/semver:go_default_library",

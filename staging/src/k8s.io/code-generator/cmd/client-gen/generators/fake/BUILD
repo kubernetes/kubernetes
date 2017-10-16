@@ -13,6 +13,7 @@ go_library(
         "generator_fake_for_group.go",
         "generator_fake_for_type.go",
     ],
+    importpath = "k8s.io/code-generator/cmd/client-gen/generators/fake",
     deps = [
         "//vendor/k8s.io/code-generator/cmd/client-gen/args:go_default_library",
         "//vendor/k8s.io/code-generator/cmd/client-gen/generators/scheme:go_default_library",

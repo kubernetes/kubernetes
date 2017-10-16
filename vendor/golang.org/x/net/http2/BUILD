@@ -30,6 +30,7 @@ go_library(
         "writesched_priority.go",
         "writesched_random.go",
     ],
+    importpath = "golang.org/x/net/http2",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/golang.org/x/net/http2/hpack:go_default_library",

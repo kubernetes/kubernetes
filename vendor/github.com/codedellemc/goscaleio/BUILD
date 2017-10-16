@@ -16,6 +16,7 @@ go_library(
         "user.go",
         "volume.go",
     ],
+    importpath = "github.com/codedellemc/goscaleio",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/codedellemc/goscaleio/types/v1:go_default_library",

@@ -12,6 +12,7 @@ go_test(
         "controller_ref_manager_test.go",
         "controller_utils_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
@@ -49,6 +50,7 @@ go_library(
         "doc.go",
         "lookup_cache.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",

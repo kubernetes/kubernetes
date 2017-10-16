@@ -13,6 +13,7 @@ go_library(
         "replication_controller.go",
         "replication_controller_utils.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/replication",
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/controller:go_default_library",
@@ -40,6 +41,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["replication_controller_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/controller/replication",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

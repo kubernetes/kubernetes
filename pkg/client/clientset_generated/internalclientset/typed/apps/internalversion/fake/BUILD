@@ -13,6 +13,7 @@ go_library(
         "fake_controllerrevision.go",
         "fake_statefulset.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion/fake",
     deps = [
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/extensions:go_default_library",

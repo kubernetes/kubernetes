@@ -7,6 +7,7 @@ go_library(
         "common.go",
         "marshal.go",
     ],
+    importpath = "github.com/google/certificate-transparency/go/asn1",
     visibility = ["//visibility:public"],
 )
 

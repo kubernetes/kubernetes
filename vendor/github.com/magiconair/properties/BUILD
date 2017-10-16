@@ -12,6 +12,7 @@ go_library(
         "properties.go",
         "rangecheck.go",
     ],
+    importpath = "github.com/magiconair/properties",
     visibility = ["//visibility:public"],
 )
 

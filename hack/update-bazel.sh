@@ -27,15 +27,23 @@ rm -f "${KUBE_ROOT}/pkg/generated/openapi/zz_generated.openapi.go"
 # The git commit sha1s here should match the values in $KUBE_ROOT/WORKSPACE.
 kube::util::go_install_from_commit \
     github.com/kubernetes/repo-infra/kazel \
-    4eaf9e671bbb549fb4ec292cf251f921d7ef80ac
+    e26fc85d14a1d3dc25569831acc06919673c545a
 kube::util::go_install_from_commit \
     github.com/bazelbuild/rules_go/go/tools/gazelle/gazelle \
-    82483596ec203eb9c1849937636f4cbed83733eb
+    a280fbac1a0a4c67b0eee660b4fd1b3db7c9f058
 
 touch "${KUBE_ROOT}/vendor/BUILD"
 
 gazelle fix \
     -build_file_name=BUILD,BUILD.bazel \
     -external=vendored \
+    -proto=legacy \
     -mode=fix
+# gazelle gets confused by our staging/ directory, prepending an extra
+# "k8s.io/kubernetes/staging/src" to the import path.
+# gazelle won't follow the symlinks in vendor/, so we can't just exclude
+# staging/. Instead we just fix the bad paths with sed.
+find staging -name BUILD -o -name BUILD.bazel | \
+  xargs sed -i 's|\(importpath = "\)k8s.io/kubernetes/staging/src/\(.*\)|\1\2|'
+
 kazel

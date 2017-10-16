@@ -13,6 +13,7 @@ go_library(
         "util.go",
         "verification.go",
     ],
+    importpath = "github.com/coreos/go-oidc/oidc",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/go-oidc/http:go_default_library",

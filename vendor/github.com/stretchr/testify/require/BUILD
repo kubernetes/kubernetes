@@ -9,6 +9,7 @@ go_library(
         "require_forward.go",
         "requirements.go",
     ],
+    importpath = "github.com/stretchr/testify/require",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/stretchr/testify/assert:go_default_library"],
 )

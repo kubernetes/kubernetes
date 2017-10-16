@@ -70,6 +70,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/docker/engine-api/client",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/docker/distribution/reference:go_default_library",

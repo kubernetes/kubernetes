@@ -23,6 +23,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/vishvananda/netlink/nl",
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [

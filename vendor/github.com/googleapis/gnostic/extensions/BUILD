@@ -6,6 +6,7 @@ go_library(
         "extension.pb.go",
         "extensions.go",
     ],
+    importpath = "github.com/googleapis/gnostic/extensions",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",

@@ -6,6 +6,7 @@ go_library(
         "client.go",
         "transport.go",
     ],
+    importpath = "github.com/docker/engine-api/client/transport",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/docker/go-connections/sockets:go_default_library"],
 )

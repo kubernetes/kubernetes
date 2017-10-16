@@ -12,6 +12,7 @@ go_library(
         "doc.go",
         "import_known_versions.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset",
     deps = [
         "//federation/apis/federation/install:go_default_library",
         "//federation/client/clientset_generated/federation_clientset/typed/autoscaling/v1:go_default_library",

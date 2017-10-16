@@ -25,6 +25,7 @@ go_library(
         "tags.go",
         "volumes.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/aws",
     deps = [
         "//pkg/api/v1/service:go_default_library",
         "//pkg/cloudprovider:go_default_library",
@@ -65,6 +66,7 @@ go_test(
         "retry_handler_test.go",
         "tags_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/aws",
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis:go_default_library",

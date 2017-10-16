@@ -21,6 +21,7 @@ go_library(
         "//conditions:default": [],
     }),
     cgo = True,
+    importpath = "github.com/docker/docker/pkg/term",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/golang.org/x/sys/unix:go_default_library",

@@ -12,6 +12,7 @@ go_library(
         "checks.go",
         "utils.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/preflight",
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//cmd/kube-controller-manager/app/options:go_default_library",
@@ -36,6 +37,7 @@ go_test(
         "checks_test.go",
         "utils_test.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/preflight",
     library = ":go_default_library",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",

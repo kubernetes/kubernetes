@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["storage_apiserver.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/admissionregistration/rest",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/admissionregistration:go_default_library",

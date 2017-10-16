@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["kind_visitor.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/apps",
     deps = ["//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library"],
 )
 
@@ -31,6 +32,7 @@ go_test(
         "apps_suite_test.go",
         "kind_visitor_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/apps_test",
     deps = [
         ":go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",

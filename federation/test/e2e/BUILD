@@ -20,6 +20,7 @@ go_library(
         "upgrade.go",
         "util.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/test/e2e",
     deps = [
         "//federation/apis/federation:go_default_library",
         "//federation/apis/federation/v1beta1:go_default_library",

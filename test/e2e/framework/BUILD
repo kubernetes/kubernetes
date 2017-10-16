@@ -39,6 +39,7 @@ go_library(
         "util.go",
         "volume_util.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e/framework",
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//pkg/api:go_default_library",

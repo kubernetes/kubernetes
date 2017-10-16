@@ -9,6 +9,7 @@ go_library(
         "int.go",
         "scan.go",
     ],
+    importpath = "gopkg.in/gcfg.v1/types",
     visibility = ["//visibility:public"],
 )
 

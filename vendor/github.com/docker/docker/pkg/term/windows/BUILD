@@ -12,6 +12,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/docker/docker/pkg/term/windows",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/Azure/go-ansiterm:go_default_library",

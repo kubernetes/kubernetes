@@ -14,6 +14,7 @@ go_library(
         "node_authz.go",
         "service_accounts.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e/auth",
     deps = [
         "//pkg/util/version:go_default_library",
         "//plugin/pkg/admission/serviceaccount:go_default_library",

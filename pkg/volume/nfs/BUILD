@@ -12,6 +12,7 @@ go_library(
         "doc.go",
         "nfs.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/nfs",
     deps = [
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",
@@ -27,6 +28,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["nfs_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/volume/nfs",
     library = ":go_default_library",
     deps = [
         "//pkg/util/mount:go_default_library",

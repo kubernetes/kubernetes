@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["interface.go"],
+    importpath = "k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration",
     deps = [
         "//vendor/k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1beta1:go_default_library",
         "//vendor/k8s.io/kube-aggregator/pkg/client/informers/externalversions/internalinterfaces:go_default_library",

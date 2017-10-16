@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["dryrun.go"],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun",
     visibility = ["//visibility:public"],
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",

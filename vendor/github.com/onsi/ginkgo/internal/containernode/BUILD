@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["container_node.go"],
+    importpath = "github.com/onsi/ginkgo/internal/containernode",
     visibility = ["//vendor/github.com/onsi/ginkgo:__subpackages__"],
     deps = [
         "//vendor/github.com/onsi/ginkgo/internal/leafnodes:go_default_library",

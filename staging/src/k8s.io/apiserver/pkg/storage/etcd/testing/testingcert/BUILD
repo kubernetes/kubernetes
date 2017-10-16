@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["certificates.go"],
+    importpath = "k8s.io/apiserver/pkg/storage/etcd/testing/testingcert",
 )
 
 filegroup(

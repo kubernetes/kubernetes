@@ -6,6 +6,7 @@ go_library(
         "ratelimit.go",
         "reader.go",
     ],
+    importpath = "github.com/juju/ratelimit",
     visibility = ["//visibility:public"],
 )
 

@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
+    importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver/validation",
     deps = [
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/go-openapi/validate:go_default_library",
@@ -32,6 +33,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["validation_test.go"],
+    importpath = "k8s.io/apiextensions-apiserver/pkg/apiserver/validation",
     library = ":go_default_library",
     deps = [
         "//vendor/github.com/go-openapi/spec:go_default_library",

@@ -6,6 +6,7 @@ go_library(
         "flatten.go",
         "parser.go",
     ],
+    importpath = "github.com/hashicorp/hcl/json/parser",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/hashicorp/hcl/hcl/ast:go_default_library",

@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["interface.go"],
+    importpath = "k8s.io/client-go/informers/networking",
     deps = [
         "//vendor/k8s.io/client-go/informers/internalinterfaces:go_default_library",
         "//vendor/k8s.io/client-go/informers/networking/v1:go_default_library",

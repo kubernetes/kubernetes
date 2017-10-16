@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["conversion.go"],
+    importpath = "k8s.io/code-generator/cmd/conversion-gen/generators",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/gengo/args:go_default_library",

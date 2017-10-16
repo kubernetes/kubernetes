@@ -7,6 +7,7 @@ go_library(
         "signatures.go",
         "types.go",
     ],
+    importpath = "github.com/google/certificate-transparency/go",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/google/certificate-transparency/go/x509:go_default_library"],
 )

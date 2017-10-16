@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["testapi.go"],
+    importpath = "k8s.io/kubernetes/pkg/api/testapi",
     deps = [
         "//federation/apis/federation:go_default_library",
         "//federation/apis/federation/install:go_default_library",
@@ -56,6 +57,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["testapi_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/api/testapi",
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

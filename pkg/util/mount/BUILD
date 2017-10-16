@@ -25,6 +25,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/util/mount",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
@@ -53,6 +54,7 @@ go_test(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/util/mount",
     library = ":go_default_library",
     deps = ["//vendor/k8s.io/utils/exec/testing:go_default_library"],
 )

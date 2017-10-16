@@ -16,6 +16,7 @@ go_library(
         "puller.go",
         "types.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/images",
     deps = [
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -38,6 +39,7 @@ go_test(
         "image_gc_manager_test.go",
         "image_manager_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/images",
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/stats/v1alpha1:go_default_library",

@@ -8,6 +8,7 @@ go_library(
         "helpers.go",
         "inotify_watcher.go",
     ],
+    importpath = "github.com/google/cadvisor/container/common",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",

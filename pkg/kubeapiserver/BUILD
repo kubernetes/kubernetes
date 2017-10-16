@@ -12,6 +12,7 @@ go_library(
         "default_storage_factory_builder.go",
         "doc.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubeapiserver",
     deps = [
         "//pkg/api:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -45,6 +46,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["default_storage_factory_builder_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubeapiserver",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

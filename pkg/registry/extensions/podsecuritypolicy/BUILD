@@ -11,6 +11,7 @@ go_library(
         "doc.go",
         "strategy.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/registry/extensions/podsecuritypolicy",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",

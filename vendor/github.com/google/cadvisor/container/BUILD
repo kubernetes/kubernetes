@@ -6,6 +6,7 @@ go_library(
         "container.go",
         "factory.go",
     ],
+    importpath = "github.com/google/cadvisor/container",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",

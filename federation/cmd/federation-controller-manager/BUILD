@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "federation-controller-manager",
+    importpath = "k8s.io/kubernetes/federation/cmd/federation-controller-manager",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["controller-manager.go"],
+    importpath = "k8s.io/kubernetes/federation/cmd/federation-controller-manager",
     deps = [
         "//federation/cmd/federation-controller-manager/app:go_default_library",
         "//federation/cmd/federation-controller-manager/app/options:go_default_library",

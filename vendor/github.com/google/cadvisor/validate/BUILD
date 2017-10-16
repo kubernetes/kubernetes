@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["validate.go"],
+    importpath = "github.com/google/cadvisor/validate",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/google/cadvisor/container/docker:go_default_library",

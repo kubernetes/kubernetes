@@ -13,6 +13,7 @@ go_library(
         "vsphere_volume.go",
         "vsphere_volume_util.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/vsphere_volume",
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/vsphere:go_default_library",
@@ -37,6 +38,7 @@ go_test(
         "attacher_test.go",
         "vsphere_volume_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/vsphere_volume",
     library = ":go_default_library",
     deps = [
         "//pkg/cloudprovider/providers/vsphere/vclib:go_default_library",

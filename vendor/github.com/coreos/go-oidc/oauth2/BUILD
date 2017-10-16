@@ -7,6 +7,7 @@ go_library(
         "error.go",
         "oauth2.go",
     ],
+    importpath = "github.com/coreos/go-oidc/oauth2",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/coreos/go-oidc/http:go_default_library"],
 )

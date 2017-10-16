@@ -12,6 +12,7 @@ go_library(
         "doc.go",
         "secret.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/secret",
     deps = [
         "//pkg/util/io:go_default_library",
         "//pkg/util/mount:go_default_library",
@@ -29,6 +30,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["secret_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/volume/secret",
     library = ":go_default_library",
     deps = [
         "//pkg/volume:go_default_library",

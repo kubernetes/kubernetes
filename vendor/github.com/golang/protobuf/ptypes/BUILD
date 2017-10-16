@@ -8,6 +8,7 @@ go_library(
         "duration.go",
         "timestamp.go",
     ],
+    importpath = "github.com/golang/protobuf/ptypes",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",

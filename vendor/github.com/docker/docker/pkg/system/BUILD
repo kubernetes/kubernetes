@@ -51,6 +51,7 @@ go_library(
         "//conditions:default": [],
     }),
     cgo = True,
+    importpath = "github.com/docker/docker/pkg/system",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/docker/docker/pkg/mount:go_default_library",

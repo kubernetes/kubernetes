@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["scheduler_test.go"],
+    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
@@ -35,6 +36,7 @@ go_library(
         "scheduler.go",
         "testutil.go",
     ],
+    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler",
     deps = [
         "//pkg/features:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",

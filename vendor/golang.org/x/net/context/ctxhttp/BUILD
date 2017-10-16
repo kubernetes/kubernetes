@@ -6,6 +6,7 @@ go_library(
         "ctxhttp.go",
         "ctxhttp_pre17.go",
     ],
+    importpath = "golang.org/x/net/context/ctxhttp",
     visibility = ["//visibility:public"],
     deps = ["//vendor/golang.org/x/net/context:go_default_library"],
 )

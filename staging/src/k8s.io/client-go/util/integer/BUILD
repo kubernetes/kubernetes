@@ -9,12 +9,14 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["integer_test.go"],
+    importpath = "k8s.io/client-go/util/integer",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["integer.go"],
+    importpath = "k8s.io/client-go/util/integer",
 )
 
 filegroup(

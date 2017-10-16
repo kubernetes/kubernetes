@@ -12,6 +12,7 @@ go_library(
         "initializerconfiguration.go",
         "interface.go",
     ],
+    importpath = "k8s.io/client-go/informers/admissionregistration/v1alpha1",
     deps = [
         "//vendor/k8s.io/api/admissionregistration/v1alpha1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

@@ -9,6 +9,7 @@ go_library(
         "sharded_parallel_spec_iterator.go",
         "spec_iterator.go",
     ],
+    importpath = "github.com/onsi/ginkgo/internal/spec_iterator",
     visibility = ["//vendor/github.com/onsi/ginkgo:__subpackages__"],
     deps = ["//vendor/github.com/onsi/ginkgo/internal/spec:go_default_library"],
 )

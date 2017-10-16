@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["kubeadm.go"],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm/install:go_default_library",
         "//cmd/kubeadm/app/cmd:go_default_library",

@@ -9,6 +9,7 @@ go_library(
         "trie.go",
         "trieval.go",
     ],
+    importpath = "golang.org/x/net/idna",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/golang.org/x/text/secure/bidirule:go_default_library",

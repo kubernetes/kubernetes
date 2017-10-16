@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["initializer.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubeapiserver/admission/util",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/initialization:go_default_library",

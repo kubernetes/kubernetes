@@ -11,6 +11,7 @@ go_library(
         "doc.go",
         "fake.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/fake",
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",

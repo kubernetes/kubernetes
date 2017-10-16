@@ -6,6 +6,7 @@ go_library(
         "container.go",
         "manager.go",
     ],
+    importpath = "github.com/google/cadvisor/manager",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/docker/go-units:go_default_library",

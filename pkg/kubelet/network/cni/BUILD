@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["cni.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/network/cni",
     deps = [
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -28,6 +29,7 @@ go_test(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/kubelet/network/cni",
     library = ":go_default_library",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [

@@ -8,6 +8,7 @@ go_library(
         "regexp.go",
         "route.go",
     ],
+    importpath = "github.com/gorilla/mux",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/gorilla/context:go_default_library"],
 )

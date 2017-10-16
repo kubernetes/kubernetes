@@ -15,6 +15,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/docker/go-connections/sockets",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/golang.org/x/net/proxy:go_default_library",

@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["jobcontroller.go"],
+    importpath = "k8s.io/kubernetes/federation/pkg/federation-controller/job",
     deps = [
         "//federation/apis/federation:go_default_library",
         "//federation/apis/federation/v1beta1:go_default_library",
@@ -41,6 +42,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["jobcontroller_test.go"],
+    importpath = "k8s.io/kubernetes/federation/pkg/federation-controller/job",
     library = ":go_default_library",
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",

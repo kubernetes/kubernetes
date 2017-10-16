@@ -6,6 +6,7 @@ go_library(
         "dec.go",
         "rounder.go",
     ],
+    importpath = "gopkg.in/inf.v0",
     visibility = ["//visibility:public"],
 )
 

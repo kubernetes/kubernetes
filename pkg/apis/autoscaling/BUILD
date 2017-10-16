@@ -14,6 +14,7 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/apis/autoscaling",
     deps = [
         "//pkg/api:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",

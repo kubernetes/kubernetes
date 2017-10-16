@@ -6,6 +6,7 @@ go_library(
         "gostring.go",
         "gostringtest.go",
     ],
+    importpath = "github.com/gogo/protobuf/plugin/gostring",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",

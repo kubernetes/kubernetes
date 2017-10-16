@@ -17,6 +17,7 @@ go_library(
         "selector.go",
         "visitor.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/resource",
     visibility = [
         "//build/visible_to:pkg_kubectl_resource_CONSUMERS",
     ],
@@ -56,6 +57,7 @@ go_test(
         "//examples:config",
         "//test/fixtures",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/resource",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

@@ -10,6 +10,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/opencontainers/runc/libcontainer/cgroups/systemd",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",

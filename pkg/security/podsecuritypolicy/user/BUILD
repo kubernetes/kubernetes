@@ -15,6 +15,7 @@ go_library(
         "runasany.go",
         "types.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/security/podsecuritypolicy/user",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",
@@ -30,6 +31,7 @@ go_test(
         "nonroot_test.go",
         "runasany_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/security/podsecuritypolicy/user",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

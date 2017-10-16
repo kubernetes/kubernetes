@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["operator.go"],
+    importpath = "k8s.io/apimachinery/pkg/selection",
 )
 
 filegroup(

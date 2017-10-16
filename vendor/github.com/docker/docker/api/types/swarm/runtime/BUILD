@@ -6,14 +6,9 @@ go_library(
         "gen.go",
         "plugin.pb.go",
     ],
+    importpath = "github.com/docker/docker/api/types/swarm/runtime",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/gogo/protobuf/proto:go_default_library"],
-)
-
-filegroup(
-    name = "go_default_library_protos",
-    srcs = ["plugin.proto"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(

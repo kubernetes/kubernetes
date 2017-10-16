@@ -6,6 +6,7 @@ go_library(
         "cast.go",
         "caste.go",
     ],
+    importpath = "github.com/spf13/cast",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/spf13/jwalterweatherman:go_default_library"],
 )

@@ -13,6 +13,7 @@ go_library(
         "utility.go",
         "version.go",
     ],
+    importpath = "github.com/Azure/go-autorest/autorest",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/Azure/go-autorest/autorest/adal:go_default_library"],
 )

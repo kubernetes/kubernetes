@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["doc.go"],
+    importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer",
 )
 
 filegroup(

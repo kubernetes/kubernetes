@@ -31,16 +31,21 @@ fi
 # TODO(spxtr): Remove this line once Bazel is the only way to build.
 rm -f "${KUBE_ROOT}/pkg/generated/openapi/zz_generated.openapi.go"
 
-# The git commit sha1s here should match the values in $KUBE_ROOT/WORKSPACE.
-kube::util::go_install_from_commit github.com/kubernetes/repo-infra/kazel 4eaf9e671bbb549fb4ec292cf251f921d7ef80ac
-kube::util::go_install_from_commit github.com/bazelbuild/rules_go/go/tools/gazelle/gazelle 82483596ec203eb9c1849937636f4cbed83733eb
+_tmpdir="$(mktemp -d -t verify-bazel.XXXXXX)"
+kube::util::trap_add "rm -rf ${_tmpdir}" EXIT
 
-gazelle_diff=$(gazelle fix -build_file_name=BUILD,BUILD.bazel -external=vendored -mode=diff -repo_root="$(kube::realpath ${KUBE_ROOT})")
-kazel_diff=$(kazel -dry-run -print-diff -root="$(kube::realpath ${KUBE_ROOT})")
+_tmp_gopath="${_tmpdir}/go"
+_tmp_kuberoot="${_tmp_gopath}/src/k8s.io/kubernetes"
+mkdir -p "${_tmp_kuberoot}/.."
+cp -a "${KUBE_ROOT}" "${_tmp_kuberoot}/.."
 
-if [[ -n "${gazelle_diff}" || -n "${kazel_diff}" ]]; then
-  echo "${gazelle_diff}"
-  echo "${kazel_diff}"
+cd "${_tmp_kuberoot}"
+GOPATH="${_tmp_gopath}" ./hack/update-bazel.sh
+
+diff=$(diff -Naupr "${KUBE_ROOT}" "${_tmp_kuberoot}" || true)
+
+if [[ -n "${diff}" ]]; then
+  echo "${diff}"
   echo
   echo "Run ./hack/update-bazel.sh"
   exit 1

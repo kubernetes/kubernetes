@@ -15,6 +15,7 @@ go_library(
         "rsa_key.go",
         "util.go",
     ],
+    importpath = "github.com/docker/libtrust",
     visibility = ["//visibility:public"],
 )
 

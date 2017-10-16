@@ -21,6 +21,7 @@ go_library(
         "volumeoptions.go",
         "vsphere_metrics.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",

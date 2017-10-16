@@ -12,6 +12,7 @@ go_test(
         "main_test.go",
         "objectmeta_test.go",
     ],
+    importpath = "k8s.io/kubernetes/test/integration/objectmeta",
     tags = ["integration"],
     deps = [
         "//pkg/api/testapi:go_default_library",

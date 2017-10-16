@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["cache.go"],
+    importpath = "k8s.io/kube-aggregator/pkg/controllers",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",

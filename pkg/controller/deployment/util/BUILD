@@ -13,6 +13,7 @@ go_library(
         "pod_util.go",
         "replicaset_util.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/deployment/util",
     deps = [
         "//pkg/apis/extensions:go_default_library",
         "//pkg/controller:go_default_library",
@@ -44,6 +45,7 @@ go_test(
         "deployment_util_test.go",
         "hash_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/deployment/util",
     library = ":go_default_library",
     deps = [
         "//pkg/controller:go_default_library",

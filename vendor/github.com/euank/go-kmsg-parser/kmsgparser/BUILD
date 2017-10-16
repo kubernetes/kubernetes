@@ -6,6 +6,7 @@ go_library(
         "kmsgparser.go",
         "log.go",
     ],
+    importpath = "github.com/euank/go-kmsg-parser/kmsgparser",
     visibility = ["//visibility:public"],
 )
 

@@ -19,6 +19,7 @@ go_library(
         "stream.go",
         "trace.go",
     ],
+    importpath = "google.golang.org/grpc",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",

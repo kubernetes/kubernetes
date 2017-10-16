@@ -13,6 +13,7 @@ go_library(
         "doc.go",
         "server.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/server",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1/validation:go_default_library",
@@ -54,6 +55,7 @@ go_test(
         "server_test.go",
         "server_websocket_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/server",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

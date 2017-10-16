@@ -6,6 +6,7 @@ go_library(
         "error.go",
         "parser.go",
     ],
+    importpath = "github.com/hashicorp/hcl/hcl/parser",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/hashicorp/hcl/hcl/ast:go_default_library",

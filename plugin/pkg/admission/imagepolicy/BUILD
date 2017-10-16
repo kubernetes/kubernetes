@@ -13,6 +13,7 @@ go_library(
         "config.go",
         "doc.go",
     ],
+    importpath = "k8s.io/kubernetes/plugin/pkg/admission/imagepolicy",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/imagepolicy/install:go_default_library",
@@ -35,6 +36,7 @@ go_test(
         "certs_test.go",
         "config_test.go",
     ],
+    importpath = "k8s.io/kubernetes/plugin/pkg/admission/imagepolicy",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

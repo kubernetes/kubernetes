@@ -13,6 +13,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/spf13/cobra",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/spf13/pflag:go_default_library",

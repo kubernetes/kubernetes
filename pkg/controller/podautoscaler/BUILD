@@ -14,6 +14,7 @@ go_library(
         "rate_limitters.go",
         "replica_calculator.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/podautoscaler",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
@@ -54,6 +55,7 @@ go_test(
         "legacy_replica_calculator_test.go",
         "replica_calculator_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/podautoscaler",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

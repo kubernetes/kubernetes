@@ -12,6 +12,7 @@ go_library(
         "templater.go",
         "templates.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/templates",
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_templates_CONSUMERS",
     ],

@@ -13,6 +13,7 @@ go_library(
         "poddisruptionbudget.go",
         "poddisruptionbudget_expansion.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/client/listers/policy/internalversion",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/policy:go_default_library",

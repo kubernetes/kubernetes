@@ -16,6 +16,7 @@ go_library(
         "interfaces.go",
         "predicate.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/lifecycle",
     deps = [
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/types:go_default_library",
@@ -34,6 +35,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["handlers_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/lifecycle",
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/container:go_default_library",

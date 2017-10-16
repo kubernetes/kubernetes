@@ -11,6 +11,7 @@ go_library(
         "network.go",
         "plugins.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/network",
     deps = [
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/container:go_default_library",

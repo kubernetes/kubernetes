@@ -15,6 +15,7 @@ go_binary(
         "-extldflags",
         "-static",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kube-controller-manager",
     library = ":go_default_library",
     x_defs = version_x_defs(),
 )
@@ -22,6 +23,7 @@ go_binary(
 go_library(
     name = "go_default_library",
     srcs = ["controller-manager.go"],
+    importpath = "k8s.io/kubernetes/cmd/kube-controller-manager",
     deps = [
         "//cmd/kube-controller-manager/app:go_default_library",
         "//cmd/kube-controller-manager/app/options:go_default_library",

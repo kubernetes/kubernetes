@@ -7,6 +7,7 @@ go_library(
         "arc.go",
         "lru.go",
     ],
+    importpath = "github.com/hashicorp/golang-lru",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/hashicorp/golang-lru/simplelru:go_default_library"],
 )

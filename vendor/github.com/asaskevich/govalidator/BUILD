@@ -12,6 +12,7 @@ go_library(
         "utils.go",
         "validator.go",
     ],
+    importpath = "github.com/asaskevich/govalidator",
     visibility = ["//visibility:public"],
 )
 

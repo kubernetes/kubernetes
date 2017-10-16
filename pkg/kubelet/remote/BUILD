@@ -13,6 +13,7 @@ go_library(
         "remote_runtime.go",
         "utils.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/remote",
     deps = [
         "//pkg/kubelet/apis/cri:go_default_library",
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",

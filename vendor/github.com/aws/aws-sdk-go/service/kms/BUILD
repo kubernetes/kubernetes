@@ -6,6 +6,7 @@ go_library(
         "api.go",
         "service.go",
     ],
+    importpath = "github.com/aws/aws-sdk-go/service/kms",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",

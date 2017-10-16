@@ -22,6 +22,7 @@ go_library(
         "uploadconfig.go",
         "util.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",
@@ -61,6 +62,7 @@ go_test(
         "etcd_test.go",
         "kubeconfig_test.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases",
     library = ":go_default_library",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",

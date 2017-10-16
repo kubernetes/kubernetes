@@ -10,6 +10,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/vmware/photon-controller-go-sdk/SSPI",
     visibility = ["//visibility:public"],
 )
 

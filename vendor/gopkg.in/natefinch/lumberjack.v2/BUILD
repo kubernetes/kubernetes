@@ -11,6 +11,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "gopkg.in/natefinch/lumberjack.v2",
     visibility = ["//visibility:public"],
 )
 

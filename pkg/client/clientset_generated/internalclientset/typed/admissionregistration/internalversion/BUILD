@@ -14,6 +14,7 @@ go_library(
         "generated_expansion.go",
         "initializerconfiguration.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/admissionregistration/internalversion",
     deps = [
         "//pkg/apis/admissionregistration:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/scheme:go_default_library",

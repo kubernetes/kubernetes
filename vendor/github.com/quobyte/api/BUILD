@@ -7,6 +7,7 @@ go_library(
         "rpc_client.go",
         "types.go",
     ],
+    importpath = "github.com/quobyte/api",
     visibility = ["//visibility:public"],
 )
 

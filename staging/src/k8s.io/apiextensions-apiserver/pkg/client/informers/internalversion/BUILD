@@ -11,6 +11,7 @@ go_library(
         "factory.go",
         "generic.go",
     ],
+    importpath = "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion",
     deps = [
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset:go_default_library",

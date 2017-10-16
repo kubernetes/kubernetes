@@ -12,6 +12,7 @@ go_library(
         "pod.go",
         "resources.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/util/format",
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
@@ -21,6 +22,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["resources_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/util/format",
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",

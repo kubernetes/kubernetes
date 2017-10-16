@@ -19,6 +19,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/cmd/kube-proxy/app",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/validation:go_default_library",
@@ -87,6 +88,7 @@ go_test(
         "server_test.go",
         "validation_test.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kube-proxy/app",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

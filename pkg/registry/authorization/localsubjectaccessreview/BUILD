@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["rest.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/authorization/localsubjectaccessreview",
     deps = [
         "//pkg/apis/authorization:go_default_library",
         "//pkg/apis/authorization/validation:go_default_library",

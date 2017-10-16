@@ -8,6 +8,7 @@ go_library(
         "huffman.go",
         "tables.go",
     ],
+    importpath = "golang.org/x/net/http2/hpack",
     visibility = ["//visibility:public"],
 )
 

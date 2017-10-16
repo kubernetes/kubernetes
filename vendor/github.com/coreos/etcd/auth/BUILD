@@ -8,6 +8,7 @@ go_library(
         "simple_token.go",
         "store.go",
     ],
+    importpath = "github.com/coreos/etcd/auth",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/auth/authpb:go_default_library",

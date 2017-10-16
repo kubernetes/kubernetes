@@ -25,6 +25,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/volume",
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/util/io:go_default_library",
@@ -52,6 +53,7 @@ go_test(
         "plugins_test.go",
         "util_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
@@ -76,6 +78,7 @@ go_test(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/volume_test",
     deps = [
         ":go_default_library",
         "//pkg/volume/testing:go_default_library",

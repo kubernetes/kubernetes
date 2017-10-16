@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["latest.go"],
+    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest",
     deps = [
         "//plugin/pkg/scheduler/api:go_default_library",
         "//plugin/pkg/scheduler/api/v1:go_default_library",

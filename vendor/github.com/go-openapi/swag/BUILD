@@ -12,6 +12,7 @@ go_library(
         "util.go",
         "yaml.go",
     ],
+    importpath = "github.com/go-openapi/swag",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/mailru/easyjson/jlexer:go_default_library",

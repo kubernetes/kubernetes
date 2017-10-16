@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["ioutils.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/util/ioutils",
 )
 
 filegroup(

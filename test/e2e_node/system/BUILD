@@ -18,6 +18,7 @@ go_library(
         "types.go",
         "validators.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e_node/system",
     deps = [
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/docker/docker/api/types:go_default_library",
@@ -37,6 +38,7 @@ go_test(
         "os_validator_test.go",
         "package_validator_test.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e_node/system",
     library = ":go_default_library",
     tags = ["e2e"],
     deps = [

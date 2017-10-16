@@ -15,6 +15,7 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
     ],
+    importpath = "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1",
     deps = [
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

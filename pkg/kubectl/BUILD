@@ -33,6 +33,7 @@ go_test(
         "serviceaccount_test.go",
         "sorting_printer_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl",
     library = ":go_default_library",
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
@@ -113,6 +114,7 @@ go_library(
         "sorting_printer.go",
         "versioned_client.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl",
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//pkg/api:go_default_library",

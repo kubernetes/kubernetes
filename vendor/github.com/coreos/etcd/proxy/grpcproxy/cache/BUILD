@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["store.go"],
+    importpath = "github.com/coreos/etcd/proxy/grpcproxy/cache",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes:go_default_library",

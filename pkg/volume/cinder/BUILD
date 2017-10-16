@@ -14,6 +14,7 @@ go_library(
         "cinder_util.go",
         "doc.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/cinder",
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/openstack:go_default_library",
@@ -42,6 +43,7 @@ go_test(
         "attacher_test.go",
         "cinder_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/cinder",
     library = ":go_default_library",
     deps = [
         "//pkg/cloudprovider:go_default_library",

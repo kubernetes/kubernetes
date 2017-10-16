@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["options.go"],
+    importpath = "k8s.io/kubernetes/cmd/cloud-controller-manager/app/options",
     deps = [
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/client/leaderelectionconfig:go_default_library",
@@ -36,6 +37,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["options_test.go"],
+    importpath = "k8s.io/kubernetes/cmd/cloud-controller-manager/app/options",
     library = ":go_default_library",
     deps = [
         "//pkg/apis/componentconfig:go_default_library",

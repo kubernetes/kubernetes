@@ -12,6 +12,7 @@ go_test(
         "main_test.go",
         "replicaset_test.go",
     ],
+    importpath = "k8s.io/kubernetes/test/integration/replicaset",
     tags = ["integration"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",

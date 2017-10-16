@@ -13,6 +13,7 @@ go_test(
         "extender_test.go",
         "generic_scheduler_test.go",
     ],
+    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/core",
     library = ":go_default_library",
     deps = [
         "//plugin/pkg/scheduler/algorithm:go_default_library",
@@ -39,6 +40,7 @@ go_library(
         "extender.go",
         "generic_scheduler.go",
     ],
+    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/core",
     deps = [
         "//pkg/util/hash:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",

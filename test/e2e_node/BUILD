@@ -25,6 +25,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/test/e2e_node",
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/features:go_default_library",
@@ -109,6 +110,7 @@ go_test(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/test/e2e_node",
     library = ":go_default_library",
     tags = ["e2e"],
     deps = [

@@ -14,6 +14,7 @@ go_library(
         "azure_util.go",
         "doc.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/azure_file",
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/azure:go_default_library",
@@ -34,6 +35,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["azure_file_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/volume/azure_file",
     library = ":go_default_library",
     deps = [
         "//pkg/cloudprovider/providers/azure:go_default_library",

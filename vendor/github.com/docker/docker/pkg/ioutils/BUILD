@@ -16,6 +16,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/docker/docker/pkg/ioutils",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/golang.org/x/net/context:go_default_library",

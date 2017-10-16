@@ -19,6 +19,7 @@ go_library(
         "util.go",
         "wal.go",
     ],
+    importpath = "k8s.io/kubernetes/third_party/forked/etcd221/wal",
     deps = [
         "//third_party/forked/etcd221/pkg/fileutil:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/crc:go_default_library",

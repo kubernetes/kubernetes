@@ -8,6 +8,7 @@ go_library(
         "fake_flunder.go",
         "fake_wardle_client.go",
     ],
+    importpath = "k8s.io/sample-apiserver/pkg/client/clientset/versioned/typed/wardle/v1alpha1/fake",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

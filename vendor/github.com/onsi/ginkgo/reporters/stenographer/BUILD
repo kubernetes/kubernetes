@@ -7,6 +7,7 @@ go_library(
         "fake_stenographer.go",
         "stenographer.go",
     ],
+    importpath = "github.com/onsi/ginkgo/reporters/stenographer",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/onsi/ginkgo/reporters/stenographer/support/go-colorable:go_default_library",

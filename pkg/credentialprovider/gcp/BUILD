@@ -13,6 +13,7 @@ go_library(
         "jwt.go",
         "metadata.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/credentialprovider/gcp",
     deps = [
         "//pkg/credentialprovider:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -30,6 +31,7 @@ go_test(
         "jwt_test.go",
         "metadata_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/credentialprovider/gcp",
     library = ":go_default_library",
     deps = [
         "//pkg/credentialprovider:go_default_library",

@@ -6,6 +6,7 @@ go_library(
         "bipartitegraph.go",
         "bipartitegraphmatching.go",
     ],
+    importpath = "github.com/onsi/gomega/matchers/support/goraph/bipartitegraph",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/onsi/gomega/matchers/support/goraph/edge:go_default_library",

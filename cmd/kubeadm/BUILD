@@ -15,6 +15,7 @@ go_binary(
         "-extldflags",
         "-static",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm",
     library = ":go_default_library",
     x_defs = version_x_defs(),
 )
@@ -22,6 +23,7 @@ go_binary(
 go_library(
     name = "go_default_library",
     srcs = ["kubeadm.go"],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm",
     deps = ["//cmd/kubeadm/app:go_default_library"],
 )
 

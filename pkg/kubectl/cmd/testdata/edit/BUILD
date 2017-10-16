@@ -6,6 +6,7 @@ load(
 
 go_binary(
     name = "edit",
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/testdata/edit",
     library = ":go_default_library",
     visibility = ["//visibility:public"],
 )
@@ -13,6 +14,7 @@ go_binary(
 go_library(
     name = "go_default_library",
     srcs = ["record.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/testdata/edit",
     visibility = ["//visibility:private"],
     deps = ["//vendor/gopkg.in/yaml.v2:go_default_library"],
 )

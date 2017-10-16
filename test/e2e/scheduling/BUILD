@@ -19,6 +19,7 @@ go_library(
         "priorities.go",
         "rescheduler.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e/scheduling",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1/helper:go_default_library",
@@ -62,6 +63,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["taints_test.go"],
+    importpath = "k8s.io/kubernetes/test/e2e/scheduling",
     library = ":go_default_library",
     tags = ["e2e"],
     deps = [

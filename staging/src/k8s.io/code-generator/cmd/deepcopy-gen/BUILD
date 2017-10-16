@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "deepcopy-gen",
+    importpath = "k8s.io/code-generator/cmd/deepcopy-gen",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
+    importpath = "k8s.io/code-generator/cmd/deepcopy-gen",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",

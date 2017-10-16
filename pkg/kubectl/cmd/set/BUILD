@@ -16,6 +16,7 @@ go_library(
         "set_serviceaccount.go",
         "set_subject.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/set",
     visibility = ["//build/visible_to:pkg_kubectl_cmd_set_CONSUMERS"],
     deps = [
         "//pkg/api:go_default_library",
@@ -54,6 +55,7 @@ go_test(
         "//examples:config",
         "//test/fixtures",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/set",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

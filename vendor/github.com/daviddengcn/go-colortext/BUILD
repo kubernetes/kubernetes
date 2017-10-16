@@ -11,6 +11,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/daviddengcn/go-colortext",
     visibility = ["//visibility:public"],
 )
 

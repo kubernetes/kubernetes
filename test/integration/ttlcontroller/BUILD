@@ -12,6 +12,7 @@ go_test(
         "main_test.go",
         "ttlcontroller_test.go",
     ],
+    importpath = "k8s.io/kubernetes/test/integration/ttlcontroller",
     tags = [
         "etcd",
         "integration",

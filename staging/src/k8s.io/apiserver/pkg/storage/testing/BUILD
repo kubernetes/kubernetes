@@ -13,6 +13,7 @@ go_library(
         "utils.go",
         "zz_generated.deepcopy.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/storage/testing",
     deps = [
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",

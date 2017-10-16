@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["crd_finalizer.go"],
+    importpath = "k8s.io/apiextensions-apiserver/pkg/controller/finalizer",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",

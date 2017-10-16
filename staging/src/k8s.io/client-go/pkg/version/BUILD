@@ -12,6 +12,7 @@ go_library(
         "doc.go",
         "version.go",
     ],
+    importpath = "k8s.io/client-go/pkg/version",
     deps = ["//vendor/k8s.io/apimachinery/pkg/version:go_default_library"],
 )
 

@@ -13,6 +13,7 @@ go_library(
         "scan.go",
         "script.go",
     ],
+    importpath = "github.com/garyburd/redigo/redis",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/garyburd/redigo/internal:go_default_library"],
 )

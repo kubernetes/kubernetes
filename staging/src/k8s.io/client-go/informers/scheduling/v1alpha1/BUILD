@@ -11,6 +11,7 @@ go_library(
         "interface.go",
         "priorityclass.go",
     ],
+    importpath = "k8s.io/client-go/informers/scheduling/v1alpha1",
     deps = [
         "//vendor/k8s.io/api/scheduling/v1alpha1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

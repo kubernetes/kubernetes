@@ -21,6 +21,7 @@ go_library(
         "v2_server.go",
         "v3_server.go",
     ],
+    importpath = "github.com/coreos/etcd/etcdserver",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/alarm:go_default_library",

@@ -11,6 +11,7 @@ go_library(
         "options.go",
         "validation.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options",
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/options:go_default_library",

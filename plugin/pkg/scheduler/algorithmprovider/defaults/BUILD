@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["defaults.go"],
+    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider/defaults",
     deps = [
         "//pkg/cloudprovider/providers/aws:go_default_library",
         "//pkg/features:go_default_library",
@@ -29,6 +30,7 @@ go_test(
         "compatibility_test.go",
         "defaults_test.go",
     ],
+    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider/defaults",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

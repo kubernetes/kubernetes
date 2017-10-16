@@ -13,6 +13,7 @@ go_library(
         "registry.go",
         "strategy.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/registry/extensions/replicaset",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/pod:go_default_library",
@@ -41,6 +42,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["strategy_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/extensions/replicaset",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

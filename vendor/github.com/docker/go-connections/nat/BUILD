@@ -7,6 +7,7 @@ go_library(
         "parse.go",
         "sort.go",
     ],
+    importpath = "github.com/docker/go-connections/nat",
     visibility = ["//visibility:public"],
 )
 

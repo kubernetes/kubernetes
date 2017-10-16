@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["repair.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/service/portallocator/controller",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/core/internalversion:go_default_library",
@@ -27,6 +28,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["repair_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/service/portallocator/controller",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

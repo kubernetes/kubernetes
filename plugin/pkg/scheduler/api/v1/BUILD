@@ -13,6 +13,7 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
+    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/api/v1",
     deps = [
         "//plugin/pkg/scheduler/api:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

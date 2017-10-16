@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["scheme_test.go"],
+    importpath = "k8s.io/sample-apiserver/pkg/apiserver",
     library = ":go_default_library",
     deps = ["//vendor/k8s.io/apimachinery/pkg/api/testing/roundtrip:go_default_library"],
 )
@@ -16,6 +17,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["apiserver.go"],
+    importpath = "k8s.io/sample-apiserver/pkg/apiserver",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/announced:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",

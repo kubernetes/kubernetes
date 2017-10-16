@@ -12,6 +12,7 @@ go_library(
         "fake_batch_client.go",
         "fake_job.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/batch/v1/fake",
     deps = [
         "//federation/client/clientset_generated/federation_clientset/typed/batch/v1:go_default_library",
         "//vendor/k8s.io/api/batch/v1:go_default_library",

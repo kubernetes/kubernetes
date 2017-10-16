@@ -30,6 +30,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/pkg/sftp",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/kr/fs:go_default_library",

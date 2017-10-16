@@ -15,6 +15,7 @@ go_library(
         "fc.go",
         "fc_util.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/fc",
     deps = [
         "//pkg/util/mount:go_default_library",
         "//pkg/util/strings:go_default_library",
@@ -33,6 +34,7 @@ go_test(
         "fc_test.go",
         "fc_util_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/fc",
     library = ":go_default_library",
     deps = [
         "//pkg/util/mount:go_default_library",

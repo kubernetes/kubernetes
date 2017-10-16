@@ -7,6 +7,7 @@ go_library(
         "run_result.go",
         "test_runner.go",
     ],
+    importpath = "github.com/onsi/ginkgo/ginkgo/testrunner",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",

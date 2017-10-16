@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["kubefed.go"],
+    importpath = "k8s.io/kubernetes/federation/cmd/kubefed/app",
     deps = [
         "//federation/pkg/kubefed:go_default_library",
         "//pkg/client/metrics/prometheus:go_default_library",

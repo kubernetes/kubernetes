@@ -9,12 +9,14 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["transformer_test.go"],
+    importpath = "k8s.io/apiserver/pkg/storage/value",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["transformer.go"],
+    importpath = "k8s.io/apiserver/pkg/storage/value",
 )
 
 filegroup(

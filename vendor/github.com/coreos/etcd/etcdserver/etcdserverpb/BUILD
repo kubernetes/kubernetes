@@ -8,6 +8,7 @@ go_library(
         "rpc.pb.go",
         "rpc.pb.gw.go",
     ],
+    importpath = "github.com/coreos/etcd/etcdserver/etcdserverpb",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/auth/authpb:go_default_library",

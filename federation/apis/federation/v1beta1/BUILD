@@ -18,6 +18,7 @@ go_library(
         "zz_generated.deepcopy.go",
         "zz_generated.defaults.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/apis/federation/v1beta1",
     deps = [
         "//federation/apis/federation:go_default_library",
         "//pkg/api:go_default_library",

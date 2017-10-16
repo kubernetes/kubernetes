@@ -11,6 +11,7 @@ go_library(
         "simple.go",
         "upgrade.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/test/e2e/upgrades",
     deps = [
         "//federation/pkg/federatedtypes:go_default_library",
         "//federation/pkg/federatedtypes/crudtester:go_default_library",

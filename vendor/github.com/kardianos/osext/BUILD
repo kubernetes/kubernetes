@@ -16,6 +16,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/kardianos/osext",
     visibility = ["//visibility:public"],
 )
 

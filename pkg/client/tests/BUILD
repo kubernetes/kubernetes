@@ -14,6 +14,7 @@ go_test(
         "portfoward_test.go",
         "remotecommand_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/client/tests",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
@@ -45,6 +46,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["doc.go"],
+    importpath = "k8s.io/kubernetes/pkg/client/tests",
 )
 
 filegroup(

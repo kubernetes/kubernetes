@@ -11,6 +11,7 @@ go_library(
         "apiservice.go",
         "expansion_generated.go",
     ],
+    importpath = "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1beta1",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

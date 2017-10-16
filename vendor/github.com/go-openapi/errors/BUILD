@@ -10,6 +10,7 @@ go_library(
         "parsing.go",
         "schema.go",
     ],
+    importpath = "github.com/go-openapi/errors",
     visibility = ["//visibility:public"],
 )
 

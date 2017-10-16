@@ -11,6 +11,7 @@ go_library(
         "generic_soak.go",
         "imports.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e/instrumentation/logging",
     deps = [
         "//test/e2e/framework:go_default_library",
         "//test/e2e/instrumentation/common:go_default_library",

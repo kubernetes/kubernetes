@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "kubefed",
+    importpath = "k8s.io/kubernetes/federation/cmd/kubefed",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["kubefed.go"],
+    importpath = "k8s.io/kubernetes/federation/cmd/kubefed",
     deps = ["//federation/cmd/kubefed/app:go_default_library"],
 )
 

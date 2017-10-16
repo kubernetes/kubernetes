@@ -6,6 +6,7 @@ go_library(
         "pass.go",
         "terminal.go",
     ],
+    importpath = "github.com/howeyc/gopass",
     visibility = ["//visibility:public"],
     deps = ["//vendor/golang.org/x/crypto/ssh/terminal:go_default_library"],
 )

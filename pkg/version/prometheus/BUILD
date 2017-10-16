@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["prometheus.go"],
+    importpath = "k8s.io/kubernetes/pkg/version/prometheus",
     deps = [
         "//pkg/version:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",

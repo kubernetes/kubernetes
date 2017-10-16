@@ -7,6 +7,7 @@ go_library(
         "state.go",
         "version.go",
     ],
+    importpath = "github.com/opencontainers/runtime-spec/specs-go",
     visibility = ["//visibility:public"],
 )
 

@@ -7,6 +7,7 @@ go_library(
         "azure.go",
         "environments.go",
     ],
+    importpath = "github.com/Azure/go-autorest/autorest/azure",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",

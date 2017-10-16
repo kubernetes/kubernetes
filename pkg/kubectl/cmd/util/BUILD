@@ -17,6 +17,7 @@ go_library(
         "printing.go",
         "shortcut_restmapper.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util",
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_util_CONSUMERS",
     ],
@@ -87,6 +88,7 @@ go_test(
     data = [
         "//api/swagger-spec",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util",
     library = ":go_default_library",
     visibility = [
         "//build/visible_to:COMMON_testing",

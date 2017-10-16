@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
+    importpath = "k8s.io/kubernetes/cmd/gke-certificates-controller",
     deps = [
         "//cmd/gke-certificates-controller/app:go_default_library",
         "//pkg/kubectl/util/logs:go_default_library",
@@ -36,5 +37,6 @@ filegroup(
 
 go_binary(
     name = "gke-certificates-controller",
+    importpath = "k8s.io/kubernetes/cmd/gke-certificates-controller",
     library = ":go_default_library",
 )

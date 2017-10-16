@@ -9,6 +9,7 @@ go_library(
         "endpoint_location.go",
         "errors.go",
     ],
+    importpath = "github.com/gophercloud/gophercloud/openstack",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/gophercloud/gophercloud:go_default_library",

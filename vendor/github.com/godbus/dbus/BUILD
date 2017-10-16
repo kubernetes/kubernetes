@@ -35,6 +35,7 @@ go_library(
         "//conditions:default": [],
     }),
     cgo = True,
+    importpath = "github.com/godbus/dbus",
     visibility = ["//visibility:public"],
 )
 

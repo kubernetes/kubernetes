@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["ovirt.go"],
+    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt",
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/controller:go_default_library",
@@ -21,6 +22,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["ovirt_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/ovirt",
     library = ":go_default_library",
     deps = ["//pkg/cloudprovider:go_default_library"],
 )

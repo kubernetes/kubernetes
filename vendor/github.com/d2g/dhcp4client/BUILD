@@ -12,6 +12,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/d2g/dhcp4client",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/d2g/dhcp4:go_default_library",

@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["suite.go"],
+    importpath = "github.com/onsi/ginkgo/internal/suite",
     visibility = ["//vendor/github.com/onsi/ginkgo:__subpackages__"],
     deps = [
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",

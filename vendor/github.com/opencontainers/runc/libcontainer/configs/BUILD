@@ -27,6 +27,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/opencontainers/runc/libcontainer/configs",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/opencontainers/runtime-spec/specs-go:go_default_library",
