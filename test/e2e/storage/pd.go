@@ -89,6 +89,7 @@ var _ = SIGDescribe("Pod Disks", func() {
 		}
 
 		for _, t := range tests {
+			podDelOpt := t.deleteOpt
 			It(fmt.Sprintf("when pod delete grace period is %s", t.descr), func() {
 				framework.SkipUnlessProviderIs("gce", "gke", "aws")
 
@@ -96,11 +97,9 @@ var _ = SIGDescribe("Pod Disks", func() {
 				diskName, err := framework.CreatePDWithRetry()
 				framework.ExpectNoError(err, "Error creating PD")
 
-				By("creating host0Pod on node0")
 				host0Pod := testPDPod([]string{diskName}, host0Name, false /* readOnly */, 1 /* numContainers */)
 				host1Pod := testPDPod([]string{diskName}, host1Name, false /* readOnly */, 1 /* numContainers */)
 
-				podDelOpt := t.deleteOpt
 				defer func() {
 					// Teardown should do nothing unless test failed
 					By("defer: cleaning up PD-RW test environment")
@@ -109,6 +108,8 @@ var _ = SIGDescribe("Pod Disks", func() {
 					podClient.Delete(host1Pod.Name, podDelOpt)
 					detachAndDeletePDs(diskName, []types.NodeName{host0Name, host1Name})
 				}()
+
+				By("creating host0Pod on node0")
 				_, err = podClient.Create(host0Pod)
 				framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 				framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
@@ -170,6 +171,7 @@ var _ = SIGDescribe("Pod Disks", func() {
 		}
 
 		for _, t := range tests {
+			podDelOpt := t.deleteOpt
 			It(fmt.Sprintf("when pod delete grace period is %s", t.descr), func() {
 				framework.SkipUnlessProviderIs("gce", "gke")
 
@@ -181,7 +183,6 @@ var _ = SIGDescribe("Pod Disks", func() {
 				host0ROPod := testPDPod([]string{diskName}, host0Name, true /* readOnly */, 1 /* numContainers */)
 				host1ROPod := testPDPod([]string{diskName}, host1Name, true /* readOnly */, 1 /* numContainers */)
 
-				podDelOpt := t.deleteOpt
 				defer func() {
 					// Teardown should do nothing unless test failed.
 					By("defer: cleaning up PD-RO test environment")
@@ -200,7 +201,6 @@ var _ = SIGDescribe("Pod Disks", func() {
 				By("deleting the rwPod")
 				framework.ExpectNoError(podClient.Delete(rwPod.Name, metav1.NewDeleteOptions(0)), "Failed to delete rwPod")
 				framework.Logf("deleted rwPod %q", rwPod.Name)
-
 				By("waiting for PD to detach")
 				framework.ExpectNoError(waitForPDDetach(diskName, host0Name))
 
@@ -311,113 +311,107 @@ var _ = SIGDescribe("Pod Disks", func() {
 		}
 	})
 
-	It("should be able to detach from a node which was deleted [Slow] [Disruptive]", func() {
-		framework.SkipUnlessProviderIs("gce")
+	Context("detach from a disrupted node [Slow] [Disruptive]", func() {
+		const (
+			deleteNode    = 1 // delete physical node
+			deleteNodeObj = 2 // delete node's api object only
+		)
+		type testT struct {
+			descr  string // It description
+			nodeOp int    // disruptive operation performed on target node
+		}
+		tests := []testT{
+			{
+				descr:  "node is deleted",
+				nodeOp: deleteNode,
+			},
+			{
+				descr:  "node's API object is deleted",
+				nodeOp: deleteNodeObj,
+			},
+		}
 
-		initialGroupSize, err := framework.GroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup)
-		framework.ExpectNoError(err, "Error getting group size")
+		for _, t := range tests {
+			nodeOp := t.nodeOp
+			It(fmt.Sprintf("when %s", t.descr), func() {
+				framework.SkipUnlessProviderIs("gce")
 
-		By("creating a pd")
-		diskName, err := framework.CreatePDWithRetry()
-		framework.ExpectNoError(err, "Error creating a pd")
+				initialGroupSize, err := framework.GroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup)
+				framework.ExpectNoError(err, "Error getting group size")
+				nodeCount := len(nodes.Items) // (note: unsure if this count ever differs from initialGroupSize?)
 
-		host0Pod := testPDPod([]string{diskName}, host0Name, false, 1)
-		containerName := "mycontainer"
+				By("creating a pd")
+				diskName, err := framework.CreatePDWithRetry()
+				framework.ExpectNoError(err, "Error creating a pd")
 
-		defer func() {
-			By("defer: cleaning up PD-RW test env")
-			framework.Logf("defer cleanup errors can usually be ignored")
-			podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0))
-			detachAndDeletePDs(diskName, []types.NodeName{host0Name})
-			framework.WaitForNodeToBeReady(f.ClientSet, string(host0Name), nodeStatusTimeout)
-			framework.WaitForAllNodesSchedulable(f.ClientSet, nodeStatusTimeout)
-			nodes = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-			Expect(len(nodes.Items)).To(Equal(initialGroupSize), "Requires node count to return to initial group size.")
-		}()
+				targetNode := &nodes.Items[0]
+				host0Pod := testPDPod([]string{diskName}, host0Name, false, 1)
+				containerName := "mycontainer"
 
-		By("creating host0Pod on node0")
-		_, err = podClient.Create(host0Pod)
-		framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
-		framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
+				defer func() {
+					By("defer: cleaning up PD-RW test env")
+					framework.Logf("defer cleanup errors can usually be ignored")
+					if nodeOp == deleteNode {
+						podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0))
+					}
+					detachAndDeletePDs(diskName, []types.NodeName{host0Name})
+					if nodeOp == deleteNodeObj {
+						targetNode.ObjectMeta.SetResourceVersion("0")
+						// need to set the resource version or else the Create() fails
+						_, err := nodeClient.Create(targetNode)
+						framework.ExpectNoError(err, "Unable to re-create the deleted node")
+						framework.ExpectNoError(framework.WaitForGroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup, int32(initialGroupSize)), "Unable to get the node group back to the original size")
+					}
+					framework.WaitForNodeToBeReady(f.ClientSet, string(host0Name), nodeStatusTimeout)
+					framework.WaitForAllNodesSchedulable(f.ClientSet, nodeStatusTimeout)
+					nodes = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+					if nodeOp == deleteNode {
+						Expect(len(nodes.Items)).To(Equal(initialGroupSize), "Requires node count to return to initial group size.")
+					} else if nodeOp == deleteNodeObj {
+						Expect(len(nodes.Items)).To(Equal(nodeCount), "Requires node count to return to original node count.")
+					}
+				}()
 
-		By("writing content to host0Pod")
-		testFile := "/testpd1/tracker"
-		testFileContents := fmt.Sprintf("%v", mathrand.Int())
-		framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
-		framework.Logf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name)
+				By("creating host0Pod on node0")
+				_, err = podClient.Create(host0Pod)
+				framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
+				framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
 
-		By("verifying PD is present in node0's VolumeInUse list")
-		framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* should exist*/))
+				By("writing content to host0Pod")
+				testFile := "/testpd1/tracker"
+				testFileContents := fmt.Sprintf("%v", mathrand.Int())
+				framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
+				framework.Logf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name)
 
-		By("getting gce instances")
-		gceCloud, err := framework.GetGCECloud()
-		framework.ExpectNoError(err, fmt.Sprintf("Unable to create gcloud client err=%v", err))
-		output, err := gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
-		framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
-		Expect(true, strings.Contains(string(output), string(host0Name)))
+				By("verifying PD is present in node0's VolumeInUse list")
+				framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* should exist*/))
 
-		By("deleting host0")
-		resp, err := gceCloud.DeleteInstance(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone, string(host0Name))
-		framework.ExpectNoError(err, fmt.Sprintf("Failed to delete host0Pod: err=%v response=%#v", err, resp))
-		output, err = gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
-		framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
-		Expect(false, strings.Contains(string(output), string(host0Name)))
+				if nodeOp == deleteNode {
+					By("getting gce instances")
+					gceCloud, err := framework.GetGCECloud()
+					framework.ExpectNoError(err, fmt.Sprintf("Unable to create gcloud client err=%v", err))
+					output, err := gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
+					framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
+					Expect(true, strings.Contains(string(output), string(host0Name)))
 
-		By("waiting for pd to detach from host0")
-		waitForPDDetach(diskName, host0Name)
-		framework.ExpectNoError(framework.WaitForGroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup, int32(initialGroupSize)), "Unable to get back the cluster to inital size")
-	})
+					By("deleting host0")
+					resp, err := gceCloud.DeleteInstance(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone, string(host0Name))
+					framework.ExpectNoError(err, fmt.Sprintf("Failed to delete host0Pod: err=%v response=%#v", err, resp))
+					output, err = gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
+					framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
+					Expect(false, strings.Contains(string(output), string(host0Name)))
+				} else if nodeOp == deleteNodeObj {
+					By("deleting host0's node api object")
+					framework.ExpectNoError(nodeClient.Delete(string(host0Name), metav1.NewDeleteOptions(0)), "Unable to delete host0's node object")
+					By("deleting host0Pod")
+					framework.ExpectNoError(podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0)), "Unable to delete host0Pod")
+				}
 
-	It("should be able to detach from a node whose api object was deleted [Slow] [Disruptive]", func() {
-		framework.SkipUnlessProviderIs("gce")
-
-		initialGroupSize, err := framework.GroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup)
-		framework.ExpectNoError(err, "Error getting group size")
-
-		By("creating a pd")
-		diskName, err := framework.CreatePDWithRetry()
-		framework.ExpectNoError(err, "Error creating a pd")
-
-		host0Pod := testPDPod([]string{diskName}, host0Name, false, 1)
-		originalCount := len(nodes.Items)
-		containerName := "mycontainer"
-		nodeToDelete := &nodes.Items[0]
-
-		defer func() {
-			By("defer: cleaning up PD-RW test env")
-			framework.Logf("defer cleanup errors can usually be ignored")
-			detachAndDeletePDs(diskName, []types.NodeName{host0Name})
-			nodeToDelete.ObjectMeta.SetResourceVersion("0")
-			// need to set the resource version or else the Create() fails
-			_, err := nodeClient.Create(nodeToDelete)
-			framework.ExpectNoError(err, "Unable to re-create the deleted node")
-			framework.ExpectNoError(framework.WaitForGroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup, int32(initialGroupSize)), "Unable to get the node group back to the original size")
-			framework.WaitForNodeToBeReady(f.ClientSet, nodeToDelete.Name, nodeStatusTimeout)
-			framework.WaitForAllNodesSchedulable(f.ClientSet, nodeStatusTimeout)
-			nodes = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-			Expect(len(nodes.Items)).To(Equal(originalCount), "Requires node count to return to original node count.")
-		}()
-
-		By("creating host0Pod on node0")
-		_, err = podClient.Create(host0Pod)
-		framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod %q: %v", host0Pod.Name, err))
-		framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
-
-		By("writing content to host0Pod")
-		testFile := "/testpd1/tracker"
-		testFileContents := fmt.Sprintf("%v", mathrand.Int())
-		framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
-		framework.Logf("wrote %q to file %q in pod %q on node %q", testFileContents, testFile, host0Pod.Name, host0Name)
-
-		By("verifying PD is present in node0's VolumeInUse list")
-		framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* should exist*/))
-
-		By("deleting host0 api object")
-		framework.ExpectNoError(nodeClient.Delete(string(host0Name), metav1.NewDeleteOptions(0)), "Unable to delete host0")
-		By("deleting host0Pod")
-		framework.ExpectNoError(podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0)), "Unable to delete host0Pod")
-		By("Waiting for pd to detach from host0")
-		framework.ExpectNoError(waitForPDDetach(diskName, host0Name), "Timed out waiting for detach pd")
+				By("waiting for pd to detach from host0")
+				waitForPDDetach(diskName, host0Name)
+				framework.ExpectNoError(framework.WaitForGroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup, int32(initialGroupSize)), "Unable to get back the cluster to inital size")
+			})
+		}
 	})
 
 	It("should be able to delete a non-existent PD without error", func() {
