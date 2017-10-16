@@ -46,6 +46,7 @@ type StreamWatcher struct {
 	source  Decoder
 	result  chan Event
 	stopped bool
+	cancel  func()
 }
 
 // NewStreamWatcher creates a StreamWatcher from the given decoder.
@@ -66,11 +67,20 @@ func (sw *StreamWatcher) ResultChan() <-chan Event {
 	return sw.result
 }
 
+// SetCancelFunc stores cancel function in stream watcher.
+func (sw *StreamWatcher) SetCancelFunc(cancel func()) {
+	sw.cancel = cancel
+}
+
 // Stop implements Interface.
 func (sw *StreamWatcher) Stop() {
 	// Call Close() exactly once by locking and setting a flag.
+	// Call cancel function if it exists.
 	sw.Lock()
 	defer sw.Unlock()
+	if sw.cancel != nil {
+		sw.cancel()
+	}
 	if !sw.stopped {
 		sw.stopped = true
 		sw.source.Close()

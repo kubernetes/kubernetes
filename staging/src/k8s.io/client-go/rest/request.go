@@ -492,19 +492,21 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	var cancelFunc func()
 	// If request r's context is nil or has no deadline, use the requestTimeout
 	if r.ctx != nil {
-		if _, ok := r.ctx.Deadline(); ok == true {
+		if _, ok := r.ctx.Deadline(); ok {
 			req = req.WithContext(r.ctx)
 		} else {
 			c, cancel := context.WithTimeout(r.ctx, r.requestTimeout)
 			req = req.WithContext(c)
-			defer cancel()
+			cancelFunc = cancel
 		}
 	} else if r.requestTimeout > 0 {
 		c, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
 		req = req.WithContext(c)
-		defer cancel()
+		cancelFunc = cancel
 	}
 	req.Header = r.headers
 	client := r.client
@@ -525,20 +527,34 @@ func (r *Request) Watch() (watch.Interface, error) {
 		// The watch stream mechanism handles many common partial data errors, so closed
 		// connections can be retried in many cases.
 		if net.IsProbableEOF(err) {
+			if cancelFunc != nil {
+				cancelFunc()
+			}
 			return watch.NewEmptyWatch(), nil
+		}
+		if cancelFunc != nil {
+			cancelFunc()
 		}
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
 		if result := r.transformResponse(resp, req); result.err != nil {
+			if cancelFunc != nil {
+				cancelFunc()
+			}
 			return nil, result.err
+		}
+		if cancelFunc != nil {
+			cancelFunc()
 		}
 		return nil, fmt.Errorf("for request '%+v', got status: %v", url, resp.StatusCode)
 	}
 	framer := r.serializers.Framer.NewFrameReader(resp.Body)
 	decoder := streaming.NewDecoder(framer, r.serializers.StreamingSerializer)
-	return watch.NewStreamWatcher(restclientwatch.NewDecoder(decoder, r.serializers.Decoder)), nil
+	streamWatcher := watch.NewStreamWatcher(restclientwatch.NewDecoder(decoder, r.serializers.Decoder))
+	streamWatcher.SetCancelFunc(cancelFunc)
+	return streamWatcher, nil
 }
 
 // updateURLMetrics is a convenience function for pushing metrics.
@@ -563,9 +579,12 @@ func updateURLMetrics(req *Request, resp *http.Response, err error) {
 // Returns io.ReadCloser which could be used for streaming of the response, or an error
 // Any non-2xx http status code causes an error.  If we get a non-2xx code, we try to convert the body into an APIStatus object.
 // If we can, we return that as an error.  Otherwise, we create an error that lists the http status and the content of the response.
-func (r *Request) Stream() (io.ReadCloser, error) {
+// NOTE: Upon success, the function returns a cancel function along with the io.ReadCloser. The cancel function is non-nil if the
+// stream request has context with timeout. It's user's responsibity to call the cancel function once finishing streaming to
+// prevent context leak.
+func (r *Request) Stream() (io.ReadCloser, error, func()) {
 	if r.err != nil {
-		return nil, r.err
+		return nil, r.err, nil
 	}
 
 	r.tryThrottle()
@@ -573,21 +592,23 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	url := r.URL().String()
 	req, err := http.NewRequest(r.verb, url, nil)
 	if err != nil {
-		return nil, err
+		return nil, err, nil
 	}
+
+	var cancelFunc func()
 	// If request r's context is nil or has no deadline, use the requestTimeout
 	if r.ctx != nil {
-		if _, ok := r.ctx.Deadline(); ok == true {
+		if _, ok := r.ctx.Deadline(); ok {
 			req = req.WithContext(r.ctx)
 		} else {
 			c, cancel := context.WithTimeout(r.ctx, r.requestTimeout)
 			req = req.WithContext(c)
-			defer cancel()
+			cancelFunc = cancel
 		}
 	} else if r.requestTimeout > 0 {
 		c, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
 		req = req.WithContext(c)
-		defer cancel()
+		cancelFunc = cancel
 	}
 	req.Header = r.headers
 	client := r.client
@@ -605,12 +626,15 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		}
 	}
 	if err != nil {
-		return nil, err
+		if cancelFunc != nil {
+			cancelFunc()
+		}
+		return nil, err, nil
 	}
 
 	switch {
 	case (resp.StatusCode >= 200) && (resp.StatusCode < 300):
-		return resp.Body, nil
+		return resp.Body, nil, cancelFunc
 
 	default:
 		// ensure we close the body before returning the error
@@ -621,7 +645,10 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		if err == nil {
 			err = fmt.Errorf("%d while accessing %v: %s", result.statusCode, url, string(result.body))
 		}
-		return nil, err
+		if cancelFunc != nil {
+			cancelFunc()
+		}
+		return nil, err, nil
 	}
 }
 
@@ -666,7 +693,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		}
 		// If request r's context is nil or has no deadline, use the requestTimeout
 		if r.ctx != nil {
-			if _, ok := r.ctx.Deadline(); ok == true {
+			if _, ok := r.ctx.Deadline(); ok {
 				req = req.WithContext(r.ctx)
 			} else {
 				c, cancel := context.WithTimeout(r.ctx, r.requestTimeout)
