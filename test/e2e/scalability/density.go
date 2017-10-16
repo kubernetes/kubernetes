@@ -227,7 +227,7 @@ func runDensityTest(dtc DensityTestConfig) time.Duration {
 	logStopCh := make(chan struct{})
 	go logPodStartupStatus(dtc.ClientSets[0], dtc.PodCount, map[string]string{"type": "densityPod"}, dtc.PollInterval, logStopCh)
 	wg.Wait()
-	startupTime := time.Now().Sub(startTime)
+	startupTime := time.Since(startTime)
 	close(logStopCh)
 	framework.Logf("E2E startup time for %d pods: %v", dtc.PodCount, startupTime)
 	framework.Logf("Throughput (pods/s) during cluster saturation phase: %v", float32(dtc.PodCount)/float32(startupTime/time.Second))

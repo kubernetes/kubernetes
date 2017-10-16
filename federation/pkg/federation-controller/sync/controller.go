@@ -336,7 +336,7 @@ func (s *FederationSyncController) reconcile(qualifiedName federatedtypes.Qualif
 
 	glog.V(4).Infof("Starting to reconcile %v %v", kind, key)
 	startTime := time.Now()
-	defer glog.V(4).Infof("Finished reconciling %v %v (duration: %v)", kind, key, time.Now().Sub(startTime))
+	defer glog.V(4).Infof("Finished reconciling %v %v (duration: %v)", kind, key, time.Since(startTime))
 
 	obj, err := s.objFromCache(kind, key)
 	if err != nil {
