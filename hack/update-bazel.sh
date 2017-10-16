@@ -20,14 +20,7 @@ set -o pipefail
 export KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-if LANG=C sed --help 2>&1 | grep -q GNU; then
-  SED="sed"
-elif which gsed &>/dev/null; then
-  SED="gsed"
-else
-  echo "Failed to find GNU sed as sed or gsed. If you are on Mac: brew install gnu-sed." >&2
-  exit 1
-fi
+kube::util::ensure-gnu-sed
 
 # Remove generated files prior to running kazel.
 # TODO(spxtr): Remove this line once Bazel is the only way to build.
