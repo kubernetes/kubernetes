@@ -62,7 +62,7 @@ type ClusterState struct {
 // GetAvailableUpgrades fetches all versions from the specified VersionGetter and computes which
 // kinds of upgrades can be performed
 func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool) ([]Upgrade, error) {
-	fmt.Println("[upgrade] Fetching available versions to upgrade to:")
+	fmt.Println("[upgrade] Fetching available versions to upgrade to")
 
 	// Collect the upgrades kubeadm can do in this list
 	upgrades := []Upgrade{}
@@ -82,7 +82,9 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 	// Get and output the current latest stable version
 	stableVersionStr, stableVersion, err := versionGetterImpl.VersionFromCILabel("stable", "stable version")
 	if err != nil {
-		return nil, err
+		fmt.Printf("[upgrade/versions] WARNING: %v\n", err)
+		fmt.Println("[upgrade/versions] WARNING: Falling back to current kubeadm version as latest stable version")
+		stableVersionStr, stableVersion = kubeadmVersionStr, kubeadmVersion
 	}
 
 	// Get the kubelet versions in the cluster
@@ -115,34 +117,34 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		// Get and output the latest patch version for the cluster branch
 		patchVersionStr, patchVersion, err := versionGetterImpl.VersionFromCILabel(versionLabel, description)
 		if err != nil {
-			return nil, err
-		}
+			fmt.Printf("[upgrade/versions] WARNING: %v\n", err)
+		} else {
+			// Check if a minor version upgrade is possible when a patch release exists
+			// It's only possible if the latest patch version is higher than the current patch version
+			// If that's the case, they must be on different branches => a newer minor version can be upgraded to
+			canDoMinorUpgrade = minorUpgradePossibleWithPatchRelease(stableVersion, patchVersion)
 
-		// Check if a minor version upgrade is possible when a patch release exists
-		// It's only possible if the latest patch version is higher than the current patch version
-		// If that's the case, they must be on different branches => a newer minor version can be upgraded to
-		canDoMinorUpgrade = minorUpgradePossibleWithPatchRelease(stableVersion, patchVersion)
+			// If the cluster version is lower than the newest patch version, we should inform about the possible upgrade
+			if patchUpgradePossible(clusterVersion, patchVersion) {
 
-		// If the cluster version is lower than the newest patch version, we should inform about the possible upgrade
-		if patchUpgradePossible(clusterVersion, patchVersion) {
+				// The kubeadm version has to be upgraded to the latest patch version
+				newKubeadmVer := patchVersionStr
+				if kubeadmVersion.AtLeast(patchVersion) {
+					// In this case, the kubeadm CLI version is new enough. Don't display an update suggestion for kubeadm by making .NewKubeadmVersion equal .CurrentKubeadmVersion
+					newKubeadmVer = kubeadmVersionStr
+				}
 
-			// The kubeadm version has to be upgraded to the latest patch version
-			newKubeadmVer := patchVersionStr
-			if kubeadmVersion.AtLeast(patchVersion) {
-				// In this case, the kubeadm CLI version is new enough. Don't display an update suggestion for kubeadm by making .NewKubeadmVersion equal .CurrentKubeadmVersion
-				newKubeadmVer = kubeadmVersionStr
+				upgrades = append(upgrades, Upgrade{
+					Description: description,
+					Before:      beforeState,
+					After: ClusterState{
+						KubeVersion:    patchVersionStr,
+						DNSVersion:     dns.GetKubeDNSVersion(patchVersion),
+						KubeadmVersion: newKubeadmVer,
+						// KubeletVersions is unset here as it is not used anywhere in .After
+					},
+				})
 			}
-
-			upgrades = append(upgrades, Upgrade{
-				Description: description,
-				Before:      beforeState,
-				After: ClusterState{
-					KubeVersion:    patchVersionStr,
-					DNSVersion:     dns.GetKubeDNSVersion(patchVersion),
-					KubeadmVersion: newKubeadmVer,
-					// KubeletVersions is unset here as it is not used anywhere in .After
-				},
-			})
 		}
 	}
 
