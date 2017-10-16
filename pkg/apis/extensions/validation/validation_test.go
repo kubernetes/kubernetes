@@ -2326,33 +2326,6 @@ func TestValidateReplicaSet(t *testing.T) {
 }
 
 func TestValidatePodSecurityPolicy(t *testing.T) {
-	validPSP := func() *extensions.PodSecurityPolicy {
-		return &extensions.PodSecurityPolicy{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:        "foo",
-				Annotations: map[string]string{},
-			},
-			Spec: extensions.PodSecurityPolicySpec{
-				SELinux: extensions.SELinuxStrategyOptions{
-					Rule: extensions.SELinuxStrategyRunAsAny,
-				},
-				RunAsUser: extensions.RunAsUserStrategyOptions{
-					Rule: extensions.RunAsUserStrategyRunAsAny,
-				},
-				FSGroup: extensions.FSGroupStrategyOptions{
-					Rule: extensions.FSGroupStrategyRunAsAny,
-				},
-				SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
-					Rule: extensions.SupplementalGroupsStrategyRunAsAny,
-				},
-				AllowedHostPaths: []extensions.AllowedHostPath{
-					{PathPrefix: "/foo/bar"},
-					{PathPrefix: "/baz/"},
-				},
-			},
-		}
-	}
-
 	noUserOptions := validPSP()
 	noUserOptions.Spec.RunAsUser.Rule = ""
 
@@ -2735,26 +2708,6 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 }
 
 func TestValidatePSPVolumes(t *testing.T) {
-	validPSP := func() *extensions.PodSecurityPolicy {
-		return &extensions.PodSecurityPolicy{
-			ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-			Spec: extensions.PodSecurityPolicySpec{
-				SELinux: extensions.SELinuxStrategyOptions{
-					Rule: extensions.SELinuxStrategyRunAsAny,
-				},
-				RunAsUser: extensions.RunAsUserStrategyOptions{
-					Rule: extensions.RunAsUserStrategyRunAsAny,
-				},
-				FSGroup: extensions.FSGroupStrategyOptions{
-					Rule: extensions.FSGroupStrategyRunAsAny,
-				},
-				SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
-					Rule: extensions.SupplementalGroupsStrategyRunAsAny,
-				},
-			},
-		}
-	}
-
 	volumes := psputil.GetAllFSTypesAsSet()
 	// add in the * value since that is a pseudo type that is not included by default
 	volumes.Insert(string(extensions.All))
@@ -2818,5 +2771,28 @@ func TestIsValidSysctlPattern(t *testing.T) {
 		if IsValidSysctlPattern(s) {
 			t.Errorf("%q expected to be an invalid sysctl pattern", s)
 		}
+	}
+}
+
+func validPSP() *extensions.PodSecurityPolicy {
+	return &extensions.PodSecurityPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "foo",
+			Annotations: map[string]string{},
+		},
+		Spec: extensions.PodSecurityPolicySpec{
+			SELinux: extensions.SELinuxStrategyOptions{
+				Rule: extensions.SELinuxStrategyRunAsAny,
+			},
+			RunAsUser: extensions.RunAsUserStrategyOptions{
+				Rule: extensions.RunAsUserStrategyRunAsAny,
+			},
+			FSGroup: extensions.FSGroupStrategyOptions{
+				Rule: extensions.FSGroupStrategyRunAsAny,
+			},
+			SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
+				Rule: extensions.SupplementalGroupsStrategyRunAsAny,
+			},
+		},
 	}
 }
