@@ -36,7 +36,7 @@ func TestResourceVersioner(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if version != "10" {
-		t.Errorf("unexpected version %v", version)
+		t.Errorf("version = %v, want 10", version)
 	}
 
 	clusterList := federation.ClusterList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}}
@@ -45,7 +45,7 @@ func TestResourceVersioner(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if version != "10" {
-		t.Errorf("unexpected version %v", version)
+		t.Errorf("version = %v, want 10", version)
 	}
 }
 
@@ -68,7 +68,7 @@ func TestCodec(t *testing.T) {
 
 func TestInterfacesFor(t *testing.T) {
 	if _, err := api.Registry.GroupOrDie(federation.GroupName).InterfacesFor(federation.SchemeGroupVersion); err == nil {
-		t.Fatalf("unexpected non-error: %v", err)
+		t.Fatalf("expected an error, but got nil")
 	}
 	for i, version := range api.Registry.GroupOrDie(federation.GroupName).GroupVersions {
 		if vi, err := api.Registry.GroupOrDie(federation.GroupName).InterfacesFor(version); err != nil || vi == nil {
@@ -104,7 +104,7 @@ func TestRESTMapper(t *testing.T) {
 
 		interfaces, _ := api.Registry.GroupOrDie(federation.GroupName).InterfacesFor(version)
 		if mapping.ObjectConvertor != interfaces.ObjectConvertor {
-			t.Errorf("unexpected: %#v, expected: %#v", mapping, interfaces)
+			t.Errorf("mapping: %#v, interfaces: %#v", mapping, interfaces)
 		}
 
 		rc := &federation.Cluster{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
