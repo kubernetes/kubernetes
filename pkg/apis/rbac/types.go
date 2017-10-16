@@ -155,6 +155,18 @@ type ClusterRole struct {
 
 	// Rules holds all the PolicyRules for this ClusterRole
 	Rules []PolicyRule
+
+	// AggregationRule is an optional field that describes how to build the Rules for this ClusterRole.
+	// If AggregationRule is set, then the Rules are controller managed and direct changes to Rules will be
+	// stomped by the controller.
+	AggregationRule *AggregationRule
+}
+
+// AggregationRule describes how to locate ClusterRoles to aggregate into the ClusterRole
+type AggregationRule struct {
+	// ClusterRoleSelectors holds a list of selectors which will be used to find ClusterRoles and create the rules.
+	// If any of the selectors match, then the ClusterRole's permissions will be added
+	ClusterRoleSelectors []metav1.LabelSelector
 }
 
 // +genclient
