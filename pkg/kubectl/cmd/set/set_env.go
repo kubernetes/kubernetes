@@ -54,7 +54,8 @@ var (
 		syntax.
 
 		Possible resources include (case insensitive):
-		` + envResources)
+		` + envResources + `
+		Among resources above, environment variables of pod can only be listed, not updated `)
 
 	envExample = templates.Examples(`
 		# Update deployment 'registry' with a new environment variable
