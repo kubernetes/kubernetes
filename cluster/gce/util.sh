@@ -771,6 +771,18 @@ function check-existing() {
   fi
 }
 
+# TODO(#54017): Remove below logics for handling deprecated network mode field.
+# `x_gcloud_mode` was replaced by `x_gcloud_subnet_mode` in gcloud 175.0.0 and
+# the content changed as well. Keeping such logic to make the transition eaiser.
+function check-network-mode() {
+  local mode="$(gcloud compute networks list --filter="name=('${NETWORK}')" --project ${NETWORK_PROJECT} --format='value(x_gcloud_subnet_mode)' || true)"
+  if [[ -z "${mode}" ]]; then
+    mode="$(gcloud compute networks list --filter="name=('${NETWORK}')" --project ${NETWORK_PROJECT} --format='value(x_gcloud_mode)' || true)"
+  fi
+  # The deprecated field uses lower case. Convert to upper case for consistency.
+  echo "$(echo $mode | tr [a-z] [A-Z])"
+}
+
 function create-network() {
   if ! gcloud compute networks --project "${NETWORK_PROJECT}" describe "${NETWORK}" &>/dev/null; then
     # The network needs to be created synchronously or we have a race. The
@@ -783,7 +795,7 @@ function create-network() {
     gcloud compute networks create --project "${NETWORK_PROJECT}" "${NETWORK}" --mode="${network_mode}"
   else
     PREEXISTING_NETWORK=true
-    PREEXISTING_NETWORK_MODE="$(gcloud compute networks list --filter="name=('${NETWORK}')" --project ${NETWORK_PROJECT} --format='value(x_gcloud_subnet_mode)' || true)"
+    PREEXISTING_NETWORK_MODE="$(check-network-mode)"
     echo "Found existing network ${NETWORK} in ${PREEXISTING_NETWORK_MODE} mode."
   fi
 
@@ -946,7 +958,7 @@ function delete-network() {
 function delete-subnetworks() {
   if [[ ${ENABLE_IP_ALIASES:-} != "true" ]]; then
     # If running in custom mode network we need to delete subnets
-    mode="$(gcloud compute networks list --filter="name=('${NETWORK}')" --project ${NETWORK_PROJECT} --format='value(x_gcloud_subnet_mode)' || true)"
+    mode="$(check-network-mode)"
     if [[ "${mode}" == "CUSTOM" ]]; then
       if [[ "${ENABLE_BIG_CLUSTER_SUBNETS}" = "true" ]]; then
         echo "Deleting default subnets..."
