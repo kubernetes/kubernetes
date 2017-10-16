@@ -582,18 +582,31 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	It("Should be able to scale a node group up from 0[Feature:ClusterSizeAutoscalingScaleUp]", func() {
-		framework.SkipUnlessAtLeast(len(originalSizes), 2, "At least 2 node groups are needed for scale-to-0 tests")
-		By("Manually scale smallest node group to 0")
-		minMig := ""
-		minSize := nodeCount
-		for mig, size := range originalSizes {
-			if size <= minSize {
-				minMig = mig
-				minSize = size
+		// Provider-specific setup
+		if framework.ProviderIs("gke") {
+			// GKE-specific setup
+			By("Add a new node pool with 0 nodes and min size 0")
+			const extraPoolName = "extra-pool"
+			addNodePool(extraPoolName, "n1-standard-4", 0)
+			defer deleteNodePool(extraPoolName)
+			framework.ExpectNoError(enableAutoscaler(extraPoolName, 0, 1))
+			defer disableAutoscaler(extraPoolName, 0, 1)
+		} else {
+			// on GCE, run only if there are already at least 2 node groups
+			framework.SkipUnlessAtLeast(len(originalSizes), 2, "At least 2 node groups are needed for scale-to-0 tests")
+
+			By("Manually scale smallest node group to 0")
+			minMig := ""
+			minSize := nodeCount
+			for mig, size := range originalSizes {
+				if size <= minSize {
+					minMig = mig
+					minSize = size
+				}
 			}
+			framework.ExpectNoError(framework.ResizeGroup(minMig, int32(0)))
+			framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount-minSize, resizeTimeout))
 		}
-		framework.ExpectNoError(framework.ResizeGroup(minMig, int32(0)))
-		framework.ExpectNoError(framework.WaitForReadyNodes(c, nodeCount-minSize, resizeTimeout))
 
 		By("Make remaining nodes unschedulable")
 		nodes, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
@@ -607,6 +620,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			defer func(n v1.Node) {
 				makeNodeSchedulable(f.ClientSet, &n, false)
 			}(node)
+
 			framework.ExpectNoError(err)
 		}
 
