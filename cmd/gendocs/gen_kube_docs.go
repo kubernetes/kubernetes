@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/spf13/cobra/doc"
@@ -27,6 +28,8 @@ import (
 	cmapp "k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
+	kubectl "k8s.io/kubernetes/pkg/kubectl/cmd"
+	kubectlcmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	schapp "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 )
 
@@ -73,6 +76,10 @@ func main() {
 		// generate docs for kubelet
 		kubelet := kubeletapp.NewKubeletCommand()
 		doc.GenMarkdownTree(kubelet, outDir)
+	case "kubectl":
+		// generate docs for kubectl
+		kubectl := kubectl.NewKubectlCommand(kubectlcmdutil.NewFactory(nil), os.Stdin, ioutil.Discard, ioutil.Discard)
+		doc.GenMarkdownTree(kubectl, outDir)
 	default:
 		fmt.Fprintf(os.Stderr, "Module %s is not supported", module)
 		os.Exit(1)

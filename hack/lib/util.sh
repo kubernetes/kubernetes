@@ -195,20 +195,19 @@ kube::util::gen-docs() {
 
   # Find binary
   gendocs=$(kube::util::find-binary "gendocs")
-  genkubedocs=$(kube::util::find-binary "genkubedocs")
   genman=$(kube::util::find-binary "genman")
   genyaml=$(kube::util::find-binary "genyaml")
   genfeddocs=$(kube::util::find-binary "genfeddocs")
 
   mkdir -p "${dest}/docs/user-guide/kubectl/"
-  "${gendocs}" "${dest}/docs/user-guide/kubectl/"
+  "${gendocs}" "${dest}/docs/user-guide/kubectl/" "kubectl"
   mkdir -p "${dest}/docs/admin/"
-  "${genkubedocs}" "${dest}/docs/admin/" "kube-apiserver"
-  "${genkubedocs}" "${dest}/docs/admin/" "kube-controller-manager"
-  "${genkubedocs}" "${dest}/docs/admin/" "cloud-controller-manager"
-  "${genkubedocs}" "${dest}/docs/admin/" "kube-proxy"
-  "${genkubedocs}" "${dest}/docs/admin/" "kube-scheduler"
-  "${genkubedocs}" "${dest}/docs/admin/" "kubelet"
+  "${gendocs}" "${dest}/docs/admin/" "kube-apiserver"
+  "${gendocs}" "${dest}/docs/admin/" "kube-controller-manager"
+  "${gendocs}" "${dest}/docs/admin/" "cloud-controller-manager"
+  "${gendocs}" "${dest}/docs/admin/" "kube-proxy"
+  "${gendocs}" "${dest}/docs/admin/" "kube-scheduler"
+  "${gendocs}" "${dest}/docs/admin/" "kubelet"
 
   # We don't really need federation-apiserver and federation-controller-manager
   # binaries to generate the docs. We just pass their names to decide which docs

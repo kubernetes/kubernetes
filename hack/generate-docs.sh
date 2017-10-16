@@ -29,7 +29,6 @@ kube::golang::setup_env
 
 BINS=(
 	cmd/gendocs
-	cmd/genkubedocs
 	cmd/genman
 	cmd/genyaml
 	federation/cmd/genfeddocs
