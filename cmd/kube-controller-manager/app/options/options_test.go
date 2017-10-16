@@ -151,6 +151,7 @@ func TestAddFlags(t *testing.T) {
 			NodeMonitorPeriod:                               metav1.Duration{Duration: 10 * time.Second},
 			HorizontalPodAutoscalerUpscaleForbiddenWindow:   metav1.Duration{Duration: 1 * time.Minute},
 			HorizontalPodAutoscalerDownscaleForbiddenWindow: metav1.Duration{Duration: 2 * time.Minute},
+			HorizontalPodAutoscalerTolerance:                0.1,
 			TerminatedPodGCThreshold:                        12000,
 			VolumeConfiguration: componentconfig.VolumeConfiguration{
 				EnableDynamicProvisioning:  false,
