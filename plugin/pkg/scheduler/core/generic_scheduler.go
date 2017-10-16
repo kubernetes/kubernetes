@@ -129,6 +129,12 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, nodeLister algorithm.NodeLister
 	}
 
 	trace.Step("Prioritizing")
+
+	// When only one node after predicate, just use it.
+	if len(filteredNodes) == 1 {
+		return filteredNodes[0].Name, nil
+	}
+
 	metaPrioritiesInterface := g.priorityMetaProducer(pod, g.cachedNodeInfoMap)
 	priorityList, err := PrioritizeNodes(pod, g.cachedNodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders)
 	if err != nil {
