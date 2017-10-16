@@ -39,6 +39,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim",
     deps = [
         "//pkg/credentialprovider:go_default_library",
         "//pkg/kubelet/apis/cri:go_default_library",
@@ -102,6 +103,7 @@ go_test(
         "fixtures/seccomp/sub/subtest",
         "fixtures/seccomp/test",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/dockershim",
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",

@@ -15,6 +15,7 @@ go_library(
         "types.go",
         "utils.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/deviceplugin",
     deps = [
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/kubelet/apis/deviceplugin/v1alpha1:go_default_library",
@@ -45,6 +46,7 @@ go_test(
         "manager_test.go",
         "utils_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/deviceplugin",
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/deviceplugin/v1alpha1:go_default_library",

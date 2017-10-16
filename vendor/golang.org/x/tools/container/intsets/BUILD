@@ -21,6 +21,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "golang.org/x/tools/container/intsets",
     visibility = ["//visibility:public"],
 )
 

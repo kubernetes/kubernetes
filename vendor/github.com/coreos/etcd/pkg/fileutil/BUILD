@@ -28,6 +28,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/coreos/etcd/pkg/fileutil",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/coreos/pkg/capnslog:go_default_library"],
 )

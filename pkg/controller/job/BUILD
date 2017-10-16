@@ -13,6 +13,7 @@ go_library(
         "job_controller.go",
         "utils.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/job",
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/util/metrics:go_default_library",
@@ -44,6 +45,7 @@ go_test(
         "job_controller_test.go",
         "utils_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/job",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

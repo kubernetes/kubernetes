@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["storage_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/storage/storageclass/storage",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
@@ -26,6 +27,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["storage.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/storage/storageclass/storage",
     deps = [
         "//pkg/apis/storage:go_default_library",
         "//pkg/registry/storage/storageclass:go_default_library",

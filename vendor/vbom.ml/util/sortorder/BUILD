@@ -6,6 +6,7 @@ go_library(
         "doc.go",
         "natsort.go",
     ],
+    importpath = "vbom.ml/util/sortorder",
     visibility = ["//visibility:public"],
 )
 

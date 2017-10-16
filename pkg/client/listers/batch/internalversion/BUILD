@@ -14,6 +14,7 @@ go_library(
         "job.go",
         "job_expansion.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/client/listers/batch/internalversion",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",
@@ -27,6 +28,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["job_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/client/listers/batch/internalversion",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

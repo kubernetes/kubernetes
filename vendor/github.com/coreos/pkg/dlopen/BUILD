@@ -12,6 +12,7 @@ go_library(
     }),
     cgo = True,
     clinkopts = ["-ldl"],
+    importpath = "github.com/coreos/pkg/dlopen",
     visibility = ["//visibility:public"],
 )
 

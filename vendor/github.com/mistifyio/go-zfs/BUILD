@@ -8,6 +8,7 @@ go_library(
         "zfs.go",
         "zpool.go",
     ],
+    importpath = "github.com/mistifyio/go-zfs",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/pborman/uuid:go_default_library"],
 )

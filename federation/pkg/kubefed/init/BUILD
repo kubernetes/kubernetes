@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["init.go"],
+    importpath = "k8s.io/kubernetes/federation/pkg/kubefed/init",
     deps = [
         "//cmd/kubeadm/app/util/kubeconfig:go_default_library",
         "//federation/apis/federation:go_default_library",
@@ -40,6 +41,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["init_test.go"],
+    importpath = "k8s.io/kubernetes/federation/pkg/kubefed/init",
     library = ":go_default_library",
     deps = [
         "//federation/apis/federation:go_default_library",

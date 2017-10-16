@@ -9,6 +9,7 @@ go_library(
         "pre_go17.go",
         "pre_go19.go",
     ],
+    importpath = "golang.org/x/net/context",
     visibility = ["//visibility:public"],
 )
 

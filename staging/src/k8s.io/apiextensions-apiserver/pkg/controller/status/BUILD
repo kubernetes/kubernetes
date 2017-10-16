@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["naming_controller_test.go"],
+    importpath = "k8s.io/apiextensions-apiserver/pkg/controller/status",
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
@@ -21,6 +22,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["naming_controller.go"],
+    importpath = "k8s.io/apiextensions-apiserver/pkg/controller/status",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",

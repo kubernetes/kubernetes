@@ -15,6 +15,7 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/apis/rbac/v1",
     deps = [
         "//pkg/apis/rbac:go_default_library",
         "//vendor/k8s.io/api/rbac/v1:go_default_library",

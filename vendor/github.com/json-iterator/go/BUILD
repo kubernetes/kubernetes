@@ -42,6 +42,7 @@ go_library(
         "feature_stream_string.go",
         "jsoniter.go",
     ],
+    importpath = "github.com/json-iterator/go",
     visibility = ["//visibility:public"],
 )
 

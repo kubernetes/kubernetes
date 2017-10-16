@@ -14,6 +14,7 @@ go_library(
         "generated_expansion.go",
         "statefulset.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/apps/internalversion",
     deps = [
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/extensions:go_default_library",

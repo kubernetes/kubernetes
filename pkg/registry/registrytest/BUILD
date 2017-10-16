@@ -17,6 +17,7 @@ go_library(
         "shortNamesProvider.go",
         "validate.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/registry/registrytest",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",

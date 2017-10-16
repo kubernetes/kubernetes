@@ -12,6 +12,7 @@ go_library(
         "doc.go",
         "endpoints_controller.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/endpoint",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1/endpoints:go_default_library",
@@ -39,6 +40,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["endpoints_controller_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/controller/endpoint",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

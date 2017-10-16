@@ -17,12 +17,14 @@ go_test(
     data = [
         ":testdata",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/validation",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["schema.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/validation",
     visibility = ["//build/visible_to:pkg_kubectl_validation_CONSUMERS"],
     deps = [
         "//vendor/github.com/exponent-io/jsonpath:go_default_library",

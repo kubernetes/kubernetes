@@ -328,32 +328,6 @@ func TestValidateHorizontalPodAutoscaler(t *testing.T) {
 					Namespace: metav1.NamespaceDefault,
 				},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					ScaleTargetRef: autoscaling.CrossVersionObjectReference{
-						Kind: "ReplicationController",
-						Name: "myrc",
-					},
-					MinReplicas: newInt32(1),
-					MaxReplicas: 5,
-					Metrics: []autoscaling.MetricSpec{
-						{
-							Type: autoscaling.ResourceMetricSourceType,
-							Resource: &autoscaling.ResourceMetricSource{
-								Name: api.ResourceCPU,
-								TargetAverageUtilization: newInt32(-70),
-							},
-						},
-					},
-				},
-			},
-			msg: "must be greater than 0",
-		},
-		{
-			horizontalPodAutoscaler: autoscaling.HorizontalPodAutoscaler{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "myautoscaler",
-					Namespace: metav1.NamespaceDefault,
-				},
-				Spec: autoscaling.HorizontalPodAutoscalerSpec{
 					ScaleTargetRef: autoscaling.CrossVersionObjectReference{Name: "myrc", Kind: "ReplicationController"},
 					MinReplicas:    newInt32(1),
 					MaxReplicas:    5,

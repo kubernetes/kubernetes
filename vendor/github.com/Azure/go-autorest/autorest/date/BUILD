@@ -9,6 +9,7 @@ go_library(
         "unixtime.go",
         "utility.go",
     ],
+    importpath = "github.com/Azure/go-autorest/autorest/date",
     visibility = ["//visibility:public"],
 )
 

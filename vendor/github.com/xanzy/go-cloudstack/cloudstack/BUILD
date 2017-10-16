@@ -68,6 +68,7 @@ go_library(
         "ZoneService.go",
         "cloudstack.go",
     ],
+    importpath = "github.com/xanzy/go-cloudstack/cloudstack",
     visibility = ["//visibility:public"],
 )
 

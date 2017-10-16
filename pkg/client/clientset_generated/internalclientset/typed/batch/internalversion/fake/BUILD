@@ -13,6 +13,7 @@ go_library(
         "fake_cronjob.go",
         "fake_job.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/internalversion/fake",
     deps = [
         "//pkg/apis/batch:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/batch/internalversion:go_default_library",

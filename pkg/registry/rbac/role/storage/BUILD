@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["storage.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/rbac/role/storage",
     deps = [
         "//pkg/apis/rbac:go_default_library",
         "//pkg/registry/rbac/role:go_default_library",

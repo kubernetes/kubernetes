@@ -8,6 +8,7 @@ go_library(
         "recorder.go",
         "testutil.go",
     ],
+    importpath = "github.com/coreos/etcd/pkg/testutil",
     visibility = ["//visibility:public"],
 )
 

@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["negotiate_test.go"],
+    importpath = "k8s.io/apiserver/pkg/endpoints/handlers/negotiation",
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -23,6 +24,7 @@ go_library(
         "errors.go",
         "negotiate.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/endpoints/handlers/negotiation",
     deps = [
         "//vendor/bitbucket.org/ww/goautoneg:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

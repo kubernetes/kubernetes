@@ -14,6 +14,7 @@ go_library(
         "transformer.go",
         "trieval.go",
     ],
+    importpath = "golang.org/x/text/secure/precis",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/golang.org/x/text/cases:go_default_library",

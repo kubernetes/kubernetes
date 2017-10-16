@@ -12,6 +12,7 @@ go_test(
         "namer_test.go",
         "rest_test.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/endpoints/handlers",
     library = ":go_default_library",
     deps = [
         "//vendor/github.com/evanphx/json-patch:go_default_library",
@@ -44,6 +45,7 @@ go_library(
         "rest.go",
         "watch.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/endpoints/handlers",
     deps = [
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

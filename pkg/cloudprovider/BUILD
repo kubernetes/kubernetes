@@ -12,6 +12,7 @@ go_library(
         "doc.go",
         "plugins.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/cloudprovider",
     deps = [
         "//pkg/controller:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

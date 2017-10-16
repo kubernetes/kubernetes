@@ -6,6 +6,7 @@ go_library(
         "atom.go",
         "table.go",
     ],
+    importpath = "golang.org/x/net/html/atom",
     visibility = ["//visibility:public"],
 )
 

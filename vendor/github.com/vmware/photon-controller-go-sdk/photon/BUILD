@@ -27,6 +27,7 @@ go_library(
         "virtualnetworks.go",
         "vms.go",
     ],
+    importpath = "github.com/vmware/photon-controller-go-sdk/photon",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/vmware/photon-controller-go-sdk/photon/lightwave:go_default_library"],
 )

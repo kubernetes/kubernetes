@@ -21,6 +21,7 @@ go_library(
         "scale.go",
         "thirdpartyresource.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",
@@ -47,6 +48,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["daemonset_expansion_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

@@ -11,6 +11,7 @@ go_library(
         "fake_mirror_client.go",
         "mock_manager.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/pod/testing",
     deps = [
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/types:go_default_library",

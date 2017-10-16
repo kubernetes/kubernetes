@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["clusterselector_test.go"],
+    importpath = "k8s.io/kubernetes/federation/pkg/federation-controller/util/clusterselector",
     library = ":go_default_library",
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
@@ -19,6 +20,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["clusterselector.go"],
+    importpath = "k8s.io/kubernetes/federation/pkg/federation-controller/util/clusterselector",
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",

@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["fuzzer.go"],
+    importpath = "k8s.io/kubernetes/pkg/apis/storage/fuzzer",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/storage:go_default_library",

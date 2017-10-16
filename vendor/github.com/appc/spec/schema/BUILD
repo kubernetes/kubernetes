@@ -9,6 +9,7 @@ go_library(
         "pod.go",
         "version.go",
     ],
+    importpath = "github.com/appc/spec/schema",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/appc/spec/schema/types:go_default_library",

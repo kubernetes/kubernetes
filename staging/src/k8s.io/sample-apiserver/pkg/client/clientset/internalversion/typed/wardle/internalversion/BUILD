@@ -9,6 +9,7 @@ go_library(
         "generated_expansion.go",
         "wardle_client.go",
     ],
+    importpath = "k8s.io/sample-apiserver/pkg/client/clientset/internalversion/typed/wardle/internalversion",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

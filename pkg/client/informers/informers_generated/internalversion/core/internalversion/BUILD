@@ -26,6 +26,7 @@ go_library(
         "service.go",
         "serviceaccount.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/core/internalversion",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",

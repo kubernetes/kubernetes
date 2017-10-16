@@ -13,6 +13,7 @@ go_library(
         "framework.go",
         "util.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/test/e2e/framework",
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset:go_default_library",

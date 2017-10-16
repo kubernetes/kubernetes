@@ -14,6 +14,7 @@ go_test(
         "certificate_manager_test.go",
         "certificate_store_test.go",
     ],
+    importpath = "k8s.io/client-go/util/certificate",
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [
@@ -31,6 +32,7 @@ go_library(
         "certificate_manager.go",
         "certificate_store.go",
     ],
+    importpath = "k8s.io/client-go/util/certificate",
     tags = ["automanaged"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",

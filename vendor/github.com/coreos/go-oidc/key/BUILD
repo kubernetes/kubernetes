@@ -10,6 +10,7 @@ go_library(
         "rotate.go",
         "sync.go",
     ],
+    importpath = "github.com/coreos/go-oidc/key",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/go-oidc/jose:go_default_library",

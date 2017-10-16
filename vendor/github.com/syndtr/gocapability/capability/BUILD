@@ -14,6 +14,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/syndtr/gocapability/capability",
     visibility = ["//visibility:public"],
 )
 

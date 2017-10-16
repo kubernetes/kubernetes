@@ -6,6 +6,7 @@ go_library(
         "auth.go",
         "auth_requests.go",
     ],
+    importpath = "github.com/coreos/etcd/etcdserver/auth",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/error:go_default_library",

@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["file.go"],
+    importpath = "k8s.io/kubernetes/pkg/util/file",
 )
 
 filegroup(

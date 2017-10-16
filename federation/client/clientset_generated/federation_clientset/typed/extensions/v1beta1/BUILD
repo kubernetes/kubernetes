@@ -17,6 +17,7 @@ go_library(
         "ingress.go",
         "replicaset.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/extensions/v1beta1",
     deps = [
         "//federation/client/clientset_generated/federation_clientset/scheme:go_default_library",
         "//vendor/k8s.io/api/extensions/v1beta1:go_default_library",

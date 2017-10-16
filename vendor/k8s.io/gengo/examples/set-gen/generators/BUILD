@@ -6,6 +6,7 @@ go_library(
         "sets.go",
         "tags.go",
     ],
+    importpath = "k8s.io/gengo/examples/set-gen/generators",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",

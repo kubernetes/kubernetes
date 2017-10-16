@@ -6,6 +6,7 @@ go_library(
         "union.go",
         "uniontest.go",
     ],
+    importpath = "github.com/gogo/protobuf/plugin/union",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",

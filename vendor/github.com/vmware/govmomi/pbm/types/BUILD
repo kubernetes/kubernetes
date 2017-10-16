@@ -7,6 +7,7 @@ go_library(
         "if.go",
         "types.go",
     ],
+    importpath = "github.com/vmware/govmomi/pbm/types",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/vmware/govmomi/vim25/types:go_default_library"],
 )

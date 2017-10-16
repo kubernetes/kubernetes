@@ -13,6 +13,7 @@ go_test(
         "selfhosting_test.go",
         "selfhosting_volumes_test.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting",
     library = ":go_default_library",
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
@@ -29,6 +30,7 @@ go_library(
         "selfhosting.go",
         "selfhosting_volumes.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/selfhosting",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",

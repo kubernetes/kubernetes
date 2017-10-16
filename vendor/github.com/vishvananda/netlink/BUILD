@@ -50,6 +50,7 @@ go_library(
         "//conditions:default": [],
     }),
     cgo = True,
+    importpath = "github.com/vishvananda/netlink",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/vishvananda/netlink/nl:go_default_library",

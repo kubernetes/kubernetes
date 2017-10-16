@@ -15,6 +15,7 @@ go_library(
         "openapi.go",
         "openapi_getter.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi",
     deps = [
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/googleapis/gnostic/OpenAPIv2:go_default_library",
@@ -33,6 +34,7 @@ go_test(
         "openapi_test.go",
     ],
     data = ["//api/openapi-spec:swagger-spec"],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi_test",
     deps = [
         ":go_default_library",
         "//pkg/kubectl/cmd/util/openapi/testing:go_default_library",

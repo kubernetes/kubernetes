@@ -16,6 +16,7 @@ go_library(
         "metrics_grabber.go",
         "scheduler_metrics.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e/framework/metrics",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/master/ports:go_default_library",

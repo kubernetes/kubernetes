@@ -9,12 +9,14 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["custom_metrics.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/custommetrics",
     deps = ["//vendor/k8s.io/api/core/v1:go_default_library"],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["custom_metrics_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/custommetrics",
     library = ":go_default_library",
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

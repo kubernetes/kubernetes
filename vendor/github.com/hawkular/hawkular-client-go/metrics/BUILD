@@ -7,6 +7,7 @@ go_library(
         "helpers.go",
         "types.go",
     ],
+    importpath = "github.com/hawkular/hawkular-client-go/metrics",
     visibility = ["//visibility:public"],
 )
 

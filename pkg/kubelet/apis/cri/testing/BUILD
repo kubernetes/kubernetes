@@ -12,6 +12,7 @@ go_library(
         "fake_runtime_service.go",
         "utils.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing",
     deps = [
         "//pkg/kubelet/apis/cri/v1alpha1/runtime:go_default_library",
         "//pkg/kubelet/util/sliceutils:go_default_library",

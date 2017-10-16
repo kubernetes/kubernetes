@@ -13,6 +13,7 @@ go_library(
         "kubefed.go",
         "unjoin.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/pkg/kubefed",
     deps = [
         "//federation/apis/federation:go_default_library",
         "//federation/apis/federation/v1beta1:go_default_library",
@@ -49,6 +50,7 @@ go_test(
         "join_test.go",
         "unjoin_test.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/pkg/kubefed",
     library = ":go_default_library",
     deps = [
         "//federation/apis/federation:go_default_library",

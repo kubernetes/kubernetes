@@ -8,6 +8,7 @@ go_library(
         "member.go",
         "store.go",
     ],
+    importpath = "github.com/coreos/etcd/etcdserver/membership",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/error:go_default_library",

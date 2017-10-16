@@ -10,6 +10,7 @@ go_library(
         "pkg.go",
         "single.go",
     ],
+    importpath = "github.com/gophercloud/gophercloud/pagination",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/gophercloud/gophercloud:go_default_library"],
 )

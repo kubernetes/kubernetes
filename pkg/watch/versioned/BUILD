@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["readonly.go"],
+    importpath = "k8s.io/kubernetes/pkg/watch/versioned",
 )
 
 filegroup(

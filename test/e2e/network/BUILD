@@ -27,6 +27,7 @@ go_library(
         "serviceloadbalancers.go",
         "util_iperf.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e/network",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",

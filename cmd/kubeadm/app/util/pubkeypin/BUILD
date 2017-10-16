@@ -9,12 +9,14 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["pubkeypin_test.go"],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["pubkeypin.go"],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin",
 )
 
 filegroup(

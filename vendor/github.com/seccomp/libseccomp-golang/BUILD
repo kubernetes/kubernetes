@@ -17,6 +17,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/seccomp/libseccomp-golang",
     visibility = ["//visibility:public"],
 )
 

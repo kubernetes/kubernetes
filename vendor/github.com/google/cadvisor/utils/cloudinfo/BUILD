@@ -8,6 +8,7 @@ go_library(
         "cloudinfo.go",
         "gce.go",
     ],
+    importpath = "github.com/google/cadvisor/utils/cloudinfo",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/cloud.google.com/go/compute/metadata:go_default_library",

@@ -12,6 +12,7 @@ go_library(
         "registry.go",
         "strategy.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/serviceaccount",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/validation:go_default_library",

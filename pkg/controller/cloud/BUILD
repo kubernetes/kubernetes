@@ -12,6 +12,7 @@ go_library(
         "node_controller.go",
         "pvlcontroller.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/cloud",
     deps = [
         "//pkg/api/v1/node:go_default_library",
         "//pkg/cloudprovider:go_default_library",
@@ -47,6 +48,7 @@ go_test(
         "node_controller_test.go",
         "pvlcontroller_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/cloud",
     library = ":go_default_library",
     deps = [
         "//pkg/cloudprovider:go_default_library",

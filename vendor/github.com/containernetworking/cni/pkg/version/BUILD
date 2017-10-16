@@ -8,6 +8,7 @@ go_library(
         "reconcile.go",
         "version.go",
     ],
+    importpath = "github.com/containernetworking/cni/pkg/version",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",

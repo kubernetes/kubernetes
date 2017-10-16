@@ -6,6 +6,7 @@ go_library(
         "client.go",
         "volume.go",
     ],
+    importpath = "github.com/libopenstorage/openstorage/api/client/volume",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/libopenstorage/openstorage/api:go_default_library",

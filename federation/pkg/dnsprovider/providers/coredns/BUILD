@@ -17,6 +17,7 @@ go_library(
         "zone.go",
         "zones.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns",
     deps = [
         "//federation/pkg/dnsprovider:go_default_library",
         "//federation/pkg/dnsprovider/providers/coredns/stubs:go_default_library",
@@ -34,6 +35,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["coredns_test.go"],
+    importpath = "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns",
     library = ":go_default_library",
     deps = [
         "//federation/pkg/dnsprovider:go_default_library",

@@ -10,6 +10,7 @@ go_library(
         "retain_keys_visitor.go",
         "strategic_visitor.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/apply/strategy",
     visibility = ["//visibility:public"],
     deps = ["//pkg/kubectl/apply:go_default_library"],
 )
@@ -31,6 +32,7 @@ go_test(
         ":swagger-spec",
         "//api/openapi-spec:swagger-spec",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/apply/strategy_test",
     deps = [
         ":go_default_library",
         "//pkg/kubectl/apply:go_default_library",

@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
+    importpath = "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
@@ -32,6 +33,7 @@ go_library(
         "admission.go",
         "config.go",
     ],
+    importpath = "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/helper/qos:go_default_library",

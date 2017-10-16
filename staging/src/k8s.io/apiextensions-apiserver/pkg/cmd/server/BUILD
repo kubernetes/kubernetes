@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["start.go"],
+    importpath = "k8s.io/apiextensions-apiserver/pkg/cmd/server",
     deps = [
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",

@@ -9,6 +9,7 @@ go_library(
         "prettify.go",
         "string_value.go",
     ],
+    importpath = "github.com/aws/aws-sdk-go/aws/awsutil",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/jmespath/go-jmespath:go_default_library"],
 )

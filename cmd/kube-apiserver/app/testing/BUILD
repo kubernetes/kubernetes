@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["server_test.go"],
+    importpath = "k8s.io/kubernetes/cmd/kube-apiserver/app/testing",
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/api/admissionregistration/v1alpha1:go_default_library",
@@ -33,6 +34,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["testserver.go"],
+    importpath = "k8s.io/kubernetes/cmd/kube-apiserver/app/testing",
     deps = [
         "//cmd/kube-apiserver/app:go_default_library",
         "//cmd/kube-apiserver/app/options:go_default_library",

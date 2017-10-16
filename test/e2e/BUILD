@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["e2e_test.go"],
+    importpath = "k8s.io/kubernetes/test/e2e",
     library = ":go_default_library",
     tags = ["e2e"],
     deps = [
@@ -50,6 +51,7 @@ go_library(
         "resource_quota.go",
         "ssh.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e",
     deps = [
         "//federation/test/e2e:go_default_library",
         "//pkg/api:go_default_library",

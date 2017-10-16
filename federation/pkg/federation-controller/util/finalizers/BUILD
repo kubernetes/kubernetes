@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["finalizers.go"],
+    importpath = "k8s.io/kubernetes/federation/pkg/federation-controller/util/finalizers",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -32,6 +33,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["finalizers_test.go"],
+    importpath = "k8s.io/kubernetes/federation/pkg/federation-controller/util/finalizers",
     library = ":go_default_library",
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

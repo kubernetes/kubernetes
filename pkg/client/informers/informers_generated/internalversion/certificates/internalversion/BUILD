@@ -11,6 +11,7 @@ go_library(
         "certificatesigningrequest.go",
         "interface.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/certificates/internalversion",
     deps = [
         "//pkg/apis/certificates:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",

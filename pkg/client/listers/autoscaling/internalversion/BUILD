@@ -11,6 +11,7 @@ go_library(
         "expansion_generated.go",
         "horizontalpodautoscaler.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/client/listers/autoscaling/internalversion",
     deps = [
         "//pkg/apis/autoscaling:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

@@ -13,6 +13,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/coreos/etcd/pkg/netutil",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/pkg/types:go_default_library",

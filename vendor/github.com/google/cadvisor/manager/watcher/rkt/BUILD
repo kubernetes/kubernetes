@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["rkt.go"],
+    importpath = "github.com/google/cadvisor/manager/watcher/rkt",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/rkt/api/v1alpha:go_default_library",

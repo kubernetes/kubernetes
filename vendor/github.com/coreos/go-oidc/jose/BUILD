@@ -12,6 +12,7 @@ go_library(
         "sig.go",
         "sig_rsa.go",
     ],
+    importpath = "github.com/coreos/go-oidc/jose",
     visibility = ["//visibility:public"],
 )
 

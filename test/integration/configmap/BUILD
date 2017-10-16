@@ -12,6 +12,7 @@ go_test(
         "configmap_test.go",
         "main_test.go",
     ],
+    importpath = "k8s.io/kubernetes/test/integration/configmap",
     tags = ["integration"],
     deps = [
         "//pkg/api/testapi:go_default_library",

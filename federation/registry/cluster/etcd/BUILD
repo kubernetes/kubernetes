@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["etcd.go"],
+    importpath = "k8s.io/kubernetes/federation/registry/cluster/etcd",
     deps = [
         "//federation/apis/federation:go_default_library",
         "//federation/registry/cluster:go_default_library",
@@ -23,6 +24,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["etcd_test.go"],
+    importpath = "k8s.io/kubernetes/federation/registry/cluster/etcd",
     library = ":go_default_library",
     deps = [
         "//federation/apis/federation:go_default_library",

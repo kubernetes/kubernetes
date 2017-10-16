@@ -12,6 +12,7 @@ go_test(
         "manifests_test.go",
         "volumes_test.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane",
     library = ":go_default_library",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
@@ -29,6 +30,7 @@ go_library(
         "manifests.go",
         "volumes.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/apis/kubeadm/v1alpha1:go_default_library",

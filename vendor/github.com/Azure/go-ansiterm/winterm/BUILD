@@ -15,6 +15,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/Azure/go-ansiterm/winterm",
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:windows_amd64": [

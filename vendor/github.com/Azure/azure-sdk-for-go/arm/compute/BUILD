@@ -17,6 +17,7 @@ go_library(
         "virtualmachinescalesetvms.go",
         "virtualmachinesizes.go",
     ],
+    importpath = "github.com/Azure/azure-sdk-for-go/arm/compute",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",

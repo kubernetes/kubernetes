@@ -8,6 +8,7 @@ go_library(
         "cluster_direct.go",
         "doc.go",
     ],
+    importpath = "github.com/coreos/etcd/integration",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/client:go_default_library",

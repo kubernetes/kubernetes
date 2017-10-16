@@ -19,6 +19,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/kubectl/util/term",
     deps = [
         "//pkg/util/interrupt:go_default_library",
         "//vendor/github.com/docker/docker/pkg/term:go_default_library",
@@ -32,6 +33,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["term_writer_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/util/term",
     library = ":go_default_library",
 )
 

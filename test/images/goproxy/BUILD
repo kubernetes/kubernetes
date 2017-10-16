@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "goproxy",
+    importpath = "k8s.io/kubernetes/test/images/goproxy",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["goproxy.go"],
+    importpath = "k8s.io/kubernetes/test/images/goproxy",
     deps = ["//vendor/github.com/elazarl/goproxy:go_default_library"],
 )
 

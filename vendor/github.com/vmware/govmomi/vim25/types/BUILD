@@ -12,6 +12,7 @@ go_library(
         "registry.go",
         "types.go",
     ],
+    importpath = "github.com/vmware/govmomi/vim25/types",
     visibility = ["//visibility:public"],
 )
 

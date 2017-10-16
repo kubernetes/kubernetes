@@ -8,6 +8,7 @@ go_library(
         "port.go",
         "utils.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/proxy/util",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api:go_default_library",
@@ -26,6 +27,7 @@ go_test(
         "port_test.go",
         "utils_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/proxy/util",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

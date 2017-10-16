@@ -21,6 +21,7 @@ go_library(
         "scale_expansion.go",
         "thirdpartyresource.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion",
     deps = [
         "//pkg/apis/extensions:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/scheme:go_default_library",

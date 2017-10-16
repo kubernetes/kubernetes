@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "test-webserver",
+    importpath = "k8s.io/kubernetes/test/images/test-webserver",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["test-webserver.go"],
+    importpath = "k8s.io/kubernetes/test/images/test-webserver",
 )
 
 filegroup(

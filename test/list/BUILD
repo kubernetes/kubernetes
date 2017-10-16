@@ -9,18 +9,21 @@ load(
 
 go_binary(
     name = "list",
+    importpath = "k8s.io/kubernetes/test/list",
     library = ":go_default_library",
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["main_test.go"],
+    importpath = "k8s.io/kubernetes/test/list",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
+    importpath = "k8s.io/kubernetes/test/list",
 )
 
 filegroup(

@@ -6,6 +6,7 @@ go_library(
         "framework.go",
         "ubernetes_lite.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e/multicluster",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubelet/apis:go_default_library",

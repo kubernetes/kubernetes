@@ -10,6 +10,7 @@ go_library(
         "server.go",
         "util.go",
     ],
+    importpath = "github.com/gorilla/websocket",
     visibility = ["//visibility:public"],
 )
 

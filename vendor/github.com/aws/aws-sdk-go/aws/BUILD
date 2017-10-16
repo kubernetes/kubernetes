@@ -10,6 +10,7 @@ go_library(
         "types.go",
         "version.go",
     ],
+    importpath = "github.com/aws/aws-sdk-go/aws",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws/awserr:go_default_library",

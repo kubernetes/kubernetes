@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["deletion_helper.go"],
+    importpath = "k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper",
     deps = [
         "//federation/pkg/federation-controller/util:go_default_library",
         "//federation/pkg/federation-controller/util/finalizers:go_default_library",

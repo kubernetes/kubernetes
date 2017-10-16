@@ -12,6 +12,7 @@ go_library(
         "kubelet.go",
         "transport.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/certificate",
     deps = [
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
@@ -31,6 +32,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["transport_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/certificate",
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

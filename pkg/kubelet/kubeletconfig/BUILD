@@ -13,6 +13,7 @@ go_library(
         "rollback.go",
         "watch.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/kubeletconfig",
     deps = [
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/validation:go_default_library",

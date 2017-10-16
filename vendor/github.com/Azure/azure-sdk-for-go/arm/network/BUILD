@@ -31,6 +31,7 @@ go_library(
         "virtualnetworks.go",
         "watchers.go",
     ],
+    importpath = "github.com/Azure/azure-sdk-for-go/arm/network",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",

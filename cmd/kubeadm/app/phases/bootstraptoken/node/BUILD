@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["token_test.go"],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node",
     library = ":go_default_library",
     deps = ["//cmd/kubeadm/app/apis/kubeadm:go_default_library"],
 )
@@ -19,6 +20,7 @@ go_library(
         "tlsbootstrap.go",
         "token.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node",
     deps = [
         "//cmd/kubeadm/app/constants:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",

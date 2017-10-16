@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["controller_utils.go"],
+    importpath = "k8s.io/kubernetes/pkg/controller/node/util",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/cloudprovider:go_default_library",

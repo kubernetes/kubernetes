@@ -12,6 +12,7 @@ go_library(
         "configmap_manager.go",
         "fake_manager.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/configmap",
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/kubelet/util:go_default_library",
@@ -41,6 +42,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["configmap_manager_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/configmap",
     library = ":go_default_library",
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

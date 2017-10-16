@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "sample-apiserver",
+    importpath = "k8s.io/sample-apiserver",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
+    importpath = "k8s.io/sample-apiserver",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",

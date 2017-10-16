@@ -20,6 +20,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/containernetworking/cni/pkg/invoke",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",

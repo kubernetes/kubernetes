@@ -13,6 +13,7 @@ go_test(
         "config_test.go",
         "genericapiserver_test.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/server",
     library = ":go_default_library",
     deps = [
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
@@ -60,6 +61,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/apiserver/pkg/server",
     deps = [
         "//vendor/github.com/coreos/go-systemd/daemon:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",

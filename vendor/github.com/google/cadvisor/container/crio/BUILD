@@ -7,6 +7,7 @@ go_library(
         "factory.go",
         "handler.go",
     ],
+    importpath = "github.com/google/cadvisor/container/crio",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",

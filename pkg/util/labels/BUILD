@@ -12,12 +12,14 @@ go_library(
         "doc.go",
         "labels.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/util/labels",
     deps = ["//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library"],
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["labels_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/util/labels",
     library = ":go_default_library",
     deps = ["//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library"],
 )

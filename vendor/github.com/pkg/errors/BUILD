@@ -6,6 +6,7 @@ go_library(
         "errors.go",
         "stack.go",
     ],
+    importpath = "github.com/pkg/errors",
     visibility = ["//visibility:public"],
 )
 

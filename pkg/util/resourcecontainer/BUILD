@@ -15,6 +15,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/util/resourcecontainer",
     deps = select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",

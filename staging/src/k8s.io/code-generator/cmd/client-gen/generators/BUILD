@@ -15,6 +15,7 @@ go_library(
         "generator_for_type.go",
         "tags.go",
     ],
+    importpath = "k8s.io/code-generator/cmd/client-gen/generators",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/code-generator/cmd/client-gen/args:go_default_library",

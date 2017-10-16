@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "net",
+    importpath = "k8s.io/kubernetes/test/images/net",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
+    importpath = "k8s.io/kubernetes/test/images/net",
     deps = [
         "//test/images/net/common:go_default_library",
         "//test/images/net/nat:go_default_library",

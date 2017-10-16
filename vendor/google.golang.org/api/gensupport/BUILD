@@ -15,6 +15,7 @@ go_library(
         "retry.go",
         "send.go",
     ],
+    importpath = "google.golang.org/api/gensupport",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/golang.org/x/net/context:go_default_library",

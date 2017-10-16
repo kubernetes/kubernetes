@@ -20,6 +20,7 @@ go_library(
         "meta.go",
         "secret.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/pkg/federation-controller/util",
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
@@ -55,6 +56,7 @@ go_test(
         "handlers_test.go",
         "meta_test.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/pkg/federation-controller/util",
     library = ":go_default_library",
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",

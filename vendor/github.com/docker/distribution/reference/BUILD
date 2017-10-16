@@ -8,6 +8,7 @@ go_library(
         "reference.go",
         "regexp.go",
     ],
+    importpath = "github.com/docker/distribution/reference",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/docker/distribution/digestset:go_default_library",

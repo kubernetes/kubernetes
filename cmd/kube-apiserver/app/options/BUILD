@@ -13,6 +13,7 @@ go_library(
         "plugins.go",
         "validation.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kube-apiserver/app/options",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/validation:go_default_library",
@@ -59,6 +60,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["options_test.go"],
+    importpath = "k8s.io/kubernetes/cmd/kube-apiserver/app/options",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

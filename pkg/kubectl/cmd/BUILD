@@ -62,6 +62,7 @@ go_library(
         "top_pod.go",
         "version.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd",
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_CONSUMERS",
     ],
@@ -190,6 +191,7 @@ go_test(
         "//examples:config",
         "//test/fixtures",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

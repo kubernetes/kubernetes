@@ -13,6 +13,7 @@ go_test(
         "printers_test.go",
         "sorted_resource_name_list_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/printers/internalversion",
     library = ":go_default_library",
     deps = [
         "//federation/apis/federation:go_default_library",
@@ -55,6 +56,7 @@ go_library(
         "describe.go",
         "printers.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/printers/internalversion",
     deps = [
         "//federation/apis/federation:go_default_library",
         "//federation/apis/federation/v1beta1:go_default_library",

@@ -6,6 +6,7 @@ go_library(
         "clientset.go",
         "doc.go",
     ],
+    importpath = "k8s.io/sample-apiserver/pkg/client/clientset/internalversion",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",

@@ -20,6 +20,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/onsi/ginkgo/internal/remote",
     visibility = ["//vendor/github.com/onsi/ginkgo:__subpackages__"],
     deps = [
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",

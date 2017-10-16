@@ -16,6 +16,7 @@ go_library(
         "rolling.go",
         "sync.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/deployment",
     deps = [
         "//pkg/controller:go_default_library",
         "//pkg/controller/deployment/util:go_default_library",
@@ -55,6 +56,7 @@ go_test(
         "rolling_test.go",
         "sync_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/deployment",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

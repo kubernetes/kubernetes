@@ -7,6 +7,7 @@ go_library(
         "util_cgo.go",
     ],
     cgo = True,
+    importpath = "github.com/coreos/go-systemd/util",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/coreos/pkg/dlopen:go_default_library"],
 )

@@ -15,6 +15,7 @@ go_library(
         "fake_role.go",
         "fake_rolebinding.go",
     ],
+    importpath = "k8s.io/client-go/kubernetes/typed/rbac/v1/fake",
     deps = [
         "//vendor/k8s.io/api/rbac/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

@@ -7,6 +7,7 @@ go_library(
         "volume_driver_registry.go",
         "volume_not_supported.go",
     ],
+    importpath = "github.com/libopenstorage/openstorage/volume",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/libopenstorage/openstorage/api:go_default_library"],
 )

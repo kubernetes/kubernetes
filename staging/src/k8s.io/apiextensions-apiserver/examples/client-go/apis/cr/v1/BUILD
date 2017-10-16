@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["roundtrip_test.go"],
+    importpath = "k8s.io/apiextensions-apiserver/examples/client-go/apis/cr/v1",
     library = ":go_default_library",
     deps = [
         "//vendor/github.com/google/gofuzz:go_default_library",
@@ -29,6 +30,7 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
+    importpath = "k8s.io/apiextensions-apiserver/examples/client-go/apis/cr/v1",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",

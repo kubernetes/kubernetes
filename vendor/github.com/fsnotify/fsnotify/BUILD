@@ -18,6 +18,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/fsnotify/fsnotify",
     visibility = ["//visibility:public"],
     deps = select({
         "@io_bazel_rules_go//go/platform:darwin_amd64": [

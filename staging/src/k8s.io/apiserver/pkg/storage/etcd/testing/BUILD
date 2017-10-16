@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["utils.go"],
+    importpath = "k8s.io/apiserver/pkg/storage/etcd/testing",
     deps = [
         "//vendor/github.com/coreos/etcd/client:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",

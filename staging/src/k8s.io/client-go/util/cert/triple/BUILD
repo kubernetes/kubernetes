@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["triple.go"],
+    importpath = "k8s.io/client-go/util/cert/triple",
     deps = ["//vendor/k8s.io/client-go/util/cert:go_default_library"],
 )
 

@@ -13,6 +13,7 @@ go_library(
         "record.go",
         "record.pb.go",
     ],
+    importpath = "k8s.io/kubernetes/third_party/forked/etcd237/wal/walpb",
     deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],
 )
 

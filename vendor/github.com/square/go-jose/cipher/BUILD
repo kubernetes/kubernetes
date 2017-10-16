@@ -8,6 +8,7 @@ go_library(
         "ecdh_es.go",
         "key_wrap.go",
     ],
+    importpath = "github.com/square/go-jose/cipher",
     visibility = ["//visibility:public"],
 )
 

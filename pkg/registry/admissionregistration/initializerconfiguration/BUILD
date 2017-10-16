@@ -11,6 +11,7 @@ go_library(
         "doc.go",
         "strategy.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/registry/admissionregistration/initializerconfiguration",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/admissionregistration:go_default_library",

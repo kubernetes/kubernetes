@@ -6,6 +6,7 @@ go_library(
         "build.go",
         "unmarshal.go",
     ],
+    importpath = "github.com/aws/aws-sdk-go/private/protocol/json/jsonutil",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/aws/aws-sdk-go/private/protocol:go_default_library"],
 )

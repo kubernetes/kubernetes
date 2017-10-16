@@ -15,6 +15,7 @@ go_library(
         "tables.go",
         "tags.go",
     ],
+    importpath = "golang.org/x/text/language",
     visibility = ["//visibility:public"],
     deps = ["//vendor/golang.org/x/text/internal/tag:go_default_library"],
 )

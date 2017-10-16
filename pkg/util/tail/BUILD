@@ -22,10 +22,12 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["tail_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/util/tail",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["tail.go"],
+    importpath = "k8s.io/kubernetes/pkg/util/tail",
 )

@@ -12,6 +12,7 @@ go_test(
         "certs_test.go",
         "webhook_test.go",
     ],
+    importpath = "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook",
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/api/authentication/v1beta1:go_default_library",
@@ -24,6 +25,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["webhook.go"],
+    importpath = "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook",
     deps = [
         "//vendor/k8s.io/api/authentication/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",

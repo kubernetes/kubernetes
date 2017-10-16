@@ -13,6 +13,7 @@ go_library(
         "photon_pd.go",
         "photon_util.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/photon_pd",
     deps = [
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/photon:go_default_library",
@@ -35,6 +36,7 @@ go_test(
         "attacher_test.go",
         "photon_pd_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/volume/photon_pd",
     library = ":go_default_library",
     deps = [
         "//pkg/cloudprovider/providers/photon:go_default_library",

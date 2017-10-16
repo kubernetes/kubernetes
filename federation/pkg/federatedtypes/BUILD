@@ -12,6 +12,7 @@ go_test(
         "hpa_test.go",
         "scheduling_test.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/pkg/federatedtypes",
     library = ":go_default_library",
     deps = [
         "//federation/pkg/federation-controller/util/test:go_default_library",
@@ -39,6 +40,7 @@ go_library(
         "scheduling.go",
         "secret.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/pkg/federatedtypes",
     deps = [
         "//federation/apis/federation:go_default_library",
         "//federation/apis/federation/v1beta1:go_default_library",

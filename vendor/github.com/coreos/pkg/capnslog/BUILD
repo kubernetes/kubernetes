@@ -17,6 +17,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/coreos/pkg/capnslog",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/coreos/go-systemd/journal:go_default_library"],
 )

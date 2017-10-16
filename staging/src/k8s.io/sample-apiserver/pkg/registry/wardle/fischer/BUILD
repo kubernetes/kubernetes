@@ -11,6 +11,7 @@ go_library(
         "etcd.go",
         "strategy.go",
     ],
+    importpath = "k8s.io/sample-apiserver/pkg/registry/wardle/fischer",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",

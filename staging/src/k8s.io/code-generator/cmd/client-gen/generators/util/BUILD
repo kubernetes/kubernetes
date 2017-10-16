@@ -9,12 +9,14 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["tags_test.go"],
+    importpath = "k8s.io/code-generator/cmd/client-gen/generators/util",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["tags.go"],
+    importpath = "k8s.io/code-generator/cmd/client-gen/generators/util",
     deps = ["//vendor/k8s.io/gengo/types:go_default_library"],
 )
 

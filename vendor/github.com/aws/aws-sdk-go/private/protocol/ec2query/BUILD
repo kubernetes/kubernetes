@@ -6,6 +6,7 @@ go_library(
         "build.go",
         "unmarshal.go",
     ],
+    importpath = "github.com/aws/aws-sdk-go/private/protocol/ec2query",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws/awserr:go_default_library",

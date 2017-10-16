@@ -12,6 +12,7 @@ go_library(
         "fake_lister.go",
         "pods_to_cache.go",
     ],
+    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/testing",
     deps = [
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",

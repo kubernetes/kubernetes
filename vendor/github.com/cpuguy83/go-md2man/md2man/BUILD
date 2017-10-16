@@ -6,6 +6,7 @@ go_library(
         "md2man.go",
         "roff.go",
     ],
+    importpath = "github.com/cpuguy83/go-md2man/md2man",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/russross/blackfriday:go_default_library"],
 )

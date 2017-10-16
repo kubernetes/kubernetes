@@ -9,6 +9,7 @@ go_library(
         "rules.go",
         "serviceresolver.go",
     ],
+    importpath = "k8s.io/kubernetes/plugin/pkg/admission/webhook",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/apis/admission/install:go_default_library",
@@ -40,6 +41,7 @@ go_test(
         "rules_test.go",
         "serviceresolver_test.go",
     ],
+    importpath = "k8s.io/kubernetes/plugin/pkg/admission/webhook",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

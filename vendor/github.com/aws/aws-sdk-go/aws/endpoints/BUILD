@@ -9,6 +9,7 @@ go_library(
         "endpoints.go",
         "v3model.go",
     ],
+    importpath = "github.com/aws/aws-sdk-go/aws/endpoints",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/aws/aws-sdk-go/aws/awserr:go_default_library"],
 )

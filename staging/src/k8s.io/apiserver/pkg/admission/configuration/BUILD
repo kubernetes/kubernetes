@@ -13,6 +13,7 @@ go_test(
         "external_admission_hook_manager_test.go",
         "initializer_manager_test.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/admission/configuration",
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/api/admissionregistration/v1alpha1:go_default_library",
@@ -31,6 +32,7 @@ go_library(
         "external_admission_hook_manager.go",
         "initializer_manager.go",
     ],
+    importpath = "k8s.io/apiserver/pkg/admission/configuration",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/admissionregistration/v1alpha1:go_default_library",

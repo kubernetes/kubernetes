@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["testvolumespec.go"],
+    importpath = "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing",
     deps = [
         "//pkg/volume:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",

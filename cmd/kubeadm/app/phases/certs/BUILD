@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["certs_test.go"],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs",
     library = ":go_default_library",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
@@ -25,6 +26,7 @@ go_library(
         "certs.go",
         "doc.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs",
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",

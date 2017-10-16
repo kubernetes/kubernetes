@@ -6,6 +6,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["jsonmerge.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/jsonmerge",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/evanphx/json-patch:go_default_library",

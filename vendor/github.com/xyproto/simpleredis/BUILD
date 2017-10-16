@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["simpleredis.go"],
+    importpath = "github.com/xyproto/simpleredis",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/garyburd/redigo/redis:go_default_library"],
 )

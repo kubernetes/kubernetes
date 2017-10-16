@@ -7,6 +7,7 @@ go_library(
         "diskv.go",
         "index.go",
     ],
+    importpath = "github.com/peterbourgon/diskv",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/google/btree:go_default_library"],
 )

@@ -9,6 +9,7 @@ go_library(
         "sort.go",
         "sql.go",
     ],
+    importpath = "github.com/blang/semver",
     visibility = ["//visibility:public"],
 )
 

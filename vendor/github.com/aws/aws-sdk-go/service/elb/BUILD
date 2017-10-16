@@ -7,6 +7,7 @@ go_library(
         "service.go",
         "waiters.go",
     ],
+    importpath = "github.com/aws/aws-sdk-go/service/elb",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",

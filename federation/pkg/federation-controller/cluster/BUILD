@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["clustercontroller_test.go"],
+    importpath = "k8s.io/kubernetes/federation/pkg/federation-controller/cluster",
     library = ":go_default_library",
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
@@ -29,6 +30,7 @@ go_library(
         "clustercontroller.go",
         "doc.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/pkg/federation-controller/cluster",
     deps = [
         "//federation/apis/federation/v1beta1:go_default_library",
         "//federation/client/cache:go_default_library",

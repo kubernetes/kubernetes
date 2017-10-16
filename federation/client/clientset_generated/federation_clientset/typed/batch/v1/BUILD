@@ -13,6 +13,7 @@ go_library(
         "generated_expansion.go",
         "job.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/typed/batch/v1",
     deps = [
         "//federation/client/clientset_generated/federation_clientset/scheme:go_default_library",
         "//vendor/k8s.io/api/batch/v1:go_default_library",

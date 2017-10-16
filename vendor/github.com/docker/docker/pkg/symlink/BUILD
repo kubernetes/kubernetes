@@ -11,6 +11,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "github.com/docker/docker/pkg/symlink",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/docker/docker/pkg/system:go_default_library",

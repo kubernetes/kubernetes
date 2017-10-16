@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["nodecontroller_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/controller/node",
     library = ":go_default_library",
     deps = [
         "//pkg/cloudprovider:go_default_library",
@@ -46,6 +47,7 @@ go_library(
         "metrics.go",
         "node_controller.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/node",
     deps = [
         "//pkg/api/v1/node:go_default_library",
         "//pkg/cloudprovider:go_default_library",

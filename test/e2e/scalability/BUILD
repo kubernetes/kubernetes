@@ -13,6 +13,7 @@ go_library(
         "framework.go",
         "load.go",
     ],
+    importpath = "k8s.io/kubernetes/test/e2e/scalability",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/batch:go_default_library",

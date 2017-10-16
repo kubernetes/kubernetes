@@ -13,6 +13,7 @@ go_library(
         "exec.go",
         "funcs.go",
     ],
+    importpath = "k8s.io/kubernetes/third_party/forked/golang/template",
 )
 
 filegroup(

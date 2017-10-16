@@ -9,6 +9,7 @@ go_library(
         "server.go",
         "websocket.go",
     ],
+    importpath = "golang.org/x/net/websocket",
     visibility = ["//visibility:public"],
 )
 

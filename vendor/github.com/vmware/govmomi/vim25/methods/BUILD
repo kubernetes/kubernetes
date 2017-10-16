@@ -7,6 +7,7 @@ go_library(
         "methods.go",
         "service_content.go",
     ],
+    importpath = "github.com/vmware/govmomi/vim25/methods",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/vmware/govmomi/vim25/soap:go_default_library",

@@ -32,6 +32,7 @@ go_library(
         "fake_service_expansion.go",
         "fake_serviceaccount.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion/fake",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/extensions:go_default_library",

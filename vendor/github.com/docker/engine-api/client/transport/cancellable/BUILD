@@ -7,6 +7,7 @@ go_library(
         "canceler_go14.go",
         "cancellable.go",
     ],
+    importpath = "github.com/docker/engine-api/client/transport/cancellable",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/docker/engine-api/client/transport:go_default_library",

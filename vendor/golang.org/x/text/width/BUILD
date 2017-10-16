@@ -9,6 +9,7 @@ go_library(
         "trieval.go",
         "width.go",
     ],
+    importpath = "golang.org/x/text/width",
     visibility = ["//visibility:public"],
     deps = ["//vendor/golang.org/x/text/transform:go_default_library"],
 )

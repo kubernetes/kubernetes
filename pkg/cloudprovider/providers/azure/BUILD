@@ -25,6 +25,7 @@ go_library(
         "azure_wrap.go",
         "azure_zones.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/azure",
     deps = [
         "//pkg/api/v1/service:go_default_library",
         "//pkg/cloudprovider:go_default_library",
@@ -55,6 +56,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["azure_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers/azure",
     library = ":go_default_library",
     deps = [
         "//pkg/api/v1/service:go_default_library",

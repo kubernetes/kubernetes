@@ -7,6 +7,7 @@ go_library(
         "md_docs.go",
         "util.go",
     ],
+    importpath = "github.com/spf13/cobra/doc",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/cpuguy83/go-md2man/md2man:go_default_library",

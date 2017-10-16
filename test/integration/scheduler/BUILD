@@ -17,6 +17,7 @@ go_test(
         "scheduler_test.go",
         "taint_test.go",
     ],
+    importpath = "k8s.io/kubernetes/test/integration/scheduler",
     library = ":go_default_library",
     tags = ["integration"],
     deps = [
@@ -74,6 +75,7 @@ filegroup(
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
+    importpath = "k8s.io/kubernetes/test/integration/scheduler",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",

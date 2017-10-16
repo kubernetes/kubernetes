@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
+    importpath = "k8s.io/kubernetes/plugin/pkg/admission/podpreset",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
@@ -27,6 +28,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["admission.go"],
+    importpath = "k8s.io/kubernetes/plugin/pkg/admission/podpreset",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/ref:go_default_library",

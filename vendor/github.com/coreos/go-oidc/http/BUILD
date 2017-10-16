@@ -8,6 +8,7 @@ go_library(
         "http.go",
         "url.go",
     ],
+    importpath = "github.com/coreos/go-oidc/http",
     visibility = ["//visibility:public"],
 )
 

@@ -9,6 +9,7 @@ go_library(
         "none.go",
         "reconcilers.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/master/reconcilers",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api:go_default_library",
@@ -27,6 +28,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["lease_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/master/reconcilers",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",

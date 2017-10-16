@@ -13,6 +13,7 @@ go_test(
         "taint_controller_test.go",
         "timed_workers_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/node/scheduler",
     library = ":go_default_library",
     deps = [
         "//pkg/controller/testutil:go_default_library",
@@ -32,6 +33,7 @@ go_library(
         "taint_controller.go",
         "timed_workers.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/controller/node/scheduler",
     deps = [
         "//pkg/api/helper:go_default_library",
         "//pkg/api/v1/helper:go_default_library",

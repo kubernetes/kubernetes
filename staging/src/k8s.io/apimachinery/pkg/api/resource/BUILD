@@ -15,6 +15,7 @@ go_test(
         "quantity_test.go",
         "scale_int_test.go",
     ],
+    importpath = "k8s.io/apimachinery/pkg/api/resource",
     library = ":go_default_library",
     deps = [
         "//vendor/github.com/google/gofuzz:go_default_library",
@@ -35,6 +36,7 @@ go_library(
         "suffix.go",
         "zz_generated.deepcopy.go",
     ],
+    importpath = "k8s.io/apimachinery/pkg/api/resource",
     deps = [
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
@@ -48,6 +50,7 @@ go_library(
 go_test(
     name = "go_default_xtest",
     srcs = ["quantity_example_test.go"],
+    importpath = "k8s.io/apimachinery/pkg/api/resource_test",
     deps = ["//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library"],
 )
 

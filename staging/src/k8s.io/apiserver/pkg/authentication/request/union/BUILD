@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["unionauth_test.go"],
+    importpath = "k8s.io/apiserver/pkg/authentication/request/union",
     library = ":go_default_library",
     deps = ["//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
 )
@@ -16,6 +17,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["union.go"],
+    importpath = "k8s.io/apiserver/pkg/authentication/request/union",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",

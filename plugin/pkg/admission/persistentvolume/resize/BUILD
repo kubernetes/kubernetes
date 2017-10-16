@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["admission_test.go"],
+    importpath = "k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/resize",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
@@ -26,6 +27,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["admission.go"],
+    importpath = "k8s.io/kubernetes/plugin/pkg/admission/persistentvolume/resize",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/helper:go_default_library",

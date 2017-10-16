@@ -7,6 +7,7 @@ go_library(
         "token.go",
         "transport.go",
     ],
+    importpath = "golang.org/x/oauth2",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/golang.org/x/net/context:go_default_library",

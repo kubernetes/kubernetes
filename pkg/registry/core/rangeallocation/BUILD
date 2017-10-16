@@ -11,6 +11,7 @@ go_library(
         "doc.go",
         "registry.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/rangeallocation",
     deps = ["//pkg/api:go_default_library"],
 )
 

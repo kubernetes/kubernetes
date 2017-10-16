@@ -7,6 +7,7 @@ go_library(
         "server.go",
         "status.go",
     ],
+    importpath = "github.com/xiang90/probing",
     visibility = ["//visibility:public"],
 )
 

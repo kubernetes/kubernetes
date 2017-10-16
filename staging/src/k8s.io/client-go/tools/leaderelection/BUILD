@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["leaderelection.go"],
+    importpath = "k8s.io/client-go/tools/leaderelection",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -22,6 +23,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["leaderelection_test.go"],
+    importpath = "k8s.io/client-go/tools/leaderelection",
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",

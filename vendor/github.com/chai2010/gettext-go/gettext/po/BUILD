@@ -12,6 +12,7 @@ go_library(
         "re.go",
         "util.go",
     ],
+    importpath = "github.com/chai2010/gettext-go/gettext/po",
     visibility = ["//visibility:public"],
 )
 

@@ -12,6 +12,7 @@ go_test(
         "eviction_manager_test.go",
         "helpers_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/eviction",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
@@ -46,6 +47,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/kubelet/eviction",
     deps = [
         "//pkg/api/v1/helper/qos:go_default_library",
         "//pkg/api/v1/resource:go_default_library",

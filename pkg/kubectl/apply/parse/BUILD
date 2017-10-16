@@ -13,6 +13,7 @@ go_library(
         "util.go",
         "visitor.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/apply/parse",
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubectl/apply:go_default_library",
@@ -27,6 +28,7 @@ go_test(
     data = [
         "//api/openapi-spec:swagger-spec",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/apply/parse_test",
     deps = [
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",

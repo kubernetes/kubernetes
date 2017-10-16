@@ -6,6 +6,7 @@ go_library(
         "info.go",
         "machine.go",
     ],
+    importpath = "github.com/google/cadvisor/machine",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",

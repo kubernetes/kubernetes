@@ -23,6 +23,7 @@ go_library(
         "use_context.go",
         "view.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/config",
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_config_CONSUMERS",
     ],
@@ -62,6 +63,7 @@ go_test(
         "use_context_test.go",
         "view_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/config",
     library = ":go_default_library",
     deps = [
         "//pkg/kubectl/cmd/util:go_default_library",

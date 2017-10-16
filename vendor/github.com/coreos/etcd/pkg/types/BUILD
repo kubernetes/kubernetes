@@ -10,6 +10,7 @@ go_library(
         "urls.go",
         "urlsmap.go",
     ],
+    importpath = "github.com/coreos/etcd/pkg/types",
     visibility = ["//visibility:public"],
 )
 

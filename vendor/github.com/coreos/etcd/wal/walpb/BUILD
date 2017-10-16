@@ -6,6 +6,7 @@ go_library(
         "record.go",
         "record.pb.go",
     ],
+    importpath = "github.com/coreos/etcd/wal/walpb",
     visibility = ["//visibility:public"],
     deps = ["//vendor/github.com/golang/protobuf/proto:go_default_library"],
 )

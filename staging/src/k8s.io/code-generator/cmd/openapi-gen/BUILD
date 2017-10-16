@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "openapi-gen",
+    importpath = "k8s.io/code-generator/cmd/openapi-gen",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
+    importpath = "k8s.io/code-generator/cmd/openapi-gen",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/gengo/args:go_default_library",

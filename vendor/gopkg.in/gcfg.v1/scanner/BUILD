@@ -6,6 +6,7 @@ go_library(
         "errors.go",
         "scanner.go",
     ],
+    importpath = "gopkg.in/gcfg.v1/scanner",
     visibility = ["//visibility:public"],
     deps = ["//vendor/gopkg.in/gcfg.v1/token:go_default_library"],
 )

@@ -8,6 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["storage.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/rbac/clusterrolebinding/policybased",
     deps = [
         "//pkg/api/helper:go_default_library",
         "//pkg/apis/rbac:go_default_library",

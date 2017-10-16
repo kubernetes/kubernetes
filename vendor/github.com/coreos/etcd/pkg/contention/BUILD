@@ -6,6 +6,7 @@ go_library(
         "contention.go",
         "doc.go",
     ],
+    importpath = "github.com/coreos/etcd/pkg/contention",
     visibility = ["//visibility:public"],
 )
 

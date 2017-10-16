@@ -6,6 +6,7 @@ go_library(
         "tlsconfig_clone.go",
         "tlsconfig_clone_go17.go",
     ],
+    importpath = "github.com/docker/docker/pkg/tlsconfig",
     visibility = ["//visibility:public"],
 )
 

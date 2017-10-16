@@ -8,12 +8,14 @@ load(
 
 go_binary(
     name = "import-boss",
+    importpath = "k8s.io/code-generator/cmd/import-boss",
     library = ":go_default_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["main.go"],
+    importpath = "k8s.io/code-generator/cmd/import-boss",
     deps = [
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/gengo/args:go_default_library",

@@ -10,6 +10,7 @@ go_library(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/proxy/winkernel",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
@@ -43,6 +44,7 @@ go_test(
         ],
         "//conditions:default": [],
     }),
+    importpath = "k8s.io/kubernetes/pkg/proxy/winkernel",
     library = ":go_default_library",
     deps = select({
         "@io_bazel_rules_go//go/platform:windows_amd64": [

@@ -6,6 +6,7 @@ go_library(
         "override.go",
         "unicode.go",
     ],
+    importpath = "golang.org/x/text/encoding/unicode",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/golang.org/x/text/encoding:go_default_library",
