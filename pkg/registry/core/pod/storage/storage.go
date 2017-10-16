@@ -148,6 +148,18 @@ func (r *BindingREST) Create(ctx genericapirequest.Context, obj runtime.Object, 
 	return
 }
 
+// assignPod assigns the given pod to the given machine.
+func (r *BindingREST) assignPod(ctx genericapirequest.Context, podID string, machine string, annotations map[string]string) (err error) {
+	if _, err = r.setPodHostAndAnnotations(ctx, podID, "", machine, annotations); err != nil {
+		err = storeerr.InterpretGetError(err, api.Resource("pods"), podID)
+		err = storeerr.InterpretUpdateError(err, api.Resource("pods"), podID)
+		if _, ok := err.(*errors.StatusError); !ok {
+			err = errors.NewConflict(api.Resource("pods/binding"), podID, err)
+		}
+	}
+	return
+}
+
 // setPodHostAndAnnotations sets the given pod's host to 'machine' if and only if it was
 // previously 'oldMachine' and merges the provided annotations with those of the pod.
 // Returns the current state of the pod, or an error.
@@ -182,18 +194,6 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx genericapirequest.Context, po
 		return pod, nil
 	}))
 	return finalPod, err
-}
-
-// assignPod assigns the given pod to the given machine.
-func (r *BindingREST) assignPod(ctx genericapirequest.Context, podID string, machine string, annotations map[string]string) (err error) {
-	if _, err = r.setPodHostAndAnnotations(ctx, podID, "", machine, annotations); err != nil {
-		err = storeerr.InterpretGetError(err, api.Resource("pods"), podID)
-		err = storeerr.InterpretUpdateError(err, api.Resource("pods"), podID)
-		if _, ok := err.(*errors.StatusError); !ok {
-			err = errors.NewConflict(api.Resource("pods/binding"), podID, err)
-		}
-	}
-	return
 }
 
 // StatusREST implements the REST endpoint for changing the status of a pod.
