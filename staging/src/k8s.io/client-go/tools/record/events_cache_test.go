@@ -177,72 +177,134 @@ func TestEventCorrelator(t *testing.T) {
 	similarButDifferentContainerEvent := similarEvent
 	similarButDifferentContainerEvent.InvolvedObject.FieldPath = "spec.containers{container2}"
 	scenario := map[string]struct {
-		previousEvents  []v1.Event
-		newEvent        v1.Event
-		expectedEvent   v1.Event
-		intervalSeconds int
-		expectedSkip    bool
+		previousEvents         []v1.Event
+		newEvent               v1.Event
+		expectedEvent          v1.Event
+		intervalSeconds        int
+		expectedSkip           bool
+		eventCorrelatorOptions *EventCorrelatorOptions
 	}{
 		"create-a-single-event": {
-			previousEvents:  []v1.Event{},
-			newEvent:        firstEvent,
-			expectedEvent:   setCount(firstEvent, 1),
-			intervalSeconds: 5,
+			previousEvents:         []v1.Event{},
+			newEvent:               firstEvent,
+			expectedEvent:          setCount(firstEvent, 1),
+			intervalSeconds:        5,
+			eventCorrelatorOptions: NewDefaultEventCorrelatorOptions(),
 		},
 		"the-same-event-should-just-count": {
-			previousEvents:  makeEvents(1, duplicateEvent),
-			newEvent:        duplicateEvent,
-			expectedEvent:   setCount(duplicateEvent, 2),
-			intervalSeconds: 5,
+			previousEvents:         makeEvents(1, duplicateEvent),
+			newEvent:               duplicateEvent,
+			expectedEvent:          setCount(duplicateEvent, 2),
+			intervalSeconds:        5,
+			eventCorrelatorOptions: NewDefaultEventCorrelatorOptions(),
 		},
 		"the-same-event-should-just-count-even-if-more-than-aggregate": {
-			previousEvents:  makeEvents(defaultAggregateMaxEvents, duplicateEvent),
-			newEvent:        duplicateEvent,
-			expectedEvent:   setCount(duplicateEvent, defaultAggregateMaxEvents+1),
-			intervalSeconds: 30, // larger interval induces aggregation but not spam.
+			previousEvents:         makeEvents(defaultAggregateMaxEvents, duplicateEvent),
+			newEvent:               duplicateEvent,
+			expectedEvent:          setCount(duplicateEvent, defaultAggregateMaxEvents+1),
+			intervalSeconds:        30, // larger interval induces aggregation but not spam.
+			eventCorrelatorOptions: NewDefaultEventCorrelatorOptions(),
 		},
 		"the-same-event-is-spam-if-happens-too-frequently": {
-			previousEvents:  makeEvents(defaultSpamBurst+1, duplicateEvent),
+			previousEvents:         makeEvents(defaultSpamBurst+1, duplicateEvent),
+			newEvent:               duplicateEvent,
+			expectedSkip:           true,
+			intervalSeconds:        1,
+			eventCorrelatorOptions: NewDefaultEventCorrelatorOptions(),
+		},
+		"the-same-event-is-spam-under-one-minute-with-hard-limit": {
+			previousEvents:  makeEvents(1, duplicateEvent),
 			newEvent:        duplicateEvent,
 			expectedSkip:    true,
 			intervalSeconds: 1,
+			eventCorrelatorOptions: &EventCorrelatorOptions{
+				CacheSize:                  maxLruCacheEntries,
+				SpamBurst:                  1,
+				SpamQPS:                    1. / 60.,
+				AggregateMaxEvents:         defaultAggregateMaxEvents,
+				AggregateIntervalInSeconds: defaultAggregateIntervalInSeconds,
+			},
+		},
+		"similar-event-is-spam-under-one-minute-with-hard-limit": {
+			previousEvents:  makeEvents(1, similarEvent),
+			newEvent:        similarEvent,
+			expectedSkip:    true,
+			intervalSeconds: 1,
+			eventCorrelatorOptions: &EventCorrelatorOptions{
+				CacheSize:                  maxLruCacheEntries,
+				SpamBurst:                  1,
+				SpamQPS:                    1. / 60.,
+				AggregateMaxEvents:         defaultAggregateMaxEvents,
+				AggregateIntervalInSeconds: defaultAggregateIntervalInSeconds,
+			},
+		},
+		"the-same-event-is-not-spam-after-one-minute-with-hard-limit": {
+			previousEvents:  makeEvents(1, duplicateEvent),
+			newEvent:        duplicateEvent,
+			expectedEvent:   setCount(duplicateEvent, 2),
+			intervalSeconds: 15, // This ends up being slightly more than 1min
+			eventCorrelatorOptions: &EventCorrelatorOptions{
+				CacheSize:                  maxLruCacheEntries,
+				SpamBurst:                  1,
+				SpamQPS:                    1. / 60.,
+				AggregateMaxEvents:         defaultAggregateMaxEvents,
+				AggregateIntervalInSeconds: defaultAggregateIntervalInSeconds,
+			},
+		},
+		"similar-event-is-not-spam-after-one-minute-with-hard-limit": {
+			previousEvents:  makeEvents(1, similarEvent),
+			newEvent:        similarEvent,
+			expectedEvent:   setCount(similarEvent, 2),
+			intervalSeconds: 15, // This ends up being slightly more than 1min
+			eventCorrelatorOptions: &EventCorrelatorOptions{
+				CacheSize:                  maxLruCacheEntries,
+				SpamBurst:                  1,
+				SpamQPS:                    1. / 60.,
+				AggregateMaxEvents:         defaultAggregateMaxEvents,
+				AggregateIntervalInSeconds: defaultAggregateIntervalInSeconds,
+			},
 		},
 		"create-many-unique-events": {
-			previousEvents:  makeUniqueEvents(30),
-			newEvent:        uniqueEvent,
-			expectedEvent:   setCount(uniqueEvent, 1),
-			intervalSeconds: 5,
+			previousEvents:         makeUniqueEvents(30),
+			newEvent:               uniqueEvent,
+			expectedEvent:          setCount(uniqueEvent, 1),
+			intervalSeconds:        5,
+			eventCorrelatorOptions: NewDefaultEventCorrelatorOptions(),
 		},
 		"similar-events-should-aggregate-event": {
-			previousEvents:  makeSimilarEvents(defaultAggregateMaxEvents-1, similarEvent, similarEvent.Message),
-			newEvent:        similarEvent,
-			expectedEvent:   setCount(aggregateEvent, 1),
-			intervalSeconds: 5,
+			previousEvents:         makeSimilarEvents(defaultAggregateMaxEvents-1, similarEvent, similarEvent.Message),
+			newEvent:               similarEvent,
+			expectedEvent:          setCount(aggregateEvent, 1),
+			intervalSeconds:        5,
+			eventCorrelatorOptions: NewDefaultEventCorrelatorOptions(),
 		},
 		"similar-events-many-times-should-count-the-aggregate": {
-			previousEvents:  makeSimilarEvents(defaultAggregateMaxEvents, similarEvent, similarEvent.Message),
-			newEvent:        similarEvent,
-			expectedEvent:   setCount(aggregateEvent, 2),
-			intervalSeconds: 5,
+			previousEvents:         makeSimilarEvents(defaultAggregateMaxEvents, similarEvent, similarEvent.Message),
+			newEvent:               similarEvent,
+			expectedEvent:          setCount(aggregateEvent, 2),
+			intervalSeconds:        5,
+			eventCorrelatorOptions: NewDefaultEventCorrelatorOptions(),
 		},
 		"events-from-different-containers-do-not-aggregate": {
-			previousEvents:  makeEvents(1, similarButDifferentContainerEvent),
-			newEvent:        similarEvent,
-			expectedEvent:   setCount(similarEvent, 1),
-			intervalSeconds: 5,
+			previousEvents:         makeEvents(1, similarButDifferentContainerEvent),
+			newEvent:               similarEvent,
+			expectedEvent:          setCount(similarEvent, 1),
+			intervalSeconds:        5,
+			eventCorrelatorOptions: NewDefaultEventCorrelatorOptions(),
 		},
 		"similar-events-whose-interval-is-greater-than-aggregate-interval-do-not-aggregate": {
-			previousEvents:  makeSimilarEvents(defaultAggregateMaxEvents-1, similarEvent, similarEvent.Message),
-			newEvent:        similarEvent,
-			expectedEvent:   setCount(similarEvent, 1),
-			intervalSeconds: defaultAggregateIntervalInSeconds,
+			previousEvents:         makeSimilarEvents(defaultAggregateMaxEvents-1, similarEvent, similarEvent.Message),
+			newEvent:               similarEvent,
+			expectedEvent:          setCount(similarEvent, 1),
+			intervalSeconds:        defaultAggregateIntervalInSeconds,
+			eventCorrelatorOptions: NewDefaultEventCorrelatorOptions(),
 		},
 	}
 
 	for testScenario, testInput := range scenario {
 		eventInterval := time.Duration(testInput.intervalSeconds) * time.Second
 		clock := clock.IntervalClock{Time: time.Now(), Duration: eventInterval}
-		correlator := NewEventCorrelator(&clock)
+		correlator := NewEventCorrelator(&clock, testInput.eventCorrelatorOptions)
 		for i := range testInput.previousEvents {
 			event := testInput.previousEvents[i]
 			now := metav1.NewTime(clock.Now())

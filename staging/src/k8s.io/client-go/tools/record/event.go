@@ -81,6 +81,10 @@ type EventBroadcaster interface {
 	// desired.
 	StartEventWatcher(eventHandler func(*v1.Event)) watch.Interface
 
+	// StartRecordingToSinkWithOptions is the same as StartRecordingToSink but takes an EventCorrelatorOptions
+	// struct in order to change the spam limiter and aggregation parameters.
+	StartRecordingToSinkWithOptions(sink EventSink, opts *EventCorrelatorOptions) watch.Interface
+
 	// StartRecordingToSink starts sending events received from this EventBroadcaster to the given
 	// sink. The return value can be ignored or used to stop recording, if desired.
 	StartRecordingToSink(sink EventSink) watch.Interface
@@ -110,12 +114,22 @@ type eventBroadcasterImpl struct {
 
 // StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
 // The return value can be ignored or used to stop recording, if desired.
-// TODO: make me an object with parameterizable queue length and retry interval
 func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSink) watch.Interface {
+	eventCorrelator := NewEventCorrelator(clock.RealClock{}, NewDefaultEventCorrelatorOptions())
+	return eventBroadcaster.setupSink(sink, eventCorrelator)
+}
+
+// StartRecordingToSinkWithOptions is the same as StartRecordingToSink but takes an EventCorrelatorOptions
+// struct in order to change the spam limiter and aggregation parameters.
+func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSinkWithOptions(sink EventSink, opts *EventCorrelatorOptions) watch.Interface {
+	eventCorrelator := NewEventCorrelator(clock.RealClock{}, opts)
+	return eventBroadcaster.setupSink(sink, eventCorrelator)
+}
+
+func (eventBroadcaster *eventBroadcasterImpl) setupSink(sink EventSink, eventCorrelator *EventCorrelator) watch.Interface {
 	// The default math/rand package functions aren't thread safe, so create a
 	// new Rand object for each StartRecording call.
 	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
-	eventCorrelator := NewEventCorrelator(clock.RealClock{})
 	return eventBroadcaster.StartEventWatcher(
 		func(event *v1.Event) {
 			recordToSink(sink, event, eventCorrelator, randGen, eventBroadcaster.sleepDuration)

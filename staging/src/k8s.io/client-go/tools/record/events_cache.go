@@ -416,12 +416,22 @@ type EventCorrelateResult struct {
 	Skip bool
 }
 
-// NewEventCorrelator returns an EventCorrelator configured with default values.
-//
-// The EventCorrelator is responsible for event filtering, aggregating, and counting
-// prior to interacting with the API server to record the event.
-//
-// The default behavior is as follows:
+// Spam limit and aggregation parameters for EventCorrelator
+type EventCorrelatorOptions struct {
+	// The maximum amount of lru cache entries for the aggregation state
+	CacheSize int
+	// The number of events allowed per source and object
+	SpamBurst int
+	// Refill rate of the token bucket in queries per second
+	SpamQPS float32
+	// The maximum number of events in the specified interval before aggregation occurs
+	AggregateMaxEvents int
+	// The amount of time in seconds that must transpire since the last occurrence of a similar event before
+	// it's considered new
+	AggregateIntervalInSeconds int
+}
+
+// NewDefaultEventCorrelatorOptions returns an option set containing the default EventCorrelator behavior:
 //   * Aggregation is performed if a similar event is recorded 10 times in a
 //     in a 10 minute rolling interval.  A similar event is an event that varies only by
 //     the Event.Message field.  Rather than recording the precise event, aggregation
@@ -431,20 +441,31 @@ type EventCorrelateResult struct {
 //     times.
 //   * A source may burst 25 events about an object, but has a refill rate budget
 //     per object of 1 event every 5 minutes to control long-tail of spam.
-func NewEventCorrelator(clock clock.Clock) *EventCorrelator {
-	cacheSize := maxLruCacheEntries
-	spamFilter := NewEventSourceObjectSpamFilter(cacheSize, defaultSpamBurst, defaultSpamQPS, clock)
+func NewDefaultEventCorrelatorOptions() *EventCorrelatorOptions {
+	return &EventCorrelatorOptions{
+		CacheSize:                  maxLruCacheEntries,
+		SpamBurst:                  defaultSpamBurst,
+		SpamQPS:                    defaultSpamQPS,
+		AggregateMaxEvents:         defaultAggregateMaxEvents,
+		AggregateIntervalInSeconds: defaultAggregateIntervalInSeconds,
+	}
+}
+
+// The EventCorrelator is responsible for event filtering, aggregating, and counting
+// prior to interacting with the API server to record the event.
+func NewEventCorrelator(clock clock.Clock, opts *EventCorrelatorOptions) *EventCorrelator {
+	spamFilter := NewEventSourceObjectSpamFilter(opts.CacheSize, opts.SpamBurst, opts.SpamQPS, clock)
 	return &EventCorrelator{
 		filterFunc: spamFilter.Filter,
 		aggregator: NewEventAggregator(
-			cacheSize,
+			opts.CacheSize,
 			EventAggregatorByReasonFunc,
 			EventAggregatorByReasonMessageFunc,
-			defaultAggregateMaxEvents,
-			defaultAggregateIntervalInSeconds,
+			opts.AggregateMaxEvents,
+			opts.AggregateIntervalInSeconds,
 			clock),
 
-		logger: newEventLogger(cacheSize, clock),
+		logger: newEventLogger(opts.CacheSize, clock),
 	}
 }
 

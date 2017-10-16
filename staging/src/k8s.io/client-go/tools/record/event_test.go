@@ -416,7 +416,7 @@ func TestWriteEventError(t *testing.T) {
 	}
 
 	clock := clock.IntervalClock{Time: time.Now(), Duration: time.Second}
-	eventCorrelator := NewEventCorrelator(&clock)
+	eventCorrelator := NewEventCorrelator(&clock, NewDefaultEventCorrelatorOptions())
 	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	for caseName, ent := range table {
@@ -440,7 +440,7 @@ func TestWriteEventError(t *testing.T) {
 
 func TestUpdateExpiredEvent(t *testing.T) {
 	clock := clock.IntervalClock{Time: time.Now(), Duration: time.Second}
-	eventCorrelator := NewEventCorrelator(&clock)
+	eventCorrelator := NewEventCorrelator(&clock, NewDefaultEventCorrelatorOptions())
 	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	var createdEvent *v1.Event
