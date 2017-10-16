@@ -42,7 +42,6 @@ import (
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	admissioninit "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 
 	// install the clientgo admission API for use with api registry
 	_ "k8s.io/kubernetes/pkg/apis/admission/install"
@@ -101,7 +100,7 @@ func NewGenericAdmissionWebhook() (*GenericAdmissionWebhook, error) {
 type GenericAdmissionWebhook struct {
 	*admission.Handler
 	hookSource           WebhookSource
-	serviceResolver      admissioninit.ServiceResolver
+	serviceResolver      genericadmissioninit.ServiceResolver
 	negotiatedSerializer runtime.NegotiatedSerializer
 	clientCert           []byte
 	clientKey            []byte
@@ -109,7 +108,7 @@ type GenericAdmissionWebhook struct {
 }
 
 var (
-	_ = admissioninit.WantsServiceResolver(&GenericAdmissionWebhook{})
+	_ = genericadmissioninit.WantsServiceResolver(&GenericAdmissionWebhook{})
 	_ = genericadmissioninit.WantsClientCert(&GenericAdmissionWebhook{})
 	_ = genericadmissioninit.WantsExternalKubeClientSet(&GenericAdmissionWebhook{})
 )
@@ -120,7 +119,7 @@ func (a *GenericAdmissionWebhook) SetProxyTransport(pt *http.Transport) {
 
 // SetServiceResolver sets a service resolver for the webhook admission plugin.
 // Passing a nil resolver does not have an effect, instead a default one will be used.
-func (a *GenericAdmissionWebhook) SetServiceResolver(sr admissioninit.ServiceResolver) {
+func (a *GenericAdmissionWebhook) SetServiceResolver(sr genericadmissioninit.ServiceResolver) {
 	if sr != nil {
 		a.serviceResolver = sr
 	}

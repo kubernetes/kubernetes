@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
-	kubeadmission "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/apiserver/pkg/admission/initializer"
 	informers "k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -48,7 +48,7 @@ func newHandlerForTestWithClock(c clientset.Interface, cacheClock clock.Clock) (
 	if err != nil {
 		return nil, f, err
 	}
-	pluginInitializer, err := kubeadmission.New(c, f, nil, nil, nil, nil)
+	pluginInitializer, err := initializer.New(c, f, nil, nil, nil, nil, nil)
 	if err != nil {
 		return handler, f, err
 	}

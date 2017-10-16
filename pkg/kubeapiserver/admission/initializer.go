@@ -18,7 +18,6 @@ package admission
 
 import (
 	"net/http"
-	"net/url"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
@@ -59,18 +58,6 @@ type WantsQuotaRegistry interface {
 	admission.Validator
 }
 
-// WantsServiceResolver defines a fuction that accepts a ServiceResolver for
-// admission plugins that need to make calls to services.
-type WantsServiceResolver interface {
-	SetServiceResolver(ServiceResolver)
-}
-
-// ServiceResolver knows how to convert a service reference into an actual
-// location.
-type ServiceResolver interface {
-	ResolveEndpoint(namespace, name string) (*url.URL, error)
-}
-
 // WantsProxyTransport defines a fuction that accepts a proxy transport for admission
 // plugins that need to make calls to pods.
 type WantsProxyTransport interface {
@@ -78,14 +65,13 @@ type WantsProxyTransport interface {
 }
 
 type PluginInitializer struct {
-	internalClient  internalclientset.Interface
-	externalClient  clientset.Interface
-	informers       informers.SharedInformerFactory
-	authorizer      authorizer.Authorizer
-	cloudConfig     []byte
-	restMapper      meta.RESTMapper
-	quotaRegistry   quota.Registry
-	serviceResolver ServiceResolver
+	internalClient internalclientset.Interface
+	externalClient clientset.Interface
+	informers      informers.SharedInformerFactory
+	authorizer     authorizer.Authorizer
+	cloudConfig    []byte
+	restMapper     meta.RESTMapper
+	quotaRegistry  quota.Registry
 
 	// for proving we are apiserver in call-outs
 	proxyTransport *http.Transport
@@ -110,12 +96,6 @@ func NewPluginInitializer(
 		restMapper:     restMapper,
 		quotaRegistry:  quotaRegistry,
 	}
-}
-
-// SetServiceResolver sets the service resolver which is needed by some plugins.
-func (i *PluginInitializer) SetServiceResolver(s ServiceResolver) *PluginInitializer {
-	i.serviceResolver = s
-	return i
 }
 
 // SetProxyTransport sets the proxyTransport which is needed by some plugins.
@@ -145,10 +125,6 @@ func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 
 	if wants, ok := plugin.(WantsQuotaRegistry); ok {
 		wants.SetQuotaRegistry(i.quotaRegistry)
-	}
-
-	if wants, ok := plugin.(WantsServiceResolver); ok {
-		wants.SetServiceResolver(i.serviceResolver)
 	}
 
 	if wants, ok := plugin.(WantsProxyTransport); ok {

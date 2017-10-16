@@ -84,6 +84,7 @@ func (a *AdmissionOptions) ApplyTo(
 	serverIdentifyingClientKey []byte,
 	clientConfig *rest.Config,
 	scheme *runtime.Scheme,
+	serviceResolver initializer.ServiceResolver,
 	pluginInitializers ...admission.PluginInitializer,
 ) error {
 	pluginNames := a.PluginNames
@@ -100,7 +101,15 @@ func (a *AdmissionOptions) ApplyTo(
 	if err != nil {
 		return err
 	}
-	genericInitializer, err := initializer.New(clientset, informers, c.Authorizer, serverIdentifyingClientCert, serverIdentifyingClientKey, scheme)
+	genericInitializer, err := initializer.New(
+		clientset,
+		informers,
+		c.Authorizer,
+		serverIdentifyingClientCert,
+		serverIdentifyingClientKey,
+		scheme,
+		serviceResolver,
+	)
 	if err != nil {
 		return err
 	}

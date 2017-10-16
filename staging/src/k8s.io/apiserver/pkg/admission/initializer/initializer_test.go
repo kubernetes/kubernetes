@@ -17,6 +17,7 @@ limitations under the License.
 package initializer_test
 
 import (
+	"net/url"
 	"testing"
 	"time"
 
@@ -29,11 +30,26 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
+// TestWantsServiceResolver ensures that the service resolver
+// is injected when the WantsServiceResolver interface is implemented by a plugin
+func TestWantsServiceResolver(t *testing.T) {
+	fsr := &fakeServiceResolver{}
+	target, err := initializer.New(nil, nil, nil, nil, nil, nil, fsr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantServiceResolver := &WantServiceResolver{}
+	target.Initialize(wantServiceResolver)
+	if wantServiceResolver.s == nil {
+		t.Errorf("expected service resolver to be initialized")
+	}
+}
+
 // TestWantsScheme ensures that the scheme is injected when
 // the WantsScheme interface is implemented by a plugin.
 func TestWantsScheme(t *testing.T) {
 	scheme := runtime.NewScheme()
-	target, err := initializer.New(nil, nil, nil, nil, nil, scheme)
+	target, err := initializer.New(nil, nil, nil, nil, nil, scheme, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +63,7 @@ func TestWantsScheme(t *testing.T) {
 // TestWantsAuthorizer ensures that the authorizer is injected
 // when the WantsAuthorizer interface is implemented by a plugin.
 func TestWantsAuthorizer(t *testing.T) {
-	target, err := initializer.New(nil, nil, &TestAuthorizer{}, nil, nil, nil)
+	target, err := initializer.New(nil, nil, &TestAuthorizer{}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +78,7 @@ func TestWantsAuthorizer(t *testing.T) {
 // when the WantsExternalKubeClientSet interface is implemented by a plugin.
 func TestWantsExternalKubeClientSet(t *testing.T) {
 	cs := &fake.Clientset{}
-	target, err := initializer.New(cs, nil, &TestAuthorizer{}, nil, nil, nil)
+	target, err := initializer.New(cs, nil, &TestAuthorizer{}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +94,7 @@ func TestWantsExternalKubeClientSet(t *testing.T) {
 func TestWantsExternalKubeInformerFactory(t *testing.T) {
 	cs := &fake.Clientset{}
 	sf := informers.NewSharedInformerFactory(cs, time.Duration(1)*time.Second)
-	target, err := initializer.New(cs, sf, &TestAuthorizer{}, nil, nil, nil)
+	target, err := initializer.New(cs, sf, &TestAuthorizer{}, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +108,7 @@ func TestWantsExternalKubeInformerFactory(t *testing.T) {
 // TestWantsClientCert ensures that the client certificate and key are injected
 // when the WantsClientCert interface is implemented by a plugin.
 func TestWantsClientCert(t *testing.T) {
-	target, err := initializer.New(nil, nil, nil, []byte("cert"), []byte("key"), nil)
+	target, err := initializer.New(nil, nil, nil, []byte("cert"), []byte("key"), nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,3 +189,23 @@ func (self *WantSchemeAdmission) Validate() error                    { return ni
 
 var _ admission.Interface = &WantSchemeAdmission{}
 var _ initializer.WantsScheme = &WantSchemeAdmission{}
+
+// WantServiceResolver is a test stub that fulfills the WantsServiceResolver interface.
+type WantServiceResolver struct {
+	s initializer.ServiceResolver
+}
+
+func (self *WantServiceResolver) SetServiceResolver(s initializer.ServiceResolver) { self.s = s }
+
+func (self *WantServiceResolver) Admit(a admission.Attributes) error { return nil }
+func (self *WantServiceResolver) Handles(o admission.Operation) bool { return false }
+func (self *WantServiceResolver) Validate() error                    { return nil }
+
+var _ admission.Interface = &WantServiceResolver{}
+var _ initializer.WantsServiceResolver = &WantServiceResolver{}
+
+type fakeServiceResolver struct{}
+
+func (f *fakeServiceResolver) ResolveEndpoint(namespace, name string) (*url.URL, error) {
+	return nil, nil
+}

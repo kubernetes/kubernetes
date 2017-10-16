@@ -17,7 +17,6 @@ limitations under the License.
 package admission
 
 import (
-	"net/url"
 	"testing"
 
 	"k8s.io/apiserver/pkg/admission"
@@ -46,28 +45,5 @@ func TestCloudConfigAdmissionPlugin(t *testing.T) {
 
 	if wantsCloudConfigAdmission.cloudConfig == nil {
 		t.Errorf("Expected cloud config to be initialized but found nil")
-	}
-}
-
-type fakeServiceResolver struct{}
-
-func (f *fakeServiceResolver) ResolveEndpoint(namespace, name string) (*url.URL, error) {
-	return nil, nil
-}
-
-type serviceWanter struct {
-	doNothingAdmission
-	got ServiceResolver
-}
-
-func (s *serviceWanter) SetServiceResolver(sr ServiceResolver) { s.got = sr }
-
-func TestWantsServiceResolver(t *testing.T) {
-	sw := &serviceWanter{}
-	fsr := &fakeServiceResolver{}
-	i := &PluginInitializer{}
-	i.SetServiceResolver(fsr).Initialize(sw)
-	if got, ok := sw.got.(*fakeServiceResolver); !ok || got != fsr {
-		t.Errorf("plumbing fail - %v %v#", ok, got)
 	}
 }

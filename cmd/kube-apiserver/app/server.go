@@ -454,7 +454,6 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 		s,
 		client,
 		sharedInformers,
-		serviceResolver,
 		proxyTransport,
 	)
 	if err != nil {
@@ -485,6 +484,7 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 		keyBytes,
 		kubeClientConfig,
 		api.Scheme,
+		serviceResolver,
 		pluginInitializer)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to initialize admission: %v", err)
@@ -493,7 +493,7 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 }
 
 // BuildAdmissionPluginInitializer constructs the admission plugin initializer
-func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, serviceResolver aggregatorapiserver.ServiceResolver, proxyTransport *http.Transport) (admission.PluginInitializer, error) {
+func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, proxyTransport *http.Transport) (admission.PluginInitializer, error) {
 	var cloudConfig []byte
 
 	if s.CloudProvider.CloudConfigFile != "" {
@@ -512,8 +512,6 @@ func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client interna
 	quotaRegistry := quotainstall.NewRegistry(nil, nil)
 
 	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, restMapper, quotaRegistry)
-
-	pluginInitializer = pluginInitializer.SetServiceResolver(serviceResolver)
 	pluginInitializer = pluginInitializer.SetProxyTransport(proxyTransport)
 
 	return pluginInitializer, nil
