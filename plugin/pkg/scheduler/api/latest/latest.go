@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/api"
+	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/api/v1"
 )
 
@@ -42,9 +42,9 @@ var Versions = []string{"v1"}
 var Codec runtime.Codec
 
 func init() {
-	jsonSerializer := json.NewSerializer(json.DefaultMetaFactory, api.Scheme, api.Scheme, true)
+	jsonSerializer := json.NewSerializer(json.DefaultMetaFactory, schedulerapi.Scheme, schedulerapi.Scheme, true)
 	Codec = versioning.NewDefaultingCodecForScheme(
-		api.Scheme,
+		schedulerapi.Scheme,
 		jsonSerializer,
 		jsonSerializer,
 		schema.GroupVersion{Version: Version},
