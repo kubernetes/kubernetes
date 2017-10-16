@@ -993,7 +993,7 @@ func TestAdmitSupplementalGroups(t *testing.T) {
 			pod:               goodPod(),
 			psps:              []*extensions.PodSecurityPolicy{runAsAny},
 			shouldPass:        true,
-			expectedSupGroups: []int64{},
+			expectedSupGroups: nil,
 			expectedPSP:       runAsAny.Name,
 		},
 		"runAsAny pod request": {
