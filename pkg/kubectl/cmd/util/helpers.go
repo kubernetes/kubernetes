@@ -36,7 +36,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -729,17 +728,6 @@ func PrintFilterCount(out io.Writer, found, hidden, errors int, options *printer
 			}
 		}
 	}
-}
-
-// ObjectListToVersionedObject receives a list of api objects and a group version
-// and squashes the list's items into a single versioned runtime.Object.
-func ObjectListToVersionedObject(objects []runtime.Object, version schema.GroupVersion) (runtime.Object, error) {
-	objectList := &api.List{Items: objects}
-	converted, err := resource.TryConvert(api.Scheme, objectList, version, api.Registry.GroupOrDie(api.GroupName).GroupVersion)
-	if err != nil {
-		return nil, err
-	}
-	return converted, nil
 }
 
 // IsSiblingCommandExists receives a pointer to a cobra command and a target string.
