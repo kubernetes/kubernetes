@@ -33,7 +33,7 @@ import (
 	restful "github.com/emicklei/go-restful"
 	"github.com/golang/glog"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/metrics"
+	cadvisormetrics "github.com/google/cadvisor/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
@@ -48,6 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/httplog"
+	"k8s.io/apiserver/pkg/server/metrics"
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/api"
@@ -269,11 +270,11 @@ func (s *Server) InstallDefaultHandlers() {
 	s.restfulCont.Add(ws)
 
 	s.restfulCont.Add(stats.CreateHandlers(statsPath, s.host, s.resourceAnalyzer))
-	s.restfulCont.Handle(metricsPath, prometheus.Handler())
+	s.restfulCont.Handle(metricsPath, metrics.NewPrometheusHandler())
 
 	// cAdvisor metrics are exposed under the secured handler as well
 	r := prometheus.NewRegistry()
-	r.MustRegister(metrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabels))
+	r.MustRegister(cadvisormetrics.NewPrometheusCollector(prometheusHostAdapter{s.host}, containerPrometheusLabels))
 	s.restfulCont.Handle(cadvisorMetricsPath,
 		promhttp.HandlerFor(r, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),
 	)
@@ -818,12 +819,12 @@ func containerPrometheusLabels(c *cadvisorapi.ContainerInfo) map[string]string {
 		containerName = v
 	}
 	set := map[string]string{
-		metrics.LabelID:    c.Name,
-		metrics.LabelName:  name,
-		metrics.LabelImage: image,
-		"pod_name":         podName,
-		"namespace":        namespace,
-		"container_name":   containerName,
+		cadvisormetrics.LabelID:    c.Name,
+		cadvisormetrics.LabelName:  name,
+		cadvisormetrics.LabelImage: image,
+		"pod_name":                 podName,
+		"namespace":                namespace,
+		"container_name":           containerName,
 	}
 	return set
 }

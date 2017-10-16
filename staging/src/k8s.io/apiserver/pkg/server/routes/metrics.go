@@ -21,10 +21,9 @@ import (
 	"net/http"
 
 	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/server/metrics"
 	"k8s.io/apiserver/pkg/server/mux"
 	etcdmetrics "k8s.io/apiserver/pkg/storage/etcd/metrics"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // DefaultMetrics installs the default prometheus metrics handler
@@ -32,7 +31,7 @@ type DefaultMetrics struct{}
 
 // Install adds the DefaultMetrics handler
 func (m DefaultMetrics) Install(c *mux.PathRecorderMux) {
-	c.Handle("/metrics", prometheus.Handler())
+	c.Handle("/metrics", metrics.NewPrometheusHandler())
 }
 
 // MetricsWithReset install the prometheus metrics handler extended with support for the DELETE method
@@ -41,7 +40,7 @@ type MetricsWithReset struct{}
 
 // Install adds the MetricsWithReset handler
 func (m MetricsWithReset) Install(c *mux.PathRecorderMux) {
-	defaultMetricsHandler := prometheus.Handler().ServeHTTP
+	defaultMetricsHandler := metrics.NewPrometheusHandler().ServeHTTP
 	c.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
 		if req.Method == "DELETE" {
 			apimetrics.Reset()

@@ -17,13 +17,15 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"net"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
+	genericapimetrics "k8s.io/apiserver/pkg/server/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 func TestRecordOperation(t *testing.T) {
@@ -38,7 +40,7 @@ func TestRecordOperation(t *testing.T) {
 
 	prometheusUrl := "http://" + temporalServer + "/metrics"
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", prometheus.Handler())
+	mux.Handle("/metrics", genericapimetrics.NewPrometheusHandler())
 	server := &http.Server{
 		Addr:    temporalServer,
 		Handler: mux,

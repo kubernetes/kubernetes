@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	certutil "k8s.io/client-go/util/cert"
 
+	"k8s.io/apiserver/pkg/server/metrics"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/leaderelection"
@@ -61,7 +62,6 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 
 	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -211,7 +211,7 @@ func startHTTP(s *options.CMServer) {
 		}
 	}
 	configz.InstallHandler(mux)
-	mux.Handle("/metrics", prometheus.Handler())
+	mux.Handle("/metrics", metrics.NewPrometheusHandler())
 
 	server := &http.Server{
 		Addr:    net.JoinHostPort(s.Address, strconv.Itoa(int(s.Port))),
