@@ -32,7 +32,7 @@ const (
 	// TODO: Parametrize it by making it a feature in TestFramework.
 	// so we can override the daemonset in other setups (non COS).
 	// GPUDevicePluginDSYAML is the official Google Device Plugin Daemonset NVIDIA GPU manifest for GKE
-	GPUDevicePluginDSYAML = "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/device-plugin-daemonset.yaml"
+	GPUDevicePluginDSYAML = "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/k8s-1.8/device-plugin-daemonset.yaml"
 )
 
 // TODO make this generic and not linked to COS only
