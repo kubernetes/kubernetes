@@ -88,7 +88,7 @@ func TestRequestSetsHeaders(t *testing.T) {
 	// Check if all "issue" methods are setting headers.
 	_ = r.Do()
 	_, _ = r.Watch()
-	_, _ = r.Stream()
+	_, _, _ = r.Stream()
 }
 
 func TestRequestWithErrorWontChange(t *testing.T) {
@@ -935,7 +935,7 @@ func TestRequestStream(t *testing.T) {
 	}
 	for i, testCase := range testCases {
 		testCase.Request.backoffMgr = &NoBackoff{}
-		body, err := testCase.Request.Stream()
+		body, err, _ := testCase.Request.Stream()
 		hasErr := err != nil
 		if hasErr != testCase.Err {
 			t.Errorf("%d: expected %t, got %t: %v", i, testCase.Err, hasErr, err)
@@ -1636,7 +1636,7 @@ func TestStream(t *testing.T) {
 	defer testServer.Close()
 
 	s := testRESTClient(t, testServer)
-	readCloser, err := s.Get().Prefix("path/to/stream/thing").Stream()
+	readCloser, err, _ := s.Get().Prefix("path/to/stream/thing").Stream()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
