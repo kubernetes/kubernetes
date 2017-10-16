@@ -84,8 +84,6 @@ type VirtualCenterConfig struct {
 	Password string `gcfg:"password"`
 	// vCenter port.
 	VCenterPort string `gcfg:"port"`
-	// True if vCenter uses self-signed cert.
-	InsecureFlag bool `gcfg:"insecure-flag"`
 	// Datacenter in which VMs are located.
 	Datacenters string `gcfg:"datacenters"`
 	// Soap round tripper count (retries = RoundTripper - 1)
@@ -255,7 +253,6 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 			Password:          cfg.Global.Password,
 			VCenterPort:       cfg.Global.VCenterPort,
 			Datacenters:       cfg.Global.Datacenter,
-			InsecureFlag:      cfg.Global.InsecureFlag,
 			RoundTripperCount: cfg.Global.RoundTripperCount,
 		}
 
@@ -263,7 +260,7 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 			Username:          vcConfig.User,
 			Password:          vcConfig.Password,
 			Hostname:          cfg.Global.VCenterIP,
-			Insecure:          vcConfig.InsecureFlag,
+			Insecure:          cfg.Global.InsecureFlag,
 			RoundTripperCount: vcConfig.RoundTripperCount,
 			Port:              vcConfig.VCenterPort,
 		}
@@ -326,7 +323,7 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 				Username:          vcConfig.User,
 				Password:          vcConfig.Password,
 				Hostname:          vcServer,
-				Insecure:          vcConfig.InsecureFlag,
+				Insecure:          cfg.Global.InsecureFlag,
 				RoundTripperCount: vcConfig.RoundTripperCount,
 				Port:              vcConfig.VCenterPort,
 			}
@@ -382,6 +379,8 @@ func newControllerNode(cfg VSphereConfig) (*VSphere, error) {
 		vsphereInstanceMap: vsphereInstanceMap,
 		nodeManager: &NodeManager{
 			vsphereInstanceMap: vsphereInstanceMap,
+			nodeInfoMap: make(map[string]*NodeInfo),
+			registeredNodes: make(map[string]*v1.Node),
 		},
 		cfg: &cfg,
 	}
@@ -451,22 +450,19 @@ func getLocalIP() ([]v1.NodeAddress, error) {
 }
 
 func (vs *VSphere) getVSphereInstance(nodeName k8stypes.NodeName) (*VSphereInstance, error) {
-	vsphereIns, err := vs.nodeManager.getVSphereInstance(nodeName)
+	vsphereIns, err := vs.nodeManager.GetVSphereInstance(nodeName)
 	if err != nil {
 		glog.Errorf("Cannot find node %q in cache. Node not found!!!", nodeName)
 		return nil, errors.New(fmt.Sprintf("Cannot find node %q in vsphere configuration map", nodeName))
 	}
-	return vsphereIns, nil
+	return &vsphereIns, nil
 }
 
 // Get the VM Managed Object instance by from the node
 func (vs *VSphere) getVMByName(ctx context.Context, nodeName k8stypes.NodeName) (*vclib.VirtualMachine, error) {
-	nodeInfo, err := vs.nodeManager.getNodeInfo(nodeName)
+	nodeInfo, err := vs.nodeManager.GetNodeInfo(nodeName)
 	if err != nil {
 		return nil, err
-	}
-	if nodeInfo == nil {
-		return nil, errors.New(fmt.Sprintf("Node %q not found in node manager!", nodeName))
 	}
 	return nodeInfo.vm, nil
 }
@@ -941,11 +937,11 @@ func (vs *VSphere) HasClusterID() bool {
 // Notification handler when node is registered.
 func (vs *VSphere) NodeRegistered(node *v1.Node) {
 	glog.V(4).Infof("Node Registered: %+v", node)
-	vs.nodeManager.registerNode(node)
+	vs.nodeManager.RegisterNode(node)
 }
 
 // Notification handler when node is unregistered.
 func (vs *VSphere) NodeUnregistered(node *v1.Node) {
 	glog.V(4).Infof("Node Unregistered: %+v", node)
-	vs.nodeManager.unregisterNode(node)
+	vs.nodeManager.UnRegisterNode(node)
 }
