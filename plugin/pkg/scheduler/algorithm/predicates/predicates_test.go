@@ -663,7 +663,7 @@ func TestGetUsedPorts(t *testing.T) {
 	}
 }
 
-func TestDiskConflicts(t *testing.T) {
+func TestGCEDiskConflicts(t *testing.T) {
 	volState := v1.PodSpec{
 		Volumes: []v1.Volume{
 			{
