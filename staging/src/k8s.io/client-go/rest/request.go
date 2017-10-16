@@ -104,6 +104,10 @@ type Request struct {
 	err  error
 	body io.Reader
 
+	// This is the default request timeout set by client. It will be used if no context is
+	// provided, or request's context has no deadline.
+	requestTimeout time.Duration
+
 	// This is only used for per-request timeouts, deadlines, and cancellations.
 	ctx context.Context
 
@@ -123,21 +127,18 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPa
 		pathPrefix = path.Join(pathPrefix, baseURL.Path)
 	}
 	var c context.Context
-	if timeout > 0 {
-		c, _ = context.WithTimeout(context.Background(), timeout)
-	} else {
-		c = context.Background()
-	}
+
 	r := &Request{
-		client:      client,
-		verb:        verb,
-		baseURL:     baseURL,
-		pathPrefix:  path.Join(pathPrefix, versionedAPIPath),
-		content:     content,
-		serializers: serializers,
-		backoffMgr:  backoff,
-		throttle:    throttle,
-		ctx:         c,
+		client:         client,
+		verb:           verb,
+		baseURL:        baseURL,
+		pathPrefix:     path.Join(pathPrefix, versionedAPIPath),
+		content:        content,
+		serializers:    serializers,
+		backoffMgr:     backoff,
+		throttle:       throttle,
+		ctx:            c,
+		requestTimeout: timeout,
 	}
 	switch {
 	case len(content.AcceptContentTypes) > 0:
@@ -402,8 +403,8 @@ func (r *Request) Context(ctx context.Context) *Request {
 	return r
 }
 
-func (r *Request) GetContextDeadline() (deadline time.Time, ok bool) {
-	return r.ctx.Deadline()
+func (r *Request) GetRequestTimeout() time.Duration {
+	return r.requestTimeout
 }
 
 // URL returns the current working URL.
@@ -491,8 +492,19 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
+	// If request r's context is nil or has no deadline, use the requestTimeout
 	if r.ctx != nil {
-		req = req.WithContext(r.ctx)
+		if _, ok := r.ctx.Deadline(); ok == true {
+			req = req.WithContext(r.ctx)
+		} else {
+			c, cancel := context.WithTimeout(r.ctx, r.requestTimeout)
+			req = req.WithContext(c)
+			defer cancel()
+		}
+	} else if r.requestTimeout > 0 {
+		c, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
+		req = req.WithContext(c)
+		defer cancel()
 	}
 	req.Header = r.headers
 	client := r.client
@@ -563,8 +575,19 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
+	// If request r's context is nil or has no deadline, use the requestTimeout
 	if r.ctx != nil {
-		req = req.WithContext(r.ctx)
+		if _, ok := r.ctx.Deadline(); ok == true {
+			req = req.WithContext(r.ctx)
+		} else {
+			c, cancel := context.WithTimeout(r.ctx, r.requestTimeout)
+			req = req.WithContext(c)
+			defer cancel()
+		}
+	} else if r.requestTimeout > 0 {
+		c, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
+		req = req.WithContext(c)
+		defer cancel()
 	}
 	req.Header = r.headers
 	client := r.client
@@ -641,8 +664,19 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		if err != nil {
 			return err
 		}
+		// If request r's context is nil or has no deadline, use the requestTimeout
 		if r.ctx != nil {
-			req = req.WithContext(r.ctx)
+			if _, ok := r.ctx.Deadline(); ok == true {
+				req = req.WithContext(r.ctx)
+			} else {
+				c, cancel := context.WithTimeout(r.ctx, r.requestTimeout)
+				req = req.WithContext(c)
+				defer cancel()
+			}
+		} else if r.requestTimeout > 0 {
+			c, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
+			req = req.WithContext(c)
+			defer cancel()
 		}
 		req.Header = r.headers
 

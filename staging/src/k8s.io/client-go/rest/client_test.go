@@ -89,6 +89,8 @@ func TestRESTClientRequestTimeout(t *testing.T) {
 	testServer, _, _ := testServerEnv(t, 200)
 	defer testServer.Close()
 
+	timeout := 10 * time.Second
+
 	c, err := RESTClientFor(&Config{
 		Host: testServer.URL,
 		ContentConfig: ContentConfig{
@@ -97,7 +99,7 @@ func TestRESTClientRequestTimeout(t *testing.T) {
 		},
 		Username: "user",
 		Password: "pass",
-		Timeout:  10 * time.Second,
+		Timeout:  timeout,
 	})
 	// check timeout is not set in http client
 	if err != nil {
@@ -108,9 +110,9 @@ func TestRESTClientRequestTimeout(t *testing.T) {
 		}
 	}
 	// check timeout is set in per request context
-	deadline, ok := c.Get().GetContextDeadline()
-	if ok != true || deadline.Before(time.Now()) {
-		t.Errorf("unexpected per-request timeout not-set")
+	requestTimeout := c.Get().GetRequestTimeout()
+	if requestTimeout != timeout {
+		t.Errorf("incorrect request timeout value, want: %v, got: %v", timeout, requestTimeout)
 	}
 }
 
