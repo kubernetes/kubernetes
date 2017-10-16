@@ -18,6 +18,7 @@ limitations under the License.
 package main
 
 import (
+	goflag "flag"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -153,6 +154,7 @@ func parseIncludedTypesOverrides() (map[types.GroupVersion][]string, error) {
 func main() {
 	arguments := args.Default()
 	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
+	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	flag.Parse()
 	var cmdArgs string
 	flag.VisitAll(func(f *flag.Flag) {
