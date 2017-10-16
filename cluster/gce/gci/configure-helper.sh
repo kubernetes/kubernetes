@@ -199,6 +199,12 @@ function append_or_replace_prefixed_line {
   mv "${tmpfile}" "${file}"
 }
 
+function write-pki-data {
+  local data="${1}"
+  local path="${2}"
+  (umask 077; echo "${data}" | base64 --decode > "${path}")
+}
+
 function create-node-pki {
   echo "Creating node pki files"
 
@@ -210,14 +216,14 @@ function create-node-pki {
   fi
 
   CA_CERT_BUNDLE_PATH="${pki_dir}/ca-certificates.crt"
-  echo "${CA_CERT_BUNDLE}" | base64 --decode > "${CA_CERT_BUNDLE_PATH}"
+  write-pki-data "${CA_CERT_BUNDLE}" "${CA_CERT_BUNDLE_PATH}"
 
   if [[ ! -z "${KUBELET_CERT:-}" && ! -z "${KUBELET_KEY:-}" ]]; then
     KUBELET_CERT_PATH="${pki_dir}/kubelet.crt"
-    echo "${KUBELET_CERT}" | base64 --decode > "${KUBELET_CERT_PATH}"
+    write-pki-data "${KUBELET_CERT}" "${KUBELET_CERT_PATH}"
 
     KUBELET_KEY_PATH="${pki_dir}/kubelet.key"
-    echo "${KUBELET_KEY}" | base64 --decode > "${KUBELET_KEY_PATH}"
+    write-pki-data "${KUBELET_KEY}" "${KUBELET_KEY_PATH}"
   fi
 
   # TODO(mikedanese): remove this when we don't support downgrading to versions
@@ -232,12 +238,12 @@ function create-master-pki {
   mkdir -p "${pki_dir}"
 
   CA_CERT_PATH="${pki_dir}/ca.crt"
-  echo "${CA_CERT}" | base64 --decode > "${CA_CERT_PATH}"
+  write-pki-data "${CA_CERT}" "${CA_CERT_PATH}"
 
   # this is not true on GKE
   if [[ ! -z "${CA_KEY:-}" ]]; then
     CA_KEY_PATH="${pki_dir}/ca.key"
-    echo "${CA_KEY}" | base64 --decode > "${CA_KEY_PATH}"
+    write-pki-data "${CA_KEY}" "${CA_KEY_PATH}"
   fi
 
   if [[ -z "${APISERVER_SERVER_CERT:-}" || -z "${APISERVER_SERVER_KEY:-}" ]]; then
@@ -246,10 +252,10 @@ function create-master-pki {
   fi
 
   APISERVER_SERVER_CERT_PATH="${pki_dir}/apiserver.crt"
-  echo "${APISERVER_SERVER_CERT}" | base64 --decode > "${APISERVER_SERVER_CERT_PATH}"
+  write-pki-data "${APISERVER_SERVER_CERT}" "${APISERVER_SERVER_CERT_PATH}"
 
   APISERVER_SERVER_KEY_PATH="${pki_dir}/apiserver.key"
-  echo "${APISERVER_SERVER_KEY}" | base64 --decode > "${APISERVER_SERVER_KEY_PATH}"
+  write-pki-data "${APISERVER_SERVER_KEY}" "${APISERVER_SERVER_KEY_PATH}"
 
   if [[ -z "${APISERVER_CLIENT_CERT:-}" || -z "${APISERVER_CLIENT_KEY:-}" ]]; then
     APISERVER_CLIENT_CERT="${KUBEAPISERVER_CERT}"
@@ -257,10 +263,10 @@ function create-master-pki {
   fi
 
   APISERVER_CLIENT_CERT_PATH="${pki_dir}/apiserver-client.crt"
-  echo "${APISERVER_CLIENT_CERT}" | base64 --decode > "${APISERVER_CLIENT_CERT_PATH}"
+  write-pki-data "${APISERVER_CLIENT_CERT}" "${APISERVER_CLIENT_CERT_PATH}"
 
   APISERVER_CLIENT_KEY_PATH="${pki_dir}/apiserver-client.key"
-  echo "${APISERVER_CLIENT_KEY}" | base64 --decode > "${APISERVER_CLIENT_KEY_PATH}"
+  write-pki-data "${APISERVER_CLIENT_KEY}" "${APISERVER_CLIENT_KEY_PATH}"
 
   if [[ -z "${SERVICEACCOUNT_CERT:-}" || -z "${SERVICEACCOUNT_KEY:-}" ]]; then
     SERVICEACCOUNT_CERT="${MASTER_CERT}"
@@ -268,10 +274,10 @@ function create-master-pki {
   fi
 
   SERVICEACCOUNT_CERT_PATH="${pki_dir}/serviceaccount.crt"
-  echo "${SERVICEACCOUNT_CERT}" | base64 --decode > "${SERVICEACCOUNT_CERT_PATH}"
+  write-pki-data "${SERVICEACCOUNT_CERT}" "${SERVICEACCOUNT_CERT_PATH}"
 
   SERVICEACCOUNT_KEY_PATH="${pki_dir}/serviceaccount.key"
-  echo "${SERVICEACCOUNT_KEY}" | base64 --decode > "${SERVICEACCOUNT_KEY_PATH}"
+  write-pki-data "${SERVICEACCOUNT_KEY}" "${SERVICEACCOUNT_KEY_PATH}"
 
   # TODO(mikedanese): remove this when we don't support downgrading to versions
   # < 1.6.
@@ -280,16 +286,16 @@ function create-master-pki {
 
   if [[ ! -z "${REQUESTHEADER_CA_CERT:-}" ]]; then
     AGGREGATOR_CA_KEY_PATH="${pki_dir}/aggr_ca.key"
-    echo "${AGGREGATOR_CA_KEY}" | base64 --decode > "${AGGREGATOR_CA_KEY_PATH}"
+    write-pki-data "${AGGREGATOR_CA_KEY}" "${AGGREGATOR_CA_KEY_PATH}"
 
     REQUESTHEADER_CA_CERT_PATH="${pki_dir}/aggr_ca.crt"
-    echo "${REQUESTHEADER_CA_CERT}" | base64 --decode > "${REQUESTHEADER_CA_CERT_PATH}"
+    write-pki-data "${REQUESTHEADER_CA_CERT}" "${REQUESTHEADER_CA_CERT_PATH}"
 
     PROXY_CLIENT_KEY_PATH="${pki_dir}/proxy_client.key"
-    echo "${PROXY_CLIENT_KEY}" | base64 --decode > "${PROXY_CLIENT_KEY_PATH}"
+    write-pki-data "${PROXY_CLIENT_KEY}" "${PROXY_CLIENT_KEY_PATH}"
 
     PROXY_CLIENT_CERT_PATH="${pki_dir}/proxy_client.crt"
-    echo "${PROXY_CLIENT_CERT}" | base64 --decode > "${PROXY_CLIENT_CERT_PATH}"
+    write-pki-data "${PROXY_CLIENT_CERT}" "${PROXY_CLIENT_CERT_PATH}"
   fi
 }
 
