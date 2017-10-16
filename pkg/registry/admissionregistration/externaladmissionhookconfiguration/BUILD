@@ -13,7 +13,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/admissionregistration/externaladmissionhookconfiguration",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/admissionregistration:go_default_library",
         "//pkg/apis/admissionregistration/validation:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

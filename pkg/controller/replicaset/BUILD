@@ -47,7 +47,7 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/controller/replicaset",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/securitycontext:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

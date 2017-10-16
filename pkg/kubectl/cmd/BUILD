@@ -68,6 +68,7 @@ go_library(
     ],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/certificates:go_default_library",
         "//pkg/apis/policy:go_default_library",
@@ -195,6 +196,7 @@ go_test(
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/ref:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",

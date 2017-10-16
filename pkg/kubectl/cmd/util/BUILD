@@ -25,6 +25,7 @@ go_library(
         "//federation/apis/federation:go_default_library",
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/batch:go_default_library",
@@ -95,6 +96,7 @@ go_test(
     ],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/apis/apps:go_default_library",

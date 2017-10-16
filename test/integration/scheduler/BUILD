@@ -21,7 +21,7 @@ go_test(
     library = ":go_default_library",
     tags = ["integration"],
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
@@ -77,7 +77,7 @@ go_library(
     srcs = ["util.go"],
     importpath = "k8s.io/kubernetes/test/integration/scheduler",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//plugin/pkg/scheduler:go_default_library",
         "//plugin/pkg/scheduler/algorithmprovider:go_default_library",

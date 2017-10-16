@@ -59,8 +59,8 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/controller/deployment",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
         "//pkg/apis/authentication/install:go_default_library",
         "//pkg/apis/authorization/install:go_default_library",

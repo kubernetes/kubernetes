@@ -20,6 +20,7 @@ go_test(
     tags = ["integration"],
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/authorization:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",

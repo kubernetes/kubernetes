@@ -13,6 +13,7 @@ go_library(
         "//federation/client/clientset_generated/federation_clientset:go_default_library",
         "//federation/pkg/kubefed/util:go_default_library",
         "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",

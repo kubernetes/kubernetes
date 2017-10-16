@@ -16,6 +16,7 @@ go_library(
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions:go_default_library",

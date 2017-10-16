@@ -15,7 +15,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/extensions/deployment",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/pod:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/validation:go_default_library",

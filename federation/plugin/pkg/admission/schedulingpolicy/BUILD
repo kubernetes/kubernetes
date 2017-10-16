@@ -37,6 +37,7 @@ go_library(
     importpath = "k8s.io/kubernetes/federation/plugin/pkg/admission/schedulingpolicy",
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/ref:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

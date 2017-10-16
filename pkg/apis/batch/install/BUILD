@@ -10,7 +10,7 @@ go_library(
     srcs = ["install.go"],
     importpath = "k8s.io/kubernetes/pkg/apis/batch/install",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/batch/v1:go_default_library",
         "//pkg/apis/batch/v1beta1:go_default_library",
