@@ -650,3 +650,118 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	}
 	return manageReplicasErr
 }
+
+// Obtain all RSs affected by pod creation event. The codes should be similar with addPod(),
+// but return RSs instead of enqueuing them to controller's workqueue.
+func (rsc *ReplicaSetController) getAffectedRSsByPodCreation(pod *v1.Pod) []*extensions.ReplicaSet {
+	if pod.DeletionTimestamp != nil {
+		return rsc.getAffectedRSsByPodDeletion(pod)
+	}
+
+	if controllerRef := metav1.GetControllerOf(pod); controllerRef != nil {
+		rs := rsc.resolveControllerRef(pod.Namespace, controllerRef)
+		if rs == nil {
+			return nil
+		}
+		rsKey, err := controller.KeyFunc(rs)
+		if err != nil {
+			return nil
+		}
+		glog.V(4).Infof("Pod %s created: %#v.", pod.Name, pod)
+		rsc.expectations.CreationObserved(rsKey)
+		return []*extensions.ReplicaSet{rs}
+	}
+
+	glog.V(4).Infof("Orphan Pod %s created: %#v.", pod.Name, pod)
+	return rsc.getPodReplicaSets(pod)
+}
+
+// Obtain all RSs affected by pod update event. The codes should be similar with updatePod(),
+// but return RSs instead of enqueuing them to controller's workqueue.
+func (rsc *ReplicaSetController) getAffectedRSsByPodUpdate(oldPod, curPod *v1.Pod) []*extensions.ReplicaSet {
+	var rss []*extensions.ReplicaSet
+	if curPod.ResourceVersion == oldPod.ResourceVersion {
+		return rss
+	}
+
+	labelChanged := !reflect.DeepEqual(curPod.Labels, oldPod.Labels)
+	if curPod.DeletionTimestamp != nil {
+		rss = rsc.getAffectedRSsByPodDeletion(curPod)
+		if labelChanged {
+			affectedOldRSs := rsc.getAffectedRSsByPodDeletion(oldPod)
+			for _, rs := range affectedOldRSs {
+				rss = append(rss, rs)
+			}
+		}
+		return rss
+	}
+
+	curControllerRef := metav1.GetControllerOf(curPod)
+	oldControllerRef := metav1.GetControllerOf(oldPod)
+	controllerRefChanged := !reflect.DeepEqual(curControllerRef, oldControllerRef)
+	if controllerRefChanged && oldControllerRef != nil {
+		if rs := rsc.resolveControllerRef(oldPod.Namespace, oldControllerRef); rs != nil {
+			rss = append(rss, rs)
+		}
+	}
+	if curControllerRef != nil {
+		rs := rsc.resolveControllerRef(curPod.Namespace, curControllerRef)
+		if rs == nil {
+			return rss
+		}
+		glog.V(4).Infof("Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
+		rss = append(rss, rs)
+		if !podutil.IsPodReady(oldPod) && podutil.IsPodReady(curPod) && rs.Spec.MinReadySeconds > 0 {
+			glog.V(2).Infof("ReplicaSet %q will be enqueued after %ds for availability check", rs.Name, rs.Spec.MinReadySeconds)
+			// explicitly enqueue rs for second time if its MinReadySeconds > 0
+			return append(rss, rs)
+		}
+		return rss
+	}
+	if labelChanged || controllerRefChanged {
+		matchingRSs := rsc.getPodReplicaSets(curPod)
+		if len(matchingRSs) == 0 {
+			return rss
+		}
+		glog.V(4).Infof("Orphan Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
+		for _, rs := range matchingRSs {
+			rss = append(rss, rs)
+		}
+	}
+	return rss
+}
+
+// Obtain all RSs affected by pod deletion event. The codes should be similar with deletePod(),
+// but return RSs instead of enqueuing them to controller's workqueue.
+func (rsc *ReplicaSetController) getAffectedRSsByPodDeletion(obj interface{}) []*extensions.ReplicaSet {
+	var rss []*extensions.ReplicaSet
+	pod, ok := obj.(*v1.Pod)
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("couldn't get object from tombstone %+v", obj))
+			return rss
+		}
+		pod, ok = tombstone.Obj.(*v1.Pod)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a pod %#v", obj))
+			return rss
+		}
+	}
+
+	controllerRef := metav1.GetControllerOf(pod)
+	if controllerRef == nil {
+		return rss
+	}
+	rs := rsc.resolveControllerRef(pod.Namespace, controllerRef)
+	if rs == nil {
+		return rss
+	}
+	rsKey, err := controller.KeyFunc(rs)
+	if err != nil {
+		return rss
+	}
+	glog.V(4).Infof("Pod %s/%s deleted through %v, timestamp %+v: %#v.", pod.Namespace, pod.Name, utilruntime.GetCaller(), pod.DeletionTimestamp, pod)
+	rsc.expectations.DeletionObserved(rsKey, controller.PodKey(pod))
+	return append(rss, rs)
+}
