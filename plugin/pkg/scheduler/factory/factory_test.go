@@ -37,6 +37,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api/latest"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
+	schedulertesting "k8s.io/kubernetes/plugin/pkg/scheduler/testing"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
 
@@ -524,4 +525,94 @@ func TestInvalidFactoryArgs(t *testing.T) {
 		}
 	}
 
+}
+
+func TestSkipPodUpdate(t *testing.T) {
+	for _, test := range []struct {
+		pod              *v1.Pod
+		isAssumedPodFunc func(*v1.Pod) bool
+		getPodFunc       func(*v1.Pod) *v1.Pod
+		expected         bool
+	}{
+		// Non-assumed pod should not be skipped.
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pod-0",
+				},
+			},
+			isAssumedPodFunc: func(*v1.Pod) bool { return false },
+			getPodFunc: func(*v1.Pod) *v1.Pod {
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pod-0",
+					},
+				}
+			},
+			expected: false,
+		},
+		// Pod update (with changes on ResourceVersion, Spec.NodeName and/or
+		// Annotations) for an already assumed pod should be skipped.
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "pod-0",
+					Annotations:     map[string]string{"a": "b"},
+					ResourceVersion: "0",
+				},
+				Spec: v1.PodSpec{
+					NodeName: "node-0",
+				},
+			},
+			isAssumedPodFunc: func(*v1.Pod) bool {
+				return true
+			},
+			getPodFunc: func(*v1.Pod) *v1.Pod {
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:            "pod-0",
+						Annotations:     map[string]string{"c": "d"},
+						ResourceVersion: "1",
+					},
+					Spec: v1.PodSpec{
+						NodeName: "node-1",
+					},
+				}
+			},
+			expected: true,
+		},
+		// Pod update (with changes on Labels) for an already assumed pod
+		// should not be skipped.
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "pod-0",
+					Labels: map[string]string{"a": "b"},
+				},
+			},
+			isAssumedPodFunc: func(*v1.Pod) bool {
+				return true
+			},
+			getPodFunc: func(*v1.Pod) *v1.Pod {
+				return &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "pod-0",
+						Labels: map[string]string{"c": "d"},
+					},
+				}
+			},
+			expected: false,
+		},
+	} {
+		c := &configFactory{
+			schedulerCache: &schedulertesting.FakeCache{
+				IsAssumedPodFunc: test.isAssumedPodFunc,
+				GetPodFunc:       test.getPodFunc,
+			},
+		}
+		got := c.skipPodUpdate(test.pod)
+		if got != test.expected {
+			t.Errorf("skipPodUpdate() = %t, expected = %t", got, test.expected)
+		}
+	}
 }

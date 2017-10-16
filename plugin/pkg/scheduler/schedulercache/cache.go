@@ -307,6 +307,39 @@ func (cache *schedulerCache) RemovePod(pod *v1.Pod) error {
 	return nil
 }
 
+func (cache *schedulerCache) IsAssumedPod(pod *v1.Pod) (bool, error) {
+	key, err := getPodKey(pod)
+	if err != nil {
+		return false, err
+	}
+
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	b, found := cache.assumedPods[key]
+	if !found {
+		return false, nil
+	}
+	return b, nil
+}
+
+func (cache *schedulerCache) GetPod(pod *v1.Pod) (*v1.Pod, error) {
+	key, err := getPodKey(pod)
+	if err != nil {
+		return nil, err
+	}
+
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	podState, ok := cache.podStates[key]
+	if !ok {
+		return nil, fmt.Errorf("pod %v does not exist", key)
+	}
+
+	return podState.pod, nil
+}
+
 func (cache *schedulerCache) AddNode(node *v1.Node) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
