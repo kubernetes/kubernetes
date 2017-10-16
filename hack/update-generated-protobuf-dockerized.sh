@@ -61,6 +61,7 @@ PACKAGES=(
   k8s.io/api/authentication/v1beta1
   k8s.io/api/rbac/v1alpha1
   k8s.io/api/rbac/v1beta1
+  k8s.io/api/rbac/v1
   k8s.io/api/certificates/v1beta1
   k8s.io/api/imagepolicy/v1alpha1
   k8s.io/api/scheduling/v1alpha1
