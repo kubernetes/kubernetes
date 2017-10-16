@@ -681,8 +681,7 @@ fi
 {
 	EVENT_STORE_IP="${EVENT_STORE_IP:-127.0.0.1}"
 	EVENT_STORE_URL="${EVENT_STORE_URL:-http://${EVENT_STORE_IP}:4002}"
-	EVENT_PD="${EVENT_PD:-false}"
-	if [ "${EVENT_PD:-false}" == "true" ]; then
+	if [ "${EVENT_PD:-}" == "true" ]; then
 		event_etcd_mount_point="/mnt/disks/master-event-pd"
 		mount-pd "google-master-event-pd" "${event_etcd_mount_point}"
 		# Contains all the data stored in event etcd.
