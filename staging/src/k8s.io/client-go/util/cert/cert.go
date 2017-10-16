@@ -138,6 +138,8 @@ func MakeEllipticPrivateKeyPEM() ([]byte, error) {
 // Host may be an IP or a DNS name
 // You may also specify additional subject alt names (either ip or dns names) for the certificate
 func GenerateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS []string) ([]byte, []byte, error) {
+	CheckEntropy() // sanity check entropy, ignore errors
+
 	priv, err := rsa.GenerateKey(cryptorand.Reader, 2048)
 	if err != nil {
 		return nil, nil, err

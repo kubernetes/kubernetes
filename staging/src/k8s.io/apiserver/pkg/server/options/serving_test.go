@@ -47,6 +47,7 @@ import (
 	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/client-go/discovery"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/util/cert"
 )
 
 func setUp(t *testing.T) Config {
@@ -212,6 +213,11 @@ func TestGetNamedCertificateMap(t *testing.T) {
 
 NextTest:
 	for i, test := range tests {
+		// this test needs tons of entropy. So better warn if it is low, making debugging of timeout much easier.
+		if s, _ := cert.EntropyWarning(); len(s) != 0 {
+			t.Log(s)
+		}
+
 		var namedTLSCerts []NamedTLSCert
 		bySignature := map[string]int{} // index in test.certs by cert signature
 		for j, c := range test.certs {
@@ -401,6 +407,11 @@ func TestServerRunWithSNI(t *testing.T) {
 
 NextTest:
 	for title, test := range tests {
+		// this test needs tons of entropy. So better warn if it is low, making debugging of timeout much easier.
+		if s, _ := cert.EntropyWarning(); len(s) != 0 {
+			t.Log(s)
+		}
+
 		// create server cert
 		certDir := "testdata/" + specToName(test.Cert)
 		serverCertBundleFile := filepath.Join(certDir, "cert")
