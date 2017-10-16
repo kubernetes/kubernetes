@@ -107,6 +107,7 @@ filegroup(
         "//pkg/controller/bootstrap:all-srcs",
         "//pkg/controller/certificates:all-srcs",
         "//pkg/controller/cloud:all-srcs",
+        "//pkg/controller/clusterroleaggregation:all-srcs",
         "//pkg/controller/cronjob:all-srcs",
         "//pkg/controller/daemon:all-srcs",
         "//pkg/controller/deployment:all-srcs",

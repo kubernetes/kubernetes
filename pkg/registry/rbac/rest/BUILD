@@ -33,6 +33,7 @@ go_library(
         "//vendor/k8s.io/api/rbac/v1:go_default_library",
         "//vendor/k8s.io/api/rbac/v1alpha1:go_default_library",
         "//vendor/k8s.io/api/rbac/v1beta1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
