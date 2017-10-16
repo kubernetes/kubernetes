@@ -80,7 +80,7 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 	}
 	annotations := maps.CopySS(pod.Annotations)
 
-	if len(sc.SupplementalGroups) == 0 {
+	if sc.SupplementalGroups == nil {
 		supGroups, err := s.strategies.SupplementalGroupStrategy.Generate(pod)
 		if err != nil {
 			return nil, nil, err

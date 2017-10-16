@@ -34,7 +34,7 @@ func NewRunAsAny() (GroupStrategy, error) {
 
 // Generate creates the group based on policy rules.  This strategy returns an empty slice.
 func (s *runAsAny) Generate(pod *api.Pod) ([]int64, error) {
-	return []int64{}, nil
+	return nil, nil
 }
 
 // Generate a single value to be applied.  This is used for FSGroup.  This strategy returns nil.
