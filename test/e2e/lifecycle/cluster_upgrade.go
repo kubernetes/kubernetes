@@ -42,6 +42,7 @@ import (
 var upgradeTests = []upgrades.Test{
 	&upgrades.ServiceUpgradeTest{},
 	&upgrades.SecretUpgradeTest{},
+	&apps.ReplicaSetUpgradeTest{},
 	&apps.StatefulSetUpgradeTest{},
 	&apps.DeploymentUpgradeTest{},
 	&apps.JobUpgradeTest{},
