@@ -10,7 +10,8 @@ URL: https://kubernetes.io
 Binaries required to provision container networking.
 
 %prep
-tar xzfv cni-*.tar.gz
+mkdir -p ./bin
+tar -C ./bin -xz -f cni-plugins-amd64-v0.6.0.tgz
 
 %install
 

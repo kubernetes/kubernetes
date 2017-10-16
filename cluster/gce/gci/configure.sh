@@ -170,9 +170,9 @@ function install-node-problem-detector {
 }
 
 function install-cni-binaries {
-  #TODO(andyzheng0831): We should make the cni version number as a k8s env variable.
-  local -r cni_tar="cni-0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff.tar.gz"
-  local -r cni_sha1="1d9788b0f5420e1a219aad2cb8681823fc515e7c"
+  local -r cni_version="v0.6.0"
+  local -r cni_tar="cni-plugins-amd64-${cni_version}.tgz"
+  local -r cni_sha1="d595d3ded6499a64e8dac02466e2f5f2ce257c9f"
   if is-preloaded "${cni_tar}" "${cni_sha1}"; then
     echo "${cni_tar} is preloaded."
     return
@@ -181,8 +181,8 @@ function install-cni-binaries {
   echo "Downloading cni binaries"
   download-or-bust "${cni_sha1}" "https://storage.googleapis.com/kubernetes-release/network-plugins/${cni_tar}"
   local -r cni_dir="${KUBE_HOME}/cni"
-  mkdir -p "${cni_dir}"
-  tar xzf "${KUBE_HOME}/${cni_tar}" -C "${cni_dir}" --overwrite
+  mkdir -p "${cni_dir}/bin"
+  tar xzf "${KUBE_HOME}/${cni_tar}" -C "${cni_dir}/bin" --overwrite
   mv "${cni_dir}/bin"/* "${KUBE_BIN}"
   rmdir "${cni_dir}/bin"
   rm -f "${KUBE_HOME}/${cni_tar}"
