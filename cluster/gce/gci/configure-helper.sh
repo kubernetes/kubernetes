@@ -1878,8 +1878,12 @@ function start-lb-controller {
     echo "Start GCE L7 pod"
     prepare-log-file /var/log/glbc.log
     setup-addon-manifests "addons" "cluster-loadbalancing/glbc"
-    cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/glbc.manifest" \
-       /etc/kubernetes/manifests/
+
+    local -r glbc_manifest="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/glbc.manifest"
+    if [[ ! -z "${GCE_GLBC_IMAGE:-}" ]]; then
+      sed -i "s@image:.*@image: ${GCE_GLBC_IMAGE}@" "${glbc_manifest}"
+    fi
+    cp "${glbc_manifest}" /etc/kubernetes/manifests/
   fi
 }
 
