@@ -506,7 +506,7 @@ function create-master-audit-policy {
       - group: "batch"
       - group: "certificates.k8s.io"
       - group: "extensions"
-      - group: "metrics"
+      - group: "metrics.k8s.io"
       - group: "networking.k8s.io"
       - group: "policy"
       - group: "rbac.authorization.k8s.io"
@@ -568,7 +568,7 @@ rules:
       - system:kube-controller-manager
     verbs: ["get", "list"]
     resources:
-      - group: "metrics"
+      - group: "metrics.k8s.io"
 
   # Don't log these read-only URLs.
   - level: None
