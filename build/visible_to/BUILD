@@ -264,11 +264,20 @@ package_group(
         "//pkg/kubectl/cmd/testing",
         "//pkg/kubectl/cmd/util",
         "//pkg/kubectl/cmd/util/editor",
+        "//pkg/kubectl/cmd/util/diff",
     ],
 )
 
 package_group(
     name = "pkg_kubectl_cmd_util_editor_CONSUMERS",
+    packages = [
+        "//pkg/kubectl/cmd",
+        "//pkg/kubectl/cmd/util",
+    ],
+)
+
+package_group(
+    name = "pkg_kubectl_cmd_util_diff_CONSUMERS",
     packages = [
         "//pkg/kubectl/cmd",
         "//pkg/kubectl/cmd/util",

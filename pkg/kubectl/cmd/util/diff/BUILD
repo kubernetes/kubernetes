@@ -8,7 +8,7 @@ go_library(
     srcs = ["diffoptions.go"],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/diff",
     visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_util_editor_CONSUMERS",
+        "//build/visible_to:pkg_kubectl_cmd_util_diff_CONSUMERS",
     ],
     deps = [
         "//pkg/kubectl:go_default_library",
@@ -33,6 +33,6 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_util_editor_CONSUMERS",
+        "//build/visible_to:pkg_kubectl_cmd_util_diff_CONSUMERS",
     ],
 )
