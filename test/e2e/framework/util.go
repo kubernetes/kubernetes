@@ -4397,31 +4397,6 @@ func isElementOf(podUID types.UID, pods *v1.PodList) bool {
 	return false
 }
 
-func CheckRSHashLabel(rs *extensions.ReplicaSet) error {
-	if len(rs.Labels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 ||
-		len(rs.Spec.Selector.MatchLabels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 ||
-		len(rs.Spec.Template.Labels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 {
-		return fmt.Errorf("unexpected RS missing required pod-hash-template: %+v, selector = %+v, template = %+v", rs, rs.Spec.Selector, rs.Spec.Template)
-	}
-	return nil
-}
-
-func CheckPodHashLabel(pods *v1.PodList) error {
-	invalidPod := ""
-	for _, pod := range pods.Items {
-		if len(pod.Labels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 {
-			if len(invalidPod) == 0 {
-				invalidPod = "unexpected pods missing required pod-hash-template:"
-			}
-			invalidPod = fmt.Sprintf("%s %+v;", invalidPod, pod)
-		}
-	}
-	if len(invalidPod) > 0 {
-		return fmt.Errorf("%s", invalidPod)
-	}
-	return nil
-}
-
 // timeout for proxy requests.
 const proxyTimeout = 2 * time.Minute
 
