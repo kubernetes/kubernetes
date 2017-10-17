@@ -36,7 +36,7 @@ const (
 	// metadataUrlTemplate allows building an OpenStack Metadata service URL.
 	// It's a hardcoded IPv4 link-local address as documented in "OpenStack Cloud
 	// Administrator Guide", chapter Compute - Networking with nova-network.
-	// https://docs.openstack.org/admin-guide/compute-networking-nova.html#metadata-service
+	// https://docs.openstack.org/nova/pike/admin/networking-nova.html#metadata-service
 	defaultMetadataVersion = "2012-08-10"
 	metadataUrlTemplate    = "http://169.254.169.254/openstack/%s/meta_data.json"
 
