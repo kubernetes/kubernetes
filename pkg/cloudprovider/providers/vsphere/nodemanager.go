@@ -92,12 +92,14 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 			err := vsi.conn.Connect(ctx)
 			if err != nil {
 				glog.V(4).Info("Discovering node error vc:", err)
+				continue
 			}
 
 			if vsi.cfg.Datacenters == "" {
 				datacenterObjs, err = vclib.GetAllDatacenter(ctx, vsi.conn)
 				if err != nil {
 					glog.V(4).Info("Discovering node error dc:", err)
+					continue
 				}
 			} else {
 				datacenters := strings.Split(vsi.cfg.Datacenters, ",")
@@ -193,7 +195,7 @@ func (nm *NodeManager) RediscoverNode(nodeName k8stypes.NodeName) error {
 }
 
 func (nm *NodeManager) GetNode(nodeName k8stypes.NodeName) (v1.Node, error) {
-	nm.nodeInfoLock.RLock()
+	nm.registeredNodesLock.RLock()
 	node := nm.registeredNodes[convertToString(nodeName)]
 	nm.registeredNodesLock.RUnlock()
 	if node == nil {
@@ -217,7 +219,7 @@ func (nm *NodeManager) removeNode(node *v1.Node) {
 func (nm *NodeManager) GetNodeInfo(nodeName k8stypes.NodeName) (NodeInfo, error) {
 	nm.nodeInfoLock.RLock()
 	nodeInfo := nm.nodeInfoMap[convertToString(nodeName)]
-	nm.registeredNodesLock.RUnlock()
+	nm.nodeInfoLock.RUnlock()
 	if nodeInfo == nil {
 		err := nm.RediscoverNode(nodeName)
 		if err != nil {
@@ -242,7 +244,7 @@ func (nm *NodeManager) GetVSphereInstance(nodeName k8stypes.NodeName) (VSphereIn
 	if vsphereInstance == nil {
 		return VSphereInstance{}, fmt.Errorf("vSphereInstance for vc server %q not found while looking for node %q", nodeInfo.vcServer, convertToString(nodeName))
 	}
-	return *nm.vsphereInstanceMap[convertToString(nodeName)], nil
+	return *vsphereInstance, nil
 }
 
 
