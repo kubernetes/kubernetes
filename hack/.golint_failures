@@ -189,10 +189,6 @@ pkg/kubeapiserver/options
 pkg/kubeapiserver/server
 pkg/kubectl
 pkg/kubectl/cmd
-pkg/kubectl/cmd/auth
-pkg/kubectl/cmd/config
-pkg/kubectl/cmd/rollout
-pkg/kubectl/cmd/set
 pkg/kubectl/cmd/templates
 pkg/kubectl/cmd/testing
 pkg/kubectl/cmd/util
