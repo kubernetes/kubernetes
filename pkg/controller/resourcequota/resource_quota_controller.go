@@ -79,21 +79,18 @@ type ResourceQuotaController struct {
 	resyncPeriod controller.ResyncPeriodFunc
 	// knows how to calculate usage
 	registry quota.Registry
-	// controllers monitoring to notify for replenishment
-	replenishmentControllers []cache.Controller
 }
 
 func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *ResourceQuotaController {
 	// build the resource quota controller
 	rq := &ResourceQuotaController{
-		rqClient:                 options.QuotaClient,
-		rqLister:                 options.ResourceQuotaInformer.Lister(),
-		informerSyncedFuncs:      []cache.InformerSynced{options.ResourceQuotaInformer.Informer().HasSynced},
-		queue:                    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resourcequota_primary"),
-		missingUsageQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resourcequota_priority"),
-		resyncPeriod:             options.ResyncPeriod,
-		registry:                 options.Registry,
-		replenishmentControllers: []cache.Controller{},
+		rqClient:            options.QuotaClient,
+		rqLister:            options.ResourceQuotaInformer.Lister(),
+		informerSyncedFuncs: []cache.InformerSynced{options.ResourceQuotaInformer.Informer().HasSynced},
+		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resourcequota_primary"),
+		missingUsageQueue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "resourcequota_priority"),
+		resyncPeriod:        options.ResyncPeriod,
+		registry:            options.Registry,
 	}
 	// set the synchronization handler
 	rq.syncHandler = rq.syncResourceQuotaFromKey
@@ -237,11 +234,6 @@ func (rq *ResourceQuotaController) Run(workers int, stopCh <-chan struct{}) {
 
 	glog.Infof("Starting resource quota controller")
 	defer glog.Infof("Shutting down resource quota controller")
-
-	// the controllers that replenish other resources to respond rapidly to state changes
-	for _, replenishmentController := range rq.replenishmentControllers {
-		go replenishmentController.Run(stopCh)
-	}
 
 	if !controller.WaitForCacheSync("resource quota", stopCh, rq.informerSyncedFuncs...) {
 		return
