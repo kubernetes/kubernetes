@@ -30,6 +30,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const (
+	NEGAnnotation = "alpha.cloud.google.com/load-balancer-neg"
+)
+
 var _ = SIGDescribe("Loadbalancing: L7", func() {
 	defer GinkgoRecover()
 	var (
@@ -96,7 +100,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 		})
 
 		It("should conform to Ingress spec", func() {
-			conformanceTests = framework.CreateIngressComformanceTests(jig, ns)
+			conformanceTests = framework.CreateIngressComformanceTests(jig, ns, map[string]string{})
 			for _, t := range conformanceTests {
 				By(t.EntryLog)
 				t.Execute()
@@ -113,7 +117,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "static-ip"), ns, map[string]string{
 				"kubernetes.io/ingress.global-static-ip-name": ns,
 				"kubernetes.io/ingress.allow-http":            "false",
-			})
+			}, map[string]string{})
 
 			By("waiting for Ingress to come up with ip: " + ip)
 			httpClient := framework.BuildInsecureClient(framework.IngressReqTimeout)
@@ -148,6 +152,53 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 
 		// TODO: Implement a multizone e2e that verifies traffic reaches each
 		// zone based on pod labels.
+	})
+	Describe("GCE [Slow] [Feature:NEG]", func() {
+		var gceController *framework.GCEIngressController
+
+		// Platform specific setup
+		BeforeEach(func() {
+			framework.SkipUnlessProviderIs("gce", "gke")
+			By("Initializing gce controller")
+			gceController = &framework.GCEIngressController{
+				Ns:     ns,
+				Client: jig.Client,
+				Cloud:  framework.TestContext.CloudConfig,
+			}
+			gceController.Init()
+		})
+
+		// Platform specific cleanup
+		AfterEach(func() {
+			if CurrentGinkgoTestDescription().Failed {
+				framework.DescribeIng(ns)
+			}
+			if jig.Ingress == nil {
+				By("No ingress created, no cleanup necessary")
+				return
+			}
+			By("Deleting ingress")
+			jig.TryDeleteIngress()
+
+			By("Cleaning up cloud resources")
+			framework.CleanupGCEIngressController(gceController)
+		})
+
+		It("should conform to Ingress spec", func() {
+			jig.PollInterval = 5 * time.Second
+			conformanceTests = framework.CreateIngressComformanceTests(jig, ns, map[string]string{
+				NEGAnnotation: "true",
+			})
+			for _, t := range conformanceTests {
+				By(t.EntryLog)
+				t.Execute()
+				By(t.ExitLog)
+				jig.WaitForIngress(true)
+				usingNeg, err := gceController.BackendServiceUsingNEG(jig.GetIngressNodePorts(false))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(usingNeg).To(BeTrue())
+			}
+		})
 	})
 
 	// Time: borderline 5m, slow by design
@@ -191,7 +242,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			// Poll more frequently to reduce e2e completion time.
 			// This test runs in presubmit.
 			jig.PollInterval = 5 * time.Second
-			conformanceTests = framework.CreateIngressComformanceTests(jig, ns)
+			conformanceTests = framework.CreateIngressComformanceTests(jig, ns, map[string]string{})
 			for _, t := range conformanceTests {
 				By(t.EntryLog)
 				t.Execute()
