@@ -27,8 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/tolerations"
 )
 
-
-
 func getPod(name string, numContainers int, needGPU bool) *api.Pod {
 	res := api.ResourceRequirements{}
 	if needGPU {
@@ -52,13 +50,11 @@ func getPod(name string, numContainers int, needGPU bool) *api.Pod {
 }
 
 func getToleration() *api.Toleration {
-	tolerationSeconds := int64(3600)
 	toleration := &api.Toleration{
-	Key: "dedicated",
-	Operator: api.TolerationOpEqual,
-	Value: "gpu",
-	Effect: api.TaintEffectNoExecute,
-	TolerationSeconds: &tolerationSeconds,
+		Key: "dedicated",
+		Operator: api.TolerationOpEqual,
+		Value: "gpu",
+		Effect: api.TaintEffectNoSchedule,
 	}
 	return toleration
 }
