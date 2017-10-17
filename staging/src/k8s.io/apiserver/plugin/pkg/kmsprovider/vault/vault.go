@@ -27,6 +27,7 @@ import (
 	"sync"
 
 	"github.com/ghodss/yaml"
+	"github.com/golang/glog"
 
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
 )
@@ -36,7 +37,8 @@ const vaultPrefix = "vault"
 //EnvelopeConfig contains connection information for Vault transformer
 type EnvelopeConfig struct {
 	// The names of encryption key for Vault transit communication
-	KeyNames []string `json:"key-names"`
+	KeyNames []string `json:"keyNames"`
+
 	// Vault listen address, for example https://localhost:8200
 	Address string `json:"addr"`
 
@@ -44,25 +46,25 @@ type EnvelopeConfig struct {
 	Token string `json:"token"`
 
 	// TLS certificate authentication information
-	ClientCert string `json:"client-cert"`
-	ClientKey  string `json:"client-key"`
+	ClientCert string `json:"clientCert"`
+	ClientKey  string `json:"clientKey"`
 
 	// AppRole authentication information
-	RoleID   string `json:"role-id"`
-	SecretID string `json:"secret-id"`
+	RoleID   string `json:"roleID"`
+	SecretID string `json:"secretID"`
 
 	// CACert is the path to a PEM-encoded CA cert file to use to verify the
 	// Vault server SSL certificate.
-	CACert string `json:"ca-cert"`
+	VaultCACert string `json:"vaultCACert"`
 
 	// TLSServerName, if set, is used to set the SNI host when connecting via TLS.
-	TLSServerName string `json:"tls-server-name"`
+	TLSServerName string `json:"tlsServerName"`
 
 	// The path for transit API, default is "transit"
-	TransitPath string `json:"transit-path"`
+	TransitPath string `json:"transitPath"`
 
 	// The path for auth backend, default is "auth"
-	AuthPath string `json:"auth-path"`
+	AuthPath string `json:"authPath"`
 }
 
 // KMSFactory function creates Vault KMS service
@@ -78,7 +80,7 @@ func KMSFactory(configFile io.Reader) (envelope.Service, error) {
 		return nil, fmt.Errorf("error while parsing file: %v", err)
 	}
 
-	err = checkConfig(&config)
+	err = validateConfig(&config)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +93,7 @@ func KMSFactory(configFile io.Reader) (envelope.Service, error) {
 	return &vaultEnvelopeService{config: &config, client: client}, nil
 }
 
-func checkConfig(config *EnvelopeConfig) error {
+func validateConfig(config *EnvelopeConfig) error {
 	if len(config.KeyNames) == 0 {
 		return errors.New("vault provider has no valid key names")
 	}
@@ -100,11 +102,11 @@ func checkConfig(config *EnvelopeConfig) error {
 		return errors.New("vault provider has no valid address")
 	}
 
-	return checkAuthConfig(config)
+	return validateAuthConfig(config)
 }
 
-func checkAuthConfig(config *EnvelopeConfig) error {
-	var count uint
+func validateAuthConfig(config *EnvelopeConfig) error {
+	count := 0
 
 	if config.Token != "" {
 		count++
@@ -157,9 +159,11 @@ func (s *vaultEnvelopeService) Decrypt(data string) ([]byte, error) {
 	}
 
 	// Replace the key name with "vault:" for Vault transit API
-	cipher := strings.Replace(data, key, vaultPrefix, 1)
+	if !strings.HasPrefix(data, key) {
+		return nil, errors.New("encrypted data from storage does not have key prefix")
+	}
+	cipher := vaultPrefix + data[len(key):]
 
-	//plain, _, err := s.client.decrypt(key, cipher)
 	plain, err := s.withRefreshToken((*clientWrapper).decrypt, key, cipher)
 	if err != nil {
 		return nil, err
@@ -180,7 +184,10 @@ func (s *vaultEnvelopeService) Encrypt(data []byte) (string, error) {
 
 	// The format of cipher from Vault is "vault:v1:....".
 	// "vault:" is unnecessary, replace it with key name.
-	return strings.Replace(cipher, vaultPrefix, key, 1), nil
+	if !strings.HasPrefix(cipher, vaultPrefix) {
+		return "", fmt.Errorf("encrypted data from vault does not have prefix %v", vaultPrefix)
+	}
+	return key + cipher[len(vaultPrefix):], nil
 }
 
 // The function type for clientWrapper.encrypt and clientWrapper.decrypt.
@@ -212,7 +219,7 @@ func (s *vaultEnvelopeService) withRefreshToken(f encryptOrDecryptFunc, key, dat
 	if err != nil {
 		return result, err
 	}
-
+	glog.V(6).Infof("vault token refreshed")
 	secret, requestErr := f(s.client, key, data)
 	return secret, requestErr
 }

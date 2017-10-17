@@ -32,18 +32,18 @@ const (
 	sampleText = "abcdefghijklmnopqrstuvwxyz"
 
 	configOneKey = `
-key-names: 
+keyNames: 
   - @key@
 addr: @url@
-ca-cert: testdata/ca.crt
+vaultCACert: testdata/ca.crt
 token: 8dad1053-4a4e-f359-2eab-d57968eb277f
 `
 	configTwoKey = `
-key-names: 
+keyNames: 
   - @key@
   - @key@
 addr: @url@
-ca-cert: testdata/ca.crt
+vaultCACert: testdata/ca.crt
 token: 8dad1053-4a4e-f359-2eab-d57968eb277f
 `
 )
@@ -64,7 +64,7 @@ func TestOneKey(t *testing.T) {
 		t.Fatalf("fail to encrypt data with Vault, error %s", err)
 	}
 	if !strings.HasPrefix(cipher, key+":v1:") {
-		t.Errorf("the cipher has no correct prefix, %s", cipher)
+		t.Fatalf("the cipher has no correct prefix, %s", cipher)
 	}
 
 	untransformedData, err := service.Decrypt(cipher)
@@ -167,7 +167,7 @@ func TestWithRefreshToken(t *testing.T) {
 
 	cipher, err := service.Encrypt(originalText)
 	if err == nil {
-		t.Error("should be forbidden to encrypt data with Vault")
+		t.Fatal("should be forbidden to encrypt data with Vault")
 	}
 	if encryptCount != 1 {
 		t.Errorf("expect call encrypt 1 time, but %d times", encryptCount)
@@ -182,7 +182,7 @@ func TestWithRefreshToken(t *testing.T) {
 	}
 
 	// For approle auth, it will refresh token and retry request.
-	configRole := strings.Replace(configOneKey, "token", "role-id", 1)
+	configRole := strings.Replace(configOneKey, "token", "roleID", 1)
 	service, err = serviceTestFactory(configRole, server.URL, key)
 	if err != nil {
 		t.Fatalf("fail to initialize Vault envelope service, %s", err)
@@ -194,7 +194,7 @@ func TestWithRefreshToken(t *testing.T) {
 
 	cipher, err = service.Encrypt(originalText)
 	if err != nil {
-		t.Errorf("fail to encrypt with error %s", err)
+		t.Fatalf("fail to encrypt with error %s", err)
 	}
 	if encryptCount != 2 {
 		t.Errorf("expect call encrypt 2 times, but %d times", encryptCount)
@@ -202,7 +202,7 @@ func TestWithRefreshToken(t *testing.T) {
 
 	untransformedData, err := service.Decrypt(cipher)
 	if err != nil {
-		t.Errorf("fail to decrypt with error %s", err)
+		t.Fatalf("fail to decrypt with error %s", err)
 	}
 	if encryptCount != 2 {
 		t.Errorf("expect call decrypt 2 times, but %d times", decryptCount)
@@ -257,55 +257,55 @@ func TestInvalidConfiguration(t *testing.T) {
 	// No key name
 	configWithoutKey := `
 addr: @url@
-ca-cert: testdata/ca.crt
+vaultCACert: testdata/ca.crt
 token: 8dad1053-4a4e-f359-2eab-d57968eb277f
 `
 	// No address
 	configWithoutAddress := `
-key-names: 
+keyNames: 
   - @key@
-ca-cert: testdata/ca.crt
+vaultCACert: testdata/ca.crt
 token: 8dad1053-4a4e-f359-2eab-d57968eb277f
 `
 	// No any authentication info
 	configWithoutAuth := `
-key-names: 
+keyNames: 
   - @key@
 addr: @url@
-ca-cert: testdata/ca.crt
+vaultCACert: testdata/ca.crt
 `
 	// tls authentication, but no client key
 	configTLSWithoutClientKey := `
-key-names: 
+keyNames: 
   - @key@
 addr: @url@
-ca-cert: testdata/ca.crt
-client-cert: testdata/client.crt
+vaultCACert: testdata/ca.crt
+clientCert: testdata/client.crt
 `
 	// tls authentication, but no client cert
 	configTLSWithoutClientCert := `
-key-names: 
+keyNames: 
   - @key@
 addr: @url@
-ca-cert: testdata/ca.crt
-client-key: testdata/client.key
+vaultCACert: testdata/ca.crt
+clientKey: testdata/client.key
 `
 	// approle authentication, but no role id
 	configRoleWithoutRoleID := `
-key-names: 
+keyNames: 
   - @key@
 addr: @url@
-ca-cert: testdata/ca.crt
-secret-id: cd834818-ac2b-4db0-b3e9-2cdd6db599f0
+vaultCACert: testdata/ca.crt
+secretID: cd834818-ac2b-4db0-b3e9-2cdd6db599f0
 `
 	// there are more than one authentication
 	configMoreThanOneAuth := `
-key-names: 
+keyNames: 
   - @key@
 addr: @url@
-ca-cert: testdata/ca.crt
+vaultCACert: testdata/ca.crt
 token: 8dad1053-4a4e-f359-2eab-d57968eb277f
-role-id: 655a9287-f1be-4be0-844c-4f13a1757532
+roleID: 655a9287-f1be-4be0-844c-4f13a1757532
 `
 
 	invalidConfigs := []struct {

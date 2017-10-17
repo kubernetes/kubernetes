@@ -82,7 +82,7 @@ func newVaultClient(config *EnvelopeConfig) (*vaultapi.Client, error) {
 	vaultConfig.Address = config.Address
 
 	tlsConfig := &vaultapi.TLSConfig{
-		CACert:        config.CACert,
+		CACert:        config.VaultCACert,
 		ClientCert:    config.ClientCert,
 		ClientKey:     config.ClientKey,
 		TLSServerName: config.TLSServerName,
@@ -100,13 +100,13 @@ func (c *clientWrapper) refreshToken(config *EnvelopeConfig) error {
 	case config.ClientCert != "" && config.ClientKey != "":
 		token, err := c.tlsToken(config)
 		if err != nil {
-			return err
+			return fmt.Errorf("rotating token through TLS auth backend: %v", err)
 		}
 		c.client.SetToken(token)
 	case config.RoleID != "":
 		token, err := c.appRoleToken(config)
 		if err != nil {
-			return err
+			return fmt.Errorf("rotating token through app role backend: %v", err)
 		}
 		c.client.SetToken(token)
 	default:

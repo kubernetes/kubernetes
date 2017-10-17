@@ -44,20 +44,20 @@ func TestTypicalCase(t *testing.T) {
 	defer server.Close()
 
 	configToken := &EnvelopeConfig{
-		Token:   uuid.NewRandom().String(),
-		Address: server.URL,
-		CACert:  cafile,
+		Token:       uuid.NewRandom().String(),
+		Address:     server.URL,
+		VaultCACert: cafile,
 	}
 	configTLS := &EnvelopeConfig{
-		ClientCert: clientCert,
-		ClientKey:  clientKey,
-		Address:    server.URL,
-		CACert:     cafile,
+		ClientCert:  clientCert,
+		ClientKey:   clientKey,
+		Address:     server.URL,
+		VaultCACert: cafile,
 	}
 	configRole := &EnvelopeConfig{
-		RoleID:  uuid.NewRandom().String(),
-		Address: server.URL,
-		CACert:  cafile,
+		RoleID:      uuid.NewRandom().String(),
+		Address:     server.URL,
+		VaultCACert: cafile,
 	}
 
 	configs := []struct {
@@ -80,9 +80,9 @@ func TestCustomTransitPath(t *testing.T) {
 	defer server.Close()
 
 	config := &EnvelopeConfig{
-		Token:   uuid.NewRandom().String(),
-		Address: server.URL,
-		CACert:  cafile,
+		Token:       uuid.NewRandom().String(),
+		Address:     server.URL,
+		VaultCACert: cafile,
 	}
 
 	// Work with custom transit path
@@ -116,9 +116,9 @@ func TestCustomAuthPath(t *testing.T) {
 	defer server.Close()
 
 	appRoleConfig := &EnvelopeConfig{
-		RoleID:  uuid.NewRandom().String(),
-		Address: server.URL,
-		CACert:  cafile,
+		RoleID:      uuid.NewRandom().String(),
+		Address:     server.URL,
+		VaultCACert: cafile,
 	}
 
 	validAuthPaths := []string{customAuthPath, "/" + customAuthPath, customAuthPath + "/", "/" + customAuthPath + "/"}
@@ -201,9 +201,9 @@ func TestForbiddenRequest(t *testing.T) {
 	defer server.Close()
 
 	config := &EnvelopeConfig{
-		Token:   uuid.NewRandom().String(),
-		Address: server.URL,
-		CACert:  cafile,
+		Token:       uuid.NewRandom().String(),
+		Address:     server.URL,
+		VaultCACert: cafile,
 	}
 	client, err := newClientWrapper(config)
 	if err != nil {
@@ -240,15 +240,15 @@ func TestRefreshToken(t *testing.T) {
 	defer server.Close()
 
 	configTLS := &EnvelopeConfig{
-		ClientCert: clientCert,
-		ClientKey:  clientKey,
-		Address:    server.URL,
-		CACert:     cafile,
+		ClientCert:  clientCert,
+		ClientKey:   clientKey,
+		Address:     server.URL,
+		VaultCACert: cafile,
 	}
 	configRole := &EnvelopeConfig{
-		RoleID:  uuid.NewRandom().String(),
-		Address: server.URL,
-		CACert:  cafile,
+		RoleID:      uuid.NewRandom().String(),
+		Address:     server.URL,
+		VaultCACert: cafile,
 	}
 
 	configs := []struct {
@@ -326,7 +326,7 @@ func (h *encryptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	msg, err := parseRequest(r)
 	if err != nil {
-		h.tb.Error("error request message for encrypt request: ", err)
+		h.tb.Fatalf("error request message for encrypt request: %v", err)
 	}
 
 	plain := msg["plaintext"].(string)
@@ -349,7 +349,7 @@ func (h *decryptHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	msg, err := parseRequest(r)
 	if err != nil {
-		h.tb.Error("error request message for decrypt request: ", err)
+		h.tb.Fatalf("error request message for decrypt request: %v", err)
 	}
 
 	cipher := msg["ciphertext"].(string)
@@ -380,7 +380,7 @@ type approleLoginHandler struct {
 func (h *approleLoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	msg, err := parseRequest(r)
 	if err != nil {
-		h.tb.Errorf("error request message for approle login: %s ", err)
+		h.tb.Fatalf("error request message for approle login: %s ", err)
 	}
 
 	roleID := msg["role_id"].(string)
