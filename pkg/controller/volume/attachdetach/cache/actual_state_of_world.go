@@ -173,7 +173,7 @@ type actualStateOfWorld struct {
 	sync.RWMutex
 }
 
-// The volume object represents a volume the the attach/detach controller
+// The volume object represents a volume the attach/detach controller
 // believes to be successfully attached to a node it is managing.
 type attachedVolume struct {
 	// volumeName contains the unique identifier for this volume.

@@ -33,17 +33,17 @@ func NewRunAsAny() (GroupStrategy, error) {
 }
 
 // Generate creates the group based on policy rules.  This strategy returns an empty slice.
-func (s *runAsAny) Generate(pod *api.Pod) ([]int64, error) {
-	return []int64{}, nil
+func (s *runAsAny) Generate(_ *api.Pod) ([]int64, error) {
+	return nil, nil
 }
 
 // Generate a single value to be applied.  This is used for FSGroup.  This strategy returns nil.
-func (s *runAsAny) GenerateSingle(pod *api.Pod) (*int64, error) {
+func (s *runAsAny) GenerateSingle(_ *api.Pod) (*int64, error) {
 	return nil, nil
 }
 
 // Validate ensures that the specified values fall within the range of the strategy.
-func (s *runAsAny) Validate(pod *api.Pod, groups []int64) field.ErrorList {
+func (s *runAsAny) Validate(_ *api.Pod, groups []int64) field.ErrorList {
 	return field.ErrorList{}
 
 }

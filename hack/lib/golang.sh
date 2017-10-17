@@ -263,7 +263,7 @@ kube::golang::current_platform() {
   echo "$os/$arch"
 }
 
-# Takes the the platform name ($1) and sets the appropriate golang env variables
+# Takes the platform name ($1) and sets the appropriate golang env variables
 # for that platform.
 kube::golang::set_platform_envs() {
   [[ -n ${1-} ]] || {

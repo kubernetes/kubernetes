@@ -29,7 +29,10 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var hostIPVersion = utilversion.MustParseSemantic("v1.8.0")
+var (
+	hostIPVersion = utilversion.MustParseSemantic("v1.8.0")
+	podUIDVersion = utilversion.MustParseSemantic("v1.8.0")
+)
 
 var _ = Describe("[sig-api-machinery] Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
@@ -197,6 +200,28 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 		}
 
 		testDownwardAPIUsingPod(f, pod, env, expectations)
+	})
+
+	It("should provide pod UID as env vars [Conformance]", func() {
+		framework.SkipUnlessServerVersionGTE(podUIDVersion, f.ClientSet.Discovery())
+		podName := "downward-api-" + string(uuid.NewUUID())
+		env := []v1.EnvVar{
+			{
+				Name: "POD_UID",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "metadata.uid",
+					},
+				},
+			},
+		}
+
+		expectations := []string{
+			fmt.Sprintf("POD_UID=[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}"),
+		}
+
+		testDownwardAPI(f, podName, env, expectations)
 	})
 })
 

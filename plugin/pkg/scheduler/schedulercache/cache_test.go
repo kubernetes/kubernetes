@@ -546,10 +546,34 @@ func TestForgetPod(t *testing.T) {
 			if err := assumeAndFinishBinding(cache, pod, now); err != nil {
 				t.Fatalf("assumePod failed: %v", err)
 			}
+			isAssumed, err := cache.IsAssumedPod(pod)
+			if err != nil {
+				t.Fatalf("IsAssumedPod failed: %v.", err)
+			}
+			if !isAssumed {
+				t.Fatalf("Pod is expected to be assumed.")
+			}
+			assumedPod, err := cache.GetPod(pod)
+			if err != nil {
+				t.Fatalf("GetPod failed: %v.", err)
+			}
+			if assumedPod.Namespace != pod.Namespace {
+				t.Errorf("assumedPod.Namespace != pod.Namespace (%s != %s)", assumedPod.Namespace, pod.Namespace)
+			}
+			if assumedPod.Name != pod.Name {
+				t.Errorf("assumedPod.Name != pod.Name (%s != %s)", assumedPod.Name, pod.Name)
+			}
 		}
 		for _, pod := range tt.pods {
 			if err := cache.ForgetPod(pod); err != nil {
 				t.Fatalf("ForgetPod failed: %v", err)
+			}
+			isAssumed, err := cache.IsAssumedPod(pod)
+			if err != nil {
+				t.Fatalf("IsAssumedPod failed: %v.", err)
+			}
+			if isAssumed {
+				t.Fatalf("Pod is expected to be unassumed.")
 			}
 		}
 		cache.cleanupAssumedPods(now.Add(2 * ttl))

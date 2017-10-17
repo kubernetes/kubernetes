@@ -72,7 +72,7 @@ def install_load_balancer(apiserver, tls):
     cert_exists = server_cert_path and os.path.isfile(server_cert_path)
     server_key_path = layer_options.get('server_key_path')
     key_exists = server_key_path and os.path.isfile(server_key_path)
-    # Do both the the key and certificate exist?
+    # Do both the key and certificate exist?
     if cert_exists and key_exists:
         # At this point the cert and key exist, and they are owned by root.
         chown = ['chown', 'www-data:www-data', server_cert_path]

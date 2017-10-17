@@ -84,7 +84,7 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 	if obj.Conntrack.TCPCloseWaitTimeout == zero {
 		// See https://github.com/kubernetes/kubernetes/issues/32551.
 		//
-		// CLOSE_WAIT conntrack state occurs when the the Linux kernel
+		// CLOSE_WAIT conntrack state occurs when the Linux kernel
 		// sees a FIN from the remote server. Note: this is a half-close
 		// condition that persists as long as the local side keeps the
 		// socket open. The condition is rare as it is typical in most

@@ -67,7 +67,7 @@ import (
 )
 
 const (
-	// DefaultLegacyAPIPrefix is where the the legacy APIs will be located.
+	// DefaultLegacyAPIPrefix is where the legacy APIs will be located.
 	DefaultLegacyAPIPrefix = "/api"
 
 	// APIGroupPrefix is where non-legacy API group will be located.
