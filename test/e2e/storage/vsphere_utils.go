@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/test/e2e/framework"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // Sanity check for vSphere testing.  Verify the persistent disk attached to the node.
@@ -245,7 +244,7 @@ func getVSpherePodSpecWithClaim(claimName string, nodeSelectorKV map[string]stri
 			Containers: []v1.Container{
 				{
 					Name:    "volume-tester",
-					Image:   imageutils.GetBusyBoxImage(),
+					Image:   "busybox",
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", command},
 					VolumeMounts: []v1.VolumeMount{
@@ -310,7 +309,7 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 			Containers: []v1.Container{
 				{
 					Name:         "vsphere-e2e-container-" + string(uuid.NewUUID()),
-					Image:        imageutils.GetBusyBoxImage(),
+					Image:        "busybox",
 					Command:      commands,
 					VolumeMounts: volumeMounts,
 				},

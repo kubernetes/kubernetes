@@ -95,7 +95,7 @@ var (
 	kittenImage   = imageutils.GetE2EImage(imageutils.Kitten)
 	redisImage    = imageutils.GetE2EImage(imageutils.Redis)
 	nginxImage    = imageutils.GetE2EImage(imageutils.NginxSlim)
-	busyboxImage  = imageutils.GetBusyBoxImage()
+	busyboxImage  = "busybox"
 )
 
 var testImages = struct {
