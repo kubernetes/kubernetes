@@ -1219,6 +1219,30 @@ func TestUpscaleCap(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestUpscaleCapGreaterThanMaxReplicas(t *testing.T) {
+	tc := testCase{
+		minReplicas:     1,
+		maxReplicas:     20,
+		initialReplicas: 3,
+		// desiredReplicas would be 24 without maxReplicas
+		desiredReplicas:     20,
+		CPUTarget:           10,
+		reportedLevels:      []uint64{100, 200, 300},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("0.1"), resource.MustParse("0.1"), resource.MustParse("0.1")},
+		useMetricsApi:       true,
+		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.ScalingLimited,
+			Status: v1.ConditionTrue,
+			Reason: "ScaleUpLimit",
+		}, autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.ScalingLimited,
+			Status: v1.ConditionTrue,
+			Reason: "TooManyReplicas",
+		}),
+	}
+	tc.runTest(t)
+}
+
 func TestConditionInvalidSelectorMissing(t *testing.T) {
 	tc := testCase{
 		minReplicas:         1,
