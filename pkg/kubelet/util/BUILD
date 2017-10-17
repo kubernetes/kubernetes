@@ -53,7 +53,6 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/kubelet/util/cache:all-srcs",
-        "//pkg/kubelet/util/csr:all-srcs",
         "//pkg/kubelet/util/format:all-srcs",
         "//pkg/kubelet/util/ioutils:all-srcs",
         "//pkg/kubelet/util/queue:all-srcs",
