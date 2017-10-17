@@ -277,6 +277,39 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 			testCanConnect(f, f.Namespace, "client-a", service, 80)
 			testCanConnect(f, f.Namespace, "client-b", service, 81)
 		})
+
+		It("should allow ingress access on one named port [Feature:NetworkPolicy]", func() {
+			policy := &networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "allow-client-a-via-named-port-ingress-rule",
+				},
+				Spec: networking.NetworkPolicySpec{
+					// Apply this policy to the Server
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"pod-name": podServer.Name,
+						},
+					},
+					// Allow traffic to only one named port: "serve-80".
+					Ingress: []networking.NetworkPolicyIngressRule{{
+						Ports: []networking.NetworkPolicyPort{{
+							Port: &intstr.IntOrString{Type: intstr.String, StrVal: "serve-80"},
+						}},
+					}},
+				},
+			}
+
+			policy, err := f.InternalClientset.Networking().NetworkPolicies(f.Namespace.Name).Create(policy)
+			Expect(err).NotTo(HaveOccurred())
+			defer cleanupNetworkPolicy(f, policy)
+
+			By("Creating client-a which should be able to contact the server.", func() {
+				testCanConnect(f, f.Namespace, "client-a", service, 80)
+			})
+			By("Creating client-b which should not be able to contact the server on port 81.", func() {
+				testCannotConnect(f, f.Namespace, "client-b", service, 81)
+			})
+		})
 	})
 })
 
@@ -392,7 +425,12 @@ func createServerPodAndService(f *framework.Framework, namespace *v1.Namespace, 
 					Value: "foo",
 				},
 			},
-			Ports: []v1.ContainerPort{{ContainerPort: int32(port)}},
+			Ports: []v1.ContainerPort{
+				{
+					ContainerPort: int32(port),
+					Name:          fmt.Sprintf("serve-%d", port),
+				},
+			},
 			ReadinessProbe: &v1.Probe{
 				Handler: v1.Handler{
 					HTTPGet: &v1.HTTPGetAction{
