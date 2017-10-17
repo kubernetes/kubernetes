@@ -19,9 +19,12 @@ limitations under the License.
 package factory
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
+
+	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -52,9 +55,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/core"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
-
-	"encoding/json"
-	"github.com/golang/glog"
 )
 
 const (
@@ -192,6 +192,9 @@ func NewConfigFactory(
 					}
 				},
 				UpdateFunc: func(oldObj, newObj interface{}) {
+					if c.skipPodUpdate(newObj.(*v1.Pod)) {
+						return
+					}
 					if err := c.podQueue.Update(newObj); err != nil {
 						runtime.HandleError(fmt.Errorf("unable to update %T: %v", newObj, err))
 					}
@@ -253,6 +256,53 @@ func NewConfigFactory(
 	// it only make sense when pod is scheduled or deleted
 
 	return c
+}
+
+// skipPodUpdate checks whether the specified pod update should be ignored.
+// This function will return true if
+//   - The pod has already been assumed, AND
+//   - The pod has only its ResourceVersion, Spec.NodeName and/or Annotations
+//     updated.
+func (c *configFactory) skipPodUpdate(pod *v1.Pod) bool {
+	// Non-assumed pods should never be skipped.
+	isAssumed, err := c.schedulerCache.IsAssumedPod(pod)
+	if err != nil {
+		runtime.HandleError(fmt.Errorf("failed to check whether pod %s/%s is assumed: %v", pod.Namespace, pod.Name, err))
+		return false
+	}
+	if !isAssumed {
+		return false
+	}
+
+	// Gets the assumed pod from the cache.
+	assumedPod, err := c.schedulerCache.GetPod(pod)
+	if err != nil {
+		runtime.HandleError(fmt.Errorf("failed to get assumed pod %s/%s from cache: %v", pod.Namespace, pod.Name, err))
+		return false
+	}
+
+	// Compares the assumed pod in the cache with the pod update. If they are
+	// equal (with certain fields excluded), this pod update will be skipped.
+	f := func(pod *v1.Pod) *v1.Pod {
+		p := pod.DeepCopy()
+		// ResourceVersion must be excluded because each object update will
+		// have a new resource version.
+		p.ResourceVersion = ""
+		// Spec.NodeName must be excluded because the pod assumed in the cache
+		// is expected to have a node assigned while the pod update may nor may
+		// not have this field set.
+		p.Spec.NodeName = ""
+		// Annotations must be excluded for the reasons described in
+		// https://github.com/kubernetes/kubernetes/issues/52914.
+		p.Annotations = nil
+		return p
+	}
+	assumedPodCopy, podCopy := f(assumedPod), f(pod)
+	if !reflect.DeepEqual(assumedPodCopy, podCopy) {
+		return false
+	}
+	glog.V(3).Infof("Skipping pod %s/%s update", pod.Namespace, pod.Name)
+	return true
 }
 
 func (c *configFactory) onPvAdd(obj interface{}) {

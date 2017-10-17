@@ -79,6 +79,13 @@ type Cache interface {
 	// RemovePod removes a pod. The pod's information would be subtracted from assigned node.
 	RemovePod(pod *v1.Pod) error
 
+	// GetPod returns the pod from the cache with the same namespace and the
+	// same name of the specified pod.
+	GetPod(pod *v1.Pod) (*v1.Pod, error)
+
+	// IsAssumedPod returns true if the pod is assumed and not expired.
+	IsAssumedPod(pod *v1.Pod) (bool, error)
+
 	// AddNode adds overall information about node.
 	AddNode(node *v1.Node) error
 
