@@ -21,7 +21,7 @@ set -o pipefail
 # generate-internal-groups generates everything for a project with internal types, e.g. an
 # user-provided API server based on k8s.io/apiserver.
 
-if [ "$#" -le 5 ] || [ "${1}" == "--help" ]; then
+if [ "$#" -lt 5 ] || [ "${1}" == "--help" ]; then
   cat <<EOF
 Usage: $(basename $0) <generators> <output-package> <internal-apis-package> <extensiona-apis-package> <groups-versions> ...
 
