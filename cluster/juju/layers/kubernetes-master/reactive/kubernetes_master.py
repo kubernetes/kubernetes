@@ -61,8 +61,6 @@ nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 
-valid_auth_modes = ['rbac', 'none']
-
 
 def service_cidr():
     ''' Return the charm's service-cidr config '''
@@ -357,11 +355,6 @@ def idle_status(kube_api, kube_control):
         msg = 'WARN: cannot change service-cidr, still using ' + service_cidr()
         hookenv.status_set('active', msg)
     else:
-        mode = hookenv.config().get('authorization-mode').lower()
-        if mode not in valid_auth_modes:
-            hookenv.status_set('blocked', 'Incorrect authorization mode.')
-            return
-
         # All services should be up and running at this point. Double-check...
         failing_services = master_services_down()
         if len(failing_services) == 0:
@@ -463,7 +456,7 @@ def create_service_configs(kube_control):
         group = request[1]['group']
         kubelet_token = get_token(username)
         if not kubelet_token and username and group:
-            # Usernames have to be in the form of system:node:<hostname>
+            # Usernames have to be in the form of system:node:<nodeName>
             userid = "kubelet-{}".format(request[0].split('/')[1])
             setup_tokens(None, username, userid, group)
             kubelet_token = get_token(username)
@@ -500,7 +493,7 @@ def flush_auth_for_departed(kube_control):
     with open(token_auth_file, 'w') as fp:
         fp.writelines(known_tokens)
     # Trigger rebroadcast of auth files for followers
-    remove_state('autentication.setup')
+    remove_state('authentication.setup')
 
 
 @when_not('kube-control.connected')
@@ -706,9 +699,8 @@ def initial_nrpe_config(nagios=None):
       'kubernetes-master.components.started')
 def switch_auth_mode():
     config = hookenv.config()
-    mode = config.get('authorization-mode').lower()
-    if mode in valid_auth_modes and \
-            data_changed('auth-mode', mode):
+    mode = config.get('authorization-mode')
+    if data_changed('auth-mode', mode):
         remove_state('kubernetes-master.components.started')
 
 
@@ -1063,11 +1055,11 @@ def configure_apiserver():
         'DefaultTolerationSeconds'
     ]
 
-    if hookenv.config('authorization-mode').lower() == 'rbac':
+    auth_mode = hookenv.config('authorization-mode')
+    if 'Node' in auth_mode:
         admission_control.append('NodeRestriction')
-        api_opts.add('authorization-mode', 'Node,RBAC', strict=True)
-    else:
-        api_opts.add('authorization-mode', 'AlwaysAllow', strict=True)
+
+    api_opts.add('authorization-mode', auth_mode, strict=True)
 
     if get_version('kube-apiserver') < (1, 6):
         hookenv.log('Removing DefaultTolerationSeconds from admission-control')

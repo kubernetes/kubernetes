@@ -52,8 +52,6 @@ kubeclientconfig_path = '/root/.kube/config'
 
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 
-db = unitdata.kv()
-
 
 @hook('upgrade-charm')
 def upgrade_charm():
@@ -338,7 +336,8 @@ def start_worker(kube_api, kube_control, auth_control, cni):
         hookenv.log('Waiting for cluster cidr.')
         return
 
-    creds = db.get('credentials')
+    nodeuser = 'system:node:{}'.format(gethostname())
+    creds = kube_control.get_auth_credentials(nodeuser)
     data_changed('kube-control.creds', creds)
 
     # set --allow-privileged flag for kubelet
@@ -830,7 +829,6 @@ def catch_change_in_creds(kube_control):
     if creds \
             and data_changed('kube-control.creds', creds) \
             and creds['user'] == nodeuser:
-        db.set('credentials', creds)
         set_state('worker.auth.bootstrapped')
         set_state('kubernetes-worker.restart-needed')
 
