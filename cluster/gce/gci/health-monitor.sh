@@ -30,7 +30,7 @@ function docker_monitoring {
       echo "Docker daemon failed!"
       pkill docker
       # Wait for a while, as we don't want to kill it again before it is really up.
-      sleep 30
+      sleep 120
     else
       sleep "${SLEEP_SECONDS}"
     fi
