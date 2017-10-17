@@ -242,8 +242,8 @@ __custom_func() {
     * secrets
     * serviceaccounts (aka 'sa')
     * services (aka 'svc')
-    * statefulsets
-    * storageclasses
+    * statefulsets (aka 'sts')
+    * storageclasses (aka 'sc')
 
 `
 )
