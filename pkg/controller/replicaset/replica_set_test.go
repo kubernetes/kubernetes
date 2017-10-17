@@ -217,12 +217,12 @@ func TestSyncReplicaSetDoesNothing(t *testing.T) {
 
 	// 2 running pods, a controller with 2 replicas, sync is a no-op
 	labelMap := map[string]string{"foo": "bar"}
-	rsSpec := newReplicaSet(2, labelMap)
-	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rsSpec)
-	newPodList(informers.Core().V1().Pods().Informer().GetIndexer(), 2, v1.PodRunning, labelMap, rsSpec, "pod")
+	rs := newReplicaSet(2, labelMap)
+	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
+	newPodList(informers.Core().V1().Pods().Informer().GetIndexer(), 2, v1.PodRunning, labelMap, rs, "pod")
 
 	manager.podControl = &fakePodControl
-	manager.syncReplicaSet(getKey(rsSpec, t))
+	manager.syncReplicaSet(getKey(rs, t))
 	validateSyncReplicaSet(t, &fakePodControl, 0, 0, 0)
 }
 
@@ -234,30 +234,19 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, BurstReplicas)
 	manager.podControl = &fakePodControl
 
-	received := make(chan string)
-	manager.syncHandler = func(key string) error {
-		received <- key
-		return nil
-	}
-
 	// The DeletedFinalStateUnknown object should cause the ReplicaSet manager to insert
 	// the controller matching the selectors of the deleted pod into the work queue.
 	labelMap := map[string]string{"foo": "bar"}
-	rsSpec := newReplicaSet(1, labelMap)
-	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rsSpec)
-	pods := newPodList(nil, 1, v1.PodRunning, labelMap, rsSpec, "pod")
-	manager.deletePod(cache.DeletedFinalStateUnknown{Key: "foo", Obj: &pods.Items[0]})
-
-	go manager.worker()
-
-	expected := getKey(rsSpec, t)
-	select {
-	case key := <-received:
-		if key != expected {
-			t.Errorf("Unexpected sync all for ReplicaSet %v, expected %v", key, expected)
-		}
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("Processing DeleteFinalStateUnknown took longer than expected")
+	rs := newReplicaSet(1, labelMap)
+	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
+	pods := newPodList(nil, 1, v1.PodRunning, labelMap, rs, "pod")
+	rss := getAffectedRSsByPodDeletion(cache.DeletedFinalStateUnknown{Key: "foo", Obj: &pods.Items[0]}, manager)
+	if len(rss) != 1 {
+		t.Fatalf("Expected 1 replicaset, got: %d", len(rss))
+	}
+	key := getKey(rss[0], t)
+	if key != "default/foobar" {
+		t.Errorf("Unexpected sync all for ReplicaSet: got %v, expected default/foobar", key)
 	}
 }
 
@@ -308,47 +297,47 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	manager.podControl = &fakePodControl
 
 	labelMap := map[string]string{"foo": "bar"}
-	rsSpec := newReplicaSet(2, labelMap)
-	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rsSpec)
-	newPodList(informers.Core().V1().Pods().Informer().GetIndexer(), 1, v1.PodRunning, labelMap, rsSpec, "pod")
+	rs := newReplicaSet(2, labelMap)
+	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
+	newPodList(informers.Core().V1().Pods().Informer().GetIndexer(), 1, v1.PodRunning, labelMap, rs, "pod")
 
 	// Creates a replica and sets expectations
-	rsSpec.Status.Replicas = 1
-	rsSpec.Status.ReadyReplicas = 1
-	rsSpec.Status.AvailableReplicas = 1
-	manager.syncReplicaSet(getKey(rsSpec, t))
+	rs.Status.Replicas = 1
+	rs.Status.ReadyReplicas = 1
+	rs.Status.AvailableReplicas = 1
+	manager.syncReplicaSet(getKey(rs, t))
 	validateSyncReplicaSet(t, &fakePodControl, 1, 0, 0)
 
 	// Expectations prevents replicas but not an update on status
-	rsSpec.Status.Replicas = 0
-	rsSpec.Status.ReadyReplicas = 0
-	rsSpec.Status.AvailableReplicas = 0
+	rs.Status.Replicas = 0
+	rs.Status.ReadyReplicas = 0
+	rs.Status.AvailableReplicas = 0
 	fakePodControl.Clear()
-	manager.syncReplicaSet(getKey(rsSpec, t))
+	manager.syncReplicaSet(getKey(rs, t))
 	validateSyncReplicaSet(t, &fakePodControl, 0, 0, 0)
 
 	// Get the key for the controller
-	rsKey, err := controller.KeyFunc(rsSpec)
+	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
-		t.Errorf("Couldn't get key for object %#v: %v", rsSpec, err)
+		t.Errorf("Couldn't get key for object %#v: %v", rs, err)
 	}
 
 	// Lowering expectations should lead to a sync that creates a replica, however the
 	// fakePodControl error will prevent this, leaving expectations at 0, 0
 	manager.expectations.CreationObserved(rsKey)
-	rsSpec.Status.Replicas = 1
-	rsSpec.Status.ReadyReplicas = 1
-	rsSpec.Status.AvailableReplicas = 1
+	rs.Status.Replicas = 1
+	rs.Status.ReadyReplicas = 1
+	rs.Status.AvailableReplicas = 1
 	fakePodControl.Clear()
 	fakePodControl.Err = fmt.Errorf("Fake Error")
 
-	manager.syncReplicaSet(getKey(rsSpec, t))
+	manager.syncReplicaSet(getKey(rs, t))
 	validateSyncReplicaSet(t, &fakePodControl, 1, 0, 0)
 
 	// This replica should not need a Lowering of expectations, since the previous create failed
 	fakePodControl.Clear()
 	fakePodControl.Err = nil
-	manager.syncReplicaSet(getKey(rsSpec, t))
+	manager.syncReplicaSet(getKey(rs, t))
 	validateSyncReplicaSet(t, &fakePodControl, 1, 0, 0)
 
 	// 2 PUT for the ReplicaSet status during dormancy window.
@@ -448,9 +437,9 @@ func TestWatchControllers(t *testing.T) {
 		if !exists || err != nil {
 			t.Errorf("Expected to find replica set under key %v", key)
 		}
-		rsSpec := *obj.(*extensions.ReplicaSet)
-		if !apiequality.Semantic.DeepDerivative(rsSpec, testRSSpec) {
-			t.Errorf("Expected %#v, but got %#v", testRSSpec, rsSpec)
+		rs := *obj.(*extensions.ReplicaSet)
+		if !apiequality.Semantic.DeepDerivative(rs, testRSSpec) {
+			t.Errorf("Expected %#v, but got %#v", testRSSpec, rs)
 		}
 		close(received)
 		return nil
@@ -493,12 +482,12 @@ func TestWatchPods(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error splitting key: %v", err)
 		}
-		rsSpec, err := manager.rsLister.ReplicaSets(namespace).Get(name)
+		rs, err := manager.rsLister.ReplicaSets(namespace).Get(name)
 		if err != nil {
 			t.Errorf("Expected to find replica set under key %v: %v", key, err)
 		}
-		if !apiequality.Semantic.DeepDerivative(rsSpec, testRSSpec) {
-			t.Errorf("\nExpected %#v,\nbut got %#v", testRSSpec, rsSpec)
+		if !apiequality.Semantic.DeepDerivative(rs, testRSSpec) {
+			t.Errorf("\nExpected %#v,\nbut got %#v", testRSSpec, rs)
 		}
 		close(received)
 		return nil
@@ -526,21 +515,6 @@ func TestUpdatePods(t *testing.T) {
 	defer close(stopCh)
 	manager, informers := testNewReplicaSetControllerFromClient(fake.NewSimpleClientset(), stopCh, BurstReplicas)
 
-	received := make(chan string)
-
-	manager.syncHandler = func(key string) error {
-		namespace, name, err := cache.SplitMetaNamespaceKey(key)
-		if err != nil {
-			t.Errorf("Error splitting key: %v", err)
-		}
-		rsSpec, err := manager.rsLister.ReplicaSets(namespace).Get(name)
-		if err != nil {
-			t.Errorf("Expected to find replica set under key %v: %v", key, err)
-		}
-		received <- rsSpec.Name
-		return nil
-	}
-
 	go wait.Until(manager.worker, 10*time.Millisecond, stopCh)
 
 	// Put 2 ReplicaSets and one pod into the informers
@@ -564,17 +538,19 @@ func TestUpdatePods(t *testing.T) {
 	pod2 := pod1
 	pod2.Labels = labelMap2
 	pod2.ResourceVersion = "2"
-	manager.updatePod(&pod1, &pod2)
+	rss := getAffectedRSsByPodUpdate(&pod1, &pod2, manager)
 	expected := sets.NewString(testRSSpec1.Name)
-	for _, name := range expected.List() {
+
+	var rsKeys []string
+	for _, rs := range rss {
+		// We only need <name> from <namespace/name> key
+		// Both namespace and name are always available for these unit tests
+		rsKeys = append(rsKeys, strings.Split(getKey(rs, t), "/")[1])
+	}
+	for idx, name := range expected.List() {
 		t.Logf("Expecting update for %+v", name)
-		select {
-		case got := <-received:
-			if !expected.Has(got) {
-				t.Errorf("Expected keys %#v got %v", expected, got)
-			}
-		case <-time.After(wait.ForeverTestTimeout):
-			t.Errorf("Expected update notifications for replica sets")
+		if !expected.Has(rsKeys[idx]) {
+			t.Errorf("Expected keys %#v got %v", expected, rsKeys)
 		}
 	}
 
@@ -586,17 +562,17 @@ func TestUpdatePods(t *testing.T) {
 	pod2 = pod1
 	pod2.OwnerReferences = nil
 	pod2.ResourceVersion = "2"
-	manager.updatePod(&pod1, &pod2)
+	rss = getAffectedRSsByPodUpdate(&pod1, &pod2, manager)
 	expected = sets.NewString(testRSSpec2.Name)
-	for _, name := range expected.List() {
+
+	rsKeys = nil
+	for _, rs := range rss {
+		rsKeys = append(rsKeys, strings.Split(getKey(rs, t), "/")[1])
+	}
+	for idx, name := range expected.List() {
 		t.Logf("Expecting update for %+v", name)
-		select {
-		case got := <-received:
-			if !expected.Has(got) {
-				t.Errorf("Expected keys %#v got %v", expected, got)
-			}
-		case <-time.After(wait.ForeverTestTimeout):
-			t.Errorf("Expected update notifications for replica sets")
+		if !expected.Has(rsKeys[idx]) {
+			t.Errorf("Expected keys %#v got %v", expected, rsKeys)
 		}
 	}
 
@@ -609,17 +585,17 @@ func TestUpdatePods(t *testing.T) {
 	pod2 = pod1
 	pod2.OwnerReferences = nil
 	pod2.ResourceVersion = "2"
-	manager.updatePod(&pod1, &pod2)
+	rss = getAffectedRSsByPodUpdate(&pod1, &pod2, manager)
 	expected = sets.NewString(testRSSpec1.Name, testRSSpec2.Name)
-	for _, name := range expected.List() {
+
+	rsKeys = nil
+	for _, rs := range rss {
+		rsKeys = append(rsKeys, strings.Split(getKey(rs, t), "/")[1])
+	}
+	for idx, name := range expected.List() {
 		t.Logf("Expecting update for %+v", name)
-		select {
-		case got := <-received:
-			if !expected.Has(got) {
-				t.Errorf("Expected keys %#v got %v", expected, got)
-			}
-		case <-time.After(wait.ForeverTestTimeout):
-			t.Errorf("Expected update notifications for replica sets")
+		if !expected.Has(rsKeys[idx]) {
+			t.Errorf("Expected keys %#v got %v", expected, rsKeys)
 		}
 	}
 
@@ -631,17 +607,17 @@ func TestUpdatePods(t *testing.T) {
 	pod2 = pod1
 	pod2.Labels = labelMap2
 	pod2.ResourceVersion = "2"
-	manager.updatePod(&pod1, &pod2)
+	rss = getAffectedRSsByPodUpdate(&pod1, &pod2, manager)
 	expected = sets.NewString(testRSSpec2.Name)
-	for _, name := range expected.List() {
+
+	rsKeys = nil
+	for _, rs := range rss {
+		rsKeys = append(rsKeys, strings.Split(getKey(rs, t), "/")[1])
+	}
+	for idx, name := range expected.List() {
 		t.Logf("Expecting update for %+v", name)
-		select {
-		case got := <-received:
-			if !expected.Has(got) {
-				t.Errorf("Expected keys %#v got %v", expected, got)
-			}
-		case <-time.After(wait.ForeverTestTimeout):
-			t.Errorf("Expected update notifications for replica sets")
+		if !expected.Has(rsKeys[idx]) {
+			t.Errorf("Expected keys %#v got %v", expected, rsKeys)
 		}
 	}
 }
@@ -727,32 +703,32 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 // TODO: This test is too hairy for a unittest. It should be moved to an E2E suite.
 func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int) {
 	labelMap := map[string]string{"foo": "bar"}
-	rsSpec := newReplicaSet(numReplicas, labelMap)
-	client := fake.NewSimpleClientset(rsSpec)
+	rs := newReplicaSet(numReplicas, labelMap)
+	client := fake.NewSimpleClientset(rs)
 	fakePodControl := controller.FakePodControl{}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	manager, informers := testNewReplicaSetControllerFromClient(client, stopCh, burstReplicas)
 	manager.podControl = &fakePodControl
 
-	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rsSpec)
+	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
 
 	expectedPods := int32(0)
-	pods := newPodList(nil, numReplicas, v1.PodPending, labelMap, rsSpec, "pod")
+	pods := newPodList(nil, numReplicas, v1.PodPending, labelMap, rs, "pod")
 
-	rsKey, err := controller.KeyFunc(rsSpec)
+	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
-		t.Errorf("Couldn't get key for object %#v: %v", rsSpec, err)
+		t.Errorf("Couldn't get key for object %#v: %v", rs, err)
 	}
 
 	// Size up the controller, then size it down, and confirm the expected create/delete pattern
 	for _, replicas := range []int32{int32(numReplicas), 0} {
 
-		*(rsSpec.Spec.Replicas) = replicas
-		informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rsSpec)
+		*(rs.Spec.Replicas) = replicas
+		informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
 
 		for i := 0; i < numReplicas; i += burstReplicas {
-			manager.syncReplicaSet(getKey(rsSpec, t))
+			manager.syncReplicaSet(getKey(rs, t))
 
 			// The store accrues active pods. It's also used by the ReplicaSet to determine how many
 			// replicas to create.
@@ -772,7 +748,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 				// None of these should wake the controller because it has expectations==BurstReplicas.
 				for i := int32(0); i < expectedPods-1; i++ {
 					informers.Core().V1().Pods().Informer().GetIndexer().Add(&pods.Items[i])
-					manager.addPod(&pods.Items[i])
+					getAffectedRSsByPodCreation(&pods.Items[i], manager)
 				}
 
 				podExp, exists, err := manager.expectations.GetExpectations(rsKey)
@@ -791,7 +767,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 
 				// To accurately simulate a watch we must delete the exact pods
 				// the rs is waiting for.
-				expectedDels := manager.expectations.GetUIDs(getKey(rsSpec, t))
+				expectedDels := manager.expectations.GetUIDs(getKey(rs, t))
 				podsToDelete := []*v1.Pod{}
 				isController := true
 				for _, key := range expectedDels.List() {
@@ -800,9 +776,9 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      nsName[1],
 							Namespace: nsName[0],
-							Labels:    rsSpec.Spec.Selector.MatchLabels,
+							Labels:    rs.Spec.Selector.MatchLabels,
 							OwnerReferences: []metav1.OwnerReference{
-								{UID: rsSpec.UID, APIVersion: "v1", Kind: "ReplicaSet", Name: rsSpec.Name, Controller: &isController},
+								{UID: rs.UID, APIVersion: "v1", Kind: "ReplicaSet", Name: rs.Name, Controller: &isController},
 							},
 						},
 					})
@@ -812,7 +788,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 				// don't double delete.
 				for i := range podsToDelete[1:] {
 					informers.Core().V1().Pods().Informer().GetIndexer().Delete(podsToDelete[i])
-					manager.deletePod(podsToDelete[i])
+					getAffectedRSsByPodDeletion(podsToDelete[i], manager)
 				}
 				podExp, exists, err := manager.expectations.GetExpectations(rsKey)
 				if !exists || err != nil {
@@ -825,7 +801,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 
 			// Check that the ReplicaSet didn't take any action for all the above pods
 			fakePodControl.Clear()
-			manager.syncReplicaSet(getKey(rsSpec, t))
+			manager.syncReplicaSet(getKey(rs, t))
 			validateSyncReplicaSet(t, &fakePodControl, 0, 0, 0)
 
 			// Create/Delete the last pod
@@ -833,9 +809,9 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 			// which will cause it to create/delete the remaining replicas up to burstReplicas.
 			if replicas != 0 {
 				informers.Core().V1().Pods().Informer().GetIndexer().Add(&pods.Items[expectedPods-1])
-				manager.addPod(&pods.Items[expectedPods-1])
+				getAffectedRSsByPodCreation(&pods.Items[expectedPods-1], manager)
 			} else {
-				expectedDel := manager.expectations.GetUIDs(getKey(rsSpec, t))
+				expectedDel := manager.expectations.GetUIDs(getKey(rs, t))
 				if expectedDel.Len() != 1 {
 					t.Fatalf("Waiting on unexpected number of deletes.")
 				}
@@ -845,25 +821,25 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      nsName[1],
 						Namespace: nsName[0],
-						Labels:    rsSpec.Spec.Selector.MatchLabels,
+						Labels:    rs.Spec.Selector.MatchLabels,
 						OwnerReferences: []metav1.OwnerReference{
-							{UID: rsSpec.UID, APIVersion: "v1", Kind: "ReplicaSet", Name: rsSpec.Name, Controller: &isController},
+							{UID: rs.UID, APIVersion: "v1", Kind: "ReplicaSet", Name: rs.Name, Controller: &isController},
 						},
 					},
 				}
 				informers.Core().V1().Pods().Informer().GetIndexer().Delete(lastPod)
-				manager.deletePod(lastPod)
+				getAffectedRSsByPodDeletion(lastPod, manager)
 			}
 			pods.Items = pods.Items[expectedPods:]
 		}
 
 		// Confirm that we've created the right number of replicas
 		activePods := int32(len(informers.Core().V1().Pods().Informer().GetIndexer().List()))
-		if activePods != *(rsSpec.Spec.Replicas) {
-			t.Fatalf("Unexpected number of active pods, expected %d, got %d", *(rsSpec.Spec.Replicas), activePods)
+		if activePods != *(rs.Spec.Replicas) {
+			t.Fatalf("Unexpected number of active pods, expected %d, got %d", *(rs.Spec.Replicas), activePods)
 		}
 		// Replenish the pod list, since we cut it down sizing up
-		pods = newPodList(nil, int(replicas), v1.PodRunning, labelMap, rsSpec, "pod")
+		pods = newPodList(nil, int(replicas), v1.PodRunning, labelMap, rs, "pod")
 	}
 }
 
@@ -895,9 +871,9 @@ func TestRSSyncExpectations(t *testing.T) {
 	manager.podControl = &fakePodControl
 
 	labelMap := map[string]string{"foo": "bar"}
-	rsSpec := newReplicaSet(2, labelMap)
-	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rsSpec)
-	pods := newPodList(nil, 2, v1.PodPending, labelMap, rsSpec, "pod")
+	rs := newReplicaSet(2, labelMap)
+	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
+	pods := newPodList(nil, 2, v1.PodPending, labelMap, rs, "pod")
 	informers.Core().V1().Pods().Informer().GetIndexer().Add(&pods.Items[0])
 	postExpectationsPod := pods.Items[1]
 
@@ -909,7 +885,7 @@ func TestRSSyncExpectations(t *testing.T) {
 			informers.Core().V1().Pods().Informer().GetIndexer().Add(&postExpectationsPod)
 		},
 	})
-	manager.syncReplicaSet(getKey(rsSpec, t))
+	manager.syncReplicaSet(getKey(rs, t))
 	validateSyncReplicaSet(t, &fakePodControl, 0, 0, 0)
 }
 
@@ -982,10 +958,10 @@ func TestOverlappingRSs(t *testing.T) {
 	timestamp := metav1.Date(2014, time.December, 0, 0, 0, 0, 0, time.Local)
 	var controllers []*extensions.ReplicaSet
 	for j := 1; j < 10; j++ {
-		rsSpec := newReplicaSet(1, labelMap)
-		rsSpec.CreationTimestamp = timestamp
-		rsSpec.Name = fmt.Sprintf("rs%d", j)
-		controllers = append(controllers, rsSpec)
+		rs := newReplicaSet(1, labelMap)
+		rs.CreationTimestamp = timestamp
+		rs.Name = fmt.Sprintf("rs%d", j)
+		controllers = append(controllers, rs)
 	}
 	shuffledControllers := shuffle(controllers)
 	for j := range shuffledControllers {
@@ -1003,10 +979,13 @@ func TestOverlappingRSs(t *testing.T) {
 	}
 	rsKey := getKey(rs, t)
 
-	manager.addPod(pod)
-	queueRS, _ := manager.queue.Get()
-	if queueRS != rsKey {
-		t.Fatalf("Expected to find key %v in queue, found %v", rsKey, queueRS)
+	rss := getAffectedRSsByPodCreation(pod, manager)
+	if len(rss) != 1 {
+		t.Fatalf("Expected 1 replicaset, got: %d", len(rss))
+	}
+	key := getKey(rss[0], t)
+	if key != rsKey {
+		t.Fatalf("Expected to find key %v in queue, found %v", rsKey, key)
 	}
 }
 
@@ -1029,13 +1008,14 @@ func TestDeletionTimestamp(t *testing.T) {
 	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(&pod)})
 
 	// A pod added with a deletion timestamp should decrement deletions, not creations.
-	manager.addPod(&pod)
-
-	queueRS, _ := manager.queue.Get()
-	if queueRS != rsKey {
-		t.Fatalf("Expected to find key %v in queue, found %v", rsKey, queueRS)
+	rss := getAffectedRSsByPodCreation(&pod, manager)
+	if len(rss) != 1 {
+		t.Fatalf("Expected 1 replicaset, got: %d", len(rss))
 	}
-	manager.queue.Done(rsKey)
+	key := getKey(rss[0], t)
+	if key != rsKey {
+		t.Fatalf("Expected to find key %v in queue, found %v", rsKey, key)
+	}
 
 	podExp, exists, err := manager.expectations.GetExpectations(rsKey)
 	if !exists || err != nil || !podExp.Fulfilled() {
@@ -1047,13 +1027,14 @@ func TestDeletionTimestamp(t *testing.T) {
 	oldPod := newPodList(nil, 1, v1.PodPending, labelMap, rs, "pod").Items[0]
 	oldPod.ResourceVersion = "2"
 	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(&pod)})
-	manager.updatePod(&oldPod, &pod)
-
-	queueRS, _ = manager.queue.Get()
-	if queueRS != rsKey {
-		t.Fatalf("Expected to find key %v in queue, found %v", rsKey, queueRS)
+	rss = getAffectedRSsByPodUpdate(&oldPod, &pod, manager)
+	if len(rss) != 1 {
+		t.Fatalf("Expected 1 replicaset, got: %d", len(rss))
 	}
-	manager.queue.Done(rsKey)
+	key = getKey(rss[0], t)
+	if key != rsKey {
+		t.Fatalf("Expected to find key %v in queue, found %v", rsKey, key)
+	}
 
 	podExp, exists, err = manager.expectations.GetExpectations(rsKey)
 	if !exists || err != nil || !podExp.Fulfilled() {
@@ -1076,7 +1057,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(secondPod)})
 	oldPod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	oldPod.ResourceVersion = "2"
-	manager.updatePod(&oldPod, &pod)
+	getAffectedRSsByPodUpdate(&oldPod, &pod, manager)
 
 	podExp, exists, err = manager.expectations.GetExpectations(rsKey)
 	if !exists || err != nil || podExp.Fulfilled() {
@@ -1085,21 +1066,21 @@ func TestDeletionTimestamp(t *testing.T) {
 
 	// A pod with a non-nil deletion timestamp should also be ignored by the
 	// delete handler, because it's already been counted in the update.
-	manager.deletePod(&pod)
+	getAffectedRSsByPodDeletion(&pod, manager)
 	podExp, exists, err = manager.expectations.GetExpectations(rsKey)
 	if !exists || err != nil || podExp.Fulfilled() {
 		t.Fatalf("Wrong expectations %#v", podExp)
 	}
 
 	// Deleting the second pod should clear expectations.
-	manager.deletePod(secondPod)
-
-	queueRS, _ = manager.queue.Get()
-	if queueRS != rsKey {
-		t.Fatalf("Expected to find key %v in queue, found %v", rsKey, queueRS)
+	rss = getAffectedRSsByPodDeletion(secondPod, manager)
+	if len(rss) != 1 {
+		t.Fatalf("Expected 1 replicaset, got: %d", len(rss))
 	}
-	manager.queue.Done(rsKey)
-
+	key = getKey(rss[0], t)
+	if key != rsKey {
+		t.Fatalf("Expected to find key %v in queue, found %v", rsKey, key)
+	}
 	podExp, exists, err = manager.expectations.GetExpectations(rsKey)
 	if !exists || err != nil || !podExp.Fulfilled() {
 		t.Fatalf("Wrong expectations %#v", podExp)
