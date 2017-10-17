@@ -384,7 +384,7 @@ func TestUnschedulableNodes(t *testing.T) {
 		}
 
 		// There are no schedulable nodes - the pod shouldn't be scheduled.
-		err = waitForPodToSchedule(context.clientSet, myPod)
+		err = waitForPodToScheduleWithTimeout(context.clientSet, myPod, 2*time.Second)
 		if err == nil {
 			t.Errorf("Pod scheduled successfully on unschedulable nodes")
 		}

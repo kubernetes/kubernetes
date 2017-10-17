@@ -332,13 +332,13 @@ func podScheduled(c clientset.Interface, podNamespace, podName string) wait.Cond
 // waitForPodToScheduleWithTimeout waits for a pod to get scheduled and returns
 // an error if it does not scheduled within the given timeout.
 func waitForPodToScheduleWithTimeout(cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
-	return wait.Poll(time.Second, timeout, podScheduled(cs, pod.Namespace, pod.Name))
+	return wait.Poll(100*time.Millisecond, timeout, podScheduled(cs, pod.Namespace, pod.Name))
 }
 
 // waitForPodToSchedule waits for a pod to get scheduled and returns an error if
-// it does not scheduled within the timeout duration (30 seconds).
+// it does not get scheduled within the timeout duration (30 seconds).
 func waitForPodToSchedule(cs clientset.Interface, pod *v1.Pod) error {
-	return waitForPodToScheduleWithTimeout(cs, pod, wait.ForeverTestTimeout)
+	return waitForPodToScheduleWithTimeout(cs, pod, 30*time.Second)
 }
 
 // deletePod deletes the given pod in the given namespace.
