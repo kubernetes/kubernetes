@@ -96,6 +96,7 @@ type NodeConfig struct {
 	CgroupsPerQOS         bool
 	CgroupRoot            string
 	CgroupDriver          string
+	KubeletRootDir        string
 	ProtectKernelDefaults bool
 	NodeAllocatableConfig
 	ExperimentalQOSReserved               map[v1.ResourceName]int64
