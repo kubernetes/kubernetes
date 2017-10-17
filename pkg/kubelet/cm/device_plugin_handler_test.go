@@ -162,6 +162,7 @@ func TestCheckpoint(t *testing.T) {
 }
 
 func TestPodContainerDeviceAllocation(t *testing.T) {
+	t.Skip("Skipping due to issue #54100")
 	flag.Set("alsologtostderr", fmt.Sprintf("%t", true))
 	var logLevel string
 	flag.StringVar(&logLevel, "logLevel", "4", "test")
