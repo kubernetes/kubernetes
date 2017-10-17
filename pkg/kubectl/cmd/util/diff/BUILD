@@ -1,12 +1,12 @@
 load(
-     "@io_bazel_rules_go//go:def.bzl",
-     "go_library",
+    "@io_bazel_rules_go//go:def.bzl",
+    "go_library",
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["diffoptions.go"],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/editor",
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/diff",
     visibility = [
         "//build/visible_to:pkg_kubectl_cmd_util_editor_CONSUMERS",
     ],
