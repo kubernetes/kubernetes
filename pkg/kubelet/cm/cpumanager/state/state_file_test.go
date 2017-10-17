@@ -17,34 +17,72 @@ limitations under the License.
 package state
 
 import (
+	"bytes"
+	"flag"
+	"fmt"
+	"io"
 	"io/ioutil"
+	"os"
 	"path"
 	"reflect"
+	"strings"
 	"testing"
 
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
-
-	"os"
 )
 
 func writeToStateFile(statefile string, content string) {
 	ioutil.WriteFile(statefile, []byte(content), 0644)
 }
 
+func stateEqual(t *testing.T, sf State, sm State) {
+	cpusetSf := sf.GetDefaultCPUSet()
+	cpusetSm := sm.GetDefaultCPUSet()
+	if !cpusetSf.Equals(cpusetSm) {
+		t.Errorf("State CPUSet mismatch. Have %v, want %v", cpusetSf, cpusetSm)
+	}
+
+	cpuassignmentSf := sf.GetCPUAssignments()
+	cpuassignmentSm := sm.GetCPUAssignments()
+	if !reflect.DeepEqual(cpuassignmentSf, cpuassignmentSm) {
+		t.Errorf("State CPU assigments mismatch. Have %s, want %s", cpuassignmentSf, cpuassignmentSm)
+	}
+}
+
+func stderrCapture(t *testing.T, f func() State) (bytes.Buffer, State) {
+	stderr := os.Stderr
+
+	readBuffer, writeBuffer, err := os.Pipe()
+	if err != nil {
+		t.Errorf("cannot create pipe: %v", err.Error())
+	}
+
+	os.Stderr = writeBuffer
+	var outputBuffer bytes.Buffer
+
+	state := f()
+	writeBuffer.Close()
+	io.Copy(&outputBuffer, readBuffer)
+	os.Stderr = stderr
+
+	return outputBuffer, state
+}
+
 func TestFileStateTryRestore(t *testing.T) {
+	flag.Set("alsologtostderr", "true")
+	flag.Parse()
+
 	testCases := []struct {
 		description      string
 		stateFileContent string
 		expErr           string
-		expectedState    stateMemory
+		expectedState    *stateMemory
 	}{
 		{
 			"Invalid JSON - empty file",
 			"\n",
-			"unexpected end of JSON input",
-			stateMemory{
+			"state file: could not unmarshal, corrupted state file",
+			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
 				defaultCPUSet: cpuset.NewCPUSet(),
 			},
@@ -52,8 +90,8 @@ func TestFileStateTryRestore(t *testing.T) {
 		{
 			"Invalid JSON - invalid content",
 			"{",
-			"unexpected end of JSON input",
-			stateMemory{
+			"state file: could not unmarshal, corrupted state file",
+			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
 				defaultCPUSet: cpuset.NewCPUSet(),
 			},
@@ -62,7 +100,7 @@ func TestFileStateTryRestore(t *testing.T) {
 			"Try restore defaultCPUSet only",
 			"{ \"defaultCpuSet\": \"4-6\"}",
 			"",
-			stateMemory{
+			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
 				defaultCPUSet: cpuset.NewCPUSet(4, 5, 6),
 			},
@@ -71,7 +109,7 @@ func TestFileStateTryRestore(t *testing.T) {
 			"Try restore defaultCPUSet only - invalid name",
 			"{ \"defCPUSet\": \"4-6\"}",
 			"",
-			stateMemory{
+			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
 				defaultCPUSet: cpuset.NewCPUSet(),
 			},
@@ -79,12 +117,12 @@ func TestFileStateTryRestore(t *testing.T) {
 		{
 			"Try restore assignments only",
 			"{" +
-				"\"reservedList\": { " +
+				"\"entries\": { " +
 				"\"container1\": \"4-6\"," +
 				"\"container2\": \"1-3\"" +
 				"} }",
 			"",
-			stateMemory{
+			&stateMemory{
 				assignments: ContainerCPUAssignments{
 					"container1": cpuset.NewCPUSet(4, 5, 6),
 					"container2": cpuset.NewCPUSet(1, 2, 3),
@@ -94,9 +132,9 @@ func TestFileStateTryRestore(t *testing.T) {
 		},
 		{
 			"Try restore invalid assignments",
-			"{ \"reservedList\": }",
-			"invalid character '}' looking for beginning of value",
-			stateMemory{
+			"{ \"entries\": }",
+			"state file: could not unmarshal, corrupted state file",
+			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
 				defaultCPUSet: cpuset.NewCPUSet(),
 			},
@@ -105,12 +143,12 @@ func TestFileStateTryRestore(t *testing.T) {
 			"Try restore valid file",
 			"{ " +
 				"\"defaultCpuSet\": \"23-24\", " +
-				"\"reservedList\": { " +
+				"\"entries\": { " +
 				"\"container1\": \"4-6\", " +
 				"\"container2\": \"1-3\"" +
 				" } }",
 			"",
-			stateMemory{
+			&stateMemory{
 				assignments: ContainerCPUAssignments{
 					"container1": cpuset.NewCPUSet(4, 5, 6),
 					"container2": cpuset.NewCPUSet(1, 2, 3),
@@ -121,8 +159,8 @@ func TestFileStateTryRestore(t *testing.T) {
 		{
 			"Try restore un-parsable defaultCPUSet ",
 			"{ \"defaultCpuSet\": \"2-sd\" }",
-			"strconv.Atoi: parsing \"sd\": invalid syntax",
-			stateMemory{
+			"state file: could not parse state file",
+			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
 				defaultCPUSet: cpuset.NewCPUSet(),
 			},
@@ -131,12 +169,12 @@ func TestFileStateTryRestore(t *testing.T) {
 			"Try restore un-parsable assignments",
 			"{ " +
 				"\"defaultCpuSet\": \"23-24\", " +
-				"\"reservedList\": { " +
+				"\"entries\": { " +
 				"\"container1\": \"p-6\", " +
 				"\"container2\": \"1-3\"" +
 				" } }",
-			"strconv.Atoi: parsing \"p\": invalid syntax",
-			stateMemory{
+			"state file: could not parse state file",
+			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
 				defaultCPUSet: cpuset.NewCPUSet(),
 			},
@@ -145,7 +183,7 @@ func TestFileStateTryRestore(t *testing.T) {
 			"TryRestoreState creates empty state file",
 			"",
 			"",
-			stateMemory{
+			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
 				defaultCPUSet: cpuset.NewCPUSet(),
 			},
@@ -154,39 +192,35 @@ func TestFileStateTryRestore(t *testing.T) {
 
 	for idx, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-
-			sfilePath := path.Join("/tmp", fmt.Sprintf("cpumanager_state_file_test_%d", idx))
+			sfilePath, err := ioutil.TempFile("/tmp", fmt.Sprintf("cpumanager_state_file_test_%d", idx))
+			if err != nil {
+				t.Errorf("cannot create temporary file: %q", err.Error())
+			}
 			// Don't create state file, let TryRestoreState figure out that is should create
 			if tc.stateFileContent != "" {
-				writeToStateFile(sfilePath, tc.stateFileContent)
+				writeToStateFile(sfilePath.Name(), tc.stateFileContent)
 			}
 
 			// Always remove file - regardless of who created
-			defer os.Remove(sfilePath)
+			defer os.Remove(sfilePath.Name())
 
-			fileState := NewFileState(sfilePath)
-			err := fileState.TryRestoreState()
+			logData, fileState := stderrCapture(t, func() State {
+				return NewFileState(sfilePath.Name())
+			})
 
 			if tc.expErr != "" {
-				if err != nil {
-					if err.Error() != tc.expErr {
-						t.Errorf("TryRestoreState() error = %v, wantErr %v", err, tc.expErr)
+				if logData.String() != "" {
+					if !strings.Contains(logData.String(), tc.expErr) {
+						t.Errorf("TryRestoreState() error = %v, wantErr %v", logData.String(), tc.expErr)
 						return
 					}
 				} else {
 					t.Errorf("TryRestoreState() error = nil, wantErr %v", tc.expErr)
 					return
 				}
-			} else {
-				if err != nil {
-					t.Errorf("TryRestoreState() error = %v, wantErr nil", err)
-					return
-				}
 			}
 
-			if !reflect.DeepEqual(fileState.State, &tc.expectedState) {
-				t.Errorf("TryRestoreState() = %v, want %v", fileState.State, tc.expectedState)
-			}
+			stateEqual(t, fileState, tc.expectedState)
 		})
 	}
 }
@@ -204,10 +238,7 @@ func TestFileStateTryRestorePanic(t *testing.T) {
 	}
 
 	t.Run(testCase.description, func(t *testing.T) {
-
 		sfilePath := path.Join("/invalid_path/to_some_dir", "cpumanager_state_file_test")
-		fileState := NewFileState(sfilePath)
-
 		defer func() {
 			if err := recover(); err != nil {
 				if testCase.wantPanic {
@@ -219,21 +250,23 @@ func TestFileStateTryRestorePanic(t *testing.T) {
 				}
 			}
 		}()
-		fileState.TryRestoreState()
+		NewFileState(sfilePath)
 	})
 }
 
 func TestUpdateStateFile(t *testing.T) {
+	flag.Set("alsologtostderr", "true")
+	flag.Parse()
 
 	testCases := []struct {
 		description   string
 		expErr        string
-		expectedState stateMemory
+		expectedState *stateMemory
 	}{
 		{
 			"Save empty state",
 			"",
-			stateMemory{
+			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
 				defaultCPUSet: cpuset.NewCPUSet(),
 			},
@@ -241,7 +274,7 @@ func TestUpdateStateFile(t *testing.T) {
 		{
 			"Save defaultCPUSet only",
 			"",
-			stateMemory{
+			&stateMemory{
 				assignments:   ContainerCPUAssignments{},
 				defaultCPUSet: cpuset.NewCPUSet(1, 6),
 			},
@@ -249,7 +282,7 @@ func TestUpdateStateFile(t *testing.T) {
 		{
 			"Save assignments only",
 			"",
-			stateMemory{
+			&stateMemory{
 				assignments: ContainerCPUAssignments{
 					"container1": cpuset.NewCPUSet(4, 5, 6),
 					"container2": cpuset.NewCPUSet(1, 2, 3),
@@ -262,20 +295,30 @@ func TestUpdateStateFile(t *testing.T) {
 	for idx, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 
-			sfilePath := path.Join("/tmp", fmt.Sprintf("cpumanager_state_file_test_%d", idx))
-
-			fileState := NewFileState(sfilePath)
+			sfilePath, err := ioutil.TempFile("/tmp", fmt.Sprintf("cpumanager_state_file_test_%d", idx))
+			defer os.Remove(sfilePath.Name())
+			if err != nil {
+				t.Errorf("cannot create temporary file: %q", err.Error())
+			}
+			fileState := stateFile{
+				stateFilePath: sfilePath.Name(),
+				cache:         NewMemoryState(),
+			}
 
 			fileState.SetDefaultCPUSet(tc.expectedState.defaultCPUSet)
 			fileState.SetCPUAssignments(tc.expectedState.assignments)
 
-			err := fileState.UpdateStateFile()
-			defer os.Remove(sfilePath)
+			logData, _ := stderrCapture(t, func() State {
+				fileState.storeState()
+				return &stateFile{}
+			})
+
+			errMsg := logData.String()
 
 			if tc.expErr != "" {
-				if err != nil {
-					if err.Error() != tc.expErr {
-						t.Errorf("UpdateStateFile() error = %v, wantErr %v", err, tc.expErr)
+				if errMsg != "" {
+					if errMsg != tc.expErr {
+						t.Errorf("UpdateStateFile() error = %v, wantErr %v", errMsg, tc.expErr)
 						return
 					}
 				} else {
@@ -283,17 +326,121 @@ func TestUpdateStateFile(t *testing.T) {
 					return
 				}
 			} else {
-				if err != nil {
-					t.Errorf("UpdateStateFile() error = %v, wantErr nil", err)
+				if errMsg != "" {
+					t.Errorf("UpdateStateFile() error = %v, wantErr nil", errMsg)
 					return
 				}
 			}
+			newFileState := NewFileState(sfilePath.Name())
+			stateEqual(t, newFileState, tc.expectedState)
+		})
+	}
+}
 
-			fileState.ClearState()
-			err = fileState.TryRestoreState()
-			if !reflect.DeepEqual(fileState.State, &tc.expectedState) {
-				t.Errorf("TryRestoreState() = %v, want %v", fileState.State, tc.expectedState)
+func TestHelpersStateFile(t *testing.T) {
+	testCases := []struct {
+		description   string
+		defaultCPUset cpuset.CPUSet
+		containers    map[string]cpuset.CPUSet
+	}{
+		{
+			description:   "one container",
+			defaultCPUset: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8),
+			containers: map[string]cpuset.CPUSet{
+				"c1": cpuset.NewCPUSet(0, 1),
+			},
+		},
+		{
+			description:   "two containers",
+			defaultCPUset: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8),
+			containers: map[string]cpuset.CPUSet{
+				"c1": cpuset.NewCPUSet(0, 1),
+				"c2": cpuset.NewCPUSet(2, 3, 4, 5),
+			},
+		},
+		{
+			description:   "container with more cpus than is possible",
+			defaultCPUset: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8),
+			containers: map[string]cpuset.CPUSet{
+				"c1": cpuset.NewCPUSet(0, 10),
+			},
+		},
+		{
+			description:   "container without assigned cpus",
+			defaultCPUset: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8),
+			containers: map[string]cpuset.CPUSet{
+				"c1": cpuset.NewCPUSet(),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			sfFile, err := ioutil.TempFile("/tmp", "testHelpersStateFile")
+			defer os.Remove(sfFile.Name())
+			if err != nil {
+				t.Errorf("cannot create temporary test file: %q", err.Error())
 			}
+
+			state := NewFileState(sfFile.Name())
+			state.SetDefaultCPUSet(tc.defaultCPUset)
+
+			for containerName, containerCPUs := range tc.containers {
+				state.SetCPUSet(containerName, containerCPUs)
+				if cpus, _ := state.GetCPUSet(containerName); !cpus.Equals(containerCPUs) {
+					t.Errorf("state is inconsistant. Wants = %q Have = %q", containerCPUs, cpus)
+				}
+				state.Delete(containerName)
+				if cpus := state.GetCPUSetOrDefault(containerName); !cpus.Equals(tc.defaultCPUset) {
+					t.Error("deleted container still existing in state")
+				}
+
+			}
+
+		})
+	}
+}
+
+func TestClearStateStateFile(t *testing.T) {
+	testCases := []struct {
+		description   string
+		defaultCPUset cpuset.CPUSet
+		containers    map[string]cpuset.CPUSet
+	}{
+		{
+			description:   "valid file",
+			defaultCPUset: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8),
+			containers: map[string]cpuset.CPUSet{
+				"c1": cpuset.NewCPUSet(0, 1),
+				"c2": cpuset.NewCPUSet(2, 3),
+				"c3": cpuset.NewCPUSet(4, 5),
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			sfFile, err := ioutil.TempFile("/tmp", "testHelpersStateFile")
+			defer os.Remove(sfFile.Name())
+			if err != nil {
+				t.Errorf("cannot create temporary test file: %q", err.Error())
+			}
+
+			state := NewFileState(sfFile.Name())
+			state.SetDefaultCPUSet(testCase.defaultCPUset)
+			for containerName, containerCPUs := range testCase.containers {
+				state.SetCPUSet(containerName, containerCPUs)
+			}
+
+			state.ClearState()
+			if !cpuset.NewCPUSet().Equals(state.GetDefaultCPUSet()) {
+				t.Error("cleared state shoudn't has got information about available cpuset")
+			}
+			for containerName := range testCase.containers {
+				if !cpuset.NewCPUSet().Equals(state.GetCPUSetOrDefault(containerName)) {
+					t.Error("cleared state shoudn't has got information about containers")
+				}
+			}
+
 		})
 	}
 }
