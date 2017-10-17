@@ -894,6 +894,11 @@ EOF
 CLUSTER_SIGNING_DURATION: $(yaml-quote ${CLUSTER_SIGNING_DURATION})
 EOF
     fi
+    if [ -n "${CONCURRENT_SERVICE_SYNCS:-}" ]; then
+      cat >>$file <<EOF
+CONCURRENT_SERVICE_SYNCS: $(yaml-quote ${CONCURRENT_SERVICE_SYNCS})
+EOF
+    fi
 
   else
     # Node-only env vars.
