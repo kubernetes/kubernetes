@@ -2057,23 +2057,6 @@ func permissivePSP() *extensions.PodSecurityPolicy {
 	}
 }
 
-func createNamespaceForTest() *kapi.Namespace {
-	return &kapi.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "default",
-		},
-	}
-}
-
-func createSAForTest() *kapi.ServiceAccount {
-	return &kapi.ServiceAccount{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: "default",
-			Name:      "default",
-		},
-	}
-}
-
 // goodPod is empty and should not be used directly for testing since we're providing
 // two different PSPs.  Since no values are specified it would be allowed to match any
 // psp when defaults are filled in.
