@@ -17,8 +17,7 @@ limitations under the License.
 package validation
 
 import (
-	"reflect"
-
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -92,7 +91,7 @@ func ValidateNetworkPolicy(np *networking.NetworkPolicy) field.ErrorList {
 func ValidateNetworkPolicyUpdate(update, old *networking.NetworkPolicy) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
-	if !reflect.DeepEqual(update.Spec, old.Spec) {
+	if !apiequality.Semantic.DeepEqual(update.Spec, old.Spec) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to networkpolicy spec are forbidden."))
 	}
 	return allErrs
