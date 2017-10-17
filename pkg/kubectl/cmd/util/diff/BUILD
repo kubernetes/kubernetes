@@ -33,6 +33,6 @@ filegroup(
     srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_util_editor_CONSUMERS",
+        "//build/visible_to:pkg_kubectl_cmd_util_diff_CONSUMERS",
     ],
 )
