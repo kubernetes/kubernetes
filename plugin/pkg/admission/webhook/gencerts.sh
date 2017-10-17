@@ -35,6 +35,7 @@ extendedKeyUsage = clientAuth, serverAuth
 subjectAltName = @alt_names
 [alt_names]
 IP.1 = 127.0.0.1
+DNS.1 = webhook-test.default.svc
 EOF
 
 cat > client.conf << EOF
@@ -49,6 +50,7 @@ extendedKeyUsage = clientAuth, serverAuth
 subjectAltName = @alt_names
 [alt_names]
 IP.1 = 127.0.0.1
+DNS.1 = webhook-test.default.svc
 EOF
 
 # Create a certificate authority
