@@ -212,7 +212,10 @@ func (m *kubeGenericRuntimeManager) Type() string {
 }
 
 func newRuntimeVersion(version string) (*utilversion.Version, error) {
-	return utilversion.ParseSemantic(version)
+	if ver, err := utilversion.ParseSemantic(version); err == nil {
+		return ver, err
+	}
+	return utilversion.ParseGeneric(version)
 }
 
 func (m *kubeGenericRuntimeManager) getTypedVersion() (*runtimeapi.VersionResponse, error) {
