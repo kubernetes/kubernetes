@@ -240,7 +240,7 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 	rs := newReplicaSet(1, labelMap)
 	informers.Extensions().V1beta1().ReplicaSets().Informer().GetIndexer().Add(rs)
 	pods := newPodList(nil, 1, v1.PodRunning, labelMap, rs, "pod")
-	rss := manager.getAffectedRSsByPodDeletion(cache.DeletedFinalStateUnknown{Key: "foo", Obj: &pods.Items[0]})
+	rss := getAffectedRSsByPodDeletion(cache.DeletedFinalStateUnknown{Key: "foo", Obj: &pods.Items[0]}, manager)
 	if len(rss) != 1 {
 		t.Fatalf("Expected 1 replicaset, got: %d", len(rss))
 	}
@@ -538,7 +538,7 @@ func TestUpdatePods(t *testing.T) {
 	pod2 := pod1
 	pod2.Labels = labelMap2
 	pod2.ResourceVersion = "2"
-	rss := manager.getAffectedRSsByPodUpdate(&pod1, &pod2)
+	rss := getAffectedRSsByPodUpdate(&pod1, &pod2, manager)
 	expected := sets.NewString(testRSSpec1.Name)
 
 	var rsKeys []string
@@ -562,7 +562,7 @@ func TestUpdatePods(t *testing.T) {
 	pod2 = pod1
 	pod2.OwnerReferences = nil
 	pod2.ResourceVersion = "2"
-	rss = manager.getAffectedRSsByPodUpdate(&pod1, &pod2)
+	rss = getAffectedRSsByPodUpdate(&pod1, &pod2, manager)
 	expected = sets.NewString(testRSSpec2.Name)
 
 	rsKeys = nil
@@ -585,7 +585,7 @@ func TestUpdatePods(t *testing.T) {
 	pod2 = pod1
 	pod2.OwnerReferences = nil
 	pod2.ResourceVersion = "2"
-	rss = manager.getAffectedRSsByPodUpdate(&pod1, &pod2)
+	rss = getAffectedRSsByPodUpdate(&pod1, &pod2, manager)
 	expected = sets.NewString(testRSSpec1.Name, testRSSpec2.Name)
 
 	rsKeys = nil
@@ -607,7 +607,7 @@ func TestUpdatePods(t *testing.T) {
 	pod2 = pod1
 	pod2.Labels = labelMap2
 	pod2.ResourceVersion = "2"
-	rss = manager.getAffectedRSsByPodUpdate(&pod1, &pod2)
+	rss = getAffectedRSsByPodUpdate(&pod1, &pod2, manager)
 	expected = sets.NewString(testRSSpec2.Name)
 
 	rsKeys = nil
@@ -748,7 +748,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 				// None of these should wake the controller because it has expectations==BurstReplicas.
 				for i := int32(0); i < expectedPods-1; i++ {
 					informers.Core().V1().Pods().Informer().GetIndexer().Add(&pods.Items[i])
-					manager.getAffectedRSsByPodCreation(&pods.Items[i])
+					getAffectedRSsByPodCreation(&pods.Items[i], manager)
 				}
 
 				podExp, exists, err := manager.expectations.GetExpectations(rsKey)
@@ -788,7 +788,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 				// don't double delete.
 				for i := range podsToDelete[1:] {
 					informers.Core().V1().Pods().Informer().GetIndexer().Delete(podsToDelete[i])
-					manager.getAffectedRSsByPodDeletion(podsToDelete[i])
+					getAffectedRSsByPodDeletion(podsToDelete[i], manager)
 				}
 				podExp, exists, err := manager.expectations.GetExpectations(rsKey)
 				if !exists || err != nil {
@@ -809,7 +809,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 			// which will cause it to create/delete the remaining replicas up to burstReplicas.
 			if replicas != 0 {
 				informers.Core().V1().Pods().Informer().GetIndexer().Add(&pods.Items[expectedPods-1])
-				manager.getAffectedRSsByPodCreation(&pods.Items[expectedPods-1])
+				getAffectedRSsByPodCreation(&pods.Items[expectedPods-1], manager)
 			} else {
 				expectedDel := manager.expectations.GetUIDs(getKey(rs, t))
 				if expectedDel.Len() != 1 {
@@ -828,7 +828,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 					},
 				}
 				informers.Core().V1().Pods().Informer().GetIndexer().Delete(lastPod)
-				manager.getAffectedRSsByPodDeletion(lastPod)
+				getAffectedRSsByPodDeletion(lastPod, manager)
 			}
 			pods.Items = pods.Items[expectedPods:]
 		}
@@ -979,7 +979,7 @@ func TestOverlappingRSs(t *testing.T) {
 	}
 	rsKey := getKey(rs, t)
 
-	rss := manager.getAffectedRSsByPodCreation(pod)
+	rss := getAffectedRSsByPodCreation(pod, manager)
 	if len(rss) != 1 {
 		t.Fatalf("Expected 1 replicaset, got: %d", len(rss))
 	}
@@ -1008,7 +1008,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(&pod)})
 
 	// A pod added with a deletion timestamp should decrement deletions, not creations.
-	rss := manager.getAffectedRSsByPodCreation(&pod)
+	rss := getAffectedRSsByPodCreation(&pod, manager)
 	if len(rss) != 1 {
 		t.Fatalf("Expected 1 replicaset, got: %d", len(rss))
 	}
@@ -1027,7 +1027,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	oldPod := newPodList(nil, 1, v1.PodPending, labelMap, rs, "pod").Items[0]
 	oldPod.ResourceVersion = "2"
 	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(&pod)})
-	rss = manager.getAffectedRSsByPodUpdate(&oldPod, &pod)
+	rss = getAffectedRSsByPodUpdate(&oldPod, &pod, manager)
 	if len(rss) != 1 {
 		t.Fatalf("Expected 1 replicaset, got: %d", len(rss))
 	}
@@ -1057,7 +1057,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(secondPod)})
 	oldPod.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 	oldPod.ResourceVersion = "2"
-	manager.getAffectedRSsByPodUpdate(&oldPod, &pod)
+	getAffectedRSsByPodUpdate(&oldPod, &pod, manager)
 
 	podExp, exists, err = manager.expectations.GetExpectations(rsKey)
 	if !exists || err != nil || podExp.Fulfilled() {
@@ -1066,14 +1066,14 @@ func TestDeletionTimestamp(t *testing.T) {
 
 	// A pod with a non-nil deletion timestamp should also be ignored by the
 	// delete handler, because it's already been counted in the update.
-	manager.getAffectedRSsByPodDeletion(&pod)
+	getAffectedRSsByPodDeletion(&pod, manager)
 	podExp, exists, err = manager.expectations.GetExpectations(rsKey)
 	if !exists || err != nil || podExp.Fulfilled() {
 		t.Fatalf("Wrong expectations %#v", podExp)
 	}
 
 	// Deleting the second pod should clear expectations.
-	rss = manager.getAffectedRSsByPodDeletion(secondPod)
+	rss = getAffectedRSsByPodDeletion(secondPod, manager)
 	if len(rss) != 1 {
 		t.Fatalf("Expected 1 replicaset, got: %d", len(rss))
 	}
