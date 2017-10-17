@@ -570,6 +570,7 @@ func updateURLMetrics(req *Request, resp *http.Response, err error) {
 	}
 }
 
+// ReadCloser wrapper that calls cancel function upon closing.
 type readCloserWithCancelFunc struct {
 	rc     io.ReadCloser
 	cancel func()
@@ -590,9 +591,6 @@ func (r readCloserWithCancelFunc) Close() error {
 // Returns io.ReadCloser which could be used for streaming of the response, or an error
 // Any non-2xx http status code causes an error.  If we get a non-2xx code, we try to convert the body into an APIStatus object.
 // If we can, we return that as an error.  Otherwise, we create an error that lists the http status and the content of the response.
-// NOTE: Upon success, the function returns a cancel function along with the io.ReadCloser. The cancel function is non-nil if the
-// stream request has context with timeout. It's user's responsibity to call the cancel function once finishing streaming to
-// prevent context leak.
 func (r *Request) Stream() (io.ReadCloser, error) {
 	if r.err != nil {
 		return nil, r.err
