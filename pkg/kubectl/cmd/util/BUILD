@@ -9,6 +9,7 @@ go_library(
     srcs = [
         "cached_discovery.go",
         "clientcache.go",
+        "cmdtools.go",
         "factory.go",
         "factory_builder.go",
         "factory_client_access.go",
@@ -38,6 +39,7 @@ go_library(
         "//pkg/kubectl/cmd/util/openapi/validation:go_default_library",
         "//pkg/kubectl/plugins:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
+        "//pkg/kubectl/util/term:go_default_library",
         "//pkg/kubectl/validation:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
@@ -80,6 +82,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "cached_discovery_test.go",
+        "cmdtools_test.go",
         "factory_object_mapping_test.go",
         "factory_test.go",
         "helpers_test.go",
@@ -90,9 +93,6 @@ go_test(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util",
     library = ":go_default_library",
-    visibility = [
-        "//build/visible_to:COMMON_testing",
-    ],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
@@ -141,6 +141,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/kubectl/cmd/util/diff:all-srcs",
         "//pkg/kubectl/cmd/util/editor:all-srcs",
         "//pkg/kubectl/cmd/util/env:all-srcs",
         "//pkg/kubectl/cmd/util/jsonmerge:all-srcs",

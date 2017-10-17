@@ -276,6 +276,14 @@ package_group(
 )
 
 package_group(
+    name = "pkg_kubectl_cmd_util_diff_CONSUMERS",
+    packages = [
+        "//pkg/kubectl/cmd",
+        "//pkg/kubectl/cmd/util",
+    ],
+)
+
+package_group(
     name = "pkg_kubectl_cmd_util_jsonmerge_CONSUMERS",
     packages = [
         "//pkg/kubectl/cmd",

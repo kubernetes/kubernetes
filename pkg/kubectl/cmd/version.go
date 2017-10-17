@@ -64,9 +64,9 @@ func NewCmdVersion(f cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmdutil.CheckErr(options.Run(f, out))
 		},
 	}
+	cmdutil.AddOutputFlagsForJsonYaml(cmd, "")
 	cmd.Flags().BoolP("client", "c", false, "Client version only (no server required).")
 	cmd.Flags().BoolP("short", "", false, "Print just the version number.")
-	cmd.Flags().StringP("output", "o", "", "One of 'yaml' or 'json'.")
 	cmd.Flags().MarkShorthandDeprecated("client", "please use --client instead.")
 	return cmd
 }
