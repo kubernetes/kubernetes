@@ -17,13 +17,15 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"net"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 func TestRecordOperation(t *testing.T) {
@@ -66,4 +68,24 @@ func TestInstrumentedVersion(t *testing.T) {
 	vr, err := irs.Version("1")
 	assert.NoError(t, err)
 	assert.Equal(t, kubeRuntimeAPIVersion, vr.Version)
+}
+
+func TestStatus(t *testing.T) {
+	fakeRuntime, _, _, _ := createTestRuntimeManager()
+	fakeRuntime.FakeStatus = &runtimeapi.RuntimeStatus{
+		Conditions: []*runtimeapi.RuntimeCondition{
+			{Type: runtimeapi.RuntimeReady, Status: false},
+			{Type: runtimeapi.NetworkReady, Status: true},
+		},
+	}
+	irs := newInstrumentedRuntimeService(fakeRuntime)
+	actural, err := irs.Status()
+	assert.NoError(t, err)
+	expected := &runtimeapi.RuntimeStatus{
+		Conditions: []*runtimeapi.RuntimeCondition{
+			{Type: runtimeapi.RuntimeReady, Status: false},
+			{Type: runtimeapi.NetworkReady, Status: true},
+		},
+	}
+	assert.Equal(t, expected, actural)
 }
