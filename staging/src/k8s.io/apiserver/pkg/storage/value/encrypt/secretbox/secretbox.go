@@ -27,7 +27,7 @@ import (
 )
 
 // secretbox implements at rest encryption of the provided values given a 32 byte secret key.
-// Uses a standard 24 byte nonce (placed at the the beginning of the cipher text) generated
+// Uses a standard 24 byte nonce (placed at the beginning of the cipher text) generated
 // from crypto/rand. Does not perform authentication of the data at rest.
 type secretboxTransformer struct {
 	key [32]byte

@@ -236,7 +236,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			return nil, fmt.Errorf("invalid configuration: cgroup-root %q doesn't exist: %v", cgroupRoot, err)
 		}
 		glog.Infof("container manager verified user specified cgroup-root exists: %v", cgroupRoot)
-		// Include the the top level cgroup for enforcing node allocatable into cgroup-root.
+		// Include the top level cgroup for enforcing node allocatable into cgroup-root.
 		// This way, all sub modules can avoid having to understand the concept of node allocatable.
 		cgroupRoot = path.Join(cgroupRoot, defaultNodeAllocatableCgroupName)
 	}

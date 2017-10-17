@@ -48,7 +48,7 @@ type portal struct {
 
 // ServiceInfo contains information and state for a particular proxied service
 type ServiceInfo struct {
-	// Timeout is the the read/write timeout (used for UDP connections)
+	// Timeout is the read/write timeout (used for UDP connections)
 	Timeout time.Duration
 	// ActiveClients is the cache of active UDP clients being proxied by this proxy for this service
 	ActiveClients *ClientCache
