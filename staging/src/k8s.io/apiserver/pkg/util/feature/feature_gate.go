@@ -157,7 +157,7 @@ func (f *featureGate) Set(value string) error {
 		}
 		arr := strings.SplitN(s, "=", 2)
 		k := Feature(strings.TrimSpace(arr[0]))
-		_, ok := known[Feature(k)]
+		_, ok := known[k]
 		if !ok {
 			return fmt.Errorf("unrecognized key: %s", k)
 		}
