@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -148,7 +149,7 @@ var _ = SIGDescribe("Pod Disks", func() {
 					// Teardown should do nothing unless test failed
 					By("defer: cleaning up PD-RW test environment")
 					framework.Logf("defer cleanup errors can usually be ignored")
-					if readOnly {
+					if fmtPod != nil {
 						podClient.Delete(fmtPod.Name, podDelOpt)
 					}
 					podClient.Delete(host0Pod.Name, podDelOpt)
@@ -212,15 +213,18 @@ var _ = SIGDescribe("Pod Disks", func() {
 		type testT struct {
 			numContainers int
 			numPDs        int
+			repeatCnt     int
 		}
 		tests := []testT{
 			{
 				numContainers: 4,
 				numPDs:        1,
+				repeatCnt:     3,
 			},
 			{
 				numContainers: 1,
 				numPDs:        2,
+				repeatCnt:     3,
 			},
 		}
 
@@ -253,7 +257,7 @@ var _ = SIGDescribe("Pod Disks", func() {
 					}
 				}()
 
-				for i := 0; i < 3; i++ { // "rapid" repeat loop
+				for i := 0; i < t.repeatCnt; i++ { // "rapid" repeat loop
 					framework.Logf("PD Read/Writer Iteration #%v", i)
 					By(fmt.Sprintf("creating host0Pod with %d containers on node0", numContainers))
 					host0Pod = testPDPod(diskNames, host0Name, false /* readOnly */, numContainers)
@@ -315,10 +319,7 @@ var _ = SIGDescribe("Pod Disks", func() {
 			nodeOp := t.nodeOp
 			It(fmt.Sprintf("when %s", t.descr), func() {
 				framework.SkipUnlessProviderIs("gce")
-
-				initialGroupSize, err := framework.GroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup)
-				framework.ExpectNoError(err, "Error getting group size")
-				nodeCount := len(nodes.Items) // (note: unsure if this count ever differs from initialGroupSize?)
+				origNodeCnt := len(nodes.Items) // healhy nodes running kublet
 
 				By("creating a pd")
 				diskName, err := framework.CreatePDWithRetry()
@@ -339,17 +340,10 @@ var _ = SIGDescribe("Pod Disks", func() {
 						targetNode.ObjectMeta.SetResourceVersion("0")
 						// need to set the resource version or else the Create() fails
 						_, err := nodeClient.Create(targetNode)
-						framework.ExpectNoError(err, "Unable to re-create the deleted node")
-						framework.ExpectNoError(framework.WaitForGroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup, int32(initialGroupSize)), "Unable to get the node group back to the original size")
+						framework.ExpectNoError(err, "defer: Unable to re-create the deleted node")
 					}
-					framework.WaitForNodeToBeReady(f.ClientSet, string(host0Name), nodeStatusTimeout)
-					framework.WaitForAllNodesSchedulable(f.ClientSet, nodeStatusTimeout)
-					nodes = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-					if nodeOp == deleteNode {
-						Expect(len(nodes.Items)).To(Equal(initialGroupSize), "Requires node count to return to initial group size.")
-					} else if nodeOp == deleteNodeObj {
-						Expect(len(nodes.Items)).To(Equal(nodeCount), "Requires node count to return to original node count.")
-					}
+					numNodes := countReadyNodes(f.ClientSet, host0Name)
+					Expect(numNodes).To(Equal(origNodeCnt), fmt.Sprintf("defer: Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt))
 				}()
 
 				By("creating host0Pod on node0")
@@ -377,9 +371,13 @@ var _ = SIGDescribe("Pod Disks", func() {
 					By("deleting host0")
 					resp, err := gceCloud.DeleteInstance(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone, string(host0Name))
 					framework.ExpectNoError(err, fmt.Sprintf("Failed to delete host0Pod: err=%v response=%#v", err, resp))
+					By("expecting host0 node to be recreated")
+					numNodes := countReadyNodes(f.ClientSet, host0Name)
+					Expect(numNodes).To(Equal(origNodeCnt), fmt.Sprintf("Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt))
 					output, err = gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
 					Expect(false, strings.Contains(string(output), string(host0Name)))
+
 				} else if nodeOp == deleteNodeObj {
 					By("deleting host0's node api object")
 					framework.ExpectNoError(nodeClient.Delete(string(host0Name), metav1.NewDeleteOptions(0)), "Unable to delete host0's node object")
@@ -389,7 +387,6 @@ var _ = SIGDescribe("Pod Disks", func() {
 
 				By("waiting for pd to detach from host0")
 				waitForPDDetach(diskName, host0Name)
-				framework.ExpectNoError(framework.WaitForGroupSize(framework.TestContext.CloudConfig.NodeInstanceGroup, int32(initialGroupSize)), "Unable to get back the cluster to inital size")
 			})
 		}
 	})
@@ -401,6 +398,13 @@ var _ = SIGDescribe("Pod Disks", func() {
 		framework.ExpectNoError(framework.DeletePDWithRetry("non-exist"))
 	})
 })
+
+func countReadyNodes(c clientset.Interface, hostName types.NodeName) int {
+	framework.WaitForNodeToBeReady(c, string(hostName), nodeStatusTimeout)
+	framework.WaitForAllNodesSchedulable(c, nodeStatusTimeout)
+	nodes := framework.GetReadySchedulableNodesOrDie(c)
+	return len(nodes.Items)
+}
 
 func verifyPDContentsViaContainer(f *framework.Framework, podName, containerName string, fileAndContentToVerify map[string]string) {
 	for filePath, expectedContents := range fileAndContentToVerify {
