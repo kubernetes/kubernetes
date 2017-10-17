@@ -113,12 +113,21 @@ type kubeGenericRuntimeManager struct {
 
 	// Internal lifecycle event handlers for container resource management.
 	internalLifecycle cm.InternalContainerLifecycle
+
+	// A shim to legacy functions for backward compatibility.
+	legacyLogProvider LegacyLogProvider
 }
 
 type KubeGenericRuntime interface {
 	kubecontainer.Runtime
 	kubecontainer.IndirectStreamingRuntime
 	kubecontainer.ContainerCommandRunner
+}
+
+// LegacyLogProvider gives the ability to use unsupported docker log drivers (e.g. journald)
+type LegacyLogProvider interface {
+	// Get the last few lines of the logs for a specific container.
+	GetContainerLogTail(uid kubetypes.UID, name, namespace string, containerID kubecontainer.ContainerID) (string, error)
 }
 
 // NewKubeGenericRuntimeManager creates a new kubeGenericRuntimeManager
@@ -140,6 +149,7 @@ func NewKubeGenericRuntimeManager(
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
 	internalLifecycle cm.InternalContainerLifecycle,
+	legacyLogProvider LegacyLogProvider,
 ) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
@@ -154,6 +164,7 @@ func NewKubeGenericRuntimeManager(
 		imageService:        newInstrumentedImageManagerService(imageService),
 		keyring:             credentialprovider.NewDockerKeyring(),
 		internalLifecycle:   internalLifecycle,
+		legacyLogProvider:   legacyLogProvider,
 	}
 
 	typedVersion, err := kubeRuntimeManager.runtimeService.Version(kubeRuntimeAPIVersion)
