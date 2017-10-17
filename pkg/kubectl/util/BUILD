@@ -16,9 +16,7 @@ go_library(
         "//conditions:default": [],
     }),
     importpath = "k8s.io/kubernetes/pkg/kubectl/util",
-    visibility = [
-        "//build/visible_to:pkg_kubectl_cmd_util_CONSUMERS",
-    ],
+    visibility = ["//build/visible_to:pkg_kubectl_util_CONSUMERS"],
     deps = [
         "//vendor/golang.org/x/sys/unix:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -26,23 +24,11 @@ go_library(
     ],
 )
 
-go_test(
-    name = "go_default_test",
-    srcs = ["util_test.go"],
-    data = [
-        "//api/swagger-spec",
-    ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/util",
-    library = ":go_default_library",
-    visibility = [
-        "//build/visible_to:COMMON_testing",
-    ],
-)
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
     tags = ["automanaged"],
+    visibility = ["//visibility:private"],
 )
 
 filegroup(
@@ -57,5 +43,12 @@ filegroup(
         "//pkg/kubectl/util/term:all-srcs",
     ],
     tags = ["automanaged"],
-    visibility = ["//build/visible_to:pkg_kubectl_cmd_util_CONSUMERS"],
+    visibility = ["//build/visible_to:pkg_kubectl_util_CONSUMERS"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["util_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/util",
+    library = ":go_default_library",
 )
