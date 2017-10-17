@@ -36,3 +36,13 @@ func (h *FakeNetlinkHandle) EnsureAddressBind(address, devName string) (exist bo
 func (h *FakeNetlinkHandle) UnbindAddress(address, devName string) error {
 	return nil
 }
+
+// EnsureDummyDevice is a mock implementation
+func (h *FakeNetlinkHandle) EnsureDummyDevice(devName string) (bool, error) {
+	return false, nil
+}
+
+// DeleteDummyDevice is a mock implementation
+func (h *FakeNetlinkHandle) DeleteDummyDevice(devName string) error {
+	return nil
+}
