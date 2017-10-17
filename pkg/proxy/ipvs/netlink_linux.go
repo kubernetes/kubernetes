@@ -78,7 +78,9 @@ func (h *netlinkHandle) EnsureDummyDevice(devName string) (bool, error) {
 		// found dummy device
 		return true, nil
 	}
-	dummy := &netlink.Dummy{netlink.LinkAttrs{Name: devName}}
+	dummy := &netlink.Dummy{
+		LinkAttrs: netlink.LinkAttrs{Name: devName},
+	}
 	return false, h.LinkAdd(dummy)
 }
 

@@ -8,7 +8,9 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["proxier_test.go"],
+    srcs = [
+        "proxier_test.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/proxy/ipvs",
     library = ":go_default_library",
     deps = [
