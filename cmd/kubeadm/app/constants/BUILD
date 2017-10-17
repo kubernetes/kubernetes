@@ -11,7 +11,6 @@ go_library(
     srcs = ["constants.go"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/constants",
     deps = [
-        "//pkg/controller/service:go_default_library",
         "//pkg/util/version:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
     ],
