@@ -55,30 +55,21 @@ func TestCreatePodSecurityContextNonmutating(t *testing.T) {
 				Name: "psp-sa",
 				Annotations: map[string]string{
 					seccomp.AllowedProfilesAnnotationKey: "*",
-					seccomp.DefaultProfileAnnotationKey:  "foo",
 				},
 			},
 			Spec: extensions.PodSecurityPolicySpec{
-				DefaultAddCapabilities:   []api.Capability{"foo"},
-				RequiredDropCapabilities: []api.Capability{"bar"},
+				AllowPrivilegeEscalation: true,
 				RunAsUser: extensions.RunAsUserStrategyOptions{
 					Rule: extensions.RunAsUserStrategyRunAsAny,
 				},
 				SELinux: extensions.SELinuxStrategyOptions{
 					Rule: extensions.SELinuxStrategyRunAsAny,
 				},
-				// these are pod mutating strategies that are tested above
 				FSGroup: extensions.FSGroupStrategyOptions{
-					Rule: extensions.FSGroupStrategyMustRunAs,
-					Ranges: []extensions.GroupIDRange{
-						{Min: 1, Max: 1},
-					},
+					Rule: extensions.FSGroupStrategyRunAsAny,
 				},
 				SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
-					Rule: extensions.SupplementalGroupsStrategyMustRunAs,
-					Ranges: []extensions.GroupIDRange{
-						{Min: 1, Max: 1},
-					},
+					Rule: extensions.SupplementalGroupsStrategyRunAsAny,
 				},
 			},
 		}
@@ -91,17 +82,13 @@ func TestCreatePodSecurityContextNonmutating(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to create provider %v", err)
 	}
-	sc, _, err := provider.CreatePodSecurityContext(pod)
+	_, _, err = provider.CreatePodSecurityContext(pod)
 	if err != nil {
 		t.Fatalf("unable to create psc %v", err)
 	}
 
-	// The generated security context should have filled in missing options, so they should differ
-	if reflect.DeepEqual(sc, &pod.Spec.SecurityContext) {
-		t.Error("expected created security context to be different than container's, but they were identical")
-	}
-
 	// Creating the provider or the security context should not have mutated the psp or pod
+	// since all the strategies were permissive
 	if !reflect.DeepEqual(createPod(), pod) {
 		diffs := diff.ObjectDiff(createPod(), pod)
 		t.Errorf("pod was mutated by CreatePodSecurityContext. diff:\n%s", diffs)
@@ -134,7 +121,6 @@ func TestCreateContainerSecurityContextNonmutating(t *testing.T) {
 
 		// Create a PSP with strategies that will populate a blank security context
 		createPSP := func() *extensions.PodSecurityPolicy {
-			uid := int64(1)
 			return &extensions.PodSecurityPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "psp-sa",
@@ -144,25 +130,19 @@ func TestCreateContainerSecurityContextNonmutating(t *testing.T) {
 					},
 				},
 				Spec: extensions.PodSecurityPolicySpec{
-					DefaultAddCapabilities:   []api.Capability{"foo"},
-					RequiredDropCapabilities: []api.Capability{"bar"},
+					AllowPrivilegeEscalation: true,
 					RunAsUser: extensions.RunAsUserStrategyOptions{
-						Rule:   extensions.RunAsUserStrategyMustRunAs,
-						Ranges: []extensions.UserIDRange{{Min: uid, Max: uid}},
+						Rule: extensions.RunAsUserStrategyRunAsAny,
 					},
 					SELinux: extensions.SELinuxStrategyOptions{
-						Rule:           extensions.SELinuxStrategyMustRunAs,
-						SELinuxOptions: &api.SELinuxOptions{User: "you"},
+						Rule: extensions.SELinuxStrategyRunAsAny,
 					},
-					// these are pod mutating strategies that are tested above
 					FSGroup: extensions.FSGroupStrategyOptions{
 						Rule: extensions.FSGroupStrategyRunAsAny,
 					},
 					SupplementalGroups: extensions.SupplementalGroupsStrategyOptions{
 						Rule: extensions.SupplementalGroupsStrategyRunAsAny,
 					},
-					// mutates the container SC by defaulting to true if container sets nil
-					ReadOnlyRootFilesystem: true,
 				},
 			}
 		}
@@ -174,17 +154,13 @@ func TestCreateContainerSecurityContextNonmutating(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unable to create provider %v", err)
 		}
-		sc, _, err := provider.CreateContainerSecurityContext(pod, &pod.Spec.Containers[0])
+		_, _, err = provider.CreateContainerSecurityContext(pod, &pod.Spec.Containers[0])
 		if err != nil {
 			t.Fatalf("unable to create container security context %v", err)
 		}
 
-		// The generated security context should have filled in missing options, so they should differ
-		if reflect.DeepEqual(sc, &pod.Spec.Containers[0].SecurityContext) {
-			t.Error("expected created security context to be different than container's, but they were identical")
-		}
-
 		// Creating the provider or the security context should not have mutated the psp or pod
+		// since all the strategies were permissive
 		if !reflect.DeepEqual(createPod(), pod) {
 			diffs := diff.ObjectDiff(createPod(), pod)
 			t.Errorf("pod was mutated by CreateContainerSecurityContext. diff:\n%s", diffs)
@@ -323,12 +299,12 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		"failNilSELinux": {
 			pod:           failNilSELinuxPod,
 			psp:           failSELinuxPSP,
-			expectedError: "unable to validate nil seLinuxOptions",
+			expectedError: "seLinuxOptions: Required",
 		},
 		"failInvalidSELinux": {
 			pod:           failInvalidSELinuxPod,
 			psp:           failSELinuxPSP,
-			expectedError: "does not match required level.  Found bar, wanted foo",
+			expectedError: "seLinuxOptions.level: Invalid value",
 		},
 		"failHostDirPSP": {
 			pod:           failHostDirPod,
@@ -455,12 +431,12 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 		"failUserPSP": {
 			pod:           failUserPod,
 			psp:           failUserPSP,
-			expectedError: "does not match required range",
+			expectedError: "runAsUser: Invalid value",
 		},
 		"failSELinuxPSP": {
 			pod:           failSELinuxPod,
 			psp:           failSELinuxPSP,
-			expectedError: "does not match required level",
+			expectedError: "seLinuxOptions.level: Invalid value",
 		},
 		"failNilAppArmor": {
 			pod:           failNilAppArmorPod,
