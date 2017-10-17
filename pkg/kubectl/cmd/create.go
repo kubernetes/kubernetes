@@ -221,7 +221,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 		return nil
 	})
 	if err != nil {
-		return cmdutil.NoneIdempotentOperationErrorReturn(o.ignoreUnchanged, err)
+		return cmdutil.NoneIdempotentOperationErrorReturn(o.Out, o.ignoreUnchanged, err)
 	}
 	if count == 0 {
 		return fmt.Errorf("no objects passed to create")

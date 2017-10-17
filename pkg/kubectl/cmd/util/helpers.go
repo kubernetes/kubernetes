@@ -135,8 +135,13 @@ func IdempotentOperationErrorReturn(flag, dryRun bool) error {
 
 // NoneIdempotentOperationErrorReturn first check the `--ignore-unchanged` flag if command set to true,
 // and then if error is resource already exist ignore this error return nil
-func NoneIdempotentOperationErrorReturn(flag bool, err error) error {
-	if flag && (strings.Contains(err.Error(), "already exist") || strings.Contains(err.Error(), "already has")) {
+func NoneIdempotentOperationErrorReturn(out io.Writer, flag bool, err error) error {
+	errMsg := err.Error()
+	if flag && (strings.Contains(errMsg, "already exist") || strings.Contains(errMsg, "already has")) {
+		if strings.Contains(errMsg, ":") {
+			errMsg = strings.Split(errMsg, ": ")[1]
+		}
+		fmt.Fprintf(out, "%s\n", errMsg)
 		return nil
 	}
 	return err

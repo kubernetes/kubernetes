@@ -413,7 +413,7 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 		cmdutil.PrintSuccess(false, cmdOut, runObject.Object, cmdutil.GetDryRunFlag(cmd), "created")
 	}
 
-	return cmdutil.NoneIdempotentOperationErrorReturn(ignoreUnchanged, utilerrors.NewAggregate(allErrs))
+	return cmdutil.NoneIdempotentOperationErrorReturn(cmdOut, ignoreUnchanged, utilerrors.NewAggregate(allErrs))
 }
 
 // waitForPod watches the given pod until the exitCondition is true
