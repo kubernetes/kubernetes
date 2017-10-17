@@ -99,10 +99,7 @@ func CreateServiceAccount(client clientset.Interface) error {
 
 // CreateRBACRules creates the essential RBAC rules for a minimally set-up cluster
 func CreateRBACRules(client clientset.Interface) error {
-	if err := createClusterRoleBindings(client); err != nil {
-		return err
-	}
-	return nil
+	return createClusterRoleBindings(client)
 }
 
 func createKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client clientset.Interface) error {
@@ -122,10 +119,7 @@ func createKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client clientse
 	}
 
 	// Create the DaemonSet for kube-proxy or update it in case it already exists
-	if err := apiclient.CreateOrUpdateDaemonSet(client, kubeproxyDaemonSet); err != nil {
-		return err
-	}
-	return nil
+	return apiclient.CreateOrUpdateDaemonSet(client, kubeproxyDaemonSet)
 }
 
 func createClusterRoleBindings(client clientset.Interface) error {

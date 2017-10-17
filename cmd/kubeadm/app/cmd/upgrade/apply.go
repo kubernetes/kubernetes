@@ -241,10 +241,7 @@ func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter
 		return err
 	}
 
-	if err := upgrade.StaticPodControlPlane(waiter, pathManager, internalcfg); err != nil {
-		return err
-	}
-	return nil
+	return upgrade.StaticPodControlPlane(waiter, pathManager, internalcfg)
 }
 
 // DryRunStaticPodUpgrade fakes an upgrade of the control plane
@@ -268,8 +265,5 @@ func DryRunStaticPodUpgrade(internalcfg *kubeadmapi.MasterConfiguration) error {
 		files = append(files, dryrunutil.NewFileToPrint(realPath, outputPath))
 	}
 
-	if err := dryrunutil.PrintDryRunFiles(files, os.Stdout); err != nil {
-		return err
-	}
-	return nil
+	return dryrunutil.PrintDryRunFiles(files, os.Stdout)
 }

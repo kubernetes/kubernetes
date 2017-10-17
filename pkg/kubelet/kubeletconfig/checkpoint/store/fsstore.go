@@ -56,10 +56,7 @@ func (s *fsStore) Initialize() error {
 	if err := utilfiles.EnsureFile(s.fs, filepath.Join(s.checkpointsDir, curFile)); err != nil {
 		return err
 	}
-	if err := utilfiles.EnsureFile(s.fs, filepath.Join(s.checkpointsDir, lkgFile)); err != nil {
-		return err
-	}
-	return nil
+	return utilfiles.EnsureFile(s.fs, filepath.Join(s.checkpointsDir, lkgFile))
 }
 
 func (s *fsStore) Exists(uid string) (bool, error) {
@@ -77,10 +74,7 @@ func (s *fsStore) Save(c checkpoint.Checkpoint) error {
 		return err
 	}
 	// save the file
-	if err := utilfiles.ReplaceFile(s.fs, filepath.Join(s.checkpointsDir, c.UID()), data); err != nil {
-		return err
-	}
-	return nil
+	return utilfiles.ReplaceFile(s.fs, filepath.Join(s.checkpointsDir, c.UID()), data)
 }
 
 func (s *fsStore) Load(uid string) (checkpoint.Checkpoint, error) {
