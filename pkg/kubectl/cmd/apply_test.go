@@ -41,6 +41,7 @@ import (
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/printers"
+	utilfile "k8s.io/kubernetes/pkg/util/file"
 )
 
 func TestApplyExtraArgsFail(t *testing.T) {
@@ -62,18 +63,24 @@ func validateApplyArgs(cmd *cobra.Command, args []string) error {
 }
 
 const (
-	filenameRC             = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.yaml"
-	filenameRCNoAnnotation = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-no-annotation.yaml"
-	filenameRCLASTAPPLIED  = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-lastapplied.yaml"
-	filenameSVC            = "../../../test/fixtures/pkg/kubectl/cmd/apply/service.yaml"
-	filenameRCSVC          = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-service.yaml"
-	filenameNoExistRC      = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-noexist.yaml"
-	filenameRCPatchTest    = "../../../test/fixtures/pkg/kubectl/cmd/apply/patch.json"
-	dirName                = "../../../test/fixtures/pkg/kubectl/cmd/apply/testdir"
-	filenameRCJSON         = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.json"
+	filenameRC                   = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.yaml"
+	filenameRCNoAnnotation       = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-no-annotation.yaml"
+	filenameRCLASTAPPLIED        = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-lastapplied.yaml"
+	filenameSVC                  = "../../../test/fixtures/pkg/kubectl/cmd/apply/service.yaml"
+	filenameRCSVC                = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-service.yaml"
+	filenameNoExistRC            = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-noexist.yaml"
+	filenameLocalChangedRC       = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-changed.yaml"
+	filenameApplyDiffRESP        = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-resp.json"
+	filenameApplyDiffChangedRESP = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-changed-resp.json"
+	filenameRCPatchTest          = "../../../test/fixtures/pkg/kubectl/cmd/apply/patch.json"
+	dirName                      = "../../../test/fixtures/pkg/kubectl/cmd/apply/testdir"
+	filenameRCJSON               = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.json"
 
 	filenameWidgetClientside = "../../../test/fixtures/pkg/kubectl/cmd/apply/widget-clientside.yaml"
 	filenameWidgetServerside = "../../../test/fixtures/pkg/kubectl/cmd/apply/widget-serverside.yaml"
+
+	fileNameGitDiffResult    = "./git-diff.result"
+	fileNameNormalDiffResutl = "./diff.result"
 )
 
 func readBytesFromFile(t *testing.T, filename string) []byte {
@@ -989,6 +996,97 @@ func TestRunApplySetLastApplied(t *testing.T) {
 		}
 	}
 	cmdutil.BehaviorOnFatal(func(str string, code int) {})
+}
+
+func TestRunApplyDiffLastApplied(t *testing.T) {
+	initTestErrorHandler(t)
+	rcByte := readBytesFromFile(t, filenameApplyDiffRESP)
+	pathRC := "/namespaces/test/replicationcontrollers/" + "test-rc"
+
+	rcChangedByte := readBytesFromFile(t, filenameApplyDiffChangedRESP)
+
+	tests := []struct {
+		name, nameRC, pathRC, filePath, expectedGitDiffOut, expectedDiffOut, expectedErr, output string
+		resp                                                                                     []byte
+	}{
+		{
+			name:               "git-diff objects with no different",
+			filePath:           filenameRC,
+			expectedErr:        "",
+			expectedGitDiffOut: "",
+			expectedDiffOut:    "",
+			resp:               rcByte,
+			output:             "yaml",
+		},
+		{
+			name:               "git-diff after local file changed with json",
+			filePath:           filenameLocalChangedRC,
+			expectedErr:        "",
+			expectedGitDiffOut: "-                \"containerPort\": 80\n+                \"containerPort\": 123\n               }\n",
+			expectedDiffOut:    "<                 \"containerPort\": 80\n>                 \"containerPort\": 123\n",
+			resp:               rcByte,
+			output:             "json",
+		},
+		{
+			name:               "git-diff after annotations changed",
+			filePath:           filenameRC,
+			expectedErr:        "",
+			expectedGitDiffOut: "-        - containerPort: 123\n+        - containerPort: 80\n",
+			expectedDiffOut:    "<         - containerPort: 123\n>         - containerPort: 80\n",
+			resp:               rcChangedByte,
+			output:             "yaml",
+		},
+	}
+	for _, test := range tests {
+		f, tf, _, _ := cmdtesting.NewAPIFactory()
+		tf.Printer = &testPrinter{}
+		tf.UnstructuredClient = &fake.RESTClient{
+			APIRegistry:          api.Registry,
+			NegotiatedSerializer: unstructuredSerializer,
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				switch p, m := req.URL.Path, req.Method; {
+				case p == pathRC && m == "GET":
+					bodyRC := ioutil.NopCloser(bytes.NewReader(test.resp))
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: bodyRC}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			}),
+		}
+		tf.Namespace = "test"
+		tf.ClientConfig = defaultClientConfig()
+		buf, errBuf := bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{})
+
+		cmd := NewCmdApplyDiffLastApplied(f, buf, errBuf)
+		os.Setenv("KUBECTL_EXTERNAL_DIFF", "testdata/diff/test_diff.sh")
+
+		cmd.Flags().Set("filename", test.filePath)
+		cmd.Flags().Set("output", test.output)
+		cmd.Run(cmd, []string{})
+
+		pathExist, _ := utilfile.FileExists(fileNameGitDiffResult)
+		if pathExist {
+			out := string(readBytesFromFile(t, fileNameGitDiffResult))
+			if out != test.expectedGitDiffOut {
+				t.Fatalf("%s: unexpected output: %q\nexpected: %q", test.name, out, test.expectedGitDiffOut)
+			}
+			os.Remove(fileNameGitDiffResult)
+			continue
+		}
+
+		pathExist, _ = utilfile.FileExists(fileNameNormalDiffResutl)
+		if pathExist {
+			out := string(readBytesFromFile(t, fileNameNormalDiffResutl))
+			if out != test.expectedDiffOut {
+				t.Fatalf("%s: unexpected output: %q\nexpected: %q", test.name, out, test.expectedDiffOut)
+			}
+			os.Remove(fileNameNormalDiffResutl)
+			continue
+		}
+
+		t.Fatalf(`External test script failed. Check that either "diff" or "git diff" is installed.`)
+	}
 }
 
 func checkPatchString(t *testing.T, req *http.Request) {
