@@ -38,6 +38,9 @@ message AdmissionHookClientConfig {
   // Required
   optional ServiceReference service = 1;
 
+  // URLPath is an optional field that specifies the URL path to use when posting the AdmissionReview object.
+  optional string urlPath = 3;
+
   // CABundle is a PEM encoded CA bundle which will be used to validate webhook's server certificate.
   // Required
   optional bytes caBundle = 2;
