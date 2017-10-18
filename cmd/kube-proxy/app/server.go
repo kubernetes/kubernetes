@@ -163,15 +163,13 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }
 
-func NewOptions() (*Options, error) {
-	o := &Options{
+func NewOptions() *Options {
+	return &Options{
 		config:      new(proxyconfig.KubeProxyConfiguration),
 		healthzPort: ports.ProxyHealthzPort,
 		scheme:      scheme.Scheme,
 		codecs:      scheme.Codecs,
 	}
-
-	return o, nil
 }
 
 // Complete completes all the required options.
@@ -316,10 +314,7 @@ func (o *Options) ApplyDefaults(in *proxyconfig.KubeProxyConfiguration) (*proxyc
 
 // NewProxyCommand creates a *cobra.Command object with default parameters
 func NewProxyCommand() *cobra.Command {
-	opts, err := NewOptions()
-	if err != nil {
-		glog.Fatalf("Unable to initialize command options: %v", err)
-	}
+	opts := NewOptions()
 
 	cmd := &cobra.Command{
 		Use: "kube-proxy",
@@ -338,6 +333,7 @@ with the apiserver API to configure the proxy.`,
 		},
 	}
 
+	var err error
 	opts.config, err = opts.ApplyDefaults(opts.config)
 	if err != nil {
 		glog.Fatalf("unable to create flag defaults: %v", err)

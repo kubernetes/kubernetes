@@ -17,7 +17,6 @@ limitations under the License.
 package app
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -28,11 +27,9 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8sRuntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/proxy/apis/proxyconfig"
-	"k8s.io/kubernetes/pkg/proxy/apis/proxyconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/iptables"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
@@ -138,39 +135,6 @@ func Test_getProxyMode(t *testing.T) {
 	}
 }
 
-// TestNewOptionsFailures tests failure modes for NewOptions()
-func TestNewOptionsFailures(t *testing.T) {
-	// Create a fake scheme builder that generates an error
-	errString := fmt.Sprintf("Simulated error")
-	genError := func(scheme *k8sRuntime.Scheme) error {
-		return errors.New(errString)
-	}
-	fakeSchemeBuilder := k8sRuntime.NewSchemeBuilder(genError)
-
-	simulatedErrorTest := func(target string) {
-		var addToScheme *func(s *k8sRuntime.Scheme) error
-		if target == proxyconfig.GroupName {
-			addToScheme = &proxyconfig.AddToScheme
-		} else {
-			addToScheme = &v1alpha1.AddToScheme
-		}
-		restoreValue := *addToScheme
-		restore := func() {
-			*addToScheme = restoreValue
-		}
-		defer restore()
-		*addToScheme = fakeSchemeBuilder.AddToScheme
-		_, err := NewOptions()
-		assert.Error(t, err, fmt.Sprintf("Simulated error in component %s", target))
-	}
-
-	// Simulate errors in calls to AddToScheme()
-	faultTargets := []string{proxyconfig.GroupName, "v1alpha1"}
-	for _, target := range faultTargets {
-		simulatedErrorTest(target)
-	}
-}
-
 // This test verifies that NewProxyServer does not crash when CleanupAndExit is true.
 func TestProxyServerWithCleanupAndExit(t *testing.T) {
 	// Each bind address below is a separate test case
@@ -179,10 +143,7 @@ func TestProxyServerWithCleanupAndExit(t *testing.T) {
 		"::",
 	}
 	for _, addr := range bindAddresses {
-		options, err := NewOptions()
-		if err != nil {
-			t.Fatalf("Unexpected error with address %s: %v", addr, err)
-		}
+		options := NewOptions()
 
 		options.config = &proxyconfig.KubeProxyConfiguration{
 			BindAddress: addr,
@@ -410,8 +371,7 @@ udpTimeoutMilliseconds: 123ms
 			UDPIdleTimeout:     metav1.Duration{Duration: 123 * time.Millisecond},
 		}
 
-		options, err := NewOptions()
-		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
+		options := NewOptions()
 
 		yaml := fmt.Sprintf(
 			yamlTemplate, tc.bindAddress, tc.clusterCIDR,
@@ -449,7 +409,7 @@ func TestLoadConfigFailures(t *testing.T) {
 	}
 	version := "apiVersion: kubeproxy.k8s.io/v1alpha1"
 	for _, tc := range testCases {
-		options, _ := NewOptions()
+		options := NewOptions()
 		config := fmt.Sprintf("%s\n%s", version, tc.config)
 		_, err := options.loadConfig([]byte(config))
 		if assert.Error(t, err, tc.name) {
