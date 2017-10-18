@@ -23,10 +23,10 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/apis/proxyconfig/v1alpha1"
 )
 
-// Utility functions for the Kube-proxy's proxyconfig API group
+// Utility functions for the Kube-proxy's "kubeproxy.k8s.io" API group
 
 // NewSchemeAndCodecs is a utility funciton that returns a Scheme and CodecFactory
-// that understand the types in the proxyconfig API group.
+// that understand the types in the "kubeproxy.k8s.io" API group.
 func NewSchemeAndCodecs() (*runtime.Scheme, *serializer.CodecFactory, error) {
 	scheme := runtime.NewScheme()
 	if err := proxyconfig.AddToScheme(scheme); err != nil {
