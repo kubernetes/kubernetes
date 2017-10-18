@@ -389,6 +389,10 @@ func (b *fcDiskMapper) SetUpDevice() (string, error) {
 	return "", nil
 }
 
+func (c *fcDiskMapper) TearDownDevice() error {
+	return nil
+}
+
 // GetGlobalMapPath returns global map path and error
 // path: plugins/kubernetes.io/{PluginName}/volumeDevices/{WWID}/{podUid}
 func (b *fcDiskMapper) GetGlobalMapPath(spec *volume.Spec) (string, error) {
@@ -407,10 +411,6 @@ type fcDiskUnmapper struct {
 }
 
 var _ volume.BlockVolumeUnmapper = &fcDiskUnmapper{}
-
-func (c *fcDiskUnmapper) TearDownDevice() error {
-	return nil
-}
 
 // GetGlobalUnmapPath returns global map path and error
 // path: plugins/kubernetes.io/{PluginName}/volumeDevices/{WWID}/{podUid}
