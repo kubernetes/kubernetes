@@ -449,7 +449,7 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 			return nil, err
 		}
 	}
-	if len(config.ManagedZones) != 1 {
+	if len(config.ManagedZones) > 1 {
 		glog.Infof("managing multiple zones: %v", config.ManagedZones)
 	}
 
