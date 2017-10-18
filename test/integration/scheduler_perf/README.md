@@ -39,6 +39,50 @@ cd test/integration/scheduler_perf
 ./test-performance.sh
 ```
 
+Configure Scheduler
+------
+
+The scheduling policy in this Scheduler Performance Test is also configurable.
+
+Be default, `kube-scheduler` will always use default algorithm provider regardless of `config/scheduler-config.json` is present or not.
+
+You can specify you want to use customized scheduler by set `DEFAULT_PROVIDER` to `false`:
+
+```shell
+export DEFAULT_PROVIDER=false
+
+make generated_files
+
+cd test/integration/scheduler_perf
+./test-performance.sh
+```
+
+In this case, `kube-scheduler` will use predicates and priorities specified in `config/scheduler-config.json`.
+
+Also, the performance tests will configure nodes and pods based on the contents in the configure file.
+
+For example, I only want to enable `MatchNodeSelector` predicate during the performance test:
+
+```json
+{
+"kind" : "Policy",
+"apiVersion" : "v1",
+"predicates" : [
+  {"name" : "MatchNodeSelector"}
+  ],
+"priorities" : [
+  {"name" : "LeastRequestedPriority", "weight" : 1},
+  {"name" : "BalancedResourceAllocation", "weight" : 1},
+  {"name" : "ServiceSpreadingPriority", "weight" : 1},
+  {"name" : "EqualPriority", "weight" : 1}
+  ],
+"hardPodAffinitySymmetricWeight" : 10
+}
+```
+Done!
+
+The test case will configure corresponding `NodeAffinity` to make sure this predicate is respected during test process.
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/component/scheduler/perf/README.md?pixel)]()
