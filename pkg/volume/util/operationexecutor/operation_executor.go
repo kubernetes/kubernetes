@@ -856,7 +856,6 @@ type VolumeStateHandler interface {
 }
 
 // NewVolumeHandler return a new instance of volumeHandler depens on a volumeMode
-
 func NewVolumeHandler(volumeSpec *volume.Spec, oe OperationExecutor) VolumeStateHandler {
 	var volumeHandler VolumeStateHandler
 	// If a persistent volume is nil, we handle this as filesystem volume mode case
@@ -891,7 +890,7 @@ type BlockVolumeHandler struct {
 	oe OperationExecutor
 }
 
-// Volume is mounted, unmount it
+// HandleUnmounted unmount a volume if a volume is mounted
 func (f FilesystemVolumeHandler) HandleUnmounted(mountedVolume MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
 	glog.V(12).Infof(mountedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountVolume", ""))
 	err := f.oe.UnmountVolume(
@@ -900,7 +899,7 @@ func (f FilesystemVolumeHandler) HandleUnmounted(mountedVolume MountedVolume, ac
 	return err
 }
 
-// Volume is attached, mount/remount it
+// HandleAttachedMounted Volume mount/remount a volume when a volume is attached
 func (f FilesystemVolumeHandler) HandleAttachedMounted(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater, isRemount bool, remountingLogStr string) error {
 	glog.V(12).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.MountVolume", remountingLogStr))
 	err := f.oe.MountVolume(
@@ -911,7 +910,7 @@ func (f FilesystemVolumeHandler) HandleAttachedMounted(waitForAttachTimeout time
 	return err
 }
 
-// Volume is globally mounted to device, unmount it
+// HandleDetachedUnmounted unmount a volume if a volume is globally mounted to device
 func (f FilesystemVolumeHandler) HandleDetachedUnmounted(attachedVolume AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.Interface) error {
 	glog.V(12).Infof(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmountDevice", ""))
 	err := f.oe.UnmountDevice(
@@ -921,7 +920,7 @@ func (f FilesystemVolumeHandler) HandleDetachedUnmounted(attachedVolume Attached
 	return err
 }
 
-// Volume is mapped, unmap it
+// HandleUnmounted unmap a volume if a volume is mapped
 func (b BlockVolumeHandler) HandleUnmounted(mountedVolume MountedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
 	glog.V(12).Infof(mountedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmapVolume", ""))
 	err := b.oe.UnmapVolume(
@@ -930,7 +929,7 @@ func (b BlockVolumeHandler) HandleUnmounted(mountedVolume MountedVolume, actualS
 	return err
 }
 
-// Volume is attached, create map to device
+// HandleAttachedMounted creates a map to device if a volume is attached
 func (b BlockVolumeHandler) HandleAttachedMounted(waitForAttachTimeout time.Duration, volumeToMount VolumeToMount, actualStateOfWorld ActualStateOfWorldMounterUpdater, _ bool, _ string) error {
 	glog.V(12).Infof(volumeToMount.GenerateMsgDetailed("Starting operationExecutor.MapVolume", ""))
 	err := b.oe.MapVolume(
@@ -940,7 +939,7 @@ func (b BlockVolumeHandler) HandleAttachedMounted(waitForAttachTimeout time.Dura
 	return err
 }
 
-// Volume is globally mapped to device, unmap it
+// HandleDetachedUnmounted unmap a volume if a volume is globally mapped to device
 func (b BlockVolumeHandler) HandleDetachedUnmounted(attachedVolume AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.Interface) error {
 	glog.V(12).Infof(attachedVolume.GenerateMsgDetailed("Starting operationExecutor.UnmapDevice", ""))
 	err := b.oe.UnmapDevice(
