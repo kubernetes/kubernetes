@@ -31,7 +31,7 @@ func TestFileStore(t *testing.T) {
 	store, err := NewFileStore(path, filesystem.NewFakeFs())
 	assert.NoError(t, err)
 
-	testData := []struct {
+	testCases := []struct {
 		key       string
 		data      string
 		expectErr bool
@@ -69,7 +69,7 @@ func TestFileStore(t *testing.T) {
 	}
 
 	// Test add data.
-	for _, c := range testData {
+	for _, c := range testCases {
 		_, err = store.Read(c.key)
 		assert.Error(t, err)
 
@@ -94,7 +94,7 @@ func TestFileStore(t *testing.T) {
 	assert.Equal(t, keys, []string{"id1", "id2"})
 
 	// Test Delete data
-	for _, c := range testData {
+	for _, c := range testCases {
 		if c.expectErr {
 			continue
 		}
@@ -102,7 +102,7 @@ func TestFileStore(t *testing.T) {
 		err = store.Delete(c.key)
 		assert.NoError(t, err)
 		_, err = store.Read(c.key)
-		assert.EqualValues(t, KeyNotFoundError, err)
+		assert.EqualValues(t, ErrKeyNotFound, err)
 	}
 
 	// Test delete non-existent key.

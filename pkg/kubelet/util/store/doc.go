@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// A store interface.
+// Package store hosts a Store interface and its implementations.
 package store // import "k8s.io/kubernetes/pkg/kubelet/util/store"
