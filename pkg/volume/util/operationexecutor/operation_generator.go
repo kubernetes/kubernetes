@@ -798,13 +798,6 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 	}
 
 	return func() error {
-		// Execute tear down device
-		unmapErr := blockVolumeUnmapper.TearDownDevice()
-		if unmapErr != nil {
-			// On failure, return error. Caller will log and retry.
-			return volumeToUnmount.GenerateErrorDetailed("UnmapVolume.TearDownDevice failed", unmapErr)
-		}
-
 		// Try to unmap symlink on global map path
 		globalUnmapPath, err :=
 			blockVolumeUnmapper.GetGlobalUnmapPath(volumeToUnmount.VolumeSpec)
@@ -881,11 +874,11 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 			blockVolumeMapper.GetGlobalMapPath(deviceToDetach.VolumeSpec)
 		if err != nil {
 			// On failure, return error. Caller will log and retry.
-			return deviceToDetach.GenerateErrorDetailed("GetGlobalMapPath failed", err)
+			return deviceToDetach.GenerateErrorDetailed("UnmapDevice.GetGlobalMapPath failed", err)
 		}
 		refs, err := util.GetDeviceSymlinkRefs(deviceToDetach.DevicePath, globalMapPath)
 		if err != nil {
-			return deviceToDetach.GenerateErrorDetailed("GetDeviceSymlinkRefs check failed", err)
+			return deviceToDetach.GenerateErrorDetailed("UnmapDevice.GetDeviceSymlinkRefs check failed", err)
 		}
 		if len(refs) > 0 {
 			err = fmt.Errorf("The device %q is still referenced from other Pods %v", globalMapPath, refs)
@@ -899,15 +892,15 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		}
 
 		// The block volume is not referenced from Pods. Release file descriptor lock.
-		glog.V(5).Infof("GenerateUnmapDeviceFunc: deviceToDetach.DevicePath: %v", deviceToDetach.DevicePath)
+		glog.V(5).Infof("UnmapDevice: deviceToDetach.DevicePath: %v", deviceToDetach.DevicePath)
 		exec := og.volumePluginMgr.Host.GetExec(blockVolumePlugin.GetPluginName())
 		loopPath, err := util.GetLoopDevice(deviceToDetach.DevicePath, exec)
 		if err != nil {
-			glog.Warningf(deviceToDetach.GenerateMsgDetailed("Couldn't find loopback device which takes file descriptor lock", fmt.Sprintf("device path: %q", deviceToDetach.DevicePath)))
+			glog.Warningf(deviceToDetach.GenerateMsgDetailed("UnmapDevice: Couldn't find loopback device which takes file descriptor lock", fmt.Sprintf("device path: %q", deviceToDetach.DevicePath)))
 		} else {
 			err = util.RemoveLoopDevice(loopPath, exec)
 			if err != nil {
-				return deviceToDetach.GenerateErrorDetailed("MapVolume.AttachFileDevice failed", err)
+				return deviceToDetach.GenerateErrorDetailed("UnmapDevice.AttachFileDevice failed", err)
 			}
 		}
 
@@ -924,6 +917,13 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 			return deviceToDetach.GenerateErrorDetailed(
 				"UnmapDevice failed",
 				fmt.Errorf("the device is in use when it was no longer expected to be in use"))
+		}
+
+		// Execute tear down device
+		unmapErr := blockVolumeMapper.TearDownDevice()
+		if unmapErr != nil {
+			// On failure, return error. Caller will log and retry.
+			return deviceToDetach.GenerateErrorDetailed("UnmapDevice.TearDownDevice failed", unmapErr)
 		}
 
 		glog.Infof(deviceToDetach.GenerateMsgDetailed("UnmapDevice succeeded", ""))

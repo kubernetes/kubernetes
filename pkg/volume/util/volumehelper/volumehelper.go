@@ -151,23 +151,3 @@ func GetVolumeMode(volumeSpec *volume.Spec) v1.PersistentVolumeMode {
 	// override the value as filesystem for the backward compatibility.
 	return v1.PersistentVolumeFilesystem
 }
-
-// GetPersistentVolumeMode retrieves VolumeMode from PersistentVolume object.
-func GetPersistentVolumeMode(volume *v1.PersistentVolume) v1.PersistentVolumeMode {
-	if volume != nil && volume.Spec.VolumeMode != nil {
-		return *volume.Spec.VolumeMode
-	}
-	// If these parameters are nil or volumeMode is not Block, we should
-	// override the value as filesystem for the backward compatibility.
-	return v1.PersistentVolumeFilesystem
-}
-
-// GetPersistentVolumeClaimVolumeMode retrieves VolumeMode from PersistentVolumeClaim object.
-func GetPersistentVolumeClaimVolumeMode(claim *v1.PersistentVolumeClaim) v1.PersistentVolumeMode {
-	if claim != nil && claim.Spec.VolumeMode != nil {
-		return *claim.Spec.VolumeMode
-	}
-	// If these parameters are nil or volumeMode is not Block, we should
-	// override the value as filesystem for the backward compatibility.
-	return v1.PersistentVolumeFilesystem
-}

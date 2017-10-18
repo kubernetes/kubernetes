@@ -144,6 +144,11 @@ type BlockVolumeMapper interface {
 	// empty string for device path.
 	// This may be called more than once, so implementations must be idempotent.
 	SetUpDevice() (string, error)
+	// TearDownDevice removes traces of the SetUpDevice procedure under
+	// a self-determined directory.
+	// If the plugin is non-attachable, this method detaches the volume
+	// from a node.
+	TearDownDevice() error
 	// GetGlobalMapPath returns a global map path which contains
 	// a symbolic links associated to a block device.
 	// ex. plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid}
@@ -157,11 +162,6 @@ type BlockVolumeMapper interface {
 // BlockVolumeUnmapper interface provides methods to cleanup/unmap the volumes.
 type BlockVolumeUnmapper interface {
 	Volume
-	// TearDownDevice removes traces of the SetUpDevice procedure under
-	// a self-determined directory.
-	// If the plugin is non-attachable, this method detaches the volume
-	// from a node.
-	TearDownDevice() error
 	// GetGlobalUnmapPath returns a path to symbolic link of a
 	// block device under a global map path.
 	GetGlobalUnmapPath(spec *Spec) (string, error)

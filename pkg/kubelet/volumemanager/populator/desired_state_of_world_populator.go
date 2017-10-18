@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
@@ -428,7 +429,7 @@ func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 			pvc.Status.Phase,
 			pvc.Spec.VolumeName)
 	}
-	volumeMode := volumehelper.GetPersistentVolumeClaimVolumeMode(pvc)
+	volumeMode := v1helper.GetPersistentVolumeClaimVolumeMode(pvc)
 	return pvc.Spec.VolumeName, pvc.UID, volumeMode, nil
 }
 
