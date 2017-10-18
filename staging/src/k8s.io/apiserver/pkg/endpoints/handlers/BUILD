@@ -37,12 +37,16 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "create.go",
+        "delete.go",
         "doc.go",
+        "get.go",
         "namer.go",
         "patch.go",
         "proxy.go",
         "response.go",
         "rest.go",
+        "update.go",
         "watch.go",
     ],
     importpath = "k8s.io/apiserver/pkg/endpoints/handlers",
