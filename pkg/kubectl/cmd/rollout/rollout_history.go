@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -45,7 +44,7 @@ func NewCmdRolloutHistory(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &resource.FilenameOptions{}
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
-	argAliases := kubectl.ResourceAliases(validArgs)
+	argAliases := cmdutil.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
 		Use:     "history (TYPE NAME | TYPE/NAME) [flags]",

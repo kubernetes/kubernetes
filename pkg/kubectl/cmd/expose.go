@@ -79,7 +79,7 @@ func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	resources := regexp.MustCompile(`\s*,`).Split(exposeResources, -1)
 	for _, r := range resources {
 		validArgs = append(validArgs, strings.Fields(r)[0])
-		argAliases = kubectl.ResourceAliases(validArgs)
+		argAliases = cmdutil.ResourceAliases(validArgs)
 	}
 
 	cmd := &cobra.Command{

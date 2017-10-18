@@ -15,6 +15,7 @@ go_library(
         "factory_object_mapping.go",
         "helpers.go",
         "printing.go",
+        "resources.go",
         "shortcut_restmapper.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util",

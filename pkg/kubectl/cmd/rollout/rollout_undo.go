@@ -65,7 +65,7 @@ func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &UndoOptions{}
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
-	argAliases := kubectl.ResourceAliases(validArgs)
+	argAliases := cmdutil.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
 		Use:     "undo (TYPE NAME | TYPE/NAME) [flags]",
