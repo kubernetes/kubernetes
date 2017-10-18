@@ -28,6 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/validation"
 )
 
@@ -39,7 +40,7 @@ type persistentvolumeclaimStrategy struct {
 
 // Strategy is the default logic that applies when creating and updating PersistentVolumeClaim
 // objects via the REST API.
-var Strategy = persistentvolumeclaimStrategy{api.Scheme, names.SimpleNameGenerator}
+var Strategy = persistentvolumeclaimStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 func (persistentvolumeclaimStrategy) NamespaceScoped() bool {
 	return true

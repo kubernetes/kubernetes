@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -580,7 +581,7 @@ func (p *patcher) patchSimple(obj runtime.Object, modified []byte, source, names
 
 	// Create the versioned struct from the type defined in the restmapping
 	// (which is the API version we'll be submitting the patch to)
-	versionedObject, err := api.Scheme.New(p.mapping.GroupVersionKind)
+	versionedObject, err := legacyscheme.Scheme.New(p.mapping.GroupVersionKind)
 	var patchType types.PatchType
 	var patch []byte
 	createPatchErrFormat := "creating patch with:\noriginal:\n%s\nmodified:\n%s\ncurrent:\n%s\nfor:"

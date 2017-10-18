@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
@@ -75,7 +75,7 @@ func TestCreateRoleBinding(t *testing.T) {
 	tf.Printer = &testPrinter{}
 	tf.Client = &RoleBindingRESTClient{
 		RESTClient: &fake.RESTClient{
-			APIRegistry:          api.Registry,
+			APIRegistry:          legacyscheme.Registry,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {

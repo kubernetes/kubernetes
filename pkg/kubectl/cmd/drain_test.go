@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/ref"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -153,7 +154,7 @@ func TestCordon(t *testing.T) {
 		new_node := &v1.Node{}
 		updated := false
 		tf.Client = &fake.RESTClient{
-			APIRegistry:          api.Registry,
+			APIRegistry:          legacyscheme.Registry,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
@@ -596,7 +597,7 @@ func TestDrain(t *testing.T) {
 			evicted := false
 			f, tf, codec, ns := cmdtesting.NewAPIFactory()
 			tf.Client = &fake.RESTClient{
-				APIRegistry:          api.Registry,
+				APIRegistry:          legacyscheme.Registry,
 				NegotiatedSerializer: ns,
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					m := &MyReq{req}
@@ -865,7 +866,7 @@ func (m *MyReq) isFor(method string, path string) bool {
 }
 
 func refJson(t *testing.T, o runtime.Object) string {
-	ref, err := ref.GetReference(api.Scheme, o)
+	ref, err := ref.GetReference(legacyscheme.Scheme, o)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

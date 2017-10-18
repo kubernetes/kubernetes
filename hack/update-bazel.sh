@@ -39,7 +39,7 @@ kube::util::go_install_from_commit \
     e26fc85d14a1d3dc25569831acc06919673c545a
 kube::util::go_install_from_commit \
     github.com/bazelbuild/rules_go/go/tools/gazelle/gazelle \
-    a280fbac1a0a4c67b0eee660b4fd1b3db7c9f058
+    c72631a220406c4fae276861ee286aaec82c5af2
 
 touch "${KUBE_ROOT}/vendor/BUILD"
 

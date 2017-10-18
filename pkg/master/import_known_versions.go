@@ -20,7 +20,8 @@ package master
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+
 	_ "k8s.io/kubernetes/pkg/api/install"
 	_ "k8s.io/kubernetes/pkg/apis/admission/install"
 	_ "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
@@ -42,7 +43,7 @@ import (
 )
 
 func init() {
-	if missingVersions := api.Registry.ValidateEnvRequestedVersions(); len(missingVersions) != 0 {
+	if missingVersions := legacyscheme.Registry.ValidateEnvRequestedVersions(); len(missingVersions) != 0 {
 		panic(fmt.Sprintf("KUBE_API_VERSIONS contains versions that are not installed: %q.", missingVersions))
 	}
 }

@@ -51,7 +51,7 @@ import (
 	servicednscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service/dns"
 	synccontroller "k8s.io/kubernetes/federation/pkg/federation-controller/sync"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/version"
 
@@ -152,7 +152,7 @@ func Run(s *options.CMServer) error {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(federationClientset))
-	recorder := eventBroadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: "controller-manager"})
+	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "controller-manager"})
 
 	id, err := os.Hostname()
 	if err != nil {

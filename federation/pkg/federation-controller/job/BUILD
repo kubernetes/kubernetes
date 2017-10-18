@@ -20,6 +20,7 @@ go_library(
         "//federation/pkg/federation-controller/util/planner:go_default_library",
         "//federation/pkg/federation-controller/util/replicapreferences:go_default_library",
         "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/controller:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

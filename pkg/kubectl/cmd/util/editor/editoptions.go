@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -547,7 +548,7 @@ func (o *EditOptions) visitToPatch(originalInfos []*resource.Info, patchVisitor 
 
 		// Create the versioned struct from the type defined in the mapping
 		// (which is the API version we'll be submitting the patch to)
-		versionedObject, err := api.Scheme.New(info.Mapping.GroupVersionKind)
+		versionedObject, err := legacyscheme.Scheme.New(info.Mapping.GroupVersionKind)
 		var patchType types.PatchType
 		var patch []byte
 		switch {

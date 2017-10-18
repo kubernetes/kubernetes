@@ -248,10 +248,7 @@ func (cc *Controller) StartSync(client clientset.Interface, nodeName string) {
 func (cc *Controller) initialize() error {
 	utillog.Infof("ensuring filesystem is set up correctly")
 	// initialize local checkpoint storage location
-	if err := cc.checkpointStore.Initialize(); err != nil {
-		return err
-	}
-	return nil
+	return cc.checkpointStore.Initialize()
 }
 
 // localConfig returns the initConfig if it is loaded, otherwise returns the defaultConfig.

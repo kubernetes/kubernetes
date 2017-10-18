@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/planner"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/replicapreferences"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -97,7 +98,7 @@ type FederationJobController struct {
 func NewJobController(fedClient fedclientset.Interface) *FederationJobController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(fedClient))
-	recorder := broadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "federated-job-controller"})
+	recorder := broadcaster.NewRecorder(legacyscheme.Scheme, clientv1.EventSource{Component: "federated-job-controller"})
 	fjc := &FederationJobController{
 		fedClient:        fedClient,
 		jobDeliverer:     fedutil.NewDelayingDeliverer(),

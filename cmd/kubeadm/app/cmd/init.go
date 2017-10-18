@@ -57,7 +57,7 @@ import (
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -103,7 +103,7 @@ var (
 // NewCmdInit returns "kubeadm init" command.
 func NewCmdInit(out io.Writer) *cobra.Command {
 	cfg := &kubeadmapiext.MasterConfiguration{}
-	api.Scheme.Default(cfg)
+	legacyscheme.Scheme.Default(cfg)
 
 	var cfgPath string
 	var skipPreFlight bool
@@ -120,9 +120,9 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 				kubeadmutil.CheckErr(err)
 			}
 
-			api.Scheme.Default(cfg)
+			legacyscheme.Scheme.Default(cfg)
 			internalcfg := &kubeadmapi.MasterConfiguration{}
-			api.Scheme.Convert(cfg, internalcfg, nil)
+			legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
 
 			i, err := NewInit(cfgPath, internalcfg, skipPreFlight, skipTokenPrint, dryRun)
 			kubeadmutil.CheckErr(err)
@@ -220,7 +220,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight,
 		if err != nil {
 			return nil, fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
 		}
-		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), b, cfg); err != nil {
+		if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
 			return nil, fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
 		}
 	}

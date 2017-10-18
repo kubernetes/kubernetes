@@ -30,6 +30,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/ref"
 	"k8s.io/kubernetes/pkg/apis/settings"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -346,7 +347,7 @@ func mergeVolumes(volumes []api.Volume, podPresets []*settings.PodPreset) ([]api
 }
 
 func (c *podPresetPlugin) addEvent(pod *api.Pod, pip *settings.PodPreset, message string) {
-	ref, err := ref.GetReference(api.Scheme, pod)
+	ref, err := ref.GetReference(legacyscheme.Scheme, pod)
 	if err != nil {
 		glog.Errorf("pip %s: get reference for pod %s failed: %v", pip.GetName(), pod.GetName(), err)
 		return

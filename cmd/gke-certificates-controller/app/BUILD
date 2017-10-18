@@ -15,7 +15,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/cmd/gke-certificates-controller/app",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/certificates/install:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/certificates:go_default_library",

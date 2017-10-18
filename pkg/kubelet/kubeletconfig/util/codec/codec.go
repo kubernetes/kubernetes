@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 )
 
@@ -34,18 +34,18 @@ import (
 func NewJSONEncoder(groupName string) (runtime.Encoder, error) {
 	// encode to json
 	mediaType := "application/json"
-	info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), mediaType)
+	info, ok := runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), mediaType)
 	if !ok {
 		return nil, fmt.Errorf("unsupported media type %q", mediaType)
 	}
 
-	versions := api.Registry.EnabledVersionsForGroup(groupName)
+	versions := legacyscheme.Registry.EnabledVersionsForGroup(groupName)
 	if len(versions) == 0 {
 		return nil, fmt.Errorf("no enabled versions for group %q", groupName)
 	}
 
-	// the "best" version supposedly comes first in the list returned from api.Registry.EnabledVersionsForGroup
-	return api.Codecs.EncoderForVersion(info.Serializer, versions[0]), nil
+	// the "best" version supposedly comes first in the list returned from legacyscheme.Registry.EnabledVersionsForGroup
+	return legacyscheme.Codecs.EncoderForVersion(info.Serializer, versions[0]), nil
 }
 
 // DecodeKubeletConfiguration decodes a serialized KubeletConfiguration to the internal type

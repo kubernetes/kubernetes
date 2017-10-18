@@ -156,10 +156,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch").Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
 			rbac.NewRule("update").Groups(autoscalingGroup).Resources("horizontalpodautoscalers/status").RuleOrDie(),
-			rbac.NewRule("get", "update").Groups(legacyGroup).Resources("replicationcontrollers/scale").RuleOrDie(),
-			// TODO this should be removable when the HPA contoller is fixed
-			rbac.NewRule("get", "update").Groups(extensionsGroup).Resources("replicationcontrollers/scale").RuleOrDie(),
-			rbac.NewRule("get", "update").Groups(extensionsGroup, appsGroup).Resources("deployments/scale", "replicasets/scale").RuleOrDie(),
+			rbac.NewRule("get", "update").Groups("*").Resources("*/scale").RuleOrDie(),
 			rbac.NewRule("list").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			// TODO: restrict this to the appropriate namespace
 			rbac.NewRule("get").Groups(legacyGroup).Resources("services/proxy").Names("https:heapster:", "http:heapster:").RuleOrDie(),

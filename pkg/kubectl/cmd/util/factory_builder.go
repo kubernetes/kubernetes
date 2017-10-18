@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/printers"
@@ -54,8 +54,8 @@ func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command, isLocal bool, outpu
 	var err error
 
 	if isLocal {
-		mapper = api.Registry.RESTMapper()
-		typer = api.Scheme
+		mapper = legacyscheme.Registry.RESTMapper()
+		typer = legacyscheme.Scheme
 	} else {
 		mapper, typer, err = f.objectMappingFactory.UnstructuredObject()
 		if err != nil {

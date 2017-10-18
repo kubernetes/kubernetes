@@ -30,6 +30,7 @@ go_library(
         "//federation/registry/cluster/etcd:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/autoscaling/install:go_default_library",
         "//pkg/apis/batch:go_default_library",

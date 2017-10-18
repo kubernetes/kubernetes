@@ -16,6 +16,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/helper/qos:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/pod:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/kubelet/client:go_default_library",
@@ -45,6 +46,7 @@ go_test(
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
         "//pkg/kubelet/client:go_default_library",

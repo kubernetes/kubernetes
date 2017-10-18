@@ -64461,7 +64461,7 @@
       }
      },
      "resources": {
-      "description": "Resources is a list of resources this rule applies to.  ResourceAll represents all resources.  \"*\" means all.",
+      "description": "Resources is a list of resources this rule applies to.  \"*\" means all in the specified apiGroups.\n \"*/foo\" represents the subresource 'foo' for all resources in the specified apiGroups.",
       "type": "array",
       "items": {
        "type": "string"
@@ -64812,7 +64812,7 @@
       }
      },
      "resources": {
-      "description": "Resources is a list of resources this rule applies to.  ResourceAll represents all resources.  \"*\" means all.",
+      "description": "Resources is a list of resources this rule applies to.  \"*\" means all in the specified apiGroups.\n \"*/foo\" represents the subresource 'foo' for all resources in the specified apiGroups.",
       "type": "array",
       "items": {
        "type": "string"
@@ -73180,7 +73180,7 @@
       }
      },
      "resources": {
-      "description": "Resources is a list of resources this rule applies to.  ResourceAll represents all resources.",
+      "description": "Resources is a list of resources this rule applies to.  '*' represents all resources in the specified apiGroups. '*/foo' represents the subresource 'foo' for all resources in the specified apiGroups.",
       "type": "array",
       "items": {
        "type": "string"

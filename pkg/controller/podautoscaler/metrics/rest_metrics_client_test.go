@@ -30,14 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api"
-	// For api.Registry.RESTMapper()
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
-	metricsfake "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake"
-	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
-
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	metricsfake "k8s.io/metrics/pkg/client/clientset_generated/clientset/fake"
+	cmfake "k8s.io/metrics/pkg/client/custom_metrics/fake"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -131,7 +129,7 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 				return true, &metrics, nil
 			} else {
 				name := getForAction.GetName()
-				mapper := api.Registry.RESTMapper()
+				mapper := legacyscheme.Registry.RESTMapper()
 				assert.NotNil(t, tc.singleObject, "should have only requested a single-object metric when we asked for metrics for a single object")
 				gk := schema.FromAPIVersionAndKind(tc.singleObject.APIVersion, tc.singleObject.Kind).GroupKind()
 				mapping, err := mapper.RESTMapping(gk)

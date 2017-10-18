@@ -50,6 +50,7 @@ go_test(
         "//federation/pkg/kubefed/util:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/helper:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",

@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -121,7 +121,7 @@ func RunApply(flags *applyFlags) error {
 
 	// Grab the external, versioned configuration and convert it to the internal type for usage here later
 	internalcfg := &kubeadmapi.MasterConfiguration{}
-	api.Scheme.Convert(upgradeVars.cfg, internalcfg, nil)
+	legacyscheme.Scheme.Convert(upgradeVars.cfg, internalcfg, nil)
 
 	// Validate requested and validate actual version
 	if err := configutil.NormalizeKubernetesVersion(internalcfg); err != nil {
@@ -241,10 +241,7 @@ func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter
 		return err
 	}
 
-	if err := upgrade.StaticPodControlPlane(waiter, pathManager, internalcfg); err != nil {
-		return err
-	}
-	return nil
+	return upgrade.StaticPodControlPlane(waiter, pathManager, internalcfg)
 }
 
 // DryRunStaticPodUpgrade fakes an upgrade of the control plane
@@ -268,8 +265,5 @@ func DryRunStaticPodUpgrade(internalcfg *kubeadmapi.MasterConfiguration) error {
 		files = append(files, dryrunutil.NewFileToPrint(realPath, outputPath))
 	}
 
-	if err := dryrunutil.PrintDryRunFiles(files, os.Stdout); err != nil {
-		return err
-	}
-	return nil
+	return dryrunutil.PrintDryRunFiles(files, os.Stdout)
 }

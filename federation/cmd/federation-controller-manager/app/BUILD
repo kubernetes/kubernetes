@@ -28,7 +28,7 @@ go_library(
         "//federation/pkg/federation-controller/service/dns:go_default_library",
         "//federation/pkg/federation-controller/sync:go_default_library",
         "//federation/pkg/federation-controller/util/eventsink:go_default_library",
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/version:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",

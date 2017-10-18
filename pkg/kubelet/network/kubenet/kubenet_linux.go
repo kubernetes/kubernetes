@@ -23,7 +23,6 @@ import (
 	"io/ioutil"
 	"net"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -58,12 +57,6 @@ const (
 
 	// fallbackMTU is used if an MTU is not specified, and we cannot determine the MTU
 	fallbackMTU = 1460
-
-	// private mac prefix safe to use
-	// Universally administered and locally administered addresses are distinguished by setting the second-least-significant
-	// bit of the first octet of the address. If it is 1, the address is locally administered. For example, for address 0a:00:00:00:00:00,
-	// the first cotet is 0a(hex), the binary form of which is 00001010, where the second-least-significant bit is 1.
-	privateMACPrefix = "0a:58"
 
 	// ebtables Chain to store dedup rules
 	dedupChain = utilebtables.Chain("KUBE-DEDUP")
@@ -334,22 +327,6 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 		return fmt.Errorf("CNI plugin reported an invalid IPv4 address for container %v: %+v.", id, res.IP4)
 	}
 
-	// Explicitly assign mac address to cbr0. If bridge mac address is not explicitly set will adopt the lowest MAC address of the attached veths.
-	// TODO: Remove this once upstream cni bridge plugin handles this
-	link, err := netlink.LinkByName(BridgeName)
-	if err != nil {
-		return fmt.Errorf("failed to lookup %q: %v", BridgeName, err)
-	}
-	macAddr, err := generateHardwareAddr(plugin.gateway)
-	if err != nil {
-		return err
-	}
-	glog.V(3).Infof("Configure %q mac address to %v", BridgeName, macAddr)
-	err = netlink.LinkSetHardwareAddr(link, macAddr)
-	if err != nil {
-		return fmt.Errorf("Failed to configure %q mac address to %q: %v", BridgeName, macAddr, err)
-	}
-
 	// Put the container bridge into promiscuous mode to force it to accept hairpin packets.
 	// TODO: Remove this once the kernel bug (#20096) is fixed.
 	// TODO: check and set promiscuous mode with netlink once vishvananda/netlink supports it
@@ -361,8 +338,14 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 				return fmt.Errorf("Error setting promiscuous mode on %s: %v", BridgeName, err)
 			}
 		}
+
+		link, err := netlink.LinkByName(BridgeName)
+		if err != nil {
+			return fmt.Errorf("failed to lookup %q: %v", BridgeName, err)
+		}
+
 		// configure the ebtables rules to eliminate duplicate packets by best effort
-		plugin.syncEbtablesDedupRules(macAddr)
+		plugin.syncEbtablesDedupRules(link.Attrs().HardwareAddr)
 	}
 
 	plugin.podIPs[id] = ip4.String()
@@ -832,22 +815,4 @@ func (plugin *kubenetNetworkPlugin) syncEbtablesDedupRules(macAddr net.HardwareA
 		glog.Errorf("Failed to ensure packets from podCidr but has mac address of cbr0 to get dropped.")
 		return
 	}
-}
-
-// generateHardwareAddr generates 48 bit virtual mac addresses based on the IP input.
-func generateHardwareAddr(ip net.IP) (net.HardwareAddr, error) {
-	if ip.To4() == nil {
-		return nil, fmt.Errorf("generateHardwareAddr only support valid ipv4 address as input")
-	}
-	mac := privateMACPrefix
-	sections := strings.Split(ip.String(), ".")
-	for _, s := range sections {
-		i, _ := strconv.Atoi(s)
-		mac = mac + ":" + fmt.Sprintf("%02x", i)
-	}
-	hwAddr, err := net.ParseMAC(mac)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to parse mac address %s generated based on ip %s due to: %v", mac, ip, err)
-	}
-	return hwAddr, nil
 }

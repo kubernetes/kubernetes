@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -118,11 +119,11 @@ func outputVersion(cmd *cobra.Command, defaultVersion *schema.GroupVersion) (sch
 
 // Complete collects information required to run Convert command from command line.
 func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) (err error) {
-	o.outputVersion, err = outputVersion(cmd, &api.Registry.EnabledVersionsForGroup(api.GroupName)[0])
+	o.outputVersion, err = outputVersion(cmd, &legacyscheme.Registry.EnabledVersionsForGroup(api.GroupName)[0])
 	if err != nil {
 		return err
 	}
-	if !api.Registry.IsEnabledVersion(o.outputVersion) {
+	if !legacyscheme.Registry.IsEnabledVersion(o.outputVersion) {
 		cmdutil.UsageErrorf(cmd, "'%s' is not a registered version.", o.outputVersion)
 	}
 
@@ -207,7 +208,7 @@ func (o *ConvertOptions) RunConvert() error {
 // and squashes the list's items into a single versioned runtime.Object.
 func objectListToVersionedObject(objects []runtime.Object, version schema.GroupVersion) (runtime.Object, error) {
 	objectList := &api.List{Items: objects}
-	converted, err := tryConvert(api.Scheme, objectList, version, api.Registry.GroupOrDie(api.GroupName).GroupVersion)
+	converted, err := tryConvert(legacyscheme.Scheme, objectList, version, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +230,7 @@ func asVersionedObject(infos []*resource.Info, forceList bool, version schema.Gr
 		object = objects[0]
 	} else {
 		object = &api.List{Items: objects}
-		converted, err := tryConvert(api.Scheme, object, version, api.Registry.GroupOrDie(api.GroupName).GroupVersion)
+		converted, err := tryConvert(legacyscheme.Scheme, object, version, legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -260,7 +261,7 @@ func asVersionedObjects(infos []*resource.Info, version schema.GroupVersion, enc
 		// objects that are not part of api.Scheme must be converted to JSON
 		// TODO: convert to map[string]interface{}, attach to runtime.Unknown?
 		if !version.Empty() {
-			if _, _, err := api.Scheme.ObjectKinds(info.Object); runtime.IsNotRegisteredError(err) {
+			if _, _, err := legacyscheme.Scheme.ObjectKinds(info.Object); runtime.IsNotRegisteredError(err) {
 				// TODO: ideally this would encode to version, but we don't expose multiple codecs here.
 				data, err := runtime.Encode(encoder, info.Object)
 				if err != nil {

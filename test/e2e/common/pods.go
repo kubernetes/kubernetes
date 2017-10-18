@@ -128,6 +128,11 @@ var _ = framework.KubeDescribe("Pods", func() {
 		podClient = f.PodClient()
 	})
 
+	/*
+		    Testname: pods-created-pod-assigned-hostip
+		    Description: Make sure when a pod is created that it is assigned a host IP
+			Address.
+	*/
 	It("should get a host IP [Conformance]", func() {
 		name := "pod-hostip-" + string(uuid.NewUUID())
 		testHostIP(podClient, &v1.Pod{
@@ -145,6 +150,11 @@ var _ = framework.KubeDescribe("Pods", func() {
 		})
 	})
 
+	/*
+		    Testname: pods-submitted-removed
+		    Description: Makes sure a pod is created, a watch can be setup for the pod,
+			pod creation was observed, pod is deleted, and pod deletion is observed.
+	*/
 	It("should be submitted and removed [Conformance]", func() {
 		By("creating the pod")
 		name := "pod-submit-remove-" + string(uuid.NewUUID())
@@ -266,6 +276,10 @@ var _ = framework.KubeDescribe("Pods", func() {
 		Expect(len(pods.Items)).To(Equal(0))
 	})
 
+	/*
+	   Testname: pods-updated-successfully
+	   Description: Make sure it is possible to successfully update a pod's labels.
+	*/
 	It("should be updated [Conformance]", func() {
 		By("creating the pod")
 		name := "pod-update-" + string(uuid.NewUUID())
@@ -315,6 +329,12 @@ var _ = framework.KubeDescribe("Pods", func() {
 		framework.Logf("Pod update OK")
 	})
 
+	/*
+		    Testname: pods-update-active-deadline-seconds
+		    Description: Make sure it is possible to create a pod, update its
+			activeDeadlineSecondsValue, and then waits for the deadline to pass
+			and verifies the pod is terminated.
+	*/
 	It("should allow activeDeadlineSeconds to be updated [Conformance]", func() {
 		By("creating the pod")
 		name := "pod-update-activedeadlineseconds-" + string(uuid.NewUUID())
@@ -356,6 +376,11 @@ var _ = framework.KubeDescribe("Pods", func() {
 		framework.ExpectNoError(f.WaitForPodTerminated(pod.Name, "DeadlineExceeded"))
 	})
 
+	/*
+		    Testname: pods-contain-services-environment-variables
+		    Description: Make sure that when a pod is created it contains environment
+			variables for each active service.
+	*/
 	It("should contain environment variables for services [Conformance]", func() {
 		// Make a pod that will be a service.
 		// This pod serves its hostname via HTTP.

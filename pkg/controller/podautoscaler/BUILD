@@ -16,7 +16,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/podautoscaler",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/podautoscaler/metrics:go_default_library",
@@ -58,7 +58,7 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/controller/podautoscaler",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/autoscaling/install:go_default_library",
         "//pkg/apis/extensions/install:go_default_library",

@@ -178,6 +178,11 @@ type MaxPDVolumeCountChecker struct {
 	maxVolumes int
 	pvInfo     PersistentVolumeInfo
 	pvcInfo    PersistentVolumeClaimInfo
+
+	// The string below is generated randomly during the struct's initialization.
+	// It is used to prefix volumeID generated inside the predicate() method to
+	// avoid conflicts with any real volume.
+	randomVolumeIDPrefix string
 }
 
 // VolumeFilter contains information on how to filter PD Volumes when checking PD Volume caps
@@ -196,16 +201,17 @@ type VolumeFilter struct {
 // the maximum.
 func NewMaxPDVolumeCountPredicate(filter VolumeFilter, maxVolumes int, pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) algorithm.FitPredicate {
 	c := &MaxPDVolumeCountChecker{
-		filter:     filter,
-		maxVolumes: maxVolumes,
-		pvInfo:     pvInfo,
-		pvcInfo:    pvcInfo,
+		filter:               filter,
+		maxVolumes:           maxVolumes,
+		pvInfo:               pvInfo,
+		pvcInfo:              pvcInfo,
+		randomVolumeIDPrefix: rand.String(32),
 	}
 
 	return c.predicate
 }
 
-func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace string, randomPrefix string, filteredVolumes map[string]bool) error {
+func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace string, filteredVolumes map[string]bool) error {
 	for i := range volumes {
 		vol := &volumes[i]
 		if id, ok := c.filter.FilterVolume(vol); ok {
@@ -217,8 +223,9 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace s
 			}
 
 			// Until we know real ID of the volume use namespace/pvcName as substitute
-			// With a random prefix so it can't conflict with existing volume ID.
-			pvId := fmt.Sprintf("%s-%s/%s", randomPrefix, namespace, pvcName)
+			// with a random prefix (calculated and stored inside 'c' during initialization)
+			// to avoid conflicts with existing volume IDs.
+			pvId := fmt.Sprintf("%s-%s/%s", c.randomVolumeIDPrefix, namespace, pvcName)
 
 			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
 			if err != nil || pvc == nil {
@@ -264,15 +271,8 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta algorithm.Predicat
 		return true, nil, nil
 	}
 
-	// randomPrefix is a prefix of auxiliary volume IDs when we don't know the
-	// real volume ID, e.g. because the corresponding PV or PVC was deleted. It
-	// is random to avoid conflicts with real volume IDs and it needs to be
-	// stable in whole predicate() call so a deleted PVC used by two pods is
-	// counted as one volume and not as two.
-	randomPrefix := rand.String(32)
-
 	newVolumes := make(map[string]bool)
-	if err := c.filterVolumes(pod.Spec.Volumes, pod.Namespace, randomPrefix, newVolumes); err != nil {
+	if err := c.filterVolumes(pod.Spec.Volumes, pod.Namespace, newVolumes); err != nil {
 		return false, nil, err
 	}
 
@@ -284,7 +284,7 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta algorithm.Predicat
 	// count unique volumes
 	existingVolumes := make(map[string]bool)
 	for _, existingPod := range nodeInfo.Pods() {
-		if err := c.filterVolumes(existingPod.Spec.Volumes, existingPod.Namespace, randomPrefix, existingVolumes); err != nil {
+		if err := c.filterVolumes(existingPod.Spec.Volumes, existingPod.Namespace, existingVolumes); err != nil {
 			return false, nil, err
 		}
 	}

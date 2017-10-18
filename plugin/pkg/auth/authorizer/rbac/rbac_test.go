@@ -224,13 +224,19 @@ func TestAuthorizer(t *testing.T) {
 		{
 			// test subresource resolution
 			clusterRoles: []*rbac.ClusterRole{
-				newClusterRole("admin", newRule("*", "*", "pods/status", "*")),
+				newClusterRole("admin",
+					newRule("*", "*", "pods/status", "*"),
+					newRule("*", "*", "*/scale", "*"),
+				),
 			},
 			roleBindings: []*rbac.RoleBinding{
 				newRoleBinding("ns1", "admin", bindToClusterRole, "User:admin", "Group:admins"),
 			},
 			shouldPass: []authorizer.Attributes{
 				&defaultAttributes{"admin", "", "get", "pods", "status", "ns1", ""},
+				&defaultAttributes{"admin", "", "get", "pods", "scale", "ns1", ""},
+				&defaultAttributes{"admin", "", "get", "deployments", "scale", "ns1", ""},
+				&defaultAttributes{"admin", "", "get", "anything", "scale", "ns1", ""},
 			},
 			shouldFail: []authorizer.Attributes{
 				&defaultAttributes{"admin", "", "get", "pods", "", "ns1", ""},

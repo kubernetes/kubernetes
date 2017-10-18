@@ -192,16 +192,28 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 	for i := range hooks {
 		go func(hook *v1alpha1.ExternalAdmissionHook) {
 			defer wg.Done()
-			if err := a.callHook(ctx, hook, attr); err == nil {
+
+			err := a.callHook(ctx, hook, attr)
+			if err == nil {
 				return
-			} else if callErr, ok := err.(*ErrCallingWebhook); ok {
-				glog.Warningf("Failed calling webhook %v: %v", hook.Name, callErr)
-				utilruntime.HandleError(callErr)
-				// Since we are failing open to begin with, we do not send an error down the channel
-			} else {
-				glog.Warningf("rejected by webhook %v %t: %v", hook.Name, err, err)
-				errCh <- err
 			}
+
+			ignoreClientCallFailures := hook.FailurePolicy == nil || *hook.FailurePolicy == v1alpha1.Ignore
+			if callErr, ok := err.(*ErrCallingWebhook); ok {
+				if ignoreClientCallFailures {
+					glog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
+					utilruntime.HandleError(callErr)
+					// Since we are failing open to begin with, we do not send an error down the channel
+					return
+				}
+
+				glog.Warningf("Failed calling webhook, failing closed %v: %v", hook.Name, err)
+				errCh <- err
+				return
+			}
+
+			glog.Warningf("rejected by webhook %v %t: %v", hook.Name, err, err)
+			errCh <- err
 		}(&hooks[i])
 	}
 	wg.Wait()
@@ -242,20 +254,21 @@ func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Exte
 	if err != nil {
 		return &ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
-	if err := client.Post().Context(ctx).Body(&request).Do().Into(&request); err != nil {
+	response := &admissionv1alpha1.AdmissionReview{}
+	if err := client.Post().Context(ctx).Body(&request).Do().Into(response); err != nil {
 		return &ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 
-	if request.Status.Allowed {
+	if response.Status.Allowed {
 		return nil
 	}
 
-	if request.Status.Result == nil {
+	if response.Status.Result == nil {
 		return fmt.Errorf("admission webhook %q denied the request without explanation", h.Name)
 	}
 
 	return &apierrors.StatusError{
-		ErrStatus: *request.Status.Result,
+		ErrStatus: *response.Status.Result,
 	}
 }
 

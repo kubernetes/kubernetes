@@ -445,25 +445,9 @@ items:
     verbs:
     - update
   - apiGroups:
-    - ""
+    - '*'
     resources:
-    - replicationcontrollers/scale
-    verbs:
-    - get
-    - update
-  - apiGroups:
-    - extensions
-    resources:
-    - replicationcontrollers/scale
-    verbs:
-    - get
-    - update
-  - apiGroups:
-    - apps
-    - extensions
-    resources:
-    - deployments/scale
-    - replicasets/scale
+    - '*/scale'
     verbs:
     - get
     - update

@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/deletionhelper"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 
 	"github.com/golang/glog"
@@ -109,7 +110,7 @@ func StartFederationSyncController(kind string, adapterFactory federatedtypes.Ad
 func newFederationSyncController(client federationclientset.Interface, adapter federatedtypes.FederatedTypeAdapter) *FederationSyncController {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
-	recorder := broadcaster.NewRecorder(api.Scheme, v1.EventSource{Component: fmt.Sprintf("federation-%v-controller", adapter.Kind())})
+	recorder := broadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: fmt.Sprintf("federation-%v-controller", adapter.Kind())})
 
 	s := &FederationSyncController{
 		reviewDelay:             time.Second * 10,

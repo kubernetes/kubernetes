@@ -17,7 +17,7 @@ go_library(
     srcs = ["hollow-node.go"],
     importpath = "k8s.io/kubernetes/cmd/kubemark",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/metrics/prometheus:go_default_library",
         "//pkg/kubelet/cadvisor/testing:go_default_library",

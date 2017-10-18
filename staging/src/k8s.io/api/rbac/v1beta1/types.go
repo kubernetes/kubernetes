@@ -54,7 +54,8 @@ type PolicyRule struct {
 	// the enumerated resources in any API group will be allowed.
 	// +optional
 	APIGroups []string `json:"apiGroups,omitempty" protobuf:"bytes,2,rep,name=apiGroups"`
-	// Resources is a list of resources this rule applies to.  ResourceAll represents all resources.
+	// Resources is a list of resources this rule applies to.  '*' represents all resources in the specified apiGroups.
+	// '*/foo' represents the subresource 'foo' for all resources in the specified apiGroups.
 	// +optional
 	Resources []string `json:"resources,omitempty" protobuf:"bytes,3,rep,name=resources"`
 	// ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.

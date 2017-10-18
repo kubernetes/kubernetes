@@ -29,7 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/federation/apis/federation/validation"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 type clusterStrategy struct {
@@ -37,7 +37,7 @@ type clusterStrategy struct {
 	names.NameGenerator
 }
 
-var Strategy = clusterStrategy{api.Scheme, names.SimpleNameGenerator}
+var Strategy = clusterStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 func (clusterStrategy) NamespaceScoped() bool {
 	return false

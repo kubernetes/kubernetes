@@ -37,10 +37,7 @@ func addFile(fs utilfs.Filesystem, path string, file string) error {
 	if err := utilfiles.EnsureDir(fs, filepath.Dir(path)); err != nil {
 		return err
 	}
-	if err := utilfiles.ReplaceFile(fs, path, []byte(file)); err != nil {
-		return err
-	}
-	return nil
+	return utilfiles.ReplaceFile(fs, path, []byte(file))
 }
 
 func TestLoad(t *testing.T) {

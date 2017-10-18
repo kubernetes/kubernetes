@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
@@ -1155,7 +1156,7 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
 	tf.TmpDir = tmpDirPath
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		APIRegistry:          legacyscheme.Registry,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {

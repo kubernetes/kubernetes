@@ -21,7 +21,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -42,7 +42,7 @@ func TestV1RollingUpdateDaemonSetConversion(t *testing.T) {
 	for k, tc := range testcases {
 		// extensions -> v1
 		internal1 := &appsv1.RollingUpdateDaemonSet{}
-		if err := api.Scheme.Convert(tc.rollingUpdateDs1, internal1, nil); err != nil {
+		if err := legacyscheme.Scheme.Convert(tc.rollingUpdateDs1, internal1, nil); err != nil {
 			t.Errorf("%q - %q: unexpected error: %v", k, "from extensions to v1", err)
 		}
 		if !apiequality.Semantic.DeepEqual(internal1, tc.rollingUpdateDs2) {
@@ -51,7 +51,7 @@ func TestV1RollingUpdateDaemonSetConversion(t *testing.T) {
 
 		// v1 -> extensions
 		internal2 := &extensions.RollingUpdateDaemonSet{}
-		if err := api.Scheme.Convert(tc.rollingUpdateDs2, internal2, nil); err != nil {
+		if err := legacyscheme.Scheme.Convert(tc.rollingUpdateDs2, internal2, nil); err != nil {
 			t.Errorf("%q - %q: unexpected error: %v", k, "from v1 to extensions", err)
 		}
 		if !apiequality.Semantic.DeepEqual(internal2, tc.rollingUpdateDs1) {

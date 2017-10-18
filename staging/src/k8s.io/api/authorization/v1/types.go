@@ -241,7 +241,8 @@ type ResourceRule struct {
 	// the enumerated resources in any API group will be allowed.  "*" means all.
 	// +optional
 	APIGroups []string `json:"apiGroups,omitempty" protobuf:"bytes,2,rep,name=apiGroups"`
-	// Resources is a list of resources this rule applies to.  ResourceAll represents all resources.  "*" means all.
+	// Resources is a list of resources this rule applies to.  "*" means all in the specified apiGroups.
+	//  "*/foo" represents the subresource 'foo' for all resources in the specified apiGroups.
 	// +optional
 	Resources []string `json:"resources,omitempty" protobuf:"bytes,3,rep,name=resources"`
 	// ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  "*" means all.

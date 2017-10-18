@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -53,7 +54,7 @@ import (
 // fuzzInternalObject fuzzes an arbitrary runtime object using the appropriate
 // fuzzer registered with the apitesting package.
 func fuzzInternalObject(t *testing.T, forVersion schema.GroupVersion, item runtime.Object, seed int64) runtime.Object {
-	fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), api.Codecs).Fuzz(item)
+	fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs).Fuzz(item)
 
 	j, err := meta.TypeAccessor(item)
 	if err != nil {
@@ -91,7 +92,7 @@ func Convert_v1beta1_ReplicaSet_to_api_ReplicationController(in *v1beta1.Replica
 }
 
 func TestSetControllerConversion(t *testing.T) {
-	if err := api.Scheme.AddConversionFuncs(Convert_v1beta1_ReplicaSet_to_api_ReplicationController); err != nil {
+	if err := legacyscheme.Scheme.AddConversionFuncs(Convert_v1beta1_ReplicaSet_to_api_ReplicationController); err != nil {
 		t.Fatal(err)
 	}
 
@@ -109,8 +110,8 @@ func TestSetControllerConversion(t *testing.T) {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
 
-	decoder := api.Codecs.DecoderToVersion(
-		api.Codecs.UniversalDeserializer(),
+	decoder := legacyscheme.Codecs.DecoderToVersion(
+		legacyscheme.Codecs.UniversalDeserializer(),
 		runtime.NewMultiGroupVersioner(
 			*defaultGroup.GroupVersion(),
 			schema.GroupKind{Group: defaultGroup.GroupVersion().Group},
@@ -139,13 +140,13 @@ func TestSetControllerConversion(t *testing.T) {
 // debug issues that arise while adding a new API type.
 func TestSpecificKind(t *testing.T) {
 	// Uncomment the following line to enable logging of which conversions
-	// api.Scheme.Log(t)
+	// legacyscheme.Scheme.Log(t)
 	internalGVK := schema.GroupVersionKind{Group: "extensions", Version: runtime.APIVersionInternal, Kind: "DaemonSet"}
 
 	seed := rand.Int63()
-	fuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), api.Codecs)
+	fuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs)
 
-	roundtrip.RoundTripSpecificKind(t, internalGVK, api.Scheme, api.Codecs, fuzzer, nil)
+	roundtrip.RoundTripSpecificKind(t, internalGVK, legacyscheme.Scheme, legacyscheme.Codecs, fuzzer, nil)
 }
 
 var nonRoundTrippableTypes = sets.NewString(
@@ -171,16 +172,16 @@ func TestCommonKindsRegistered(t *testing.T) {
 		for _, group := range testapi.Groups {
 			gv := group.GroupVersion()
 			gvk := gv.WithKind(kind)
-			obj, err := api.Scheme.New(gvk)
+			obj, err := legacyscheme.Scheme.New(gvk)
 			if err != nil {
 				t.Error(err)
 			}
 			defaults := gv.WithKind("")
 			var got *schema.GroupVersionKind
-			if obj, got, err = api.Codecs.LegacyCodec().Decode([]byte(`{"kind":"`+kind+`"}`), &defaults, obj); err != nil || gvk != *got {
+			if obj, got, err = legacyscheme.Codecs.LegacyCodec().Decode([]byte(`{"kind":"`+kind+`"}`), &defaults, obj); err != nil || gvk != *got {
 				t.Errorf("expected %v: %v %v", gvk, got, err)
 			}
-			data, err := runtime.Encode(api.Codecs.LegacyCodec(*gv), obj)
+			data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(*gv), obj)
 			if err != nil {
 				t.Errorf("expected %v: %v\n%s", gvk, err, string(data))
 				continue
@@ -204,14 +205,14 @@ func TestCommonKindsRegistered(t *testing.T) {
 // in all of the API groups registered for test in the testapi package.
 func TestRoundTripTypes(t *testing.T) {
 	seed := rand.Int63()
-	fuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), api.Codecs)
+	fuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs)
 
 	nonRoundTrippableTypes := map[schema.GroupVersionKind]bool{
 		{Group: "componentconfig", Version: runtime.APIVersionInternal, Kind: "KubeProxyConfiguration"}:     true,
 		{Group: "componentconfig", Version: runtime.APIVersionInternal, Kind: "KubeSchedulerConfiguration"}: true,
 	}
 
-	roundtrip.RoundTripTypes(t, api.Scheme, api.Codecs, fuzzer, nonRoundTrippableTypes)
+	roundtrip.RoundTripTypes(t, legacyscheme.Scheme, legacyscheme.Codecs, fuzzer, nonRoundTrippableTypes)
 }
 
 // TestEncodePtr tests that a pointer to a golang type can be encoded and
@@ -299,15 +300,15 @@ func TestUnversionedTypes(t *testing.T) {
 // TestObjectWatchFraming establishes that a watch event can be encoded and
 // decoded correctly through each of the supported RFC2046 media types.
 func TestObjectWatchFraming(t *testing.T) {
-	f := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), api.Codecs)
+	f := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), legacyscheme.Codecs)
 	secret := &api.Secret{}
 	f.Fuzz(secret)
 	secret.Data["binary"] = []byte{0x00, 0x10, 0x30, 0x55, 0xff, 0x00}
 	secret.Data["utf8"] = []byte("a string with \u0345 characters")
 	secret.Data["long"] = bytes.Repeat([]byte{0x01, 0x02, 0x03, 0x00}, 1000)
-	converted, _ := api.Scheme.ConvertToVersion(secret, v1.SchemeGroupVersion)
+	converted, _ := legacyscheme.Scheme.ConvertToVersion(secret, v1.SchemeGroupVersion)
 	v1secret := converted.(*v1.Secret)
-	for _, info := range api.Codecs.SupportedMediaTypes() {
+	for _, info := range legacyscheme.Codecs.SupportedMediaTypes() {
 		if info.StreamSerializer == nil {
 			continue
 		}
@@ -318,7 +319,7 @@ func TestObjectWatchFraming(t *testing.T) {
 			t.Errorf("no embedded serializer for %s", info.MediaType)
 			continue
 		}
-		innerDecode := api.Codecs.DecoderToVersion(embedded, api.SchemeGroupVersion)
+		innerDecode := legacyscheme.Codecs.DecoderToVersion(embedded, api.SchemeGroupVersion)
 
 		// write a single object through the framer and back out
 		obj := &bytes.Buffer{}
@@ -381,13 +382,13 @@ func TestObjectWatchFraming(t *testing.T) {
 const benchmarkSeed = 100
 
 func benchmarkItems(b *testing.B) []v1.Pod {
-	apiObjectFuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), api.Codecs)
+	apiObjectFuzzer := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), legacyscheme.Codecs)
 	items := make([]v1.Pod, 10)
 	for i := range items {
 		var pod api.Pod
 		apiObjectFuzzer.Fuzz(&pod)
 		pod.Spec.InitContainers, pod.Status.InitContainerStatuses = nil, nil
-		out, err := api.Scheme.ConvertToVersion(&pod, v1.SchemeGroupVersion)
+		out, err := legacyscheme.Scheme.ConvertToVersion(&pod, v1.SchemeGroupVersion)
 		if err != nil {
 			panic(err)
 		}
@@ -417,7 +418,7 @@ func BenchmarkEncodeCodecFromInternal(b *testing.B) {
 	width := len(items)
 	encodable := make([]api.Pod, width)
 	for i := range items {
-		if err := api.Scheme.Convert(&items[i], &encodable[i], nil); err != nil {
+		if err := legacyscheme.Scheme.Convert(&items[i], &encodable[i], nil); err != nil {
 			b.Fatal(err)
 		}
 	}

@@ -34,11 +34,12 @@ import (
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 )
 
 func NewEtcdStorage(t *testing.T, group string) (*storagebackend.Config, *etcdtesting.EtcdTestServer) {
-	server, config := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, api.Scheme)
+	server, config := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, legacyscheme.Scheme)
 	config.Codec = testapi.Groups[group].StorageCodec()
 	return config, server
 }
@@ -51,7 +52,7 @@ type UpdateFunc func(runtime.Object) runtime.Object
 
 func New(t *testing.T, storage *genericregistry.Store) *Tester {
 	return &Tester{
-		tester:  resttest.New(t, storage, api.Scheme),
+		tester:  resttest.New(t, storage, legacyscheme.Scheme),
 		storage: storage,
 	}
 }
@@ -153,7 +154,7 @@ func (t *Tester) TestWatch(valid runtime.Object, labelsPass, labelsFail []labels
 // =============================================================================
 // get codec based on runtime.Object
 func getCodec(obj runtime.Object) (runtime.Codec, error) {
-	fqKinds, _, err := api.Scheme.ObjectKinds(obj)
+	fqKinds, _, err := legacyscheme.Scheme.ObjectKinds(obj)
 	if err != nil {
 		return nil, fmt.Errorf("unexpected encoding error: %v", err)
 	}
@@ -163,9 +164,9 @@ func getCodec(obj runtime.Object) (runtime.Codec, error) {
 	// split the schemes for internal objects.
 	// TODO: caesarxuchao: we should add a map from kind to group in Scheme.
 	var codec runtime.Codec
-	if api.Scheme.Recognizes(api.Registry.GroupOrDie(api.GroupName).GroupVersion.WithKind(fqKind.Kind)) {
+	if legacyscheme.Scheme.Recognizes(legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.WithKind(fqKind.Kind)) {
 		codec = testapi.Default.Codec()
-	} else if api.Scheme.Recognizes(testapi.Extensions.GroupVersion().WithKind(fqKind.Kind)) {
+	} else if legacyscheme.Scheme.Recognizes(testapi.Extensions.GroupVersion().WithKind(fqKind.Kind)) {
 		codec = testapi.Extensions.Codec()
 	} else {
 		return nil, fmt.Errorf("unexpected kind: %v", fqKind)

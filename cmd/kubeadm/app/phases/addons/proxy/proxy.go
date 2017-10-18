@@ -30,7 +30,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
@@ -99,15 +99,12 @@ func CreateServiceAccount(client clientset.Interface) error {
 
 // CreateRBACRules creates the essential RBAC rules for a minimally set-up cluster
 func CreateRBACRules(client clientset.Interface) error {
-	if err := createClusterRoleBindings(client); err != nil {
-		return err
-	}
-	return nil
+	return createClusterRoleBindings(client)
 }
 
 func createKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client clientset.Interface) error {
 	kubeproxyConfigMap := &v1.ConfigMap{}
-	if err := kuberuntime.DecodeInto(api.Codecs.UniversalDecoder(), configMapBytes, kubeproxyConfigMap); err != nil {
+	if err := kuberuntime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), configMapBytes, kubeproxyConfigMap); err != nil {
 		return fmt.Errorf("unable to decode kube-proxy configmap %v", err)
 	}
 
@@ -117,15 +114,12 @@ func createKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client clientse
 	}
 
 	kubeproxyDaemonSet := &apps.DaemonSet{}
-	if err := kuberuntime.DecodeInto(api.Codecs.UniversalDecoder(), daemonSetbytes, kubeproxyDaemonSet); err != nil {
+	if err := kuberuntime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), daemonSetbytes, kubeproxyDaemonSet); err != nil {
 		return fmt.Errorf("unable to decode kube-proxy daemonset %v", err)
 	}
 
 	// Create the DaemonSet for kube-proxy or update it in case it already exists
-	if err := apiclient.CreateOrUpdateDaemonSet(client, kubeproxyDaemonSet); err != nil {
-		return err
-	}
-	return nil
+	return apiclient.CreateOrUpdateDaemonSet(client, kubeproxyDaemonSet)
 }
 
 func createClusterRoleBindings(client clientset.Interface) error {

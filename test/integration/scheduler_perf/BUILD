@@ -14,7 +14,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/integration/scheduler_perf",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//plugin/pkg/scheduler:go_default_library",
         "//plugin/pkg/scheduler/algorithmprovider:go_default_library",

@@ -16,6 +16,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/server",
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/v1/validation:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",

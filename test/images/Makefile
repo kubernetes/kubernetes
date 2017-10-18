@@ -15,7 +15,7 @@
 REGISTRY ?= gcr.io/kubernetes-e2e-test-images
 GOARM=7
 QEMUVERSION=v2.9.1
-GOLANG_VERSION=1.8.3
+GOLANG_VERSION=1.9.1
 export
 
 ifndef WHAT

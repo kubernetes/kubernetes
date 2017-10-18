@@ -26,6 +26,7 @@ go_library(
         "//cmd/kube-controller-manager/app/options:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
         "//pkg/apis/authentication/install:go_default_library",
         "//pkg/apis/authorization/install:go_default_library",
