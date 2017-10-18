@@ -242,6 +242,7 @@ go_test(
         "//vendor/k8s.io/client-go/rest/fake:go_default_library",
         "//vendor/k8s.io/client-go/rest/watch:go_default_library",
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
         "//vendor/k8s.io/metrics/pkg/apis/metrics/v1alpha1:go_default_library",
     ],
 )

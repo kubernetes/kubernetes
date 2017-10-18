@@ -20,6 +20,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/yaml:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
     ],
 )
 

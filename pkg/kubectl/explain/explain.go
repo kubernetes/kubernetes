@@ -21,11 +21,11 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"k8s.io/kube-openapi/pkg/util/proto"
 )
 
 type fieldsPrinter interface {
-	PrintFields(openapi.Schema) error
+	PrintFields(proto.Schema) error
 }
 
 func splitDotNotation(model string) (string, []string) {
@@ -47,7 +47,7 @@ func SplitAndParseResourceRequest(inResource string, mapper meta.RESTMapper) (st
 // PrintModelDescription prints the description of a specific model or dot path.
 // If recursive, all components nested within the fields of the schema will be
 // printed.
-func PrintModelDescription(fieldsPath []string, w io.Writer, schema openapi.Schema, recursive bool) error {
+func PrintModelDescription(fieldsPath []string, w io.Writer, schema proto.Schema, recursive bool) error {
 	fieldName := ""
 	if len(fieldsPath) != 0 {
 		fieldName = fieldsPath[len(fieldsPath)-1]

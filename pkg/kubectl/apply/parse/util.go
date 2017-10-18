@@ -22,8 +22,8 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/pkg/kubectl/apply"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
 // nilSafeLookup returns the value from the map if the map is non-nil
@@ -97,7 +97,7 @@ func getType(args ...interface{}) (reflect.Type, error) {
 }
 
 // getFieldMeta parses the metadata about the field from the openapi spec
-func getFieldMeta(s openapi.Schema, name string) (apply.FieldMetaImpl, error) {
+func getFieldMeta(s proto.Schema, name string) (apply.FieldMetaImpl, error) {
 	m := apply.FieldMetaImpl{}
 	if s != nil {
 		ext := s.GetExtensions()

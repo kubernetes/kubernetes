@@ -18,8 +18,9 @@ package parse
 
 import (
 	"fmt"
+
+	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/pkg/kubectl/apply"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
 // Contains the heavy lifting for finding tuples of matching elements in lists based on the merge key
@@ -70,7 +71,7 @@ func (v ElementBuildingVisitor) doPrimitiveList(meta apply.FieldMetaImpl, item *
 	}
 
 	for i, l := range orderedKeys.Items {
-		var s openapi.Schema
+		var s proto.Schema
 		if item.Array != nil && item.Array.SubType != nil {
 			s = item.Array.SubType
 		}
@@ -127,7 +128,7 @@ func (v ElementBuildingVisitor) doMapList(meta apply.FieldMetaImpl, item *listIt
 	}
 
 	for i, l := range orderedKeys.Items {
-		var s openapi.Schema
+		var s proto.Schema
 		if item.Array != nil && item.Array.SubType != nil {
 			s = item.Array.SubType
 		}
@@ -171,7 +172,7 @@ func (v ElementBuildingVisitor) replaceListElement(meta apply.FieldMetaImpl, ite
 		}
 
 		// Create the Item
-		var s openapi.Schema
+		var s proto.Schema
 		if item.Array != nil && item.Array.SubType != nil {
 			s = item.Array.SubType
 		}

@@ -1,5 +1,11 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
+filegroup(
+    name = "go_default_library_protos",
+    srcs = ["OpenAPIv2.proto"],
+    visibility = ["//visibility:public"],
+)
+
 go_library(
     name = "go_default_library",
     srcs = [
@@ -14,12 +20,6 @@ go_library(
         "//vendor/github.com/googleapis/gnostic/compiler:go_default_library",
         "//vendor/gopkg.in/yaml.v2:go_default_library",
     ],
-)
-
-filegroup(
-    name = "go_default_library_protos",
-    srcs = ["OpenAPIv2.proto"],
-    visibility = ["//visibility:public"],
 )
 
 filegroup(
