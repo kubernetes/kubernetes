@@ -62,7 +62,7 @@ type PriorityPolicy struct {
 	Argument *PriorityArgument `json:"argument"`
 }
 
-// Represents the arguments that the different types of predicates take
+// PredicateArgument represents the arguments to configure predicate functions in scheduler policy configuration.
 // Only one of its members may be specified
 type PredicateArgument struct {
 	// The predicate that provides affinity for pods belonging to a service
@@ -73,7 +73,7 @@ type PredicateArgument struct {
 	LabelsPresence *LabelsPresence `json:"labelsPresence"`
 }
 
-// Represents the arguments that the different types of priorities take.
+// PriorityArgument represents the arguments to configure priority functions in scheduler policy configuration.
 // Only one of its members may be specified
 type PriorityArgument struct {
 	// The priority function that ensures a good spread (anti-affinity) for pods belonging to a service
@@ -84,14 +84,14 @@ type PriorityArgument struct {
 	LabelPreference *LabelPreference `json:"labelPreference"`
 }
 
-// Holds the parameters that are used to configure the corresponding predicate
+// ServiceAffinity holds the parameters that are used to configure the corresponding predicate in scheduler policy configuration.
 type ServiceAffinity struct {
 	// The list of labels that identify node "groups"
 	// All of the labels should match for the node to be considered a fit for hosting the pod
 	Labels []string `json:"labels"`
 }
 
-// Holds the parameters that are used to configure the corresponding predicate
+// LabelsPresence holds the parameters that are used to configure the corresponding predicate in scheduler policy configuration.
 type LabelsPresence struct {
 	// The list of labels that identify node "groups"
 	// All of the labels should be either present (or absent) for the node to be considered a fit for hosting the pod
@@ -100,13 +100,13 @@ type LabelsPresence struct {
 	Presence bool `json:"presence"`
 }
 
-// Holds the parameters that are used to configure the corresponding priority function
+// ServiceAntiAffinity holds the parameters that are used to configure the corresponding priority function
 type ServiceAntiAffinity struct {
 	// Used to identify node "groups"
 	Label string `json:"label"`
 }
 
-// Holds the parameters that are used to configure the corresponding priority function
+// LabelPreference holds the parameters that are used to configure the corresponding priority function
 type LabelPreference struct {
 	// Used to identify node "groups"
 	Label string `json:"label"`
@@ -116,7 +116,7 @@ type LabelPreference struct {
 	Presence bool `json:"presence"`
 }
 
-// Holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
+// ExtenderConfig holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
 // it is assumed that the extender chose not to provide that extension.
 type ExtenderConfig struct {
 	// URLPrefix at which the extender is available
