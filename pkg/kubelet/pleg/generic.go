@@ -173,7 +173,7 @@ func (g *GenericPLEG) getRelistTime() time.Time {
 	return val.(time.Time)
 }
 
-func (g *GenericPLEG) updateRelisTime(timestamp time.Time) {
+func (g *GenericPLEG) updateRelistTime(timestamp time.Time) {
 	g.relistTime.Store(timestamp)
 }
 
@@ -198,8 +198,7 @@ func (g *GenericPLEG) relist() {
 		return
 	}
 
-	// Update the relist time.
-	g.updateRelisTime(timestamp)
+	g.updateRelistTime(timestamp)
 
 	pods := kubecontainer.Pods(podList)
 	g.podRecords.setCurrent(pods)
