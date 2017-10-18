@@ -8,7 +8,14 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = ["proxier_test.go"],
+    srcs = [
+        "proxier_test.go",
+    ] + select({
+        "@io_bazel_rules_go//go/platform:linux_amd64": [
+            "netlink_linux_test.go",
+        ],
+        "//conditions:default": [],
+    }),
     importpath = "k8s.io/kubernetes/pkg/proxy/ipvs",
     library = ":go_default_library",
     deps = [
