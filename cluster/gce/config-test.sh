@@ -102,7 +102,7 @@ MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 # It is the primary range in the subnet and is the range used for node instance IPs.
 NODE_IP_RANGE="$(get-node-ip-range)"
 
-RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
+RUNTIME_CONFIG="admissionregistration.k8s.io/v1alpha1"
 
 # Optional: set feature gates
 FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
