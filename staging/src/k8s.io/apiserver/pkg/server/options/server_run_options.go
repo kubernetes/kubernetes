@@ -36,7 +36,9 @@ import (
 type ServerRunOptions struct {
 	AdvertiseAddress net.IP
 
-	CorsAllowedOriginList       []string
+	CorsAllowedOriginList []string
+	// TODO: "--external-hostname" command line param has been deprecated, we should remove
+	// the field below when we clean up the flag.
 	ExternalHost                string
 	MaxRequestsInFlight         int
 	MaxMutatingRequestsInFlight int
@@ -58,7 +60,6 @@ func NewServerRunOptions() *ServerRunOptions {
 // ApplyOptions applies the run options to the method receiver and returns self
 func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.CorsAllowedOriginList = s.CorsAllowedOriginList
-	c.ExternalAddress = s.ExternalHost
 	c.MaxRequestsInFlight = s.MaxRequestsInFlight
 	c.MaxMutatingRequestsInFlight = s.MaxMutatingRequestsInFlight
 	c.RequestTimeout = s.RequestTimeout
@@ -124,8 +125,10 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.TargetRAMMB, "target-ram-mb", s.TargetRAMMB,
 		"Memory limit for apiserver in MB (used to configure sizes of caches, etc.)")
 
+	// TODO: When we remove this command line option, we should remove the ExternalHost field as well
 	fs.StringVar(&s.ExternalHost, "external-hostname", s.ExternalHost,
 		"The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs).")
+	fs.MarkDeprecated("external-hostname", "will be removed in a future release")
 
 	deprecatedMasterServiceNamespace := metav1.NamespaceDefault
 	fs.StringVar(&deprecatedMasterServiceNamespace, "master-service-namespace", deprecatedMasterServiceNamespace, ""+

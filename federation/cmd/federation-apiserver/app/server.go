@@ -102,9 +102,6 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), nil, nil); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
-	if err := s.CloudProvider.DefaultExternalHost(s.GenericServerRunOptions); err != nil {
-		return fmt.Errorf("error setting the external host value: %v", err)
-	}
 
 	s.Authentication.ApplyAuthorization(s.Authorization)
 
