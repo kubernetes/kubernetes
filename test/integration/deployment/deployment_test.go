@@ -30,7 +30,11 @@ import (
 )
 
 func TestNewDeployment(t *testing.T) {
-	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	s, closeFn, rm, dc, informers, c, error := dcSetup(t)
+	if error != nil {
+		t.Errorf("Deployment setup error : %v", error)
+		return
+	}
 	defer closeFn()
 	name := "test-new-deployment"
 	ns := framework.CreateTestingNamespace(name, s, t)
@@ -141,7 +145,11 @@ func TestDeploymentSelectorImmutability(t *testing.T) {
 
 // Paused deployment should not start new rollout
 func TestPausedDeployment(t *testing.T) {
-	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	s, closeFn, rm, dc, informers, c, error := dcSetup(t)
+	if error != nil {
+		t.Errorf("Deployment setup error : %v", error)
+		return
+	}
 	defer closeFn()
 	name := "test-paused-deployment"
 	ns := framework.CreateTestingNamespace(name, s, t)
@@ -242,7 +250,11 @@ func TestPausedDeployment(t *testing.T) {
 
 // Paused deployment can be scaled
 func TestScalePausedDeployment(t *testing.T) {
-	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	s, closeFn, rm, dc, informers, c, error := dcSetup(t)
+	if error != nil {
+		t.Errorf("Deployment setup error : %v", error)
+		return
+	}
 	defer closeFn()
 	name := "test-scale-paused-deployment"
 	ns := framework.CreateTestingNamespace(name, s, t)
@@ -323,7 +335,11 @@ func TestScalePausedDeployment(t *testing.T) {
 
 // Deployment rollout shouldn't be blocked on hash collisions
 func TestDeploymentHashCollision(t *testing.T) {
-	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	s, closeFn, rm, dc, informers, c, error := dcSetup(t)
+	if error != nil {
+		t.Errorf("Deployment setup error : %v", error)
+		return
+	}
 	defer closeFn()
 	name := "test-hash-collision-deployment"
 	ns := framework.CreateTestingNamespace(name, s, t)
