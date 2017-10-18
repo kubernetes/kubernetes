@@ -156,6 +156,8 @@ type KubeletFlags struct {
 	// This flag, if set, instructs the kubelet to keep volumes from terminated pods mounted to the node.
 	// This can be useful for debugging volume related issues.
 	KeepTerminatedPodVolumes bool
+	// enable gathering custom metrics.
+	EnableCustomMetrics bool
 }
 
 // NewKubeletFlags will create a new KubeletFlags with default values
@@ -184,6 +186,8 @@ func NewKubeletFlags() *KubeletFlags {
 		ExperimentalQOSReserved:             make(map[string]string),
 		RemoteRuntimeEndpoint:               remoteRuntimeEndpoint,
 		RotateCertificates:                  false,
+		// TODO(#54161:v1.11.0): Remove --enable-custom-metrics flag, it is deprecated.
+		EnableCustomMetrics: false,
 	}
 }
 
@@ -316,6 +320,9 @@ func (f *KubeletFlags) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("non-masquerade-cidr", "will be removed in a future version")
 	fs.BoolVar(&f.KeepTerminatedPodVolumes, "keep-terminated-pod-volumes", f.KeepTerminatedPodVolumes, "Keep terminated pod volumes mounted to the node after the pod terminates.  Can be useful for debugging volume related issues.")
 	fs.MarkDeprecated("keep-terminated-pod-volumes", "will be removed in a future version")
+	// TODO(#54161:v1.11.0): Remove --enable-custom-metrics flag, it is deprecated.
+	fs.BoolVar(&f.EnableCustomMetrics, "enable-custom-metrics", f.EnableCustomMetrics, "Support for gathering custom metrics.")
+	fs.MarkDeprecated("enable-custom-metrics", "will be removed in a future version")
 
 }
 
@@ -428,7 +435,6 @@ func AddKubeletConfigFlags(fs *pflag.FlagSet, c *kubeletconfig.KubeletConfigurat
 	fs.Int32Var(&c.KubeAPIBurst, "kube-api-burst", c.KubeAPIBurst, "Burst to use while talking with kubernetes apiserver")
 	fs.BoolVar(&c.SerializeImagePulls, "serialize-image-pulls", c.SerializeImagePulls, "Pull images one at a time. We recommend *not* changing the default value on nodes that run docker daemon with version < 1.9 or an Aufs storage backend. Issue #10959 has more details.")
 
-	fs.BoolVar(&c.EnableCustomMetrics, "enable-custom-metrics", c.EnableCustomMetrics, "Support for gathering custom metrics.")
 	fs.StringVar(&c.RuntimeCgroups, "runtime-cgroups", c.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
 	fs.StringVar(&c.EvictionHard, "eviction-hard", c.EvictionHard, "A set of eviction thresholds (e.g. memory.available<1Gi) that if met would trigger a pod eviction.")
 	fs.StringVar(&c.EvictionSoft, "eviction-soft", c.EvictionSoft, "A set of eviction thresholds (e.g. memory.available<1.5Gi) that if met over a corresponding grace period would trigger a pod eviction.")
