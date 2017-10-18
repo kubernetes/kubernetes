@@ -17,24 +17,29 @@ limitations under the License.
 package scheme
 
 import (
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/proxy/apis/proxyconfig"
 	"k8s.io/kubernetes/pkg/proxy/apis/proxyconfig/v1alpha1"
 )
 
-// Utility functions for the Kube-proxy's "kubeproxy.k8s.io" API group
+var (
+	// Scheme defines methods for serializing and deserializing API objects.
+	Scheme = runtime.NewScheme()
+	// Codecs provides methods for retrieving codecs and serializers for specific
+	// versions and content types.
+	Codecs = serializer.NewCodecFactory(Scheme)
+)
 
-// NewSchemeAndCodecs is a utility funciton that returns a Scheme and CodecFactory
-// that understand the types in the "kubeproxy.k8s.io" API group.
-func NewSchemeAndCodecs() (*runtime.Scheme, *serializer.CodecFactory, error) {
-	scheme := runtime.NewScheme()
-	if err := proxyconfig.AddToScheme(scheme); err != nil {
-		return nil, nil, err
-	}
-	if err := v1alpha1.AddToScheme(scheme); err != nil {
-		return nil, nil, err
-	}
-	codecs := serializer.NewCodecFactory(scheme)
-	return scheme, &codecs, nil
+func init() {
+	v1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
+	AddToScheme(Scheme)
+}
+
+// AddToScheme adds the types of this group into the given scheme.
+func AddToScheme(scheme *runtime.Scheme) {
+	v1alpha1.AddToScheme(scheme)
+	proxyconfig.AddToScheme(scheme)
 }
