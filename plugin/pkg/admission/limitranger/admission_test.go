@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
 	core "k8s.io/client-go/testing"
@@ -101,7 +102,7 @@ func validLimitRange() api.LimitRange {
 					Type:           api.LimitTypeContainer,
 					Max:            getComputeResourceList("100m", "2Gi"),
 					Min:            getComputeResourceList("25m", "1Mi"),
-					Default:        getComputeResourceList("75m", "10Mi"),
+					Default:        getComputeResourceList("75m", "1Gi"),
 					DefaultRequest: getComputeResourceList("50m", "5Mi"),
 				},
 			},
@@ -163,7 +164,7 @@ func TestDefaultContainerResourceRequirements(t *testing.T) {
 	limitRange := validLimitRange()
 	expected := api.ResourceRequirements{
 		Requests: getComputeResourceList("50m", "5Mi"),
-		Limits:   getComputeResourceList("75m", "10Mi"),
+		Limits:   getComputeResourceList("75m", "1Gi"),
 	}
 
 	actual := defaultContainerResourceRequirements(&limitRange)
@@ -192,12 +193,14 @@ func expectNoAnnotation(t *testing.T, pod *api.Pod) {
 
 func TestMergePodResourceRequirements(t *testing.T) {
 	limitRange := validLimitRange()
-
 	// pod with no resources enumerated should get each resource from default request
 	expected := getResourceRequirements(getComputeResourceList("", ""), getComputeResourceList("", ""))
 	pod := validPod("empty-resources", 1, expected)
 	defaultRequirements := defaultContainerResourceRequirements(&limitRange)
-	mergePodResourceRequirements(&pod, &defaultRequirements)
+	err := utilerrors.NewAggregate(mergePodResourceRequirements(&pod, &defaultRequirements))
+	if err != nil {
+		t.Errorf("pod mergePodResourceRequirements failed, err:%v", err)
+	}
 	for i := range pod.Spec.Containers {
 		actual := pod.Spec.Containers[i].Resources
 		if !apiequality.Semantic.DeepEqual(expected, actual) {
@@ -216,7 +219,10 @@ func TestMergePodResourceRequirements(t *testing.T) {
 		},
 		Limits: defaultRequirements.Limits,
 	}
-	mergePodResourceRequirements(&pod, &defaultRequirements)
+	err = utilerrors.NewAggregate(mergePodResourceRequirements(&pod, &defaultRequirements))
+	if err != nil {
+		t.Errorf("pod mergePodResourceRequirements failed, err:%v", err)
+	}
 	for i := range pod.Spec.Containers {
 		actual := pod.Spec.Containers[i].Resources
 		if !apiequality.Semantic.DeepEqual(expected, actual) {
@@ -236,7 +242,10 @@ func TestMergePodResourceRequirements(t *testing.T) {
 	initInputs := []api.ResourceRequirements{getResourceRequirements(getComputeResourceList("200m", "1G"), getComputeResourceList("400m", "2G"))}
 	pod = validPodInit(validPod("limit-memory", 1, input), initInputs...)
 	expected = input
-	mergePodResourceRequirements(&pod, &defaultRequirements)
+	err = utilerrors.NewAggregate(mergePodResourceRequirements(&pod, &defaultRequirements))
+	if err != nil {
+		t.Errorf("pod mergePodResourceRequirements failed, err:%v", err)
+	}
 	for i := range pod.Spec.Containers {
 		actual := pod.Spec.Containers[i].Resources
 		if !apiequality.Semantic.DeepEqual(expected, actual) {
@@ -250,6 +259,14 @@ func TestMergePodResourceRequirements(t *testing.T) {
 		}
 	}
 	expectNoAnnotation(t, &pod)
+
+	// pod with request enumerated and request.cpu > default.limit.cpu
+	input = getResourceRequirements(getComputeResourceList("100m", "512Mi"), getComputeResourceList("", ""))
+	pod = validPod("request-above-default.limit", 1, input)
+	err = utilerrors.NewAggregate(mergePodResourceRequirements(&pod, &defaultRequirements))
+	if err == nil {
+		t.Errorf("expecte error occured")
+	}
 }
 
 func TestPodLimitFunc(t *testing.T) {
@@ -640,7 +657,7 @@ func TestPodLimitFuncApplyDefault(t *testing.T) {
 		requestMemory := container.Resources.Requests.Memory().String()
 		requestCpu := container.Resources.Requests.Cpu().String()
 
-		if limitMemory != "10Mi" {
+		if limitMemory != "1Gi" {
 			t.Errorf("Unexpected memory value %s", limitMemory)
 		}
 		if limitCpu != "75m" {
@@ -661,7 +678,7 @@ func TestPodLimitFuncApplyDefault(t *testing.T) {
 		requestMemory := container.Resources.Requests.Memory().String()
 		requestCpu := container.Resources.Requests.Cpu().String()
 
-		if limitMemory != "10Mi" {
+		if limitMemory != "1Gi" {
 			t.Errorf("Unexpected memory value %s", limitMemory)
 		}
 		if limitCpu != "75m" {
