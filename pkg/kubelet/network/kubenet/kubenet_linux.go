@@ -834,20 +834,29 @@ func (plugin *kubenetNetworkPlugin) syncEbtablesDedupRules(macAddr net.HardwareA
 	}
 }
 
-// generateHardwareAddr generates 48 bit virtual mac addresses based on the IP input.
+// generateHardwareAddr generates 48 bit virtual mac addresses based on the IP input
+// for IPv4. For IPv6 it just reads the bridge mac, as it should already be a random mac.
 func generateHardwareAddr(ip net.IP) (net.HardwareAddr, error) {
-	if ip.To4() == nil {
-		return nil, fmt.Errorf("generateHardwareAddr only support valid ipv4 address as input")
+	if ip == nil {
+		return nil, fmt.Errorf("generateHardwareAddr only support valid ip address as input")
 	}
-	mac := privateMACPrefix
-	sections := strings.Split(ip.String(), ".")
-	for _, s := range sections {
-		i, _ := strconv.Atoi(s)
-		mac = mac + ":" + fmt.Sprintf("%02x", i)
+	if ip.To4() != nil {
+		mac := privateMACPrefix
+		sections := strings.Split(ip.String(), ".")
+		for _, s := range sections {
+			i, _ := strconv.Atoi(s)
+			mac = mac + ":" + fmt.Sprintf("%02x", i)
+		}
+		hwAddr, err := net.ParseMAC(mac)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to parse mac address %s generated based on ip %s due to: %v", mac, ip, err)
+		}
+		return hwAddr, nil
 	}
-	hwAddr, err := net.ParseMAC(mac)
+	// IPv6
+	link, err := netlink.LinkByName(BridgeName)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse mac address %s generated based on ip %s due to: %v", mac, ip, err)
+		return nil, err
 	}
-	return hwAddr, nil
+	return link.Attrs().HardwareAddr, nil
 }
