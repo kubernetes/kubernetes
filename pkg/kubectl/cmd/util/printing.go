@@ -201,6 +201,24 @@ func extractOutputOptions(cmd *cobra.Command) *printers.OutputOptions {
 	}
 }
 
+// ValidArgumentsAndAliases retrieves a list of handled resources from printer
+// as valid arguments
+func ValidArgumentsAndAliases(factory Factory) ([]string, []string) {
+	validArguments, argumentAliases := []string{}, []string{}
+
+	printer, err := factory.Printer(nil, printers.PrintOptions{
+		ColumnLabels: []string{},
+	})
+
+	CheckErr(err)
+
+	if printer != nil {
+		validArguments = printer.HandledResources()
+		argumentAliases = kubectl.ResourceAliases(validArguments)
+	}
+	return validArguments, argumentAliases
+}
+
 func maybeWrapSortingPrinter(cmd *cobra.Command, printer printers.ResourcePrinter) printers.ResourcePrinter {
 	sorting, err := cmd.Flags().GetString("sort-by")
 	if err != nil {

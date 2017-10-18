@@ -23,12 +23,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/editor"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
-	"k8s.io/kubernetes/pkg/printers"
 )
 
 var (
@@ -74,17 +72,7 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	options := &editor.EditOptions{
 		EditMode: editor.NormalEditMode,
 	}
-
-	// retrieve a list of handled resources from printer as valid args
-	validArgs, argAliases := []string{}, []string{}
-	p, err := f.Printer(nil, printers.PrintOptions{
-		ColumnLabels: []string{},
-	})
-	cmdutil.CheckErr(err)
-	if p != nil {
-		validArgs = p.HandledResources()
-		argAliases = kubectl.ResourceAliases(validArgs)
-	}
+	validArguments, argumentAliases := cmdutil.ValidArgumentsAndAliases(f)
 
 	cmd := &cobra.Command{
 		Use:     "edit (RESOURCE/NAME | -f FILENAME)",
@@ -100,8 +88,8 @@ func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 				cmdutil.CheckErr(err)
 			}
 		},
-		ValidArgs:  validArgs,
-		ArgAliases: argAliases,
+		ValidArgs:  validArguments,
+		ArgAliases: argumentAliases,
 	}
 	usage := "to use to edit the resource"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
