@@ -600,7 +600,7 @@ func (n FakeNodeInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
 }
 
 func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulercache.NodeInfo) algorithm.PredicateMetadata {
-	return algorithmpredicates.NewPredicateMetadataFactory(schedulertesting.FakePodLister{p})(p, nodeInfo)
+	return algorithmpredicates.NewPredicateMetadataFactory(schedulertesting.FakePodLister{p}, schedulertesting.FakeNamespaceLister{})(p, nodeInfo)
 }
 
 var smallContainers = []v1.Container{
@@ -779,7 +779,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			nodes = append(nodes, node)
 		}
 		if test.addAffinityPredicate {
-			test.predicates[predicates.MatchInterPodAffinity] = algorithmpredicates.NewPodAffinityPredicate(FakeNodeInfo(*nodes[0]), schedulertesting.FakePodLister(test.pods))
+			test.predicates[predicates.MatchInterPodAffinity] = algorithmpredicates.NewPodAffinityPredicate(FakeNodeInfo(*nodes[0]), schedulertesting.FakePodLister(test.pods), schedulertesting.FakeNamespaceLister{})
 		}
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, nodes)
 		nodeToPods, err := selectNodesForPreemption(test.pod, nodeNameToInfo, nodes, test.predicates, PredicateMetadata)

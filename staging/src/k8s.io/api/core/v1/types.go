@@ -2479,8 +2479,7 @@ type PodAffinityTerm struct {
 	// A label query over a set of resources, in this case pods.
 	// +optional
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty" protobuf:"bytes,1,opt,name=labelSelector"`
-	// namespaces specifies which namespaces the labelSelector applies to (matches against);
-	// null or empty list means "this pod's namespace"
+	// Deprecated: please use the NamespaceSelector, this field will be removed in future.
 	Namespaces []string `json:"namespaces,omitempty" protobuf:"bytes,2,rep,name=namespaces"`
 	// This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching
 	// the labelSelector in the specified namespaces, where co-located is defined as running on a node
@@ -2491,6 +2490,12 @@ type PodAffinityTerm struct {
 	// for affinity and for RequiredDuringScheduling pod anti-affinity, empty topologyKey is not allowed.
 	// +optional
 	TopologyKey string `json:"topologyKey,omitempty" protobuf:"bytes,3,opt,name=topologyKey"`
+	// Selects Namespaces using cluster scoped-labels.  This
+	// matches namespaces selected by this label selector.
+	// This field follows standard label selector semantics.
+	// If present but empty, this selector selects all namespaces.
+	// +optional
+	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,4,opt,name=namespaceSelector"`
 }
 
 // Node affinity is a group of node affinity scheduling rules.

@@ -88,6 +88,7 @@ func CreateScheduler(
 	statefulSetInformer appsinformers.StatefulSetInformer,
 	serviceInformer coreinformers.ServiceInformer,
 	pdbInformer policyinformers.PodDisruptionBudgetInformer,
+	namespaceInformer coreinformers.NamespaceInformer,
 	recorder record.EventRecorder,
 ) (*scheduler.Scheduler, error) {
 	configurator := factory.NewConfigFactory(
@@ -102,6 +103,7 @@ func CreateScheduler(
 		statefulSetInformer,
 		serviceInformer,
 		pdbInformer,
+		namespaceInformer,
 		s.HardPodAffinitySymmetricWeight,
 		utilfeature.DefaultFeatureGate.Enabled(features.EnableEquivalenceClassCache),
 	)

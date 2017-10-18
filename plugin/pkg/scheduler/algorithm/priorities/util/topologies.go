@@ -18,21 +18,44 @@ package util
 
 import (
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// GetNamespacesFromPodAffinityTerm returns a set of names
-// according to the namespaces indicated in podAffinityTerm.
-// If namespaces is empty it considers the given pod's namespace.
-func GetNamespacesFromPodAffinityTerm(pod *v1.Pod, podAffinityTerm *v1.PodAffinityTerm) sets.String {
-	names := sets.String{}
-	if len(podAffinityTerm.Namespaces) == 0 {
-		names.Insert(pod.Namespace)
+// NamespaceLister helps list Namespaces.
+type namespaceLister interface {
+	// List lists all Namespaces in the indexer.
+	List(selector labels.Selector) (ret []*v1.Namespace, err error)
+}
+
+// according to the NamespaceSelector indicated in podAffinityTerm.
+// If NamespaceSelector is not provided, podAffinityTerm.Namespaces will be used and if it is empty,
+// pod's namespace will be returned.
+// TODO We will remove the filed term.Namespaces in the future, then we need to remove using the term.Namespaces here
+func GetNamespacesFromPodAffinityTerm(nsLister namespaceLister, pod *v1.Pod, podAffinityTerm *v1.PodAffinityTerm) sets.String {
+	namespaces := sets.String{}
+	if podAffinityTerm.NamespaceSelector != nil {
+		namespaceSelector, err := metav1.LabelSelectorAsSelector(podAffinityTerm.NamespaceSelector)
+		if err != nil {
+			return namespaces
+		}
+		namespaceList, err := nsLister.List(namespaceSelector)
+		if err != nil {
+			return namespaces
+		}
+
+		for _, ns := range namespaceList {
+			namespaces.Insert(ns.Name)
+		}
 	} else {
-		names.Insert(podAffinityTerm.Namespaces...)
+		if len(podAffinityTerm.Namespaces) == 0 {
+			namespaces.Insert(pod.Namespace)
+		} else {
+			namespaces.Insert(podAffinityTerm.Namespaces...)
+		}
 	}
-	return names
+	return namespaces
 }
 
 // PodMatchesTermsNamespaceAndSelector returns true if the given <pod>
