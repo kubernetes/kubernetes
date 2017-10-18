@@ -15,7 +15,7 @@
 # This file creates a standard build environment for building cross
 # platform go binary for the architecture kubernetes cares about.
 
-FROM golang:1.8.3
+FROM golang:1.9.1
 
 ENV GOARM 7
 ENV KUBE_DYNAMIC_CROSSPLATFORMS \
