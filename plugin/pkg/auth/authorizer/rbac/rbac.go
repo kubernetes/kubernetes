@@ -174,14 +174,14 @@ func RulesAllow(requestAttributes authorizer.Attributes, rules ...rbac.PolicyRul
 
 func RuleAllows(requestAttributes authorizer.Attributes, rule *rbac.PolicyRule) bool {
 	if requestAttributes.IsResourceRequest() {
-		resource := requestAttributes.GetResource()
+		combinedResource := requestAttributes.GetResource()
 		if len(requestAttributes.GetSubresource()) > 0 {
-			resource = requestAttributes.GetResource() + "/" + requestAttributes.GetSubresource()
+			combinedResource = requestAttributes.GetResource() + "/" + requestAttributes.GetSubresource()
 		}
 
 		return rbac.VerbMatches(rule, requestAttributes.GetVerb()) &&
 			rbac.APIGroupMatches(rule, requestAttributes.GetAPIGroup()) &&
-			rbac.ResourceMatches(rule, resource) &&
+			rbac.ResourceMatches(rule, combinedResource, requestAttributes.GetSubresource()) &&
 			rbac.ResourceNameMatches(rule, requestAttributes.GetName())
 	}
 
