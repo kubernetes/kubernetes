@@ -1104,6 +1104,28 @@ func (j *IngressTestJig) ConstructFirewallForIngress(gceController *GCEIngressCo
 	return &fw
 }
 
+// GetDistinctResponseFromIngress tries GET call to the ingress VIP and return all distinct responses.
+func (j *IngressTestJig) GetDistinctResponseFromIngress() (sets.String, error) {
+	// Wait for the loadbalancer IP.
+	address, err := WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, LoadBalancerPollTimeout)
+	if err != nil {
+		Failf("Ingress failed to acquire an IP address within %v", LoadBalancerPollTimeout)
+	}
+	responses := sets.NewString()
+	timeoutClient := &http.Client{Timeout: IngressReqTimeout}
+
+	for i := 0; i < 100; i++ {
+		url := fmt.Sprintf("http://%v", address)
+		res, err := SimpleGET(timeoutClient, url, "")
+		if err != nil {
+			Logf("Failed to GET %q. Got responses: %q: %v", url, res, err)
+			return responses, err
+		}
+		responses.Insert(res)
+	}
+	return responses, nil
+}
+
 func (cont *GCEIngressController) getL7AddonUID() (string, error) {
 	Logf("Retrieving UID from config map: %v/%v", metav1.NamespaceSystem, uidConfigMap)
 	cm, err := cont.Client.Core().ConfigMaps(metav1.NamespaceSystem).Get(uidConfigMap, metav1.GetOptions{})

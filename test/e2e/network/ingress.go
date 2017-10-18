@@ -33,7 +33,8 @@ import (
 )
 
 const (
-	NEGAnnotation = "alpha.cloud.google.com/load-balancer-neg"
+	NEGAnnotation    = "alpha.cloud.google.com/load-balancer-neg"
+	NEGUpdateTimeout = 2 * time.Minute
 )
 
 var _ = SIGDescribe("Loadbalancing: L7", func() {
@@ -236,6 +237,47 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				return gceController.BackendServiceUsingNEG(jig.GetIngressNodePorts(false))
 			})
 			jig.WaitForIngress(true)
+		})
+
+		It("should sync endpoints to NEG", func() {
+			name := "hostname"
+			scaleAndValidateNEG := func(num int) {
+				scale, err := f.ClientSet.ExtensionsV1beta1().Deployments(ns).GetScale(name, metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				if scale.Spec.Replicas != int32(num) {
+					scale.Spec.Replicas = int32(num)
+					_, err = f.ClientSet.ExtensionsV1beta1().Deployments(ns).UpdateScale(name, scale)
+					Expect(err).NotTo(HaveOccurred())
+				}
+				wait.Poll(5*time.Second, NEGUpdateTimeout, func() (bool, error) {
+					res, err := jig.GetDistinctResponseFromIngress()
+					if err != nil {
+						return false, err
+					}
+					return res.Len() == num, err
+				})
+			}
+
+			By("Create a basic HTTP ingress using NEG")
+			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
+			jig.WaitForIngress(true)
+			usingNEG, err := gceController.BackendServiceUsingNEG(jig.GetIngressNodePorts(false))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(usingNEG).To(BeTrue())
+			// initial replicas number is 1
+			scaleAndValidateNEG(1)
+
+			By("Scale up number of backends to 5")
+			scaleAndValidateNEG(5)
+
+			By("Scale down number of backends to 3")
+			scaleAndValidateNEG(3)
+
+			By("Scale up number of backends to 6")
+			scaleAndValidateNEG(6)
+
+			By("Scale down number of backends to 2")
+			scaleAndValidateNEG(3)
 		})
 	})
 
