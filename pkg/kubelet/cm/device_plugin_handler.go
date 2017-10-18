@@ -33,7 +33,11 @@ import (
 )
 
 // podDevices represents a list of pod to device Id mappings.
-type containerDevices map[string]sets.String
+type containerDeviceSpec struct {
+	ids  sets.String
+	spec []*pluginapi.DeviceRuntimeSpec
+}
+type containerDevices map[string]containerDeviceSpec
 type podDevices map[string]containerDevices
 
 func (pdev podDevices) pods() sets.String {
@@ -49,9 +53,12 @@ func (pdev podDevices) insert(podUID, contName string, device string) {
 		pdev[podUID] = make(containerDevices)
 	}
 	if _, exists := pdev[podUID][contName]; !exists {
-		pdev[podUID][contName] = sets.NewString()
+		pdev[podUID][contName] = containerDeviceSpec{
+			ids:  sets.NewString(),
+			spec: []*pluginapi.DeviceRuntimeSpec{},
+		}
 	}
-	pdev[podUID][contName].Insert(device)
+	pdev[podUID][contName].ids.Insert(device)
 }
 
 func (pdev podDevices) getDevices(podUID, contName string) sets.String {
@@ -63,7 +70,7 @@ func (pdev podDevices) getDevices(podUID, contName string) sets.String {
 	if !exists {
 		return nil
 	}
-	return devices
+	return devices.ids
 }
 
 func (pdev podDevices) delete(pods []string) {
@@ -72,11 +79,45 @@ func (pdev podDevices) delete(pods []string) {
 	}
 }
 
+func (pdev podDevices) deleteContainerDevices(podUID, contName string) {
+	containers, exists := pdev[podUID]
+	if !exists {
+		return
+	}
+	delete(containers, contName)
+}
+
+func (pdev podDevices) getDeviceSpecs(podUID, contName string) []*pluginapi.DeviceRuntimeSpec {
+	containers, exists := pdev[podUID]
+	if !exists {
+		return nil
+	}
+	devices, exists := containers[contName]
+	if !exists {
+		return nil
+	}
+	return devices.spec
+}
+
+func (pdev podDevices) updateDeviceSpecs(podUID, contName string, spec []*pluginapi.DeviceRuntimeSpec) {
+	if _, exists := pdev[podUID]; !exists {
+		pdev[podUID] = make(containerDevices)
+	}
+	deviceIDs := sets.NewString()
+	if device, exists := pdev[podUID][contName]; exists {
+		deviceIDs = device.ids
+	}
+	pdev[podUID][contName] = containerDeviceSpec{
+		ids:  deviceIDs,
+		spec: spec,
+	}
+}
+
 func (pdev podDevices) devices() sets.String {
 	ret := sets.NewString()
 	for _, containerDevices := range pdev {
 		for _, deviceSet := range containerDevices {
-			ret = ret.Union(deviceSet)
+			ret = ret.Union(deviceSet.ids)
 		}
 	}
 	return ret
@@ -181,6 +222,21 @@ func (h *DevicePluginHandlerImpl) Allocate(pod *v1.Pod, container *v1.Container,
 			glog.V(3).Infof("Found pre-allocated devices for resource %s container %q in Pod %q: %v", resource, container.Name, pod.UID, devices.List())
 			needed = needed - devices.Len()
 		}
+		if needed == 0 {
+			// already allocated, return with cached device runtime specs
+			resp := &pluginapi.AllocateResponse{
+				Spec: h.allocatedDevices[resource].getDeviceSpecs(string(pod.UID), container.Name),
+			}
+			ret = append(ret, resp)
+
+			continue
+		}
+		if needed < 0 {
+			// amount of declared devices reduced, release the cache and reallocate
+			needed = int(v.Value())
+			h.allocatedDevices[resource].deleteContainerDevices(string(pod.UID), container.Name)
+
+		}
 		// Get Devices in use.
 		devicesInUse := h.allocatedDevices[resource].devices()
 		// Get a list of available devices.
@@ -209,6 +265,10 @@ func (h *DevicePluginHandlerImpl) Allocate(pod *v1.Pod, container *v1.Container,
 		if err != nil {
 			return nil, err
 		}
+
+		// update device runtime specs in allocatedDevices
+		h.allocatedDevices[resource].updateDeviceSpecs(string(pod.UID), container.Name, resp.Spec)
+
 		ret = append(ret, resp)
 	}
 	// Checkpoints device to container allocation information.
@@ -237,10 +297,11 @@ func (h *DevicePluginHandlerImpl) updateAllocatedDevices(activePods []*v1.Pod) {
 }
 
 type checkpointEntry struct {
-	PodUID        string
-	ContainerName string
-	ResourceName  string
-	DeviceID      string
+	PodUID             string
+	ContainerName      string
+	ResourceName       string
+	DeviceIDs          []string
+	DeviceRuntimeSpecs []*pluginapi.DeviceRuntimeSpec
 }
 
 // checkpointData struct is used to store pod to device allocation information
@@ -257,9 +318,7 @@ func (h *DevicePluginHandlerImpl) writeCheckpoint() error {
 	for resourceName, podDev := range h.allocatedDevices {
 		for podUID, conDev := range podDev {
 			for conName, devs := range conDev {
-				for _, devId := range devs.UnsortedList() {
-					data.Entries = append(data.Entries, checkpointEntry{podUID, conName, resourceName, devId})
-				}
+				data.Entries = append(data.Entries, checkpointEntry{podUID, conName, resourceName, devs.ids.UnsortedList(), devs.spec})
 			}
 		}
 	}
@@ -284,11 +343,14 @@ func (h *DevicePluginHandlerImpl) readCheckpoint() error {
 		return fmt.Errorf("failed to unmarshal checkpoint data: %v", err)
 	}
 	for _, entry := range data.Entries {
-		glog.V(2).Infof("Get checkpoint entry: %v %v %v %v\n", entry.PodUID, entry.ContainerName, entry.ResourceName, entry.DeviceID)
 		if h.allocatedDevices[entry.ResourceName] == nil {
 			h.allocatedDevices[entry.ResourceName] = make(podDevices)
 		}
-		h.allocatedDevices[entry.ResourceName].insert(entry.PodUID, entry.ContainerName, entry.DeviceID)
+		for _, deviceID := range entry.DeviceIDs {
+			glog.V(2).Infof("Get checkpoint entry: %v %v %v %v\n", entry.PodUID, entry.ContainerName, entry.ResourceName, deviceID)
+			h.allocatedDevices[entry.ResourceName].insert(entry.PodUID, entry.ContainerName, deviceID)
+		}
+		h.allocatedDevices[entry.ResourceName].updateDeviceSpecs(entry.PodUID, entry.ContainerName, entry.DeviceRuntimeSpecs)
 	}
 	return nil
 }
