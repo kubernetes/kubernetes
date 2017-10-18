@@ -34,6 +34,7 @@ import (
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/internaldeps"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
@@ -152,7 +153,7 @@ func (p *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn [
 		builder.ResourceNames(argsIn[0], argsIn[1])
 	}
 
-	obj, err := builder.Do().Object()
+	obj, err := builder.Do().Object(internaldeps.ToInternalList)
 	if err != nil {
 		return err
 	}

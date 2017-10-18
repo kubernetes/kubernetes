@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 // ErrMatchFunc can be used to filter errors that may not be true failures.
@@ -125,13 +125,37 @@ func (r *Result) Infos() ([]*Info, error) {
 	return infos, err
 }
 
+// ToList is a function that converts a slice of Objects into a single
+// List Object.  It allows callers to control whether an internal
+// or external List is returned.
+type ToList func([]runtime.Object, string) runtime.Object
+
+// Compile time check to enforce that list implements the necessary interface
+var _ metav1.ListInterface = &v1.List{}
+var _ metav1.ListMetaAccessor = &v1.List{}
+
+// ToV1List takes a slice of Objects + their version, and returns
+// a v1.List Object containing the objects as Items
+func ToV1List(objects []runtime.Object, version string) runtime.Object {
+	raw := []runtime.RawExtension{}
+	for _, o := range objects {
+		raw = append(raw, runtime.RawExtension{Object: o})
+	}
+	return &v1.List{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: version,
+		},
+		Items: raw,
+	}
+}
+
 // Object returns a single object representing the output of a single visit to all
 // found resources.  If the Builder was a singular context (expected to return a
 // single resource by user input) and only a single resource was found, the resource
 // will be returned as is.  Otherwise, the returned resources will be part of an
-// api.List. The ResourceVersion of the api.List will be set only if it is identical
+// v1.List. The ResourceVersion of the v1.List will be set only if it is identical
 // across all infos returned.
-func (r *Result) Object() (runtime.Object, error) {
+func (r *Result) Object(toList ToList) (runtime.Object, error) {
 	infos, err := r.Infos()
 	if err != nil {
 		return nil, err
@@ -160,12 +184,11 @@ func (r *Result) Object() (runtime.Object, error) {
 	if len(versions) == 1 {
 		version = versions.List()[0]
 	}
-	return &api.List{
-		ListMeta: metav1.ListMeta{
-			ResourceVersion: version,
-		},
-		Items: objects,
-	}, err
+	if toList == nil {
+		toList = ToV1List
+	}
+
+	return toList(objects, version), err
 }
 
 // ResourceMapping returns a single meta.RESTMapping representing the

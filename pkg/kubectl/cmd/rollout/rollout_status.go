@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+    "k8s.io/kubernetes/pkg/kubectl/internaldeps"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	"k8s.io/kubernetes/pkg/util/interrupt"
@@ -104,7 +105,7 @@ func RunStatus(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []stri
 	info := infos[0]
 	mapping := info.ResourceMapping()
 
-	obj, err := r.Object()
+	obj, err := r.Object(internaldeps.ToInternalList)
 	if err != nil {
 		return err
 	}
