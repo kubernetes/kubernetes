@@ -15,13 +15,13 @@
 # Build the hyperkube image.
 #
 # Usage:
-#   [ARCH=amd64] [REGISTRY="gcr.io/google-containers"] make (build|push) VERSION={some_released_version_of_kubernetes}
+#   [ARCH=amd64] [REGISTRY="k8s.gcr.io"] make (build|push) VERSION={some_released_version_of_kubernetes}
 
-REGISTRY?=gcr.io/google-containers
+REGISTRY?=k8s.gcr.io
 ARCH?=amd64
 HYPERKUBE_BIN?=_output/dockerized/bin/linux/$(ARCH)/hyperkube
 
-BASEIMAGE=gcr.io/google-containers/debian-hyperkube-base-$(ARCH):0.8
+BASEIMAGE=k8s.gcr.io/debian-hyperkube-base-$(ARCH):0.8
 TEMP_DIR:=$(shell mktemp -d -t hyperkubeXXXXXX)
 
 all: build
@@ -44,11 +44,11 @@ endif
 	rm -rf "${TEMP_DIR}"
 
 push: build
-	gcloud docker -- push ${REGISTRY}/hyperkube-${ARCH}:${VERSION}
+	gcloud docker --server=k8s.gcr.io -- push ${REGISTRY}/hyperkube-${ARCH}:${VERSION}
 ifeq ($(ARCH),amd64)
 	docker rmi ${REGISTRY}/hyperkube:${VERSION} 2>/dev/null || true
 	docker tag ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${REGISTRY}/hyperkube:${VERSION}
-	gcloud docker -- push ${REGISTRY}/hyperkube:${VERSION}
+	gcloud docker --server=k8s.gcr.io -- push ${REGISTRY}/hyperkube:${VERSION}
 endif
 
 .PHONY: build push all

@@ -98,7 +98,7 @@ func stackdriverExporterPodSpec(metricName string, metricValue int64) corev1.Pod
 		Containers: []corev1.Container{
 			{
 				Name:            "stackdriver-exporter",
-				Image:           "gcr.io/google-containers/sd-dummy-exporter:v0.1.0",
+				Image:           "k8s.gcr.io/sd-dummy-exporter:v0.1.0",
 				ImagePullPolicy: corev1.PullPolicy("Always"),
 				Command:         []string{"/sd_dummy_exporter", "--pod-id=$(POD_ID)", "--metric-name=" + metricName, fmt.Sprintf("--metric-value=%v", metricValue)},
 				Env: []corev1.EnvVar{

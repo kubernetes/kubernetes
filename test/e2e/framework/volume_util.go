@@ -56,11 +56,11 @@ import (
 
 // Current supported images for e2e volume testing to be assigned to VolumeTestConfig.serverImage
 const (
-	NfsServerImage       string = "gcr.io/google_containers/volume-nfs:0.8"
-	IscsiServerImage     string = "gcr.io/google_containers/volume-iscsi:0.1"
-	GlusterfsServerImage string = "gcr.io/google_containers/volume-gluster:0.2"
-	CephServerImage      string = "gcr.io/google_containers/volume-ceph:0.1"
-	RbdServerImage       string = "gcr.io/google_containers/volume-rbd:0.1"
+	NfsServerImage       string = "k8s.gcr.io/volume-nfs:0.8"
+	IscsiServerImage     string = "k8s.gcr.io/volume-iscsi:0.1"
+	GlusterfsServerImage string = "k8s.gcr.io/volume-gluster:0.2"
+	CephServerImage      string = "k8s.gcr.io/volume-ceph:0.1"
+	RbdServerImage       string = "k8s.gcr.io/volume-rbd:0.1"
 )
 
 const (

@@ -14,7 +14,7 @@
 
 .PHONY:	binary build push
 
-PREFIX = gcr.io/google-containers
+PREFIX = k8s.gcr.io
 IMAGE = elasticsearch
 TAG = v5.6.4
 
@@ -22,7 +22,7 @@ build:
 	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .
 
 push:
-	gcloud docker -- push $(PREFIX)/$(IMAGE):$(TAG)
+	gcloud docker --server=k8s.gcr.io -- push $(PREFIX)/$(IMAGE):$(TAG)
 
 binary:
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags "-w" elasticsearch_logging_discovery.go
