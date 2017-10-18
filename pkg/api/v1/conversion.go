@@ -235,7 +235,9 @@ func Convert_v1_ReplicationController_to_extensions_ReplicaSet(in *v1.Replicatio
 
 func Convert_v1_ReplicationControllerSpec_to_extensions_ReplicaSetSpec(in *v1.ReplicationControllerSpec, out *extensions.ReplicaSetSpec, s conversion.Scope) error {
 	out.Replicas = *in.Replicas
+	out.MinReadySeconds = in.MinReadySeconds
 	if in.Selector != nil {
+		out.Selector = new(metav1.LabelSelector)
 		metav1.Convert_map_to_unversioned_LabelSelector(&in.Selector, out.Selector, s)
 	}
 	if in.Template != nil {
@@ -252,6 +254,15 @@ func Convert_v1_ReplicationControllerStatus_to_extensions_ReplicaSetStatus(in *v
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.ObservedGeneration = in.ObservedGeneration
+	for _, cond := range in.Conditions {
+		out.Conditions = append(out.Conditions, extensions.ReplicaSetCondition{
+			Type:               extensions.ReplicaSetConditionType(cond.Type),
+			Status:             api.ConditionStatus(cond.Status),
+			LastTransitionTime: cond.LastTransitionTime,
+			Reason:             cond.Reason,
+			Message:            cond.Message,
+		})
+	}
 	return nil
 }
 
@@ -294,6 +305,15 @@ func Convert_extensions_ReplicaSetStatus_to_v1_ReplicationControllerStatus(in *e
 	out.ReadyReplicas = in.ReadyReplicas
 	out.AvailableReplicas = in.AvailableReplicas
 	out.ObservedGeneration = in.ObservedGeneration
+	for _, cond := range in.Conditions {
+		out.Conditions = append(out.Conditions, v1.ReplicationControllerCondition{
+			Type:               v1.ReplicationControllerConditionType(cond.Type),
+			Status:             v1.ConditionStatus(cond.Status),
+			LastTransitionTime: cond.LastTransitionTime,
+			Reason:             cond.Reason,
+			Message:            cond.Message,
+		})
+	}
 	return nil
 }
 

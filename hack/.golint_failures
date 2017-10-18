@@ -541,7 +541,6 @@ staging/src/k8s.io/apimachinery/pkg/apimachinery/announced
 staging/src/k8s.io/apimachinery/pkg/apimachinery/registered
 staging/src/k8s.io/apimachinery/pkg/apis/meta/fuzzer
 staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion
-staging/src/k8s.io/apimachinery/pkg/apis/meta/v1
 staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
 staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/validation
 staging/src/k8s.io/apimachinery/pkg/apis/meta/v1alpha1
