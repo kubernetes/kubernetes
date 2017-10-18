@@ -282,6 +282,11 @@ func (c *cachingConfigMapManager) RegisterPod(pod *v1.Pod) {
 	c.registeredPods[key] = pod
 	if prev != nil {
 		for name := range getConfigMapNames(prev) {
+			// On an update, the .Add() call above will have re-incremented the
+			// ref count of any existing items, so any configmaps that are in both
+			// names and prev need to have their ref counts decremented. Any that
+			// are only in prev need to be completely removed. This unconditional
+			// call takes care of both cases.
 			c.configMapStore.Delete(prev.Namespace, name)
 		}
 	}

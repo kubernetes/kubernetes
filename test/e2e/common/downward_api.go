@@ -148,10 +148,10 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 			},
 		}
 		expectations := []string{
-			fmt.Sprintf("CPU_LIMIT=2"),
-			fmt.Sprintf("MEMORY_LIMIT=67108864"),
-			fmt.Sprintf("CPU_REQUEST=1"),
-			fmt.Sprintf("MEMORY_REQUEST=33554432"),
+			"CPU_LIMIT=2",
+			"MEMORY_LIMIT=67108864",
+			"CPU_REQUEST=1",
+			"MEMORY_REQUEST=33554432",
 		}
 
 		testDownwardAPI(f, podName, env, expectations)
@@ -178,8 +178,8 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 			},
 		}
 		expectations := []string{
-			fmt.Sprintf("CPU_LIMIT=[1-9]"),
-			fmt.Sprintf("MEMORY_LIMIT=[1-9]"),
+			"CPU_LIMIT=[1-9]",
+			"MEMORY_LIMIT=[1-9]",
 		}
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -218,7 +218,7 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 		}
 
 		expectations := []string{
-			fmt.Sprintf("POD_UID=[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}"),
+			"POD_UID=[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}",
 		}
 
 		testDownwardAPI(f, podName, env, expectations)

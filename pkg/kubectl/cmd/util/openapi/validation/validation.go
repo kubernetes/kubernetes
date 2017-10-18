@@ -43,9 +43,9 @@ func (v *SchemaValidation) ValidateBytes(data []byte) error {
 		return err
 	}
 
-	gvk, err := getObjectKind(obj)
-	if err != nil {
-		return err
+	gvk, errs := getObjectKind(obj)
+	if errs != nil {
+		return utilerrors.NewAggregate(errs)
 	}
 
 	if strings.HasSuffix(gvk.Kind, "List") {
@@ -61,15 +61,15 @@ func (v *SchemaValidation) validateList(object interface{}) []error {
 		return []error{errors.New("invalid object to validate")}
 	}
 
-	errs := []error{}
+	allErrors := []error{}
 	for _, item := range fields["items"].([]interface{}) {
-		if gvk, err := getObjectKind(item); err != nil {
-			errs = append(errs, err)
+		if gvk, errs := getObjectKind(item); errs != nil {
+			allErrors = append(allErrors, errs...)
 		} else {
-			errs = append(errs, v.validateResource(item, gvk)...)
+			allErrors = append(allErrors, v.validateResource(item, gvk)...)
 		}
 	}
-	return errs
+	return allErrors
 }
 
 func (v *SchemaValidation) validateResource(obj interface{}, gvk schema.GroupVersionKind) []error {
@@ -99,29 +99,39 @@ func parse(data []byte) (interface{}, error) {
 	return obj, nil
 }
 
-func getObjectKind(object interface{}) (schema.GroupVersionKind, error) {
+func getObjectKind(object interface{}) (schema.GroupVersionKind, []error) {
+	var listErrors []error
 	fields := object.(map[string]interface{})
 	if fields == nil {
-		return schema.GroupVersionKind{}, errors.New("invalid object to validate")
+		listErrors = append(listErrors, errors.New("invalid object to validate"))
+		return schema.GroupVersionKind{}, listErrors
 	}
+
+	var group string
+	var version string
 	apiVersion := fields["apiVersion"]
 	if apiVersion == nil {
-		return schema.GroupVersionKind{}, errors.New("apiVersion not set")
-	}
-	if _, ok := apiVersion.(string); !ok {
-		return schema.GroupVersionKind{}, errors.New("apiVersion isn't string type")
-	}
-	gv, err := schema.ParseGroupVersion(apiVersion.(string))
-	if err != nil {
-		return schema.GroupVersionKind{}, err
+		listErrors = append(listErrors, errors.New("apiVersion not set"))
+	} else if _, ok := apiVersion.(string); !ok {
+		listErrors = append(listErrors, errors.New("apiVersion isn't string type"))
+	} else {
+		gv, err := schema.ParseGroupVersion(apiVersion.(string))
+		if err != nil {
+			listErrors = append(listErrors, err)
+		} else {
+			group = gv.Group
+			version = gv.Version
+		}
 	}
 	kind := fields["kind"]
 	if kind == nil {
-		return schema.GroupVersionKind{}, errors.New("kind not set")
+		listErrors = append(listErrors, errors.New("kind not set"))
+	} else if _, ok := kind.(string); !ok {
+		listErrors = append(listErrors, errors.New("kind isn't string type"))
 	}
-	if _, ok := kind.(string); !ok {
-		return schema.GroupVersionKind{}, errors.New("kind isn't string type")
+	if listErrors != nil {
+		return schema.GroupVersionKind{}, listErrors
 	}
 
-	return schema.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: kind.(string)}, nil
+	return schema.GroupVersionKind{Group: group, Version: version, Kind: kind.(string)}, nil
 }
