@@ -18,6 +18,7 @@ package operationexecutor
 
 import (
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/golang/glog"
@@ -431,7 +432,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				return volumeToMount.GenerateErrorDetailed("MountVolume.WaitForAttach failed", err)
 			}
 
-			glog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach succeeded", ""))
+			glog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach succeeded", fmt.Sprintf("DevicePath %q", devicePath)))
 
 			deviceMountPath, err :=
 				volumeAttacher.GetDeviceMountPath(volumeToMount.VolumeSpec)
@@ -677,7 +678,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 				return volumeToMount.GenerateErrorDetailed("MapVolume.WaitForAttach failed", err)
 			}
 
-			glog.Infof(volumeToMount.GenerateMsgDetailed("MapVolume.WaitForAttach succeeded", ""))
+			glog.Infof(volumeToMount.GenerateMsgDetailed("MapVolume.WaitForAttach succeeded", fmt.Sprintf("DevicePath %q", devicePath)))
 
 			// Update actual state of world to reflect volume is globally mounted
 			markDeviceMappedErr := actualStateOfWorld.MarkDeviceAsMounted(
@@ -732,6 +733,17 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FailedMapVolume, eventErr.Error())
 			return detailedErr
 		}
+
+		// Take filedescriptor lock to keep a block device opened. Otherwise, there is a case
+		// that the block device is silently removed and attached another device with same name.
+		// Container runtime can't handler this problem. To avoid unexpected condition fd lock
+		// for the block device is required.
+		exec := og.volumePluginMgr.Host.GetExec(blockVolumePlugin.GetPluginName())
+		_, err = util.AttachFileDevice(devicePath, exec)
+		if err != nil {
+			return volumeToMount.GenerateErrorDetailed("MapVolume.AttachFileDevice failed", err)
+		}
+
 		// Device mapping for pod device map path succeeded
 		simpleMsg, detailedMsg = volumeToMount.GenerateMsg("MapVolume.MapDevice succeeded", fmt.Sprintf("volumeMapPath %q", volumeMapPath))
 		verbosity = glog.Level(1)
@@ -750,6 +762,15 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		if markVolMountedErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateErrorDetailed("MapVolume.MarkVolumeAsMounted failed", markVolMountedErr)
+		}
+
+		var asw ActualStateOfWorldAttacherUpdater
+		// Update actual state of world
+		addVolumeNodeErr := asw.MarkVolumeAsAttached(
+			volumeToMount.VolumeName, volumeToMount.VolumeSpec, "" /* nodeName */, devicePath)
+		if addVolumeNodeErr != nil {
+			// On failure, return error. Caller will log and retry.
+			return volumeToMount.GenerateErrorDetailed("MapVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
 		}
 
 		return nil
@@ -804,7 +825,7 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 			// On failure, return error. Caller will log and retry.
 			return volumeToUnmount.GenerateErrorDetailed("UnmapVolume.UnmapDevice on pod device map path failed", unmapDeviceErr)
 		}
-		removeLinkErr := util.RemoveMapPath(podDeviceUnmapPath + "/" + volName)
+		removeLinkErr := util.RemoveMapPath(path.Join(podDeviceUnmapPath, volName))
 		if removeLinkErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToUnmount.GenerateErrorDetailed("UnmapVolume.RemoveSymlink failed", removeLinkErr)
@@ -876,6 +897,20 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 			// On failure, return error. Caller will log and retry.
 			return deviceToDetach.GenerateErrorDetailed("UnmapDevice failed", removeMapPathErr)
 		}
+
+		// The block volume is not referenced from Pods. Release file descriptor lock.
+		glog.V(5).Infof("GenerateUnmapDeviceFunc: deviceToDetach.DevicePath: %v", deviceToDetach.DevicePath)
+		exec := og.volumePluginMgr.Host.GetExec(blockVolumePlugin.GetPluginName())
+		loopPath, err := util.GetLoopDevice(deviceToDetach.DevicePath, exec)
+		if err != nil {
+			glog.Warningf(deviceToDetach.GenerateMsgDetailed("Couldn't find loopback device which takes file descriptor lock", fmt.Sprintf("device path: %q", deviceToDetach.DevicePath)))
+		} else {
+			err = util.RemoveLoopDevice(loopPath, exec)
+			if err != nil {
+				return deviceToDetach.GenerateErrorDetailed("MapVolume.AttachFileDevice failed", err)
+			}
+		}
+
 		// Before logging that UnmapDevice succeeded and moving on,
 		// use mounter.PathIsDevice to check if the path is a device,
 		// if so use mounter.DeviceOpened to check if the device is in use anywhere

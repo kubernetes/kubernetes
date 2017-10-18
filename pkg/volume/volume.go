@@ -146,7 +146,7 @@ type BlockVolumeMapper interface {
 	SetUpDevice() (string, error)
 	// GetGlobalMapPath returns a global map path which contains
 	// a symbolic links associated to a block device.
-	// ex. plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumeName}
+	// ex. plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid}
 	GetGlobalMapPath(spec *Spec) (string, error)
 	// GetPodDeviceMapPath returns a pod device map path
 	// and name of a symbolic link associated to a block device.

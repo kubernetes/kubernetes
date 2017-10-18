@@ -419,10 +419,6 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	if err != nil {
 		return nil, err
 	}
-	volumeSpec, err := plugin.ConstructVolumeSpec(volume.volumeSpecName, volume.mountPath)
-	if err != nil {
-		return nil, err
-	}
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			UID: types.UID(volume.podName),
@@ -434,6 +430,16 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 	}
 
 	mapperPlugin, err := rc.volumePluginMgr.FindMapperPluginByName(volume.pluginName)
+	if err != nil {
+		return nil, err
+	}
+
+	var volumeSpec *volumepkg.Spec
+	if volume.volumeMode == v1.PersistentVolumeFilesystem {
+		volumeSpec, err = plugin.ConstructVolumeSpec(volume.volumeSpecName, volume.mountPath)
+	} else {
+		volumeSpec, err = mapperPlugin.ConstructBlockVolumeSpec(string(volume.podName), volume.volumeSpecName, volume.mountPath)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -609,8 +615,8 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 		podName := podsDirInfo[i].Name()
 		podDir := path.Join(podDir, podName)
 		// Find both filesystem volume and block volume information
-		// ex. filesystem volume: /pods/{podUid}}/volume/{escapeQualifiedPluginName}/{volumeName}
-		//     block volume:      /pods/{podUid}}/volumeDevices/{escapeQualifiedPluginName}/{volumeName}
+		// ex. filesystem volume: /pods/{podUid}/volume/{escapeQualifiedPluginName}/{volumeName}
+		//     block volume:      /pods/{podUid}/volumeDevices/{escapeQualifiedPluginName}/{volumeName}
 		volumesDirs := map[v1.PersistentVolumeMode]string{
 			v1.PersistentVolumeFilesystem: path.Join(podDir, config.DefaultKubeletVolumesDirName),
 			v1.PersistentVolumeBlock:      path.Join(podDir, config.DefaultKubeletVolumeDevicesDirName),
@@ -632,8 +638,7 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 				unescapePluginName := strings.UnescapeQualifiedNameForDisk(pluginName)
 				for _, volumeName := range volumePluginDirs {
 					mountPath := path.Join(volumePluginPath, volumeName)
-					//glog.V(10).Infof("Obtained mount path from volume plugin directory: %v", mountPath)
-					glog.Infof("Obtained mount path from volume plugin directory: %v", mountPath)
+					glog.V(5).Infof("podName: %v, mount path from volume plugin directory: %v, ", podName, mountPath)
 					volumes = append(volumes, podVolume{
 						podName:        volumetypes.UniquePodName(podName),
 						volumeSpecName: volumeName,
