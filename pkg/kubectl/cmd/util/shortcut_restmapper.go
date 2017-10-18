@@ -45,23 +45,28 @@ func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInt
 }
 
 func (e shortcutExpander) KindFor(resource schema.GroupVersionResource) (schema.GroupVersionKind, error) {
-	return e.RESTMapper.KindFor(e.expandResourceShortcut(resource))
+	res, _ := e.expandResourceShortcut(resource)
+	return e.RESTMapper.KindFor(res)
 }
 
 func (e shortcutExpander) KindsFor(resource schema.GroupVersionResource) ([]schema.GroupVersionKind, error) {
-	return e.RESTMapper.KindsFor(e.expandResourceShortcut(resource))
+	res, _ := e.expandResourceShortcut(resource)
+	return e.RESTMapper.KindsFor(res)
 }
 
 func (e shortcutExpander) ResourcesFor(resource schema.GroupVersionResource) ([]schema.GroupVersionResource, error) {
-	return e.RESTMapper.ResourcesFor(e.expandResourceShortcut(resource))
+	res, _ := e.expandResourceShortcut(resource)
+	return e.RESTMapper.ResourcesFor(res)
 }
 
 func (e shortcutExpander) ResourceFor(resource schema.GroupVersionResource) (schema.GroupVersionResource, error) {
-	return e.RESTMapper.ResourceFor(e.expandResourceShortcut(resource))
+	res, _ := e.expandResourceShortcut(resource)
+	return e.RESTMapper.ResourceFor(res)
 }
 
 func (e shortcutExpander) ResourceSingularizer(resource string) (string, error) {
-	return e.RESTMapper.ResourceSingularizer(e.expandResourceShortcut(schema.GroupVersionResource{Resource: resource}).Resource)
+	res, _ := e.expandResourceShortcut(schema.GroupVersionResource{Resource: resource})
+	return e.RESTMapper.ResourceSingularizer(res.Resource)
 }
 
 func (e shortcutExpander) RESTMapping(gk schema.GroupKind, versions ...string) (*meta.RESTMapping, error) {
@@ -104,26 +109,85 @@ func (e shortcutExpander) getShortcutMappings() ([]kubectl.ResourceShortcuts, er
 	return res, nil
 }
 
+// resourceFinder will find the resources through discovery client as per resource plura name and singular name.
+func (e shortcutExpander) resourceFinder(resource schema.GroupVersionResource) (schema.GroupVersionResource, bool) {
+	apiResList, err := e.discoveryClient.ServerResources()
+	if err == nil {
+		for _, apiResources := range apiResList {
+			for _, apiRes := range apiResources.APIResources {
+				gv, err := schema.ParseGroupVersion(apiResources.GroupVersion)
+				if err != nil {
+					glog.V(1).Infof("Unable to parse groupversion = %s due to = %s", apiResources.GroupVersion, err.Error())
+					continue
+				} else {
+					hasGroup := len(resource.Group) > 0
+					hasVersion := len(resource.Version) > 0
+					switch {
+					case hasGroup && hasVersion:
+						if gv.Group == resource.Group && gv.Version == resource.Version {
+							break
+						} else {
+							return resource, false
+						}
+
+					case hasGroup:
+						if gv.Group == resource.Group {
+							break
+						} else {
+							return resource, false
+						}
+					case hasVersion:
+						if gv.Version == resource.Version {
+							break
+						} else {
+							return resource, false
+						}
+					default:
+						break
+					}
+				}
+
+				if apiRes.Name == resource.Resource {
+					return resource, true
+				}
+
+				if apiRes.SingularName == resource.Resource {
+					return resource, true
+				}
+			}
+		}
+	}
+
+	return resource, false
+}
+
 // expandResourceShortcut will return the expanded version of resource
 // (something that a pkg/api/meta.RESTMapper can understand), if it is
 // indeed a shortcut. If no match has been found, we will match on group prefixing.
 // Lastly we will return resource unmodified.
-func (e shortcutExpander) expandResourceShortcut(resource schema.GroupVersionResource) schema.GroupVersionResource {
+func (e shortcutExpander) expandResourceShortcut(resource schema.GroupVersionResource) (schema.GroupVersionResource, error) {
+
+	// First check if the resource is available as the provided resource name is.
+	if res, found := e.resourceFinder(resource); found {
+		return res, nil
+	}
+
 	// get the shortcut mappings and return on first match.
-	if resources, err := e.getShortcutMappings(); err == nil {
+	resources, err := e.getShortcutMappings()
+	if len(resources) > 0 && err == nil {
 		for _, item := range resources {
 			if len(resource.Group) != 0 && resource.Group != item.ShortForm.Group {
 				continue
 			}
 			if resource.Resource == item.ShortForm.Resource {
 				resource.Resource = item.LongForm.Resource
-				return resource
+				return resource, nil
 			}
 		}
 
 		// we didn't find exact match so match on group prefixing. This allows autoscal to match autoscaling
 		if len(resource.Group) == 0 {
-			return resource
+			return resource, nil
 		}
 		for _, item := range resources {
 			if !strings.HasPrefix(item.ShortForm.Group, resource.Group) {
@@ -131,10 +195,10 @@ func (e shortcutExpander) expandResourceShortcut(resource schema.GroupVersionRes
 			}
 			if resource.Resource == item.ShortForm.Resource {
 				resource.Resource = item.LongForm.Resource
-				return resource
+				return resource, nil
 			}
 		}
 	}
 
-	return resource
+	return resource, err
 }
