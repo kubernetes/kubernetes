@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -47,6 +48,7 @@ func NewContainerRuntimeOptions() *config.ContainerRuntimeOptions {
 	}
 
 	return &config.ContainerRuntimeOptions{
+		ContainerRuntime:          kubetypes.DockerContainerRuntime,
 		DockerEndpoint:            dockerEndpoint,
 		DockershimRootDirectory:   "/var/lib/dockershim",
 		DockerDisableSharedPID:    true,
