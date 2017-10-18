@@ -469,18 +469,18 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 			expectedError: `externalAdmissionHooks[0].rules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
 		},
 		{
-			name: "FailurePolicy can only be \"Ignore\"",
+			name: "FailurePolicy can only be \"Ignore\" or \"Fail\"",
 			config: getExternalAdmissionHookConfiguration(
 				[]admissionregistration.ExternalAdmissionHook{
 					{
 						Name: "webhook.k8s.io",
 						FailurePolicy: func() *admissionregistration.FailurePolicyType {
-							r := admissionregistration.Fail
+							r := admissionregistration.FailurePolicyType("other")
 							return &r
 						}(),
 					},
 				}),
-			expectedError: `failurePolicy: Unsupported value: "Fail": supported values: "Ignore"`,
+			expectedError: `externalAdmissionHooks[0].failurePolicy: Unsupported value: "other": supported values: "Fail", "Ignore"`,
 		},
 	}
 	for _, test := range tests {
