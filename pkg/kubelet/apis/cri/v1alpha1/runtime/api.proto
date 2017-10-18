@@ -331,6 +331,8 @@ message RemovePodSandboxResponse {}
 message PodSandboxStatusRequest {
     // ID of the PodSandbox for which to retrieve status.
     string pod_sandbox_id = 1;
+    // Verbose indicates whether to return extra information about the pod sandbox.
+    bool verbose = 2;
 }
 
 // PodSandboxNetworkStatus is the status of the network for a PodSandbox.
@@ -382,6 +384,11 @@ message PodSandboxStatus {
 message PodSandboxStatusResponse {
     // Status of the PodSandbox.
     PodSandboxStatus status = 1;
+    // Info is extra information of the PodSandbox. The key could be abitrary string, and
+    // value should be in json format. The information could include anything useful for
+    // debug, e.g. network namespace for linux container based container runtime.
+    // It should only be returned non-empty when Verbose is true.
+    map<string, string> info = 2;
 }
 
 // PodSandboxStateValue is the wrapper of PodSandboxState.
@@ -747,6 +754,8 @@ message ListContainersResponse {
 message ContainerStatusRequest {
     // ID of the container for which to retrieve status.
     string container_id = 1;
+    // Verbose indicates whether to return extra information about the container.
+    bool verbose = 2;
 }
 
 // ContainerStatus represents the status of a container.
@@ -791,6 +800,11 @@ message ContainerStatus {
 message ContainerStatusResponse {
     // Status of the container.
     ContainerStatus status = 1;
+    // Info is extra information of the Container. The key could be abitrary string, and
+    // value should be in json format. The information could include anything useful for
+    // debug, e.g. pid for linux container based container runtime.
+    // It should only be returned non-empty when Verbose is true.
+    map<string, string> info = 2;
 }
 
 message UpdateContainerResourcesRequest {
@@ -920,11 +934,18 @@ message ListImagesResponse {
 message ImageStatusRequest {
     // Spec of the image.
     ImageSpec image = 1;
+    // Verbose indicates whether to return extra information about the image.
+    bool verbose = 2;
 }
 
 message ImageStatusResponse {
     // Status of the image.
     Image image = 1;
+    // Info is extra information of the Image. The key could be abitrary string, and
+    // value should be in json format. The information could include anything useful
+    // for debug, e.g. image config for oci image based container runtime.
+    // It should only be returned non-empty when Verbose is true.
+    map<string, string> info = 2;
 }
 
 // AuthConfig contains authorization information for connecting to a registry.
@@ -1007,11 +1028,19 @@ message RuntimeStatus {
     repeated RuntimeCondition conditions = 1;
 }
 
-message StatusRequest {}
+message StatusRequest {
+    // Verbose indicates whether to return extra information about the runtime.
+    bool verbose = 1;
+}
 
 message StatusResponse {
     // Status of the Runtime.
     RuntimeStatus status = 1;
+    // Info is extra information of the Runtime. The key could be abitrary string, and
+    // value should be in json format. The information could include anything useful for
+    // debug, e.g. plugins used by the container runtime.
+    // It should only be returned non-empty when Verbose is true.
+    map<string, string> info = 2;
 }
 
 message ImageFsInfoRequest {}
