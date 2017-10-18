@@ -164,16 +164,11 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 }
 
 func NewOptions() (*Options, error) {
-	scheme, codecs, err := scheme.NewSchemeAndCodecs()
-	if err != nil {
-		return nil, err
-	}
-
 	o := &Options{
 		config:      new(proxyconfig.KubeProxyConfiguration),
 		healthzPort: ports.ProxyHealthzPort,
-		scheme:      scheme,
-		codecs:      *codecs,
+		scheme:      scheme.Scheme,
+		codecs:      scheme.Codecs,
 	}
 
 	return o, nil
