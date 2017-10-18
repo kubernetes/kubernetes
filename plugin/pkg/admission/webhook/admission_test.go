@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
@@ -89,8 +90,10 @@ func TestAdmit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wh.clientCert = clientCert
-	wh.clientKey = clientKey
+	wh.restClientConfig = &rest.Config{}
+	wh.restClientConfig.TLSClientConfig.CAData = caCert
+	wh.restClientConfig.TLSClientConfig.CertData = clientCert
+	wh.restClientConfig.TLSClientConfig.KeyData = clientKey
 
 	// Set up a test object for the call
 	kind := api.Kind("Pod").WithVersion("v1")
