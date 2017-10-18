@@ -149,7 +149,7 @@ func TestNewOptionsFailures(t *testing.T) {
 
 	simulatedErrorTest := func(target string) {
 		var addToScheme *func(s *k8sRuntime.Scheme) error
-		if target == "proxyconfig" {
+		if target == proxyconfig.GroupName {
 			addToScheme = &proxyconfig.AddToScheme
 		} else {
 			addToScheme = &v1alpha1.AddToScheme
@@ -165,7 +165,7 @@ func TestNewOptionsFailures(t *testing.T) {
 	}
 
 	// Simulate errors in calls to AddToScheme()
-	faultTargets := []string{"proxyconfig", "v1alpha1"}
+	faultTargets := []string{proxyconfig.GroupName, "v1alpha1"}
 	for _, target := range faultTargets {
 		simulatedErrorTest(target)
 	}
@@ -197,7 +197,7 @@ func TestProxyServerWithCleanupAndExit(t *testing.T) {
 		assert.True(t, proxyserver.CleanupAndExit, "false CleanupAndExit, addr: %s", addr)
 
 		// Clean up config for next test case
-		configz.Delete("proxyconfig")
+		configz.Delete(proxyconfig.GroupName)
 	}
 }
 
@@ -262,7 +262,7 @@ func TestGetConntrackMax(t *testing.T) {
 // TestLoadConfig tests proper operation of loadConfig()
 func TestLoadConfig(t *testing.T) {
 
-	yamlTemplate := `apiVersion: proxyconfig/v1alpha1
+	yamlTemplate := `apiVersion: kubeproxy.k8s.io/v1alpha1
 bindAddress: %s
 clientConnection:
   acceptContentTypes: "abc"
@@ -447,7 +447,7 @@ func TestLoadConfigFailures(t *testing.T) {
 			expErr: "mapping values are not allowed in this context",
 		},
 	}
-	version := "apiVersion: proxyconfig/v1alpha1"
+	version := "apiVersion: kubeproxy.k8s.io/v1alpha1"
 	for _, tc := range testCases {
 		options, _ := NewOptions()
 		config := fmt.Sprintf("%s\n%s", version, tc.config)

@@ -58,7 +58,7 @@ func NewProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		return nil, errors.New("config is required")
 	}
 
-	if c, err := configz.New("proxyconfig"); err == nil {
+	if c, err := configz.New(proxyconfigapi.GroupName); err == nil {
 		c.Set(config)
 	} else {
 		return nil, fmt.Errorf("unable to register configz: %s", err)
