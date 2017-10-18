@@ -245,6 +245,11 @@ message CephFSVolumeSource {
   // More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
   // +optional
   optional bool readOnly = 6;
+
+  // Optional: Defaults to false. Fuse here will force to mount cephfs using fuse.
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+  // +optional
+  optional bool fuse = 7;
 }
 
 // Represents a cinder volume resource in Openstack.

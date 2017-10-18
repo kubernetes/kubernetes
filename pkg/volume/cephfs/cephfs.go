@@ -58,7 +58,7 @@ func (plugin *cephfsPlugin) GetPluginName() string {
 }
 
 func (plugin *cephfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	mon, _, _, _, _, err := getVolumeSource(spec)
+	mon, _, _, _, _, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
@@ -116,7 +116,7 @@ func (plugin *cephfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.
 }
 
 func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, mounter mount.Interface, secret string) (volume.Mounter, error) {
-	mon, path, id, secretFile, readOnly, err := getVolumeSource(spec)
+	mon, path, id, secretFile, readOnly, fuse, err := getVolumeSource(spec)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +148,7 @@ func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 			mounter:      mounter,
 			plugin:       plugin,
 			mountOptions: volume.MountOptionFromSpec(spec),
-			fuse:         cephvs.Fuse,
+			fuse:         fuse,
 		},
 	}, nil
 }
@@ -413,14 +413,15 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 	return nil
 }
 
-func getVolumeSource(spec *volume.Spec) ([]string, string, string, string, bool, error) {
+func getVolumeSource(spec *volume.Spec) ([]string, string, string, string, bool, bool, error) {
 	if spec.Volume != nil && spec.Volume.CephFS != nil {
 		mon := spec.Volume.CephFS.Monitors
 		path := spec.Volume.CephFS.Path
 		user := spec.Volume.CephFS.User
 		secretFile := spec.Volume.CephFS.SecretFile
 		readOnly := spec.Volume.CephFS.ReadOnly
-		return mon, path, user, secretFile, readOnly, nil
+                fuse := spec.Volume.CephFS.Fuse
+		return mon, path, user, secretFile, readOnly, fuse, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.CephFS != nil {
 		mon := spec.PersistentVolume.Spec.CephFS.Monitors
@@ -428,10 +429,11 @@ func getVolumeSource(spec *volume.Spec) ([]string, string, string, string, bool,
 		user := spec.PersistentVolume.Spec.CephFS.User
 		secretFile := spec.PersistentVolume.Spec.CephFS.SecretFile
 		readOnly := spec.PersistentVolume.Spec.CephFS.ReadOnly
-		return mon, path, user, secretFile, readOnly, nil
+                fuse := spec.Volume.CephFS.Fuse
+		return mon, path, user, secretFile, readOnly, fuse, nil
 	}
 
-	return nil, "", "", "", false, fmt.Errorf("Spec does not reference a CephFS volume type")
+	return nil, "", "", "", false, false, fmt.Errorf("Spec does not reference a CephFS volume type")
 }
 
 func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (string, string, error) {

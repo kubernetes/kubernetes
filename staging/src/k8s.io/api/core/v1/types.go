@@ -929,6 +929,10 @@ type CephFSVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
 	// +optional
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,6,opt,name=readOnly"`
+	// Optional: Defaults to false. Fuse here will force to mount cephfs using fuse.
+	// More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
+	// +optional
+	Fuse bool `json:"fuse,omitempty" protobuf:"varint,7,opt,name=fuse"`
 }
 
 // SecretReference represents a Secret Reference. It has enough information to retrieve secret
