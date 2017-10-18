@@ -46,7 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/kubectl/internaldeps"
 )
 
 func stringBody(body string) io.ReadCloser {
@@ -894,17 +893,17 @@ func TestMultipleObject(t *testing.T) {
 	r, pods, svc := streamTestData()
 	obj, err := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
 		NamespaceParam("test").Stream(r, "STDIN").Flatten().
-		Do().Object(internaldeps.ToInternalList)
+		Do().Object()
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expected := &api.List{
-		Items: []runtime.Object{
-			&pods.Items[0],
-			&pods.Items[1],
-			&svc.Items[0],
+	expected := &v1.List{
+		Items: []runtime.RawExtension{
+			{Object: &pods.Items[0]},
+			{Object: &pods.Items[1]},
+			{Object: &svc.Items[0]},
 		},
 	}
 	if !apiequality.Semantic.DeepDerivative(expected, obj) {
@@ -947,7 +946,7 @@ func TestSingleItemImpliedObject(t *testing.T) {
 		NamespaceParam("test").DefaultNamespace().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"}}).
 		Flatten().
-		Do().Object(internaldeps.ToInternalList)
+		Do().Object()
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -967,7 +966,7 @@ func TestSingleItemImpliedObjectNoExtension(t *testing.T) {
 		NamespaceParam("test").DefaultNamespace().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/pod"}}).
 		Flatten().
-		Do().Object(internaldeps.ToInternalList)
+		Do().Object()
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1018,12 +1017,12 @@ func TestListObject(t *testing.T) {
 		ResourceTypeOrNameArgs(true, "pods").
 		Flatten()
 
-	obj, err := b.Do().Object(internaldeps.ToInternalList)
+	obj, err := b.Do().Object()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	list, ok := obj.(*api.List)
+	list, ok := obj.(*v1.List)
 	if !ok {
 		t.Fatalf("unexpected object: %#v", obj)
 	}
@@ -1051,13 +1050,13 @@ func TestListObjectWithDifferentVersions(t *testing.T) {
 		NamespaceParam("test").
 		ResourceTypeOrNameArgs(true, "pods,services").
 		Flatten().
-		Do().Object(internaldeps.ToInternalList)
+		Do().Object()
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	list, ok := obj.(*api.List)
+	list, ok := obj.(*v1.List)
 	if !ok {
 		t.Fatalf("unexpected object: %#v", obj)
 	}

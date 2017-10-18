@@ -125,37 +125,13 @@ func (r *Result) Infos() ([]*Info, error) {
 	return infos, err
 }
 
-// ToList is a function that converts a slice of Objects into a single
-// List Object.  It allows callers to control whether an internal
-// or external List is returned.
-type ToList func([]runtime.Object, string) runtime.Object
-
-// Compile time check to enforce that list implements the necessary interface
-var _ metav1.ListInterface = &v1.List{}
-var _ metav1.ListMetaAccessor = &v1.List{}
-
-// ToV1List takes a slice of Objects + their version, and returns
-// a v1.List Object containing the objects as Items
-func ToV1List(objects []runtime.Object, version string) runtime.Object {
-	raw := []runtime.RawExtension{}
-	for _, o := range objects {
-		raw = append(raw, runtime.RawExtension{Object: o})
-	}
-	return &v1.List{
-		ListMeta: metav1.ListMeta{
-			ResourceVersion: version,
-		},
-		Items: raw,
-	}
-}
-
 // Object returns a single object representing the output of a single visit to all
 // found resources.  If the Builder was a singular context (expected to return a
 // single resource by user input) and only a single resource was found, the resource
 // will be returned as is.  Otherwise, the returned resources will be part of an
 // v1.List. The ResourceVersion of the v1.List will be set only if it is identical
 // across all infos returned.
-func (r *Result) Object(toList ToList) (runtime.Object, error) {
+func (r *Result) Object() (runtime.Object, error) {
 	infos, err := r.Infos()
 	if err != nil {
 		return nil, err
@@ -184,11 +160,27 @@ func (r *Result) Object(toList ToList) (runtime.Object, error) {
 	if len(versions) == 1 {
 		version = versions.List()[0]
 	}
-	if toList == nil {
-		toList = ToV1List
-	}
 
-	return toList(objects, version), err
+	return toV1List(objects, version), err
+}
+
+// Compile time check to enforce that list implements the necessary interface
+var _ metav1.ListInterface = &v1.List{}
+var _ metav1.ListMetaAccessor = &v1.List{}
+
+// toV1List takes a slice of Objects + their version, and returns
+// a v1.List Object containing the objects in the Items field
+func toV1List(objects []runtime.Object, version string) runtime.Object {
+	raw := []runtime.RawExtension{}
+	for _, o := range objects {
+		raw = append(raw, runtime.RawExtension{Object: o})
+	}
+	return &v1.List{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: version,
+		},
+		Items: raw,
+	}
 }
 
 // ResourceMapping returns a single meta.RESTMapping representing the

@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-    "k8s.io/kubernetes/pkg/kubectl/internaldeps"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/kubectl/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -205,21 +204,21 @@ func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 			NamespaceParam(cmdNamespace).DefaultNamespace().
 			FilenameParam(enforceNamespace, &resource.FilenameOptions{Recursive: false, Filenames: []string{filename}}).
 			Do()
-		obj, err := request.Object(internaldeps.ToInternalList)
+		obj, err := request.Object()
 		if err != nil {
 			return err
 		}
 		var ok bool
 		// Handle filename input from stdin. The resource builder always returns an api.List
 		// when creating resource(s) from a stream.
-		if list, ok := obj.(*api.List); ok {
+		if list, ok := obj.(*v1.List); ok {
 			if len(list.Items) > 1 {
 				return cmdutil.UsageErrorf(cmd, "%s specifies multiple items", filename)
 			}
 			if len(list.Items) == 0 {
 				return cmdutil.UsageErrorf(cmd, "please make sure %s exists and is not empty", filename)
 			}
-			obj = list.Items[0]
+			obj = list.Items[0].Object
 		}
 		newRc, ok = obj.(*api.ReplicationController)
 		if !ok {
