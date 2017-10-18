@@ -224,6 +224,63 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 	return volume.NewSpecFromVolume(fcVolume), nil
 }
 
+// ConstructBlockVolumeSpec creates a new volume.Spec with following steps.
+//   - Searchs a file whose name is {pod uuid} under volume plugin directory.
+//   - If a file is found, then retreives volumePluginDependentPath from global map path.
+//   - Once volumePluginDependentPath is obtained, store volume information to VolumeSource
+// examples:
+//   device map Path: pods/{podUid}}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName}
+//   global map path: plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid}
+func (plugin *fcPlugin) ConstructBlockVolumeSpec(podName, volumeName, mapPath string) (*volume.Spec, error) {
+	pluginDir := plugin.host.GetVolumeDevicePluginDir(fcPluginName)
+	globalMapPath, err := util.GetGlobalMapPath(pluginDir, podName, mapPath)
+	if err != nil {
+		return nil, err
+	}
+	glog.V(5).Infof("globalMapPath: %v, err: %v", globalMapPath, err)
+
+	// Retreive volumePluginDependentPath from globalMapPath
+	// globalMapPath examples:
+	//   plugins/kubernetes.io/fc/volumeDevices/50060e801049cfd1-lun-0/{pod uuid}
+	//   plugins/kubernetes.io/fc/volumeDevices/3600508b400105e210000900000490000/{pod uuid}
+	arr := strings.Split(globalMapPath, "/")
+	if len(arr) < 2 {
+		return nil, fmt.Errorf("Fail to retreive volume plugin information from globalMapPath: %v", globalMapPath)
+	}
+	l := len(arr) - 2
+	volumeInfo := arr[l]
+
+	// Create volume from wwn+lun or wwid
+	var fcVolume *v1.Volume
+	if strings.Contains(volumeInfo, "-lun-") {
+		wwnLun := strings.Split(volumeInfo, "-lun-")
+		lun, err := strconv.Atoi(wwnLun[1])
+		if err != nil {
+			return nil, err
+		}
+		lun32 := int32(lun)
+		fcVolume = &v1.Volume{
+			Name: volumeName,
+			VolumeSource: v1.VolumeSource{
+				FC: &v1.FCVolumeSource{
+					TargetWWNs: []string{wwnLun[0]},
+					Lun:        &lun32,
+				},
+			},
+		}
+	} else {
+		fcVolume = &v1.Volume{
+			Name: volumeName,
+			VolumeSource: v1.VolumeSource{
+				FC: &v1.FCVolumeSource{
+					WWIDs: []string{volumeInfo},
+				},
+			},
+		}
+	}
+	return volume.NewSpecFromVolume(fcVolume), nil
+}
+
 type fcDisk struct {
 	volName string
 	podUID  types.UID
