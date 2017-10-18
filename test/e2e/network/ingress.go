@@ -22,7 +22,9 @@ import (
 	"time"
 
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -198,6 +200,42 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				Expect(err).NotTo(HaveOccurred())
 				Expect(usingNeg).To(BeTrue())
 			}
+		})
+
+		It("should be able to switch between IG and NEG modes", func() {
+			var err error
+			By("Create a basic HTTP ingress using NEG")
+			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
+			jig.WaitForIngress(true)
+			usingNEG, err := gceController.BackendServiceUsingNEG(jig.GetIngressNodePorts(false))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(usingNEG).To(BeTrue())
+
+			By("Switch backend service to use IG")
+			svcList, err := f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			for _, svc := range svcList.Items {
+				svc.Annotations[NEGAnnotation] = "false"
+				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
+				Expect(err).NotTo(HaveOccurred())
+			}
+			wait.Poll(5*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
+				return gceController.BackendServiceUsingIG(jig.GetIngressNodePorts(true))
+			})
+			jig.WaitForIngress(true)
+
+			By("Switch backend service to use NEG")
+			svcList, err = f.ClientSet.CoreV1().Services(ns).List(metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			for _, svc := range svcList.Items {
+				svc.Annotations[NEGAnnotation] = "true"
+				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
+				Expect(err).NotTo(HaveOccurred())
+			}
+			wait.Poll(5*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
+				return gceController.BackendServiceUsingNEG(jig.GetIngressNodePorts(false))
+			})
+			jig.WaitForIngress(true)
 		})
 	})
 
