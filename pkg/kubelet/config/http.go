@@ -106,7 +106,7 @@ func (s *sourceURL) extractFromURL() error {
 		return fmt.Errorf("zero-length data received from %v", s.url)
 	}
 	// Short circuit if the data has not changed since the last time it was read.
-	if bytes.Compare(data, s.data) == 0 {
+	if bytes.Equal(data, s.data) {
 		return nil
 	}
 	s.data = data

@@ -747,7 +747,7 @@ func (s *ServiceController) syncService(key string) error {
 	var cachedService *cachedService
 	var retryDelay time.Duration
 	defer func() {
-		glog.V(4).Infof("Finished syncing service %q (%v)", key, time.Now().Sub(startTime))
+		glog.V(4).Infof("Finished syncing service %q (%v)", key, time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
