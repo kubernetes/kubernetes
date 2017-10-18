@@ -563,7 +563,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		}
 		objToPrint := decodedObj
 		if printer.IsGeneric() {
-			// use raw object as recieved from the builder when using generic
+			// use raw object as received from the builder when using generic
 			// printer instead of decodedObj
 			objToPrint = original
 		}

@@ -122,11 +122,7 @@ func (o ViewOptions) Run(out io.Writer, printer printers.ResourcePrinter) error 
 	}
 
 	err = printer.PrintObj(config, out)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (o *ViewOptions) Complete() bool {
