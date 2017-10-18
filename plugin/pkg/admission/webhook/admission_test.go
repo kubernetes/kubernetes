@@ -216,7 +216,7 @@ func TestAdmit(t *testing.T) {
 			},
 			expectAllow: true,
 		},
-		"match & fail (but allow because fail open on nil)": {
+		"match & fail (but disallow because fail closed on nil)": {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
 					Name:         "internalErr A",
@@ -232,7 +232,7 @@ func TestAdmit(t *testing.T) {
 					Rules:        matchEverythingRules,
 				}},
 			},
-			expectAllow: true,
+			expectAllow: false,
 		},
 		"match & fail (but fail because fail closed)": {
 			hookSource: fakeHookSource{
