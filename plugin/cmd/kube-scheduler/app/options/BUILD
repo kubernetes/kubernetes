@@ -12,6 +12,7 @@ go_library(
     importpath = "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options",
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/componentconfig:go_default_library",
         "//pkg/apis/componentconfig/install:go_default_library",
         "//pkg/apis/componentconfig/v1alpha1:go_default_library",

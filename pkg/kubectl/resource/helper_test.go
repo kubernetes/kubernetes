@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 )
@@ -103,7 +104,7 @@ func TestHelperDelete(t *testing.T) {
 	}
 	for _, test := range tests {
 		client := &fake.RESTClient{
-			APIRegistry:          api.Registry,
+			APIRegistry:          legacyscheme.Registry,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Resp:                 test.Resp,
 			Err:                  test.HttpErr,
@@ -194,7 +195,7 @@ func TestHelperCreate(t *testing.T) {
 	}
 	for i, test := range tests {
 		client := &fake.RESTClient{
-			APIRegistry:          api.Registry,
+			APIRegistry:          legacyscheme.Registry,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Resp:                 test.Resp,
 			Err:                  test.HttpErr,
@@ -275,7 +276,7 @@ func TestHelperGet(t *testing.T) {
 	}
 	for _, test := range tests {
 		client := &fake.RESTClient{
-			APIRegistry:          api.Registry,
+			APIRegistry:          legacyscheme.Registry,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Resp:                 test.Resp,
 			Err:                  test.HttpErr,
@@ -339,7 +340,7 @@ func TestHelperList(t *testing.T) {
 					t.Errorf("url doesn't contain name: %#v", req.URL)
 					return false
 				}
-				if req.URL.Query().Get(metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String())) != labels.SelectorFromSet(labels.Set{"foo": "baz"}).String() {
+				if req.URL.Query().Get(metav1.LabelSelectorQueryParam(legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String())) != labels.SelectorFromSet(labels.Set{"foo": "baz"}).String() {
 					t.Errorf("url doesn't contain query parameters: %#v", req.URL)
 					return false
 				}
@@ -349,7 +350,7 @@ func TestHelperList(t *testing.T) {
 	}
 	for _, test := range tests {
 		client := &fake.RESTClient{
-			APIRegistry:          api.Registry,
+			APIRegistry:          legacyscheme.Registry,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Resp:                 test.Resp,
 			Err:                  test.HttpErr,
@@ -358,7 +359,7 @@ func TestHelperList(t *testing.T) {
 			RESTClient:      client,
 			NamespaceScoped: true,
 		}
-		obj, err := modifier.List("bar", api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(), "foo=baz", false, false)
+		obj, err := modifier.List("bar", legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(), "foo=baz", false, false)
 		if (err != nil) != test.Err {
 			t.Errorf("unexpected error: %t %v", test.Err, err)
 		}
@@ -483,7 +484,7 @@ func TestHelperReplace(t *testing.T) {
 	}
 	for i, test := range tests {
 		client := &fake.RESTClient{
-			APIRegistry:          api.Registry,
+			APIRegistry:          legacyscheme.Registry,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Client:               test.HTTPClient,
 			Resp:                 test.Resp,

@@ -29,7 +29,7 @@ go_library(
     }),
     importpath = "k8s.io/kubernetes/pkg/volume/util",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/v1/helper:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/mount:go_default_library",

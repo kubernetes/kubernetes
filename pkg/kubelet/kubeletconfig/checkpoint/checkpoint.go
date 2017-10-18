@@ -22,7 +22,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 )
 
@@ -43,7 +43,7 @@ type Checkpoint interface {
 // DecodeCheckpoint is a helper for using the apimachinery to decode serialized checkpoints
 func DecodeCheckpoint(data []byte) (Checkpoint, error) {
 	// decode the checkpoint
-	obj, err := runtime.Decode(api.Codecs.UniversalDecoder(), data)
+	obj, err := runtime.Decode(legacyscheme.Codecs.UniversalDecoder(), data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode, error: %v", err)
 	}
@@ -52,7 +52,7 @@ func DecodeCheckpoint(data []byte) (Checkpoint, error) {
 
 	// convert it to the external ConfigMap type, so we're consistently working with the external type outside of the on-disk representation
 	cm := &apiv1.ConfigMap{}
-	err = api.Scheme.Convert(obj, cm, nil)
+	err = legacyscheme.Scheme.Convert(obj, cm, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert decoded object into a v1 ConfigMap, error: %v", err)
 	}

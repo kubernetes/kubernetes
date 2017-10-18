@@ -56,6 +56,7 @@ go_test(
         ":go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
         "//pkg/apis/extensions:go_default_library",

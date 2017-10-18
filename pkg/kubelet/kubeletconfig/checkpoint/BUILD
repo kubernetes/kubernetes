@@ -40,7 +40,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/scheme:go_default_library",
         "//pkg/kubelet/kubeletconfig/status:go_default_library",

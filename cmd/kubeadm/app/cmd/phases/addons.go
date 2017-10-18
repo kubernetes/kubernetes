@@ -29,7 +29,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // NewCmdAddon returns the addon Cobra command
@@ -67,7 +67,7 @@ func EnsureAllAddons(cfg *kubeadmapi.MasterConfiguration, client clientset.Inter
 func getAddonsSubCommands() []*cobra.Command {
 	cfg := &kubeadmapiext.MasterConfiguration{}
 	// Default values for the cobra help text
-	api.Scheme.Default(cfg)
+	legacyscheme.Scheme.Default(cfg)
 
 	var cfgPath, kubeConfigFile string
 	var subCmds []*cobra.Command
@@ -137,7 +137,7 @@ func runAddonsCmdFunc(cmdFunc func(cfg *kubeadmapi.MasterConfiguration, client c
 		}
 
 		internalcfg := &kubeadmapi.MasterConfiguration{}
-		api.Scheme.Convert(cfg, internalcfg, nil)
+		legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
 		client, err := kubeconfigutil.ClientSetFromFile(*kubeConfigFile)
 		kubeadmutil.CheckErr(err)
 		internalcfg, err = configutil.ConfigFileAndDefaultsToInternalConfig(*cfgPath, cfg)

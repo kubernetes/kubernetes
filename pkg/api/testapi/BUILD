@@ -15,6 +15,7 @@ go_library(
         "//federation/apis/federation/install:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/admission:go_default_library",
         "//pkg/apis/admission/install:go_default_library",
         "//pkg/apis/admissionregistration:go_default_library",

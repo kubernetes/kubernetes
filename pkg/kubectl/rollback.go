@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -151,7 +152,7 @@ func isRollbackEvent(e *api.Event) (bool, string) {
 
 func simpleDryRun(deployment *extensions.Deployment, c clientset.Interface, toRevision int64) (string, error) {
 	externalDeployment := &externalextensions.Deployment{}
-	if err := api.Scheme.Convert(deployment, externalDeployment, nil); err != nil {
+	if err := legacyscheme.Scheme.Convert(deployment, externalDeployment, nil); err != nil {
 		return "", fmt.Errorf("failed to convert deployment, %v", err)
 	}
 	versionedExtensionsClient := versionedExtensionsClientV1beta1(c)

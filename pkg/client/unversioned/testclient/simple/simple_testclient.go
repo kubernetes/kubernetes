@@ -32,6 +32,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
@@ -141,9 +142,9 @@ func (c *Client) ValidateCommon(t *testing.T, err error) {
 		validator, ok := c.QueryValidator[key]
 		if !ok {
 			switch key {
-			case metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()):
+			case metav1.LabelSelectorQueryParam(legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String()):
 				validator = ValidateLabels
-			case metav1.FieldSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String()):
+			case metav1.FieldSelectorQueryParam(legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String()):
 				validator = validateFields
 			default:
 				validator = func(a, b string) bool { return a == b }
@@ -199,7 +200,7 @@ func validateFields(a, b string) bool {
 
 func (c *Client) body(t *testing.T, obj runtime.Object, raw *string) *string {
 	if obj != nil {
-		fqKinds, _, err := api.Scheme.ObjectKinds(obj)
+		fqKinds, _, err := legacyscheme.Scheme.ObjectKinds(obj)
 		if err != nil {
 			t.Errorf("unexpected encoding error: %v", err)
 		}

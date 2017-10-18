@@ -16,6 +16,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/helper:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/service:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/v1/helper:go_default_library",
@@ -52,6 +53,7 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/helper:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/security/apparmor:go_default_library",

@@ -34,15 +34,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 func TestUniversalDeserializer(t *testing.T) {
 	expected := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test"}}
-	d := api.Codecs.UniversalDeserializer()
+	d := legacyscheme.Codecs.UniversalDeserializer()
 	for _, mediaType := range []string{"application/json", "application/yaml", "application/vnd.kubernetes.protobuf"} {
-		info, ok := runtime.SerializerInfoForMediaType(api.Codecs.SupportedMediaTypes(), mediaType)
+		info, ok := runtime.SerializerInfoForMediaType(legacyscheme.Codecs.SupportedMediaTypes(), mediaType)
 		if !ok {
 			t.Fatal(mediaType)
 		}
@@ -61,7 +62,7 @@ func TestUniversalDeserializer(t *testing.T) {
 }
 
 func TestAllFieldsHaveTags(t *testing.T) {
-	for gvk, obj := range api.Scheme.AllKnownTypes() {
+	for gvk, obj := range legacyscheme.Scheme.AllKnownTypes() {
 		if gvk.Version == runtime.APIVersionInternal {
 			// internal versions are not serialized to protobuf
 			continue
@@ -97,7 +98,7 @@ func fieldsHaveProtobufTags(obj reflect.Type) error {
 
 func TestProtobufRoundTrip(t *testing.T) {
 	obj := &v1.Pod{}
-	fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), api.Codecs).Fuzz(obj)
+	fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), legacyscheme.Codecs).Fuzz(obj)
 	// InitContainers are turned into annotations by conversion.
 	obj.Spec.InitContainers = nil
 	obj.Status.InitContainerStatuses = nil
@@ -137,12 +138,12 @@ func BenchmarkEncodeCodecFromInternalProtobuf(b *testing.B) {
 	width := len(items)
 	encodable := make([]api.Pod, width)
 	for i := range items {
-		if err := api.Scheme.Convert(&items[i], &encodable[i], nil); err != nil {
+		if err := legacyscheme.Scheme.Convert(&items[i], &encodable[i], nil); err != nil {
 			b.Fatal(err)
 		}
 	}
 	s := protobuf.NewSerializer(nil, nil, "application/arbitrary.content.type")
-	codec := api.Codecs.EncoderForVersion(s, v1.SchemeGroupVersion)
+	codec := legacyscheme.Codecs.EncoderForVersion(s, v1.SchemeGroupVersion)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if _, err := runtime.Encode(codec, &encodable[i%width]); err != nil {
@@ -169,8 +170,8 @@ func BenchmarkEncodeProtobufGeneratedMarshal(b *testing.B) {
 func BenchmarkDecodeCodecToInternalProtobuf(b *testing.B) {
 	items := benchmarkItems(b)
 	width := len(items)
-	s := protobuf.NewSerializer(api.Scheme, api.Scheme, "application/arbitrary.content.type")
-	encoder := api.Codecs.EncoderForVersion(s, v1.SchemeGroupVersion)
+	s := protobuf.NewSerializer(legacyscheme.Scheme, legacyscheme.Scheme, "application/arbitrary.content.type")
+	encoder := legacyscheme.Codecs.EncoderForVersion(s, v1.SchemeGroupVersion)
 	var encoded [][]byte
 	for i := range items {
 		data, err := runtime.Encode(encoder, &items[i])
@@ -180,7 +181,7 @@ func BenchmarkDecodeCodecToInternalProtobuf(b *testing.B) {
 		encoded = append(encoded, data)
 	}
 
-	decoder := api.Codecs.DecoderToVersion(s, api.SchemeGroupVersion)
+	decoder := legacyscheme.Codecs.DecoderToVersion(s, api.SchemeGroupVersion)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if _, err := runtime.Decode(decoder, encoded[i%width]); err != nil {

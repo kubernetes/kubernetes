@@ -15,8 +15,8 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/controller",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/controller/testutil:go_default_library",
         "//pkg/securitycontext:go_default_library",
@@ -54,6 +54,7 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/serviceaccount:go_default_library",

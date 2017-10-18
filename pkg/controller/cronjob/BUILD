@@ -16,7 +16,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/cronjob",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/robfig/cron:go_default_library",

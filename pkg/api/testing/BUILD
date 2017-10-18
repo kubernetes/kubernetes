@@ -19,6 +19,7 @@ go_library(
         "//cmd/kubeadm/app/apis/kubeadm/fuzzer:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/fuzzer:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/admissionregistration/fuzzer:go_default_library",
         "//pkg/apis/apps/fuzzer:go_default_library",
         "//pkg/apis/autoscaling/fuzzer:go_default_library",
@@ -76,6 +77,7 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing/compat:go_default_library",
         "//pkg/api/v1:go_default_library",

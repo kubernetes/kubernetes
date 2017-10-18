@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // ValidateEvent makes sure that the event makes sense.
@@ -66,7 +67,7 @@ func isNamespacedKind(kind, groupVersion string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	g, err := api.Registry.Group(gv.Group)
+	g, err := legacyscheme.Registry.Group(gv.Group)
 	if err != nil {
 		return false, err
 	}

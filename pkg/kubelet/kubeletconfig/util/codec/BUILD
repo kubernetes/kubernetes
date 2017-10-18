@@ -10,8 +10,8 @@ go_library(
     srcs = ["codec.go"],
     importpath = "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",

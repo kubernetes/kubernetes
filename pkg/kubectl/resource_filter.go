@@ -20,6 +20,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -74,8 +75,8 @@ func DecodeUnknownObject(obj runtime.Object) (runtime.Object, error) {
 
 	switch obj.(type) {
 	case runtime.Unstructured, *runtime.Unknown:
-		if objBytes, err := runtime.Encode(api.Codecs.LegacyCodec(), obj); err == nil {
-			if decodedObj, err := runtime.Decode(api.Codecs.UniversalDecoder(), objBytes); err == nil {
+		if objBytes, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(), obj); err == nil {
+			if decodedObj, err := runtime.Decode(legacyscheme.Codecs.UniversalDecoder(), objBytes); err == nil {
 				obj = decodedObj
 			}
 		}

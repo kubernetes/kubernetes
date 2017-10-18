@@ -37,8 +37,8 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/apis/batch/v1beta1_test",
     deps = [
         ":go_default_library",
-        "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/batch/install:go_default_library",
         "//vendor/k8s.io/api/batch/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",

@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	ref "k8s.io/client-go/tools/reference"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 var ImplicitContainerPrefix string = "implicitly required container "
@@ -39,7 +39,7 @@ func GenerateContainerRef(pod *v1.Pod, container *v1.Container) (*v1.ObjectRefer
 		// start (like the pod infra container). This is not a good way, ugh.
 		fieldPath = ImplicitContainerPrefix + container.Name
 	}
-	ref, err := ref.GetPartialReference(api.Scheme, pod, fieldPath)
+	ref, err := ref.GetPartialReference(legacyscheme.Scheme, pod, fieldPath)
 	if err != nil {
 		return nil, err
 	}

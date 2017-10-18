@@ -31,7 +31,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 const (
@@ -165,7 +165,7 @@ func loadPodSpecFromFile(manifestPath string) (*v1.PodSpec, error) {
 	}
 
 	staticPod := &v1.Pod{}
-	if err := kuberuntime.DecodeInto(api.Codecs.UniversalDecoder(), podBytes, staticPod); err != nil {
+	if err := kuberuntime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), podBytes, staticPod); err != nil {
 		return nil, fmt.Errorf("unable to decode static pod %v", err)
 	}
 

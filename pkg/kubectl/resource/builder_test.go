@@ -44,6 +44,7 @@ import (
 	restclientwatch "k8s.io/client-go/rest/watch"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 )
@@ -71,7 +72,7 @@ func fakeClient() ClientMapper {
 func fakeClientWith(testName string, t *testing.T, data map[string]string) ClientMapper {
 	return ClientMapperFunc(func(*meta.RESTMapping) (RESTClient, error) {
 		return &fake.RESTClient{
-			APIRegistry:          api.Registry,
+			APIRegistry:          legacyscheme.Registry,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				p := req.URL.Path
@@ -192,7 +193,7 @@ func (v *testVisitor) Objects() []runtime.Object {
 var aPod string = `
 {
     "kind": "Pod",
-		"apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+		"apiVersion": "` + legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
     "metadata": {
         "name": "busybox{id}",
         "labels": {
@@ -219,7 +220,7 @@ var aPod string = `
 var aRC string = `
 {
     "kind": "ReplicationController",
-		"apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+		"apiVersion": "` + legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
     "metadata": {
         "name": "busybox{id}",
         "labels": {
@@ -255,7 +256,7 @@ var aRC string = `
 `
 
 func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../test/fixtures/pkg/kubectl/builder/kitten-rc.yaml"}})
 
 	test := &testVisitor{}
@@ -294,7 +295,7 @@ func TestNodeBuilder(t *testing.T) {
 		w.Write([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), node)))
 	}()
 
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 		NamespaceParam("test").Stream(r, "STDIN")
 
 	test := &testVisitor{}
@@ -358,7 +359,7 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+		b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 			FilenameParam(false, &FilenameOptions{Recursive: test.recursive, Filenames: []string{test.directory}}).
 			NamespaceParam("test").DefaultNamespace()
 
@@ -417,7 +418,7 @@ func TestPathBuilderWithMultipleInvalid(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+		b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 			FilenameParam(false, &FilenameOptions{Recursive: test.recursive, Filenames: []string{test.directory}}).
 			NamespaceParam("test").DefaultNamespace()
 
@@ -432,7 +433,7 @@ func TestPathBuilderWithMultipleInvalid(t *testing.T) {
 }
 
 func TestDirectoryBuilder(t *testing.T) {
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/guestbook/legacy"}}).
 		NamespaceParam("test").DefaultNamespace()
 
@@ -463,7 +464,7 @@ func TestNamespaceOverride(t *testing.T) {
 	}))
 	defer s.Close()
 
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{s.URL}}).
 		NamespaceParam("test")
 
@@ -474,7 +475,7 @@ func TestNamespaceOverride(t *testing.T) {
 		t.Fatalf("unexpected response: %v %#v", err, test.Infos)
 	}
 
-	b = NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+	b = NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 		FilenameParam(true, &FilenameOptions{Recursive: false, Filenames: []string{s.URL}}).
 		NamespaceParam("test")
 
@@ -494,7 +495,7 @@ func TestURLBuilder(t *testing.T) {
 	}))
 	defer s.Close()
 
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{s.URL}}).
 		NamespaceParam("foo")
 
@@ -523,7 +524,7 @@ func TestURLBuilderRequireNamespace(t *testing.T) {
 	}))
 	defer s.Close()
 
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{s.URL}}).
 		NamespaceParam("test").RequireNamespace()
 
@@ -538,7 +539,7 @@ func TestURLBuilderRequireNamespace(t *testing.T) {
 
 func TestResourceByName(t *testing.T) {
 	pods, _ := testData()
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClientWith("", t, map[string]string{
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods/foo": runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[0]),
 	}), testapi.Default.Codec()).
 		NamespaceParam("test")
@@ -571,7 +572,7 @@ func TestResourceByName(t *testing.T) {
 
 func TestMultipleResourceByTheSameName(t *testing.T) {
 	pods, svcs := testData()
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClientWith("", t, map[string]string{
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods/foo":     runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[0]),
 		"/namespaces/test/pods/baz":     runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[1]),
 		"/namespaces/test/services/foo": runtime.EncodeOrDie(testapi.Default.Codec(), &svcs.Items[0]),
@@ -603,7 +604,7 @@ func TestMultipleResourceByTheSameName(t *testing.T) {
 
 func TestResourceNames(t *testing.T) {
 	pods, svc := testData()
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClientWith("", t, map[string]string{
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods/foo":     runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[0]),
 		"/namespaces/test/services/baz": runtime.EncodeOrDie(testapi.Default.Codec(), &svc.Items[0]),
 	}), testapi.Default.Codec()).
@@ -631,7 +632,7 @@ func TestResourceNames(t *testing.T) {
 
 func TestResourceNamesWithoutResource(t *testing.T) {
 	pods, svc := testData()
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClientWith("", t, map[string]string{
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods/foo":     runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[0]),
 		"/namespaces/test/services/baz": runtime.EncodeOrDie(testapi.Default.Codec(), &svc.Items[0]),
 	}), testapi.Default.Codec()).
@@ -652,7 +653,7 @@ func TestResourceNamesWithoutResource(t *testing.T) {
 }
 
 func TestResourceByNameWithoutRequireObject(t *testing.T) {
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClientWith("", t, map[string]string{}), testapi.Default.Codec()).
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClientWith("", t, map[string]string{}), testapi.Default.Codec()).
 		NamespaceParam("test")
 
 	test := &testVisitor{}
@@ -686,7 +687,7 @@ func TestResourceByNameWithoutRequireObject(t *testing.T) {
 
 func TestResourceByNameAndEmptySelector(t *testing.T) {
 	pods, _ := testData()
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClientWith("", t, map[string]string{
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods/foo": runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[0]),
 	}), testapi.Default.Codec()).
 		NamespaceParam("test").
@@ -713,8 +714,8 @@ func TestResourceByNameAndEmptySelector(t *testing.T) {
 
 func TestSelector(t *testing.T) {
 	pods, svc := testData()
-	labelKey := metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String())
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClientWith("", t, map[string]string{
+	labelKey := metav1.LabelSelectorQueryParam(legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String())
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(testapi.Default.Codec(), pods),
 		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(testapi.Default.Codec(), svc),
 	}), testapi.Default.Codec()).
@@ -745,7 +746,7 @@ func TestSelector(t *testing.T) {
 }
 
 func TestSelectorRequiresKnownTypes(t *testing.T) {
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 		SelectorParam("a=b").
 		NamespaceParam("test").
 		ResourceTypes("unknown")
@@ -756,7 +757,7 @@ func TestSelectorRequiresKnownTypes(t *testing.T) {
 }
 
 func TestSingleResourceType(t *testing.T) {
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 		SelectorParam("a=b").
 		SingleResourceType().
 		ResourceTypeOrNameArgs(true, "pods,services")
@@ -826,7 +827,7 @@ func TestResourceTuple(t *testing.T) {
 				}
 			}
 
-			b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClientWith(k, t, expectedRequests), testapi.Default.Codec()).
+			b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClientWith(k, t, expectedRequests), testapi.Default.Codec()).
 				NamespaceParam("test").DefaultNamespace().
 				ResourceTypeOrNameArgs(true, testCase.args...).RequireObject(requireObject)
 
@@ -857,7 +858,7 @@ func TestResourceTuple(t *testing.T) {
 
 func TestStream(t *testing.T) {
 	r, pods, rc := streamTestData()
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 		NamespaceParam("test").Stream(r, "STDIN").Flatten()
 
 	test := &testVisitor{}
@@ -874,7 +875,7 @@ func TestStream(t *testing.T) {
 
 func TestYAMLStream(t *testing.T) {
 	r, pods, rc := streamYAMLTestData()
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 		NamespaceParam("test").Stream(r, "STDIN").Flatten()
 
 	test := &testVisitor{}
@@ -891,7 +892,7 @@ func TestYAMLStream(t *testing.T) {
 
 func TestMultipleObject(t *testing.T) {
 	r, pods, svc := streamTestData()
-	obj, err := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+	obj, err := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 		NamespaceParam("test").Stream(r, "STDIN").Flatten().
 		Do().Object()
 
@@ -913,7 +914,7 @@ func TestMultipleObject(t *testing.T) {
 
 func TestContinueOnErrorVisitor(t *testing.T) {
 	r, _, _ := streamTestData()
-	req := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+	req := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 		ContinueOnError().
 		NamespaceParam("test").Stream(r, "STDIN").Flatten().
 		Do()
@@ -942,7 +943,7 @@ func TestContinueOnErrorVisitor(t *testing.T) {
 }
 
 func TestSingleItemImpliedObject(t *testing.T) {
-	obj, err := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+	obj, err := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 		NamespaceParam("test").DefaultNamespace().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"}}).
 		Flatten().
@@ -962,7 +963,7 @@ func TestSingleItemImpliedObject(t *testing.T) {
 }
 
 func TestSingleItemImpliedObjectNoExtension(t *testing.T) {
-	obj, err := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+	obj, err := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 		NamespaceParam("test").DefaultNamespace().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/pod"}}).
 		Flatten().
@@ -984,7 +985,7 @@ func TestSingleItemImpliedObjectNoExtension(t *testing.T) {
 func TestSingleItemImpliedRootScopedObject(t *testing.T) {
 	node := &api.Node{ObjectMeta: metav1.ObjectMeta{Name: "test"}, Spec: api.NodeSpec{ExternalID: "test"}}
 	r := streamTestObject(node)
-	infos, err := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+	infos, err := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 		NamespaceParam("test").DefaultNamespace().
 		Stream(r, "STDIN").
 		Flatten().
@@ -1008,8 +1009,8 @@ func TestSingleItemImpliedRootScopedObject(t *testing.T) {
 
 func TestListObject(t *testing.T) {
 	pods, _ := testData()
-	labelKey := metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String())
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClientWith("", t, map[string]string{
+	labelKey := metav1.LabelSelectorQueryParam(legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String())
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db": runtime.EncodeOrDie(testapi.Default.Codec(), pods),
 	}), testapi.Default.Codec()).
 		SelectorParam("a=b").
@@ -1041,8 +1042,8 @@ func TestListObject(t *testing.T) {
 
 func TestListObjectWithDifferentVersions(t *testing.T) {
 	pods, svc := testData()
-	labelKey := metav1.LabelSelectorQueryParam(api.Registry.GroupOrDie(api.GroupName).GroupVersion.String())
-	obj, err := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClientWith("", t, map[string]string{
+	labelKey := metav1.LabelSelectorQueryParam(legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String())
+	obj, err := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(testapi.Default.Codec(), pods),
 		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(testapi.Default.Codec(), svc),
 	}), testapi.Default.Codec()).
@@ -1068,7 +1069,7 @@ func TestListObjectWithDifferentVersions(t *testing.T) {
 
 func TestWatch(t *testing.T) {
 	_, svc := testData()
-	w, err := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClientWith("", t, map[string]string{
+	w, err := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/services?fieldSelector=metadata.name%3Dredis-master&resourceVersion=12&watch=true": watchBody(watch.Event{
 			Type:   watch.Added,
 			Object: &svc.Items[0],
@@ -1100,7 +1101,7 @@ func TestWatch(t *testing.T) {
 }
 
 func TestWatchMultipleError(t *testing.T) {
-	_, err := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+	_, err := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 		NamespaceParam("test").DefaultNamespace().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"}}).Flatten().
 		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"}}).Flatten().
@@ -1123,7 +1124,7 @@ func TestLatest(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "15"},
 	}
 
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClientWith("", t, map[string]string{
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods/foo":     runtime.EncodeOrDie(testapi.Default.Codec(), newPod),
 		"/namespaces/test/pods/bar":     runtime.EncodeOrDie(testapi.Default.Codec(), newPod2),
 		"/namespaces/test/services/baz": runtime.EncodeOrDie(testapi.Default.Codec(), newSvc),
@@ -1159,7 +1160,7 @@ func TestReceiveMultipleErrors(t *testing.T) {
 		w2.Write([]byte(runtime.EncodeOrDie(testapi.Default.Codec(), &svc.Items[0])))
 	}()
 
-	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, api.Scheme, fakeClient(), testapi.Default.Codec()).
+	b := NewBuilder(testapi.Default.RESTMapper(), LegacyCategoryExpander, legacyscheme.Scheme, fakeClient(), testapi.Default.Codec()).
 		Stream(r, "1").Stream(r2, "2").
 		ContinueOnError()
 

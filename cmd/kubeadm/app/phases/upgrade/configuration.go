@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // FetchConfiguration fetches configuration required for upgrading your cluster from a file (which has precedence) or a ConfigMap in the cluster
@@ -86,12 +86,12 @@ func bytesToValidatedMasterConfig(b []byte) (*kubeadmapiext.MasterConfiguration,
 	finalCfg := &kubeadmapiext.MasterConfiguration{}
 	internalcfg := &kubeadmapi.MasterConfiguration{}
 
-	if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), b, cfg); err != nil {
+	if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
 		return nil, fmt.Errorf("unable to decode config from bytes: %v", err)
 	}
 	// Default and convert to the internal version
-	api.Scheme.Default(cfg)
-	api.Scheme.Convert(cfg, internalcfg, nil)
+	legacyscheme.Scheme.Default(cfg)
+	legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
 
 	// Applies dynamic defaults to settings not provided with flags
 	if err := configutil.SetInitDynamicDefaults(internalcfg); err != nil {
@@ -102,6 +102,6 @@ func bytesToValidatedMasterConfig(b []byte) (*kubeadmapiext.MasterConfiguration,
 		return nil, err
 	}
 	// Finally converts back to the external version
-	api.Scheme.Convert(internalcfg, finalCfg, nil)
+	legacyscheme.Scheme.Convert(internalcfg, finalCfg, nil)
 	return finalCfg, nil
 }

@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/ref"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
@@ -134,7 +135,7 @@ func (c *admissionController) publishEvent(a admission.Attributes, msg string) {
 
 	obj := a.GetObject()
 
-	ref, err := ref.GetReference(api.Scheme, obj)
+	ref, err := ref.GetReference(legacyscheme.Scheme, obj)
 	if err != nil {
 		runtime.HandleError(err)
 		return

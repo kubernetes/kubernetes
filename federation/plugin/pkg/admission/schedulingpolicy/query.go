@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 // policyUndefinedError represents an undefined response from the policy
@@ -91,7 +91,7 @@ func (query *policyEngineQuery) Do() (decision *policyDecision, err error) {
 func (query *policyEngineQuery) encode() ([]byte, error) {
 
 	var info runtime.SerializerInfo
-	infos := api.Codecs.SupportedMediaTypes()
+	infos := legacyscheme.Codecs.SupportedMediaTypes()
 
 	for i := range infos {
 		if infos[i].MediaType == "application/json" {
@@ -103,7 +103,7 @@ func (query *policyEngineQuery) encode() ([]byte, error) {
 		return nil, fmt.Errorf("serialization not supported")
 	}
 
-	codec := api.Codecs.EncoderForVersion(info.Serializer, query.gvk.GroupVersion())
+	codec := legacyscheme.Codecs.EncoderForVersion(info.Serializer, query.gvk.GroupVersion())
 
 	var buf bytes.Buffer
 	if err := codec.Encode(query.obj, &buf); err != nil {

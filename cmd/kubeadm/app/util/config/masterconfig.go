@@ -29,7 +29,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/version"
 )
@@ -72,7 +72,7 @@ func TryLoadMasterConfiguration(cfgPath string, cfg *kubeadmapiext.MasterConfigu
 		if err != nil {
 			return fmt.Errorf("unable to read config from %q [%v]", cfgPath, err)
 		}
-		if err := runtime.DecodeInto(api.Codecs.UniversalDecoder(), b, cfg); err != nil {
+		if err := runtime.DecodeInto(legacyscheme.Codecs.UniversalDecoder(), b, cfg); err != nil {
 			return fmt.Errorf("unable to decode config from %q [%v]", cfgPath, err)
 		}
 	}
@@ -96,8 +96,8 @@ func ConfigFileAndDefaultsToInternalConfig(cfgPath string, defaultversionedcfg *
 
 	// Takes passed flags into account; the defaulting is executed once again enforcing assignement of
 	// static default values to cfg only for values not provided with flags
-	api.Scheme.Default(defaultversionedcfg)
-	api.Scheme.Convert(defaultversionedcfg, internalcfg, nil)
+	legacyscheme.Scheme.Default(defaultversionedcfg)
+	legacyscheme.Scheme.Convert(defaultversionedcfg, internalcfg, nil)
 	// Applies dynamic defaults to settings not provided with flags
 	if err := SetInitDynamicDefaults(internalcfg); err != nil {
 		return nil, err
