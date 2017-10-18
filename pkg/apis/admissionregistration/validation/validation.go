@@ -182,6 +182,24 @@ func validateExternalAdmissionHook(hook *admissionregistration.ExternalAdmission
 	if hook.FailurePolicy != nil && !supportedFailurePolicies.Has(string(*hook.FailurePolicy)) {
 		allErrors = append(allErrors, field.NotSupported(fldPath.Child("failurePolicy"), *hook.FailurePolicy, supportedFailurePolicies.List()))
 	}
+
+	if len(hook.ClientConfig.URLPath) != 0 {
+		if !strings.HasPrefix(hook.ClientConfig.URLPath, "/") || !strings.HasSuffix(hook.ClientConfig.URLPath, "/") {
+			allErrors = append(allErrors, field.Invalid(fldPath.Child("clientConfig", "urlPath"), hook.ClientConfig.URLPath, "must start and end with a '/'"))
+		}
+		steps := strings.Split(hook.ClientConfig.URLPath[1:len(hook.ClientConfig.URLPath)-1], "/")
+		for i, step := range steps {
+			if len(step) == 0 {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("clientConfig", "urlPath"), hook.ClientConfig.URLPath, fmt.Sprintf("segment[%d] may not be empty", i)))
+				continue
+			}
+			failures := validation.IsDNS1123Subdomain(step)
+			for _, failure := range failures {
+				allErrors = append(allErrors, field.Invalid(fldPath.Child("clientConfig", "urlPath"), hook.ClientConfig.URLPath, fmt.Sprintf("segment[%d]: %v", i, failure)))
+			}
+		}
+	}
+
 	return allErrors
 }
 

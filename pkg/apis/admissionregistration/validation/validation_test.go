@@ -482,6 +482,58 @@ func TestValidateExternalAdmissionHookConfiguration(t *testing.T) {
 				}),
 			expectedError: `externalAdmissionHooks[0].failurePolicy: Unsupported value: "other": supported values: "Fail", "Ignore"`,
 		},
+		{
+			name: "URLPath must start with slash",
+			config: getExternalAdmissionHookConfiguration(
+				[]admissionregistration.ExternalAdmissionHook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.AdmissionHookClientConfig{
+							URLPath: "foo/",
+						},
+					},
+				}),
+			expectedError: `clientConfig.urlPath: Invalid value: "foo/": must start and end with a '/'`,
+		},
+		{
+			name: "URLPath must end with slash",
+			config: getExternalAdmissionHookConfiguration(
+				[]admissionregistration.ExternalAdmissionHook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.AdmissionHookClientConfig{
+							URLPath: "/foo",
+						},
+					},
+				}),
+			expectedError: `clientConfig.urlPath: Invalid value: "/foo": must start and end with a '/'`,
+		},
+		{
+			name: "URLPath no empty step",
+			config: getExternalAdmissionHookConfiguration(
+				[]admissionregistration.ExternalAdmissionHook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.AdmissionHookClientConfig{
+							URLPath: "/foo//bar/",
+						},
+					},
+				}),
+			expectedError: `clientConfig.urlPath: Invalid value: "/foo//bar/": segment[1] may not be empty`,
+		},
+		{
+			name: "URLPath no non-subdomain",
+			config: getExternalAdmissionHookConfiguration(
+				[]admissionregistration.ExternalAdmissionHook{
+					{
+						Name: "webhook.k8s.io",
+						ClientConfig: admissionregistration.AdmissionHookClientConfig{
+							URLPath: "/apis/foo.bar/v1alpha1/--bad/",
+						},
+					},
+				}),
+			expectedError: `clientConfig.urlPath: Invalid value: "/apis/foo.bar/v1alpha1/--bad/": segment[3]: a DNS-1123 subdomain`,
+		},
 	}
 	for _, test := range tests {
 		errs := ValidateExternalAdmissionHookConfiguration(test.config)

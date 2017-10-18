@@ -54,7 +54,6 @@ func (f *fakeHookSource) Run(stopCh <-chan struct{}) {}
 
 type fakeServiceResolver struct {
 	base url.URL
-	path string
 }
 
 func (f fakeServiceResolver) ResolveEndpoint(namespace, name string) (*url.URL, error) {
@@ -62,7 +61,6 @@ func (f fakeServiceResolver) ResolveEndpoint(namespace, name string) (*url.URL, 
 		return nil, fmt.Errorf("couldn't resolve service location")
 	}
 	u := f.base
-	u.Path = f.path
 	return &u, nil
 }
 
@@ -128,13 +126,17 @@ func TestAdmit(t *testing.T) {
 		expectAllow   bool
 		errorContains string
 	}
-	ccfg := registrationv1alpha1.AdmissionHookClientConfig{
-		Service: registrationv1alpha1.ServiceReference{
-			Name:      "webhook-test",
-			Namespace: "default",
-		},
-		CABundle: caCert,
+	ccfg := func(urlPath string) registrationv1alpha1.AdmissionHookClientConfig {
+		return registrationv1alpha1.AdmissionHookClientConfig{
+			Service: registrationv1alpha1.ServiceReference{
+				Name:      "webhook-test",
+				Namespace: "default",
+			},
+			URLPath:  urlPath,
+			CABundle: caCert,
+		}
 	}
+
 	matchEverythingRules := []registrationv1alpha1.RuleWithOperations{{
 		Operations: []registrationv1alpha1.OperationType{registrationv1alpha1.OperationAll},
 		Rule: registrationv1alpha1.Rule{
@@ -152,109 +154,102 @@ func TestAdmit(t *testing.T) {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
 					Name:         "nomatch",
-					ClientConfig: ccfg,
+					ClientConfig: ccfg("disallow"),
 					Rules: []registrationv1alpha1.RuleWithOperations{{
 						Operations: []registrationv1alpha1.OperationType{registrationv1alpha1.Create},
 					}},
 				}},
 			},
-			path:        "disallow",
 			expectAllow: true,
 		},
 		"match & allow": {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
 					Name:         "allow",
-					ClientConfig: ccfg,
+					ClientConfig: ccfg("allow"),
 					Rules:        matchEverythingRules,
 				}},
 			},
-			path:        "allow",
 			expectAllow: true,
 		},
 		"match & disallow": {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
 					Name:         "disallow",
-					ClientConfig: ccfg,
+					ClientConfig: ccfg("disallow"),
 					Rules:        matchEverythingRules,
 				}},
 			},
-			path:          "disallow",
 			errorContains: "without explanation",
 		},
 		"match & disallow ii": {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
 					Name:         "disallowReason",
-					ClientConfig: ccfg,
+					ClientConfig: ccfg("disallowReason"),
 					Rules:        matchEverythingRules,
 				}},
 			},
-			path:          "disallowReason",
 			errorContains: "you shall not pass",
 		},
 		"match & fail (but allow because fail open)": {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
 					Name:          "internalErr A",
-					ClientConfig:  ccfg,
+					ClientConfig:  ccfg("internalErr"),
 					Rules:         matchEverythingRules,
 					FailurePolicy: &policyIgnore,
 				}, {
 					Name:          "internalErr B",
-					ClientConfig:  ccfg,
+					ClientConfig:  ccfg("internalErr"),
 					Rules:         matchEverythingRules,
 					FailurePolicy: &policyIgnore,
 				}, {
 					Name:          "internalErr C",
-					ClientConfig:  ccfg,
+					ClientConfig:  ccfg("internalErr"),
 					Rules:         matchEverythingRules,
 					FailurePolicy: &policyIgnore,
 				}},
 			},
-			path:        "internalErr",
 			expectAllow: true,
 		},
 		"match & fail (but allow because fail open on nil)": {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
 					Name:         "internalErr A",
-					ClientConfig: ccfg,
+					ClientConfig: ccfg("internalErr"),
 					Rules:        matchEverythingRules,
 				}, {
 					Name:         "internalErr B",
-					ClientConfig: ccfg,
+					ClientConfig: ccfg("internalErr"),
 					Rules:        matchEverythingRules,
 				}, {
 					Name:         "internalErr C",
-					ClientConfig: ccfg,
+					ClientConfig: ccfg("internalErr"),
 					Rules:        matchEverythingRules,
 				}},
 			},
-			path:        "internalErr",
 			expectAllow: true,
 		},
 		"match & fail (but fail because fail closed)": {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.ExternalAdmissionHook{{
 					Name:          "internalErr A",
-					ClientConfig:  ccfg,
+					ClientConfig:  ccfg("internalErr"),
 					Rules:         matchEverythingRules,
 					FailurePolicy: &policyFail,
 				}, {
 					Name:          "internalErr B",
-					ClientConfig:  ccfg,
+					ClientConfig:  ccfg("internalErr"),
 					Rules:         matchEverythingRules,
 					FailurePolicy: &policyFail,
 				}, {
 					Name:          "internalErr C",
-					ClientConfig:  ccfg,
+					ClientConfig:  ccfg("internalErr"),
 					Rules:         matchEverythingRules,
 					FailurePolicy: &policyFail,
 				}},
 			},
-			path:        "internalErr",
 			expectAllow: false,
 		},
 	}
@@ -262,7 +257,7 @@ func TestAdmit(t *testing.T) {
 	for name, tt := range table {
 		t.Run(name, func(t *testing.T) {
 			wh.hookSource = &tt.hookSource
-			wh.serviceResolver = fakeServiceResolver{base: *serverURL, path: tt.path}
+			wh.serviceResolver = fakeServiceResolver{base: *serverURL}
 			wh.SetScheme(legacyscheme.Scheme)
 
 			err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, name, resource, subResource, operation, &userInfo))
