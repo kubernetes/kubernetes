@@ -22,7 +22,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -246,64 +245,69 @@ func findNodesThatFit(
 	metadataProducer algorithm.PredicateMetadataProducer,
 	ecache *EquivalenceCache,
 ) ([]*v1.Node, FailedPredicateMap, error) {
-	var filtered []*v1.Node
-	failedPredicateMap := FailedPredicateMap{}
 
-	if len(predicateFuncs) == 0 {
-		filtered = nodes
-	} else {
+	failedPredicateMap := FailedPredicateMap{}
+	filtered := nodes
+
+	if len(predicateFuncs) > 0 {
 		// Create filtered list with enough space to avoid growing it
 		// and allow assigning.
-		filtered = make([]*v1.Node, len(nodes))
-		errs := errors.MessageCountMap{}
-		var predicateResultLock sync.Mutex
-		var filteredLen int32
+		filtered = make([]*v1.Node, 0, len(nodes))
 
 		// We can use the same metadata producer for all nodes.
 		meta := metadataProducer(pod, nodeNameToInfo)
+
+		errs := errors.MessageCountMap{}
+		var predicateResultLock sync.Mutex
+
 		checkNode := func(i int) {
 			nodeName := nodes[i].Name
+
 			fits, failedPredicates, err := podFitsOnNode(pod, meta, nodeNameToInfo[nodeName], predicateFuncs, ecache)
+
+			predicateResultLock.Lock()
+			defer predicateResultLock.Unlock()
+
 			if err != nil {
-				predicateResultLock.Lock()
 				errs[err.Error()]++
-				predicateResultLock.Unlock()
 				return
 			}
+
 			if fits {
-				filtered[atomic.AddInt32(&filteredLen, 1)-1] = nodes[i]
+				filtered = append(filtered, nodes[i])
 			} else {
-				predicateResultLock.Lock()
 				failedPredicateMap[nodeName] = failedPredicates
-				predicateResultLock.Unlock()
 			}
 		}
+
 		workqueue.Parallelize(16, len(nodes), checkNode)
-		filtered = filtered[:filteredLen]
+
 		if len(errs) > 0 {
 			return []*v1.Node{}, FailedPredicateMap{}, errors.CreateAggregateFromMessageCountMap(errs)
 		}
 	}
 
-	if len(filtered) > 0 && len(extenders) != 0 {
+	if len(filtered) > 0 && len(extenders) > 0 {
 		for _, extender := range extenders {
 			filteredList, failedMap, err := extender.Filter(pod, filtered, nodeNameToInfo)
 			if err != nil {
 				return []*v1.Node{}, FailedPredicateMap{}, err
 			}
 
-			for failedNodeName, failedMsg := range failedMap {
-				if _, found := failedPredicateMap[failedNodeName]; !found {
-					failedPredicateMap[failedNodeName] = []algorithm.PredicateFailureReason{}
+			for n, msg := range failedMap {
+				if _, found := failedPredicateMap[n]; !found {
+					failedPredicateMap[n] = []algorithm.PredicateFailureReason{}
 				}
-				failedPredicateMap[failedNodeName] = append(failedPredicateMap[failedNodeName], predicates.NewFailureReason(failedMsg))
+				failedPredicateMap[n] = append(failedPredicateMap[n], predicates.NewFailureReason(msg))
 			}
+
 			filtered = filteredList
 			if len(filtered) == 0 {
 				break
 			}
 		}
 	}
+
 	return filtered, failedPredicateMap, nil
 }
 
