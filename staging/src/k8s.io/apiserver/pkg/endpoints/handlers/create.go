@@ -34,7 +34,7 @@ import (
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 )
 
-func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface, includeName bool) http.HandlerFunc {
+func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, mutatingAdmission admission.Interface, validatingAdmission admission.ValidationInterface, includeName bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Create " + req.URL.Path)
@@ -93,10 +93,10 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		ae := request.AuditEventFrom(ctx)
 		audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
 
-		if admit != nil && admit.Handles(admission.Create) {
-			userInfo, _ := request.UserFrom(ctx)
-
-			err = admit.Admit(admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo))
+		userInfo, _ := request.UserFrom(ctx)
+		admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo)
+		if mutatingAdmission != nil && mutatingAdmission.Handles(admission.Create) {
+			err = mutatingAdmission.Admit(admissionAttributes)
 			if err != nil {
 				scope.err(err, w, req)
 				return
@@ -108,7 +108,13 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 
 		trace.Step("About to store object in database")
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			return r.Create(ctx, name, obj, includeUninitialized)
+			return r.Create(
+				ctx,
+				name,
+				obj,
+				rest.AdmissionToValidateObjectFunc(validatingAdmission, admissionAttributes),
+				includeUninitialized,
+			)
 		})
 		if err != nil {
 			scope.err(err, w, req)
@@ -144,19 +150,19 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 }
 
 // CreateNamedResource returns a function that will handle a resource creation with name.
-func CreateNamedResource(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) http.HandlerFunc {
-	return createHandler(r, scope, typer, admit, true)
+func CreateNamedResource(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, mutatingAdmission admission.Interface, validatingAdmission admission.ValidationInterface) http.HandlerFunc {
+	return createHandler(r, scope, typer, mutatingAdmission, validatingAdmission, true)
 }
 
 // CreateResource returns a function that will handle a resource creation.
-func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) http.HandlerFunc {
-	return createHandler(&namedCreaterAdapter{r}, scope, typer, admit, false)
+func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectTyper, mutatingAdmission admission.Interface, validatingAdmission admission.ValidationInterface) http.HandlerFunc {
+	return createHandler(&namedCreaterAdapter{r}, scope, typer, mutatingAdmission, validatingAdmission, false)
 }
 
 type namedCreaterAdapter struct {
 	rest.Creater
 }
 
-func (c *namedCreaterAdapter) Create(ctx request.Context, name string, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
-	return c.Creater.Create(ctx, obj, includeUninitialized)
+func (c *namedCreaterAdapter) Create(ctx request.Context, name string, obj runtime.Object, createValidatingAdmission rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+	return c.Creater.Create(ctx, obj, createValidatingAdmission, includeUninitialized)
 }

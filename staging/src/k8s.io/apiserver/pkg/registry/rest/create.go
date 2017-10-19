@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/admission"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -150,4 +151,25 @@ func objectMetaAndKind(typer runtime.ObjectTyper, obj runtime.Object) (metav1.Ob
 type NamespaceScopedStrategy interface {
 	// NamespaceScoped returns if the object must be in a namespace.
 	NamespaceScoped() bool
+}
+
+// AdmissionToValidateObjectFunc converts validating admission to a rest validate object func
+func AdmissionToValidateObjectFunc(validatingAdmission admission.ValidationInterface, staticAttributes admission.Attributes) ValidateObjectFunc {
+	return func(obj runtime.Object) error {
+		finalAttributes := admission.NewAttributesRecord(
+			obj,
+			staticAttributes.GetOldObject(),
+			staticAttributes.GetKind(),
+			staticAttributes.GetNamespace(),
+			staticAttributes.GetName(),
+			staticAttributes.GetResource(),
+			staticAttributes.GetSubresource(),
+			staticAttributes.GetOperation(),
+			staticAttributes.GetUserInfo(),
+		)
+		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {
+			return nil
+		}
+		return validatingAdmission.Validate(finalAttributes)
+	}
 }
