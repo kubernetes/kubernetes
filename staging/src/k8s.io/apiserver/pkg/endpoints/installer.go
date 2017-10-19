@@ -816,14 +816,18 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		// The generic top level prefix proxy is deprecated in v1.2, and will be removed in 1.3, or 1.4 at the latest.
 		// TODO: DEPRECATED in v1.2.
 		case "PROXY": // Proxy requests to a resource.
+			deleterObject := versionedDeleterObject
+			if !isGracefulDeleter {
+				deleterObject = nil
+			}
 			// Accept all methods as per http://issue.k8s.io/3996
-			routes = append(routes, buildProxyRoute(ws, "GET", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix))
-			routes = append(routes, buildProxyRoute(ws, "PUT", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix))
-			routes = append(routes, buildProxyRoute(ws, "POST", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix))
-			routes = append(routes, buildProxyRoute(ws, "PATCH", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix))
-			routes = append(routes, buildProxyRoute(ws, "DELETE", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix))
-			routes = append(routes, buildProxyRoute(ws, "HEAD", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix))
-			routes = append(routes, buildProxyRoute(ws, "OPTIONS", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix))
+			routes = append(routes, buildProxyRoute(ws, "GET", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix, nil))
+			routes = append(routes, buildProxyRoute(ws, "PUT", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix, defaultVersionedObject))
+			routes = append(routes, buildProxyRoute(ws, "POST", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix, defaultVersionedObject))
+			routes = append(routes, buildProxyRoute(ws, "PATCH", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix, metav1.Patch{}))
+			routes = append(routes, buildProxyRoute(ws, "DELETE", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix, deleterObject))
+			routes = append(routes, buildProxyRoute(ws, "HEAD", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix, nil))
+			routes = append(routes, buildProxyRoute(ws, "OPTIONS", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix, nil))
 		case "CONNECT":
 			for _, method := range connecter.ConnectMethods() {
 				connectProducedObject := storageMeta.ProducesObject(method)
@@ -911,7 +915,8 @@ func buildProxyRoute(ws *restful.WebService,
 	hasSubresource bool,
 	params []*restful.Parameter,
 	proxyHandler http.Handler,
-	operationSuffix string) *restful.RouteBuilder {
+	operationSuffix string,
+	readObject interface{}) *restful.RouteBuilder {
 	doc := "proxy " + method + " requests to " + kind
 	if hasSubresource {
 		doc = "proxy " + method + " requests to " + subresource + " of " + kind
@@ -923,6 +928,9 @@ func buildProxyRoute(ws *restful.WebService,
 		Produces("*/*").
 		Consumes("*/*").
 		Writes("string")
+	if readObject != nil {
+		proxyRoute.Reads(readObject)
+	}
 	addParams(proxyRoute, params)
 	return proxyRoute
 }
