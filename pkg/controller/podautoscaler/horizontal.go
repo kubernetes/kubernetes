@@ -474,41 +474,29 @@ func (a *HorizontalController) normalizeDesiredReplicas(hpa *autoscalingv2.Horiz
 	switch {
 	case desiredReplicas > scaleUpLimit:
 		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, "ScaleUpLimit", "the desired replica count is increasing faster than the maximum scale rate")
-		desiredReplicas = scaleUpLimit
+		desiredReplicas = a.normalizeDesiredReplicas(hpa, currentReplicas, scaleUpLimit)
 
-		// Ensure that even if the scaleUpLimit is greater
-		// than the maximum number of replicas, we only
-		// set the max number of replicas as desired.
-		if scaleUpLimit > hpa.Spec.MaxReplicas {
-			setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, "TooManyReplicas", "the desired replica count was more than the maximum replica count")
-			desiredReplicas = hpa.Spec.MaxReplicas
-		}
+	case desiredReplicas == 0:
+		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, "TooFewReplicas", "the desired replica count was zero, which is reserved for disabling autoscaling")
+		desiredReplicas = a.normalizeDesiredReplicas(hpa, currentReplicas, 1)
 
 	case hpa.Spec.MinReplicas != nil && desiredReplicas < *hpa.Spec.MinReplicas:
-		// make sure we aren't below our minimum
-		var statusMsg string
-		if desiredReplicas == 0 {
-			statusMsg = "the desired replica count was zero"
-		} else {
-			statusMsg = "the desired replica count was less than the minimum replica count"
-		}
+		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, "TooFewReplicas", "the desired replica count was less than the minimum replica count")
+		desiredReplicas = a.normalizeDesiredReplicas(hpa, currentReplicas, *hpa.Spec.MinReplicas)
 
-		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, "TooFewReplicas", statusMsg)
-		desiredReplicas = *hpa.Spec.MinReplicas
-	case desiredReplicas == 0:
-		//  never scale down to 0, reserved for disabling autoscaling
-		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, "TooFewReplicas", "the desired replica count was zero")
-		desiredReplicas = 1
 	case desiredReplicas > hpa.Spec.MaxReplicas:
-		// make sure we aren't above our maximum
 		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, "TooManyReplicas", "the desired replica count was more than the maximum replica count")
-		desiredReplicas = hpa.Spec.MaxReplicas
+		desiredReplicas = a.normalizeDesiredReplicas(hpa, currentReplicas, hpa.Spec.MaxReplicas)
+
 	default:
-		// mark that we're within acceptible limits
 		setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionFalse, "DesiredWithinRange", "the desired replica count is within the acceptible range")
 	}
 
 	return desiredReplicas
+}
+
+func calculateScaleUpLimit(currentReplicas int32) int32 {
+	return int32(math.Max(scaleUpLimitFactor*float64(currentReplicas), scaleUpLimitMinimum))
 }
 
 func (a *HorizontalController) shouldScale(hpa *autoscalingv2.HorizontalPodAutoscaler, currentReplicas, desiredReplicas int32, timestamp time.Time) bool {
@@ -640,8 +628,4 @@ func setConditionInList(inputList []autoscalingv2.HorizontalPodAutoscalerConditi
 	existingCond.Message = fmt.Sprintf(message, args...)
 
 	return resList
-}
-
-func calculateScaleUpLimit(currentReplicas int32) int32 {
-	return int32(math.Max(scaleUpLimitFactor*float64(currentReplicas), scaleUpLimitMinimum))
 }
