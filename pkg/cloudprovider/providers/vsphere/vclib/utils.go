@@ -26,6 +26,7 @@ import (
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/types"
+	"github.com/vmware/govmomi/vim25/soap"
 )
 
 // IsNotFound return true if err is NotFoundError or DefaultNotFoundError
@@ -171,4 +172,13 @@ func GetDatastorePathObjFromVMDiskPath(vmDiskPath string) (*object.DatastorePath
 func IsValidUUID(uuid string) bool {
 	r := regexp.MustCompile("^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$")
 	return r.MatchString(uuid)
+}
+
+// IsManagedObjectNotFoundError returns true if error is of type ManagedObjectNotFound
+func IsManagedObjectNotFoundError(err error) bool {
+	isManagedObjectNotFoundError := false
+	if soap.IsSoapFault(err) {
+		_, isManagedObjectNotFoundError = soap.ToSoapFault(err).VimFault().(types.ManagedObjectNotFound)
+	}
+	return isManagedObjectNotFoundError
 }

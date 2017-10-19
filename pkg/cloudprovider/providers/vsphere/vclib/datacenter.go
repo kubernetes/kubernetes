@@ -76,7 +76,7 @@ func (dc *Datacenter) GetVMByUUID(ctx context.Context, vmUUID string) (*VirtualM
 	}
 	if svm == nil {
 		glog.Errorf("Unable to find VM by UUID. VM UUID: %s", vmUUID)
-		return nil, fmt.Errorf("Failed to find VM by UUID: %s", vmUUID)
+		return nil, ErrNoVMFound
 	}
 	virtualMachine := VirtualMachine{object.NewVirtualMachine(dc.Client(), svm.Reference()), dc}
 	return &virtualMachine, nil

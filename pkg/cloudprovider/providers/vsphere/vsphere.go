@@ -157,7 +157,7 @@ type VSphereConfig struct {
 type Volumes interface {
 	// AttachDisk attaches given disk to given node. Current node
 	// is used when nodeName is empty string.
-	AttachDisk(vmDiskPath string, storagePolicyID string, nodeName k8stypes.NodeName) (diskUUID string, err error)
+	AttachDisk(vmDiskPath string, storagePolicyName string, nodeName k8stypes.NodeName) (diskUUID string, err error)
 
 	// DetachDisk detaches given disk to given node. Current node
 	// is used when nodeName is empty string.
@@ -460,7 +460,7 @@ func (vs *VSphere) getVSphereInstance(nodeName k8stypes.NodeName) (*VSphereInsta
 	vsphereIns, err := vs.nodeManager.GetVSphereInstance(nodeName)
 	if err != nil {
 		glog.Errorf("Cannot find node %q in cache. Node not found!!!", nodeName)
-		return nil, errors.New(fmt.Sprintf("Cannot find node %q in vsphere configuration map", nodeName))
+		return nil, err
 	}
 	return &vsphereIns, nil
 }
@@ -482,7 +482,7 @@ func (vs *VSphere) getVSphereInstanceForServer(vcServer string, ctx context.Cont
 }
 
 // Get the VM Managed Object instance by from the node
-func (vs *VSphere) getVMByName(ctx context.Context, nodeName k8stypes.NodeName) (*vclib.VirtualMachine, error) {
+func (vs *VSphere) getVMFromNodeName(ctx context.Context, nodeName k8stypes.NodeName) (*vclib.VirtualMachine, error) {
 	nodeInfo, err := vs.nodeManager.GetNodeInfo(nodeName)
 	if err != nil {
 		return nil, err
@@ -568,52 +568,75 @@ func (vs *VSphere) InstanceExistsByProviderID(providerID string) (bool, error) {
 
 // InstanceID returns the cloud provider ID of the node with the specified Name.
 func (vs *VSphere) InstanceID(nodeName k8stypes.NodeName) (string, error) {
-	// TODO: Based on hostname, locate the VM in VC inventory and check for following cases.
-	// 1. Node Present.
-	// 2. Node Powered On/ Powered off.
-	// Based on these kubernetes core decides to take specific actions.
-	// Also verify if this logic is required only on master or also on worker nodes.
-	if vs.hostName == convertToString(nodeName) {
-		return vs.hostName, nil
-	}
 
-	// TODO: Need to see what to do if nodename and localNodeName are not matching.
-	// return "", cloudprovider.InstanceNotFound
-
-	// TODO: Below logic is the existing logic.
-	//if vs.localInstanceID == convertToString(nodeName) {
-	//	return vs.cfg.Global.WorkingDir + "/" + vs.localInstanceID, nil
-	//}
-
-	// Create context
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	vsi, err := vs.getVSphereInstance(nodeName)
-	if err != nil {
-		return "", err
-	}
-	// Ensure client is logged in and session is valid
-	err = vsi.conn.Connect(ctx)
-	if err != nil {
-		return "", err
-	}
-	vm, err := vs.getVMByName(ctx, nodeName)
-	if err != nil {
-		if vclib.IsNotFound(err) {
-			return "", cloudprovider.InstanceNotFound
+	instanceIDInternal := func() (string, error) {
+		// TODO: Based on hostname, locate the VM in VC inventory and check for following cases.
+		// 1. Node Present.
+		// 2. Node Powered On/ Powered off.
+		// Based on these kubernetes core decides to take specific actions.
+		// Also verify if this logic is required only on master or also on worker nodes.
+		if vs.hostName == convertToString(nodeName) {
+			return vs.hostName, nil
 		}
-		glog.Errorf("Failed to get VM object for node: %q. err: +%v", convertToString(nodeName), err)
-		return "", err
+
+		// TODO: Need to see what to do if nodename and localNodeName are not matching.
+		// return "", cloudprovider.InstanceNotFound
+
+		// TODO: Below logic is the existing logic.
+		//if vs.localInstanceID == convertToString(nodeName) {
+		//	return vs.cfg.Global.WorkingDir + "/" + vs.localInstanceID, nil
+		//}
+
+		// Create context
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		vsi, err := vs.getVSphereInstance(nodeName)
+		if err != nil {
+			return "", err
+		}
+		// Ensure client is logged in and session is valid
+		err = vsi.conn.Connect(ctx)
+		if err != nil {
+			return "", err
+		}
+		vm, err := vs.getVMFromNodeName(ctx, nodeName)
+		if err != nil {
+			if err == vclib.ErrNoVMFound {
+				return "", cloudprovider.InstanceNotFound
+			}
+			glog.Errorf("Failed to get VM object for node: %q. err: +%v", convertToString(nodeName), err)
+			return "", err
+		}
+		isActive, err := vm.IsActive(ctx)
+		if err != nil {
+			glog.Errorf("Failed to check whether node %q is active. err: %+v.", convertToString(nodeName), err)
+			return "", err
+		}
+		if isActive {
+			node, err := vs.nodeManager.GetNode(nodeName)
+			if err != nil {
+				glog.Errorf("Failed to get nodeobject of node %q. err: %+v.", convertToString(nodeName), err)
+				return "", err
+			}
+			nodeUUID := node.Status.NodeInfo.SystemUUID
+			return nodeUUID, nil
+		}
+		return "", fmt.Errorf("The node %q is not active", convertToString(nodeName))
 	}
-	isActive, err := vm.IsActive(ctx)
+
+	instanceID, err := instanceIDInternal()
 	if err != nil {
-		glog.Errorf("Failed to check whether node %q is active. err: %+v.", convertToString(nodeName), err)
-		return "", err
+		isManagedObjectNotFoundError, err := vs.retry(nodeName, err)
+		if isManagedObjectNotFoundError {
+			if err == nil {
+				glog.V(4).Infof("InstanceID: Found node %q", convertToString(nodeName))
+				instanceID, err = instanceIDInternal()
+			} else if err == vclib.ErrNoVMFound {
+				return "", cloudprovider.InstanceNotFound
+			}
+		}
 	}
-	if isActive {
-		return "/" + vm.InventoryPath, nil
-	}
-	return "", fmt.Errorf("The node %q is not active", convertToString(nodeName))
+	return instanceID, err
 }
 
 // InstanceTypeByProviderID returns the cloudprovider instance type of the node with the specified unique providerID
@@ -658,8 +681,8 @@ func (vs *VSphere) ScrubDNS(nameservers, searches []string) (nsOut, srchOut []st
 }
 
 // AttachDisk attaches given virtual disk volume to the compute running kubelet.
-func (vs *VSphere) AttachDisk(vmDiskPath string, storagePolicyID string, nodeName k8stypes.NodeName) (diskUUID string, err error) {
-	attachDiskInternal := func(vmDiskPath string, storagePolicyID string, nodeName k8stypes.NodeName) (diskUUID string, err error) {
+func (vs *VSphere) AttachDisk(vmDiskPath string, storagePolicyName string, nodeName k8stypes.NodeName) (diskUUID string, err error) {
+	attachDiskInternal := func(vmDiskPath string, storagePolicyName string, nodeName k8stypes.NodeName) (diskUUID string, err error) {
 		if nodeName == "" {
 			nodeName = convertToK8sType(vs.hostName)
 		}
@@ -675,12 +698,14 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, storagePolicyID string, nodeNam
 		if err != nil {
 			return "", err
 		}
-		vm, err := vs.getVMByName(ctx, nodeName)
+
+		vm, err := vs.getVMFromNodeName(ctx, nodeName)
 		if err != nil {
 			glog.Errorf("Failed to get VM object for node: %q. err: +%v", convertToString(nodeName), err)
 			return "", err
 		}
-		diskUUID, err = vm.AttachDisk(ctx, vmDiskPath, &vclib.VolumeOptions{SCSIControllerType: vclib.PVSCSIControllerType, StoragePolicyID: storagePolicyID})
+
+		diskUUID, err = vm.AttachDisk(ctx, vmDiskPath, &vclib.VolumeOptions{SCSIControllerType: vclib.PVSCSIControllerType, StoragePolicyName: storagePolicyName})
 		if err != nil {
 			glog.Errorf("Failed to attach disk: %s for node: %s. err: +%v", vmDiskPath, convertToString(nodeName), err)
 			return "", err
@@ -688,9 +713,30 @@ func (vs *VSphere) AttachDisk(vmDiskPath string, storagePolicyID string, nodeNam
 		return diskUUID, nil
 	}
 	requestTime := time.Now()
-	diskUUID, err = attachDiskInternal(vmDiskPath, storagePolicyID, nodeName)
+	diskUUID, err = attachDiskInternal(vmDiskPath, storagePolicyName, nodeName)
+	if err != nil {
+		isManagedObjectNotFoundError, err := vs.retry(nodeName, err)
+		if isManagedObjectNotFoundError {
+			if err == nil {
+				glog.V(4).Infof("AttachDisk: Found node %q", convertToString(nodeName))
+				diskUUID, err = attachDiskInternal(vmDiskPath, storagePolicyName, nodeName)
+			}
+		}
+	}
 	vclib.RecordvSphereMetric(vclib.OperationAttachVolume, requestTime, err)
 	return diskUUID, err
+}
+
+func (vs *VSphere) retry(nodeName k8stypes.NodeName, err error) (bool, error) {
+	isManagedObjectNotFoundError := false
+	if err != nil {
+		if vclib.IsManagedObjectNotFoundError(err) {
+			isManagedObjectNotFoundError = true
+			glog.V(4).Infof("error %q ManagedObjectNotFound for node %q", err, convertToString(nodeName))
+			err = vs.nodeManager.RediscoverNode(nodeName)
+		}
+	}
+	return isManagedObjectNotFoundError, err
 }
 
 // DetachDisk detaches given virtual disk volume from the compute running kubelet.
@@ -711,10 +757,10 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 		if err != nil {
 			return err
 		}
-		vm, err := vs.getVMByName(ctx, nodeName)
+		vm, err := vs.getVMFromNodeName(ctx, nodeName)
 		if err != nil {
 			// If node doesn't exist, disk is already detached from node.
-			if vclib.IsNotFound(err) {
+			if err == vclib.ErrNoVMFound {
 				glog.Infof("Node %q does not exist, disk %s is already detached from node.", convertToString(nodeName), volPath)
 				return nil
 			}
@@ -731,7 +777,15 @@ func (vs *VSphere) DetachDisk(volPath string, nodeName k8stypes.NodeName) error 
 	}
 	requestTime := time.Now()
 	err := detachDiskInternal(volPath, nodeName)
-	vclib.RecordvSphereMetric(vclib.OperationDetachVolume, requestTime, nil)
+	if err != nil {
+		isManagedObjectNotFoundError, err := vs.retry(nodeName, err)
+		if isManagedObjectNotFoundError {
+			if err == nil {
+				err = detachDiskInternal(volPath, nodeName)
+			}
+		}
+	}
+	vclib.RecordvSphereMetric(vclib.OperationDetachVolume, requestTime, err)
 	return err
 }
 
@@ -757,9 +811,9 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 		if err != nil {
 			return false, err
 		}
-		vm, err := vs.getVMByName(ctx, nodeName)
+		vm, err := vs.getVMFromNodeName(ctx, nodeName)
 		if err != nil {
-			if vclib.IsNotFound(err) {
+			if err == vclib.ErrNoVMFound {
 				glog.Warningf("Node %q does not exist, vsphere CP will assume disk %v is not attached to it.", nodeName, volPath)
 				// make the disk as detached and return false without error.
 				return false, nil
@@ -778,6 +832,16 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 	}
 	requestTime := time.Now()
 	isAttached, err := diskIsAttachedInternal(volPath, nodeName)
+	if err != nil {
+		isManagedObjectNotFoundError, err := vs.retry(nodeName, err)
+		if isManagedObjectNotFoundError {
+			if err == vclib.ErrNoVMFound {
+				isAttached, err = false, nil
+			} else if err == nil {
+				isAttached, err = diskIsAttachedInternal(volPath, nodeName)
+			}
+		}
+	}
 	vclib.RecordvSphereMetric(vclib.OperationDiskIsAttached, requestTime, err)
 	return isAttached, err
 }
