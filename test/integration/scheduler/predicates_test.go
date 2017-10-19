@@ -30,6 +30,8 @@ import (
 
 // This file tests the scheduler predicates functionality.
 
+const pollInterval = 100 * time.Millisecond
+
 // TestInterPodAffinity verifies that scheduler's inter pod affinity and
 // anti-affinity predicate functions works correctly.
 func TestInterPodAffinity(t *testing.T) {
@@ -808,6 +810,7 @@ func TestInterPodAffinity(t *testing.T) {
 			test: "nodes[0] and nodes[1] have same topologyKey and label value. nodes[0] has an existing pod that matches the inter pod affinity rule. The new pod can not be scheduled onto either of the two nodes.",
 		},
 	}
+
 	for _, test := range tests {
 		for _, pod := range test.pods {
 			var nsName string
@@ -820,7 +823,7 @@ func TestInterPodAffinity(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Test Failed: error, %v, while creating pod during test: %v", err, test.test)
 			}
-			err = wait.Poll(time.Second, wait.ForeverTestTimeout, podScheduled(cs, createdPod.Namespace, createdPod.Name))
+			err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podScheduled(cs, createdPod.Namespace, createdPod.Name))
 			if err != nil {
 				t.Errorf("Test Failed: error, %v, while waiting for pod during test, %v", err, test)
 			}
@@ -831,12 +834,20 @@ func TestInterPodAffinity(t *testing.T) {
 				t.Fatalf("Test Failed: error, %v, while creating pod during test: %v", err, test.test)
 			}
 		} else {
-			err = wait.Poll(time.Second, wait.ForeverTestTimeout, podScheduled(cs, testPod.Namespace, testPod.Name))
-			if err != nil && err != wait.ErrWaitTimeout {
-				t.Errorf("Test Failed: error, %v, while waiting for pod to get scheduled, %v", err, test.test)
+			waitTime := wait.ForeverTestTimeout
+			if !test.fits {
+				waitTime = 2 * time.Second
 			}
-			if (err == nil) != test.fits {
-				t.Errorf("Test Failed: %v, err %v, test.fits %v", test.test, err, test.fits)
+
+			err = wait.Poll(pollInterval, waitTime, podScheduled(cs, testPod.Namespace, testPod.Name))
+			if test.fits {
+				if err != nil {
+					t.Errorf("Test Failed: %v, err %v, test.fits %v", test.test, err, test.fits)
+				}
+			} else {
+				if err != wait.ErrWaitTimeout {
+					t.Errorf("Test Failed: error, %v, while waiting for pod to get scheduled, %v", err, test.test)
+				}
 			}
 
 			for _, pod := range test.pods {
@@ -850,7 +861,7 @@ func TestInterPodAffinity(t *testing.T) {
 				if err != nil {
 					t.Errorf("Test Failed: error, %v, while deleting pod during test: %v", err, test.test)
 				}
-				err = wait.Poll(time.Second, wait.ForeverTestTimeout, podDeleted(cs, nsName, pod.Name))
+				err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podDeleted(cs, nsName, pod.Name))
 				if err != nil {
 					t.Errorf("Test Failed: error, %v, while waiting for pod to get deleted, %v", err, test.test)
 				}
@@ -859,7 +870,7 @@ func TestInterPodAffinity(t *testing.T) {
 			if err != nil {
 				t.Errorf("Test Failed: error, %v, while deleting pod during test: %v", err, test.test)
 			}
-			err = wait.Poll(time.Second, wait.ForeverTestTimeout, podDeleted(cs, context.ns.Name, test.pod.Name))
+			err = wait.Poll(pollInterval, wait.ForeverTestTimeout, podDeleted(cs, context.ns.Name, test.pod.Name))
 			if err != nil {
 				t.Errorf("Test Failed: error, %v, while waiting for pod to get deleted, %v", err, test.test)
 			}
