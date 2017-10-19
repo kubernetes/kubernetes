@@ -7,7 +7,12 @@
   {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
   {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\", \"type\": \"FileOrCreate\"}}," -%}
 {% endif -%}
-{% set params = pillar['autoscaler_mig_config'] + " " + cloud_config + " " + pillar.get('autoscaler_expander_config', '') -%}
+{% set params = cloud_config + " " + pillar.get('autoscaler_expander_config', '') -%}
+{% set autoscaling_params = '' -%}
+{% if pillar.get('autoscaler_node_autoprovisioning_enabled', '') == '' %}
+    {% set autoscaling_params = pillar['autoscaler_mig_config'] -%}
+{% endif -%}
+{% set autoprovisioning_params = pillar['autoscaler_node_autoprovisioning_enabled'] + " " + pillar['autoscaler_gke_cluster_name'] + " " + pillar.get('autoscaler_cloud_provider', '') -%}
 
 {
     "kind": "Pod",
@@ -41,7 +46,7 @@
                     "--logtostderr=true",
                     "--write-status-configmap=true",
                     "--balance-similar-node-groups=true",
-                    "{{params}}"
+                    "{{params}} {{autoscaling_params}} {{autoprovisioning_params}}"
                 ],
                 "env": [
                     {
