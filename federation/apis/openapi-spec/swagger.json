@@ -11116,6 +11116,15 @@
       "description": "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
       "type": "boolean"
      },
+     "volumeDevices": {
+      "description": "Block devices to be used by the container. This is an alpha feature and may change in the future.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.core.v1.VolumeDevice"
+      },
+      "x-kubernetes-patch-merge-key": "devicePath",
+      "x-kubernetes-patch-strategy": "merge"
+     },
      "volumeMounts": {
       "description": "Pod volumes to mount into the container's filesystem. Cannot be updated.",
       "type": "array",
@@ -13117,6 +13126,23 @@
      "vsphereVolume": {
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
       "$ref": "#/definitions/io.k8s.api.core.v1.VsphereVirtualDiskVolumeSource"
+     }
+    }
+   },
+   "io.k8s.api.core.v1.VolumeDevice": {
+    "description": "volumeDevice describes a mapping of a raw block device within a container.",
+    "required": [
+     "name",
+     "devicePath"
+    ],
+    "properties": {
+     "devicePath": {
+      "description": "Required: Path inside of the container that the device will be mapped to.",
+      "type": "string"
+     },
+     "name": {
+      "description": "Required: This must match the Name of a Volume in the pod.",
+      "type": "string"
      }
     }
    },

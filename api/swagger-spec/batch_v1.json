@@ -2799,6 +2799,13 @@
       },
       "description": "Pod volumes to mount into the container's filesystem. Cannot be updated."
      },
+     "volumeDevices": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.VolumeDevice"
+      },
+      "description": "Block devices to be used by the container. This is an alpha feature and may change in the future."
+     },
      "livenessProbe": {
       "$ref": "v1.Probe",
       "description": "Periodic probe of container liveness. Container will be restarted if the probe fails. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes"
@@ -3050,6 +3057,24 @@
    "v1.MountPropagationMode": {
     "id": "v1.MountPropagationMode",
     "properties": {}
+   },
+   "v1.VolumeDevice": {
+    "id": "v1.VolumeDevice",
+    "description": "volumeDevice describes a mapping of a raw block device within a container.",
+    "required": [
+     "name",
+     "devicePath"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Required: This must match the Name of a Volume in the pod."
+     },
+     "devicePath": {
+      "type": "string",
+      "description": "Required: Path inside of the container that the device will be mapped to."
+     }
+    }
    },
    "v1.Probe": {
     "id": "v1.Probe",
