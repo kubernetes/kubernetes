@@ -42,6 +42,7 @@ type fcPlugin struct {
 
 var _ volume.VolumePlugin = &fcPlugin{}
 var _ volume.PersistentVolumePlugin = &fcPlugin{}
+var _ volume.BlockVolumePlugin = &fcPlugin{}
 
 const (
 	fcPluginName = "kubernetes.io/fc"
@@ -381,29 +382,8 @@ type fcDiskMapper struct {
 
 var _ volume.BlockVolumeMapper = &fcDiskMapper{}
 
-func (b *fcDiskMapper) CanBlockMap() error {
-	return nil
-}
-
 func (b *fcDiskMapper) SetUpDevice() (string, error) {
 	return "", nil
-}
-
-func (c *fcDiskMapper) TearDownDevice() error {
-	return nil
-}
-
-// GetGlobalMapPath returns global map path and error
-// path: plugins/kubernetes.io/{PluginName}/volumeDevices/{WWID}/{podUid}
-func (b *fcDiskMapper) GetGlobalMapPath(spec *volume.Spec) (string, error) {
-	return b.fcGlobalMapPath(spec)
-}
-
-// GetPodDeviceMapPath returns pod device map path and volume name
-// path: pods/{podUid}/volumeDevices/kubernetes.io~fc
-// volumeName: pv0001
-func (b *fcDiskMapper) GetPodDeviceMapPath() (string, string) {
-	return b.fcPodDeviceMapPath()
 }
 
 type fcDiskUnmapper struct {
@@ -412,18 +392,35 @@ type fcDiskUnmapper struct {
 
 var _ volume.BlockVolumeUnmapper = &fcDiskUnmapper{}
 
+func (c *fcDiskUnmapper) TearDownDevice() error {
+	return nil
+}
+
+// GetGlobalMapPath returns global map path and error
+// path: plugins/kubernetes.io/{PluginName}/volumeDevices/{WWID}/{podUid}
+func (fc *fcDisk) GetGlobalMapPath(spec *volume.Spec) (string, error) {
+	return fc.fcGlobalMapPath(spec)
+}
+
+// GetPodDeviceMapPath returns pod device map path and volume name
+// path: pods/{podUid}/volumeDevices/kubernetes.io~fc
+// volumeName: pv0001
+func (fc *fcDisk) GetPodDeviceMapPath() (string, string) {
+	return fc.fcPodDeviceMapPath()
+}
+
 // GetGlobalUnmapPath returns global map path and error
 // path: plugins/kubernetes.io/{PluginName}/volumeDevices/{WWID}/{podUid}
-func (c *fcDiskUnmapper) GetGlobalUnmapPath(spec *volume.Spec) (string, error) {
-	return c.fcGlobalMapPath(spec)
-}
+//func (fc *fcDisk) GetGlobalUnmapPath(spec *volume.Spec) (string, error) {
+//	return fc.fcGlobalMapPath(spec)
+//}
 
 // GetPodDeviceUnmapPath returns pod device map path and volume name
 // path: pods/{podUid}/volumeDevices/kubernetes.io~fc
 // volumeName: pv0001
-func (c *fcDiskUnmapper) GetPodDeviceUnmapPath() (string, string) {
-	return c.fcPodDeviceMapPath()
-}
+//func (fc *fcDisk) GetPodDeviceUnmapPath() (string, string) {
+//	return fc.fcPodDeviceMapPath()
+//}
 
 func getVolumeSource(spec *volume.Spec) (*v1.FCVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.FC != nil {
