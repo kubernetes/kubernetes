@@ -23,8 +23,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
 )
@@ -119,44 +117,45 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 	}
 }
 
-func SetDefaults_KubeSchedulerConfiguration(obj *KubeSchedulerConfiguration) {
-	if obj.Port == 0 {
-		obj.Port = ports.SchedulerPort
-	}
-	if obj.Address == "" {
-		obj.Address = "0.0.0.0"
-	}
-	if obj.AlgorithmProvider == "" {
-		obj.AlgorithmProvider = "DefaultProvider"
-	}
-	if obj.ContentType == "" {
-		obj.ContentType = "application/vnd.kubernetes.protobuf"
-	}
-	if obj.KubeAPIQPS == 0 {
-		obj.KubeAPIQPS = 50.0
-	}
-	if obj.KubeAPIBurst == 0 {
-		obj.KubeAPIBurst = 100
-	}
-	if obj.SchedulerName == "" {
-		obj.SchedulerName = api.DefaultSchedulerName
-	}
-	if obj.HardPodAffinitySymmetricWeight == 0 {
-		obj.HardPodAffinitySymmetricWeight = api.DefaultHardPodAffinitySymmetricWeight
-	}
-	if obj.FailureDomains == "" {
-		obj.FailureDomains = kubeletapis.DefaultFailureDomains
-	}
-	if obj.LockObjectNamespace == "" {
-		obj.LockObjectNamespace = SchedulerDefaultLockObjectNamespace
-	}
-	if obj.LockObjectName == "" {
-		obj.LockObjectName = SchedulerDefaultLockObjectName
-	}
-	if obj.PolicyConfigMapNamespace == "" {
-		obj.PolicyConfigMapNamespace = api.NamespaceSystem
-	}
-}
+//
+//func SetDefaults_KubeSchedulerConfiguration(obj *KubeSchedulerConfiguration) {
+//	if obj.Port == 0 {
+//		obj.Port = ports.SchedulerPort
+//	}
+//	if obj.Address == "" {
+//		obj.Address = "0.0.0.0"
+//	}
+//	if obj.AlgorithmProvider == "" {
+//		obj.AlgorithmProvider = "DefaultProvider"
+//	}
+//	if obj.ContentType == "" {
+//		obj.ContentType = "application/vnd.kubernetes.protobuf"
+//	}
+//	if obj.KubeAPIQPS == 0 {
+//		obj.KubeAPIQPS = 50.0
+//	}
+//	if obj.KubeAPIBurst == 0 {
+//		obj.KubeAPIBurst = 100
+//	}
+//	if obj.SchedulerName == "" {
+//		obj.SchedulerName = api.DefaultSchedulerName
+//	}
+//	if obj.HardPodAffinitySymmetricWeight == 0 {
+//		obj.HardPodAffinitySymmetricWeight = api.DefaultHardPodAffinitySymmetricWeight
+//	}
+//	if obj.FailureDomains == "" {
+//		obj.FailureDomains = kubeletapis.DefaultFailureDomains
+//	}
+//	if obj.LockObjectNamespace == "" {
+//		obj.LockObjectNamespace = SchedulerDefaultLockObjectNamespace
+//	}
+//	if obj.LockObjectName == "" {
+//		obj.LockObjectName = SchedulerDefaultLockObjectName
+//	}
+//	if obj.PolicyConfigMapNamespace == "" {
+//		obj.PolicyConfigMapNamespace = api.NamespaceSystem
+//	}
+//}
 
 func SetDefaults_LeaderElectionConfiguration(obj *LeaderElectionConfiguration) {
 	zero := metav1.Duration{}
