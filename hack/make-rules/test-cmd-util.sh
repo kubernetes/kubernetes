@@ -658,7 +658,7 @@ run_pod_tests() {
   echo -e "#!/bin/bash\n$SED -i \"s/mock/modified/g\" \$1" > ${TEMP}
   chmod +x ${TEMP}
   # Command
-  EDITOR=${TEMP} kubectl create --edit -f hack/testdata/multi-resource-json.json "${kube_flags[@]}"
+  EDITOR=${TEMP} kubectl create --edit -f hack/testdata/multi-resource/multi-resource-json.json "${kube_flags[@]}"
   # Post-condition: service named modified and rc named modified are created
   kube::test::get_object_assert service "{{range.items}}{{$id_field}}:{{end}}" 'modified:'
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'modified:'
@@ -670,7 +670,7 @@ run_pod_tests() {
   kube::test::get_object_assert service "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  EDITOR=${TEMP} kubectl create --edit -f hack/testdata/multi-resource-list.json "${kube_flags[@]}"
+  EDITOR=${TEMP} kubectl create --edit -f hack/testdata/multi-resource/multi-resource-list.json "${kube_flags[@]}"
   # Post-condition: service named modified and rc named modified are created
   kube::test::get_object_assert service "{{range.items}}{{$id_field}}:{{end}}" 'modified:'
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'modified:'
@@ -3242,11 +3242,11 @@ run_multi_resources_tests() {
   create_and_use_new_namespace
   kube::log::status "Testing kubectl(v1:multiple resources)"
 
-  FILES="hack/testdata/multi-resource-yaml
-  hack/testdata/multi-resource-list
-  hack/testdata/multi-resource-json
-  hack/testdata/multi-resource-rclist
-  hack/testdata/multi-resource-svclist"
+  FILES="hack/testdata/multi-resource/multi-resource-yaml
+  hack/testdata/multi-resource/multi-resource-list
+  hack/testdata/multi-resource/multi-resource-json
+  hack/testdata/multi-resource/multi-resource-rclist
+  hack/testdata/multi-resource/multi-resource-svclist"
   YAML=".yaml"
   JSON=".json"
   for file in $FILES; do
