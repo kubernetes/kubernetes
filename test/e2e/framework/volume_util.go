@@ -359,6 +359,7 @@ func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
 // pod.
 func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGroup *int64, tests []VolumeTest) {
 	By(fmt.Sprint("starting ", config.Prefix, " client"))
+	var gracePeriod int64 = 1
 	clientPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -387,6 +388,7 @@ func TestVolumeClient(client clientset.Interface, config VolumeTestConfig, fsGro
 					VolumeMounts: []v1.VolumeMount{},
 				},
 			},
+			TerminationGracePeriodSeconds: &gracePeriod,
 			SecurityContext: &v1.PodSecurityContext{
 				SELinuxOptions: &v1.SELinuxOptions{
 					Level: "s0:c0,c1",
