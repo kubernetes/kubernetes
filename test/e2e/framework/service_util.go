@@ -89,6 +89,10 @@ const (
 
 	// ServiceTestTimeout is used for most polling/waiting activities
 	ServiceTestTimeout = 60 * time.Second
+
+	// GCPMaxInstancesInInstanceGroup is the maximum number of instances supported in
+	// one instance group on GCP.
+	GCPMaxInstancesInInstanceGroup = 2000
 )
 
 // This should match whatever the default/configured range is

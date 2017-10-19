@@ -1339,8 +1339,15 @@ var _ = SIGDescribe("Services", func() {
 
 	It("should be able to create an internal type load balancer [Slow]", func() {
 		framework.SkipUnlessProviderIs("azure", "gke", "gce")
+		if framework.ProviderIs("gke", "gce") {
+			framework.SkipUnlessNodeCountIsAtMost(framework.GCPMaxInstancesInInstanceGroup)
+		}
 
 		createTimeout := framework.LoadBalancerCreateTimeoutDefault
+		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > framework.LargeClusterMinNodesNumber {
+			createTimeout = framework.LoadBalancerCreateTimeoutLarge
+		}
+
 		pollInterval := framework.Poll * 10
 
 		namespace := f.Namespace.Name
