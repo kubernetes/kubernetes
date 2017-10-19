@@ -358,7 +358,11 @@ var _ = SIGDescribe("Pod Disks", func() {
 						}
 						By("defer: verify the number of ready nodes")
 						numNodes := countReadyNodes(cs, host0Name)
-						Expect(numNodes).To(Equal(origNodeCnt), fmt.Sprintf("defer: Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt))
+						// if this defer is reached due to an Expect then nested
+						// Expects are lost, so use Failf here
+						if numNodes != origNodeCnt {
+							framework.Failf("defer: Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt)
+						}
 					}
 				}()
 
