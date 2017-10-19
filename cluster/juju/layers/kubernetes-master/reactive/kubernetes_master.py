@@ -461,7 +461,7 @@ def send_data(tls):
     # maybe they have extra names they want as SANs
     extra_sans = hookenv.config('extra_sans')
     if extra_sans and not extra_sans == "":
-      sans.extend(extra_sans.split())
+        sans.extend(extra_sans.split())
 
     # Create a path safe name by removing path characters from the unit name.
     certificate_name = hookenv.local_unit().replace('/', '_')
