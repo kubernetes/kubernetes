@@ -244,3 +244,26 @@ func WaitForObservedDeployment(c clientset.Interface, ns, deploymentName string,
 		return c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 	}, desiredGeneration, 2*time.Second, 1*time.Minute)
 }
+
+// Pool until deployment status and its underlying resources reach the desired state.
+func WaitForDeploymentCompletes(c clientset.Interface, d *extensions.Deployment, logf LogfFn, pollInterval, pollTimeout time.Duration) error {
+	var reason string
+	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+		deployment, err := c.ExtensionsV1beta1().Deployments(d.Namespace).Get(d.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		// When the deployment status and its underlying resources reach the desired state, we're done
+		if deploymentutil.DeploymentComplete(d, &deployment.Status) {
+			return true, nil
+		}
+		reason = fmt.Sprintf("deployment status: %#v", deployment.Status)
+		logf(reason)
+		return false, nil
+	})
+
+	if err == wait.ErrWaitTimeout {
+		err = fmt.Errorf("timeout waiting for deployment to complete: %v, most recent deployment status: %s", err, reason)
+	}
+	return err
+}
