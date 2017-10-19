@@ -20,7 +20,6 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/api"
@@ -55,8 +54,7 @@ func (s *componentStatusLister) List(selector labels.Selector) (ret []*api.Compo
 
 // Get retrieves the ComponentStatus from the index for a given name.
 func (s *componentStatusLister) Get(name string) (*api.ComponentStatus, error) {
-	key := &api.ComponentStatus{ObjectMeta: v1.ObjectMeta{Name: name}}
-	obj, exists, err := s.indexer.Get(key)
+	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}
