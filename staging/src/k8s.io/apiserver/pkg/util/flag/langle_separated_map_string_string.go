@@ -19,42 +19,41 @@ package flag
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 )
 
-// MapStringBool can be set from the command line with the format `--flag "string=bool"`.
-// Multiple comma-separated key-value pairs in a single invocation are supported. For example: `--flag "a=true,b=false"`.
-// Multiple flag invocations are supported. For example: `--flag "a=true" --flag "b=false"`.
-type MapStringBool struct {
-	Map         *map[string]bool
-	initialized bool
+// LangleSeparatedMapStringString can be set from the command line with the format `--flag "string<string"`.
+// Multiple comma-separated key-value pairs in a single invocation are supported. For example: `--flag "a<foo,b<bar"`.
+// Multiple flag invocations are supported. For example: `--flag "a<foo" --flag "b<foo"`.
+type LangleSeparatedMapStringString struct {
+	Map         *map[string]string
+	initialized bool // set to true after first Set call
 }
 
-// NewMapStringBool takes a pointer to a map[string]string and returns the
-// MapStringBool flag parsing shim for that map
-func NewMapStringBool(m *map[string]bool) *MapStringBool {
-	return &MapStringBool{Map: m}
+// NewLangleSeparatedMapStringString takes a pointer to a map[string]string and returns the
+// LangleSeparatedMapStringString flag parsing shim for that map
+func NewLangleSeparatedMapStringString(m *map[string]string) *LangleSeparatedMapStringString {
+	return &LangleSeparatedMapStringString{Map: m}
 }
 
 // String implements github.com/spf13/pflag.Value
-func (m *MapStringBool) String() string {
+func (m *LangleSeparatedMapStringString) String() string {
 	if *m.Map == nil {
 		return "nil"
 	}
 
 	pairs := []string{}
 	for k, v := range *m.Map {
-		pairs = append(pairs, fmt.Sprintf("%s=%t", k, v))
+		pairs = append(pairs, fmt.Sprintf("%s<%s", k, v))
 	}
 	sort.Strings(pairs)
 	return strings.Join(pairs, ",")
 }
 
 // Set implements github.com/spf13/pflag.Value
-func (m *MapStringBool) Set(value string) error {
+func (m *LangleSeparatedMapStringString) Set(value string) error {
 	if m.Map == nil {
-		return fmt.Errorf("no target (nil pointer to map[string]bool)")
+		return fmt.Errorf("no target (nil pointer to map[string]string)")
 	}
 	// allow explicit nil map
 	if value == "nil" {
@@ -64,29 +63,25 @@ func (m *MapStringBool) Set(value string) error {
 	}
 	if !m.initialized || *m.Map == nil {
 		// clear default values, or allocate if no existing map
-		*m.Map = make(map[string]bool)
+		*m.Map = make(map[string]string)
 		m.initialized = true
 	}
 	for _, s := range strings.Split(value, ",") {
 		if len(s) == 0 {
 			continue
 		}
-		arr := strings.SplitN(s, "=", 2)
+		arr := strings.SplitN(s, "<", 2)
 		if len(arr) != 2 {
-			return fmt.Errorf("malformed pair, expect string=bool")
+			return fmt.Errorf("malformed pair, expect string<string")
 		}
 		k := strings.TrimSpace(arr[0])
 		v := strings.TrimSpace(arr[1])
-		boolValue, err := strconv.ParseBool(v)
-		if err != nil {
-			return fmt.Errorf("invalid value of %s: %s, err: %v", k, v, err)
-		}
-		(*m.Map)[k] = boolValue
+		(*m.Map)[k] = v
 	}
 	return nil
 }
 
 // Type implements github.com/spf13/pflag.Value
-func (*MapStringBool) Type() string {
-	return "mapStringBool"
+func (*LangleSeparatedMapStringString) Type() string {
+	return "mapStringString"
 }

@@ -32,7 +32,6 @@ go_library(
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/cri:go_default_library",
-        "//pkg/kubelet/apis/kubeletconfig:go_default_library",
         "//pkg/kubelet/cadvisor:go_default_library",
         "//pkg/kubelet/cm/cpumanager:go_default_library",
         "//pkg/kubelet/container:go_default_library",
@@ -95,7 +94,6 @@ go_test(
         "//pkg/util/mount:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "//pkg/kubelet/apis/kubeletconfig:go_default_library",
             "//pkg/kubelet/eviction/api:go_default_library",
             "//vendor/github.com/stretchr/testify/assert:go_default_library",
             "//vendor/github.com/stretchr/testify/require:go_default_library",

@@ -439,7 +439,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies) (err error) {
 		var hardEvictionThresholds []evictionapi.Threshold
 		// If the user requested to ignore eviction thresholds, then do not set valid values for hardEvictionThresholds here.
 		if !s.ExperimentalNodeAllocatableIgnoreEvictionThreshold {
-			hardEvictionThresholds, err = eviction.ParseThresholdConfig([]string{}, s.EvictionHard, "", "", "")
+			hardEvictionThresholds, err = eviction.ParseThresholdConfig([]string{}, s.EvictionHard, nil, nil, nil)
 			if err != nil {
 				return err
 			}
@@ -846,7 +846,7 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 // parseResourceList parses the given configuration map into an API
 // ResourceList or returns an error.
-func parseResourceList(m kubeletconfiginternal.ConfigurationMap) (v1.ResourceList, error) {
+func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 	if len(m) == 0 {
 		return nil, nil
 	}
