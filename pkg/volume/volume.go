@@ -37,6 +37,20 @@ type Volume interface {
 	MetricsProvider
 }
 
+// BlockVolume represents a directory used by pods or hosts on a node.
+// This interface provides methods to generate global map path and
+// pod device map path.
+type BlockVolume interface {
+	// GetGlobalMapPath returns a global map path which contains
+	// a symbolic links associated to a block device.
+	// ex. plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid}
+	GetGlobalMapPath(spec *Spec) (string, error)
+	// GetPodDeviceMapPath returns a pod device map path
+	// and name of a symbolic link associated to a block device.
+	// ex. pods/{podUid}}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName}
+	GetPodDeviceMapPath() (string, string)
+}
+
 // MetricsProvider exposes metrics (e.g. used,available space) related to a
 // Volume.
 type MetricsProvider interface {
@@ -134,7 +148,7 @@ type Unmounter interface {
 
 // BlockVolumeMapper interface provides methods to set up/map the volume.
 type BlockVolumeMapper interface {
-	Volume
+	BlockVolume
 	// SetUpDevice prepares the volume to a self-determined directory path,
 	// which may or may not exist yet and returns combination of physical
 	// device path of a block volume and error.
@@ -144,30 +158,16 @@ type BlockVolumeMapper interface {
 	// empty string for device path.
 	// This may be called more than once, so implementations must be idempotent.
 	SetUpDevice() (string, error)
+}
+
+// BlockVolumeUnmapper interface provides methods to cleanup/unmap the volumes.
+type BlockVolumeUnmapper interface {
+	BlockVolume
 	// TearDownDevice removes traces of the SetUpDevice procedure under
 	// a self-determined directory.
 	// If the plugin is non-attachable, this method detaches the volume
 	// from a node.
 	TearDownDevice() error
-	// GetGlobalMapPath returns a global map path which contains
-	// a symbolic links associated to a block device.
-	// ex. plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid}
-	GetGlobalMapPath(spec *Spec) (string, error)
-	// GetPodDeviceMapPath returns a pod device map path
-	// and name of a symbolic link associated to a block device.
-	// ex. pods/{podUid}}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName}
-	GetPodDeviceMapPath() (string, string)
-}
-
-// BlockVolumeUnmapper interface provides methods to cleanup/unmap the volumes.
-type BlockVolumeUnmapper interface {
-	Volume
-	// GetGlobalUnmapPath returns a path to symbolic link of a
-	// block device under a global map path.
-	GetGlobalUnmapPath(spec *Spec) (string, error)
-	// GetPodDeviceUnmapPath returns a pod device map path
-	// and name of symbolic link associated to a block device.
-	GetPodDeviceUnmapPath() (string, string)
 }
 
 // Provisioner is an interface that creates templates for PersistentVolumes

@@ -764,15 +764,6 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			return volumeToMount.GenerateErrorDetailed("MapVolume.MarkVolumeAsMounted failed", markVolMountedErr)
 		}
 
-		var asw ActualStateOfWorldAttacherUpdater
-		// Update actual state of world
-		addVolumeNodeErr := asw.MarkVolumeAsAttached(
-			volumeToMount.VolumeName, volumeToMount.VolumeSpec, "" /* nodeName */, devicePath)
-		if addVolumeNodeErr != nil {
-			// On failure, return error. Caller will log and retry.
-			return volumeToMount.GenerateErrorDetailed("MapVolume.MarkVolumeAsAttached failed", addVolumeNodeErr)
-		}
-
 		return nil
 	}, blockVolumePlugin.GetPluginName(), nil
 }
@@ -800,10 +791,10 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 	return func() error {
 		// Try to unmap symlink on global map path
 		globalUnmapPath, err :=
-			blockVolumeUnmapper.GetGlobalUnmapPath(volumeToUnmount.VolumeSpec)
+			blockVolumeUnmapper.GetGlobalMapPath(volumeToUnmount.VolumeSpec)
 		if err != nil {
 			// On failure, return error. Caller will log and retry.
-			return volumeToUnmount.GenerateErrorDetailed("GetGlobalUnmapPath failed", err)
+			return volumeToUnmount.GenerateErrorDetailed("UnmapVolume.GetGlobalUnmapPath failed", err)
 		}
 		unmapDeviceErr := util.UnmapDevice(globalUnmapPath, string(volumeToUnmount.PodUID))
 		if unmapDeviceErr != nil {
@@ -812,7 +803,7 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 		}
 
 		// Try to unmap symlink on pod device map path
-		podDeviceUnmapPath, volName := blockVolumeUnmapper.GetPodDeviceUnmapPath()
+		podDeviceUnmapPath, volName := blockVolumeUnmapper.GetPodDeviceMapPath()
 		unmapDeviceErr = util.UnmapDevice(podDeviceUnmapPath, volName)
 		if unmapDeviceErr != nil {
 			// On failure, return error. Caller will log and retry.
@@ -856,10 +847,10 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 	blockVolumePlugin, err :=
 		og.volumePluginMgr.FindMapperPluginBySpec(deviceToDetach.VolumeSpec)
 	if err != nil {
-		return nil, "", deviceToDetach.GenerateErrorDetailed("MapVolume.FindMapperPluginBySpec failed", err)
+		return nil, "", deviceToDetach.GenerateErrorDetailed("UnmapDevice.FindMapperPluginBySpec failed", err)
 	}
 	if blockVolumePlugin == nil {
-		return nil, "", deviceToDetach.GenerateErrorDetailed("MapVolume.FindMapperPluginBySpec failed to find BlockVolumeMapper plugin. Volume plugin is nil.", nil)
+		return nil, "", deviceToDetach.GenerateErrorDetailed("UnmapDevice.FindMapperPluginBySpec failed to find BlockVolumeMapper plugin. Volume plugin is nil.", nil)
 	}
 	blockVolumeMapper, newMapperErr := blockVolumePlugin.NewBlockVolumeMapper(
 		deviceToDetach.VolumeSpec,
@@ -867,6 +858,13 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		volume.VolumeOptions{})
 	if newMapperErr != nil {
 		return nil, "", deviceToDetach.GenerateErrorDetailed("UnmapDevice.NewBlockVolumeMapper initialization failed", newMapperErr)
+	}
+
+	blockVolumeUnmapper, newUnmapperErr := blockVolumePlugin.NewBlockVolumeUnmapper(
+		string(deviceToDetach.VolumeName),
+		"" /* podUID */)
+	if newUnmapperErr != nil {
+		return nil, blockVolumePlugin.GetPluginName(), deviceToDetach.GenerateErrorDetailed("UnmapDevice.NewUnmapper failed", newUnmapperErr)
 	}
 
 	return func() error {
@@ -920,7 +918,7 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		}
 
 		// Execute tear down device
-		unmapErr := blockVolumeMapper.TearDownDevice()
+		unmapErr := blockVolumeUnmapper.TearDownDevice()
 		if unmapErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return deviceToDetach.GenerateErrorDetailed("UnmapDevice.TearDownDevice failed", unmapErr)

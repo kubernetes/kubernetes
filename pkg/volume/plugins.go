@@ -208,6 +208,7 @@ type ExpandableVolumePlugin interface {
 	RequiresFSResize() bool
 }
 
+// BlockVolumePlugin is an extend interface of VolumePlugin and is used for block volumes support.
 type BlockVolumePlugin interface {
 	VolumePlugin
 	// NewBlockVolumeMapper creates a new volume.BlockVolumeMapper from an API specification.
