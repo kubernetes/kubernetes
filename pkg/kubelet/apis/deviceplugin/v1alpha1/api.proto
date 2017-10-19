@@ -78,7 +78,11 @@ message Device {
 // - Allocate allows Device Plugin to run device specific operations on
 //   the Devices requested
 message AllocateRequest {
-	repeated string devicesIDs = 1;
+        // Namespace to which the container requesting device allocation belongs
+        string namespace = 1;
+        // Name of the pod to which container requesting device allocation belongs
+        string podName = 2;
+	repeated string devicesIDs = 3;
 }
 
 // Failure Handling:
