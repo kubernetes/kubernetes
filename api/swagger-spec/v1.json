@@ -5645,6 +5645,14 @@
       "nickname": "proxyPUTNodeWithPath",
       "parameters": [
        {
+        "type": "v1.Node",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "name",
@@ -5674,6 +5682,14 @@
       "summary": "proxy POST requests to Node",
       "nickname": "proxyPOSTNodeWithPath",
       "parameters": [
+       {
+        "type": "v1.Node",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
@@ -5705,6 +5721,14 @@
       "nickname": "proxyPATCHNodeWithPath",
       "parameters": [
        {
+        "type": "v1.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "name",
@@ -5734,6 +5758,14 @@
       "summary": "proxy DELETE requests to Node",
       "nickname": "proxyDELETENodeWithPath",
       "parameters": [
+       {
+        "type": "v1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
@@ -5853,6 +5885,14 @@
       "nickname": "proxyPUTNode",
       "parameters": [
        {
+        "type": "v1.Node",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "name",
@@ -5874,6 +5914,14 @@
       "summary": "proxy POST requests to Node",
       "nickname": "proxyPOSTNode",
       "parameters": [
+       {
+        "type": "v1.Node",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
@@ -5897,6 +5945,14 @@
       "nickname": "proxyPATCHNode",
       "parameters": [
        {
+        "type": "v1.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "name",
@@ -5918,6 +5974,14 @@
       "summary": "proxy DELETE requests to Node",
       "nickname": "proxyDELETENode",
       "parameters": [
+       {
+        "type": "v1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
@@ -9411,6 +9475,14 @@
       "nickname": "proxyPUTNamespacedPodWithPath",
       "parameters": [
        {
+        "type": "v1.Pod",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -9448,6 +9520,14 @@
       "summary": "proxy POST requests to Pod",
       "nickname": "proxyPOSTNamespacedPodWithPath",
       "parameters": [
+       {
+        "type": "v1.Pod",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
@@ -9487,6 +9567,14 @@
       "nickname": "proxyPATCHNamespacedPodWithPath",
       "parameters": [
        {
+        "type": "v1.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -9524,6 +9612,14 @@
       "summary": "proxy DELETE requests to Pod",
       "nickname": "proxyDELETENamespacedPodWithPath",
       "parameters": [
+       {
+        "type": "v1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
@@ -9675,6 +9771,14 @@
       "nickname": "proxyPUTNamespacedPod",
       "parameters": [
        {
+        "type": "v1.Pod",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -9704,6 +9808,14 @@
       "summary": "proxy POST requests to Pod",
       "nickname": "proxyPOSTNamespacedPod",
       "parameters": [
+       {
+        "type": "v1.Pod",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
@@ -9735,6 +9847,14 @@
       "nickname": "proxyPATCHNamespacedPod",
       "parameters": [
        {
+        "type": "v1.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -9764,6 +9884,14 @@
       "summary": "proxy DELETE requests to Pod",
       "nickname": "proxyDELETENamespacedPod",
       "parameters": [
+       {
+        "type": "v1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
@@ -17518,6 +17646,14 @@
       "nickname": "proxyPUTNamespacedServiceWithPath",
       "parameters": [
        {
+        "type": "v1.Service",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -17556,6 +17692,14 @@
       "nickname": "proxyPOSTNamespacedServiceWithPath",
       "parameters": [
        {
+        "type": "v1.Service",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -17593,6 +17737,14 @@
       "summary": "proxy PATCH requests to Service",
       "nickname": "proxyPATCHNamespacedServiceWithPath",
       "parameters": [
+       {
+        "type": "v1.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
@@ -17782,6 +17934,14 @@
       "nickname": "proxyPUTNamespacedService",
       "parameters": [
        {
+        "type": "v1.Service",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -17812,6 +17972,14 @@
       "nickname": "proxyPOSTNamespacedService",
       "parameters": [
        {
+        "type": "v1.Service",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
         "type": "string",
         "paramType": "path",
         "name": "namespace",
@@ -17841,6 +18009,14 @@
       "summary": "proxy PATCH requests to Service",
       "nickname": "proxyPATCHNamespacedService",
       "parameters": [
+       {
+        "type": "v1.Patch",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
