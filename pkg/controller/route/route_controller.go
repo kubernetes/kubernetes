@@ -66,8 +66,8 @@ type RouteController struct {
 }
 
 func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDR *net.IPNet) *RouteController {
-	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.Core().RESTClient().GetRateLimiter())
+	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	if clusterCIDR == nil {
@@ -114,7 +114,7 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 		if err := rc.reconcileNodeRoutes(); err != nil {
 			glog.Errorf("Couldn't reconcile node routes: %v", err)
 		}
-	}, syncPeriod, wait.NeverStop)
+	}, syncPeriod, stopCh)
 
 	<-stopCh
 }
@@ -254,7 +254,7 @@ func (rc *RouteController) updateNetworkingCondition(nodeName types.NodeName, ro
 			glog.Errorf("Error updating node %s: %v", nodeName, err)
 			return err
 		}
-		glog.Errorf("Error updating node %s, retrying: %v", nodeName, err)
+		glog.V(4).Infof("Error updating node %s, retrying: %v", nodeName, err)
 	}
 	glog.Errorf("Error updating node %s: %v", nodeName, err)
 	return err
