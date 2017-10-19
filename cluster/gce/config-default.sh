@@ -158,9 +158,11 @@ fi
 #
 # TODO(#8867) Enable by default.
 ENABLE_METADATA_CONCEALMENT="${ENABLE_METADATA_CONCEALMENT:-false}" # true, false
-# Apply the right node label if metadata concealment is on.
 if [[ ${ENABLE_METADATA_CONCEALMENT:-} == "true" ]]; then
+  # Put the necessary label on the node so the daemonset gets scheduled.
   NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
+  # Add to the provider custom variables.
+  PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_METADATA_CONCEALMENT"
 fi
 
 # Optional: Enable node logging.

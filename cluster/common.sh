@@ -752,11 +752,6 @@ EOF
 ENABLE_CUSTOM_METRICS: $(yaml-quote ${ENABLE_CUSTOM_METRICS})
 EOF
   fi
-  if [ -n "${ENABLE_METADATA_CONCEALMENT:-}" ]; then
-    cat >>$file <<EOF
-ENABLE_METADATA_CONCEALMENT: $(yaml-quote ${ENABLE_METADATA_CONCEALMENT})
-EOF
-  fi
   if [ -n "${FEATURE_GATES:-}" ]; then
     cat >>$file <<EOF
 FEATURE_GATES: $(yaml-quote ${FEATURE_GATES})
