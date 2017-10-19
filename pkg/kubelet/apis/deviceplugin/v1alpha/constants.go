@@ -22,8 +22,8 @@ const (
 	// UnHealthy means that the device is unhealty
 	Unhealthy = "Unhealthy"
 
-	// Version is the API version
-	Version = "0.1"
+	// Current version of the API supported by kubelet
+	Version = "v1alpha2"
 	// DevicePluginPath is the folder the Device Plugin is expecting sockets to be on
 	// Only privileged pods have access to this path
 	// Note: Placeholder until we find a "standard path"
