@@ -4,13 +4,12 @@ apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: {{ RBD_NAME }}
-  annotations:
-    volume.beta.kubernetes.io/storage-class: "rbd"
 spec:
   capacity:
     storage: {{ RBD_SIZE }}M
   accessModes:
     - {{ PV_MODE }}
+  storageClassName: "rbd"
   rbd:
     monitors:
       {% for host in monitors %}
