@@ -24,41 +24,41 @@ import (
 	"reflect"
 	"testing"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 var groupVersion = schema.GroupVersion{Group: "rbac.authorization.k8s.io", Version: "v1alpha1"}
 
 func TestCreateRoleBinding(t *testing.T) {
-	expectBinding := &rbac.RoleBinding{
+	expectBinding := &rbacv1.RoleBinding{
 		ObjectMeta: v1.ObjectMeta{
 			Name: "fake-binding",
 		},
-		RoleRef: rbac.RoleRef{
-			APIGroup: rbac.GroupName,
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
 			Kind:     "Role",
 			Name:     "fake-role",
 		},
-		Subjects: []rbac.Subject{
+		Subjects: []rbacv1.Subject{
 			{
-				Kind:     rbac.UserKind,
+				Kind:     rbacv1.UserKind,
 				APIGroup: "rbac.authorization.k8s.io",
 				Name:     "fake-user",
 			},
 			{
-				Kind:     rbac.GroupKind,
+				Kind:     rbacv1.GroupKind,
 				APIGroup: "rbac.authorization.k8s.io",
 				Name:     "fake-group",
 			},
 			{
-				Kind:      rbac.ServiceAccountKind,
+				Kind:      rbacv1.ServiceAccountKind,
 				Namespace: "fake-namespace",
 				Name:      "fake-account",
 			},
@@ -86,9 +86,9 @@ func TestCreateRoleBinding(t *testing.T) {
 						return nil, nil
 					}
 
-					if obj, _, err := decoder.Decode(bodyBits, nil, &rbac.RoleBinding{}); err == nil {
-						if !reflect.DeepEqual(obj.(*rbac.RoleBinding), expectBinding) {
-							t.Fatalf("TestCreateRoleBinding: expected:\n%#v\nsaw:\n%#v", expectBinding, obj.(*rbac.RoleBinding))
+					if obj, _, err := decoder.Decode(bodyBits, nil, &rbacv1.RoleBinding{}); err == nil {
+						if !reflect.DeepEqual(obj.(*rbacv1.RoleBinding), expectBinding) {
+							t.Fatalf("TestCreateRoleBinding: expected:\n%#v\nsaw:\n%#v", expectBinding, obj.(*rbacv1.RoleBinding))
 							return nil, nil
 						}
 					} else {
@@ -96,7 +96,7 @@ func TestCreateRoleBinding(t *testing.T) {
 						return nil, nil
 					}
 
-					responseBinding := &rbac.RoleBinding{}
+					responseBinding := &rbacv1.RoleBinding{}
 					responseBinding.Name = "fake-binding"
 					return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseBinding))))}, nil
 				default:
