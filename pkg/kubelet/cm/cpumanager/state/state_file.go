@@ -51,7 +51,7 @@ func NewFileState(filePath string, policyName string) State {
 
 	if err := stateFile.tryRestoreState(); err != nil {
 		// could not restore state, init new state file
-		glog.Infof("[cpumanager] state file: initializing empty state file - reason: \"%s\"")
+		glog.Infof("[cpumanager] state file: initializing empty state file - reason: \"%s\"", err)
 		stateFile.cache.ClearState()
 		stateFile.storeState()
 	}
