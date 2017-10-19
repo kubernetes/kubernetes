@@ -29,7 +29,6 @@ import (
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	fedframework "k8s.io/kubernetes/federation/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -279,7 +278,7 @@ func newJobForFed(namespace string, name string, completions int32, parallelism 
 					Containers: []v1.Container{
 						{
 							Name:    "sleep",
-							Image:   imageutils.GetBusyBoxImage(),
+							Image:   "busybox",
 							Command: []string{"sleep", "1"},
 						},
 					},

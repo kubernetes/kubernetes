@@ -192,7 +192,7 @@ const (
 )
 
 var (
-	BusyBoxImage = imageutils.GetBusyBoxImage()
+	BusyBoxImage = "busybox"
 	// Label allocated to the image puller static pod that runs on each node
 	// before e2es.
 	ImagePullerLabels = map[string]string{"name": "e2e-image-puller"}

@@ -32,7 +32,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 func scTestPod(hostIPC bool, hostPID bool) *v1.Pod {
@@ -50,7 +49,7 @@ func scTestPod(hostIPC bool, hostPID bool) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "test-container",
-					Image: imageutils.GetBusyBoxImage(),
+					Image: "busybox",
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,

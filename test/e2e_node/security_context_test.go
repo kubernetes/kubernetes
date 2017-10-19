@@ -341,7 +341,7 @@ var _ = framework.KubeDescribe("Security Context", func() {
 		createAndWaitUserPod := func(readOnlyRootFilesystem bool) string {
 			podName := fmt.Sprintf("busybox-readonly-%v-%s", readOnlyRootFilesystem, uuid.NewUUID())
 			podClient.Create(makeUserPod(podName,
-				imageutils.GetBusyBoxImage(),
+				"busybox",
 				[]string{"sh", "-c", "touch checkfile"},
 				readOnlyRootFilesystem,
 			))

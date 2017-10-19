@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // This test requires that --terminated-pod-gc-threshold=100 be set on the controller manager
@@ -90,7 +89,7 @@ func createTerminatingPod(f *framework.Framework) (*v1.Pod, error) {
 			Containers: []v1.Container{
 				{
 					Name:  string(uuid),
-					Image: imageutils.GetBusyBoxImage(),
+					Image: "busybox",
 				},
 			},
 			SchedulerName: "please don't schedule my pods",
