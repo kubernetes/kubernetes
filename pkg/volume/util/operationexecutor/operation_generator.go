@@ -18,6 +18,7 @@ package operationexecutor
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -434,7 +435,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				return volumeToMount.GenerateErrorDetailed("MountVolume.WaitForAttach failed", err)
 			}
 
-			glog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach succeeded", ""))
+			glog.Infof(volumeToMount.GenerateMsgDetailed("MountVolume.WaitForAttach succeeded", fmt.Sprintf("device path: %q", devicePath)))
 
 			deviceMountPath, err :=
 				volumeAttacher.GetDeviceMountPath(volumeToMount.VolumeSpec)
@@ -459,7 +460,8 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 
 			// Update actual state of world to reflect volume is globally mounted
 			markDeviceMountedErr := actualStateOfWorld.MarkDeviceAsMounted(
-				volumeToMount.VolumeName)
+				volumeToMount.VolumeName,
+				devicePath)
 			if markDeviceMountedErr != nil {
 				// On failure, return error. Caller will log and retry.
 				return volumeToMount.GenerateErrorDetailed("MountVolume.MarkDeviceAsMounted failed", markDeviceMountedErr)
@@ -607,7 +609,8 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 		isDevicePath, devicePathErr := mounter.PathIsDevice(deviceToDetach.DevicePath)
 		var deviceOpened bool
 		var deviceOpenedErr error
-		if !isDevicePath && devicePathErr == nil {
+		if (!isDevicePath && devicePathErr == nil) ||
+			(devicePathErr != nil && strings.Contains(devicePathErr.Error(), "does not exist")) {
 			// not a device path or path doesn't exist
 			//TODO: refer to #36092
 			glog.V(3).Infof("Not checking device path %s", deviceToDetach.DevicePath)
@@ -625,7 +628,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 				fmt.Errorf("the device is in use when it was no longer expected to be in use"))
 		}
 
-		glog.Infof(deviceToDetach.GenerateMsgDetailed("UnmountDevice succeeded", ""))
+		glog.Infof(deviceToDetach.GenerateMsgDetailed("UnmountDevice succeeded", fmt.Sprintf("device path: %q", deviceToDetach.DevicePath)))
 
 		// Update actual state of world
 		markDeviceUnmountedErr := actualStateOfWorld.MarkDeviceAsUnmounted(

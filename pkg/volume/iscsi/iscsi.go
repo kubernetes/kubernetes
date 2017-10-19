@@ -213,12 +213,41 @@ func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID
 }
 
 func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	// Find globalPDPath from pod volume directory(mountPath)
+	var globalPDPath string
+	mounter := plugin.host.GetMounter(plugin.GetPluginName())
+	paths, err := mount.GetMountRefs(mounter, mountPath)
+	if err != nil {
+		return nil, err
+	}
+	for _, path := range paths {
+		if strings.Contains(path, plugin.host.GetPluginDir(iscsiPluginName)) {
+			globalPDPath = path
+			break
+		}
+	}
+	// Couldn't fetch globalPDPath
+	if len(globalPDPath) == 0 {
+		return nil, fmt.Errorf("couldn't fetch globalPDPath. failed to obtain volume spec")
+	}
+
+	// Obtain iscsi disk configurations from globalPDPath
+	device, _, err := extractDeviceAndPrefix(globalPDPath)
+	if err != nil {
+		return nil, err
+	}
+	bkpPortal, iqn, err := extractPortalAndIqn(device)
+	if err != nil {
+		return nil, err
+	}
+	iface, _ := extractIface(globalPDPath)
 	iscsiVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
 			ISCSI: &v1.ISCSIVolumeSource{
-				TargetPortal: volumeName,
-				IQN:          volumeName,
+				TargetPortal:   bkpPortal,
+				IQN:            iqn,
+				ISCSIInterface: iface,
 			},
 		},
 	}
