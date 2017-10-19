@@ -41,7 +41,7 @@ var (
 )
 
 // NewKubeFedCommand creates the `kubefed` command and its nested children.
-func NewKubeFedCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer, defaultServerImage, defaultEtcdImage string) *cobra.Command {
+func NewKubeFedCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer, defaultServerImage, defaultEtcdImage string) interface{} {
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubefed",

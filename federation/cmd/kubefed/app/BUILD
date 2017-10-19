@@ -16,6 +16,7 @@ go_library(
         "//pkg/kubectl/util/logs:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/version/prometheus:go_default_library",
+        "//vendor/github.com/spf13/cobra:go_default_library",
     ],
 )
 

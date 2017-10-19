@@ -122,7 +122,8 @@ func NewCMServer() *CMServer {
 }
 
 // AddFlags adds flags for a specific CMServer to the specified FlagSet
-func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
+func (s *CMServer) AddFlags(untypedfs interface{}) {
+	fs := untypedfs.(*pflag.FlagSet)
 	fs.IntVar(&s.Port, "port", s.Port, "The port that the controller-manager's http service runs on")
 	fs.Var(componentconfig.IPVar{Val: &s.Address}, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.StringVar(&s.FederationName, "federation-name", s.FederationName, "Federation name.")

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
 	"k8s.io/kubernetes/cmd/genutils"
 	fedapiservapp "k8s.io/kubernetes/federation/cmd/federation-apiserver/app"
@@ -55,15 +56,15 @@ func main() {
 	case "federation-apiserver":
 		// generate docs for federated-apiserver
 		apiserver := fedapiservapp.NewAPIServerCommand()
-		doc.GenMarkdownTree(apiserver, outDir)
+		doc.GenMarkdownTree(apiserver.(*cobra.Command), outDir)
 	case "federation-controller-manager":
 		// generate docs for kube-controller-manager
 		controllermanager := fedcmapp.NewControllerManagerCommand()
-		doc.GenMarkdownTree(controllermanager, outDir)
+		doc.GenMarkdownTree(controllermanager.(*cobra.Command), outDir)
 	case "kubefed":
 		// generate docs for kubefed
 		kubefed := kubefed.NewKubeFedCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr, kubefedapp.GetDefaultServerImage(), kubefedapp.DefaultEtcdImage)
-		doc.GenMarkdownTree(kubefed, outDir)
+		doc.GenMarkdownTree(kubefed.(*cobra.Command), outDir)
 	default:
 		fmt.Fprintf(os.Stderr, "Module %s is not supported", module)
 		os.Exit(1)

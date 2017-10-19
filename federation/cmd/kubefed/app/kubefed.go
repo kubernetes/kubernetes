@@ -27,6 +27,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/logs"
 	"k8s.io/kubernetes/pkg/version"
 	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
+
+	"github.com/spf13/cobra"
 )
 
 const (
@@ -43,5 +45,5 @@ func Run() error {
 	defer logs.FlushLogs()
 
 	cmd := kubefed.NewKubeFedCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr, GetDefaultServerImage(), DefaultEtcdImage)
-	return cmd.Execute()
+	return cmd.(*cobra.Command).Execute()
 }
