@@ -23,8 +23,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/apis/schedulerconfig"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/apis/schedulerconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
@@ -43,7 +43,7 @@ const SchedulerPolicyConfigMapKey string = "policy.cfg"
 
 // SchedulerServer has all the context and params needed to run a Scheduler
 type SchedulerServer struct {
-	componentconfig.KubeSchedulerConfiguration
+	schedulerconfig.KubeSchedulerConfiguration
 	// Master is the address of the Kubernetes API server (overrides any
 	// value in kubeconfig).
 	Master string
@@ -57,7 +57,7 @@ type SchedulerServer struct {
 func NewSchedulerServer() *SchedulerServer {
 	versioned := &v1alpha1.KubeSchedulerConfiguration{}
 	legacyscheme.Scheme.Default(versioned)
-	cfg := componentconfig.KubeSchedulerConfiguration{}
+	cfg := schedulerconfig.KubeSchedulerConfiguration{}
 	legacyscheme.Scheme.Convert(versioned, &cfg, nil)
 	cfg.LeaderElection.LeaderElect = true
 	s := SchedulerServer{

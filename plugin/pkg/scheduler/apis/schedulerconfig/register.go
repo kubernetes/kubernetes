@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package componentconfig
+package schedulerconfig
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,7 +27,7 @@ var (
 )
 
 // GroupName is the group name use in this package
-const GroupName = "componentconfig"
+const GroupName = "kubescheduler.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
@@ -45,7 +45,7 @@ func Resource(resource string) schema.GroupResource {
 func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this will get cleaned up with the scheme types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&KubeProxyConfiguration{},
+		&KubeSchedulerConfiguration{},
 	)
 	return nil
 }
