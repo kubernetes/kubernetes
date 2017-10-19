@@ -17,7 +17,6 @@ limitations under the License.
 package admission
 
 import (
-	"net/http"
 	"net/url"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -71,12 +70,6 @@ type ServiceResolver interface {
 	ResolveEndpoint(namespace, name string) (*url.URL, error)
 }
 
-// WantsProxyTransport defines a fuction that accepts a proxy transport for admission
-// plugins that need to make calls to pods.
-type WantsProxyTransport interface {
-	SetProxyTransport(proxyTransport *http.Transport)
-}
-
 type PluginInitializer struct {
 	internalClient  internalclientset.Interface
 	externalClient  clientset.Interface
@@ -86,9 +79,6 @@ type PluginInitializer struct {
 	restMapper      meta.RESTMapper
 	quotaRegistry   quota.Registry
 	serviceResolver ServiceResolver
-
-	// for proving we are apiserver in call-outs
-	proxyTransport *http.Transport
 }
 
 var _ admission.PluginInitializer = &PluginInitializer{}
@@ -118,12 +108,6 @@ func (i *PluginInitializer) SetServiceResolver(s ServiceResolver) *PluginInitial
 	return i
 }
 
-// SetProxyTransport sets the proxyTransport which is needed by some plugins.
-func (i *PluginInitializer) SetProxyTransport(proxyTransport *http.Transport) *PluginInitializer {
-	i.proxyTransport = proxyTransport
-	return i
-}
-
 // Initialize checks the initialization interfaces implemented by each plugin
 // and provide the appropriate initialization data
 func (i *PluginInitializer) Initialize(plugin admission.Interface) {
@@ -149,9 +133,5 @@ func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 
 	if wants, ok := plugin.(WantsServiceResolver); ok {
 		wants.SetServiceResolver(i.serviceResolver)
-	}
-
-	if wants, ok := plugin.(WantsProxyTransport); ok {
-		wants.SetProxyTransport(i.proxyTransport)
 	}
 }

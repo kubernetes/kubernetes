@@ -86,7 +86,7 @@ func newGCPermissionsEnforcement() (*gcPermissionsEnforcement, error) {
 		whiteList: whiteList,
 	}
 
-	genericPluginInitializer, err := initializer.New(nil, nil, fakeAuthorizer{}, nil, nil, nil)
+	genericPluginInitializer, err := initializer.New(nil, nil, fakeAuthorizer{}, nil, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -22,6 +22,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 // WantsExternalKubeClientSet defines a function which sets external ClientSet for admission plugins that need it
@@ -42,10 +43,10 @@ type WantsAuthorizer interface {
 	admission.Validator
 }
 
-// WantsClientCert defines a fuction that accepts a cert & key for admission
+// WantsWebhookRESTClientConfig defines a function that accepts client config for admission
 // plugins that need to make calls and prove their identity.
-type WantsClientCert interface {
-	SetClientCert(cert, key []byte)
+type WantsWebhookRESTClientConfig interface {
+	SetWebhookRESTClientConfig(*rest.Config)
 	admission.Validator
 }
 
