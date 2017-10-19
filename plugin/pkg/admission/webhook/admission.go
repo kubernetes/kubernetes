@@ -191,7 +191,7 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 				return
 			}
 
-			ignoreClientCallFailures := hook.FailurePolicy == nil || *hook.FailurePolicy == v1alpha1.Ignore
+			ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1alpha1.Ignore
 			if callErr, ok := err.(*ErrCallingWebhook); ok {
 				if ignoreClientCallFailures {
 					glog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
