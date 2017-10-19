@@ -45,6 +45,8 @@ import (
 	admissioninit "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 
 	// install the clientgo admission API for use with api registry
+	"path"
+
 	_ "k8s.io/kubernetes/pkg/apis/admission/install"
 )
 
@@ -286,7 +288,7 @@ func (a *GenericAdmissionWebhook) hookClient(h *v1alpha1.ExternalAdmissionHook) 
 	// TODO: cache these instead of constructing one each time
 	cfg := &rest.Config{
 		Host:    u.Host,
-		APIPath: u.Path,
+		APIPath: path.Join(u.Path, h.ClientConfig.URLPath),
 		TLSClientConfig: rest.TLSClientConfig{
 			ServerName: h.ClientConfig.Service.Name + "." + h.ClientConfig.Service.Namespace + ".svc",
 			CAData:     h.ClientConfig.CABundle,
