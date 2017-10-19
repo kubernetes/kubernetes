@@ -36,6 +36,7 @@ type EndpointReconciler interface {
 	//      endpoints for their {rw, ro} services.
 	//  * ReconcileEndpoints is called periodically from all apiservers.
 	ReconcileEndpoints(serviceName string, ip net.IP, endpointPorts []api.EndpointPort, reconcilePorts bool) error
+	StopReconciling(serviceName string, ip net.IP, endpointPorts []api.EndpointPort) error
 }
 
 // Type the reconciler type
