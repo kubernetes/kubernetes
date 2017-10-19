@@ -24,6 +24,7 @@ https://github.com/openshift/origin/blob/bb340c5dd5ff72718be86fb194dedc0faed7f4c
 import (
 	"fmt"
 	"net"
+	"path"
 	"sync"
 	"time"
 
@@ -77,7 +78,8 @@ func (s *storageLeases) ListLeases() ([]string, error) {
 
 // UpdateLease resets the TTL on a master IP in storage
 func (s *storageLeases) UpdateLease(ip string) error {
-	return s.storage.GuaranteedUpdate(apirequest.NewDefaultContext(), s.baseKey+"/"+ip, &api.Endpoints{}, true, nil, func(input kruntime.Object, respMeta storage.ResponseMeta) (kruntime.Object, *uint64, error) {
+	key := path.Join(s.baseKey, ip)
+	return s.storage.GuaranteedUpdate(apirequest.NewDefaultContext(), key, &api.Endpoints{}, true, nil, func(input kruntime.Object, respMeta storage.ResponseMeta) (kruntime.Object, *uint64, error) {
 		// just make sure we've got the right IP set, and then refresh the TTL
 		existing := input.(*api.Endpoints)
 		existing.Subsets = []api.EndpointSubset{
@@ -86,7 +88,8 @@ func (s *storageLeases) UpdateLease(ip string) error {
 			},
 		}
 
-		leaseTime := uint64(s.leaseTime)
+		// leaseTime needs to be in seconds
+		leaseTime := uint64(s.leaseTime / time.Second)
 
 		// NB: GuaranteedUpdate does not perform the store operation unless
 		// something changed between load and store (not including resource
