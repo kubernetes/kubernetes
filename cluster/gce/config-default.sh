@@ -175,7 +175,7 @@ if [[ ${KUBE_ENABLE_INSECURE_REGISTRY:-false} == "true" ]]; then
 fi
 
 # Optional: customize runtime config
-RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
+RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-admissionregistration.k8s.io/v1alpha1}"
 
 # Optional: set feature gates
 FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
