@@ -34,7 +34,7 @@ import (
 )
 
 // Eviction Policy is described here:
-// https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/kubelet-eviction.md
+// https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/kubelet-eviction.md
 
 var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", func() {
 	var (
