@@ -29,15 +29,9 @@ import (
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&KubeProxyConfiguration{}, func(obj interface{}) { SetObjectDefaults_KubeProxyConfiguration(obj.(*KubeProxyConfiguration)) })
-	scheme.AddTypeDefaultingFunc(&KubeSchedulerConfiguration{}, func(obj interface{}) { SetObjectDefaults_KubeSchedulerConfiguration(obj.(*KubeSchedulerConfiguration)) })
 	return nil
 }
 
 func SetObjectDefaults_KubeProxyConfiguration(in *KubeProxyConfiguration) {
 	SetDefaults_KubeProxyConfiguration(in)
-}
-
-func SetObjectDefaults_KubeSchedulerConfiguration(in *KubeSchedulerConfiguration) {
-	SetDefaults_KubeSchedulerConfiguration(in)
-	SetDefaults_LeaderElectionConfiguration(&in.LeaderElection)
 }

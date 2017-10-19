@@ -72,6 +72,7 @@ filegroup(
         "//plugin/pkg/scheduler/algorithm:all-srcs",
         "//plugin/pkg/scheduler/algorithmprovider:all-srcs",
         "//plugin/pkg/scheduler/api:all-srcs",
+        "//plugin/pkg/scheduler/apis/schedulerconfig:all-srcs",
         "//plugin/pkg/scheduler/core:all-srcs",
         "//plugin/pkg/scheduler/factory:all-srcs",
         "//plugin/pkg/scheduler/metrics:all-srcs",
