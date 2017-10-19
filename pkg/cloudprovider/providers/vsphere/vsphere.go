@@ -268,14 +268,8 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 			conn: &vSphereConn,
 			cfg:  &vcConfig,
 		}
-		// TODO: Remove this log as it will print VC credentials in log.
-		glog.V(4).Infof("vcConfig for VC %s is %+v.", cfg.Global.VCenterIP, vcConfig)
-		glog.V(4).Infof("vSphereConn for VC %s is %+v.", cfg.Global.VCenterIP, vSphereConn)
-
 		vsphereInstanceMap[cfg.Global.VCenterIP] = &vsphereIns
 	} else {
-		// TODO: Remove this log
-		glog.V(4).Infof("Workspace is %+v.", cfg.Workspace)
 		if cfg.Workspace.VCenterIP == "" || cfg.Workspace.Folder == "" || cfg.Workspace.Datacenter == "" {
 			msg := fmt.Sprintf("All fields in workspace are mandatory."+
 				" vsphere.conf does not have the workspace specified correctly. cfg.Workspace: %+v", cfg.Workspace)
@@ -283,7 +277,7 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 			return nil, errors.New(msg)
 		}
 		for vcServer, vcConfig := range cfg.VirtualCenter {
-			glog.V(4).Infof("Initializing vc server %s and vcConfig %+v", vcServer, vcConfig)
+			glog.V(4).Infof("Initializing vc server %s", vcServer)
 			if vcServer == "" {
 				glog.Error("vsphere.conf does not have the VirtualCenter IP address specified")
 				return nil, errors.New("vsphere.conf does not have the VirtualCenter IP address specified")
@@ -331,10 +325,6 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 				conn: &vSphereConn,
 				cfg:  vcConfig,
 			}
-			// TODO: Remove this log as it will print VC credentials in log.
-			glog.V(4).Infof("vSphereConn for VC %s is %+v.", vcServer, vSphereConn)
-			glog.V(4).Infof("vcConfig for VC %s is %+v.", vcServer, vcConfig)
-
 			vsphereInstanceMap[vcServer] = &vsphereIns
 		}
 	}
@@ -345,8 +335,6 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 func newControllerNode(cfg VSphereConfig) (*VSphere, error) {
 	var err error
 
-	// TODO: Remove this log as it will print VC credentials in log.
-	glog.V(4).Infof("VSphereConfig is %+v", cfg)
 	if cfg.Disk.SCSIControllerType == "" {
 		cfg.Disk.SCSIControllerType = vclib.PVSCSIControllerType
 	} else if !vclib.CheckControllerSupported(cfg.Disk.SCSIControllerType) {
@@ -384,8 +372,6 @@ func newControllerNode(cfg VSphereConfig) (*VSphere, error) {
 		},
 		cfg: &cfg,
 	}
-	// TODO: Remove this log as it will print VC credentials in log.
-	glog.V(4).Infof("VSphereConfig after init is %+v", cfg)
 
 	vs.hostName, err = os.Hostname()
 	if err != nil {
@@ -456,6 +442,22 @@ func (vs *VSphere) getVSphereInstance(nodeName k8stypes.NodeName) (*VSphereInsta
 		return nil, errors.New(fmt.Sprintf("Cannot find node %q in vsphere configuration map", nodeName))
 	}
 	return &vsphereIns, nil
+}
+
+func (vs *VSphere) getVSphereInstanceForServer(vcServer string, ctx context.Context) (*VSphereInstance, error) {
+	vsphereIns, ok := vs.vsphereInstanceMap[vcServer]
+	if !ok {
+		glog.Errorf("cannot find vcServer %q in cache. VC not found!!!", vcServer)
+		return nil, errors.New(fmt.Sprintf("Cannot find node %q in vsphere configuration map", vcServer))
+	}
+	// Ensure client is logged in and session is valid
+	err := vsphereIns.conn.Connect(ctx)
+	if err != nil {
+		glog.Errorf("failed connecting to vcServer %q with error %+v", vcServer, err)
+		return nil, err
+	}
+
+	return vsphereIns, nil
 }
 
 // Get the VM Managed Object instance by from the node
@@ -895,20 +897,11 @@ func (vs *VSphere) DeleteVolume(vmDiskPath string) error {
 		// Create context
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		vsi, err := vs.getVSphereInstance(convertToK8sType(vs.hostName))
+		vsi, err := vs.getVSphereInstanceForServer(vs.cfg.Workspace.VCenterIP, ctx)
 		if err != nil {
 			return err
 		}
-		// Ensure client is logged in and session is valid
-		err = vsi.conn.Connect(ctx)
-		if err != nil {
-			return err
-		}
-		dc, err := vclib.GetDatacenter(ctx, vsi.conn, vs.cfg.Global.Datacenter)
-		if err != nil {
-			return err
-		}
-		ds, err := dc.GetDatastoreByName(ctx, vs.cfg.Global.DefaultDatastore)
+		dc, err := vclib.GetDatacenter(ctx, vsi.conn, vs.cfg.Workspace.Datacenter)
 		if err != nil {
 			return err
 		}
@@ -917,7 +910,7 @@ func (vs *VSphere) DeleteVolume(vmDiskPath string) error {
 			VolumeOptions: &vclib.VolumeOptions{},
 			VMOptions:     &vclib.VMOptions{},
 		}
-		err = disk.Delete(ctx, ds)
+		err = disk.Delete(ctx, dc)
 		if err != nil {
 			glog.Errorf("Failed to delete vsphere volume with vmDiskPath: %s. err: %+v", vmDiskPath, err)
 		}
