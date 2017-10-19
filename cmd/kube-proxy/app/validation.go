@@ -120,9 +120,10 @@ func validateProxyMode(mode componentconfig.ProxyMode, fldPath *field.Path) fiel
 	switch mode {
 	case componentconfig.ProxyModeUserspace:
 	case componentconfig.ProxyModeIPTables:
+	case componentconfig.ProxyModeIPVS:
 	case "":
 	default:
-		modes := []string{string(componentconfig.ProxyModeUserspace), string(componentconfig.ProxyModeIPTables)}
+		modes := []string{string(componentconfig.ProxyModeUserspace), string(componentconfig.ProxyModeIPTables), string(componentconfig.ProxyModeIPVS)}
 		errMsg := fmt.Sprintf("must be %s or blank (blank means the best-available proxy (currently iptables)", strings.Join(modes, ","))
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("ProxyMode"), string(mode), errMsg))
 	}
