@@ -120,17 +120,16 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	fake := &mount.FakeMounter{}
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, err := plug.(*nfsPlugin).newMounterInternal(spec, pod, fake)
-	volumePath := mounter.GetPath()
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
 	if mounter == nil {
 		t.Errorf("Got a nil Mounter")
 	}
-	path := mounter.GetPath()
+	volumePath := mounter.GetPath()
 	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~nfs/vol1", tmpDir)
-	if path != expectedPath {
-		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, path)
+	if volumePath != expectedPath {
+		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, volumePath)
 	}
 	if err := mounter.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
