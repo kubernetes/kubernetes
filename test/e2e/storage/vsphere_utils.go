@@ -39,6 +39,14 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
+// volumeState represents the state of a volume.
+type volumeState int32
+
+const (
+	volumeStateDetached volumeState = 1
+	volumeStateAttached volumeState = 2
+)
+
 // Sanity check for vSphere testing.  Verify the persistent disk attached to the node.
 func verifyVSphereDiskAttached(vsp *vsphere.VSphere, volumePath string, nodeName types.NodeName) (bool, error) {
 	var (
@@ -54,40 +62,66 @@ func verifyVSphereDiskAttached(vsp *vsphere.VSphere, volumePath string, nodeName
 	return isAttached, err
 }
 
-// Wait until vsphere vmdk is deteched from the given node or time out after 5 minutes
-func waitForVSphereDiskToDetach(vsp *vsphere.VSphere, volumePath string, nodeName types.NodeName) error {
+// Wait until vsphere vmdk moves to expected state on the given node, or time out after 6 minutes
+func waitForVSphereDiskStatus(vsp *vsphere.VSphere, volumePath string, nodeName types.NodeName, expectedState volumeState) error {
 	var (
-		err            error
-		diskAttached   = true
-		detachTimeout  = 5 * time.Minute
-		detachPollTime = 10 * time.Second
+		err          error
+		diskAttached bool
+		currentState volumeState
+		timeout      = 6 * time.Minute
+		pollTime     = 10 * time.Second
 	)
-	if vsp == nil {
-		vsp, err = vsphere.GetVSphere()
-		if err != nil {
-			return err
-		}
-	}
-	err = wait.Poll(detachPollTime, detachTimeout, func() (bool, error) {
+	err = wait.Poll(pollTime, timeout, func() (bool, error) {
 		diskAttached, err = verifyVSphereDiskAttached(vsp, volumePath, nodeName)
 		if err != nil {
 			return true, err
 		}
-		if !diskAttached {
-			framework.Logf("Volume %q appears to have successfully detached from %q.",
-				volumePath, nodeName)
+
+		if diskAttached {
+			currentState = volumeStateAttached
+		} else {
+			currentState = volumeStateDetached
+		}
+
+		if currentState == expectedState {
+			if expectedState == volumeStateDetached {
+				framework.Logf("Volume %q has successfully detached from %q.", volumePath, nodeName)
+			} else {
+				framework.Logf("Volume %q has successfully attached to %q.", volumePath, nodeName)
+			}
 			return true, nil
 		}
-		framework.Logf("Waiting for Volume %q to detach from %q.", volumePath, nodeName)
+
+		if expectedState == volumeStateDetached {
+			framework.Logf("Waiting for Volume %q to detach from %q.", volumePath, nodeName)
+		} else {
+			framework.Logf("Waiting for Volume %q to attach to %q.", volumePath, nodeName)
+		}
 		return false, nil
 	})
+
 	if err != nil {
 		return err
 	}
-	if diskAttached {
-		return fmt.Errorf("Gave up waiting for Volume %q to detach from %q after %v", volumePath, nodeName, detachTimeout)
+
+	if currentState != expectedState {
+		if expectedState == volumeStateDetached {
+			err = fmt.Errorf("Gave up waiting for Volume %q to detach from %q after %v", volumePath, nodeName, timeout)
+		} else {
+			err = fmt.Errorf("Gave up waiting for Volume %q to attach to %q after %v", volumePath, nodeName, timeout)
+		}
 	}
-	return nil
+	return err
+}
+
+// Wait until vsphere vmdk is attached from the given node or time out after 6 minutes
+func waitForVSphereDiskToAttach(vsp *vsphere.VSphere, volumePath string, nodeName types.NodeName) error {
+	return waitForVSphereDiskStatus(vsp, volumePath, nodeName, volumeStateAttached)
+}
+
+// Wait until vsphere vmdk is detached from the given node or time out after 6 minutes
+func waitForVSphereDiskToDetach(vsp *vsphere.VSphere, volumePath string, nodeName types.NodeName) error {
+	return waitForVSphereDiskStatus(vsp, volumePath, nodeName, volumeStateDetached)
 }
 
 // function to create vsphere volume spec with given VMDK volume path, Reclaim Policy and labels
