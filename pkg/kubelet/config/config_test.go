@@ -146,8 +146,10 @@ func TestNewPodAddedInvalidNamespace(t *testing.T) {
 	// see an update
 	podUpdate := CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", ""))
 	channel <- podUpdate
+	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.ADD, TestSource, CreateValidPod("foo", "")))
+
 	config.Sync()
-	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.SET, kubetypes.AllSource))
+	expectPodUpdate(t, ch, CreatePodUpdate(kubetypes.SET, kubetypes.AllSource, CreateValidPod("foo", "")))
 }
 
 func TestNewPodAddedDefaultNamespace(t *testing.T) {
