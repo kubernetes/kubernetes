@@ -12071,6 +12071,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1PUTNamespacedPod",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -12104,6 +12114,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1POSTNamespacedPod",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -12137,6 +12157,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1DELETENamespacedPod",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -12236,6 +12266,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1PATCHNamespacedPod",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -12322,6 +12362,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1PUTNamespacedPodWithPath",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -12355,6 +12405,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1POSTNamespacedPodWithPath",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Pod"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -12388,6 +12448,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1DELETENamespacedPodWithPath",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -12487,6 +12557,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1PATCHNamespacedPodWithPath",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -12581,6 +12661,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1PUTNamespacedService",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Service"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -12614,6 +12704,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1POSTNamespacedService",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Service"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -12746,6 +12846,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1PATCHNamespacedService",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -12832,6 +12942,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1PUTNamespacedServiceWithPath",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Service"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -12865,6 +12985,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1POSTNamespacedServiceWithPath",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Service"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -12997,6 +13127,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1PATCHNamespacedServiceWithPath",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -13091,6 +13231,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1PUTNode",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Node"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -13124,6 +13274,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1POSTNode",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Node"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -13157,6 +13317,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1DELETENode",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -13256,6 +13426,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1PATCHNode",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -13334,6 +13514,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1PUTNodeWithPath",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Node"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -13367,6 +13557,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1POSTNodeWithPath",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.api.core.v1.Node"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -13400,6 +13600,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1DELETENodeWithPath",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
@@ -13499,6 +13709,16 @@
       "core_v1"
      ],
      "operationId": "proxyCoreV1PATCHNodeWithPath",
+     "parameters": [
+      {
+       "name": "body",
+       "in": "body",
+       "required": true,
+       "schema": {
+        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Patch"
+       }
+      }
+     ],
      "responses": {
       "200": {
        "description": "OK",
