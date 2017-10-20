@@ -99,12 +99,12 @@ func TestCustomTransitPath(t *testing.T) {
 		t.Fatalf("fail to initialize Vault client: %s ", err)
 	}
 
-	_, err = client.encrypt("key", "plain")
+	_, err = client.encryptLocked("key", "plain")
 	if err == nil || !strings.Contains(err.Error(), "404") {
 		t.Error("should get 404 error for non-existed transit path")
 	}
 
-	_, err = client.decrypt("key", "cipher")
+	_, err = client.decryptLocked("key", "cipher")
 	if err == nil || !strings.Contains(err.Error(), "404") {
 		t.Error("should get 404 error for non-existed transit path")
 	}
@@ -145,7 +145,7 @@ func encryptAndDecrypt(t *testing.T, name string, config *EnvelopeConfig) {
 	key := "key"
 	text := "hello"
 
-	cipher, err := client.encrypt(key, text)
+	cipher, err := client.encryptLocked(key, text)
 	if err != nil {
 		t.Fatalf("name: %s, fail to encrypt text, error: %s", name, err)
 	}
@@ -153,7 +153,7 @@ func encryptAndDecrypt(t *testing.T, name string, config *EnvelopeConfig) {
 		t.Errorf("name: %s, invalid cipher text: %s", name, cipher)
 	}
 
-	plain, err := client.decrypt(key, cipher)
+	plain, err := client.decryptLocked(key, cipher)
 	if err != nil {
 		t.Fatalf("name: %s, fail to decrypt text, error: %s", name, err)
 	}
@@ -210,7 +210,7 @@ func TestForbiddenRequest(t *testing.T) {
 		t.Fatalf("fail to initialize Vault client: %s", err)
 	}
 
-	_, err = client.encrypt("key", "plain")
+	_, err = client.encryptLocked("key", "plain")
 	if err == nil {
 		t.Error("error should not be nil for 403 response")
 	}
@@ -222,7 +222,7 @@ func TestForbiddenRequest(t *testing.T) {
 		t.Errorf("error forbidden value, %+v", forbidden)
 	}
 
-	_, err = client.decrypt("key", "cipher")
+	_, err = client.decryptLocked("key", "cipher")
 	if err == nil {
 		t.Error("error should not be nil for 403 response")
 	}
@@ -266,7 +266,7 @@ func TestRefreshToken(t *testing.T) {
 		}
 
 		// Refresh token successfully.
-		err = client.refreshToken(testCase.config)
+		err = client.refreshTokenLocked(testCase.config)
 		if err != nil {
 			t.Fatalf("name: %s, unexpecte error when refresh token: %s", testCase.name, err)
 		}

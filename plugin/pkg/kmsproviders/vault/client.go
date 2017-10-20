@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"path"
 	"reflect"
+	"strings"
 
 	vaultapi "github.com/hashicorp/vault/api"
 )
@@ -68,7 +69,7 @@ func newClientWrapper(config *EnvelopeConfig) (*clientWrapper, error) {
 	if len(config.Token) != 0 {
 		client.SetToken(config.Token)
 	} else {
-		err = wrapper.refreshToken(config)
+		err = wrapper.getInitialToken(config)
 	}
 	if err != nil {
 		return nil, err
@@ -95,7 +96,11 @@ func newVaultClient(config *EnvelopeConfig) (*vaultapi.Client, error) {
 }
 
 // Get token by login and set the value to vaultapi.Client.
-func (c *clientWrapper) refreshToken(config *EnvelopeConfig) error {
+func (c *clientWrapper) refreshTokenLocked(config *EnvelopeConfig) error {
+	return c.getInitialToken(config)
+}
+
+func (c *clientWrapper) getInitialToken(config *EnvelopeConfig) error {
 	switch {
 	case config.ClientCert != "" && config.ClientKey != "":
 		token, err := c.tlsToken(config)
@@ -139,7 +144,7 @@ func (c *clientWrapper) appRoleToken(config *EnvelopeConfig) (string, error) {
 	return resp.Auth.ClientToken, nil
 }
 
-func (c *clientWrapper) decrypt(keyName string, cipher string) (string, error) {
+func (c *clientWrapper) decryptLocked(keyName string, cipher string) (string, error) {
 	var result string
 
 	data := map[string]string{"ciphertext": cipher}
@@ -156,7 +161,7 @@ func (c *clientWrapper) decrypt(keyName string, cipher string) (string, error) {
 	return result, nil
 }
 
-func (c *clientWrapper) encrypt(keyName string, plain string) (string, error) {
+func (c *clientWrapper) encryptLocked(keyName string, plain string) (string, error) {
 	var result string
 
 	data := map[string]string{"plaintext": plain}
@@ -181,12 +186,14 @@ func (c *clientWrapper) request(path string, data interface{}) (*vaultapi.Secret
 	}
 
 	resp, err := c.client.RawRequest(req)
-	if resp != nil {
-		defer resp.Body.Close()
-		if resp.StatusCode == http.StatusForbidden {
+	if err != nil {
+		if strings.Contains(err.Error(), "Code: 403") {
 			return nil, &forbiddenError{err: err}
 		}
-
+		return nil, fmt.Errorf("error making POST request to path: %v , error: %v", path, err)
+	}
+	if resp != nil {
+		defer resp.Body.Close()
 		if resp.StatusCode == http.StatusOK {
 			secret, err := vaultapi.ParseSecret(resp.Body)
 			if err != nil {
@@ -195,9 +202,6 @@ func (c *clientWrapper) request(path string, data interface{}) (*vaultapi.Secret
 			return secret, nil
 		}
 		return nil, fmt.Errorf("unexpected response code: %v received for POST request to %v", resp.StatusCode, path)
-	}
-	if err != nil {
-		return nil, err
 	}
 	return nil, fmt.Errorf("no response received for POST request to %v", path)
 }

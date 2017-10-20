@@ -33,11 +33,17 @@ import (
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
 )
 
-func Register(pluginRegistry *encryptionconfig.KMSPlugins) {
-	pluginRegistry.Register("vault", KMSFactory)
-}
+var once sync.Once
 
 const vaultPrefix = "vault"
+
+//Register vault kms provider plugin
+func Register(pluginRegistry *encryptionconfig.KMSPlugins) {
+	onceBody := func() {
+		pluginRegistry.Register("vault", KMSFactory)
+	}
+	once.Do(onceBody)
+}
 
 //EnvelopeConfig contains connection information for Vault transformer
 type EnvelopeConfig struct {
@@ -169,7 +175,7 @@ func (s *vaultEnvelopeService) Decrypt(data string) ([]byte, error) {
 	}
 	cipher := vaultPrefix + data[len(key):]
 
-	plain, err := s.withRefreshToken((*clientWrapper).decrypt, key, cipher)
+	plain, err := s.withRefreshToken(false, key, cipher)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +188,7 @@ func (s *vaultEnvelopeService) Encrypt(data []byte) (string, error) {
 	key := s.config.KeyNames[0]
 	plain := base64.StdEncoding.EncodeToString(data)
 
-	cipher, err := s.withRefreshToken((*clientWrapper).encrypt, key, plain)
+	cipher, err := s.withRefreshToken(true, key, plain)
 	if err != nil {
 		return "", err
 	}
@@ -195,14 +201,19 @@ func (s *vaultEnvelopeService) Encrypt(data []byte) (string, error) {
 	return key + cipher[len(vaultPrefix):], nil
 }
 
-// The function type for clientWrapper.encrypt and clientWrapper.decrypt.
-type encryptOrDecryptFunc func(*clientWrapper, string, string) (string, error)
-
-func (s *vaultEnvelopeService) withRefreshToken(f encryptOrDecryptFunc, key, data string) (string, error) {
+func (s *vaultEnvelopeService) withRefreshToken(isEncrypt bool, key, data string) (string, error) {
 	// Execute operation first time.
-	s.rwmutex.RLock()
-	result, err := f(s.client, key, data)
-	s.rwmutex.RUnlock()
+	var result string
+	var err error
+	func() {
+		s.rwmutex.RLock()
+		defer s.rwmutex.RUnlock()
+		if isEncrypt {
+			result, err = s.client.encryptLocked(key, data)
+		} else {
+			result, err = s.client.decryptLocked(key, data)
+		}
+	}()
 	if err == nil || s.config.Token != "" {
 		return result, err
 	}
@@ -212,19 +223,23 @@ func (s *vaultEnvelopeService) withRefreshToken(f encryptOrDecryptFunc, key, dat
 	}
 
 	// The request is forbidden, refresh token and execute operation again.
-	// with the expected usage:
-	//a. rare calls to KMS provider for decrypt during secret read due to DEK caching,
+	// With the expected usage:
+	//a. rare calls to KMS provider for decrypt during secret read: due to DEK caching,
 	//b. rare concurrent secret creation,
-	//c. Token policy having reasonable expiry and num. of use
-	// the locking is not expected to degrade performance for normal usage scenarios,
+	//c. Token policy having reasonable expiry and num. of use;
+	// the locking is not expected to degrade performance for normal usage scenarios.
 	// The race condition is still eliminated for worst case scenarios.
 	s.rwmutex.Lock()
 	defer s.rwmutex.Unlock()
-	err = s.client.refreshToken(s.config)
+	err = s.client.refreshTokenLocked(s.config)
 	if err != nil {
 		return result, err
 	}
 	glog.V(6).Infof("vault token refreshed")
-	secret, requestErr := f(s.client, key, data)
-	return secret, requestErr
+	if isEncrypt {
+		result, err = s.client.encryptLocked(key, data)
+	} else {
+		result, err = s.client.decryptLocked(key, data)
+	}
+	return result, err
 }

@@ -83,6 +83,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	resize.Register(plugins)
 }
 
+//RegisterAllKMSPlugins registers all KMS providers plugins
 func RegisterAllKMSPlugins(pluginRegistry *encryptionconfig.KMSPlugins) {
 	vault.Register(pluginRegistry)
 }
