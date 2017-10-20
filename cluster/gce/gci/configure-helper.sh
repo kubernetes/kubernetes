@@ -1783,6 +1783,7 @@ function start-kube-addons {
       cat > "${dns_controller_file}" <<EOF
 $(echo "$CUSTOM_KUBE_DNS_DEPLOYMENT" | sed -e "s/'/''/g")
 EOF
+    fi
     mv "${dst_dir}/dns/kubedns-svc.yaml.in" "${dns_svc_file}"
     # Replace the salt configurations with variable values.
     sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${dns_controller_file}"
