@@ -186,7 +186,6 @@ type Controller struct {
 	cidrAllocator     ipam.CIDRAllocator
 	taintManager      *scheduler.NoExecuteTaintManager
 
-	forcefullyDeletePod        func(*v1.Pod) error
 	nodeExistsInCloudProvider  func(types.NodeName) (bool, error)
 	computeZoneStateFunc       func(nodeConditions []*v1.NodeCondition) (int, ZoneState)
 	enterPartialDisruptionFunc func(nodeNum int) float32
@@ -285,9 +284,6 @@ func NewNodeController(
 		serviceCIDR:            serviceCIDR,
 		allocateNodeCIDRs:      allocateNodeCIDRs,
 		allocatorType:          allocatorType,
-		forcefullyDeletePod: func(p *v1.Pod) error {
-			return util.ForcefullyDeletePod(kubeClient, p)
-		},
 		nodeExistsInCloudProvider: func(nodeName types.NodeName) (bool, error) {
 			return util.NodeExistsInCloudProvider(cloud, nodeName)
 		},
