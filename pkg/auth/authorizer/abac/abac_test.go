@@ -343,21 +343,21 @@ func TestAuthorizeV1beta1(t *testing.T) {
 	a, err := newWithContents(t,
 		`
 		 # Comment line, after a blank line
-		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"*",         "readonly": true,                                                        "nonResourcePath": "/api"}}
-		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"*",                                                                                  "nonResourcePath": "/custom"}}
-		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"*",                                                                                  "nonResourcePath": "/root/*"}}
-		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"noresource",                                                                         "nonResourcePath": "*"}}
-		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"*",         "readonly": true, "resource": "events",   "namespace": "*"}}
-		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"scheduler", "readonly": true, "resource": "pods",     "namespace": "*"}}
-		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"scheduler",                   "resource": "bindings", "namespace": "*"}}
-		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"kubelet",   "readonly": true, "resource": "bindings", "namespace": "*"}}
-		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"kubelet",                     "resource": "events",   "namespace": "*"}}
-		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"alice",                       "resource": "*",        "namespace": "projectCaribou"}}
-		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"bob",       "readonly": true, "resource": "*",        "namespace": "projectCaribou"}}
-		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"debbie",                      "resource": "pods",     "namespace": "projectCaribou"}}
-		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"apigroupuser",                "resource": "*",        "namespace": "projectAnyGroup",   "apiGroup": "*"}}
-		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"apigroupuser",                "resource": "*",        "namespace": "projectEmptyGroup", "apiGroup": "" }}
-		 {"apiVersion":"abac.authorization.kubernetes.io/v1beta1","kind":"Policy","spec":{"user":"apigroupuser",                "resource": "*",        "namespace": "projectXGroup",     "apiGroup": "x"}}`)
+		 {"apiVersion":"abac.authorization.k8s.io/v1beta1","kind":"Policy","spec":{"user":"*",         "readonly": true,                                                        "nonResourcePath": "/api"}}
+		 {"apiVersion":"abac.authorization.k8s.io/v1beta1","kind":"Policy","spec":{"user":"*",                                                                                  "nonResourcePath": "/custom"}}
+		 {"apiVersion":"abac.authorization.k8s.io/v1beta1","kind":"Policy","spec":{"user":"*",                                                                                  "nonResourcePath": "/root/*"}}
+		 {"apiVersion":"abac.authorization.k8s.io/v1beta1","kind":"Policy","spec":{"user":"noresource",                                                                         "nonResourcePath": "*"}}
+		 {"apiVersion":"abac.authorization.k8s.io/v1beta1","kind":"Policy","spec":{"user":"*",         "readonly": true, "resource": "events",   "namespace": "*"}}
+		 {"apiVersion":"abac.authorization.k8s.io/v1beta1","kind":"Policy","spec":{"user":"scheduler", "readonly": true, "resource": "pods",     "namespace": "*"}}
+		 {"apiVersion":"abac.authorization.k8s.io/v1beta1","kind":"Policy","spec":{"user":"scheduler",                   "resource": "bindings", "namespace": "*"}}
+		 {"apiVersion":"abac.authorization.k8s.io/v1beta1","kind":"Policy","spec":{"user":"kubelet",   "readonly": true, "resource": "bindings", "namespace": "*"}}
+		 {"apiVersion":"abac.authorization.k8s.io/v1beta1","kind":"Policy","spec":{"user":"kubelet",                     "resource": "events",   "namespace": "*"}}
+		 {"apiVersion":"abac.authorization.k8s.io/v1beta1","kind":"Policy","spec":{"user":"alice",                       "resource": "*",        "namespace": "projectCaribou"}}
+		 {"apiVersion":"abac.authorization.k8s.io/v1beta1","kind":"Policy","spec":{"user":"bob",       "readonly": true, "resource": "*",        "namespace": "projectCaribou"}}
+		 {"apiVersion":"abac.authorization.k8s.io/v1beta1","kind":"Policy","spec":{"user":"debbie",                      "resource": "pods",     "namespace": "projectCaribou"}}
+		 {"apiVersion":"abac.authorization.k8s.io/v1beta1","kind":"Policy","spec":{"user":"apigroupuser",                "resource": "*",        "namespace": "projectAnyGroup",   "apiGroup": "*"}}
+		 {"apiVersion":"abac.authorization.k8s.io/v1beta1","kind":"Policy","spec":{"user":"apigroupuser",                "resource": "*",        "namespace": "projectEmptyGroup", "apiGroup": "" }}
+		 {"apiVersion":"abac.authorization.k8s.io/v1beta1","kind":"Policy","spec":{"user":"apigroupuser",                "resource": "*",        "namespace": "projectXGroup",     "apiGroup": "x"}}`)
 
 	if err != nil {
 		t.Fatalf("unable to read policy file: %v", err)

@@ -22,7 +22,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/abac"
 )
 
-const GroupName = "abac.authorization.kubernetes.io"
+const GroupName = "abac.authorization.k8s.io"
 
 // GroupVersion is the API group and version for abac v0
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v0"}
