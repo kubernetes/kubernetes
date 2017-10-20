@@ -59,17 +59,20 @@ type VisitorHistoryViewer struct {
 }
 
 func HistoryViewerFor(kind schema.GroupKind, c clientset.Interface) (HistoryViewer, error) {
-    return &VisitorHistoryViewer{kind, c}
+    return &VisitorHistoryViewer{kind, c}, nil
 }
 
 type HistoryVisitor struct {
     namespace, name string
     revision int64
+    result string
 }
 
-func (v* VisitorHistoryViewer) ViewHistory(namespace,name string, revision int64) {
+func (v* VisitorHistoryViewer) ViewHistory(namespace,name string, revision int64) (string, error) {
     visitor := &HistoryVisitor{namespace, name, revision}
     v.element.Accept(visitor)
+
+    return visitor.result, nil
 }
 
 // ViewHistory returns a revision-to-replicaset map as the revision history of a deployment
