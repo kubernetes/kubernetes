@@ -53,25 +53,32 @@ type HistoryViewer interface {
 	ViewHistory(namespace, name string, revision int64) (string, error)
 }
 
-func HistoryViewerFor(kind schema.GroupKind, c clientset.Interface) (HistoryViewer, error) {
-	switch kind {
-	case extensions.Kind("Deployment"), apps.Kind("Deployment"):
-		return &DeploymentHistoryViewer{c}, nil
-	case apps.Kind("StatefulSet"):
-		return &StatefulSetHistoryViewer{c}, nil
-	case extensions.Kind("DaemonSet"), apps.Kind("DaemonSet"):
-		return &DaemonSetHistoryViewer{c}, nil
-	}
-	return nil, fmt.Errorf("no history viewer has been implemented for %q", kind)
+type VisitorHistoryViewer struct {
+    element GroupKindElement
+	c clientset.Interface
 }
 
-type DeploymentHistoryViewer struct {
-	c clientset.Interface
+func HistoryViewerFor(kind schema.GroupKind, c clientset.Interface) (HistoryViewer, error) {
+    return &VisitorHistoryViewer{kind, c}
+}
+
+type HistoryVisitor struct {
+    namespace, name string
+    revision int64
+}
+
+func (v* VisitorHistoryViewer) ViewHistory(namespace,name string, revision int64) {
+    visitor := &HistoryVisitor{namespace, name, revision}
+    v.element.Accept(visitor)
 }
 
 // ViewHistory returns a revision-to-replicaset map as the revision history of a deployment
 // TODO: this should be a describer
-func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision int64) (string, error) {
+func (h *HistoryVisitor) VisitDeployment(elem GroupKindElement) {
+    namespace = h.namespace
+    name = h.name
+    revision = h.revision
+
 	versionedExtensionsClient := versionedExtensionsClientV1beta1(h.c)
 	deployment, err := versionedExtensionsClient.Deployments(namespace).Get(name, metav1.GetOptions{})
 	if err != nil {
