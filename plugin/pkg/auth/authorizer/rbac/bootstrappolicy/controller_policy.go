@@ -98,7 +98,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 			rbac.NewRule("get", "list", "watch", "update").Groups(extensionsGroup, appsGroup).Resources("deployments").RuleOrDie(),
 			rbac.NewRule("update").Groups(extensionsGroup, appsGroup).Resources("deployments/status").RuleOrDie(),
 			rbac.NewRule("update").Groups(extensionsGroup, appsGroup).Resources("deployments/finalizers").RuleOrDie(),
-			rbac.NewRule("get", "list", "watch", "create", "update", "patch", "delete").Groups(extensionsGroup).Resources("replicasets").RuleOrDie(),
+			rbac.NewRule("get", "list", "watch", "create", "update", "patch", "delete").Groups(appsGroup, extensionsGroup).Resources("replicasets").RuleOrDie(),
 			// TODO: remove "update" once
 			// https://github.com/kubernetes/kubernetes/issues/36897 is resolved.
 			rbac.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("pods").RuleOrDie(),
@@ -109,7 +109,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "disruption-controller"},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch").Groups(extensionsGroup, appsGroup).Resources("deployments").RuleOrDie(),
-			rbac.NewRule("get", "list", "watch").Groups(extensionsGroup).Resources("replicasets").RuleOrDie(),
+			rbac.NewRule("get", "list", "watch").Groups(appsGroup, extensionsGroup).Resources("replicasets").RuleOrDie(),
 			rbac.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("replicationcontrollers").RuleOrDie(),
 			rbac.NewRule("get", "list", "watch").Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
 			rbac.NewRule("get", "list", "watch").Groups(appsGroup).Resources("statefulsets").RuleOrDie(),
@@ -227,9 +227,9 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "replicaset-controller"},
 		Rules: []rbac.PolicyRule{
-			rbac.NewRule("get", "list", "watch", "update").Groups(extensionsGroup).Resources("replicasets").RuleOrDie(),
-			rbac.NewRule("update").Groups(extensionsGroup).Resources("replicasets/status").RuleOrDie(),
-			rbac.NewRule("update").Groups(extensionsGroup).Resources("replicasets/finalizers").RuleOrDie(),
+			rbac.NewRule("get", "list", "watch", "update").Groups(appsGroup, extensionsGroup).Resources("replicasets").RuleOrDie(),
+			rbac.NewRule("update").Groups(appsGroup, extensionsGroup).Resources("replicasets/status").RuleOrDie(),
+			rbac.NewRule("update").Groups(appsGroup, extensionsGroup).Resources("replicasets/finalizers").RuleOrDie(),
 			rbac.NewRule("list", "watch", "patch", "create", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			eventsRule(),
 		},
