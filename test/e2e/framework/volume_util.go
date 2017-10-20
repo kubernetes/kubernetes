@@ -72,6 +72,9 @@ const (
 	MiB int64 = 1024 * KiB
 	GiB int64 = 1024 * MiB
 	TiB int64 = 1024 * GiB
+
+	// Waiting period for volume server (Ceph, ...) to initialize itself.
+	VolumeServerPodStartupSleep = 20 * time.Second
 )
 
 // Configuration of one tests. The test consist of:
@@ -343,7 +346,7 @@ func VolumeTestCleanup(f *Framework, config VolumeTestConfig) {
 		// See issue #24100.
 		// Prevent umount errors by making sure making sure the client pod exits cleanly *before* the volume server pod exits.
 		By("sleeping a bit so client can stop and unmount")
-		time.Sleep(20 * time.Second)
+		time.Sleep(VolumeServerPodStartupSleep)
 
 		err = podClient.Delete(config.Prefix+"-server", nil)
 		if err != nil {
