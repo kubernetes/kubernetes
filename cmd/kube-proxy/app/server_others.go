@@ -81,7 +81,12 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 
 	// We omit creation of pretty much everything if we run in cleanup mode
 	if cleanupAndExit {
-		return &ProxyServer{IptInterface: iptInterface, IpvsInterface: ipvsInterface, CleanupAndExit: cleanupAndExit}, nil
+		return &ProxyServer{
+			execer:         execer,
+			IptInterface:   iptInterface,
+			IpvsInterface:  ipvsInterface,
+			CleanupAndExit: cleanupAndExit,
+		}, nil
 	}
 
 	client, eventClient, err := createClients(config.ClientConnection, master)
