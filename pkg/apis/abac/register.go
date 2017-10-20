@@ -23,7 +23,7 @@ import (
 )
 
 // Group is the API group for abac
-const GroupName = "abac.authorization.kubernetes.io"
+const GroupName = "abac.authorization.k8s.io"
 
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
 
