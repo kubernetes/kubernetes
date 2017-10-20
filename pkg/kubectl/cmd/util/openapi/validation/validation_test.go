@@ -335,4 +335,63 @@ items:
 
 		Expect(err).To(BeNil())
 	})
+
+	It("fails because apiVersion is not provided", func() {
+		err := validator.ValidateBytes([]byte(`
+kind: Pod
+metadata:
+  name: name
+spec:
+  containers:
+  - name: name
+    image: image
+`))
+		Expect(err.Error()).To(Equal("apiVersion not set"))
+	})
+
+	It("fails because apiVersion type is not string and kind is not provided", func() {
+		err := validator.ValidateBytes([]byte(`
+apiVersion: 1
+metadata:
+  name: name
+spec:
+  containers:
+  - name: name
+    image: image
+`))
+		Expect(err.Error()).To(Equal("[apiVersion isn't string type, kind not set]"))
+	})
+
+	It("fails because List first item is missing kind and second item is missing apiVersion", func() {
+		err := validator.ValidateBytes([]byte(`
+apiVersion: v1
+kind: List
+items:
+- apiVersion: v1
+  metadata:
+    name: name
+  spec:
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          name: name
+      spec:
+        containers:
+        - name: name
+          image: image
+- kind: Service
+  metadata:
+    name: name
+  spec:
+    type: NodePort
+    ports:
+    - port: 123
+      targetPort: 1234
+      name: name
+    selector:
+      name: name
+`))
+		Expect(err.Error()).To(Equal("[kind not set, apiVersion not set]"))
+	})
 })
