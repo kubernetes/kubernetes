@@ -6,6 +6,7 @@ go_library(
         "view.go",
         "view_image.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/view",
     visibility = ["//build/visible_to:pkg_kubectl_cmd_view_CONSUMERS"],
     deps = [
         "//pkg/api:go_default_library",
@@ -26,9 +27,11 @@ go_test(
         "//examples:config",
         "//test/fixtures",
     ],
+    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/view",
     library = ":go_default_library",
     deps = [
         "//pkg/api:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/resource:go_default_library",
         "//pkg/printers:go_default_library",

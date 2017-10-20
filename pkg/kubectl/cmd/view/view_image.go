@@ -87,6 +87,7 @@ func NewCmdImage(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&options.All, "all", false, "Select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set image will NOT contact api-server but run locally.")
+	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }
 
@@ -97,7 +98,8 @@ func (o *ImageOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		return err
 	}
 
-	builder := f.NewBuilder(!o.Local).
+	includeUninitialized := cmdutil.ShouldIncludeUninitialized(cmd, false)
+	builder := f.NewBuilder().
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
@@ -106,7 +108,17 @@ func (o *ImageOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		builder = builder.
 			SelectorParam(o.Selector).
 			ResourceTypeOrNameArgs(o.All, args...).
+			IncludeUninitialized(includeUninitialized).
 			Latest()
+	} else {
+		// if a --local flag was provided, and a resource was specified in the form
+		// <resource>/<name>, fail immediately as --local cannot query the api server
+		// for the specified resource.
+		if len(args) > 0 {
+			return resource.LocalResourceError
+		}
+
+		builder = builder.Local(f.ClientForMapping)
 	}
 	infos, err := builder.Do().Infos()
 	if err != nil {
