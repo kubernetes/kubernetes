@@ -288,7 +288,7 @@ var _ = SIGDescribe("Volumes", func() {
 			}()
 			_, serverIP := framework.CreateStorageServer(cs, config)
 			By("sleeping a bit to give ceph server time to initialize")
-			time.Sleep(20 * time.Second)
+			time.Sleep(framework.VolumeServerPodStartupSleep)
 
 			// create ceph secret
 			secret := &v1.Secret{
