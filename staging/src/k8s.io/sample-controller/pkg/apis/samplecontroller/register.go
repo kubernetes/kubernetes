@@ -14,20 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package deviceplugin
+package samplecontroller
 
 const (
-	// Healthy means that the device is healty
-	Healthy = "Healthy"
-	// UnHealthy means that the device is unhealty
-	Unhealthy = "Unhealthy"
-
-	// Version is the API version
-	Version = "0.1"
-	// DevicePluginPath is the folder the Device Plugin is expecting sockets to be on
-	// Only privileged pods have access to this path
-	// Note: Placeholder until we find a "standard path"
-	DevicePluginPath = "/var/lib/kubelet/device-plugins/"
-	// KubeletSocket is the path of the Kubelet registry socket
-	KubeletSocket = DevicePluginPath + "kubelet.sock"
+	GroupName = "samplecontroller.k8s.io"
 )

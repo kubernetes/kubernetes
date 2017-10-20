@@ -244,7 +244,6 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_kubeletconfig_KubeletConfigura
 		return err
 	}
 	out.NodeLabels = *(*map[string]string)(unsafe.Pointer(&in.NodeLabels))
-	out.EnableCustomMetrics = in.EnableCustomMetrics
 	if err := v1.Convert_Pointer_string_To_string(&in.EvictionHard, &out.EvictionHard, s); err != nil {
 		return err
 	}
@@ -385,7 +384,6 @@ func autoConvert_kubeletconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigura
 		return err
 	}
 	out.NodeLabels = *(*map[string]string)(unsafe.Pointer(&in.NodeLabels))
-	out.EnableCustomMetrics = in.EnableCustomMetrics
 	if err := v1.Convert_string_To_Pointer_string(&in.EvictionHard, &out.EvictionHard, s); err != nil {
 		return err
 	}

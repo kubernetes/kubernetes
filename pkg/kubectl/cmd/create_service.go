@@ -47,13 +47,13 @@ func NewCmdCreateService(f cmdutil.Factory, cmdOut, errOut io.Writer) *cobra.Com
 
 var (
 	serviceClusterIPLong = templates.LongDesc(i18n.T(`
-    Create a clusterIP service with the specified name.`))
+    Create a ClusterIP service with the specified name.`))
 
 	serviceClusterIPExample = templates.Examples(i18n.T(`
-    # Create a new clusterIP service named my-cs
+    # Create a new ClusterIP service named my-cs
     kubectl create service clusterip my-cs --tcp=5678:8080
 
-    # Create a new clusterIP service named my-cs (in headless mode)
+    # Create a new ClusterIP service named my-cs (in headless mode)
     kubectl create service clusterip my-cs --clusterip="None"`))
 )
 
@@ -61,11 +61,11 @@ func addPortFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSlice("tcp", []string{}, "Port pairs can be specified as '<port>:<targetPort>'.")
 }
 
-// NewCmdCreateServiceClusterIP is a command to create a clusterIP service
+// NewCmdCreateServiceClusterIP is a command to create a ClusterIP service
 func NewCmdCreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "clusterip NAME [--tcp=<port>:<targetPort>] [--dry-run]",
-		Short:   i18n.T("Create a clusterIP service."),
+		Short:   i18n.T("Create a ClusterIP service."),
 		Long:    serviceClusterIPLong,
 		Example: serviceClusterIPExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -86,7 +86,7 @@ func errUnsupportedGenerator(cmd *cobra.Command, generatorName string) error {
 	return cmdutil.UsageErrorf(cmd, "Generator %s not supported. ", generatorName)
 }
 
-// CreateServiceClusterIP implements the behavior to run the create service clusterIP command
+// CreateServiceClusterIP is the implementation of the create service clusterip command
 func CreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -114,10 +114,10 @@ func CreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comm
 
 var (
 	serviceNodePortLong = templates.LongDesc(i18n.T(`
-    Create a nodeport service with the specified name.`))
+    Create a NodePort service with the specified name.`))
 
 	serviceNodePortExample = templates.Examples(i18n.T(`
-    # Create a new nodeport service named my-ns
+    # Create a new NodePort service named my-ns
     kubectl create service nodeport my-ns --tcp=5678:8080`))
 )
 
@@ -198,7 +198,7 @@ func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer) *cobra
 	return cmd
 }
 
-// CreateServiceLoadBalancer is the implementation of the service loadbalancer command
+// CreateServiceLoadBalancer is the implementation of the create service loadbalancer command
 func CreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
@@ -237,7 +237,7 @@ var (
 	kubectl create service externalname my-ns --external-name bar.com`))
 )
 
-// NewCmdCreateServiceExternalName is a macro command for creating a ExternalName service
+// NewCmdCreateServiceExternalName is a macro command for creating an ExternalName service
 func NewCmdCreateServiceExternalName(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "externalname NAME --external-name external.name [--dry-run]",
@@ -259,7 +259,7 @@ func NewCmdCreateServiceExternalName(f cmdutil.Factory, cmdOut io.Writer) *cobra
 	return cmd
 }
 
-// CreateExternalNameService is the implementation of the service externalname command
+// CreateExternalNameService is the implementation of the create service externalname command
 func CreateExternalNameService(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {

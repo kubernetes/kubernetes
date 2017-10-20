@@ -84,6 +84,7 @@ import (
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 
+	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
@@ -456,12 +457,15 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 		client,
 		sharedInformers,
 		serviceResolver,
-		proxyTransport,
 	)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %v", err)
 	}
 
+	webhookClientConfig := rest.AnonymousClientConfig(genericConfig.LoopbackClientConfig)
+	if proxyTransport != nil && proxyTransport.Dial != nil {
+		webhookClientConfig.Dial = proxyTransport.Dial
+	}
 	// TODO: this is the wrong cert/key pair.
 	// Given the generic case of webhook admission from a generic apiserver,
 	// this key pair should be signed by the the API server's client CA.
@@ -477,14 +481,17 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 		if err != nil {
 			return nil, nil, nil, nil, nil, fmt.Errorf("failed to read proxy client key file from: %s, err: %v", s.ProxyClientKeyFile, err)
 		}
+		webhookClientConfig.TLSClientConfig.CertData = certBytes
+		webhookClientConfig.TLSClientConfig.KeyData = keyBytes
 	}
+	webhookClientConfig.UserAgent = "kube-apiserver-admission"
+	webhookClientConfig.Timeout = 30 * time.Second
 
 	err = s.Admission.ApplyTo(
 		genericConfig,
 		versionedInformers,
-		certBytes,
-		keyBytes,
 		kubeClientConfig,
+		webhookClientConfig,
 		legacyscheme.Scheme,
 		pluginInitializer)
 	if err != nil {
@@ -494,7 +501,7 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 }
 
 // BuildAdmissionPluginInitializer constructs the admission plugin initializer
-func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, serviceResolver aggregatorapiserver.ServiceResolver, proxyTransport *http.Transport) (admission.PluginInitializer, error) {
+func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, serviceResolver aggregatorapiserver.ServiceResolver) (admission.PluginInitializer, error) {
 	var cloudConfig []byte
 
 	if s.CloudProvider.CloudConfigFile != "" {
@@ -515,7 +522,6 @@ func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client interna
 	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, restMapper, quotaRegistry)
 
 	pluginInitializer = pluginInitializer.SetServiceResolver(serviceResolver)
-	pluginInitializer = pluginInitializer.SetProxyTransport(proxyTransport)
 
 	return pluginInitializer, nil
 }

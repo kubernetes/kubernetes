@@ -17,7 +17,7 @@ limitations under the License.
 package deviceplugin
 
 import (
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha1"
+	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
 )
 
 // MonitorCallback is the function called when a device's health state changes,

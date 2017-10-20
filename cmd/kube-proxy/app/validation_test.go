@@ -374,6 +374,7 @@ func TestValidateProxyMode(t *testing.T) {
 	successCases := []componentconfig.ProxyMode{
 		componentconfig.ProxyModeUserspace,
 		componentconfig.ProxyModeIPTables,
+		componentconfig.ProxyModeIPVS,
 		componentconfig.ProxyMode(""),
 	}
 

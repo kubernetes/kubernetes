@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/test/e2e/framework"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -304,7 +303,7 @@ func newTestCronJob(name, schedule string, concurrencyPolicy batchv1beta1.Concur
 							Containers: []v1.Container{
 								{
 									Name:  "c",
-									Image: imageutils.GetBusyBoxImage(),
+									Image: "busybox",
 									VolumeMounts: []v1.VolumeMount{
 										{
 											MountPath: "/data",

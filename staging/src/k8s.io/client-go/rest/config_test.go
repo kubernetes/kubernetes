@@ -35,6 +35,8 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/flowcontrol"
 
+	"errors"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -206,6 +208,19 @@ func (n *fakeNegotiatedSerializer) DecoderToVersion(serializer runtime.Decoder, 
 	return &fakeCodec{}
 }
 
+var fakeDialFunc = func(network, addr string) (net.Conn, error) {
+	return nil, fakeDialerError
+}
+var fakeDialerError = errors.New("fakedialer")
+
+type fakeAuthProviderConfigPersister struct{}
+
+func (fakeAuthProviderConfigPersister) Persist(map[string]string) error {
+	return fakeAuthProviderConfigPersisterError
+}
+
+var fakeAuthProviderConfigPersisterError = errors.New("fakeAuthProviderConfigPersisterError")
+
 func TestAnonymousConfig(t *testing.T) {
 	f := fuzz.New().NilChance(0.0).NumElements(1, 1)
 	f.Funcs(
@@ -268,9 +283,94 @@ func TestAnonymousConfig(t *testing.T) {
 			actual.WrapTransport = nil
 			expected.WrapTransport = nil
 		}
+		if actual.Dial != nil {
+			_, actualError := actual.Dial("", "")
+			_, expectedError := actual.Dial("", "")
+			if !reflect.DeepEqual(expectedError, actualError) {
+				t.Fatalf("CopyConfig  dropped the Dial field")
+			}
+		} else {
+			actual.Dial = nil
+			expected.Dial = nil
+		}
 
 		if !reflect.DeepEqual(*actual, expected) {
 			t.Fatalf("AnonymousClientConfig dropped unexpected fields, identify whether they are security related or not: %s", diff.ObjectGoPrintDiff(expected, actual))
+		}
+	}
+}
+
+func TestCopyConfig(t *testing.T) {
+	f := fuzz.New().NilChance(0.0).NumElements(1, 1)
+	f.Funcs(
+		func(r *runtime.Codec, f fuzz.Continue) {
+			codec := &fakeCodec{}
+			f.Fuzz(codec)
+			*r = codec
+		},
+		func(r *http.RoundTripper, f fuzz.Continue) {
+			roundTripper := &fakeRoundTripper{}
+			f.Fuzz(roundTripper)
+			*r = roundTripper
+		},
+		func(fn *func(http.RoundTripper) http.RoundTripper, f fuzz.Continue) {
+			*fn = fakeWrapperFunc
+		},
+		func(r *runtime.NegotiatedSerializer, f fuzz.Continue) {
+			serializer := &fakeNegotiatedSerializer{}
+			f.Fuzz(serializer)
+			*r = serializer
+		},
+		func(r *flowcontrol.RateLimiter, f fuzz.Continue) {
+			limiter := &fakeLimiter{}
+			f.Fuzz(limiter)
+			*r = limiter
+		},
+		func(r *AuthProviderConfigPersister, f fuzz.Continue) {
+			*r = fakeAuthProviderConfigPersister{}
+		},
+		func(r *func(network, addr string) (net.Conn, error), f fuzz.Continue) {
+			*r = fakeDialFunc
+		},
+	)
+	for i := 0; i < 20; i++ {
+		original := &Config{}
+		f.Fuzz(original)
+		actual := CopyConfig(original)
+		expected := *original
+
+		// this is the list of known risky fields, add to this list if a new field
+		// is added to Config, update CopyConfig to preserve the field otherwise.
+
+		// The DeepEqual cannot handle the func comparison, so we just verify if the
+		// function return the expected object.
+		if actual.WrapTransport == nil || !reflect.DeepEqual(expected.WrapTransport(nil), &fakeRoundTripper{}) {
+			t.Fatalf("CopyConfig dropped the WrapTransport field")
+		} else {
+			actual.WrapTransport = nil
+			expected.WrapTransport = nil
+		}
+		if actual.Dial != nil {
+			_, actualError := actual.Dial("", "")
+			_, expectedError := actual.Dial("", "")
+			if !reflect.DeepEqual(expectedError, actualError) {
+				t.Fatalf("CopyConfig  dropped the Dial field")
+			}
+		}
+		actual.Dial = nil
+		expected.Dial = nil
+		if actual.AuthConfigPersister != nil {
+			actualError := actual.AuthConfigPersister.Persist(nil)
+			expectedError := actual.AuthConfigPersister.Persist(nil)
+			if !reflect.DeepEqual(expectedError, actualError) {
+				t.Fatalf("CopyConfig  dropped the Dial field")
+			}
+		}
+		actual.AuthConfigPersister = nil
+		expected.AuthConfigPersister = nil
+
+		if !reflect.DeepEqual(*actual, expected) {
+			t.Fatalf("CopyConfig  dropped unexpected fields, identify whether they are security related or not: %s", diff.ObjectReflectDiff(expected, *actual))
 		}
 	}
 }
