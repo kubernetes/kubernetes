@@ -304,20 +304,6 @@ func CreateDeployment(client clientset.Interface, replicas int32, podLabels map[
 	if err != nil {
 		return nil, fmt.Errorf("deployment %q failed to complete: %v", deploymentSpec.Name, err)
 	}
-	// pod, err := client.CoreV1().Pods(namespace).Create(pod)
-	// if err != nil {
-	//     return nil, fmt.Errorf("pod Create API error: %v", err)
-	// }
-	// // Waiting for pod to be running
-	// err = WaitForPodNameRunningInNamespace(client, pod.Name, namespace)
-	// if err != nil {
-	//     return pod, fmt.Errorf("pod %q is not Running: %v", pod.Name, err)
-	// }
-	// // get fresh pod info
-	// pod, err = client.CoreV1().Pods(namespace).Get(pod.Name, metav1.GetOptions{})
-	// if err != nil {
-	//     return pod, fmt.Errorf("pod Get API error: %v", err)
-	// }
 	return deployment, nil
 }
 
