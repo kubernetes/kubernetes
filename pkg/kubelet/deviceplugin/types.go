@@ -23,7 +23,7 @@ import (
 // MonitorCallback is the function called when a device's health state changes,
 // or new devices are reported, or old devices are deleted.
 // Updated contains the most recent state of the Device.
-type MonitorCallback func(resourceName string, added, updated, deleted []*pluginapi.Device)
+type MonitorCallback func(resourceName string, added, updated, deleted []pluginapi.Device)
 
 // Manager manages all the Device Plugins running on a node.
 type Manager interface {
@@ -33,7 +33,7 @@ type Manager interface {
 	// Devices is the map of devices that have registered themselves
 	// against the manager.
 	// The map key is the ResourceName of the device plugins.
-	Devices() map[string][]*pluginapi.Device
+	Devices() map[string][]pluginapi.Device
 
 	// Allocate takes resourceName and list of device Ids, and calls the
 	// gRPC Allocate on the device plugin matching the resourceName.
@@ -59,7 +59,7 @@ const (
 	errDevicePluginAlreadyExists = "another device plugin already registered this Resource Name"
 	// errInvalidResourceName is the error raised when a device plugin is registering
 	// itself with an invalid ResourceName
-	errInvalidResourceName = "the ResourceName is invalid"
+	errInvalidResourceName = "the ResourceName %s is invalid"
 	// errEmptyResourceName is the error raised when the resource name field is empty
 	errEmptyResourceName = "invalid Empty ResourceName"
 

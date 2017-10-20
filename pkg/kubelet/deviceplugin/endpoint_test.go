@@ -37,7 +37,7 @@ func TestNewEndpoint(t *testing.T) {
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
 	}
 
-	p, e := esetup(t, devs, socket, "mock", func(n string, a, u, r []*pluginapi.Device) {})
+	p, e := esetup(t, devs, socket, "mock", func(n string, a, u, r []pluginapi.Device) {})
 	defer ecleanup(t, p, e)
 }
 
@@ -48,7 +48,7 @@ func TestList(t *testing.T) {
 		{ID: "ADeviceId", Health: pluginapi.Healthy},
 	}
 
-	p, e := esetup(t, devs, socket, "mock", func(n string, a, u, r []*pluginapi.Device) {})
+	p, e := esetup(t, devs, socket, "mock", func(n string, a, u, r []pluginapi.Device) {})
 	defer ecleanup(t, p, e)
 
 	_, err := e.list()
@@ -79,7 +79,7 @@ func TestListAndWatch(t *testing.T) {
 		{ID: "AThirdDeviceId", Health: pluginapi.Healthy},
 	}
 
-	p, e := esetup(t, devs, socket, "mock", func(n string, a, u, r []*pluginapi.Device) {
+	p, e := esetup(t, devs, socket, "mock", func(n string, a, u, r []pluginapi.Device) {
 		require.Len(t, a, 1)
 		require.Len(t, u, 1)
 		require.Len(t, r, 1)
@@ -114,13 +114,23 @@ func TestListAndWatch(t *testing.T) {
 
 }
 
+func TestGetDevices(t *testing.T) {
+	e := endpoint{
+		devices: map[string]pluginapi.Device{
+			"ADeviceId": {ID: "ADeviceId", Health: pluginapi.Healthy},
+		},
+	}
+	devs := e.getDevices()
+	require.Len(t, devs, 1)
+}
+
 func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string, callback MonitorCallback) (*Stub, *endpoint) {
 	p := NewDevicePluginStub(devs, socket)
 
 	err := p.Start()
 	require.NoError(t, err)
 
-	e, err := newEndpoint(socket, "mock", func(n string, a, u, r []*pluginapi.Device) {})
+	e, err := newEndpoint(socket, "mock", func(n string, a, u, r []pluginapi.Device) {})
 	require.NoError(t, err)
 
 	return p, e
