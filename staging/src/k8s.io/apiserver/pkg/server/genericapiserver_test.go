@@ -25,6 +25,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	goruntime "runtime"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -44,8 +46,11 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
+	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -507,5 +512,77 @@ func fakeVersion() version.Info {
 		GoVersion:    goruntime.Version(),
 		Compiler:     goruntime.Compiler,
 		Platform:     fmt.Sprintf("%s/%s", goruntime.GOOS, goruntime.GOARCH),
+	}
+}
+
+// TestGracefulShutdown verifies server shutdown after request handler finish.
+func TestGracefulShutdown(t *testing.T) {
+	etcdserver, config, _ := setUp(t)
+	defer etcdserver.Terminate(t)
+
+	var graceShutdown bool
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	config.BuildHandlerChainFunc = func(apiHandler http.Handler, c *Config) http.Handler {
+		handler := genericfilters.WithWaitGroup(apiHandler, c.RequestContextMapper, c.LongRunningFunc, c.HandlerChainWaitGroup)
+		handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver, c.RequestContextMapper)
+		handler = apirequest.WithRequestContext(handler, c.RequestContextMapper)
+		return handler
+	}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		wg.Done()
+		time.Sleep(2 * time.Second)
+		w.WriteHeader(http.StatusOK)
+		graceShutdown = true
+	})
+
+	s, err := config.Complete(nil).New("test", EmptyDelegate)
+	if err != nil {
+		t.Fatalf("Error in bringing up the server: %v", err)
+	}
+
+	s.Handler.NonGoRestfulMux.Handle("/test", handler)
+
+	insecureServer := &http.Server{
+		Addr:    "0.0.0.0:0",
+		Handler: s.Handler,
+	}
+	stopCh := make(chan struct{})
+	serverPort, err := RunServer(insecureServer, "tcp", 10*time.Second, stopCh)
+	if err != nil {
+		t.Errorf("RunServer err: %v", err)
+	}
+
+	graceCh := make(chan struct{})
+	// mock a client request
+	go func() {
+		resp, err := http.Get("http://127.0.0.1:" + strconv.Itoa(serverPort) + "/test")
+		if err != nil {
+			t.Errorf("Unexpected http error: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Unexpected http status code: %v", resp.StatusCode)
+		}
+		close(graceCh)
+	}()
+
+	// close stopCh after request sent to server to guarantee request handler is running.
+	wg.Wait()
+	close(stopCh)
+	// wait for wait group handler finish
+	s.HandlerChainWaitGroup.Wait()
+
+	// check server all handlers finished.
+	if !graceShutdown {
+		t.Errorf("server shutdown not gracefully.")
+	}
+	// check client to make sure receive response.
+	select {
+	case <-graceCh:
+		t.Logf("server shutdown gracefully.")
+	case <-time.After(30 * time.Second):
+		t.Errorf("Timed out waiting for response.")
 	}
 }

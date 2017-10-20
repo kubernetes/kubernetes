@@ -1,0 +1,50 @@
+/*
+Copyright 2017 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package filters
+
+import (
+	"net/http"
+	"sync"
+
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+)
+
+// WithWaitGroup adds all non long-running requests to wait group, which is used for graceful shutdown.
+func WithWaitGroup(handler http.Handler, requestContextMapper apirequest.RequestContextMapper, longRunning apirequest.LongRunningRequestCheck, wg *sync.WaitGroup) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		ctx, ok := requestContextMapper.Get(req)
+		if !ok {
+			// if this happens, the handler chain isn't setup correctly because there is no context mapper
+			handler.ServeHTTP(w, req)
+			return
+		}
+
+		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
+		if !ok {
+			// if this happens, the handler chain isn't setup correctly because there is no request info
+			handler.ServeHTTP(w, req)
+			return
+		}
+
+		if !longRunning(req, requestInfo) {
+			wg.Add(1)
+			defer wg.Done()
+		}
+
+		handler.ServeHTTP(w, req)
+	})
+}
