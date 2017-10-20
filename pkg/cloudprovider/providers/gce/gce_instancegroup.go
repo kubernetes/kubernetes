@@ -16,7 +16,11 @@ limitations under the License.
 
 package gce
 
-import compute "google.golang.org/api/compute/v1"
+import (
+	compute "google.golang.org/api/compute/v1"
+
+	"github.com/golang/glog"
+)
 
 func newInstanceGroupMetricContext(request string, zone string) *metricContext {
 	return newGenericMetricContext("instancegroup", request, unusedMetricLabel, zone, computeV1Version)
@@ -26,7 +30,9 @@ func newInstanceGroupMetricContext(request string, zone string) *metricContext {
 // instances. It is the callers responsibility to add named ports.
 func (gce *GCECloud) CreateInstanceGroup(ig *compute.InstanceGroup, zone string) error {
 	mc := newInstanceGroupMetricContext("create", zone)
+	glog.V(4).Infof("InstanceGroups.Insert(%s, %s, %v): start", gce.projectID, zone, ig)
 	op, err := gce.service.InstanceGroups.Insert(gce.projectID, zone, ig).Do()
+	glog.V(4).Infof("InstanceGroups.Insert(%s, %s, %v): end", gce.projectID, zone, ig)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -37,8 +43,10 @@ func (gce *GCECloud) CreateInstanceGroup(ig *compute.InstanceGroup, zone string)
 // DeleteInstanceGroup deletes an instance group.
 func (gce *GCECloud) DeleteInstanceGroup(name string, zone string) error {
 	mc := newInstanceGroupMetricContext("delete", zone)
+	glog.V(4).Infof("InstanceGroups.Delete(%s, %s, %s): start", gce.projectID, zone, name)
 	op, err := gce.service.InstanceGroups.Delete(
 		gce.projectID, zone, name).Do()
+	glog.V(4).Infof("InstanceGroups.Delete(%s, %s, %s): end", gce.projectID, zone, name)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -51,7 +59,9 @@ func (gce *GCECloud) DeleteInstanceGroup(name string, zone string) error {
 func (gce *GCECloud) ListInstanceGroups(zone string) (*compute.InstanceGroupList, error) {
 	mc := newInstanceGroupMetricContext("list", zone)
 	// TODO: use PageToken to list all not just the first 500
+	glog.V(4).Infof("InstanceGroups.List(%s, %s): start", gce.projectID, zone)
 	v, err := gce.service.InstanceGroups.List(gce.projectID, zone).Do()
+	glog.V(4).Infof("InstanceGroups.List(%s, %s): end", gce.projectID, zone)
 	return v, mc.Observe(err)
 }
 
@@ -59,10 +69,12 @@ func (gce *GCECloud) ListInstanceGroups(zone string) (*compute.InstanceGroupList
 // instance group and state.
 func (gce *GCECloud) ListInstancesInInstanceGroup(name string, zone string, state string) (*compute.InstanceGroupsListInstances, error) {
 	mc := newInstanceGroupMetricContext("list_instances", zone)
+	obj := compute.InstanceGroupsListInstancesRequest{InstanceState: state}
 	// TODO: use PageToken to list all not just the first 500
+	glog.V(4).Infof("InstanceGroups.ListInstances(%s, %s, %s, %v): start", gce.projectID, zone, name, obj)
 	v, err := gce.service.InstanceGroups.ListInstances(
-		gce.projectID, zone, name,
-		&compute.InstanceGroupsListInstancesRequest{InstanceState: state}).Do()
+		gce.projectID, zone, name, &obj).Do()
+	glog.V(4).Infof("InstanceGroups.ListInstances(%s, %s, %s, %v): end", gce.projectID, zone, name, obj)
 	return v, mc.Observe(err)
 }
 
@@ -70,15 +82,17 @@ func (gce *GCECloud) ListInstancesInInstanceGroup(name string, zone string, stat
 // instance group.
 func (gce *GCECloud) AddInstancesToInstanceGroup(name string, zone string, instanceRefs []*compute.InstanceReference) error {
 	mc := newInstanceGroupMetricContext("add_instances", zone)
+	obj := compute.InstanceGroupsAddInstancesRequest{
+		Instances: instanceRefs,
+	}
 	if len(instanceRefs) == 0 {
 		return nil
 	}
 
+	glog.V(4).Infof("InstanceGroups.AddInstances(%s, %s, %s, %v): start", gce.projectID, zone, name, obj)
 	op, err := gce.service.InstanceGroups.AddInstances(
-		gce.projectID, zone, name,
-		&compute.InstanceGroupsAddInstancesRequest{
-			Instances: instanceRefs,
-		}).Do()
+		gce.projectID, zone, name, &obj).Do()
+	glog.V(4).Infof("InstanceGroups.AddInstances(%s, %s, %s, %v): end", gce.projectID, zone, name, obj)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -90,15 +104,17 @@ func (gce *GCECloud) AddInstancesToInstanceGroup(name string, zone string, insta
 // the instance group.
 func (gce *GCECloud) RemoveInstancesFromInstanceGroup(name string, zone string, instanceRefs []*compute.InstanceReference) error {
 	mc := newInstanceGroupMetricContext("remove_instances", zone)
+	obj := compute.InstanceGroupsRemoveInstancesRequest{
+		Instances: instanceRefs,
+	}
 	if len(instanceRefs) == 0 {
 		return nil
 	}
 
+	glog.V(4).Infof("InstanceGroups.RemoveInstances(%s, %s, %s, %v): start", gce.projectID, zone, name, obj)
 	op, err := gce.service.InstanceGroups.RemoveInstances(
-		gce.projectID, zone, name,
-		&compute.InstanceGroupsRemoveInstancesRequest{
-			Instances: instanceRefs,
-		}).Do()
+		gce.projectID, zone, name, &obj).Do()
+	glog.V(4).Infof("InstanceGroups.RemoveInstances(%s, %s, %s, %v): end", gce.projectID, zone, name, obj)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -109,9 +125,11 @@ func (gce *GCECloud) RemoveInstancesFromInstanceGroup(name string, zone string, 
 // SetNamedPortsOfInstanceGroup sets the list of named ports on a given instance group
 func (gce *GCECloud) SetNamedPortsOfInstanceGroup(igName, zone string, namedPorts []*compute.NamedPort) error {
 	mc := newInstanceGroupMetricContext("set_namedports", zone)
+	obj := compute.InstanceGroupsSetNamedPortsRequest{NamedPorts: namedPorts}
+	glog.V(4).Infof("InstanceGroups.SetNamedPorts(%s, %s, %s, %v): start", gce.projectID, zone, igName, obj)
 	op, err := gce.service.InstanceGroups.SetNamedPorts(
-		gce.projectID, zone, igName,
-		&compute.InstanceGroupsSetNamedPortsRequest{NamedPorts: namedPorts}).Do()
+		gce.projectID, zone, igName, &obj).Do()
+	glog.V(4).Infof("InstanceGroups.SetNamedPorts(%s, %s, %s, %v): end", gce.projectID, zone, igName, obj)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -122,6 +140,8 @@ func (gce *GCECloud) SetNamedPortsOfInstanceGroup(igName, zone string, namedPort
 // GetInstanceGroup returns an instance group by name.
 func (gce *GCECloud) GetInstanceGroup(name string, zone string) (*compute.InstanceGroup, error) {
 	mc := newInstanceGroupMetricContext("get", zone)
+	glog.V(4).Infof("InstanceGroups.Get(%s, %s, %s): start", gce.projectID, zone, name)
 	v, err := gce.service.InstanceGroups.Get(gce.projectID, zone, name).Do()
+	glog.V(4).Infof("InstanceGroups.Get(%s, %s, %s): end", gce.projectID, zone, name)
 	return v, mc.Observe(err)
 }

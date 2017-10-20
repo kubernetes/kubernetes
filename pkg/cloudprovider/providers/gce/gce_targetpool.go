@@ -16,7 +16,11 @@ limitations under the License.
 
 package gce
 
-import compute "google.golang.org/api/compute/v1"
+import (
+	compute "google.golang.org/api/compute/v1"
+
+	"github.com/golang/glog"
+)
 
 func newTargetPoolMetricContext(request, region string) *metricContext {
 	return newGenericMetricContext("targetpool", request, region, unusedMetricLabel, computeV1Version)
@@ -25,14 +29,18 @@ func newTargetPoolMetricContext(request, region string) *metricContext {
 // GetTargetPool returns the TargetPool by name.
 func (gce *GCECloud) GetTargetPool(name, region string) (*compute.TargetPool, error) {
 	mc := newTargetPoolMetricContext("get", region)
+	glog.V(4).Infof("TargetPools.Get(%s, %s, %s): start", gce.projectID, region, name)
 	v, err := gce.service.TargetPools.Get(gce.projectID, region, name).Do()
+	glog.V(4).Infof("TargetPools.Get(%s, %s, %s): end", gce.projectID, region, name)
 	return v, mc.Observe(err)
 }
 
 // CreateTargetPool creates the passed TargetPool
 func (gce *GCECloud) CreateTargetPool(tp *compute.TargetPool, region string) error {
 	mc := newTargetPoolMetricContext("create", region)
+	glog.V(4).Infof("TargetPools.Insert(%s, %s, %v): start", gce.projectID, region, tp)
 	op, err := gce.service.TargetPools.Insert(gce.projectID, region, tp).Do()
+	glog.V(4).Infof("TargetPools.Insert(%s, %s, %v): end", gce.projectID, region, tp)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -43,7 +51,9 @@ func (gce *GCECloud) CreateTargetPool(tp *compute.TargetPool, region string) err
 // DeleteTargetPool deletes TargetPool by name.
 func (gce *GCECloud) DeleteTargetPool(name, region string) error {
 	mc := newTargetPoolMetricContext("delete", region)
+	glog.V(4).Infof("TargetPools.Delete(%s, %s, %s): start", gce.projectID, region, name)
 	op, err := gce.service.TargetPools.Delete(gce.projectID, region, name).Do()
+	glog.V(4).Infof("TargetPools.Delete(%s, %s, %s): end", gce.projectID, region, name)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -54,7 +64,9 @@ func (gce *GCECloud) DeleteTargetPool(name, region string) error {
 func (gce *GCECloud) AddInstancesToTargetPool(name, region string, instanceRefs []*compute.InstanceReference) error {
 	add := &compute.TargetPoolsAddInstanceRequest{Instances: instanceRefs}
 	mc := newTargetPoolMetricContext("add_instances", region)
+	glog.V(4).Infof("TargetPools.AddInstance(%s, %s, %s, %v): start", gce.projectID, region, name, add)
 	op, err := gce.service.TargetPools.AddInstance(gce.projectID, region, name, add).Do()
+	glog.V(4).Infof("TargetPools.AddInstance(%s, %s, %s, %v): end", gce.projectID, region, name, add)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -65,7 +77,9 @@ func (gce *GCECloud) AddInstancesToTargetPool(name, region string, instanceRefs 
 func (gce *GCECloud) RemoveInstancesFromTargetPool(name, region string, instanceRefs []*compute.InstanceReference) error {
 	remove := &compute.TargetPoolsRemoveInstanceRequest{Instances: instanceRefs}
 	mc := newTargetPoolMetricContext("remove_instances", region)
+	glog.V(4).Infof("TargetPools.RemoveInstance(%s, %s, %s, %v): start", gce.projectID, region, name, remove)
 	op, err := gce.service.TargetPools.RemoveInstance(gce.projectID, region, name, remove).Do()
+	glog.V(4).Infof("TargetPools.RemoveInstance(%s, %s, %s, %v): end", gce.projectID, region, name, remove)
 	if err != nil {
 		return mc.Observe(err)
 	}

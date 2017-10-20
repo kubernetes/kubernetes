@@ -321,7 +321,9 @@ func (gce *GCECloud) updateExternalLoadBalancer(clusterName string, service *v1.
 	}
 
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
+	glog.V(4).Infof("TargetPools.Get(%s, %s, %s): start", gce.projectID, gce.region, loadBalancerName)
 	pool, err := gce.service.TargetPools.Get(gce.projectID, gce.region, loadBalancerName).Do()
+	glog.V(4).Infof("TargetPools.Get(%s, %s, %s): stop", gce.projectID, gce.region, loadBalancerName)
 	if err != nil {
 		return err
 	}
@@ -636,7 +638,9 @@ func (gce *GCECloud) ensureHttpHealthCheck(name, path string, port int32) (hc *c
 // Returns whether the forwarding rule exists, whether it needs to be updated,
 // what its IP address is (if it exists), and any error we encountered.
 func (gce *GCECloud) forwardingRuleNeedsUpdate(name, region string, loadBalancerIP string, ports []v1.ServicePort) (exists bool, needsUpdate bool, ipAddress string, err error) {
+	glog.V(4).Infof("ForwardingRules.Get(%s, %s, %s): start", gce.projectID, region, name)
 	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
+	glog.V(4).Infof("ForwardingRules.Get(%s, %s, %s): stop", gce.projectID, region, name)
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
 			return false, true, "", nil
@@ -675,7 +679,9 @@ func (gce *GCECloud) forwardingRuleNeedsUpdate(name, region string, loadBalancer
 // Doesn't check whether the hosts have changed, since host updating is handled
 // separately.
 func (gce *GCECloud) targetPoolNeedsUpdate(name, region string, affinityType v1.ServiceAffinity) (exists bool, needsUpdate bool, err error) {
+	glog.V(4).Infof("TargetPools.Get(%s, %s, %s): start", gce.projectID, region, name)
 	tp, err := gce.service.TargetPools.Get(gce.projectID, region, name).Do()
+	glog.V(4).Infof("TargetPools.Get(%s, %s, %s): stop", gce.projectID, region, name)
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
 			return false, true, nil
@@ -761,7 +767,10 @@ func translateAffinityType(affinityType v1.ServiceAffinity) string {
 }
 
 func (gce *GCECloud) firewallNeedsUpdate(name, serviceName, region, ipAddress string, ports []v1.ServicePort, sourceRanges netsets.IPNet) (exists bool, needsUpdate bool, err error) {
-	fw, err := gce.service.Firewalls.Get(gce.NetworkProjectID(), MakeFirewallName(name)).Do()
+	firewallName := MakeFirewallName(name)
+	glog.V(4).Infof("Firewalls.Get(%s, %s): start", gce.projectID, firewallName)
+	fw, err := gce.service.Firewalls.Get(gce.NetworkProjectID(), firewallName).Do()
+	glog.V(4).Infof("Firewalls.Get(%s, %s): stop", gce.projectID, firewallName)
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusNotFound) {
 			return false, true, nil
@@ -808,7 +817,9 @@ func (gce *GCECloud) ensureHttpHealthCheckFirewall(svc *v1.Service, serviceName,
 	ports := []v1.ServicePort{{Protocol: "tcp", Port: hcPort}}
 
 	fwName := MakeHealthCheckFirewallName(clusterID, hcName, isNodesHealthCheck)
+	glog.V(4).Infof("Firewalls.Get(%s, %s): start", gce.projectID, fwName)
 	fw, err := gce.service.Firewalls.Get(gce.NetworkProjectID(), fwName).Do()
+	glog.V(4).Infof("Firewalls.Get(%s, %s): stop", gce.projectID, fwName)
 	if err != nil {
 		if !isHTTPErrorCode(err, http.StatusNotFound) {
 			return fmt.Errorf("error getting firewall for health checks: %v", err)

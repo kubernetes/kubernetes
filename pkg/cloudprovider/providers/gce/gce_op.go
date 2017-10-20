@@ -108,17 +108,24 @@ func (gce *GCECloud) waitForGlobalOpInProject(op gceObject, projectID string, mc
 	switch v := op.(type) {
 	case *computealpha.Operation:
 		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
+			glog.V(4).Infof("Alpha GlobalOperations.Get(%s, %s): start", projectID, operationName)
 			op, err := gce.serviceAlpha.GlobalOperations.Get(projectID, operationName).Do()
+			glog.V(4).Infof("Alpha GlobalOperations.Get(%s, %s): end", projectID, operationName)
 			return convertToV1Operation(op), err
 		}, mc)
 	case *computebeta.Operation:
 		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
+			glog.V(4).Infof("Beta GlobalOperations.Get(%s, %s): start", projectID, operationName)
 			op, err := gce.serviceBeta.GlobalOperations.Get(projectID, operationName).Do()
+			glog.V(4).Infof("Beta GlobalOperations.Get(%s, %s): end", projectID, operationName)
 			return convertToV1Operation(op), err
 		}, mc)
 	case *computev1.Operation:
 		return gce.waitForOp(op.(*computev1.Operation), func(operationName string) (*computev1.Operation, error) {
-			return gce.service.GlobalOperations.Get(projectID, operationName).Do()
+			glog.V(4).Infof("GlobalOperations.Get(%s, %s): start", projectID, operationName)
+			op, err := gce.service.GlobalOperations.Get(projectID, operationName).Do()
+			glog.V(4).Infof("GlobalOperations.Get(%s, %s): end", projectID, operationName)
+			return op, err
 		}, mc)
 	default:
 		return fmt.Errorf("unexpected type: %T", v)
@@ -129,17 +136,24 @@ func (gce *GCECloud) waitForRegionOpInProject(op gceObject, projectID, region st
 	switch v := op.(type) {
 	case *computealpha.Operation:
 		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
+			glog.V(4).Infof("Alpha RegionOperations.Get(%s, %s, %s): start", projectID, region, operationName)
 			op, err := gce.serviceAlpha.RegionOperations.Get(projectID, region, operationName).Do()
+			glog.V(4).Infof("Alpha RegionOperations.Get(%s, %s, %s): end", projectID, region, operationName)
 			return convertToV1Operation(op), err
 		}, mc)
 	case *computebeta.Operation:
 		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
+			glog.V(4).Infof("Beta RegionOperations.Get(%s, %s, %s): start", projectID, region, operationName)
 			op, err := gce.serviceBeta.RegionOperations.Get(projectID, region, operationName).Do()
+			glog.V(4).Infof("Beta RegionOperations.Get(%s, %s, %s): end", projectID, region, operationName)
 			return convertToV1Operation(op), err
 		}, mc)
 	case *computev1.Operation:
 		return gce.waitForOp(op.(*computev1.Operation), func(operationName string) (*computev1.Operation, error) {
-			return gce.service.RegionOperations.Get(projectID, region, operationName).Do()
+			glog.V(4).Infof("RegionOperations.Get(%s, %s, %s): start", projectID, region, operationName)
+			op, err := gce.service.RegionOperations.Get(projectID, region, operationName).Do()
+			glog.V(4).Infof("RegionOperations.Get(%s, %s, %s): end", projectID, region, operationName)
+			return op, err
 		}, mc)
 	default:
 		return fmt.Errorf("unexpected type: %T", v)
@@ -150,17 +164,24 @@ func (gce *GCECloud) waitForZoneOpInProject(op gceObject, projectID, zone string
 	switch v := op.(type) {
 	case *computealpha.Operation:
 		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
+			glog.V(4).Infof("ZoneOperations.Get(%s, %s, %s): start", projectID, zone, operationName)
 			op, err := gce.serviceAlpha.ZoneOperations.Get(projectID, zone, operationName).Do()
+			glog.V(4).Infof("ZoneOperations.Get(%s, %s, %s): end", projectID, zone, operationName)
 			return convertToV1Operation(op), err
 		}, mc)
 	case *computebeta.Operation:
 		return gce.waitForOp(convertToV1Operation(op), func(operationName string) (*computev1.Operation, error) {
+			glog.V(4).Infof("ZoneOperations.Get(%s, %s, %s): start", projectID, zone, operationName)
 			op, err := gce.serviceBeta.ZoneOperations.Get(projectID, zone, operationName).Do()
+			glog.V(4).Infof("ZoneOperations.Get(%s, %s, %s): end", projectID, zone, operationName)
 			return convertToV1Operation(op), err
 		}, mc)
 	case *computev1.Operation:
 		return gce.waitForOp(op.(*computev1.Operation), func(operationName string) (*computev1.Operation, error) {
-			return gce.service.ZoneOperations.Get(projectID, zone, operationName).Do()
+			glog.V(4).Infof("ZoneOperations.Get(%s, %s, %s): start", projectID, zone, operationName)
+			op, err := gce.service.ZoneOperations.Get(projectID, zone, operationName).Do()
+			glog.V(4).Infof("ZoneOperations.Get(%s, %s, %s): end", projectID, zone, operationName)
+			return op, err
 		}, mc)
 	default:
 		return fmt.Errorf("unexpected type: %T", v)

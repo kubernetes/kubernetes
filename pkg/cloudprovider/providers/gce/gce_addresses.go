@@ -40,7 +40,9 @@ func newAddressMetricContextWithVersion(request, region, version string) *metric
 // ephemeral IP associated with a global forwarding rule.
 func (gce *GCECloud) ReserveGlobalAddress(addr *compute.Address) error {
 	mc := newAddressMetricContext("reserve", "")
+	glog.V(4).Infof("GlobalAddresses.Insert(%s, %v): start", gce.projectID, addr)
 	op, err := gce.service.GlobalAddresses.Insert(gce.projectID, addr).Do()
+	glog.V(4).Infof("GlobalAddresses.Insert(%s, %v): end", gce.projectID, addr)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -50,7 +52,9 @@ func (gce *GCECloud) ReserveGlobalAddress(addr *compute.Address) error {
 // DeleteGlobalAddress deletes a global address by name.
 func (gce *GCECloud) DeleteGlobalAddress(name string) error {
 	mc := newAddressMetricContext("delete", "")
+	glog.V(4).Infof("GlobalAddresses.Delete(%s, %s): start", gce.projectID, name)
 	op, err := gce.service.GlobalAddresses.Delete(gce.projectID, name).Do()
+	glog.V(4).Infof("GlobalAddresses.Delete(%s, %s): end", gce.projectID, name)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -60,14 +64,18 @@ func (gce *GCECloud) DeleteGlobalAddress(name string) error {
 // GetGlobalAddress returns the global address by name.
 func (gce *GCECloud) GetGlobalAddress(name string) (*compute.Address, error) {
 	mc := newAddressMetricContext("get", "")
+	glog.V(4).Infof("GlobalAddresses.Get(%s, %s): start", gce.projectID, name)
 	v, err := gce.service.GlobalAddresses.Get(gce.projectID, name).Do()
+	glog.V(4).Infof("GlobalAddresses.Get(%s, %s): end", gce.projectID, name)
 	return v, mc.Observe(err)
 }
 
 // ReserveRegionAddress creates a region address
 func (gce *GCECloud) ReserveRegionAddress(addr *compute.Address, region string) error {
 	mc := newAddressMetricContext("reserve", region)
+	glog.V(4).Infof("Addresses.Insert(%s, %s, %v): start", gce.projectID, region, addr)
 	op, err := gce.service.Addresses.Insert(gce.projectID, region, addr).Do()
+	glog.V(4).Infof("Addresses.Insert(%s, %s, %v): end", gce.projectID, region, addr)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -77,7 +85,9 @@ func (gce *GCECloud) ReserveRegionAddress(addr *compute.Address, region string) 
 // ReserveAlphaRegionAddress creates an Alpha, regional address.
 func (gce *GCECloud) ReserveAlphaRegionAddress(addr *computealpha.Address, region string) error {
 	mc := newAddressMetricContextWithVersion("reserve", region, computeAlphaVersion)
+	glog.V(4).Infof("Alpha Addresses.Insert(%s, %s, %v): start", gce.projectID, region, addr)
 	op, err := gce.serviceAlpha.Addresses.Insert(gce.projectID, region, addr).Do()
+	glog.V(4).Infof("Alpha Addresses.Insert(%s, %s, %v): start", gce.projectID, region, addr)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -87,7 +97,9 @@ func (gce *GCECloud) ReserveAlphaRegionAddress(addr *computealpha.Address, regio
 // ReserveBetaRegionAddress creates a beta region address
 func (gce *GCECloud) ReserveBetaRegionAddress(addr *computebeta.Address, region string) error {
 	mc := newAddressMetricContextWithVersion("reserve", region, computeBetaVersion)
+	glog.V(4).Infof("Beta Addresses.Insert(%s, %s, %v): start", gce.projectID, region, addr)
 	op, err := gce.serviceBeta.Addresses.Insert(gce.projectID, region, addr).Do()
+	glog.V(4).Infof("Beta Addresses.Insert(%s, %s, %v): end", gce.projectID, region, addr)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -97,7 +109,9 @@ func (gce *GCECloud) ReserveBetaRegionAddress(addr *computebeta.Address, region 
 // DeleteRegionAddress deletes a region address by name.
 func (gce *GCECloud) DeleteRegionAddress(name, region string) error {
 	mc := newAddressMetricContext("delete", region)
+	glog.V(4).Infof("GlobalAddresses.Delete(%s, %s, %s): start", gce.projectID, region, name)
 	op, err := gce.service.Addresses.Delete(gce.projectID, region, name).Do()
+	glog.V(4).Infof("GlobalAddresses.Delete(%s, %s, %s): end", gce.projectID, region, name)
 	if err != nil {
 		return mc.Observe(err)
 	}
@@ -107,28 +121,36 @@ func (gce *GCECloud) DeleteRegionAddress(name, region string) error {
 // GetRegionAddress returns the region address by name
 func (gce *GCECloud) GetRegionAddress(name, region string) (*compute.Address, error) {
 	mc := newAddressMetricContext("get", region)
+	glog.V(4).Infof("GlobalAddresses.Get(%s, %s, %s): start", gce.projectID, region, name)
 	v, err := gce.service.Addresses.Get(gce.projectID, region, name).Do()
+	glog.V(4).Infof("GlobalAddresses.Get(%s, %s, %s): end", gce.projectID, region, name)
 	return v, mc.Observe(err)
 }
 
 // GetAlphaRegionAddress returns the Alpha, regional address by name.
 func (gce *GCECloud) GetAlphaRegionAddress(name, region string) (*computealpha.Address, error) {
 	mc := newAddressMetricContextWithVersion("get", region, computeAlphaVersion)
+	glog.V(4).Infof("Alpha Addresses.Get(%s, %s, %s): start", gce.projectID, region, name)
 	v, err := gce.serviceAlpha.Addresses.Get(gce.projectID, region, name).Do()
+	glog.V(4).Infof("Alpha Addresses.Get(%s, %s, %s): end", gce.projectID, region, name)
 	return v, mc.Observe(err)
 }
 
 // GetBetaRegionAddress returns the beta region address by name
 func (gce *GCECloud) GetBetaRegionAddress(name, region string) (*computebeta.Address, error) {
 	mc := newAddressMetricContextWithVersion("get", region, computeBetaVersion)
+	glog.V(4).Infof("Beta Addresses.Get(%s, %s, %s): start", gce.projectID, region, name)
 	v, err := gce.serviceBeta.Addresses.Get(gce.projectID, region, name).Do()
+	glog.V(4).Infof("Beta Addresses.Get(%s, %s, %s): end", gce.projectID, region, name)
 	return v, mc.Observe(err)
 }
 
 // GetRegionAddressByIP returns the regional address matching the given IP address.
 func (gce *GCECloud) GetRegionAddressByIP(region, ipAddress string) (*compute.Address, error) {
 	mc := newAddressMetricContext("list", region)
+	glog.V(4).Infof("Addresses.List(%s, %s): start", gce.projectID, region)
 	addrs, err := gce.service.Addresses.List(gce.projectID, region).Filter("address eq " + ipAddress).Do()
+	glog.V(4).Infof("Addresses.List(%s, %s): end", gce.projectID, region)
 	// Record the metrics for the call.
 	mc.Observe(err)
 	if err != nil {
@@ -154,7 +176,9 @@ func (gce *GCECloud) GetRegionAddressByIP(region, ipAddress string) (*compute.Ad
 // GetBetaRegionAddressByIP returns the beta regional address matching the given IP address.
 func (gce *GCECloud) GetBetaRegionAddressByIP(region, ipAddress string) (*computebeta.Address, error) {
 	mc := newAddressMetricContext("list", region)
+	glog.V(4).Infof("Beta Addresses.List(%s, %s): start", gce.projectID, region)
 	addrs, err := gce.serviceBeta.Addresses.List(gce.projectID, region).Filter("address eq " + ipAddress).Do()
+	glog.V(4).Infof("Beta Addresses.List(%s, %s): end", gce.projectID, region)
 	// Record the metrics for the call.
 	mc.Observe(err)
 	if err != nil {
