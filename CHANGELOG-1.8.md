@@ -490,7 +490,7 @@ Consider the following changes, limitations, and guidelines before you upgrade:
 
   * The `--audit-policy-file` option is required if the `AdvancedAudit` feature is not explicitly turned off (`--feature-gates=AdvancedAudit=false`) on the API server.
   * The audit log file defaults to JSON encoding when using the advanced auditing feature gate.
-  * The `--audit-policy-file` option requires `kind` and `apiVersion` fields specifying what format version the `Policy` is using.
+  * An audit policy file without either an `apiVersion` or a `kind` field may be treated as invalid.
   * The webhook and log file now output the `v1beta1` event format.
 
     For more details, see [Advanced audit](https://kubernetes.io/docs/tasks/debug-application-cluster/audit/#advanced-audit).
