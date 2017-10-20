@@ -69,6 +69,14 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 		},
 	})
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "clusterrole-aggregation-controller"},
+		Rules: []rbac.PolicyRule{
+			// this controller must have full permissions to allow it to mutate any role in any way
+			rbac.NewRule("*").Groups("*").Resources("*").RuleOrDie(),
+			rbac.NewRule("*").URLs("*").RuleOrDie(),
+		},
+	})
+	addControllerRole(&controllerRoles, &controllerRoleBindings, rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "cronjob-controller"},
 		Rules: []rbac.PolicyRule{
 			rbac.NewRule("get", "list", "watch", "update").Groups(batchGroup).Resources("cronjobs").RuleOrDie(),

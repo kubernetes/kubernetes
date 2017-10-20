@@ -176,6 +176,30 @@ func ClusterRoles() []rbac.ClusterRole {
 		{
 			// a role for a namespace level admin.  It is `edit` plus the power to grant permissions to other users.
 			ObjectMeta: metav1.ObjectMeta{Name: "admin"},
+			AggregationRule: &rbac.AggregationRule{
+				ClusterRoleSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-admin": "true"}}},
+			},
+		},
+		{
+			// a role for a namespace level editor.  It grants access to all user level actions in a namespace.
+			// It does not grant powers for "privileged" resources which are domain of the system: `/status`
+			// subresources or `quota`/`limits` which are used to control namespaces
+			ObjectMeta: metav1.ObjectMeta{Name: "edit"},
+			AggregationRule: &rbac.AggregationRule{
+				ClusterRoleSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-edit": "true"}}},
+			},
+		},
+		{
+			// a role for namespace level viewing.  It grants Read-only access to non-escalating resources in
+			// a namespace.
+			ObjectMeta: metav1.ObjectMeta{Name: "view"},
+			AggregationRule: &rbac.AggregationRule{
+				ClusterRoleSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-view": "true"}}},
+			},
+		},
+		{
+			// a role for a namespace level admin.  It is `edit` plus the power to grant permissions to other users.
+			ObjectMeta: metav1.ObjectMeta{Name: "system:aggregate-to-admin", Labels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-admin": "true"}},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule(ReadWrite...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
 				rbac.NewRule(ReadWrite...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
@@ -211,7 +235,7 @@ func ClusterRoles() []rbac.ClusterRole {
 			// a role for a namespace level editor.  It grants access to all user level actions in a namespace.
 			// It does not grant powers for "privileged" resources which are domain of the system: `/status`
 			// subresources or `quota`/`limits` which are used to control namespaces
-			ObjectMeta: metav1.ObjectMeta{Name: "edit"},
+			ObjectMeta: metav1.ObjectMeta{Name: "system:aggregate-to-edit", Labels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-edit": "true"}},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule(ReadWrite...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
 				rbac.NewRule(ReadWrite...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
@@ -242,7 +266,7 @@ func ClusterRoles() []rbac.ClusterRole {
 		{
 			// a role for namespace level viewing.  It grants Read-only access to non-escalating resources in
 			// a namespace.
-			ObjectMeta: metav1.ObjectMeta{Name: "view"},
+			ObjectMeta: metav1.ObjectMeta{Name: "system:aggregate-to-view", Labels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-view": "true"}},
 			Rules: []rbac.PolicyRule{
 				rbac.NewRule(Read...).Groups(legacyGroup).Resources("pods", "replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
 					"services", "endpoints", "persistentvolumeclaims", "configmaps").RuleOrDie(),
@@ -443,4 +467,12 @@ func ClusterRoleBindings() []rbac.ClusterRoleBinding {
 	addClusterRoleBindingLabel(rolebindings)
 
 	return rolebindings
+}
+
+func ClusterRolesToAggregate() map[string]string {
+	return map[string]string{
+		"admin": "system:aggregate-to-admin",
+		"edit":  "system:aggregate-to-edit",
+		"view":  "system:aggregate-to-view",
+	}
 }

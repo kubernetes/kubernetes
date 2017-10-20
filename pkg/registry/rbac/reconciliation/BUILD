@@ -18,6 +18,7 @@ go_test(
         "//pkg/apis/core/helper:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
     ],
 )
 

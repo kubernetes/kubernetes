@@ -42,7 +42,10 @@ func NewStorage(s rest.StandardStorage, ruleResolver rbacregistryvalidation.Auth
 	return &Storage{s, ruleResolver}
 }
 
-var fullAuthority = []rbac.PolicyRule{rbac.NewRule("*").Groups("*").Resources("*").RuleOrDie()}
+var fullAuthority = []rbac.PolicyRule{
+	rbac.NewRule("*").Groups("*").Resources("*").RuleOrDie(),
+	rbac.NewRule("*").URLs("*").RuleOrDie(),
+}
 
 func (s *Storage) Create(ctx genericapirequest.Context, obj runtime.Object, createValidatingAdmission rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	if rbacregistry.EscalationAllowed(ctx) {
