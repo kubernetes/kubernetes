@@ -55,7 +55,7 @@ kind: DaemonSet
 metadata:
   labels:
     k8s-app: kube-proxy
-  name: kube-proxy
+  name: kube-proxy{{ if not .ImageOverride }}-{{ .Arch }}{{ end }}
   namespace: kube-system
 spec:
   selector:
@@ -85,6 +85,10 @@ spec:
           name: xtables-lock
           readOnly: false
       hostNetwork: true
+      {{ if not .ImageOverride }}
+      nodeSelector:
+        beta.kubernetes.io/arch: {{ .Arch }}
+      {{ end }}
       serviceAccountName: kube-proxy
       tolerations:
       - key: {{ .MasterTaintKey }}

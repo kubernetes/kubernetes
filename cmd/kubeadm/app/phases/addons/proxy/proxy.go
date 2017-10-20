@@ -43,6 +43,9 @@ const (
 	KubeProxyServiceAccountName = "kube-proxy"
 )
 
+// Supported architectures for kubernetes cluster, used while creating ds for all architectures
+var k8sArchs = [...]string{"amd64", "arm", "arm64", "ppc64le", "s390x"}
+
 // EnsureProxyAddon creates the kube-proxy addons
 func EnsureProxyAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interface) error {
 	if err := CreateServiceAccount(client); err != nil {
@@ -62,21 +65,42 @@ func EnsureProxyAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Inte
 		return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
 	}
 
-	proxyDaemonSetBytes, err := kubeadmutil.ParseTemplate(KubeProxyDaemonSet, struct{ ImageRepository, Arch, Version, ImageOverride, ClusterCIDR, MasterTaintKey, CloudTaintKey string }{
-		ImageRepository: cfg.GetControlPlaneImageRepository(),
-		Arch:            runtime.GOARCH,
-		Version:         kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion),
-		ImageOverride:   cfg.UnifiedControlPlaneImage,
-		ClusterCIDR:     getClusterCIDR(cfg.Networking.PodSubnet),
-		MasterTaintKey:  kubeadmconstants.LabelNodeRoleMaster,
-		CloudTaintKey:   algorithm.TaintExternalCloudProvider,
-	})
-	if err != nil {
-		return fmt.Errorf("error when parsing kube-proxy daemonset template: %v", err)
-	}
+	if cfg.UnifiedControlPlaneImage != "" {
+		proxyDaemonSetBytes, err := kubeadmutil.ParseTemplate(KubeProxyDaemonSet, struct{ ImageRepository, Arch, Version, ImageOverride, ClusterCIDR, MasterTaintKey, CloudTaintKey string }{
+			ImageRepository: cfg.GetControlPlaneImageRepository(),
+			Arch:            runtime.GOARCH,
+			Version:         kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion),
+			ImageOverride:   cfg.UnifiedControlPlaneImage,
+			ClusterCIDR:     getClusterCIDR(cfg.Networking.PodSubnet),
+			MasterTaintKey:  kubeadmconstants.LabelNodeRoleMaster,
+			CloudTaintKey:   algorithm.TaintExternalCloudProvider,
+		})
+		if err != nil {
+			return fmt.Errorf("error when parsing kube-proxy daemonset template: %v", err)
+		}
 
-	if err := createKubeProxyAddon(proxyConfigMapBytes, proxyDaemonSetBytes, client); err != nil {
-		return err
+		if err := createKubeProxyAddon(proxyConfigMapBytes, proxyDaemonSetBytes, client); err != nil {
+			return err
+		}
+	} else {
+		for _, ARCH := range k8sArchs {
+			proxyDaemonSetBytes, err := kubeadmutil.ParseTemplate(KubeProxyDaemonSet, struct{ ImageRepository, Arch, Version, ImageOverride, ClusterCIDR, MasterTaintKey, CloudTaintKey string }{
+				ImageRepository: cfg.GetControlPlaneImageRepository(),
+				Arch:            ARCH,
+				Version:         kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion),
+				ImageOverride:   "",
+				ClusterCIDR:     getClusterCIDR(cfg.Networking.PodSubnet),
+				MasterTaintKey:  kubeadmconstants.LabelNodeRoleMaster,
+				CloudTaintKey:   algorithm.TaintExternalCloudProvider,
+			})
+			if err != nil {
+				return fmt.Errorf("error when parsing kube-proxy daemonset template: %v", err)
+			}
+
+			if err := createKubeProxyAddon(proxyConfigMapBytes, proxyDaemonSetBytes, client); err != nil {
+				return err
+			}
+		}
 	}
 	if err := CreateRBACRules(client); err != nil {
 		return fmt.Errorf("error when creating kube-proxy RBAC rules: %v", err)
