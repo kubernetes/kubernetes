@@ -598,17 +598,6 @@ func makeHttpRequestToService(c clientset.Interface, ns, service, path string, t
 	return string(result), err
 }
 
-// pass enough context with the 'old' parameter so that it replaces what your really intended.
-func prepareResourceWithReplacedString(inputFile, old, new string) string {
-	f, err := os.Open(inputFile)
-	Expect(err).NotTo(HaveOccurred())
-	defer f.Close()
-	data, err := ioutil.ReadAll(f)
-	Expect(err).NotTo(HaveOccurred())
-	podYaml := strings.Replace(string(data), old, new, 1)
-	return podYaml
-}
-
 func createFileForGoBinData(gobindataPath, outputFilename string) error {
 	data := generated.ReadOrDie(gobindataPath)
 	if len(data) == 0 {

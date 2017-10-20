@@ -14,11 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package network
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -44,7 +47,7 @@ try:
 except:
 	print 'err'`
 
-var _ = framework.KubeDescribe("ClusterDns [Feature:Example]", func() {
+var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 	f := framework.NewDefaultFramework("cluster-dns")
 
 	var c clientset.Interface
@@ -155,4 +158,15 @@ var _ = framework.KubeDescribe("ClusterDns [Feature:Example]", func() {
 
 func getNsCmdFlag(ns *v1.Namespace) string {
 	return fmt.Sprintf("--namespace=%v", ns.Name)
+}
+
+// pass enough context with the 'old' parameter so that it replaces what your really intended.
+func prepareResourceWithReplacedString(inputFile, old, new string) string {
+	f, err := os.Open(inputFile)
+	Expect(err).NotTo(HaveOccurred())
+	defer f.Close()
+	data, err := ioutil.ReadAll(f)
+	Expect(err).NotTo(HaveOccurred())
+	podYaml := strings.Replace(string(data), old, new, 1)
+	return podYaml
 }
