@@ -21,7 +21,6 @@ package v1alpha1
 import (
 	v1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -55,8 +54,7 @@ func (s *priorityClassLister) List(selector labels.Selector) (ret []*v1alpha1.Pr
 
 // Get retrieves the PriorityClass from the index for a given name.
 func (s *priorityClassLister) Get(name string) (*v1alpha1.PriorityClass, error) {
-	key := &v1alpha1.PriorityClass{ObjectMeta: v1.ObjectMeta{Name: name}}
-	obj, exists, err := s.indexer.Get(key)
+	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}
