@@ -30,6 +30,7 @@ go_library(
         "//vendor/golang.org/x/oauth2/google:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
         "//vendor/google.golang.org/api/dns/v1:go_default_library",
+        "//vendor/google.golang.org/api/googleapi:go_default_library",
         "//vendor/gopkg.in/gcfg.v1:go_default_library",
     ],
 )
