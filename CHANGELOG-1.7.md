@@ -78,7 +78,7 @@
     - [Namespace](#namespace)
     - [Scheduling](#scheduling)
   - [**Notable Features**](#notable-features)
-  - [Kubefed](#kubefed)
+    - [**Kubefed**](#kubefed)
     - [**Kubernetes API**](#kubernetes-api)
       - [User Provided Extensions](#user-provided-extensions)
     - [**Application Deployment**](#application-deployment)
@@ -931,7 +931,7 @@ JSON API clients should tolerate `null` values for such fields, and treat `null`
 
 Features for this release were tracked via the use of the [kubernetes/features](https://github.com/kubernetes/features) issues repo. Each Feature issue is owned by a Special Interest Group from [kubernetes/community](https://github.com/kubernetes/community)
 
-## Kubefed
+### **Kubefed**
 
 * Deprecate the `--secret-name` flag from `kubefed join`, instead generating the secret name arbitrarily. ([#42513](https://github.com/kubernetes/kubernetes/pull/42513), [@perotinus](https://github.com/perotinus))
 
