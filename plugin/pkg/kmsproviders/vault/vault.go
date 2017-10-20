@@ -29,8 +29,13 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 
+	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
 )
+
+func Register(pluginRegistry *encryptionconfig.KMSPlugins) {
+	pluginRegistry.Register("vault", KMSFactory)
+}
 
 const vaultPrefix = "vault"
 

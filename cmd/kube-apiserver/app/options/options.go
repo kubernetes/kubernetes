@@ -24,6 +24,7 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -120,6 +121,9 @@ func NewServerRunOptions() *ServerRunOptions {
 	RegisterAllAdmissionPlugins(s.Admission.Plugins)
 	// Set the default for admission plugins names
 	s.Admission.PluginNames = []string{"AlwaysAdmit"}
+
+	// register all the kms plugins
+	RegisterAllKMSPlugins(&encryptionconfig.KMSPluginRegistry)
 	return &s
 }
 

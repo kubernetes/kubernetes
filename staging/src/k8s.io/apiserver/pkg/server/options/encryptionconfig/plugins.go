@@ -26,12 +26,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
-	"k8s.io/apiserver/plugin/pkg/kmsprovider/vault"
 )
-
-func init() {
-	KMSPluginRegistry.Register("vault", vault.KMSFactory)
-}
 
 // Factory is a function that returns an envelope Service for encryption providers.
 // The config parameter provides an io.Reader handler to the factory in
