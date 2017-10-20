@@ -97,6 +97,8 @@ func TestInitFederation(t *testing.T) {
 		apiserverServiceType         v1.ServiceType
 		advertiseAddress             string
 		serverImage                  string
+		imagePullPolicy              string
+		imagePullSecrets             string
 		etcdImage                    string
 		etcdPVCapacity               string
 		etcdPVStorageClass           string
@@ -120,6 +122,7 @@ func TestInitFederation(t *testing.T) {
 			lbIP:                  lbIP,
 			apiserverServiceType:  v1.ServiceTypeLoadBalancer,
 			serverImage:           "example.test/foo:bar",
+			imagePullPolicy:       "IfNotPresent",
 			etcdPVCapacity:        "5Gi",
 			etcdPersistence:       "true",
 			expectedErr:           "",
@@ -138,6 +141,7 @@ func TestInitFederation(t *testing.T) {
 			lbIP:                 lbIP,
 			apiserverServiceType: v1.ServiceTypeLoadBalancer,
 			serverImage:          "example.test/foo:bar",
+			imagePullPolicy:      "IfNotPresent",
 			etcdPVCapacity:       "", //test for default value of pvc-size
 			etcdPersistence:      "true",
 			expectedErr:          "",
@@ -151,6 +155,7 @@ func TestInitFederation(t *testing.T) {
 			lbIP:                 lbIP,
 			apiserverServiceType: v1.ServiceTypeLoadBalancer,
 			serverImage:          "example.test/foo:bar",
+			imagePullPolicy:      "IfNotPresent",
 			etcdPVCapacity:       "",
 			etcdPersistence:      "true",
 			expectedErr:          "",
@@ -164,6 +169,7 @@ func TestInitFederation(t *testing.T) {
 			lbIP:                 lbIP,
 			apiserverServiceType: v1.ServiceTypeLoadBalancer,
 			serverImage:          "example.test/foo:bar",
+			imagePullPolicy:      "IfNotPresent",
 			etcdPVCapacity:       "5Gi",
 			etcdPersistence:      "false",
 			expectedErr:          "",
@@ -176,6 +182,7 @@ func TestInitFederation(t *testing.T) {
 			dnsZoneName:          "example.test.",
 			apiserverServiceType: v1.ServiceTypeNodePort,
 			serverImage:          "example.test/foo:bar",
+			imagePullPolicy:      "IfNotPresent",
 			etcdPVCapacity:       "5Gi",
 			etcdPersistence:      "true",
 			expectedErr:          "",
@@ -189,6 +196,7 @@ func TestInitFederation(t *testing.T) {
 			apiserverServiceType: v1.ServiceTypeNodePort,
 			advertiseAddress:     nodeIP,
 			serverImage:          "example.test/foo:bar",
+			imagePullPolicy:      "IfNotPresent",
 			etcdPVCapacity:       "5Gi",
 			etcdPersistence:      "true",
 			expectedErr:          "",
@@ -202,6 +210,7 @@ func TestInitFederation(t *testing.T) {
 			apiserverServiceType: v1.ServiceTypeNodePort,
 			advertiseAddress:     nodeIP,
 			serverImage:          "example.test/foo:bar",
+			imagePullPolicy:      "IfNotPresent",
 			etcdImage:            "gcr.io/google_containers/etcd:latest",
 			etcdPVCapacity:       "5Gi",
 			etcdPVStorageClass:   "fast",
@@ -248,8 +257,11 @@ func TestInitFederation(t *testing.T) {
 		if tc.etcdImage == "" {
 			tc.etcdImage = defaultEtcdImage
 		}
+		if tc.imagePullPolicy == "" {
+			tc.imagePullPolicy = "IfNotPresent"
+		}
 
-		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.serverImage, tc.etcdImage, tc.dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.etcdPVStorageClass, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable, tc.nodeSelector)
+		hostFactory, err := fakeInitHostFactory(tc.apiserverServiceType, tc.federation, util.DefaultFederationSystemNamespace, tc.advertiseAddress, tc.lbIP, tc.dnsZoneName, tc.serverImage, tc.etcdImage, tc.dnsProvider, tc.dnsProviderConfig, tc.etcdPersistence, tc.etcdPVCapacity, tc.etcdPVStorageClass, tc.apiserverArgOverrides, tc.cmArgOverrides, tmpDirPath, tc.apiserverEnableHTTPBasicAuth, tc.apiserverEnableTokenAuth, tc.isRBACAPIAvailable, tc.nodeSelector, tc.imagePullPolicy, tc.imagePullSecrets)
 		if err != nil {
 			t.Fatalf("[%d] unexpected error: %v", i, err)
 		}
@@ -266,6 +278,7 @@ func TestInitFederation(t *testing.T) {
 		cmd.Flags().Set("dns-zone-name", tc.dnsZoneName)
 		cmd.Flags().Set("image", tc.serverImage)
 		cmd.Flags().Set("etcd-image", tc.etcdImage)
+		cmd.Flags().Set("image-pull-policy", tc.imagePullPolicy)
 		cmd.Flags().Set("dns-provider", tc.dnsProvider)
 		cmd.Flags().Set("apiserver-arg-overrides", tc.apiserverArgOverrides)
 		cmd.Flags().Set("controllermanager-arg-overrides", tc.cmArgOverrides)
@@ -281,6 +294,9 @@ func TestInitFederation(t *testing.T) {
 		}
 		if tc.etcdPersistence != "true" {
 			cmd.Flags().Set("etcd-persistent-storage", tc.etcdPersistence)
+		}
+		if tc.imagePullSecrets != "" {
+			cmd.Flags().Set("image-pull-secrets", tc.imagePullSecrets)
 		}
 		if tc.apiserverServiceType != v1.ServiceTypeLoadBalancer {
 			cmd.Flags().Set(apiserverServiceTypeFlag, string(tc.apiserverServiceType))
@@ -627,7 +643,7 @@ func TestCertsHTTPS(t *testing.T) {
 	}
 }
 
-func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, serverImage, etcdImage, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, etcdPVStorageClass, apiserverOverrideArg, cmOverrideArg, tmpDirPath string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth, isRBACAPIAvailable bool, nodeSelectorString string) (cmdutil.Factory, error) {
+func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, namespaceName, advertiseAddress, lbIp, dnsZoneName, serverImage, etcdImage, dnsProvider, dnsProviderConfig, etcdPersistence, etcdPVCapacity, etcdPVStorageClass, apiserverOverrideArg, cmOverrideArg, tmpDirPath string, apiserverEnableHTTPBasicAuth, apiserverEnableTokenAuth, isRBACAPIAvailable bool, nodeSelectorString string, imagePullPolicy, imagePullSecrets string) (cmdutil.Factory, error) {
 	svcName := federationName + "-apiserver"
 	svcUrlPrefix := "/api/v1/namespaces/federation-system/services"
 	credSecretName := svcName + "-credentials"
@@ -923,9 +939,10 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:    "apiserver",
-							Image:   serverImage,
-							Command: apiserverCommand,
+							Name:            "apiserver",
+							Image:           serverImage,
+							ImagePullPolicy: v1.PullPolicy(imagePullPolicy),
+							Command:         apiserverCommand,
 							Ports: []v1.ContainerPort{
 								{
 									Name:          apiServerSecurePortName,
@@ -955,6 +972,11 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 						},
 					},
 					NodeSelector: nodeSelector,
+					ImagePullSecrets: []v1.LocalObjectReference{
+						{
+							Name: imagePullSecrets,
+						},
+					},
 					Volumes: []v1.Volume{
 						{
 							Name: credSecretName,
@@ -1041,9 +1063,10 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:    "controller-manager",
-							Image:   serverImage,
-							Command: cmCommand,
+							Name:            "controller-manager",
+							Image:           serverImage,
+							ImagePullPolicy: v1.PullPolicy(imagePullPolicy),
+							Command:         cmCommand,
 							VolumeMounts: []v1.VolumeMount{
 								{
 									Name:      cmKubeconfigSecretName,
@@ -1064,6 +1087,11 @@ func fakeInitHostFactory(apiserverServiceType v1.ServiceType, federationName, na
 						},
 					},
 					NodeSelector: nodeSelector,
+					ImagePullSecrets: []v1.LocalObjectReference{
+						{
+							Name: imagePullSecrets,
+						},
+					},
 					Volumes: []v1.Volume{
 						{
 							Name: cmKubeconfigSecretName,
