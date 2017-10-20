@@ -469,7 +469,7 @@ def send_data(tls):
     tls.request_server_cert(common_name, sans, certificate_name)
 
 
-@when('config.changed', 'certificates.available')
+@when('config.changed.extra_sans', 'certificates.available')
 def update_certificate(tls):
     # I using the config.changed flag instead of something more
     # specific to try and catch ip changes. Being a little
