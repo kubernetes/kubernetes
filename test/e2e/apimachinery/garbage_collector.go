@@ -44,6 +44,34 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
+// estimateMaximumPods estimates how many pods the cluster can handle
+// with some wiggle room, to prevent pods being unable to schedule due
+// to max pod constraints.
+func estimateMaximumPods(c clientset.Interface, min, max int32) int32 {
+	availablePods := int32(0)
+	for _, node := range framework.GetReadySchedulableNodesOrDie(c).Items {
+		if q, ok := node.Status.Allocatable["pods"]; ok {
+			if num, ok := q.AsInt64(); ok {
+				availablePods += int32(num)
+				continue
+			}
+		}
+		// best guess per node, since default maxPerCore is 10 and most nodes have at least
+		// one core.
+		availablePods += 10
+	}
+	//avoid creating exactly max pods
+	availablePods *= 8 / 10
+	// bound the top and bottom
+	if availablePods > max {
+		availablePods = max
+	}
+	if availablePods < min {
+		availablePods = min
+	}
+	return availablePods
+}
+
 func getForegroundOptions() *metav1.DeleteOptions {
 	policy := metav1.DeletePropagationForeground
 	return &metav1.DeleteOptions{PropagationPolicy: &policy}
@@ -362,7 +390,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rcName := "simpletest.rc"
 		// TODO: find better way to keep this label unique in the test
 		uniqLabels := map[string]string{"gctest": "orphan_pods"}
-		rc := newOwnerRC(f, rcName, 100, uniqLabels)
+		rc := newOwnerRC(f, rcName, estimateMaximumPods(clientSet, 10, 100), uniqLabels)
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
 		if err != nil {
@@ -596,7 +624,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rcName := "simpletest.rc"
 		// TODO: find better way to keep this label unique in the test
 		uniqLabels := map[string]string{"gctest": "delete_pods_foreground"}
-		rc := newOwnerRC(f, rcName, 100, uniqLabels)
+		rc := newOwnerRC(f, rcName, estimateMaximumPods(clientSet, 10, 100), uniqLabels)
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
 		if err != nil {
@@ -678,7 +706,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
 		rc1Name := "simpletest-rc-to-be-deleted"
-		replicas := int32(100)
+		replicas := int32(estimateMaximumPods(clientSet, 10, 100))
 		halfReplicas := int(replicas / 2)
 		// TODO: find better way to keep this label unique in the test
 		uniqLabels := map[string]string{"gctest": "valid_and_pending_owners"}
