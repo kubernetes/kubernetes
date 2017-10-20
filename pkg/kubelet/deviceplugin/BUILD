@@ -13,7 +13,6 @@ go_library(
         "endpoint.go",
         "manager.go",
         "types.go",
-        "utils.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/deviceplugin",
     deps = [
@@ -44,7 +43,6 @@ go_test(
     srcs = [
         "endpoint_test.go",
         "manager_test.go",
-        "utils_test.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/deviceplugin",
     library = ":go_default_library",

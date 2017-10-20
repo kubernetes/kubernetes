@@ -20,7 +20,6 @@ package internalversion
 
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 	scheduling "k8s.io/kubernetes/pkg/apis/scheduling"
@@ -55,8 +54,7 @@ func (s *priorityClassLister) List(selector labels.Selector) (ret []*scheduling.
 
 // Get retrieves the PriorityClass from the index for a given name.
 func (s *priorityClassLister) Get(name string) (*scheduling.PriorityClass, error) {
-	key := &scheduling.PriorityClass{ObjectMeta: v1.ObjectMeta{Name: name}}
-	obj, exists, err := s.indexer.Get(key)
+	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}

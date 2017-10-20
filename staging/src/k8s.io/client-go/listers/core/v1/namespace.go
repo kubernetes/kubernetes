@@ -21,7 +21,6 @@ package v1
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -55,8 +54,7 @@ func (s *namespaceLister) List(selector labels.Selector) (ret []*v1.Namespace, e
 
 // Get retrieves the Namespace from the index for a given name.
 func (s *namespaceLister) Get(name string) (*v1.Namespace, error) {
-	key := &v1.Namespace{ObjectMeta: meta_v1.ObjectMeta{Name: name}}
-	obj, exists, err := s.indexer.Get(key)
+	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}

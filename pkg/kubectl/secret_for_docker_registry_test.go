@@ -70,7 +70,7 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 			},
 			expected: &api.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo-gb4kftc655",
+					Name: "foo-94759gc65b",
 				},
 				Data: map[string][]byte{
 					api.DockerConfigKey: secretData,

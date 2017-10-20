@@ -25,11 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/validation"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -323,34 +319,17 @@ func (s *podStorage) seenSources(sources ...string) bool {
 func filterInvalidPods(pods []*v1.Pod, source string, recorder record.EventRecorder) (filtered []*v1.Pod) {
 	names := sets.String{}
 	for i, pod := range pods {
-		var errlist field.ErrorList
-		// TODO: remove the conversion when validation is performed on versioned objects.
-		internalPod := &api.Pod{}
-		if err := k8s_api_v1.Convert_v1_Pod_To_api_Pod(pod, internalPod, nil); err != nil {
-			glog.Warningf("Pod[%d] (%s) from %s failed to convert to v1, ignoring: %v", i+1, format.Pod(pod), source, err)
-			recorder.Eventf(pod, v1.EventTypeWarning, "FailedConversion", "Error converting pod %s from %s, ignoring: %v", format.Pod(pod), source, err)
+		// Pods from each source are assumed to have passed validation individually.
+		// This function only checks if there is any naming conflict.
+		name := kubecontainer.GetPodFullName(pod)
+		if names.Has(name) {
+			glog.Warningf("Pod[%d] (%s) from %s failed validation due to duplicate pod name %q, ignoring", i+1, format.Pod(pod), source, pod.Name)
+			recorder.Eventf(pod, v1.EventTypeWarning, events.FailedValidation, "Error validating pod %s from %s due to duplicate pod name %q, ignoring", format.Pod(pod), source, pod.Name)
 			continue
-		}
-		if errs := validation.ValidatePod(internalPod); len(errs) != 0 {
-			errlist = append(errlist, errs...)
-			// If validation fails, don't trust it any further -
-			// even Name could be bad.
 		} else {
-			name := kubecontainer.GetPodFullName(pod)
-			if names.Has(name) {
-				// TODO: when validation becomes versioned, this gets a bit
-				// more complicated.
-				errlist = append(errlist, field.Duplicate(field.NewPath("metadata", "name"), pod.Name))
-			} else {
-				names.Insert(name)
-			}
+			names.Insert(name)
 		}
-		if len(errlist) > 0 {
-			err := errlist.ToAggregate()
-			glog.Warningf("Pod[%d] (%s) from %s failed validation, ignoring: %v", i+1, format.Pod(pod), source, err)
-			recorder.Eventf(pod, v1.EventTypeWarning, events.FailedValidation, "Error validating pod %s from %s, ignoring: %v", format.Pod(pod), source, err)
-			continue
-		}
+
 		filtered = append(filtered, pod)
 	}
 	return

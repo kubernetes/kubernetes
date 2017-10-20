@@ -1,33 +1,18 @@
 /*
  *
- * Copyright 2016, Google Inc.
- * All rights reserved.
+ * Copyright 2016 gRPC authors.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *     * Redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above
- * copyright notice, this list of conditions and the following disclaimer
- * in the documentation and/or other materials provided with the
- * distribution.
- *     * Neither the name of Google Inc. nor the names of its
- * contributors may be used to endorse or promote products derived from
- * this software without specific prior written permission.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -96,8 +81,8 @@ const (
 	GRPCLB
 )
 
-// AddrMetadataGRPCLB contains the information the name resolution for grpclb should provide. The
-// name resolver used by grpclb balancer is required to provide this type of metadata in
+// AddrMetadataGRPCLB contains the information the name resolver for grpclb should provide. The
+// name resolver used by the grpclb balancer is required to provide this type of metadata in
 // its address updates.
 type AddrMetadataGRPCLB struct {
 	// AddrType is the type of server (grpc load balancer or backend).
@@ -152,6 +137,7 @@ type balancer struct {
 func (b *balancer) watchAddrUpdates(w naming.Watcher, ch chan []remoteBalancerInfo) error {
 	updates, err := w.Next()
 	if err != nil {
+		grpclog.Warningf("grpclb: failed to get next addr update from watcher: %v", err)
 		return err
 	}
 	b.mu.Lock()
@@ -176,13 +162,13 @@ func (b *balancer) watchAddrUpdates(w naming.Watcher, ch chan []remoteBalancerIn
 			md, ok := update.Metadata.(*AddrMetadataGRPCLB)
 			if !ok {
 				// TODO: Revisit the handling here and may introduce some fallback mechanism.
-				grpclog.Printf("The name resolution contains unexpected metadata %v", update.Metadata)
+				grpclog.Errorf("The name resolution contains unexpected metadata %v", update.Metadata)
 				continue
 			}
 			switch md.AddrType {
 			case Backend:
 				// TODO: Revisit the handling here and may introduce some fallback mechanism.
-				grpclog.Printf("The name resolution does not give grpclb addresses")
+				grpclog.Errorf("The name resolution does not give grpclb addresses")
 				continue
 			case GRPCLB:
 				b.rbs = append(b.rbs, remoteBalancerInfo{
@@ -190,7 +176,7 @@ func (b *balancer) watchAddrUpdates(w naming.Watcher, ch chan []remoteBalancerIn
 					name: md.ServerName,
 				})
 			default:
-				grpclog.Printf("Received unknow address type %d", md.AddrType)
+				grpclog.Errorf("Received unknow address type %d", md.AddrType)
 				continue
 			}
 		case naming.Delete:
@@ -202,7 +188,7 @@ func (b *balancer) watchAddrUpdates(w naming.Watcher, ch chan []remoteBalancerIn
 				}
 			}
 		default:
-			grpclog.Println("Unknown update.Op ", update.Op)
+			grpclog.Errorf("Unknown update.Op %v", update.Op)
 		}
 	}
 	// TODO: Fall back to the basic round-robin load balancing if the resulting address is
@@ -249,8 +235,15 @@ func (b *balancer) processServerList(l *lbpb.ServerList, seq int) {
 	)
 	for _, s := range servers {
 		md := metadata.Pairs("lb-token", s.LoadBalanceToken)
+		ip := net.IP(s.IpAddress)
+		ipStr := ip.String()
+		if ip.To4() == nil {
+			// Add square brackets to ipv6 addresses, otherwise net.Dial() and
+			// net.SplitHostPort() will return too many colons error.
+			ipStr = fmt.Sprintf("[%s]", ipStr)
+		}
 		addr := Address{
-			Addr:     fmt.Sprintf("%s:%d", net.IP(s.IpAddress), s.Port),
+			Addr:     fmt.Sprintf("%s:%d", ipStr, s.Port),
 			Metadata: &md,
 		}
 		sl = append(sl, &grpclbAddrInfo{
@@ -306,6 +299,7 @@ func (b *balancer) sendLoadReport(s *balanceLoadClientStream, interval time.Dura
 				ClientStats: &stats,
 			},
 		}); err != nil {
+			grpclog.Errorf("grpclb: failed to send load report: %v", err)
 			return
 		}
 	}
@@ -316,7 +310,7 @@ func (b *balancer) callRemoteBalancer(lbc *loadBalancerClient, seq int) (retry b
 	defer cancel()
 	stream, err := lbc.BalanceLoad(ctx)
 	if err != nil {
-		grpclog.Printf("Failed to perform RPC to the remote balancer %v", err)
+		grpclog.Errorf("grpclb: failed to perform RPC to the remote balancer %v", err)
 		return
 	}
 	b.mu.Lock()
@@ -333,23 +327,25 @@ func (b *balancer) callRemoteBalancer(lbc *loadBalancerClient, seq int) (retry b
 		},
 	}
 	if err := stream.Send(initReq); err != nil {
+		grpclog.Errorf("grpclb: failed to send init request: %v", err)
 		// TODO: backoff on retry?
 		return true
 	}
 	reply, err := stream.Recv()
 	if err != nil {
+		grpclog.Errorf("grpclb: failed to recv init response: %v", err)
 		// TODO: backoff on retry?
 		return true
 	}
 	initResp := reply.GetInitialResponse()
 	if initResp == nil {
-		grpclog.Println("Failed to receive the initial response from the remote balancer.")
+		grpclog.Errorf("grpclb: reply from remote balancer did not include initial response.")
 		return
 	}
 	// TODO: Support delegation.
 	if initResp.LoadBalancerDelegate != "" {
 		// delegation
-		grpclog.Println("TODO: Delegation is not supported yet.")
+		grpclog.Errorf("TODO: Delegation is not supported yet.")
 		return
 	}
 	streamDone := make(chan struct{})
@@ -364,6 +360,7 @@ func (b *balancer) callRemoteBalancer(lbc *loadBalancerClient, seq int) (retry b
 	for {
 		reply, err := stream.Recv()
 		if err != nil {
+			grpclog.Errorf("grpclb: failed to recv server list: %v", err)
 			break
 		}
 		b.mu.Lock()
@@ -397,6 +394,7 @@ func (b *balancer) Start(target string, config BalancerConfig) error {
 	w, err := b.r.Resolve(target)
 	if err != nil {
 		b.mu.Unlock()
+		grpclog.Errorf("grpclb: failed to resolve address: %v, err: %v", target, err)
 		return err
 	}
 	b.w = w
@@ -406,7 +404,7 @@ func (b *balancer) Start(target string, config BalancerConfig) error {
 	go func() {
 		for {
 			if err := b.watchAddrUpdates(w, balancerAddrsCh); err != nil {
-				grpclog.Printf("grpc: the naming watcher stops working due to %v.\n", err)
+				grpclog.Warningf("grpclb: the naming watcher stops working due to %v.\n", err)
 				close(balancerAddrsCh)
 				return
 			}
@@ -490,22 +488,29 @@ func (b *balancer) Start(target string, config BalancerConfig) error {
 				cc.Close()
 			}
 			// Talk to the remote load balancer to get the server list.
-			var err error
-			creds := config.DialCreds
-			ccError = make(chan struct{})
-			if creds == nil {
-				cc, err = Dial(rb.addr, WithInsecure())
-			} else {
+			var (
+				err   error
+				dopts []DialOption
+			)
+			if creds := config.DialCreds; creds != nil {
 				if rb.name != "" {
 					if err := creds.OverrideServerName(rb.name); err != nil {
-						grpclog.Printf("Failed to override the server name in the credentials: %v", err)
+						grpclog.Warningf("grpclb: failed to override the server name in the credentials: %v", err)
 						continue
 					}
 				}
-				cc, err = Dial(rb.addr, WithTransportCredentials(creds))
+				dopts = append(dopts, WithTransportCredentials(creds))
+			} else {
+				dopts = append(dopts, WithInsecure())
 			}
+			if dialer := config.Dialer; dialer != nil {
+				// WithDialer takes a different type of function, so we instead use a special DialOption here.
+				dopts = append(dopts, func(o *dialOptions) { o.copts.Dialer = dialer })
+			}
+			ccError = make(chan struct{})
+			cc, err = Dial(rb.addr, dopts...)
 			if err != nil {
-				grpclog.Printf("Failed to setup a connection to the remote balancer %v: %v", rb.addr, err)
+				grpclog.Warningf("grpclb: failed to setup a connection to the remote balancer %v: %v", rb.addr, err)
 				close(ccError)
 				continue
 			}
@@ -732,6 +737,9 @@ func (b *balancer) Notify() <-chan []Address {
 func (b *balancer) Close() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if b.done {
+		return errBalancerClosed
+	}
 	b.done = true
 	if b.expTimer != nil {
 		b.expTimer.Stop()

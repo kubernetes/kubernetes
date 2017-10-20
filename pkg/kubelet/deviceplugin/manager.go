@@ -27,6 +27,8 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
+	"k8s.io/api/core/v1"
+	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
 )
 
@@ -94,9 +96,14 @@ func (m *ManagerImpl) removeContents(dir string) error {
 	return nil
 }
 
+const (
+	// defaultCheckpoint is the file name of device plugin checkpoint
+	defaultCheckpoint = "kubelet_internal_checkpoint"
+)
+
 // CheckpointFile returns device plugin checkpoint file path.
 func (m *ManagerImpl) CheckpointFile() string {
-	return filepath.Join(m.socketdir, "kubelet_internal_checkpoint")
+	return filepath.Join(m.socketdir, defaultCheckpoint)
 }
 
 // Start starts the Device Plugin Manager
@@ -110,11 +117,6 @@ func (m *ManagerImpl) Start() error {
 	// this and use it as a signal to re-register with the new Kubelet.
 	if err := m.removeContents(m.socketdir); err != nil {
 		glog.Errorf("Fail to clean up stale contents under %s: %+v", m.socketdir, err)
-	}
-
-	if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
-		glog.Errorf(errRemoveSocket+" %+v", err)
-		return err
 	}
 
 	s, err := net.Listen("unix", socketPath)
@@ -133,11 +135,11 @@ func (m *ManagerImpl) Start() error {
 
 // Devices is the map of devices that are known by the Device
 // Plugin manager with the kind of the devices as key
-func (m *ManagerImpl) Devices() map[string][]*pluginapi.Device {
+func (m *ManagerImpl) Devices() map[string][]pluginapi.Device {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	devs := make(map[string][]*pluginapi.Device)
+	devs := make(map[string][]pluginapi.Device)
 	for k, e := range m.endpoints {
 		glog.V(3).Infof("Endpoint: %+v: %+v", k, e)
 		devs[k] = e.getDevices()
@@ -174,8 +176,8 @@ func (m *ManagerImpl) Register(ctx context.Context,
 		return &pluginapi.Empty{}, fmt.Errorf(errUnsuportedVersion)
 	}
 
-	if err := IsResourceNameValid(r.ResourceName); err != nil {
-		return &pluginapi.Empty{}, err
+	if !v1helper.IsExtendedResourceName(v1.ResourceName(r.ResourceName)) {
+		return &pluginapi.Empty{}, fmt.Errorf(errInvalidResourceName, r.ResourceName)
 	}
 
 	// TODO: for now, always accepts newest device plugin. Later may consider to
@@ -231,7 +233,7 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 			glog.V(2).Infof("Delete resource for endpoint %v", e)
 			delete(m.endpoints, r.ResourceName)
 			// Issues callback to delete all of devices.
-			e.callback(e.resourceName, []*pluginapi.Device{}, []*pluginapi.Device{}, e.getDevices())
+			e.callback(e.resourceName, []pluginapi.Device{}, []pluginapi.Device{}, e.getDevices())
 		}
 		glog.V(2).Infof("Unregistered endpoint %v", e)
 		m.mutex.Unlock()

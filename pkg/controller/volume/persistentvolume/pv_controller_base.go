@@ -70,6 +70,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 	eventRecorder := p.EventRecorder
 	if eventRecorder == nil {
 		broadcaster := record.NewBroadcaster()
+		broadcaster.StartLogging(glog.Infof)
 		broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(p.KubeClient.Core().RESTClient()).Events("")})
 		eventRecorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "persistentvolume-controller"})
 	}

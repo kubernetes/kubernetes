@@ -21,6 +21,7 @@ reviewers:
   - soltysh
   - sig-testing-reviewers
   - sttts
+  - timothysc
   - zmerlynn
   - vishh
 approvers:
@@ -47,5 +48,6 @@ approvers:
   - smarterclayton
   - soltysh
   - sttts
+  - timothysc
   - zmerlynn
   - vishh 

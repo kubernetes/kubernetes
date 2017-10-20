@@ -41,7 +41,7 @@ func TestUpdateCapacity(t *testing.T) {
 	as.NotNil(testDevicePluginHandler)
 	as.Nil(err)
 
-	devs := []*pluginapi.Device{
+	devs := []pluginapi.Device{
 		{ID: "Device1", Health: pluginapi.Healthy},
 		{ID: "Device2", Health: pluginapi.Healthy},
 		{ID: "Device3", Health: pluginapi.Unhealthy},
@@ -51,9 +51,9 @@ func TestUpdateCapacity(t *testing.T) {
 	// Adds three devices for resource1, two healthy and one unhealthy.
 	// Expects capacity for resource1 to be 2.
 	expected[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(2), resource.DecimalSI)
-	testDevicePluginHandler.devicePluginManagerMonitorCallback(resourceName, devs, []*pluginapi.Device{}, []*pluginapi.Device{})
+	testDevicePluginHandler.devicePluginManagerMonitorCallback(resourceName, devs, []pluginapi.Device{}, []pluginapi.Device{})
 	// Deletes an unhealthy device should NOT change capacity.
-	testDevicePluginHandler.devicePluginManagerMonitorCallback(resourceName, []*pluginapi.Device{}, []*pluginapi.Device{}, []*pluginapi.Device{devs[2]})
+	testDevicePluginHandler.devicePluginManagerMonitorCallback(resourceName, []pluginapi.Device{}, []pluginapi.Device{}, []pluginapi.Device{devs[2]})
 	// Updates a healthy device to unhealthy should reduce capacity by 1.
 	expected[v1.ResourceName(resourceName)] = *resource.NewQuantity(int64(1), resource.DecimalSI)
 	// Deletes a healthy device should reduce capacity by 1.
@@ -62,7 +62,7 @@ func TestUpdateCapacity(t *testing.T) {
 	delete(expected, v1.ResourceName(resourceName))
 	resourceName2 := "resource2"
 	expected[v1.ResourceName(resourceName2)] = *resource.NewQuantity(int64(2), resource.DecimalSI)
-	testDevicePluginHandler.devicePluginManagerMonitorCallback(resourceName2, devs, []*pluginapi.Device{}, []*pluginapi.Device{})
+	testDevicePluginHandler.devicePluginManagerMonitorCallback(resourceName2, devs, []pluginapi.Device{}, []pluginapi.Device{})
 }
 
 type stringPairType struct {
@@ -90,8 +90,8 @@ func (m *DevicePluginManagerTestStub) Start() error {
 	return nil
 }
 
-func (m *DevicePluginManagerTestStub) Devices() map[string][]*pluginapi.Device {
-	return make(map[string][]*pluginapi.Device)
+func (m *DevicePluginManagerTestStub) Devices() map[string][]pluginapi.Device {
+	return make(map[string][]pluginapi.Device)
 }
 
 func (m *DevicePluginManagerTestStub) Allocate(resourceName string, devIds []string) (*pluginapi.AllocateResponse, error) {
@@ -181,7 +181,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 	m, err := NewDevicePluginManagerTestStub()
 	as := assert.New(t)
 	as.Nil(err)
-	monitorCallback := func(resourceName string, added, updated, deleted []*pluginapi.Device) {}
+	monitorCallback := func(resourceName string, added, updated, deleted []pluginapi.Device) {}
 
 	testDevicePluginHandler := &DevicePluginHandlerImpl{
 		devicePluginManager:                m,

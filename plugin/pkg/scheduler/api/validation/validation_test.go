@@ -50,18 +50,22 @@ func TestValidatePolicy(t *testing.T) {
 			expected: errors.New("Priority WeightPriority should have a positive weight applied to it or it has overflown"),
 		},
 		{
-			policy:   api.Policy{ExtenderConfigs: []api.ExtenderConfig{{URLPrefix: "http://127.0.0.1:8081/extender", FilterVerb: "filter", Weight: 2}}},
+			policy:   api.Policy{ExtenderConfigs: []api.ExtenderConfig{{URLPrefix: "http://127.0.0.1:8081/extender", PrioritizeVerb: "prioritize", Weight: 2}}},
 			expected: nil,
 		},
 		{
-			policy:   api.Policy{ExtenderConfigs: []api.ExtenderConfig{{URLPrefix: "http://127.0.0.1:8081/extender", FilterVerb: "filter", Weight: -2}}},
+			policy:   api.Policy{ExtenderConfigs: []api.ExtenderConfig{{URLPrefix: "http://127.0.0.1:8081/extender", PrioritizeVerb: "prioritize", Weight: -2}}},
 			expected: errors.New("Priority for extender http://127.0.0.1:8081/extender should have a positive weight applied to it"),
+		},
+		{
+			policy:   api.Policy{ExtenderConfigs: []api.ExtenderConfig{{URLPrefix: "http://127.0.0.1:8081/extender", FilterVerb: "filter"}}},
+			expected: nil,
 		},
 		{
 			policy: api.Policy{
 				ExtenderConfigs: []api.ExtenderConfig{
-					{URLPrefix: "http://127.0.0.1:8081/extender", BindVerb: "bind", Weight: 2},
-					{URLPrefix: "http://127.0.0.1:8082/extender", BindVerb: "bind", Weight: 2},
+					{URLPrefix: "http://127.0.0.1:8081/extender", BindVerb: "bind"},
+					{URLPrefix: "http://127.0.0.1:8082/extender", BindVerb: "bind"},
 				}},
 			expected: errors.New("Only one extender can implement bind, found 2"),
 		},
