@@ -1776,6 +1776,9 @@ function start-kube-addons {
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns"
     local -r dns_controller_file="${dst_dir}/dns/kubedns-controller.yaml"
+    # Replace with custom GKE deployment
+    echo <<EOF >${dns_controller_file}
+$(echo "$CUSTOM_KUBE_DNS_DEPLOYMENT" | sed -e "s/'/''/g")
     local -r dns_svc_file="${dst_dir}/dns/kubedns-svc.yaml"
     mv "${dst_dir}/dns/kubedns-controller.yaml.in" "${dns_controller_file}"
     mv "${dst_dir}/dns/kubedns-svc.yaml.in" "${dns_svc_file}"
