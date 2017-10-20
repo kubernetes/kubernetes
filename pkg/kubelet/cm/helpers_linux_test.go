@@ -22,6 +22,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -195,5 +197,69 @@ func TestMilliCPUToQuota(t *testing.T) {
 		if quota != testCase.quota || period != testCase.period {
 			t.Errorf("Input %v, expected quota %v period %v, but got quota %v period %v", testCase.input, testCase.quota, testCase.period, quota, period)
 		}
+	}
+}
+
+func TestMilliCPUToShares(t *testing.T) {
+	testCases := []struct {
+		input  int64
+		shares uint64
+	}{
+		{
+			input:  int64(0),
+			shares: uint64(2),
+		},
+		{
+			input:  int64(1),
+			shares: uint64(2),
+		},
+		{
+			input:  int64(2),
+			shares: uint64(2),
+		},
+		{
+			input:  int64(5),
+			shares: uint64(5),
+		},
+		{
+			input:  int64(10),
+			shares: uint64(10),
+		},
+		{
+			input:  int64(200),
+			shares: uint64(204),
+		},
+		{
+			input:  int64(1000),
+			shares: uint64(1024),
+		},
+	}
+	for _, testCase := range testCases {
+		result := MilliCPUToShares(testCase.input)
+		if result != testCase.shares {
+			t.Errorf("Input %v, expected shares %v, but got result %v", testCase.input, testCase.shares, result)
+		}
+	}
+}
+
+func TestHugePageLimits(t *testing.T) {
+	resourceList := v1.ResourceList{
+		v1.ResourceHugePagesPrefix + "2Mi":   *resource.NewQuantity(50, resource.BinarySI),
+		v1.ResourceHugePagesPrefix + "4Mi":   *resource.NewQuantity(100, resource.BinarySI),
+		v1.ResourceHugePagesPrefix + "100Mi": *resource.NewQuantity(200, resource.BinarySI),
+	}
+
+	var Mi int64 = 1048576
+
+	expected := map[int64]int64{
+		2 * Mi:   50,
+		4 * Mi:   100,
+		100 * Mi: 200,
+	}
+
+	result := HugePageLimits(resourceList)
+	for k, v := range expected {
+		assert.NotNil(t, result[k], "unexpected nil pagesize: %v", k)
+		assert.EqualValues(t, v, result[k], "unexpected hugepage, expected: %v, actual: %v", v, result[k])
 	}
 }
