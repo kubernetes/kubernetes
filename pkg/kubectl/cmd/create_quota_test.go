@@ -22,13 +22,13 @@ import (
 	"testing"
 
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
+	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestCreateQuota(t *testing.T) {
-	resourceQuotaObject := &api.ResourceQuota{}
+	resourceQuotaObject := &apiv1.ResourceQuota{}
 	resourceQuotaObject.Name = "my-quota"
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}

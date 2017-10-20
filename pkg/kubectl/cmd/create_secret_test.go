@@ -22,13 +22,13 @@ import (
 	"testing"
 
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
+	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestCreateSecretGeneric(t *testing.T) {
-	secretObject := &api.Secret{
+	secretObject := &apiv1.Secret{
 		Data: map[string][]byte{
 			"password": []byte("includes,comma"),
 			"username": []byte("test_user"),
@@ -64,7 +64,7 @@ func TestCreateSecretGeneric(t *testing.T) {
 }
 
 func TestCreateSecretDockerRegistry(t *testing.T) {
-	secretObject := &api.Secret{}
+	secretObject := &apiv1.Secret{}
 	secretObject.Name = "my-secret"
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
