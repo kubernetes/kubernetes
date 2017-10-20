@@ -158,6 +158,7 @@ type ProxyMode string
 const (
 	ProxyModeUserspace ProxyMode = "userspace"
 	ProxyModeIPTables  ProxyMode = "iptables"
+	ProxyModeIPVS      ProxyMode = "ipvs"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

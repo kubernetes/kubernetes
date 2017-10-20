@@ -63,6 +63,7 @@ func autoConvert_v1alpha1_AdmissionHookClientConfig_To_admissionregistration_Adm
 	if err := Convert_v1alpha1_ServiceReference_To_admissionregistration_ServiceReference(&in.Service, &out.Service, s); err != nil {
 		return err
 	}
+	out.URLPath = in.URLPath
 	out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
 	return nil
 }
@@ -76,6 +77,7 @@ func autoConvert_admissionregistration_AdmissionHookClientConfig_To_v1alpha1_Adm
 	if err := Convert_admissionregistration_ServiceReference_To_v1alpha1_ServiceReference(&in.Service, &out.Service, s); err != nil {
 		return err
 	}
+	out.URLPath = in.URLPath
 	out.CABundle = *(*[]byte)(unsafe.Pointer(&in.CABundle))
 	return nil
 }

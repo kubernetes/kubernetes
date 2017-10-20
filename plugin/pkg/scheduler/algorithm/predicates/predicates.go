@@ -49,7 +49,7 @@ const (
 
 // IMPORTANT NOTE for predicate developers:
 // We are using cached predicate result for pods belonging to the same equivalence class.
-// So when updating a existing predicate, you should consider whether your change will introduce new
+// So when updating an existing predicate, you should consider whether your change will introduce new
 // dependency to attributes of any API object like Pod, Node, Service etc.
 // If yes, you are expected to invalidate the cached predicate result for related API object change.
 // For example:

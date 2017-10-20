@@ -39,7 +39,7 @@ function kfind() {
     # include the "special" vendor directories which are actually part
     # of the Kubernetes source tree - generators will use these for
     # including certain core API concepts.
-    find -H . ./vendor/k8s.io/apimachinery ./vendor/k8s.io/apiserver ./vendor/k8s.io/kube-aggregator ./vendor/k8s.io/apiextensions-apiserver ./vendor/k8s.io/metrics ./vendor/k8s.io/sample-apiserver ./vendor/k8s.io/api ./vendor/k8s.io/client-go ./vendor/k8s.io/code-generator \
+    find -H . ./vendor/k8s.io/apimachinery ./vendor/k8s.io/apiserver ./vendor/k8s.io/kube-aggregator ./vendor/k8s.io/apiextensions-apiserver ./vendor/k8s.io/metrics ./vendor/k8s.io/sample-apiserver ./vendor/k8s.io/api ./vendor/k8s.io/client-go ./vendor/k8s.io/code-generator ./vendor/k8s.io/sample-controller \
         \(                         \
         -not \(                    \
             \(                     \

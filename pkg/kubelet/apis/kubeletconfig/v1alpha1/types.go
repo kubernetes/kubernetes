@@ -244,8 +244,6 @@ type KubeletConfiguration struct {
 	SerializeImagePulls *bool `json:"serializeImagePulls"`
 	// nodeLabels to add when registering the node in the cluster.
 	NodeLabels map[string]string `json:"nodeLabels"`
-	// enable gathering custom metrics.
-	EnableCustomMetrics bool `json:"enableCustomMetrics"`
 	// Comma-delimited list of hard eviction expressions.  For example, 'memory.available<300Mi'.
 	EvictionHard *string `json:"evictionHard"`
 	// Comma-delimited list of soft eviction expressions.  For example, 'memory.available<300Mi'.

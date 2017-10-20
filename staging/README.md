@@ -15,6 +15,7 @@ Repositories currently staged here:
 - [`k8s.io/code-generator`](https://github.com/kubernetes/code-generator)
 - [`k8s.io/metrics`](https://github.com/kubernetes/metrics)
 - [`k8s.io/sample-apiserver`](https://github.com/kubernetes/sample-apiserver)
+- [`k8s.io/sample-controller`](https://github.com/kubernetes/sample-controller)
 
 The code in the staging/ directory is authoritative, i.e. the only copy of the
 code. You can directly modify such code.

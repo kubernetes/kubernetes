@@ -19,12 +19,16 @@ package framework
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/onsi/ginkgo/config"
 	"github.com/spf13/viper"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubemark"
@@ -296,12 +300,61 @@ func ViperizeFlags() {
 	AfterReadingAllFlags(&TestContext)
 }
 
+func createKubeConfig(clientCfg *restclient.Config) *clientcmdapi.Config {
+	clusterNick := "cluster"
+	userNick := "user"
+	contextNick := "context"
+
+	config := clientcmdapi.NewConfig()
+
+	credentials := clientcmdapi.NewAuthInfo()
+	credentials.Token = clientCfg.BearerToken
+	credentials.ClientCertificate = clientCfg.TLSClientConfig.CertFile
+	if len(credentials.ClientCertificate) == 0 {
+		credentials.ClientCertificateData = clientCfg.TLSClientConfig.CertData
+	}
+	credentials.ClientKey = clientCfg.TLSClientConfig.KeyFile
+	if len(credentials.ClientKey) == 0 {
+		credentials.ClientKeyData = clientCfg.TLSClientConfig.KeyData
+	}
+	config.AuthInfos[userNick] = credentials
+
+	cluster := clientcmdapi.NewCluster()
+	cluster.Server = clientCfg.Host
+	cluster.CertificateAuthority = clientCfg.CAFile
+	if len(cluster.CertificateAuthority) == 0 {
+		cluster.CertificateAuthorityData = clientCfg.CAData
+	}
+	cluster.InsecureSkipTLSVerify = clientCfg.Insecure
+	config.Clusters[clusterNick] = cluster
+
+	context := clientcmdapi.NewContext()
+	context.Cluster = clusterNick
+	context.AuthInfo = userNick
+	config.Contexts[contextNick] = context
+	config.CurrentContext = contextNick
+
+	return config
+}
+
 // AfterReadingAllFlags makes changes to the context after all flags
 // have been read.
 func AfterReadingAllFlags(t *TestContextType) {
 	// Only set a default host if one won't be supplied via kubeconfig
 	if len(t.Host) == 0 && len(t.KubeConfig) == 0 {
-		t.Host = defaultHost
+		// Check if we can use the in-cluster config
+		if clusterConfig, err := restclient.InClusterConfig(); err == nil {
+			if tempFile, err := ioutil.TempFile(os.TempDir(), "kubeconfig-"); err == nil {
+				kubeConfig := createKubeConfig(clusterConfig)
+				clientcmd.WriteToFile(*kubeConfig, tempFile.Name())
+				t.KubeConfig = tempFile.Name()
+				glog.Infof("Using a temporary kubeconfig file from in-cluster config : %s", tempFile.Name())
+			}
+		}
+		if len(t.KubeConfig) == 0 {
+			glog.Warningf("Unable to find in-cluster config, using default host : %s", defaultHost)
+			t.Host = defaultHost
+		}
 	}
 	// Reset the cluster IP range flag to CLUSTER_IP_RANGE env var, if defined.
 	if clusterIPRange := os.Getenv("CLUSTER_IP_RANGE"); clusterIPRange != "" {

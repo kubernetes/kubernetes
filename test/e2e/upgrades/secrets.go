@@ -114,7 +114,7 @@ func (t *SecretUpgradeTest) testPod(f *framework.Framework) {
 				},
 				{
 					Name:    "secret-env-test",
-					Image:   imageutils.GetBusyBoxImage(),
+					Image:   "busybox",
 					Command: []string{"sh", "-c", "env"},
 					Env: []v1.EnvVar{
 						{

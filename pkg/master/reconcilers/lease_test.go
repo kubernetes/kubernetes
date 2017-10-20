@@ -54,6 +54,11 @@ func (f *fakeLeases) UpdateLease(ip string) error {
 	return nil
 }
 
+func (f *fakeLeases) RemoveLease(ip string) error {
+	delete(f.keys, ip)
+	return nil
+}
+
 func (f *fakeLeases) SetKeys(keys []string) {
 	for _, ip := range keys {
 		f.keys[ip] = false
@@ -526,6 +531,103 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 		}
 		if updatedKeys := fakeLeases.GetUpdatedKeys(); len(updatedKeys) != 1 || updatedKeys[0] != test.ip {
 			t.Errorf("case %q: expected the master's IP to be refreshed, but the following IPs were refreshed instead: %v", test.testName, updatedKeys)
+		}
+	}
+}
+
+func TestLeaseStopReconciling(t *testing.T) {
+	ns := api.NamespaceDefault
+	om := func(name string) metav1.ObjectMeta {
+		return metav1.ObjectMeta{Namespace: ns, Name: name}
+	}
+	stopTests := []struct {
+		testName      string
+		serviceName   string
+		ip            string
+		endpointPorts []api.EndpointPort
+		endpointKeys  []string
+		endpoints     *api.EndpointsList
+		expectUpdate  *api.Endpoints // nil means none expected
+	}{
+		{
+			testName:      "successful stop reconciling",
+			serviceName:   "foo",
+			ip:            "1.2.3.4",
+			endpointPorts: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
+			endpoints: &api.EndpointsList{
+				Items: []api.Endpoints{{
+					ObjectMeta: om("foo"),
+					Subsets: []api.EndpointSubset{{
+						Addresses: []api.EndpointAddress{
+							{IP: "1.2.3.4"},
+							{IP: "4.3.2.2"},
+							{IP: "4.3.2.3"},
+							{IP: "4.3.2.4"},
+						},
+						Ports: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+					}},
+				}},
+			},
+			expectUpdate: &api.Endpoints{
+				ObjectMeta: om("foo"),
+				Subsets: []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{
+						{IP: "4.3.2.2"},
+						{IP: "4.3.2.3"},
+						{IP: "4.3.2.4"},
+					},
+					Ports: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+				}},
+			},
+		},
+		{
+			testName:      "stop reconciling with ip not in endpoint ip list",
+			serviceName:   "foo",
+			ip:            "5.6.7.8",
+			endpointPorts: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+			endpointKeys:  []string{"1.2.3.4", "4.3.2.2", "4.3.2.3", "4.3.2.4"},
+			endpoints: &api.EndpointsList{
+				Items: []api.Endpoints{{
+					ObjectMeta: om("foo"),
+					Subsets: []api.EndpointSubset{{
+						Addresses: []api.EndpointAddress{
+							{IP: "1.2.3.4"},
+							{IP: "4.3.2.2"},
+							{IP: "4.3.2.3"},
+							{IP: "4.3.2.4"},
+						},
+						Ports: []api.EndpointPort{{Name: "foo", Port: 8080, Protocol: "TCP"}},
+					}},
+				}},
+			},
+		},
+	}
+	for _, test := range stopTests {
+		fakeLeases := newFakeLeases()
+		fakeLeases.SetKeys(test.endpointKeys)
+		registry := &registrytest.EndpointRegistry{
+			Endpoints: test.endpoints,
+		}
+		r := NewLeaseEndpointReconciler(registry, fakeLeases)
+		err := r.StopReconciling(test.serviceName, net.ParseIP(test.ip), test.endpointPorts)
+		if err != nil {
+			t.Errorf("case %q: unexpected error: %v", test.testName, err)
+		}
+		if test.expectUpdate != nil {
+			if len(registry.Updates) != 1 {
+				t.Errorf("case %q: unexpected updates: %v", test.testName, registry.Updates)
+			} else if e, a := test.expectUpdate, &registry.Updates[0]; !reflect.DeepEqual(e, a) {
+				t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
+			}
+		}
+		if test.expectUpdate == nil && len(registry.Updates) > 0 {
+			t.Errorf("case %q: no update expected, yet saw: %v", test.testName, registry.Updates)
+		}
+		for _, key := range fakeLeases.GetUpdatedKeys() {
+			if key == test.ip {
+				t.Errorf("case %q: Found ip %s in leases but shouldn't be there", test.testName, key)
+			}
 		}
 	}
 }

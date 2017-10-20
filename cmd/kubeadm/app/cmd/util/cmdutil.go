@@ -39,19 +39,21 @@ func SubCmdRunE(name string) func(*cobra.Command, []string) error {
 
 // ValidateExactArgNumber validates that the required top-level arguments are specified
 func ValidateExactArgNumber(args []string, supportedArgs []string) error {
+	lenSupported := len(supportedArgs)
 	validArgs := 0
 	// Disregard possible "" arguments; they are invalid
 	for _, arg := range args {
 		if len(arg) > 0 {
 			validArgs++
 		}
+		// break early for too many arguments
+		if validArgs > lenSupported {
+			return fmt.Errorf("too many arguments. Required arguments: %v", supportedArgs)
+		}
 	}
 
-	if validArgs < len(supportedArgs) {
+	if validArgs < lenSupported {
 		return fmt.Errorf("missing one or more required arguments. Required arguments: %v", supportedArgs)
-	}
-	if validArgs > len(supportedArgs) {
-		return fmt.Errorf("too many arguments, only %d argument(s) supported: %v", validArgs, supportedArgs)
 	}
 	return nil
 }

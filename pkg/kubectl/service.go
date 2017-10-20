@@ -135,7 +135,7 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	if portString, found = params["ports"]; !found {
 		portString, found = params["port"]
 		if !found && !isHeadlessService {
-			return nil, fmt.Errorf("'port' is a required parameter.")
+			return nil, fmt.Errorf("'ports' or 'port' is a required parameter.")
 		}
 	}
 

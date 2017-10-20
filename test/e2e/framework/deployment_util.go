@@ -289,3 +289,22 @@ func RunDeployment(config testutils.DeploymentConfig) error {
 func logPodsOfDeployment(c clientset.Interface, deployment *extensions.Deployment, rsList []*extensions.ReplicaSet) {
 	testutils.LogPodsOfDeployment(c, deployment, rsList, Logf)
 }
+
+func WaitForDeploymentCompletes(c clientset.Interface, deployment *extensions.Deployment) error {
+	return testutils.WaitForDeploymentCompletes(c, deployment, Logf, Poll, pollLongTimeout)
+}
+
+func WaitForDeploymentRevision(c clientset.Interface, d *extensions.Deployment, targetRevision string) error {
+	err := wait.PollImmediate(Poll, pollLongTimeout, func() (bool, error) {
+		deployment, err := c.ExtensionsV1beta1().Deployments(d.Namespace).Get(d.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		revision := deployment.Annotations[deploymentutil.RevisionAnnotation]
+		return revision == targetRevision, nil
+	})
+	if err != nil {
+		return fmt.Errorf("error waiting for revision to become %q for deployment %q: %v", targetRevision, d.Name, err)
+	}
+	return nil
+}

@@ -86,21 +86,3 @@ var (
 func GetE2EImage(image ImageConfig) string {
 	return fmt.Sprintf("%s/%s-%s:%s", image.registry, image.name, runtime.GOARCH, image.version)
 }
-
-// GetBusyboxImage returns multi-arch busybox docker image
-func GetBusyBoxImage() string {
-	switch arch := runtime.GOARCH; arch {
-	case "amd64":
-		return "busybox"
-	case "arm":
-		return "arm32v6/busybox"
-	case "arm64":
-		return "arm64v8/busybox"
-	case "ppc64le":
-		return "ppc64le/busybox"
-	case "s390x":
-		return "s390x/busybox"
-	default:
-		return ""
-	}
-}
