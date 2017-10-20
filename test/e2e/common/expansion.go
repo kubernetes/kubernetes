@@ -31,6 +31,11 @@ import (
 var _ = framework.KubeDescribe("Variable Expansion", func() {
 	f := framework.NewDefaultFramework("var-expansion")
 
+	/*
+		    Testname: var-expansion-env
+		    Description: Make sure environment variables can be set using an
+			expansion of previously defined environment variables
+	*/
 	It("should allow composing env vars into new env vars [Conformance]", func() {
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		pod := &v1.Pod{
@@ -71,6 +76,11 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		})
 	})
 
+	/*
+		    Testname: var-expansion-command
+		    Description: Make sure a container's commands can be set using an
+			expansion of environment variables.
+	*/
 	It("should allow substituting values in a container's command [Conformance]", func() {
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		pod := &v1.Pod{
@@ -101,6 +111,11 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		})
 	})
 
+	/*
+		    Testname: var-expansion-arg
+		    Description: Make sure a container's args can be set using an
+			expansion of environment variables.
+	*/
 	It("should allow substituting values in a container's args [Conformance]", func() {
 		podName := "var-expansion-" + string(uuid.NewUUID())
 		pod := &v1.Pod{
