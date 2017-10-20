@@ -358,6 +358,7 @@ func NewControllerInitializers() map[string]InitFunc {
 	controllers["persistentvolume-binder"] = startPersistentVolumeBinderController
 	controllers["attachdetach"] = startAttachDetachController
 	controllers["persistentvolume-expander"] = startVolumeExpandController
+	controllers["clusterrole-aggregation"] = startClusterRoleAggregrationController
 
 	return controllers
 }
