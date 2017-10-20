@@ -134,6 +134,10 @@ type GenericAPIServer struct {
 	postStartHooksCalled   bool
 	disabledPostStartHooks sets.String
 
+	preShutdownHookLock    sync.Mutex
+	preShutdownHooks       map[string]preShutdownHookEntry
+	preShutdownHooksCalled bool
+
 	// healthz checks
 	healthzLock    sync.Mutex
 	healthzChecks  []healthz.HealthzChecker
@@ -163,6 +167,9 @@ type DelegationTarget interface {
 	// PostStartHooks returns the post-start hooks that need to be combined
 	PostStartHooks() map[string]postStartHookEntry
 
+	// PreShutdownHooks returns the pre-stop hooks that need to be combined
+	PreShutdownHooks() map[string]preShutdownHookEntry
+
 	// HealthzChecks returns the healthz checks that need to be combined
 	HealthzChecks() []healthz.HealthzChecker
 
@@ -179,6 +186,9 @@ func (s *GenericAPIServer) UnprotectedHandler() http.Handler {
 }
 func (s *GenericAPIServer) PostStartHooks() map[string]postStartHookEntry {
 	return s.postStartHooks
+}
+func (s *GenericAPIServer) PreShutdownHooks() map[string]preShutdownHookEntry {
+	return s.preShutdownHooks
 }
 func (s *GenericAPIServer) HealthzChecks() []healthz.HealthzChecker {
 	return s.healthzChecks
@@ -204,6 +214,9 @@ func (s emptyDelegate) UnprotectedHandler() http.Handler {
 }
 func (s emptyDelegate) PostStartHooks() map[string]postStartHookEntry {
 	return map[string]postStartHookEntry{}
+}
+func (s emptyDelegate) PreShutdownHooks() map[string]preShutdownHookEntry {
+	return map[string]preShutdownHookEntry{}
 }
 func (s emptyDelegate) HealthzChecks() []healthz.HealthzChecker {
 	return []healthz.HealthzChecker{}
@@ -264,7 +277,7 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 		s.GenericAPIServer.AuditBackend.Shutdown()
 	}
 
-	return nil
+	return s.RunPreShutdownHooks()
 }
 
 // NonBlockingRun spawns the secure http server. An error is

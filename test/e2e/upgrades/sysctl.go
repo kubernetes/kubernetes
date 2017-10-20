@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // SecretUpgradeTest tests that a pod with sysctls runs before and after an upgrade. During
@@ -132,7 +131,7 @@ func sysctlTestPod(name string, sysctls map[string]string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:    "test-container",
-					Image:   imageutils.GetBusyBoxImage(),
+					Image:   "busybox",
 					Command: append([]string{"/bin/sysctl"}, keys...),
 				},
 			},

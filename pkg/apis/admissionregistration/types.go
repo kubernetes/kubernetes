@@ -199,6 +199,10 @@ type AdmissionHookClientConfig struct {
 	// ports open, port 443 will be used if it is open, otherwise it is an error.
 	// Required
 	Service ServiceReference
+
+	// URLPath is an optional field that specifies the URL path to use when posting the AdmissionReview object.
+	URLPath string
+
 	// CABundle is a PEM encoded CA bundle which will be used to validate webhook's server certificate.
 	// Required
 	CABundle []byte

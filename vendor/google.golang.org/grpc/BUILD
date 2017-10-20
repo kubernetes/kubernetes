@@ -27,6 +27,7 @@ go_library(
         "//vendor/golang.org/x/net/http2:go_default_library",
         "//vendor/golang.org/x/net/trace:go_default_library",
         "//vendor/google.golang.org/grpc/codes:go_default_library",
+        "//vendor/google.golang.org/grpc/connectivity:go_default_library",
         "//vendor/google.golang.org/grpc/credentials:go_default_library",
         "//vendor/google.golang.org/grpc/grpclb/grpc_lb_v1:go_default_library",
         "//vendor/google.golang.org/grpc/grpclog:go_default_library",
@@ -54,6 +55,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//vendor/google.golang.org/grpc/codes:all-srcs",
+        "//vendor/google.golang.org/grpc/connectivity:all-srcs",
         "//vendor/google.golang.org/grpc/credentials:all-srcs",
         "//vendor/google.golang.org/grpc/grpclb/grpc_lb_v1:all-srcs",
         "//vendor/google.golang.org/grpc/grpclog:all-srcs",

@@ -460,6 +460,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		openAPIConfig: c.OpenAPIConfig,
 
 		postStartHooks:         map[string]postStartHookEntry{},
+		preShutdownHooks:       map[string]preShutdownHookEntry{},
 		disabledPostStartHooks: c.DisabledPostStartHooks,
 
 		healthzChecks: c.HealthzChecks,
@@ -473,8 +474,12 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		s.postStartHooks[k] = v
 	}
 
+	for k, v := range delegationTarget.PreShutdownHooks() {
+		s.preShutdownHooks[k] = v
+	}
+
 	genericApiServerHookName := "generic-apiserver-start-informers"
-	if c.SharedInformerFactory != nil && !s.isHookRegistered(genericApiServerHookName) {
+	if c.SharedInformerFactory != nil && !s.isPostStartHookRegistered(genericApiServerHookName) {
 		err := s.AddPostStartHook(genericApiServerHookName, func(context PostStartHookContext) error {
 			c.SharedInformerFactory.Start(context.StopCh)
 			return nil

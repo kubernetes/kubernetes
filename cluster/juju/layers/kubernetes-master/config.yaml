@@ -7,6 +7,12 @@ options:
     type: string
     default: cluster.local
     description: The local domain for cluster dns
+  extra_sans:
+    type: string
+    default: ""
+    description: |
+      Space-separated list of extra SAN entries to add to the x509 certificate
+      created for the master nodes.
   service-cidr:
     type: string
     default: 10.152.183.0/24

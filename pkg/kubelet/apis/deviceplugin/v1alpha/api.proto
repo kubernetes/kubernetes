@@ -81,25 +81,21 @@ message AllocateRequest {
 	repeated string devicesIDs = 1;
 }
 
+// AllocateResponse includes the artifacts that needs to be injected into
+// a container for accessing 'deviceIDs' that were mentioned as part of
+// 'AllocateRequest'.
 // Failure Handling:
 // if Kubelet sends an allocation request for dev1 and dev2.
 // Allocation on dev1 succeeds but allocation on dev2 fails.
 // The Device plugin should send a ListAndWatch update and fail the
 // Allocation request
 message AllocateResponse {
-	repeated DeviceRuntimeSpec spec = 1;
-}
-
-// The list to be added to the CRI spec
-message DeviceRuntimeSpec {
-	// ID of the Device
-	string ID = 1;
-	// List of environment variable to set in the container.
-	map<string, string> envs = 2;
+  	// List of environment variable to be set in the container to access one of more devices.
+	map<string, string> envs = 1;
 	// Mounts for the container.
-	repeated Mount mounts = 3;
-	// Devices for the container
-	repeated DeviceSpec devices = 4;
+	repeated Mount mounts = 2;
+	// Devices for the container.
+	repeated DeviceSpec devices = 3;
 }
 
 // Mount specifies a host volume to mount into a container.

@@ -628,56 +628,60 @@ func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Containe
 	}
 	// Loops through AllocationResponses of all required extended resources.
 	for _, resp := range allocResps {
-		// Loops through runtime spec of all devices of the given resource.
-		for _, devRuntime := range resp.Spec {
-			// Updates RunContainerOptions.Devices.
-			for _, dev := range devRuntime.Devices {
-				if d, ok := devsMap[dev.ContainerPath]; ok {
-					glog.V(3).Infof("skip existing device %s %s", dev.ContainerPath, dev.HostPath)
-					if d != dev.HostPath {
-						glog.Errorf("Container device %s has conflicting mapping host devices: %s and %s",
-							dev.ContainerPath, d, dev.HostPath)
-					}
-					continue
+		// Each Allocate response has the following artifacts.
+		// Environment variables
+		// Mount points
+		// Device files
+		// These artifacts are per resource per container.
+		// Updates RunContainerOptions.Envs.
+		for k, v := range resp.Envs {
+			if e, ok := envsMap[k]; ok {
+				glog.V(3).Infof("skip existing envs %s %s", k, v)
+				if e != v {
+					glog.Errorf("Environment variable %s has conflicting setting: %s and %s", k, e, v)
 				}
-				devsMap[dev.ContainerPath] = dev.HostPath
-				opts.Devices = append(opts.Devices, kubecontainer.DeviceInfo{
-					PathOnHost:      dev.HostPath,
-					PathInContainer: dev.ContainerPath,
-					Permissions:     dev.Permissions,
-				})
+				continue
 			}
-			// Updates RunContainerOptions.Mounts.
-			for _, mount := range devRuntime.Mounts {
-				if m, ok := mountsMap[mount.ContainerPath]; ok {
-					glog.V(3).Infof("skip existing mount %s %s", mount.ContainerPath, mount.HostPath)
-					if m != mount.HostPath {
-						glog.Errorf("Container mount %s has conflicting mapping host mounts: %s and %s",
-							mount.ContainerPath, m, mount.HostPath)
-					}
-					continue
+			envsMap[k] = v
+			opts.Envs = append(opts.Envs, kubecontainer.EnvVar{Name: k, Value: v})
+		}
+
+		// Updates RunContainerOptions.Devices.
+		for _, dev := range resp.Devices {
+			if d, ok := devsMap[dev.ContainerPath]; ok {
+				glog.V(3).Infof("skip existing device %s %s", dev.ContainerPath, dev.HostPath)
+				if d != dev.HostPath {
+					glog.Errorf("Container device %s has conflicting mapping host devices: %s and %s",
+						dev.ContainerPath, d, dev.HostPath)
 				}
-				mountsMap[mount.ContainerPath] = mount.HostPath
-				opts.Mounts = append(opts.Mounts, kubecontainer.Mount{
-					Name:           mount.ContainerPath,
-					ContainerPath:  mount.ContainerPath,
-					HostPath:       mount.HostPath,
-					ReadOnly:       mount.ReadOnly,
-					SELinuxRelabel: false,
-				})
+				continue
 			}
-			// Updates RunContainerOptions.Envs.
-			for k, v := range devRuntime.Envs {
-				if e, ok := envsMap[k]; ok {
-					glog.V(3).Infof("skip existing envs %s %s", k, v)
-					if e != v {
-						glog.Errorf("Environment variable %s has conflicting setting: %s and %s", k, e, v)
-					}
-					continue
+			devsMap[dev.ContainerPath] = dev.HostPath
+			opts.Devices = append(opts.Devices, kubecontainer.DeviceInfo{
+				PathOnHost:      dev.HostPath,
+				PathInContainer: dev.ContainerPath,
+				Permissions:     dev.Permissions,
+			})
+		}
+		// Updates RunContainerOptions.Mounts.
+		for _, mount := range resp.Mounts {
+			if m, ok := mountsMap[mount.ContainerPath]; ok {
+				glog.V(3).Infof("skip existing mount %s %s", mount.ContainerPath, mount.HostPath)
+				if m != mount.HostPath {
+					glog.Errorf("Container mount %s has conflicting mapping host mounts: %s and %s",
+						mount.ContainerPath, m, mount.HostPath)
 				}
-				envsMap[k] = v
-				opts.Envs = append(opts.Envs, kubecontainer.EnvVar{Name: k, Value: v})
+				continue
 			}
+			mountsMap[mount.ContainerPath] = mount.HostPath
+			opts.Mounts = append(opts.Mounts, kubecontainer.Mount{
+				Name:          mount.ContainerPath,
+				ContainerPath: mount.ContainerPath,
+				HostPath:      mount.HostPath,
+				ReadOnly:      mount.ReadOnly,
+				// TODO: This may need to be part of Device plugin API.
+				SELinuxRelabel: false,
+			})
 		}
 	}
 	return opts, nil

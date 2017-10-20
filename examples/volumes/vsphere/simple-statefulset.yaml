@@ -37,10 +37,9 @@ spec:
   volumeClaimTemplates:
   - metadata:
       name: www
-      annotations:
-        volume.beta.kubernetes.io/storage-class: thin-disk
     spec:
       accessModes: [ "ReadWriteOnce" ]
       resources:
         requests:
           storage: 1Gi
+      storageClassName: thin-disk

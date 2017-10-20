@@ -119,8 +119,7 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 	newPod, ok := obj.(*api.Pod)
 	// Check whether the object could be converted to single pod.
 	if !ok {
-		err = fmt.Errorf("invalid pod: %#v", obj)
-		return false, pod, err
+		return false, pod, fmt.Errorf("invalid pod: %#v", obj)
 	}
 
 	// Apply default values and validate the pod.
@@ -128,11 +127,11 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 		return true, pod, err
 	}
 	if errs := validation.ValidatePod(newPod); len(errs) > 0 {
-		err = fmt.Errorf("invalid pod: %v", errs)
-		return true, pod, err
+		return true, pod, fmt.Errorf("invalid pod: %v", errs)
 	}
 	v1Pod := &v1.Pod{}
 	if err := k8s_api_v1.Convert_api_Pod_To_v1_Pod(newPod, v1Pod, nil); err != nil {
+		glog.Errorf("Pod %q failed to convert to v1", newPod.Name)
 		return true, nil, err
 	}
 	return true, v1Pod, nil

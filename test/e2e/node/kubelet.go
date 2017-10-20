@@ -34,7 +34,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -170,7 +169,7 @@ func createPodUsingNfs(f *framework.Framework, c clientset.Interface, ns, nfsIP,
 			Containers: []v1.Container{
 				{
 					Name:    "pod-nfs-vol",
-					Image:   imageutils.GetBusyBoxImage(),
+					Image:   "busybox",
 					Command: []string{"/bin/sh"},
 					Args:    cmdLine,
 					VolumeMounts: []v1.VolumeMount{

@@ -475,7 +475,6 @@ func (asw *actualStateOfWorld) updateNodeStatusUpdateNeeded(nodeName types.NodeN
 		// should not happen
 		errMsg := fmt.Sprintf("Failed to set statusUpdateNeeded to needed %t because nodeName=%q  does not exist",
 			needed, nodeName)
-		glog.Errorf(errMsg)
 		return fmt.Errorf(errMsg)
 	}
 

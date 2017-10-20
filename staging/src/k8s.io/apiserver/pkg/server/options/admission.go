@@ -80,9 +80,8 @@ func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
 func (a *AdmissionOptions) ApplyTo(
 	c *server.Config,
 	informers informers.SharedInformerFactory,
-	serverIdentifyingClientCert []byte,
-	serverIdentifyingClientKey []byte,
-	clientConfig *rest.Config,
+	kubeAPIServerClientConfig *rest.Config,
+	webhookClientConfig *rest.Config,
 	scheme *runtime.Scheme,
 	pluginInitializers ...admission.PluginInitializer,
 ) error {
@@ -96,11 +95,11 @@ func (a *AdmissionOptions) ApplyTo(
 		return fmt.Errorf("failed to read plugin config: %v", err)
 	}
 
-	clientset, err := kubernetes.NewForConfig(clientConfig)
+	clientset, err := kubernetes.NewForConfig(kubeAPIServerClientConfig)
 	if err != nil {
 		return err
 	}
-	genericInitializer, err := initializer.New(clientset, informers, c.Authorizer, serverIdentifyingClientCert, serverIdentifyingClientKey, scheme)
+	genericInitializer, err := initializer.New(clientset, informers, c.Authorizer, webhookClientConfig, scheme)
 	if err != nil {
 		return err
 	}

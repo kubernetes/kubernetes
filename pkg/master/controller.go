@@ -112,6 +112,11 @@ func (c *Controller) PostStartHook(hookContext genericapiserver.PostStartHookCon
 	return nil
 }
 
+func (c *Controller) PreShutdownHook() error {
+	c.Stop()
+	return nil
+}
+
 // Start begins the core controller loops that must exist for bootstrapping
 // a cluster.
 func (c *Controller) Start() {
@@ -138,6 +143,14 @@ func (c *Controller) Start() {
 
 	c.runner = async.NewRunner(c.RunKubernetesNamespaces, c.RunKubernetesService, repairClusterIPs.RunUntil, repairNodePorts.RunUntil)
 	c.runner.Start()
+}
+
+func (c *Controller) Stop() {
+	if c.runner != nil {
+		c.runner.Stop()
+	}
+	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
+	c.EndpointReconciler.StopReconciling("kubernetes", c.PublicIP, endpointPorts)
 }
 
 // RunKubernetesNamespaces periodically makes sure that all internal namespaces exist

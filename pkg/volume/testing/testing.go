@@ -803,3 +803,12 @@ func MetricsEqualIgnoreTimestamp(a *Metrics, b *Metrics) bool {
 	inodesUsed := a.InodesUsed == b.InodesUsed
 	return available && capacity && used && inodes && inodesFree && inodesUsed
 }
+
+func ContainsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
+}

@@ -22,17 +22,16 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 type pluginInitializer struct {
 	externalClient    kubernetes.Interface
 	externalInformers informers.SharedInformerFactory
 	authorizer        authorizer.Authorizer
-	// serverIdentifyingClientCert used to provide identity when calling out to admission plugins
-	serverIdentifyingClientCert []byte
-	// serverIdentifyingClientKey private key for the client certificate used when calling out to admission plugins
-	serverIdentifyingClientKey []byte
-	scheme                     *runtime.Scheme
+	// webhookRESTClientConfig provies a client used to contact webhooks
+	webhookRESTClientConfig *rest.Config
+	scheme                  *runtime.Scheme
 }
 
 // New creates an instance of admission plugins initializer.
@@ -41,17 +40,15 @@ func New(
 	extClientset kubernetes.Interface,
 	extInformers informers.SharedInformerFactory,
 	authz authorizer.Authorizer,
-	serverIdentifyingClientCert,
-	serverIdentifyingClientKey []byte,
+	webhookRESTClientConfig *rest.Config,
 	scheme *runtime.Scheme,
 ) (pluginInitializer, error) {
 	return pluginInitializer{
-		externalClient:              extClientset,
-		externalInformers:           extInformers,
-		authorizer:                  authz,
-		serverIdentifyingClientCert: serverIdentifyingClientCert,
-		serverIdentifyingClientKey:  serverIdentifyingClientKey,
-		scheme: scheme,
+		externalClient:          extClientset,
+		externalInformers:       extInformers,
+		authorizer:              authz,
+		webhookRESTClientConfig: webhookRESTClientConfig,
+		scheme:                  scheme,
 	}, nil
 }
 
@@ -70,8 +67,8 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 		wants.SetAuthorizer(i.authorizer)
 	}
 
-	if wants, ok := plugin.(WantsClientCert); ok {
-		wants.SetClientCert(i.serverIdentifyingClientCert, i.serverIdentifyingClientKey)
+	if wants, ok := plugin.(WantsWebhookRESTClientConfig); ok {
+		wants.SetWebhookRESTClientConfig(i.webhookRESTClientConfig)
 	}
 
 	if wants, ok := plugin.(WantsScheme); ok {
