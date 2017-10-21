@@ -302,11 +302,11 @@ func (az *Cloud) ListPIPWithRetry() ([]network.PublicIPAddress, error) {
 func (az *Cloud) CreateOrUpdatePIPWithRetry(pip network.PublicIPAddress) error {
 	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
 		az.operationPollRateLimiter.Accept()
-		glog.V(10).Infof("PublicIPAddressesClient.CreateOrUpdate(%s, %s): start", resourceGroup, *pip.Name)
-		respChan, errChan := az.PublicIPAddressesClient.CreateOrUpdate(resourceGroup, *pip.Name, pip, nil)
+		glog.V(10).Infof("PublicIPAddressesClient.CreateOrUpdate(%s, %s): start", pipResourceGroup, *pip.Name)
+		respChan, errChan := az.PublicIPAddressesClient.CreateOrUpdate(pipResourceGroup, *pip.Name, pip, nil)
 		resp := <-respChan
 		err := <-errChan
-		glog.V(10).Infof("PublicIPAddressesClient.CreateOrUpdate(%s, %s): end", resourceGroup, *pip.Name)
+		glog.V(10).Infof("PublicIPAddressesClient.CreateOrUpdate(%s, %s): end", pipResourceGroup, *pip.Name)
 		return processRetryResponse(resp.Response, err)
 	})
 }

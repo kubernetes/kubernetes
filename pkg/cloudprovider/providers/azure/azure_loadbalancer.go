@@ -394,6 +394,7 @@ func (az *Cloud) ensurePublicIPExists(serviceName, pipName, domainNameLabel stri
 		return &pip, nil
 	}
 
+	serviceName := getServiceName(service)
 	pip.Name = to.StringPtr(pipName)
 	pip.Location = to.StringPtr(az.Location)
 	pip.PublicIPAddressPropertiesFormat = &network.PublicIPAddressPropertiesFormat{
