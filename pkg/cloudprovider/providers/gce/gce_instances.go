@@ -371,7 +371,7 @@ func (gce *GCECloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNe
 
 	mc := newInstancesMetricContext("addalias", v1instance.Zone)
 	op, err := gce.serviceAlpha.Instances.UpdateNetworkInterface(
-		gce.projectID, instance.Zone, instance.Name, iface.Name, iface).Do()
+		gce.projectID, lastComponent(instance.Zone), instance.Name, iface.Name, iface).Do()
 	if err != nil {
 		return mc.Observe(err)
 	}
