@@ -18,7 +18,7 @@ func main() {
 }
 ```
 
-That will get you completions of subcommands and flags. If you make additional annotations to your code, you can get even more intelligent and flexible behavior.
+`out.sh` will get you completions of subcommands and flags. Copy it to `/etc/bash_completion.d/` as described [here](https://debian-administration.org/article/316/An_introduction_to_bash_completion_part_1) and reset your terminal to use autocompletion. If you make additional annotations to your code, you can get even more intelligent and flexible behavior.
 
 ## Creating your own custom functions
 
@@ -106,7 +106,7 @@ node                 pod                    replicationcontroller  service
 
 If your nouns have a number of aliases, you can define them alongside `ValidArgs` using `ArgAliases`:
 
-```go`
+```go
 argAliases []string = { "pods", "nodes", "services", "svc", "replicationcontrollers", "rc" }
 
 cmd := &cobra.Command{
