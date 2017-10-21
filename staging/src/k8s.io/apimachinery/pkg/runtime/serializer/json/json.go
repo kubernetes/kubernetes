@@ -215,7 +215,7 @@ func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 		_, err = w.Write(data)
 		return err
 	}
-	encoder := jsoniter.ConfigFastest.NewEncoder(w)
+	encoder := jsoniter.ConfigCompatibleWithStandardLibrary.NewEncoder(w)
 	return encoder.Encode(obj)
 }
 
