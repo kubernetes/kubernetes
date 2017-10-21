@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubectl
+package kubefed
 
 import (
 	"fmt"
@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	"k8s.io/kubernetes/pkg/kubectl"
 )
 
 const (
@@ -57,15 +58,15 @@ type ClusterGeneratorV1Beta1 struct {
 
 // Ensure it supports the generator pattern that uses parameter
 // injection.
-var _ Generator = &ClusterGeneratorV1Beta1{}
+var _ kubectl.Generator = &ClusterGeneratorV1Beta1{}
 
 // Ensure it supports the generator pattern that uses parameters
 // specified during construction.
-var _ StructuredGenerator = &ClusterGeneratorV1Beta1{}
+var _ kubectl.StructuredGenerator = &ClusterGeneratorV1Beta1{}
 
 // Generate returns a cluster resource using the specified parameters.
 func (s ClusterGeneratorV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
-	err := ValidateParams(s.ParamNames(), genericParams)
+	err := kubectl.ValidateParams(s.ParamNames(), genericParams)
 	if err != nil {
 		return nil, err
 	}
@@ -89,14 +90,32 @@ func (s ClusterGeneratorV1Beta1) Generate(genericParams map[string]interface{}) 
 
 // ParamNames returns the set of supported input parameters when using
 // the parameter injection generator pattern.
-func (s ClusterGeneratorV1Beta1) ParamNames() []GeneratorParam {
-	return []GeneratorParam{
-		{"name", true},
-		{"client-cidr", false},
-		{"server-address", true},
-		{"secret", false},
-		{"service-account-name", false},
-		{"cluster-role-name", false},
+func (s ClusterGeneratorV1Beta1) ParamNames() []kubectl.GeneratorParam {
+	return []kubectl.GeneratorParam{
+		{
+			Name:     "name",
+			Required: true,
+		},
+		{
+			Name:     "client-cidr",
+			Required: false,
+		},
+		{
+			Name:     "server-address",
+			Required: true,
+		},
+		{
+			Name:     "secret",
+			Required: false,
+		},
+		{
+			Name:     "service-account-name",
+			Required: false,
+		},
+		{
+			Name:     "cluster-role-name",
+			Required: false,
+		},
 	}
 }
 
