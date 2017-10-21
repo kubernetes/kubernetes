@@ -153,6 +153,7 @@ func (attacher *rbdAttacher) MountDevice(spec *volume.Spec, devicePath string, d
 	mountOptions := volume.MountOptionFromSpec(spec, options...)
 	err = attacher.plugin.mounter.FormatAndMount(devicePath, deviceMountPath, fstype, mountOptions)
 	if err != nil {
+		os.Remove(deviceMountPath)
 		return fmt.Errorf("rbd: failed to mount device %s at %s (fstype: %s), error %v", devicePath, deviceMountPath, fstype, err)
 	}
 	glog.V(3).Infof("rbd: successfully mount device %s at %s (fstype: %s)", devicePath, deviceMountPath, fstype)
