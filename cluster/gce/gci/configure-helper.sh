@@ -405,7 +405,7 @@ EOF
   if [[ -n "${SECONDARY_RANGE_NAME:-}" ]]; then
     use_cloud_config="true"
     cat <<EOF >> /etc/gce.conf
-secondary-range-name = ${SECONDARY-RANGE-NAME}
+secondary-range-name = ${SECONDARY_RANGE_NAME}
 EOF
   fi
   if [[ "${use_cloud_config}" != "true" ]]; then

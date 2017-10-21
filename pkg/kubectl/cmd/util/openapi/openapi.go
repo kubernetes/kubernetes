@@ -17,236 +17,108 @@ limitations under the License.
 package openapi
 
 import (
-	"fmt"
-	"sort"
-	"strings"
+	openapi_v2 "github.com/googleapis/gnostic/OpenAPIv2"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-)
-
-// Defines openapi types.
-const (
-	Integer = "integer"
-	Number  = "number"
-	String  = "string"
-	Boolean = "boolean"
-
-	// These types are private as they should never leak, and are
-	// represented by actual structs.
-	array  = "array"
-	object = "object"
+	"k8s.io/kube-openapi/pkg/util/proto"
 )
 
 // Resources interface describe a resources provider, that can give you
 // resource based on group-version-kind.
 type Resources interface {
-	LookupResource(gvk schema.GroupVersionKind) Schema
+	LookupResource(gvk schema.GroupVersionKind) proto.Schema
 }
 
-// SchemaVisitor is an interface that you need to implement if you want
-// to "visit" an openapi schema. A dispatch on the Schema type will call
-// the appropriate function based on its actual type:
-// - Array is a list of one and only one given subtype
-// - Map is a map of string to one and only one given subtype
-// - Primitive can be string, integer, number and boolean.
-// - Kind is an object with specific fields mapping to specific types.
-// - Reference is a link to another definition.
-type SchemaVisitor interface {
-	VisitArray(*Array)
-	VisitMap(*Map)
-	VisitPrimitive(*Primitive)
-	VisitKind(*Kind)
-	VisitReference(Reference)
+// groupVersionKindExtensionKey is the key used to lookup the
+// GroupVersionKind value for an object definition from the
+// definition's "extensions" map.
+const groupVersionKindExtensionKey = "x-kubernetes-group-version-kind"
+
+// document is an implementation of `Resources`. It looks for
+// resources in an openapi Schema.
+type document struct {
+	// Maps gvk to model name
+	resources map[schema.GroupVersionKind]string
+	models    proto.Models
 }
 
-// Schema is the base definition of an openapi type.
-type Schema interface {
-	// Giving a visitor here will let you visit the actual type.
-	Accept(SchemaVisitor)
+var _ Resources = &document{}
 
-	// Pretty print the name of the type.
-	GetName() string
-	// Describes how to access this field.
-	GetPath() *Path
-	// Describes the field.
-	GetDescription() string
-	// Returns type extensions.
-	GetExtensions() map[string]interface{}
-}
-
-// Path helps us keep track of type paths
-type Path struct {
-	parent *Path
-	key    string
-}
-
-func NewPath(key string) Path {
-	return Path{key: key}
-}
-
-func (p *Path) Get() []string {
-	if p == nil {
-		return []string{}
+func NewOpenAPIData(doc *openapi_v2.Document) (Resources, error) {
+	models, err := proto.NewOpenAPIData(doc)
+	if err != nil {
+		return nil, err
 	}
-	if p.key == "" {
-		return p.parent.Get()
-	}
-	return append(p.parent.Get(), p.key)
-}
 
-func (p *Path) Len() int {
-	return len(p.Get())
-}
-
-func (p *Path) String() string {
-	return strings.Join(p.Get(), "")
-}
-
-// ArrayPath appends an array index and creates a new path
-func (p *Path) ArrayPath(i int) Path {
-	return Path{
-		parent: p,
-		key:    fmt.Sprintf("[%d]", i),
-	}
-}
-
-// FieldPath appends a field name and creates a new path
-func (p *Path) FieldPath(field string) Path {
-	return Path{
-		parent: p,
-		key:    fmt.Sprintf(".%s", field),
-	}
-}
-
-// BaseSchema holds data used by each types of schema.
-type BaseSchema struct {
-	Description string
-	Extensions  map[string]interface{}
-
-	Path Path
-}
-
-func (b *BaseSchema) GetDescription() string {
-	return b.Description
-}
-
-func (b *BaseSchema) GetExtensions() map[string]interface{} {
-	return b.Extensions
-}
-
-func (b *BaseSchema) GetPath() *Path {
-	return &b.Path
-}
-
-// Array must have all its element of the same `SubType`.
-type Array struct {
-	BaseSchema
-
-	SubType Schema
-}
-
-var _ Schema = &Array{}
-
-func (a *Array) Accept(v SchemaVisitor) {
-	v.VisitArray(a)
-}
-
-func (a *Array) GetName() string {
-	return fmt.Sprintf("Array of %s", a.SubType.GetName())
-}
-
-// Kind is a complex object. It can have multiple different
-// subtypes for each field, as defined in the `Fields` field. Mandatory
-// fields are listed in `RequiredFields`. The key of the object is
-// always of type `string`.
-type Kind struct {
-	BaseSchema
-
-	// Lists names of required fields.
-	RequiredFields []string
-	// Maps field names to types.
-	Fields map[string]Schema
-}
-
-var _ Schema = &Kind{}
-
-func (k *Kind) Accept(v SchemaVisitor) {
-	v.VisitKind(k)
-}
-
-func (k *Kind) GetName() string {
-	properties := []string{}
-	for key := range k.Fields {
-		properties = append(properties, key)
-	}
-	return fmt.Sprintf("Kind(%v)", properties)
-}
-
-// IsRequired returns true if `field` is a required field for this type.
-func (k *Kind) IsRequired(field string) bool {
-	for _, f := range k.RequiredFields {
-		if f == field {
-			return true
+	resources := map[schema.GroupVersionKind]string{}
+	for _, modelName := range models.ListModels() {
+		model := models.LookupModel(modelName)
+		if model == nil {
+			panic("ListModels returns a model that can't be looked-up.")
+		}
+		gvk := parseGroupVersionKind(model)
+		if len(gvk.Kind) > 0 {
+			resources[gvk] = modelName
 		}
 	}
-	return false
+
+	return &document{
+		resources: resources,
+		models:    models,
+	}, nil
 }
 
-// Keys returns a alphabetically sorted list of keys.
-func (k *Kind) Keys() []string {
-	keys := make([]string, 0)
-	for key := range k.Fields {
-		keys = append(keys, key)
+func (d *document) LookupResource(gvk schema.GroupVersionKind) proto.Schema {
+	modelName, found := d.resources[gvk]
+	if !found {
+		return nil
 	}
-	sort.Strings(keys)
-	return keys
+	return d.models.LookupModel(modelName)
 }
 
-// Map is an object who values must all be of the same `SubType`.
-// The key of the object is always of type `string`.
-type Map struct {
-	BaseSchema
+// Get and parse GroupVersionKind from the extension. Returns empty if it doesn't have one.
+func parseGroupVersionKind(s proto.Schema) schema.GroupVersionKind {
+	extensions := s.GetExtensions()
 
-	SubType Schema
-}
-
-var _ Schema = &Map{}
-
-func (m *Map) Accept(v SchemaVisitor) {
-	v.VisitMap(m)
-}
-
-func (m *Map) GetName() string {
-	return fmt.Sprintf("Map of %s", m.SubType.GetName())
-}
-
-// Primitive is a literal. There can be multiple types of primitives,
-// and this subtype can be visited through the `subType` field.
-type Primitive struct {
-	BaseSchema
-
-	// Type of a primitive must be one of: integer, number, string, boolean.
-	Type   string
-	Format string
-}
-
-var _ Schema = &Primitive{}
-
-func (p *Primitive) Accept(v SchemaVisitor) {
-	v.VisitPrimitive(p)
-}
-
-func (p *Primitive) GetName() string {
-	if p.Format == "" {
-		return p.Type
+	// Get the extensions
+	gvkExtension, ok := extensions[groupVersionKindExtensionKey]
+	if !ok {
+		return schema.GroupVersionKind{}
 	}
-	return fmt.Sprintf("%s (%s)", p.Type, p.Format)
-}
 
-// Reference implementation depends on the type of document.
-type Reference interface {
-	Schema
+	// gvk extension must be a list of 1 element.
+	gvkList, ok := gvkExtension.([]interface{})
+	if !ok {
+		return schema.GroupVersionKind{}
+	}
+	if len(gvkList) != 1 {
+		return schema.GroupVersionKind{}
 
-	Reference() string
-	SubSchema() Schema
+	}
+	gvk := gvkList[0]
+
+	// gvk extension list must be a map with group, version, and
+	// kind fields
+	gvkMap, ok := gvk.(map[interface{}]interface{})
+	if !ok {
+		return schema.GroupVersionKind{}
+	}
+	group, ok := gvkMap["group"].(string)
+	if !ok {
+		return schema.GroupVersionKind{}
+	}
+	version, ok := gvkMap["version"].(string)
+	if !ok {
+		return schema.GroupVersionKind{}
+	}
+	kind, ok := gvkMap["kind"].(string)
+	if !ok {
+		return schema.GroupVersionKind{}
+	}
+
+	return schema.GroupVersionKind{
+		Group:   group,
+		Version: version,
+		Kind:    kind,
+	}
 }

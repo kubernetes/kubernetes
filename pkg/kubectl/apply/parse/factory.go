@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/pkg/kubectl/apply"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
@@ -60,7 +61,7 @@ func (b *Factory) CreateElement(recorded, local, remote map[string]interface{}) 
 }
 
 // getItem returns the appropriate Item based on the underlying type of the arguments
-func (v *ElementBuildingVisitor) getItem(s openapi.Schema, name string, data apply.RawElementData) (Item, error) {
+func (v *ElementBuildingVisitor) getItem(s proto.Schema, name string, data apply.RawElementData) (Item, error) {
 	kind, err := getType(data.GetRecorded(), data.GetLocal(), data.GetRemote())
 	if err != nil {
 		return nil, err

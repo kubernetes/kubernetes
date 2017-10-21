@@ -53,12 +53,13 @@ func EnsureDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interf
 
 	// Get the YAML manifest conditionally based on the k8s version
 	kubeDNSDeploymentBytes := GetKubeDNSManifest(k8sVersion)
-	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(kubeDNSDeploymentBytes, struct{ ImageRepository, Arch, Version, DNSDomain, MasterTaintKey string }{
+	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(kubeDNSDeploymentBytes, struct{ ImageRepository, Arch, Version, DNSDomain, DNSProbeType, MasterTaintKey string }{
 		ImageRepository: cfg.ImageRepository,
 		Arch:            runtime.GOARCH,
 		// Get the kube-dns version conditionally based on the k8s version
 		Version:        GetKubeDNSVersion(k8sVersion),
 		DNSDomain:      cfg.Networking.DNSDomain,
+		DNSProbeType:   GetKubeDNSProbeType(k8sVersion),
 		MasterTaintKey: kubeadmconstants.LabelNodeRoleMaster,
 	})
 	if err != nil {

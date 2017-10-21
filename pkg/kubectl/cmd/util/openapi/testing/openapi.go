@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 
 	yaml "gopkg.in/yaml.v2"
@@ -109,7 +110,7 @@ func NewFakeResources(path string) *FakeResources {
 
 // LookupResource will read the schema, parse it and return the
 // resources. It doesn't return errors and will panic instead.
-func (f *FakeResources) LookupResource(gvk schema.GroupVersionKind) openapi.Schema {
+func (f *FakeResources) LookupResource(gvk schema.GroupVersionKind) proto.Schema {
 	s, err := f.fake.OpenAPISchema()
 	if err != nil {
 		panic(err)
