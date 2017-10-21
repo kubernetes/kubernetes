@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/sample-controller",
-	"GoVersion": "go1.8",
+	"GoVersion": "go1.9",
 	"GodepVersion": "v79",
 	"Packages": [
 		"./..."
@@ -940,7 +940,7 @@
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/common",
-			"Rev": "868f2f29720b192240e18284659231b440f9cda5"
+			"Rev": "89ae48fe8691077463af5b7fb3b6f194632c5946"
 		}
 	]
 }
