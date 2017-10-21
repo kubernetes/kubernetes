@@ -77,6 +77,19 @@ func findDiskByLunWithConstraint(lun int, io ioHandler, azureDisks []string) (st
 			if len(arr) < 4 {
 				continue
 			}
+			if len(azureDisks) == 0 {
+				glog.V(4).Infof("/dev/disk/azure is not populated, now try to parse %v directly", name)
+				target, err := strconv.Atoi(arr[0])
+				if err != nil {
+					glog.Errorf("failed to parse target from %v (%v), err %v", arr[0], name, err)
+					continue
+				}
+				// as observed, targets 0-3 are used by OS disks. Skip them
+				if target <= 3 {
+					continue
+				}
+			}
+
 			// extract LUN from the path.
 			// LUN is the last index of the array, i.e. 1 in /sys/bus/scsi/devices/3:0:0:1
 			l, err := strconv.Atoi(arr[3])
