@@ -1135,7 +1135,7 @@ Anyway, the cluster should get back to the proper size after 10 min.
     clusters post upgrade where kubelet hard eviction has been turned on for
     memory. To opt-out set `--experimental-allocatable-ignore-eviction=true`.
   * More details on these feature here:
-    https://kubernetes.io/docs/concepts/cluster-administration/node-allocatable/
+    https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/
 * Drop the support for docker 1.9.x. Docker versions 1.10.3, 1.11.2, 1.12.6
   have been validated.
 * The following deprecated kubelet flags are removed: `--config`, `--auth-path`,
