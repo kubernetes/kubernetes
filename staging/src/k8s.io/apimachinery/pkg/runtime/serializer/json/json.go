@@ -17,7 +17,6 @@ limitations under the License.
 package json
 
 import (
-	"encoding/json"
 	"io"
 	"strconv"
 	"unsafe"
@@ -73,19 +72,19 @@ func init() {
 	decodeNumberAsInt64IfPossible := func(ptr unsafe.Pointer, iter *jsoniter.Iterator) {
 		switch iter.WhatIsNext() {
 		case jsoniter.NumberValue:
-			var number json.Number
+			var number string
 			iter.ReadVal(&number)
-			u64, err := strconv.ParseUint(string(number), 10, 64)
+			u64, err := strconv.ParseUint(number, 10, 64)
 			if err == nil {
 				*(*interface{})(ptr) = u64
 				return
 			}
-			i64, err := strconv.ParseInt(string(number), 10, 64)
+			i64, err := strconv.ParseInt(number, 10, 64)
 			if err == nil {
 				*(*interface{})(ptr) = i64
 				return
 			}
-			f64, err := strconv.ParseFloat(string(number), 64)
+			f64, err := strconv.ParseFloat(number, 64)
 			if err == nil {
 				*(*interface{})(ptr) = f64
 				return
