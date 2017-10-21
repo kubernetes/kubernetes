@@ -1067,6 +1067,6 @@ func (p *podPreemptor) UpdatePodAnnotations(pod *v1.Pod, annotations map[string]
 	if err != nil {
 		return err
 	}
-	_, error := p.Client.CoreV1().Pods(podCopy.Namespace).Patch(podCopy.Name, types.MergePatchType, patchData)
+	_, error := p.Client.CoreV1().Pods(podCopy.Namespace).Patch(podCopy.Name, types.MergePatchType, patchData, "status")
 	return error
 }
