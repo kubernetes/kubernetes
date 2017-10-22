@@ -141,7 +141,7 @@ func (r *Result) Object() (runtime.Object, error) {
 	objects := []runtime.Object{}
 	for _, info := range infos {
 		if info.Object != nil {
-			objects = append(objects, info.Object)
+			objects = append(objects, info.VersionedObject)
 			versions.Insert(info.ResourceVersion)
 		}
 	}
