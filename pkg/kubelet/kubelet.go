@@ -2013,7 +2013,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
 	for _, pod := range pods {
-		existingPods := kl.podManager.GetPods()
+
 		// Always add the pod to the pod manager. Kubelet relies on the pod
 		// manager as the source of truth for the desired state. If a pod does
 		// not exist in the pod manager, it means that it has been deleted in
@@ -2028,6 +2028,9 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		if !kl.podIsTerminated(pod) {
 			// Only go through the admission process if the pod is not
 			// terminated.
+			
+			// Get all pod in the pod manager.
+			existingPods := kl.podManager.GetPods()
 
 			// We failed pods that we rejected, so activePods include all admitted
 			// pods that are alive.
