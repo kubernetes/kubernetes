@@ -42,11 +42,12 @@ func NewCmdReset(out io.Writer) *cobra.Command {
 	var skipPreFlight bool
 	var certsDir string
 	var criSocketPath string
+	var etcdDataDir string
 	cmd := &cobra.Command{
 		Use:   "reset",
 		Short: "Run this to revert any changes made to this host by 'kubeadm init' or 'kubeadm join'.",
 		Run: func(cmd *cobra.Command, args []string) {
-			r, err := NewReset(skipPreFlight, certsDir, criSocketPath)
+			r, err := NewReset(skipPreFlight, certsDir, criSocketPath, etcdDataDir)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(r.Run(out))
 		},
@@ -67,6 +68,11 @@ func NewCmdReset(out io.Writer) *cobra.Command {
 		"The path to the CRI socket to use with crictl when cleaning up containers.",
 	)
 
+	cmd.PersistentFlags().StringVar(
+		&etcdDataDir, "etcd-data-dir", "/var/etcd",
+		"The path to the directory where the etcd state is stored. If specified, clean this directory.",
+	)
+
 	return cmd
 }
 
@@ -74,10 +80,11 @@ func NewCmdReset(out io.Writer) *cobra.Command {
 type Reset struct {
 	certsDir      string
 	criSocketPath string
+	etcdDataDir   string
 }
 
 // NewReset instantiate Reset struct
-func NewReset(skipPreFlight bool, certsDir, criSocketPath string) (*Reset, error) {
+func NewReset(skipPreFlight bool, certsDir, criSocketPath, etcdDataDir string) (*Reset, error) {
 	if !skipPreFlight {
 		fmt.Println("[preflight] Running pre-flight checks.")
 
@@ -91,6 +98,7 @@ func NewReset(skipPreFlight bool, certsDir, criSocketPath string) (*Reset, error
 	return &Reset{
 		certsDir:      certsDir,
 		criSocketPath: criSocketPath,
+		etcdDataDir:   etcdDataDir,
 	}, nil
 }
 
@@ -127,12 +135,12 @@ func (r *Reset) Run(out io.Writer) error {
 	dirsToClean := []string{"/var/lib/kubelet", "/etc/cni/net.d", "/var/lib/dockershim", "/var/run/kubernetes"}
 
 	// Only clear etcd data when the etcd manifest is found. In case it is not found, we must assume that the user
-	// provided external etcd endpoints. In that case, it is his own responsibility to reset etcd
+	// provided external etcd endpoints. In that case, it is their own responsibility to reset etcd
 	etcdManifestPath := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName, "etcd.yaml")
 	if _, err := os.Stat(etcdManifestPath); err == nil {
 		dirsToClean = append(dirsToClean, "/var/lib/etcd")
 	} else {
-		fmt.Printf("[reset] No etcd manifest found in %q, assuming external etcd.\n", etcdManifestPath)
+		dirsToClean = append(dirsToClean, r.etcdDataDir)
 	}
 
 	// Then clean contents from the stateful kubelet, etcd and cni directories

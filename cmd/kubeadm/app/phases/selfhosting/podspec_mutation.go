@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 
 	"k8s.io/api/core/v1"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -57,18 +58,22 @@ func GetDefaultMutators() map[string][]PodSpecMutatorFunc {
 }
 
 // GetMutatorsFromFeatureGates returns all mutators needed based on the feature gates passed
-func GetMutatorsFromFeatureGates(featureGates map[string]bool) map[string][]PodSpecMutatorFunc {
+func GetMutatorsFromFeatureGates(cfg *kubeadmapi.MasterConfiguration) map[string][]PodSpecMutatorFunc {
 	// Here the map of different mutators to use for the control plane's podspec is stored
 	mutators := GetDefaultMutators()
 
 	// Some extra work to be done if we should store the control plane certificates in Secrets
-	if features.Enabled(featureGates, features.StoreCertsInSecrets) {
-
+	if features.Enabled(cfg.FeatureGates, features.StoreCertsInSecrets) {
 		// Add the store-certs-in-secrets-specific mutators here so that the self-hosted component starts using them
-		mutators[kubeadmconstants.KubeAPIServer] = append(mutators[kubeadmconstants.KubeAPIServer], setSelfHostedVolumesForAPIServer)
+		mutators[kubeadmconstants.KubeAPIServer] = append(mutators[kubeadmconstants.KubeAPIServer], setSelfHostedVolumesForAPIServer(cfg))
 		mutators[kubeadmconstants.KubeControllerManager] = append(mutators[kubeadmconstants.KubeControllerManager], setSelfHostedVolumesForControllerManager)
 		mutators[kubeadmconstants.KubeScheduler] = append(mutators[kubeadmconstants.KubeScheduler], setSelfHostedVolumesForScheduler)
 	}
+
+	if features.Enabled(cfg.FeatureGates, features.HighAvailability) {
+		mutators[kubeadmconstants.KubeAPIServer] = append(mutators[kubeadmconstants.KubeAPIServer], mutateEtcdCommand(cfg))
+	}
+
 	return mutators
 }
 
@@ -107,11 +112,13 @@ func setRightDNSPolicyOnPodSpec(podSpec *v1.PodSpec) {
 }
 
 // setSelfHostedVolumesForAPIServer makes sure the self-hosted api server has the right volume source coming from a self-hosted cluster
-func setSelfHostedVolumesForAPIServer(podSpec *v1.PodSpec) {
-	for i, v := range podSpec.Volumes {
-		// If the volume name matches the expected one; switch the volume source from hostPath to cluster-hosted
-		if v.Name == kubeadmconstants.KubeCertificatesVolumeName {
-			podSpec.Volumes[i].VolumeSource = apiServerCertificatesVolumeSource()
+func setSelfHostedVolumesForAPIServer(cfg *kubeadmapi.MasterConfiguration) func(*v1.PodSpec) {
+	return func(podSpec *v1.PodSpec) {
+		for i, v := range podSpec.Volumes {
+			// If the volume name matches the expected one; switch the volume source from hostPath to cluster-hosted
+			if v.Name == kubeadmconstants.KubeCertificatesVolumeName {
+				podSpec.Volumes[i].VolumeSource = apiServerCertificatesVolumeSource(cfg)
+			}
 		}
 	}
 }
@@ -166,4 +173,16 @@ func setSelfHostedVolumesForScheduler(podSpec *v1.PodSpec) {
 		argMap["kubeconfig"] = filepath.Join(selfHostedKubeConfigDir, kubeadmconstants.SchedulerKubeConfigFileName)
 		return argMap
 	})
+}
+
+func mutateEtcdCommand(cfg *kubeadmapi.MasterConfiguration) func(*v1.PodSpec) {
+	return func(podSpec *v1.PodSpec) {
+		podSpec.Containers[0].Command = kubeadmutil.ReplaceArgument(podSpec.Containers[0].Command, func(argMap map[string]string) map[string]string {
+			argMap["etcd-servers"] = "https://localhost:2379"
+			argMap["etcd-cafile"] = filepath.Join(cfg.Etcd.SelfHosted.CertificatesDir, kubeadmconstants.CACertName)
+			argMap["etcd-certfile"] = filepath.Join(cfg.Etcd.SelfHosted.CertificatesDir, kubeadmconstants.EtcdClientCertName)
+			argMap["etcd-keyfile"] = filepath.Join(cfg.Etcd.SelfHosted.CertificatesDir, kubeadmconstants.EtcdClientKeyName)
+			return argMap
+		})
+	}
 }

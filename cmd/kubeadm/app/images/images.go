@@ -35,5 +35,6 @@ func GetCoreImage(image, repoPrefix, k8sVersion, overrideImage string) string {
 		constants.KubeAPIServer:         fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-apiserver", runtime.GOARCH, kubernetesImageTag),
 		constants.KubeControllerManager: fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-controller-manager", runtime.GOARCH, kubernetesImageTag),
 		constants.KubeScheduler:         fmt.Sprintf("%s/%s-%s:%s", repoPrefix, "kube-scheduler", runtime.GOARCH, kubernetesImageTag),
+		constants.EtcdOperator:          fmt.Sprintf("%s/%s:%s", repoPrefix, "etcd-operator", k8sVersion),
 	}[image]
 }

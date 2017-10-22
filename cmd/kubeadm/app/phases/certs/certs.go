@@ -28,6 +28,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/pkiutil"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
@@ -43,6 +44,10 @@ func CreatePKIAssets(cfg *kubeadmapi.MasterConfiguration) error {
 		CreateServiceAccountKeyAndPublicKeyFiles,
 		CreateFrontProxyCACertAndKeyFiles,
 		CreateFrontProxyClientCertAndKeyFiles,
+	}
+
+	if features.Enabled(cfg.FeatureGates, features.HighAvailability) {
+		certActions = append(certActions, CreateEtcdCertAndKeyFiles)
 	}
 
 	for _, action := range certActions {
@@ -182,6 +187,39 @@ func CreateFrontProxyClientCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) 
 	)
 }
 
+// CreateEtcdCertAndKeyFiles create a self signed CA certificate and key files, as well as client certs, for etcd.
+func CreateEtcdCertAndKeyFiles(cfg *kubeadmapi.MasterConfiguration) error {
+	caCert, caKey, err := NewEtcdCACertAndKey()
+	if err != nil {
+		return err
+	}
+
+	if err := writeCertificateAuthorithyFilesIfNotExist(
+		cfg.Etcd.SelfHosted.CertificatesDir,
+		kubeadmconstants.CACertAndKeyBaseName,
+		caCert,
+		caKey,
+	); err != nil {
+		return err
+	}
+
+	clientCert, clientKey, err := NewEtcdClientCertAndKey(caCert, caKey)
+	if err != nil {
+		return err
+	}
+	if err := writeCertificateFilesIfNotExist(
+		cfg.Etcd.SelfHosted.CertificatesDir,
+		kubeadmconstants.EtcdClientCertAndKeyBaseName,
+		caCert,
+		clientCert,
+		clientKey,
+	); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // NewCACertAndKey will generate a self signed CA.
 func NewCACertAndKey() (*x509.Certificate, *rsa.PrivateKey, error) {
 
@@ -266,6 +304,30 @@ func NewFrontProxyClientCertAndKey(frontProxyCACert *x509.Certificate, frontProx
 	}
 
 	return frontProxyClientCert, frontProxyClientKey, nil
+}
+
+// NewEtcdCACertAndKey generates a new CA cert and key for etcd
+func NewEtcdCACertAndKey() (*x509.Certificate, *rsa.PrivateKey, error) {
+	caCert, caKey, err := pkiutil.NewCertificateAuthority()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failure while generating etcd CA certificate and key: %v", err)
+	}
+
+	return caCert, caKey, nil
+}
+
+// NewEtcdClientCertAndKey generates client certs to use with etcd (e.g. for apiserver and the operator)
+func NewEtcdClientCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error) {
+	config := certutil.Config{
+		CommonName: "etcd-client",
+		Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}
+	clientCert, clientKey, err := pkiutil.NewCertAndKey(caCert, caKey, config)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failure while creating etcd client key and certificate: %v", err)
+	}
+
+	return clientCert, clientKey, nil
 }
 
 // loadCertificateAuthorithy loads certificate authorithy

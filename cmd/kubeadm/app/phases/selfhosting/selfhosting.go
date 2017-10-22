@@ -57,8 +57,8 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 	// Adjust the timeout slightly to something self-hosting specific
 	waiter.SetTimeout(selfHostingWaitTimeout)
 
-	// Here the map of different mutators to use for the control plane's PodSpec is stored
-	mutators := GetMutatorsFromFeatureGates(cfg.FeatureGates)
+	// Here the map of different mutators to use for the control plane's podspec is stored
+	mutators := GetMutatorsFromFeatureGates(cfg)
 
 	// Some extra work to be done if we should store the control plane certificates in Secrets
 	if features.Enabled(cfg.FeatureGates, features.StoreCertsInSecrets) {
@@ -124,6 +124,7 @@ func CreateSelfHostedControlPlane(manifestsDir, kubeConfigDir string, cfg *kubea
 
 		fmt.Printf("[self-hosted] self-hosted %s ready after %f seconds\n", componentName, time.Since(start).Seconds())
 	}
+
 	return nil
 }
 
@@ -141,6 +142,7 @@ func BuildDaemonSet(name string, podSpec *v1.PodSpec, mutators map[string][]PodS
 			Labels:    BuildSelfhostedComponentLabels(name),
 		},
 		Spec: apps.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{MatchLabels: BuildSelfhostedComponentLabels(name)},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: BuildSelfhostedComponentLabels(name),

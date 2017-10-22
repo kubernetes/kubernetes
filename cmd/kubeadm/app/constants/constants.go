@@ -85,6 +85,13 @@ const (
 	// FrontProxyClientCertCommonName defines front proxy certificate common name
 	FrontProxyClientCertCommonName = "front-proxy-client" //used as subject.commonname attribute (CN)
 
+	// EtcdClientCertAndKeyBaseName defines etcd client certificate and key base name
+	EtcdClientCertAndKeyBaseName = "etcd-client"
+	// EtcdClientCertName defines etcd client certificate name
+	EtcdClientCertName = "etcd-client.crt"
+	// EtcdClientKeyName defines etcd client key name
+	EtcdClientKeyName = "etcd-client.key"
+
 	// AdminKubeConfigFileName defines name for the KubeConfig aimed to be used by the superuser/admin of the cluster
 	AdminKubeConfigFileName = "admin.conf"
 	// KubeletBootstrapKubeConfigFileName defines the file name for the KubeConfig that the kubelet will use to do
@@ -156,6 +163,9 @@ const (
 	KubeScheduler = "kube-scheduler"
 	// KubeProxy defines variable used internally when referring to kube-proxy component
 	KubeProxy = "kube-proxy"
+	// EtcdOperator defines variable used internally when referring to kube-apiserver component. It serves a common
+	// identifier that is used for the name of the Deployment, as well as other RBAC resources
+	EtcdOperator = "etcd-operator"
 
 	// SelfHostingPrefix describes the prefix workloads that are self-hosted by kubeadm has
 	SelfHostingPrefix = "self-hosted-"
@@ -176,6 +186,18 @@ const (
 	CoreDNS = "CoreDNS"
 	// KubeDNS defines a variable used internally when referring to the kube-dns addon for a cluster
 	KubeDNS = "kube-dns"
+
+	// EtcdClusterName is the name of the cluster as created by the etcd-operator
+	EtcdClusterName = "etcd-cluster"
+
+	// EtcdOperatorEtcdTLSSecret is the name of the secret used to store etcd TLS assets for the operator
+	EtcdOperatorEtcdTLSSecret = "etcd-operator-etcd-tls"
+
+	// KubeAPIServerEtcdTLSSecret is the name of the secret used to store etcd TLS assets for the apiserver
+	KubeAPIServerEtcdTLSSecret = "kube-apiserver-etcd-tls"
+
+	// EtcdBootstrapMemberName describes the name of the bootstrap member as it exists in the etcd cluster.
+	EtcdBootstrapMemberName = "bootstrap"
 )
 
 var (

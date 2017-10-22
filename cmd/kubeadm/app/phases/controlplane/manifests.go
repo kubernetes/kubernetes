@@ -28,8 +28,10 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiext "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1alpha1"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
@@ -165,6 +167,10 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 		"proxy-client-key-file":              filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientKeyName),
 	}
 
+	if features.Enabled(cfg.FeatureGates, features.HighAvailability) {
+		defaultArguments["feature-gates"] = "TaintNodesByCondition=true"
+	}
+
 	command := []string{"kube-apiserver"}
 
 	if k8sVersion.Minor() == 8 {
@@ -182,7 +188,8 @@ func getAPIServerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion *versio
 	if len(cfg.Etcd.Endpoints) > 0 {
 		command = append(command, fmt.Sprintf("--etcd-servers=%s", strings.Join(cfg.Etcd.Endpoints, ",")))
 	} else {
-		command = append(command, "--etcd-servers=http://127.0.0.1:2379")
+		clientPort, _ := etcdphase.GetEtcdPorts(cfg)
+		command = append(command, fmt.Sprintf("--etcd-servers=http://127.0.0.1:%d", clientPort))
 	}
 
 	// Is etcd secured?
@@ -220,6 +227,10 @@ func getControllerManagerCommand(cfg *kubeadmapi.MasterConfiguration, k8sVersion
 		"cluster-signing-key-file":         filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName),
 		"use-service-account-credentials":  "true",
 		"controllers":                      "*,bootstrapsigner,tokencleaner",
+	}
+
+	if features.Enabled(cfg.FeatureGates, features.HighAvailability) {
+		defaultArguments["feature-gates"] = "TaintNodesByCondition=true"
 	}
 
 	// If using external CA, pass empty string to controller manager instead of ca.key/ca.crt path,
@@ -262,6 +273,10 @@ func getSchedulerCommand(cfg *kubeadmapi.MasterConfiguration) []string {
 		"address":      "127.0.0.1",
 		"leader-elect": "true",
 		"kubeconfig":   filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName),
+	}
+
+	if features.Enabled(cfg.FeatureGates, features.HighAvailability) {
+		defaultArguments["feature-gates"] = "TaintNodesByCondition=true"
 	}
 
 	command := []string{"kube-scheduler"}
