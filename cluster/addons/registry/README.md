@@ -179,7 +179,7 @@ node by creating following daemonset.
 
 <!-- BEGIN MUNGE: EXAMPLE ../../saltbase/salt/kube-registry-proxy/kube-registry-proxy.yaml -->
 ```yaml
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1beta2
 kind: DaemonSet
 metadata:
   name: kube-registry-proxy
@@ -189,6 +189,12 @@ metadata:
     kubernetes.io/cluster-service: "true"
     version: v0.4
 spec:
+  selector:
+    matchLabels:
+      k8s-app: kube-registry-proxy
+      kubernetes.io/name: "kube-registry-proxy"
+      kubernetes.io/cluster-service: "true"
+      version: v0.4
   template:
     metadata:
       labels:
