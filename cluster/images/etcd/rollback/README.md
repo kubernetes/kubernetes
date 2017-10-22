@@ -1,7 +1,7 @@
 # Rollback workflow
 
 Build it in this directory.
-Make sure you have etcd dependency ready. Last time we use etcd v3.0.7.
+Make sure you have etcd dependency ready. Last time we use etcd v3.1.10.
 ```
 $ go build .
 ```
