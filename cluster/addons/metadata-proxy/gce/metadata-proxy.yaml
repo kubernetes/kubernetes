@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1beta2
 kind: DaemonSet
 metadata:
   name: metadata-proxy-v0.1
@@ -9,6 +9,11 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
     version: v0.1
 spec:
+  selector:
+    matchLabels:
+      k8s-app: metadata-proxy
+      kubernetes.io/cluster-service: "true"
+      version: v0.1
   updateStrategy:
     type: RollingUpdate
   template:
