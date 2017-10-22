@@ -580,8 +580,12 @@ func PodFitsResources(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 	}
 
 	for rName, rQuant := range podRequest.ScalarResources {
+		if isPodBestEffort(pod) && v1helper.IsHugePageResourceName(rName) {
+			continue
+		}
 		if allocatable.ScalarResources[rName] < rQuant+nodeInfo.RequestedResource().ScalarResources[rName] {
 			predicateFails = append(predicateFails, NewInsufficientResourceError(rName, podRequest.ScalarResources[rName], nodeInfo.RequestedResource().ScalarResources[rName], allocatable.ScalarResources[rName]))
+
 		}
 	}
 
