@@ -33,7 +33,8 @@ import (
 // for managing gRPC communications with the device plugin and caching
 // device states reported by the device plugin.
 type endpoint struct {
-	client pluginapi.DevicePluginClient
+	client     pluginapi.DevicePluginClient
+	clientConn *grpc.ClientConn
 
 	socketPath   string
 	resourceName string
@@ -42,32 +43,25 @@ type endpoint struct {
 	mutex   sync.Mutex
 
 	callback MonitorCallback
-
-	cancel context.CancelFunc
-	ctx    context.Context
 }
 
 // newEndpoint creates a new endpoint for the given resourceName.
 func newEndpoint(socketPath, resourceName string, callback MonitorCallback) (*endpoint, error) {
-	client, err := dial(socketPath)
+	client, c, err := dial(socketPath)
 	if err != nil {
 		glog.Errorf("Can't create new endpoint with path %s err %v", socketPath, err)
 		return nil, err
 	}
 
-	ctx, stop := context.WithCancel(context.Background())
-
 	return &endpoint{
-		client: client,
+		client:     client,
+		clientConn: c,
 
 		socketPath:   socketPath,
 		resourceName: resourceName,
 
 		devices:  nil,
 		callback: callback,
-
-		cancel: stop,
-		ctx:    ctx,
 	}, nil
 }
 
@@ -86,11 +80,9 @@ func (e *endpoint) getDevices() []pluginapi.Device {
 // list initializes ListAndWatch gRPC call for the device plugin and gets the
 // initial list of the devices. Returns ListAndWatch gRPC stream on success.
 func (e *endpoint) list() (pluginapi.DevicePlugin_ListAndWatchClient, error) {
-	glog.V(3).Infof("Starting List")
-	stream, err := e.client.ListAndWatch(e.ctx, &pluginapi.Empty{})
+	stream, err := e.client.ListAndWatch(context.Background(), &pluginapi.Empty{})
 	if err != nil {
 		glog.Errorf(errListAndWatch, e.resourceName, err)
-
 		return nil, err
 	}
 
@@ -190,7 +182,6 @@ func (e *endpoint) listAndWatch(stream pluginapi.DevicePlugin_ListAndWatchClient
 
 		e.callback(e.resourceName, added, updated, deleted)
 	}
-
 }
 
 // allocate issues Allocate gRPC call to the device plugin.
@@ -201,11 +192,11 @@ func (e *endpoint) allocate(devs []string) (*pluginapi.AllocateResponse, error) 
 }
 
 func (e *endpoint) stop() {
-	e.cancel()
+	e.clientConn.Close()
 }
 
 // dial establishes the gRPC communication with the registered device plugin.
-func dial(unixSocketPath string) (pluginapi.DevicePluginClient, error) {
+func dial(unixSocketPath string) (pluginapi.DevicePluginClient, *grpc.ClientConn, error) {
 	c, err := grpc.Dial(unixSocketPath, grpc.WithInsecure(),
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
 			return net.DialTimeout("unix", addr, timeout)
@@ -213,8 +204,8 @@ func dial(unixSocketPath string) (pluginapi.DevicePluginClient, error) {
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf(errFailedToDialDevicePlugin+" %v", err)
+		return nil, nil, fmt.Errorf(errFailedToDialDevicePlugin+" %v", err)
 	}
 
-	return pluginapi.NewDevicePluginClient(c), nil
+	return pluginapi.NewDevicePluginClient(c), c, nil
 }

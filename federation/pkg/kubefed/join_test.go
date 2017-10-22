@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	k8srbacv1 "k8s.io/kubernetes/pkg/apis/rbac/v1"
-	"k8s.io/kubernetes/pkg/kubectl"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -595,8 +594,8 @@ func fakeCluster(clusterName, secretName, server string, isRBACAPIAvailable bool
 	if isRBACAPIAvailable {
 		saName := serviceAccountName(clusterName)
 		annotations := map[string]string{
-			kubectl.ServiceAccountNameAnnotation: saName,
-			kubectl.ClusterRoleNameAnnotation:    util.ClusterRoleName(testFederationName, saName),
+			ServiceAccountNameAnnotation: saName,
+			ClusterRoleNameAnnotation:    util.ClusterRoleName(testFederationName, saName),
 		}
 		cluster.ObjectMeta.SetAnnotations(annotations)
 	}

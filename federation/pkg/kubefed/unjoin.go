@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/federation/pkg/kubefed/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -304,7 +303,7 @@ func removeConfigMapString(str string, toRemove string) string {
 // deleteServiceAccountFromCluster removes the service account that the federation control plane uses
 // to access the cluster from the cluster that is leaving the federation.
 func deleteServiceAccountFromCluster(unjoiningClusterClientset internalclientset.Interface, cluster *federationapi.Cluster, fedSystemNamespace string) error {
-	serviceAccountName, ok := cluster.ObjectMeta.Annotations[kubectl.ServiceAccountNameAnnotation]
+	serviceAccountName, ok := cluster.ObjectMeta.Annotations[ServiceAccountNameAnnotation]
 	if !ok {
 		// If there is no service account name annotation, assume that this cluster does not have a federation control plane service account.
 		return nil
@@ -315,7 +314,7 @@ func deleteServiceAccountFromCluster(unjoiningClusterClientset internalclientset
 // deleteClusterRoleBindingFromCluster deletes the ClusterRole and ClusterRoleBinding from the
 // cluster that is leaving the federation.
 func deleteClusterRoleBindingFromCluster(unjoiningClusterClientset internalclientset.Interface, cluster *federationapi.Cluster) error {
-	clusterRoleName, ok := cluster.ObjectMeta.Annotations[kubectl.ClusterRoleNameAnnotation]
+	clusterRoleName, ok := cluster.ObjectMeta.Annotations[ClusterRoleNameAnnotation]
 	if !ok {
 		// If there is no cluster role name annotation, assume that this cluster does not have cluster role bindings.
 		return nil

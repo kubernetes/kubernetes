@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "cluster.go",
         "join.go",
         "kubefed.go",
         "unjoin.go",
@@ -32,6 +33,7 @@ go_library(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -47,6 +49,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "cluster_test.go",
         "join_test.go",
         "unjoin_test.go",
     ],
@@ -61,7 +64,6 @@ go_test(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/apis/rbac/v1:go_default_library",
-        "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

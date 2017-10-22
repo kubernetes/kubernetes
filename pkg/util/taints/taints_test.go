@@ -111,3 +111,104 @@ func TestAddOrUpdateTaint(t *testing.T) {
 	newNode, result, err = AddOrUpdateTaint(node, taint)
 	checkResult("Add Duplicate Taint", newNode, taint, result, false, err)
 }
+
+func TestParseTaints(t *testing.T) {
+	cases := []struct {
+		name                   string
+		spec                   []string
+		expectedTaints         []v1.Taint
+		expectedTaintsToRemove []v1.Taint
+		expectedErr            bool
+	}{
+		{
+			name:        "invalid spec format",
+			spec:        []string{"foo=abc"},
+			expectedErr: true,
+		},
+		{
+			name:        "invalid spec effect for adding taint",
+			spec:        []string{"foo=abc:invalid_effect"},
+			expectedErr: true,
+		},
+		{
+			name:        "invalid spec effect for deleting taint",
+			spec:        []string{"foo:invalid_effect-"},
+			expectedErr: true,
+		},
+		{
+			name: "add new taints",
+			spec: []string{"foo=abc:NoSchedule", "bar=abc:NoSchedule"},
+			expectedTaints: []v1.Taint{
+				{
+					Key:    "foo",
+					Value:  "abc",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+				{
+					Key:    "bar",
+					Value:  "abc",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "delete taints",
+			spec: []string{"foo:NoSchedule-", "bar:NoSchedule-"},
+			expectedTaintsToRemove: []v1.Taint{
+				{
+					Key:    "foo",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+				{
+					Key:    "bar",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "add taints and delete taints",
+			spec: []string{"foo=abc:NoSchedule", "bar=abc:NoSchedule", "foo:NoSchedule-", "bar:NoSchedule-"},
+			expectedTaints: []v1.Taint{
+				{
+					Key:    "foo",
+					Value:  "abc",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+				{
+					Key:    "bar",
+					Value:  "abc",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			expectedTaintsToRemove: []v1.Taint{
+				{
+					Key:    "foo",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+				{
+					Key:    "bar",
+					Effect: v1.TaintEffectNoSchedule,
+				},
+			},
+			expectedErr: false,
+		},
+	}
+
+	for _, c := range cases {
+		taints, taintsToRemove, err := ParseTaints(c.spec)
+		if c.expectedErr && err == nil {
+			t.Errorf("[%s] expected error, but got nothing", c.name)
+		}
+		if !c.expectedErr && err != nil {
+			t.Errorf("[%s] expected no error, but got: %v", c.name, err)
+		}
+		if !reflect.DeepEqual(c.expectedTaints, taints) {
+			t.Errorf("[%s] expected returen taints as %v, but got: %v", c.name, c.expectedTaints, taints)
+		}
+		if !reflect.DeepEqual(c.expectedTaintsToRemove, taintsToRemove) {
+			t.Errorf("[%s] expected return taints to be removed as %v, but got: %v", c.name, c.expectedTaintsToRemove, taintsToRemove)
+		}
+	}
+}

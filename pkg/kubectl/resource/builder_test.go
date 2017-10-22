@@ -900,11 +900,11 @@ func TestMultipleObject(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expected := &api.List{
-		Items: []runtime.Object{
-			&pods.Items[0],
-			&pods.Items[1],
-			&svc.Items[0],
+	expected := &v1.List{
+		Items: []runtime.RawExtension{
+			{Object: &pods.Items[0]},
+			{Object: &pods.Items[1]},
+			{Object: &svc.Items[0]},
 		},
 	}
 	if !apiequality.Semantic.DeepDerivative(expected, obj) {
@@ -1023,7 +1023,7 @@ func TestListObject(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	list, ok := obj.(*api.List)
+	list, ok := obj.(*v1.List)
 	if !ok {
 		t.Fatalf("unexpected object: %#v", obj)
 	}
@@ -1057,7 +1057,7 @@ func TestListObjectWithDifferentVersions(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	list, ok := obj.(*api.List)
+	list, ok := obj.(*v1.List)
 	if !ok {
 		t.Fatalf("unexpected object: %#v", obj)
 	}

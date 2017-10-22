@@ -427,7 +427,7 @@ func clusterGenerator(clientConfig *clientcmdapi.Config, name, contextName, secr
 		serverAddress = strings.Join([]string{scheme, serverAddress}, "://")
 	}
 
-	generator := &kubectl.ClusterGeneratorV1Beta1{
+	generator := &ClusterGeneratorV1Beta1{
 		Name:               name,
 		ClientCIDR:         defaultClientCIDR,
 		ServerAddress:      serverAddress,
