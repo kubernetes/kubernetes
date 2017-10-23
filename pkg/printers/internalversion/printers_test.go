@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/storage"
 	kubectltesting "k8s.io/kubernetes/pkg/kubectl/testing"
 	"k8s.io/kubernetes/pkg/printers"
+	"k8s.io/kubernetes/pkg/util/node"
 )
 
 func init() {
@@ -1656,6 +1657,25 @@ func TestPrintPod(t *testing.T) {
 				},
 			},
 			[]metav1alpha1.TableRow{{Cells: []interface{}{"test5", "1/2", "podReason", 6, "<unknown>"}}},
+		},
+		{
+			// Test pod status when deletion timestamp is not nil and status.reason is NodeLost
+			api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test6",
+					DeletionTimestamp: &metav1.Time{Time: time.Now().AddDate(0, 0, 1)},
+				},
+				Spec: api.PodSpec{Containers: make([]api.Container, 2)},
+				Status: api.PodStatus{
+					Reason: node.NodeUnreachablePodReason,
+					Phase:  "podPhase",
+					ContainerStatuses: []api.ContainerStatus{
+						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+						{Ready: true, RestartCount: 3},
+					},
+				},
+			},
+			[]metav1alpha1.TableRow{{Cells: []interface{}{"test6", "1/2", "NodeLost", 6, "<unknown>"}}},
 		},
 	}
 
