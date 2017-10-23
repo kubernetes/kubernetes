@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
-// NewCmdCerts return main command for certs phase
+// NewCmdCerts returns main command for certs phase
 func NewCmdCerts() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "certs",
