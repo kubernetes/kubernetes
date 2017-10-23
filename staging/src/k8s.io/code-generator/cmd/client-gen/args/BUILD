@@ -16,6 +16,7 @@ go_library(
     importpath = "k8s.io/code-generator/cmd/client-gen/args",
     deps = [
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/gopkg.in/yaml.v2:go_default_library",
         "//vendor/k8s.io/code-generator/cmd/client-gen/types:go_default_library",
     ],
 )

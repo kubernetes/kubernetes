@@ -1,0 +1,8 @@
+plural:
+  # These exceptions are used to avoid bad pluralization (Endpoints->Endpointses, etc..)
+  Endpoints: Endpoints
+public:
+  # These exceptions are used to deconflict the generated code. You can put your
+  # fully qualified package to generate a name that does not conflict with your
+  # group.
+private:

@@ -16,13 +16,20 @@ limitations under the License.
 
 package generators
 
-import "github.com/spf13/pflag"
+import (
+	"github.com/spf13/pflag"
+
+	clientgenargs "k8s.io/code-generator/cmd/client-gen/args"
+)
 
 type CustomArgs struct {
 	VersionedClientSetPackage string
 	InternalClientSetPackage  string
 	ListersPackage            string
 	SingleDirectory           bool
+
+	// We need to pass this to Packages()
+	NamerExceptions clientgenargs.NamerExceptions
 }
 
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
