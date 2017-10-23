@@ -59,16 +59,10 @@ func startCSRApprovingController(ctx ControllerContext) (bool, error) {
 		return false, nil
 	}
 
-	approver, err := approver.NewCSRApprovingController(
+	approver := approver.NewCSRApprovingController(
 		ctx.ClientBuilder.ClientOrDie("certificate-controller"),
 		ctx.InformerFactory.Certificates().V1beta1().CertificateSigningRequests(),
 	)
-	if err != nil {
-		// TODO this is failing consistently in test-cmd and local-up-cluster.sh.  Fix them and make it consistent with all others which
-		// cause a crash loop
-		glog.Errorf("Failed to start certificate controller: %v", err)
-		return false, nil
-	}
 	go approver.Run(1, ctx.Stop)
 
 	return true, nil
