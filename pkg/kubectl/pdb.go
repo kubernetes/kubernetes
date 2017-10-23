@@ -122,7 +122,7 @@ func (PodDisruptionBudgetV2Generator) ParamNames() []GeneratorParam {
 		{"name", true},
 		{"min-available", false},
 		{"max-unavailable", false},
-		{"selector", false},
+		{"selector", true},
 	}
 }
 
