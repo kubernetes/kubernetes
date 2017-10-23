@@ -515,6 +515,7 @@ func (lbaas *LbaasV2) createLoadBalancer(service *v1.Service, name string, inter
 		Name:        name,
 		Description: fmt.Sprintf("Kubernetes external service %s", name),
 		VipSubnetID: lbaas.opts.SubnetId,
+		Provider:    lbaas.opts.LBProvider,
 	}
 
 	loadBalancerIP := service.Spec.LoadBalancerIP
