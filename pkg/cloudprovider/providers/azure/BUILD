@@ -35,7 +35,6 @@ go_library(
         "//pkg/volume:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/arm/compute:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/arm/disk:go_default_library",
-        "//vendor/github.com/Azure/azure-sdk-for-go/arm/keyvault:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/arm/network:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/arm/storage:go_default_library",
         "//vendor/github.com/Azure/azure-sdk-for-go/dataplane/keyvault:go_default_library",
