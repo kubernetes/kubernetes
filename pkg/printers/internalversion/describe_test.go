@@ -776,7 +776,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 			Spec: api.PersistentVolumeSpec{
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					RBD: &api.RBDVolumeSource{},
+					RBD: &api.RBDPersistentVolumeSource{},
 				},
 			},
 		},

@@ -343,7 +343,7 @@ type PersistentVolumeSource struct {
 	NFS *NFSVolumeSource
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime
 	// +optional
-	RBD *RBDVolumeSource
+	RBD *RBDPersistentVolumeSource
 	// Quobyte represents a Quobyte mount on the host that shares a pod's lifetime
 	// +optional
 	Quobyte *QuobyteVolumeSource
@@ -1000,6 +1000,37 @@ type RBDVolumeSource struct {
 	// Optional: SecretRef is name of the authentication secret for RBDUser, default is nil.
 	// +optional
 	SecretRef *LocalObjectReference
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
+}
+
+// Represents a Rados Block Device mount that lasts the lifetime of a pod.
+// RBD volumes support ownership management and SELinux relabeling.
+type RBDPersistentVolumeSource struct {
+	// Required: CephMonitors is a collection of Ceph monitors
+	CephMonitors []string
+	// Required: RBDImage is the rados image name
+	RBDImage string
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	// +optional
+	FSType string
+	// Optional: RadosPool is the rados pool name,default is rbd
+	// +optional
+	RBDPool string
+	// Optional: RBDUser is the rados user name, default is admin
+	// +optional
+	RadosUser string
+	// Optional: Keyring is the path to key ring for RBDUser, default is /etc/ceph/keyring
+	// +optional
+	Keyring string
+	// Optional: SecretRef is reference to the authentication secret for User, default is empty.
+	// +optional
+	SecretRef *SecretReference
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	// +optional

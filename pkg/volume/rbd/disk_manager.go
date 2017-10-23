@@ -39,7 +39,7 @@ type diskManager interface {
 	// Detaches the disk from the kubelet's host machine.
 	DetachDisk(disk rbdUnmounter, mntPath string) error
 	// Creates a rbd image
-	CreateImage(provisioner *rbdVolumeProvisioner) (r *v1.RBDVolumeSource, volumeSizeGB int, err error)
+	CreateImage(provisioner *rbdVolumeProvisioner) (r *v1.RBDPersistentVolumeSource, volumeSizeGB int, err error)
 	// Deletes a rbd image
 	DeleteImage(deleter *rbdVolumeDeleter) error
 }

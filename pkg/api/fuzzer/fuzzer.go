@@ -355,6 +355,20 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				r.Keyring = "/etc/ceph/keyring"
 			}
 		},
+		func(r *api.RBDPersistentVolumeSource, c fuzz.Continue) {
+			r.RBDPool = c.RandString()
+			if r.RBDPool == "" {
+				r.RBDPool = "rbd"
+			}
+			r.RadosUser = c.RandString()
+			if r.RadosUser == "" {
+				r.RadosUser = "admin"
+			}
+			r.Keyring = c.RandString()
+			if r.Keyring == "" {
+				r.Keyring = "/etc/ceph/keyring"
+			}
+		},
 		func(obj *api.HostPathVolumeSource, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
 			types := []api.HostPathType{api.HostPathUnset, api.HostPathDirectoryOrCreate, api.HostPathDirectory,

@@ -362,7 +362,7 @@ func (util *RBDUtil) DetachDisk(c rbdUnmounter, mntPath string) error {
 	return nil
 }
 
-func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDVolumeSource, size int, err error) {
+func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDPersistentVolumeSource, size int, err error) {
 	var output []byte
 	capacity := p.options.PVC.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
 	volSizeBytes := capacity.Value()
@@ -400,7 +400,7 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDVolumeSource
 		return nil, 0, fmt.Errorf("failed to create rbd image: %v, command output: %s", err, string(output))
 	}
 
-	return &v1.RBDVolumeSource{
+	return &v1.RBDPersistentVolumeSource{
 		CephMonitors: p.rbdMounter.Mon,
 		RBDImage:     p.rbdMounter.Image,
 		RBDPool:      p.rbdMounter.Pool,

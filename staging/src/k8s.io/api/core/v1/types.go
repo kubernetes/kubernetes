@@ -398,7 +398,7 @@ type PersistentVolumeSource struct {
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime.
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md
 	// +optional
-	RBD *RBDVolumeSource `json:"rbd,omitempty" protobuf:"bytes,6,opt,name=rbd"`
+	RBD *RBDPersistentVolumeSource `json:"rbd,omitempty" protobuf:"bytes,6,opt,name=rbd"`
 	// ISCSI represents an ISCSI Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod. Provisioned by an admin.
 	// +optional
@@ -831,6 +831,50 @@ type RBDVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
 	// +optional
 	SecretRef *LocalObjectReference `json:"secretRef,omitempty" protobuf:"bytes,7,opt,name=secretRef"`
+	// ReadOnly here will force the ReadOnly setting in VolumeMounts.
+	// Defaults to false.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,8,opt,name=readOnly"`
+}
+
+// Represents a Rados Block Device mount that lasts the lifetime of a pod.
+// RBD volumes support ownership management and SELinux relabeling.
+type RBDPersistentVolumeSource struct {
+	// A collection of Ceph monitors.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+	CephMonitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
+	// The rados image name.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+	RBDImage string `json:"image" protobuf:"bytes,2,opt,name=image"`
+	// Filesystem type of the volume that you want to mount.
+	// Tip: Ensure that the filesystem type is supported by the host operating system.
+	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	// +optional
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,3,opt,name=fsType"`
+	// The rados pool name.
+	// Default is rbd.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+	// +optional
+	RBDPool string `json:"pool,omitempty" protobuf:"bytes,4,opt,name=pool"`
+	// The rados user name.
+	// Default is admin.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+	// +optional
+	RadosUser string `json:"user,omitempty" protobuf:"bytes,5,opt,name=user"`
+	// Keyring is the path to key ring for RBDUser.
+	// Default is /etc/ceph/keyring.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+	// +optional
+	Keyring string `json:"keyring,omitempty" protobuf:"bytes,6,opt,name=keyring"`
+	// SecretRef is name of the authentication secret for RBDUser. If provided
+	// overrides keyring.
+	// Default is nil.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+	// +optional
+	SecretRef *SecretReference `json:"secretRef,omitempty" protobuf:"bytes,7,opt,name=secretRef"`
 	// ReadOnly here will force the ReadOnly setting in VolumeMounts.
 	// Defaults to false.
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
