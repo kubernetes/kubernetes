@@ -279,6 +279,58 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			By("Scale down number of backends to 2")
 			scaleAndValidateNEG(3)
 		})
+
+		It("rolling update backend pods should not cause service disruption", func() {
+			name := "hostname"
+			replicas := 8
+			By("Create a basic HTTP ingress using NEG")
+			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "neg"), ns, map[string]string{}, map[string]string{})
+			jig.WaitForIngress(true)
+			usingNEG, err := gceController.BackendServiceUsingNEG(jig.GetIngressNodePorts(false))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(usingNEG).To(BeTrue())
+
+			By(fmt.Sprintf("Scale backend replicas to %d", replicas))
+			scale, err := f.ClientSet.ExtensionsV1beta1().Deployments(ns).GetScale(name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			scale.Spec.Replicas = int32(replicas)
+			_, err = f.ClientSet.ExtensionsV1beta1().Deployments(ns).UpdateScale(name, scale)
+			Expect(err).NotTo(HaveOccurred())
+			wait.Poll(5*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
+				res, err := jig.GetDistinctResponseFromIngress()
+				if err != nil {
+					return false, err
+				}
+				return res.Len() == replicas, err
+			})
+
+			By("Trigger rolling update and observe service disruption")
+			deploy, err := f.ClientSet.ExtensionsV1beta1().Deployments(ns).Get(name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			// trigger by changing graceful termination period to 60 seconds
+			gracePeriod := int64(60)
+			deploy.Spec.Template.Spec.TerminationGracePeriodSeconds = &gracePeriod
+			_, err = f.ClientSet.ExtensionsV1beta1().Deployments(ns).Update(deploy)
+			Expect(err).NotTo(HaveOccurred())
+			wait.Poll(30*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
+				res, err := jig.GetDistinctResponseFromIngress()
+				Expect(err).NotTo(HaveOccurred())
+				deploy, err := f.ClientSet.ExtensionsV1beta1().Deployments(ns).Get(name, metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				if int(deploy.Status.UpdatedReplicas) == replicas {
+					if res.Len() == replicas {
+						return true, nil
+					} else {
+						framework.Logf("Expecting %d different responses, but got %d.", replicas, res.Len())
+						return false, nil
+					}
+
+				} else {
+					framework.Logf("Waiting for rolling update to finished. Keep sending traffic.")
+					return false, nil
+				}
+			})
+		})
 	})
 
 	// Time: borderline 5m, slow by design
