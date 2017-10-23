@@ -139,6 +139,18 @@ func (t *Transport) rewriteURL(targetURL string, sourceURL *url.URL, sourceReque
 		return targetURL
 	}
 
+	// Example:
+	//      When API server processes a proxy request to a service (e.g. /api/v1/namespace/foo/service/bar/proxy/),
+	//      the sourceURL.Host (i.e. req.URL.Host) is the endpoint IP address of the service. The
+	//      sourceRequestHost (i.e. req.Host) is the Host header that specifies the host on which the
+	//      URL is sought, which can be different from sourceURL.Host. For example, if user sends the
+	//      request through "kubectl proxy" locally (i.e. localhost:8001/api/v1/namespace/foo/service/bar/proxy/),
+	//      sourceRequestHost is "localhost:8001".
+	//
+	//      If the service's response URL contains non-empty host, and url.Host is equal to either sourceURL.Host
+	//      or sourceRequestHost, we should not consider the returned URL to be a completely different host.
+	//      It's the API server's responsibility to rewrite a same-host-and-absolute-path URL and append the
+	//      necessary URL prefix (i.e. /api/v1/namespace/foo/service/bar/proxy/).
 	isDifferentHost := url.Host != "" && url.Host != sourceURL.Host && url.Host != sourceRequestHost
 	isRelative := !strings.HasPrefix(url.Path, "/")
 	if isDifferentHost || isRelative {
