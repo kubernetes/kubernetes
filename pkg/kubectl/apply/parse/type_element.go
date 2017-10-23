@@ -38,5 +38,9 @@ func (v ElementBuildingVisitor) typeElement(meta apply.FieldMetaImpl, item *type
 	}
 
 	// Return the result
-	return &apply.TypeElement{meta, item.MapElementData, values}, nil
+	return &apply.TypeElement{
+		FieldMetaImpl:  meta,
+		MapElementData: item.MapElementData,
+		Values:         values,
+	}, nil
 }

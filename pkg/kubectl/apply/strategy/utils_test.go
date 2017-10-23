@@ -44,7 +44,7 @@ func runWith(instance apply.Strategy, recorded, local, remote, expected map[stri
 	Expect(err).To(BeNil())
 	resources, err := openapi.NewOpenAPIData(s)
 	Expect(err).To(BeNil())
-	parseFactory := parse.Factory{resources}
+	parseFactory := parse.Factory{Resources: resources}
 
 	parsed, err := parseFactory.CreateElement(recorded, local, remote)
 	Expect(err).Should(Not(HaveOccurred()))
