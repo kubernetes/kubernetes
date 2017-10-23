@@ -227,7 +227,7 @@ func TestCheckOpenStackOpts(t *testing.T) {
 					SearchOrder: "",
 				},
 			},
-			expectedError: fmt.Errorf("Invalid value in section [Metadata] with key `search-order`. Value cannot be empty"),
+			expectedError: fmt.Errorf("invalid value in section [Metadata] with key `search-order`. Value cannot be empty"),
 		},
 		{
 			name: "test5",
@@ -237,7 +237,7 @@ func TestCheckOpenStackOpts(t *testing.T) {
 					SearchOrder: "value1,value2,value3",
 				},
 			},
-			expectedError: fmt.Errorf("Invalid value in section [Metadata] with key `search-order`. Value cannot contain more than 2 elements"),
+			expectedError: fmt.Errorf("invalid value in section [Metadata] with key `search-order`. Value cannot contain more than 2 elements"),
 		},
 		{
 			name: "test6",
@@ -247,8 +247,8 @@ func TestCheckOpenStackOpts(t *testing.T) {
 					SearchOrder: "value1",
 				},
 			},
-			expectedError: fmt.Errorf("Invalid element '%s' found in section [Metadata] with key `search-order`."+
-				"Supported elements include '%s' and '%s'", "value1", configDriveID, metadataID),
+			expectedError: fmt.Errorf("invalid element %q found in section [Metadata] with key `search-order`."+
+				"Supported elements include %q and %q", "value1", configDriveID, metadataID),
 		},
 	}
 

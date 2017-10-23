@@ -844,6 +844,11 @@ EOF
 ETCD_VERSION: $(yaml-quote ${ETCD_VERSION})
 EOF
     fi
+    if [ -n "${ETCD_HOSTNAME:-}" ]; then
+      cat >>$file <<EOF
+ETCD_HOSTNAME: $(yaml-quote ${ETCD_HOSTNAME})
+EOF
+    fi
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
 APISERVER_TEST_ARGS: $(yaml-quote ${APISERVER_TEST_ARGS})

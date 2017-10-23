@@ -53,9 +53,9 @@ const (
 	defaultTimeOut   = 60 * time.Second
 )
 
-var ErrNotFound = errors.New("Failed to find object")
-var ErrMultipleResults = errors.New("Multiple results where only one expected")
-var ErrNoAddressFound = errors.New("No address found for host")
+var ErrNotFound = errors.New("failed to find object")
+var ErrMultipleResults = errors.New("multiple results where only one expected")
+var ErrNoAddressFound = errors.New("no address found for host")
 
 // encoding.TextUnmarshaler interface for time.Duration
 type MyDuration struct {
@@ -179,8 +179,7 @@ func (cfg Config) toAuth3Options() tokens3.AuthOptions {
 
 func readConfig(config io.Reader) (Config, error) {
 	if config == nil {
-		err := fmt.Errorf("no OpenStack cloud provider config file given")
-		return Config{}, err
+		return Config{}, fmt.Errorf("no OpenStack cloud provider config file given")
 	}
 
 	var cfg Config
@@ -549,7 +548,6 @@ func isNotFound(err error) bool {
 
 func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
 	glog.V(1).Info("Claiming to support Zones")
-
 	return os, true
 }
 
@@ -563,8 +561,7 @@ func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
 		FailureDomain: md.AvailabilityZone,
 		Region:        os.region,
 	}
-	glog.V(1).Infof("Current zone is %v", zone)
-
+	glog.V(4).Infof("Current zone is %v", zone)
 	return zone, nil
 }
 
@@ -592,7 +589,6 @@ func (os *OpenStack) GetZoneByProviderID(providerID string) (cloudprovider.Zone,
 		Region:        os.region,
 	}
 	glog.V(4).Infof("The instance %s in zone %v", srv.Name, zone)
-
 	return zone, nil
 }
 
@@ -618,7 +614,6 @@ func (os *OpenStack) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Z
 		Region:        os.region,
 	}
 	glog.V(4).Infof("The instance %s in zone %v", srv.Name, zone)
-
 	return zone, nil
 }
 
@@ -653,7 +648,6 @@ func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 	}
 
 	glog.V(1).Info("Claiming to support Routes")
-
 	return r, true
 }
 
@@ -703,19 +697,18 @@ func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
 		}
 	default:
 		err_txt := fmt.Sprintf("Config error: unrecognised bs-version \"%v\"", os.bsOpts.BSVersion)
-		glog.Warningf(err_txt)
 		return nil, errors.New(err_txt)
 	}
 }
 
 func checkMetadataSearchOrder(order string) error {
 	if order == "" {
-		return errors.New("Invalid value in section [Metadata] with key `search-order`. Value cannot be empty")
+		return errors.New("invalid value in section [Metadata] with key `search-order`. Value cannot be empty")
 	}
 
 	elements := strings.Split(order, ",")
 	if len(elements) > 2 {
-		return errors.New("Invalid value in section [Metadata] with key `search-order`. Value cannot contain more than 2 elements")
+		return errors.New("invalid value in section [Metadata] with key `search-order`. Value cannot contain more than 2 elements")
 	}
 
 	for _, id := range elements {
@@ -724,9 +717,8 @@ func checkMetadataSearchOrder(order string) error {
 		case configDriveID:
 		case metadataID:
 		default:
-			errTxt := "Invalid element '%s' found in section [Metadata] with key `search-order`." +
-				"Supported elements include '%s' and '%s'"
-			return fmt.Errorf(errTxt, id, configDriveID, metadataID)
+			return fmt.Errorf("invalid element %q found in section [Metadata] with key `search-order`."+
+				"Supported elements include %q and %q", id, configDriveID, metadataID)
 		}
 	}
 
