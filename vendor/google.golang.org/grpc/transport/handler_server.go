@@ -1,18 +1,32 @@
 /*
+ * Copyright 2016, Google Inc.
+ * All rights reserved.
  *
- * Copyright 2016 gRPC authors.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *     * Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above
+ * copyright notice, this list of conditions and the following disclaimer
+ * in the documentation and/or other materials provided with the
+ * distribution.
+ *     * Neither the name of Google Inc. nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
 
@@ -88,6 +102,15 @@ func NewServerHandlerTransport(w http.ResponseWriter, r *http.Request) (ServerTr
 			continue
 		}
 		for _, v := range vv {
+			if k == "user-agent" {
+				// user-agent is special. Copying logic of http_util.go.
+				if i := strings.LastIndex(v, " "); i == -1 {
+					// There is no application user agent string being set
+					continue
+				} else {
+					v = v[:i]
+				}
+			}
 			v, err := decodeMetadataHeader(k, v)
 			if err != nil {
 				return nil, streamErrorf(codes.InvalidArgument, "malformed binary metadata: %v", err)
@@ -156,18 +179,11 @@ func (a strAddr) String() string { return string(a) }
 
 // do runs fn in the ServeHTTP goroutine.
 func (ht *serverHandlerTransport) do(fn func()) error {
-	// Avoid a panic writing to closed channel. Imperfect but maybe good enough.
 	select {
+	case ht.writes <- fn:
+		return nil
 	case <-ht.closedCh:
 		return ErrConnClosing
-	default:
-		select {
-		case ht.writes <- fn:
-			return nil
-		case <-ht.closedCh:
-			return ErrConnClosing
-		}
-
 	}
 }
 
@@ -293,13 +309,13 @@ func (ht *serverHandlerTransport) HandleStreams(startStream func(*Stream), trace
 	req := ht.req
 
 	s := &Stream{
-		id:           0, // irrelevant
-		requestRead:  func(int) {},
-		cancel:       cancel,
-		buf:          newRecvBuffer(),
-		st:           ht,
-		method:       req.URL.Path,
-		recvCompress: req.Header.Get("grpc-encoding"),
+		id:            0,            // irrelevant
+		windowHandler: func(int) {}, // nothing
+		cancel:        cancel,
+		buf:           newRecvBuffer(),
+		st:            ht,
+		method:        req.URL.Path,
+		recvCompress:  req.Header.Get("grpc-encoding"),
 	}
 	pr := &peer.Peer{
 		Addr: ht.RemoteAddr(),
@@ -310,10 +326,7 @@ func (ht *serverHandlerTransport) HandleStreams(startStream func(*Stream), trace
 	ctx = metadata.NewIncomingContext(ctx, ht.headerMD)
 	ctx = peer.NewContext(ctx, pr)
 	s.ctx = newContextWithStream(ctx, s)
-	s.trReader = &transportReader{
-		reader:        &recvBufferReader{ctx: s.ctx, recv: s.buf},
-		windowHandler: func(int) {},
-	}
+	s.dec = &recvBufferReader{ctx: s.ctx, recv: s.buf}
 
 	// readerDone is closed when the Body.Read-ing goroutine exits.
 	readerDone := make(chan struct{})
@@ -325,11 +338,11 @@ func (ht *serverHandlerTransport) HandleStreams(startStream func(*Stream), trace
 		for buf := make([]byte, readSize); ; {
 			n, err := req.Body.Read(buf)
 			if n > 0 {
-				s.buf.put(recvMsg{data: buf[:n:n]})
+				s.buf.put(&recvMsg{data: buf[:n:n]})
 				buf = buf[n:]
 			}
 			if err != nil {
-				s.buf.put(recvMsg{err: mapRecvMsgError(err)})
+				s.buf.put(&recvMsg{err: mapRecvMsgError(err)})
 				return
 			}
 			if len(buf) == 0 {
