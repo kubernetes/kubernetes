@@ -142,7 +142,7 @@ func (s PodDisruptionBudgetV2Generator) Generate(params map[string]interface{}) 
 		return nil, fmt.Errorf("expected string, found %v", minAvailable)
 	}
 
-	maxUnavailable, isString := params["max-available"].(string)
+	maxUnavailable, isString := params["max-unavailable"].(string)
 	if !isString {
 		return nil, fmt.Errorf("expected string, found %v", maxUnavailable)
 	}
