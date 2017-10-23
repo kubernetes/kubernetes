@@ -204,7 +204,7 @@ func (s *PodDisruptionBudgetV2Generator) validate() error {
 		return fmt.Errorf("a selector must be specified")
 	}
 	if len(s.MaxUnavailable) == 0 && len(s.MinAvailable) == 0 {
-		return fmt.Errorf("one of min-available/max-available must be specified")
+		return fmt.Errorf("one of min-available or max-unavailable must be specified")
 	}
 	if len(s.MaxUnavailable) > 0 && len(s.MinAvailable) > 0 {
 		return fmt.Errorf("min-available and max-unavailable cannot be both specified")
