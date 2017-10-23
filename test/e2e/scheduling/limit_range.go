@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package scheduling
 
 import (
 	"fmt"
@@ -28,7 +28,11 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("LimitRange", func() {
+const (
+	podName = "pfpod"
+)
+
+var _ = SIGDescribe("LimitRange", func() {
 	f := framework.NewDefaultFramework("limitrange")
 
 	It("should create a LimitRange with defaults and ensure pod has those defaults applied.", func() {

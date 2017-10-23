@@ -47,11 +47,6 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
-const (
-	// TODO: Delete this once all the tests that depend upon it are moved out of test/e2e and into subdirs
-	podName = "pfpod"
-)
-
 var (
 	cloudConfig = &framework.TestContext.CloudConfig
 )
