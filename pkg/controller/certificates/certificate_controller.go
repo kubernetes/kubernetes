@@ -53,7 +53,7 @@ func NewCertificateController(
 	kubeClient clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	handler func(*certificates.CertificateSigningRequest) error,
-) (*CertificateController, error) {
+) *CertificateController {
 	// Send events to the apiserver
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -98,7 +98,7 @@ func NewCertificateController(
 	cc.csrLister = csrInformer.Lister()
 	cc.csrsSynced = csrInformer.Informer().HasSynced
 	cc.handler = handler
-	return cc, nil
+	return cc
 }
 
 // Run the main goroutine responsible for watching and syncing jobs.
