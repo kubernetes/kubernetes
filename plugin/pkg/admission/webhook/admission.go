@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path"
 	"sync"
 
 	"github.com/golang/glog"
@@ -30,10 +31,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/configuration"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
@@ -42,15 +43,7 @@ import (
 	admissioninit "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 
 	// install the clientgo admission API for use with api registry
-	"path"
-
 	_ "k8s.io/kubernetes/pkg/apis/admission/install"
-)
-
-var (
-	groupVersions = []schema.GroupVersion{
-		admissionv1alpha1.SchemeGroupVersion,
-	}
 )
 
 type ErrCallingWebhook struct {
@@ -68,7 +61,7 @@ func (e *ErrCallingWebhook) Error() string {
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register("GenericAdmissionWebhook", func(configFile io.Reader) (admission.Interface, error) {
-		plugin, err := NewGenericAdmissionWebhook()
+		plugin, err := NewGenericAdmissionWebhook(configFile)
 		if err != nil {
 			return nil, err
 		}
@@ -84,7 +77,23 @@ type WebhookSource interface {
 }
 
 // NewGenericAdmissionWebhook returns a generic admission webhook plugin.
-func NewGenericAdmissionWebhook() (*GenericAdmissionWebhook, error) {
+func NewGenericAdmissionWebhook(configFile io.Reader) (*GenericAdmissionWebhook, error) {
+	kubeconfigFile := ""
+	if configFile != nil {
+		// TODO: move this to a versioned configuration file format
+		var config AdmissionConfig
+		d := yaml.NewYAMLOrJSONDecoder(configFile, 4096)
+		err := d.Decode(&config)
+		if err != nil {
+			return nil, err
+		}
+		kubeconfigFile = config.KubeConfigFile
+	}
+	authInfoResolver, err := newDefaultAuthenticationInfoResolver(kubeconfigFile)
+	if err != nil {
+		return nil, err
+	}
+
 	return &GenericAdmissionWebhook{
 		Handler: admission.NewHandler(
 			admission.Connect,
@@ -92,7 +101,8 @@ func NewGenericAdmissionWebhook() (*GenericAdmissionWebhook, error) {
 			admission.Delete,
 			admission.Update,
 		),
-		serviceResolver: defaultServiceResolver{},
+		authInfoResolver: authInfoResolver,
+		serviceResolver:  defaultServiceResolver{},
 	}, nil
 }
 
@@ -103,7 +113,7 @@ type GenericAdmissionWebhook struct {
 	serviceResolver      admissioninit.ServiceResolver
 	negotiatedSerializer runtime.NegotiatedSerializer
 
-	restClientConfig *rest.Config
+	authInfoResolver AuthenticationInfoResolver
 }
 
 var (
@@ -112,8 +122,14 @@ var (
 	_ = genericadmissioninit.WantsExternalKubeClientSet(&GenericAdmissionWebhook{})
 )
 
+// TODO find a better way wire this, but keep this pull small for now.
 func (a *GenericAdmissionWebhook) SetWebhookRESTClientConfig(in *rest.Config) {
-	a.restClientConfig = in
+	if in != nil {
+		a.authInfoResolver = &dialOverridingAuthenticationInfoResolver{
+			dialFn:   in.Dial,
+			delegate: a.authInfoResolver,
+		}
+	}
 }
 
 // SetServiceResolver sets a service resolver for the webhook admission plugin.
@@ -138,9 +154,6 @@ func (a *GenericAdmissionWebhook) SetExternalKubeClientSet(client clientset.Inte
 }
 
 func (a *GenericAdmissionWebhook) Validate() error {
-	if a.restClientConfig == nil {
-		return fmt.Errorf("the GenericAdmissionWebhook admission plugin requires a restClientConfig to be provided")
-	}
 	if a.hookSource == nil {
 		return fmt.Errorf("the GenericAdmissionWebhook admission plugin requires a Kubernetes client to be provided")
 	}
@@ -266,16 +279,21 @@ func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Exte
 }
 
 func (a *GenericAdmissionWebhook) hookClient(h *v1alpha1.ExternalAdmissionHook) (*rest.RESTClient, error) {
+	serverName := h.ClientConfig.Service.Name + "." + h.ClientConfig.Service.Namespace + ".svc"
 	u, err := a.serviceResolver.ResolveEndpoint(h.ClientConfig.Service.Namespace, h.ClientConfig.Service.Name)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: cache these instead of constructing one each time
-	cfg := rest.CopyConfig(a.restClientConfig)
+	restConfig, err := a.authInfoResolver.ClientConfigFor(serverName)
+	if err != nil {
+		return nil, err
+	}
+	cfg := rest.CopyConfig(restConfig)
 	cfg.Host = u.Host
 	cfg.APIPath = path.Join(u.Path, h.ClientConfig.URLPath)
-	cfg.TLSClientConfig.ServerName = h.ClientConfig.Service.Name + "." + h.ClientConfig.Service.Namespace + ".svc"
+	cfg.TLSClientConfig.ServerName = serverName
 	cfg.TLSClientConfig.CAData = h.ClientConfig.CABundle
 	cfg.ContentConfig.NegotiatedSerializer = a.negotiatedSerializer
 	return rest.UnversionedRESTClientFor(cfg)
