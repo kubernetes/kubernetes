@@ -22,12 +22,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
 
+var supportedQoSComputeResources = sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
+
 func isSupportedQoSComputeResource(name core.ResourceName) bool {
-	supportedQoSComputeResources := sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))
-	return supportedQoSComputeResources.Has(string(name)) || helper.IsHugePageResourceName(name)
+	return supportedQoSComputeResources.Has(string(name))
 }
 
 // GetPodQOS returns the QoS class of a pod.
