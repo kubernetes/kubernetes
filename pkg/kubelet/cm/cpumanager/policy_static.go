@@ -109,9 +109,60 @@ func (p *staticPolicy) Name() string {
 }
 
 func (p *staticPolicy) Start(s state.State) {
-	// Configure the shared pool to include all detected CPU IDs.
-	allCPUs := p.topology.CPUDetails.CPUs()
-	s.SetDefaultCPUSet(allCPUs)
+
+	// flag to indicate whether ignore state from file and start fresh state
+	initializeNewEmptyState := false
+
+	if s.GetDefaultCPUSet().IsEmpty() {
+		// Nothing read from state file or state initialized empty
+		// Configure the shared pool to include all detected CPU IDs.
+		initializeNewEmptyState = true
+	} else {
+		// State has been initialized from state file, validate
+
+		// 1 Reserved cpuset is not part of default cpuset because:
+		// - kube/system reserved have changed (increased)
+		// - user tampered with file
+		if !p.reserved.Intersection(s.GetDefaultCPUSet()).Equals(p.reserved) {
+			glog.Warningf("[cpumanager] static policy: not all reserved cpus: \"%s\" are present in defaultCpuSet: \"%s\"",
+				p.reserved.String(), s.GetDefaultCPUSet().String())
+			initializeNewEmptyState = true
+		}
+
+		// 2. Check if state for static policy is consistent
+		if !initializeNewEmptyState {
+			tmpAssignments := s.GetAllCPUSets()
+			tmpDefaultCPuset := s.GetDefaultCPUSet()
+			for cID, cset := range tmpAssignments {
+				// Non of the cpu in DEFAULT cset should be in s.assignments
+				if !tmpDefaultCPuset.Intersection(cset).IsEmpty() {
+					initializeNewEmptyState = true
+					glog.Warningf("[cpumanager] static policy: (container id: %s cpuset: \"%s\" overlaps with default cpuset \"%s\"",
+						cID, cset.String(), tmpDefaultCPuset.String())
+					break
+				}
+				// Non of the cpu in p.reserved cset should be in s.assignments
+				if !p.reserved.Intersection(cset).IsEmpty() {
+					initializeNewEmptyState = true
+					glog.Warningf("[cpumanager] static policy: (container id: %s cpuset: \"%s\" overlaps with reserved cpuset \"%s\"",
+						cID, cset.String(), p.reserved.String())
+					break
+				}
+			}
+		}
+
+		// Clear state if some checks failed
+		if initializeNewEmptyState {
+			s.ClearState()
+		}
+	}
+
+	if initializeNewEmptyState {
+		glog.Warningf("[cpumanager] static policy: initializing")
+		allCPUs := p.topology.CPUDetails.CPUs()
+		s.SetDefaultCPUSet(allCPUs)
+		s.UpdateStateFile()
+	}
 }
 
 // assignableCPUs returns the set of unassigned CPUs minus the reserved set.
@@ -120,15 +171,22 @@ func (p *staticPolicy) assignableCPUs(s state.State) cpuset.CPUSet {
 }
 
 func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Container, containerID string) error {
-	glog.Infof("[cpumanager] static policy: AddContainer (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
 	if numCPUs := guaranteedCPUs(pod, container); numCPUs != 0 {
+		glog.Infof("[cpumanager] static policy: AddContainer (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
 		// container belongs in an exclusively allocated pool
+
+		if _, ok := s.GetCPUSet(containerID); ok {
+			glog.Infof("[cpumanager] static policy: container already present in state, skipping (container: %s, container id: %s)", container.Name, containerID)
+			return nil
+		}
+
 		cpuset, err := p.allocateCPUs(s, numCPUs)
 		if err != nil {
 			glog.Errorf("[cpumanager] unable to allocate %d CPUs (container id: %s, error: %v)", numCPUs, containerID, err)
 			return err
 		}
 		s.SetCPUSet(containerID, cpuset)
+		s.UpdateStateFile()
 	}
 	// container belongs in the shared pool (nothing to do; use default cpuset)
 	return nil
@@ -140,6 +198,7 @@ func (p *staticPolicy) RemoveContainer(s state.State, containerID string) error 
 		s.Delete(containerID)
 		// Mutate the shared pool, adding released cpus.
 		s.SetDefaultCPUSet(s.GetDefaultCPUSet().Union(toRelease))
+		s.UpdateStateFile()
 	}
 	return nil
 }

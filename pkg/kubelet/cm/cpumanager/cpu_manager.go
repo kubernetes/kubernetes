@@ -151,8 +151,8 @@ func NewManager(
 }
 
 func (m *manager) Start(activePods ActivePodsFunc, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService) {
-	glog.Infof("[cpumanger] starting with %s policy", m.policy.Name())
-	glog.Infof("[cpumanger] reconciling every %v", m.reconcilePeriod)
+	glog.Infof("[cpumanager] starting with %s policy", m.policy.Name())
+	glog.Infof("[cpumanager] reconciling every %v", m.reconcilePeriod)
 
 	m.activePods = activePods
 	m.podStatusProvider = podStatusProvider
@@ -231,6 +231,26 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 				glog.Warningf("[cpumanager] reconcileState: skipping container; ID not found in status (pod: %s, container: %s, error: %v)", pod.Name, container.Name, err)
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
 				continue
+			}
+
+			// Check whether container is present in state, there may be 3 reasons why it's not present:
+			// - container is in Be/Bu pod
+			// - kubelet just restarted - state has not been restored properly and is empty
+			// - container has been removed from state by RemoveContainer call (DeletionTimestamp is set)
+			if _, ok := m.state.GetCPUSet(containerID); !ok {
+				if status.Phase == v1.PodRunning && pod.DeletionTimestamp == nil {
+
+					glog.Infof("[cpumanager] reconcileState: container is not present in state - trying to add (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
+					err := m.AddContainer(pod, &container, containerID)
+					if err != nil {
+						glog.Errorf("[cpumanager] reconcileState: failed to add orphaned container (pod: %s, container: %s, container id: %s, error: %v)", pod.Name, container.Name, containerID, err)
+						failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
+					}
+				} else {
+					// if DeletionTimestamp is set, pod has already been removed from state
+					// skip the pod/container since it's not running and will be deleted soon
+					continue
+				}
 			}
 
 			cset := m.state.GetCPUSetOrDefault(containerID)

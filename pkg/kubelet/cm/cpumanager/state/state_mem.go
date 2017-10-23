@@ -23,20 +23,39 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
+type ContainerCpuAssignment map[string]cpuset.CPUSet
+
+func (as ContainerCpuAssignment) DeepCopy() ContainerCpuAssignment {
+	ret := make(ContainerCpuAssignment)
+	for key, val := range as {
+		ret[key] = val
+	}
+	return ret
+}
+
+
 type stateMemory struct {
 	sync.RWMutex
-	assignments   map[string]cpuset.CPUSet
+	assignments   ContainerCpuAssignment
 	defaultCPUSet cpuset.CPUSet
+	stateFile     *stateFile
 }
 
 var _ State = &stateMemory{}
 
 // NewMemoryState creates new State for keeping track of cpu/pod assignment
 func NewMemoryState() State {
-	glog.Infof("[cpumanager] initializing new in-memory state store")
+	glog.Infof("[cpumanager] state memory: initializing new state store")
+	stateFile := NewStateFileBackend()
+	defaultCPUSet, assignments, err := stateFile.tryRestoreState()
+	if err != nil {
+		glog.Infof("[cpumanager] state memory: could not restore state from state file, using empty state")
+	}
+
 	return &stateMemory{
-		assignments:   map[string]cpuset.CPUSet{},
-		defaultCPUSet: cpuset.NewCPUSet(),
+		assignments:   assignments,
+		defaultCPUSet: defaultCPUSet,
+		stateFile:     stateFile,
 	}
 }
 
@@ -46,6 +65,12 @@ func (s *stateMemory) GetCPUSet(containerID string) (cpuset.CPUSet, bool) {
 
 	res, ok := s.assignments[containerID]
 	return res.Clone(), ok
+}
+
+func (s *stateMemory) GetAllCPUSets() ContainerCpuAssignment {
+	s.RLock()
+	defer s.RUnlock()
+	return s.assignments.DeepCopy()
 }
 
 func (s *stateMemory) GetDefaultCPUSet() cpuset.CPUSet {
@@ -70,7 +95,7 @@ func (s *stateMemory) SetCPUSet(containerID string, cset cpuset.CPUSet) {
 	defer s.Unlock()
 
 	s.assignments[containerID] = cset
-	glog.Infof("[cpumanager] updated desired cpuset (container id: %s, cpuset: \"%s\")", containerID, cset)
+	glog.Infof("[cpumanager] state memory: updated desired cpuset (container id: %s, cpuset: \"%s\")", containerID, cset)
 }
 
 func (s *stateMemory) SetDefaultCPUSet(cset cpuset.CPUSet) {
@@ -78,7 +103,7 @@ func (s *stateMemory) SetDefaultCPUSet(cset cpuset.CPUSet) {
 	defer s.Unlock()
 
 	s.defaultCPUSet = cset
-	glog.Infof("[cpumanager] updated default cpuset: \"%s\"", cset)
+	glog.Infof("[cpumanager] state memory: updated default cpuset: \"%s\"", cset)
 }
 
 func (s *stateMemory) Delete(containerID string) {
@@ -86,5 +111,26 @@ func (s *stateMemory) Delete(containerID string) {
 	defer s.Unlock()
 
 	delete(s.assignments, containerID)
-	glog.V(2).Infof("[cpumanager] deleted cpuset assignment (container id: %s)", containerID)
+	glog.V(2).Infof("[cpumanager] state memory: deleted cpuset assignment (container id: %s)", containerID)
+}
+
+func (s *stateMemory) UpdateStateFile() {
+	s.Lock()
+	defer s.Unlock()
+	if err := s.stateFile.updateStateFile(s.defaultCPUSet, s.assignments); err != nil {
+		glog.Errorf("[cpumanager] state memory: failed to update state file - %s", err.Error())
+	}
+
+	glog.V(2).Infof("[cpumanager] state memory: updated state file")
+}
+
+func (s *stateMemory) ClearState() {
+	s.Lock()
+	defer s.Unlock()
+
+	s.defaultCPUSet = cpuset.CPUSet{}
+	s.assignments = make(ContainerCpuAssignment)
+
+	glog.V(2).Infof("[cpumanager] state memory: cleared state")
+
 }
