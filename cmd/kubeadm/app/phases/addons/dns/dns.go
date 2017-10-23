@@ -51,24 +51,33 @@ func EnsureDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interf
 		return err
 	}
 
-	// Get the YAML manifest conditionally based on the k8s version
-	kubeDNSDeploymentBytes := GetKubeDNSManifest(k8sVersion)
-	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(kubeDNSDeploymentBytes, struct{ ImageRepository, Arch, Version, DNSDomain, DNSProbeType, MasterTaintKey string }{
-		ImageRepository: cfg.ImageRepository,
-		Arch:            runtime.GOARCH,
-		// Get the kube-dns version conditionally based on the k8s version
-		Version:        GetKubeDNSVersion(k8sVersion),
-		DNSDomain:      cfg.Networking.DNSDomain,
-		DNSProbeType:   GetKubeDNSProbeType(k8sVersion),
-		MasterTaintKey: kubeadmconstants.LabelNodeRoleMaster,
-	})
-	if err != nil {
-		return fmt.Errorf("error when parsing kube-dns deployment template: %v", err)
-	}
-
 	dnsip, err := getDNSIP(client)
 	if err != nil {
 		return err
+	}
+
+	var dnsBindAddr string
+	if dnsip.To16() != nil {
+		dnsBindAddr = "::1"
+	} else {
+		dnsBindAddr = "127.0.0.1"
+	}
+
+	// Get the YAML manifest conditionally based on the k8s version
+	kubeDNSDeploymentBytes := GetKubeDNSManifest(k8sVersion)
+	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(kubeDNSDeploymentBytes,
+		struct{ ImageRepository, Arch, Version, DNSBindAddr, DNSDomain, DNSProbeType, MasterTaintKey string }{
+			ImageRepository: cfg.ImageRepository,
+			Arch:            runtime.GOARCH,
+			// Get the kube-dns version conditionally based on the k8s version
+			Version:        GetKubeDNSVersion(k8sVersion),
+			DNSBindAddr:    dnsBindAddr,
+			DNSDomain:      cfg.Networking.DNSDomain,
+			DNSProbeType:   GetKubeDNSProbeType(k8sVersion),
+			MasterTaintKey: kubeadmconstants.LabelNodeRoleMaster,
+		})
+	if err != nil {
+		return fmt.Errorf("error when parsing kube-dns deployment template: %v", err)
 	}
 
 	dnsServiceBytes, err := kubeadmutil.ParseTemplate(KubeDNSService, struct{ DNSIP string }{
