@@ -103,6 +103,84 @@ func Test_Discover(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "DualSocketHT - non unique Core'ID's",
+			args: &cadvisorapi.MachineInfo{
+				NumCores: 12,
+				Topology: []cadvisorapi.Node{
+					{Id: 0,
+						Cores: []cadvisorapi.Core{
+							{Id: 0, Threads: []int{0, 6}},
+							{Id: 1, Threads: []int{1, 7}},
+							{Id: 2, Threads: []int{2, 8}},
+						},
+					},
+					{Id: 1,
+						Cores: []cadvisorapi.Core{
+							{Id: 0, Threads: []int{3, 9}},
+							{Id: 1, Threads: []int{4, 10}},
+							{Id: 2, Threads: []int{5, 11}},
+						},
+					},
+				},
+			},
+			want: &CPUTopology{
+				NumCPUs:    12,
+				NumSockets: 2,
+				NumCores:   6,
+				CPUDetails: map[int]CPUInfo{
+					0:  {CoreID: 0, SocketID: 0},
+					1:  {CoreID: 1, SocketID: 0},
+					2:  {CoreID: 2, SocketID: 0},
+					3:  {CoreID: 3, SocketID: 1},
+					4:  {CoreID: 4, SocketID: 1},
+					5:  {CoreID: 5, SocketID: 1},
+					6:  {CoreID: 0, SocketID: 0},
+					7:  {CoreID: 1, SocketID: 0},
+					8:  {CoreID: 2, SocketID: 0},
+					9:  {CoreID: 3, SocketID: 1},
+					10: {CoreID: 4, SocketID: 1},
+					11: {CoreID: 5, SocketID: 1},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "OneSocketHT fail",
+			args: &cadvisorapi.MachineInfo{
+				NumCores: 8,
+				Topology: []cadvisorapi.Node{
+					{Id: 0,
+						Cores: []cadvisorapi.Core{
+							{Id: 0, Threads: []int{0, 4}},
+							{Id: 1, Threads: []int{1, 5}},
+							{Id: 2, Threads: []int{2, 2}}, // Wrong case - should fail here
+							{Id: 3, Threads: []int{3, 7}},
+						},
+					},
+				},
+			},
+			want:    &CPUTopology{},
+			wantErr: true,
+		},
+		{
+			name: "OneSocketHT fail",
+			args: &cadvisorapi.MachineInfo{
+				NumCores: 8,
+				Topology: []cadvisorapi.Node{
+					{Id: 0,
+						Cores: []cadvisorapi.Core{
+							{Id: 0, Threads: []int{0, 4}},
+							{Id: 1, Threads: []int{1, 5}},
+							{Id: 2, Threads: []int{2, 6}},
+							{Id: 3, Threads: []int{}}, // Wrong case - should fail here
+						},
+					},
+				},
+			},
+			want:    &CPUTopology{},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
