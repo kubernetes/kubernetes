@@ -42,6 +42,7 @@ const (
 	cfgCertificateAuthorityData = "idp-certificate-authority-data"
 	cfgIDToken                  = "id-token"
 	cfgRefreshToken             = "refresh-token"
+	cfgAuthorizationCode        = "authorization-code"
 
 	// Unused. Scopes aren't sent during refreshing.
 	cfgExtraScopes = "extra-scopes"
@@ -220,6 +221,58 @@ func (t *roundTripper) WrappedRoundTripper() http.RoundTripper { return t.wrappe
 func (p *oidcAuthProvider) idToken() (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	ac, found := p.cfg[cfgAuthorizationCode]
+	if found && len(ac) > 0 {
+
+		// Determine provider's OAuth2 token endpoint.
+		tokenURL, err := tokenEndpoint(p.client, p.cfg[cfgIssuerUrl])
+		if err != nil {
+			return "", err
+		}
+
+		config := oauth2.Config{
+			ClientID:     p.cfg[cfgClientID],
+			ClientSecret: p.cfg[cfgClientSecret],
+			Endpoint:     oauth2.Endpoint{TokenURL: tokenURL},
+			RedirectURL:  "urn:ietf:wg:oauth:2.0:oob",
+		}
+
+		ctx := context.WithValue(context.Background(), oauth2.HTTPClient, p.client)
+		token, err := config.Exchange(ctx, ac)
+		if err != nil {
+			return "", fmt.Errorf("failed to exchange code: %v", err)
+		}
+
+		idToken, ok := token.Extra("id_token").(string)
+		if !ok {
+			// id_token isn't a required part of a refresh token response, so some
+			// providers (Okta) don't return this value.
+			//
+			// See https://github.com/kubernetes/kubernetes/issues/36847
+			return "", fmt.Errorf("token response did not contain an id_token, either the scope \"openid\" wasn't requested upon login, or the provider doesn't support id_tokens as part of the refresh response.")
+		}
+
+		// Create a new config to persist.
+		newCfg := make(map[string]string)
+		for key, val := range p.cfg {
+			if key != cfgRefreshToken && key != cfgAuthorizationCode {
+				newCfg[key] = val
+			}
+		}
+		if token.RefreshToken != "" {
+			newCfg[cfgRefreshToken] = token.RefreshToken
+		}
+		newCfg[cfgIDToken] = idToken
+
+		// Persist new config and if successful, update the in memory config.
+		if err = p.persister.Persist(newCfg); err != nil {
+			return "", fmt.Errorf("could not perist new tokens: %v", err)
+		}
+		p.cfg = newCfg
+
+		return idToken, nil
+	}
 
 	if idToken, ok := p.cfg[cfgIDToken]; ok && len(idToken) > 0 {
 		valid, err := idTokenExpired(p.now, idToken)
