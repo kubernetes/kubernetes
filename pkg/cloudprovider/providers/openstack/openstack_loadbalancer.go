@@ -1418,4 +1418,3 @@ func (lbaas *LbaasV2) EnsureLoadBalancerDeleted(clusterName string, service *v1.
 
 	return nil
 }
-
