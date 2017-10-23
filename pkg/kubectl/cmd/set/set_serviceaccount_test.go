@@ -29,6 +29,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -65,7 +66,7 @@ func TestServiceAccountLocal(t *testing.T) {
 
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Client = &fake.RESTClient{
-		APIRegistry: legacyscheme.Registry,
+		GroupVersion: legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 			return nil, nil
@@ -155,7 +156,7 @@ func TestServiceAccountRemote(t *testing.T) {
 		tf.Namespace = "test"
 		tf.CategoryExpander = resource.LegacyCategoryExpander
 		tf.Client = &fake.RESTClient{
-			APIRegistry:          legacyscheme.Registry,
+			GroupVersion:         legacyscheme.Registry.GroupOrDie(input.apiGroup).GroupVersion,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				resourcePath := testapi.Default.ResourcePath(input.args[0]+"s", tf.Namespace, input.args[1])
@@ -179,7 +180,6 @@ func TestServiceAccountRemote(t *testing.T) {
 				}
 			}),
 			VersionedAPIPath: path.Join(input.apiPrefix, groupVersion.String()),
-			GroupName:        input.apiGroup,
 		}
 		out := new(bytes.Buffer)
 		cmd := NewCmdServiceAccount(f, out, out)
@@ -207,7 +207,7 @@ func TestServiceAccountValidation(t *testing.T) {
 	for _, input := range inputs {
 		f, tf, _, _ := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
-			APIRegistry: legacyscheme.Registry,
+			GroupVersion: schema.GroupVersion{Version: "v1"},
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
 				return nil, nil

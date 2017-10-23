@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
@@ -118,7 +119,7 @@ func TestTopPod(t *testing.T) {
 		f, tf, _, ns := cmdtesting.NewAPIFactory()
 		tf.Printer = &testPrinter{}
 		tf.Client = &fake.RESTClient{
-			APIRegistry:          legacyscheme.Registry,
+			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m, q := req.URL.Path, req.Method, req.URL.RawQuery; {
@@ -254,7 +255,7 @@ func TestTopPodCustomDefaults(t *testing.T) {
 		f, tf, _, ns := cmdtesting.NewAPIFactory()
 		tf.Printer = &testPrinter{}
 		tf.Client = &fake.RESTClient{
-			APIRegistry:          legacyscheme.Registry,
+			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m, q := req.URL.Path, req.Method, req.URL.RawQuery; {

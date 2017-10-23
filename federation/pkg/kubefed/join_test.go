@@ -231,7 +231,7 @@ func testJoinFederationFactory(clusterName, secretName, server string, isRBACAPI
 	codec := testapi.Federation.Codec()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
+		GroupVersion:         legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -365,7 +365,7 @@ func fakeJoinHostFactory(clusterName, clusterCtx, secretName, server, token, dns
 	ns := dynamic.ContentConfig().NegotiatedSerializer
 	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
+		GroupVersion:         legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -526,7 +526,7 @@ func fakeJoinTargetClusterFactory(clusterName, clusterCtx, dnsProvider, tmpDirPa
 	tf.TmpDir = tmpDirPath
 	tf.ClientConfig = kubefedtesting.DefaultClientConfig()
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          legacyscheme.Registry,
+		GroupVersion:         legacyscheme.Registry.GroupOrDie(v1.GroupName).GroupVersion,
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m, r := req.URL.Path, req.Method, isRBACAPIAvailable; {

@@ -289,7 +289,7 @@ runTests() {
       ${KUBE_RACE} ${KUBE_TIMEOUT} "${@}" \
      "${testargs[@]:+${testargs[@]}}" \
      | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
-     | grep "${go_test_grep_pattern}" && rc=$? || rc=$?
+     | grep --binary-files=text "${go_test_grep_pattern}" && rc=$? || rc=$?
     produceJUnitXMLReport "${junit_filename_prefix}"
     return ${rc}
   fi
