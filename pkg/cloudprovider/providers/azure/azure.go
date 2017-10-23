@@ -31,6 +31,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/disk"
+	"github.com/Azure/azure-sdk-for-go/arm/keyvault"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/azure-sdk-for-go/arm/storage"
 	"github.com/Azure/go-autorest/autorest"
@@ -113,6 +114,9 @@ type Config struct {
 
 	// Use managed service identity for the virtual machine to access Azure ARM APIs
 	UseManagedIdentityExtension bool `json:"useManagedIdentityExtension"`
+
+	// Use external KMS (for encrypting secrets in etcd)
+	ClusterKeyVault string `json:"clusterKeyVault" yaml:"clusterKeyVault"`
 }
 
 // Cloud holds the config and clients
@@ -129,6 +133,7 @@ type Cloud struct {
 	VirtualMachinesClient    compute.VirtualMachinesClient
 	StorageAccountClient     storage.AccountsClient
 	DisksClient              disk.DisksClient
+	KeyVaultClient           keyvault.ManagementClient
 	operationPollRateLimiter flowcontrol.RateLimiter
 	resourceRequestBackoff   wait.Backoff
 	metadata                 *InstanceMetadata
@@ -157,8 +162,8 @@ func decodePkcs12(pkcs []byte, password string) (*x509.Certificate, *rsa.Private
 	return certificate, rsaPrivateKey, nil
 }
 
-// GetServicePrincipalToken creates a new service principal token based on the configuration
-func GetServicePrincipalToken(config *Config, env *azure.Environment) (*adal.ServicePrincipalToken, error) {
+// GetServicePrincipalToken creates a new service principal token based on configuration for a scope
+func GetServicePrincipalToken(config *Config, env *azure.Environment, scope string) (*adal.ServicePrincipalToken, error) {
 	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, config.TenantID)
 	if err != nil {
 		return nil, fmt.Errorf("creating the OAuth config: %v", err)
@@ -168,7 +173,7 @@ func GetServicePrincipalToken(config *Config, env *azure.Environment) (*adal.Ser
 		glog.V(2).Infoln("azure: using managed identity extension to retrieve access token")
 		return adal.NewServicePrincipalTokenFromMSI(
 			*oauthConfig,
-			env.ServiceManagementEndpoint)
+			scope)
 	}
 
 	if len(config.AADClientSecret) > 0 {
@@ -177,7 +182,7 @@ func GetServicePrincipalToken(config *Config, env *azure.Environment) (*adal.Ser
 			*oauthConfig,
 			config.AADClientID,
 			config.AADClientSecret,
-			env.ServiceManagementEndpoint)
+			scope)
 	}
 
 	if len(config.AADClientCertPath) > 0 && len(config.AADClientCertPassword) > 0 {
@@ -195,7 +200,7 @@ func GetServicePrincipalToken(config *Config, env *azure.Environment) (*adal.Ser
 			config.AADClientID,
 			certificate,
 			privateKey,
-			env.ServiceManagementEndpoint)
+			scope)
 	}
 
 	return nil, fmt.Errorf("No credentials provided for AAD application %s", config.AADClientID)
@@ -212,7 +217,7 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		Environment: *env,
 	}
 
-	servicePrincipalToken, err := GetServicePrincipalToken(config, env)
+	servicePrincipalToken, err := GetServicePrincipalToken(config, &az.Environment, az.Environment.ServiceManagementEndpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -273,6 +278,23 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	az.DisksClient.Authorizer = autorest.NewBearerAuthorizer(servicePrincipalToken)
 	configureUserAgent(&az.DisksClient.Client)
 
+	// Keyvault client is a dataplaneclient not ARM's KeyVault
+	// Tokens are created for a different scope
+	// Trailing token discussion https://github.com/Azure/azure-sdk-for-go/issues/697
+	kvEndPoint := az.Environment.KeyVaultEndpoint
+	if '/' == kvEndPoint[len(kvEndPoint)-1] {
+		kvEndPoint = kvEndPoint[:len(kvEndPoint)-1]
+	}
+
+	kvDataPlaneSP, err := GetServicePrincipalToken(config, &az.Environment, kvEndPoint)
+	if err != nil {
+		return nil, err
+	}
+
+	az.KeyVaultClient = keyvault.New()
+	az.KeyVaultClient.Authorizer = autorest.NewBearerAuthorizer(kvDataPlaneSP)
+	configureUserAgent(&az.KeyVaultClient.Client)
+
 	// Conditionally configure rate limits
 	if az.CloudProviderRateLimit {
 		// Assign rate limit defaults if no configuration was passed in
@@ -326,6 +348,10 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	if err := initDiskControllers(&az); err != nil {
 		return nil, err
 	}
+
+	//register Key vault as kms
+	az.RegisterKeyVaultAsKmsService()
+
 	return &az, nil
 }
 
