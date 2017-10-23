@@ -60,7 +60,7 @@ func DeletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 	remaining := false
 	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName).String()
 	options := metav1.ListOptions{FieldSelector: selector}
-	pods, err := kubeClient.Core().Pods(metav1.NamespaceAll).List(options)
+	pods, err := kubeClient.CoreV1().Pods(metav1.NamespaceAll).List(options)
 	var updateErrList []error
 
 	if err != nil {
@@ -76,6 +76,9 @@ func DeletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 		if pod.Spec.NodeName != nodeName {
 			continue
 		}
+
+		// Set pod phase to Unknown, since it may caused by node unresponsive
+		pod.Status.Phase = v1.PodUnknown
 
 		// Set reason and message in the pod object.
 		if _, err = SetPodTerminationReason(kubeClient, &pod, nodeName); err != nil {
