@@ -64,18 +64,19 @@ func initTest(t *testing.T, nsPrefix string) *TestContext {
 
 	context.clientSet = clientset.NewForConfigOrDie(&restclient.Config{Host: context.httpServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
 	context.informerFactory = informers.NewSharedInformerFactory(context.clientSet, 0)
-
+	podInformer := factory.NewPodInformer(context.clientSet, 30*time.Second, v1.DefaultSchedulerName)
 	context.schedulerConfigFactory = factory.NewConfigFactory(
 		v1.DefaultSchedulerName,
 		context.clientSet,
 		context.informerFactory.Core().V1().Nodes(),
-		context.informerFactory.Core().V1().Pods(),
+		podInformer,
 		context.informerFactory.Core().V1().PersistentVolumes(),
 		context.informerFactory.Core().V1().PersistentVolumeClaims(),
 		context.informerFactory.Core().V1().ReplicationControllers(),
 		context.informerFactory.Extensions().V1beta1().ReplicaSets(),
 		context.informerFactory.Apps().V1beta1().StatefulSets(),
 		context.informerFactory.Core().V1().Services(),
+		context.informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		true,
 	)
@@ -87,6 +88,7 @@ func initTest(t *testing.T, nsPrefix string) *TestContext {
 	eventBroadcaster := record.NewBroadcaster()
 	context.schedulerConfig.Recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName})
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(context.clientSet.CoreV1().RESTClient()).Events("")})
+	go podInformer.Informer().Run(context.schedulerConfig.StopEverything)
 	context.informerFactory.Start(context.schedulerConfig.StopEverything)
 	context.scheduler, err = scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{Config: context.schedulerConfig}, nil...)
 	if err != nil {

@@ -36,6 +36,7 @@ go_library(
         "//pkg/proxy/healthcheck:go_default_library",
         "//pkg/proxy/iptables:go_default_library",
         "//pkg/proxy/ipvs:go_default_library",
+        "//pkg/proxy/metrics:go_default_library",
         "//pkg/proxy/userspace:go_default_library",
         "//pkg/util/configz:go_default_library",
         "//pkg/util/dbus:go_default_library",

@@ -65,9 +65,16 @@ func TestPVSecrets(t *testing.T) {
 		{Spec: api.PersistentVolumeSpec{
 			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: api.PersistentVolumeSource{
-				RBD: &api.RBDVolumeSource{
-					SecretRef: &api.LocalObjectReference{
+				RBD: &api.RBDPersistentVolumeSource{
+					SecretRef: &api.SecretReference{
 						Name: "Spec.PersistentVolumeSource.RBD.SecretRef"}}}}},
+		{Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				RBD: &api.RBDPersistentVolumeSource{
+					SecretRef: &api.SecretReference{
+						Name:      "Spec.PersistentVolumeSource.RBD.SecretRef",
+						Namespace: "rbdns"}}}}},
 		{Spec: api.PersistentVolumeSpec{
 			ClaimRef: &api.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"},
 			PersistentVolumeSource: api.PersistentVolumeSource{
@@ -141,6 +148,7 @@ func TestPVSecrets(t *testing.T) {
 		"cephfs/Spec.PersistentVolumeSource.CephFS.SecretRef",
 		"claimrefns/Spec.PersistentVolumeSource.FlexVolume.SecretRef",
 		"claimrefns/Spec.PersistentVolumeSource.RBD.SecretRef",
+		"rbdns/Spec.PersistentVolumeSource.RBD.SecretRef",
 		"claimrefns/Spec.PersistentVolumeSource.ScaleIO.SecretRef",
 		"claimrefns/Spec.PersistentVolumeSource.ISCSI.SecretRef",
 		"storageosns/Spec.PersistentVolumeSource.StorageOS.SecretRef",

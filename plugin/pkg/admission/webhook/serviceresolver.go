@@ -32,11 +32,10 @@ var _ admissioninit.ServiceResolver = defaultServiceResolver{}
 // ResolveEndpoint constructs a service URL from a given namespace and name
 // note that the name and namespace are required and by default all created addresses use HTTPS scheme.
 // for example:
-//  name=ross namespace=andromeda resolves to https://ross.andromeda.svc
+//  name=ross namespace=andromeda resolves to https://ross.andromeda.svc:443
 func (sr defaultServiceResolver) ResolveEndpoint(namespace, name string) (*url.URL, error) {
 	if len(name) == 0 || len(namespace) == 0 {
-		return &url.URL{}, errors.New("cannot resolve an empty service name or namespace")
+		return nil, errors.New("cannot resolve an empty service name or namespace")
 	}
-
-	return url.Parse(fmt.Sprintf("https://%s.%s.svc", name, namespace))
+	return &url.URL{Scheme: "https", Host: fmt.Sprintf("%s.%s.svc:443", name, namespace)}, nil
 }

@@ -39,7 +39,11 @@ func (v ElementBuildingVisitor) mapElement(meta apply.FieldMetaImpl, item *mapIt
 	}
 
 	// Return the result
-	return &apply.MapElement{meta, item.MapElementData, values}, nil
+	return &apply.MapElement{
+		FieldMetaImpl:  meta,
+		MapElementData: item.MapElementData,
+		Values:         values,
+	}, nil
 }
 
 // schemaFn returns the schema for a field or map value based on its name or key

@@ -82,9 +82,6 @@ type Configurator interface {
 	GetSchedulerName() string
 	MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue *cache.FIFO) func(pod *v1.Pod, err error)
 
-	// Probably doesn't need to be public.  But exposed for now in case.
-	ResponsibleForPod(pod *v1.Pod) bool
-
 	// Needs to be exposed for things like integration tests where we want to make fake nodes.
 	GetNodeLister() corelisters.NodeLister
 	GetClient() clientset.Interface

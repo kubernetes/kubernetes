@@ -32,19 +32,15 @@ import (
 	tst "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/testing"
 )
 
+var fakeResources = tst.NewFakeResources(filepath.Join("..", "..", "..", "..", "api", "openapi-spec", "swagger.json"))
+
 // run parses the openapi and runs the tests
 func run(instance apply.Strategy, recorded, local, remote, expected map[string]interface{}) {
-	runWith(instance, recorded, local, remote, expected,
-		filepath.Join("..", "..", "..", "..", "api", "openapi-spec", "swagger.json"))
+	runWith(instance, recorded, local, remote, expected, fakeResources)
 }
 
-func runWith(instance apply.Strategy, recorded, local, remote, expected map[string]interface{}, swaggerPath string) {
-	fakeSchema := tst.Fake{Path: swaggerPath}
-	s, err := fakeSchema.OpenAPISchema()
-	Expect(err).To(BeNil())
-	resources, err := openapi.NewOpenAPIData(s)
-	Expect(err).To(BeNil())
-	parseFactory := parse.Factory{resources}
+func runWith(instance apply.Strategy, recorded, local, remote, expected map[string]interface{}, resources openapi.Resources) {
+	parseFactory := parse.Factory{Resources: resources}
 
 	parsed, err := parseFactory.CreateElement(recorded, local, remote)
 	Expect(err).Should(Not(HaveOccurred()))

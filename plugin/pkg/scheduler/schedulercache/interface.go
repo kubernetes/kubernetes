@@ -18,6 +18,7 @@ package schedulercache
 
 import (
 	"k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -94,6 +95,18 @@ type Cache interface {
 
 	// RemoveNode removes overall information about node.
 	RemoveNode(node *v1.Node) error
+
+	// AddPDB adds a PodDisruptionBudget object to the cache.
+	AddPDB(pdb *policy.PodDisruptionBudget) error
+
+	// UpdatePDB updates a PodDisruptionBudget object in the cache.
+	UpdatePDB(oldPDB, newPDB *policy.PodDisruptionBudget) error
+
+	// RemovePDB removes a PodDisruptionBudget object from the cache.
+	RemovePDB(pdb *policy.PodDisruptionBudget) error
+
+	// List lists all cached PDBs matching the selector.
+	ListPDBs(selector labels.Selector) ([]*policy.PodDisruptionBudget, error)
 
 	// UpdateNodeNameToInfoMap updates the passed infoMap to the current contents of Cache.
 	// The node info contains aggregated information of pods scheduled (including assumed to be)

@@ -44,7 +44,7 @@ type sarApprover struct {
 	recognizers []csrRecognizer
 }
 
-func NewCSRApprovingController(client clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer) (*certificates.CertificateController, error) {
+func NewCSRApprovingController(client clientset.Interface, csrInformer certificatesinformers.CertificateSigningRequestInformer) *certificates.CertificateController {
 	approver := &sarApprover{
 		client:      client,
 		recognizers: recognizers(),

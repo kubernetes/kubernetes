@@ -109,7 +109,7 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	if redirect := resp.Header.Get("Location"); redirect != "" {
-		resp.Header.Set("Location", t.rewriteURL(redirect, req.URL))
+		resp.Header.Set("Location", t.rewriteURL(redirect, req.URL, req.Host))
 		return resp, nil
 	}
 
@@ -131,21 +131,39 @@ func (rt *Transport) WrappedRoundTripper() http.RoundTripper {
 
 // rewriteURL rewrites a single URL to go through the proxy, if the URL refers
 // to the same host as sourceURL, which is the page on which the target URL
-// occurred. If any error occurs (e.g. parsing), it returns targetURL.
-func (t *Transport) rewriteURL(targetURL string, sourceURL *url.URL) string {
+// occurred, or if the URL matches the sourceRequestHost. If any error occurs (e.g.
+// parsing), it returns targetURL.
+func (t *Transport) rewriteURL(targetURL string, sourceURL *url.URL, sourceRequestHost string) string {
 	url, err := url.Parse(targetURL)
 	if err != nil {
 		return targetURL
 	}
 
-	isDifferentHost := url.Host != "" && url.Host != sourceURL.Host
+	// Example:
+	//      When API server processes a proxy request to a service (e.g. /api/v1/namespace/foo/service/bar/proxy/),
+	//      the sourceURL.Host (i.e. req.URL.Host) is the endpoint IP address of the service. The
+	//      sourceRequestHost (i.e. req.Host) is the Host header that specifies the host on which the
+	//      URL is sought, which can be different from sourceURL.Host. For example, if user sends the
+	//      request through "kubectl proxy" locally (i.e. localhost:8001/api/v1/namespace/foo/service/bar/proxy/),
+	//      sourceRequestHost is "localhost:8001".
+	//
+	//      If the service's response URL contains non-empty host, and url.Host is equal to either sourceURL.Host
+	//      or sourceRequestHost, we should not consider the returned URL to be a completely different host.
+	//      It's the API server's responsibility to rewrite a same-host-and-absolute-path URL and append the
+	//      necessary URL prefix (i.e. /api/v1/namespace/foo/service/bar/proxy/).
+	isDifferentHost := url.Host != "" && url.Host != sourceURL.Host && url.Host != sourceRequestHost
 	isRelative := !strings.HasPrefix(url.Path, "/")
 	if isDifferentHost || isRelative {
 		return targetURL
 	}
 
-	url.Scheme = t.Scheme
-	url.Host = t.Host
+	// Do not rewrite scheme and host if the Transport has empty scheme and host
+	// when targetURL already contains the sourceRequestHost
+	if !(url.Host == sourceRequestHost && t.Scheme == "" && t.Host == "") {
+		url.Scheme = t.Scheme
+		url.Host = t.Host
+	}
+
 	origPath := url.Path
 	// Do not rewrite URL if the sourceURL already contains the necessary prefix.
 	if strings.HasPrefix(url.Path, t.PathPrepend) {
@@ -223,7 +241,7 @@ func (t *Transport) rewriteResponse(req *http.Request, resp *http.Response) (*ht
 	}
 
 	urlRewriter := func(targetUrl string) string {
-		return t.rewriteURL(targetUrl, req.URL)
+		return t.rewriteURL(targetUrl, req.URL, req.Host)
 	}
 	err := rewriteHTML(reader, writer, urlRewriter)
 	if err != nil {

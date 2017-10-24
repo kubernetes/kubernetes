@@ -250,7 +250,7 @@ func applyGroupOverrides(universe types.Universe, customArgs *clientgenargs.Cust
 	changes := make(map[clientgentypes.GroupVersion]clientgentypes.GroupVersion)
 	for gv, inputDir := range customArgs.GroupVersionToInputPath {
 		p := universe.Package(inputDir)
-		if override := types.ExtractCommentTags("+", p.DocComments)["groupName"]; override != nil {
+		if override := types.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
 			newGV := clientgentypes.GroupVersion{
 				Group:   clientgentypes.Group(strings.SplitN(override[0], ".", 2)[0]),
 				Version: gv.Version,

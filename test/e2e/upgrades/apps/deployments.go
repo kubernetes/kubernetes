@@ -63,7 +63,7 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	By(fmt.Sprintf("Waiting deployment %q to complete", deploymentName))
-	framework.ExpectNoError(framework.WaitForDeploymentCompletes(c, deployment))
+	framework.ExpectNoError(framework.WaitForDeploymentComplete(c, deployment))
 
 	By(fmt.Sprintf("Getting replicaset revision 1 of deployment %q", deploymentName))
 	rsSelector, err := metav1.LabelSelectorAsSelector(d.Spec.Selector)
@@ -87,7 +87,7 @@ func (t *DeploymentUpgradeTest) Setup(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	By(fmt.Sprintf("Waiting deployment %q to complete", deploymentName))
-	framework.ExpectNoError(framework.WaitForDeploymentCompletes(c, deployment))
+	framework.ExpectNoError(framework.WaitForDeploymentComplete(c, deployment))
 
 	By(fmt.Sprintf("Getting replicasets revision 1 and 2 of deployment %q", deploymentName))
 	rsList, err = rsClient.List(metav1.ListOptions{LabelSelector: rsSelector.String()})
@@ -153,7 +153,7 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	Expect(deployment.Annotations[deploymentutil.RevisionAnnotation]).To(Equal("2"))
 
 	By(fmt.Sprintf("Waiting for deployment %q to complete adoption", deploymentName))
-	framework.ExpectNoError(framework.WaitForDeploymentCompletes(c, deployment))
+	framework.ExpectNoError(framework.WaitForDeploymentComplete(c, deployment))
 
 	// Verify the upgraded deployment is active by scaling up the deployment by 1
 	By(fmt.Sprintf("Scaling up replicaset of deployment %q by 1", deploymentName))
@@ -163,7 +163,7 @@ func (t *DeploymentUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	framework.ExpectNoError(err)
 
 	By(fmt.Sprintf("Waiting for deployment %q to complete after scaling", deploymentName))
-	framework.ExpectNoError(framework.WaitForDeploymentCompletes(c, deployment))
+	framework.ExpectNoError(framework.WaitForDeploymentComplete(c, deployment))
 }
 
 // Teardown cleans up any remaining resources.
