@@ -3602,3 +3602,11 @@ func recordAwsMetric(actionName string, timeTaken float64, err error) {
 	}
 
 }
+
+// Notification handler when node is registered.
+func (c *Cloud) NodeRegistered(node *v1.Node) {
+}
+
+// Notification handler when node is unregistered.
+func (c *Cloud) NodeUnregistered(node *v1.Node) {
+}

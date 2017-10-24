@@ -665,3 +665,9 @@ func (instances *instances) AddSSHKeyToAllInstances(user string, keyData []byte)
 func (instances *instances) CurrentNodeName(hostname string) (types.NodeName, error) {
 	return "", errors.New("Not implemented")
 }
+
+func (instances *instances) NodeRegistered(node *v1.Node) {
+}
+
+func (instances *instances) NodeUnregistered(node *v1.Node) {
+}
