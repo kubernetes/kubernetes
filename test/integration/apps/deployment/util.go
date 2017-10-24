@@ -97,38 +97,6 @@ func newDeployment(name, ns string, replicas int32) *v1beta1.Deployment {
 	}
 }
 
-func newReplicaSet(name, ns string, replicas int32) *v1beta1.ReplicaSet {
-	return &v1beta1.ReplicaSet{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ReplicaSet",
-			APIVersion: "extensions/v1beta1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ns,
-			Name:      name,
-		},
-		Spec: v1beta1.ReplicaSetSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: testLabels(),
-			},
-			Replicas: &replicas,
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: testLabels(),
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:  fakeContainerName,
-							Image: fakeImage,
-						},
-					},
-				},
-			},
-		},
-	}
-}
-
 func newDeploymentRollback(name string, annotations map[string]string, revision int64) *v1beta1.DeploymentRollback {
 	return &v1beta1.DeploymentRollback{
 		Name:               name,
