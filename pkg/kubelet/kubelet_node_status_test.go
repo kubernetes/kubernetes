@@ -23,6 +23,7 @@ import (
 	goruntime "runtime"
 	"sort"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -1117,6 +1118,68 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 	updatedNode, err := applyNodeStatusPatch(&existingNode, actions[1].(core.PatchActionImpl).GetPatch())
 	assert.NoError(t, err)
 	assert.True(t, apiequality.Semantic.DeepEqual(expectedNode.Status.Allocatable, updatedNode.Status.Allocatable), "%s", diff.ObjectDiff(expectedNode.Status.Allocatable, updatedNode.Status.Allocatable))
+}
+
+func TestOSEnumerateDistribution(t *testing.T) {
+	cases := []struct {
+		name     string
+		contents string
+		expected releaseInfo
+	}{
+		{
+			name: "standard case",
+			expected: releaseInfo{
+				ID:        "Fedora",
+				VersionID: "Rawhide",
+			},
+			contents: `
+NAME="Fedora Linux"
+PRETTY_NAME="Fedora Linux"
+VERSION_ID="Rawhide"
+ID=Fedora
+ID_LIKE=fedora
+ANSI_COLOR="0;36"
+HOME_URL="https://www.getfedora.org/"
+`,
+		},
+		{
+			name: "escaped quotes",
+			expected: releaseInfo{
+				ID:        "Gentoo Linux",
+				VersionID: "",
+			},
+			contents: `
+NAME="Gentoo Linux"
+PRETTY_NAME="Gentoo Linux"
+ID="Gentoo "'Linux"
+`,
+		},
+		{
+			name: "empty",
+			expected: releaseInfo{
+				ID:        "",
+				VersionID: "",
+			},
+			contents: "",
+		},
+		{
+			name: "no id or version",
+			expected: releaseInfo{
+				ID:        "",
+				VersionID: "",
+			},
+			contents: `
+NAME=
+PRETTY_NAME="Gentoo Linux"
+`,
+		},
+	}
+
+	for _, tc := range cases {
+		info := readOSRelease(strings.NewReader(tc.contents))
+		assert.Equal(t, tc.expected.ID, info.ID, tc.name)
+		assert.Equal(t, tc.expected.VersionID, info.VersionID, tc.name)
+	}
 }
 
 func TestUpdateDefaultLabels(t *testing.T) {
