@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/async"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -854,12 +855,6 @@ func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.syncProxyRules()
 }
 
-type syncReason string
-
-const syncReasonServices syncReason = "ServicesUpdate"
-const syncReasonEndpoints syncReason = "EndpointsUpdate"
-const syncReasonForce syncReason = "Force"
-
 // This is where all of the ipvs calls happen.
 // assumes proxier.mu is held
 func (proxier *Proxier) syncProxyRules() {
@@ -868,6 +863,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	start := time.Now()
 	defer func() {
+		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInMicroseconds(start))
 		glog.V(4).Infof("syncProxyRules took %v", time.Since(start))
 	}()
 	// don't sync rules till we've received services and endpoints

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package iptables
+package metrics
 
 import (
 	"sync"
@@ -26,6 +26,7 @@ import (
 const kubeProxySubsystem = "kubeproxy"
 
 var (
+	// SyncProxyRulesLatency is the latency of one round of kube-proxy syncing proxy rules.
 	SyncProxyRulesLatency = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: kubeProxySubsystem,
@@ -38,13 +39,14 @@ var (
 
 var registerMetricsOnce sync.Once
 
+// RegisterMetrics registers sync proxy rules latency metrics
 func RegisterMetrics() {
 	registerMetricsOnce.Do(func() {
 		prometheus.MustRegister(SyncProxyRulesLatency)
 	})
 }
 
-// Gets the time since the specified start in microseconds.
-func sinceInMicroseconds(start time.Time) float64 {
+// SinceInMicroseconds gets the time since the specified start in microseconds.
+func SinceInMicroseconds(start time.Time) float64 {
 	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
 }
