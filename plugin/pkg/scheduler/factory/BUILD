@@ -65,6 +65,7 @@ go_test(
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//plugin/pkg/scheduler/api:go_default_library",
         "//plugin/pkg/scheduler/api/latest:go_default_library",
+        "//plugin/pkg/scheduler/core:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//plugin/pkg/scheduler/testing:go_default_library",
         "//plugin/pkg/scheduler/util:go_default_library",

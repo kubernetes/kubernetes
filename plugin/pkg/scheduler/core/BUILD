@@ -39,6 +39,7 @@ go_library(
         "equivalence_cache.go",
         "extender.go",
         "generic_scheduler.go",
+        "scheduling_queue.go",
     ],
     importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/core",
     deps = [
@@ -56,6 +57,7 @@ go_library(
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/util/trace:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
+        "//vendor/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/client-go/util/workqueue:go_default_library",
     ],
 )
