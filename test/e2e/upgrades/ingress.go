@@ -69,7 +69,7 @@ func (t *IngressUpgradeTest) Setup(f *framework.Framework) {
 	jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "static-ip"), ns.Name, map[string]string{
 		"kubernetes.io/ingress.global-static-ip-name": t.ipName,
 		"kubernetes.io/ingress.allow-http":            "false",
-	})
+	}, map[string]string{})
 
 	By("waiting for Ingress to come up with ip: " + t.ip)
 	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%v/", t.ip), "", framework.LoadBalancerPollTimeout, jig.PollInterval, t.httpClient, false))
