@@ -1,17 +1,24 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-- [v1.8.1](#v181)
-  - [Downloads for v1.8.1](#downloads-for-v181)
+- [v1.8.2](#v182)
+  - [Downloads for v1.8.2](#downloads-for-v182)
     - [Client Binaries](#client-binaries)
     - [Server Binaries](#server-binaries)
     - [Node Binaries](#node-binaries)
-  - [Changelog since v1.8.0](#changelog-since-v180)
-    - [Action Required](#action-required)
+  - [Changelog since v1.8.1](#changelog-since-v181)
     - [Other notable changes](#other-notable-changes)
-- [v1.8.0](#v180)
-  - [Downloads for v1.8.0](#downloads-for-v180)
+- [v1.8.1](#v181)
+  - [Downloads for v1.8.1](#downloads-for-v181)
     - [Client Binaries](#client-binaries-1)
     - [Server Binaries](#server-binaries-1)
     - [Node Binaries](#node-binaries-1)
+  - [Changelog since v1.8.0](#changelog-since-v180)
+    - [Action Required](#action-required)
+    - [Other notable changes](#other-notable-changes-1)
+- [v1.8.0](#v180)
+  - [Downloads for v1.8.0](#downloads-for-v180)
+    - [Client Binaries](#client-binaries-2)
+    - [Server Binaries](#server-binaries-2)
+    - [Node Binaries](#node-binaries-2)
   - [Introduction to v1.8.0](#introduction-to-v180)
   - [Major Themes](#major-themes)
     - [SIG API Machinery](#sig-api-machinery)
@@ -45,8 +52,8 @@
       - [Scheduling](#scheduling-1)
       - [Storage](#storage)
     - [Cluster Federation](#cluster-federation)
-      - [[alpha] Federated Jobs](#[alpha]-federated-jobs)
-      - [[alpha] Federated Horizontal Pod Autoscaling (HPA)](#[alpha]-federated-horizontal-pod-autoscaling-hpa)
+      - [[alpha] Federated Jobs](#alpha-federated-jobs)
+      - [[alpha] Federated Horizontal Pod Autoscaling (HPA)](#alpha-federated-horizontal-pod-autoscaling-hpa)
     - [Node Components](#node-components)
       - [Autoscaling and Metrics](#autoscaling-and-metrics)
         - [Cluster Autoscaler](#cluster-autoscaler)
@@ -72,47 +79,114 @@
   - [External Dependencies](#external-dependencies)
 - [v1.8.0-rc.1](#v180-rc1)
   - [Downloads for v1.8.0-rc.1](#downloads-for-v180-rc1)
-    - [Client Binaries](#client-binaries-2)
-    - [Server Binaries](#server-binaries-2)
-    - [Node Binaries](#node-binaries-2)
-  - [Changelog since v1.8.0-beta.1](#changelog-since-v180-beta1)
-    - [Action Required](#action-required-1)
-    - [Other notable changes](#other-notable-changes-1)
-- [v1.8.0-beta.1](#v180-beta1)
-  - [Downloads for v1.8.0-beta.1](#downloads-for-v180-beta1)
     - [Client Binaries](#client-binaries-3)
     - [Server Binaries](#server-binaries-3)
     - [Node Binaries](#node-binaries-3)
-  - [Changelog since v1.8.0-alpha.3](#changelog-since-v180-alpha3)
-    - [Action Required](#action-required-2)
+  - [Changelog since v1.8.0-beta.1](#changelog-since-v180-beta1)
+    - [Action Required](#action-required-1)
     - [Other notable changes](#other-notable-changes-2)
-- [v1.8.0-alpha.3](#v180-alpha3)
-  - [Downloads for v1.8.0-alpha.3](#downloads-for-v180-alpha3)
+- [v1.8.0-beta.1](#v180-beta1)
+  - [Downloads for v1.8.0-beta.1](#downloads-for-v180-beta1)
     - [Client Binaries](#client-binaries-4)
     - [Server Binaries](#server-binaries-4)
     - [Node Binaries](#node-binaries-4)
-  - [Changelog since v1.8.0-alpha.2](#changelog-since-v180-alpha2)
-    - [Action Required](#action-required-3)
+  - [Changelog since v1.8.0-alpha.3](#changelog-since-v180-alpha3)
+    - [Action Required](#action-required-2)
     - [Other notable changes](#other-notable-changes-3)
-- [v1.8.0-alpha.2](#v180-alpha2)
-  - [Downloads for v1.8.0-alpha.2](#downloads-for-v180-alpha2)
+- [v1.8.0-alpha.3](#v180-alpha3)
+  - [Downloads for v1.8.0-alpha.3](#downloads-for-v180-alpha3)
     - [Client Binaries](#client-binaries-5)
     - [Server Binaries](#server-binaries-5)
     - [Node Binaries](#node-binaries-5)
-  - [Changelog since v1.7.0](#changelog-since-v170)
-    - [Action Required](#action-required-4)
+  - [Changelog since v1.8.0-alpha.2](#changelog-since-v180-alpha2)
+    - [Action Required](#action-required-3)
     - [Other notable changes](#other-notable-changes-4)
-- [v1.8.0-alpha.1](#v180-alpha1)
-  - [Downloads for v1.8.0-alpha.1](#downloads-for-v180-alpha1)
+- [v1.8.0-alpha.2](#v180-alpha2)
+  - [Downloads for v1.8.0-alpha.2](#downloads-for-v180-alpha2)
     - [Client Binaries](#client-binaries-6)
     - [Server Binaries](#server-binaries-6)
     - [Node Binaries](#node-binaries-6)
+  - [Changelog since v1.7.0](#changelog-since-v170)
+    - [Action Required](#action-required-4)
+    - [Other notable changes](#other-notable-changes-5)
+- [v1.8.0-alpha.1](#v180-alpha1)
+  - [Downloads for v1.8.0-alpha.1](#downloads-for-v180-alpha1)
+    - [Client Binaries](#client-binaries-7)
+    - [Server Binaries](#server-binaries-7)
+    - [Node Binaries](#node-binaries-7)
   - [Changelog since v1.7.0-alpha.4](#changelog-since-v170-alpha4)
     - [Action Required](#action-required-5)
-    - [Other notable changes](#other-notable-changes-5)
+    - [Other notable changes](#other-notable-changes-6)
 <!-- END MUNGE: GENERATED_TOC -->
 
 <!-- NEW RELEASE NOTES ENTRY -->
+
+
+# v1.8.2
+
+[Documentation](https://docs.k8s.io) & [Examples](https://releases.k8s.io/release-1.8/examples)
+
+## Downloads for v1.8.2
+
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes.tar.gz) | `06a800c414e776640a7861baa4f0b6edbd898c13ad3ebcd33860fe5d949bbdee`
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-src.tar.gz) | `fbfb65a4eb1ddff32e302a0821204fa780ebb5b27298e31699c43c19da48191e`
+
+### Client Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-client-darwin-386.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-client-darwin-386.tar.gz) | `3eb81f1178ff73ca683738606acea1d9537a33c6e3d15571795a24af6c53dbd7`
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-client-darwin-amd64.tar.gz) | `15da279f018a73f93b857639931c4ba8a714c86e5c5738c33840c47df44ac2a4`
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-client-linux-386.tar.gz) | `bd9f144e6ddfc715fa77d9cb0310763e49f8121e894ed33714658fb2d6eb2675`
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-client-linux-amd64.tar.gz) | `7c20d4a3859c07aadf9a1676876bafdf56187478a69d3bfca5277fb275febb96`
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-client-linux-arm64.tar.gz) | `395c3fb5992509191cacbaf6e7ed4fd0fbee5c0b9c890f496879784454f88aa3`
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-client-linux-arm.tar.gz) | `a1cff2f8ab5f77f000e20f87b00a3723a8323fec82926afcc984722ab3f8d714`
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-client-linux-ppc64le.tar.gz) | `832a1e399802bfd8871cd911f17dbb6b2264680e9477c2944d442a3f9e5fa6f2`
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-client-linux-s390x.tar.gz) | `6afc2c4a331ee70e095a6d1e1f11bf69923afb1830840d110459e32b849b1b6c`
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-client-windows-386.tar.gz) | `ecaadb5a4c08357685dbaee288d1220bd60ff0f86281ec88a5467da6eebf213b`
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-client-windows-amd64.tar.gz) | `b8ff337615f740b1501cf7284d7f0a51a82880dcf23fff2464f8d37045c27f3f`
+
+### Server Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-server-linux-amd64.tar.gz) | `8ccd4912473e0d334694434936a5ca9547caddaa39d771a1fb94620c5d6002d4`
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-server-linux-arm64.tar.gz) | `39b3c61927c905f142d74fe69391156e6bf61cc5e7a798cdf2c295a76e72161d`
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-server-linux-arm.tar.gz) | `fc6b01b233f8d0c61dd485d8d571c9a2e1a5b085f0d0db734a84c42b71416537`
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-server-linux-ppc64le.tar.gz) | `6f6d8dcef0334736021d9f6cc2bbfdb78500483f8961e7ff14b09f1c67d37056`
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-server-linux-s390x.tar.gz) | `6f1b6b5fb818fdb787cdf65ff3da81235b5b4db5b4a9b5579920d11dc8a3fa73`
+
+### Node Binaries
+
+filename | sha256 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-node-linux-amd64.tar.gz) | `93c6b5d2a5e4aaf8776f56e5b8f40038c76d3d03709124fb8900f83acb49c782`
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-node-linux-arm64.tar.gz) | `ab4535e19825e0e9b76987dbb11d9fd746281e45a90f90b453dbc7d6fecb2c69`
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-node-linux-arm.tar.gz) | `96acd6ec41d4a3ec7ea6f95acecf116755340915e3d261de760d9ed84708e3f0`
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-node-linux-ppc64le.tar.gz) | `4256a8c315de083435fcdfc8ee2ae370bd603fa976218edadbf7bfe11adcf223`
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-node-linux-s390x.tar.gz) | `30f2254bf442fc36fc23bd962930eb48fd000c9ffce81c26c0d64d4a0fd0c193`
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.8.2/kubernetes-node-windows-amd64.tar.gz) | `b92c2670ce8dd75f744537abb6e98df84ce5a18da7df6b70741e92d9e57098bf`
+
+## Changelog since v1.8.1
+
+### Other notable changes
+
+* Allow for configuring etcd hostname in the manifest ([#54403](https://github.com/kubernetes/kubernetes/pull/54403), [@wojtek-t](https://github.com/wojtek-t))
+* Allow standard flags in client-gen. ([#53999](https://github.com/kubernetes/kubernetes/pull/53999), [@sttts](https://github.com/sttts))
+* Cluster Autoscaler 1.0.1 ([#54298](https://github.com/kubernetes/kubernetes/pull/54298), [@mwielgus](https://github.com/mwielgus))
+* Resolves forbidden error when accessing replicasets and daemonsets via the apps API group ([#54309](https://github.com/kubernetes/kubernetes/pull/54309), [@liggitt](https://github.com/liggitt))
+* kubelet: prevent removal of default labels from Node API objects on startup ([#54073](https://github.com/kubernetes/kubernetes/pull/54073), [@liggitt](https://github.com/liggitt))
+* Fix a bug that prevents client-go metrics from being registered in prometheus in multiple components. ([#53434](https://github.com/kubernetes/kubernetes/pull/53434), [@crassirostris](https://github.com/crassirostris))
+* Webhook always retries connection reset error. ([#53947](https://github.com/kubernetes/kubernetes/pull/53947), [@crassirostris](https://github.com/crassirostris))
+* Adjust batching audit webhook default parameters: increase queue size, batch size, and initial backoff. Add throttling to the batching audit webhook. Default rate limit is 10 QPS. ([#53417](https://github.com/kubernetes/kubernetes/pull/53417), [@crassirostris](https://github.com/crassirostris))
+* Address a bug which allowed the horizontal pod autoscaler to allocate `desiredReplicas` > `maxReplicas` in certain instances. ([#53690](https://github.com/kubernetes/kubernetes/pull/53690), [@mattjmcnaughton](https://github.com/mattjmcnaughton))
+* Fix metrics API group name in audit configuration ([#53493](https://github.com/kubernetes/kubernetes/pull/53493), [@piosz](https://github.com/piosz))
+* Use separate client for leader election in scheduler to avoid starving leader election by regular scheduler operations. ([#53793](https://github.com/kubernetes/kubernetes/pull/53793), [@wojtek-t](https://github.com/wojtek-t))
+* kubeadm: Strip bootstrap tokens from the `kubeadm-config` ConfigMap ([#53559](https://github.com/kubernetes/kubernetes/pull/53559), [@fabriziopandini](https://github.com/fabriziopandini))
+
 
 
 # v1.8.1
