@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package resource
 
 import (
 	"encoding/json"
@@ -56,14 +56,17 @@ type GetOptions struct {
 
 var (
 	getLong = templates.LongDesc(`
-		Display one or many resources.
+		Display one or many resources
 
-		` + validResources + `
-
+		Prints a table of the most important information about the specified resources.
+		You can filter the list using a label selector and the --selector flag. If the
+		desired resource type is namespaced you will only see results in your current
+		namespace unless you pass --all-namespaces.
+		
 		This command will hide resources that have completed, such as pods that are
 		in the Succeeded or Failed phases. You can see the full results for any
-		resource by providing the '--show-all' flag, but this flag does not include
-		the uninitialized objects by default, unless '--include-uninitialized' is explicitly set.
+		resource by providing the --show-all flag. Uninitialized objects are not
+		shown unless --include-uninitialized is passed.
 
 		By specifying the output as 'template' and providing a Go template as the value
 		of the --template flag, you can filter the attributes of the fetched resources.`)
@@ -120,7 +123,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:     "get [(-o|--output=)json|yaml|wide|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=...] (TYPE [NAME | -l label] | TYPE/NAME ...) [flags]",
 		Short:   i18n.T("Display one or many resources"),
-		Long:    getLong,
+		Long:    getLong + "\n\n" + cmdutil.ValidResourceTypeList(f),
 		Example: getExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunGet(f, out, errOut, cmd, args, options)
@@ -191,7 +194,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 	}
 
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(options.Filenames) {
-		fmt.Fprint(errOut, "You must specify the type of resource to get. ", validResources)
+		fmt.Fprint(errOut, "You must specify the type of resource to get. ", cmdutil.ValidResourceTypeList(f))
 
 		fullCmdName := cmd.Parent().CommandPath()
 		usageString := "Required resource not specified."

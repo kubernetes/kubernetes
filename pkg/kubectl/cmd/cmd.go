@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/auth"
 	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/resource"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/rollout"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -200,51 +201,6 @@ __custom_func() {
     esac
 }
 `
-
-	// If you add a resource to this list, please also take a look at pkg/kubectl/kubectl.go
-	// and add a short forms entry in expandResourceShortcut() when appropriate.
-	// TODO: This should be populated using the discovery information from apiserver.
-	validResources = `Valid resource types include:
-
-    * all
-    * certificatesigningrequests (aka 'csr')
-    * clusterrolebindings
-    * clusterroles
-    * componentstatuses (aka 'cs')
-    * configmaps (aka 'cm')
-    * controllerrevisions
-    * cronjobs
-    * customresourcedefinition (aka 'crd')
-    * daemonsets (aka 'ds')
-    * deployments (aka 'deploy')
-    * endpoints (aka 'ep')
-    * events (aka 'ev')
-    * horizontalpodautoscalers (aka 'hpa')
-    * ingresses (aka 'ing')
-    * jobs
-    * limitranges (aka 'limits')
-    * namespaces (aka 'ns')
-    * networkpolicies (aka 'netpol')
-    * nodes (aka 'no')
-    * persistentvolumeclaims (aka 'pvc')
-    * persistentvolumes (aka 'pv')
-    * poddisruptionbudgets (aka 'pdb')
-    * podpreset
-    * pods (aka 'po')
-    * podsecuritypolicies (aka 'psp')
-    * podtemplates
-    * replicasets (aka 'rs')
-    * replicationcontrollers (aka 'rc')
-    * resourcequotas (aka 'quota')
-    * rolebindings
-    * roles
-    * secrets
-    * serviceaccounts (aka 'sa')
-    * services (aka 'svc')
-    * statefulsets (aka 'sts')
-    * storageclasses (aka 'sc')
-
-`
 )
 
 var (
@@ -297,7 +253,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		{
 			Message: "Basic Commands (Intermediate):",
 			Commands: []*cobra.Command{
-				NewCmdGet(f, out, err),
+				resource.NewCmdGet(f, out, err),
 				NewCmdExplain(f, out, err),
 				NewCmdEdit(f, out, err),
 				NewCmdDelete(f, out, err),
