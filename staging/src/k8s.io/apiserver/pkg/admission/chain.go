@@ -30,9 +30,27 @@ func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
 		if !handler.Handles(a.GetOperation()) {
 			continue
 		}
-		err := handler.Admit(a)
-		if err != nil {
-			return err
+		if mutator, ok := handler.(MutationInterface); ok {
+			err := mutator.Admit(a)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// ValidatingAdmit performs an admission control check using a chain of handlers, and returns immediately on first error
+func (admissionHandler chainAdmissionHandler) ValidatingAdmit(a Attributes) error {
+	for _, handler := range admissionHandler {
+		if !handler.Handles(a.GetOperation()) {
+			continue
+		}
+		if validator, ok := handler.(ValidationInterface); ok {
+			err := validator.ValidatingAdmit(a)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
