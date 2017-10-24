@@ -79,8 +79,8 @@ func Run(s *options.SchedulerServer) error {
 
 	informerFactory := informers.NewSharedInformerFactory(kubeClient, 0)
 	// cache only non-terminal pods
-	podInformer := factory.NewPodInformer(kubeClient, 0)
 
+	podInformer := factory.NewPodInformer(kubeClient, 0, s.SchedulerName)
 	// Apply algorithms based on feature gates.
 	algorithmprovider.ApplyFeatureGates()
 
