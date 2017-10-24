@@ -226,10 +226,20 @@ type UpdatedObjectInfo interface {
 // object.
 type ValidateObjectFunc func(obj runtime.Object) error
 
+// ValidateAllObjectFunc is a "admit everything" instance of ValidateObjectFunc.
+func ValidateAllObjectFunc(obj runtime.Object) error {
+	return nil
+}
+
 // ValidateObjectUpdateFunc is a function to act on a given object and its predecessor.
 // An error may be returned if the hook cannot be completed. An UpdateObjectFunc
 // may NOT transform the provided object.
 type ValidateObjectUpdateFunc func(obj, old runtime.Object) error
+
+// ValidateAllObjectUpdateFunc is a "admit everything" instance of ValidateObjectUpdateFunc.
+func ValidateAllObjectUpdateFunc(obj, old runtime.Object) error {
+	return nil
+}
 
 // Updater is an object that can update an instance of a RESTful object.
 type Updater interface {

@@ -49,7 +49,7 @@ const defaultContainerName = "test-c"
 
 // NewTestAdmission provides an admission plugin with test implementations of internal structs.  It uses
 // an authorizer that always returns true.
-func NewTestAdmission(lister extensionslisters.PodSecurityPolicyLister) kadmission.Interface {
+func NewTestAdmission(lister extensionslisters.PodSecurityPolicyLister) kadmission.MutationInterface {
 	return &podSecurityPolicyPlugin{
 		Handler:         kadmission.NewHandler(kadmission.Create, kadmission.Update),
 		strategyFactory: kpsp.NewSimpleStrategyFactory(),

@@ -83,7 +83,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	// Set up NodeRestriction admission
 	nodeRestrictionAdmission := noderestriction.NewPlugin(nodeidentifier.NewDefaultNodeIdentifier())
 	nodeRestrictionAdmission.SetInternalKubeClientSet(superuserClient)
-	if err := nodeRestrictionAdmission.Validate(); err != nil {
+	if err := nodeRestrictionAdmission.ValidateInitialization(); err != nil {
 		t.Fatal(err)
 	}
 

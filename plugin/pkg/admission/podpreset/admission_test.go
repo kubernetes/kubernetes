@@ -393,7 +393,7 @@ func TestMergeVolumes(t *testing.T) {
 
 // NewTestAdmission provides an admission plugin with test implementations of internal structs.  It uses
 // an authorizer that always returns true.
-func NewTestAdmission(lister settingslisters.PodPresetLister, objects ...runtime.Object) kadmission.Interface {
+func NewTestAdmission(lister settingslisters.PodPresetLister, objects ...runtime.Object) kadmission.MutationInterface {
 	// Build a test client that the admission plugin can use to look up the service account missing from its cache
 	client := fake.NewSimpleClientset(objects...)
 

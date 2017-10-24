@@ -94,23 +94,20 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		}
 
 		trace.Step("About to check admission control")
-		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Delete) {
+		if admit != nil && admit.Handles(admission.Delete) {
 			userInfo, _ := request.UserFrom(ctx)
-
-			err = mutatingAdmission.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo))
-			if err != nil {
-				scope.err(err, w, req)
-				return
+			attrs := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo)
+			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
+				if err := mutatingAdmission.Admit(attrs); err != nil {
+					scope.err(err, w, req)
+					return
+				}
 			}
-		}
-		// TODO: avoid calling Handles twice
-		if validatingAdmission, ok := admit.(admission.ValidationInterface); ok && validatingAdmission.Handles(admission.Delete) {
-			userInfo, _ := request.UserFrom(ctx)
-
-			err = validatingAdmission.ValidatingAdmit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo))
-			if err != nil {
-				scope.err(err, w, req)
-				return
+			if validatingAdmission, ok := admit.(admission.ValidationInterface); ok {
+				if err := validatingAdmission.ValidatingAdmit(attrs); err != nil {
+					scope.err(err, w, req)
+					return
+				}
 			}
 		}
 
