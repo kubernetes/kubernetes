@@ -65732,7 +65732,7 @@
       "format": "int32"
      },
      "manualSelector": {
-      "description": "manualSelector controls generation of pod labels and pod selectors. Leave `manualSelector` unset unless you are certain what you are doing. When false or unset, the system pick labels unique to this job and appends those labels to the pod template.  When true, the user is responsible for picking unique labels and specifying the selector.  Failure to pick a unique label may cause this and other jobs to not function correctly.  However, You may see `manualSelector=true` in jobs that were created with the old `extensions/v1beta1` API. More info: https://git.k8s.io/community/contributors/design-proposals/selector-generation.md",
+      "description": "manualSelector controls generation of pod labels and pod selectors. Leave `manualSelector` unset unless you are certain what you are doing. When false or unset, the system pick labels unique to this job and appends those labels to the pod template.  When true, the user is responsible for picking unique labels and specifying the selector.  Failure to pick a unique label may cause this and other jobs to not function correctly.  However, You may see `manualSelector=true` in jobs that were created with the old `extensions/v1beta1` API. More info: https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/#specifying-your-own-pod-selector",
       "type": "boolean"
      },
      "parallelism": {
@@ -66800,7 +66800,7 @@
       "$ref": "#/definitions/io.k8s.api.core.v1.ResourceRequirements"
      },
      "securityContext": {
-      "description": "Security options the pod should run with. More info: https://kubernetes.io/docs/concepts/policy/security-context/ More info: https://git.k8s.io/community/contributors/design-proposals/security_context.md",
+      "description": "Security options the pod should run with. More info: https://kubernetes.io/docs/concepts/policy/security-context/ More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
       "$ref": "#/definitions/io.k8s.api.core.v1.SecurityContext"
      },
      "stdin": {
@@ -67822,7 +67822,7 @@
       "type": "string"
      },
      "items": {
-      "description": "Items is a list of LimitRange objects. More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_limit_range.md",
+      "description": "Items is a list of LimitRange objects. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.core.v1.LimitRange"
@@ -67997,7 +67997,7 @@
     "description": "NamespaceSpec describes the attributes on a Namespace.",
     "properties": {
      "finalizers": {
-      "description": "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: https://git.k8s.io/community/contributors/design-proposals/namespaces.md#finalizers",
+      "description": "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/",
       "type": "array",
       "items": {
        "type": "string"
@@ -68009,7 +68009,7 @@
     "description": "NamespaceStatus is information about the current status of a Namespace.",
     "properties": {
      "phase": {
-      "description": "Phase is the current lifecycle phase of the namespace. More info: https://git.k8s.io/community/contributors/design-proposals/namespaces.md#phases",
+      "description": "Phase is the current lifecycle phase of the namespace. More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/",
       "type": "string"
      }
     }
@@ -69694,7 +69694,7 @@
       "type": "string"
      },
      "items": {
-      "description": "Items is a list of ResourceQuota objects. More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md",
+      "description": "Items is a list of ResourceQuota objects. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/",
       "type": "array",
       "items": {
        "$ref": "#/definitions/io.k8s.api.core.v1.ResourceQuota"
@@ -69721,7 +69721,7 @@
     "description": "ResourceQuotaSpec defines the desired hard limits to enforce for Quota.",
     "properties": {
      "hard": {
-      "description": "Hard is the set of desired hard limits for each named resource. More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md",
+      "description": "Hard is the set of desired hard limits for each named resource. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/",
       "type": "object",
       "additionalProperties": {
        "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
@@ -69740,7 +69740,7 @@
     "description": "ResourceQuotaStatus defines the enforced hard limits and observed use.",
     "properties": {
      "hard": {
-      "description": "Hard is the set of enforced hard limits for each named resource. More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md",
+      "description": "Hard is the set of enforced hard limits for each named resource. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/",
       "type": "object",
       "additionalProperties": {
        "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
@@ -71851,7 +71851,7 @@
       "type": "string"
      },
      "seLinuxOptions": {
-      "description": "seLinuxOptions required to run as; required for MustRunAs More info: https://git.k8s.io/community/contributors/design-proposals/security_context.md",
+      "description": "seLinuxOptions required to run as; required for MustRunAs More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
       "$ref": "#/definitions/io.k8s.api.core.v1.SELinuxOptions"
      }
     }
