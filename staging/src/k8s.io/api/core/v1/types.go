@@ -2058,6 +2058,16 @@ type Lifecycle struct {
 	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	// +optional
 	PreStop *Handler `json:"preStop,omitempty" protobuf:"bytes,2,opt,name=preStop"`
+	// Retry policy for the preStop action. Valid options are Never or OnFailure.
+	// Never is the existing functionality; the preStop hook is only attempted once.
+	// OnFailure will retry the preStop hook until it succeeds or the gracePeriod has been exceeded.
+	// Defaults to Never.
+	// +optional
+	PreStopRetryPolicy *RetryPolicy `json:"preStopRetryPolicy,omitempty" protobuf:"bytes,3,opt,name=preStopRetryPolicy"`
+	// Specifies the amount of time (in seconds) to wait between preStop action retries.
+	// Defaults to 1.
+	// +optional
+	PreStopRetryPeriodSeconds *int32 `json:"preStopRetryPeriodSeconds,omitempty" protobuf:"varint,4,opt,name=preStopRetryPeriod"`
 }
 
 type ConditionStatus string
@@ -2231,6 +2241,17 @@ const (
 	RestartPolicyAlways    RestartPolicy = "Always"
 	RestartPolicyOnFailure RestartPolicy = "OnFailure"
 	RestartPolicyNever     RestartPolicy = "Never"
+)
+
+// RetryPolicy describes how the an action should be retried
+// Only one of the following retry policies may be specified.
+// If none of the following policies is specified, the default one
+// is RetryPolicyAlways.
+type RetryPolicy string
+
+const (
+	RetryPolicyOnFailure RetryPolicy = "OnFailure"
+	RetryPolicyNever     RetryPolicy = "Never"
 )
 
 // DNSPolicy defines how a pod's DNS will be configured.

@@ -5845,6 +5845,15 @@
      "preStop": {
       "$ref": "v1.Handler",
       "description": "PreStop is called immediately before a container is terminated. The container is terminated after the handler completes. The reason for termination is passed to the handler. Regardless of the outcome of the handler, the container is eventually terminated. Other management of the container blocks until the hook completes. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks"
+     },
+     "preStopRetryPolicy": {
+      "$ref": "v1.RetryPolicy",
+      "description": "Retry policy for the preStop action. Valid options are Never or OnFailure. Never is the existing functionality; the preStop hook is only attempted once. OnFailure will retry the preStop hook until it succeeds or the gracePeriod has been exceeded. Defaults to Never."
+     },
+     "preStopRetryPeriodSeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Specifies the amount of time (in seconds) to wait between preStop action retries. Defaults to 1."
      }
     }
    },
@@ -5865,6 +5874,10 @@
       "description": "TCPSocket specifies an action involving a TCP port. TCP hooks not yet supported"
      }
     }
+   },
+   "v1.RetryPolicy": {
+    "id": "v1.RetryPolicy",
+    "properties": {}
    },
    "v1.SecurityContext": {
     "id": "v1.SecurityContext",

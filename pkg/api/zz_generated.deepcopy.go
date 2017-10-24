@@ -2525,6 +2525,24 @@ func (in *Lifecycle) DeepCopyInto(out *Lifecycle) {
 			(*in).DeepCopyInto(*out)
 		}
 	}
+	if in.PreStopRetryPolicy != nil {
+		in, out := &in.PreStopRetryPolicy, &out.PreStopRetryPolicy
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(RetryPolicy)
+			**out = **in
+		}
+	}
+	if in.PreStopRetryPeriodSeconds != nil {
+		in, out := &in.PreStopRetryPeriodSeconds, &out.PreStopRetryPeriodSeconds
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(int32)
+			**out = **in
+		}
+	}
 	return
 }
 

@@ -389,3 +389,17 @@ func SetDefaults_HostPathVolumeSource(obj *v1.HostPathVolumeSource) {
 		obj.Type = &typeVol
 	}
 }
+
+func SetDefaults_PreStopRetryPolicy(obj *v1.Lifecycle) {
+	if obj.PreStopRetryPolicy == nil {
+		value := v1.RetryPolicyNever
+		obj.PreStopRetryPolicy = &value
+	}
+}
+
+func SetDefaults_PreStopRetryPeriodSeconds(obj *v1.Lifecycle) {
+	if obj.PreStopRetryPeriodSeconds == nil {
+		value := int32(1)
+		obj.PreStopRetryPeriodSeconds = &value
+	}
+}

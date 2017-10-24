@@ -2101,6 +2101,24 @@ func validateLifecycle(lifecycle *api.Lifecycle, fldPath *field.Path) field.Erro
 	if lifecycle.PreStop != nil {
 		allErrs = append(allErrs, validateHandler(lifecycle.PreStop, fldPath.Child("preStop"))...)
 	}
+	if lifecycle.PreStopRetryPolicy != nil {
+		switch *lifecycle.PreStopRetryPolicy {
+		case api.RetryPolicyNever:
+			break
+		case api.RetryPolicyOnFailure:
+			if lifecycle.PreStopRetryPeriodSeconds == nil {
+				allErrs = append(allErrs, field.Required(fldPath.Child("preStopRetryPeriodSeconds"), ""))
+			}
+		case "":
+			allErrs = append(allErrs, field.Required(fldPath.Child("preStopRetryPolicy"), ""))
+		default:
+			validValues := []string{string(api.RetryPolicyNever), string(api.RetryPolicyOnFailure)}
+			allErrs = append(allErrs, field.NotSupported(fldPath, lifecycle.PreStopRetryPolicy, validValues))
+		}
+	}
+	if lifecycle.PreStopRetryPeriodSeconds != nil {
+		allErrs = append(allErrs, ValidateNonnegativeField(int64(*lifecycle.PreStopRetryPeriodSeconds), fldPath.Child("preStopRetryPeriodSeconds"))...)
+	}
 	return allErrs
 }
 

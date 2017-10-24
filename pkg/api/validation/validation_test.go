@@ -3912,6 +3912,8 @@ func TestValidateContainers(t *testing.T) {
 	capabilities.SetForTests(capabilities.Capabilities{
 		AllowPrivileged: true,
 	})
+	validRetryPeriodSeconds := newInt32(1)
+	validRetryPolicy := api.RetryPolicyNever
 
 	successCase := []api.Container{
 		{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
@@ -3927,6 +3929,8 @@ func TestValidateContainers(t *testing.T) {
 				PreStop: &api.Handler{
 					Exec: &api.ExecAction{Command: []string{"ls", "-l"}},
 				},
+				PreStopRetryPolicy: &validRetryPolicy,
+				PreStopRetryPeriodSeconds: validRetryPeriodSeconds,
 			},
 			ImagePullPolicy:          "IfNotPresent",
 			TerminationMessagePolicy: "File",
