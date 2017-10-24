@@ -436,7 +436,7 @@ func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
 	return err
 }
 
-// run rbd status command to check if there is watcher on the image
+// rbdStatus runs `rbd status` command to check if there is watcher on the image.
 func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, error) {
 	var err error
 	var output string
@@ -444,33 +444,50 @@ func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, error) {
 
 	l := len(b.Mon)
 	start := rand.Int() % l
-	// iterate all hosts until mount succeeds.
+	// iterate all hosts until rbd command succeeds.
 	for i := start; i < start+l; i++ {
 		mon := b.Mon[i%l]
 		// cmd "rbd status" list the rbd client watch with the following output:
+		//
+		// # there is a watcher (exit=0)
 		// Watchers:
 		//   watcher=10.16.153.105:0/710245699 client.14163 cookie=1
+		//
+		// # there is no watcher (exit=0)
+		// Watchers: none
+		//
+		// Otherwise, exit is non-zero, for example:
+		//
+		// # image does not exist (exit=2)
+		// rbd: error opening image kubernetes-dynamic-pvc-<UUID>: (2) No such file or directory
+		//
 		glog.V(4).Infof("rbd: status %s using mon %s, pool %s id %s key %s", b.Image, mon, b.Pool, b.adminId, b.adminSecret)
 		cmd, err = b.exec.Run("rbd",
 			"status", b.Image, "--pool", b.Pool, "-m", mon, "--id", b.adminId, "--key="+b.adminSecret)
 		output = string(cmd)
 
-		if err != nil {
-			if err.Error() == rbdCmdErr {
-				glog.Errorf("rbd cmd not found")
-			} else {
-				// ignore error code, just checkout output for watcher string
-				glog.Warningf("failed to execute rbd status on mon %s", mon)
-			}
+		// break if command succeeds
+		if err == nil {
+			break
 		}
 
-		if strings.Contains(output, imageWatcherStr) {
-			glog.V(4).Infof("rbd: watchers on %s: %s", b.Image, output)
-			return true, nil
-		} else {
-			glog.Warningf("rbd: no watchers on %s", b.Image)
-			return false, nil
+		if err.Error() == rbdCmdErr {
+			glog.Errorf("rbd cmd not found")
+			// fail fast if command not found
+			return false, err
 		}
 	}
-	return false, nil
+
+	// If command never succeed, returns its last error.
+	if err != nil {
+		return false, err
+	}
+
+	if strings.Contains(output, imageWatcherStr) {
+		glog.V(4).Infof("rbd: watchers on %s: %s", b.Image, output)
+		return true, nil
+	} else {
+		glog.Warningf("rbd: no watchers on %s", b.Image)
+		return false, nil
+	}
 }
