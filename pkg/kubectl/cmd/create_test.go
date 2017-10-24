@@ -34,7 +34,8 @@ func TestExtraArgsFail(t *testing.T) {
 
 	f, _, _, _ := cmdtesting.NewAPIFactory()
 	c := NewCmdCreate(f, buf, errBuf)
-	if ValidateArgs(c, []string{"rc"}) == nil {
+	options := CreateOptions{}
+	if options.ValidateArgs(c, []string{"rc"}) == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
