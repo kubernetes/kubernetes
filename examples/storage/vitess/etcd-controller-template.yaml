@@ -13,14 +13,22 @@ spec:
     spec:
       volumes:
         - name: certs
-          hostPath: {path: /etc/ssl/certs}
+          # Uncomment one of the following lines to configure the location
+          # of the root certificates file on your host OS. We need this so
+          # we can import it into the container OS.
+          # If your host OS is Fedora/RHEL:
+          #hostPath: {path: /etc/pki/tls/certs/ca-bundle.crt}
+          # If your host OS is Debian/Ubuntu/Gentoo:
+          hostPath: {path: /etc/ssl/certs/ca-certificates.crt}
       containers:
         - name: etcd
           image: vitess/etcd:v2.0.13-lite
           volumeMounts:
             - name: certs
               readOnly: true
-              mountPath: /etc/ssl/certs
+              # Mount root certs from the host OS into the location
+              # expected for our container OS (Debian):
+              mountPath: /etc/ssl/certs/ca-certificates.crt
           resources:
             limits:
               memory: "128Mi"
@@ -28,27 +36,75 @@ spec:
           command:
             - bash
             - "-c"
-            - >-
+            - |
               ipaddr=$(hostname -i)
+              peer_url="http://$ipaddr:7001"
+              client_url="http://$ipaddr:4001"
 
-              global_etcd=$ETCD_GLOBAL_SERVICE_HOST:$ETCD_GLOBAL_SERVICE_PORT
+              export ETCD_NAME=$HOSTNAME
+              export ETCD_DATA_DIR=/vt/vtdataroot/etcd-$ETCD_NAME
+              export ETCD_STRICT_RECONFIG_CHECK=true
+              export ETCD_ADVERTISE_CLIENT_URLS=$client_url
+              export ETCD_INITIAL_ADVERTISE_PEER_URLS=$peer_url
+              export ETCD_LISTEN_CLIENT_URLS=$client_url
+              export ETCD_LISTEN_PEER_URLS=$peer_url
 
-              cell="{{cell}}" &&
-              local_etcd_host_var="ETCD_${cell^^}_SERVICE_HOST" &&
-              local_etcd_port_var="ETCD_${cell^^}_SERVICE_PORT" &&
-              local_etcd=${!local_etcd_host_var}:${!local_etcd_port_var}
+              if [ -d $ETCD_DATA_DIR ]; then
+                # We've been restarted with an intact datadir.
+                # Just run without trying to do any bootstrapping.
+                echo "Resuming with existing data dir: $ETCD_DATA_DIR"
+              else
+                # This is the first run for this member.
 
-              if [ "{{cell}}" != "global" ]; then
-              until etcdctl -C "http://$global_etcd"
-              set "/vt/cells/{{cell}}" "http://$local_etcd"; do
-              echo "[$(date)] waiting for global etcd to register cell '{{cell}}'";
-              sleep 1;
-              done;
+                # If there's already a functioning cluster, join it.
+                echo "Checking for existing cluster by trying to join..."
+                if result=$(etcdctl -C http://etcd-{{cell}}:4001 member add $ETCD_NAME $peer_url); then
+                  [[ "$result" =~ ETCD_INITIAL_CLUSTER=\"([^\"]*)\" ]] && \
+                  export ETCD_INITIAL_CLUSTER="${BASH_REMATCH[1]}"
+                  export ETCD_INITIAL_CLUSTER_STATE=existing
+                  echo "Joining existing cluster: $ETCD_INITIAL_CLUSTER"
+                else
+                  # Join failed. Assume we're trying to bootstrap.
+
+                  # First register with global topo, if we aren't global.
+                  if [ "{{cell}}" != "global" ]; then
+                    echo "Registering cell "{{cell}}" with global etcd..."
+                    until etcdctl -C "http://etcd-global:4001" \
+                        set "/vt/cells/{{cell}}" "http://etcd-{{cell}}:4001"; do
+                      echo "[$(date)] waiting for global etcd to register cell '{{cell}}'"
+                      sleep 1
+                    done
+                  fi
+
+                  # Use DNS to bootstrap.
+
+                  # First wait for the desired number of replicas to show up.
+                  echo "Waiting for {{replicas}} replicas in SRV record for etcd-{{cell}}-srv..."
+                  until [ $(getsrv etcd-server tcp etcd-{{cell}}-srv | wc -l) -eq {{replicas}} ]; do
+                    echo "[$(date)] waiting for {{replicas}} entries in SRV record for etcd-{{cell}}-srv"
+                    sleep 1
+                  done
+
+                  export ETCD_DISCOVERY_SRV=etcd-{{cell}}-srv
+                  echo "Bootstrapping with DNS discovery:"
+                  getsrv etcd-server tcp etcd-{{cell}}-srv
+                fi
               fi
 
-              etcd -name $HOSTNAME -discovery {{discovery}}
-              -advertise-client-urls http://$ipaddr:4001
-              -initial-advertise-peer-urls http://$ipaddr:7001
-              -listen-client-urls http://$ipaddr:4001
-              -listen-peer-urls http://$ipaddr:7001
+              # We've set up the env as we want it. Now run.
+              etcd
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - bash
+                  - "-c"
+                  - |
+                    # Find our member ID.
+                    members=$(etcdctl -C http://etcd-{{cell}}:4001 member list)
+                    if [[ "$members" =~ ^([0-9a-f]+):\ name=$HOSTNAME ]]; then
+                      member_id=${BASH_REMATCH[1]}
+                      echo "Removing $HOSTNAME ($member_id) from etcd-{{cell}} cluster..."
+                      etcdctl -C http://etcd-{{cell}}:4001 member remove $member_id
+                    fi
 

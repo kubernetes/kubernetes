@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors.
-#
+# Copyright 2017 Google Inc.
+# 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-#
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
+# 
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,6 +17,13 @@
 # This script generates config.sh, which is a site-local config file that is not
 # checked into source control.
 
+# Erase any existing file since we append from here on.
+> config.sh
+
+# Custom Docker image.
+read -p "Vitess Docker image (leave empty for default) []: "
+echo "vitess_image=\"$REPLY\"" >> config.sh
+
 # Select and configure Backup Storage Implementation.
 storage=gcs
 read -p "Backup Storage (file, gcs) [gcs]: "
@@ -25,14 +32,6 @@ if [ -n "$REPLY" ]; then storage="$REPLY"; fi
 case "$storage" in
 gcs)
   # Google Cloud Storage
-  project=$(gcloud config list project | grep 'project\s*=' | sed -r 's/^.*=\s*(.*)$/\1/')
-  read -p "Google Developers Console Project [$project]: "
-  if [ -n "$REPLY" ]; then project="$REPLY"; fi
-  if [ -z "$project" ]; then
-    echo "ERROR: Project name must not be empty."
-    exit 1
-  fi
-
   read -p "Google Cloud Storage bucket for Vitess backups: " bucket
   if [ -z "$bucket" ]; then
     echo "ERROR: Bucket name must not be empty."
@@ -44,7 +43,6 @@ gcs)
   echo
 
   backup_flags=$(echo -backup_storage_implementation gcs \
-                      -gcs_backup_storage_project "'$project'" \
                       -gcs_backup_storage_bucket "'$bucket'")
   ;;
 file)
@@ -67,7 +65,5 @@ file)
   echo "ERROR: Unsupported backup storage implementation: $storage"
   exit 1
 esac
-
-echo "Saving config.sh..."
-echo "backup_flags=\"$backup_flags\"" > config.sh
+echo "backup_flags=\"$backup_flags\"" >> config.sh
 

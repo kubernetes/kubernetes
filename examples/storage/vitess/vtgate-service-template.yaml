@@ -1,0 +1,21 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: vtgate-{{cell}}
+  labels:
+    component: vtgate
+    cell: {{cell}}
+    app: vitess
+spec:
+  ports:
+    - name: web
+      port: 15001
+    - name: grpc
+      port: 15991
+    - name: mysql
+      port: {{mysql_server_port}}
+  selector:
+    component: vtgate
+    cell: {{cell}}
+    app: vitess
+  type: LoadBalancer

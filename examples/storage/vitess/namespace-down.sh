@@ -14,20 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This is an example script that stops vtgate.
+# This is an example script that deletes a namespace.
 
 set -e
 
 script_root=`dirname "${BASH_SOURCE}"`
 source $script_root/env.sh
 
-cells=`echo $CELLS | tr ',' ' '`
+namespace=${VITESS_NAME:-'vitess'}
 
-for cell in $cells; do
-  echo "Stopping vtgate replicationcontroller in cell $cell..."
-  $KUBECTL $KUBECTL_OPTIONS delete replicationcontroller vtgate-$cell
-
-  echo "Deleting vtgate service in cell $cell..."
-  $KUBECTL $KUBECTL_OPTIONS delete service vtgate-$cell
-done
-
+echo "Deleting namespace $namespace..."
+$KUBECTL $KUBECTL_OPTIONS delete namespace $namespace

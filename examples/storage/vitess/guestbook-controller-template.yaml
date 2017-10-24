@@ -1,0 +1,29 @@
+kind: ReplicationController
+apiVersion: v1
+metadata:
+  name: guestbook
+spec:
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        component: frontend
+        app: guestbook
+    spec:
+      containers:
+        - name: guestbook
+          image: vitess/guestbook
+          livenessProbe:
+            httpGet:
+              path: /env
+              port: 8080
+            initialDelaySeconds: 30
+            timeoutSeconds: 5
+          ports:
+            - name: http-server
+              containerPort: 8080
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          args: ["--port", "{{port}}", "--cell", "{{cell}}", "--keyspace", "{{keyspace}}", "--vtgate_port", "{{vtgate_port}}"]

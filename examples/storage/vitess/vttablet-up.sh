@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors.
-#
+# Copyright 2017 Google Inc.
+# 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-#
+# 
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
+# 
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,7 +22,6 @@ script_root=`dirname "${BASH_SOURCE}"`
 source $script_root/env.sh
 
 # Create the pods for shard-0
-CELLS=${CELLS:-'test'}
 keyspace='test_keyspace'
 SHARDS=${SHARDS:-'0'}
 TABLETS_PER_SHARD=${TABLETS_PER_SHARD:-5}
@@ -30,14 +29,24 @@ port=15002
 grpc_port=16002
 UID_BASE=${UID_BASE:-100}
 VTTABLET_TEMPLATE=${VTTABLET_TEMPLATE:-'vttablet-pod-template.yaml'}
+VTDATAROOT_VOLUME=${VTDATAROOT_VOLUME:-''}
 RDONLY_COUNT=${RDONLY_COUNT:-2}
 
+vtdataroot_volume='emptyDir: {}'
+if [ -n "$VTDATAROOT_VOLUME" ]; then
+  vtdataroot_volume="hostPath: {path: ${VTDATAROOT_VOLUME}}"
+fi
+
 uid_base=$UID_BASE
+indices=${TASKS:-`seq 0 $(($TABLETS_PER_SHARD-1))`}
+cells=`echo $CELLS | tr ',' ' '`
+num_cells=`echo $cells | wc -w`
+
 for shard in $(echo $SHARDS | tr "," " "); do
-  cell_index=0
-  for cell in `echo $CELLS | tr ',' ' '`; do
-    echo "Creating $keyspace.shard-$shard pods in cell $CELL..."
-    for uid_index in `seq 0 $(($TABLETS_PER_SHARD-1))`; do
+  [[ $num_cells -gt 1 ]] && cell_index=100000000 || cell_index=0
+  for cell in $cells; do
+    echo "Creating $keyspace.shard-$shard pods in cell $cell..."
+    for uid_index in $indices; do
       uid=$[$uid_base + $uid_index + $cell_index]
       printf -v alias '%s-%010d' $cell $uid
       printf -v tablet_subdir 'vt_%010d' $uid
@@ -55,12 +64,12 @@ for shard in $(echo $SHARDS | tr "," " "); do
 
       # Expand template variables
       sed_script=""
-      for var in alias cell uid keyspace shard shard_label port grpc_port tablet_subdir tablet_type backup_flags; do
+      for var in vitess_image alias cell uid keyspace shard shard_label port grpc_port tablet_subdir vtdataroot_volume tablet_type backup_flags; do
         sed_script+="s,{{$var}},${!var},g;"
       done
 
       # Instantiate template and send to kubectl.
-      cat $VTTABLET_TEMPLATE | sed -e "$sed_script" | $KUBECTL create -f -
+      cat $VTTABLET_TEMPLATE | sed -e "$sed_script" | $KUBECTL $KUBECTL_OPTIONS create -f -
     done
     let cell_index=cell_index+100000000
   done

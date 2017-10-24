@@ -1,0 +1,18 @@
+{
+  "sharded": true,
+  "vindexes": {
+    "hash": {
+      "type": "hash"
+    }
+  },
+  "tables": {
+    "messages": {
+      "column_vindexes": [
+        {
+          "column": "page",
+          "name": "hash"
+        }
+      ]
+    }
+  }
+}

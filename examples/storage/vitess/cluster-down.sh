@@ -14,20 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This is an example script that stops vtgate.
+# Tears down the container engine cluster, removes rules/pools
 
-set -e
+GKE_ZONE=${GKE_ZONE:-'us-central1-b'}
+GKE_CLUSTER_NAME=${GKE_CLUSTER_NAME:-'example'}
 
-script_root=`dirname "${BASH_SOURCE}"`
-source $script_root/env.sh
+base_ssd_name="$GKE_CLUSTER_NAME-vt-ssd-"
 
-cells=`echo $CELLS | tr ',' ' '`
+gcloud container clusters delete $GKE_CLUSTER_NAME -z $GKE_ZONE -q
 
-for cell in $cells; do
-  echo "Stopping vtgate replicationcontroller in cell $cell..."
-  $KUBECTL $KUBECTL_OPTIONS delete replicationcontroller vtgate-$cell
-
-  echo "Deleting vtgate service in cell $cell..."
-  $KUBECTL $KUBECTL_OPTIONS delete service vtgate-$cell
+num_ssds=`gcloud compute disks list | awk -v name="$base_ssd_name" -v zone=$GKE_ZONE '$1~name && $2==zone' | wc -l`
+for i in `seq 1 $num_ssds`; do
+  gcloud compute disks delete $base_ssd_name$i --zone $GKE_ZONE -q
 done
 

@@ -1,0 +1,17 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: vtctld
+  labels:
+    component: vtctld
+    app: vitess
+spec:
+  ports:
+    - name: web
+      port: 15000
+    - name: grpc
+      port: 15999
+  selector:
+    component: vtctld
+    app: vitess
+  type: {{service_type}}

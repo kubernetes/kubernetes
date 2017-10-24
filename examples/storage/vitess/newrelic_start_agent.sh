@@ -14,20 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This is an example script that stops vtgate.
+NEWRELIC_LICENSE_KEY=$1
 
-set -e
-
-script_root=`dirname "${BASH_SOURCE}"`
-source $script_root/env.sh
-
-cells=`echo $CELLS | tr ',' ' '`
-
-for cell in $cells; do
-  echo "Stopping vtgate replicationcontroller in cell $cell..."
-  $KUBECTL $KUBECTL_OPTIONS delete replicationcontroller vtgate-$cell
-
-  echo "Deleting vtgate service in cell $cell..."
-  $KUBECTL $KUBECTL_OPTIONS delete service vtgate-$cell
-done
-
+sudo sh -c 'echo deb http://apt.newrelic.com/debian/ newrelic non-free >> /etc/apt/sources.list.d/newrelic.list'
+wget -O- https://download.newrelic.com/548C16BF.gpg | sudo apt-key add -
+sudo apt-get update
+sudo apt-get install newrelic-sysmond
+sudo nrsysmond-config --set license_key=$NEWRELIC_LICENSE_KEY
+sudo /etc/init.d/newrelic-sysmond start

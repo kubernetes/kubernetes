@@ -1,0 +1,38 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: vtworker
+  labels:
+    component: vtworker
+    app: vitess
+spec:
+  containers:
+    - name: vtworker
+      image: {{vitess_image}}
+      volumeMounts:
+        - name: syslog
+          mountPath: /dev/log
+        - name: vtdataroot
+          mountPath: /vt/vtdataroot
+      command:
+        - sh
+        - "-c"
+        - >-
+          mkdir -p $VTDATAROOT/tmp &&
+          chown -R vitess /vt &&
+          su -p -c "/vt/bin/vtworker
+          -log_dir $VTDATAROOT/tmp
+          -alsologtostderr
+          -port {{port}}
+          -topo_implementation etcd
+          -etcd_global_addrs http://etcd-global:4001
+          -cell {{cell}}
+          -use_v3_resharding_mode
+          {{vtworker_command}}" vitess
+  restartPolicy: Never
+  volumes:
+    - name: syslog
+      hostPath: {path: /dev/log}
+    - name: vtdataroot
+      emptyDir: {}
+
