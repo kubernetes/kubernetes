@@ -35,6 +35,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	fileutil "k8s.io/kubernetes/pkg/util/file"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
@@ -225,46 +226,6 @@ func (util *RBDUtil) rbdLock(b rbdMounter, lock bool) error {
 	return err
 }
 
-func (util *RBDUtil) persistRBD(rbd rbdMounter, mnt string) error {
-	file := path.Join(mnt, "rbd.json")
-	fp, err := os.Create(file)
-	if err != nil {
-		return fmt.Errorf("rbd: create err %s/%s", file, err)
-	}
-	defer fp.Close()
-
-	encoder := json.NewEncoder(fp)
-	if err = encoder.Encode(rbd); err != nil {
-		return fmt.Errorf("rbd: encode err: %v.", err)
-	}
-
-	return nil
-}
-
-func (util *RBDUtil) loadRBD(mounter *rbdMounter, mnt string) error {
-	file := path.Join(mnt, "rbd.json")
-	fp, err := os.Open(file)
-	if err != nil {
-		return fmt.Errorf("rbd: open err %s/%s", file, err)
-	}
-	defer fp.Close()
-
-	decoder := json.NewDecoder(fp)
-	if err = decoder.Decode(mounter); err != nil {
-		return fmt.Errorf("rbd: decode err: %v.", err)
-	}
-
-	return nil
-}
-
-func (util *RBDUtil) fencing(b rbdMounter) error {
-	// no need to fence readOnly
-	if (&b).GetAttributes().ReadOnly {
-		return nil
-	}
-	return util.rbdLock(b, true)
-}
-
 // AttachDisk attaches the disk on the node.
 // If Volume is not read-only, acquire a lock on image first.
 func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
@@ -287,16 +248,16 @@ func (util *RBDUtil) AttachDisk(b rbdMounter) (string, error) {
 			glog.Warningf("rbd: failed to load rbd kernel module:%v", err)
 		}
 
-		// fence off other mappers
-		if err = util.fencing(b); err != nil {
-			return "", rbdErrors(err, fmt.Errorf("rbd: failed to lock image %s (maybe locked by other nodes), error %v", b.Image, err))
+		// Currently, we don't acquire advisory lock on image, but for backward
+		// compatibility, we need to check if the image is being used by nodes running old kubelet.
+		found, err := util.rbdStatus(&b)
+		if err != nil {
+			return "", err
 		}
-		// rbd lock remove needs ceph and image config
-		// but kubelet doesn't get them from apiserver during teardown
-		// so persit rbd config so upon disk detach, rbd lock can be removed
-		// since rbd json is persisted in the same local directory that is used as rbd mountpoint later,
-		// the json file remains invisible during rbd mount and thus won't be removed accidentally.
-		util.persistRBD(b, globalPDPath)
+		if found {
+			glog.Info("rbd is still being used ", b.Image)
+			return "", fmt.Errorf("rbd %s is still being used", b.Image)
+		}
 
 		// rbd map
 		l := len(b.Mon)
@@ -342,20 +303,55 @@ func (util *RBDUtil) DetachDisk(plugin *rbdPlugin, deviceMountPath string, devic
 		}
 		glog.V(3).Infof("rbd: successfully unmap device %s", device)
 	}
-	// load ceph and image/pool info to remove fencing
+	// Currently, we don't persist rbd info on the disk, but for backward
+	// compatbility, we need to clean it if found.
+	rbdFile := path.Join(deviceMountPath, "rbd.json")
+	exists, err := fileutil.FileExists(rbdFile)
+	if err != nil {
+		return err
+	}
+	if exists {
+		glog.V(3).Infof("rbd: old rbd.json is found under %s, cleaning it", deviceMountPath)
+		err = util.cleanOldRBDFile(plugin, rbdFile)
+		if err != nil {
+			glog.Errorf("rbd: failed to clean %s", rbdFile)
+			return err
+		}
+		glog.V(3).Infof("rbd: successfully remove %s", rbdFile)
+	}
+	return nil
+}
+
+// cleanOldRBDFile read rbd info from rbd.json file and removes lock if found.
+// At last, it removes rbd.json file.
+func (util *RBDUtil) cleanOldRBDFile(plugin *rbdPlugin, rbdFile string) error {
 	mounter := &rbdMounter{
 		// util.rbdLock needs it to run command.
 		rbd: newRBD("", "", "", "", false, plugin, util),
 	}
-	err = util.loadRBD(mounter, deviceMountPath)
+	fp, err := os.Open(rbdFile)
 	if err != nil {
-		glog.Errorf("failed to load rbd info from %s: %v", deviceMountPath, err)
+		return fmt.Errorf("rbd: open err %s/%s", rbdFile, err)
+	}
+	defer fp.Close()
+
+	decoder := json.NewDecoder(fp)
+	if err = decoder.Decode(mounter); err != nil {
+		return fmt.Errorf("rbd: decode err: %v.", err)
+	}
+
+	if err != nil {
+		glog.Errorf("failed to load rbd info from %s: %v", rbdFile, err)
 		return err
 	}
 	// remove rbd lock if found
 	// the disk is not attached to this node anymore, so the lock on image
 	// for this node can be removed safely
-	return util.rbdLock(*mounter, false)
+	err = util.rbdLock(*mounter, false)
+	if err == nil {
+		os.Remove(rbdFile)
+	}
+	return err
 }
 
 func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *v1.RBDPersistentVolumeSource, size int, err error) {
@@ -438,6 +434,14 @@ func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, error) {
 	var output string
 	var cmd []byte
 
+	// If we don't have admin id/secret (e.g. attaching), fallback to user id/secret.
+	id := b.adminId
+	secret := b.adminSecret
+	if id == "" {
+		id = b.Id
+		secret = b.Secret
+	}
+
 	l := len(b.Mon)
 	start := rand.Int() % l
 	// iterate all hosts until rbd command succeeds.
@@ -457,9 +461,9 @@ func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, error) {
 		// # image does not exist (exit=2)
 		// rbd: error opening image kubernetes-dynamic-pvc-<UUID>: (2) No such file or directory
 		//
-		glog.V(4).Infof("rbd: status %s using mon %s, pool %s id %s key %s", b.Image, mon, b.Pool, b.adminId, b.adminSecret)
+		glog.V(4).Infof("rbd: status %s using mon %s, pool %s id %s key %s", b.Image, mon, b.Pool, id, secret)
 		cmd, err = b.exec.Run("rbd",
-			"status", b.Image, "--pool", b.Pool, "-m", mon, "--id", b.adminId, "--key="+b.adminSecret)
+			"status", b.Image, "--pool", b.Pool, "-m", mon, "--id", id, "--key="+secret)
 		output = string(cmd)
 
 		// break if command succeeds

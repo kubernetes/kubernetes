@@ -206,7 +206,7 @@ func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
 		return err
 	}
 	glog.V(3).Infof("rbd: successfully detach device %s", devicePath)
-	err = os.RemoveAll(deviceMountPath)
+	err = os.Remove(deviceMountPath)
 	if err != nil {
 		return err
 	}
