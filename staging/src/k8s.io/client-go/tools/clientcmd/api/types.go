@@ -77,6 +77,12 @@ type Cluster struct {
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	// +optional
 	Extensions map[string]runtime.Object `json:"extensions,omitempty"`
+	// ProxyNetworkType is a network type to proxy requests over. See https://golang.org/pkg/net/#Dial for known network types.
+	// +optional
+	ProxyNetworkType string `json:"proxy-network-type,omitempty"`
+	// Proxy is an address to proxy outbound requests over. See https://golang.org/pkg/net/#Dial for examples.
+	// +optional
+	ProxyAddress string `json:"proxy-address,omitempty"`
 }
 
 // AuthInfo contains information that describes identity information.  This is use to tell the kubernetes cluster who you are.

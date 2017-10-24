@@ -58,8 +58,8 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 	if err != nil {
 		return nil, err
 	}
-	// The options didn't require a custom TLS config
-	if tlsConfig == nil {
+	// The options didn't require a custom TLS config or a custom Dial function
+	if tlsConfig == nil && config.Dial == nil {
 		return http.DefaultTransport, nil
 	}
 

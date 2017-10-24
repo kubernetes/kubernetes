@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/url"
 	"os"
 	"strings"
@@ -132,6 +133,16 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 	clientConfig := &restclient.Config{}
 	clientConfig.Host = configClusterInfo.Server
 
+	// make sure either both or neither of proxy-address and proxy-network-type are provided
+	if (configClusterInfo.ProxyAddress == "" && configClusterInfo.ProxyNetworkType != "") || (configClusterInfo.ProxyAddress != "" && configClusterInfo.ProxyNetworkType == "") {
+		return nil, fmt.Errorf("Either both or neither of proxy-address and proxy-network-type must be provided")
+	}
+	if configClusterInfo.ProxyAddress != "" {
+		clientConfig.Dial = func(network, addr string) (net.Conn, error) {
+			return net.Dial(configClusterInfo.ProxyNetworkType, configClusterInfo.ProxyAddress)
+		}
+	}
+
 	if len(config.overrides.Timeout) > 0 {
 		timeout, err := ParseTimeout(config.overrides.Timeout)
 		if err != nil {
@@ -160,6 +171,10 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 		// mergo is a first write wins for map value and a last writing wins for interface values
 		// NOTE: This behavior changed with https://github.com/imdario/mergo/commit/d304790b2ed594794496464fadd89d2bb266600a.
 		//       Our mergo.Merge version is older than this change.
+		// TODO: There is a fix to mergo that supports function values which would fix an issue with
+		//       the Dial function getting clobbered (https://github.com/imdario/mergo/commit/a58a1a86830982d07450dd93bed0ac3fc6ac1a9d)
+		//       Upgrade when possible. For now, just backup/restore
+		origDial := clientConfig.Dial
 		var persister restclient.AuthProviderConfigPersister
 		if config.configAccess != nil {
 			authInfoName, _ := config.getAuthInfoName()
@@ -176,6 +191,7 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 			return nil, err
 		}
 		mergo.Merge(clientConfig, serverAuthPartialConfig)
+		clientConfig.Dial = origDial
 	}
 
 	return clientConfig, nil
@@ -484,6 +500,15 @@ func (config *inClusterClientConfig) ClientConfig() (*restclient.Config, error) 
 		}
 		if certificateAuthorityFile := config.overrides.ClusterInfo.CertificateAuthority; len(certificateAuthorityFile) > 0 {
 			icc.TLSClientConfig.CAFile = certificateAuthorityFile
+		}
+		// make sure either both or neither of proxy-address and proxy-network-type are provided
+		if (len(config.overrides.ClusterInfo.ProxyAddress) == 0 && len(config.overrides.ClusterInfo.ProxyNetworkType) != 0) || (len(config.overrides.ClusterInfo.ProxyAddress) != 0 && len(config.overrides.ClusterInfo.ProxyNetworkType) == 0) {
+			return nil, fmt.Errorf("Either both or neither of proxy-address and proxy-network-type must be passed")
+		}
+		if proxyAddress := config.overrides.ClusterInfo.ProxyAddress; len(proxyAddress) > 0 {
+			icc.Dial = func(network, addr string) (net.Conn, error) {
+				return net.Dial(config.overrides.ClusterInfo.ProxyNetworkType, proxyAddress)
+			}
 		}
 	}
 
