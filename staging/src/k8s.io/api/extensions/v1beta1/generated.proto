@@ -34,15 +34,15 @@ option go_package = "v1beta1";
 
 // An APIVersion represents a single concrete version of an object model.
 message APIVersion {
-  // Name of this version (e.g. 'v1').
+  // Version (e.g. 'v1').
   // +optional
   optional string name = 1;
 }
 
-// defines the host volume conditions that will be enabled by a policy
+// Defines the host volume conditions that will be enabled by a policy
 // for pods to use. It requires the path prefix to be defined.
 message AllowedHostPath {
-  // is the path prefix that the host volume must match.
+  // Is the path prefix that the host volume must match.
   // It does not support `*`.
   // Trailing slashes are trimmed when validating the path prefix with a host path.
   // 
@@ -79,7 +79,7 @@ message CustomMetricTargetList {
 
 // DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for
 // more information.
-// DaemonSet represents the configuration of a daemon set.
+// Represents the configuration of a daemon set.
 message DaemonSet {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
@@ -100,7 +100,7 @@ message DaemonSet {
   optional DaemonSetStatus status = 3;
 }
 
-// DaemonSetList is a collection of daemon sets.
+// Collection of daemon sets.
 message DaemonSetList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
@@ -111,7 +111,7 @@ message DaemonSetList {
   repeated DaemonSet items = 2;
 }
 
-// DaemonSetSpec is the specification of a daemon set.
+// Specification of a daemon set.
 message DaemonSetSpec {
   // A label query over pods that are managed by the daemon set.
   // Must match in order to be controlled.
@@ -151,7 +151,7 @@ message DaemonSetSpec {
   optional int32 revisionHistoryLimit = 6;
 }
 
-// DaemonSetStatus represents the current status of a daemon set.
+// Represents the current status of a daemon set.
 message DaemonSetStatus {
   // The number of nodes that are running at least 1
   // daemon pod and are supposed to run the daemon pod.
@@ -215,8 +215,7 @@ message DaemonSetUpdateStrategy {
 }
 
 // DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
-// more information.
-// Deployment enables declarative updates for Pods and ReplicaSets.
+// more information. It enables declarative updates for Pods and ReplicaSets.
 message Deployment {
   // Standard object metadata.
   // +optional
@@ -231,7 +230,7 @@ message Deployment {
   optional DeploymentStatus status = 3;
 }
 
-// DeploymentCondition describes the state of a deployment at a certain point.
+// Describes the state of a deployment at a certain point.
 message DeploymentCondition {
   // Type of deployment condition.
   optional string type = 1;
@@ -252,23 +251,23 @@ message DeploymentCondition {
   optional string message = 5;
 }
 
-// DeploymentList is a list of Deployments.
+// List of Deployments.
 message DeploymentList {
   // Standard list metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of Deployments.
+  // List of Deployments.
   repeated Deployment items = 2;
 }
 
 // DEPRECATED.
-// DeploymentRollback stores the information required to rollback a deployment.
+// Stores the information required to rollback a deployment.
 message DeploymentRollback {
   // Required: This must match the Name of a deployment.
   optional string name = 1;
 
-  // The annotations to be updated to a deployment
+  // The annotations to be updated to a deployment.
   // +optional
   map<string, string> updatedAnnotations = 2;
 
@@ -276,7 +275,7 @@ message DeploymentRollback {
   optional RollbackConfig rollbackTo = 3;
 }
 
-// DeploymentSpec is the specification of the desired behavior of the Deployment.
+// Specification of the desired behavior of the Deployment.
 message DeploymentSpec {
   // Number of desired pods. This is a pointer to distinguish between explicit
   // zero and not specified. Defaults to 1.
@@ -288,7 +287,7 @@ message DeploymentSpec {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
-  // Template describes the pods that will be created.
+  // Describes the pods that will be created.
   optional k8s.io.api.core.v1.PodTemplateSpec template = 3;
 
   // The deployment strategy to use to replace existing pods with new ones.
@@ -327,7 +326,7 @@ message DeploymentSpec {
   optional int32 progressDeadlineSeconds = 9;
 }
 
-// DeploymentStatus is the most recently observed status of the Deployment.
+// Most recently observed status of the Deployment.
 message DeploymentStatus {
   // The generation observed by the deployment controller.
   // +optional
@@ -367,7 +366,7 @@ message DeploymentStatus {
   optional int32 collisionCount = 8;
 }
 
-// DeploymentStrategy describes how to replace existing pods with new ones.
+// Describes how to replace existing pods with new ones.
 message DeploymentStrategy {
   // Type of deployment. Can be "Recreate" or "RollingUpdate". Default is RollingUpdate.
   // +optional
@@ -382,22 +381,22 @@ message DeploymentStrategy {
   optional RollingUpdateDeployment rollingUpdate = 2;
 }
 
-// FSGroupStrategyOptions defines the strategy type and options used to create the strategy.
+// Defines the strategy type and options used to create the strategy.
 message FSGroupStrategyOptions {
-  // Rule is the strategy that will dictate what FSGroup is used in the SecurityContext.
+  // The strategy that will dictate what FSGroup is used in the SecurityContext.
   // +optional
   optional string rule = 1;
 
-  // Ranges are the allowed ranges of fs groups.  If you would like to force a single
+  // The allowed ranges of fs groups.  If you would like to force a single
   // fs group then supply a single range with the same start and end.
   // +optional
   repeated IDRange ranges = 2;
 }
 
-// HTTPIngressPath associates a path regex with a backend. Incoming urls matching
+// Associates a path regex with a backend. Incoming urls matching
 // the path are forwarded to the backend.
 message HTTPIngressPath {
-  // Path is an extended POSIX regex as defined by IEEE Std 1003.1,
+  // An extended POSIX regex as defined by IEEE Std 1003.1,
   // (i.e this follows the egrep/unix syntax, not the perl syntax)
   // matched against the path of an incoming request. Currently it can
   // contain characters disallowed from the conventional "path"
@@ -407,12 +406,12 @@ message HTTPIngressPath {
   // +optional
   optional string path = 1;
 
-  // Backend defines the referenced service endpoint to which the traffic
+  // Defines the referenced service endpoint to which the traffic
   // will be forwarded to.
   optional IngressBackend backend = 2;
 }
 
-// HTTPIngressRuleValue is a list of http selectors pointing to backends.
+// List of http selectors pointing to backends.
 // In the example: http://<host>/<path>?<searchpart> -> backend where
 // where parts of the url correspond to RFC 3986, this resource will be used
 // to match against everything after the last '/' and before the first '?'
@@ -422,41 +421,41 @@ message HTTPIngressRuleValue {
   repeated HTTPIngressPath paths = 1;
 }
 
-// Host Port Range defines a range of host ports that will be enabled by a policy
+// Defines a range of host ports that will be enabled by a policy
 // for pods to use.  It requires both the start and end to be defined.
 message HostPortRange {
-  // min is the start of the range, inclusive.
+  // The start of the range, inclusive.
   optional int32 min = 1;
 
-  // max is the end of the range, inclusive.
+  // The end of the range, inclusive.
   optional int32 max = 2;
 }
 
-// ID Range provides a min/max of an allowed range of IDs.
+// Provides a min/max of an allowed range of IDs.
 message IDRange {
-  // Min is the start of the range, inclusive.
+  // The start of the range, inclusive.
   optional int64 min = 1;
 
-  // Max is the end of the range, inclusive.
+  // The end of the range, inclusive.
   optional int64 max = 2;
 }
 
-// IPBlock describes a particular CIDR (Ex. "192.168.1.1/24") that is allowed to the pods
+// Describes a particular CIDR (Ex. "192.168.1.1/24") that is allowed to the pods
 // matched by a NetworkPolicySpec's podSelector. The except entry describes CIDRs that should
 // not be included within this rule.
 message IPBlock {
-  // CIDR is a string representing the IP Block
+  // String representing the IP Block
   // Valid examples are "192.168.1.1/24"
   optional string cidr = 1;
 
-  // Except is a slice of CIDRs that should not be included within an IP Block
+  // Slice of CIDRs that should not be included within an IP Block
   // Valid examples are "192.168.1.1/24"
   // Except values will be rejected if they are outside the CIDR range
   // +optional
   repeated string except = 2;
 }
 
-// Ingress is a collection of rules that allow inbound connections to reach the
+// Collection of rules that allow inbound connections to reach the
 // endpoints defined by a backend. An Ingress can be configured to give services
 // externally-reachable urls, load balance traffic, terminate SSL, offer name
 // based virtual hosting etc.
@@ -466,18 +465,18 @@ message Ingress {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec is the desired state of the Ingress.
+  // Desired state of the Ingress.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional IngressSpec spec = 2;
 
-  // Status is the current state of the Ingress.
+  // Current state of the Ingress.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional IngressStatus status = 3;
 }
 
-// IngressBackend describes all endpoints for a given service and port.
+// Describes all endpoints for a given service and port.
 message IngressBackend {
   // Specifies the name of the referenced service.
   optional string serviceName = 1;
@@ -486,22 +485,22 @@ message IngressBackend {
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString servicePort = 2;
 }
 
-// IngressList is a collection of Ingress.
+// Collection of Ingress.
 message IngressList {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of Ingress.
+  // List of Ingress.
   repeated Ingress items = 2;
 }
 
-// IngressRule represents the rules mapping the paths under a specified host to
+// Represents the rules mapping the paths under a specified host to
 // the related backend services. Incoming requests are first evaluated for a host
 // match, then routed to the backend associated with the matching IngressRuleValue.
 message IngressRule {
-  // Host is the fully qualified domain name of a network host, as defined
+  // The fully qualified domain name of a network host, as defined
   // by RFC 3986. Note the following deviations from the "host" part of the
   // URI as defined in the RFC:
   // 1. IPs are not allowed. Currently an IngressRuleValue can only apply to the
@@ -516,7 +515,7 @@ message IngressRule {
   // +optional
   optional string host = 1;
 
-  // IngressRuleValue represents a rule to route requests for this IngressRule.
+  // Represents a rule to route requests for this IngressRule.
   // If unspecified, the rule defaults to a http catch-all. Whether that sends
   // just traffic matching the host to the default backend or all traffic to the
   // default backend, is left to the controller fulfilling the Ingress. Http is
@@ -525,7 +524,7 @@ message IngressRule {
   optional IngressRuleValue ingressRuleValue = 2;
 }
 
-// IngressRuleValue represents a rule to apply against incoming requests. If the
+// Represents a rule to apply against incoming requests. If the
 // rule is satisfied, the request is routed to the specified backend. Currently
 // mixing different types of rules in a single Ingress is disallowed, so exactly
 // one of the following must be set.
@@ -534,7 +533,7 @@ message IngressRuleValue {
   optional HTTPIngressRuleValue http = 1;
 }
 
-// IngressSpec describes the Ingress the user wishes to exist.
+// Describes the Ingress the user wishes to exist.
 message IngressSpec {
   // A default backend capable of servicing requests that don't match any
   // rule. At least one of 'backend' or 'rules' must be specified. This field
@@ -557,23 +556,23 @@ message IngressSpec {
   repeated IngressRule rules = 3;
 }
 
-// IngressStatus describe the current state of the Ingress.
+// The current state of the Ingress.
 message IngressStatus {
-  // LoadBalancer contains the current status of the load-balancer.
+  // Contains the current status of the load-balancer.
   // +optional
   optional k8s.io.api.core.v1.LoadBalancerStatus loadBalancer = 1;
 }
 
-// IngressTLS describes the transport layer security associated with an Ingress.
+// Describes the transport layer security associated with an Ingress.
 message IngressTLS {
-  // Hosts are a list of hosts included in the TLS certificate. The values in
+  // List of hosts included in the TLS certificate. The values in
   // this list must match the name/s used in the tlsSecret. Defaults to the
   // wildcard host setting for the loadbalancer controller fulfilling this
   // Ingress, if left unspecified.
   // +optional
   repeated string hosts = 1;
 
-  // SecretName is the name of the secret used to terminate SSL traffic on 443.
+  // Name of the secret used to terminate SSL traffic on 443.
   // Field is left optional to allow SSL routing based on SNI hostname alone.
   // If the SNI host in a listener conflicts with the "Host" header field used
   // by an IngressRule, the SNI host is used for termination and value of the
@@ -582,7 +581,7 @@ message IngressTLS {
   optional string secretName = 2;
 }
 
-// NetworkPolicy describes what network traffic is allowed for a set of Pods
+// Describes what network traffic is allowed for a set of Pods
 message NetworkPolicy {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
@@ -615,7 +614,7 @@ message NetworkPolicyEgressRule {
   repeated NetworkPolicyPeer to = 2;
 }
 
-// This NetworkPolicyIngressRule matches traffic if and only if the traffic matches both ports AND from.
+// Matches traffic if and only if the traffic matches both ports AND from.
 message NetworkPolicyIngressRule {
   // List of ports which should be made accessible on the pods selected for this rule.
   // Each item in this list is combined using a logical OR.
@@ -634,14 +633,14 @@ message NetworkPolicyIngressRule {
   repeated NetworkPolicyPeer from = 2;
 }
 
-// Network Policy List is a list of NetworkPolicy objects.
+// List of NetworkPolicy objects.
 message NetworkPolicyList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is a list of schema objects.
+  // List of schema objects.
   repeated NetworkPolicy items = 2;
 }
 
@@ -659,7 +658,7 @@ message NetworkPolicyPeer {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 2;
 
-  // IPBlock defines policy on a particular IPBlock
+  // Defines policy on a particular IPBlock
   // +optional
   optional IPBlock ipBlock = 3;
 }
@@ -721,7 +720,7 @@ message NetworkPolicySpec {
   repeated string policyTypes = 4;
 }
 
-// Pod Security Policy governs the ability to make requests that affect the Security Context
+// Governs the ability to make requests that affect the Security Context
 // that will be applied to a pod and container.
 message PodSecurityPolicy {
   // Standard object's metadata.
@@ -729,79 +728,79 @@ message PodSecurityPolicy {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // spec defines the policy enforced.
+  // Defines the policy enforced.
   // +optional
   optional PodSecurityPolicySpec spec = 2;
 }
 
-// Pod Security Policy List is a list of PodSecurityPolicy objects.
+// List of PodSecurityPolicy objects.
 message PodSecurityPolicyList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is a list of schema objects.
+  // List of schema objects.
   repeated PodSecurityPolicy items = 2;
 }
 
-// Pod Security Policy Spec defines the policy enforced.
+// Defines the policy enforced.
 message PodSecurityPolicySpec {
-  // privileged determines if a pod can request to be run as privileged.
+  // Determines if a pod can request to be run as privileged.
   // +optional
   optional bool privileged = 1;
 
-  // DefaultAddCapabilities is the default set of capabilities that will be added to the container
+  // Default set of capabilities that will be added to the container
   // unless the pod spec specifically drops the capability.  You may not list a capabiility in both
   // DefaultAddCapabilities and RequiredDropCapabilities.
   // +optional
   repeated string defaultAddCapabilities = 2;
 
-  // RequiredDropCapabilities are the capabilities that will be dropped from the container.  These
+  // Capabilities that will be dropped from the container.  These
   // are required to be dropped and cannot be added.
   // +optional
   repeated string requiredDropCapabilities = 3;
 
-  // AllowedCapabilities is a list of capabilities that can be requested to add to the container.
+  // List of capabilities that can be requested to add to the container.
   // Capabilities in this field may be added at the pod author's discretion.
   // You must not list a capability in both AllowedCapabilities and RequiredDropCapabilities.
   // +optional
   repeated string allowedCapabilities = 4;
 
-  // volumes is a white list of allowed volume plugins.  Empty indicates that all plugins
+  // A white list of allowed volume plugins.  Empty indicates that all plugins
   // may be used.
   // +optional
   repeated string volumes = 5;
 
-  // hostNetwork determines if the policy allows the use of HostNetwork in the pod spec.
+  // Determines if the policy allows the use of HostNetwork in the pod spec.
   // +optional
   optional bool hostNetwork = 6;
 
-  // hostPorts determines which host port ranges are allowed to be exposed.
+  // Determines which host port ranges are allowed to be exposed.
   // +optional
   repeated HostPortRange hostPorts = 7;
 
-  // hostPID determines if the policy allows the use of HostPID in the pod spec.
+  // Determines if the policy allows the use of HostPID in the pod spec.
   // +optional
   optional bool hostPID = 8;
 
-  // hostIPC determines if the policy allows the use of HostIPC in the pod spec.
+  // Determines if the policy allows the use of HostIPC in the pod spec.
   // +optional
   optional bool hostIPC = 9;
 
-  // seLinux is the strategy that will dictate the allowable labels that may be set.
+  // The strategy that will dictate the allowable labels that may be set.
   optional SELinuxStrategyOptions seLinux = 10;
 
-  // runAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.
+  // The strategy that will dictate the allowable RunAsUser values that may be set.
   optional RunAsUserStrategyOptions runAsUser = 11;
 
-  // SupplementalGroups is the strategy that will dictate what supplemental groups are used by the SecurityContext.
+  // The strategy that will dictate what supplemental groups are used by the SecurityContext.
   optional SupplementalGroupsStrategyOptions supplementalGroups = 12;
 
-  // FSGroup is the strategy that will dictate what fs group is used by the SecurityContext.
+  // The strategy that will dictate what fs group is used by the SecurityContext.
   optional FSGroupStrategyOptions fsGroup = 13;
 
-  // ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file
+  // When set to true will force containers to run with a read only root file
   // system.  If the container specifically requests to run with a non-read only root file system
   // the PSP should deny the pod.
   // If set to false the container may run with a read only root file system if it wishes but it
@@ -809,24 +808,24 @@ message PodSecurityPolicySpec {
   // +optional
   optional bool readOnlyRootFilesystem = 14;
 
-  // DefaultAllowPrivilegeEscalation controls the default setting for whether a
+  // Controls the default setting for whether a
   // process can gain more privileges than its parent process.
   // +optional
   optional bool defaultAllowPrivilegeEscalation = 15;
 
-  // AllowPrivilegeEscalation determines if a pod can request to allow
+  // Determines if a pod can request to allow
   // privilege escalation. If unspecified, defaults to true.
   // +optional
   optional bool allowPrivilegeEscalation = 16;
 
-  // is a white list of allowed host paths. Empty indicates that all host paths may be used.
+  // Is a white list of allowed host paths. Empty indicates that all host paths may be used.
   // +optional
   repeated AllowedHostPath allowedHostPaths = 17;
 }
 
 // DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for
 // more information.
-// ReplicaSet ensures that a specified number of pod replicas are running at any given time.
+// Ensures that a specified number of pod replicas are running at any given time.
 message ReplicaSet {
   // If the Labels of a ReplicaSet are empty, they are defaulted to
   // be the same as the Pod(s) that the ReplicaSet manages.
@@ -834,12 +833,12 @@ message ReplicaSet {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Spec defines the specification of the desired behavior of the ReplicaSet.
+  // Defines the specification of the desired behavior of the ReplicaSet.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
   // +optional
   optional ReplicaSetSpec spec = 2;
 
-  // Status is the most recently observed status of the ReplicaSet.
+  // Is the most recently observed status of the ReplicaSet.
   // This data may be out of date by some window of time.
   // Populated by the system.
   // Read-only.
@@ -848,7 +847,7 @@ message ReplicaSet {
   optional ReplicaSetStatus status = 3;
 }
 
-// ReplicaSetCondition describes the state of a replica set at a certain point.
+// Describes the state of a replica set at a certain point.
 message ReplicaSetCondition {
   // Type of replica set condition.
   optional string type = 1;
@@ -869,7 +868,7 @@ message ReplicaSetCondition {
   optional string message = 5;
 }
 
-// ReplicaSetList is a collection of ReplicaSets.
+// Collection of ReplicaSets.
 message ReplicaSetList {
   // Standard list metadata.
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
@@ -881,9 +880,9 @@ message ReplicaSetList {
   repeated ReplicaSet items = 2;
 }
 
-// ReplicaSetSpec is the specification of a ReplicaSet.
+// Specification of a ReplicaSet.
 message ReplicaSetSpec {
-  // Replicas is the number of desired replicas.
+  // Number of desired replicas.
   // This is a pointer to distinguish between explicit zero and unspecified.
   // Defaults to 1.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller
@@ -896,23 +895,23 @@ message ReplicaSetSpec {
   // +optional
   optional int32 minReadySeconds = 4;
 
-  // Selector is a label query over pods that should match the replica count.
+  // A label query over pods that should match the replica count.
   // If the selector is empty, it is defaulted to the labels present on the pod template.
   // Label keys and values that must match in order to be controlled by this replica set.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
-  // Template is the object that describes the pod that will be created if
+  // The object that describes the pod that will be created if
   // insufficient replicas are detected.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#pod-template
   // +optional
   optional k8s.io.api.core.v1.PodTemplateSpec template = 3;
 }
 
-// ReplicaSetStatus represents the current status of a ReplicaSet.
+// Represents the current status of a ReplicaSet.
 message ReplicaSetStatus {
-  // Replicas is the most recently oberved number of replicas.
+  // The most recently oberved number of replicas.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller/#what-is-a-replicationcontroller
   optional int32 replicas = 1;
 
@@ -928,7 +927,7 @@ message ReplicaSetStatus {
   // +optional
   optional int32 availableReplicas = 5;
 
-  // ObservedGeneration reflects the generation of the most recently observed ReplicaSet.
+  // Reflects the generation of the most recently observed ReplicaSet.
   // +optional
   optional int64 observedGeneration = 3;
 
@@ -939,7 +938,7 @@ message ReplicaSetStatus {
   repeated ReplicaSetCondition conditions = 6;
 }
 
-// Dummy definition
+// Dummy definition.
 message ReplicationControllerDummy {
 }
 
@@ -1000,19 +999,19 @@ message RollingUpdateDeployment {
   optional k8s.io.apimachinery.pkg.util.intstr.IntOrString maxSurge = 2;
 }
 
-// Run A sUser Strategy Options defines the strategy type and any options used to create the strategy.
+// Defines the strategy type and any options used to create the strategy.
 message RunAsUserStrategyOptions {
-  // Rule is the strategy that will dictate the allowable RunAsUser values that may be set.
+  // Strategy that will dictate the allowable RunAsUser values that may be set.
   optional string rule = 1;
 
-  // Ranges are the allowed ranges of uids that may be used.
+  // Allowed ranges of uids that may be used.
   // +optional
   repeated IDRange ranges = 2;
 }
 
-// SELinux  Strategy Options defines the strategy type and any options used to create the strategy.
+// Defines the strategy type and any options used to create the strategy.
 message SELinuxStrategyOptions {
-  // type is the strategy that will dictate the allowable labels that may be set.
+  // The strategy that will dictate the allowable labels that may be set.
   optional string rule = 1;
 
   // seLinuxOptions required to run as; required for MustRunAs
@@ -1021,38 +1020,39 @@ message SELinuxStrategyOptions {
   optional k8s.io.api.core.v1.SELinuxOptions seLinuxOptions = 2;
 }
 
-// represents a scaling request for a resource.
+// Represents a scaling request for a resource.
 message Scale {
   // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
+  // Defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
   // +optional
   optional ScaleSpec spec = 2;
 
-  // current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only.
+  // Current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only.
   // +optional
   optional ScaleStatus status = 3;
 }
 
-// describes the attributes of a scale subresource
+// Describes the attributes of a scale subresource.
 message ScaleSpec {
   // desired number of instances for the scaled object.
   // +optional
   optional int32 replicas = 1;
 }
 
-// represents the current status of a scale subresource.
+// Represents the current status of a scale subresource.
 message ScaleStatus {
-  // actual number of observed instances of the scaled object.
+  // Actual number of observed instances of the scaled object.
   optional int32 replicas = 1;
 
-  // label query over pods that should match the replicas count. More info: http://kubernetes.io/docs/user-guide/labels#label-selectors
+  // Label query over pods that should match the replicas count. More
+  // info: http://kubernetes.io/docs/user-guide/labels#label-selectors.
   // +optional
   map<string, string> selector = 2;
 
-  // label selector for pods that should match the replicas count. This is a serializated
+  // Label selector for pods that should match the replicas count. This is a serializated
   // version of both map-based and more expressive set-based selectors. This is done to
   // avoid introspection in the clients. The string will be in the same format as the
   // query-param syntax. If the target type only supports map-based selectors, both this
@@ -1062,30 +1062,30 @@ message ScaleStatus {
   optional string targetSelector = 3;
 }
 
-// SupplementalGroupsStrategyOptions defines the strategy type and options used to create the strategy.
+// Defines the strategy type and options used to create the strategy.
 message SupplementalGroupsStrategyOptions {
-  // Rule is the strategy that will dictate what supplemental groups is used in the SecurityContext.
+  // The strategy that will dictate what supplemental groups is used in the SecurityContext.
   // +optional
   optional string rule = 1;
 
-  // Ranges are the allowed ranges of supplemental groups.  If you would like to force a single
+  // The allowed ranges of supplemental groups.  If you would like to force a single
   // supplemental group then supply a single range with the same start and end.
   // +optional
   repeated IDRange ranges = 2;
 }
 
-// A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
+// A generic representation of a resource, it is used by add-ons and plugins to add new resource
 // types to the API.  It consists of one or more Versions of the api.
 message ThirdPartyResource {
-  // Standard object metadata
+  // Standard object metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Description is the description of this object.
+  // Description of this object.
   // +optional
   optional string description = 2;
 
-  // Versions are versions for this third party object
+  // Versions for this third party object.
   // +optional
   repeated APIVersion versions = 3;
 }
@@ -1096,29 +1096,29 @@ message ThirdPartyResourceData {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // Data is the raw JSON data for this data.
+  // Raw JSON data for this data.
   // +optional
   optional bytes data = 2;
 }
 
-// ThirdPartyResrouceDataList is a list of ThirdPartyResourceData.
+// List of ThirdPartyResourceData.
 message ThirdPartyResourceDataList {
   // Standard list metadata
   // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of ThirdpartyResourceData.
+  // List of ThirdpartyResourceData.
   repeated ThirdPartyResourceData items = 2;
 }
 
-// ThirdPartyResourceList is a list of ThirdPartyResources.
+// List of ThirdPartyResources.
 message ThirdPartyResourceList {
   // Standard list metadata.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
-  // Items is the list of ThirdPartyResources.
+  // List of ThirdPartyResources.
   repeated ThirdPartyResource items = 2;
 }
 
