@@ -67,6 +67,8 @@ type MutationInterface interface {
 
 // ValidationInterface is an abstract, pluggable interface for Admission Control decisions.
 type ValidationInterface interface {
+	Interface
+
 	// ValidatingAdmit makes an admission decision based on the request attributes.  It is NOT allowed to mutate
 	ValidatingAdmit(a Attributes) (err error)
 }

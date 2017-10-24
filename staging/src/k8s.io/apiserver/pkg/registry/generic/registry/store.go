@@ -52,16 +52,6 @@ import (
 // object.
 type ObjectFunc func(obj runtime.Object) error
 
-// ValidateObjectFunc is a function to act on a given object. An error may be returned
-// if the hook cannot be completed. An ObjectFunc may NOT transform the provided
-// object.
-type ValidateObjectFunc func(obj runtime.Object) error
-
-// ValidateObjectUpdateFunc is a function to act on a given object and its predecessor.
-// An error may be returned if the hook cannot be completed. An UpdateObjectFunc
-// may NOT transform the provided object.
-type ValidateObjectUpdateFunc func(obj, old runtime.Object) error
-
 // GenericStore interface can be used for type assertions when we need to access the underlying strategies.
 type GenericStore interface {
 	GetCreateStrategy() rest.RESTCreateStrategy
@@ -315,7 +305,7 @@ func (e *Store) ListPredicate(ctx genericapirequest.Context, p storage.Selection
 }
 
 // Create inserts a new item according to the unique key from the object.
-func (e *Store) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
+func (e *Store) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
 		return nil, err
 	}
@@ -514,7 +504,7 @@ func (e *Store) deleteWithoutFinalizers(ctx genericapirequest.Context, name, key
 // Update performs an atomic update and set of the object. Returns the result of the update
 // or an error. If the registry allows create-on-update, the create flow will be executed.
 // A bool is returned along with the object and any errors, to indicate object creation.
-func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation ValidateObjectFunc, updateValidation ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+func (e *Store) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, false, err

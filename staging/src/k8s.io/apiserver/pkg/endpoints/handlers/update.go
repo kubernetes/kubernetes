@@ -33,7 +33,7 @@ import (
 )
 
 // UpdateResource returns a function that will handle a resource update
-func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectTyper, mutatingAdmission admission.Interface, validatingAdmission admission.ValidationInterface) http.HandlerFunc {
+func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Update " + req.URL.Path)
@@ -89,7 +89,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 		userInfo, _ := request.UserFrom(ctx)
 		staticAdmissionAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo)
 		var transformers []rest.TransformFunc
-		if mutatingAdmission != nil && mutatingAdmission.Handles(admission.Update) {
+		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Update) {
 			transformers = append(transformers, func(ctx request.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
 				return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
 			})
@@ -102,8 +102,8 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 				ctx,
 				name,
 				rest.DefaultUpdatedObjectInfo(obj, transformers...),
-				rest.AdmissionToValidateObjectFunc(validatingAdmission, staticAdmissionAttributes),
-				rest.AdmissionToValidateObjectUpdateFunc(validatingAdmission, staticAdmissionAttributes),
+				rest.AdmissionToValidateObjectFunc(admit, staticAdmissionAttributes),
+				rest.AdmissionToValidateObjectUpdateFunc(admit, staticAdmissionAttributes),
 			)
 			wasCreated = created
 			return obj, err

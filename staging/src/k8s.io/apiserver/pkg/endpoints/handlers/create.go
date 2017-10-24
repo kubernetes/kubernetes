@@ -34,7 +34,7 @@ import (
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 )
 
-func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, mutatingAdmission admission.Interface, validatingAdmission admission.ValidationInterface, includeName bool) http.HandlerFunc {
+func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface, includeName bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Create " + req.URL.Path)
@@ -95,7 +95,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 
 		userInfo, _ := request.UserFrom(ctx)
 		admissionAttributes := admission.NewAttributesRecord(obj, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Create, userInfo)
-		if mutatingAdmission != nil && mutatingAdmission.Handles(admission.Create) {
+		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Create) {
 			err = mutatingAdmission.Admit(admissionAttributes)
 			if err != nil {
 				scope.err(err, w, req)
@@ -112,7 +112,7 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 				ctx,
 				name,
 				obj,
-				rest.AdmissionToValidateObjectFunc(validatingAdmission, admissionAttributes),
+				rest.AdmissionToValidateObjectFunc(admit, admissionAttributes),
 				includeUninitialized,
 			)
 		})
@@ -150,13 +150,13 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 }
 
 // CreateNamedResource returns a function that will handle a resource creation with name.
-func CreateNamedResource(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, mutatingAdmission admission.Interface, validatingAdmission admission.ValidationInterface) http.HandlerFunc {
-	return createHandler(r, scope, typer, mutatingAdmission, validatingAdmission, true)
+func CreateNamedResource(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admission admission.Interface) http.HandlerFunc {
+	return createHandler(r, scope, typer, admission, true)
 }
 
 // CreateResource returns a function that will handle a resource creation.
-func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectTyper, mutatingAdmission admission.Interface, validatingAdmission admission.ValidationInterface) http.HandlerFunc {
-	return createHandler(&namedCreaterAdapter{r}, scope, typer, mutatingAdmission, validatingAdmission, false)
+func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectTyper, admission admission.Interface) http.HandlerFunc {
+	return createHandler(&namedCreaterAdapter{r}, scope, typer, admission, false)
 }
 
 type namedCreaterAdapter struct {

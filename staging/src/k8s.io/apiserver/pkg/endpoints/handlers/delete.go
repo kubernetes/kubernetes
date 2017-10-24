@@ -35,7 +35,7 @@ import (
 
 // DeleteResource returns a function that will handle a resource deletion
 // TODO admission here becomes solely validating admission
-func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestScope, mutatingAdmission admission.Interface, validatingAdmission admission.ValidationInterface) http.HandlerFunc {
+func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
 		trace := utiltrace.New("Delete " + req.URL.Path)
@@ -94,7 +94,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		}
 
 		trace.Step("About to check admission control")
-		if mutatingAdmission != nil && mutatingAdmission.Handles(admission.Delete) {
+		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Delete) {
 			userInfo, _ := request.UserFrom(ctx)
 
 			err = mutatingAdmission.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo))
@@ -103,7 +103,8 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 				return
 			}
 		}
-		if validatingAdmission != nil && validatingAdmission.Handles(admission.Delete) {
+		// TODO: avoid calling Handles twice
+		if validatingAdmission, ok := admit.(admission.ValidationInterface); ok && validatingAdmission.Handles(admission.Delete) {
 			userInfo, _ := request.UserFrom(ctx)
 
 			err = validatingAdmission.ValidatingAdmit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo))
@@ -167,7 +168,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 }
 
 // DeleteCollection returns a function that will handle a collection deletion
-func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestScope, mutatingAdmission admission.Interface, validatingAdmission admission.ValidationInterface) http.HandlerFunc {
+func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.URL.Query().Get("timeout"))
@@ -181,7 +182,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 		ctx := scope.ContextFunc(req)
 		ctx = request.WithNamespace(ctx, namespace)
 
-		if mutatingAdmission != nil && mutatingAdmission.Handles(admission.Delete) {
+		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Delete) {
 			userInfo, _ := request.UserFrom(ctx)
 
 			err = mutatingAdmission.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo))
@@ -190,7 +191,8 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 				return
 			}
 		}
-		if validatingAdmission != nil && validatingAdmission.Handles(admission.Delete) {
+		// TODO: avoid calling Handles twice
+		if validatingAdmission, ok := admit.(admission.ValidationInterface); ok && validatingAdmission.Handles(admission.Delete) {
 			userInfo, _ := request.UserFrom(ctx)
 
 			err = validatingAdmission.ValidatingAdmit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo))
