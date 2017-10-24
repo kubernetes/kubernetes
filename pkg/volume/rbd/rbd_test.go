@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -92,7 +93,7 @@ func (fake *fakeDiskManager) DetachDisk(c rbdUnmounter, mntPath string) error {
 	return nil
 }
 
-func (fake *fakeDiskManager) CreateImage(provisioner *rbdVolumeProvisioner) (r *v1.RBDVolumeSource, volumeSizeGB int, err error) {
+func (fake *fakeDiskManager) CreateImage(provisioner *rbdVolumeProvisioner) (r *v1.RBDPersistentVolumeSource, volumeSizeGB int, err error) {
 	return nil, 0, fmt.Errorf("not implemented")
 }
 
@@ -180,7 +181,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				RBD: &v1.RBDVolumeSource{
+				RBD: &v1.RBDPersistentVolumeSource{
 					CephMonitors: []string{"a", "b"},
 					RBDImage:     "bar",
 					FSType:       "ext4",
@@ -205,7 +206,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
-				RBD: &v1.RBDVolumeSource{
+				RBD: &v1.RBDPersistentVolumeSource{
 					CephMonitors: []string{"a", "b"},
 					RBDImage:     "bar",
 					FSType:       "ext4",
@@ -327,5 +328,37 @@ func TestPersistAndLoadRBD(t *testing.T) {
 		if !reflect.DeepEqual(tmpRBDMounter, c.expectedLoadedRBDMounter) {
 			t.Errorf("loaded rbd does not equal to expected one: %v, should be %v", tmpRBDMounter, c.rbdMounter)
 		}
+	}
+}
+
+func TestGetSecretNameAndNamespace(t *testing.T) {
+	secretName := "test-secret-name"
+	secretNamespace := "test-secret-namespace"
+
+	volSpec := &volume.Spec{
+		PersistentVolume: &v1.PersistentVolume{
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					RBD: &v1.RBDPersistentVolumeSource{
+						CephMonitors: []string{"a", "b"},
+						RBDImage:     "bar",
+						FSType:       "ext4",
+					},
+				},
+			},
+		},
+	}
+
+	secretRef := new(v1.SecretReference)
+	secretRef.Name = secretName
+	secretRef.Namespace = secretNamespace
+	volSpec.PersistentVolume.Spec.PersistentVolumeSource.RBD.SecretRef = secretRef
+
+	foundSecretName, foundSecretNamespace, err := getSecretNameAndNamespace(volSpec, "default")
+	if err != nil {
+		t.Errorf("getSecretNameAndNamespace failed to get Secret's name and namespace: %v", err)
+	}
+	if strings.Compare(secretName, foundSecretName) != 0 || strings.Compare(secretNamespace, foundSecretNamespace) != 0 {
+		t.Errorf("getSecretNameAndNamespace returned incorrect values, expected %s and %s but got %s and %s", secretName, secretNamespace, foundSecretName, foundSecretNamespace)
 	}
 }
