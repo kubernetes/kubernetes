@@ -1778,6 +1778,13 @@ function start-kube-addons {
     local -r dns_controller_file="${dst_dir}/dns/kubedns-controller.yaml"
     local -r dns_svc_file="${dst_dir}/dns/kubedns-svc.yaml"
     mv "${dst_dir}/dns/kubedns-controller.yaml.in" "${dns_controller_file}"
+    if [ -n "${CUSTOM_KUBE_DNS_DEPLOYMENT:-}" ]; then
+      # Replace with custom GKE kubedns deployment.
+      cat > "${dns_controller_file}" <<EOF
+$(echo "$CUSTOM_KUBE_DNS_DEPLOYMENT")
+EOF
+      update-prometheus-to-sd-parameters ${dns_controller_file}
+    fi
     mv "${dst_dir}/dns/kubedns-svc.yaml.in" "${dns_svc_file}"
     # Replace the salt configurations with variable values.
     sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${dns_controller_file}"
