@@ -145,6 +145,7 @@ go_library(
         "//vendor/k8s.io/client-go/tools/portforward:go_default_library",
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
         "//vendor/k8s.io/client-go/transport/spdy:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
@@ -194,6 +195,7 @@ go_test(
     ],
     data = [
         "testdata",
+        "//api/openapi-spec:swagger-spec",
         "//examples:config",
         "//test/fixtures",
     ],
@@ -240,6 +242,7 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/strategicpatch:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/strategicpatch/testing:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/dynamic:go_default_library",
