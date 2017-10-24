@@ -26,8 +26,10 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1"
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/features"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -734,33 +736,35 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider, capacityProvi
 		}
 	}
 
-	storageScratchCapacity, storageScratchAllocatable, exist := getResourceAllocatable(nodeCapacity, allocatableReservation, v1.ResourceStorageScratch)
-	if exist {
-		for _, pod := range pods {
-			podStat, ok := statsFunc(pod)
-			if !ok {
-				continue
-			}
+	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+		storageScratchCapacity, storageScratchAllocatable, exist := getResourceAllocatable(nodeCapacity, allocatableReservation, v1.ResourceStorageScratch)
+		if exist {
+			for _, pod := range pods {
+				podStat, ok := statsFunc(pod)
+				if !ok {
+					continue
+				}
 
-			usage, err := podDiskUsage(podStat, pod, []fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource, fsStatsRoot})
-			if err != nil {
-				glog.Warningf("eviction manager: error getting pod disk usage %v", err)
-				continue
+				usage, err := podDiskUsage(podStat, pod, []fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource, fsStatsRoot})
+				if err != nil {
+					glog.Warningf("eviction manager: error getting pod disk usage %v", err)
+					continue
+				}
+				// If there is a seperate imagefs set up for container runtimes, the scratch disk usage from nodefs should exclude the overlay usage
+				if withImageFs {
+					diskUsage := usage[resourceDisk]
+					diskUsageP := &diskUsage
+					diskUsagep := diskUsageP.Copy()
+					diskUsagep.Sub(usage[resourceOverlay])
+					storageScratchAllocatable.Sub(*diskUsagep)
+				} else {
+					storageScratchAllocatable.Sub(usage[resourceDisk])
+				}
 			}
-			// If there is a seperate imagefs set up for container runtimes, the scratch disk usage from nodefs should exclude the overlay usage
-			if withImageFs {
-				diskUsage := usage[resourceDisk]
-				diskUsageP := &diskUsage
-				diskUsagep := diskUsageP.Copy()
-				diskUsagep.Sub(usage[resourceOverlay])
-				storageScratchAllocatable.Sub(*diskUsagep)
-			} else {
-				storageScratchAllocatable.Sub(usage[resourceDisk])
+			result[evictionapi.SignalAllocatableNodeFsAvailable] = signalObservation{
+				available: storageScratchAllocatable,
+				capacity:  storageScratchCapacity,
 			}
-		}
-		result[evictionapi.SignalAllocatableNodeFsAvailable] = signalObservation{
-			available: storageScratchAllocatable,
-			capacity:  storageScratchCapacity,
 		}
 	}
 
