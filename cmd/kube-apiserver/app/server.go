@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/webhook"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -452,26 +453,36 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
+	webhookAuthResolver := func(delegate webhook.AuthenticationInfoResolver) webhook.AuthenticationInfoResolver {
+		return webhook.AuthenticationInfoResolverFunc(func(server string) (*rest.Config, error) {
+			if server == "kubernetes.default.svc" {
+				return genericConfig.LoopbackClientConfig, nil
+			}
+			ret, err := delegate.ClientConfigFor(server)
+			if err != nil {
+				return nil, err
+			}
+			if proxyTransport != nil && proxyTransport.Dial != nil {
+				ret.Dial = proxyTransport.Dial
+			}
+			return ret, err
+		})
+	}
 	pluginInitializer, err := BuildAdmissionPluginInitializer(
 		s,
 		client,
 		sharedInformers,
 		serviceResolver,
+		webhookAuthResolver,
 	)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %v", err)
-	}
-
-	webhookClientConfig := rest.AnonymousClientConfig(genericConfig.LoopbackClientConfig)
-	if proxyTransport != nil && proxyTransport.Dial != nil {
-		webhookClientConfig.Dial = proxyTransport.Dial
 	}
 
 	err = s.Admission.ApplyTo(
 		genericConfig,
 		versionedInformers,
 		kubeClientConfig,
-		webhookClientConfig,
 		legacyscheme.Scheme,
 		pluginInitializer)
 	if err != nil {
@@ -481,7 +492,7 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 }
 
 // BuildAdmissionPluginInitializer constructs the admission plugin initializer
-func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, serviceResolver aggregatorapiserver.ServiceResolver) (admission.PluginInitializer, error) {
+func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, serviceResolver aggregatorapiserver.ServiceResolver, webhookAuthWrapper webhook.AuthenticationInfoResolverWrapper) (admission.PluginInitializer, error) {
 	var cloudConfig []byte
 
 	if s.CloudProvider.CloudConfigFile != "" {
@@ -499,9 +510,7 @@ func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client interna
 	// do not require us to open watches for all items tracked by quota.
 	quotaRegistry := quotainstall.NewRegistry(nil, nil)
 
-	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, restMapper, quotaRegistry)
-
-	pluginInitializer = pluginInitializer.SetServiceResolver(serviceResolver)
+	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, restMapper, quotaRegistry, webhookAuthWrapper, serviceResolver)
 
 	return pluginInitializer, nil
 }

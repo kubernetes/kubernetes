@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"path"
 	"sync"
 
@@ -40,10 +41,11 @@ import (
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	admissioninit "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+)
 
-	// install the clientgo admission API for use with api registry
-	_ "k8s.io/kubernetes/pkg/apis/admission/install"
+const (
+	// Name of admission plug-in
+	PluginName = "GenericAdmissionWebhook"
 )
 
 type ErrCallingWebhook struct {
@@ -60,7 +62,7 @@ func (e *ErrCallingWebhook) Error() string {
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
-	plugins.Register("GenericAdmissionWebhook", func(configFile io.Reader) (admission.Interface, error) {
+	plugins.Register(PluginName, func(configFile io.Reader) (admission.Interface, error) {
 		plugin, err := NewGenericAdmissionWebhook(configFile)
 		if err != nil {
 			return nil, err
@@ -110,31 +112,31 @@ func NewGenericAdmissionWebhook(configFile io.Reader) (*GenericAdmissionWebhook,
 type GenericAdmissionWebhook struct {
 	*admission.Handler
 	hookSource           WebhookSource
-	serviceResolver      admissioninit.ServiceResolver
+	serviceResolver      ServiceResolver
 	negotiatedSerializer runtime.NegotiatedSerializer
 
 	authInfoResolver AuthenticationInfoResolver
 }
 
+// serviceResolver knows how to convert a service reference into an actual location.
+type ServiceResolver interface {
+	ResolveEndpoint(namespace, name string) (*url.URL, error)
+}
+
 var (
-	_ = admissioninit.WantsServiceResolver(&GenericAdmissionWebhook{})
-	_ = genericadmissioninit.WantsWebhookRESTClientConfig(&GenericAdmissionWebhook{})
 	_ = genericadmissioninit.WantsExternalKubeClientSet(&GenericAdmissionWebhook{})
 )
 
 // TODO find a better way wire this, but keep this pull small for now.
-func (a *GenericAdmissionWebhook) SetWebhookRESTClientConfig(in *rest.Config) {
-	if in != nil {
-		a.authInfoResolver = &dialOverridingAuthenticationInfoResolver{
-			dialFn:   in.Dial,
-			delegate: a.authInfoResolver,
-		}
+func (a *GenericAdmissionWebhook) SetAuthenticationInfoResolverWrapper(wrapper AuthenticationInfoResolverWrapper) {
+	if wrapper != nil {
+		a.authInfoResolver = wrapper(a.authInfoResolver)
 	}
 }
 
 // SetServiceResolver sets a service resolver for the webhook admission plugin.
 // Passing a nil resolver does not have an effect, instead a default one will be used.
-func (a *GenericAdmissionWebhook) SetServiceResolver(sr admissioninit.ServiceResolver) {
+func (a *GenericAdmissionWebhook) SetServiceResolver(sr ServiceResolver) {
 	if sr != nil {
 		a.serviceResolver = sr
 	}

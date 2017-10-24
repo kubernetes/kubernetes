@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/webhook"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -61,7 +62,7 @@ type WantsQuotaRegistry interface {
 // WantsServiceResolver defines a fuction that accepts a ServiceResolver for
 // admission plugins that need to make calls to services.
 type WantsServiceResolver interface {
-	SetServiceResolver(ServiceResolver)
+	SetServiceResolver(webhook.ServiceResolver)
 }
 
 // ServiceResolver knows how to convert a service reference into an actual
@@ -70,15 +71,23 @@ type ServiceResolver interface {
 	ResolveEndpoint(namespace, name string) (*url.URL, error)
 }
 
+// WantsAuthenticationInfoResolverWrapper defines a function that wraps the standard AuthenticationInfoResolver
+// to allow the apiserver to control what is returned as auth info
+type WantsAuthenticationInfoResolverWrapper interface {
+	SetAuthenticationInfoResolverWrapper(webhook.AuthenticationInfoResolverWrapper)
+	admission.Validator
+}
+
 type PluginInitializer struct {
-	internalClient  internalclientset.Interface
-	externalClient  clientset.Interface
-	informers       informers.SharedInformerFactory
-	authorizer      authorizer.Authorizer
-	cloudConfig     []byte
-	restMapper      meta.RESTMapper
-	quotaRegistry   quota.Registry
-	serviceResolver ServiceResolver
+	internalClient                    internalclientset.Interface
+	externalClient                    clientset.Interface
+	informers                         informers.SharedInformerFactory
+	authorizer                        authorizer.Authorizer
+	cloudConfig                       []byte
+	restMapper                        meta.RESTMapper
+	quotaRegistry                     quota.Registry
+	serviceResolver                   webhook.ServiceResolver
+	authenticationInfoResolverWrapper webhook.AuthenticationInfoResolverWrapper
 }
 
 var _ admission.PluginInitializer = &PluginInitializer{}
@@ -92,20 +101,18 @@ func NewPluginInitializer(
 	cloudConfig []byte,
 	restMapper meta.RESTMapper,
 	quotaRegistry quota.Registry,
+	authenticationInfoResolverWrapper webhook.AuthenticationInfoResolverWrapper,
+	serviceResolver webhook.ServiceResolver,
 ) *PluginInitializer {
 	return &PluginInitializer{
-		internalClient: internalClient,
-		informers:      sharedInformers,
-		cloudConfig:    cloudConfig,
-		restMapper:     restMapper,
-		quotaRegistry:  quotaRegistry,
+		internalClient:                    internalClient,
+		informers:                         sharedInformers,
+		cloudConfig:                       cloudConfig,
+		restMapper:                        restMapper,
+		quotaRegistry:                     quotaRegistry,
+		authenticationInfoResolverWrapper: authenticationInfoResolverWrapper,
+		serviceResolver:                   serviceResolver,
 	}
-}
-
-// SetServiceResolver sets the service resolver which is needed by some plugins.
-func (i *PluginInitializer) SetServiceResolver(s ServiceResolver) *PluginInitializer {
-	i.serviceResolver = s
-	return i
 }
 
 // Initialize checks the initialization interfaces implemented by each plugin
@@ -133,5 +140,11 @@ func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 
 	if wants, ok := plugin.(WantsServiceResolver); ok {
 		wants.SetServiceResolver(i.serviceResolver)
+	}
+
+	if wants, ok := plugin.(WantsAuthenticationInfoResolverWrapper); ok {
+		if i.authenticationInfoResolverWrapper != nil {
+			wants.SetAuthenticationInfoResolverWrapper(i.authenticationInfoResolverWrapper)
+		}
 	}
 }

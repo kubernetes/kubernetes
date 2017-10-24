@@ -42,7 +42,6 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	clientgoinformers "k8s.io/client-go/informers"
 	clientgoclientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	federationv1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
@@ -211,13 +210,12 @@ func NonBlockingRun(s *options.ServerRunOptions, stopCh <-chan struct{}) error {
 	// NOTE: we do not provide informers to the quota registry because admission level decisions
 	// do not require us to open watches for all items tracked by quota.
 	quotaRegistry := quotainstall.NewRegistry(nil, nil)
-	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, nil, quotaRegistry)
+	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, nil, quotaRegistry, nil, nil)
 
 	err = s.Admission.ApplyTo(
 		genericConfig,
 		versionedInformers,
 		kubeClientConfig,
-		rest.AnonymousClientConfig(kubeClientConfig),
 		legacyscheme.Scheme,
 		pluginInitializer,
 	)
