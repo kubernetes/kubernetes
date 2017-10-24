@@ -144,6 +144,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
+		metrics.RegisterMetrics()
 		proxier = proxierIPTables
 		serviceEventHandler = proxierIPTables
 		endpointsEventHandler = proxierIPTables
@@ -175,6 +176,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
+		metrics.RegisterMetrics()
 		proxier = proxierIPVS
 		serviceEventHandler = proxierIPVS
 		endpointsEventHandler = proxierIPVS
@@ -217,8 +219,6 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 	}
 
 	iptInterface.AddReloadFunc(proxier.Sync)
-
-	metrics.RegisterMetrics()
 
 	return &ProxyServer{
 		Client:                 client,
