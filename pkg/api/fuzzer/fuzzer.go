@@ -158,6 +158,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			policies := []api.RestartPolicy{api.RestartPolicyAlways, api.RestartPolicyNever, api.RestartPolicyOnFailure}
 			*rp = policies[c.Rand.Intn(len(policies))]
 		},
+		func(rp *api.RetryPolicy, c fuzz.Continue) {
+			policies := []api.RetryPolicy{api.RetryPolicyNever, api.RetryPolicyOnFailure}
+			*rp = policies[c.Rand.Intn(len(policies))]
+		},
 		// api.DownwardAPIVolumeFile needs to have a specific func since FieldRef has to be
 		// defaulted to a version otherwise roundtrip will fail
 		func(m *api.DownwardAPIVolumeFile, c fuzz.Continue) {
