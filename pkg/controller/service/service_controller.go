@@ -245,15 +245,17 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 	err, retry := s.createLoadBalancerIfNeeded(key, service)
 	if err != nil {
 		message := "Error creating load balancer"
+		var retryToReturn time.Duration
 		if retry {
 			message += " (will retry): "
+			retryToReturn = cachedService.nextRetryDelay()
 		} else {
 			message += " (will not retry): "
+			retryToReturn = doNotRetry
 		}
 		message += err.Error()
 		s.eventRecorder.Event(service, v1.EventTypeWarning, "CreatingLoadBalancerFailed", message)
-
-		return err, cachedService.nextRetryDelay()
+		return err, retryToReturn
 	}
 	// Always update the cache upon success.
 	// NOTE: Since we update the cached service if and only if we successfully
