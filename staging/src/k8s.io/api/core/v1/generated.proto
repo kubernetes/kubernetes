@@ -1392,6 +1392,14 @@ message Lifecycle {
   // More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
   // +optional
   optional Handler preStop = 2;
+
+  // Retry policy for the preStop action.
+  // +optional
+  optional string preStopRetryPolicy = 3;
+
+  // Retry period for the preStop action.
+  // +optional
+  optional int32 preStopRetryPeriod = 4;
 }
 
 // LimitRange sets resource usage limits for each kind of resource in a Namespace.
