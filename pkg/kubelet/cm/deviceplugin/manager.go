@@ -141,7 +141,7 @@ func (m *ManagerImpl) Devices() map[string][]pluginapi.Device {
 
 	devs := make(map[string][]pluginapi.Device)
 	for k, e := range m.endpoints {
-		glog.V(3).Infof("Endpoint: %+v: %+v", k, e)
+		glog.V(3).Infof("Endpoint: %+v: %p", k, e)
 		devs[k] = e.getDevices()
 	}
 
@@ -221,8 +221,8 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 	m.mutex.Lock()
 	old, ok := m.endpoints[r.ResourceName]
 	m.endpoints[r.ResourceName] = e
-	m.mutex.Unlock()
 	glog.V(2).Infof("Registered endpoint %v", e)
+	m.mutex.Unlock()
 
 	if ok && old != nil {
 		old.stop()

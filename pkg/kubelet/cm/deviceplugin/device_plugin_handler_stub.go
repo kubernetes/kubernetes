@@ -14,29 +14,37 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cm
+package deviceplugin
 
 import (
 	"k8s.io/api/core/v1"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
 )
 
-// A simple stub implementation for DevicePluginHandler.
-type DevicePluginHandlerStub struct{}
+// HandlerStub provides a simple stub implementation for Handler.
+type HandlerStub struct{}
 
-func NewDevicePluginHandlerStub() (*DevicePluginHandlerStub, error) {
-	return &DevicePluginHandlerStub{}, nil
+// NewHandlerStub creates a HandlerStub.
+func NewHandlerStub() (*HandlerStub, error) {
+	return &HandlerStub{}, nil
 }
 
-func (h *DevicePluginHandlerStub) Start() error {
+// Start simply returns nil.
+func (h *HandlerStub) Start() error {
 	return nil
 }
 
-func (h *DevicePluginHandlerStub) Devices() map[string][]pluginapi.Device {
+// Devices returns an empty map.
+func (h *HandlerStub) Devices() map[string][]pluginapi.Device {
 	return make(map[string][]pluginapi.Device)
 }
 
-func (h *DevicePluginHandlerStub) Allocate(pod *v1.Pod, container *v1.Container, activePods []*v1.Pod) ([]*pluginapi.AllocateResponse, error) {
-	var ret []*pluginapi.AllocateResponse
-	return ret, nil
+// Allocate simply returns nil.
+func (h *HandlerStub) Allocate(pod *v1.Pod, container *v1.Container, activePods []*v1.Pod) error {
+	return nil
+}
+
+// GetDeviceRunContainerOptions simply returns nil.
+func (h *HandlerStub) GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) *DeviceRunContainerOptions {
+	return nil
 }

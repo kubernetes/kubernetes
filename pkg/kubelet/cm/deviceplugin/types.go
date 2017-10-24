@@ -18,6 +18,7 @@ package deviceplugin
 
 import (
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // MonitorCallback is the function called when a device's health state changes,
@@ -44,6 +45,16 @@ type Manager interface {
 
 	// Returns checkpoint file path.
 	CheckpointFile() string
+}
+
+// DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.
+type DeviceRunContainerOptions struct {
+	// The environment variables list.
+	Envs []kubecontainer.EnvVar
+	// The mounts for the container.
+	Mounts []kubecontainer.Mount
+	// The host devices mapped into the container.
+	Devices []kubecontainer.DeviceInfo
 }
 
 // TODO: evaluate whether we need these error definitions.
