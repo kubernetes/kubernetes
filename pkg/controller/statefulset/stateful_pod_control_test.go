@@ -402,7 +402,7 @@ func TestStatefulPodControlDeletesStatefulPod(t *testing.T) {
 	fakeClient.AddReactor("delete", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, nil
 	})
-	if err := control.DeleteStatefulPod(set, pod); err != nil {
+	if err := control.DeleteStatefulPod(set, pod, nil); err != nil {
 		t.Errorf("Error returned on successful delete: %s", err)
 	}
 	events := collectEvents(recorder.Events)
@@ -422,7 +422,7 @@ func TestStatefulPodControlDeleteFailure(t *testing.T) {
 	fakeClient.AddReactor("delete", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
 	})
-	if err := control.DeleteStatefulPod(set, pod); err == nil {
+	if err := control.DeleteStatefulPod(set, pod, nil); err == nil {
 		t.Error("Failed to return error on failed delete")
 	}
 	events := collectEvents(recorder.Events)

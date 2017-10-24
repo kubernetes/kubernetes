@@ -23,6 +23,7 @@ import (
 	apps "k8s.io/api/apps/v1beta1"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
@@ -47,16 +48,11 @@ type StatefulPodControlInterface interface {
 	UpdateStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error
 	// DeleteStatefulPod deletes a Pod in a StatefulSet. The pods PVCs are not deleted. If the delete is successful,
 	// the returned error is nil.
-	DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error
+	DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod, options *metav1.DeleteOptions) error
 }
 
-func NewRealStatefulPodControl(
-	client clientset.Interface,
-	setLister appslisters.StatefulSetLister,
-	podLister corelisters.PodLister,
-	pvcLister corelisters.PersistentVolumeClaimLister,
-	recorder record.EventRecorder,
-) StatefulPodControlInterface {
+func NewRealStatefulPodControl(client clientset.Interface, setLister appslisters.StatefulSetLister, podLister corelisters.PodLister,
+	pvcLister corelisters.PersistentVolumeClaimLister, recorder record.EventRecorder) StatefulPodControlInterface {
 	return &realStatefulPodControl{client, setLister, podLister, pvcLister, recorder}
 }
 
@@ -133,8 +129,8 @@ func (spc *realStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod 
 	return err
 }
 
-func (spc *realStatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
-	err := spc.client.Core().Pods(set.Namespace).Delete(pod.Name, nil)
+func (spc *realStatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod, options *metav1.DeleteOptions) error {
+	err := spc.client.Core().Pods(set.Namespace).Delete(pod.Name, options)
 	spc.recordPodEvent("delete", set, pod, err)
 	return err
 }

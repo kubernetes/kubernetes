@@ -113,8 +113,8 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 		t.Error("StatefulSet does not respect termination")
 	}
 	sort.Sort(ascendingOrdinal(pods))
-	spc.DeleteStatefulPod(set, pods[3])
-	spc.DeleteStatefulPod(set, pods[4])
+	spc.DeleteStatefulPod(set, pods[3], nil)
+	spc.DeleteStatefulPod(set, pods[4], nil)
 	*set.Spec.Replicas = 0
 	if err := scaleDownStatefulSetController(set, ssc, spc); err != nil {
 		t.Errorf("Failed to turn down StatefulSet : %s", err)
@@ -164,7 +164,7 @@ func TestStatefulSetControllerBlocksScaling(t *testing.T) {
 		t.Error("StatefulSet does not block scaling")
 	}
 	sort.Sort(ascendingOrdinal(pods))
-	spc.DeleteStatefulPod(set, pods[0])
+	spc.DeleteStatefulPod(set, pods[0], nil)
 	ssc.enqueueStatefulSet(set)
 	fakeWorker(ssc)
 	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
@@ -678,7 +678,7 @@ func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetContr
 	pod = getPodAtOrdinal(pods, ord)
 	ssc.updatePod(&prev, pod)
 	fakeWorker(ssc)
-	spc.DeleteStatefulPod(set, pod)
+	spc.DeleteStatefulPod(set, pod, nil)
 	ssc.deletePod(pod)
 	fakeWorker(ssc)
 	for set.Status.Replicas > *set.Spec.Replicas {
@@ -695,7 +695,7 @@ func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetContr
 		pod = getPodAtOrdinal(pods, ord)
 		ssc.updatePod(&prev, pod)
 		fakeWorker(ssc)
-		spc.DeleteStatefulPod(set, pod)
+		spc.DeleteStatefulPod(set, pod, nil)
 		ssc.deletePod(pod)
 		fakeWorker(ssc)
 		if obj, _, err := spc.setsIndexer.Get(set); err != nil {
