@@ -59,8 +59,9 @@ func TestNewDeployment(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Make sure the Deployment status becomes valid while manually marking Deployment pods as ready at the same time
-	if err := tester.waitForDeploymentStatusValidAndMarkPodsReady(); err != nil {
+	// Make sure the Deployment completes while manually marking Deployment pods as ready at the same time.
+	// Use soft check because this deployment was just created and rolling update strategy might be violated.
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -187,8 +188,9 @@ func TestPausedDeployment(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Make sure the Deployment status becomes valid while manually marking Deployment pods as ready at the same time
-	if err := tester.waitForDeploymentStatusValidAndMarkPodsReady(); err != nil {
+	// Make sure the Deployment completes while manually marking Deployment pods as ready at the same time.
+	// Use soft check because this deployment was just created and rolling update strategy might be violated.
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -271,8 +273,9 @@ func TestScalePausedDeployment(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Make sure the Deployment status becomes valid while manually marking Deployment pods as ready at the same time
-	if err := tester.waitForDeploymentStatusValidAndMarkPodsReady(); err != nil {
+	// Make sure the Deployment completes while manually marking Deployment pods as ready at the same time.
+	// Use soft check because this deployment was just created and rolling update strategy might be violated.
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -315,8 +318,9 @@ func TestScalePausedDeployment(t *testing.T) {
 		t.Errorf("expected new replicaset replicas = %d, got %d", newReplicas, *rs.Spec.Replicas)
 	}
 
-	// Make sure the Deployment status becomes valid while manually marking Deployment pods as ready at the same time
-	if err := tester.waitForDeploymentStatusValidAndMarkPodsReady(); err != nil {
+	// Make sure the Deployment completes while manually marking Deployment pods as ready at the same time.
+	// Use soft check because this deployment was just scaled and rolling update strategy might be violated.
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -378,6 +382,119 @@ func TestDeploymentHashCollision(t *testing.T) {
 
 	// Expect a new ReplicaSet to be created
 	if err := tester.waitForDeploymentRevisionAndImage("2", fakeImage); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Deployment supports rollback even when there's old replica set without revision.
+func TestRollbackDeploymentRSNoRevision(t *testing.T) {
+	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	defer closeFn()
+	name := "test-rollback-no-revision-deployment"
+	ns := framework.CreateTestingNamespace(name, s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	// Create an old RS without revision
+	rsName := "test-rollback-no-revision-controller"
+	rsReplicas := int32(1)
+	rs := newReplicaSet(rsName, ns.Name, rsReplicas)
+	rs.Annotations = make(map[string]string)
+	rs.Annotations["make"] = "difference"
+	rs.Spec.Template.Spec.Containers[0].Image = "different-image"
+	_, err := c.ExtensionsV1beta1().ReplicaSets(ns.Name).Create(rs)
+	if err != nil {
+		t.Fatalf("failed to create replicaset %s: %v", rsName, err)
+	}
+
+	replicas := int32(1)
+	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
+	oriImage := tester.deployment.Spec.Template.Spec.Containers[0].Image
+
+	// Create a deployment which have different template than the replica set created above.
+	if tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment); err != nil {
+		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
+	}
+
+	// Start informer and controllers
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go rm.Run(5, stopCh)
+	go dc.Run(5, stopCh)
+
+	// Wait for the Deployment to be updated to revision 1
+	if err = tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Rollback to the last revision
+	//    Since there's only 1 revision in history, it should still be revision 1
+	revision := int64(0)
+	rollback := newDeploymentRollback(tester.deployment.Name, nil, revision)
+	if err = c.ExtensionsV1beta1().Deployments(ns.Name).Rollback(rollback); err != nil {
+		t.Fatalf("failed to roll back deployment %s to last revision: %v", tester.deployment.Name, err)
+	}
+
+	// Wait for the deployment to start rolling back
+	if err = tester.waitForDeploymentRollbackCleared(); err != nil {
+		t.Fatalf("failed to roll back deployment %s to last revision: %v", tester.deployment.Name, err)
+	}
+	// TODO: report RollbackRevisionNotFound in deployment status and check it here
+
+	// The pod template shouldn't change since there's no last revision
+	// Check if the deployment is still revision 1 and still has the old pod template
+	err = tester.checkDeploymentRevisionAndImage("1", oriImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 2. Update the deployment to revision 2.
+	updatedImage := "update"
+	tester.deployment, err = tester.updateDeployment(func(update *v1beta1.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Name = updatedImage
+		update.Spec.Template.Spec.Containers[0].Image = updatedImage
+	})
+	if err != nil {
+		t.Fatalf("failed updating deployment %s: %v", tester.deployment.Name, err)
+	}
+
+	// Use observedGeneration to determine if the controller noticed the pod template update.
+	// Wait for the controller to notice the resume.
+	if err = tester.waitForObservedDeployment(tester.deployment.Generation); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for it to be updated to revision 2
+	if err = tester.waitForDeploymentRevisionAndImage("2", updatedImage); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for the Deployment to complete while manually marking Deployment pods as ready at the same time
+	if err = tester.waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+
+	// 3. Update the deploymentRollback to rollback to revision 1
+	revision = int64(1)
+	rollback = newDeploymentRollback(tester.deployment.Name, nil, revision)
+	if err = c.ExtensionsV1beta1().Deployments(ns.Name).Rollback(rollback); err != nil {
+		t.Fatalf("failed to roll back deployment %s to revision %d: %v", tester.deployment.Name, revision, err)
+	}
+
+	// Wait for the deployment to start rolling back
+	if err = tester.waitForDeploymentRollbackCleared(); err != nil {
+		t.Fatalf("failed to roll back deployment %s to revision %d: %v", tester.deployment.Name, revision, err)
+	}
+	// TODO: report RollbackDone in deployment status and check it here
+
+	// The pod template should be updated to the one in revision 1
+	// Wait for it to be updated to revision 3
+	if err = tester.waitForDeploymentRevisionAndImage("3", oriImage); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for the Deployment to complete while manually marking Deployment pods as ready at the same time
+	if err = tester.waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady(); err != nil {
 		t.Fatal(err)
 	}
 }
