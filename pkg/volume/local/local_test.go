@@ -34,7 +34,6 @@ import (
 const (
 	testPVName    = "pvA"
 	testMountPath = "pods/poduid/volumes/kubernetes.io~local-volume/pvA"
-	testNodeName  = "fakeNodeName"
 )
 
 func getPlugin(t *testing.T) (string, volume.VolumePlugin) {
