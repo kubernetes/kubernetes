@@ -237,20 +237,18 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	nameArgs := []string{"nodes"}
-	if len(args) > 0 {
-		nameArgs = append(nameArgs, args[0])
-		if strings.Contains(args[0], "/") {
-			nameArgs = []string{args[0]}
-		}
+	builder := o.Factory.NewBuilder().
+		NamespaceParam(cmdNamespace).DefaultNamespace().
+		ResourceNames("nodes", args...).
+		SingleResourceType().
+		Flatten()
+
+	if len(o.Selector) > 0 {
+		builder = builder.SelectorParam(o.Selector).
+			ResourceTypes("nodes")
 	}
 
-	r := o.Factory.NewBuilder().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		SelectorParam(o.Selector).
-		ResourceTypeOrNameArgs(true, nameArgs...).
-		Flatten().
-		Do()
+	r := builder.Do()
 
 	if err = r.Err(); err != nil {
 		return err
@@ -260,6 +258,10 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
+		if info.Mapping.Resource != "nodes" {
+			return fmt.Errorf("error: expected resource of type node, got %q", info.Mapping.Resource)
+		}
+
 		o.nodeInfos = append(o.nodeInfos, info)
 		return nil
 	})
