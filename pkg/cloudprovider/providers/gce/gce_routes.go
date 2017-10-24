@@ -21,7 +21,6 @@ import (
 	"net/http"
 	"path"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 
 	"github.com/golang/glog"
@@ -57,11 +56,24 @@ func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, err
 			return nil, err
 		}
 		pageToken = res.NextPageToken
+
+		var targetsNames []string
 		for _, r := range res.Items {
-			target := path.Base(r.NextHopInstance)
+			targetsNames = append(targetsNames, path.Base(r.NextHopInstance))
+		}
+		targetsArr, err := gce.getInstancesByNames(targetsNames)
+		if err != nil {
+			glog.Errorf("Error getting instances from GCE %v", err)
+			return nil, err
+		}
+		targetsIndex := make(map[string]*gceInstance)
+		for _, t := range targetsArr {
+			targetsIndex[t.Name] = t
+		}
+		for _, r := range res.Items {
 			// TODO: Should we lastComponent(target) this?
-			targetNodeName := types.NodeName(target) // NodeName == Instance Name on GCE
-			routes = append(routes, &cloudprovider.Route{Name: r.Name, TargetNode: targetNodeName, DestinationCIDR: r.DestRange})
+			target := targetsIndex[path.Base(r.NextHopInstance)]
+			routes = append(routes, &cloudprovider.Route{Name: r.Name, TargetNode: target.NodeName, DestinationCIDR: r.DestRange})
 		}
 	}
 	if page >= maxPages {

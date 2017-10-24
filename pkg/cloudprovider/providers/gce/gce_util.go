@@ -28,16 +28,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"cloud.google.com/go/compute/metadata"
+	"github.com/golang/glog"
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
+	"os"
 )
 
 type gceInstance struct {
-	Zone  string
-	Name  string
-	ID    uint64
-	Disks []*compute.AttachedDisk
-	Type  string
+	Zone     string
+	Name     string
+	NodeName types.NodeName
+	ID       uint64
+	Disks    []*compute.AttachedDisk
+	Type     string
 }
 
 var providerIdRE = regexp.MustCompile(`^` + ProviderName + `://([^/]+)/([^/]+)/([^/]+)$`)
@@ -120,12 +123,47 @@ func lastComponent(s string) string {
 // mapNodeNameToInstanceName maps a k8s NodeName to a GCE Instance Name
 // This is a simple string cast.
 func mapNodeNameToInstanceName(nodeName types.NodeName) string {
-	return string(nodeName)
+	return canonicalizeInstanceName(string(nodeName))
 }
 
 // mapInstanceToNodeName maps a GCE Instance to a k8s NodeName
-func mapInstanceToNodeName(instance *compute.Instance) types.NodeName {
-	return types.NodeName(instance.Name)
+func mapInstanceToNodeName(instance *compute.Instance) (types.NodeName, error) {
+	currentInstanceHostname, err := getInstanceHostname()
+	if err != nil {
+		return "", err
+	}
+	currentInstanceProjectId, err := getInstanceProjectViaMetadata()
+	if err != nil {
+		return "", err
+	}
+	return getNodeName(instance.Name, currentInstanceHostname, currentInstanceProjectId)
+}
+
+func getNodeName(instanceName string, instanceHostname string, instanceProjectId string) (types.NodeName, error) {
+	matched, err := regexp.MatchString(".*\\.c\\."+instanceProjectId+"\\.internal", instanceHostname)
+	if err != nil {
+		return "", err
+	}
+	if matched {
+		return types.NodeName(instanceName + ".c." + instanceProjectId + ".internal"), nil
+	}
+	return types.NodeName(instanceName), nil
+
+}
+func getInstanceHostname() (string, error) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		glog.Fatalf("Couldn't determine hostname: %v", err)
+	}
+	return strings.ToLower(strings.TrimSpace(hostname)), nil
+}
+
+func getInstanceProjectViaMetadata() (string, error) {
+	result, err := metadata.Get("project/project-id")
+	if err != nil {
+		return "", err
+	}
+	return result, nil
 }
 
 // GetGCERegion returns region of the gce zone. Zone names

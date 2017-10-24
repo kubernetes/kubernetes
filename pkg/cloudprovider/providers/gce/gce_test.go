@@ -27,6 +27,7 @@ import (
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	computev1 "google.golang.org/api/compute/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
@@ -683,6 +684,59 @@ func TestLastComponent(t *testing.T) {
 		result := lastComponent(input)
 		if result != output {
 			t.Errorf("Actual result %q does not match expected result %q for input: %q", result, output, input)
+		}
+	}
+}
+
+func TestGetNodeName(t *testing.T) {
+	testCases := []struct {
+		intanceName       string
+		instanceHostname  string
+		instanceProjectId string
+		expected          types.NodeName
+	}{
+		{
+			"instance1",
+			"instance1.c.project1.internal",
+			"project1",
+			"instance1.c.project1.internal",
+		},
+		{
+			"instance1",
+			"instance1",
+			"project1",
+			"instance1",
+		},
+	}
+	for _, tc := range testCases {
+		nodeName, err := getNodeName(tc.intanceName, tc.instanceHostname, tc.instanceProjectId)
+		if err != nil {
+			t.Errorf("Failed to getNodeName %v", err)
+		}
+		if tc.expected != nodeName {
+			t.Errorf("Expected nodeName to be %v, but got %v", tc.expected, nodeName)
+		}
+	}
+}
+
+func TestMapNodeNameToInstanceName(t *testing.T) {
+	testCases := []struct {
+		nodeName types.NodeName
+		expected string
+	}{
+		{
+			"instance1.c.project1.internal",
+			"instance1",
+		},
+		{
+			"instance1",
+			"instance1",
+		},
+	}
+	for _, tc := range testCases {
+		instanceName := mapNodeNameToInstanceName(tc.nodeName)
+		if tc.expected != instanceName {
+			t.Errorf("Expected instanceName to be %v, but got %v", tc.expected, instanceName)
 		}
 	}
 }
