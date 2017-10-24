@@ -1996,7 +1996,7 @@ type Container struct {
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy,omitempty" protobuf:"bytes,14,opt,name=imagePullPolicy,casttype=PullPolicy"`
 	// Security options the pod should run with.
 	// More info: https://kubernetes.io/docs/concepts/policy/security-context/
-	// More info: https://git.k8s.io/community/contributors/design-proposals/security_context.md
+	// More info: https://git.k8s.io/community/contributors/design-proposals/auth/security_context.md
 	// +optional
 	SecurityContext *SecurityContext `json:"securityContext,omitempty" protobuf:"bytes,15,opt,name=securityContext"`
 
@@ -2793,7 +2793,7 @@ type PodStatus struct {
 	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty" protobuf:"bytes,8,rep,name=containerStatuses"`
 	// The Quality of Service (QOS) classification assigned to the pod based on resource requirements
 	// See PodQOSClass type for available QOS classes
-	// More info: https://github.com/kubernetes/kubernetes/blob/master/docs/design/resource-qos.md
+	// More info: https:/git.k8s.io/community/contributors/design-proposals/node/resource-qos.md
 	// +optional
 	QOSClass PodQOSClass `json:"qosClass,omitempty" protobuf:"bytes,9,rep,name=qosClass"`
 }
@@ -3825,7 +3825,7 @@ const (
 // NamespaceSpec describes the attributes on a Namespace.
 type NamespaceSpec struct {
 	// Finalizers is an opaque list of values that must be empty to permanently remove object from storage.
-	// More info: https://git.k8s.io/community/contributors/design-proposals/namespaces.md#finalizers
+	// More info: https://git.k8s.io/community/contributors/design-proposals/architecture/namespaces.md#finalizers
 	// +optional
 	Finalizers []FinalizerName `json:"finalizers,omitempty" protobuf:"bytes,1,rep,name=finalizers,casttype=FinalizerName"`
 }
@@ -3833,7 +3833,7 @@ type NamespaceSpec struct {
 // NamespaceStatus is information about the current status of a Namespace.
 type NamespaceStatus struct {
 	// Phase is the current lifecycle phase of the namespace.
-	// More info: https://git.k8s.io/community/contributors/design-proposals/namespaces.md#phases
+	// More info: https://git.k8s.io/community/contributors/design-proposals/architecture/namespaces.md#phases
 	// +optional
 	Phase NamespacePhase `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase,casttype=NamespacePhase"`
 }
@@ -4376,7 +4376,7 @@ type LimitRangeList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is a list of LimitRange objects.
-	// More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_limit_range.md
+	// More info: https://git.k8s.io/community/contributors/design-proposals/resource-management/admission_control_limit_range.md
 	Items []LimitRange `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -4433,7 +4433,7 @@ const (
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota.
 type ResourceQuotaSpec struct {
 	// Hard is the set of desired hard limits for each named resource.
-	// More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md
+	// More info: https://git.k8s.io/community/contributors/design-proposals/resource-management/admission_control_resource_quota.md
 	// +optional
 	Hard ResourceList `json:"hard,omitempty" protobuf:"bytes,1,rep,name=hard,casttype=ResourceList,castkey=ResourceName"`
 	// A collection of filters that must match each object tracked by a quota.
@@ -4856,7 +4856,7 @@ type Sysctl struct {
 }
 
 // NodeResources is an object for conveying resource information about a node.
-// see http://releases.k8s.io/HEAD/docs/design/resources.md for more details.
+// see https://git.k8s.io/community/contributors/design-proposals/scheduling/resources.md for more details.
 type NodeResources struct {
 	// Capacity represents the available resources of a node
 	Capacity ResourceList `protobuf:"bytes,1,rep,name=capacity,casttype=ResourceList,castkey=ResourceName"`
