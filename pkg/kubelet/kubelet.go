@@ -574,13 +574,12 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	// TODO: These need to become arguments to a standalone docker shim.
-	binDir := crOptions.CNIBinDir
 	pluginSettings := dockershim.NetworkPluginSettings{
 		HairpinMode:       hairpinMode,
 		NonMasqueradeCIDR: nonMasqueradeCIDR,
 		PluginName:        crOptions.NetworkPluginName,
 		PluginConfDir:     crOptions.CNIConfDir,
-		PluginBinDir:      binDir,
+		PluginBinDir:      crOptions.CNIBinDir,
 		MTU:               int(crOptions.NetworkPluginMTU),
 	}
 
