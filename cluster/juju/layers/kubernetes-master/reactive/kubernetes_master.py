@@ -26,6 +26,8 @@ import ipaddress
 
 import charms.leadership
 
+from shutil import move
+
 from shlex import split
 from subprocess import check_call
 from subprocess import check_output
@@ -79,8 +81,39 @@ def reset_states_for_delivery():
     '''An upgrade charm event was triggered by Juju, react to that here.'''
     migrate_from_pre_snaps()
     install_snaps()
+    add_rbac_roles()
     set_state('reconfigure.authentication.setup')
     remove_state('authentication.setup')
+
+
+def add_rbac_roles():
+    '''Update the known_tokens file with proper groups.'''
+
+    tokens_fname = '/root/cdk/known_tokens.csv'
+    tokens_backup_fname = '/root/cdk/known_tokens.csv.backup'
+    move(tokens_fname, tokens_backup_fname)
+    with open(tokens_fname, 'w') as ftokens:
+        with open(tokens_backup_fname, 'r') as stream:
+            for line in stream:
+                record = line.strip().split(',')
+                # token, username, user, groups
+                if record[2] == 'admin' and len(record) == 3:
+                    towrite = '{0},{1},{2},"{3}"\n'.format(record[0],
+                                                           record[1],
+                                                           record[2],
+                                                           'system:masters')
+                    ftokens.write(towrite)
+                    continue
+                if record[2] == 'kube_proxy':
+                    towrite = '{0},{1},{2}\n'.format(record[0],
+                                                     'system:kube-proxy',
+                                                     'kube-proxy')
+                    ftokens.write(towrite)
+                    continue
+                if record[2] == 'kubelet' and record[1] == 'kubelet':
+                    continue
+
+                ftokens.write('{}'.format(line))
 
 
 def rename_file_idempotent(source, destination):
@@ -209,12 +242,10 @@ def setup_leader_authentication():
     if not get_keys_from_leader(keys) \
             or is_state('reconfigure.authentication.setup'):
         last_pass = get_password('basic_auth.csv', 'admin')
-        setup_basic_auth(last_pass, 'admin', 'admin')
+        setup_basic_auth(last_pass, 'admin', 'admin', 'system:masters')
 
         if not os.path.isfile(known_tokens):
-            setup_tokens(None, 'admin', 'admin')
-            setup_tokens(None, 'kubelet', 'kubelet')
-            setup_tokens(None, 'kube_proxy', 'kube_proxy')
+            touch(known_tokens)
 
         # Generate the default service account token key
         os.makedirs('/root/cdk', exist_ok=True)
@@ -302,6 +333,7 @@ def get_keys_from_leader(keys, overwrite_local=False):
             # Write out the file and move on to the next item
             with open(k, 'w+') as fp:
                 fp.write(contents)
+                fp.write('\n')
 
     return True
 
@@ -399,20 +431,69 @@ def send_cluster_dns_detail(kube_control):
     kube_control.set_dns(53, hookenv.config('dns_domain'), dns_ip)
 
 
-@when('kube-control.auth.requested')
-@when('authentication.setup')
+@when('kube-control.connected')
+@when('snap.installed.kubectl')
 @when('leadership.is_leader')
-def send_tokens(kube_control):
-    """Send the tokens to the workers."""
-    kubelet_token = get_token('kubelet')
-    proxy_token = get_token('kube_proxy')
-    admin_token = get_token('admin')
+def create_service_configs(kube_control):
+    """Create the users for kubelet"""
+    should_restart = False
+    # generate the username/pass for the requesting unit
+    proxy_token = get_token('system:kube-proxy')
+    if not proxy_token:
+        setup_tokens(None, 'system:kube-proxy', 'kube-proxy')
+        proxy_token = get_token('system:kube-proxy')
+        should_restart = True
 
-    # Send the data
+    client_token = get_token('admin')
+    if not client_token:
+        setup_tokens(None, 'admin', 'admin', "system:masters")
+        client_token = get_token('admin')
+        should_restart = True
+
     requests = kube_control.auth_user()
     for request in requests:
-        kube_control.sign_auth_request(request[0], kubelet_token,
-                                       proxy_token, admin_token)
+        username = request[1]['user']
+        group = request[1]['group']
+        kubelet_token = get_token(username)
+        if not kubelet_token and username and group:
+            # Usernames have to be in the form of system:node:<nodeName>
+            userid = "kubelet-{}".format(request[0].split('/')[1])
+            setup_tokens(None, username, userid, group)
+            kubelet_token = get_token(username)
+            kube_control.sign_auth_request(request[0], username,
+                                           kubelet_token, proxy_token,
+                                           client_token)
+            should_restart = True
+
+    if should_restart:
+        host.service_restart('snap.kube-apiserver.daemon')
+        remove_state('authentication.setup')
+
+
+@when('kube-control.departed')
+@when('leadership.is_leader')
+def flush_auth_for_departed(kube_control):
+    ''' Unit has left the cluster and needs to have its authentication
+    tokens removed from the token registry '''
+    token_auth_file = '/root/cdk/known_tokens.csv'
+    departing_unit = kube_control.flush_departed()
+    userid = "kubelet-{}".format(departing_unit.split('/')[1])
+    known_tokens = open(token_auth_file, 'r').readlines()
+    for line in known_tokens[:]:
+        haystack = line.split(',')
+        # skip the entry if we dont have token,user,id,groups format
+        if len(haystack) < 4:
+            continue
+        if haystack[2] == userid:
+            hookenv.log('Found unit {} in token auth. Removing auth'
+                        ' token.'.format(userid))
+            known_tokens.remove(line)
+    # atomically rewrite the file minus any scrubbed units
+    hookenv.log('Rewriting token auth file: {}'.format(token_auth_file))
+    with open(token_auth_file, 'w') as fp:
+        fp.writelines(known_tokens)
+    # Trigger rebroadcast of auth files for followers
+    remove_state('authentication.setup')
 
 
 @when_not('kube-control.connected')
@@ -638,6 +719,15 @@ def ceph_storage(ceph_admin):
 def initial_nrpe_config(nagios=None):
     set_state('nrpe-external-master.initial-config')
     update_nrpe_config(nagios)
+
+
+@when('config.changed.authorization-mode',
+      'kubernetes-master.components.started')
+def switch_auth_mode():
+    config = hookenv.config()
+    mode = config.get('authorization-mode')
+    if data_changed('auth-mode', mode):
+        remove_state('kubernetes-master.components.started')
 
 
 @when('kubernetes-master.components.started')
@@ -991,6 +1081,12 @@ def configure_apiserver():
         'DefaultTolerationSeconds'
     ]
 
+    auth_mode = hookenv.config('authorization-mode')
+    if 'Node' in auth_mode:
+        admission_control.append('NodeRestriction')
+
+    api_opts.add('authorization-mode', auth_mode, strict=True)
+
     if get_version('kube-apiserver') < (1, 6):
         hookenv.log('Removing DefaultTolerationSeconds from admission-control')
         admission_control.remove('DefaultTolerationSeconds')
@@ -1046,7 +1142,8 @@ def configure_scheduler():
     set_state('kube-scheduler.do-restart')
 
 
-def setup_basic_auth(password=None, username='admin', uid='admin'):
+def setup_basic_auth(password=None, username='admin', uid='admin',
+                     groups=None):
     '''Create the htacces file and the tokens.'''
     root_cdk = '/root/cdk'
     if not os.path.isdir(root_cdk):
@@ -1055,10 +1152,14 @@ def setup_basic_auth(password=None, username='admin', uid='admin'):
     if not password:
         password = token_generator()
     with open(htaccess, 'w') as stream:
-        stream.write('{0},{1},{2}'.format(password, username, uid))
+        if groups:
+            stream.write('{0},{1},{2},"{3}"'.format(password,
+                                                    username, uid, groups))
+        else:
+            stream.write('{0},{1},{2}'.format(password, username, uid))
 
 
-def setup_tokens(token, username, user):
+def setup_tokens(token, username, user, groups=None):
     '''Create a token file for kubernetes authentication.'''
     root_cdk = '/root/cdk'
     if not os.path.isdir(root_cdk):
@@ -1067,7 +1168,13 @@ def setup_tokens(token, username, user):
     if not token:
         token = token_generator()
     with open(known_tokens, 'a') as stream:
-        stream.write('{0},{1},{2}\n'.format(token, username, user))
+        if groups:
+            stream.write('{0},{1},{2},"{3}"\n'.format(token,
+                                                      username,
+                                                      user,
+                                                      groups))
+        else:
+            stream.write('{0},{1},{2}\n'.format(token, username, user))
 
 
 def get_password(csv_fname, user):
@@ -1133,3 +1240,10 @@ def apiserverVersion():
     cmd = 'kube-apiserver --version'.split()
     version_string = check_output(cmd).decode('utf-8')
     return tuple(int(q) for q in re.findall("[0-9]+", version_string)[:3])
+
+
+def touch(fname):
+    try:
+        os.utime(fname, None)
+    except OSError:
+        open(fname, 'a').close()
