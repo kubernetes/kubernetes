@@ -37,9 +37,9 @@ else
   readonly use_custom_instance_list=
 fi
 
-readonly master_ssh_supported_providers="gce aws"
-readonly node_ssh_supported_providers="gce gke aws"
-readonly gcloud_supported_providers="gce gke"
+readonly master_ssh_supported_providers="gce aws kubernetes-anywhere"
+readonly node_ssh_supported_providers="gce gke aws kubernetes-anywhere"
+readonly gcloud_supported_providers="gce gke kubernetes-anywhere"
 
 readonly master_logfiles="kube-apiserver kube-apiserver-audit kube-scheduler rescheduler kube-controller-manager etcd etcd-events glbc cluster-autoscaler kube-addon-manager fluentd"
 readonly node_logfiles="kube-proxy fluentd node-problem-detector"
@@ -141,7 +141,7 @@ function save-logs() {
       fi
     else
       case "${KUBERNETES_PROVIDER}" in
-        gce|gke)
+        gce|gke|kubernetes-anywhere)
           files="${files} ${gce_logfiles}"
           ;;
         aws)
