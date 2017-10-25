@@ -24,12 +24,10 @@ import (
 )
 
 func SleepContext(ctx context.Context, clock clock.Clock, d time.Duration) error {
-	t := clock.NewTimer(d)
 	select {
-	case <-t.C():
+	case <-clock.After(d):
 		return nil
 	case <-ctx.Done():
-		t.Stop()
 		return ctx.Err()
 	}
 }

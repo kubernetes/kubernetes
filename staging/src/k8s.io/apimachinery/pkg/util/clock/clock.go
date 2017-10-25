@@ -117,6 +117,7 @@ func (f *FakeClock) After(d time.Duration) <-chan time.Time {
 		targetTime: stopTime,
 		destChan:   ch,
 	})
+	f.setTimeLocked(f.time.Add(d))
 	return ch
 }
 

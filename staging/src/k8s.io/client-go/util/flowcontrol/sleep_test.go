@@ -10,20 +10,12 @@ import (
 )
 
 func TestSleepContext(t *testing.T) {
-	clock := clock.NewFakeClock(time.Now())
+	duration := time.Minute
+	start := time.Now()
+	clock := clock.NewFakeClock(start)
 	ctx := context.Background()
 
-	ch := make(chan struct{})
-	var err error
-	go func() {
-		defer close(ch)
-		err = flowcontrol.SleepContext(ctx, clock, time.Minute)
-	}()
-
-	time.Sleep(time.Second / 20)
-	clock.Step(time.Hour * 2)
-
-	<-ch
+	err := flowcontrol.SleepContext(ctx, clock, duration)
 
 	if err != nil {
 		t.Error("unexpected error")
@@ -32,17 +24,23 @@ func TestSleepContext(t *testing.T) {
 	if clock.HasWaiters() {
 		t.Error("unexpected waiters")
 	}
+
+	if actual := clock.Since(start); actual != duration {
+		t.Errorf("unexpected sleep duration %v != %v", actual, duration)
+	}
 }
 
 func TestSleepContext_preempted(t *testing.T) {
-	clock := clock.NewFakeClock(time.Now())
+	duration := time.Second / 10
+	clock := clock.RealClock{}
+	start := clock.Now()
 	ctx, cancel := context.WithCancel(context.Background())
 
 	ch := make(chan struct{})
 	var err error
 	go func() {
 		defer close(ch)
-		err = flowcontrol.SleepContext(ctx, clock, time.Minute)
+		err = flowcontrol.SleepContext(ctx, clock, duration)
 	}()
 
 	cancel()
@@ -51,5 +49,9 @@ func TestSleepContext_preempted(t *testing.T) {
 
 	if err != ctx.Err() {
 		t.Error("expected error not returned")
+	}
+
+	if actual := clock.Since(start); actual >= duration {
+		t.Errorf("unexpected sleep duration %v >= %v", actual, duration)
 	}
 }
