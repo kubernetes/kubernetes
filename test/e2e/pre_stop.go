@@ -175,6 +175,11 @@ func testPreStop(c clientset.Interface, ns string) {
 var _ = framework.KubeDescribe("PreStop", func() {
 	f := framework.NewDefaultFramework("prestop")
 
+	/*
+		    Testname: pods-prestop-handler-invoked
+		    Description: Makes sure a pod's preStop handler is successfully
+			invoked immediately before a container is terminated.
+	*/
 	It("should call prestop when killing a pod [Conformance]", func() {
 		testPreStop(f.ClientSet, f.Namespace.Name)
 	})
