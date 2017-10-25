@@ -82,7 +82,7 @@ deb_data(
 
 pkg_tar(
     name = "kubernetes-cni-data",
-    package_dir = "/opt/cni",
+    package_dir = "/opt/cni/bin",
     deps = ["@kubernetes_cni//file"],
 )
 
