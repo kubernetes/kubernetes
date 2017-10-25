@@ -38,4 +38,4 @@ if [[ ! -x "$importverifier" ]]; then
   exit 1
 fi
 
-"${importverifier}" "k8s.io/" "${KUBE_ROOT}/hack/staging-import-restrictions.json"
+"${importverifier}" "k8s.io/" "${KUBE_ROOT}/hack/import-restrictions.json"
