@@ -535,9 +535,7 @@ var _ = SIGDescribe("Volumes", func() {
 	Describe("vsphere [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("vsphere")
-			var (
-				volumePath string
-			)
+			var volumePath string
 			config := framework.VolumeTestConfig{
 				Namespace: namespace.Name,
 				Prefix:    "vsphere",
