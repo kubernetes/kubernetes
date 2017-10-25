@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authods.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -149,7 +149,7 @@ func waitDSStable(t *testing.T, clientSet clientset.Interface, ds *v1beta1.Daemo
 	nodeClient := clientSet.CoreV1().Nodes()
 	nodeList, err := nodeClient.List(metav1.ListOptions{})
 	if err != nil {
-		t.Fatalf("Failed to get node list", err)
+		t.Fatalf("Failed to get node list: %v", err)
 	}
 
 	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
