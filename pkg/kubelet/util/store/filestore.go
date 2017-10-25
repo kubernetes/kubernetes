@@ -124,14 +124,14 @@ func writeFile(fs utilfs.Filesystem, path string, data []byte) (retErr error) {
 			if retErr == nil {
 				retErr = err
 			} else {
-				retErr = fmt.Errorf("failed to close temp file after error %v", retErr)
+				retErr = fmt.Errorf("failed to close temp file after error %v; close error: %v", retErr, err)
 			}
 		}
 
 		// Clean up the temp file on error.
 		if retErr != nil && tmpPath != "" {
 			if err := removePath(fs, tmpPath); err != nil {
-				retErr = fmt.Errorf("failed to remove the temporary file after error %v", retErr)
+				retErr = fmt.Errorf("failed to remove the temporary file (%q) after error %v; remove error: %v", tmpPath, retErr, err)
 			}
 		}
 	}()
