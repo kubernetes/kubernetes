@@ -26,6 +26,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/controller/history"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
 // StatefulSetControl implements the control logic for updating StatefulSets and their children Pods. It is implemented
@@ -366,12 +367,23 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	// Examine each replica with respect to its ordinal
 	for i := range replicas {
 		// delete and recreate failed pods
-		if isFailed(replicas[i]) {
-			glog.V(4).Infof("StatefulSet %s/%s is recreating failed Pod %s",
-				set.Namespace,
-				set.Name,
-				replicas[i].Name)
-			if err := ssc.podControl.DeleteStatefulPod(set, replicas[i]); err != nil {
+		nodeLost := replicas[i].Status.Reason == nodeutil.NodeUnreachablePodReason
+		if isFailed(replicas[i]) || nodeLost {
+			var option *metav1.DeleteOptions
+			if nodeLost {
+				glog.V(4).Infof("StatefulSet %s/%s is forcing deleting Pod %s due to NodeLost",
+					set.Namespace,
+					set.Name,
+					replicas[i].Name)
+				option = metav1.NewDeleteOptions(0)
+			} else {
+
+				glog.V(4).Infof("StatefulSet %s/%s is recreating failed Pod %s",
+					set.Namespace,
+					set.Name,
+					replicas[i].Name)
+			}
+			if err := ssc.podControl.DeleteStatefulPod(set, replicas[i], option); err != nil {
 				return &status, err
 			}
 			if getPodRevision(replicas[i]) == currentRevision.Name {
@@ -471,7 +483,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 			set.Name,
 			condemned[target].Name)
 
-		if err := ssc.podControl.DeleteStatefulPod(set, condemned[target]); err != nil {
+		if err := ssc.podControl.DeleteStatefulPod(set, condemned[target], nil); err != nil {
 			return &status, err
 		}
 		if getPodRevision(condemned[target]) == currentRevision.Name {
@@ -503,7 +515,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				set.Namespace,
 				set.Name,
 				replicas[target].Name)
-			err := ssc.podControl.DeleteStatefulPod(set, replicas[target])
+			err := ssc.podControl.DeleteStatefulPod(set, replicas[target], nil)
 			status.CurrentReplicas--
 			return &status, err
 		}

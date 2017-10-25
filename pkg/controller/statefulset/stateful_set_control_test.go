@@ -1666,7 +1666,7 @@ func (spc *fakeStatefulPodControl) UpdateStatefulPod(set *apps.StatefulSet, pod 
 	return nil
 }
 
-func (spc *fakeStatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod) error {
+func (spc *fakeStatefulPodControl) DeleteStatefulPod(set *apps.StatefulSet, pod *v1.Pod, options *metav1.DeleteOptions) error {
 	defer spc.deletePodTracker.inc()
 	if spc.deletePodTracker.errorReady() {
 		defer spc.deletePodTracker.reset()
