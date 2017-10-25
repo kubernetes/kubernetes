@@ -19,9 +19,8 @@ package initialresources
 import (
 	"flag"
 	"fmt"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"time"
-
-	"k8s.io/kubernetes/pkg/api"
 )
 
 var (

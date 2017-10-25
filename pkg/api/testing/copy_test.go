@@ -28,9 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/testing/roundtrip"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestDeepCopyApiObjects(t *testing.T) {

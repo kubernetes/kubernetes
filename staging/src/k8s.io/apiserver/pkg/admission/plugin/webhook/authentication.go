@@ -17,11 +17,10 @@ limitations under the License.
 package webhook
 
 import (
+	"fmt"
 	"io/ioutil"
 	"strings"
 	"time"
-
-	"fmt"
 
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
