@@ -277,50 +277,97 @@ func getResourceList(cpu, memory string) api.ResourceList {
 }
 
 func TestDescribeService(t *testing.T) {
-	fake := fake.NewSimpleClientset(&api.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "bar",
-			Namespace: "foo",
+	testCases := []struct {
+		service *api.Service
+		expect  []string
+	}{
+		{
+			service: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{{
+						Name:       "port-tcp",
+						Port:       8080,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(9527),
+						NodePort:   31111,
+					}},
+					Selector:              map[string]string{"blah": "heh"},
+					ClusterIP:             "1.2.3.4",
+					LoadBalancerIP:        "5.6.7.8",
+					SessionAffinity:       "None",
+					ExternalTrafficPolicy: "Local",
+					HealthCheckNodePort:   32222,
+				},
+			},
+			expect: []string{
+				"Name", "bar",
+				"Namespace", "foo",
+				"Selector", "blah=heh",
+				"Type", "LoadBalancer",
+				"IP", "1.2.3.4",
+				"Port", "port-tcp", "8080/TCP",
+				"TargetPort", "9527/TCP",
+				"NodePort", "port-tcp", "31111/TCP",
+				"Session Affinity", "None",
+				"External Traffic Policy", "Local",
+				"HealthCheck NodePort", "32222",
+			},
 		},
-		Spec: api.ServiceSpec{
-			Type: api.ServiceTypeLoadBalancer,
-			Ports: []api.ServicePort{{
-				Name:       "port-tcp",
-				Port:       8080,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(9527),
-				NodePort:   31111,
-			}},
-			Selector:              map[string]string{"blah": "heh"},
-			ClusterIP:             "1.2.3.4",
-			LoadBalancerIP:        "5.6.7.8",
-			SessionAffinity:       "None",
-			ExternalTrafficPolicy: "Local",
-			HealthCheckNodePort:   32222,
+		{
+			service: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{{
+						Name:       "port-tcp",
+						Port:       8080,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromString("targetPort"),
+						NodePort:   31111,
+					}},
+					Selector:              map[string]string{"blah": "heh"},
+					ClusterIP:             "1.2.3.4",
+					LoadBalancerIP:        "5.6.7.8",
+					SessionAffinity:       "None",
+					ExternalTrafficPolicy: "Local",
+					HealthCheckNodePort:   32222,
+				},
+			},
+			expect: []string{
+				"Name", "bar",
+				"Namespace", "foo",
+				"Selector", "blah=heh",
+				"Type", "LoadBalancer",
+				"IP", "1.2.3.4",
+				"Port", "port-tcp", "8080/TCP",
+				"TargetPort", "targetPort/TCP",
+				"NodePort", "port-tcp", "31111/TCP",
+				"Session Affinity", "None",
+				"External Traffic Policy", "Local",
+				"HealthCheck NodePort", "32222",
+			},
 		},
-	})
-	expectedElements := []string{
-		"Name", "bar",
-		"Namespace", "foo",
-		"Selector", "blah=heh",
-		"Type", "LoadBalancer",
-		"IP", "1.2.3.4",
-		"Port", "port-tcp", "8080/TCP",
-		"TargetPort", "9527/TCP",
-		"NodePort", "port-tcp", "31111/TCP",
-		"Session Affinity", "None",
-		"External Traffic Policy", "Local",
-		"HealthCheck NodePort", "32222",
 	}
-	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
-	d := ServiceDescriber{c}
-	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	for _, expected := range expectedElements {
-		if !strings.Contains(out, expected) {
-			t.Errorf("expected to find %q in output: %q", expected, out)
+	for _, testCase := range testCases {
+		fake := fake.NewSimpleClientset(testCase.service)
+		c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+		d := ServiceDescriber{c}
+		out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		for _, expected := range testCase.expect {
+			if !strings.Contains(out, expected) {
+				t.Errorf("expected to find %q in output: %q", expected, out)
+			}
 		}
 	}
 }
