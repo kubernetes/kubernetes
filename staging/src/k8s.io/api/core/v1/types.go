@@ -1634,24 +1634,10 @@ type CSIPersistentVolumeSource struct {
 	// plugin’s CreateVolume to refer to the volume on all subsequent calls.
 	VolumeHandle string `json:"volumeHandle" protobuf:"bytes,2,opt,name=volumeHandle"`
 
-	// Optional: MountSecretRef is a reference to the secret object containing
-	// sensitive information to pass to the CSI driver during NodePublish.
-	// This may be empty if no secret is required. If the secret object contains
-	// more than one secret, all secrets are passed.
-	// +optional
-	MountSecretRef *SecretReference `json:"mountSecretRef,omitempty" protobuf:"bytes,3,opt,name=mountSecretRef"`
-
-	// Optional: AttachSecretRef is a reference to the secret object containing
-	// sensitive information to pass to the CSI driver during ControllerPublish.
-	// This may be empty if no secret is required. If the secret object contains
-	// more than one secret, all secrets are passed.
-	// +optional
-	AttachSecretRef *SecretReference `json:"attachSecretRef,omitempty" protobuf:"bytes,4,opt,name=attachSecretRef"`
-
 	// Optional: The value to pass to ControllerPublishVolumeRequest.
 	// Defaults to false (read/write).
 	// +optional
-	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,5,opt,name=readOnly"`
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
 }
 
 // ContainerPort represents a network port in a single container.

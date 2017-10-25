@@ -1517,20 +1517,6 @@ type CSIPersistentVolumeSource struct {
 	// Required.
 	VolumeHandle string
 
-	// Optional: MountSecretRef is a reference to the secret object containing
-	// sensitive information to pass to the CSI driver during NodePublish.
-	// This may be empty if no secret is required. If the secret object contains
-	// more than one secret, all secrets are passed.
-	// +optional
-	MountSecretRef *SecretReference
-
-	// Optional: AttachSecretRef is a reference to the secret object containing
-	// sensitive information to pass to the CSI driver during ControllerPublish.
-	// This may be empty if no secret is required. If the secret object contains
-	// more than one secret, all secrets are passed.
-	// +optional
-	AttachSecretRef *SecretReference
-
 	// Optional: The value to pass to ControllerPublishVolumeRequest.
 	// Defaults to false (read/write).
 	// +optional
