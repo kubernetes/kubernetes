@@ -37,7 +37,7 @@ from charms.kubernetes.flagmanager import FlagManager
 from charms.reactive.helpers import data_changed, any_file_changed
 from charms.templating.jinja2 import render
 
-from charmhelpers.core import hookenv, unitdata
+from charmhelpers.core import hookenv
 from charmhelpers.core.host import service_stop, service_restart
 from charmhelpers.contrib.charmsupport import nrpe
 
