@@ -17,6 +17,7 @@ go_library(
     name = "go_default_library",
     srcs = ["framer.go"],
     importpath = "k8s.io/apimachinery/pkg/util/framer",
+    deps = ["//vendor/github.com/golang/glog:go_default_library"],
 )
 
 filegroup(

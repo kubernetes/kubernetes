@@ -1,0 +1,109 @@
+{
+  "configTrialDuration": "10m0s",
+  "podManifestPath": "/etc/kubernetes/manifests",
+  "syncFrequency": "1m0s",
+  "fileCheckFrequency": "20s",
+  "httpCheckFrequency": "20s",
+  "manifestURL": "",
+  "manifestURLHeader": null,
+  "enableServer": true,
+  "address": "0.0.0.0",
+  "port": 10250,
+  "readOnlyPort": 10255,
+  "tlsCertFile": "/var/lib/kubelet/pki/kubelet.crt",
+  "tlsPrivateKeyFile": "/var/lib/kubelet/pki/kubelet.key",
+  "authentication": {
+    "x509": {
+      "clientCAFile": "/etc/srv/kubernetes/pki/ca-certificates.crt"
+    },
+    "webhook": {
+      "enabled": false,
+      "cacheTTL": "2m0s"
+    },
+    "anonymous": {
+      "enabled": false
+    }
+  },
+  "authorization": {
+    "mode": "Webhook",
+    "webhook": {
+      "cacheAuthorizedTTL": "5m0s",
+      "cacheUnauthorizedTTL": "30s"
+    }
+  },
+  "allowPrivileged": true,
+  "hostNetworkSources": [
+    "*"
+  ],
+  "hostPIDSources": [
+    "*"
+  ],
+  "hostIPCSources": [
+    "*"
+  ],
+  "registryPullQPS": 5,
+  "registryBurst": 10,
+  "eventRecordQPS": 5,
+  "eventBurst": 10,
+  "enableDebuggingHandlers": true,
+  "enableContentionProfiling": false,
+  "cAdvisorPort": 4194,
+  "healthzPort": 10248,
+  "healthzBindAddress": "127.0.0.1",
+  "oomScoreAdj": -999,
+  "clusterDomain": "cluster.local",
+  "clusterDNS": [
+    "10.0.0.10"
+  ],
+  "streamingConnectionIdleTimeout": "4h0m0s",
+  "nodeStatusUpdateFrequency": "10s",
+  "imageMinimumGCAge": "2m0s",
+  "imageGCHighThresholdPercent": 85,
+  "imageGCLowThresholdPercent": 80,
+  "volumeStatsAggPeriod": "1m0s",
+  "kubeletCgroups": "",
+  "systemCgroups": "",
+  "cgroupRoot": "/",
+  "cgroupsPerQOS": true,
+  "cgroupDriver": "cgroupfs",
+  "cpuManagerPolicy": "none",
+  "cpuManagerReconcilePeriod": "10s",
+  "runtimeRequestTimeout": "2m0s",
+  "hairpinMode": "promiscuous-bridge",
+  "maxPods": 110,
+  "podCIDR": "",
+  "resolvConf": "/etc/resolv.conf",
+  "cpuCFSQuota": true,
+  "maxOpenFiles": 1000000,
+  "contentType": "application/vnd.kubernetes.protobuf",
+  "kubeAPIQPS": 5,
+  "kubeAPIBurst": 10,
+  "serializeImagePulls": true,
+  "evictionHard": {
+    "memory.available": "250Mi",
+    "nodefs.available": "10%",
+    "nodefs.inodesFree": "5%"
+  },
+  "evictionSoft": null,
+  "evictionSoftGracePeriod": null,
+  "evictionPressureTransitionPeriod": "5m0s",
+  "evictionMaxPodGracePeriod": 0,
+  "evictionMinimumReclaim": null,
+  "podsPerCore": 0,
+  "enableControllerAttachDetach": true,
+  "protectKernelDefaults": false,
+  "makeIPTablesUtilChains": true,
+  "iptablesMasqueradeBit": 14,
+  "iptablesDropBit": 15,
+  "featureGates": {
+    "DynamicKubeletConfig": true
+  },
+  "failSwapOn": true,
+  "systemReserved": null,
+  "kubeReserved": null,
+  "enforceNodeAllocatable": [
+    "pods"
+  ],
+  "kind": "KubeletConfiguration",
+  "apiVersion": "kubeletconfig/v1alpha1"
+}

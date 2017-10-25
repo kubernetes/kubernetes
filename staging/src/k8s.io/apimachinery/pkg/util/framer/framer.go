@@ -18,6 +18,9 @@ limitations under the License.
 package framer
 
 import (
+	"github.com/golang/glog"
+	"strings"
+
 	"encoding/binary"
 	"encoding/json"
 	"io"
@@ -129,6 +132,12 @@ func NewJSONFramedReader(r io.ReadCloser) io.ReadCloser {
 // ReadFrame decodes the next JSON object in the stream, or returns an error. The returned
 // byte slice will be modified the next time ReadFrame is invoked and should not be altered.
 func (r *jsonFrameReader) Read(data []byte) (int, error) {
+	// logExtra := false
+	if strings.Contains(string(data), "nodeconfig.k8s.io") {
+		// logExtra = true
+		glog.Infof("reading json nodeconfig.k8s.io: will log extra")
+		glog.Infof("reading json nodeconfig.k8s.io: data: %s", string(data))
+	}
 	// Return whatever remaining data exists from an in progress frame
 	if n := len(r.remaining); n > 0 {
 		if n <= len(data) {

@@ -100,6 +100,7 @@ func startNodeController(ctx ControllerContext) (bool, error) {
 	nodeController, err := nodecontroller.NewNodeController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),
+		ctx.NodeConfigInformerFactory.Nodeconfig().V1alpha1().NodeConfigSourcePools(),
 		ctx.InformerFactory.Extensions().V1beta1().DaemonSets(),
 		ctx.Cloud,
 		ctx.ClientBuilder.ClientOrDie("node-controller"),

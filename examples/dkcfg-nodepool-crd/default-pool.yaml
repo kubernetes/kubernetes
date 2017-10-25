@@ -1,0 +1,12 @@
+apiVersion: nodeconfig.k8s.io/v1alpha1
+kind: NodeConfigSourcePool
+metadata:
+  name: default-pool
+spec:
+  percentNew: 0
+  labelSelector:
+    matchLabels:
+      nodepool: default-pool
+# history omitted for initial
+# TODO(mtaufen): probably useful to have a status here that includes the % actually on new
+# TODO(mtaufen): should have a way of "pushing" the local default onto the history... maybe just append nil?

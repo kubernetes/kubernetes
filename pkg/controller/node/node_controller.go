@@ -56,6 +56,13 @@ import (
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+
+	// mtaufen note to self:
+	// run ./generate-groups.sh all k8s.io/kubernetes/pkg/controller/node/nodeconfig/client-go k8s.io/kubernetes/pkg/controller/node "nodeconfig:v1alpha1"
+	// to generate the client, listers, informers (from code-generator repo)
+	nodeconfigv1alpha1informers "k8s.io/kubernetes/pkg/controller/node/nodeconfig/client-go/informers/externalversions/nodeconfig/v1alpha1"
+	nodeconfigv1alpha1listers "k8s.io/kubernetes/pkg/controller/node/nodeconfig/client-go/listers/nodeconfig/v1alpha1"
+	nodeconfigv1alpha1 "k8s.io/kubernetes/pkg/controller/node/nodeconfig/v1alpha1"
 )
 
 func init() {
@@ -177,6 +184,10 @@ type Controller struct {
 	nodeLister         corelisters.NodeLister
 	nodeInformerSynced cache.InformerSynced
 
+	nodeConfigSourcePoolLister         nodeconfigv1alpha1listers.NodeConfigSourcePoolLister
+	nodeConfigSourcePoolInformerSynced cache.InformerSynced
+	pendingNodeConfigSourcePoolSync    chan bool
+
 	daemonSetStore          extensionslisters.DaemonSetLister
 	daemonSetInformerSynced cache.InformerSynced
 
@@ -215,6 +226,7 @@ type Controller struct {
 func NewNodeController(
 	podInformer coreinformers.PodInformer,
 	nodeInformer coreinformers.NodeInformer,
+	nodeConfigSourcePoolInformer nodeconfigv1alpha1informers.NodeConfigSourcePoolInformer,
 	daemonSetInformer extensionsinformers.DaemonSetInformer,
 	cloud cloudprovider.Interface,
 	kubeClient clientset.Interface,
@@ -285,14 +297,15 @@ func NewNodeController(
 		nodeExistsInCloudProvider: func(nodeName types.NodeName) (bool, error) {
 			return util.NodeExistsInCloudProvider(cloud, nodeName)
 		},
-		evictionLimiterQPS:          evictionLimiterQPS,
-		secondaryEvictionLimiterQPS: secondaryEvictionLimiterQPS,
-		largeClusterThreshold:       largeClusterThreshold,
-		unhealthyZoneThreshold:      unhealthyZoneThreshold,
-		zoneStates:                  make(map[string]ZoneState),
-		runTaintManager:             runTaintManager,
-		useTaintBasedEvictions:      useTaintBasedEvictions && runTaintManager,
-		taintNodeByCondition:        taintNodeByCondition,
+		evictionLimiterQPS:              evictionLimiterQPS,
+		secondaryEvictionLimiterQPS:     secondaryEvictionLimiterQPS,
+		largeClusterThreshold:           largeClusterThreshold,
+		unhealthyZoneThreshold:          unhealthyZoneThreshold,
+		zoneStates:                      make(map[string]ZoneState),
+		runTaintManager:                 runTaintManager,
+		useTaintBasedEvictions:          useTaintBasedEvictions && runTaintManager,
+		taintNodeByCondition:            taintNodeByCondition,
+		pendingNodeConfigSourcePoolSync: make(chan bool, 1),
 	}
 	if useTaintBasedEvictions {
 		glog.Infof("Controller is using taint based evictions.")
@@ -408,8 +421,40 @@ func NewNodeController(
 		}),
 	})
 
+	// Event handlers for reconciling config to added nodes
+	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: util.CreateAddNodeHandler(func(node *v1.Node) error {
+			nc.needsNodeConfigSourcePoolSync()
+			return nil
+		}),
+		UpdateFunc: util.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
+			// TODO(mtaufen): healing config to updated nodes (will need to check if things differ from what we expect)
+			return nil
+		}),
+	})
+
 	nc.nodeLister = nodeInformer.Lister()
 	nc.nodeInformerSynced = nodeInformer.Informer().HasSynced
+
+	// TODO(mtaufen): event handlers on the informer
+
+	nodeConfigSourcePoolInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: CreateAddNodeConfigSourcePoolHandler(func(pool *nodeconfigv1alpha1.NodeConfigSourcePool) error {
+			glog.Infof("added NodeConfigSourcePool")
+			nc.needsNodeConfigSourcePoolSync()
+			return nil
+		}),
+		UpdateFunc: CreateUpdateNodeConfigSourcePoolHandler(func(oldPool, newPool *nodeconfigv1alpha1.NodeConfigSourcePool) error {
+			glog.Infof("updated NodeConfigSourcePool")
+			nc.needsNodeConfigSourcePoolSync()
+			return nil
+		}),
+		// TODO(mtaufen): consider whether deletion should have any side-effects on the nodes
+	})
+
+	// TODO(mtaufen): might not need these two lines
+	nc.nodeConfigSourcePoolLister = nodeConfigSourcePoolInformer.Lister()
+	nc.nodeConfigSourcePoolInformerSynced = nodeConfigSourcePoolInformer.Informer().HasSynced
 
 	nc.daemonSetStore = daemonSetInformer.Lister()
 	nc.daemonSetInformerSynced = daemonSetInformer.Informer().HasSynced
@@ -558,7 +603,7 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 	glog.Infof("Starting node controller")
 	defer glog.Infof("Shutting down node controller")
 
-	if !controller.WaitForCacheSync("node", stopCh, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
+	if !controller.WaitForCacheSync("node", stopCh, nc.nodeInformerSynced /*nc.nodeConfigSourcePoolInformerSynced*/, nc.podInformerSynced, nc.daemonSetInformerSynced) {
 		return
 	}
 
@@ -589,6 +634,11 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 			go nc.cidrAllocator.Run(wait.NeverStop)
 		}
 	}
+
+	// initial poke for the sync worker thread, so that we always get a resync when the node controller starts up
+	glog.Infof("about to make the magic happen")
+	nc.needsNodeConfigSourcePoolSync()
+	go wait.Until(nc.syncNodeConfigSourcePools, nc.nodeMonitorPeriod, wait.NeverStop)
 
 	<-stopCh
 }

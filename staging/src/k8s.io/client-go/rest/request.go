@@ -28,6 +28,7 @@ import (
 	"net/url"
 	"path"
 	"reflect"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -486,16 +487,41 @@ func (r *Request) tryThrottle() {
 func (r *Request) Watch() (watch.Interface, error) {
 	// We specifically don't want to rate limit watches, so we
 	// don't use r.throttle here.
+
+	logExtra := false
+	if r.resource == "nodeconfigsourcepools" {
+		logExtra = true
+		glog.Infof("watching nodeconfigsourcepools, with extra logging")
+	}
+
 	if r.err != nil {
+		if logExtra {
+			glog.Infof("watching nodeconfigsourcepools: error: %v", r.err)
+		}
 		return nil, r.err
 	}
 	if r.serializers.Framer == nil {
+		if logExtra {
+			glog.Infof("watching nodeconfigsourcepools: error: %v", fmt.Errorf("watching resources is not possible with this client (content-type: %s)", r.content.ContentType))
+		}
 		return nil, fmt.Errorf("watching resources is not possible with this client (content-type: %s)", r.content.ContentType)
 	}
 
+	if logExtra {
+		glog.Infof("expected content-type is: %s", r.content.ContentType)
+		glog.Infof("framer is: %#v", r.serializers.Framer)
+		glog.Infof("stack trace:\n%s", string(debug.Stack()))
+	}
+
 	url := r.URL().String()
+	if logExtra {
+		glog.Infof("watching nodeconfigsourcepools: url string is: %s", url)
+	}
 	req, err := http.NewRequest(r.verb, url, r.body)
 	if err != nil {
+		if logExtra {
+			glog.Infof("watching nodeconfigsourcepools: error in NewRequest: %v", err)
+		}
 		return nil, err
 	}
 	if r.ctx != nil {
@@ -507,7 +533,13 @@ func (r *Request) Watch() (watch.Interface, error) {
 		client = http.DefaultClient
 	}
 	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
+	if logExtra {
+		glog.Infof("watching nodeconfigsourcepools: req: %#v", req)
+	}
 	resp, err := client.Do(req)
+	if logExtra {
+		glog.Infof("watching nodeconfigsourcepools: resp: %#v", resp)
+	}
 	updateURLMetrics(r, resp, err)
 	if r.baseURL != nil {
 		if err != nil {

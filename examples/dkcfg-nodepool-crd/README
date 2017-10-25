@@ -1,0 +1,128 @@
+0. make quick-release
+1. Bring up a cluster
+2. label nodes e.g. nodepool: default-pool
+3. create the CRD
+4. create the pool resource
+5. add an item to the history, and see if we can roll it out
+
+Useful commands:
+KUBE_NODE_OS_DISTRIBUTION="cos" KUBE_FEATURE_GATES="DynamicKubeletConfig=true" KUBELET_TEST_ARGS="--dynamic-config-dir=/var/run/kubelet/dynamic-config" $GOPATH/src/k8s.io/kubernetes/cluster/kube-up.sh
+
+# need latest kubectl for some of the fancier CRD stuff
+export kubectl=$GOPATH/src/k8s.io/kubernetes/cluster/kubectl.sh
+
+$kubectl label no <nodenames> nodepool=default-pool
+$kubectl get no -o json | jq ".items|.[].metadata.labels"
+
+$kubectl create -f examples/dkcfg-nodepool-crd/nodeconfigsourcepool.yaml
+$kubectl get customresourcedefinitions
+
+# create a pool with percentNew at 0, labelselector for default-pool, and no history
+$kubectl create -f examples/dkcfg-nodepool-crd/default-pool.yaml
+$kubectl get ncsp -o yaml
+
+# create another pool with percentNew at 0 and no history, for comparison
+$kubectl create -f examples/dkcfg-nodepool-crd/non-default-pool.yaml
+$kubectl get ncsp -o yaml
+
+# create a new node config source configmap
+$kubectl proxy &
+# remember to replace NODE_NAME
+curl http://localhost:8001/api/v1/proxy/nodes/${NODE_NAME}/configz | jq '.kubeletconfig|.kind="KubeletConfiguration"|.apiVersion="kubeletconfig/v1alpha1"' > examples/dkcfg-nodepool-crd/kubelet
+$kubectl -n kube-system create configmap default-pool --from-file=examples/dkcfg-nodepool-crd/kubelet --append-hash -o yaml
+$kubectl -n kube-system get configmaps
+
+# authorize nodes to read the configmap
+export CONFIG_MAP_NAME=name-from-previous-step
+$kubectl -n kube-system create role "${CONFIG_MAP_NAME}-reader" --verb=get --resource=configmap --resource-name=${CONFIG_MAP_NAME}
+$kubectl -n kube-system create rolebinding ${CONFIG_MAP_NAME}-reader --role=${CONFIG_MAP_NAME}-reader --user=system:node:${NODE_NAME} [--user=OTHER_NODE...]
+$kubectl -n kube-system get rolebinding ${CONFIG_MAP_NAME}-reader -o yaml
+
+# add the configmap to the history, but don't change the percentage
+$kubectl edit ncsp default-pool
+
+# edit it so it looks something like this:
+
+----------------
+
+# Please edit the object below. Lines beginning with a '#' will be ignored,
+# and an empty file will abort the edit. If an error occurs while saving this file will be
+# reopened with the relevant failures.
+#
+apiVersion: nodeconfig.k8s.io/v1alpha1
+kind: NodeConfigSourcePool
+metadata:
+  clusterName: ""
+  creationTimestamp: 2017-11-06T03:34:11Z
+  deletionGracePeriodSeconds: null
+  deletionTimestamp: null
+  name: default-pool
+  namespace: ""
+  resourceVersion: "1391"
+  selfLink: /apis/nodeconfig.k8s.io/v1alpha1/default-pool
+  uid: 5ab5a0a6-c2a3-11e7-9519-42010a800006
+spec:
+  percentNew: 0
+  history:
+    - configMapRef:
+        name: default-pool-cgdgfhfkb7
+        namespace: kube-system
+        uid: d57eeb91-c2a4-11e7-9519-42010a800006
+  labelSelector:
+    matchLabels:
+      nodepool: default-pool
+
+----------------
+
+# check the config status of the nodes
+$kubectl get nodes -o json | jq '.items|.[].status.conditions|map(select(.type=="ConfigOK"))'
+
+# now raise percentage to something that should move one node to the new config, e.g. if you have 3 nodes set to 34%
+$kubectl edit ncsp default-pool
+
+# check the config status of the nodes again
+$kubectl get nodes -o json | jq '.items|.[].status.conditions|map(select(.type=="ConfigOK"))'
+
+
+
+
+############
+# to drop in a new kube-controller-manager binary:
+make quick-release
+gcloud compute scp _output/release-images/amd64/kube-controller-manager.tar kubernetes-master:/home/mtaufen
+
+# or if you build with bazel
+bazel build build:kube-controller-manager.tar
+gcloud compute scp bazel-bin/build/kube-controller-manager.tar kubernetes-master:/home/mtaufen
+chmod 755 bazel-bin/build/kube-controller-manager.tar
+
+# on master:
+docker load -i /home/mtaufen/kube-controller-manager.tar
+
+# then edit the manifest to point to the newly-loaded image
+sudoedit /etc/kubernetes/manifests/kube-controller-manager.manifest
+
+# check this before and after:
+kubectl get po -n kube-system kube-controller-manager-kubernetes-master -o yaml
+
+
+old: gcr.io/google_containers/kube-controller-manager:v1.9.0-alpha.1.1719_e5b189c0b1759c-dirty
+new: gcr.io/google_containers/kube-controller-manager:v1.9.0-alpha.1.1722_3566bf1b4aa63f-dirty
+
+
+# Logs:
+tail -f /var/log/kube-controller-manager.log
+
+
+#################
+
+
+run:
+./generate-groups.sh all k8s.io/kubernetes/pkg/controller/node/nodeconfig/client-go k8s.io/kubernetes/pkg/controller/node "nodeconfig:v1alpha1"
+to generate the client, listers, informers (from k8s.io/code-generator repo)
+
+then, in kubernetes repo run:
+make clean_generated
+make generated_files
+
+to undo the incorrect deep copy that generate-groups.sh produces

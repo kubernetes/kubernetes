@@ -1,0 +1,59 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  # name must match the spec fields below, and be in the form: <plural>.<group>
+  name: nodeconfigsourcepools.nodeconfig.k8s.io
+spec:
+  # group name to use for REST API: /apis/<group>/<version>
+  group: nodeconfig.k8s.io
+  # version name to use for REST API: /apis/<group>/<version>
+  version: v1alpha1
+  # either Namespaced or Cluster
+  scope: Cluster # Nodes are cluster scoped, and so shall this be
+  names:
+    # plural name to be used in the URL: /apis/<group>/<version>/<plural>
+    plural: nodeconfigsourcepools
+    # singular name to be used as an alias on the CLI and for display
+    singular: nodeconfigsourcepool
+    # kind is normally the CamelCased singular type. Your resource manifests use this.
+    kind: NodeConfigSourcePool # TODO(mtaufen): This needs a better name. NodeConfigSourceDeployment isn't quite accurate, since few things are managed for you. NodeConfigSourceAffinity?
+    # shortNames allow shorter string to match your resource on the CLI
+    shortNames:
+    - ncsp
+  # Note the validation subfeature is still alpha
+  # TODO(mtaufen): update validation so it actually matches the object type
+  validation:
+    # openAPIV3Schema is the schema for validating custom objects.
+    openAPIV3Schema:
+      properties:
+        spec:
+          properties: #TODO(mtaufen): add a selector that identifies the pool
+            percentNew: #TODO(mtaufen): description
+              type: integer
+              minimum: 0
+              maximum: 100
+            history:
+              type: array
+              items:
+                type: object
+                properties:
+                  kind:
+                    type: string
+                  apiVersion:
+                    type: string
+                  configMapRef:
+                    properties:
+                      kind:
+                        type: string
+                      namespace:
+                        type: string
+                      name:
+                        type: string
+                      uid:
+                        type: string
+                      apiVersion:
+                        type: string
+                      resourceVersion:
+                        type: string
+                      fieldPath:
+                        type: string

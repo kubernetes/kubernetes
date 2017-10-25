@@ -59,6 +59,8 @@ go_library(
         "//pkg/controller/namespace:go_default_library",
         "//pkg/controller/node:go_default_library",
         "//pkg/controller/node/ipam:go_default_library",
+        "//pkg/controller/node/nodeconfig/client-go/clientset/versioned:go_default_library",
+        "//pkg/controller/node/nodeconfig/client-go/informers/externalversions:go_default_library",
         "//pkg/controller/podautoscaler:go_default_library",
         "//pkg/controller/podautoscaler/metrics:go_default_library",
         "//pkg/controller/podgc:go_default_library",

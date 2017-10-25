@@ -1491,6 +1491,8 @@ function remove-salt-config-comments {
 #   CLOUD_CONFIG_MOUNT
 #   DOCKER_REGISTRY
 function start-kube-apiserver {
+  # FEATURE_GATES="${FEATURE_GATES},CustomResourceValidation=true" # mtaufen: hack to get the API server to start up with validation enabled
+
   echo "Start kubernetes api-server"
   prepare-log-file /var/log/kube-apiserver.log
   prepare-log-file /var/log/kube-apiserver-audit.log
@@ -1644,7 +1646,7 @@ function start-kube-apiserver {
   if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
     local -r vm_external_ip=$(curl --retry 5 --retry-delay 3 --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
     if [[ -n "${PROXY_SSH_USER:-}" ]]; then
-      params+=" --advertise-address=${vm_external_ip}"      
+      params+=" --advertise-address=${vm_external_ip}"
       params+=" --ssh-user=${PROXY_SSH_USER}"
       params+=" --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
     else

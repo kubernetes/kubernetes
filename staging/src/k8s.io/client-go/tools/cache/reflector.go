@@ -368,6 +368,17 @@ func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string, err
 		r.metrics.watchDuration.Observe(time.Since(start).Seconds())
 	}()
 
+	logExtra := false
+	if r.expectedType == nil {
+		glog.Infof("expectedType is nil")
+	} else {
+		glog.Infof("expectedType is: %s", r.expectedType.String())
+	}
+	if r.expectedType != nil && strings.Contains(r.expectedType.String(), "NodeConfig") {
+		logExtra = true
+		glog.Infof("watch handler for nodeconfig: will log extra")
+	}
+
 loop:
 	for {
 		select {
@@ -377,7 +388,15 @@ loop:
 			return err
 		case event, ok := <-w.ResultChan():
 			if !ok {
+				if logExtra {
+					glog.Infof("watch handler for nodeconfig: closed channel")
+				}
 				break loop
+			}
+			if logExtra {
+				glog.Infof("watch handler for nodeconfig: got event: %#v", event)
+			} else {
+				glog.Infof("watch handler for everything else: got event: %#v", event)
 			}
 			if event.Type == watch.Error {
 				return apierrs.FromObject(event.Object)
