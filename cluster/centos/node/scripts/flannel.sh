@@ -15,7 +15,7 @@
 # limitations under the License.
 
 
-ETCD_SERVERS=${1:-"http://8.8.8.18:2379"}
+ETCD_SERVERS=${1:-"https://8.8.8.18:2379"}
 FLANNEL_NET=${2:-"172.16.0.0/16"}
 
 CA_FILE="/srv/kubernetes/etcd/ca.pem"
