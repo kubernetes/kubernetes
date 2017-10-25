@@ -13,6 +13,7 @@ func TestSleepContext(t *testing.T) {
 	duration := time.Minute
 	start := time.Now()
 	clock := clock.NewFakeClock(start)
+	clock.AdvanceOnAfter = true
 	ctx := context.Background()
 
 	err := flowcontrol.SleepContext(ctx, clock, duration)

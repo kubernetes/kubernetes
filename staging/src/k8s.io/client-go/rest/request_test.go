@@ -1095,7 +1095,7 @@ func TestBackoffLifecycle(t *testing.T) {
 	// which are used in the server implementation returning StatusOK above.
 	seconds := []int{0, 1, 2, 4, 8, 0, 1, 2, 4, 0}
 	request := c.Verb("POST").Prefix("backofftest").Suffix("abc")
-	clock := clock.FakeClock{}
+	clock := clock.FakeClock{AdvanceOnAfter: true}
 	request.backoffMgr = &URLBackoff{
 		// Use a fake backoff here to avoid flakes and speed the test up.
 		Backoff: flowcontrol.NewFakeBackOff(
