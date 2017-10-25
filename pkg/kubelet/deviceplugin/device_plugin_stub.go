@@ -145,7 +145,13 @@ func (m *Stub) Update(devs []*pluginapi.Device) {
 func (m *Stub) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
 	log.Printf("Allocate, %+v", r)
 
-	var response pluginapi.AllocateResponse
+	var specs []*pluginapi.DeviceRuntimeSpec
+	for _, k := range r.DevicesIDs {
+		spec := &pluginapi.DeviceRuntimeSpec{ID: k}
+		specs = append(specs, spec)
+	}
+
+	response := pluginapi.AllocateResponse{Spec: specs}
 	return &response, nil
 }
 
