@@ -22,19 +22,19 @@ import (
 	"reflect"
 	"testing"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 type testRolePrinter struct {
-	CachedRole *rbac.Role
+	CachedRole *rbacv1.Role
 }
 
 func (t *testRolePrinter) PrintObj(obj runtime.Object, out io.Writer) error {
-	t.CachedRole = obj.(*rbac.Role)
+	t.CachedRole = obj.(*rbacv1.Role)
 	return nil
 }
 
@@ -64,16 +64,16 @@ func TestCreateRole(t *testing.T) {
 		verbs         string
 		resources     string
 		resourceNames string
-		expectedRole  *rbac.Role
+		expectedRole  *rbacv1.Role
 	}{
 		"test-duplicate-resources": {
 			verbs:     "get,watch,list",
 			resources: "pods,pods",
-			expectedRole: &rbac.Role{
+			expectedRole: &rbacv1.Role{
 				ObjectMeta: v1.ObjectMeta{
 					Name: roleName,
 				},
-				Rules: []rbac.PolicyRule{
+				Rules: []rbacv1.PolicyRule{
 					{
 						Verbs:         []string{"get", "watch", "list"},
 						Resources:     []string{"pods"},
@@ -86,11 +86,11 @@ func TestCreateRole(t *testing.T) {
 		"test-subresources": {
 			verbs:     "get,watch,list",
 			resources: "replicasets/scale",
-			expectedRole: &rbac.Role{
+			expectedRole: &rbacv1.Role{
 				ObjectMeta: v1.ObjectMeta{
 					Name: roleName,
 				},
-				Rules: []rbac.PolicyRule{
+				Rules: []rbacv1.PolicyRule{
 					{
 						Verbs:         []string{"get", "watch", "list"},
 						Resources:     []string{"replicasets/scale"},
@@ -103,11 +103,11 @@ func TestCreateRole(t *testing.T) {
 		"test-subresources-with-apigroup": {
 			verbs:     "get,watch,list",
 			resources: "replicasets.extensions/scale",
-			expectedRole: &rbac.Role{
+			expectedRole: &rbacv1.Role{
 				ObjectMeta: v1.ObjectMeta{
 					Name: roleName,
 				},
-				Rules: []rbac.PolicyRule{
+				Rules: []rbacv1.PolicyRule{
 					{
 						Verbs:         []string{"get", "watch", "list"},
 						Resources:     []string{"replicasets/scale"},
@@ -120,11 +120,11 @@ func TestCreateRole(t *testing.T) {
 		"test-valid-case-with-multiple-apigroups": {
 			verbs:     "get,watch,list",
 			resources: "pods,deployments.extensions",
-			expectedRole: &rbac.Role{
+			expectedRole: &rbacv1.Role{
 				ObjectMeta: v1.ObjectMeta{
 					Name: roleName,
 				},
-				Rules: []rbac.PolicyRule{
+				Rules: []rbacv1.PolicyRule{
 					{
 						Verbs:         []string{"get", "watch", "list"},
 						Resources:     []string{"pods"},

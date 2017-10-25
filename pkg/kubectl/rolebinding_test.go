@@ -20,15 +20,15 @@ import (
 	"reflect"
 	"testing"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
 func TestRoleBindingGenerate(t *testing.T) {
 	tests := map[string]struct {
 		params        map[string]interface{}
 		expectErrMsg  string
-		expectBinding *rbac.RoleBinding
+		expectBinding *rbacv1.RoleBinding
 	}{
 		"test-missing-name": {
 			params: map[string]interface{}{
@@ -82,28 +82,28 @@ func TestRoleBindingGenerate(t *testing.T) {
 				"group":          []string{"fake-group"},
 				"serviceaccount": []string{"fake-namespace:fake-account"},
 			},
-			expectBinding: &rbac.RoleBinding{
+			expectBinding: &rbacv1.RoleBinding{
 				ObjectMeta: v1.ObjectMeta{
 					Name: "fake-binding",
 				},
-				RoleRef: rbac.RoleRef{
-					APIGroup: rbac.GroupName,
+				RoleRef: rbacv1.RoleRef{
+					APIGroup: rbacv1.GroupName,
 					Kind:     "Role",
 					Name:     "fake-role",
 				},
-				Subjects: []rbac.Subject{
+				Subjects: []rbacv1.Subject{
 					{
-						Kind:     rbac.UserKind,
+						Kind:     rbacv1.UserKind,
 						APIGroup: "rbac.authorization.k8s.io",
 						Name:     "fake-user",
 					},
 					{
-						Kind:     rbac.GroupKind,
+						Kind:     rbacv1.GroupKind,
 						APIGroup: "rbac.authorization.k8s.io",
 						Name:     "fake-group",
 					},
 					{
-						Kind:      rbac.ServiceAccountKind,
+						Kind:      rbacv1.ServiceAccountKind,
 						Namespace: "fake-namespace",
 						Name:      "fake-account",
 					},
@@ -128,8 +128,8 @@ func TestRoleBindingGenerate(t *testing.T) {
 			t.Errorf("test '%s': unexpected error %s", name, err.Error())
 			continue
 		}
-		if !reflect.DeepEqual(obj.(*rbac.RoleBinding), test.expectBinding) {
-			t.Errorf("test '%s': expected:\n%#v\nsaw:\n%#v", name, test.expectBinding, obj.(*rbac.RoleBinding))
+		if !reflect.DeepEqual(obj.(*rbacv1.RoleBinding), test.expectBinding) {
+			t.Errorf("test '%s': expected:\n%#v\nsaw:\n%#v", name, test.expectBinding, obj.(*rbacv1.RoleBinding))
 		}
 	}
 }

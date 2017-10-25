@@ -22,13 +22,13 @@ import (
 	"testing"
 
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
+	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestCreateNamespace(t *testing.T) {
-	namespaceObject := &api.Namespace{}
+	namespaceObject := &apiv1.Namespace{}
 	namespaceObject.Name = "my-namespace"
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}

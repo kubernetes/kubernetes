@@ -23,13 +23,13 @@ import (
 
 	"github.com/spf13/cobra"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -51,7 +51,7 @@ var (
 	kubectl create rolebinding admin --role=admin --user=admin -o yaml --dry-run | kubectl set subject --local -f - --user=foo -o yaml`)
 )
 
-type updateSubjects func(existings []rbac.Subject, targets []rbac.Subject) (bool, []rbac.Subject)
+type updateSubjects func(existings []rbacv1.Subject, targets []rbacv1.Subject) (bool, []rbacv1.Subject)
 
 // SubjectOptions is the start of the data required to perform the operation. As new fields are added, add them here instead of
 // referencing the cmd.Flags
@@ -169,7 +169,7 @@ func (o *SubjectOptions) Validate() error {
 		}
 
 		for _, info := range o.Infos {
-			_, ok := info.Object.(*rbac.ClusterRoleBinding)
+			_, ok := info.Object.(*rbacv1.ClusterRoleBinding)
 			if ok && tokens[0] == "" {
 				return fmt.Errorf("serviceaccount must be <namespace>:<name>, namespace must be specified")
 			}
@@ -182,19 +182,19 @@ func (o *SubjectOptions) Validate() error {
 func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 	var err error
 	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
-		subjects := []rbac.Subject{}
+		subjects := []rbacv1.Subject{}
 		for _, user := range sets.NewString(o.Users...).List() {
-			subject := rbac.Subject{
-				Kind:     rbac.UserKind,
-				APIGroup: rbac.GroupName,
+			subject := rbacv1.Subject{
+				Kind:     rbacv1.UserKind,
+				APIGroup: rbacv1.GroupName,
 				Name:     user,
 			}
 			subjects = append(subjects, subject)
 		}
 		for _, group := range sets.NewString(o.Groups...).List() {
-			subject := rbac.Subject{
-				Kind:     rbac.GroupKind,
-				APIGroup: rbac.GroupName,
+			subject := rbacv1.Subject{
+				Kind:     rbacv1.GroupKind,
+				APIGroup: rbacv1.GroupName,
 				Name:     group,
 			}
 			subjects = append(subjects, subject)
@@ -209,8 +209,8 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 					return nil, err
 				}
 			}
-			subject := rbac.Subject{
-				Kind:      rbac.ServiceAccountKind,
+			subject := rbacv1.Subject{
+				Kind:      rbacv1.ServiceAccountKind,
 				Namespace: namespace,
 				Name:      name,
 			}
@@ -261,13 +261,13 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 }
 
 //Note: the obj mutates in the function
-func updateSubjectForObject(obj runtime.Object, subjects []rbac.Subject, fn updateSubjects) (bool, error) {
+func updateSubjectForObject(obj runtime.Object, subjects []rbacv1.Subject, fn updateSubjects) (bool, error) {
 	switch t := obj.(type) {
-	case *rbac.RoleBinding:
+	case *rbacv1.RoleBinding:
 		transformed, result := fn(t.Subjects, subjects)
 		t.Subjects = result
 		return transformed, nil
-	case *rbac.ClusterRoleBinding:
+	case *rbacv1.ClusterRoleBinding:
 		transformed, result := fn(t.Subjects, subjects)
 		t.Subjects = result
 		return transformed, nil
@@ -276,7 +276,7 @@ func updateSubjectForObject(obj runtime.Object, subjects []rbac.Subject, fn upda
 	}
 }
 
-func addSubjects(existings []rbac.Subject, targets []rbac.Subject) (bool, []rbac.Subject) {
+func addSubjects(existings []rbacv1.Subject, targets []rbacv1.Subject) (bool, []rbacv1.Subject) {
 	transformed := false
 	updated := existings
 	for _, item := range targets {
@@ -288,7 +288,7 @@ func addSubjects(existings []rbac.Subject, targets []rbac.Subject) (bool, []rbac
 	return transformed, updated
 }
 
-func contain(slice []rbac.Subject, item rbac.Subject) bool {
+func contain(slice []rbacv1.Subject, item rbacv1.Subject) bool {
 	for _, v := range slice {
 		if v == item {
 			return true

@@ -22,19 +22,19 @@ import (
 	"reflect"
 	"testing"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 type testClusterRolePrinter struct {
-	CachedClusterRole *rbac.ClusterRole
+	CachedClusterRole *rbacv1.ClusterRole
 }
 
 func (t *testClusterRolePrinter) PrintObj(obj runtime.Object, out io.Writer) error {
-	t.CachedClusterRole = obj.(*rbac.ClusterRole)
+	t.CachedClusterRole = obj.(*rbacv1.ClusterRole)
 	return nil
 }
 
@@ -65,16 +65,16 @@ func TestCreateClusterRole(t *testing.T) {
 		resources           string
 		nonResourceURL      string
 		resourceNames       string
-		expectedClusterRole *rbac.ClusterRole
+		expectedClusterRole *rbacv1.ClusterRole
 	}{
 		"test-duplicate-resources": {
 			verbs:     "get,watch,list",
 			resources: "pods,pods",
-			expectedClusterRole: &rbac.ClusterRole{
+			expectedClusterRole: &rbacv1.ClusterRole{
 				ObjectMeta: v1.ObjectMeta{
 					Name: clusterRoleName,
 				},
-				Rules: []rbac.PolicyRule{
+				Rules: []rbacv1.PolicyRule{
 					{
 						Verbs:         []string{"get", "watch", "list"},
 						Resources:     []string{"pods"},
@@ -87,11 +87,11 @@ func TestCreateClusterRole(t *testing.T) {
 		"test-valid-case-with-multiple-apigroups": {
 			verbs:     "get,watch,list",
 			resources: "pods,deployments.extensions",
-			expectedClusterRole: &rbac.ClusterRole{
+			expectedClusterRole: &rbacv1.ClusterRole{
 				ObjectMeta: v1.ObjectMeta{
 					Name: clusterRoleName,
 				},
-				Rules: []rbac.PolicyRule{
+				Rules: []rbacv1.PolicyRule{
 					{
 						Verbs:         []string{"get", "watch", "list"},
 						Resources:     []string{"pods"},
@@ -110,11 +110,11 @@ func TestCreateClusterRole(t *testing.T) {
 		"test-non-resource-url": {
 			verbs:          "get",
 			nonResourceURL: "/logs/,/healthz",
-			expectedClusterRole: &rbac.ClusterRole{
+			expectedClusterRole: &rbacv1.ClusterRole{
 				ObjectMeta: v1.ObjectMeta{
 					Name: clusterRoleName,
 				},
-				Rules: []rbac.PolicyRule{
+				Rules: []rbacv1.PolicyRule{
 					{
 						Verbs:           []string{"get"},
 						NonResourceURLs: []string{"/logs/", "/healthz"},
@@ -126,11 +126,11 @@ func TestCreateClusterRole(t *testing.T) {
 			verbs:          "get",
 			nonResourceURL: "/logs/,/healthz",
 			resources:      "pods",
-			expectedClusterRole: &rbac.ClusterRole{
+			expectedClusterRole: &rbacv1.ClusterRole{
 				ObjectMeta: v1.ObjectMeta{
 					Name: clusterRoleName,
 				},
-				Rules: []rbac.PolicyRule{
+				Rules: []rbacv1.PolicyRule{
 					{
 						Verbs:         []string{"get"},
 						Resources:     []string{"pods"},
