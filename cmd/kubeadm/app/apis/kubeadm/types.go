@@ -92,7 +92,21 @@ type Etcd struct {
 	DataDir   string
 	ExtraArgs map[string]string
 	// Image specifies which container image to use for running etcd. If empty, automatically populated by kubeadm using the image repository and default etcd version
-	Image string
+	Image      string
+	SelfHosted *SelfHostedEtcd
+}
+
+// SelfHostedEtcd describes options required to configure self-hosted etcd
+type SelfHostedEtcd struct {
+	// CertificatesDir represents the directory where all etcd TLS assets are stored. By default this is
+	// a dir names "etcd" in the main CertificatesDir value.
+	CertificatesDir string
+	// ClusterServiceName is the name of the service that load balances the etcd cluster
+	ClusterServiceName string
+	// EtcdVersion is the version of etcd running in the cluster.
+	EtcdVersion string
+	// OperatorVersion is the version of the etcd-operator to use.
+	OperatorVersion string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

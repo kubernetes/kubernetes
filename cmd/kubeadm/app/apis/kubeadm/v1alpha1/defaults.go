@@ -40,10 +40,19 @@ const (
 	DefaultCACertPath = "/etc/kubernetes/pki/ca.crt"
 	// DefaultCertificatesDir defines default certificate directory
 	DefaultCertificatesDir = "/etc/kubernetes/pki"
-	// DefaultEtcdDataDir defines default location of etcd
-	DefaultEtcdDataDir = "/var/lib/etcd"
 	// DefaultImageRepository defines default image registry
 	DefaultImageRepository = "gcr.io/google_containers"
+
+	// DefaultEtcdDataDir defines default location of etcd where static pods will save data to
+	DefaultEtcdDataDir = "/var/lib/etcd"
+	// DefaultEtcdClusterSize defines the default cluster size when using the etcd-operator
+	DefaultEtcdClusterSize = 3
+	// DefaultEtcdOperatorVersion defines the default version of the etcd-operator to use
+	DefaultEtcdOperatorVersion = "v0.6.0"
+	// DefaultEtcdCertDir represents the directory where PKI assets are stored for self-hosted etcd
+	DefaultEtcdCertDir = "/etc/kubernetes/pki/etcd"
+	// DefaultEtcdClusterServiceName is the default name of the service backing the etcd cluster
+	DefaultEtcdClusterServiceName = "etcd-cluster"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -89,6 +98,8 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 	if obj.Etcd.DataDir == "" {
 		obj.Etcd.DataDir = DefaultEtcdDataDir
 	}
+
+	SetDefaultsEtcdSelfHosted(obj)
 }
 
 // SetDefaults_NodeConfiguration assigns default values to a regular node
@@ -108,5 +119,28 @@ func SetDefaults_NodeConfiguration(obj *NodeConfiguration) {
 		if err == nil && u.Scheme == "file" {
 			obj.DiscoveryFile = u.Path
 		}
+	}
+}
+
+// SetDefaultsEtcdSelfHosted sets defaults for self-hosted etcd
+func SetDefaultsEtcdSelfHosted(obj *MasterConfiguration) {
+	if obj.Etcd.SelfHosted == nil {
+		obj.Etcd.SelfHosted = &SelfHostedEtcd{}
+	}
+
+	if obj.Etcd.SelfHosted.ClusterServiceName == "" {
+		obj.Etcd.SelfHosted.ClusterServiceName = DefaultEtcdClusterServiceName
+	}
+
+	if obj.Etcd.SelfHosted.EtcdVersion == "" {
+		obj.Etcd.SelfHosted.EtcdVersion = constants.DefaultEtcdVersion
+	}
+
+	if obj.Etcd.SelfHosted.OperatorVersion == "" {
+		obj.Etcd.SelfHosted.OperatorVersion = DefaultEtcdOperatorVersion
+	}
+
+	if obj.Etcd.SelfHosted.CertificatesDir == "" {
+		obj.Etcd.SelfHosted.CertificatesDir = DefaultEtcdCertDir
 	}
 }
