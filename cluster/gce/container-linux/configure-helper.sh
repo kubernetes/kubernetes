@@ -1286,6 +1286,13 @@ function start-kube-addons {
     setup-addon-manifests "addons" "dns"
     local -r kubedns_file="${dst_dir}/dns/kube-dns.yaml"
     mv "${dst_dir}/dns/kube-dns.yaml.in" "${kubedns_file}"
+    if [ -n "${CUSTOM_KUBE_DNS_YAML:-}" ]; then
+      # Replace with custom GKE kube-dns deployment.
+      cat > "${kubedns_file}" <<EOF
+$(echo "$CUSTOM_KUBE_DNS_YAML")
+EOF
+      update-prometheus-to-sd-parameters ${kubedns_file}
+    fi
     # Replace the salt configurations with variable values.
     sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${kubedns_file}"
     sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${kubedns_file}"
