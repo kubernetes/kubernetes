@@ -17,6 +17,7 @@ limitations under the License.
 package tunneler
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -39,32 +40,32 @@ func TestSecondsSinceSync(t *testing.T) {
 
 	// Nano Second. No difference.
 	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 1, 2, time.UTC))
-	assert.Equal(int64(0), tunneler.SecondsSinceSync())
+	assert.Equal(int64(0), tunneler.secondsSinceSync())
 
 	// Second
 	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 2, 1, time.UTC))
-	assert.Equal(int64(1), tunneler.SecondsSinceSync())
+	assert.Equal(int64(1), tunneler.secondsSinceSync())
 
 	// Minute
 	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 2, 1, 1, time.UTC))
-	assert.Equal(int64(60), tunneler.SecondsSinceSync())
+	assert.Equal(int64(60), tunneler.secondsSinceSync())
 
 	// Hour
 	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 2, 1, 1, 1, time.UTC))
-	assert.Equal(int64(3600), tunneler.SecondsSinceSync())
+	assert.Equal(int64(3600), tunneler.secondsSinceSync())
 
 	// Day
 	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 2, 1, 1, 1, 1, time.UTC))
-	assert.Equal(int64(86400), tunneler.SecondsSinceSync())
+	assert.Equal(int64(86400), tunneler.secondsSinceSync())
 
 	// Month
 	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.February, 1, 1, 1, 1, 1, time.UTC))
-	assert.Equal(int64(2678400), tunneler.SecondsSinceSync())
+	assert.Equal(int64(2678400), tunneler.secondsSinceSync())
 
 	// Future Month. Should be -Month.
 	tunneler.lastSync = time.Date(2015, time.February, 1, 1, 1, 1, 1, time.UTC).Unix()
 	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC))
-	assert.Equal(int64(-2678400), tunneler.SecondsSinceSync())
+	assert.Equal(int64(-2678400), tunneler.secondsSinceSync())
 }
 
 // generateTempFile creates a temporary file path
@@ -109,27 +110,26 @@ func TestGenerateSSHKey(t *testing.T) {
 type FakeTunneler struct {
 	SecondsSinceSyncValue       int64
 	SecondsSinceSSHKeySyncValue int64
+	HealthyReturn               error
 }
 
 func (t *FakeTunneler) Run(AddressFunc)                         {}
 func (t *FakeTunneler) Stop()                                   {}
 func (t *FakeTunneler) Dial(net, addr string) (net.Conn, error) { return nil, nil }
-func (t *FakeTunneler) SecondsSinceSync() int64                 { return t.SecondsSinceSyncValue }
-func (t *FakeTunneler) SecondsSinceSSHKeySync() int64           { return t.SecondsSinceSSHKeySyncValue }
+func (t *FakeTunneler) Healthy() error                          { return t.HealthyReturn }
 
 // TestIsTunnelSyncHealthy verifies that the 600 second lag test
 // is honored.
 func TestIsTunnelSyncHealthy(t *testing.T) {
 	tunneler := &FakeTunneler{}
 
-	// Pass case: 540 second lag
-	tunneler.SecondsSinceSyncValue = 540
+	tunneler.HealthyReturn = nil
 	healthFn := TunnelSyncHealthChecker(tunneler)
 	err := healthFn(nil)
 	assert.NoError(t, err, "IsTunnelSyncHealthy() should not have returned an error.")
 
 	// Fail case: 720 second lag
-	tunneler.SecondsSinceSyncValue = 720
+	tunneler.HealthyReturn = errors.New("failed")
 	err = healthFn(nil)
 	assert.Error(t, err, "IsTunnelSyncHealthy() should have returned an error.")
 }
