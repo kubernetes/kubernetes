@@ -391,6 +391,9 @@ type PersistentVolumeSource struct {
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md
 	// +optional
 	StorageOS *StorageOSPersistentVolumeSource
+	// CSI (Container Storage Interface) represents storage that handled by an external CSI driver
+	// +optional
+	CSI *CSIPersistentVolumeSource
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -1501,6 +1504,37 @@ type LocalVolumeSource struct {
 	// For alpha, this path must be a directory
 	// Once block as a source is supported, then this path can point to a block device
 	Path string
+}
+
+// Represents storage that is managed by an external CSI volume driver
+type CSIPersistentVolumeSource struct {
+	// Driver is the name of the driver to use for this volume.
+	// Required.
+	Driver string
+
+	// VolumeHandle is the unique volume name returned by the CSI volume
+	// plugin’s CreateVolume to refer to the volume on all subsequent calls.
+	// Required.
+	VolumeHandle string
+
+	// Optional: MountSecretRef is a reference to the secret object containing
+	// sensitive information to pass to the CSI driver during NodePublish.
+	// This may be empty if no secret is required. If the secret object contains
+	// more than one secret, all secrets are passed.
+	// +optional
+	MountSecretRef *SecretReference
+
+	// Optional: AttachSecretRef is a reference to the secret object containing
+	// sensitive information to pass to the CSI driver during ControllerPublish.
+	// This may be empty if no secret is required. If the secret object contains
+	// more than one secret, all secrets are passed.
+	// +optional
+	AttachSecretRef *SecretReference
+
+	// Optional: The value to pass to ControllerPublishVolumeRequest.
+	// Defaults to false (read/write).
+	// +optional
+	ReadOnly bool
 }
 
 // ContainerPort represents a network port in a single container

@@ -1353,6 +1353,52 @@ func TestValidateGlusterfs(t *testing.T) {
 	}
 }
 
+func TestValidateCSIVolumeSource(t *testing.T) {
+	testCases := []struct {
+		name     string
+		csi      *api.CSIPersistentVolumeSource
+		errtype  field.ErrorType
+		errfield string
+	}{
+		{
+			name: "all required fields ok",
+			csi:  &api.CSIPersistentVolumeSource{Driver: "test-driver", VolumeHandle: "test-123", ReadOnly: true},
+		},
+		{
+			name: "with default values ok",
+			csi:  &api.CSIPersistentVolumeSource{Driver: "test-driver", VolumeHandle: "test-123"},
+		},
+		{
+			name:     "missing driver name",
+			csi:      &api.CSIPersistentVolumeSource{VolumeHandle: "test-123"},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "driver",
+		},
+		{
+			name:     "missing volume handle",
+			csi:      &api.CSIPersistentVolumeSource{Driver: "my-driver"},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "volumeHandle",
+		},
+	}
+
+	for i, tc := range testCases {
+		errs := validateCSIPersistentVolumeSource(tc.csi, field.NewPath("field"))
+
+		if len(errs) > 0 && tc.errtype == "" {
+			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
+		} else if len(errs) == 0 && tc.errtype != "" {
+			t.Errorf("[%d: %q] expected error type %v", i, tc.name, tc.errtype)
+		} else if len(errs) >= 1 {
+			if errs[0].Type != tc.errtype {
+				t.Errorf("[%d: %q] expected error type %v, got %v", i, tc.name, tc.errtype, errs[0].Type)
+			} else if !strings.HasSuffix(errs[0].Field, "."+tc.errfield) {
+				t.Errorf("[%d: %q] expected error on field %q, got %q", i, tc.name, tc.errfield, errs[0].Field)
+			}
+		}
+	}
+}
+
 // helper
 func newInt32(val int) *int32 {
 	p := new(int32)
