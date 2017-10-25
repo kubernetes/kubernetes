@@ -39,10 +39,10 @@ QUICK_PATTERNS+=(
   "verify-generated-files-remake"
   "verify-godep-licenses.sh"
   "verify-gofmt.sh"
+  "verify-imports.sh"
   "verify-pkg-names.sh"
   "verify-readonly-packages.sh"
   "verify-staging-client-go.sh"
-  "verify-staging-imports.sh"
   "verify-test-images.sh"
   "verify-test-owners.sh"
 )
