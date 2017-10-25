@@ -359,6 +359,11 @@ func (s *ServiceController) ensureLoadBalancer(service *v1.Service) (*v1.LoadBal
 		return nil, err
 	}
 
+	// If there are no available nodes for LoadBalancer service, make a EventTypeWarning event for it.
+	if len(nodes) == 0 {
+		s.eventRecorder.Eventf(service, v1.EventTypeWarning, "UnAvailableLoadBalancer", "There are no available nodes for LoadBalancer service %s/%s", service.Namespace, service.Name)
+	}
+
 	// - Only one protocol supported per service
 	// - Not all cloud providers support all protocols and the next step is expected to return
 	//   an error for unsupported protocols
@@ -686,7 +691,12 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *v1.Service, h
 	// This operation doesn't normally take very long (and happens pretty often), so we only record the final event
 	err := s.balancer.UpdateLoadBalancer(s.clusterName, service, hosts)
 	if err == nil {
-		s.eventRecorder.Event(service, v1.EventTypeNormal, "UpdatedLoadBalancer", "Updated load balancer with new hosts")
+		// If there are no available nodes for LoadBalancer service, make a EventTypeWarning event for it.
+		if len(hosts) == 0 {
+			s.eventRecorder.Eventf(service, v1.EventTypeWarning, "UnAvailableLoadBalancer", "There are no available nodes for LoadBalancer service %s/%s", service.Namespace, service.Name)
+		} else {
+			s.eventRecorder.Event(service, v1.EventTypeNormal, "UpdatedLoadBalancer", "Updated load balancer with new hosts")
+		}
 		return nil
 	}
 
