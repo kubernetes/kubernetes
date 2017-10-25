@@ -300,14 +300,20 @@ func buildUserAgent(command, version, os, arch, commit string) string {
 		"%s/%s (%s/%s) kubernetes/%s", command, version, os, arch, commit)
 }
 
-// DefaultKubernetesUserAgent returns a User-Agent string built from static global vars.
-func DefaultKubernetesUserAgent() string {
+// UserAgentForComponent returns a User-Agent string with custom component
+// prefix.
+func UserAgentForComponent(name string) string {
 	return buildUserAgent(
-		adjustCommand(os.Args[0]),
+		adjustCommand(name),
 		adjustVersion(version.Get().GitVersion),
 		gruntime.GOOS,
 		gruntime.GOARCH,
 		adjustCommit(version.Get().GitCommit))
+}
+
+// DefaultKubernetesUserAgent returns a User-Agent string built from static global vars.
+func DefaultKubernetesUserAgent() string {
+	return UserAgentForComponent(os.Args[0])
 }
 
 // InClusterConfig returns a config object which uses the service account

@@ -625,6 +625,10 @@ func CreateAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, 
 		return nil, err
 	}
 
+	// Hardcode "kubelet" instead of os.Args[0] as the os.Args[0] in some cases
+	// might be different than "kubelet" (in case kubelet is vendored in
+	// third-party project).
+	clientConfig.UserAgent = restclient.UserAgentForComponent(componentKubelet)
 	clientConfig.ContentType = s.ContentType
 	// Override kubeconfig qps/burst settings from flags
 	clientConfig.QPS = float32(s.KubeAPIQPS)
