@@ -4860,7 +4860,7 @@ func CleanupGCEResources(c clientset.Interface, loadBalancerName, zone string) (
 	if hc != nil {
 		hcNames = append(hcNames, hc.Name)
 	}
-	if err := gceCloud.DeleteExternalTargetPoolAndChecks(nil, loadBalancerName, region, clusterID, hcNames...); err != nil &&
+	if err := gceCloud.DeleteExternalTargetPoolAndChecks(&v1.Service{}, loadBalancerName, region, clusterID, hcNames...); err != nil &&
 		!IsGoogleAPIHTTPErrorCode(err, http.StatusNotFound) {
 		retErr = fmt.Errorf("%v\n%v", retErr, err)
 	}
