@@ -1659,6 +1659,43 @@ func TestDescribeResourceQuota(t *testing.T) {
 	}
 }
 
+func TestDescribeServiceAccount(t *testing.T) {
+	fake := fake.NewSimpleClientset(&api.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Secrets: []api.ObjectReference{
+			{
+				Name: "test-objectref",
+			},
+		},
+		ImagePullSecrets: []api.LocalObjectReference{
+			{
+				Name: "test-local-ref",
+			},
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := ServiceAccountDescriber{c}
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	expectedOut := `Name:                bar
+Namespace:           foo
+Labels:              <none>
+Annotations:         <none>
+Image pull secrets:  test-local-ref (not found)
+Mountable secrets:   test-objectref (not found)
+Tokens:              <none>
+Events:              <none>` + "\n"
+	if out != expectedOut {
+		t.Errorf("expected : %q\n but got output:\n %q", expectedOut, out)
+	}
+
+}
+
 // boolPtr returns a pointer to a bool
 func boolPtr(b bool) *bool {
 	o := b
