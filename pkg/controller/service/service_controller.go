@@ -245,15 +245,17 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 	err, retry := s.createLoadBalancerIfNeeded(key, service)
 	if err != nil {
 		message := "Error creating load balancer"
+		var retryToReturn time.Duration
 		if retry {
 			message += " (will retry): "
+			retryToReturn = cachedService.nextRetryDelay()
 		} else {
 			message += " (will not retry): "
+			retryToReturn = doNotRetry
 		}
 		message += err.Error()
 		s.eventRecorder.Event(service, v1.EventTypeWarning, "CreatingLoadBalancerFailed", message)
-
-		return err, cachedService.nextRetryDelay()
+		return err, retryToReturn
 	}
 	// Always update the cache upon success.
 	// NOTE: Since we update the cached service if and only if we successfully
@@ -759,7 +761,7 @@ func (s *ServiceController) syncService(key string) error {
 
 	if retryDelay != 0 {
 		// Add the failed service back to the queue so we'll retry it.
-		glog.Errorf("Failed to process service. Retrying in %s: %v", retryDelay, err)
+		glog.Errorf("Failed to process service %v. Retrying in %s: %v", key, retryDelay, err)
 		go func(obj interface{}, delay time.Duration) {
 			// put back the service key to working queue, it is possible that more entries of the service
 			// were added into the queue during the delay, but it does not mess as when handling the retry,
@@ -767,7 +769,7 @@ func (s *ServiceController) syncService(key string) error {
 			s.workingQueue.AddAfter(obj, delay)
 		}(key, retryDelay)
 	} else if err != nil {
-		runtime.HandleError(fmt.Errorf("Failed to process service. Not retrying: %v", err))
+		runtime.HandleError(fmt.Errorf("Failed to process service %v. Not retrying: %v", key, err))
 	}
 	return nil
 }

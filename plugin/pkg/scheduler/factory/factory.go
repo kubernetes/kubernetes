@@ -77,7 +77,7 @@ var (
 type configFactory struct {
 	client clientset.Interface
 	// queue for pods that need scheduling
-	podQueue *cache.FIFO
+	podQueue core.SchedulingQueue
 	// a means to list all known scheduled pods.
 	scheduledPodLister corelisters.PodLister
 	// a means to list all known scheduled pods and pods assumed to have been scheduled.
@@ -142,10 +142,11 @@ func NewConfigFactory(
 	stopEverything := make(chan struct{})
 	schedulerCache := schedulercache.New(30*time.Second, stopEverything)
 
+	schedulingQueue := &core.FIFO{FIFO: cache.NewFIFO(cache.MetaNamespaceKeyFunc)}
 	c := &configFactory{
 		client:                         client,
 		podLister:                      schedulerCache,
-		podQueue:                       cache.NewFIFO(cache.MetaNamespaceKeyFunc),
+		podQueue:                       schedulingQueue,
 		pVLister:                       pvInformer.Lister(),
 		pVCLister:                      pvcInformer.Lister(),
 		serviceLister:                  serviceInformer.Lister(),
@@ -901,9 +902,14 @@ func (f *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 }
 
 func (f *configFactory) getNextPod() *v1.Pod {
-	pod := cache.Pop(f.podQueue).(*v1.Pod)
-	glog.V(4).Infof("About to try and schedule pod %v", pod.Name)
-	return pod
+	if obj, err := f.podQueue.Pop(); err == nil {
+		pod := obj.(*v1.Pod)
+		glog.V(4).Infof("About to try and schedule pod %v", pod.Name)
+		return pod
+	} else {
+		glog.Errorf("Error while retrieving next pod from scheduling queue: %v", err)
+		return nil
+	}
 }
 
 // unassignedNonTerminatedPod selects pods that are unassigned and non-terminal.
@@ -1011,7 +1017,7 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration, sche
 	}
 }
 
-func (factory *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue *cache.FIFO) func(pod *v1.Pod, err error) {
+func (factory *configFactory) MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue core.SchedulingQueue) func(pod *v1.Pod, err error) {
 	return func(pod *v1.Pod, err error) {
 		if err == core.ErrNoNodesAvailable {
 			glog.V(4).Infof("Unable to schedule %v %v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)

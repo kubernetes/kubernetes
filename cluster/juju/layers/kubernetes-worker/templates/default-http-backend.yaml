@@ -32,12 +32,13 @@ apiVersion: v1
 kind: Service
 metadata:
   name: default-http-backend
+#  namespace: kube-system
   labels:
-    app: default-http-backend
+    k8s-app: default-http-backend
 spec:
   ports:
-    - port: 80
-      protocol: TCP
-      targetPort: 80
+  - port: 80
+    protocol: TCP
+    targetPort: 80
   selector:
     app: default-http-backend

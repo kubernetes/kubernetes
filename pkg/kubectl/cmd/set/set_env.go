@@ -74,10 +74,10 @@ var (
 	  kubectl set env rc --all ENV=prod
 
 	  # Import environment from a secret
-	  kubectl set env --from=secret/mysecret dc/myapp
+	  kubectl set env --from=secret/mysecret deployment/myapp
 
 	  # Import environment from a config map with a prefix
-	  kubectl set env --from=configmap/myconfigmap --prefix=MYSQL_ dc/myapp
+	  kubectl set env --from=configmap/myconfigmap --prefix=MYSQL_ deployment/myapp
 
 	  # Remove the environment variable ENV from container 'c1' in all deployment configs
 	  kubectl set env deployments --all --containers="c1" ENV-
@@ -87,7 +87,7 @@ var (
 	  kubectl set env -f deploy.json ENV-
 
 	  # Set some of the local shell environment into a deployment config on the server
-	  env | grep RAILS_ | kubectl set env -e - dc/registry`)
+	  env | grep RAILS_ | kubectl set env -e - deployment/registry`)
 )
 
 type EnvOptions struct {
@@ -153,7 +153,7 @@ func NewCmdEnv(f cmdutil.Factory, in io.Reader, out, errout io.Writer) *cobra.Co
 	cmd.Flags().BoolVar(&options.List, "list", options.List, "If true, display the environment and any changes in the standard format. this flag will removed when we have kubectl view env.")
 	cmd.Flags().BoolVar(&options.Resolve, "resolve", options.Resolve, "If true, show secret or configmap references when listing variables")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on")
-	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set image will NOT contact api-server but run locally.")
+	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set env will NOT contact api-server but run locally.")
 	cmd.Flags().BoolVar(&options.All, "all", options.All, "If true, select all resources in the namespace of the specified resource types")
 	cmd.Flags().BoolVar(&options.Overwrite, "overwrite", true, "If true, allow environment to be overwritten, otherwise reject updates that overwrite existing environment.")
 
@@ -316,7 +316,7 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		return err
 	}
 	patches := CalculatePatches(o.Infos, o.Encoder, func(info *resource.Info) ([]byte, error) {
-		_, err := f.UpdatePodSpecForObject(info.Object, func(spec *api.PodSpec) error {
+		_, err := o.UpdatePodSpecForObject(info.Object, func(spec *api.PodSpec) error {
 			resolutionErrorsEncountered := false
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
 			if len(containers) == 0 {

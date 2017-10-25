@@ -916,7 +916,7 @@ __EOF__
 }
 
 # runs specific kubectl create tests
-run_create_tests() {
+run_create_secret_tests() {
     set -o nounset
     set -o errexit
 
@@ -4297,11 +4297,17 @@ run_cluster_management_tests() {
   response=$(! kubectl cordon 2>&1)
   kube::test::if_has_string "${response}" 'error\: USAGE\: cordon NODE'
 
-  ### kubectl cordon selects all nodes with an empty --selector=
+  ### kubectl cordon selects no nodes with an empty --selector=
   # Pre-condition: node "127.0.0.1" is uncordoned
   kubectl uncordon "127.0.0.1"
-  response=$(kubectl cordon --selector=)
+  response=$(! kubectl cordon --selector= 2>&1)
+  kube::test::if_has_string "${response}" 'must provide one or more resources'
+  # test=label matches our node
+  response=$(kubectl cordon --selector test=label)
   kube::test::if_has_string "${response}" 'node "127.0.0.1" cordoned'
+  # invalid=label does not match any nodes
+  response=$(kubectl cordon --selector invalid=label)
+  kube::test::if_has_not_string "${response}" 'cordoned'
   # Post-condition: node "127.0.0.1" is cordoned
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" 'true'
 
@@ -4607,7 +4613,7 @@ runTests() {
   # Create             #
   ######################
   if kube::test::if_supports_resource "${secrets}" ; then
-    record_command run_create_tests
+    record_command run_create_secret_tests
   fi
 
   ##################

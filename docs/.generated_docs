@@ -18,6 +18,7 @@ docs/man/man1/kube-apiserver.1
 docs/man/man1/kube-controller-manager.1
 docs/man/man1/kube-proxy.1
 docs/man/man1/kube-scheduler.1
+docs/man/man1/kubectl-alpha-diff.1
 docs/man/man1/kubectl-alpha.1
 docs/man/man1/kubectl-annotate.1
 docs/man/man1/kubectl-api-versions.1
@@ -115,6 +116,8 @@ docs/man/man1/kubectl-version.1
 docs/man/man1/kubectl.1
 docs/man/man1/kubelet.1
 docs/user-guide/kubectl/kubectl.md
+docs/user-guide/kubectl/kubectl_alpha.md
+docs/user-guide/kubectl/kubectl_alpha_diff.md
 docs/user-guide/kubectl/kubectl_annotate.md
 docs/user-guide/kubectl/kubectl_api-versions.md
 docs/user-guide/kubectl/kubectl_apply.md
