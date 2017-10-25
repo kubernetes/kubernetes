@@ -1348,16 +1348,21 @@ func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontaine
 	// set status for Pods created on versions of kube older than 1.6
 	apiPodStatus.QOSClass = v1qos.GetPodQOS(pod)
 
+	oldPodStatus, found := kl.statusManager.GetPodStatus(pod.UID)
+	if !found {
+		oldPodStatus = pod.Status
+	}
+
 	apiPodStatus.ContainerStatuses = kl.convertToAPIContainerStatuses(
 		pod, podStatus,
-		pod.Status.ContainerStatuses,
+		oldPodStatus.ContainerStatuses,
 		pod.Spec.Containers,
 		len(pod.Spec.InitContainers) > 0,
 		false,
 	)
 	apiPodStatus.InitContainerStatuses = kl.convertToAPIContainerStatuses(
 		pod, podStatus,
-		pod.Status.InitContainerStatuses,
+		oldPodStatus.InitContainerStatuses,
 		pod.Spec.InitContainers,
 		len(pod.Spec.InitContainers) > 0,
 		true,
@@ -1424,7 +1429,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		}
 		oldStatus, found := oldStatuses[container.Name]
 		if found {
-			if isInitContainer && oldStatus.State.Terminated != nil {
+			if oldStatus.State.Terminated != nil {
 				// Do not update status on terminated init containers as
 				// they be removed at any time.
 				status = &oldStatus
