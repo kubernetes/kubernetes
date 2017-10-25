@@ -83,6 +83,7 @@ type LoadBalancerOpts struct {
 	SubnetId             string     `gcfg:"subnet-id"`           // overrides autodetection.
 	FloatingNetworkId    string     `gcfg:"floating-network-id"` // If specified, will create floating ip for loadbalancer, or do not create floating ip.
 	LBMethod             string     `gcfg:"lb-method"`           // default to ROUND_ROBIN.
+	LBProvider           string     `gcfg:"lb-provider"`
 	CreateMonitor        bool       `gcfg:"create-monitor"`
 	MonitorDelay         MyDuration `gcfg:"monitor-delay"`
 	MonitorTimeout       MyDuration `gcfg:"monitor-timeout"`

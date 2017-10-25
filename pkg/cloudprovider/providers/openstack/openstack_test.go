@@ -162,6 +162,7 @@ func TestCheckOpenStackOpts(t *testing.T) {
 					SubnetId:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
 					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
 					LBMethod:             "ROUND_ROBIN",
+					LBProvider:           "haproxy",
 					CreateMonitor:        true,
 					MonitorDelay:         delay,
 					MonitorTimeout:       timeout,
