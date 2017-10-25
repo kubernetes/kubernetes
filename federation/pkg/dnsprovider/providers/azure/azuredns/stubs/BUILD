@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["azurednsapi.go"],
+    importpath = "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/azure/azuredns/stubs",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/Azure/azure-sdk-for-go/arm/dns:go_default_library",

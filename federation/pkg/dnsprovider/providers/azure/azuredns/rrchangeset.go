@@ -17,11 +17,10 @@ limitations under the License.
 package azuredns
 
 import (
-	"strings"
-
 	"github.com/Azure/azure-sdk-for-go/arm/dns"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
+	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
 )
 
 // Compile time check for interface adherence
@@ -102,20 +101,20 @@ func (c *ResourceRecordChangeset) Apply() error {
 		props := rset.RecordSetProperties
 
 		if glog.V(5) {
-			switch strings.TrimPrefix(*recType, "Microsoft.Network/dnszones/") {
-			case "A":
+			switch addition.(ResourceRecordSet).Type() {
+			case rrstype.A:
 				for i := range *props.ARecords {
 					rec := *props.ARecords
 					glog.V(0).Infof("azuredns: A Rec Ipv4: %s\n", *rec[i].Ipv4Address)
 				}
 
-			case "AAAA":
+			case rrstype.AAAA:
 				for i := range *props.AaaaRecords {
 					rec := *props.AaaaRecords
 					glog.V(0).Infof("azuredns: AAAA Rec Ipv6: %s\n", *rec[i].Ipv6Address)
 				}
 
-			case "CNAME":
+			case rrstype.CNAME:
 				glog.V(5).Infof("azuredns: CNAME: %s for name: %s, ID: %s, TTL %i\n", *props.CnameRecord.Cname, *rset.Name, *rset.ID, *rset.RecordSetProperties.TTL)
 			}
 		}

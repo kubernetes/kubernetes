@@ -9,6 +9,7 @@ go_library(
         "version.go",
         "zones.go",
     ],
+    importpath = "github.com/Azure/azure-sdk-for-go/arm/dns",
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",

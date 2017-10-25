@@ -50,7 +50,7 @@ func newTestInterface() (dnsprovider.Interface, error) {
 
 func newAzureDNSProvider() (dnsprovider.Interface, error) {
 	// Did you add the azure subscription configuration to the line below and uncomment
-	//configString := strings.NewReader("\n[Global]\nsubscription-id = [subscription id]\ntenant-id = [tenant id]\nclient-id = [sp client id]\nsecret = [sp secret]\nresourceGroup = [rg name]"
+	//configString := "\n[Global]\nsubscription-id = [subscription id]\ntenant-id = [tenant id]\nclient-id = [sp client id]\nsecret = [sp secret]\nresourceGroup = [rg name]"
 	configString := ""
 
 	if len(configString) == 0 {

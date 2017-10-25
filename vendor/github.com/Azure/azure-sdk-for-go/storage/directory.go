@@ -4,7 +4,6 @@ import (
 	"encoding/xml"
 	"net/http"
 	"net/url"
-	"sync"
 )
 
 // Directory represents a directory on a share.
@@ -170,7 +169,6 @@ func (d *Directory) GetFileReference(name string) *File {
 		Name:   name,
 		parent: d,
 		share:  d.share,
-		mutex:  &sync.Mutex{},
 	}
 }
 

@@ -47,12 +47,12 @@ type Config struct {
 func init() {
 	dnsprovider.RegisterDnsProvider(ProviderName, func(config io.Reader) (dnsprovider.Interface, error) {
 		glog.V(5).Infof("Registering Azure DNS provider\n")
-		return newazuredns(config)
+		return newAzureDNS(config)
 	})
 }
 
 // newazuredns creates a new instance of an AWS azuredns DNS Interface.
-func newazuredns(config io.Reader) (*Interface, error) {
+func newAzureDNS(config io.Reader) (*Interface, error) {
 
 	var azConfig Config
 	if err := gcfg.ReadInto(&azConfig, config); err != nil {

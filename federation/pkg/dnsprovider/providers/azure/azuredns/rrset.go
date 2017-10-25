@@ -40,6 +40,7 @@ type ResourceRecordSet struct {
 
 // Name returns the absolute ResourceRecordSet name, i.e. the name includes the zone
 func (rrset ResourceRecordSet) Name() string {
+	// no need to append full name for @ record.
 	if *rrset.impl.Name == "@" {
 		return *rrset.impl.Name
 	}
@@ -83,7 +84,7 @@ func (rrset ResourceRecordSet) toRecordSet() *dns.RecordSet {
 
 	glog.V(5).Infof("New RecordSet: Name: %s ID: %s, Type: %s\n", *r.Name, *r.ID, *r.Type)
 
-	addRrDatasToRecordSet(r, rrset.Rrdatas())
+	addRrDatasToRecordSet(r, rrset.Rrdatas(), rrset.Type())
 	r.RecordSetProperties.TTL = to.Int64Ptr(rrset.Ttl())
 	return r
 }
@@ -94,7 +95,7 @@ func (rrset ResourceRecordSet) getRrDatas() []string {
 	var rrDatas []string
 
 	switch rrset.Type() {
-	case "A":
+	case rrstype.A:
 		rrDatas = make([]string, len(*props.ARecords))
 
 		for i := range *props.ARecords {
@@ -102,7 +103,7 @@ func (rrset ResourceRecordSet) getRrDatas() []string {
 			rrDatas[i] = *rec[i].Ipv4Address
 		}
 
-	case "AAAA":
+	case rrstype.AAAA:
 		rrDatas = make([]string, len(*props.AaaaRecords))
 
 		for i := range *props.AaaaRecords {
@@ -110,7 +111,7 @@ func (rrset ResourceRecordSet) getRrDatas() []string {
 			rrDatas[i] = *rec[i].Ipv6Address
 		}
 
-	case "CNAME":
+	case rrstype.CNAME:
 		rrDatas = make([]string, 1)
 		rrDatas[0] = *props.CnameRecord.Cname
 	}
@@ -118,13 +119,12 @@ func (rrset ResourceRecordSet) getRrDatas() []string {
 	return rrDatas
 }
 
-func addRrDatasToRecordSet(rs *dns.RecordSet, rrDatas []string) {
+func addRrDatasToRecordSet(rs *dns.RecordSet, rrDatas []string, rrsType rrstype.RrsType) {
 	props := dns.RecordSetProperties{}
 	var i int
-	rrsType := string(*rs.Type)
 	// kubernetes 1.6.2 only handles A, AAAA and CNAME
 	switch rrsType {
-	case "A":
+	case rrstype.A:
 		recs := make([]dns.ARecord, 0)
 
 		rrmap := make(map[string]string)
@@ -139,7 +139,7 @@ func addRrDatasToRecordSet(rs *dns.RecordSet, rrDatas []string) {
 		}
 		props.ARecords = &recs
 
-	case "AAAA":
+	case rrstype.AAAA:
 		recs := make([]dns.AaaaRecord, len(rrDatas))
 		for i = range rrDatas {
 			recs[i] = dns.AaaaRecord{
@@ -148,7 +148,7 @@ func addRrDatasToRecordSet(rs *dns.RecordSet, rrDatas []string) {
 		}
 		props.AaaaRecords = &recs
 
-	case "CNAME":
+	case rrstype.CNAME:
 		for i = range rrDatas {
 			props.CnameRecord = &dns.CnameRecord{
 				Cname: to.StringPtr(rrDatas[i]),
@@ -161,7 +161,7 @@ func addRrDatasToRecordSet(rs *dns.RecordSet, rrDatas []string) {
 
 func (rrset ResourceRecordSet) setRecordSetProperties(ttl int64, rrDatas []string) dnsprovider.ResourceRecordSet {
 
-	addRrDatasToRecordSet(rrset.impl, rrDatas)
+	addRrDatasToRecordSet(rrset.impl, rrDatas, rrset.Type())
 	rrset.impl.RecordSetProperties.TTL = to.Int64Ptr(ttl)
 
 	return rrset

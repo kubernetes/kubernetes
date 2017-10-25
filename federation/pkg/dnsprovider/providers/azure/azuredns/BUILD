@@ -12,6 +12,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "azuredns.go",
+        "dnsapi.go",
         "helpers.go",
         "interface.go",
         "rrchangeset.go",
@@ -20,6 +21,7 @@ go_library(
         "zone.go",
         "zones.go",
     ],
+    importpath = "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/azure/azuredns",
     tags = ["automanaged"],
     deps = [
         "//federation/pkg/dnsprovider:go_default_library",
@@ -38,6 +40,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["azuredns_test.go"],
+    importpath = "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/azure/azuredns",
     library = ":go_default_library",
     tags = ["automanaged"],
     deps = [

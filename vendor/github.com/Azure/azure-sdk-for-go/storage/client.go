@@ -75,13 +75,19 @@ type DefaultSender struct {
 
 // Send is the default retry strategy in the client
 func (ds *DefaultSender) Send(c *Client, req *http.Request) (resp *http.Response, err error) {
-	rr := autorest.NewRetriableRequest(req)
-	for attempts := 0; attempts < ds.RetryAttempts; attempts++ {
-		err = rr.Prepare()
+	b := []byte{}
+	if req.Body != nil {
+		b, err = ioutil.ReadAll(req.Body)
 		if err != nil {
 			return resp, err
 		}
-		resp, err = c.HTTPClient.Do(rr.Request())
+	}
+
+	for attempts := 0; attempts < ds.RetryAttempts; attempts++ {
+		if len(b) > 0 {
+			req.Body = ioutil.NopCloser(bytes.NewBuffer(b))
+		}
+		resp, err = c.HTTPClient.Do(req)
 		if err != nil || !autorest.ResponseHasStatusCode(resp, ds.ValidStatusCodes...) {
 			return resp, err
 		}
@@ -398,22 +404,8 @@ func (c Client) exec(verb, url string, headers map[string]string, body io.Reader
 		return nil, errors.New("azure/storage: error creating request: " + err.Error())
 	}
 
-	// if a body was provided ensure that the content length was set.
-	// http.NewRequest() will automatically do this for a handful of types
-	// and for those that it doesn't we will handle here.
-	if body != nil && req.ContentLength < 1 {
-		if lr, ok := body.(*io.LimitedReader); ok {
-			req.ContentLength = lr.N
-			snapshot := *lr
-			req.GetBody = func() (io.ReadCloser, error) {
-				r := snapshot
-				return ioutil.NopCloser(&r), nil
-			}
-		}
-	}
-
 	for k, v := range headers {
-		req.Header[k] = append(req.Header[k], v) // Must bypass case munging present in `Add` by using map functions directly. See https://github.com/Azure/azure-sdk-for-go/issues/645
+		req.Header.Add(k, v)
 	}
 
 	resp, err := c.Sender.Send(&c, req)

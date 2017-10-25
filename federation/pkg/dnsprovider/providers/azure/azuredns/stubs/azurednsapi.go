@@ -51,7 +51,7 @@ func NewAPIStub() API {
 		zones:      make(map[string]*dns.Zone),
 		recordSets: make(map[string][]dns.RecordSet),
 	}
-	api.zones["test.com"] = &dns.Zone{ID: to.StringPtr("zoneID"), Name: to.StringPtr("test.com"), Type: to.StringPtr("ZoneTypes")}
+	api.zones["fedtest.local"] = &dns.Zone{ID: to.StringPtr("zoneID"), Name: to.StringPtr("test.com"), Type: to.StringPtr("ZoneTypes")}
 	return api
 }
 

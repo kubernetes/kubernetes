@@ -1,11 +1,12 @@
 package autorest
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
-	"strconv"
 	"time"
 )
 
@@ -174,13 +175,8 @@ func DoPollForStatusCodes(duration time.Duration, delay time.Duration, codes ...
 func DoRetryForAttempts(attempts int, backoff time.Duration) SendDecorator {
 	return func(s Sender) Sender {
 		return SenderFunc(func(r *http.Request) (resp *http.Response, err error) {
-			rr := NewRetriableRequest(r)
 			for attempt := 0; attempt < attempts; attempt++ {
-				err = rr.Prepare()
-				if err != nil {
-					return resp, err
-				}
-				resp, err = s.Do(rr.Request())
+				resp, err = s.Do(r)
 				if err == nil {
 					return resp, err
 				}
@@ -198,41 +194,27 @@ func DoRetryForAttempts(attempts int, backoff time.Duration) SendDecorator {
 func DoRetryForStatusCodes(attempts int, backoff time.Duration, codes ...int) SendDecorator {
 	return func(s Sender) Sender {
 		return SenderFunc(func(r *http.Request) (resp *http.Response, err error) {
-			rr := NewRetriableRequest(r)
-			// Increment to add the first call (attempts denotes number of retries)
-			attempts++
-			for attempt := 0; attempt < attempts; attempt++ {
-				err = rr.Prepare()
+			b := []byte{}
+			if r.Body != nil {
+				b, err = ioutil.ReadAll(r.Body)
 				if err != nil {
 					return resp, err
 				}
-				resp, err = s.Do(rr.Request())
+			}
+
+			// Increment to add the first call (attempts denotes number of retries)
+			attempts++
+			for attempt := 0; attempt < attempts; attempt++ {
+				r.Body = ioutil.NopCloser(bytes.NewBuffer(b))
+				resp, err = s.Do(r)
 				if err != nil || !ResponseHasStatusCode(resp, codes...) {
 					return resp, err
 				}
-				delayed := DelayWithRetryAfter(resp, r.Cancel)
-				if !delayed {
-					DelayForBackoff(backoff, attempt, r.Cancel)
-				}
+				DelayForBackoff(backoff, attempt, r.Cancel)
 			}
 			return resp, err
 		})
 	}
-}
-
-// DelayWithRetryAfter invokes time.After for the duration specified in the "Retry-After" header in
-// responses with status code 429
-func DelayWithRetryAfter(resp *http.Response, cancel <-chan struct{}) bool {
-	retryAfter, _ := strconv.Atoi(resp.Header.Get("Retry-After"))
-	if resp.StatusCode == http.StatusTooManyRequests && retryAfter > 0 {
-		select {
-		case <-time.After(time.Duration(retryAfter) * time.Second):
-			return true
-		case <-cancel:
-			return false
-		}
-	}
-	return false
 }
 
 // DoRetryForDuration returns a SendDecorator that retries the request until the total time is equal
@@ -242,14 +224,9 @@ func DelayWithRetryAfter(resp *http.Response, cancel <-chan struct{}) bool {
 func DoRetryForDuration(d time.Duration, backoff time.Duration) SendDecorator {
 	return func(s Sender) Sender {
 		return SenderFunc(func(r *http.Request) (resp *http.Response, err error) {
-			rr := NewRetriableRequest(r)
 			end := time.Now().Add(d)
 			for attempt := 0; time.Now().Before(end); attempt++ {
-				err = rr.Prepare()
-				if err != nil {
-					return resp, err
-				}
-				resp, err = s.Do(rr.Request())
+				resp, err = s.Do(r)
 				if err == nil {
 					return resp, err
 				}

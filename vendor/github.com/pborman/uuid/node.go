@@ -4,13 +4,9 @@
 
 package uuid
 
-import (
-	"net"
-	"sync"
-)
+import "net"
 
 var (
-	nodeMu     sync.Mutex
 	interfaces []net.Interface // cached list of interfaces
 	ifname     string          // name of interface being used
 	nodeID     []byte          // hardware for version 1 UUIDs
@@ -20,8 +16,6 @@ var (
 // derived.  The interface "user" is returned if the NodeID was set by
 // SetNodeID.
 func NodeInterface() string {
-	defer nodeMu.Unlock()
-	nodeMu.Lock()
 	return ifname
 }
 
@@ -32,12 +26,6 @@ func NodeInterface() string {
 //
 // SetNodeInterface never fails when name is "".
 func SetNodeInterface(name string) bool {
-	defer nodeMu.Unlock()
-	nodeMu.Lock()
-	return setNodeInterface(name)
-}
-
-func setNodeInterface(name string) bool {
 	if interfaces == nil {
 		var err error
 		interfaces, err = net.Interfaces()
@@ -71,10 +59,8 @@ func setNodeInterface(name string) bool {
 // NodeID returns a slice of a copy of the current Node ID, setting the Node ID
 // if not already set.
 func NodeID() []byte {
-	defer nodeMu.Unlock()
-	nodeMu.Lock()
 	if nodeID == nil {
-		setNodeInterface("")
+		SetNodeInterface("")
 	}
 	nid := make([]byte, 6)
 	copy(nid, nodeID)
@@ -85,8 +71,6 @@ func NodeID() []byte {
 // of id are used.  If id is less than 6 bytes then false is returned and the
 // Node ID is not set.
 func SetNodeID(id []byte) bool {
-	defer nodeMu.Unlock()
-	nodeMu.Lock()
 	if setNodeID(id) {
 		ifname = "user"
 		return true
