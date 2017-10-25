@@ -84,7 +84,12 @@ if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
   fi
 fi
 
-NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
+if [[ "${KUBERNETES_PROVIDER}" == "kubernetes-anywhere" ]]; then
+  NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-node"
+else
+  NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
+fi
+
 NODE_TAGS="${NODE_TAG}"
 
 ALLOCATE_NODE_CIDRS=true
