@@ -231,6 +231,10 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight,
 		return nil, err
 	}
 
+	if err := features.ValidateVersion(features.InitFeatureGates, cfg.FeatureGates, cfg.KubernetesVersion); err != nil {
+		return nil, err
+	}
+
 	fmt.Printf("[init] Using Kubernetes version: %s\n", cfg.KubernetesVersion)
 	fmt.Printf("[init] Using Authorization modes: %v\n", cfg.AuthorizationModes)
 
