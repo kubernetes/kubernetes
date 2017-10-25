@@ -14,9 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -o errexit
-set -o nounset
-set -o pipefail
+#set -o errexit
+#set -o nounset
+#set -o pipefail
+
+set -x
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/common.sh"
@@ -124,12 +126,17 @@ if [[ "${GINKGO_NO_COLOR}" == "y" ]]; then
   ginkgo_args+=("--noColor")
 fi
 
+set -x
+
 # The --host setting is used only when providing --auth_config
 # If --kubeconfig is used, the host to use is retrieved from the .kubeconfig
 # file and the one provided with --host is ignored.
 # Add path for things like running kubectl binary.
 export PATH=$(dirname "${e2e_test}"):"${PATH}"
-"${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
+
+EXIT_CODE=0
+
+echo "${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
   "${auth_config[@]:+${auth_config[@]}}" \
   --ginkgo.flakeAttempts="${FLAKE_ATTEMPTS}" \
   --host="${KUBE_MASTER_URL}" \
@@ -156,3 +163,90 @@ export PATH=$(dirname "${e2e_test}"):"${PATH}"
   ${E2E_REPORT_DIR:+"--report-dir=${E2E_REPORT_DIR}"} \
   ${E2E_REPORT_PREFIX:+"--report-prefix=${E2E_REPORT_PREFIX}"} \
   "${@:-}"
+
+"${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
+  "${auth_config[@]:+${auth_config[@]}}" \
+  --ginkgo.flakeAttempts="${FLAKE_ATTEMPTS}" \
+  --host="${KUBE_MASTER_URL}" \
+  --provider="${KUBERNETES_PROVIDER}" \
+  --gce-project="${PROJECT:-}" \
+  --gce-zone="${ZONE:-}" \
+  --gce-region="${REGION:-}" \
+  --gce-multizone="${MULTIZONE:-false}" \
+  --gke-cluster="${CLUSTER_NAME:-}" \
+  --kube-master="${KUBE_MASTER:-}" \
+  --cluster-tag="${CLUSTER_ID:-}" \
+  --cloud-config-file="${CLOUD_CONFIG:-}" \
+  --repo-root="${KUBE_ROOT}" \
+  --node-instance-group="${NODE_INSTANCE_GROUP:-}" \
+  --prefix="${KUBE_GCE_INSTANCE_PREFIX:-e2e}" \
+  --network="${KUBE_GCE_NETWORK:-${KUBE_GKE_NETWORK:-e2e}}" \
+  --node-tag="${NODE_TAG:-}" \
+  --master-tag="${MASTER_TAG:-}" \
+  --federated-kube-context="${FEDERATION_KUBE_CONTEXT:-e2e-federation}" \
+  ${KUBE_CONTAINER_RUNTIME:+"--container-runtime=${KUBE_CONTAINER_RUNTIME}"} \
+  ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
+  ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \
+  ${NUM_NODES:+"--num-nodes=${NUM_NODES}"} \
+  ${E2E_REPORT_DIR:+"--report-dir=${E2E_REPORT_DIR}"} \
+  ${E2E_REPORT_PREFIX:+"--report-prefix=${E2E_REPORT_PREFIX}"} \
+  "${@:-}" || EXIT_CODE=$? && true ;
+
+env
+
+if [[ "$KUBERNETES_PROVIDER" == "kubernetes-anywhere" ]];then
+  KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+  source "${KUBE_ROOT}/cluster/gce/util.sh"
+
+  NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-node"
+
+  detect-project
+  detect-nodes
+  detect-node-names
+
+  echo "================= Start Log everything running in kubernetes ============="
+  "${KUBE_ROOT}/cluster/kubectl.sh" get all --all-namespaces -o wide > /workspace/_artifacts/get-all-wide.txt
+  "${KUBE_ROOT}/cluster/kubectl.sh" get all --all-namespaces -o json > /workspace/_artifacts/get-all-json.json
+  "${KUBE_ROOT}/cluster/kubectl.sh" get pods -n kube-system | grep -v NAME | awk '{print $1}' | xargs "${KUBE_ROOT}/cluster/kubectl.sh" describe po -n kube-system > /workspace/_artifacts/describe-po.txt
+  echo "================= Stop Log everything running in kubernetes ============="
+
+  echo "================= Start Getting list of Log files from Nodes ============="
+  for node_name in ${NODE_NAMES[@]:-}; do
+
+    ssh-to-node "${node_name}" "sudo chmod 777 /var/log/" || true
+    ssh-to-node "${node_name}" "sudo chmod 755 /var/log/*.log" || true
+    ssh-to-node "${node_name}" "sudo ls -altr /var/log/" || true
+    ssh-to-node "${node_name}" "sudo tar -chvzf /var/log/node-${node_name}-logs.tgz /var/log/*.log" || true
+
+    ssh-to-node "${node_name}" "sudo chmod 777 /var/log/containers/" || true
+    ssh-to-node "${node_name}" "sudo chmod 755 /var/log/containers/*" || true
+    ssh-to-node "${node_name}" "sudo ls -altr /var/log/containers" || true
+    ssh-to-node "${node_name}" "sudo tar -chvzf /var/log/node-${node_name}-containers.tgz /var/log/containers/*" || true
+
+    ssh-to-node "${node_name}" "sudo chmod 777 /var/log/pods/" || true
+    ssh-to-node "${node_name}" "sudo chmod 755 /var/log/pods/*" || true
+    ssh-to-node "${node_name}" "sudo ls -altr /var/log/pods" || true
+    ssh-to-node "${node_name}" "sudo tar -chvzf /var/log/node-${node_name}-pods.tgz /var/log/pods/*" || true
+
+    ssh-to-node "${node_name}" "sudo chmod 755 /var/lib/docker/containers/" || true
+    ssh-to-node "${node_name}" "sudo chmod 755 /var/lib/docker/containers/*" || true
+    ssh-to-node "${node_name}" "sudo chmod 755 /var/lib/docker/containers/*/*.log" || true
+    ssh-to-node "${node_name}" "sudo ls -altr /var/lib/docker/containers/" || true
+    ssh-to-node "${node_name}" "sudo ls -altr /var/lib/docker/containers/*/*.log" || true
+    ssh-to-node "${node_name}" "sudo tar -chvzf /var/log/node-${node_name}-docker-containers.tgz /var/lib/docker/containers/*" || true
+
+    gcloud compute ssh "${node_name}" --zone="${ZONE}" --project="${PROJECT}" \
+        --command="sudo find /var/log/ -name *.log -print" > /workspace/_artifacts/"${node_name}"-files.log || true
+
+    gcloud compute ssh "${node_name}" --zone="${ZONE}" --project="${PROJECT}" \
+        --command="sudo journalctl -r -u kubelet" > /workspace/_artifacts/"${node_name}"-kubelet.log  || true
+
+    gcloud compute copy-files --project "${PROJECT}" --zone "${ZONE}" "${node_name}:/var/log/node-${node_name}-logs.tgz" /workspace/_artifacts > /dev/null || true
+    gcloud compute copy-files --project "${PROJECT}" --zone "${ZONE}" "${node_name}:/var/log/node-${node_name}-containers.tgz" /workspace/_artifacts > /dev/null || true
+    gcloud compute copy-files --project "${PROJECT}" --zone "${ZONE}" "${node_name}:/var/log/node-${node_name}-pods.tgz" /workspace/_artifacts > /dev/null || true
+    gcloud compute copy-files --project "${PROJECT}" --zone "${ZONE}" "${node_name}:/var/log/node-${node_name}-docker-containers.tgz" /workspace/_artifacts > /dev/null || true
+  done
+  echo "================= Stop Getting list of Log files from Nodes ============="
+fi
+
+exit $EXIT_CODE
