@@ -25,19 +25,20 @@ import (
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/schedulercache"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
+func boolPtr(b bool) *bool {
+	o := b
+	return &o
+}
+
 func controllerRef(kind, name, uid string) []metav1.OwnerReference {
-	// TODO: When ControllerRef will be implemented uncomment code below.
-	return nil
-	//trueVar := true
-	//return []metav1.OwnerReference{
-	//	{Kind: kind, Name: name, UID: types.UID(uid), Controller: &trueVar},
-	//}
+	return []metav1.OwnerReference{{Kind: kind, Name: name, UID: types.UID(uid), Controller: boolPtr(true)}}
 }
 
 func TestSelectorSpreadPriority(t *testing.T) {
