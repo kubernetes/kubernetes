@@ -1318,7 +1318,7 @@ func validateStorageOSPersistentVolumeSource(storageos *core.StorageOSPersistent
 	return allErrs
 }
 
-func validateCSIPersistentVolumeSource(csi *api.CSIPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
+func validateCSIPersistentVolumeSource(csi *core.CSIPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIPersistentVolume) {

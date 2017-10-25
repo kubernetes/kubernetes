@@ -116,6 +116,17 @@ func (Binding) SwaggerDoc() map[string]string {
 	return map_Binding
 }
 
+var map_CSIPersistentVolumeSource = map[string]string{
+	"":             "Represents storage that is managed by an external CSI volume driver",
+	"driver":       "Driver is the name of the driver to use for this volume. Required.",
+	"volumeHandle": "VolumeHandle is the unique volume name returned by the CSI volume plugin’s CreateVolume to refer to the volume on all subsequent calls. Required.",
+	"readOnly":     "Optional: The value to pass to ControllerPublishVolumeRequest. Defaults to false (read/write).",
+}
+
+func (CSIPersistentVolumeSource) SwaggerDoc() map[string]string {
+	return map_CSIPersistentVolumeSource
+}
+
 var map_Capabilities = map[string]string{
 	"":     "Adds and removes POSIX capabilities from running containers.",
 	"add":  "Added capabilities",
@@ -1212,6 +1223,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"scaleIO":              "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.",
 	"local":                "Local represents directly-attached storage with node affinity",
 	"storageos":            "StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod More info: https://releases.k8s.io/HEAD/examples/volumes/storageos/README.md",
+	"csi":                  "CSI represents storage that handled by an external CSI driver",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
