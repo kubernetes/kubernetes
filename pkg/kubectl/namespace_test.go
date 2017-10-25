@@ -20,14 +20,14 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestNamespaceGenerate(t *testing.T) {
 	tests := []struct {
 		params    map[string]interface{}
-		expected  *api.Namespace
+		expected  *v1.Namespace
 		expectErr bool
 		index     int
 	}{
@@ -35,7 +35,7 @@ func TestNamespaceGenerate(t *testing.T) {
 			params: map[string]interface{}{
 				"name": "foo",
 			},
-			expected: &api.Namespace{
+			expected: &v1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -92,8 +92,8 @@ func TestNamespaceGenerate(t *testing.T) {
 		case !test.expectErr && err == nil:
 			// do nothing and drop through
 		}
-		if !reflect.DeepEqual(obj.(*api.Namespace), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*api.Namespace))
+		if !reflect.DeepEqual(obj.(*v1.Namespace), test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*v1.Namespace))
 		}
 	}
 }
