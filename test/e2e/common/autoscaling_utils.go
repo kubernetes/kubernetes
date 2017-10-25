@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
-	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -65,10 +64,10 @@ var (
 	resourceConsumerControllerImage = imageutils.GetE2EImage(imageutils.ResourceController)
 )
 
-const (
-	KindRC         = "ReplicationController"
-	KindDeployment = "Deployment"
-	KindReplicaSet = "ReplicaSet"
+var (
+	KindRC         = schema.GroupVersionKind{Version: "v1", Kind: "ReplicationController"}
+	KindDeployment = schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "Deployment"}
+	KindReplicaSet = schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "ReplicaSet"}
 	subresource    = "scale"
 )
 
@@ -83,7 +82,7 @@ rc.ConsumeCPU(300)
 type ResourceConsumer struct {
 	name                     string
 	controllerName           string
-	kind                     string
+	kind                     schema.GroupVersionKind
 	nsName                   string
 	clientSet                clientset.Interface
 	internalClientset        *internalclientset.Clientset
@@ -105,7 +104,7 @@ func GetResourceConsumerImage() string {
 	return resourceConsumerImage
 }
 
-func NewDynamicResourceConsumer(name, nsName, kind string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, internalClientset *internalclientset.Clientset) *ResourceConsumer {
+func NewDynamicResourceConsumer(name, nsName string, kind schema.GroupVersionKind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, internalClientset *internalclientset.Clientset) *ResourceConsumer {
 	return newResourceConsumer(name, nsName, kind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, dynamicConsumptionTimeInSeconds,
 		dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, dynamicRequestSizeCustomMetric, cpuLimit, memLimit, clientset, internalClientset)
 }
@@ -123,7 +122,7 @@ initMemoryTotal argument is in megabytes
 memLimit argument is in megabytes, memLimit is a maximum amount of memory that can be consumed by a single pod
 cpuLimit argument is in millicores, cpuLimit is a maximum amount of cpu that can be consumed by a single pod
 */
-func newResourceConsumer(name, nsName, kind string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, consumptionTimeInSeconds, requestSizeInMillicores,
+func newResourceConsumer(name, nsName string, kind schema.GroupVersionKind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, consumptionTimeInSeconds, requestSizeInMillicores,
 	requestSizeInMegabytes int, requestSizeCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, internalClientset *internalclientset.Clientset) *ResourceConsumer {
 
 	runServiceAndWorkloadForResourceConsumer(clientset, internalClientset, nsName, name, kind, replicas, cpuLimit, memLimit)
@@ -401,28 +400,14 @@ func (rc *ResourceConsumer) CleanUp() {
 	rc.stopWaitGroup.Wait()
 	// Wait some time to ensure all child goroutines are finished.
 	time.Sleep(10 * time.Second)
-	kind, err := kindOf(rc.kind)
-	framework.ExpectNoError(err)
+	kind := rc.kind.GroupKind()
 	framework.ExpectNoError(framework.DeleteResourceAndPods(rc.clientSet, rc.internalClientset, kind, rc.nsName, rc.name))
 	framework.ExpectNoError(rc.clientSet.Core().Services(rc.nsName).Delete(rc.name, nil))
 	framework.ExpectNoError(framework.DeleteResourceAndPods(rc.clientSet, rc.internalClientset, api.Kind("ReplicationController"), rc.nsName, rc.controllerName))
 	framework.ExpectNoError(rc.clientSet.Core().Services(rc.nsName).Delete(rc.controllerName, nil))
 }
 
-func kindOf(kind string) (schema.GroupKind, error) {
-	switch kind {
-	case KindRC:
-		return api.Kind(kind), nil
-	case KindReplicaSet:
-		return extensionsinternal.Kind(kind), nil
-	case KindDeployment:
-		return extensionsinternal.Kind(kind), nil
-	default:
-		return schema.GroupKind{}, fmt.Errorf("Unsupported kind: %v", kind)
-	}
-}
-
-func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, internalClient internalclientset.Interface, ns, name, kind string, replicas int, cpuLimitMillis, memLimitMb int64) {
+func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, internalClient internalclientset.Interface, ns, name string, kind schema.GroupVersionKind, replicas int, cpuLimitMillis, memLimitMb int64) {
 	By(fmt.Sprintf("Running consuming RC %s via %s with %v replicas", name, kind, replicas))
 	_, err := c.Core().Services(ns).Create(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -521,8 +506,9 @@ func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, ma
 		},
 		Spec: autoscalingv1.HorizontalPodAutoscalerSpec{
 			ScaleTargetRef: autoscalingv1.CrossVersionObjectReference{
-				Kind: rc.kind,
-				Name: rc.name,
+				APIVersion: rc.kind.GroupVersion().String(),
+				Kind:       rc.kind.Kind,
+				Name:       rc.name,
 			},
 			MinReplicas:                    &minReplicas,
 			MaxReplicas:                    maxRepl,
