@@ -38,6 +38,7 @@ go_library(
         "create_serviceaccount.go",
         "delete.go",
         "describe.go",
+        "diff.go",
         "drain.go",
         "edit.go",
         "exec.go",
@@ -78,6 +79,8 @@ go_library(
         "//pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion:go_default_library",
         "//pkg/client/unversioned:go_default_library",
         "//pkg/kubectl:go_default_library",
+        "//pkg/kubectl/apply/parse:go_default_library",
+        "//pkg/kubectl/apply/strategy:go_default_library",
         "//pkg/kubectl/cmd/auth:go_default_library",
         "//pkg/kubectl/cmd/config:go_default_library",
         "//pkg/kubectl/cmd/rollout:go_default_library",
@@ -169,6 +172,7 @@ go_test(
         "create_test.go",
         "delete_test.go",
         "describe_test.go",
+        "diff_test.go",
         "drain_test.go",
         "edit_test.go",
         "exec_test.go",
@@ -244,6 +248,7 @@ go_test(
         "//vendor/k8s.io/client-go/tools/remotecommand:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
         "//vendor/k8s.io/metrics/pkg/apis/metrics/v1alpha1:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 
