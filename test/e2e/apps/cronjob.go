@@ -436,7 +436,7 @@ func checkNoEventWithReason(c clientset.Interface, ns, cronJobName string, reaso
 	if err != nil {
 		return fmt.Errorf("Error in getting cronjob %s/%s: %v", ns, cronJobName, err)
 	}
-	events, err := c.Core().Events(ns).Search(legacyscheme.Scheme, sj)
+	events, err := c.CoreV1().Events(ns).Search(legacyscheme.Scheme, sj)
 	if err != nil {
 		return fmt.Errorf("Error in listing events: %s", err)
 	}

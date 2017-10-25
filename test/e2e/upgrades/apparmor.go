@@ -99,7 +99,7 @@ func (t *AppArmorUpgradeTest) verifyNewPodSucceeds(f *framework.Framework) {
 
 func (t *AppArmorUpgradeTest) verifyNodesAppArmorEnabled(f *framework.Framework) {
 	By("Verifying nodes are AppArmor enabled")
-	nodes, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
+	nodes, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "Failed to list nodes")
 	for _, node := range nodes.Items {
 		Expect(node.Status.Conditions).To(gstruct.MatchElements(conditionType, gstruct.IgnoreExtras, gstruct.Elements{

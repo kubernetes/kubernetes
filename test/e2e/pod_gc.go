@@ -40,7 +40,7 @@ var _ = framework.KubeDescribe("Pod garbage collector [Feature:PodGarbageCollect
 			pod, err := createTerminatingPod(f)
 			pod.ResourceVersion = ""
 			pod.Status.Phase = v1.PodFailed
-			pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).UpdateStatus(pod)
+			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).UpdateStatus(pod)
 			if err != nil {
 				framework.Failf("err failing pod: %v", err)
 			}
@@ -62,7 +62,7 @@ var _ = framework.KubeDescribe("Pod garbage collector [Feature:PodGarbageCollect
 
 		By(fmt.Sprintf("Waiting for gc controller to gc all but %d pods", gcThreshold))
 		pollErr := wait.Poll(1*time.Minute, timeout, func() (bool, error) {
-			pods, err = f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+			pods, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
 			if err != nil {
 				framework.Logf("Failed to list pod %v", err)
 				return false, nil
@@ -95,5 +95,5 @@ func createTerminatingPod(f *framework.Framework) (*v1.Pod, error) {
 			SchedulerName: "please don't schedule my pods",
 		},
 	}
-	return f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
+	return f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 }

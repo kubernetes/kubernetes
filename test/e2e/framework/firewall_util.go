@@ -373,7 +373,7 @@ func WaitForFirewallRule(gceCloud *gcecloud.GCECloud, fwName string, exist bool,
 }
 
 func GetClusterID(c clientset.Interface) (string, error) {
-	cm, err := c.Core().ConfigMaps(metav1.NamespaceSystem).Get(gcecloud.UIDConfigMapName, metav1.GetOptions{})
+	cm, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(gcecloud.UIDConfigMapName, metav1.GetOptions{})
 	if err != nil || cm == nil {
 		return "", fmt.Errorf("error getting cluster ID: %v", err)
 	}

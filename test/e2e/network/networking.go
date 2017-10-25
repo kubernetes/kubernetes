@@ -76,7 +76,7 @@ var _ = SIGDescribe("Networking", func() {
 		}
 		for _, test := range tests {
 			By(fmt.Sprintf("testing: %s", test.path))
-			data, err := f.ClientSet.Core().RESTClient().Get().
+			data, err := f.ClientSet.CoreV1().RESTClient().Get().
 				AbsPath(test.path).
 				DoRaw()
 			if err != nil {
