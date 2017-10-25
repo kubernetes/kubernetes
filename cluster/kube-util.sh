@@ -18,12 +18,14 @@
 # cluster/${KUBERNETES_PROVIDER}/util.sh where KUBERNETES_PROVIDER, if unset,
 # will use its default value (gce).
 
+set -x
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 source "${KUBE_ROOT}/cluster/skeleton/util.sh"
 
 if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
-    KUBERNETES_PROVIDER=""
+    KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER:-""}
 else
     KUBERNETES_PROVIDER="${KUBERNETES_PROVIDER:-gce}"
 fi
