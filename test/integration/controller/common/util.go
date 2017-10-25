@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
+// NewMatchingPod creates a pod with labels supplied and sets it to running.
 func NewMatchingPod(podName, namespace string, labels map[string]string) *v1.Pod {
 	return &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -54,6 +55,7 @@ func NewMatchingPod(podName, namespace string, labels map[string]string) *v1.Pod
 	}
 }
 
+// GetPods returns a list of pods.
 func GetPods(t *testing.T, podClient typedv1.PodInterface, labelMap map[string]string) *v1.PodList {
 	podSelector := labels.Set(labelMap).AsSelector()
 	options := metav1.ListOptions{LabelSelector: podSelector.String()}
@@ -64,6 +66,7 @@ func GetPods(t *testing.T, podClient typedv1.PodInterface, labelMap map[string]s
 	return pods
 }
 
+// UpdatePod updates a single pod according to supplied function.
 func UpdatePod(t *testing.T, podClient typedv1.PodInterface, podName string, updateFunc func(*v1.Pod)) *v1.Pod {
 	var pod *v1.Pod
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -80,6 +83,7 @@ func UpdatePod(t *testing.T, podClient typedv1.PodInterface, podName string, upd
 	return pod
 }
 
+// DeleteNodes deletes nodes of the form "`prefix`-X" where X is an ordinal.
 func DeleteNodes(cs clientset.Interface, prefix string, numNodes int) error {
 	for i := 0; i < numNodes; i++ {
 		nodeName := fmt.Sprintf("%v-%d", prefix, i)
@@ -91,7 +95,7 @@ func DeleteNodes(cs clientset.Interface, prefix string, numNodes int) error {
 	return nil
 }
 
-// createNodes creates `numNodes` nodes. The created node names will be in the
+// CreateNodes creates `numNodes` nodes. The created node names will be in the
 // form of "`prefix`-X" where X is an ordinal.
 func CreateNodes(cs clientset.Interface, prefix string, res *v1.ResourceList, numNodes int) ([]*v1.Node, error) {
 	nodes := make([]*v1.Node, numNodes)
