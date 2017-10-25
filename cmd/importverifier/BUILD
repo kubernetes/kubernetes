@@ -16,6 +16,7 @@ go_library(
     name = "go_default_library",
     srcs = ["importverifier.go"],
     importpath = "k8s.io/kubernetes/cmd/importverifier",
+    deps = ["//vendor/gopkg.in/yaml.v2:go_default_library"],
 )
 
 filegroup(
