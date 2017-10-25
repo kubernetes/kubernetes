@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,32 +24,40 @@ import (
 // +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// Foo is a specification for a Foo resource
-type Foo struct {
+// Example is a specification for an Example resource
+type Example struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata"`
 
-	Spec   FooSpec   `json:"spec"`
-	Status FooStatus `json:"status"`
+	Spec   ExampleSpec   `json:"spec"`
+	Status ExampleStatus `json:"status,omitempty"`
 }
 
-// FooSpec is the spec for a Foo resource
-type FooSpec struct {
-	DeploymentName string `json:"deploymentName"`
-	Replicas       *int32 `json:"replicas"`
+// ExampleSpec is the spec for an Example resource
+type ExampleSpec struct {
+	Foo string `json:"foo"`
+	Bar bool   `json:"bar"`
 }
 
-// FooStatus is the status for a Foo resource
-type FooStatus struct {
-	AvailableReplicas int32 `json:"availableReplicas"`
+// ExampleStatus is the status for an Example resource
+type ExampleStatus struct {
+	State   ExampleState `json:"state,omitempty"`
+	Message string       `json:"message,omitempty"`
 }
+
+type ExampleState string
+
+const (
+	ExampleStateCreated   ExampleState = "Created"
+	ExampleStateProcessed ExampleState = "Processed"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// FooList is a list of Foo resources
-type FooList struct {
+// ExampleList is a list of Example resources
+type ExampleList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
 
-	Items []Foo `json:"items"`
+	Items []Example `json:"items"`
 }
