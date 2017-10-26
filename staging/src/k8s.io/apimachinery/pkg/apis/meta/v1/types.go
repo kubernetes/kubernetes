@@ -403,16 +403,17 @@ type GetOptions struct {
 type DeletionPropagation string
 
 const (
-	// Orphans the dependents.
+	// DeletePropagationOrphan orphans the dependents.
 	DeletePropagationOrphan DeletionPropagation = "Orphan"
-	// Deletes the object from the key-value store, the garbage collector will
-	// delete the dependents in the background.
+	// DeletePropagationBackground deletes the object from the key-value store,
+	// the garbage collector will delete the dependents in the background.
 	DeletePropagationBackground DeletionPropagation = "Background"
-	// The object exists in the key-value store until the garbage collector
-	// deletes all the dependents whose ownerReference.blockOwnerDeletion=true
-	// from the key-value store.  API sever will put the "foregroundDeletion"
-	// finalizer on the object, and sets its deletionTimestamp.  This policy is
-	// cascading, i.e., the dependents will be deleted with Foreground.
+	// DeletePropagationForeground keeps the object in the key-value store
+	// until the garbage collector deletes all the dependents whose
+	// ownerReference.blockOwnerDeletion=true from the key-value store. API
+	// sever will put the "foregroundDeletion" finalizer on the object, and sets
+	// its deletionTimestamp.  This policy is cascading, i.e., the dependents
+	// will be deleted with Foreground.
 	DeletePropagationForeground DeletionPropagation = "Foreground"
 )
 
@@ -888,7 +889,7 @@ type Patch struct{}
 // newer style that is structured.  LabelSelector is an internal representation for the
 // latter style.
 
-// A label selector is a label query over a set of resources. The result of matchLabels and
+// LabelSelector is a label query over a set of resources. The result of matchLabels and
 // matchExpressions are ANDed. An empty label selector matches all objects. A null
 // label selector matches no objects.
 type LabelSelector struct {
@@ -902,7 +903,7 @@ type LabelSelector struct {
 	MatchExpressions []LabelSelectorRequirement `json:"matchExpressions,omitempty" protobuf:"bytes,2,rep,name=matchExpressions"`
 }
 
-// A label selector requirement is a selector that contains values, a key, and an operator that
+// LabelSelectorRequirement is a selector that contains values, a key, and an operator that
 // relates the key and values.
 type LabelSelectorRequirement struct {
 	// key is the label key that the selector applies to.
@@ -920,7 +921,7 @@ type LabelSelectorRequirement struct {
 	Values []string `json:"values,omitempty" protobuf:"bytes,3,rep,name=values"`
 }
 
-// A label selector operator is the set of operators that can be used in a selector requirement.
+// LabelSelectorOperator is the set of operators that can be used in a selector requirement.
 type LabelSelectorOperator string
 
 const (
