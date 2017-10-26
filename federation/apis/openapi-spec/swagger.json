@@ -10661,7 +10661,7 @@
      }
     ]
    },
-   "/version/": {
+   "/version": {
     "get": {
      "description": "get the code version",
      "consumes": [
