@@ -15,8 +15,5 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package,register
-// +k8s:conversion-gen=k8s.io/kubernetes/pkg/proxy/apis/proxyconfig
-// +k8s:openapi-gen=true
-// +k8s:defaulter-gen=TypeMeta
 
-package v1alpha1 // import "k8s.io/kubernetes/pkg/proxy/apis/proxyconfig/v1alpha1"
+package kubeproxyconfig // import "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"

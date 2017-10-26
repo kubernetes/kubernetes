@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package proxyconfig
+package kubeproxyconfig
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
@@ -27,7 +27,7 @@ var (
 )
 
 // GroupName is the group name use in this package
-const GroupName = "kubeproxy.k8s.io"
+const GroupName = "kubeproxyconfig.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
