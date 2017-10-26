@@ -834,11 +834,12 @@ test/images/resource-consumer/common
 test/images/resource-consumer/controller
 test/integration
 test/integration/auth
+test/integration/controller/daemonset
+test/integration/controller/replicaset
+test/integration/controller/replicationcontroller
 test/integration/evictions
 test/integration/framework
 test/integration/master
-test/integration/replicaset
-test/integration/replicationcontroller
 test/integration/scheduler
 test/integration/scheduler_perf
 test/integration/volume

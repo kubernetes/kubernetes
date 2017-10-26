@@ -28,7 +28,6 @@ import (
 	"k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
+	"k8s.io/kubernetes/test/integration/controller/common"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -81,31 +81,6 @@ func newRS(name, namespace string, replicas int) *v1beta1.ReplicaSet {
 					},
 				},
 			},
-		},
-	}
-}
-
-func newMatchingPod(podName, namespace string) *v1.Pod {
-	return &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      podName,
-			Namespace: namespace,
-			Labels:    labelMap(),
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "fake-name",
-					Image: "fakeimage",
-				},
-			},
-		},
-		Status: v1.PodStatus{
-			Phase: v1.PodRunning,
 		},
 	}
 }
@@ -238,22 +213,6 @@ func scaleRS(t *testing.T, c clientset.Interface, rs *v1beta1.ReplicaSet, replic
 	waitRSStable(t, c, rs)
 }
 
-func updatePod(t *testing.T, podClient typedv1.PodInterface, podName string, updateFunc func(*v1.Pod)) *v1.Pod {
-	var pod *v1.Pod
-	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		newPod, err := podClient.Get(podName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		updateFunc(newPod)
-		pod, err = podClient.Update(newPod)
-		return err
-	}); err != nil {
-		t.Fatalf("Failed to update pod %s: %v", podName, err)
-	}
-	return pod
-}
-
 func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, pod *v1.Pod, updateStatusFunc func(*v1.Pod)) {
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		newPod, err := podClient.Get(pod.Name, metav1.GetOptions{})
@@ -266,16 +225,6 @@ func updatePodStatus(t *testing.T, podClient typedv1.PodInterface, pod *v1.Pod, 
 	}); err != nil {
 		t.Fatalf("Failed to update status of pod %s: %v", pod.Name, err)
 	}
-}
-
-func getPods(t *testing.T, podClient typedv1.PodInterface, labelMap map[string]string) *v1.PodList {
-	podSelector := labels.Set(labelMap).AsSelector()
-	options := metav1.ListOptions{LabelSelector: podSelector.String()}
-	pods, err := podClient.List(options)
-	if err != nil {
-		t.Fatalf("Failed obtaining a list of pods that match the pod labels %v: %v", labelMap, err)
-	}
-	return pods
 }
 
 func updateRS(t *testing.T, rsClient typedv1beta1.ReplicaSetInterface, rsName string, updateFunc func(*v1beta1.ReplicaSet)) *v1beta1.ReplicaSet {
@@ -298,7 +247,7 @@ func updateRS(t *testing.T, rsClient typedv1beta1.ReplicaSetInterface, rsName st
 func testPodControllerRefPatch(t *testing.T, c clientset.Interface, pod *v1.Pod, ownerReference *metav1.OwnerReference, rs *v1beta1.ReplicaSet, expectedOwnerReferenceNum int) {
 	ns := rs.Namespace
 	podClient := c.Core().Pods(ns)
-	updatePod(t, podClient, pod.Name, func(pod *v1.Pod) {
+	common.UpdatePod(t, podClient, pod.Name, func(pod *v1.Pod) {
 		pod.OwnerReferences = []metav1.OwnerReference{*ownerReference}
 	})
 
@@ -467,7 +416,7 @@ func TestAdoption(t *testing.T) {
 				t.Fatalf("Failed to create replica set: %v", err)
 			}
 			podName := fmt.Sprintf("pod%d", i)
-			pod := newMatchingPod(podName, ns.Name)
+			pod := common.NewMatchingPod(podName, ns.Name, labelMap())
 			pod.OwnerReferences = tc.existingOwnerReferences(rs)
 			_, err = podClient.Create(pod)
 			if err != nil {
@@ -591,7 +540,7 @@ func TestDeletingAndFailedPods(t *testing.T) {
 
 	// Verify RS creates 2 pods
 	podClient := c.Core().Pods(ns.Name)
-	pods := getPods(t, podClient, labelMap())
+	pods := common.GetPods(t, podClient, labelMap())
 	if len(pods.Items) != 2 {
 		t.Fatalf("len(pods) = %d, want 2", len(pods.Items))
 	}
@@ -599,7 +548,7 @@ func TestDeletingAndFailedPods(t *testing.T) {
 	// Set first pod as deleting pod
 	// Set finalizers for the pod to simulate pending deletion status
 	deletingPod := &pods.Items[0]
-	updatePod(t, podClient, deletingPod.Name, func(pod *v1.Pod) {
+	common.UpdatePod(t, podClient, deletingPod.Name, func(pod *v1.Pod) {
 		pod.Finalizers = []string{"fake.example.com/blockDeletion"}
 	})
 	if err := c.Core().Pods(ns.Name).Delete(deletingPod.Name, &metav1.DeleteOptions{}); err != nil {
@@ -614,7 +563,7 @@ func TestDeletingAndFailedPods(t *testing.T) {
 
 	// Pool until 2 new pods have been created to replace deleting and failed pods
 	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		pods = getPods(t, podClient, labelMap())
+		pods = common.GetPods(t, podClient, labelMap())
 		return len(pods.Items) == 4, nil
 	}); err != nil {
 		t.Fatalf("Failed to verify 2 new pods have been created (expected 4 pods): %v", err)
@@ -659,7 +608,7 @@ func TestOverlappingRSs(t *testing.T) {
 
 	// Expect 3 total Pods to be created
 	podClient := c.Core().Pods(ns.Name)
-	pods := getPods(t, podClient, labelMap())
+	pods := common.GetPods(t, podClient, labelMap())
 	if len(pods.Items) != 3 {
 		t.Errorf("len(pods) = %d, want 3", len(pods.Items))
 	}
@@ -691,7 +640,7 @@ func TestPodOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 
 	// Orphaning: RS should remove OwnerReference from a pod when the pod's labels change to not match its labels
 	podClient := c.Core().Pods(ns.Name)
-	pods := getPods(t, podClient, labelMap())
+	pods := common.GetPods(t, podClient, labelMap())
 	if len(pods.Items) != 1 {
 		t.Fatalf("len(pods) = %d, want 1", len(pods.Items))
 	}
@@ -702,7 +651,7 @@ func TestPodOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 		t.Fatalf("ControllerRef of pod %s is nil", pod.Name)
 	}
 	newLabelMap := map[string]string{"new-foo": "new-bar"}
-	updatePod(t, podClient, pod.Name, func(pod *v1.Pod) {
+	common.UpdatePod(t, podClient, pod.Name, func(pod *v1.Pod) {
 		pod.Labels = newLabelMap
 	})
 	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
@@ -717,7 +666,7 @@ func TestPodOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	}
 
 	// Adoption: RS should add ControllerRef to a pod when the pod's labels change to match its labels
-	updatePod(t, podClient, pod.Name, func(pod *v1.Pod) {
+	common.UpdatePod(t, podClient, pod.Name, func(pod *v1.Pod) {
 		pod.Labels = labelMap()
 	})
 	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
@@ -726,7 +675,7 @@ func TestPodOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 			// If the pod is not found, it means the RS picks the pod for deletion (it is extra)
 			// Verify there is only one pod in namespace and it has ControllerRef to the RS
 			if errors.IsNotFound(err) {
-				pods := getPods(t, podClient, labelMap())
+				pods := common.GetPods(t, podClient, labelMap())
 				if len(pods.Items) != 1 {
 					return false, fmt.Errorf("Expected 1 pod in current namespace, got %d", len(pods.Items))
 				}
@@ -767,7 +716,7 @@ func TestGeneralPodAdoption(t *testing.T) {
 	waitRSStable(t, c, rs)
 
 	podClient := c.Core().Pods(ns.Name)
-	pods := getPods(t, podClient, labelMap())
+	pods := common.GetPods(t, podClient, labelMap())
 	if len(pods.Items) != 1 {
 		t.Fatalf("len(pods) = %d, want 1", len(pods.Items))
 	}
@@ -805,7 +754,7 @@ func TestReadyAndAvailableReplicas(t *testing.T) {
 	}
 
 	podClient := c.Core().Pods(ns.Name)
-	pods := getPods(t, podClient, labelMap())
+	pods := common.GetPods(t, podClient, labelMap())
 	if len(pods.Items) != 3 {
 		t.Fatalf("len(pods) = %d, want 3", len(pods.Items))
 	}
@@ -866,7 +815,7 @@ func TestExtraPodsAdoptionAndDeletion(t *testing.T) {
 	// Create 3 pods, RS should adopt only 2 of them
 	podList := []*v1.Pod{}
 	for i := 0; i < 3; i++ {
-		pod := newMatchingPod(fmt.Sprintf("pod-%d", i+1), ns.Name)
+		pod := common.NewMatchingPod(fmt.Sprintf("pod-%d", i+1), ns.Name, labelMap())
 		pod.Labels = labelMap()
 		podList = append(podList, pod)
 	}
@@ -881,7 +830,7 @@ func TestExtraPodsAdoptionAndDeletion(t *testing.T) {
 	podClient := c.Core().Pods(ns.Name)
 	if err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		// All pods have labelMap as their labels
-		pods := getPods(t, podClient, labelMap())
+		pods := common.GetPods(t, podClient, labelMap())
 		return int32(len(pods.Items)) == *rs.Spec.Replicas, nil
 	}); err != nil {
 		t.Fatalf("Failed to verify number of all pods within current namespace matches .spec.replicas of rs %s: %v", rs.Name, err)
@@ -910,12 +859,12 @@ func TestFullyLabeledReplicas(t *testing.T) {
 
 	// Set one of the pods to have extra labels
 	podClient := c.Core().Pods(ns.Name)
-	pods := getPods(t, podClient, labelMap())
+	pods := common.GetPods(t, podClient, labelMap())
 	if len(pods.Items) != 2 {
 		t.Fatalf("len(pods) = %d, want 2", len(pods.Items))
 	}
 	fullyLabeledPod := &pods.Items[0]
-	updatePod(t, podClient, fullyLabeledPod.Name, func(pod *v1.Pod) {
+	common.UpdatePod(t, podClient, fullyLabeledPod.Name, func(pod *v1.Pod) {
 		pod.Labels = extraLabelMap
 	})
 
