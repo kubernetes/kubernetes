@@ -1,0 +1,46 @@
+syntax = "proto2";
+package k8s.io.kubectl.cmd;
+
+import "google/protobuf/descriptor.proto";
+
+message FlagDetail {
+  required string name = 1;
+  repeated string value = 2;
+  required string shorthand = 3;
+  required string usage = 4;
+  enum EXT {
+      NONE = 0;
+      ISTIME = 1;
+      ISSTRARRAY = 2;
+      ISSTRSLICE = 3;
+  }
+  optional EXT ext = 5;
+}
+
+extend google.protobuf.FieldOptions {
+  optional FlagDetail info = 1234;
+}
+
+message Array {
+    repeated string array = 1;
+}
+
+//Flags Description
+
+
+//This is the flag description for `kubectl version`
+message VersionFlags {
+  optional bool client = 2 [ (info) = { name: "client" value: "false" shorthand: "c" usage: "Client version only (no server required)."}];
+  optional bool short = 3  [ (info) = { name: "short" value: "false" shorthand: "" usage: "Print just the version number."}];
+  optional string output = 4 [ (info) = { name: "output" value: "" shorthand: "o" usage: "One of 'yaml' or 'json'."}];
+}
+
+//This is the flag description only for test
+message TestTest {
+    optional bool BoolFlag = 1 [ (info) = { name: "bool-flag" value: "false" shorthand: "c" usage: "test"}];
+    optional string StringFlag = 2 [ (info) = { name: "string-flag" value: "" shorthand: "o" usage: "test"}];
+    optional int32 Int32Flag = 3 [ (info) = { name: "int32-flag" value: "0" shorthand: "" usage: "test"}];
+    optional Array ArrayFlag = 4 [ (info) = { name: "repeated-string-flag" value: "default1" value: "default2" shorthand: "" usage: "test" ext: ISSTRARRAY}];
+    optional int64 Int64Flag = 5 [ (info) = { name: "int64-flag" value: "1234" shorthand: "" usage: "test"}];
+    optional int64 TimeFlag = 6 [ (info) = { name: "time-flag" value: "1234565666" shorthand: "" usage: "test" ext: ISTIME}];
+}

@@ -363,6 +363,15 @@ func GetFlagInt(cmd *cobra.Command, flag string) int {
 }
 
 // Assumes the flag has a default value.
+func GetFlagInt32(cmd *cobra.Command, flag string) int32 {
+	i, err := cmd.Flags().GetInt32(flag)
+	if err != nil {
+		glog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+	}
+	return i
+}
+
+// Assumes the flag has a default value.
 func GetFlagInt64(cmd *cobra.Command, flag string) int64 {
 	i, err := cmd.Flags().GetInt64(flag)
 	if err != nil {
