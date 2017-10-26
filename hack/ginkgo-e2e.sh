@@ -124,11 +124,44 @@ if [[ "${GINKGO_NO_COLOR}" == "y" ]]; then
   ginkgo_args+=("--noColor")
 fi
 
+# Remove the last
+set -- "${@:1:$(($#-1))}"
+
 # The --host setting is used only when providing --auth_config
 # If --kubeconfig is used, the host to use is retrieved from the .kubeconfig
 # file and the one provided with --host is ignored.
 # Add path for things like running kubectl binary.
 export PATH=$(dirname "${e2e_test}"):"${PATH}"
+
+echo "${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
+  "${auth_config[@]:+${auth_config[@]}}" \
+  --ginkgo.flakeAttempts="${FLAKE_ATTEMPTS}" \
+  --host="${KUBE_MASTER_URL}" \
+  --provider="${KUBERNETES_PROVIDER}" \
+  --gce-project="${PROJECT:-}" \
+  --gce-zone="${ZONE:-}" \
+  --gce-region="${REGION:-}" \
+  --gce-multizone="${MULTIZONE:-false}" \
+  --gke-cluster="${CLUSTER_NAME:-}" \
+  --kube-master="${KUBE_MASTER:-}" \
+  --cluster-tag="${CLUSTER_ID:-}" \
+  --cloud-config-file="${CLOUD_CONFIG:-}" \
+  --repo-root="${KUBE_ROOT}" \
+  --node-instance-group="${NODE_INSTANCE_GROUP:-}" \
+  --prefix="${KUBE_GCE_INSTANCE_PREFIX:-e2e}" \
+  --network="${KUBE_GCE_NETWORK:-${KUBE_GKE_NETWORK:-e2e}}" \
+  --node-tag="${NODE_TAG:-}" \
+  --master-tag="${MASTER_TAG:-}" \
+  --federated-kube-context="${FEDERATION_KUBE_CONTEXT:-e2e-federation}" \
+  ${KUBE_CONTAINER_RUNTIME:+"--container-runtime=${KUBE_CONTAINER_RUNTIME}"} \
+  ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
+  ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \
+  ${NUM_NODES:+"--num-nodes=${NUM_NODES}"} \
+  ${E2E_REPORT_DIR:+"--report-dir=${E2E_REPORT_DIR}"} \
+  ${E2E_REPORT_PREFIX:+"--report-prefix=${E2E_REPORT_PREFIX}"} \
+  "${@:-}"
+
+
 "${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
   "${auth_config[@]:+${auth_config[@]}}" \
   --ginkgo.flakeAttempts="${FLAKE_ATTEMPTS}" \
