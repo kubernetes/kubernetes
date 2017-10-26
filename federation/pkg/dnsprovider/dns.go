@@ -29,7 +29,7 @@ type Interface interface {
 }
 
 type Zones interface {
-	// List returns the managed Zones, or an error if the list operation failed.
+	// List returns the (possibly empty) list of managed Zones, or an error if the list operation failed.
 	List() ([]Zone, error)
 	// Add creates and returns a new managed zone, or an error if the operation failed
 	Add(Zone) (Zone, error)
