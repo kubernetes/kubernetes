@@ -1682,18 +1682,22 @@ func TestDescribeServiceAccount(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	expectedOut := `Name:                bar
-Namespace:           foo
-Labels:              <none>
-Annotations:         <none>
-Image pull secrets:  test-local-ref (not found)
-Mountable secrets:   test-objectref (not found)
-Tokens:              <none>
-Events:              <none>` + "\n"
-	if out != expectedOut {
-		t.Errorf("expected : %q\n but got output:\n %q", expectedOut, out)
-	}
 
+	expectedElements := []string{
+		"Name:                bar",
+		"Namespace:           foo",
+		"Labels:              <none>",
+		"Annotations:         <none>",
+		"Image pull secrets:  test-local-ref (not found)",
+		"Mountable secrets:   test-objectref (not found)",
+		"Tokens:              <none>",
+		"Events:              <none>",
+	}
+	for _, expected := range expectedElements {
+		if !strings.Contains(out, expected) {
+			t.Errorf("expected to find %q in output: %q", expected, out)
+		}
+	}
 }
 
 // boolPtr returns a pointer to a bool
