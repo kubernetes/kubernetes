@@ -75,3 +75,48 @@ func TestResourcesLocal(t *testing.T) {
 		t.Errorf("did not set resources: %s", buf.String())
 	}
 }
+
+func TestSetMultiResourcesLimitsLocal(t *testing.T) {
+	f, tf, codec, ns := cmdtesting.NewAPIFactory()
+	tf.Client = &fake.RESTClient{
+		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+			return nil, nil
+		}),
+	}
+	tf.Namespace = "test"
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdResources(f, buf, buf)
+	cmd.SetOutput(buf)
+	cmd.Flags().Set("output", "name")
+	cmd.Flags().Set("local", "true")
+	mapper, typer := f.Object()
+	tf.Printer = &printers.NamePrinter{Decoders: []runtime.Decoder{codec}, Typer: typer, Mapper: mapper}
+
+	opts := ResourcesOptions{FilenameOptions: resource.FilenameOptions{
+		Filenames: []string{"../../../../test/fixtures/pkg/kubectl/cmd/set/multi-resource-yaml.yaml"}},
+		Out:               buf,
+		Local:             true,
+		Limits:            "cpu=200m,memory=512Mi",
+		Requests:          "cpu=200m,memory=512Mi",
+		ContainerSelector: "*"}
+
+	err := opts.Complete(f, cmd, []string{})
+	if err == nil {
+		err = opts.Validate()
+	}
+	if err == nil {
+		err = opts.Run()
+	}
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expectedOut := "replicationcontrollers/first-rc\nreplicationcontrollers/second-rc\n"
+	if buf.String() != expectedOut {
+		t.Errorf("expected out:\n%s\nbut got:\n%s", expectedOut, buf.String())
+	}
+}
