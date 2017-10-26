@@ -296,5 +296,7 @@ func (a *GenericAdmissionWebhook) hookClient(h *v1alpha1.ExternalAdmissionHook) 
 	cfg.TLSClientConfig.ServerName = serverName
 	cfg.TLSClientConfig.CAData = h.ClientConfig.CABundle
 	cfg.ContentConfig.NegotiatedSerializer = a.negotiatedSerializer
+	// TODO: remove the hard-coding when we figure out how to dynamically decide the content-type
+	cfg.ContentConfig.ContentType = runtime.ContentTypeJSON
 	return rest.UnversionedRESTClientFor(cfg)
 }
