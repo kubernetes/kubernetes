@@ -783,9 +783,13 @@ func validateKeyToPath(kp *api.KeyToPath, fldPath *field.Path) field.ErrorList {
 }
 
 func validatePersistentClaimVolumeSource(claim *api.PersistentVolumeClaimVolumeSource, fldPath *field.Path) field.ErrorList {
+	namePath := fldPath.Child("claimName")
+
 	allErrs := field.ErrorList{}
 	if len(claim.ClaimName) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("claimName"), ""))
+		allErrs = append(allErrs, field.Required(namePath, ""))
+	} else {
+		allErrs = append(allErrs, ValidateDNS1123Label(claim.ClaimName, namePath)...)
 	}
 	return allErrs
 }

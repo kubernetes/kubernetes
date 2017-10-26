@@ -67,7 +67,6 @@ var _ volume.Deleter = &glusterfsVolumeDeleter{}
 const (
 	glusterfsPluginName            = "kubernetes.io/glusterfs"
 	volPrefix                      = "vol_"
-	dynamicEpSvcPrefix             = "glusterfs-dynamic-"
 	replicaCount                   = 3
 	durabilityType                 = "replicate"
 	secretKeyName                  = "key" // key name used in secret
@@ -379,8 +378,7 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 
 }
 
-func getVolumeSource(
-	spec *volume.Spec) (*v1.GlusterfsVolumeSource, bool, error) {
+func getVolumeSource(spec *volume.Spec) (*v1.GlusterfsVolumeSource, bool, error) {
 	if spec.Volume != nil && spec.Volume.Glusterfs != nil {
 		return spec.Volume.Glusterfs, spec.Volume.Glusterfs.ReadOnly, nil
 	} else if spec.PersistentVolume != nil &&
@@ -768,11 +766,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		return nil, 0, fmt.Errorf("error [%v] when getting cluster nodes for volume %s", err, volume)
 	}
 
-	// The 'endpointname' is created in form of 'gluster-dynamic-<claimname>'.
-	// createEndpointService() checks for this 'endpoint' existence in PVC's namespace and
-	// If not found, it create an endpoint and svc using the IPs we dynamically picked at time
-	// of volume creation.
-	epServiceName := dynamicEpSvcPrefix + p.options.PVC.Name
+	epServiceName := p.options.PVC.Name
 	epNamespace := p.options.PVC.Namespace
 	endpoint, service, err := p.createEndpointService(epNamespace, epServiceName, dynamicHostIps, p.options.PVC.Name)
 	if err != nil {
