@@ -18,6 +18,7 @@ package dbus
 
 import (
 	"fmt"
+	"sync"
 
 	godbus "github.com/godbus/dbus"
 )
@@ -30,6 +31,7 @@ type DBusFake struct {
 
 // DBusFakeConnection represents a fake D-Bus connection
 type DBusFakeConnection struct {
+	lock           sync.Mutex
 	busObject      *fakeObject
 	objects        map[string]*fakeObject
 	signalHandlers []chan<- *godbus.Signal
@@ -88,6 +90,8 @@ func (conn *DBusFakeConnection) Object(name, path string) Object {
 
 // Signal is part of the Connection interface
 func (conn *DBusFakeConnection) Signal(ch chan<- *godbus.Signal) {
+	conn.lock.Lock()
+	defer conn.lock.Unlock()
 	for i := range conn.signalHandlers {
 		if conn.signalHandlers[i] == ch {
 			conn.signalHandlers = append(conn.signalHandlers[:i], conn.signalHandlers[i+1:]...)
@@ -109,6 +113,8 @@ func (conn *DBusFakeConnection) AddObject(name, path string, handler DBusFakeHan
 
 // EmitSignal emits a signal on conn
 func (conn *DBusFakeConnection) EmitSignal(name, path, iface, signal string, args ...interface{}) {
+	conn.lock.Lock()
+	defer conn.lock.Unlock()
 	sig := &godbus.Signal{
 		Sender: name,
 		Path:   godbus.ObjectPath(path),
