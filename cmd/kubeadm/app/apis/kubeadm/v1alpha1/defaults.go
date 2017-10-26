@@ -66,8 +66,8 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 		obj.CertificatesDir = DefaultCertificatesDir
 	}
 
-	if obj.TokenTTL.Duration == 0 {
-		obj.TokenTTL = metav1.Duration{
+	if obj.TokenTTL == nil {
+		obj.TokenTTL = &metav1.Duration{
 			Duration: constants.DefaultTokenDuration,
 		}
 	}
