@@ -159,9 +159,10 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	// 5. Make sure this additional pod is not scheduled.
 	It("validates resource limits of pods that are allowed to run [Conformance]", func() {
 		framework.WaitForStableCluster(cs, masterNodes)
-		nodeMaxCapacity := int64(0)
 
-		nodeToCapacityMap := make(map[string]int64)
+		nodeMaxAllocatable := int64(0)
+		nodeToAllocatableMap := make(map[string]int64)
+
 		for _, node := range nodeList.Items {
 			nodeReady := false
 			for _, condition := range node.Status.Conditions {
@@ -176,16 +177,16 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			// Apply node label to each node
 			framework.AddOrUpdateLabelOnNode(cs, node.Name, "node", node.Name)
 			framework.ExpectNodeHasLabel(cs, node.Name, "node", node.Name)
-			capacity, found := node.Status.Capacity["cpu"]
+			allocatable, found := node.Status.Allocatable["cpu"]
 			Expect(found).To(Equal(true))
-			nodeToCapacityMap[node.Name] = capacity.MilliValue()
-			if nodeMaxCapacity < capacity.MilliValue() {
-				nodeMaxCapacity = capacity.MilliValue()
+			nodeToAllocatableMap[node.Name] = allocatable.MilliValue()
+			if nodeMaxAllocatable < allocatable.MilliValue() {
+				nodeMaxAllocatable = allocatable.MilliValue()
 			}
 		}
 		// Clean up added labels after this test.
 		defer func() {
-			for nodeName := range nodeToCapacityMap {
+			for nodeName := range nodeToAllocatableMap {
 				framework.RemoveLabelOffNode(cs, nodeName, "node")
 			}
 		}()
@@ -193,16 +194,16 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		pods, err := cs.Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		for _, pod := range pods.Items {
-			_, found := nodeToCapacityMap[pod.Spec.NodeName]
+			_, found := nodeToAllocatableMap[pod.Spec.NodeName]
 			if found && pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
 				framework.Logf("Pod %v requesting resource cpu=%vm on Node %v", pod.Name, getRequestedCPU(pod), pod.Spec.NodeName)
-				nodeToCapacityMap[pod.Spec.NodeName] -= getRequestedCPU(pod)
+				nodeToAllocatableMap[pod.Spec.NodeName] -= getRequestedCPU(pod)
 			}
 		}
 
 		// Create one pod per node that requires 70% of the node remaining CPU.
 		fillerPods := []*v1.Pod{}
-		for nodeName, cpu := range nodeToCapacityMap {
+		for nodeName, cpu := range nodeToAllocatableMap {
 			requestedCPU := cpu * 7 / 10
 			fillerPods = append(fillerPods, createPausePod(f, pausePodConfig{
 				Name: "filler-pod-" + nodeName,
@@ -247,7 +248,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			Labels: map[string]string{"name": "additional"},
 			Resources: &v1.ResourceRequirements{
 				Limits: v1.ResourceList{
-					v1.ResourceCPU: *resource.NewMilliQuantity(nodeMaxCapacity*5/10, "DecimalSI"),
+					v1.ResourceCPU: *resource.NewMilliQuantity(nodeMaxAllocatable*5/10, "DecimalSI"),
 				},
 			},
 		}
