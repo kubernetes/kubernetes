@@ -27,6 +27,7 @@ go_test(
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/policy:go_default_library",
+        "//pkg/apis/scheduling:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/fake:go_default_library",

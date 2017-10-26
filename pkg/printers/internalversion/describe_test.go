@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
@@ -1788,5 +1789,31 @@ func TestControllerRef(t *testing.T) {
 	}
 	if !strings.Contains(out, "1 Running") {
 		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribePriorityClass(t *testing.T) {
+	fake := fake.NewSimpleClientset(&scheduling.PriorityClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+		},
+		Value:         100,
+		GlobalDefault: true,
+		Description:   "Used for the highest priority pods.",
+	})
+	c := &describeClient{T: t, Namespace: "", Interface: fake}
+	d := PriorityClassDescriber{c}
+	out, err := d.Describe("", "bar", printers.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	expectedOut := `Name:           bar
+Value:          100
+GlobalDefault:  True
+Description:    Used for the highest priority pods.
+Annotations:    <none>
+Events:         <none>` + "\n"
+	if out != expectedOut {
+		t.Errorf("expected : %q\n but got output:\n %q", expectedOut, out)
 	}
 }
