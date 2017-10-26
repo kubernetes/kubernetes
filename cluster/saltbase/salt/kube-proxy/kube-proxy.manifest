@@ -96,6 +96,9 @@ spec:
     - mountPath: /run/xtables.lock
       name: iptableslock
       readOnly: false
+    - mountPath: /lib/modules
+      name: lib-modules
+      readOnly: true
   volumes:
   - hostPath:
       path: /usr/share/ca-certificates
@@ -114,3 +117,6 @@ spec:
       path: /run/xtables.lock
       type: FileOrCreate
     name: iptableslock
+  - name: lib-modules
+    hostPath:
+      path: /lib/modules

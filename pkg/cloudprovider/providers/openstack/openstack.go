@@ -78,7 +78,7 @@ type LoadBalancer struct {
 }
 
 type LoadBalancerOpts struct {
-	LBVersion            string     `gcfg:"lb-version"`          // overrides autodetection. v1 or v2
+	LBVersion            string     `gcfg:"lb-version"`          // overrides autodetection. Only support v2.
 	SubnetId             string     `gcfg:"subnet-id"`           // overrides autodetection.
 	FloatingNetworkId    string     `gcfg:"floating-network-id"` // If specified, will create floating ip for loadbalancer, or do not create floating ip.
 	LBMethod             string     `gcfg:"lb-method"`           // default to ROUND_ROBIN.
@@ -507,39 +507,17 @@ func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 		return nil, false
 	}
 
+	// LBaaS v1 is deprecated in the OpenStack Liberty release.
+	// Currently kubernetes OpenStack cloud provider just support LBaaS v2.
 	lbVersion := os.lbOpts.LBVersion
-	if lbVersion == "" {
-		// No version specified, try newest supported by server
-		netExts, err := networkExtensions(network)
-		if err != nil {
-			glog.Warningf("Failed to list neutron extensions: %v", err)
-			return nil, false
-		}
-
-		if netExts["lbaasv2"] {
-			lbVersion = "v2"
-		} else if netExts["lbaas"] {
-			lbVersion = "v1"
-		} else {
-			glog.Warningf("Failed to find neutron LBaaS extension (v1 or v2)")
-			return nil, false
-		}
-		glog.V(3).Infof("Using LBaaS extension %v", lbVersion)
+	if lbVersion != "" && lbVersion != "v2" {
+		glog.Warningf("Config error: currently only support LBaaS v2, unrecognised lb-version \"%v\"", lbVersion)
+		return nil, false
 	}
 
 	glog.V(1).Info("Claiming to support LoadBalancer")
 
-	if lbVersion == "v2" {
-		return &LbaasV2{LoadBalancer{network, compute, os.lbOpts}}, true
-	} else if lbVersion == "v1" {
-		// Since LBaaS v1 is deprecated in the OpenStack Liberty release, so deprecate LBaaSV1 at V1.8, then remove LBaaSV1 after V1.9.
-		// Reference OpenStack doc:	https://docs.openstack.org/mitaka/networking-guide/config-lbaas.html
-		glog.Warningf("The LBaaS v1 of OpenStack cloud provider has been deprecated, Please use LBaaS v2")
-		return &LbaasV1{LoadBalancer{network, compute, os.lbOpts}}, true
-	} else {
-		glog.Warningf("Config error: unrecognised lb-version \"%v\"", lbVersion)
-		return nil, false
-	}
+	return &LbaasV2{LoadBalancer{network, compute, os.lbOpts}}, true
 }
 
 func isNotFound(err error) bool {

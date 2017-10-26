@@ -300,9 +300,7 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 	})
 
 	Context("when using local volume provisioner", func() {
-		var (
-			volumePath string
-		)
+		var volumePath string
 
 		BeforeEach(func() {
 			setupLocalVolumeProvisioner(config)

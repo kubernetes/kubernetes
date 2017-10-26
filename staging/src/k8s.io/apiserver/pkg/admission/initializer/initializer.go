@@ -30,6 +30,7 @@ type pluginInitializer struct {
 	externalInformers informers.SharedInformerFactory
 	authorizer        authorizer.Authorizer
 	// webhookRESTClientConfig provies a client used to contact webhooks
+	// TODO clean out cruft
 	webhookRESTClientConfig *rest.Config
 	scheme                  *runtime.Scheme
 }

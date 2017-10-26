@@ -30,10 +30,12 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/testapi"
@@ -45,12 +47,15 @@ const (
 	gcePDDetachPollTime = 10 * time.Second
 	nodeStatusTimeout   = 10 * time.Minute
 	nodeStatusPollTime  = 1 * time.Second
+	podEvictTimeout     = 2 * time.Minute
 	maxReadRetry        = 3
 	minNodes            = 2
 )
 
 var _ = SIGDescribe("Pod Disks", func() {
 	var (
+		ns         string
+		cs         clientset.Interface
 		podClient  v1core.PodInterface
 		nodeClient v1core.NodeInterface
 		host0Name  types.NodeName
@@ -61,10 +66,12 @@ var _ = SIGDescribe("Pod Disks", func() {
 
 	BeforeEach(func() {
 		framework.SkipUnlessNodeCountIsAtLeast(minNodes)
+		cs = f.ClientSet
+		ns = f.Namespace.Name
 
-		podClient = f.ClientSet.Core().Pods(f.Namespace.Name)
-		nodeClient = f.ClientSet.Core().Nodes()
-		nodes = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+		podClient = cs.Core().Pods(ns)
+		nodeClient = cs.Core().Nodes()
+		nodes = framework.GetReadySchedulableNodesOrDie(cs)
 		Expect(len(nodes.Items)).To(BeNumerically(">=", minNodes), fmt.Sprintf("Requires at least %d nodes", minNodes))
 		host0Name = types.NodeName(nodes.Items[0].ObjectMeta.Name)
 		host1Name = types.NodeName(nodes.Items[1].ObjectMeta.Name)
@@ -294,28 +301,33 @@ var _ = SIGDescribe("Pod Disks", func() {
 		}
 	})
 
-	Context("detach from a disrupted node [Slow] [Disruptive]", func() {
+	Context("detach in a disrupted environment [Slow] [Disruptive]", func() {
 		const (
 			deleteNode    = 1 // delete physical node
 			deleteNodeObj = 2 // delete node's api object only
+			evictPod      = 3 // evict host0Pod on node0
 		)
 		type testT struct {
-			descr  string // It description
-			nodeOp int    // disruptive operation performed on target node
+			descr     string // It description
+			disruptOp int    // disruptive operation performed on target node
 		}
 		tests := []testT{
 			{
-				descr:  "node is deleted",
-				nodeOp: deleteNode,
+				descr:     "node is deleted",
+				disruptOp: deleteNode,
 			},
 			{
-				descr:  "node's API object is deleted",
-				nodeOp: deleteNodeObj,
+				descr:     "node's API object is deleted",
+				disruptOp: deleteNodeObj,
+			},
+			{
+				descr:     "pod is evicted",
+				disruptOp: evictPod,
 			},
 		}
 
 		for _, t := range tests {
-			nodeOp := t.nodeOp
+			disruptOp := t.disruptOp
 			It(fmt.Sprintf("when %s", t.descr), func() {
 				framework.SkipUnlessProviderIs("gce")
 				origNodeCnt := len(nodes.Items) // healhy nodes running kublet
@@ -324,30 +336,39 @@ var _ = SIGDescribe("Pod Disks", func() {
 				diskName, err := framework.CreatePDWithRetry()
 				framework.ExpectNoError(err, "Error creating a pd")
 
-				targetNode := &nodes.Items[0]
+				targetNode := &nodes.Items[0] // for node delete ops
 				host0Pod := testPDPod([]string{diskName}, host0Name, false, 1)
 				containerName := "mycontainer"
 
 				defer func() {
 					By("defer: cleaning up PD-RW test env")
 					framework.Logf("defer cleanup errors can usually be ignored")
-					if nodeOp == deleteNode {
-						podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0))
-					}
+					By("defer: delete host0Pod")
+					podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0))
+					By("defer: detach and delete PDs")
 					detachAndDeletePDs(diskName, []types.NodeName{host0Name})
-					if nodeOp == deleteNodeObj {
-						targetNode.ObjectMeta.SetResourceVersion("0")
-						// need to set the resource version or else the Create() fails
-						_, err := nodeClient.Create(targetNode)
-						framework.ExpectNoError(err, "defer: Unable to re-create the deleted node")
+					if disruptOp == deleteNode || disruptOp == deleteNodeObj {
+						if disruptOp == deleteNodeObj {
+							targetNode.ObjectMeta.SetResourceVersion("0")
+							// need to set the resource version or else the Create() fails
+							By("defer: re-create host0 node object")
+							_, err := nodeClient.Create(targetNode)
+							framework.ExpectNoError(err, fmt.Sprintf("defer: Unable to re-create the deleted node object %q", targetNode.Name))
+						}
+						By("defer: verify the number of ready nodes")
+						numNodes := countReadyNodes(cs, host0Name)
+						// if this defer is reached due to an Expect then nested
+						// Expects are lost, so use Failf here
+						if numNodes != origNodeCnt {
+							framework.Failf("defer: Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt)
+						}
 					}
-					numNodes := countReadyNodes(f.ClientSet, host0Name)
-					Expect(numNodes).To(Equal(origNodeCnt), fmt.Sprintf("defer: Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt))
 				}()
 
 				By("creating host0Pod on node0")
 				_, err = podClient.Create(host0Pod)
 				framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
+				By("waiting for host0Pod to be running")
 				framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
 
 				By("writing content to host0Pod")
@@ -359,7 +380,7 @@ var _ = SIGDescribe("Pod Disks", func() {
 				By("verifying PD is present in node0's VolumeInUse list")
 				framework.ExpectNoError(waitForPDInVolumesInUse(nodeClient, diskName, host0Name, nodeStatusTimeout, true /* should exist*/))
 
-				if nodeOp == deleteNode {
+				if disruptOp == deleteNode {
 					By("getting gce instances")
 					gceCloud, err := framework.GetGCECloud()
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to create gcloud client err=%v", err))
@@ -370,18 +391,36 @@ var _ = SIGDescribe("Pod Disks", func() {
 					By("deleting host0")
 					resp, err := gceCloud.DeleteInstance(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone, string(host0Name))
 					framework.ExpectNoError(err, fmt.Sprintf("Failed to delete host0Pod: err=%v response=%#v", err, resp))
-					By("expecting host0 node to be recreated")
-					numNodes := countReadyNodes(f.ClientSet, host0Name)
+					By("expecting host0 node to be re-created")
+					numNodes := countReadyNodes(cs, host0Name)
 					Expect(numNodes).To(Equal(origNodeCnt), fmt.Sprintf("Requires current node count (%d) to return to original node count (%d)", numNodes, origNodeCnt))
 					output, err = gceCloud.ListInstanceNames(framework.TestContext.CloudConfig.ProjectID, framework.TestContext.CloudConfig.Zone)
 					framework.ExpectNoError(err, fmt.Sprintf("Unable to get list of node instances err=%v output=%s", err, output))
 					Expect(false, strings.Contains(string(output), string(host0Name)))
 
-				} else if nodeOp == deleteNodeObj {
+				} else if disruptOp == deleteNodeObj {
 					By("deleting host0's node api object")
 					framework.ExpectNoError(nodeClient.Delete(string(host0Name), metav1.NewDeleteOptions(0)), "Unable to delete host0's node object")
 					By("deleting host0Pod")
 					framework.ExpectNoError(podClient.Delete(host0Pod.Name, metav1.NewDeleteOptions(0)), "Unable to delete host0Pod")
+
+				} else if disruptOp == evictPod {
+					evictTarget := &policy.Eviction{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      host0Pod.Name,
+							Namespace: ns,
+						},
+					}
+					By("evicting host0Pod")
+					err = wait.PollImmediate(framework.Poll, podEvictTimeout, func() (bool, error) {
+						err = cs.CoreV1().Pods(ns).Evict(evictTarget)
+						if err != nil {
+							return false, nil
+						} else {
+							return true, nil
+						}
+					})
+					Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("failed to evict host0Pod after %v", podEvictTimeout))
 				}
 
 				By("waiting for pd to detach from host0")

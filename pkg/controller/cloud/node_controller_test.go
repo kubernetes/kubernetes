@@ -458,7 +458,7 @@ func TestGCECondition(t *testing.T) {
 		}
 	}
 
-	assert.True(t, conditionAdded, "Network Route Condition for GCE not added by external cloud intializer")
+	assert.True(t, conditionAdded, "Network Route Condition for GCE not added by external cloud initializer")
 }
 
 // This test checks that a node with the external cloud provider taint is cloudprovider initialized and
