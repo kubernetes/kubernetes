@@ -18,13 +18,17 @@ package predicates
 
 import (
 	"fmt"
+	"os"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -1588,6 +1592,280 @@ func TestServiceAffinity(t *testing.T) {
 	}
 }
 
+func unsetEnvKubeMaxPDVols(previousValue string) {
+	os.Unsetenv(KubeMaxPDVols)
+	if previousValue != "" {
+		os.Setenv(KubeMaxPDVols, previousValue)
+	}
+}
+
+func TestGCEPDCountConflicts(t *testing.T) {
+
+	var twoPodList_64 []*v1.Pod
+	var onePodList_15 []*v1.Pod
+	var onePodList_31 []*v1.Pod
+
+	for i := 0; i < 15; i++ {
+		pdName := fmt.Sprintf("onepd_%d", i)
+		oneVolPod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
+					{
+						VolumeSource: v1.VolumeSource{
+							GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: pdName},
+						},
+					},
+				},
+			},
+		}
+		onePodList_15 = append(onePodList_15, oneVolPod)
+	}
+
+	for i := 0; i < 31; i++ {
+		pdName := fmt.Sprintf("onepd_%d", i)
+		oneVolPod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
+					{
+						VolumeSource: v1.VolumeSource{
+							GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: pdName},
+						},
+					},
+				},
+			},
+		}
+		onePodList_31 = append(onePodList_31, oneVolPod)
+	}
+
+	for i := 0; i < 32; i++ {
+		pdName1 := fmt.Sprintf("twopd1_%d", i)
+		pdName2 := fmt.Sprintf("twopd2_%d", i)
+		twoVolPod := &v1.Pod{
+			Spec: v1.PodSpec{
+				Volumes: []v1.Volume{
+					{
+						VolumeSource: v1.VolumeSource{
+							GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: pdName1},
+						},
+					},
+					{
+						VolumeSource: v1.VolumeSource{
+							GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: pdName2},
+						},
+					},
+				},
+			},
+		}
+		twoPodList_64 = append(twoPodList_64, twoVolPod)
+	}
+
+	oneVolPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: "pv1"},
+					},
+				},
+			},
+		},
+	}
+
+	twoVolPod := &v1.Pod{
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: "pv2"},
+					},
+				},
+				{
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{PDName: "pv3"},
+					},
+				},
+			},
+		},
+	}
+
+	standard_1_node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "hostname",
+			Labels: map[string]string{
+				kubeletapis.LabelInstanceType: "n1-standard-1",
+			},
+		},
+	}
+
+	standard_2_node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "hostname",
+			Labels: map[string]string{
+				kubeletapis.LabelInstanceType: "n1-standard-2",
+			},
+		},
+	}
+
+	highcpu_8_node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "hostname",
+			Labels: map[string]string{
+				kubeletapis.LabelInstanceType: "n1-highcpu-8",
+			},
+		},
+	}
+
+	small_node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "hostname",
+			Labels: map[string]string{
+				kubeletapis.LabelInstanceType: "small-node",
+			},
+		},
+	}
+
+	tests := []struct {
+		newPod       *v1.Pod
+		existingPods []*v1.Pod
+		node         *v1.Node
+		fits         bool
+		test         string
+	}{
+		{
+			newPod:       oneVolPod,
+			existingPods: append(onePodList_15, onePodList_31...),
+			node:         standard_1_node,
+			fits:         true,
+			test:         "fits when node capacity >= new pod's GCE volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: append(onePodList_15, onePodList_31...),
+			node:         standard_1_node,
+			fits:         false,
+			test:         "doesn't fit when node capacity < new pod's GCE volumes",
+		},
+		{
+			newPod:       oneVolPod,
+			existingPods: twoPodList_64,
+			node:         standard_2_node,
+			fits:         false,
+			test:         "doesn't fit when node capacity < new pod's GCE volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: append(onePodList_15, twoPodList_64...),
+			node:         highcpu_8_node,
+			fits:         true,
+			test:         "fits when node capacity >= new pod's GCE volumes",
+		},
+		{
+			newPod:       oneVolPod,
+			existingPods: onePodList_15,
+			node:         small_node,
+			fits:         true,
+			test:         "fits when node capacity >= new pod's GCE volumes",
+		},
+	}
+
+	filter := VolumeFilter{
+		FilterVolume: func(vol *v1.Volume) (string, bool) {
+			if vol.GCEPersistentDisk != nil {
+				return vol.GCEPersistentDisk.PDName, true
+			}
+			return "", false
+		},
+		FilterPersistentVolume: func(pv *v1.PersistentVolume) (string, bool) {
+			if pv.Spec.GCEPersistentDisk != nil {
+				return pv.Spec.GCEPersistentDisk.PDName, true
+			}
+			return "", false
+		},
+	}
+	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}
+
+	pvInfo := FakePersistentVolumeInfo{}
+
+	pvcInfo := FakePersistentVolumeClaimInfo{}
+
+	for _, test := range tests {
+		pred := NewMaxPDVolumeCountPredicate(filter, gce.MaxPDCount, pvInfo, pvcInfo)
+		nodeInfo := schedulercache.NewNodeInfo(test.existingPods...)
+		nodeInfo.SetNode(test.node)
+		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), nodeInfo)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.test, err)
+		}
+		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		}
+		if fits != test.fits {
+			t.Errorf("%s: expected %v, got %v", test.test, test.fits, fits)
+		}
+	}
+
+	// Test get MaxPDCount value from environment varible
+	envTests := []struct {
+		newPod       *v1.Pod
+		existingPods []*v1.Pod
+		node         *v1.Node
+		envMaxPDs    string
+		fits         bool
+		test         string
+	}{
+		{
+			newPod:       oneVolPod,
+			existingPods: append(onePodList_15, onePodList_31...),
+			node:         standard_1_node,
+			envMaxPDs:    "invalid",
+			fits:         true,
+			test:         "fits when node capacity >= new pod's GCE volumes",
+		},
+		{
+			newPod:       oneVolPod,
+			existingPods: append(onePodList_15, onePodList_31...),
+			node:         standard_1_node,
+			envMaxPDs:    "31",
+			fits:         false,
+			test:         "doesn't fit when node capacity < new pod's GCE volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: twoPodList_64,
+			node:         standard_2_node,
+			envMaxPDs:    "70",
+			fits:         true,
+			test:         "fits when node capacity >= new pod's GCE volumes",
+		},
+		{
+			newPod:       twoVolPod,
+			existingPods: append(onePodList_15, twoPodList_64...),
+			node:         highcpu_8_node,
+			envMaxPDs:    "-10",
+			fits:         true,
+			test:         "fits when node capacity >= new pod's GCE volumes",
+		},
+	}
+	previousValue := os.Getenv(KubeMaxPDVols)
+	for _, test := range envTests {
+		os.Setenv(KubeMaxPDVols, test.envMaxPDs)
+		pred := NewMaxPDVolumeCountPredicate(filter, gce.MaxPDCount, pvInfo, pvcInfo)
+		nodeInfo := schedulercache.NewNodeInfo(test.existingPods...)
+		nodeInfo.SetNode(test.node)
+		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), nodeInfo)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", test.test, err)
+		}
+		if !fits && !reflect.DeepEqual(reasons, expectedFailureReasons) {
+			t.Errorf("%s: unexpected failure reasons: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		}
+		if fits != test.fits {
+			t.Errorf("%s: expected %v, got %v", test.test, test.fits, fits)
+		}
+	}
+	unsetEnvKubeMaxPDVols(previousValue)
+}
+
 func TestEBSVolumeCountConflicts(t *testing.T) {
 	oneVolPod := &v1.Pod{
 		Spec: v1.PodSpec{
@@ -2005,8 +2283,10 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 	}
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}
 
+	previousValue := os.Getenv(KubeMaxPDVols)
 	for _, test := range tests {
-		pred := NewMaxPDVolumeCountPredicate(filter, test.maxVols, pvInfo, pvcInfo)
+		os.Setenv(KubeMaxPDVols, strconv.Itoa(test.maxVols))
+		pred := NewMaxPDVolumeCountPredicate(filter, aws.MaxPDCount, pvInfo, pvcInfo)
 		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), schedulercache.NewNodeInfo(test.existingPods...))
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
@@ -2018,6 +2298,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 			t.Errorf("%s: expected %v, got %v", test.test, test.fits, fits)
 		}
 	}
+	unsetEnvKubeMaxPDVols(previousValue)
 }
 
 func newPodWithPort(hostPorts ...int) *v1.Pod {
