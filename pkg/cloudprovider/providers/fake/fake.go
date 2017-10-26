@@ -329,13 +329,3 @@ func (c *FakeCloud) GetLabelsForVolume(pv *v1.PersistentVolume) (map[string]stri
 	}
 	return nil, fmt.Errorf("label not found for volume")
 }
-
-// Notification handler when node is registered.
-func (f *FakeCloud) NodeRegistered(node *v1.Node) {
-
-}
-
-// Notification handler when node is unregistered.
-func (f *FakeCloud) NodeUnregistered(node *v1.Node) {
-
-}

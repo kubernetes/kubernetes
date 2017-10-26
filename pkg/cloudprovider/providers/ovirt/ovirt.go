@@ -322,13 +322,3 @@ func (v *OVirtCloud) CurrentNodeName(hostname string) (types.NodeName, error) {
 func (v *OVirtCloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {
 	return cloudprovider.NotImplemented
 }
-
-// Notification handler when node is registered.
-func (v *OVirtCloud) NodeRegistered(node *v1.Node) {
-
-}
-
-// Notification handler when node is unregistered.
-func (v *OVirtCloud) NodeUnregistered(node *v1.Node) {
-
-}

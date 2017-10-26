@@ -17,21 +17,22 @@ limitations under the License.
 package vsphere
 
 import (
+	"fmt"
+	"strings"
+	"sync"
+
+	"github.com/golang/glog"
+	"golang.org/x/net/context"
 	"k8s.io/api/core/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
-	"github.com/golang/glog"
-	"golang.org/x/net/context"
-	"strings"
-	"sync"
-	"fmt"
 )
 
 // Stores info about the kubernetes node
 type NodeInfo struct {
 	dataCenter *vclib.Datacenter
-	vm       *vclib.VirtualMachine
-	vcServer string
+	vm         *vclib.VirtualMachine
+	vcServer   string
 }
 
 type NodeManager struct {
@@ -44,26 +45,23 @@ type NodeManager struct {
 	// Maps node name to node structure
 	registeredNodes map[string]*v1.Node
 
-
 	// Mutexes
 	registeredNodesLock sync.RWMutex
-	nodeInfoLock sync.RWMutex
+	nodeInfoLock        sync.RWMutex
 }
 
 // TODO: Make it configurable in vsphere.conf
 const (
-	POOL_SIZE = 8
+	POOL_SIZE  = 8
 	QUEUE_SIZE = POOL_SIZE * 10
 )
-
 
 func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 
 	type VmSearch struct {
-		vc string
+		vc         string
 		datacenter *vclib.Datacenter
 	}
-
 
 	var mutex = &sync.Mutex{}
 
@@ -72,7 +70,6 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 	queueChannel = make(chan *VmSearch, QUEUE_SIZE)
 	nodeUUID := node.Status.NodeInfo.SystemUUID
 	vmFound := false
-
 
 	go func() {
 		var datacenterObjs []*vclib.Datacenter
@@ -136,14 +133,14 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 
 	for i := 0; i < POOL_SIZE; i++ {
 		go func() {
-			for res:= range queueChannel {
+			for res := range queueChannel {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				vm, err := res.datacenter.GetVMByUUID(ctx, nodeUUID)
 				if err != nil {
 					glog.V(4).Infof("Error %q while looking for vm=%+v in vc=%s and datacenter=%s",
 						err, node.Name, vm, res.vc, res.datacenter.Name())
-						continue
+					continue
 				}
 				if vm != nil {
 					glog.V(4).Infof("Found node %s as vm=%+v in vc=%s and datacenter=%s",
@@ -151,7 +148,8 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 
 					nodeInfo := &NodeInfo{dataCenter: res.datacenter, vm: vm, vcServer: res.vc}
 					nm.addNodeInfo(node.ObjectMeta.Name, nodeInfo)
-					for range queueChannel {}
+					for range queueChannel {
+					}
 					mutex.Lock()
 					vmFound = true
 					mutex.Unlock()
@@ -173,11 +171,10 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 	return nil
 }
 
-
-
 func (nm *NodeManager) RegisterNode(node *v1.Node) error {
 	nm.addNode(node)
-	return nm.DiscoverNode(node)
+	nm.DiscoverNode(node)
+	return nil
 }
 
 func (nm *NodeManager) UnRegisterNode(node *v1.Node) error {
@@ -246,6 +243,3 @@ func (nm *NodeManager) GetVSphereInstance(nodeName k8stypes.NodeName) (VSphereIn
 	}
 	return *vsphereInstance, nil
 }
-
-
-

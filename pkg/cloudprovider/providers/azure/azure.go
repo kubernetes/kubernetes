@@ -24,7 +24,6 @@ import (
 	"io/ioutil"
 	"time"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
@@ -452,14 +451,4 @@ func initDiskControllers(az *Cloud) error {
 	az.controllerCommon = common
 
 	return nil
-}
-
-// Notification handler when node is registered.
-func (az *Cloud) NodeRegistered(node *v1.Node) {
-
-}
-
-// Notification handler when node is unregistered.
-func (az *Cloud) NodeUnregistered(node *v1.Node) {
-
 }
