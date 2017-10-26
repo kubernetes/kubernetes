@@ -29,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/proxy/apis/proxyconfig"
+	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/iptables"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
@@ -145,7 +145,7 @@ func TestProxyServerWithCleanupAndExit(t *testing.T) {
 	for _, addr := range bindAddresses {
 		options := NewOptions()
 
-		options.config = &proxyconfig.KubeProxyConfiguration{
+		options.config = &kubeproxyconfig.KubeProxyConfiguration{
 			BindAddress: addr,
 		}
 		options.CleanupAndExit = true
@@ -158,7 +158,7 @@ func TestProxyServerWithCleanupAndExit(t *testing.T) {
 		assert.True(t, proxyserver.CleanupAndExit, "false CleanupAndExit, addr: %s", addr)
 
 		// Clean up config for next test case
-		configz.Delete(proxyconfig.GroupName)
+		configz.Delete(kubeproxyconfig.GroupName)
 	}
 }
 
@@ -202,7 +202,7 @@ func TestGetConntrackMax(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		cfg := proxyconfig.KubeProxyConntrackConfiguration{
+		cfg := kubeproxyconfig.KubeProxyConntrackConfiguration{
 			Min:        tc.min,
 			Max:        tc.max,
 			MaxPerCore: tc.maxPerCore,
@@ -223,7 +223,7 @@ func TestGetConntrackMax(t *testing.T) {
 // TestLoadConfig tests proper operation of loadConfig()
 func TestLoadConfig(t *testing.T) {
 
-	yamlTemplate := `apiVersion: kubeproxy.k8s.io/v1alpha1
+	yamlTemplate := `apiVersion: kubeproxyconfig.k8s.io/v1alpha1
 bindAddress: %s
 clientConnection:
   acceptContentTypes: "abc"
@@ -332,9 +332,9 @@ udpTimeoutMilliseconds: 123ms
 			// Surrounding double quotes will get stripped by the yaml parser.
 			expBindAddr = expBindAddr[1 : len(tc.bindAddress)-1]
 		}
-		expected := &proxyconfig.KubeProxyConfiguration{
+		expected := &kubeproxyconfig.KubeProxyConfiguration{
 			BindAddress: expBindAddr,
-			ClientConnection: proxyconfig.ClientConnectionConfiguration{
+			ClientConnection: kubeproxyconfig.ClientConnectionConfiguration{
 				AcceptContentTypes: "abc",
 				Burst:              100,
 				ContentType:        "content-type",
@@ -343,7 +343,7 @@ udpTimeoutMilliseconds: 123ms
 			},
 			ClusterCIDR:      tc.clusterCIDR,
 			ConfigSyncPeriod: metav1.Duration{Duration: 15 * time.Second},
-			Conntrack: proxyconfig.KubeProxyConntrackConfiguration{
+			Conntrack: kubeproxyconfig.KubeProxyConntrackConfiguration{
 				Max:                   4,
 				MaxPerCore:            2,
 				Min:                   1,
@@ -353,18 +353,18 @@ udpTimeoutMilliseconds: 123ms
 			FeatureGates:       "all",
 			HealthzBindAddress: tc.healthzBindAddress,
 			HostnameOverride:   "foo",
-			IPTables: proxyconfig.KubeProxyIPTablesConfiguration{
+			IPTables: kubeproxyconfig.KubeProxyIPTablesConfiguration{
 				MasqueradeAll: true,
 				MasqueradeBit: utilpointer.Int32Ptr(17),
 				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
 				SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
 			},
-			IPVS: proxyconfig.KubeProxyIPVSConfiguration{
+			IPVS: kubeproxyconfig.KubeProxyIPVSConfiguration{
 				MinSyncPeriod: metav1.Duration{Duration: 10 * time.Second},
 				SyncPeriod:    metav1.Duration{Duration: 60 * time.Second},
 			},
 			MetricsBindAddress: tc.metricsBindAddress,
-			Mode:               proxyconfig.ProxyMode(tc.mode),
+			Mode:               kubeproxyconfig.ProxyMode(tc.mode),
 			OOMScoreAdj:        utilpointer.Int32Ptr(17),
 			PortRange:          "2-7",
 			ResourceContainer:  "/foo",
@@ -407,7 +407,7 @@ func TestLoadConfigFailures(t *testing.T) {
 			expErr: "mapping values are not allowed in this context",
 		},
 	}
-	version := "apiVersion: kubeproxy.k8s.io/v1alpha1"
+	version := "apiVersion: kubeproxyconfig.k8s.io/v1alpha1"
 	for _, tc := range testCases {
 		options := NewOptions()
 		config := fmt.Sprintf("%s\n%s", version, tc.config)
