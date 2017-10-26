@@ -269,7 +269,7 @@ func describeStruct(cfg *frozenConfig, typ reflect.Type) (*StructDescriptor, err
 		if decoder == nil {
 			var err error
 			decoder, err = decoderOfType(cfg, field.Type)
-			if err != nil {
+			if len(fieldNames) > 0 && err != nil {
 				return nil, err
 			}
 		}
@@ -277,11 +277,11 @@ func describeStruct(cfg *frozenConfig, typ reflect.Type) (*StructDescriptor, err
 		if encoder == nil {
 			var err error
 			encoder, err = encoderOfType(cfg, field.Type)
-			if err != nil {
+			if len(fieldNames) > 0 && err != nil {
 				return nil, err
 			}
 			// map is stored as pointer in the struct
-			if field.Type.Kind() == reflect.Map {
+			if encoder != nil && field.Type.Kind() == reflect.Map {
 				encoder = &optionalEncoder{encoder}
 			}
 		}
