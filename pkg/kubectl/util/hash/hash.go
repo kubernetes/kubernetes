@@ -21,12 +21,13 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/api"
 )
 
 // ConfigMapHash returns a hash of the ConfigMap.
 // The Data, Kind, and Name are taken into account.
-func ConfigMapHash(cm *api.ConfigMap) (string, error) {
+func ConfigMapHash(cm *v1.ConfigMap) (string, error) {
 	encoded, err := encodeConfigMap(cm)
 	if err != nil {
 		return "", err
@@ -54,7 +55,7 @@ func SecretHash(sec *api.Secret) (string, error) {
 
 // encodeConfigMap encodes a ConfigMap.
 // Data, Kind, and Name are taken into account.
-func encodeConfigMap(cm *api.ConfigMap) (string, error) {
+func encodeConfigMap(cm *v1.ConfigMap) (string, error) {
 	// json.Marshal sorts the keys in a stable order in the encoding
 	data, err := json.Marshal(map[string]interface{}{"kind": "ConfigMap", "name": cm.Name, "data": cm.Data})
 	if err != nil {
