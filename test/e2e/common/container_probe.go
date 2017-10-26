@@ -123,6 +123,11 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		}, 1, defaultObservationTimeout)
 	})
 
+	/*
+	  Testname: pods-exec-liveness-probe-not-restarted
+	  Description: Make sure when exec liveness probe succeeds, the pod should
+	         not be restarted.
+	*/
 	It("should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [Conformance]", func() {
 		runLivenessTest(f, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
