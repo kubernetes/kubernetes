@@ -16,19 +16,19 @@
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest",
-			"Rev": "58f6f26e200fa5dfb40c9cd1c83f3e2c860d779d"
+			"Rev": "48a8154950f853ae1f2a9c409e0eb1fb71119bc8"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/adal",
-			"Rev": "58f6f26e200fa5dfb40c9cd1c83f3e2c860d779d"
+			"Rev": "48a8154950f853ae1f2a9c409e0eb1fb71119bc8"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/azure",
-			"Rev": "58f6f26e200fa5dfb40c9cd1c83f3e2c860d779d"
+			"Rev": "48a8154950f853ae1f2a9c409e0eb1fb71119bc8"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/date",
-			"Rev": "58f6f26e200fa5dfb40c9cd1c83f3e2c860d779d"
+			"Rev": "48a8154950f853ae1f2a9c409e0eb1fb71119bc8"
 		},
 		{
 			"ImportPath": "github.com/PuerkitoBio/purell",
