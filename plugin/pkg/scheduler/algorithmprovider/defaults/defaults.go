@@ -17,12 +17,9 @@ limitations under the License.
 package defaults
 
 import (
-	"os"
-	"strconv"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
@@ -34,19 +31,11 @@ import (
 )
 
 const (
-	// DefaultMaxGCEPDVolumes defines the maximum number of PD Volumes for GCE
-	// GCE instances can have up to 16 PD volumes attached.
-	DefaultMaxGCEPDVolumes = 16
-	// DefaultMaxAzureDiskVolumes defines the maximum number of PD Volumes for Azure
-	// Larger Azure VMs can actually have much more disks attached.
-	// TODO We should determine the max based on VM size
-	DefaultMaxAzureDiskVolumes = 16
+
 	// ClusterAutoscalerProvider defines the default autoscaler provider
 	ClusterAutoscalerProvider = "ClusterAutoscalerProvider"
 	// StatefulSetKind defines the name of 'StatefulSet' kind
 	StatefulSetKind = "StatefulSet"
-	// KubeMaxPDVols defines the maximum number of PD Volumes per kubelet
-	KubeMaxPDVols = "KUBE_MAX_PD_VOLS"
 )
 
 func init() {
@@ -133,27 +122,21 @@ func defaultPredicates() sets.String {
 		factory.RegisterFitPredicateFactory(
 			"MaxEBSVolumeCount",
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-				// TODO: allow for generically parameterized scheduler predicates, because this is a bit ugly
-				maxVols := getMaxVols(aws.DefaultMaxEBSVolumes)
-				return predicates.NewMaxPDVolumeCountPredicate(predicates.EBSVolumeFilter, maxVols, args.PVInfo, args.PVCInfo)
+				return predicates.NewMaxPDVolumeCountPredicate(predicates.EBSVolumeFilterType, args.PVInfo, args.PVCInfo)
 			},
 		),
 		// Fit is determined by whether or not there would be too many GCE PD volumes attached to the node
 		factory.RegisterFitPredicateFactory(
 			"MaxGCEPDVolumeCount",
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-				// TODO: allow for generically parameterized scheduler predicates, because this is a bit ugly
-				maxVols := getMaxVols(DefaultMaxGCEPDVolumes)
-				return predicates.NewMaxPDVolumeCountPredicate(predicates.GCEPDVolumeFilter, maxVols, args.PVInfo, args.PVCInfo)
+				return predicates.NewMaxPDVolumeCountPredicate(predicates.GCEPDVolumeFilterType, args.PVInfo, args.PVCInfo)
 			},
 		),
 		// Fit is determined by whether or not there would be too many Azure Disk volumes attached to the node
 		factory.RegisterFitPredicateFactory(
 			"MaxAzureDiskVolumeCount",
 			func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-				// TODO: allow for generically parameterized scheduler predicates, because this is a bit ugly
-				maxVols := getMaxVols(DefaultMaxAzureDiskVolumes)
-				return predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilter, maxVols, args.PVInfo, args.PVCInfo)
+				return predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, args.PVInfo, args.PVCInfo)
 			},
 		),
 		// Fit is determined by inter-pod affinity.
@@ -260,21 +243,6 @@ func defaultPriorities() sets.String {
 		// Prioritizes nodes that marked with taint which pod can tolerate.
 		factory.RegisterPriorityFunction2("TaintTolerationPriority", priorities.ComputeTaintTolerationPriorityMap, priorities.ComputeTaintTolerationPriorityReduce, 1),
 	)
-}
-
-// getMaxVols checks the max PD volumes environment variable, otherwise returning a default value
-func getMaxVols(defaultVal int) int {
-	if rawMaxVols := os.Getenv(KubeMaxPDVols); rawMaxVols != "" {
-		if parsedMaxVols, err := strconv.Atoi(rawMaxVols); err != nil {
-			glog.Errorf("Unable to parse maximum PD volumes value, using default of %v: %v", defaultVal, err)
-		} else if parsedMaxVols <= 0 {
-			glog.Errorf("Maximum PD volumes must be a positive value, using default of %v", defaultVal)
-		} else {
-			return parsedMaxVols
-		}
-	}
-
-	return defaultVal
 }
 
 func copyAndReplace(set sets.String, replaceWhat, replaceWith string) sets.String {
