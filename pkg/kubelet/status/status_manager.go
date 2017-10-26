@@ -17,6 +17,7 @@ limitations under the License.
 package status
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -264,6 +265,23 @@ func (m *manager) TerminatePod(pod *v1.Pod) {
 	m.updateStatusInternal(pod, status, true)
 }
 
+// checkContainerStateTransition ensures that no container is trying to transition
+// from a terminated to non-terminated state, which is illegal and indicates a
+// logical error in the kubelet.
+func checkContainerStateTransition(oldStatuses, newStatuses []v1.ContainerStatus) error {
+	for _, newStatus := range newStatuses {
+		for _, oldStatus := range oldStatuses {
+			if newStatus.Name != oldStatus.Name {
+				continue
+			}
+			if oldStatus.State.Terminated != nil && newStatus.State.Terminated == nil {
+				return fmt.Errorf("terminated container %v attempted illegal transition to non-terminated state", newStatus.Name)
+			}
+		}
+	}
+	return nil
+}
+
 // updateStatusInternal updates the internal status cache, and queues an update to the api server if
 // necessary. Returns whether an update was triggered.
 // This method IS NOT THREAD SAFE and must be called from a locked function.
@@ -276,6 +294,18 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 		oldStatus = mirrorPod.Status
 	} else {
 		oldStatus = pod.Status
+	}
+
+	// Check for illegal state transition in containers
+	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
+		if err := checkContainerStateTransition(oldStatus.ContainerStatuses, status.ContainerStatuses); err != nil {
+			glog.Errorf("Status update on pod %v/%v aborted: %v", pod.Namespace, pod.Name, err)
+			return false
+		}
+		if err := checkContainerStateTransition(oldStatus.InitContainerStatuses, status.InitContainerStatuses); err != nil {
+			glog.Errorf("Status update on pod %v/%v aborted: %v", pod.Namespace, pod.Name, err)
+			return false
+		}
 	}
 
 	// Set ReadyCondition.LastTransitionTime.
