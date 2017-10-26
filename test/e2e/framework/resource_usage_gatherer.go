@@ -250,7 +250,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 		}
 
 		for _, node := range nodeList.Items {
-			if !options.masterOnly || system.IsMasterNode(node.Name) {
+			if !options.masterOnly || system.IsMasterNode(node) {
 				g.workerWg.Add(1)
 				g.workers = append(g.workers, resourceGatherWorker{
 					c:            c,
