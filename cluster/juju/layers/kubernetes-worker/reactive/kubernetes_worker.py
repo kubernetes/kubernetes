@@ -37,7 +37,7 @@ from charms.kubernetes.flagmanager import FlagManager
 from charms.reactive.helpers import data_changed, any_file_changed
 from charms.templating.jinja2 import render
 
-from charmhelpers.core import hookenv, unitdata
+from charmhelpers.core import hookenv
 from charmhelpers.core.host import service_stop, service_restart
 from charmhelpers.contrib.charmsupport import nrpe
 
@@ -47,10 +47,10 @@ from charmhelpers.contrib.charmsupport import nrpe
 nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 
 kubeconfig_path = '/root/cdk/kubeconfig'
+kubeproxyconfig_path = '/root/cdk/kubeproxyconfig'
+kubeclientconfig_path = '/root/.kube/config'
 
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
-
-db = unitdata.kv()
 
 
 @hook('upgrade-charm')
@@ -319,7 +319,8 @@ def watch_for_changes(kube_api, kube_control, cni):
       'tls_client.client.key.saved', 'tls_client.server.certificate.saved',
       'tls_client.server.key.saved',
       'kube-control.dns.available', 'kube-control.auth.available',
-      'cni.available', 'kubernetes-worker.restart-needed')
+      'cni.available', 'kubernetes-worker.restart-needed',
+      'worker.auth.bootstrapped')
 def start_worker(kube_api, kube_control, auth_control, cni):
     ''' Start kubelet using the provided API and DNS info.'''
     servers = get_kube_api_servers(kube_api)
@@ -335,7 +336,8 @@ def start_worker(kube_api, kube_control, auth_control, cni):
         hookenv.log('Waiting for cluster cidr.')
         return
 
-    creds = kube_control.get_auth_credentials()
+    nodeuser = 'system:node:{}'.format(gethostname())
+    creds = kube_control.get_auth_credentials(nodeuser)
     data_changed('kube-control.creds', creds)
 
     # set --allow-privileged flag for kubelet
@@ -458,11 +460,13 @@ def create_config(server, creds):
     cmd = ['chown', '-R', 'ubuntu:ubuntu', '/home/ubuntu/.kube']
     check_call(cmd)
     # Create kubernetes configuration in the default location for root.
-    create_kubeconfig('/root/.kube/config', server, ca,
+    create_kubeconfig(kubeclientconfig_path, server, ca,
                       token=creds['client_token'], user='root')
     # Create kubernetes configuration for kubelet, and kube-proxy services.
     create_kubeconfig(kubeconfig_path, server, ca,
                       token=creds['kubelet_token'], user='kubelet')
+    create_kubeconfig(kubeproxyconfig_path, server, ca,
+                      token=creds['proxy_token'], user='kube-proxy')
 
 
 def configure_worker_services(api_servers, dns, cluster_cidr):
@@ -491,7 +495,7 @@ def configure_worker_services(api_servers, dns, cluster_cidr):
 
     kube_proxy_opts = FlagManager('kube-proxy')
     kube_proxy_opts.add('cluster-cidr', cluster_cidr)
-    kube_proxy_opts.add('kubeconfig', kubeconfig_path)
+    kube_proxy_opts.add('kubeconfig', kubeproxyconfig_path)
     kube_proxy_opts.add('logtostderr', 'true')
     kube_proxy_opts.add('v', '0')
     kube_proxy_opts.add('master', random.choice(api_servers), strict=True)
@@ -613,7 +617,7 @@ def get_kube_api_servers(kube_api):
 def kubectl(*args):
     ''' Run a kubectl cli command with a config file. Returns stdout and throws
     an error if the command fails. '''
-    command = ['kubectl', '--kubeconfig=' + kubeconfig_path] + list(args)
+    command = ['kubectl', '--kubeconfig=' + kubeclientconfig_path] + list(args)
     hookenv.log('Executing {}'.format(command))
     return check_output(command)
 
@@ -817,11 +821,15 @@ def request_kubelet_and_proxy_credentials(kube_control):
     kube_control.set_auth_request(nodeuser)
 
 
-@when('kube-control.auth.available')
+@when('kube-control.connected')
 def catch_change_in_creds(kube_control):
     """Request a service restart in case credential updates were detected."""
-    creds = kube_control.get_auth_credentials()
-    if data_changed('kube-control.creds', creds):
+    nodeuser = 'system:node:{}'.format(gethostname())
+    creds = kube_control.get_auth_credentials(nodeuser)
+    if creds \
+            and data_changed('kube-control.creds', creds) \
+            and creds['user'] == nodeuser:
+        set_state('worker.auth.bootstrapped')
         set_state('kubernetes-worker.restart-needed')
 
 

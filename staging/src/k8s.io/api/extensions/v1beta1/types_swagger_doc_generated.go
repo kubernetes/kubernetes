@@ -575,7 +575,7 @@ func (RunAsUserStrategyOptions) SwaggerDoc() map[string]string {
 var map_SELinuxStrategyOptions = map[string]string{
 	"":               "SELinux  Strategy Options defines the strategy type and any options used to create the strategy.",
 	"rule":           "type is the strategy that will dictate the allowable labels that may be set.",
-	"seLinuxOptions": "seLinuxOptions required to run as; required for MustRunAs More info: https://git.k8s.io/community/contributors/design-proposals/security_context.md",
+	"seLinuxOptions": "seLinuxOptions required to run as; required for MustRunAs More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
 }
 
 func (SELinuxStrategyOptions) SwaggerDoc() map[string]string {

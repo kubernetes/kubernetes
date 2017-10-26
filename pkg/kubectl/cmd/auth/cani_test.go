@@ -122,7 +122,7 @@ func TestRunAccessCheck(t *testing.T) {
 
 		f, tf, _, ns := cmdtesting.NewAPIFactory()
 		tf.Client = &fake.RESTClient{
-			APIRegistry:          legacyscheme.Registry,
+			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				expectPath := "/apis/authorization.k8s.io/v1/selfsubjectaccessreviews"

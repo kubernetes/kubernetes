@@ -78,15 +78,19 @@ func (plugin *rbdPlugin) GetPluginName() string {
 }
 
 func (plugin *rbdPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	volumeSource, _, err := getVolumeSource(spec)
+	mon, err := getVolumeSourceMonitors(spec)
+	if err != nil {
+		return "", err
+	}
+	img, err := getVolumeSourceImage(spec)
 	if err != nil {
 		return "", err
 	}
 
 	return fmt.Sprintf(
 		"%v:%v",
-		volumeSource.CephMonitors,
-		volumeSource.RBDImage), nil
+		mon,
+		img), nil
 }
 
 func (plugin *rbdPlugin) CanSupport(spec *volume.Spec) bool {
@@ -117,14 +121,24 @@ func (plugin *rbdPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 }
 
 func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	var secret string
-	var err error
-	source, _ := plugin.getRBDVolumeSource(spec)
-
-	if source.SecretRef != nil {
-		if secret, err = parsePodSecret(pod, source.SecretRef.Name, plugin.host.GetKubeClient()); err != nil {
-			glog.Errorf("Couldn't get secret from %v/%v", pod.Namespace, source.SecretRef)
+	secretName, secretNs, err := getSecretNameAndNamespace(spec, pod.Namespace)
+	if err != nil {
+		return nil, err
+	}
+	secret := ""
+	if len(secretName) > 0 && len(secretNs) > 0 {
+		// if secret is provideded, retrieve it
+		kubeClient := plugin.host.GetKubeClient()
+		if kubeClient == nil {
+			return nil, fmt.Errorf("Cannot get kube client")
+		}
+		secrets, err := kubeClient.Core().Secrets(secretNs).Get(secretName, metav1.GetOptions{})
+		if err != nil {
+			err = fmt.Errorf("Couldn't get secret %v/%v err: %v", secretNs, secretName, err)
 			return nil, err
+		}
+		for _, data := range secrets.Data {
+			secret = string(data)
 		}
 	}
 
@@ -132,40 +146,54 @@ func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.Vol
 	return plugin.newMounterInternal(spec, pod.UID, &RBDUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()), secret)
 }
 
-func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) (*v1.RBDVolumeSource, bool) {
-	// rbd volumes used directly in a pod have a ReadOnly flag set by the pod author.
-	// rbd volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
-	if spec.Volume != nil && spec.Volume.RBD != nil {
-		return spec.Volume.RBD, spec.Volume.RBD.ReadOnly
-	} else {
-		return spec.PersistentVolume.Spec.RBD, spec.ReadOnly
-	}
-}
-
 func (plugin *rbdPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec, secret string) (volume.Mounter, error) {
-	source, readOnly := plugin.getRBDVolumeSource(spec)
-	pool := source.RBDPool
-	id := source.RadosUser
-	keyring := source.Keyring
+	mon, err := getVolumeSourceMonitors(spec)
+	if err != nil {
+		return nil, err
+	}
+	img, err := getVolumeSourceImage(spec)
+	if err != nil {
+		return nil, err
+	}
+	fstype, err := getVolumeSourceFSType(spec)
+	if err != nil {
+		return nil, err
+	}
+	pool, err := getVolumeSourcePool(spec)
+	if err != nil {
+		return nil, err
+	}
+	id, err := getVolumeSourceUser(spec)
+	if err != nil {
+		return nil, err
+	}
+	keyring, err := getVolumeSourceKeyRing(spec)
+	if err != nil {
+		return nil, err
+	}
+	ro, err := getVolumeSourceReadOnly(spec)
+	if err != nil {
+		return nil, err
+	}
 
 	return &rbdMounter{
 		rbd: &rbd{
 			podUID:          podUID,
 			volName:         spec.Name(),
-			Image:           source.RBDImage,
+			Image:           img,
 			Pool:            pool,
-			ReadOnly:        readOnly,
+			ReadOnly:        ro,
 			manager:         manager,
 			mounter:         &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
 			exec:            exec,
 			plugin:          plugin,
 			MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, spec.Name(), plugin.host)),
 		},
-		Mon:          source.CephMonitors,
+		Mon:          mon,
 		Id:           id,
 		Keyring:      keyring,
 		Secret:       secret,
-		fsType:       source.FSType,
+		fsType:       fstype,
 		mountOptions: volume.MountOptionFromSpec(spec),
 	}, nil
 }
@@ -289,8 +317,9 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	var err error
 	adminSecretName := ""
 	adminSecretNamespace := rbdDefaultAdminSecretNamespace
-	secretName := ""
 	secret := ""
+	secretName := ""
+	secretNamespace := ""
 	imageFormat := rbdImageFormat2
 	fstype := ""
 
@@ -313,6 +342,8 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 			r.Pool = v
 		case "usersecretname":
 			secretName = v
+		case "usersecretnamespace":
+			secretNamespace = v
 		case "imageformat":
 			imageFormat = v
 		case "imagefeatures":
@@ -370,8 +401,9 @@ func (r *rbdVolumeProvisioner) Provision() (*v1.PersistentVolume, error) {
 	glog.Infof("successfully created rbd image %q", image)
 	pv := new(v1.PersistentVolume)
 	metav1.SetMetaDataAnnotation(&pv.ObjectMeta, volumehelper.VolumeDynamicallyCreatedByKey, "rbd-dynamic-provisioner")
-	rbd.SecretRef = new(v1.LocalObjectReference)
+	rbd.SecretRef = new(v1.SecretReference)
 	rbd.SecretRef.Name = secretName
+	rbd.SecretRef.Namespace = secretNamespace
 	rbd.RadosUser = r.Id
 	rbd.FSType = fstype
 	pv.Spec.PersistentVolumeSource.RBD = rbd
@@ -486,16 +518,83 @@ func (c *rbdUnmounter) TearDownAt(dir string) error {
 	return diskTearDown(c.manager, *c, dir, c.mounter)
 }
 
-func getVolumeSource(
-	spec *volume.Spec) (*v1.RBDVolumeSource, bool, error) {
+func getVolumeSourceMonitors(spec *volume.Spec) ([]string, error) {
 	if spec.Volume != nil && spec.Volume.RBD != nil {
-		return spec.Volume.RBD, spec.Volume.RBD.ReadOnly, nil
+		return spec.Volume.RBD.CephMonitors, nil
 	} else if spec.PersistentVolume != nil &&
 		spec.PersistentVolume.Spec.RBD != nil {
-		return spec.PersistentVolume.Spec.RBD, spec.ReadOnly, nil
+		return spec.PersistentVolume.Spec.RBD.CephMonitors, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference a RBD volume type")
+	return nil, fmt.Errorf("Spec does not reference a RBD volume type")
+}
+
+func getVolumeSourceImage(spec *volume.Spec) (string, error) {
+	if spec.Volume != nil && spec.Volume.RBD != nil {
+		return spec.Volume.RBD.RBDImage, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.RBD != nil {
+		return spec.PersistentVolume.Spec.RBD.RBDImage, nil
+	}
+
+	return "", fmt.Errorf("Spec does not reference a RBD volume type")
+}
+
+func getVolumeSourceFSType(spec *volume.Spec) (string, error) {
+	if spec.Volume != nil && spec.Volume.RBD != nil {
+		return spec.Volume.RBD.FSType, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.RBD != nil {
+		return spec.PersistentVolume.Spec.RBD.FSType, nil
+	}
+
+	return "", fmt.Errorf("Spec does not reference a RBD volume type")
+}
+
+func getVolumeSourcePool(spec *volume.Spec) (string, error) {
+	if spec.Volume != nil && spec.Volume.RBD != nil {
+		return spec.Volume.RBD.RBDPool, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.RBD != nil {
+		return spec.PersistentVolume.Spec.RBD.RBDPool, nil
+	}
+
+	return "", fmt.Errorf("Spec does not reference a RBD volume type")
+}
+
+func getVolumeSourceUser(spec *volume.Spec) (string, error) {
+	if spec.Volume != nil && spec.Volume.RBD != nil {
+		return spec.Volume.RBD.RadosUser, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.RBD != nil {
+		return spec.PersistentVolume.Spec.RBD.RadosUser, nil
+	}
+
+	return "", fmt.Errorf("Spec does not reference a RBD volume type")
+}
+
+func getVolumeSourceKeyRing(spec *volume.Spec) (string, error) {
+	if spec.Volume != nil && spec.Volume.RBD != nil {
+		return spec.Volume.RBD.Keyring, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.RBD != nil {
+		return spec.PersistentVolume.Spec.RBD.Keyring, nil
+	}
+
+	return "", fmt.Errorf("Spec does not reference a RBD volume type")
+}
+
+func getVolumeSourceReadOnly(spec *volume.Spec) (bool, error) {
+	if spec.Volume != nil && spec.Volume.RBD != nil {
+		return spec.Volume.RBD.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.RBD != nil {
+		// rbd volumes used as a PersistentVolume gets the ReadOnly flag indirectly through
+		// the persistent-claim volume used to mount the PV
+		return spec.ReadOnly, nil
+	}
+
+	return false, fmt.Errorf("Spec does not reference a RBD volume type")
 }
 
 func parsePodSecret(pod *v1.Pod, secretName string, kubeClient clientset.Interface) (string, error) {
@@ -530,4 +629,27 @@ func parseSecretMap(secretMap map[string]string) (string, error) {
 	}
 	// If not found, the last secret in the map wins as done before
 	return secret, nil
+}
+
+func getSecretNameAndNamespace(spec *volume.Spec, defaultNamespace string) (string, string, error) {
+	if spec.Volume != nil && spec.Volume.RBD != nil {
+		localSecretRef := spec.Volume.RBD.SecretRef
+		if localSecretRef != nil {
+			return localSecretRef.Name, defaultNamespace, nil
+		}
+		return "", "", nil
+
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.RBD != nil {
+		secretRef := spec.PersistentVolume.Spec.RBD.SecretRef
+		secretNs := defaultNamespace
+		if secretRef != nil {
+			if len(secretRef.Namespace) != 0 {
+				secretNs = secretRef.Namespace
+			}
+			return secretRef.Name, secretNs, nil
+		}
+		return "", "", nil
+	}
+	return "", "", fmt.Errorf("Spec does not reference an RBD volume type")
 }

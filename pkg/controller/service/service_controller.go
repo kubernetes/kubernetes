@@ -115,7 +115,6 @@ func New(
 	broadcaster.StartLogging(glog.Infof)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
-	broadcaster.StartLogging(glog.Infof)
 
 	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("service_controller", kubeClient.Core().RESTClient().GetRateLimiter())
@@ -245,15 +244,17 @@ func (s *ServiceController) processServiceUpdate(cachedService *cachedService, s
 	err, retry := s.createLoadBalancerIfNeeded(key, service)
 	if err != nil {
 		message := "Error creating load balancer"
+		var retryToReturn time.Duration
 		if retry {
 			message += " (will retry): "
+			retryToReturn = cachedService.nextRetryDelay()
 		} else {
 			message += " (will not retry): "
+			retryToReturn = doNotRetry
 		}
 		message += err.Error()
 		s.eventRecorder.Event(service, v1.EventTypeWarning, "CreatingLoadBalancerFailed", message)
-
-		return err, cachedService.nextRetryDelay()
+		return err, retryToReturn
 	}
 	// Always update the cache upon success.
 	// NOTE: Since we update the cached service if and only if we successfully
@@ -355,6 +356,11 @@ func (s *ServiceController) ensureLoadBalancer(service *v1.Service) (*v1.LoadBal
 	nodes, err := s.nodeLister.ListWithPredicate(getNodeConditionPredicate())
 	if err != nil {
 		return nil, err
+	}
+
+	// If there are no available nodes for LoadBalancer service, make a EventTypeWarning event for it.
+	if len(nodes) == 0 {
+		s.eventRecorder.Eventf(service, v1.EventTypeWarning, "UnAvailableLoadBalancer", "There are no available nodes for LoadBalancer service %s/%s", service.Namespace, service.Name)
 	}
 
 	// - Only one protocol supported per service
@@ -684,7 +690,12 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *v1.Service, h
 	// This operation doesn't normally take very long (and happens pretty often), so we only record the final event
 	err := s.balancer.UpdateLoadBalancer(s.clusterName, service, hosts)
 	if err == nil {
-		s.eventRecorder.Event(service, v1.EventTypeNormal, "UpdatedLoadBalancer", "Updated load balancer with new hosts")
+		// If there are no available nodes for LoadBalancer service, make a EventTypeWarning event for it.
+		if len(hosts) == 0 {
+			s.eventRecorder.Eventf(service, v1.EventTypeWarning, "UnAvailableLoadBalancer", "There are no available nodes for LoadBalancer service %s/%s", service.Namespace, service.Name)
+		} else {
+			s.eventRecorder.Event(service, v1.EventTypeNormal, "UpdatedLoadBalancer", "Updated load balancer with new hosts")
+		}
 		return nil
 	}
 
@@ -759,7 +770,7 @@ func (s *ServiceController) syncService(key string) error {
 
 	if retryDelay != 0 {
 		// Add the failed service back to the queue so we'll retry it.
-		glog.Errorf("Failed to process service. Retrying in %s: %v", retryDelay, err)
+		glog.Errorf("Failed to process service %v. Retrying in %s: %v", key, retryDelay, err)
 		go func(obj interface{}, delay time.Duration) {
 			// put back the service key to working queue, it is possible that more entries of the service
 			// were added into the queue during the delay, but it does not mess as when handling the retry,
@@ -767,7 +778,7 @@ func (s *ServiceController) syncService(key string) error {
 			s.workingQueue.AddAfter(obj, delay)
 		}(key, retryDelay)
 	} else if err != nil {
-		runtime.HandleError(fmt.Errorf("Failed to process service. Not retrying: %v", err))
+		runtime.HandleError(fmt.Errorf("Failed to process service %v. Not retrying: %v", key, err))
 	}
 	return nil
 }

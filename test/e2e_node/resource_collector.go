@@ -534,7 +534,7 @@ func getContainer(pid int) (string, error) {
 		return "", cgroups.NewNotFoundError("memory")
 	}
 
-	// since we use this container for accounting, we need to ensure its a unified hierarchy.
+	// since we use this container for accounting, we need to ensure it is a unified hierarchy.
 	if cpu != memory {
 		return "", fmt.Errorf("cpu and memory cgroup hierarchy not unified.  cpu: %s, memory: %s", cpu, memory)
 	}

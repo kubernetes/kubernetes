@@ -768,7 +768,7 @@ func (p *glusterfsVolumeProvisioner) CreateVolume(gid int) (r *v1.GlusterfsVolum
 		return nil, 0, fmt.Errorf("error [%v] when getting cluster nodes for volume %s", err, volume)
 	}
 
-	// The 'endpointname' is created in form of 'gluster-dynamic-<claimname>'.
+	// The 'endpointname' is created in form of 'glusterfs-dynamic-<claimname>'.
 	// createEndpointService() checks for this 'endpoint' existence in PVC's namespace and
 	// If not found, it create an endpoint and svc using the IPs we dynamically picked at time
 	// of volume creation.

@@ -53,6 +53,7 @@ go_library(
         "//pkg/master/ports:go_default_library",
         "//pkg/util/net/sets:go_default_library",
         "//pkg/util/version:go_default_library",
+        "//pkg/version:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//vendor/cloud.google.com/go/compute/metadata:go_default_library",

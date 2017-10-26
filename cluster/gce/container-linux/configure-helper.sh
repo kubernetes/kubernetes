@@ -730,7 +730,7 @@ function start-kube-proxy {
 # $4: value for variable 'cpulimit'
 # $5: pod name, which should be either etcd or etcd-events
 function prepare-etcd-manifest {
-  local host_name=$(hostname -s)
+  local host_name=${ETCD_HOSTNAME:-$(hostname -s)}
   local etcd_cluster=""
   local cluster_state="new"
   local etcd_protocol="http"
@@ -964,9 +964,13 @@ function start-kube-apiserver {
   fi
   if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
     local -r vm_external_ip=$(curl --retry 5 --retry-delay 3 --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
-    params+=" --advertise-address=${vm_external_ip}"
-    params+=" --ssh-user=${PROXY_SSH_USER}"
-    params+=" --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
+    if [[ -n "${PROXY_SSH_USER:-}" ]]; then
+      params+=" --advertise-address=${vm_external_ip}"      
+      params+=" --ssh-user=${PROXY_SSH_USER}"
+      params+=" --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
+    else
+      params+=" --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
+    fi    
   elif [ -n "${MASTER_ADVERTISE_ADDRESS:-}" ]; then
     params="${params} --advertise-address=${MASTER_ADVERTISE_ADDRESS}"
   fi
@@ -1282,6 +1286,13 @@ function start-kube-addons {
     setup-addon-manifests "addons" "dns"
     local -r kubedns_file="${dst_dir}/dns/kube-dns.yaml"
     mv "${dst_dir}/dns/kube-dns.yaml.in" "${kubedns_file}"
+    if [ -n "${CUSTOM_KUBE_DNS_YAML:-}" ]; then
+      # Replace with custom GKE kube-dns deployment.
+      cat > "${kubedns_file}" <<EOF
+$(echo "$CUSTOM_KUBE_DNS_YAML")
+EOF
+      update-prometheus-to-sd-parameters ${kubedns_file}
+    fi
     # Replace the salt configurations with variable values.
     sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${kubedns_file}"
     sed -i -e "s@{{ *pillar\['dns_server'\] *}}@${DNS_SERVER_IP}@g" "${kubedns_file}"

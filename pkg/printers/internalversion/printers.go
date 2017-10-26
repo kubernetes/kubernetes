@@ -1753,10 +1753,7 @@ func layoutContainers(containers []api.Container, w io.Writer) error {
 		}
 	}
 	_, err := fmt.Fprintf(w, "\t%s\t%s", namesBuffer.String(), imagesBuffer.String())
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // Lay out all the containers on one line if use wide output.

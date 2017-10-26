@@ -169,6 +169,7 @@ func TestCheckOpenStackOpts(t *testing.T) {
 					SubnetId:             "6261548e-ffde-4bc7-bd22-59c83578c5ef",
 					FloatingNetworkId:    "38b8b5f9-64dc-4424-bf86-679595714786",
 					LBMethod:             "ROUND_ROBIN",
+					LBProvider:           "haproxy",
 					CreateMonitor:        true,
 					MonitorDelay:         delay,
 					MonitorTimeout:       timeout,
@@ -227,7 +228,7 @@ func TestCheckOpenStackOpts(t *testing.T) {
 					SearchOrder: "",
 				},
 			},
-			expectedError: fmt.Errorf("Invalid value in section [Metadata] with key `search-order`. Value cannot be empty"),
+			expectedError: fmt.Errorf("invalid value in section [Metadata] with key `search-order`. Value cannot be empty"),
 		},
 		{
 			name: "test5",
@@ -237,7 +238,7 @@ func TestCheckOpenStackOpts(t *testing.T) {
 					SearchOrder: "value1,value2,value3",
 				},
 			},
-			expectedError: fmt.Errorf("Invalid value in section [Metadata] with key `search-order`. Value cannot contain more than 2 elements"),
+			expectedError: fmt.Errorf("invalid value in section [Metadata] with key `search-order`. Value cannot contain more than 2 elements"),
 		},
 		{
 			name: "test6",
@@ -247,8 +248,8 @@ func TestCheckOpenStackOpts(t *testing.T) {
 					SearchOrder: "value1",
 				},
 			},
-			expectedError: fmt.Errorf("Invalid element '%s' found in section [Metadata] with key `search-order`."+
-				"Supported elements include '%s' and '%s'", "value1", configDriveID, metadataID),
+			expectedError: fmt.Errorf("invalid element %q found in section [Metadata] with key `search-order`."+
+				"Supported elements include %q and %q", "value1", configDriveID, metadataID),
 		},
 	}
 

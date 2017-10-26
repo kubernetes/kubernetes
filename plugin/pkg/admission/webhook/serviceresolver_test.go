@@ -30,7 +30,7 @@ func TestDefaultServiceResolver(t *testing.T) {
 		expectError      bool
 	}{
 		// scenario 1: a service name along with a namespace resolves
-		{serviceName: "ross", serviceNamespace: "andromeda", expectedOutput: "https://ross.andromeda.svc"},
+		{serviceName: "ross", serviceNamespace: "andromeda", expectedOutput: "https://ross.andromeda.svc:443"},
 		// scenario 2: a service name without a namespace does not resolve
 		{serviceName: "ross", expectError: true},
 		// scenario 3: cannot resolve an empty service name
@@ -49,8 +49,10 @@ func TestDefaultServiceResolver(t *testing.T) {
 			if err == nil && scenario.expectError {
 				t.Error("expected an error but got nothing")
 			}
-			if serviceURL.String() != scenario.expectedOutput {
-				t.Errorf("expected = %s, got = %s", scenario.expectedOutput, serviceURL.String())
+			if !scenario.expectError {
+				if serviceURL.String() != scenario.expectedOutput {
+					t.Errorf("expected = %s, got = %s", scenario.expectedOutput, serviceURL.String())
+				}
 			}
 		})
 	}

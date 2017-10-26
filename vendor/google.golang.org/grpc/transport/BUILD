@@ -3,7 +3,6 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "bdp_estimator.go",
         "control.go",
         "go16.go",
         "go17.go",
@@ -11,7 +10,6 @@ go_library(
         "http2_client.go",
         "http2_server.go",
         "http_util.go",
-        "log.go",
         "transport.go",
     ],
     importpath = "google.golang.org/grpc/transport",

@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
+	"k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
@@ -82,7 +83,12 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 
 	// We omit creation of pretty much everything if we run in cleanup mode
 	if cleanupAndExit {
-		return &ProxyServer{IptInterface: iptInterface, IpvsInterface: ipvsInterface, CleanupAndExit: cleanupAndExit}, nil
+		return &ProxyServer{
+			execer:         execer,
+			IptInterface:   iptInterface,
+			IpvsInterface:  ipvsInterface,
+			CleanupAndExit: cleanupAndExit,
+		}, nil
 	}
 
 	client, eventClient, err := createClients(config.ClientConnection, master)
@@ -143,7 +149,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
-		iptables.RegisterMetrics()
+		metrics.RegisterMetrics()
 		proxier = proxierIPTables
 		serviceEventHandler = proxierIPTables
 		endpointsEventHandler = proxierIPTables
@@ -175,6 +181,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
+		metrics.RegisterMetrics()
 		proxier = proxierIPVS
 		serviceEventHandler = proxierIPVS
 		endpointsEventHandler = proxierIPVS

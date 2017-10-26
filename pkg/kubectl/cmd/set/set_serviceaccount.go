@@ -96,7 +96,7 @@ func NewCmdServiceAccount(f cmdutil.Factory, out, err io.Writer) *cobra.Command 
 	usage := "identifying the resource to get from a server."
 	cmdutil.AddFilenameOptionFlags(cmd, &saConfig.fileNameOptions, usage)
 	cmd.Flags().BoolVar(&saConfig.all, "all", false, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
-	cmd.Flags().BoolVar(&saConfig.local, "local", false, "If true, set image will NOT contact api-server but run locally.")
+	cmd.Flags().BoolVar(&saConfig.local, "local", false, "If true, set serviceaccount will NOT contact api-server but run locally.")
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)

@@ -1,18 +1,33 @@
 /*
  *
- * Copyright 2014 gRPC authors.
+ * Copyright 2014, Google Inc.
+ * All rights reserved.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     * Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above
+ * copyright notice, this list of conditions and the following disclaimer
+ * in the documentation and/or other materials provided with the
+ * distribution.
+ *     * Neither the name of Google Inc. nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
 
@@ -25,7 +40,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/http"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -36,6 +50,7 @@ import (
 	"golang.org/x/net/http2/hpack"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/status"
 )
 
@@ -73,24 +88,6 @@ var (
 		codes.ResourceExhausted: http2.ErrCodeEnhanceYourCalm,
 		codes.PermissionDenied:  http2.ErrCodeInadequateSecurity,
 	}
-	httpStatusConvTab = map[int]codes.Code{
-		// 400 Bad Request - INTERNAL.
-		http.StatusBadRequest: codes.Internal,
-		// 401 Unauthorized  - UNAUTHENTICATED.
-		http.StatusUnauthorized: codes.Unauthenticated,
-		// 403 Forbidden - PERMISSION_DENIED.
-		http.StatusForbidden: codes.PermissionDenied,
-		// 404 Not Found - UNIMPLEMENTED.
-		http.StatusNotFound: codes.Unimplemented,
-		// 429 Too Many Requests - UNAVAILABLE.
-		http.StatusTooManyRequests: codes.Unavailable,
-		// 502 Bad Gateway - UNAVAILABLE.
-		http.StatusBadGateway: codes.Unavailable,
-		// 503 Service Unavailable - UNAVAILABLE.
-		http.StatusServiceUnavailable: codes.Unavailable,
-		// 504 Gateway timeout - UNAVAILABLE.
-		http.StatusGatewayTimeout: codes.Unavailable,
-	}
 )
 
 // Records the states during HPACK decoding. Must be reset once the
@@ -103,9 +100,8 @@ type decodeState struct {
 	statusGen *status.Status
 	// rawStatusCode and rawStatusMsg are set from the raw trailer fields and are not
 	// intended for direct access outside of parsing.
-	rawStatusCode *int
+	rawStatusCode int32
 	rawStatusMsg  string
-	httpStatus    *int
 	// Server side only fields.
 	timeoutSet bool
 	timeout    time.Duration
@@ -163,7 +159,7 @@ func validContentType(t string) bool {
 func (d *decodeState) status() *status.Status {
 	if d.statusGen == nil {
 		// No status-details were provided; generate status using code/msg.
-		d.statusGen = status.New(codes.Code(int32(*(d.rawStatusCode))), d.rawStatusMsg)
+		d.statusGen = status.New(codes.Code(d.rawStatusCode), d.rawStatusMsg)
 	}
 	return d.statusGen
 }
@@ -197,44 +193,6 @@ func decodeMetadataHeader(k, v string) (string, error) {
 	return v, nil
 }
 
-func (d *decodeState) decodeResponseHeader(frame *http2.MetaHeadersFrame) error {
-	for _, hf := range frame.Fields {
-		if err := d.processHeaderField(hf); err != nil {
-			return err
-		}
-	}
-
-	// If grpc status exists, no need to check further.
-	if d.rawStatusCode != nil || d.statusGen != nil {
-		return nil
-	}
-
-	// If grpc status doesn't exist and http status doesn't exist,
-	// then it's a malformed header.
-	if d.httpStatus == nil {
-		return streamErrorf(codes.Internal, "malformed header: doesn't contain status(gRPC or HTTP)")
-	}
-
-	if *(d.httpStatus) != http.StatusOK {
-		code, ok := httpStatusConvTab[*(d.httpStatus)]
-		if !ok {
-			code = codes.Unknown
-		}
-		return streamErrorf(code, http.StatusText(*(d.httpStatus)))
-	}
-
-	// gRPC status doesn't exist and http status is OK.
-	// Set rawStatusCode to be unknown and return nil error.
-	// So that, if the stream has ended this Unknown status
-	// will be propogated to the user.
-	// Otherwise, it will be ignored. In which case, status from
-	// a later trailer, that has StreamEnded flag set, is propogated.
-	code := int(codes.Unknown)
-	d.rawStatusCode = &code
-	return nil
-
-}
-
 func (d *decodeState) processHeaderField(f hpack.HeaderField) error {
 	switch f.Name {
 	case "content-type":
@@ -248,7 +206,7 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) error {
 		if err != nil {
 			return streamErrorf(codes.Internal, "transport: malformed grpc-status: %v", err)
 		}
-		d.rawStatusCode = &code
+		d.rawStatusCode = int32(code)
 	case "grpc-message":
 		d.rawStatusMsg = decodeGrpcMessage(f.Value)
 	case "grpc-status-details-bin":
@@ -269,12 +227,6 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) error {
 		}
 	case ":path":
 		d.method = f.Value
-	case ":status":
-		code, err := strconv.Atoi(f.Value)
-		if err != nil {
-			return streamErrorf(codes.Internal, "transport: malformed http-status: %v", err)
-		}
-		d.httpStatus = &code
 	default:
 		if !isReservedHeader(f.Name) || isWhitelistedPseudoHeader(f.Name) {
 			if d.mdata == nil {
@@ -282,7 +234,7 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) error {
 			}
 			v, err := decodeMetadataHeader(f.Name, f.Value)
 			if err != nil {
-				errorf("Failed to decode metadata header (%q, %q): %v", f.Name, f.Value, err)
+				grpclog.Printf("Failed to decode (%q, %q): %v", f.Name, f.Value, err)
 				return nil
 			}
 			d.mdata[f.Name] = append(d.mdata[f.Name], v)

@@ -110,7 +110,7 @@ func isPathUnder(base, path string) (bool, error) {
 
 	// if path is below base, the relative path
 	// from base to path will not start with `../`
-	return !strings.HasPrefix(relPath, "."), nil
+	return !strings.HasPrefix(relPath, ".."), nil
 }
 
 // forbiddenImportsFor determines all of the forbidden

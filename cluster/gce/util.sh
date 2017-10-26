@@ -401,12 +401,12 @@ function detect-master() {
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
     local master_address_name="${MASTER_NAME}-ip"
     echo "Looking for address '${master_address_name}'" >&2
-    KUBE_MASTER_IP=$(gcloud compute addresses describe "${master_address_name}" \
-      --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
-  fi
-  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
-    echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'" >&2
-    exit 1
+    if ! KUBE_MASTER_IP=$(gcloud compute addresses describe "${master_address_name}" \
+      --project "${PROJECT}" --region "${REGION}" -q --format='value(address)') || \
+      [[ -z "${KUBE_MASTER_IP-}" ]]; then
+      echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'" >&2
+      exit 1
+    fi
   fi
   echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)" >&2
 }
@@ -616,6 +616,7 @@ function create-node-template() {
       --boot-disk-size "${NODE_DISK_SIZE}" \
       --image-project="${NODE_IMAGE_PROJECT}" \
       --image "${NODE_IMAGE}" \
+      --service-account "${NODE_SERVICE_ACCOUNT}" \
       --tags "${NODE_TAG}" \
       ${accelerator_args} \
       ${local_ssds} \
@@ -1355,6 +1356,7 @@ function create-nodes() {
 # - NODE_DISK_SIZE
 # - NODE_IMAGE_PROJECT
 # - NODE_IMAGE
+# - NODE_SERVICE_ACCOUNT
 # - NODE_TAG
 # - NETWORK
 # - ENABLE_IP_ALIASES
@@ -1385,6 +1387,7 @@ function create-heapster-node() {
       --boot-disk-size "${NODE_DISK_SIZE}" \
       --image-project="${NODE_IMAGE_PROJECT}" \
       --image "${NODE_IMAGE}" \
+      --service-account "${NODE_SERVICE_ACCOUNT}" \
       --tags "${NODE_TAG}" \
       ${network} \
       $(get-scope-flags) \

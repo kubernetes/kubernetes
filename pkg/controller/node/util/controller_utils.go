@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	nodepkg "k8s.io/kubernetes/pkg/util/node"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 
 	"github.com/golang/glog"
 )
@@ -47,10 +46,6 @@ var (
 	// ErrCloudInstance occurs when the cloud provider does not support
 	// the Instances API.
 	ErrCloudInstance = errors.New("cloud provider doesn't support instances")
-	// podStatusReconciliationVersion is the the minimum kubelet version
-	// for which the nodecontroller can safely flip pod.Status to
-	// NotReady.
-	podStatusReconciliationVersion = utilversion.MustParseSemantic("v1.2.0")
 )
 
 // DeletePods will delete all pods from master running on given node,

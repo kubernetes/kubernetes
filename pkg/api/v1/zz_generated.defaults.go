@@ -137,7 +137,7 @@ func SetObjectDefaults_PersistentVolume(in *v1.PersistentVolume) {
 		SetDefaults_HostPathVolumeSource(in.Spec.PersistentVolumeSource.HostPath)
 	}
 	if in.Spec.PersistentVolumeSource.RBD != nil {
-		SetDefaults_RBDVolumeSource(in.Spec.PersistentVolumeSource.RBD)
+		SetDefaults_RBDPersistentVolumeSource(in.Spec.PersistentVolumeSource.RBD)
 	}
 	if in.Spec.PersistentVolumeSource.ISCSI != nil {
 		SetDefaults_ISCSIVolumeSource(in.Spec.PersistentVolumeSource.ISCSI)

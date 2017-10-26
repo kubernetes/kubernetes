@@ -266,6 +266,14 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 // Run spawns the secure http server. It only returns if stopCh is closed
 // or the secure port cannot be listened on initially.
 func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
+	// Register audit backend preShutdownHook.
+	if s.AuditBackend != nil {
+		s.AddPreShutdownHook("audit-backend", func() error {
+			s.AuditBackend.Shutdown()
+			return nil
+		})
+	}
+
 	err := s.NonBlockingRun(stopCh)
 	if err != nil {
 		return err
@@ -273,16 +281,20 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 
 	<-stopCh
 
-	if s.GenericAPIServer.AuditBackend != nil {
-		s.GenericAPIServer.AuditBackend.Shutdown()
-	}
-
 	return s.RunPreShutdownHooks()
 }
 
 // NonBlockingRun spawns the secure http server. An error is
 // returned if the secure port cannot be listened on.
 func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
+	// Start the audit backend before any request comes in. This means we must call Backend.Run
+	// before http server start serving. Otherwise the Backend.ProcessEvents call might block.
+	if s.AuditBackend != nil {
+		if err := s.AuditBackend.Run(stopCh); err != nil {
+			return fmt.Errorf("failed to run the audit backend: %v", err)
+		}
+	}
+
 	// Use an internal stop channel to allow cleanup of the listeners on error.
 	internalStopCh := make(chan struct{})
 
@@ -300,14 +312,6 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 		<-stopCh
 		close(internalStopCh)
 	}()
-
-	// Start the audit backend before any request comes in. This means we cannot turn it into a
-	// post start hook because without calling Backend.Run the Backend.ProcessEvents call might block.
-	if s.AuditBackend != nil {
-		if err := s.AuditBackend.Run(stopCh); err != nil {
-			return fmt.Errorf("failed to run the audit backend: %v", err)
-		}
-	}
 
 	s.RunPostStartHooks(stopCh)
 

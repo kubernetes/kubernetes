@@ -17,7 +17,10 @@ limitations under the License.
 package apiserver
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/golang/glog"
@@ -42,6 +45,10 @@ import (
 	"k8s.io/kube-aggregator/pkg/controllers"
 )
 
+type ServiceResolver interface {
+	ResolveEndpoint(namespace, name string) (*url.URL, error)
+}
+
 type AvailableConditionController struct {
 	apiServiceClient apiregistrationclient.APIServicesGetter
 
@@ -55,6 +62,9 @@ type AvailableConditionController struct {
 	endpointsLister v1listers.EndpointsLister
 	endpointsSynced cache.InformerSynced
 
+	proxyTransport  *http.Transport
+	serviceResolver ServiceResolver
+
 	// To allow injection for testing.
 	syncFn func(key string) error
 
@@ -66,6 +76,8 @@ func NewAvailableConditionController(
 	serviceInformer v1informers.ServiceInformer,
 	endpointsInformer v1informers.EndpointsInformer,
 	apiServiceClient apiregistrationclient.APIServicesGetter,
+	proxyTransport *http.Transport,
+	serviceResolver ServiceResolver,
 ) *AvailableConditionController {
 	c := &AvailableConditionController{
 		apiServiceClient: apiServiceClient,
@@ -75,6 +87,8 @@ func NewAvailableConditionController(
 		servicesSynced:   serviceInformer.Informer().HasSynced,
 		endpointsLister:  endpointsInformer.Lister(),
 		endpointsSynced:  endpointsInformer.Informer().HasSynced,
+		proxyTransport:   proxyTransport,
+		serviceResolver:  serviceResolver,
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "AvailableConditionController"),
 	}
 
@@ -175,8 +189,57 @@ func (c *AvailableConditionController) sync(key string) error {
 			return err
 		}
 	}
+	// actually try to hit the discovery endpoint when it isn't local and when we're routing as a service.
+	if apiService.Spec.Service != nil && c.serviceResolver != nil {
+		discoveryURL, err := c.serviceResolver.ResolveEndpoint(apiService.Spec.Service.Namespace, apiService.Spec.Service.Name)
+		if err != nil {
+			return err
+		}
+		// construct an http client that will ignore TLS verification (if someone owns the network and messes with your status
+		// that's not so bad) and sets a very short timeout.
+		httpClient := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+			// the request should happen quickly.
+			Timeout: 5 * time.Second,
+		}
+		if c.proxyTransport != nil {
+			httpClient.Transport = c.proxyTransport
+		}
 
-	// TODO actually try to hit the discovery endpoint
+		errCh := make(chan error)
+		go func() {
+			resp, err := httpClient.Get(discoveryURL.String())
+			if resp != nil {
+				resp.Body.Close()
+			}
+			errCh <- err
+		}()
+
+		select {
+		case err = <-errCh:
+
+		// we had trouble with slow dial and DNS responses causing us to wait too long.
+		// we added this as insurance
+		case <-time.After(6 * time.Second):
+			err = fmt.Errorf("timed out waiting for %v", discoveryURL)
+		}
+
+		if err != nil {
+			availableCondition.Status = apiregistration.ConditionFalse
+			availableCondition.Reason = "FailedDiscoveryCheck"
+			availableCondition.Message = fmt.Sprintf("no response from %v: %v", discoveryURL, err)
+			apiregistration.SetAPIServiceCondition(apiService, availableCondition)
+			_, updateErr := c.apiServiceClient.APIServices().UpdateStatus(apiService)
+			if updateErr != nil {
+				return updateErr
+			}
+			// force a requeue to make it very obvious that this will be retried at some point in the future
+			// along with other requeues done via service change, endpoint change, and resync
+			return err
+		}
+	}
 
 	availableCondition.Reason = "Passed"
 	availableCondition.Message = "all checks passed"
