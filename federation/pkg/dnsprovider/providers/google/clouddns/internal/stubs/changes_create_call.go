@@ -39,6 +39,8 @@ func hashKey(set interfaces.ResourceRecordSet) string {
 }
 
 func (c ChangesCreateCall) Do(opts ...googleapi.CallOption) (interfaces.Change, error) {
+	c.Service.Service.Lock()
+	defer c.Service.Service.Unlock()
 	if c.Error != nil {
 		return nil, c.Error
 	}

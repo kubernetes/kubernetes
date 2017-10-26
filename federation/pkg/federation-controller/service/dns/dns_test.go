@@ -18,19 +18,53 @@ package dns
 
 import (
 	"fmt"
+	"io"
+	"reflect"
 	"sort"
+	"strconv"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fakefedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
+	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns" // Only for unit testing purposes.
 	"k8s.io/kubernetes/federation/pkg/federation-controller/service/ingress"
 	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
+
+	"github.com/golang/glog"
+	"github.com/stretchr/testify/require"
 )
+
+const (
+	services string = "services"
+
+	dnsZone      = "example.com"
+	fedName      = "ufp"
+	svcName      = "nginx"
+	svcNamespace = "test"
+	recordA      = "A"
+	recordCNAME  = "CNAME"
+	DNSTTL       = "180"
+
+	retryInterval = 100 * time.Millisecond
+
+	OP_ADD    = "ADD"
+	OP_UPDATE = "UPDATE"
+	OP_DELETE = "DELETE"
+)
+
+var instanceCounter uint64 = 0
 
 // NewClusterWithRegionZone builds a new cluster object with given region and zone attributes.
 func NewClusterWithRegionZone(name string, readyStatus v1.ConditionStatus, region, zone string) *v1beta1.Cluster {
@@ -40,189 +74,248 @@ func NewClusterWithRegionZone(name string, readyStatus v1.ConditionStatus, regio
 	return cluster
 }
 
-func TestServiceController_ensureDnsRecords(t *testing.T) {
+func NewService(name, namespace string, serviceType v1.ServiceType, port int32) *v1.Service {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			SelfLink:  "/api/v1/namespaces/" + namespace + "/services/" + name,
+			Labels:    map[string]string{"app": name},
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{{Port: port}},
+			Type:  serviceType,
+		},
+	}
+}
+
+func init() {
+	dnsprovider.RegisterDnsProvider("fake-clouddns", func(config io.Reader) (dnsprovider.Interface, error) {
+		return clouddns.NewFakeInterface([]string{dnsZone})
+	})
+}
+
+func TestServiceDNSController(t *testing.T) {
 	cluster1Name := "c1"
 	cluster2Name := "c2"
 	cluster1 := NewClusterWithRegionZone(cluster1Name, v1.ConditionTrue, "fooregion", "foozone")
 	cluster2 := NewClusterWithRegionZone(cluster2Name, v1.ConditionTrue, "barregion", "barzone")
-	globalDNSName := "servicename.servicenamespace.myfederation.svc.federation.example.com"
-	fooRegionDNSName := "servicename.servicenamespace.myfederation.svc.fooregion.federation.example.com"
-	fooZoneDNSName := "servicename.servicenamespace.myfederation.svc.foozone.fooregion.federation.example.com"
-	barRegionDNSName := "servicename.servicenamespace.myfederation.svc.barregion.federation.example.com"
-	barZoneDNSName := "servicename.servicenamespace.myfederation.svc.barzone.barregion.federation.example.com"
+	globalDNSName := strings.Join([]string{svcName, svcNamespace, fedName, "svc", dnsZone}, ".")
+	fooRegionDNSName := strings.Join([]string{svcName, svcNamespace, fedName, "svc", "fooregion", dnsZone}, ".")
+	fooZoneDNSName := strings.Join([]string{svcName, svcNamespace, fedName, "svc", "foozone", "fooregion", dnsZone}, ".")
+	barRegionDNSName := strings.Join([]string{svcName, svcNamespace, fedName, "svc", "barregion", dnsZone}, ".")
+	barZoneDNSName := strings.Join([]string{svcName, svcNamespace, fedName, "svc", "barzone", "barregion", dnsZone}, ".")
 
-	tests := []struct {
-		name     string
-		service  v1.Service
-		expected sets.String
+	type step struct {
+		operation string
+		ingress   string
+		expected  sets.String
+	}
+	tests := map[string]struct {
+		steps []step
 	}{
-		{
-			name: "ServiceWithSingleLBIngress",
-			service: v1.Service{
-				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
-					ingress.FederatedServiceIngressAnnotation: ingress.NewFederatedServiceIngress().
-						AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
-						AddEndpoints(cluster2Name, []string{}).
-						String()},
-				},
-			},
-			expected: sets.NewString(
-				"example.com:"+globalDNSName+":A:180:[198.51.100.1]",
-				"example.com:"+fooRegionDNSName+":A:180:[198.51.100.1]",
-				"example.com:"+fooZoneDNSName+":A:180:[198.51.100.1]",
-				"example.com:"+barRegionDNSName+":CNAME:180:["+globalDNSName+"]",
-				"example.com:"+barZoneDNSName+":CNAME:180:["+barRegionDNSName+"]",
-			),
+		"ServiceWithNoIngress": {steps: []step{{
+			operation: OP_ADD,
+			expected:  sets.NewString(),
+		}}},
+
+		"ServiceWithSingleLBIngress": {steps: []step{{
+			operation: OP_ADD,
+			expected:  sets.NewString(),
 		},
-		/*
-			TODO: getResolvedEndpoints preforms DNS lookup.
-			Mock and maybe look at error handling when some endpoints resolve, but also caching?
 			{
-				name: "withname",
-				service: v1.Service{
-					ObjectMeta: metav1.ObjectMeta{},
-				},
-				expected: []string{
-					"example.com:"+globalDNSName+":A:180:[198.51.100.1]",
-					"example.com:"+fooRegionDNSName+":A:180:[198.51.100.1]",
-					"example.com:"+fooZoneDNSName+":A:180:[198.51.100.1]",
-				},
-			},
+				operation: OP_UPDATE,
+				ingress: ingress.NewFederatedServiceIngress().
+					AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
+					AddEndpoints(cluster2Name, []string{}).
+					String(),
+				expected: sets.NewString(
+					strings.Join([]string{dnsZone, globalDNSName, recordA, DNSTTL, "[198.51.100.1]"}, ":"),
+					strings.Join([]string{dnsZone, fooRegionDNSName, recordA, DNSTTL, "[198.51.100.1]"}, ":"),
+					strings.Join([]string{dnsZone, fooZoneDNSName, recordA, DNSTTL, "[198.51.100.1]"}, ":"),
+					strings.Join([]string{dnsZone, barRegionDNSName, recordCNAME, DNSTTL, "[" + globalDNSName + "]"}, ":"),
+					strings.Join([]string{dnsZone, barZoneDNSName, recordCNAME, DNSTTL, "[" + barRegionDNSName + "]"}, ":"),
+				),
+			}}},
+
+		/* This test case is dependent on system. there is no way to mock net.LookupHost
+		// This test case however can be run locally as we are using 'localhost'
+		"ServiceWithHostnameAsIngress": {steps: []step{{
+			operation: OP_ADD,
+			expected:  sets.NewString(),
+		}, {
+			operation: OP_UPDATE,
+			ingress: ingress.NewFederatedServiceIngress().
+				AddEndpoints(cluster1Name, []string{"localhost"}).
+				AddEndpoints(cluster2Name, []string{}).
+				String(),
+			expected: sets.NewString(
+				strings.Join([]string{dnsZone, globalDNSName, recordA, DNSTTL, "[127.0.0.1]"}, ":"),
+				strings.Join([]string{dnsZone, fooRegionDNSName, recordA, DNSTTL, "[127.0.0.1]"}, ":"),
+				strings.Join([]string{dnsZone, fooZoneDNSName, recordA, DNSTTL, "[127.0.0.1]"}, ":"),
+				strings.Join([]string{dnsZone, barRegionDNSName, recordCNAME, DNSTTL, "[" + globalDNSName + "]"}, ":"),
+				strings.Join([]string{dnsZone, barZoneDNSName, recordCNAME, DNSTTL, "[" + barRegionDNSName + "]"}, ":"),
+			),
+		}}},
 		*/
-		{
-			name: "ServiceWithNoLBIngress",
-			service: v1.Service{
-				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
-					ingress.FederatedServiceIngressAnnotation: ingress.NewFederatedServiceIngress().
-						AddEndpoints(cluster1Name, []string{}).
-						AddEndpoints(cluster2Name, []string{}).
-						String()},
-				},
-			},
+
+		"ServiceWithNoLBIngress": {steps: []step{{
+			operation: OP_ADD,
+			expected:  sets.NewString(),
+		}, {
+			operation: OP_UPDATE,
+			ingress: ingress.NewFederatedServiceIngress().
+				AddEndpoints(cluster1Name, []string{}).
+				AddEndpoints(cluster2Name, []string{}).
+				String(),
 			expected: sets.NewString(
-				"example.com:"+fooRegionDNSName+":CNAME:180:["+globalDNSName+"]",
-				"example.com:"+fooZoneDNSName+":CNAME:180:["+fooRegionDNSName+"]",
-				"example.com:"+barRegionDNSName+":CNAME:180:["+globalDNSName+"]",
-				"example.com:"+barZoneDNSName+":CNAME:180:["+barRegionDNSName+"]",
+				strings.Join([]string{dnsZone, fooRegionDNSName, recordCNAME, DNSTTL, "[" + globalDNSName + "]"}, ":"),
+				strings.Join([]string{dnsZone, fooZoneDNSName, recordCNAME, DNSTTL, "[" + fooRegionDNSName + "]"}, ":"),
+				strings.Join([]string{dnsZone, barRegionDNSName, recordCNAME, DNSTTL, "[" + globalDNSName + "]"}, ":"),
+				strings.Join([]string{dnsZone, barZoneDNSName, recordCNAME, DNSTTL, "[" + barRegionDNSName + "]"}, ":"),
 			),
-		},
-		{
-			name: "ServiceWithMultipleLBIngress",
-			service: v1.Service{
-				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
-					ingress.FederatedServiceIngressAnnotation: ingress.NewFederatedServiceIngress().
-						AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
-						AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
-						String()},
-				},
-			},
+		}}},
+
+		"ServiceWithMultipleLBIngress": {steps: []step{{
+			operation: OP_ADD,
+			expected:  sets.NewString(),
+		}, {
+			operation: OP_UPDATE,
+			ingress: ingress.NewFederatedServiceIngress().
+				AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
+				AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
+				String(),
 			expected: sets.NewString(
-				"example.com:"+globalDNSName+":A:180:[198.51.100.1 198.51.200.1]",
-				"example.com:"+fooRegionDNSName+":A:180:[198.51.100.1]",
-				"example.com:"+fooZoneDNSName+":A:180:[198.51.100.1]",
-				"example.com:"+barRegionDNSName+":A:180:[198.51.200.1]",
-				"example.com:"+barZoneDNSName+":A:180:[198.51.200.1]",
+				strings.Join([]string{dnsZone, globalDNSName, recordA, DNSTTL, "[198.51.100.1 198.51.200.1]"}, ":"),
+				strings.Join([]string{dnsZone, fooRegionDNSName, recordA, DNSTTL, "[198.51.100.1]"}, ":"),
+				strings.Join([]string{dnsZone, fooZoneDNSName, recordA, DNSTTL, "[198.51.100.1]"}, ":"),
+				strings.Join([]string{dnsZone, barRegionDNSName, recordA, DNSTTL, "[198.51.200.1]"}, ":"),
+				strings.Join([]string{dnsZone, barZoneDNSName, recordA, DNSTTL, "[198.51.200.1]"}, ":"),
 			),
-		},
-		{
-			name: "ServiceWithLBIngressAndServiceDeleted",
-			service: v1.Service{
-				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
-					ingress.FederatedServiceIngressAnnotation: ingress.NewFederatedServiceIngress().
-						AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
-						AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
-						String()},
-					DeletionTimestamp: &metav1.Time{Time: time.Now()},
-				},
-			},
+		}}},
+
+		"ServiceWithLBIngressAndServiceDeleted": {steps: []step{{
+			operation: OP_ADD,
+			expected:  sets.NewString(),
+		}, {
+			operation: OP_UPDATE,
+			ingress: ingress.NewFederatedServiceIngress().
+				AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
+				AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
+				String(),
+			expected: sets.NewString(
+				strings.Join([]string{dnsZone, globalDNSName, recordA, DNSTTL, "[198.51.100.1 198.51.200.1]"}, ":"),
+				strings.Join([]string{dnsZone, fooRegionDNSName, recordA, DNSTTL, "[198.51.100.1]"}, ":"),
+				strings.Join([]string{dnsZone, fooZoneDNSName, recordA, DNSTTL, "[198.51.100.1]"}, ":"),
+				strings.Join([]string{dnsZone, barRegionDNSName, recordA, DNSTTL, "[198.51.200.1]"}, ":"),
+				strings.Join([]string{dnsZone, barZoneDNSName, recordA, DNSTTL, "[198.51.200.1]"}, ":"),
+			),
+		}, {
+			operation: OP_DELETE,
+			ingress: ingress.NewFederatedServiceIngress().
+				AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
+				AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
+				String(),
 			expected: sets.NewString(
 				// TODO: Ideally we should expect that there are no DNS records when federated service is deleted. Need to remove these leaks in future
-				"example.com:"+fooRegionDNSName+":CNAME:180:["+globalDNSName+"]",
-				"example.com:"+fooZoneDNSName+":CNAME:180:["+fooRegionDNSName+"]",
-				"example.com:"+barRegionDNSName+":CNAME:180:["+globalDNSName+"]",
-				"example.com:"+barZoneDNSName+":CNAME:180:["+barRegionDNSName+"]",
+				strings.Join([]string{dnsZone, fooRegionDNSName, recordCNAME, DNSTTL, "[" + globalDNSName + "]"}, ":"),
+				strings.Join([]string{dnsZone, fooZoneDNSName, recordCNAME, DNSTTL, "[" + fooRegionDNSName + "]"}, ":"),
+				strings.Join([]string{dnsZone, barRegionDNSName, recordCNAME, DNSTTL, "[" + globalDNSName + "]"}, ":"),
+				strings.Join([]string{dnsZone, barZoneDNSName, recordCNAME, DNSTTL, "[" + barRegionDNSName + "]"}, ":"),
 			),
-		},
-		{
-			name: "ServiceWithMultipleLBIngressAndOneLBIngressGettingRemoved",
-			service: v1.Service{
-				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
-					ingress.FederatedServiceIngressAnnotation: ingress.NewFederatedServiceIngress().
-						AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
-						AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
-						RemoveEndpoint(cluster2Name, "198.51.200.1").
-						String()},
-				},
-			},
+		}}},
+
+		"ServiceWithLBIngressAndLBIngressModifiedOvertime": {steps: []step{{
+			operation: OP_ADD,
+			expected:  sets.NewString(),
+		}, {
+			operation: OP_UPDATE,
+			ingress: ingress.NewFederatedServiceIngress().
+				AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
+				AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
+				String(),
 			expected: sets.NewString(
-				"example.com:"+globalDNSName+":A:180:[198.51.100.1]",
-				"example.com:"+fooRegionDNSName+":A:180:[198.51.100.1]",
-				"example.com:"+fooZoneDNSName+":A:180:[198.51.100.1]",
-				"example.com:"+barRegionDNSName+":CNAME:180:["+globalDNSName+"]",
-				"example.com:"+barZoneDNSName+":CNAME:180:["+barRegionDNSName+"]",
+				strings.Join([]string{dnsZone, globalDNSName, recordA, DNSTTL, "[198.51.100.1 198.51.200.1]"}, ":"),
+				strings.Join([]string{dnsZone, fooRegionDNSName, recordA, DNSTTL, "[198.51.100.1]"}, ":"),
+				strings.Join([]string{dnsZone, fooZoneDNSName, recordA, DNSTTL, "[198.51.100.1]"}, ":"),
+				strings.Join([]string{dnsZone, barRegionDNSName, recordA, DNSTTL, "[198.51.200.1]"}, ":"),
+				strings.Join([]string{dnsZone, barZoneDNSName, recordA, DNSTTL, "[198.51.200.1]"}, ":"),
 			),
-		},
-		{
-			name: "ServiceWithMultipleLBIngressAndAllLBIngressGettingRemoved",
-			service: v1.Service{
-				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
-					ingress.FederatedServiceIngressAnnotation: ingress.NewFederatedServiceIngress().
-						AddEndpoints(cluster1Name, []string{"198.51.100.1"}).
-						AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
-						RemoveEndpoint(cluster1Name, "198.51.100.1").
-						RemoveEndpoint(cluster2Name, "198.51.200.1").
-						String()},
-				},
-			},
+		}, {
+			operation: OP_UPDATE,
+			ingress: ingress.NewFederatedServiceIngress().
+				AddEndpoints(cluster1Name, []string{"198.51.150.1"}).
+				AddEndpoints(cluster2Name, []string{"198.51.200.1"}).
+				String(),
 			expected: sets.NewString(
-				"example.com:"+fooRegionDNSName+":CNAME:180:["+globalDNSName+"]",
-				"example.com:"+fooZoneDNSName+":CNAME:180:["+fooRegionDNSName+"]",
-				"example.com:"+barRegionDNSName+":CNAME:180:["+globalDNSName+"]",
-				"example.com:"+barZoneDNSName+":CNAME:180:["+barRegionDNSName+"]",
+				strings.Join([]string{dnsZone, globalDNSName, recordA, DNSTTL, "[198.51.150.1 198.51.200.1]"}, ":"),
+				strings.Join([]string{dnsZone, fooRegionDNSName, recordA, DNSTTL, "[198.51.150.1]"}, ":"),
+				strings.Join([]string{dnsZone, fooZoneDNSName, recordA, DNSTTL, "[198.51.150.1]"}, ":"),
+				strings.Join([]string{dnsZone, barRegionDNSName, recordA, DNSTTL, "[198.51.200.1]"}, ":"),
+				strings.Join([]string{dnsZone, barZoneDNSName, recordA, DNSTTL, "[198.51.200.1]"}, ":"),
 			),
-		},
+		}}},
 	}
-	for _, test := range tests {
-		fakedns, _ := clouddns.NewFakeInterface()
-		fakednsZones, ok := fakedns.Zones()
-		if !ok {
-			t.Error("Unable to fetch zones")
-		}
-		fakeClient := &fakefedclientset.Clientset{}
-		RegisterFakeClusterGet(&fakeClient.Fake, &v1beta1.ClusterList{Items: []v1beta1.Cluster{*cluster1, *cluster2}})
-		d := ServiceDNSController{
-			federationClient: fakeClient,
-			dns:              fakedns,
-			dnsZones:         fakednsZones,
-			serviceDNSSuffix: "federation.example.com",
-			zoneName:         "example.com",
-			federationName:   "myfederation",
-		}
+	for testName, test := range tests {
+		t.Run(testName, func(t *testing.T) {
+			fakeClient := &fakefedclientset.Clientset{}
+			RegisterFakeClusterGet(&fakeClient.Fake, &v1beta1.ClusterList{Items: []v1beta1.Cluster{*cluster1, *cluster2}})
+			RegisterFakeList(services, &fakeClient.Fake, &v1.ServiceList{Items: []v1.Service{}})
+			fedServiceWatch := RegisterFakeWatch(services, &fakeClient.Fake)
+			RegisterFakeOnCreate(services, &fakeClient.Fake, fedServiceWatch)
+			RegisterFakeOnUpdate(services, &fakeClient.Fake, fedServiceWatch)
 
-		dnsZones, err := getDNSZones(d.zoneName, d.zoneID, d.dnsZones)
-		if err != nil {
-			t.Errorf("Test failed for %s, Get DNS Zones failed: %v", test.name, err)
-		}
-		d.dnsZone = dnsZones[0]
-		test.service.Name = "servicename"
-		test.service.Namespace = "servicenamespace"
+			dc, err := NewServiceDNSController(fakeClient, "fake-clouddns", "", fedName, "", dnsZone, "")
+			if err != nil {
+				t.Errorf("error initializing dns controller: %v", err)
+			}
+			stop := make(chan struct{})
+			glog.Infof("Running Service DNS Controller")
+			go dc.DNSControllerRun(5, stop)
 
-		ingress, err := ingress.ParseFederatedServiceIngress(&test.service)
-		if err != nil {
-			t.Errorf("Error in parsing lb ingress for service %s/%s: %v", test.service.Namespace, test.service.Name, err)
-			return
-		}
-		for _, clusterIngress := range ingress.Items {
-			d.ensureDNSRecords(clusterIngress.Cluster, &test.service)
-		}
+			service := NewService(svcName, svcNamespace, v1.ServiceTypeLoadBalancer, 80)
+			key := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}.String()
+			for _, step := range test.steps {
+				switch step.operation {
+				case OP_ADD:
+					fedServiceWatch.Add(service)
+					require.NoError(t, WaitForFederatedServiceUpdate(t, dc.serviceStore,
+						key, service, serviceCompare, wait.ForeverTestTimeout))
+				case OP_UPDATE:
+					service.Annotations = map[string]string{
+						ingress.FederatedServiceIngressAnnotation: step.ingress}
+					fedServiceWatch.Modify(service)
+					require.NoError(t, WaitForFederatedServiceUpdate(t, dc.serviceStore,
+						key, service, serviceCompare, wait.ForeverTestTimeout))
+				case OP_DELETE:
+					service.ObjectMeta.Finalizers = append(service.ObjectMeta.Finalizers, metav1.FinalizerOrphanDependents)
+					service.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+					fedServiceWatch.Delete(service)
+					require.NoError(t, WaitForFederatedServiceDelete(t, dc.serviceStore,
+						key, wait.ForeverTestTimeout))
+				}
 
-		zones, err := fakednsZones.List()
-		if err != nil {
-			t.Errorf("error querying zones: %v", err)
-		}
+				waitForDNSRecords(t, dc, step.expected)
+			}
+			close(stop)
+		})
+	}
+}
 
-		// Dump every record to a testable-by-string-comparison form
-		records := sets.NewString()
+// waitForDNSRecords waits for DNS records in fakedns to match expected DNS records
+func waitForDNSRecords(t *testing.T, d *ServiceDNSController, expectedDNSRecords sets.String) {
+	fakednsZones, ok := d.dns.Zones()
+	if !ok {
+		t.Error("Unable to fetch zones")
+	}
+	zones, err := fakednsZones.List()
+	if err != nil {
+		t.Errorf("error querying zones: %v", err)
+	}
+
+	// Dump every record to a testable-by-string-comparison form
+	availableDNSRecords := sets.NewString()
+	err = wait.PollImmediate(retryInterval, 5*time.Second, func() (bool, error) {
 		for _, z := range zones {
 			zoneName := z.Name()
 
@@ -235,17 +328,165 @@ func TestServiceController_ensureDnsRecords(t *testing.T) {
 			if err != nil {
 				t.Errorf("error querying rr for zone %q: %v", zoneName, err)
 			}
+			availableDNSRecords = sets.NewString()
 			for _, rr := range rrList {
 				rrdatas := rr.Rrdatas()
 
 				// Put in consistent (testable-by-string-comparison) order
 				sort.Strings(rrdatas)
-				records.Insert(fmt.Sprintf("%s:%s:%s:%d:%s", zoneName, rr.Name(), rr.Type(), rr.Ttl(), rrdatas))
+				availableDNSRecords.Insert(fmt.Sprintf("%s:%s:%s:%d:%s", zoneName, rr.Name(), rr.Type(), rr.Ttl(), rrdatas))
 			}
 		}
 
-		if !records.Equal(test.expected) {
-			t.Errorf("Test %q failed.  Actual=%v, Expected=%v", test.name, records, test.expected)
+		if !availableDNSRecords.Equal(expectedDNSRecords) {
+			return false, nil
 		}
+		return true, nil
+	})
+	if err != nil {
+		t.Errorf("Actual DNS records does not match expected. Actual=%v, Expected=%v", availableDNSRecords, expectedDNSRecords)
 	}
+}
+
+func TestNewServiceDNSController(t *testing.T) {
+	tests := map[string]struct {
+		registeredProvider string
+		useProvider        string
+		registeredZones    []string
+		useZone            string
+		federationName     string
+		serviceDNSSuffix   string
+		zoneId             string
+		expectError        bool
+	}{
+		"AllValidParams": {
+			federationName: "ufp",
+			expectError:    false,
+		},
+		"EmptyFederationName": {
+			federationName: "",
+			expectError:    true,
+		},
+		"NoneExistingDNSProvider": {
+			federationName: "ufp",
+			useProvider:    "non-existent",
+			expectError:    true,
+		},
+		"MultipleRegisteredZonesWithDifferentNames": {
+			federationName:  "ufp",
+			registeredZones: []string{"abc.com", "xyz.com"},
+			expectError:     false,
+		},
+		"MultipleRegisteredZonesWithSameNames": {
+			federationName:  "ufp",
+			registeredZones: []string{"abc.com", "abc.com"},
+			expectError:     true,
+		},
+
+		"MultipleRegisteredZonesWithSameNamesUseZoneId": {
+			federationName:  "ufp",
+			registeredZones: []string{"abc.com", "abc.com"},
+			useZone:         "abc.com",
+			zoneId:          "1",
+			expectError:     true, // TODO: "google-clouddns" does not support multiple managed zones with same names
+		},
+
+		"UseNonExistentZone": {
+			federationName:  "ufp",
+			registeredZones: []string{"abc.com", "xyz.com"},
+			useZone:         "example.com",
+			expectError:     false,
+		},
+		"WithServiceDNSSuffix": {
+			federationName:   "ufp",
+			serviceDNSSuffix: "federation.example.com",
+			expectError:      false,
+		},
+	}
+	for testName, test := range tests {
+		t.Run(testName, func(t *testing.T) {
+			if test.registeredProvider == "" {
+				test.registeredProvider = "fake-dns-" + testName + strconv.FormatUint(instanceCounter, 10)
+				atomic.AddUint64(&instanceCounter, 1)
+			}
+			if test.useProvider == "" {
+				test.useProvider = test.registeredProvider
+			}
+			if test.registeredZones == nil {
+				test.registeredZones = append(test.registeredZones, "example.com")
+			}
+			if test.useZone == "" {
+				test.useZone = test.registeredZones[0]
+			}
+
+			dnsprovider.RegisterDnsProvider(test.registeredProvider, func(config io.Reader) (dnsprovider.Interface, error) {
+				return clouddns.NewFakeInterface(test.registeredZones)
+			})
+
+			_, err := NewServiceDNSController(&fakefedclientset.Clientset{},
+				test.useProvider,
+				"",
+				test.federationName,
+				test.serviceDNSSuffix,
+				test.useZone,
+				test.zoneId)
+			if err != nil {
+				if !test.expectError {
+					t.Errorf("expected to succeed but got error: %v", err)
+				}
+			} else {
+				if test.expectError {
+					t.Errorf("expected to return error but succeeded")
+				}
+			}
+		})
+	}
+}
+
+type compare func(current, desired *v1.Service) (match bool)
+
+func serviceCompare(s1, s2 *v1.Service) bool {
+	return s1.Name == s2.Name && s1.Namespace == s2.Namespace &&
+		(reflect.DeepEqual(s1.Annotations, s2.Annotations) || (len(s1.Annotations) == 0 && len(s2.Annotations) == 0)) &&
+		(reflect.DeepEqual(s1.Labels, s2.Labels) || (len(s1.Labels) == 0 && len(s2.Labels) == 0)) &&
+		reflect.DeepEqual(s1.Spec, s2.Spec) &&
+		s1.DeletionTimestamp == s2.DeletionTimestamp
+}
+
+// WaitForFederatedServiceUpdate waits for federated service updates to match the desiredService.
+func WaitForFederatedServiceUpdate(t *testing.T, store corelisters.ServiceLister, key string, desiredService *v1.Service, match compare, timeout time.Duration) error {
+	err := wait.PollImmediate(retryInterval, timeout, func() (bool, error) {
+		namespace, name, err := cache.SplitMetaNamespaceKey(key)
+		if err != nil {
+			return false, err
+		}
+		service, err := store.Services(namespace).Get(name)
+		switch {
+		case errors.IsNotFound(err):
+			return false, nil
+		case err != nil:
+			return false, err
+		case !match(service, desiredService):
+			return false, nil
+		default:
+			return true, nil
+		}
+	})
+	return err
+}
+
+// WaitForFederatedServiceDelete waits for federated service to be deleted.
+func WaitForFederatedServiceDelete(t *testing.T, store corelisters.ServiceLister, key string, timeout time.Duration) error {
+	err := wait.PollImmediate(retryInterval, timeout, func() (bool, error) {
+		namespace, name, err := cache.SplitMetaNamespaceKey(key)
+		if err != nil {
+			return false, err
+		}
+		_, err = store.Services(namespace).Get(name)
+		if errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, nil
+	})
+	return err
 }

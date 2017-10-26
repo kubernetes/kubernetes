@@ -34,6 +34,8 @@ type ManagedZonesGetCall struct {
 }
 
 func (call ManagedZonesGetCall) Do(opts ...googleapi.CallOption) (interfaces.ManagedZone, error) {
+	call.Service.Service.Lock()
+	defer call.Service.Service.Unlock()
 	if call.Response != nil {
 		return call.Response, *call.Error
 	} else {

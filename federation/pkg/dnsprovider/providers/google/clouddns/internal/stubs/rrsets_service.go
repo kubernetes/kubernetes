@@ -44,6 +44,8 @@ func (s ResourceRecordSetsService) managedZone(project, managedZone string) (*Ma
 }
 
 func (s ResourceRecordSetsService) List(project string, managedZone string) interfaces.ResourceRecordSetsListCall {
+	s.Service.Lock()
+	defer s.Service.Unlock()
 	if s.ListCall != nil {
 		return s.ListCall
 	}
@@ -60,6 +62,8 @@ func (s ResourceRecordSetsService) List(project string, managedZone string) inte
 }
 
 func (s ResourceRecordSetsService) Get(project, managedZone, name string) interfaces.ResourceRecordSetsListCall {
+	s.Service.Lock()
+	defer s.Service.Unlock()
 	if s.ListCall != nil {
 		return s.ListCall
 	}
@@ -77,7 +81,9 @@ func (s ResourceRecordSetsService) Get(project, managedZone, name string) interf
 	return &ResourceRecordSetsListCall{Response_: response}
 }
 
-func (service ResourceRecordSetsService) NewResourceRecordSet(name string, rrdatas []string, ttl int64, type_ rrstype.RrsType) interfaces.ResourceRecordSet {
+func (s ResourceRecordSetsService) NewResourceRecordSet(name string, rrdatas []string, ttl int64, type_ rrstype.RrsType) interfaces.ResourceRecordSet {
+	s.Service.Lock()
+	defer s.Service.Unlock()
 	rrset := ResourceRecordSet{Name_: name, Rrdatas_: rrdatas, Ttl_: ttl, Type_: string(type_)}
 	return rrset
 }

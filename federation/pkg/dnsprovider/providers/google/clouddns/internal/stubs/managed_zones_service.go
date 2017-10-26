@@ -22,25 +22,36 @@ import "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/i
 var _ interfaces.ManagedZonesService = &ManagedZonesService{}
 
 type ManagedZonesService struct {
-	Impl map[string]map[string]interfaces.ManagedZone
+	Service *Service
+	Impl    map[string]map[string]interfaces.ManagedZone
 }
 
 func (m *ManagedZonesService) Create(project string, managedzone interfaces.ManagedZone) interfaces.ManagedZonesCreateCall {
+	m.Service.Lock()
+	defer m.Service.Unlock()
 	return &ManagedZonesCreateCall{nil, m, project, managedzone.(*ManagedZone)}
 }
 
 func (m *ManagedZonesService) Delete(project string, managedZone string) interfaces.ManagedZonesDeleteCall {
+	m.Service.Lock()
+	defer m.Service.Unlock()
 	return &ManagedZonesDeleteCall{m, project, managedZone, nil}
 }
 
 func (m *ManagedZonesService) Get(project string, managedZone string) interfaces.ManagedZonesGetCall {
+	m.Service.Lock()
+	defer m.Service.Unlock()
 	return &ManagedZonesGetCall{m, project, managedZone, nil, nil, ""}
 }
 
 func (m *ManagedZonesService) List(project string) interfaces.ManagedZonesListCall {
+	m.Service.Lock()
+	defer m.Service.Unlock()
 	return &ManagedZonesListCall{m, project, nil, nil, ""}
 }
 
 func (m *ManagedZonesService) NewManagedZone(dnsName string) interfaces.ManagedZone {
-	return &ManagedZone{Service: m, Name_: dnsName}
+	m.Service.Lock()
+	defer m.Service.Unlock()
+	return &ManagedZone{Name_: dnsName}
 }

@@ -26,9 +26,13 @@ type ChangesService struct {
 }
 
 func (c *ChangesService) Create(project string, managedZone string, change interfaces.Change) interfaces.ChangesCreateCall {
+	c.Service.Lock()
+	defer c.Service.Unlock()
 	return &ChangesCreateCall{c, project, managedZone, change, nil}
 }
 
 func (c *ChangesService) NewChange(additions, deletions []interfaces.ResourceRecordSet) interfaces.Change {
+	c.Service.Lock()
+	defer c.Service.Unlock()
 	return &Change{c, additions, deletions}
 }

@@ -16,12 +16,17 @@ limitations under the License.
 
 package stubs
 
-import "k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
+import (
+	"sync"
+
+	"k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns/internal/interfaces"
+)
 
 // Compile time check for interface adherence
 var _ interfaces.Service = &Service{}
 
 type Service struct {
+	sync.Mutex
 	Changes_      *ChangesService
 	ManagedZones_ *ManagedZonesService
 	Projects_     *ProjectsService
@@ -29,9 +34,9 @@ type Service struct {
 }
 
 func NewService() *Service {
-	s := &Service{}
+	s := &Service{sync.Mutex{}, nil, nil, nil, nil}
 	s.Changes_ = &ChangesService{s}
-	s.ManagedZones_ = &ManagedZonesService{}
+	s.ManagedZones_ = &ManagedZonesService{s, nil}
 	s.Projects_ = &ProjectsService{}
 	s.Rrsets_ = &ResourceRecordSetsService{s, nil}
 	return s
