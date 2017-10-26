@@ -2273,7 +2273,8 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 			mountHeader: mountSecretNames,
 			tokenHeader: tokenSecretNames,
 		}
-		for header, names := range types {
+		for _, header := range sets.StringKeySet(types).List() {
+			names := types[header]
 			if len(names) == 0 {
 				w.Write(LEVEL_0, "%s\t<none>\n", header)
 			} else {
