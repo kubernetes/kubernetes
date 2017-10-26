@@ -18,6 +18,7 @@ package scheduling
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -286,7 +287,8 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		for nodeName, cpu := range nodeToAllocatableMap {
 			requestedCPU := cpu * 7 / 10
 			fillerPods = append(fillerPods, createPausePod(f, pausePodConfig{
-				Name: "filler-pod-" + nodeName,
+				// To avoid denying invalid name which include "." if nodeName is IP address.
+				Name: "filler-pod-" + strings.Replace(nodeName, ".", "-", -1),
 				Resources: &v1.ResourceRequirements{
 					Limits: v1.ResourceList{
 						v1.ResourceCPU: *resource.NewMilliQuantity(requestedCPU, "DecimalSI"),
