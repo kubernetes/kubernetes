@@ -87,6 +87,8 @@ func NewCmdPortForward(f cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Comma
 		},
 	}
 	cmd.Flags().StringP("pod", "p", "", "Pod name")
+	// TODO It's deprecated and will be removed in a future release. (kubernetes/kubectl#104)
+	cmd.Flags().MarkDeprecated("pod", "This flag is DEPRECATED and will be removed in a future version. Use port-forward POD instead.")
 	// TODO support UID
 	return cmd
 }
