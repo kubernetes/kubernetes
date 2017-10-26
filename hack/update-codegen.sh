@@ -59,10 +59,10 @@ GV_DIRS_CSV=$(IFS=',';echo "${GV_DIRS[*]// /,}";IFS=$)
 
 # This can be called with one flag, --verify-only, so it works for both the
 # update- and verify- scripts.
-${clientgen} "$@"
-${clientgen} --output-base "${KUBE_ROOT}/vendor" --clientset-path="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${GV_DIRS_CSV}" "$@"
+${clientgen} --namer-exceptions-file "${KUBE_ROOT}/hack/codegen-naming-exceptions.yaml" "$@"
+${clientgen} --output-base "${KUBE_ROOT}/vendor" --clientset-path="k8s.io/client-go" --clientset-name="kubernetes" --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="${GV_DIRS_CSV}" --namer-exceptions-file "${KUBE_ROOT}/hack/codegen-naming-exceptions.yaml" "$@"
 # Clientgen for federation clientset.
-${clientgen} --clientset-name=federation_clientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="../../../federation/apis/federation/v1beta1","core/v1","extensions/v1beta1","batch/v1","autoscaling/v1" --included-types-overrides="core/v1/Service,core/v1/Namespace,extensions/v1beta1/ReplicaSet,core/v1/Secret,extensions/v1beta1/Ingress,extensions/v1beta1/Deployment,extensions/v1beta1/DaemonSet,core/v1/ConfigMap,core/v1/Event,batch/v1/Job,autoscaling/v1/HorizontalPodAutoscaler"   "$@"
+${clientgen} --clientset-name=federation_clientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input-base="k8s.io/kubernetes/vendor/k8s.io/api" --input="../../../federation/apis/federation/v1beta1","core/v1","extensions/v1beta1","batch/v1","autoscaling/v1" --included-types-overrides="core/v1/Service,core/v1/Namespace,extensions/v1beta1/ReplicaSet,core/v1/Secret,extensions/v1beta1/Ingress,extensions/v1beta1/Deployment,extensions/v1beta1/DaemonSet,core/v1/ConfigMap,core/v1/Event,batch/v1/Job,autoscaling/v1/HorizontalPodAutoscaler" --namer-exceptions-file "${KUBE_ROOT}/hack/codegen-naming-exceptions.yaml" "$@"
 
 listergen_internal_apis=(
 pkg/api
@@ -73,7 +73,7 @@ $(
 )
 listergen_internal_apis=(${listergen_internal_apis[@]/#/k8s.io/kubernetes/})
 listergen_internal_apis_csv=$(IFS=,; echo "${listergen_internal_apis[*]}")
-${listergen} --input-dirs "${listergen_internal_apis_csv}" "$@"
+${listergen} --namer-exceptions-file "${KUBE_ROOT}/hack/codegen-naming-exceptions.yaml" --input-dirs "${listergen_internal_apis_csv}" "$@"
 
 listergen_external_apis=(
 $(
@@ -83,7 +83,12 @@ $(
 )
 )
 listergen_external_apis_csv=$(IFS=,; echo "${listergen_external_apis[*]}")
-${listergen} --output-base "${KUBE_ROOT}/vendor" --output-package "k8s.io/client-go/listers" --input-dirs "${listergen_external_apis_csv}" "$@"
+${listergen} \
+  --output-base "${KUBE_ROOT}/vendor" \
+  --output-package "k8s.io/client-go/listers" \
+  --input-dirs "${listergen_external_apis_csv}" \
+  --namer-exceptions-file "${KUBE_ROOT}/hack/codegen-naming-exceptions.yaml" \
+  "$@"
 
 informergen_internal_apis=(
 pkg/api
@@ -98,6 +103,7 @@ ${informergen} \
   --input-dirs "${informergen_internal_apis_csv}" \
   --internal-clientset-package k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset \
   --listers-package k8s.io/kubernetes/pkg/client/listers \
+  --namer-exceptions-file "${KUBE_ROOT}/hack/codegen-naming-exceptions.yaml" \
   "$@"
 
 informergen_external_apis=(
@@ -117,6 +123,7 @@ ${informergen} \
   --input-dirs "${informergen_external_apis_csv}" \
   --versioned-clientset-package k8s.io/client-go/kubernetes \
   --listers-package k8s.io/client-go/listers \
+  --namer-exceptions-file "${KUBE_ROOT}/hack/codegen-naming-exceptions.yaml" \
   "$@"
 
 # You may add additional calls of code generators like set-gen above.

@@ -27,6 +27,7 @@ import (
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
+	clientgenargs "k8s.io/code-generator/cmd/client-gen/args"
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 
@@ -34,16 +35,13 @@ import (
 )
 
 // NameSystems returns the name system used by the generators in this package.
-func NameSystems() namer.NameSystems {
-	pluralExceptions := map[string]string{
-		"Endpoints": "Endpoints",
-	}
+func NameSystems(exceptions clientgenargs.NamerExceptions) namer.NameSystems {
 	return namer.NameSystems{
 		"public":             namer.NewPublicNamer(0),
 		"private":            namer.NewPrivateNamer(0),
 		"raw":                namer.NewRawNamer("", nil),
-		"publicPlural":       namer.NewPublicPluralNamer(pluralExceptions),
-		"allLowercasePlural": namer.NewAllLowercasePluralNamer(pluralExceptions),
+		"publicPlural":       namer.NewPublicPluralNamer(exceptions.PluralNamerExceptions),
+		"allLowercasePlural": namer.NewAllLowercasePluralNamer(exceptions.PluralNamerExceptions),
 		"lowercaseSingular":  &lowercaseSingularNamer{},
 	}
 }

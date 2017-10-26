@@ -37,6 +37,8 @@ func main() {
 	customArgs := &clientgenargs.CustomArgs{}
 	customArgs.AddFlags(pflag.CommandLine)
 
+	namerExceptionFile := pflag.StringP("namer-exceptions-file", "", "", "a YAML file that contains namer exceptions.")
+
 	// Override defaults.
 	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
 	arguments.CustomArgs = customArgs
@@ -61,8 +63,13 @@ func main() {
 		arguments.InputDirs = append(arguments.InputDirs, pkg)
 	}
 
+	exceptions, err := clientgenargs.LoadNamerExceptions(*namerExceptionFile)
+	if err != nil {
+		glog.Fatalf("Unable to load namer exceptions from %q: %v", namerExceptionFile, err)
+	}
+
 	if err := arguments.Execute(
-		generators.NameSystems(),
+		generators.NameSystems(exceptions),
 		generators.DefaultNameSystem(),
 		generators.Packages,
 	); err != nil {

@@ -17,8 +17,10 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"path/filepath"
 
+	clientgenargs "k8s.io/code-generator/cmd/client-gen/args"
 	"k8s.io/code-generator/cmd/informer-gen/generators"
 	"k8s.io/gengo/args"
 
@@ -27,7 +29,7 @@ import (
 )
 
 func main() {
-	arguments := args.Default()
+	arguments := args.Default().WithoutDefaultFlagParsing()
 
 	// Custom arguments.
 	customArgs := &generators.CustomArgs{
@@ -38,14 +40,26 @@ func main() {
 	}
 	customArgs.AddFlags(pflag.CommandLine)
 
+	namerExceptionFile := pflag.StringP("namer-exceptions-file", "", "", "a YAML file that contains namer exceptions.")
+
 	// Override defaults.
 	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
 	arguments.OutputPackagePath = "k8s.io/kubernetes/pkg/client/informers/informers_generated"
 	arguments.CustomArgs = customArgs
 
+	arguments.AddFlags(pflag.CommandLine)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
+
+	exceptions, err := clientgenargs.LoadNamerExceptions(*namerExceptionFile)
+	if err != nil {
+		glog.Fatalf("Unable to load namer exceptions from %s: %v", namerExceptionFile, err)
+	}
+	customArgs.NamerExceptions = exceptions
+
 	// Run it.
 	if err := arguments.Execute(
-		generators.NameSystems(),
+		generators.NameSystems(exceptions),
 		generators.DefaultNameSystem(),
 		generators.Packages,
 	); err != nil {

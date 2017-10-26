@@ -17,10 +17,21 @@ limitations under the License.
 package args
 
 import (
+	"io/ioutil"
+
 	"github.com/spf13/pflag"
+	yaml "gopkg.in/yaml.v2"
 
 	"k8s.io/code-generator/cmd/client-gen/types"
 )
+
+// NamerExceptions contains public, private and plural name exceptions for
+// custom types.
+type NamerExceptions struct {
+	PublicNamerExceptions  map[string]string `yaml:"public"`
+	PrivateNamerExceptions map[string]string `yaml:"private"`
+	PluralNamerExceptions  map[string]string `yaml:"plural"`
+}
 
 // ClientGenArgs is a wrapper for arguments to client-gen.
 type CustomArgs struct {
@@ -80,4 +91,20 @@ func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
 	pflag.StringVar(&ca.ClientsetOutputPath, "clientset-path", "k8s.io/kubernetes/pkg/client/clientset_generated/", "the generated clientset will be output to <clientset-path>/<clientset-name>.")
 	pflag.BoolVar(&ca.ClientsetOnly, "clientset-only", false, "when set, client-gen only generates the clientset shell, without generating the individual typed clients")
 	pflag.BoolVar(&ca.FakeClient, "fake-clientset", true, "when set, client-gen will generate the fake clientset that can be used in tests")
+}
+
+// LoadNamerExceptions loads the namer exception from provided YAML file.
+func LoadNamerExceptions(fileName string) (NamerExceptions, error) {
+	var result NamerExceptions
+	if len(fileName) == 0 {
+		return result, nil
+	}
+	f, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		return result, err
+	}
+	if err := yaml.Unmarshal(f, &result); err != nil {
+		return result, err
+	}
+	return result, err
 }

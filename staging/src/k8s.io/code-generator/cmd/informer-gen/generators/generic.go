@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strings"
 
+	clientgenargs "k8s.io/code-generator/cmd/client-gen/args"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -35,6 +36,7 @@ type genericGenerator struct {
 	groupVersions        map[string]clientgentypes.GroupVersions
 	typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type
 	filtered             bool
+	exceptions           clientgenargs.NamerExceptions
 }
 
 var _ generator.Generator = &genericGenerator{}
@@ -48,9 +50,7 @@ func (g *genericGenerator) Filter(c *generator.Context, t *types.Type) bool {
 }
 
 func (g *genericGenerator) Namers(c *generator.Context) namer.NameSystems {
-	pluralExceptions := map[string]string{
-		"Endpoints": "Endpoints",
-	}
+	pluralExceptions := g.exceptions.PluralNamerExceptions
 	return namer.NameSystems{
 		"raw":                namer.NewRawNamer(g.outputPackage, g.imports),
 		"allLowercasePlural": namer.NewAllLowercasePluralNamer(pluralExceptions),

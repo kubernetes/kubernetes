@@ -26,6 +26,7 @@ import (
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
+	clientgenargs "k8s.io/code-generator/cmd/client-gen/args"
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 
@@ -33,16 +34,13 @@ import (
 )
 
 // NameSystems returns the name system used by the generators in this package.
-func NameSystems() namer.NameSystems {
-	pluralExceptions := map[string]string{
-		"Endpoints": "Endpoints",
-	}
+func NameSystems(exceptions clientgenargs.NamerExceptions) namer.NameSystems {
 	return namer.NameSystems{
 		"public":             namer.NewPublicNamer(0),
 		"private":            namer.NewPrivateNamer(0),
 		"raw":                namer.NewRawNamer("", nil),
-		"publicPlural":       namer.NewPublicPluralNamer(pluralExceptions),
-		"allLowercasePlural": namer.NewAllLowercasePluralNamer(pluralExceptions),
+		"publicPlural":       namer.NewPublicPluralNamer(exceptions.PluralNamerExceptions),
+		"allLowercasePlural": namer.NewAllLowercasePluralNamer(exceptions.PluralNamerExceptions),
 		"lowercaseSingular":  &lowercaseSingularNamer{},
 	}
 }
@@ -209,7 +207,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 	if len(externalGroupVersions) != 0 {
 		packageList = append(packageList, factoryInterfacePackage(externalVersionPackagePath, boilerplate, customArgs.VersionedClientSetPackage, typesForGroupVersion))
-		packageList = append(packageList, factoryPackage(externalVersionPackagePath, boilerplate, externalGroupVersions, customArgs.VersionedClientSetPackage, typesForGroupVersion))
+		packageList = append(packageList, factoryPackage(externalVersionPackagePath, boilerplate, externalGroupVersions, customArgs.VersionedClientSetPackage, typesForGroupVersion, customArgs.NamerExceptions))
 		for _, groupVersionsEntry := range externalGroupVersions {
 			packageList = append(packageList, groupPackage(externalVersionPackagePath, groupVersionsEntry, boilerplate))
 		}
@@ -217,7 +215,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 
 	if len(internalGroupVersions) != 0 {
 		packageList = append(packageList, factoryInterfacePackage(internalVersionPackagePath, boilerplate, customArgs.InternalClientSetPackage, typesForGroupVersion))
-		packageList = append(packageList, factoryPackage(internalVersionPackagePath, boilerplate, internalGroupVersions, customArgs.InternalClientSetPackage, typesForGroupVersion))
+		packageList = append(packageList, factoryPackage(internalVersionPackagePath, boilerplate, internalGroupVersions, customArgs.InternalClientSetPackage, typesForGroupVersion, customArgs.NamerExceptions))
 		for _, groupVersionsEntry := range internalGroupVersions {
 			packageList = append(packageList, groupPackage(internalVersionPackagePath, groupVersionsEntry, boilerplate))
 		}
@@ -230,7 +228,7 @@ func isInternalVersion(gv clientgentypes.GroupVersion) bool {
 	return len(gv.Version) == 0
 }
 
-func factoryPackage(basePackage string, boilerplate []byte, groupVersions map[string]clientgentypes.GroupVersions, clientSetPackage string, typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type) generator.Package {
+func factoryPackage(basePackage string, boilerplate []byte, groupVersions map[string]clientgentypes.GroupVersions, clientSetPackage string, typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type, exceptions clientgenargs.NamerExceptions) generator.Package {
 	return &generator.DefaultPackage{
 		PackageName: filepath.Base(basePackage),
 		PackagePath: basePackage,
@@ -255,6 +253,7 @@ func factoryPackage(basePackage string, boilerplate []byte, groupVersions map[st
 				imports:              generator.NewImportTracker(),
 				groupVersions:        groupVersions,
 				typesForGroupVersion: typesForGroupVersion,
+				exceptions:           exceptions,
 			})
 
 			return generators
