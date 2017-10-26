@@ -19,6 +19,7 @@ package scheduler
 import (
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -30,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientcache "k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/leaderelection"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -85,6 +88,37 @@ func podWithResources(id, desiredHost string, limits v1.ResourceList, requests v
 		{Name: "ctr", Resources: v1.ResourceRequirements{Limits: limits, Requests: requests}},
 	}
 	return pod
+}
+
+func grantSchedulerLeadership() bool {
+	id, err := os.Hostname()
+	if err != nil {
+		return false
+	}
+
+	rl, err := resourcelock.New(resourcelock.EndpointsResourceLock, "", "", nil,
+		resourcelock.ResourceLockConfig{
+			Identity: id,
+		})
+	if err != nil {
+		return false
+	}
+	leaderElector, err := leaderelection.NewLeaderElector(
+		leaderelection.LeaderElectionConfig{
+			Lock:          rl,
+			LeaseDuration: time.Duration(15) * time.Second,
+			RenewDeadline: time.Duration(10) * time.Second,
+			RetryPeriod:   time.Duration(2) * time.Second,
+		},
+	)
+	if err != nil {
+		return false
+	}
+	leaderelection.Leader = leaderElector
+	leaderElector.SetLeaderElectionRecord(resourcelock.LeaderElectionRecord{
+		HolderIdentity: id,
+	})
+	return true
 }
 
 type mockScheduler struct {
@@ -198,6 +232,7 @@ func TestScheduler(t *testing.T) {
 			}
 			close(called)
 		})
+		grantSchedulerLeadership()
 		s.scheduleOne()
 		<-called
 		if e, a := item.expectAssumedPod, gotAssumedPod; !reflect.DeepEqual(e, a) {
@@ -262,6 +297,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 	// We use conflicted pod ports to incur fit predicate failure if first pod not removed.
 	secondPod := podWithPort("bar", "", 8080)
 	queuedPodStore.Add(secondPod)
+	grantSchedulerLeadership()
 	scheduler.scheduleOne()
 	select {
 	case b := <-bindingChan:
@@ -295,6 +331,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	// queuedPodStore: [bar:8080]
 	// cache: [(assumed)foo:8080]
 
+	grantSchedulerLeadership()
 	scheduler.scheduleOne()
 	select {
 	case err := <-errChan:
@@ -323,6 +360,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	}
 
 	queuedPodStore.Add(secondPod)
+	grantSchedulerLeadership()
 	scheduler.scheduleOne()
 	select {
 	case b := <-bindingChan:
@@ -408,7 +446,9 @@ func setupTestSchedulerWithOnePodOnNode(t *testing.T, queuedPodStore *clientcach
 	// queuedPodStore: [foo:8080]
 	// cache: []
 
+	grantSchedulerLeadership()
 	scheduler.scheduleOne()
+
 	// queuedPodStore: []
 	// cache: [(assumed)foo:8080]
 
@@ -480,6 +520,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	scheduler, _, errChan := setupTestScheduler(queuedPodStore, scache, nodeLister, predicateMap)
 
 	queuedPodStore.Add(podWithTooBigResourceRequests)
+	grantSchedulerLeadership()
 	scheduler.scheduleOne()
 	select {
 	case err := <-errChan:
