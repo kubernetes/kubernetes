@@ -231,6 +231,7 @@ package_group(
         "//pkg/kubectl/cmd/set",
         "//pkg/kubectl/cmd/testing",
         "//pkg/kubectl/cmd/util",
+        "//pkg/kubectl/cmd/util/cmdproto",
         "//pkg/kubectl/cmd/util/editor",
     ],
 )
