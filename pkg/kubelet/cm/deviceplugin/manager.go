@@ -97,13 +97,13 @@ func (m *ManagerImpl) removeContents(dir string) error {
 }
 
 const (
-	// defaultCheckpoint is the file name of device plugin checkpoint
-	defaultCheckpoint = "kubelet_internal_checkpoint"
+	// kubeletDevicePluginCheckpoint is the file name of device plugin checkpoint
+	kubeletDevicePluginCheckpoint = "kubelet_internal_checkpoint"
 )
 
 // CheckpointFile returns device plugin checkpoint file path.
 func (m *ManagerImpl) CheckpointFile() string {
-	return filepath.Join(m.socketdir, defaultCheckpoint)
+	return filepath.Join(m.socketdir, kubeletDevicePluginCheckpoint)
 }
 
 // Start starts the Device Plugin Manager
@@ -209,13 +209,6 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 		return
 	}
 
-	stream, err := e.list()
-	if err != nil {
-		glog.Errorf("Failed to List devices for plugin %v: %v", r.ResourceName, err)
-		e.stop()
-		return
-	}
-
 	// Associates the newly created endpoint with the corresponding resource name.
 	// Stops existing endpoint if there is any.
 	m.mutex.Lock()
@@ -229,7 +222,7 @@ func (m *ManagerImpl) addEndpoint(r *pluginapi.RegisterRequest) {
 	}
 
 	go func() {
-		e.listAndWatch(stream)
+		e.run()
 		e.stop()
 
 		m.mutex.Lock()
