@@ -37,19 +37,19 @@ import (
 )
 
 type sioVolume struct {
-	sioMgr      *sioMgr
-	plugin      *sioPlugin
-	pod         *api.Pod
-	podUID      types.UID
-	spec        *volume.Spec
-	source      *api.ScaleIOVolumeSource
-	namespace   string
-	volSpecName string
-	volName     string
-	readOnly    bool
-	fsType      string
-	options     volume.VolumeOptions
-	configData  map[string]string
+	sioMgr          *sioMgr
+	plugin          *sioPlugin
+	pod             *api.Pod
+	podUID          types.UID
+	spec            *volume.Spec
+	secretName      string
+	secretNamespace string
+	volSpecName     string
+	volName         string
+	readOnly        bool
+	fsType          string
+	options         volume.VolumeOptions
+	configData      map[string]string
 
 	volume.MetricsNil
 }
@@ -59,7 +59,6 @@ type sioVolume struct {
 var _ volume.Volume = &sioVolume{}
 
 // GetPath returns the path where the volume will be mounted.
-// The volumeName is prefixed with the pod's namespace a <pod.Namespace>-<volumeName>
 func (v *sioVolume) GetPath() string {
 	return v.plugin.host.GetPodVolumeDir(
 		v.podUID,
@@ -128,11 +127,11 @@ func (v *sioVolume) SetUpAt(dir string, fsGroup *int64) error {
 	switch {
 	default:
 		options = append(options, "rw")
-	case isROM && !v.source.ReadOnly:
+	case isROM && !v.readOnly:
 		options = append(options, "rw")
 	case isROM:
 		options = append(options, "ro")
-	case v.source.ReadOnly:
+	case v.readOnly:
 		options = append(options, "ro")
 	}
 
@@ -327,10 +326,10 @@ func (v *sioVolume) Provision() (*api.PersistentVolume, error) {
 				),
 			},
 			PersistentVolumeSource: api.PersistentVolumeSource{
-				ScaleIO: &api.ScaleIOVolumeSource{
+				ScaleIO: &api.ScaleIOPersistentVolumeSource{
 					Gateway:          v.configData[confKey.gateway],
 					SSLEnabled:       sslEnabled,
-					SecretRef:        &api.LocalObjectReference{Name: v.configData[confKey.secretRef]},
+					SecretRef:        &api.SecretReference{Name: v.secretName, Namespace: v.secretNamespace},
 					System:           v.configData[confKey.system],
 					ProtectionDomain: v.configData[confKey.protectionDomain],
 					StoragePool:      v.configData[confKey.storagePool],
@@ -366,13 +365,17 @@ func (v *sioVolume) setSioMgr() error {
 			glog.V(4).Info(log("previous config file not found, creating new one"))
 			// prepare config data
 			configData = make(map[string]string)
-			mapVolumeSource(configData, v.source)
+			mapVolumeSpec(configData, v.spec)
+
+			// additional config data
+			configData[confKey.secretNamespace] = v.secretNamespace
+			configData[confKey.secretName] = v.secretName
+			configData[confKey.volSpecName] = v.volSpecName
+
 			if err := validateConfigs(configData); err != nil {
 				glog.Error(log("config setup failed: %s", err))
 				return err
 			}
-			configData[confKey.namespace] = v.namespace
-			configData[confKey.volSpecName] = v.volSpecName
 
 			// persist config
 			if err := saveConfig(configName, configData); err != nil {
@@ -381,7 +384,7 @@ func (v *sioVolume) setSioMgr() error {
 			}
 		}
 		// merge in secret
-		if err := attachSecret(v.plugin, v.namespace, configData); err != nil {
+		if err := attachSecret(v.plugin, v.secretNamespace, configData); err != nil {
 			glog.Error(log("failed to load secret: %v", err))
 			return err
 		}
@@ -414,12 +417,13 @@ func (v *sioVolume) resetSioMgr() error {
 			glog.Error(log("failed to load config data: %v", err))
 			return err
 		}
-		v.namespace = configData[confKey.namespace]
+		v.secretName = configData[confKey.secretName]
+		v.secretNamespace = configData[confKey.secretNamespace]
 		v.volName = configData[confKey.volumeName]
 		v.volSpecName = configData[confKey.volSpecName]
 
 		// attach secret
-		if err := attachSecret(v.plugin, v.namespace, configData); err != nil {
+		if err := attachSecret(v.plugin, v.secretNamespace, configData); err != nil {
 			glog.Error(log("failed to load secret: %v", err))
 			return err
 		}
@@ -446,21 +450,22 @@ func (v *sioVolume) resetSioMgr() error {
 func (v *sioVolume) setSioMgrFromConfig() error {
 	glog.V(4).Info(log("setting scaleio mgr from available config"))
 	if v.sioMgr == nil {
-		configData := v.configData
-		applyConfigDefaults(configData)
-		if err := validateConfigs(configData); err != nil {
+		applyConfigDefaults(v.configData)
+
+		v.configData[confKey.volSpecName] = v.volSpecName
+
+		if err := validateConfigs(v.configData); err != nil {
 			glog.Error(log("config data setup failed: %s", err))
 			return err
 		}
-		configData[confKey.namespace] = v.namespace
-		configData[confKey.volSpecName] = v.volSpecName
 
 		// copy config and attach secret
 		data := map[string]string{}
-		for k, v := range configData {
+		for k, v := range v.configData {
 			data[k] = v
 		}
-		if err := attachSecret(v.plugin, v.namespace, data); err != nil {
+
+		if err := attachSecret(v.plugin, v.secretNamespace, data); err != nil {
 			glog.Error(log("failed to load secret: %v", err))
 			return err
 		}
@@ -483,16 +488,20 @@ func (v *sioVolume) setSioMgrFromSpec() error {
 	if v.sioMgr == nil {
 		// get config data form spec volume source
 		configData := map[string]string{}
-		mapVolumeSource(configData, v.source)
+		mapVolumeSpec(configData, v.spec)
+
+		// additional config
+		configData[confKey.secretNamespace] = v.secretNamespace
+		configData[confKey.secretName] = v.secretName
+		configData[confKey.volSpecName] = v.volSpecName
+
 		if err := validateConfigs(configData); err != nil {
 			glog.Error(log("config setup failed: %s", err))
 			return err
 		}
-		configData[confKey.namespace] = v.namespace
-		configData[confKey.volSpecName] = v.volSpecName
 
 		// attach secret object to config data
-		if err := attachSecret(v.plugin, v.namespace, configData); err != nil {
+		if err := attachSecret(v.plugin, v.secretNamespace, configData); err != nil {
 			glog.Error(log("failed to load secret: %v", err))
 			return err
 		}
