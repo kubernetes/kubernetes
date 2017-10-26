@@ -206,7 +206,7 @@ func attachSecret(plug *sioPlugin, namespace string, configData map[string]strin
 	kubeClient := plug.host.GetKubeClient()
 	secretMap, err := volutil.GetSecretForPV(namespace, secretRefName, sioPluginName, kubeClient)
 	if err != nil {
-		glog.Error(log("failed to get secret: %v", err))
+		glog.Error(log("failed to get secret from namespace %s: %v", namespace, err))
 		return secretNotFoundErr
 	}
 	// merge secret data
