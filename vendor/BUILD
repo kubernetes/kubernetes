@@ -124,6 +124,7 @@ filegroup(
         "//vendor/github.com/d2g/dhcp4client:all-srcs",
         "//vendor/github.com/davecgh/go-spew/spew:all-srcs",
         "//vendor/github.com/daviddengcn/go-colortext:all-srcs",
+        "//vendor/github.com/decker502/dnspod-go:all-srcs",
         "//vendor/github.com/dgrijalva/jwt-go:all-srcs",
         "//vendor/github.com/docker/distribution/digestset:all-srcs",
         "//vendor/github.com/docker/distribution/reference:all-srcs",
