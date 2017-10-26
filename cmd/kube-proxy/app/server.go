@@ -53,10 +53,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/proxy"
-	"k8s.io/kubernetes/pkg/proxy/apis/proxyconfig"
-	"k8s.io/kubernetes/pkg/proxy/apis/proxyconfig/scheme"
-	"k8s.io/kubernetes/pkg/proxy/apis/proxyconfig/v1alpha1"
-	"k8s.io/kubernetes/pkg/proxy/apis/proxyconfig/validation"
+	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
+	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
+	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/validation"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
@@ -96,10 +96,10 @@ type Options struct {
 	CleanupAndExit bool
 
 	// config is the proxy server's configuration object.
-	config *proxyconfig.KubeProxyConfiguration
+	config *kubeproxyconfig.KubeProxyConfiguration
 
 	// The fields below here are placeholders for flags that can't be directly mapped into
-	// proxyconfig.KubeProxyConfiguration.
+	// kubeproxyconfig.KubeProxyConfiguration.
 	//
 	// TODO remove these fields once the deprecated flags are removed.
 
@@ -165,7 +165,7 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 
 func NewOptions() *Options {
 	return &Options{
-		config:      new(proxyconfig.KubeProxyConfiguration),
+		config:      new(kubeproxyconfig.KubeProxyConfiguration),
 		healthzPort: ports.ProxyHealthzPort,
 		scheme:      scheme.Scheme,
 		codecs:      scheme.Codecs,
@@ -272,7 +272,7 @@ func (o *Options) applyDeprecatedHealthzPortToConfig() {
 
 // loadConfigFromFile loads the contents of file and decodes it as a
 // KubeProxyConfiguration object.
-func (o *Options) loadConfigFromFile(file string) (*proxyconfig.KubeProxyConfiguration, error) {
+func (o *Options) loadConfigFromFile(file string) (*kubeproxyconfig.KubeProxyConfiguration, error) {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
@@ -282,19 +282,19 @@ func (o *Options) loadConfigFromFile(file string) (*proxyconfig.KubeProxyConfigu
 }
 
 // loadConfig decodes data as a KubeProxyConfiguration object.
-func (o *Options) loadConfig(data []byte) (*proxyconfig.KubeProxyConfiguration, error) {
+func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfiguration, error) {
 	configObj, gvk, err := o.codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	config, ok := configObj.(*proxyconfig.KubeProxyConfiguration)
+	config, ok := configObj.(*kubeproxyconfig.KubeProxyConfiguration)
 	if !ok {
 		return nil, fmt.Errorf("got unexpected config type: %v", gvk)
 	}
 	return config, nil
 }
 
-func (o *Options) ApplyDefaults(in *proxyconfig.KubeProxyConfiguration) (*proxyconfig.KubeProxyConfiguration, error) {
+func (o *Options) ApplyDefaults(in *kubeproxyconfig.KubeProxyConfiguration) (*kubeproxyconfig.KubeProxyConfiguration, error) {
 	external, err := o.scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
@@ -302,12 +302,12 @@ func (o *Options) ApplyDefaults(in *proxyconfig.KubeProxyConfiguration) (*proxyc
 
 	o.scheme.Default(external)
 
-	internal, err := o.scheme.ConvertToVersion(external, proxyconfig.SchemeGroupVersion)
+	internal, err := o.scheme.ConvertToVersion(external, kubeproxyconfig.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
 
-	out := internal.(*proxyconfig.KubeProxyConfiguration)
+	out := internal.(*kubeproxyconfig.KubeProxyConfiguration)
 
 	return out, nil
 }
@@ -358,7 +358,7 @@ type ProxyServer struct {
 	Proxier                proxy.ProxyProvider
 	Broadcaster            record.EventBroadcaster
 	Recorder               record.EventRecorder
-	ConntrackConfiguration proxyconfig.KubeProxyConntrackConfiguration
+	ConntrackConfiguration kubeproxyconfig.KubeProxyConntrackConfiguration
 	Conntracker            Conntracker // if nil, ignored
 	ProxyMode              string
 	NodeRef                *v1.ObjectReference
@@ -375,7 +375,7 @@ type ProxyServer struct {
 
 // createClients creates a kube client and an event client from the given config and masterOverride.
 // TODO remove masterOverride when CLI flags are removed.
-func createClients(config proxyconfig.ClientConnectionConfiguration, masterOverride string) (clientset.Interface, v1core.EventsGetter, error) {
+func createClients(config kubeproxyconfig.ClientConnectionConfiguration, masterOverride string) (clientset.Interface, v1core.EventsGetter, error) {
 	var kubeConfig *rest.Config
 	var err error
 
@@ -547,7 +547,7 @@ func (s *ProxyServer) birthCry() {
 	s.Recorder.Eventf(s.NodeRef, api.EventTypeNormal, "Starting", "Starting kube-proxy.")
 }
 
-func getConntrackMax(config proxyconfig.KubeProxyConntrackConfiguration) (int, error) {
+func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (int, error) {
 	if config.Max > 0 {
 		if config.MaxPerCore > 0 {
 			return -1, fmt.Errorf("invalid config: Conntrack Max and Conntrack MaxPerCore are mutually exclusive")
