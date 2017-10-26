@@ -106,7 +106,7 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 		if !isPodManagedContainer(&cinfo) {
 			continue
 		}
-		ref := buildPodRef(&cinfo)
+		ref := buildPodRef(cinfo.Spec.Labels)
 
 		// Lookup the PodStats for the pod using the PodRef. If none exists,
 		// initialize a new entry.
@@ -172,10 +172,10 @@ func (p *cadvisorStatsProvider) ImageFsStats() (*statsapi.FsStats, error) {
 }
 
 // buildPodRef returns a PodReference that identifies the Pod managing cinfo
-func buildPodRef(cinfo *cadvisorapiv2.ContainerInfo) statsapi.PodReference {
-	podName := kubetypes.GetPodName(cinfo.Spec.Labels)
-	podNamespace := kubetypes.GetPodNamespace(cinfo.Spec.Labels)
-	podUID := kubetypes.GetPodUID(cinfo.Spec.Labels)
+func buildPodRef(containerLabels map[string]string) statsapi.PodReference {
+	podName := kubetypes.GetPodName(containerLabels)
+	podNamespace := kubetypes.GetPodNamespace(containerLabels)
+	podUID := kubetypes.GetPodUID(containerLabels)
 	return statsapi.PodReference{Name: podName, Namespace: podNamespace, UID: podUID}
 }
 
@@ -204,7 +204,7 @@ func removeTerminatedContainerInfo(containerInfo map[string]cadvisorapiv2.Contai
 			continue
 		}
 		cinfoID := containerID{
-			podRef:        buildPodRef(&cinfo),
+			podRef:        buildPodRef(cinfo.Spec.Labels),
 			containerName: kubetypes.GetContainerName(cinfo.Spec.Labels),
 		}
 		cinfoMap[cinfoID] = append(cinfoMap[cinfoID], containerInfoWithCgroup{
