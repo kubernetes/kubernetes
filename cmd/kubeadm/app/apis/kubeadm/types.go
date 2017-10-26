@@ -36,7 +36,7 @@ type MasterConfiguration struct {
 	AuthorizationModes []string
 
 	Token    string
-	TokenTTL metav1.Duration
+	TokenTTL *metav1.Duration
 
 	APIServerExtraArgs         map[string]string
 	ControllerManagerExtraArgs map[string]string

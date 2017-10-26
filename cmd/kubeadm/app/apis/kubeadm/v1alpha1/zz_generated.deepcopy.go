@@ -21,6 +21,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	reflect "reflect"
@@ -114,7 +115,15 @@ func (in *MasterConfiguration) DeepCopyInto(out *MasterConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	out.TokenTTL = in.TokenTTL
+	if in.TokenTTL != nil {
+		in, out := &in.TokenTTL, &out.TokenTTL
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(v1.Duration)
+			**out = **in
+		}
+	}
 	if in.APIServerExtraArgs != nil {
 		in, out := &in.APIServerExtraArgs, &out.APIServerExtraArgs
 		*out = make(map[string]string, len(*in))
