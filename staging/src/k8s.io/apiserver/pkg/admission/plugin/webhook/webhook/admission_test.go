@@ -29,14 +29,12 @@ import (
 
 	"k8s.io/api/admission/v1alpha1"
 	registrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
+	api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-
 	"k8s.io/client-go/rest"
-	_ "k8s.io/kubernetes/pkg/apis/admission/install"
 )
 
 type fakeHookSource struct {
@@ -67,6 +65,10 @@ func (f fakeServiceResolver) ResolveEndpoint(namespace, name string) (*url.URL, 
 
 // TestAdmit tests that GenericAdmissionWebhook#Admit works as expected
 func TestAdmit(t *testing.T) {
+	scheme := runtime.NewScheme()
+	v1alpha1.AddToScheme(scheme)
+	api.AddToScheme(scheme)
+
 	// Create the test webhook server
 	sCert, err := tls.X509KeyPair(serverCert, serverKey)
 	if err != nil {
@@ -101,7 +103,7 @@ func TestAdmit(t *testing.T) {
 	}
 
 	// Set up a test object for the call
-	kind := api.Kind("Pod").WithVersion("v1")
+	kind := api.SchemeGroupVersion.WithKind("Pod")
 	name := "my-pod"
 	namespace := "webhook-test"
 	object := api.Pod{
@@ -266,7 +268,7 @@ func TestAdmit(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			wh.hookSource = &tt.hookSource
 			wh.serviceResolver = fakeServiceResolver{base: *serverURL}
-			wh.SetScheme(legacyscheme.Scheme)
+			wh.SetScheme(scheme)
 
 			err = wh.Admit(admission.NewAttributesRecord(&object, &oldObject, kind, namespace, name, resource, subResource, operation, &userInfo))
 			if tt.expectAllow != (err == nil) {

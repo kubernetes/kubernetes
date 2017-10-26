@@ -18,7 +18,6 @@ package webhook
 
 import (
 	"io/ioutil"
-	"net"
 	"strings"
 	"time"
 
@@ -29,8 +28,16 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
+type AuthenticationInfoResolverWrapper func(AuthenticationInfoResolver) AuthenticationInfoResolver
+
 type AuthenticationInfoResolver interface {
 	ClientConfigFor(server string) (*rest.Config, error)
+}
+
+type AuthenticationInfoResolverFunc func(server string) (*rest.Config, error)
+
+func (a AuthenticationInfoResolverFunc) ClientConfigFor(server string) (*rest.Config, error) {
+	return a(server)
 }
 
 type defaultAuthenticationInfoResolver struct {
@@ -139,19 +146,4 @@ func setGlobalDefaults(config *rest.Config) *rest.Config {
 	config.Timeout = 30 * time.Second
 
 	return config
-}
-
-type dialOverridingAuthenticationInfoResolver struct {
-	dialFn   func(network, addr string) (net.Conn, error)
-	delegate AuthenticationInfoResolver
-}
-
-func (c *dialOverridingAuthenticationInfoResolver) ClientConfigFor(server string) (*rest.Config, error) {
-	cfg, err := c.delegate.ClientConfigFor(server)
-	if err != nil {
-		return nil, err
-	}
-
-	cfg.Dial = c.dialFn
-	return cfg, nil
 }

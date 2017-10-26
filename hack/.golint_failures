@@ -463,7 +463,6 @@ plugin/pkg/admission/security
 plugin/pkg/admission/security/podsecuritypolicy
 plugin/pkg/admission/serviceaccount
 plugin/pkg/admission/storageclass/setdefault
-plugin/pkg/admission/webhook
 plugin/pkg/auth/authorizer/node
 plugin/pkg/auth/authorizer/rbac
 plugin/pkg/scheduler/algorithm
@@ -584,6 +583,7 @@ staging/src/k8s.io/apiserver/pkg/admission
 staging/src/k8s.io/apiserver/pkg/admission/configuration
 staging/src/k8s.io/apiserver/pkg/admission/plugin/initialization
 staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle
+staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/webhook
 staging/src/k8s.io/apiserver/pkg/apis/apiserver
 staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1
 staging/src/k8s.io/apiserver/pkg/apis/audit

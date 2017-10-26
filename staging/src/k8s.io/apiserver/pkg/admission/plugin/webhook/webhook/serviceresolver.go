@@ -21,13 +21,9 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-
-	admissioninit "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
 type defaultServiceResolver struct{}
-
-var _ admissioninit.ServiceResolver = defaultServiceResolver{}
 
 // ResolveEndpoint constructs a service URL from a given namespace and name
 // note that the name and namespace are required and by default all created addresses use HTTPS scheme.

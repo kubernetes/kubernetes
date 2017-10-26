@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/initialization"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/webhook"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -55,8 +56,8 @@ func NewAdmissionOptions() *AdmissionOptions {
 	options := &AdmissionOptions{
 		Plugins:                &admission.Plugins{},
 		PluginNames:            []string{},
-		RecommendedPluginOrder: []string{lifecycle.PluginName, initialization.PluginName},
-		DefaultOffPlugins:      []string{initialization.PluginName},
+		RecommendedPluginOrder: []string{lifecycle.PluginName, initialization.PluginName, webhook.PluginName},
+		DefaultOffPlugins:      []string{initialization.PluginName, webhook.PluginName},
 	}
 	server.RegisterAllAdmissionPlugins(options.Plugins)
 	return options
@@ -81,7 +82,6 @@ func (a *AdmissionOptions) ApplyTo(
 	c *server.Config,
 	informers informers.SharedInformerFactory,
 	kubeAPIServerClientConfig *rest.Config,
-	webhookClientConfig *rest.Config,
 	scheme *runtime.Scheme,
 	pluginInitializers ...admission.PluginInitializer,
 ) error {
@@ -99,7 +99,7 @@ func (a *AdmissionOptions) ApplyTo(
 	if err != nil {
 		return err
 	}
-	genericInitializer, err := initializer.New(clientset, informers, c.Authorizer, webhookClientConfig, scheme)
+	genericInitializer, err := initializer.New(clientset, informers, c.Authorizer, scheme)
 	if err != nil {
 		return err
 	}
