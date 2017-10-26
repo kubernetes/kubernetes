@@ -466,26 +466,6 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 	if proxyTransport != nil && proxyTransport.Dial != nil {
 		webhookClientConfig.Dial = proxyTransport.Dial
 	}
-	// TODO: this is the wrong cert/key pair.
-	// Given the generic case of webhook admission from a generic apiserver,
-	// this key pair should be signed by the the API server's client CA.
-	// Read client cert/key for plugins that need to make calls out
-	certBytes, keyBytes := []byte{}, []byte{}
-	if len(s.ProxyClientCertFile) > 0 && len(s.ProxyClientKeyFile) > 0 {
-		var err error
-		certBytes, err = ioutil.ReadFile(s.ProxyClientCertFile)
-		if err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("failed to read proxy client cert file from: %s, err: %v", s.ProxyClientCertFile, err)
-		}
-		keyBytes, err = ioutil.ReadFile(s.ProxyClientKeyFile)
-		if err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("failed to read proxy client key file from: %s, err: %v", s.ProxyClientKeyFile, err)
-		}
-		webhookClientConfig.TLSClientConfig.CertData = certBytes
-		webhookClientConfig.TLSClientConfig.KeyData = keyBytes
-	}
-	webhookClientConfig.UserAgent = "kube-apiserver-admission"
-	webhookClientConfig.Timeout = 30 * time.Second
 
 	err = s.Admission.ApplyTo(
 		genericConfig,

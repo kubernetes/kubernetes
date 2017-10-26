@@ -32,10 +32,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
+	"k8s.io/client-go/rest"
 	_ "k8s.io/kubernetes/pkg/apis/admission/install"
 )
 
@@ -86,14 +86,19 @@ func TestAdmit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("this should never happen? %v", err)
 	}
-	wh, err := NewGenericAdmissionWebhook()
+	wh, err := NewGenericAdmissionWebhook(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wh.restClientConfig = &rest.Config{}
-	wh.restClientConfig.TLSClientConfig.CAData = caCert
-	wh.restClientConfig.TLSClientConfig.CertData = clientCert
-	wh.restClientConfig.TLSClientConfig.KeyData = clientKey
+	wh.authInfoResolver = &fakeAuthenticationInfoResolver{
+		restConfig: &rest.Config{
+			TLSClientConfig: rest.TLSClientConfig{
+				CAData:   caCert,
+				CertData: clientCert,
+				KeyData:  clientKey,
+			},
+		},
+	}
 
 	// Set up a test object for the call
 	kind := api.Kind("Pod").WithVersion("v1")
@@ -317,4 +322,12 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+type fakeAuthenticationInfoResolver struct {
+	restConfig *rest.Config
+}
+
+func (c *fakeAuthenticationInfoResolver) ClientConfigFor(server string) (*rest.Config, error) {
+	return c.restConfig, nil
 }
