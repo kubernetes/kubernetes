@@ -65,7 +65,7 @@ spec:
               readOnly: true
         # BEGIN_PROMETHEUS_TO_SD
         - name: prom-to-sd
-          image: gcr.io/google-containers/prometheus-to-sd:v0.2.1
+          image: gcr.io/google-containers/prometheus-to-sd:v0.2.2
           command:
             - /monitor
             - --source=heapster:http://localhost:8082?whitelisted=stackdriver_requests_count,stackdriver_timeseries_count
@@ -73,9 +73,6 @@ spec:
             - --api-override={{ prometheus_to_sd_endpoint }}
             - --pod-id=$(POD_NAME)
             - --namespace-id=$(POD_NAMESPACE)
-          volumeMounts:
-          - name: ssl-certs
-            mountPath: /etc/ssl/certs
           env:
             - name: POD_NAME
               valueFrom:
