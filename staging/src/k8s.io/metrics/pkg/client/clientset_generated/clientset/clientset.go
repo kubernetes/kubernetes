@@ -68,11 +68,14 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 // NewForConfig creates a new Clientset for the given config.
 func NewForConfig(c *rest.Config) (*Clientset, error) {
 	configShallowCopy := *c
+	var err error
 	if configShallowCopy.RateLimiter == nil && configShallowCopy.QPS > 0 {
-		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
+		configShallowCopy.RateLimiter, err = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
+		if err != nil {
+			return nil, err
+		}
 	}
 	var cs Clientset
-	var err error
 	cs.metricsV1alpha1, err = metricsv1alpha1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err

@@ -33,7 +33,7 @@ func throttleImagePulling(imageService kubecontainer.ImageService, qps float32, 
 	}
 	return &throttledImageService{
 		ImageService: imageService,
-		limiter:      flowcontrol.NewTokenBucketRateLimiter(qps, burst),
+		limiter:      flowcontrol.MustNewTokenBucketRateLimiter(qps, burst),
 	}
 }
 

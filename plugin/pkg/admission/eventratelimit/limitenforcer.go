@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/golang-lru"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/api"
@@ -44,9 +45,9 @@ type limitEnforcer struct {
 	keyFunc func(admission.Attributes) string
 }
 
-func newLimitEnforcer(config eventratelimitapi.Limit, clock flowcontrol.Clock) (*limitEnforcer, error) {
+func newLimitEnforcer(config eventratelimitapi.Limit, clock clock.Clock) (*limitEnforcer, error) {
 	rateLimiterFactory := func() flowcontrol.RateLimiter {
-		return flowcontrol.NewTokenBucketRateLimiterWithClock(float32(config.QPS), int(config.Burst), clock)
+		return flowcontrol.MustNewTokenBucketRateLimiterWithClock(float32(config.QPS), int(config.Burst), clock)
 	}
 
 	if config.Type == eventratelimitapi.ServerLimitType {

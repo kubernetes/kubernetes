@@ -25,7 +25,10 @@ import (
 )
 
 func TestSingleCache(t *testing.T) {
-	rateLimiter := flowcontrol.NewTokenBucketRateLimiter(1., 1)
+	rateLimiter, err := flowcontrol.NewTokenBucketRateLimiter(1., 1)
+	if err != nil {
+		t.Fatalf("unable to create rate limiter: %v", err)
+	}
 	cache := singleCache{
 		rateLimiter: rateLimiter,
 	}
@@ -40,10 +43,10 @@ func TestSingleCache(t *testing.T) {
 
 func TestLRUCache(t *testing.T) {
 	rateLimiters := []flowcontrol.RateLimiter{
-		flowcontrol.NewTokenBucketRateLimiter(1., 1),
-		flowcontrol.NewTokenBucketRateLimiter(2., 2),
-		flowcontrol.NewTokenBucketRateLimiter(3., 3),
-		flowcontrol.NewTokenBucketRateLimiter(4., 4),
+		flowcontrol.MustNewTokenBucketRateLimiter(1., 1),
+		flowcontrol.MustNewTokenBucketRateLimiter(2., 2),
+		flowcontrol.MustNewTokenBucketRateLimiter(3., 3),
+		flowcontrol.MustNewTokenBucketRateLimiter(4., 4),
 	}
 	nextRateLimiter := 0
 	rateLimiterFactory := func() flowcontrol.RateLimiter {

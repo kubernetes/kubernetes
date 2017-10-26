@@ -17,9 +17,10 @@ limitations under the License.
 package flowcontrol
 
 import (
+	"context"
 	"sync"
 
-	"github.com/juju/ratelimit"
+	"k8s.io/apimachinery/pkg/util/clock"
 )
 
 type RateLimiter interface {
@@ -28,6 +29,9 @@ type RateLimiter interface {
 	TryAccept() bool
 	// Accept returns once a token becomes available.
 	Accept()
+	// AcceptContext returns once a token becomes available or the context is done.  If the latter,
+	// context.Err() is returned.
+	AcceptContext(context.Context) error
 	// Stop stops the rate limiter, subsequent calls to CanAccept will return false
 	Stop()
 	// Saturation returns a percentage number which describes how saturated
@@ -40,7 +44,7 @@ type RateLimiter interface {
 }
 
 type tokenBucketRateLimiter struct {
-	limiter *ratelimit.Bucket
+	limiter Limiter
 	qps     float32
 }
 
@@ -49,24 +53,41 @@ type tokenBucketRateLimiter struct {
 // smoothed qps rate of 'qps'.
 // The bucket is initially filled with 'burst' tokens, and refills at a rate of 'qps'.
 // The maximum number of tokens in the bucket is capped at 'burst'.
-func NewTokenBucketRateLimiter(qps float32, burst int) RateLimiter {
-	limiter := ratelimit.NewBucketWithRate(float64(qps), int64(burst))
-	return newTokenBucketRateLimiter(limiter, qps)
+func NewTokenBucketRateLimiter(qps float32, burst int) (RateLimiter, error) {
+	limiter, err := NewBucketLimiter(float64(qps), int64(burst))
+	if err != nil {
+		return nil, err
+	}
+	return newTokenBucketRateLimiter(limiter, qps), nil
 }
 
-// An injectable, mockable clock interface.
-type Clock interface {
-	ratelimit.Clock
+func MustNewTokenBucketRateLimiter(qps float32, burst int) RateLimiter {
+	rlimiter, err := NewTokenBucketRateLimiter(qps, burst)
+	if err != nil {
+		panic(err)
+	}
+	return rlimiter
 }
 
 // NewTokenBucketRateLimiterWithClock is identical to NewTokenBucketRateLimiter
 // but allows an injectable clock, for testing.
-func NewTokenBucketRateLimiterWithClock(qps float32, burst int, clock Clock) RateLimiter {
-	limiter := ratelimit.NewBucketWithRateAndClock(float64(qps), int64(burst), clock)
-	return newTokenBucketRateLimiter(limiter, qps)
+func NewTokenBucketRateLimiterWithClock(qps float32, burst int, clock clock.Clock) (RateLimiter, error) {
+	limiter, err := NewBucketLimiterWithClock(float64(qps), int64(burst), clock)
+	if err != nil {
+		return nil, err
+	}
+	return newTokenBucketRateLimiter(limiter, qps), nil
 }
 
-func newTokenBucketRateLimiter(limiter *ratelimit.Bucket, qps float32) RateLimiter {
+func MustNewTokenBucketRateLimiterWithClock(qps float32, burst int, clock clock.Clock) RateLimiter {
+	rlimiter, err := NewTokenBucketRateLimiterWithClock(qps, burst, clock)
+	if err != nil {
+		panic(err)
+	}
+	return rlimiter
+}
+
+func newTokenBucketRateLimiter(limiter Limiter, qps float32) RateLimiter {
 	return &tokenBucketRateLimiter{
 		limiter: limiter,
 		qps:     qps,
@@ -86,6 +107,10 @@ func (t *tokenBucketRateLimiter) Saturation() float64 {
 // Accept will block until a token becomes available
 func (t *tokenBucketRateLimiter) Accept() {
 	t.limiter.Wait(1)
+}
+
+func (t *tokenBucketRateLimiter) AcceptContext(ctx context.Context) error {
+	return t.limiter.WaitContext(ctx, 1)
 }
 
 func (t *tokenBucketRateLimiter) Stop() {
@@ -112,6 +137,10 @@ func (t *fakeAlwaysRateLimiter) Saturation() float64 {
 func (t *fakeAlwaysRateLimiter) Stop() {}
 
 func (t *fakeAlwaysRateLimiter) Accept() {}
+
+func (t *fakeAlwaysRateLimiter) AcceptContext(_ context.Context) error {
+	return nil
+}
 
 func (t *fakeAlwaysRateLimiter) QPS() float32 {
 	return 1
@@ -141,6 +170,11 @@ func (t *fakeNeverRateLimiter) Stop() {
 
 func (t *fakeNeverRateLimiter) Accept() {
 	t.wg.Wait()
+}
+
+func (t *fakeNeverRateLimiter) AcceptContext(ctx context.Context) error {
+	<-ctx.Done()
+	return ctx.Err()
 }
 
 func (t *fakeNeverRateLimiter) QPS() float32 {

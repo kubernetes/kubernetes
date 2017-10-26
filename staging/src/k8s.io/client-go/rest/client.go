@@ -112,7 +112,10 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConf
 
 	var throttle flowcontrol.RateLimiter
 	if maxQPS > 0 && rateLimiter == nil {
-		throttle = flowcontrol.NewTokenBucketRateLimiter(maxQPS, maxBurst)
+		throttle, err = flowcontrol.NewTokenBucketRateLimiter(maxQPS, maxBurst)
+		if err != nil {
+			return nil, err
+		}
 	} else if rateLimiter != nil {
 		throttle = rateLimiter
 	}

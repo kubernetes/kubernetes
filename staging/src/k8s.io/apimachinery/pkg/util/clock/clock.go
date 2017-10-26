@@ -76,7 +76,8 @@ type FakeClock struct {
 	time time.Time
 
 	// waiters are waiting for the fake time to pass their specified time
-	waiters []fakeClockWaiter
+	waiters        []fakeClockWaiter
+	AdvanceOnAfter bool
 }
 
 type fakeClockWaiter struct {
@@ -117,6 +118,9 @@ func (f *FakeClock) After(d time.Duration) <-chan time.Time {
 		targetTime: stopTime,
 		destChan:   ch,
 	})
+	if f.AdvanceOnAfter {
+		f.setTimeLocked(f.time.Add(d))
+	}
 	return ch
 }
 

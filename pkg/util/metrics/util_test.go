@@ -31,12 +31,12 @@ func TestRegisterMetricAndTrackRateLimiterUsage(t *testing.T) {
 	}{
 		{
 			ownerName:   "owner_name",
-			rateLimiter: flowcontrol.NewTokenBucketRateLimiter(1, 1),
+			rateLimiter: flowcontrol.MustNewTokenBucketRateLimiter(1, 1),
 			err:         "",
 		},
 		{
 			ownerName:   "invalid-owner-name",
-			rateLimiter: flowcontrol.NewTokenBucketRateLimiter(1, 1),
+			rateLimiter: flowcontrol.MustNewTokenBucketRateLimiter(1, 1),
 			err:         "error registering rate limiter usage metric",
 		},
 	}

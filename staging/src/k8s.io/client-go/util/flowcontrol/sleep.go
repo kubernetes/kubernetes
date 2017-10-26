@@ -14,21 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package eventratelimit
+package flowcontrol
 
 import (
+	"context"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/clock"
 )
 
-// realClock implements flowcontrol.Clock in terms of standard time functions.
-type realClock struct{}
-
-// Now is identical to time.Now.
-func (realClock) Now() time.Time {
-	return time.Now()
-}
-
-// Sleep is identical to time.Sleep.
-func (realClock) Sleep(d time.Duration) {
-	time.Sleep(d)
+func SleepContext(ctx context.Context, clock clock.Clock, d time.Duration) error {
+	select {
+	case <-clock.After(d):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

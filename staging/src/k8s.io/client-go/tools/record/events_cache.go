@@ -140,7 +140,7 @@ func (f *EventSourceObjectSpamFilter) Filter(event *v1.Event) bool {
 
 	// verify we have a rate limiter for this record
 	if record.rateLimiter == nil {
-		record.rateLimiter = flowcontrol.NewTokenBucketRateLimiterWithClock(f.qps, f.burst, f.clock)
+		record.rateLimiter = flowcontrol.MustNewTokenBucketRateLimiterWithClock(f.qps, f.burst, f.clock)
 	}
 
 	// ensure we have available rate

@@ -467,7 +467,10 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		glog.Infof("managing multiple zones: %v", config.ManagedZones)
 	}
 
-	operationPollRateLimiter := flowcontrol.NewTokenBucketRateLimiter(10, 100) // 10 qps, 100 bucket size.
+	operationPollRateLimiter, err := flowcontrol.NewTokenBucketRateLimiter(10, 100) // 10 qps, 100 bucket size.
+	if err != nil {
+		return nil, err
+	}
 
 	gce := &GCECloud{
 		service:                  service,

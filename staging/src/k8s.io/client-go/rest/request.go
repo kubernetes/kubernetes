@@ -118,6 +118,10 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPa
 		backoff = &NoBackoff{}
 	}
 
+	if client == nil {
+		client = http.DefaultClient
+	}
+
 	pathPrefix := "/"
 	if baseURL != nil {
 		pathPrefix = path.Join(pathPrefix, baseURL.Path)
@@ -131,6 +135,7 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPa
 		serializers: serializers,
 		backoffMgr:  backoff,
 		throttle:    throttle,
+		ctx:         context.Background(),
 	}
 	switch {
 	case len(content.AcceptContentTypes) > 0:
@@ -391,7 +396,9 @@ func (r *Request) Body(obj interface{}) *Request {
 // Context adds a context to the request. Contexts are only used for
 // timeouts, deadlines, and cancellations.
 func (r *Request) Context(ctx context.Context) *Request {
-	r.ctx = ctx
+	if ctx != nil {
+		r.ctx = ctx
+	}
 	return r
 }
 
@@ -453,14 +460,28 @@ func (r Request) finalURLTemplate() url.URL {
 	return *url
 }
 
-func (r *Request) tryThrottle() {
-	now := time.Now()
-	if r.throttle != nil {
-		r.throttle.Accept()
+func (r *Request) doBackoff() error {
+	if r.err = r.backoffMgr.SleepContext(r.ctx, r.backoffMgr.CalculateBackoff(r.URL())); r.err != nil {
+		return r.err
 	}
+	return nil
+}
+
+func (r *Request) tryThrottle() error {
+	if r.throttle == nil {
+		return nil
+	}
+
+	now := time.Now()
+	if r.err = r.throttle.AcceptContext(r.ctx); r.err != nil {
+		return r.err
+	}
+
 	if latency := time.Since(now); latency > longThrottleLatency {
 		glog.V(4).Infof("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String())
 	}
+
+	return nil
 }
 
 // Watch attempts to begin watching the requested location.
@@ -480,16 +501,13 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-	if r.ctx != nil {
-		req = req.WithContext(r.ctx)
-	}
+	req = req.WithContext(r.ctx)
 	req.Header = r.headers
-	client := r.client
-	if client == nil {
-		client = http.DefaultClient
+
+	if err := r.doBackoff(); err != nil {
+		return nil, err
 	}
-	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
-	resp, err := client.Do(req)
+	resp, err := r.client.Do(req)
 	updateURLMetrics(r, resp, err)
 	if r.baseURL != nil {
 		if err != nil {
@@ -545,23 +563,24 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		return nil, r.err
 	}
 
-	r.tryThrottle()
+	if err := r.tryThrottle(); err != nil {
+		return nil, err
+	}
 
 	url := r.URL().String()
 	req, err := http.NewRequest(r.verb, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	if r.ctx != nil {
-		req = req.WithContext(r.ctx)
-	}
+
+	req = req.WithContext(r.ctx)
 	req.Header = r.headers
-	client := r.client
-	if client == nil {
-		client = http.DefaultClient
+
+	if err := r.doBackoff(); err != nil {
+		return nil, err
 	}
-	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
-	resp, err := client.Do(req)
+
+	resp, err := r.client.Do(req)
 	updateURLMetrics(r, resp, err)
 	if r.baseURL != nil {
 		if err != nil {
@@ -615,11 +634,6 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		return fmt.Errorf("an empty namespace may not be set during creation")
 	}
 
-	client := r.client
-	if client == nil {
-		client = http.DefaultClient
-	}
-
 	// Right now we make about ten retry attempts if we get a Retry-After response.
 	// TODO: Change to a timeout based approach.
 	maxRetries := 10
@@ -630,19 +644,21 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		if err != nil {
 			return err
 		}
-		if r.ctx != nil {
-			req = req.WithContext(r.ctx)
-		}
+		req = req.WithContext(r.ctx)
 		req.Header = r.headers
 
-		r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
+		if err := r.doBackoff(); err != nil {
+			return err
+		}
 		if retries > 0 {
 			// We are retrying the request that we already send to apiserver
 			// at least once before.
 			// This request should also be throttled with the client-internal throttler.
-			r.tryThrottle()
+			if err := r.tryThrottle(); err != nil {
+				return err
+			}
 		}
-		resp, err := client.Do(req)
+		resp, err := r.client.Do(req)
 		updateURLMetrics(r, resp, err)
 		if err != nil {
 			r.backoffMgr.UpdateBackoff(r.URL(), err, 0)
@@ -690,7 +706,9 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 				}
 
 				glog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", seconds, retries, url)
-				r.backoffMgr.Sleep(time.Duration(seconds) * time.Second)
+				if r.err = r.backoffMgr.SleepContext(r.ctx, time.Duration(seconds)*time.Second); r.err != nil {
+					return true
+				}
 				return false
 			}
 			fn(req, resp)
@@ -711,7 +729,10 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 //  * If the server responds with a status: *errors.StatusError or *errors.UnexpectedObjectError
 //  * http.Client.Do errors are returned directly.
 func (r *Request) Do() Result {
-	r.tryThrottle()
+
+	if err := r.tryThrottle(); err != nil {
+		return Result{err: err}
+	}
 
 	var result Result
 	err := r.request(func(req *http.Request, resp *http.Response) {
@@ -725,7 +746,9 @@ func (r *Request) Do() Result {
 
 // DoRaw executes the request but does not process the response body.
 func (r *Request) DoRaw() ([]byte, error) {
-	r.tryThrottle()
+	if err := r.tryThrottle(); err != nil {
+		return nil, err
+	}
 
 	var result Result
 	err := r.request(func(req *http.Request, resp *http.Response) {

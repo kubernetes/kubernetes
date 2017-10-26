@@ -17,10 +17,12 @@ limitations under the License.
 package rest
 
 import (
+	"context"
 	"net/url"
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/flowcontrol"
 )
@@ -36,6 +38,7 @@ type BackoffManager interface {
 	UpdateBackoff(actualUrl *url.URL, err error, responseCode int)
 	CalculateBackoff(actualUrl *url.URL) time.Duration
 	Sleep(d time.Duration)
+	SleepContext(ctx context.Context, d time.Duration) error
 }
 
 // URLBackoff struct implements the semantics on top of Backoff which
@@ -59,6 +62,10 @@ func (n *NoBackoff) CalculateBackoff(actualUrl *url.URL) time.Duration {
 
 func (n *NoBackoff) Sleep(d time.Duration) {
 	time.Sleep(d)
+}
+
+func (n *NoBackoff) SleepContext(ctx context.Context, d time.Duration) error {
+	return flowcontrol.SleepContext(ctx, clock.RealClock{}, d)
 }
 
 // Disable makes the backoff trivial, i.e., sets it to zero.  This might be used
@@ -104,4 +111,8 @@ func (b *URLBackoff) CalculateBackoff(actualUrl *url.URL) time.Duration {
 
 func (b *URLBackoff) Sleep(d time.Duration) {
 	b.Backoff.Clock.Sleep(d)
+}
+
+func (b *URLBackoff) SleepContext(ctx context.Context, d time.Duration) error {
+	return flowcontrol.SleepContext(ctx, b.Backoff.Clock, d)
 }

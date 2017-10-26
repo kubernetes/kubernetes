@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/util/flowcontrol"
 
 	"github.com/golang/glog"
@@ -159,7 +160,7 @@ func construct(name string, fn func(), minInterval, maxInterval time.Duration, b
 	} else {
 		// allow burst updates in short succession
 		qps := float32(time.Second) / float32(minInterval)
-		bfr.limiter = flowcontrol.NewTokenBucketRateLimiterWithClock(qps, burstRuns, timer)
+		bfr.limiter = flowcontrol.MustNewTokenBucketRateLimiterWithClock(qps, burstRuns, clock.RealClock{})
 	}
 	return bfr
 }
