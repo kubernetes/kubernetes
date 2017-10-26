@@ -37,7 +37,7 @@ var (
 var _ = Describe("[sig-api-machinery] Downward API", func() {
 	f := framework.NewDefaultFramework("downward-api")
 
-	It("should provide pod name and namespace as env vars [Conformance]", func() {
+	framework.ConformanceIt("should provide pod name and namespace as env vars ", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -68,7 +68,7 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 		testDownwardAPI(f, podName, env, expectations)
 	})
 
-	It("should provide pod IP as an env var [Conformance]", func() {
+	framework.ConformanceIt("should provide pod IP as an env var ", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -89,7 +89,7 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 		testDownwardAPI(f, podName, env, expectations)
 	})
 
-	It("should provide host IP as an env var [Conformance]", func() {
+	framework.ConformanceIt("should provide host IP as an env var ", func() {
 		framework.SkipUnlessServerVersionGTE(hostIPVersion, f.ClientSet.Discovery())
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
@@ -111,7 +111,7 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 		testDownwardAPI(f, podName, env, expectations)
 	})
 
-	It("should provide container's limits.cpu/memory and requests.cpu/memory as env vars [Conformance]", func() {
+	framework.ConformanceIt("should provide container's limits.cpu/memory and requests.cpu/memory as env vars ", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -157,7 +157,7 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 		testDownwardAPI(f, podName, env, expectations)
 	})
 
-	It("should provide default limits.cpu/memory from node allocatable [Conformance]", func() {
+	framework.ConformanceIt("should provide default limits.cpu/memory from node allocatable ", func() {
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
 			{
@@ -202,7 +202,7 @@ var _ = Describe("[sig-api-machinery] Downward API", func() {
 		testDownwardAPIUsingPod(f, pod, env, expectations)
 	})
 
-	It("should provide pod UID as env vars [Conformance]", func() {
+	framework.ConformanceIt("should provide pod UID as env vars ", func() {
 		framework.SkipUnlessServerVersionGTE(podUIDVersion, f.ClientSet.Discovery())
 		podName := "downward-api-" + string(uuid.NewUUID())
 		env := []v1.EnvVar{
