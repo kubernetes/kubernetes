@@ -23,21 +23,61 @@ import (
 	"strings"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/util/version"
 )
 
 const (
+	// HighAvailability is alpha in v1.9
+	HighAvailability = "HighAvailability"
+
 	// SelfHosting is beta in v1.8
-	SelfHosting utilfeature.Feature = "SelfHosting"
+	SelfHosting = "SelfHosting"
 
 	// StoreCertsInSecrets is alpha in v1.8
-	StoreCertsInSecrets utilfeature.Feature = "StoreCertsInSecrets"
+	StoreCertsInSecrets = "StoreCertsInSecrets"
 )
 
+var v190 = version.MustParseSemantic("v1.9.0")
+
+// InitFeatureGates are the default feature gates for the init command
+var InitFeatureGates = FeatureList{
+	SelfHosting:         {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
+	StoreCertsInSecrets: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
+	HighAvailability:    {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
+}
+
+// Feature represents a feature being gated
+type Feature struct {
+	utilfeature.FeatureSpec
+	MinimumVersion *version.Version
+}
+
 // FeatureList represents a list of feature gates
-type FeatureList map[utilfeature.Feature]utilfeature.FeatureSpec
+type FeatureList map[string]Feature
+
+// ValidateVersion ensures that a feature gate list is compatible with the chosen kubernetes version
+func ValidateVersion(allFeatures FeatureList, requestedFeatures map[string]bool, requestedVersion string) error {
+	if requestedVersion == "" {
+		return nil
+	}
+	parsedExpVersion, err := version.ParseSemantic(requestedVersion)
+	if err != nil {
+		return fmt.Errorf("Error parsing version %s: %v", requestedVersion, err)
+	}
+	for k := range requestedFeatures {
+		if minVersion := allFeatures[k].MinimumVersion; minVersion != nil {
+			if !parsedExpVersion.AtLeast(minVersion) {
+				return fmt.Errorf(
+					"the requested kubernetes version (%s) is incompatible with the %s feature gate, which needs %s as a minimum",
+					requestedVersion, k, minVersion)
+			}
+		}
+	}
+	return nil
+}
 
 // Enabled indicates whether a feature name has been enabled
-func Enabled(featureList map[string]bool, featureName utilfeature.Feature) bool {
+func Enabled(featureList map[string]bool, featureName string) bool {
 	return featureList[string(featureName)]
 }
 
@@ -59,12 +99,6 @@ func Keys(featureList FeatureList) []string {
 		list = append(list, string(k))
 	}
 	return list
-}
-
-// InitFeatureGates are the default feature gates for the init command
-var InitFeatureGates = FeatureList{
-	SelfHosting:         {Default: false, PreRelease: utilfeature.Alpha},
-	StoreCertsInSecrets: {Default: false, PreRelease: utilfeature.Alpha},
 }
 
 // KnownFeatures returns a slice of strings describing the FeatureList features.
