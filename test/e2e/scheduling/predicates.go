@@ -237,6 +237,11 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 	// 3. Wait for the pods to be scheduled.
 	// 4. Create another pod with no affinity to any node that need 50% of the largest node CPU.
 	// 5. Make sure this additional pod is not scheduled.
+	/*
+		    Testname: scheduler-resource-limits
+		    Description: Ensure that scheduler accounts node resources correctly
+			and respects pods' resource requirements during scheduling.
+	*/
 	It("validates resource limits of pods that are allowed to run [Conformance]", func() {
 		framework.WaitForStableCluster(cs, masterNodes)
 		nodeMaxAllocatable := int64(0)
@@ -338,6 +343,11 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 
 	// Test Nodes does not have any label, hence it should be impossible to schedule Pod with
 	// nonempty Selector set.
+	/*
+		    Testname: scheduler-node-selector-not-matching
+		    Description: Ensure that scheduler respects the NodeSelector field of
+			PodSpec during scheduling (when it does not match any node).
+	*/
 	It("validates that NodeSelector is respected if not matching [Conformance]", func() {
 		By("Trying to schedule Pod with nonempty NodeSelector.")
 		podName := "restricted-pod"
@@ -379,6 +389,11 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		}
 	})
 
+	/*
+		    Testname: scheduler-node-selector-matching
+		    Description: Ensure that scheduler respects the NodeSelector field
+			of PodSpec during scheduling (when it matches).
+	*/
 	It("validates that NodeSelector is respected if matching [Conformance]", func() {
 		nodeName := GetNodeThatCanRunPod(f)
 
