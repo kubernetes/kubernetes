@@ -1661,10 +1661,9 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *api.PersistentVol
 
 var supportedPortProtocols = sets.NewString(string(api.ProtocolTCP), string(api.ProtocolUDP))
 
-func validateContainerPorts(ports []api.ContainerPort, fldPath *field.Path) field.ErrorList {
+func validateContainerPorts(ports []api.ContainerPort, allPortNames *sets.String, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	allNames := sets.String{}
 	for i, port := range ports {
 		idxPath := fldPath.Index(i)
 		if len(port.Name) > 0 {
@@ -1672,10 +1671,10 @@ func validateContainerPorts(ports []api.ContainerPort, fldPath *field.Path) fiel
 				for i = range msgs {
 					allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), port.Name, msgs[i]))
 				}
-			} else if allNames.Has(port.Name) {
+			} else if allPortNames.Has(port.Name) {
 				allErrs = append(allErrs, field.Duplicate(idxPath.Child("name"), port.Name))
 			} else {
-				allNames.Insert(port.Name)
+				allPortNames.Insert(port.Name)
 			}
 		}
 		if port.ContainerPort == 0 {
@@ -2171,6 +2170,7 @@ func validateContainers(containers []api.Container, volumes sets.String, fldPath
 	}
 
 	allNames := sets.String{}
+	allPortNames := sets.String{}
 	for i, ctr := range containers {
 		idxPath := fldPath.Index(i)
 		namePath := idxPath.Child("name")
@@ -2208,7 +2208,7 @@ func validateContainers(containers []api.Container, volumes sets.String, fldPath
 		}
 
 		allErrs = append(allErrs, validateProbe(ctr.ReadinessProbe, idxPath.Child("readinessProbe"))...)
-		allErrs = append(allErrs, validateContainerPorts(ctr.Ports, idxPath.Child("ports"))...)
+		allErrs = append(allErrs, validateContainerPorts(ctr.Ports, &allPortNames, idxPath.Child("ports"))...)
 		allErrs = append(allErrs, ValidateEnv(ctr.Env, idxPath.Child("env"))...)
 		allErrs = append(allErrs, ValidateEnvFrom(ctr.EnvFrom, idxPath.Child("envFrom"))...)
 		allErrs = append(allErrs, ValidateVolumeMounts(ctr.VolumeMounts, volumes, &ctr, idxPath.Child("volumeMounts"))...)
