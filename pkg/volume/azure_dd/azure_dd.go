@@ -48,7 +48,7 @@ type DiskController interface {
 	GetNextDiskLun(nodeName types.NodeName) (int32, error)
 
 	// Create a VHD blob
-	CreateVolume(name, storageAccount string, storageAccountType storage.SkuName, location string, requestGB int) (string, string, int, error)
+	CreateVolume(name, storageAccount, storageAccountType, location string, requestGB int) (string, string, int, error)
 	// Delete a VHD blob
 	DeleteVolume(diskURI string) error
 }
