@@ -283,7 +283,7 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 
 	discoverResourcesFn := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
 
-	namespaceController := namespacecontroller.NewNamespaceController(
+	namespaceController, err := namespacecontroller.NewNamespaceController(
 		namespaceKubeClient,
 		namespaceClientPool,
 		discoverResourcesFn,
@@ -291,6 +291,9 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 		ctx.Options.NamespaceSyncPeriod.Duration,
 		v1.FinalizerKubernetes,
 	)
+	if err != nil {
+		return false, fmt.Errorf("failed to start namespace controller : %v", err)
+	}
 	go namespaceController.Run(int(ctx.Options.ConcurrentNamespaceSyncs), ctx.Stop)
 
 	return true, nil
