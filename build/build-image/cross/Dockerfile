@@ -54,7 +54,9 @@ RUN mkdir -p /usr/local/src/protobuf \
 # Use dynamic cgo linking for architectures other than amd64 for the server platforms
 # To install crossbuild essential for other architectures add the following repository.
 RUN echo "deb http://archive.ubuntu.com/ubuntu xenial main universe" > /etc/apt/sources.list.d/cgocrosscompiling.list \
-  && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 40976EAF437D05B5 3B4FE6ACC0B21F32 \
+  && if [ -n "$http_proxy" ]; then PROXY="--keyserver-options http-proxy=$http_proxy"; fi \
+  && if [ -n "$HTTP_PROXY" ]; then PROXY="--keyserver-options http-proxy=$HTTP_PROXY"; fi \
+  && apt-key adv --keyserver keyserver.ubuntu.com $PROXY --recv-keys 40976EAF437D05B5 3B4FE6ACC0B21F32 \
   && apt-get update \
   && apt-get install -y build-essential \
   && for platform in ${KUBE_DYNAMIC_CROSSPLATFORMS}; do apt-get install -y crossbuild-essential-${platform}; done \

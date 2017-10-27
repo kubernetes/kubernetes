@@ -21,7 +21,7 @@ TAG=$(shell cat VERSION)
 all: push
 
 build:
-	docker build --pull -t staging-k8s.gcr.io/$(IMAGE):$(TAG) .
+	docker build --build-arg HTTP_PROXY --build-arg HTTPS_PROXY --build-arg NO_PROXY --build-arg http_proxy --build-arg https_proxy --build-arg no_proxy --pull -t staging-k8s.gcr.io/$(IMAGE):$(TAG) .
 
 push: build
 	gcloud docker -- push staging-k8s.gcr.io/$(IMAGE):$(TAG)

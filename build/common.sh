@@ -478,7 +478,10 @@ function kube::build::docker_build() {
   local -r image=$1
   local -r context_dir=$2
   local -r pull="${3:-true}"
-  local -ra build_cmd=("${DOCKER[@]}" build -t "${image}" "--pull=${pull}" "${context_dir}")
+  local -ra build_cmd=("${DOCKER[@]}" build --build-arg HTTP_PROXY \
+      --build-arg HTTPS_PROXY --build-arg NO_PROXY \
+      --build-arg http_proxy --build-arg https_proxy \
+      --build-arg no_proxy -t "${image}" "--pull=${pull}" "${context_dir}")
 
   kube::log::status "Building Docker image ${image}"
   local docker_output
@@ -535,6 +538,12 @@ function kube::build::ensure_data_container() {
       --volume /usr/local/go/pkg/windows_386_cgo
       --name "${KUBE_DATA_CONTAINER_NAME}"
       --hostname "${HOSTNAME}"
+      --env HTTP_PROXY
+      --env HTTPS_PROXY
+      --env NO_PROXY
+      --env http_proxy
+      --env https_proxy
+      --env no_proxy
       "${KUBE_BUILD_IMAGE}"
       chown -R ${USER_ID}:${GROUP_ID}
         "${REMOTE_ROOT}"
@@ -599,6 +608,12 @@ function kube::build::run_build_command_ex() {
     --env "GOFLAGS=${GOFLAGS:-}"
     --env "GOLDFLAGS=${GOLDFLAGS:-}"
     --env "GOGCFLAGS=${GOGCFLAGS:-}"
+    --env HTTP_PROXY
+    --env HTTPS_PROXY
+    --env NO_PROXY
+    --env http_proxy
+    --env https_proxy
+    --env no_proxy
   )
 
   if [[ -n "${DOCKER_CGROUP_PARENT:-}" ]]; then
