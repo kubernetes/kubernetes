@@ -49,24 +49,7 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	if s.CloudProvider == "" {
-		glog.Errorf("--cloud-provider cannot be empty")
-	}
-
-	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
-	if err != nil {
-		glog.Fatalf("Cloud provider could not be initialized: %v", err)
-	}
-
-	if cloud.HasClusterID() == false {
-		if s.AllowUntaggedCloud == true {
-			glog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
-		} else {
-			glog.Fatalf("no ClusterID found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
-		}
-	}
-
-	if err := app.Run(s, cloud); err != nil {
+	if err := app.Run(s); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
