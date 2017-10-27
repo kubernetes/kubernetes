@@ -280,9 +280,10 @@ func describeStruct(cfg *frozenConfig, typ reflect.Type) (*StructDescriptor, err
 			if len(fieldNames) > 0 && err != nil {
 				return nil, err
 			}
-			// map is stored as pointer in the struct
+			// map is stored as pointer in the struct,
+			// and treat nil or empty map as empty field
 			if encoder != nil && field.Type.Kind() == reflect.Map {
-				encoder = &optionalEncoder{encoder}
+				encoder = &optionalMapEncoder{encoder}
 			}
 		}
 		binding := &Binding{

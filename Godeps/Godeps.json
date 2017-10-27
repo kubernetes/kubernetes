@@ -1890,7 +1890,7 @@
 		{
 			"ImportPath": "github.com/json-iterator/go",
 			"Comment": "1.0.3",
-			"Rev": "06b2a7cf1d30701d2d1b37547ac732b8a7508f66"
+			"Rev": "fbd210edfcc4a947bd86b68701590990ca3d6036"
 		},
 		{
 			"ImportPath": "github.com/jteeuwen/go-bindata",
