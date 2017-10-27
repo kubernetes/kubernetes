@@ -45,6 +45,12 @@ func (d durations) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
 var _ = SIGDescribe("Service endpoints latency", func() {
 	f := framework.NewDefaultFramework("svc-latency")
 
+	/*
+		    Testname: service-endpoint-latency
+		    Description: Ensure service endpoint's latency is not high
+		    (e.g. p50 < 20 seconds and p99 < 50 seconds). If any call to the
+			service endpoint fails, the test will also fail.
+	*/
 	It("should not be very high [Conformance]", func() {
 		const (
 			// These are very generous criteria. Ideally we will

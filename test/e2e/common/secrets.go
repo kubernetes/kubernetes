@@ -30,6 +30,11 @@ import (
 var _ = Describe("[sig-api-machinery] Secrets", func() {
 	f := framework.NewDefaultFramework("secrets")
 
+	/*
+		    Testname: secret-env-vars
+		    Description: Ensure that secret can be consumed via environment
+			variables.
+	*/
 	It("should be consumable from pods in env vars [Conformance]", func() {
 		name := "secret-test-" + string(uuid.NewUUID())
 		secret := secretForTest(f.Namespace.Name, name)
@@ -74,6 +79,11 @@ var _ = Describe("[sig-api-machinery] Secrets", func() {
 		})
 	})
 
+	/*
+		    Testname: secret-configmaps-source
+		    Description: Ensure that secret can be consumed via source of a set
+			of ConfigMaps.
+	*/
 	It("should be consumable via the environment [Conformance]", func() {
 		name := "secret-test-" + string(uuid.NewUUID())
 		secret := newEnvFromSecret(f.Namespace.Name, name)
