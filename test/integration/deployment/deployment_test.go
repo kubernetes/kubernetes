@@ -633,3 +633,50 @@ func TestDeploymentLabelAdopted(t *testing.T) {
 		t.Errorf("found mismatching pod-template-hash value: rs hash = %s whereas pod hash = %s", rsHash, podHash)
 	}
 }
+
+// Deployment should have a timeout condition when it fails to progress after given deadline.
+func TestFailedDeployment(t *testing.T) {
+	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	defer closeFn()
+	name := "test-failed-deployment"
+	ns := framework.CreateTestingNamespace(name, s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	deploymentName := "progress-check"
+	replicas := int32(1)
+	three := int32(3)
+	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(deploymentName, ns.Name, replicas)}
+	tester.deployment.Spec.ProgressDeadlineSeconds = &three
+	var err error
+	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	if err != nil {
+		t.Fatalf("failed to create deployment %q: %v", deploymentName, err)
+	}
+
+	// Start informer and controllers
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go rm.Run(5, stopCh)
+	go dc.Run(5, stopCh)
+
+	if err = tester.waitForDeploymentUpdatedReplicasLTE(replicas); err != nil {
+		t.Fatal(err)
+	}
+
+	// Pods are not marked as Ready, therefore the deployment progress will eventually timeout after progressDeadlineSeconds has passed.
+	// Wait for the deployment to have a progress timeout condition.
+	if err = tester.waitForDeploymentWithCondition(deploymentutil.TimedOutReason, v1beta1.DeploymentProgressing); err != nil {
+		t.Fatal(err)
+	}
+
+	// Manually mark pods as Ready and wait for deployment to complete.
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+		t.Fatalf("deployment %q fails to have its status becoming valid: %v", deploymentName, err)
+	}
+
+	// Wait for the deployment to have a progress complete condition.
+	if err = tester.waitForDeploymentWithCondition(deploymentutil.NewRSAvailableReason, v1beta1.DeploymentProgressing); err != nil {
+		t.Fatal(err)
+	}
+}

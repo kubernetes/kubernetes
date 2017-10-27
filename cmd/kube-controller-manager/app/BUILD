@@ -24,7 +24,6 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kube-controller-manager/app",
     deps = [
         "//cmd/kube-controller-manager/app/options:go_default_library",
-        "//pkg/api:go_default_library",
         "//pkg/api/install:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
@@ -78,6 +77,7 @@ go_library(
         "//pkg/controller/volume/expand:go_default_library",
         "//pkg/controller/volume/persistentvolume:go_default_library",
         "//pkg/features:go_default_library",
+        "//pkg/quota/generic:go_default_library",
         "//pkg/quota/install:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//pkg/util/configz:go_default_library",

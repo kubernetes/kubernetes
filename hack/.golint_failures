@@ -235,7 +235,6 @@ pkg/proxy/util
 pkg/proxy/winkernel
 pkg/proxy/winuserspace
 pkg/quota/evaluator/core
-pkg/quota/generic
 pkg/registry/admissionregistration/externaladmissionhookconfiguration/storage
 pkg/registry/admissionregistration/initializerconfiguration/storage
 pkg/registry/admissionregistration/rest
@@ -534,7 +533,7 @@ staging/src/k8s.io/apiserver/pkg/admission
 staging/src/k8s.io/apiserver/pkg/admission/configuration
 staging/src/k8s.io/apiserver/pkg/admission/plugin/initialization
 staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle
-staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/webhook
+staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook
 staging/src/k8s.io/apiserver/pkg/apis/apiserver
 staging/src/k8s.io/apiserver/pkg/apis/apiserver/v1alpha1
 staging/src/k8s.io/apiserver/pkg/apis/audit

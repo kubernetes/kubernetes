@@ -21,7 +21,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/initialization"
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/webhook"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 )
 
 // RegisterAllAdmissionPlugins registers all admission plugins

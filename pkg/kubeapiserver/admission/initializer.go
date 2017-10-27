@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/webhook"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -53,9 +53,9 @@ type WantsRESTMapper interface {
 	SetRESTMapper(meta.RESTMapper)
 }
 
-// WantsQuotaRegistry defines a function which sets quota registry for admission plugins that need it.
-type WantsQuotaRegistry interface {
-	SetQuotaRegistry(quota.Registry)
+// WantsQuotaConfiguration defines a function which sets quota configuration for admission plugins that need it.
+type WantsQuotaConfiguration interface {
+	SetQuotaConfiguration(quota.Configuration)
 	admission.Validator
 }
 
@@ -85,7 +85,7 @@ type PluginInitializer struct {
 	authorizer                        authorizer.Authorizer
 	cloudConfig                       []byte
 	restMapper                        meta.RESTMapper
-	quotaRegistry                     quota.Registry
+	quotaConfiguration                quota.Configuration
 	serviceResolver                   webhook.ServiceResolver
 	authenticationInfoResolverWrapper webhook.AuthenticationInfoResolverWrapper
 }
@@ -100,7 +100,7 @@ func NewPluginInitializer(
 	sharedInformers informers.SharedInformerFactory,
 	cloudConfig []byte,
 	restMapper meta.RESTMapper,
-	quotaRegistry quota.Registry,
+	quotaConfiguration quota.Configuration,
 	authenticationInfoResolverWrapper webhook.AuthenticationInfoResolverWrapper,
 	serviceResolver webhook.ServiceResolver,
 ) *PluginInitializer {
@@ -109,7 +109,7 @@ func NewPluginInitializer(
 		informers:                         sharedInformers,
 		cloudConfig:                       cloudConfig,
 		restMapper:                        restMapper,
-		quotaRegistry:                     quotaRegistry,
+		quotaConfiguration:                quotaConfiguration,
 		authenticationInfoResolverWrapper: authenticationInfoResolverWrapper,
 		serviceResolver:                   serviceResolver,
 	}
@@ -134,8 +134,8 @@ func (i *PluginInitializer) Initialize(plugin admission.Interface) {
 		wants.SetRESTMapper(i.restMapper)
 	}
 
-	if wants, ok := plugin.(WantsQuotaRegistry); ok {
-		wants.SetQuotaRegistry(i.quotaRegistry)
+	if wants, ok := plugin.(WantsQuotaConfiguration); ok {
+		wants.SetQuotaConfiguration(i.quotaConfiguration)
 	}
 
 	if wants, ok := plugin.(WantsServiceResolver); ok {

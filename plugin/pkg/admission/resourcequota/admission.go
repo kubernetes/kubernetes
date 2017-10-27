@@ -53,16 +53,16 @@ func Register(plugins *admission.Plugins) {
 // quotaAdmission implements an admission controller that can enforce quota constraints
 type quotaAdmission struct {
 	*admission.Handler
-	config        *resourcequotaapi.Configuration
-	stopCh        <-chan struct{}
-	registry      quota.Registry
-	numEvaluators int
-	quotaAccessor *quotaAccessor
-	evaluator     Evaluator
+	config             *resourcequotaapi.Configuration
+	stopCh             <-chan struct{}
+	quotaConfiguration quota.Configuration
+	numEvaluators      int
+	quotaAccessor      *quotaAccessor
+	evaluator          Evaluator
 }
 
 var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&quotaAdmission{})
-var _ = kubeapiserveradmission.WantsQuotaRegistry(&quotaAdmission{})
+var _ = kubeapiserveradmission.WantsQuotaConfiguration(&quotaAdmission{})
 
 type liveLookupEntry struct {
 	expiry time.Time
@@ -95,9 +95,9 @@ func (a *quotaAdmission) SetInternalKubeInformerFactory(f informers.SharedInform
 	a.quotaAccessor.lister = f.Core().InternalVersion().ResourceQuotas().Lister()
 }
 
-func (a *quotaAdmission) SetQuotaRegistry(r quota.Registry) {
-	a.registry = r
-	a.evaluator = NewQuotaEvaluator(a.quotaAccessor, a.registry, nil, a.config, a.numEvaluators, a.stopCh)
+func (a *quotaAdmission) SetQuotaConfiguration(c quota.Configuration) {
+	a.quotaConfiguration = c
+	a.evaluator = NewQuotaEvaluator(a.quotaAccessor, a.quotaConfiguration, nil, a.config, a.numEvaluators, a.stopCh)
 }
 
 // Validate ensures an authorizer is set.
@@ -111,8 +111,8 @@ func (a *quotaAdmission) Validate() error {
 	if a.quotaAccessor.lister == nil {
 		return fmt.Errorf("missing quotaAccessor.lister")
 	}
-	if a.registry == nil {
-		return fmt.Errorf("missing registry")
+	if a.quotaConfiguration == nil {
+		return fmt.Errorf("missing quotaConfiguration")
 	}
 	if a.evaluator == nil {
 		return fmt.Errorf("missing evaluator")
@@ -124,6 +124,10 @@ func (a *quotaAdmission) Validate() error {
 func (a *quotaAdmission) Admit(attr admission.Attributes) (err error) {
 	// ignore all operations that correspond to sub-resource actions
 	if attr.GetSubresource() != "" {
+		return nil
+	}
+	// ignore all operations that are not namespaced
+	if attr.GetNamespace() == "" {
 		return nil
 	}
 	return a.evaluator.Evaluate(attr)

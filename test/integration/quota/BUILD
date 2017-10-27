@@ -15,7 +15,6 @@ go_test(
     importpath = "k8s.io/kubernetes/test/integration/quota",
     tags = ["integration"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
@@ -23,6 +22,7 @@ go_test(
         "//pkg/controller/replication:go_default_library",
         "//pkg/controller/resourcequota:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
+        "//pkg/quota/generic:go_default_library",
         "//pkg/quota/install:go_default_library",
         "//plugin/pkg/admission/resourcequota:go_default_library",
         "//plugin/pkg/admission/resourcequota/apis/resourcequota:go_default_library",
@@ -32,7 +32,6 @@ go_test(
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//vendor/k8s.io/client-go/informers:go_default_library",

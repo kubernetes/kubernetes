@@ -297,7 +297,8 @@ func (util *RBDUtil) DetachDisk(plugin *rbdPlugin, deviceMountPath string, devic
 	var err error
 	if len(device) > 0 {
 		// rbd unmap
-		_, err = plugin.exec.Run("rbd", "unmap", device)
+		exec := plugin.host.GetExec(plugin.GetPluginName())
+		_, err = exec.Run("rbd", "unmap", device)
 		if err != nil {
 			return rbdErrors(err, fmt.Errorf("rbd: failed to unmap device %s:Error: %v", device, err))
 		}

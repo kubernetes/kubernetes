@@ -52,16 +52,23 @@ spec:
         - '/event-exporter'
       # BEGIN_PROMETHEUS_TO_SD
       - name: prometheus-to-sd-exporter
-        image: gcr.io/google-containers/prometheus-to-sd:v0.2.1
+        image: gcr.io/google-containers/prometheus-to-sd:v0.2.2
         command:
           - /monitor
-          - --component=event_exporter
           - --stackdriver-prefix={{ prometheus_to_sd_prefix }}/addons
           - --api-override={{ prometheus_to_sd_endpoint }}
-          - --whitelisted-metrics=stackdriver_sink_received_entry_count,stackdriver_sink_request_count,stackdriver_sink_successfully_sent_entry_count
-        volumeMounts:
-        - name: ssl-certs
-          mountPath: /etc/ssl/certs
+          - --source=event_exported:http://localhost:80?whitelisted=stackdriver_sink_received_entry_count,stackdriver_sink_request_count,stackdriver_sink_successfully_sent_entry_count
+          - --pod-id=$(POD_NAME)
+          - --namespace-id=$(POD_NAMESPACE)
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
       # END_PROMETHEUS_TO_SD
       terminationGracePeriodSeconds: 30
       volumes:
