@@ -82,7 +82,7 @@ type CategoriesProvider interface {
 // This trumps KindProvider since it is capable of providing the information required.
 // TODO KindProvider (only used by federation) should be removed and replaced with this, but that presents greater risk late in 1.8.
 type GroupVersionKindProvider interface {
-	GroupVersionKind() schema.GroupVersionKind
+	GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind
 }
 
 // Lister is an object that can retrieve resources that match the provided field and label criteria.
