@@ -34,7 +34,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeutils "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
-	federationtest "k8s.io/kubernetes/federation/test/e2e"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/kubectl/util/logs"
@@ -161,7 +160,6 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 				metav1.NamespaceSystem,
 				metav1.NamespaceDefault,
 				metav1.NamespacePublic,
-				framework.FederationSystemNamespace(),
 			})
 		if err != nil {
 			framework.Failf("Error deleting orphaned namespaces: %v", err)
@@ -238,9 +236,6 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.E2E
-
-	// Reference federation test to make the import valid.
-	federationtest.FederationSuite = commontest.FederationE2E
 
 	return nil
 

@@ -378,9 +378,6 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 // Be very careful when whitelisting an object as ephemeral.
 // Doing so removes the safety we gain from this test by skipping that object.
 var ephemeralWhiteList = createEphemeralWhiteList(
-	// k8s.io/kubernetes/federation/apis/federation/v1beta1
-	gvr("federation", "v1beta1", "clusters"), // we cannot create this
-	// --
 
 	// k8s.io/kubernetes/pkg/api/v1
 	gvr("", "v1", "bindings"),             // annotation on pod, not stored in etcd

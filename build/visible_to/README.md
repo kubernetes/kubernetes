@@ -34,7 +34,7 @@ generally inhibit progress.
   one can specify the following visibility rule in any `BUILD` rule:
   ```
   visibility = [ "//build/visible_to:database_CONSUMERS" ],
-  ``` 
+  ```
 
 * A visibility rule takes a list of package groups as its
   argument - or one of the pre-defined groups
@@ -59,7 +59,7 @@ generally inhibit progress.
  * One set of `OWNERS` to manage visibility.
 
 The alternative is to use special [package literals] directly
-in visibility rules, e.g. 
+in visibility rules, e.g.
 
 ```
   visibility = [
@@ -114,7 +114,7 @@ visibility = ["//visible_to:client_foo,//visible_to:server_foo"],
 #### Quickly check for visibility violations
 ```
 bazel build --check_visibility --nobuild \
-    //cmd/... //pkg/... //federation/... //plugin/... \
+    //cmd/... //pkg/... //plugin/... \
     //third_party/... //examples/... //test/... //vendor/k8s.io/...
 ```
 
@@ -179,6 +179,6 @@ bazel query --nohost_deps --noimplicit_deps \
 bazel query "somepath(cmd/kubectl:kubectl, pkg/util/parsers:go_default_library)"
 ```
 
- 
+
 
 [package literals]: https://bazel.build/versions/master/docs/be/common-definitions.html#common.visibility

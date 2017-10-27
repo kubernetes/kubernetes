@@ -11,7 +11,6 @@ openapi_library(
     srcs = ["doc.go"],
     go_prefix = openapi_go_prefix,
     openapi_targets = [
-        "federation/apis/federation/v1beta1",
         "pkg/apis/abac/v0",
         "pkg/apis/abac/v1beta1",
         "pkg/apis/componentconfig/v1alpha1",

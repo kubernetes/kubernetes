@@ -7,4 +7,3 @@ test/test_owners.csv merge=union
 **/generated.proto -diff
 **/types_swagger_doc_generated.go -diff
 docs/api-reference/** -diff
-federation/docs/api-reference/** -diff

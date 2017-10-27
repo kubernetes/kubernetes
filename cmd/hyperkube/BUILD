@@ -30,8 +30,6 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
-        "federation-apiserver.go",
-        "federation-controller-manager.go",
         "hyperkube.go",
         "kube-aggregator.go",
         "kube-apiserver.go",
@@ -52,10 +50,6 @@ go_library(
         "//cmd/kube-proxy/app:go_default_library",
         "//cmd/kubelet/app:go_default_library",
         "//cmd/kubelet/app/options:go_default_library",
-        "//federation/cmd/federation-apiserver/app:go_default_library",
-        "//federation/cmd/federation-apiserver/app/options:go_default_library",
-        "//federation/cmd/federation-controller-manager/app:go_default_library",
-        "//federation/cmd/federation-controller-manager/app/options:go_default_library",
         "//pkg/client/metrics/prometheus:go_default_library",
         "//pkg/kubectl/cmd:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
