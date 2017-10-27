@@ -93,9 +93,6 @@ var _ = SIGDescribe("Deployment", func() {
 	It("overlapping deployment should not fight with each other", func() {
 		testOverlappingDeployment(f)
 	})
-	It("lack of progress should be reported in the deployment status", func() {
-		testFailedDeployment(f)
-	})
 	It("iterative rollouts should eventually progress", func() {
 		testIterativeDeployments(f)
 	})
@@ -814,46 +811,6 @@ func testOverlappingDeployment(f *framework.Framework) {
 	rsList, err := c.Extensions().ReplicaSets(ns).List(options)
 	Expect(err).NotTo(HaveOccurred(), "Failed listing all replica sets in namespace %s", ns)
 	Expect(rsList.Items).To(HaveLen(2))
-}
-
-func testFailedDeployment(f *framework.Framework) {
-	ns := f.Namespace.Name
-	c := f.ClientSet
-
-	podLabels := map[string]string{"name": NginxImageName}
-	replicas := int32(1)
-
-	// Create a nginx deployment.
-	deploymentName := "progress-check"
-	nonExistentImage := "nginx:not-there"
-	ten := int32(10)
-	d := framework.NewDeployment(deploymentName, replicas, podLabels, NginxImageName, nonExistentImage, extensions.RecreateDeploymentStrategyType)
-	d.Spec.ProgressDeadlineSeconds = &ten
-
-	framework.Logf("Creating deployment %q with progressDeadlineSeconds set to %ds and a non-existent image", deploymentName, ten)
-	deployment, err := c.Extensions().Deployments(ns).Create(d)
-	Expect(err).NotTo(HaveOccurred())
-
-	framework.Logf("Waiting for deployment %q new replica set to come up", deploymentName)
-	Expect(framework.WaitForDeploymentUpdatedReplicasLTE(c, ns, deploymentName, replicas, deployment.Generation))
-
-	framework.Logf("Checking deployment %q for a timeout condition", deploymentName)
-	Expect(framework.WaitForDeploymentWithCondition(c, ns, deploymentName, deploymentutil.TimedOutReason, extensions.DeploymentProgressing)).NotTo(HaveOccurred())
-
-	framework.Logf("Updating deployment %q with a good image", deploymentName)
-	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *extensions.Deployment) {
-		update.Spec.Template.Spec.Containers[0].Image = NginxImage
-	})
-	Expect(err).NotTo(HaveOccurred())
-
-	framework.Logf("Waiting for deployment %q new replica set to come up", deploymentName)
-	Expect(framework.WaitForDeploymentUpdatedReplicasLTE(c, ns, deploymentName, replicas, deployment.Generation))
-
-	framework.Logf("Waiting for deployment %q status", deploymentName)
-	Expect(framework.WaitForDeploymentComplete(c, deployment)).NotTo(HaveOccurred())
-
-	framework.Logf("Checking deployment %q for a complete condition", deploymentName)
-	Expect(framework.WaitForDeploymentWithCondition(c, ns, deploymentName, deploymentutil.NewRSAvailableReason, extensions.DeploymentProgressing)).NotTo(HaveOccurred())
 }
 
 func randomScale(d *extensions.Deployment, i int) {
