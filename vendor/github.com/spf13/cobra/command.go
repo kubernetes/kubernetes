@@ -196,7 +196,7 @@ func (c *Command) getOut(def io.Writer) io.Writer {
 
 // UsageFunc returns either the function set by SetUsageFunc for this command
 // or a parent, or it returns a default usage function
-func (c *Command) UsageFunc() (f func(*Command) error) {
+func (c *Command) UsageFunc() (func(*Command) error) {
 	if c.usageFunc != nil {
 		return c.usageFunc
 	}
