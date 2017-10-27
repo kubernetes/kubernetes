@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package instrumentation
 
 import (
 	"fmt"
@@ -28,12 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/instrumentation/common"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Events", func() {
+var _ = common.SIGDescribe("Events", func() {
 	f := framework.NewDefaultFramework("events")
 
 	It("should be sent by kubelets and the scheduler about pods scheduling and running [Conformance]", func() {
