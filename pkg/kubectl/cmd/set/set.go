@@ -47,6 +47,7 @@ func NewCmdSet(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Comma
 	cmd.AddCommand(NewCmdSubject(f, out, err))
 	cmd.AddCommand(NewCmdServiceAccount(f, out, err))
 	cmd.AddCommand(NewCmdEnv(f, in, out, err))
+	cmd.AddCommand(NewCmdVolume(f, out, err))
 
 	return cmd
 }

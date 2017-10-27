@@ -2943,6 +2943,33 @@ run_deployment_tests() {
   kubectl delete configmap test-set-env-config "${kube_flags[@]}"
   kubectl delete secret test-set-env-secret "${kube_flags[@]}"
 
+  ### Set volume of a deployment
+  # Pre-condition: no deployment exists
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Create a deployment
+  kubectl create -f hack/testdata/deployment-multicontainer.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/configmap.yaml "${kube_flags[@]}"
+  kubectl create -f hack/testdata/secret.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
+  kube::test::get_object_assert configmap "{{range.items}}{{$id_field}}:{{end}}" 'test-set-env-config:'
+  kube::test::get_object_assert secret "{{range.items}}{{$id_field}}:{{end}}" 'test-set-env-secret:'
+  # Set volume of deployments for all container
+  kubectl set volume deployment nginx-deployment --add --mount-path=/mount-point-1 "${kube_flags[@]}"
+  # Set volume of deployments for specific container
+  kubectl set volume deployment nginx-deployment --add --mount-path=/mount-point-2 -c=nginx "${kube_flags[@]}"
+  # Set volume of deployments by configmap
+  kubectl set volume deployment nginx-deployment --add --type=configmap --configmap-name=test-set-env-config --name=configmap-volume --mount-path=/test-configmap "${kube_flags[@]}"
+  # Set volume of deployments by secret
+  kubectl set volume deployment nginx-deployment --add --type=secret --secret-name=test-set-env-secret --name=secret-volume --mount-path=/test-secret "${kube_flags[@]}"
+  # Set volume of deployments by local dir
+  kubectl set volume deployment nginx-deployment --add --type=hostPath --path=. --name=local-volume --mount-path=/test-local "${kube_flags[@]}"
+  # Remove specific volume of deployment
+  kubectl set volume deployment nginx-deployment --remove --name=local-volume "${kube_flags[@]}"
+  # Clean up
+  kubectl delete deployment nginx-deployment "${kube_flags[@]}"
+  kubectl delete configmap test-set-env-config "${kube_flags[@]}"
+  kubectl delete secret test-set-env-secret "${kube_flags[@]}"
+
   ### Delete a deployment with initializer
   # Pre-condition: no deployment exists
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
