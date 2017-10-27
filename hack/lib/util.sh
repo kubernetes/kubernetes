@@ -183,6 +183,7 @@ kube::util::gen-docs() {
   "${genkubedocs}" "${dest}/docs/admin/" "kube-proxy"
   "${genkubedocs}" "${dest}/docs/admin/" "kube-scheduler"
   "${genkubedocs}" "${dest}/docs/admin/" "kubelet"
+  "${genkubedocs}" "${dest}/docs/admin/" "kubeadm"
 
   mkdir -p "${dest}/docs/man/man1/"
   "${genman}" "${dest}/docs/man/man1/" "kube-apiserver"
@@ -192,6 +193,7 @@ kube::util::gen-docs() {
   "${genman}" "${dest}/docs/man/man1/" "kube-scheduler"
   "${genman}" "${dest}/docs/man/man1/" "kubelet"
   "${genman}" "${dest}/docs/man/man1/" "kubectl"
+  "${genman}" "${dest}/docs/man/man1/" "kubeadm"
 
   mkdir -p "${dest}/docs/yaml/kubectl/"
   "${genyaml}" "${dest}/docs/yaml/kubectl/"
