@@ -176,7 +176,7 @@ func (hk *HyperKube) Run(args []string, stopCh <-chan struct{}) error {
 		if len(args) > 0 && len(args[0]) > 0 {
 			serverName = args[0]
 			args = args[1:]
-			hk.Printf("Warning: alpha command syntax is unable!\n\n")
+			hk.Printf("Warning: alpha command syntax is unstable!\n\n")
 		} else {
 			err = errors.New("no alpha server specified")
 			hk.Printf("Error: %v\n\n", err)
