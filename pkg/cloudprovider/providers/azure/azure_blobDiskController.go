@@ -59,11 +59,12 @@ type BlobDiskController struct {
 	accounts map[string]*storageAccountState
 }
 
-var defaultContainerName = ""
-var storageAccountNamePrefix = ""
-var storageAccountNameMatch = ""
-
-var accountsLock = &sync.Mutex{}
+var (
+	defaultContainerName     = ""
+	storageAccountNamePrefix = ""
+	storageAccountNameMatch  = ""
+	accountsLock             = &sync.Mutex{}
+)
 
 func newBlobDiskController(common *controllerCommon) (*BlobDiskController, error) {
 	c := BlobDiskController{common: common}
@@ -83,7 +84,7 @@ func newBlobDiskController(common *controllerCommon) (*BlobDiskController, error
 // CreateVolume creates a VHD blob in a storage account that has storageType and location using the given storage account.
 // If no storage account is given, search all the storage accounts associated with the resource group and pick one that
 // fits storage type and location.
-func (c *BlobDiskController) CreateVolume(name, storageAccount string, storageAccountType storage.SkuName, location string, requestGB int) (string, string, int, error) {
+func (c *BlobDiskController) CreateVolume(name, storageAccount, storageAccountType, location string, requestGB int) (string, string, int, error) {
 	var err error
 	accounts := []accountWithLocation{}
 	if len(storageAccount) > 0 {
@@ -98,7 +99,7 @@ func (c *BlobDiskController) CreateVolume(name, storageAccount string, storageAc
 	}
 	for _, account := range accounts {
 		glog.V(4).Infof("account %s type %s location %s", account.Name, account.StorageType, account.Location)
-		if (account.StorageType == string(storageAccountType)) && (location == "" || account.Location == location) {
+		if (storageAccountType == "" || account.StorageType == storageAccountType) && (location == "" || account.Location == location) || len(storageAccount) > 0 {
 			// find the access key with this account
 			key, err := c.common.cloud.getStorageAccesskey(account.Name)
 			if err != nil {
@@ -111,12 +112,6 @@ func (c *BlobDiskController) CreateVolume(name, storageAccount string, storageAc
 				return "", "", 0, err
 			}
 			blobClient := client.GetBlobService()
-
-			container := blobClient.GetContainerReference(vhdContainerName)
-			_, err = container.CreateIfNotExists(&azstorage.CreateContainerOptions{Access: azstorage.ContainerAccessTypePrivate})
-			if err != nil {
-				return "", "", 0, err
-			}
 
 			// create a page blob in this account's vhd container
 			diskName, diskURI, err := c.createVHDBlobDisk(blobClient, account.Name, name, vhdContainerName, int64(requestGB))
@@ -176,11 +171,6 @@ func (c *BlobDiskController) getBlobNameAndAccountFromURI(diskURI string) (strin
 
 func (c *BlobDiskController) createVHDBlobDisk(blobClient azstorage.BlobStorageClient, accountName, vhdName, containerName string, sizeGB int64) (string, string, error) {
 	container := blobClient.GetContainerReference(containerName)
-	_, err := container.CreateIfNotExists(&azstorage.CreateContainerOptions{Access: azstorage.ContainerAccessTypePrivate})
-	if err != nil {
-		return "", "", err
-	}
-
 	size := 1024 * 1024 * 1024 * sizeGB
 	vhdSize := size + vhd.VHD_HEADER_SIZE /* header size */
 	// Blob name in URL must end with '.vhd' extension.
@@ -193,7 +183,17 @@ func (c *BlobDiskController) createVHDBlobDisk(blobClient azstorage.BlobStorageC
 	blob := container.GetBlobReference(vhdName)
 	blob.Properties.ContentLength = vhdSize
 	blob.Metadata = tags
-	err = blob.PutPageBlob(nil)
+	err := blob.PutPageBlob(nil)
+	if err != nil {
+		// if container doesn't exist, create one and retry PutPageBlob
+		detail := err.Error()
+		if strings.Contains(detail, errContainerNotFound) {
+			err = container.Create(&azstorage.CreateContainerOptions{Access: azstorage.ContainerAccessTypePrivate})
+			if err == nil {
+				err = blob.PutPageBlob(nil)
+			}
+		}
+	}
 	if err != nil {
 		return "", "", fmt.Errorf("failed to put page blob %s in container %s: %v", vhdName, containerName, err)
 	}
