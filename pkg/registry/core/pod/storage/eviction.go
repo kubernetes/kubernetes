@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -64,6 +65,12 @@ type EvictionREST struct {
 }
 
 var _ = rest.Creater(&EvictionREST{})
+var _ = rest.GroupVersionKindProvider(&EvictionREST{})
+
+// GroupVersionKind specifies a particular GroupVersionKind to discovery
+func (r *EvictionREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
+	return schema.GroupVersionKind{Group: "policy", Version: "v1beta1", Kind: "Eviction"}
+}
 
 // New creates a new eviction resource
 func (r *EvictionREST) New() runtime.Object {

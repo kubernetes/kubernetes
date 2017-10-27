@@ -878,7 +878,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		apiResource.Categories = categoriesProvider.Categories()
 	}
 	if gvkProvider, ok := storage.(rest.GroupVersionKindProvider); ok {
-		gvk := gvkProvider.GroupVersionKind()
+		gvk := gvkProvider.GroupVersionKind(a.group.GroupVersion)
 		apiResource.Group = gvk.Group
 		apiResource.Version = gvk.Version
 		apiResource.Kind = gvk.Kind
