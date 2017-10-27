@@ -17,9 +17,11 @@ limitations under the License.
 package azure_file
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -366,4 +368,35 @@ func TestGetSecretNameAndNamespaceForPV(t *testing.T) {
 		}
 	}
 
+}
+
+func TestAppendDefaultMountOptions(t *testing.T) {
+	tests := []struct {
+		options  []string
+		expected []string
+	}{
+		{
+			options:  []string{"dir_mode=0777"},
+			expected: []string{"dir_mode=0777", fmt.Sprintf("%s=%s", fileModeName, defaultFileMode)},
+		},
+		{
+			options:  []string{"file_mode=0777"},
+			expected: []string{"file_mode=0777", fmt.Sprintf("%s=%s", dirModeName, defaultDirMode)},
+		},
+		{
+			options:  []string{""},
+			expected: []string{"", fmt.Sprintf("%s=%s", fileModeName, defaultFileMode), fmt.Sprintf("%s=%s", dirModeName, defaultDirMode)},
+		},
+		{
+			options:  []string{"file_mode=0777", "dir_mode=0777"},
+			expected: []string{"file_mode=0777", "dir_mode=0777"},
+		},
+	}
+
+	for _, test := range tests {
+		result := appendDefaultMountOptions(test.options)
+		if !reflect.DeepEqual(result, test.expected) {
+			t.Errorf("input: %q, appendDefaultMountOptions result: %q, expected: %q", test.options, result, test.expected)
+		}
+	}
 }

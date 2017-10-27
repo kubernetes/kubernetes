@@ -18,11 +18,19 @@ package azure_file
 
 import (
 	"fmt"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/volume"
+)
+
+const (
+	fileModeName    = "file_mode"
+	dirModeName     = "dir_mode"
+	defaultFileMode = "700"
+	defaultDirMode  = "700"
 )
 
 // Abstract interface to azure file operations.
@@ -83,4 +91,30 @@ func (s *azureSvc) SetAzureCredentials(host volume.VolumeHost, nameSpace, accoun
 		return "", fmt.Errorf("Couldn't create secret %v", err)
 	}
 	return secretName, err
+}
+
+// check whether mountOptions contains file_mode and dir_mode, if not, append default mode
+func appendDefaultMountOptions(mountOptions []string) []string {
+	fileModeFlag := false
+	dirModeFlag := false
+
+	for _, mountOption := range mountOptions {
+		if strings.HasPrefix(mountOption, fileModeName) {
+			fileModeFlag = true
+		}
+		if strings.HasPrefix(mountOption, dirModeName) {
+			dirModeFlag = true
+		}
+	}
+
+	allMountOptions := mountOptions
+	if !fileModeFlag {
+		allMountOptions = append(allMountOptions, fmt.Sprintf("%s=%s", fileModeName, defaultFileMode))
+	}
+
+	if !dirModeFlag {
+		allMountOptions = append(allMountOptions, fmt.Sprintf("%s=%s", dirModeName, defaultDirMode))
+	}
+
+	return allMountOptions
 }
