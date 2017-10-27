@@ -38,7 +38,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "e2e.go",
-        "events.go",
         "examples.go",
         "gke_local_ssd.go",
         "gke_node_pools.go",
