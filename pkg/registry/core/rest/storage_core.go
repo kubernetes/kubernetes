@@ -92,19 +92,12 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta:                    *api.Registry.GroupOrDie(api.GroupName),
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
-		Scheme:                      api.Scheme,
-		ParameterCodec:              api.ParameterCodec,
-		NegotiatedSerializer:        api.Codecs,
-		SubresourceGroupVersionKind: map[string]schema.GroupVersionKind{},
+		Scheme:               api.Scheme,
+		ParameterCodec:       api.ParameterCodec,
+		NegotiatedSerializer: api.Codecs,
 	}
-	if autoscalingGroupVersion := (schema.GroupVersion{Group: "autoscaling", Version: "v1"}); api.Registry.IsEnabledVersion(autoscalingGroupVersion) {
-		apiGroupInfo.SubresourceGroupVersionKind["replicationcontrollers/scale"] = autoscalingGroupVersion.WithKind("Scale")
-	}
-
 	var podDisruptionClient policyclient.PodDisruptionBudgetsGetter
 	if policyGroupVersion := (schema.GroupVersion{Group: "policy", Version: "v1beta1"}); api.Registry.IsEnabledVersion(policyGroupVersion) {
-		apiGroupInfo.SubresourceGroupVersionKind["pods/eviction"] = policyGroupVersion.WithKind("Eviction")
-
 		var err error
 		podDisruptionClient, err = policyclient.NewForConfig(c.LoopbackClientConfig)
 		if err != nil {
