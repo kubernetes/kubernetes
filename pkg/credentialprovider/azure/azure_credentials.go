@@ -94,7 +94,7 @@ func (a *acrProvider) Enabled() bool {
 		return false
 	}
 
-	a.servicePrincipalToken, err = azure.GetServicePrincipalToken(a.config, a.environment)
+	a.servicePrincipalToken, err = azure.GetServicePrincipalToken(a.config, a.environment, a.environment.ServiceManagementEndpoint)
 	if err != nil {
 		glog.Errorf("Failed to create service principal token: %v", err)
 		return false
