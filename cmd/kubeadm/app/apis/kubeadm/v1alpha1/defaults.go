@@ -30,6 +30,8 @@ const (
 	DefaultServiceDNSDomain = "cluster.local"
 	// DefaultServicesSubnet defines default service subnet range
 	DefaultServicesSubnet = "10.96.0.0/12"
+	// DefaultServiceDNSIP sets a blank default for ClusterIP for kubedns
+	DefaultServiceDNSIP       = ""
 	// DefaultKubernetesVersion defines default kubernetes version
 	DefaultKubernetesVersion = "stable-1.8"
 	// DefaultAPIBindPort defines default API port
@@ -66,6 +68,10 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 
 	if obj.Networking.DNSDomain == "" {
 		obj.Networking.DNSDomain = DefaultServiceDNSDomain
+	}
+
+	if obj.Networking.DNSIP == "" {
+		obj.Networking.DNSIP = DefaultServiceDNSIP
 	}
 
 	if len(obj.AuthorizationModes) == 0 {

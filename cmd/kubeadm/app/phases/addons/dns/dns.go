@@ -66,9 +66,14 @@ func EnsureDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interf
 		return fmt.Errorf("error when parsing kube-dns deployment template: %v", err)
 	}
 
-	dnsip, err := getDNSIP(client)
-	if err != nil {
-		return err
+	var dnsip net.IP
+	if cfg.Networking.DNSIP != "" {
+		dnsip = net.ParseIP(cfg.Networking.DNSIP)
+	} else {
+		dnsip, err = getDNSIP(client)
+		if err != nil {
+			return err
+		}
 	}
 
 	dnsServiceBytes, err := kubeadmutil.ParseTemplate(KubeDNSService, struct{ DNSIP string }{
