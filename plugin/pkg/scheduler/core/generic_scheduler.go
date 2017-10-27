@@ -530,7 +530,7 @@ func pickOneNodeForPreemption(nodesToPods map[*v1.Node][]*v1.Pod) *v1.Node {
 		highestPodPriority := util.GetPodPriority(pods[0])
 		if highestPodPriority < minHighestPriority {
 			minHighestPriority = highestPodPriority
-			minPriorityScores = nil
+			minPriorityScores = []*nodeScore{{node: node, highestPriority: highestPodPriority, numPods: len(pods)}}
 		}
 		if highestPodPriority == minHighestPriority {
 			minPriorityScores = append(minPriorityScores, &nodeScore{node: node, highestPriority: highestPodPriority, numPods: len(pods)})
@@ -543,9 +543,9 @@ func pickOneNodeForPreemption(nodesToPods map[*v1.Node][]*v1.Pod) *v1.Node {
 	// smallest sum of priorities.
 	minSumPriorities := int64(math.MaxInt64)
 	minSumPriorityScores := []*nodeScore{}
-	for _, nodeScore := range minPriorityScores {
+	for _, score := range minPriorityScores {
 		var sumPriorities int64
-		for _, pod := range nodesToPods[nodeScore.node] {
+		for _, pod := range nodesToPods[score.node] {
 			// We add MaxInt32+1 to all priorities to make all of them >= 0. This is
 			// needed so that a node with a few pods with negative priority is not
 			// picked over a node with a smaller number of pods with the same negative
@@ -554,11 +554,11 @@ func pickOneNodeForPreemption(nodesToPods map[*v1.Node][]*v1.Pod) *v1.Node {
 		}
 		if sumPriorities < minSumPriorities {
 			minSumPriorities = sumPriorities
-			minSumPriorityScores = nil
+			minSumPriorityScores = []*nodeScore{score}
 		}
-		nodeScore.sumPriorities = sumPriorities
+		score.sumPriorities = sumPriorities
 		if sumPriorities == minSumPriorities {
-			minSumPriorityScores = append(minSumPriorityScores, nodeScore)
+			minSumPriorityScores = append(minSumPriorityScores, score)
 		}
 	}
 	if len(minSumPriorityScores) == 1 {
@@ -568,13 +568,13 @@ func pickOneNodeForPreemption(nodesToPods map[*v1.Node][]*v1.Pod) *v1.Node {
 	// Find one with the minimum number of pods.
 	minNumPods := math.MaxInt32
 	minNumPodScores := []*nodeScore{}
-	for _, nodeScore := range minSumPriorityScores {
-		if nodeScore.numPods < minNumPods {
-			minNumPods = nodeScore.numPods
-			minNumPodScores = nil
+	for _, score := range minSumPriorityScores {
+		if score.numPods < minNumPods {
+			minNumPods = score.numPods
+			minNumPodScores = []*nodeScore{score}
 		}
-		if nodeScore.numPods == minNumPods {
-			minNumPodScores = append(minNumPodScores, nodeScore)
+		if score.numPods == minNumPods {
+			minNumPodScores = append(minNumPodScores, score)
 		}
 	}
 	// At this point, even if there are more than one node with the same score,
