@@ -27,7 +27,7 @@ import (
 
 func TestDaemonSetUpdatesPods(t *testing.T) {
 	ds := newDaemonSet("foo")
-	manager, podControl, _ := newTestController(ds)
+	manager, podControl, _, _ := newTestController(ds)
 	maxUnavailable := 2
 	addNodes(manager.nodeStore, 0, 5, nil)
 	manager.dsStore.Add(ds)
@@ -66,7 +66,7 @@ func TestDaemonSetUpdatesPods(t *testing.T) {
 
 func TestDaemonSetUpdatesWhenNewPosIsNotReady(t *testing.T) {
 	ds := newDaemonSet("foo")
-	manager, podControl, _ := newTestController(ds)
+	manager, podControl, _, _ := newTestController(ds)
 	maxUnavailable := 3
 	addNodes(manager.nodeStore, 0, 5, nil)
 	manager.dsStore.Add(ds)
@@ -93,7 +93,7 @@ func TestDaemonSetUpdatesWhenNewPosIsNotReady(t *testing.T) {
 
 func TestDaemonSetUpdatesAllOldPodsNotReady(t *testing.T) {
 	ds := newDaemonSet("foo")
-	manager, podControl, _ := newTestController(ds)
+	manager, podControl, _, _ := newTestController(ds)
 	maxUnavailable := 3
 	addNodes(manager.nodeStore, 0, 5, nil)
 	manager.dsStore.Add(ds)
@@ -119,7 +119,7 @@ func TestDaemonSetUpdatesAllOldPodsNotReady(t *testing.T) {
 
 func TestDaemonSetUpdatesNoTemplateChanged(t *testing.T) {
 	ds := newDaemonSet("foo")
-	manager, podControl, _ := newTestController(ds)
+	manager, podControl, _, _ := newTestController(ds)
 	maxUnavailable := 3
 	addNodes(manager.nodeStore, 0, 5, nil)
 	manager.dsStore.Add(ds)
@@ -149,7 +149,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 		{
 			name: "No nodes",
 			Manager: func() *daemonSetsController {
-				manager, _, _ := newTestController()
+				manager, _, _, _ := newTestController()
 				return manager
 			}(),
 			ds: func() *extensions.DaemonSet {
@@ -165,7 +165,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 		{
 			name: "Two nodes with ready pods",
 			Manager: func() *daemonSetsController {
-				manager, _, _ := newTestController()
+				manager, _, _, _ := newTestController()
 				addNodes(manager.nodeStore, 0, 2, nil)
 				return manager
 			}(),
@@ -191,7 +191,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 		{
 			name: "Two nodes, one node without pods",
 			Manager: func() *daemonSetsController {
-				manager, _, _ := newTestController()
+				manager, _, _, _ := newTestController()
 				addNodes(manager.nodeStore, 0, 2, nil)
 				return manager
 			}(),
@@ -214,7 +214,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 		{
 			name: "Two nodes with pods, MaxUnavailable in percents",
 			Manager: func() *daemonSetsController {
-				manager, _, _ := newTestController()
+				manager, _, _, _ := newTestController()
 				addNodes(manager.nodeStore, 0, 2, nil)
 				return manager
 			}(),
@@ -240,7 +240,7 @@ func TestGetUnavailableNumbers(t *testing.T) {
 		{
 			name: "Two nodes with pods, MaxUnavailable in percents, pod terminating",
 			Manager: func() *daemonSetsController {
-				manager, _, _ := newTestController()
+				manager, _, _, _ := newTestController()
 				addNodes(manager.nodeStore, 0, 2, nil)
 				return manager
 			}(),
