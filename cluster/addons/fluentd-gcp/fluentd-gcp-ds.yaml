@@ -91,14 +91,23 @@ spec:
               fi;
       # BEGIN_PROMETHEUS_TO_SD
       - name: prometheus-to-sd-exporter
-        image: gcr.io/google-containers/prometheus-to-sd:v0.1.3
+        image: gcr.io/google-containers/prometheus-to-sd:v0.2.2
         command:
           - /monitor
-          - --component=fluentd
-          - --target-port=31337
           - --stackdriver-prefix={{ prometheus_to_sd_prefix }}/addons
           - --api-override={{ prometheus_to_sd_endpoint }}
-          - --whitelisted-metrics=stackdriver_successful_requests_count,stackdriver_failed_requests_count,stackdriver_ingested_entries_count,stackdriver_dropped_entries_count
+          - --source=fluentd:http://localhost:31337?whitelisted=stackdriver_successful_requests_count,stackdriver_failed_requests_count,stackdriver_ingested_entries_count,stackdriver_dropped_entries_count
+          - --pod-id=$(POD_NAME)
+          - --namespace-id=$(POD_NAMESPACE)
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
       # END_PROMETHEUS_TO_SD
       nodeSelector:
         beta.kubernetes.io/fluentd-ds-ready: "true"
