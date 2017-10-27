@@ -72,42 +72,6 @@ var (
 	keyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
 )
 
-// NewEndpointController returns a new *EndpointController.
-func NewEndpointController(podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
-	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface) *EndpointController {
-	if client != nil && client.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.Core().RESTClient().GetRateLimiter())
-	}
-	e := &EndpointController{
-		client:           client,
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "endpoint"),
-		workerLoopPeriod: time.Second,
-	}
-
-	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: e.enqueueService,
-		UpdateFunc: func(old, cur interface{}) {
-			e.enqueueService(cur)
-		},
-		DeleteFunc: e.enqueueService,
-	})
-	e.serviceLister = serviceInformer.Lister()
-	e.servicesSynced = serviceInformer.Informer().HasSynced
-
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    e.addPod,
-		UpdateFunc: e.updatePod,
-		DeleteFunc: e.deletePod,
-	})
-	e.podLister = podInformer.Lister()
-	e.podsSynced = podInformer.Informer().HasSynced
-
-	e.endpointsLister = endpointsInformer.Lister()
-	e.endpointsSynced = endpointsInformer.Informer().HasSynced
-
-	return e
-}
-
 // EndpointController manages selector-based service endpoints.
 type EndpointController struct {
 	client clientset.Interface
@@ -142,6 +106,45 @@ type EndpointController struct {
 
 	// workerLoopPeriod is the time between worker runs. The workers process the queue of service and pod changes.
 	workerLoopPeriod time.Duration
+
+	// To allow injection of syncService for testing.
+	syncHandler func(key string) error
+}
+
+// NewEndpointController returns a new *EndpointController.
+func NewEndpointController(podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
+	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface) *EndpointController {
+	if client != nil && client.Core().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.Core().RESTClient().GetRateLimiter())
+	}
+	e := &EndpointController{
+		client:           client,
+		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "endpoint"),
+		workerLoopPeriod: time.Second,
+	}
+
+	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: e.enqueueService,
+		UpdateFunc: func(old, cur interface{}) {
+			e.enqueueService(cur)
+		},
+		DeleteFunc: e.enqueueService,
+	})
+	e.serviceLister = serviceInformer.Lister()
+	e.servicesSynced = serviceInformer.Informer().HasSynced
+
+	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc:    e.addPod,
+		UpdateFunc: e.updatePod,
+		DeleteFunc: e.deletePod,
+	})
+	e.podLister = podInformer.Lister()
+	e.podsSynced = podInformer.Informer().HasSynced
+
+	e.endpointsLister = endpointsInformer.Lister()
+	e.endpointsSynced = endpointsInformer.Informer().HasSynced
+	e.syncHandler = e.syncService
+	return e
 }
 
 // Runs e; will not return until stopCh is closed. workers determines how many
@@ -355,7 +358,7 @@ func (e *EndpointController) processNextWorkItem() bool {
 	}
 	defer e.queue.Done(eKey)
 
-	err := e.syncService(eKey.(string))
+	err := e.syncHandler(eKey.(string))
 	e.handleErr(err, eKey)
 
 	return true

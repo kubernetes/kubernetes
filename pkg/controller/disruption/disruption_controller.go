@@ -95,6 +95,9 @@ type DisruptionController struct {
 	broadcaster record.EventBroadcaster
 	recorder    record.EventRecorder
 
+	// To allow injection of sync for testing.
+	syncHandler func(key string) error
+
 	getUpdater func() updater
 }
 
@@ -158,7 +161,7 @@ func NewDisruptionController(
 
 	dc.ssLister = ssInformer.Lister()
 	dc.ssListerSynced = ssInformer.Informer().HasSynced
-
+	dc.syncHandler = dc.sync
 	return dc
 }
 
@@ -441,7 +444,7 @@ func (dc *DisruptionController) processNextWorkItem() bool {
 	}
 	defer dc.queue.Done(dKey)
 
-	err := dc.sync(dKey.(string))
+	err := dc.syncHandler(dKey.(string))
 	if err == nil {
 		dc.queue.Forget(dKey)
 		return true

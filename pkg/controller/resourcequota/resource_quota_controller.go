@@ -199,30 +199,26 @@ func (rq *ResourceQuotaController) addQuota(obj interface{}) {
 	rq.queue.Add(key)
 }
 
-// worker runs a worker thread that just dequeues items, processes them, and marks them done.
-func (rq *ResourceQuotaController) worker(queue workqueue.RateLimitingInterface) func() {
-	workFunc := func() bool {
-		key, quit := queue.Get()
-		if quit {
-			return true
-		}
-		defer queue.Done(key)
-		err := rq.syncHandler(key.(string))
-		if err == nil {
-			queue.Forget(key)
-			return false
-		}
-		utilruntime.HandleError(err)
-		queue.AddRateLimited(key)
+func (rq *ResourceQuotaController) processNextWorkItem(queue workqueue.RateLimitingInterface) bool {
+	key, quit := queue.Get()
+	if quit {
+		return true
+	}
+	defer queue.Done(key)
+	err := rq.syncHandler(key.(string))
+	if err == nil {
+		queue.Forget(key)
 		return false
 	}
+	utilruntime.HandleError(err)
+	queue.AddRateLimited(key)
+	return false
+}
 
+// worker runs a worker thread that just dequeues items, processes them, and marks them done.
+func (rq *ResourceQuotaController) worker(queue workqueue.RateLimitingInterface) func() {
 	return func() {
-		for {
-			if quit := workFunc(); quit {
-				glog.Infof("resource quota controller worker shutting down")
-				return
-			}
+		for !rq.processNextWorkItem(queue) {
 		}
 	}
 }

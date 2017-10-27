@@ -60,7 +60,7 @@ import (
 )
 
 func startServiceController(ctx ControllerContext) (bool, error) {
-	serviceController, err := servicecontroller.New(
+	serviceController, err := servicecontroller.NewServiceController(
 		ctx.Cloud,
 		ctx.ClientBuilder.ClientOrDie("service-controller"),
 		ctx.InformerFactory.Core().V1().Services(),
