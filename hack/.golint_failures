@@ -235,7 +235,6 @@ pkg/proxy/util
 pkg/proxy/winkernel
 pkg/proxy/winuserspace
 pkg/quota/evaluator/core
-pkg/quota/generic
 pkg/registry/admissionregistration/externaladmissionhookconfiguration/storage
 pkg/registry/admissionregistration/initializerconfiguration/storage
 pkg/registry/admissionregistration/rest

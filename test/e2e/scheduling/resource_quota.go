@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -409,6 +410,41 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
+	It("should create a ResourceQuota and capture the life of a replica set.", func() {
+		By("Creating a ResourceQuota")
+		quotaName := "test-quota"
+		resourceQuota := newTestResourceQuota(quotaName)
+		resourceQuota, err := createResourceQuota(f.ClientSet, f.Namespace.Name, resourceQuota)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status is calculated")
+		usedResources := v1.ResourceList{}
+		usedResources[v1.ResourceQuotas] = resource.MustParse("1")
+		usedResources[v1.ResourceName("count/replicasets.extensions")] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a ReplicaSet")
+		replicaSet := newTestReplicaSetForQuota("test-rs", "nginx", 0)
+		replicaSet, err = f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Create(replicaSet)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status captures replicaset creation")
+		usedResources = v1.ResourceList{}
+		usedResources[v1.ResourceName("count/replicasets.extensions")] = resource.MustParse("1")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Deleting a ReplicaSet")
+		err = f.ClientSet.Extensions().ReplicaSets(f.Namespace.Name).Delete(replicaSet.Name, nil)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring resource quota status released usage")
+		usedResources[v1.ResourceName("count/replicasets.extensions")] = resource.MustParse("0")
+		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
 	It("should create a ResourceQuota and capture the life of a persistent volume claim. [sig-storage]", func() {
 		By("Creating a ResourceQuota")
 		quotaName := "test-quota"
@@ -708,6 +744,8 @@ func newTestResourceQuota(name string) *v1.ResourceQuota {
 	hard[v1.ResourceRequestsStorage] = resource.MustParse("10Gi")
 	hard[core.V1ResourceByStorageClass(classGold, v1.ResourcePersistentVolumeClaims)] = resource.MustParse("10")
 	hard[core.V1ResourceByStorageClass(classGold, v1.ResourceRequestsStorage)] = resource.MustParse("10Gi")
+	// test quota on discovered resource type
+	hard[v1.ResourceName("count/replicasets.extensions")] = resource.MustParse("5")
 	return &v1.ResourceQuota{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec:       v1.ResourceQuotaSpec{Hard: hard},
@@ -772,6 +810,33 @@ func newTestReplicationControllerForQuota(name, image string, replicas int32) *v
 					Labels: map[string]string{"name": name},
 				},
 				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  name,
+							Image: image,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// newTestReplicaSetForQuota returns a simple replica set
+func newTestReplicaSetForQuota(name, image string, replicas int32) *extensions.ReplicaSet {
+	zero := int64(0)
+	return &extensions.ReplicaSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: extensions.ReplicaSetSpec{
+			Replicas: &replicas,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"name": name},
+				},
+				Spec: v1.PodSpec{
+					TerminationGracePeriodSeconds: &zero,
 					Containers: []v1.Container{
 						{
 							Name:  name,
