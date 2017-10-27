@@ -215,7 +215,7 @@ func WaitForJobFailure(c clientset.Interface, ns, jobName string, timeout time.D
 func CheckForAllJobPodsRunning(c clientset.Interface, ns, jobName string, parallelism int32) (bool, error) {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{JobSelectorKey: jobName}))
 	options := metav1.ListOptions{LabelSelector: label.String()}
-	pods, err := c.Core().Pods(ns).List(options)
+	pods, err := c.CoreV1().Pods(ns).List(options)
 	if err != nil {
 		return false, err
 	}

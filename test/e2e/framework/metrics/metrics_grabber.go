@@ -57,7 +57,7 @@ type MetricsGrabber struct {
 func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, kubelets bool, scheduler bool, controllers bool, apiServer bool, clusterAutoscaler bool) (*MetricsGrabber, error) {
 	registeredMaster := false
 	masterName := ""
-	nodeList, err := c.Core().Nodes().List(metav1.ListOptions{})
+	nodeList, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (g *MetricsGrabber) HasRegisteredMaster() bool {
 }
 
 func (g *MetricsGrabber) GrabFromKubelet(nodeName string) (KubeletMetrics, error) {
-	nodes, err := g.client.Core().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{api.ObjectNameField: nodeName}.AsSelector().String()})
+	nodes, err := g.client.CoreV1().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{api.ObjectNameField: nodeName}.AsSelector().String()})
 	if err != nil {
 		return KubeletMetrics{}, err
 	}
@@ -210,7 +210,7 @@ func (g *MetricsGrabber) Grab() (MetricsCollection, error) {
 	}
 	if g.grabFromKubelets {
 		result.KubeletMetrics = make(map[string]KubeletMetrics)
-		nodes, err := g.client.Core().Nodes().List(metav1.ListOptions{})
+		nodes, err := g.client.CoreV1().Nodes().List(metav1.ListOptions{})
 		if err != nil {
 			errs = append(errs, err)
 		} else {
@@ -231,7 +231,7 @@ func (g *MetricsGrabber) Grab() (MetricsCollection, error) {
 }
 
 func (g *MetricsGrabber) getMetricsFromPod(client clientset.Interface, podName string, namespace string, port int) (string, error) {
-	rawOutput, err := client.Core().RESTClient().Get().
+	rawOutput, err := client.CoreV1().RESTClient().Get().
 		Namespace(namespace).
 		Resource("pods").
 		SubResource("proxy").

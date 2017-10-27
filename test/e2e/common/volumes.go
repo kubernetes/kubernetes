@@ -139,7 +139,7 @@ var _ = Describe("[sig-storage] GCP Volumes", func() {
 			defer func() {
 				if clean {
 					framework.VolumeTestCleanup(f, config)
-					err := c.Core().Endpoints(namespace.Name).Delete(name, nil)
+					err := c.CoreV1().Endpoints(namespace.Name).Delete(name, nil)
 					Expect(err).NotTo(HaveOccurred(), "defer: Gluster delete endpoints failed")
 				}
 			}()

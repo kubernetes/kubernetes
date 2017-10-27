@@ -117,7 +117,7 @@ func createDeploymentsToScale(f *framework.Framework, cs clientset.Interface) er
 	if err != nil {
 		return err
 	}
-	_, err = cs.Core().Pods(f.Namespace.ObjectMeta.Name).Create(monitoring.StackdriverExporterPod(stackdriverExporterPod, f.Namespace.Name, stackdriverExporterPod, monitoring.CustomMetricName, 100))
+	_, err = cs.CoreV1().Pods(f.Namespace.ObjectMeta.Name).Create(monitoring.StackdriverExporterPod(stackdriverExporterPod, f.Namespace.Name, stackdriverExporterPod, monitoring.CustomMetricName, 100))
 	if err != nil {
 		return err
 	}
@@ -127,7 +127,7 @@ func createDeploymentsToScale(f *framework.Framework, cs clientset.Interface) er
 
 func cleanupDeploymentsToScale(f *framework.Framework, cs clientset.Interface) {
 	_ = cs.Extensions().Deployments(f.Namespace.ObjectMeta.Name).Delete(stackdriverExporterDeployment, &metav1.DeleteOptions{})
-	_ = cs.Core().Pods(f.Namespace.ObjectMeta.Name).Delete(stackdriverExporterPod, &metav1.DeleteOptions{})
+	_ = cs.CoreV1().Pods(f.Namespace.ObjectMeta.Name).Delete(stackdriverExporterPod, &metav1.DeleteOptions{})
 	_ = cs.Extensions().Deployments(f.Namespace.ObjectMeta.Name).Delete(dummyDeploymentName, &metav1.DeleteOptions{})
 }
 

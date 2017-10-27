@@ -386,12 +386,12 @@ func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
 		return
 	}
 	p.Namespace = ns
-	if _, err := c.Core().Pods(ns).Create(p); err != nil {
+	if _, err := c.CoreV1().Pods(ns).Create(p); err != nil {
 		framework.Logf("Failed to create %v: %v", p.Name, err)
 		return
 	}
 	defer func() {
-		if err := c.Core().Pods(ns).Delete(p.Name, nil); err != nil {
+		if err := c.CoreV1().Pods(ns).Delete(p.Name, nil); err != nil {
 			framework.Logf("Failed to delete pod %v: %v", p.Name, err)
 		}
 	}()

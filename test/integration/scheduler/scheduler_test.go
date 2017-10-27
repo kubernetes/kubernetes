@@ -568,11 +568,11 @@ func TestMultiScheduler(t *testing.T) {
 		//		- note: these two pods belong to default scheduler which no longer exists
 		podWithNoAnnotation2 := createPod("pod-with-no-annotation2", nil)
 		podWithAnnotationFitsDefault2 := createPod("pod-with-annotation-fits-default2", schedulerAnnotationFitsDefault)
-		testPodNoAnnotation2, err := clientSet.Core().Pods(ns.Name).Create(podWithNoAnnotation2)
+		testPodNoAnnotation2, err := clientSet.CoreV1().Pods(ns.Name).Create(podWithNoAnnotation2)
 		if err != nil {
 			t.Fatalf("Failed to create pod: %v", err)
 		}
-		testPodWithAnnotationFitsDefault2, err := clientSet.Core().Pods(ns.Name).Create(podWithAnnotationFitsDefault2)
+		testPodWithAnnotationFitsDefault2, err := clientSet.CoreV1().Pods(ns.Name).Create(podWithAnnotationFitsDefault2)
 		if err != nil {
 			t.Fatalf("Failed to create pod: %v", err)
 		}

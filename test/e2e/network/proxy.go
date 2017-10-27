@@ -103,7 +103,7 @@ var _ = SIGDescribe("Proxy", func() {
 		It("should proxy through a service and a pod [Conformance]", func() {
 			start := time.Now()
 			labels := map[string]string{"proxy-service-target": "true"}
-			service, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(&v1.Service{
+			service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "proxy-service-",
 				},
@@ -293,7 +293,7 @@ var _ = SIGDescribe("Proxy", func() {
 			}
 
 			if len(errs) != 0 {
-				body, err := f.ClientSet.Core().Pods(f.Namespace.Name).GetLogs(pods[0].Name, &v1.PodLogOptions{}).Do().Raw()
+				body, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).GetLogs(pods[0].Name, &v1.PodLogOptions{}).Do().Raw()
 				if err != nil {
 					framework.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
 				} else {
@@ -314,7 +314,7 @@ func doProxy(f *framework.Framework, path string, i int) (body []byte, statusCod
 	//   chance of the things we are talking to being confused for an error
 	//   that apiserver would have emitted.
 	start := time.Now()
-	body, err = f.ClientSet.Core().RESTClient().Get().AbsPath(path).Do().StatusCode(&statusCode).Raw()
+	body, err = f.ClientSet.CoreV1().RESTClient().Get().AbsPath(path).Do().StatusCode(&statusCode).Raw()
 	d = time.Since(start)
 	if len(body) > 0 {
 		framework.Logf("(%v) %v: %s (%v; %v)", i, path, truncate(body, maxDisplayBodyLen), statusCode, d)

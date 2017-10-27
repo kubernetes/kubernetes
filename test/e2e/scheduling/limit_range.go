@@ -47,11 +47,11 @@ var _ = SIGDescribe("LimitRange", func() {
 			min, max,
 			defaultLimit, defaultRequest,
 			maxLimitRequestRatio)
-		limitRange, err := f.ClientSet.Core().LimitRanges(f.Namespace.Name).Create(limitRange)
+		limitRange, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Create(limitRange)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Fetching the LimitRange to ensure it has proper values")
-		limitRange, err = f.ClientSet.Core().LimitRanges(f.Namespace.Name).Get(limitRange.Name, metav1.GetOptions{})
+		limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Get(limitRange.Name, metav1.GetOptions{})
 		expected := v1.ResourceRequirements{Requests: defaultRequest, Limits: defaultLimit}
 		actual := v1.ResourceRequirements{Requests: limitRange.Spec.Limits[0].DefaultRequest, Limits: limitRange.Spec.Limits[0].Default}
 		err = equalResourceRequirement(expected, actual)
@@ -59,11 +59,11 @@ var _ = SIGDescribe("LimitRange", func() {
 
 		By("Creating a Pod with no resource requirements")
 		pod := f.NewTestPod("pod-no-resources", v1.ResourceList{}, v1.ResourceList{})
-		pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring Pod has resource requirements applied from LimitRange")
-		pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		for i := range pod.Spec.Containers {
 			err = equalResourceRequirement(expected, pod.Spec.Containers[i].Resources)
@@ -76,11 +76,11 @@ var _ = SIGDescribe("LimitRange", func() {
 
 		By("Creating a Pod with partial resource requirements")
 		pod = f.NewTestPod("pod-partial-resources", getResourceList("", "150Mi"), getResourceList("300m", ""))
-		pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring Pod has merged resource requirements applied from LimitRange")
-		pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		// This is an interesting case, so it's worth a comment
 		// If you specify a Limit, and no Request, the Limit will default to the Request
@@ -97,12 +97,12 @@ var _ = SIGDescribe("LimitRange", func() {
 
 		By("Failing to create a Pod with less than min resources")
 		pod = f.NewTestPod(podName, getResourceList("10m", "50Mi"), v1.ResourceList{})
-		pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		Expect(err).To(HaveOccurred())
 
 		By("Failing to create a Pod with more than max resources")
 		pod = f.NewTestPod(podName, getResourceList("600m", "600Mi"), v1.ResourceList{})
-		pod, err = f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod)
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		Expect(err).To(HaveOccurred())
 	})
 

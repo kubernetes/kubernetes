@@ -219,8 +219,8 @@ func newGCPod(name string) *v1.Pod {
 // controllers and pods are rcNum and podNum. It returns error if the
 // communication with the API server fails.
 func verifyRemainingReplicationControllersPods(f *framework.Framework, clientSet clientset.Interface, rcNum, podNum int) (bool, error) {
-	rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
-	pods, err := clientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+	rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
+	pods, err := clientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list pods: %v", err)
 	}
@@ -264,7 +264,7 @@ func verifyRemainingCronJobsJobsPods(f *framework.Framework, clientSet clientset
 		By(fmt.Sprintf("expected %d jobs, got %d jobs", jobNum, len(jobs.Items)))
 	}
 
-	pods, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+	pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list pods: %v", err)
 	}
@@ -332,8 +332,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 	f := framework.NewDefaultFramework("gc")
 	It("should delete pods created by rc when not orphaning", func() {
 		clientSet := f.ClientSet
-		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
-		podClient := clientSet.Core().Pods(f.Namespace.Name)
+		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
+		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
 		// TODO: find better way to keep this label unique in the test
 		uniqLabels := map[string]string{"gctest": "delete_pods"}
@@ -385,8 +385,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 	It("should orphan pods created by rc if delete options say so", func() {
 		clientSet := f.ClientSet
-		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
-		podClient := clientSet.Core().Pods(f.Namespace.Name)
+		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
+		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
 		// TODO: find better way to keep this label unique in the test
 		uniqLabels := map[string]string{"gctest": "orphan_pods"}
@@ -454,8 +454,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 	It("should orphan pods created by rc if deleteOptions.OrphanDependents is nil", func() {
 		clientSet := f.ClientSet
-		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
-		podClient := clientSet.Core().Pods(f.Namespace.Name)
+		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
+		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
 		// TODO: find better way to keep this label unique in the test
 		uniqLabels := map[string]string{"gctest": "orphan_pods_nil_option"}
@@ -619,8 +619,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 
 	It("should keep the rc around until all its pods are deleted if the deleteOptions says so", func() {
 		clientSet := f.ClientSet
-		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
-		podClient := clientSet.Core().Pods(f.Namespace.Name)
+		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
+		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
 		// TODO: find better way to keep this label unique in the test
 		uniqLabels := map[string]string{"gctest": "delete_pods_foreground"}
@@ -703,8 +703,8 @@ var _ = SIGDescribe("Garbage collector", func() {
 	// TODO: this should be an integration test
 	It("should not delete dependents that have both valid owner and owner that's waiting for dependents to be deleted", func() {
 		clientSet := f.ClientSet
-		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
-		podClient := clientSet.Core().Pods(f.Namespace.Name)
+		rcClient := clientSet.CoreV1().ReplicationControllers(f.Namespace.Name)
+		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		rc1Name := "simpletest-rc-to-be-deleted"
 		replicas := int32(estimateMaximumPods(clientSet, 10, 100))
 		halfReplicas := int(replicas / 2)
@@ -814,7 +814,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 	// TODO: should be an integration test
 	It("should not be blocked by dependency circle", func() {
 		clientSet := f.ClientSet
-		podClient := clientSet.Core().Pods(f.Namespace.Name)
+		podClient := clientSet.CoreV1().Pods(f.Namespace.Name)
 		pod1 := newGCPod("pod1")
 		pod1, err := podClient.Create(pod1)
 		Expect(err).NotTo(HaveOccurred())

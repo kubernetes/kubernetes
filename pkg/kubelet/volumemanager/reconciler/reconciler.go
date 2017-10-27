@@ -495,7 +495,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 
 func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*reconstructedVolume) error {
 	// Get the node status to retrieve volume device path information.
-	node, fetchErr := rc.kubeClient.Core().Nodes().Get(string(rc.nodeName), metav1.GetOptions{})
+	node, fetchErr := rc.kubeClient.CoreV1().Nodes().Get(string(rc.nodeName), metav1.GetOptions{})
 	if fetchErr != nil {
 		glog.Errorf("updateStates in reconciler: could not get node status with error %v", fetchErr)
 	} else {

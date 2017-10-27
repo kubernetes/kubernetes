@@ -661,11 +661,11 @@ func (config *NetworkingTestConfig) getPodClient() *PodClient {
 }
 
 func (config *NetworkingTestConfig) getServiceClient() coreclientset.ServiceInterface {
-	return config.f.ClientSet.Core().Services(config.Namespace)
+	return config.f.ClientSet.CoreV1().Services(config.Namespace)
 }
 
 func (config *NetworkingTestConfig) getNamespacesClient() coreclientset.NamespaceInterface {
-	return config.f.ClientSet.Core().Namespaces()
+	return config.f.ClientSet.CoreV1().Namespaces()
 }
 
 func CheckReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {

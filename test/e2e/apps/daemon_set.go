@@ -85,7 +85,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		} else {
 			framework.Logf("unable to dump daemonsets: %v", err)
 		}
-		if pods, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{}); err == nil {
+		if pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{}); err == nil {
 			framework.Logf("pods: %s", runtime.EncodeOrDie(legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...), pods))
 		} else {
 			framework.Logf("unable to dump pods: %v", err)
@@ -126,7 +126,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		By("Stop a daemon pod, check that the daemon pod is revived.")
 		podList := listDaemonPods(c, ns, label)
 		pod := podList.Items[0]
-		err = c.Core().Pods(ns).Delete(pod.Name, nil)
+		err = c.CoreV1().Pods(ns).Delete(pod.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to revive")
@@ -243,7 +243,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		pod := podList.Items[0]
 		pod.ResourceVersion = ""
 		pod.Status.Phase = v1.PodFailed
-		_, err = c.Core().Pods(ns).UpdateStatus(&pod)
+		_, err = c.CoreV1().Pods(ns).UpdateStatus(&pod)
 		Expect(err).NotTo(HaveOccurred(), "error failing a daemon pod")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, ds))
 		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pod to revive")
@@ -549,7 +549,7 @@ func newDaemonSet(dsName, image string, label map[string]string) *extensions.Dae
 func listDaemonPods(c clientset.Interface, ns string, label map[string]string) *v1.PodList {
 	selector := labels.Set(label).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	podList, err := c.Core().Pods(ns).List(options)
+	podList, err := c.CoreV1().Pods(ns).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(podList.Items)).To(BeNumerically(">", 0))
 	return podList
@@ -580,7 +580,7 @@ func clearDaemonSetNodeLabels(c clientset.Interface) error {
 }
 
 func setDaemonSetNodeLabels(c clientset.Interface, nodeName string, labels map[string]string) (*v1.Node, error) {
-	nodeClient := c.Core().Nodes()
+	nodeClient := c.CoreV1().Nodes()
 	var newNode *v1.Node
 	var newLabels map[string]string
 	err := wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, func() (bool, error) {
@@ -621,7 +621,7 @@ func setDaemonSetNodeLabels(c clientset.Interface, nodeName string, labels map[s
 
 func checkDaemonPodOnNodes(f *framework.Framework, ds *extensions.DaemonSet, nodeNames []string) func() (bool, error) {
 	return func() (bool, error) {
-		podList, err := f.ClientSet.Core().Pods(f.Namespace.Name).List(metav1.ListOptions{})
+		podList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(metav1.ListOptions{})
 		if err != nil {
 			framework.Logf("could not get the pod list: %v", err)
 			return false, nil
@@ -660,7 +660,7 @@ func checkDaemonPodOnNodes(f *framework.Framework, ds *extensions.DaemonSet, nod
 
 func checkRunningOnAllNodes(f *framework.Framework, ds *extensions.DaemonSet) func() (bool, error) {
 	return func() (bool, error) {
-		nodeList, err := f.ClientSet.Core().Nodes().List(metav1.ListOptions{})
+		nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		nodeNames := make([]string, 0)
 		for _, node := range nodeList.Items {
@@ -717,7 +717,7 @@ func checkDaemonStatus(f *framework.Framework, dsName string) error {
 
 func checkDaemonPodsImageAndAvailability(c clientset.Interface, ds *extensions.DaemonSet, image string, maxUnavailable int) func() (bool, error) {
 	return func() (bool, error) {
-		podList, err := c.Core().Pods(ds.Namespace).List(metav1.ListOptions{})
+		podList, err := c.CoreV1().Pods(ds.Namespace).List(metav1.ListOptions{})
 		if err != nil {
 			return false, err
 		}

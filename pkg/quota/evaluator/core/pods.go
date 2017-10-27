@@ -66,7 +66,7 @@ func listPodsByNamespaceFuncUsingClient(kubeClient clientset.Interface) generic.
 	// unfortunately, dynamic client works with Unstructured objects, and when we calculate Usage, we require
 	// structured objects.
 	return func(namespace string, options metav1.ListOptions) ([]runtime.Object, error) {
-		itemList, err := kubeClient.Core().Pods(namespace).List(options)
+		itemList, err := kubeClient.CoreV1().Pods(namespace).List(options)
 		if err != nil {
 			return nil, err
 		}

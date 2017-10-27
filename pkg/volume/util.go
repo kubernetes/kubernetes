@@ -187,15 +187,15 @@ type realRecyclerClient struct {
 }
 
 func (c *realRecyclerClient) CreatePod(pod *v1.Pod) (*v1.Pod, error) {
-	return c.client.Core().Pods(pod.Namespace).Create(pod)
+	return c.client.CoreV1().Pods(pod.Namespace).Create(pod)
 }
 
 func (c *realRecyclerClient) GetPod(name, namespace string) (*v1.Pod, error) {
-	return c.client.Core().Pods(namespace).Get(name, metav1.GetOptions{})
+	return c.client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 }
 
 func (c *realRecyclerClient) DeletePod(name, namespace string) error {
-	return c.client.Core().Pods(namespace).Delete(name, nil)
+	return c.client.CoreV1().Pods(namespace).Delete(name, nil)
 }
 
 func (c *realRecyclerClient) Event(eventtype, message string) {
@@ -212,13 +212,13 @@ func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan s
 		Watch:         true,
 	}
 
-	podWatch, err := c.client.Core().Pods(namespace).Watch(options)
+	podWatch, err := c.client.CoreV1().Pods(namespace).Watch(options)
 	if err != nil {
 		return nil, err
 	}
 
 	eventSelector, _ := fields.ParseSelector("involvedObject.name=" + name)
-	eventWatch, err := c.client.Core().Events(namespace).Watch(metav1.ListOptions{
+	eventWatch, err := c.client.CoreV1().Events(namespace).Watch(metav1.ListOptions{
 		FieldSelector: eventSelector.String(),
 		Watch:         true,
 	})

@@ -216,7 +216,7 @@ func (d *deploymentTester) markAllPodsReady() {
 	var readyPods int32
 	err = wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		readyPods = 0
-		pods, err := d.c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: selector.String()})
+		pods, err := d.c.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			d.t.Logf("failed to list Deployment pods, will retry later: %v", err)
 			return false, nil
