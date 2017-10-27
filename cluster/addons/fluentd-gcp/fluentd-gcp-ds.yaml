@@ -34,7 +34,6 @@ spec:
     spec:
       serviceAccountName: fluentd-gcp
       dnsPolicy: Default
-      hostNetwork: true
       containers:
       - name: fluentd-gcp
         image: gcr.io/google-containers/fluentd-gcp:2.0.9
