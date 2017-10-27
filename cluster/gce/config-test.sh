@@ -302,6 +302,11 @@ if [[ -n "${GCE_ALPHA_FEATURES:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} GCE_ALPHA_FEATURES"
 fi
 
+# Disable Docker live-restore.
+if [[ -n "${DISABLE_DOCKER_LIVE_RESTORE:-}" ]]; then
+  PROVIDER_VARS="${PROVIDER_VARS:-} DISABLE_DOCKER_LIVE_RESTORE"
+fi
+
 # Override default GLBC image
 if [[ -n "${GCE_GLBC_IMAGE:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} GCE_GLBC_IMAGE"
