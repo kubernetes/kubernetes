@@ -30,6 +30,7 @@ import (
 	"k8s.io/api/admission/v1alpha1"
 	registrationv1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	api "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
@@ -280,6 +281,9 @@ func TestAdmit(t *testing.T) {
 					t.Errorf(" expected an error saying %q, but got %v", tt.errorContains, err)
 				}
 			}
+			if _, isStatusErr := err.(*apierrors.StatusError); err != nil && !isStatusErr {
+				t.Errorf("%s: expected a StatusError, got %T", name, err)
+			}
 		})
 	}
 }
@@ -332,4 +336,53 @@ type fakeAuthenticationInfoResolver struct {
 
 func (c *fakeAuthenticationInfoResolver) ClientConfigFor(server string) (*rest.Config, error) {
 	return c.restConfig, nil
+}
+
+func TestToStatusErr(t *testing.T) {
+	hookName := "foo"
+	deniedBy := fmt.Sprintf("admission webhook %q denied the request", hookName)
+	tests := []struct {
+		name          string
+		result        *metav1.Status
+		expectedError string
+	}{
+		{
+			"nil result",
+			nil,
+			deniedBy + " without explanation",
+		},
+		{
+			"only message",
+			&metav1.Status{
+				Message: "you shall not pass",
+			},
+			deniedBy + ": you shall not pass",
+		},
+		{
+			"only reason",
+			&metav1.Status{
+				Reason: metav1.StatusReasonForbidden,
+			},
+			deniedBy + ": Forbidden",
+		},
+		{
+			"message and reason",
+			&metav1.Status{
+				Message: "you shall not pass",
+				Reason:  metav1.StatusReasonForbidden,
+			},
+			deniedBy + ": you shall not pass",
+		},
+		{
+			"no message, no reason",
+			&metav1.Status{},
+			deniedBy + " without explanation",
+		},
+	}
+	for _, test := range tests {
+		err := toStatusErr(hookName, test.result)
+		if err == nil || err.Error() != test.expectedError {
+			t.Errorf("%s: expected an error saying %q, but got %v", test.name, test.expectedError, err)
+		}
+	}
 }
