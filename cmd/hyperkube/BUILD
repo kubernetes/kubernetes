@@ -30,6 +30,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "cloud-controller-manager.go",
         "hyperkube.go",
         "kube-aggregator.go",
         "kube-apiserver.go",
@@ -43,6 +44,8 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/cmd/hyperkube",
     deps = [
+        "//cmd/cloud-controller-manager/app:go_default_library",
+        "//cmd/cloud-controller-manager/app/options:go_default_library",
         "//cmd/kube-apiserver/app:go_default_library",
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//cmd/kube-controller-manager/app:go_default_library",
