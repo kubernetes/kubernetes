@@ -105,6 +105,12 @@ func (gce *GCECloud) GetLoadBalancer(clusterName string, svc *v1.Service) (*v1.L
 	return nil, false, ignoreNotFound(err)
 }
 
+// ListServiceByLoadBalancer list services whose load balancer are created by kubernetes.
+// The key of the map contains service's namespace and service's name, like: namespace/name
+func (gce *GCECloud) ListServiceByLoadBalancer(clusterName string) (serviceToLoadbalancer map[string]*v1.LoadBalancerStatus, err error) {
+	return serviceToLoadbalancer, cloudprovider.NotImplemented
+}
+
 // EnsureLoadBalancer is an implementation of LoadBalancer.EnsureLoadBalancer.
 func (gce *GCECloud) EnsureLoadBalancer(clusterName string, svc *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(svc)

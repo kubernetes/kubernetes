@@ -85,6 +85,9 @@ func GetInstanceProviderID(cloud Interface, nodeName types.NodeName) (string, er
 
 // LoadBalancer is an abstract, pluggable interface for load balancers.
 type LoadBalancer interface {
+	// ListServiceByLoadBalancer list services whose load balancer are created by kubernetes.
+	// The key of the map contains service's namespace and service's name, like: namespace/name
+	ListServiceByLoadBalancer(clusterName string) (serviceToLoadbalancer map[string]*v1.LoadBalancerStatus, err error)
 	// TODO: Break this up into different interfaces (LB, etc) when we have more than one type of service
 	// GetLoadBalancer returns whether the specified load balancer exists, and
 	// if so, what its status is.
