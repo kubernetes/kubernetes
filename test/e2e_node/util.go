@@ -279,7 +279,7 @@ func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, er
 // creates a configmap containing kubeCfg in kube-system namespace
 func createConfigMap(f *framework.Framework, internalKC *kubeletconfig.KubeletConfiguration) (*apiv1.ConfigMap, error) {
 	cmap := newKubeletConfigMap("testcfg", internalKC)
-	cmap, err := f.ClientSet.Core().ConfigMaps("kube-system").Create(cmap)
+	cmap, err := f.ClientSet.CoreV1().ConfigMaps("kube-system").Create(cmap)
 	if err != nil {
 		return nil, err
 	}

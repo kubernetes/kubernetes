@@ -147,7 +147,7 @@ func GetSecretForPod(pod *v1.Pod, secretName string, kubeClient clientset.Interf
 	if kubeClient == nil {
 		return secret, fmt.Errorf("Cannot get kube client")
 	}
-	secrets, err := kubeClient.Core().Secrets(pod.Namespace).Get(secretName, metav1.GetOptions{})
+	secrets, err := kubeClient.CoreV1().Secrets(pod.Namespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
 		return secret, err
 	}
@@ -163,7 +163,7 @@ func GetSecretForPV(secretNamespace, secretName, volumePluginName string, kubeCl
 	if kubeClient == nil {
 		return secret, fmt.Errorf("Cannot get kube client")
 	}
-	secrets, err := kubeClient.Core().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
+	secrets, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
 	if err != nil {
 		return secret, err
 	}

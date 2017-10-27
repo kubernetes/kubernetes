@@ -33,7 +33,7 @@ func listResourceQuotasByNamespaceFuncUsingClient(kubeClient clientset.Interface
 	// unfortunately, dynamic client works with Unstructured objects, and when we calculate Usage, we require
 	// structured objects.
 	return func(namespace string, options metav1.ListOptions) ([]runtime.Object, error) {
-		itemList, err := kubeClient.Core().ResourceQuotas(namespace).List(options)
+		itemList, err := kubeClient.CoreV1().ResourceQuotas(namespace).List(options)
 		if err != nil {
 			return nil, err
 		}

@@ -37,7 +37,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 	It("should return chunks of results for list calls", func() {
 		ns := f.Namespace.Name
 		c := f.ClientSet
-		client := c.Core().PodTemplates(ns)
+		client := c.CoreV1().PodTemplates(ns)
 
 		By("creating a large number of resources")
 		workqueue.Parallelize(20, numberOfTotalResources, func(i int) {

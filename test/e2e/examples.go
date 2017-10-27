@@ -298,7 +298,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			label := labels.SelectorFromSet(labels.Set(map[string]string{"app": "cassandra"}))
 			err = wait.PollImmediate(statefulsetPoll, statefulsetTimeout,
 				func() (bool, error) {
-					podList, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: label.String()})
+					podList, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: label.String()})
 					if err != nil {
 						return false, fmt.Errorf("Unable to get list of pods in statefulset %s", label)
 					}
@@ -413,7 +413,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 				err := framework.WaitForPodNameRunningInNamespace(c, podName, ns)
 				Expect(err).NotTo(HaveOccurred())
 				for t := time.Now(); time.Since(t) < timeout; time.Sleep(framework.Poll) {
-					pod, err := c.Core().Pods(ns).Get(podName, metav1.GetOptions{})
+					pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
 					framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
 					stat := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, podName)
 					framework.Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)
@@ -577,7 +577,7 @@ func makeHttpRequestToService(c clientset.Interface, ns, service, path string, t
 	var result []byte
 	var err error
 	for t := time.Now(); time.Since(t) < timeout; time.Sleep(framework.Poll) {
-		proxyRequest, errProxy := framework.GetServicesProxyRequest(c, c.Core().RESTClient().Get())
+		proxyRequest, errProxy := framework.GetServicesProxyRequest(c, c.CoreV1().RESTClient().Get())
 		if errProxy != nil {
 			break
 		}
@@ -596,17 +596,6 @@ func makeHttpRequestToService(c clientset.Interface, ns, service, path string, t
 		}
 	}
 	return string(result), err
-}
-
-// pass enough context with the 'old' parameter so that it replaces what your really intended.
-func prepareResourceWithReplacedString(inputFile, old, new string) string {
-	f, err := os.Open(inputFile)
-	Expect(err).NotTo(HaveOccurred())
-	defer f.Close()
-	data, err := ioutil.ReadAll(f)
-	Expect(err).NotTo(HaveOccurred())
-	podYaml := strings.Replace(string(data), old, new, 1)
-	return podYaml
 }
 
 func createFileForGoBinData(gobindataPath, outputFilename string) error {

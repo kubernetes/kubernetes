@@ -102,12 +102,6 @@ type TestContextType struct {
 	FeatureGates string
 	// Node e2e specific test context
 	NodeTestContextType
-	// Federation e2e context
-	FederatedKubeContext string
-	// Federation control plane version to upgrade to while doing upgrade tests
-	FederationUpgradeTarget string
-	// Whether configuration for accessing federation member clusters should be sourced from the host cluster
-	FederationConfigFromCluster bool
 
 	// Indicates what path the kubernetes-anywhere is installed on
 	KubernetesAnywherePath string
@@ -217,8 +211,6 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.KubemarkExternalKubeConfig, fmt.Sprintf("%s-%s", "kubemark-external", clientcmd.RecommendedConfigPathFlag), "", "Path to kubeconfig containing embedded authinfo for external cluster.")
 	flag.StringVar(&TestContext.KubeContext, clientcmd.FlagContext, "", "kubeconfig context to use/override. If unset, will use value from 'current-context'")
 	flag.StringVar(&TestContext.KubeAPIContentType, "kube-api-content-type", "application/vnd.kubernetes.protobuf", "ContentType used to communicate with apiserver")
-	flag.StringVar(&TestContext.FederatedKubeContext, "federated-kube-context", "e2e-federation", "kubeconfig context for federation.")
-	flag.BoolVar(&TestContext.FederationConfigFromCluster, "federation-config-from-cluster", false, "whether to source configuration for member clusters from the hosting cluster.")
 
 	flag.StringVar(&TestContext.KubeVolumeDir, "volume-dir", "/var/lib/kubelet", "Path to the directory containing the kubelet volumes.")
 	flag.StringVar(&TestContext.CertDir, "cert-dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
@@ -256,7 +248,6 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.EtcdUpgradeVersion, "etcd-upgrade-version", "", "The etcd binary version to upgrade to (e.g., '3.0.14', '2.3.7') if doing an etcd upgrade test.")
 	flag.StringVar(&TestContext.UpgradeImage, "upgrade-image", "", "Image to upgrade to (e.g. 'container_vm' or 'gci') if doing an upgrade test.")
 	flag.StringVar(&TestContext.GCEUpgradeScript, "gce-upgrade-script", "", "Script to use to upgrade a GCE cluster.")
-	flag.StringVar(&TestContext.FederationUpgradeTarget, "federation-upgrade-target", "ci/latest", "Version to upgrade to (e.g. 'release/stable', 'release/latest', 'ci/latest', '0.19.1', '0.19.1-669-gabac8c8') if doing an federation upgrade test.")
 	flag.BoolVar(&TestContext.CleanStart, "clean-start", false, "If true, purge all namespaces except default and system before running tests. This serves to Cleanup test namespaces from failed/interrupted e2e runs in a long-lived cluster.")
 	flag.BoolVar(&TestContext.GarbageCollectorEnabled, "garbage-collector-enabled", true, "Set to true if the garbage collector is enabled in the kube-apiserver and kube-controller-manager, then some tests will rely on the garbage collector to delete dependent resources.")
 }

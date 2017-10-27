@@ -200,6 +200,12 @@ func (d *deploymentTester) waitForDeploymentRevisionAndImage(revision, image str
 	return nil
 }
 
+func markPodReady(c clientset.Interface, ns string, pod *v1.Pod) error {
+	addPodConditionReady(pod, metav1.Now())
+	_, err := c.Core().Pods(ns).UpdateStatus(pod)
+	return err
+}
+
 // markAllPodsReady manually updates all Deployment pods status to ready
 func (d *deploymentTester) markAllPodsReady() {
 	ns := d.deployment.Namespace
@@ -210,9 +216,13 @@ func (d *deploymentTester) markAllPodsReady() {
 	var readyPods int32
 	err = wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		readyPods = 0
-		pods, err := d.c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: selector.String()})
+		pods, err := d.c.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: selector.String()})
 		if err != nil {
 			d.t.Logf("failed to list Deployment pods, will retry later: %v", err)
+			return false, nil
+		}
+		if len(pods.Items) != int(*d.deployment.Spec.Replicas) {
+			d.t.Logf("%d/%d of deployment pods are created", len(pods.Items), *d.deployment.Spec.Replicas)
 			return false, nil
 		}
 		for i := range pods.Items {
@@ -221,8 +231,7 @@ func (d *deploymentTester) markAllPodsReady() {
 				readyPods++
 				continue
 			}
-			addPodConditionReady(&pod, metav1.Now())
-			if _, err = d.c.Core().Pods(ns).UpdateStatus(&pod); err != nil {
+			if err = markPodReady(d.c, ns, &pod); err != nil {
 				d.t.Logf("failed to update Deployment pod %s, will retry later: %v", pod.Name, err)
 			} else {
 				readyPods++

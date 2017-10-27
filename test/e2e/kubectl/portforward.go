@@ -211,7 +211,7 @@ func runPortForward(ns, podName string, port int) *portForwardCommand {
 func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 	By("Creating the target pod")
 	pod := pfPod("", "10", "10", "100", fmt.Sprintf("%s", bindAddress))
-	if _, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod); err != nil {
+	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
 	if err := f.WaitForPodReady(pod.Name); err != nil {
@@ -267,7 +267,7 @@ func doTestConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 	By("Creating the target pod")
 	pod := pfPod("abc", "1", "1", "1", fmt.Sprintf("%s", bindAddress))
-	if _, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod); err != nil {
+	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
 	if err := f.WaitForPodReady(pod.Name); err != nil {
@@ -312,7 +312,7 @@ func doTestMustConnectSendNothing(bindAddress string, f *framework.Framework) {
 func doTestMustConnectSendDisconnect(bindAddress string, f *framework.Framework) {
 	By("Creating the target pod")
 	pod := pfPod("abc", "10", "10", "100", fmt.Sprintf("%s", bindAddress))
-	if _, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod); err != nil {
+	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
 	if err := f.WaitForPodReady(pod.Name); err != nil {
@@ -382,7 +382,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 
 	By("Creating the pod")
 	pod := pfPod("def", "10", "10", "100", fmt.Sprintf("%s", bindAddress))
-	if _, err := f.ClientSet.Core().Pods(f.Namespace.Name).Create(pod); err != nil {
+	if _, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod); err != nil {
 		framework.Failf("Couldn't create pod: %v", err)
 	}
 	if err := f.WaitForPodReady(pod.Name); err != nil {
@@ -397,7 +397,7 @@ func doTestOverWebSockets(bindAddress string, f *framework.Framework) {
 		}
 	}()
 
-	req := f.ClientSet.Core().RESTClient().Get().
+	req := f.ClientSet.CoreV1().RESTClient().Get().
 		Namespace(f.Namespace.Name).
 		Resource("pods").
 		Name(pod.Name).

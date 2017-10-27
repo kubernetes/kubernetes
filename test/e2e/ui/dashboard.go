@@ -55,7 +55,7 @@ var _ = SIGDescribe("Kubernetes Dashboard", func() {
 		By("Checking to make sure we get a response from the kubernetes-dashboard.")
 		err = wait.Poll(framework.Poll, serverStartTimeout, func() (bool, error) {
 			var status int
-			proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.Core().RESTClient().Get())
+			proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
 			if errProxy != nil {
 				framework.Logf("Get services proxy request failed: %v", errProxy)
 			}
@@ -87,7 +87,7 @@ var _ = SIGDescribe("Kubernetes Dashboard", func() {
 
 		By("Checking that the ApiServer /ui endpoint redirects to a valid server.")
 		var status int
-		err = f.ClientSet.Core().RESTClient().Get().
+		err = f.ClientSet.CoreV1().RESTClient().Get().
 			AbsPath("/ui").
 			Timeout(framework.SingleCallTimeout).
 			Do().

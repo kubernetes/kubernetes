@@ -49,6 +49,11 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		podClient = f.PodClient()
 	})
 
+	/*
+		    Testname: pods-readiness-probe-initial-delay
+		    Description: Make sure that pod with readiness probe should not be
+			ready before initial delay and never restart.
+	*/
 	It("with readiness probe should not be ready before initial delay and never restart [Conformance]", func() {
 		p := podClient.Create(makePodSpec(probe.withInitialDelay().build(), nil))
 		f.WaitForPodReady(p.Name)
@@ -76,6 +81,11 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Expect(restartCount == 0).To(BeTrue(), "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
+	/*
+		    Testname: pods-readiness-probe-failure
+		    Description: Make sure that pod with readiness probe that fails should
+			never be ready and never restart.
+	*/
 	It("with readiness probe that fails should never be ready and never restart [Conformance]", func() {
 		p := podClient.Create(makePodSpec(probe.withFailing().build(), nil))
 		Consistently(func() (bool, error) {
@@ -96,6 +106,11 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Expect(restartCount == 0).To(BeTrue(), "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
+	/*
+		    Testname: pods-cat-liveness-probe-restarted
+		    Description: Make sure the pod is restarted with a cat /tmp/health
+			liveness probe.
+	*/
 	It("should be restarted with a exec \"cat /tmp/health\" liveness probe [Conformance]", func() {
 		runLivenessTest(f, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -123,6 +138,11 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		}, 1, defaultObservationTimeout)
 	})
 
+	/*
+		    Testname: pods-cat-liveness-probe-not-restarted
+		    Description: Make sure the pod is not restarted with a cat /tmp/health
+			liveness probe.
+	*/
 	It("should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [Conformance]", func() {
 		runLivenessTest(f, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -150,6 +170,11 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		}, 0, defaultObservationTimeout)
 	})
 
+	/*
+		    Testname: pods-http-liveness-probe-restarted
+		    Description: Make sure when http liveness probe fails, the pod should
+			be restarted.
+	*/
 	It("should be restarted with a /healthz http liveness probe [Conformance]", func() {
 		runLivenessTest(f, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -179,6 +204,11 @@ var _ = framework.KubeDescribe("Probing container", func() {
 	})
 
 	// Slow by design (5 min)
+	/*
+		    Testname: pods-restart-count
+		    Description: Make sure when a pod gets restarted, its start count
+			should increase.
+	*/
 	It("should have monotonically increasing restart count [Conformance] [Slow]", func() {
 		runLivenessTest(f, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -207,6 +237,11 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		}, 5, time.Minute*5)
 	})
 
+	/*
+		    Testname: pods-http-liveness-probe-not-restarted
+		    Description: Make sure when http liveness probe succeeds, the pod
+			should not be restarted.
+	*/
 	It("should *not* be restarted with a /healthz http liveness probe [Conformance]", func() {
 		runLivenessTest(f, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -236,6 +271,11 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		}, 0, defaultObservationTimeout)
 	})
 
+	/*
+		    Testname: pods-docker-liveness-probe-timeout
+		    Description: Make sure that the pod is restarted with a docker exec
+			liveness probe with timeout.
+	*/
 	It("should be restarted with a docker exec liveness probe with timeout [Conformance]", func() {
 		// TODO: enable this test once the default exec handler supports timeout.
 		framework.Skipf("The default exec handler, dockertools.NativeExecHandler, does not support timeouts due to a limitation in the Docker Remote API")

@@ -87,9 +87,6 @@ var _ = SIGDescribe("Deployment", func() {
 	It("deployment should support rollback", func() {
 		testRollbackDeployment(f)
 	})
-	It("deployment should label adopted RSs and pods", func() {
-		testDeploymentLabelAdopted(f)
-	})
 	It("scaled rollout deployment should not block on annotation check", func() {
 		testScaledRolloutDeployment(f)
 	})
@@ -148,7 +145,7 @@ func failureTrap(c clientset.Interface, ns string) {
 			framework.Logf("failed to get selector of ReplicaSet %s: %v", rs.Name, err)
 		}
 		options := metav1.ListOptions{LabelSelector: selector.String()}
-		podList, err := c.Core().Pods(rs.Namespace).List(options)
+		podList, err := c.CoreV1().Pods(rs.Namespace).List(options)
 		for _, pod := range podList.Items {
 			framework.Logf(spew.Sprintf("pod: %q:\n%+v\n", pod.Name, pod))
 		}
@@ -194,7 +191,7 @@ func stopDeployment(c clientset.Interface, internalClient internalclientset.Inte
 	framework.Logf("Ensuring deployment %s's Pods were deleted", deploymentName)
 	var pods *v1.PodList
 	if err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
-		pods, err = c.Core().Pods(ns).List(options)
+		pods, err = c.CoreV1().Pods(ns).List(options)
 		if err != nil {
 			return false, err
 		}
@@ -345,7 +342,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	deploymentName := "test-cleanup-deployment"
 	framework.Logf("Creating deployment %s", deploymentName)
 
-	pods, err := c.Core().Pods(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
+	pods, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	Expect(err).NotTo(HaveOccurred(), "Failed to query for pods: %v", err)
 
 	options := metav1.ListOptions{
@@ -353,7 +350,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	w, err := c.Core().Pods(ns).Watch(options)
+	w, err := c.CoreV1().Pods(ns).Watch(options)
 	Expect(err).NotTo(HaveOccurred())
 	go func() {
 		// There should be only one pod being created, which is the pod with the redis image.
@@ -627,57 +624,6 @@ func testRollbackDeployment(f *framework.Framework) {
 	// Check if it's still revision 4 and still has the old pod template
 	err = framework.CheckDeploymentRevisionAndImage(c, ns, deploymentName, "4", updatedDeploymentImage)
 	Expect(err).NotTo(HaveOccurred())
-}
-
-func testDeploymentLabelAdopted(f *framework.Framework) {
-	ns := f.Namespace.Name
-	c := f.ClientSet
-	// Create nginx pods.
-	podName := "nginx"
-	podLabels := map[string]string{"name": podName}
-
-	rsName := "test-adopted-controller"
-	replicas := int32(1)
-	image := NginxImage
-	_, err := c.Extensions().ReplicaSets(ns).Create(newRS(rsName, replicas, podLabels, podName, image))
-	Expect(err).NotTo(HaveOccurred())
-	// Verify that the required pods have come up.
-	err = framework.VerifyPodsRunning(c, ns, podName, false, replicas)
-	Expect(err).NotTo(HaveOccurred(), "error in waiting for pods to come up: %v", err)
-
-	// Create a nginx deployment to adopt the old rs.
-	deploymentName := "test-adopted-deployment"
-	framework.Logf("Creating deployment %s", deploymentName)
-	deploy, err := c.Extensions().Deployments(ns).Create(framework.NewDeployment(deploymentName, replicas, podLabels, podName, image, extensions.RollingUpdateDeploymentStrategyType))
-	Expect(err).NotTo(HaveOccurred())
-
-	// Wait for it to be updated to revision 1
-	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", image)
-	Expect(err).NotTo(HaveOccurred())
-
-	// The RS and pods should be relabeled before the status is updated by syncRollingUpdateDeployment
-	err = framework.WaitForDeploymentComplete(c, deploy)
-	Expect(err).NotTo(HaveOccurred())
-
-	// There should be no old RSs (overlapping RS)
-	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-	Expect(err).NotTo(HaveOccurred())
-	oldRSs, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
-	Expect(err).NotTo(HaveOccurred())
-	Expect(len(oldRSs)).Should(Equal(0))
-	Expect(len(allOldRSs)).Should(Equal(0))
-	// New RS should contain pod-template-hash in its selector, label, and template label
-	err = framework.CheckRSHashLabel(newRS)
-	Expect(err).NotTo(HaveOccurred())
-	// All pods targeted by the deployment should contain pod-template-hash in their labels, and there should be only 3 pods
-	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
-	Expect(err).NotTo(HaveOccurred())
-	options := metav1.ListOptions{LabelSelector: selector.String()}
-	pods, err := c.Core().Pods(ns).List(options)
-	Expect(err).NotTo(HaveOccurred())
-	err = framework.CheckPodHashLabel(pods)
-	Expect(err).NotTo(HaveOccurred())
-	Expect(int32(len(pods.Items))).Should(Equal(replicas))
 }
 
 func testScaledRolloutDeployment(f *framework.Framework) {
@@ -1001,7 +947,7 @@ func testIterativeDeployments(f *framework.Framework) {
 			selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 			Expect(err).NotTo(HaveOccurred())
 			opts := metav1.ListOptions{LabelSelector: selector.String()}
-			podList, err := c.Core().Pods(ns).List(opts)
+			podList, err := c.CoreV1().Pods(ns).List(opts)
 			Expect(err).NotTo(HaveOccurred())
 			if len(podList.Items) == 0 {
 				framework.Logf("%02d: no deployment pods to delete", i)
@@ -1013,7 +959,7 @@ func testIterativeDeployments(f *framework.Framework) {
 				}
 				name := podList.Items[p].Name
 				framework.Logf("%02d: deleting deployment pod %q", i, name)
-				err := c.Core().Pods(ns).Delete(name, nil)
+				err := c.CoreV1().Pods(ns).Delete(name, nil)
 				if err != nil && !errors.IsNotFound(err) {
 					Expect(err).NotTo(HaveOccurred())
 				}

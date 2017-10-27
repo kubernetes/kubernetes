@@ -47,8 +47,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	clientextensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
-	federation "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/helper"
@@ -970,6 +968,26 @@ func printScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, w PrefixWriter) {
 		sio.Gateway, sio.System, sio.ProtectionDomain, sio.StoragePool, sio.StorageMode, sio.VolumeName, sio.FSType, sio.ReadOnly)
 }
 
+func printScaleIOPersistentVolumeSource(sio *api.ScaleIOPersistentVolumeSource, w PrefixWriter) {
+	var secretNS, secretName string
+	if sio.SecretRef != nil {
+		secretName = sio.SecretRef.Name
+		secretNS = sio.SecretRef.Namespace
+	}
+	w.Write(LEVEL_2, "Type:\tScaleIO (a persistent volume backed by a block device in ScaleIO)\n"+
+		"    Gateway:\t%v\n"+
+		"    System:\t%v\n"+
+		"    Protection Domain:\t%v\n"+
+		"    Storage Pool:\t%v\n"+
+		"    Storage Mode:\t%v\n"+
+		"    VolumeName:\t%v\n"+
+		"    SecretName:\t%v\n"+
+		"    SecretNamespace:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		sio.Gateway, sio.System, sio.ProtectionDomain, sio.StoragePool, sio.StorageMode, sio.VolumeName, secretName, secretNS, sio.FSType, sio.ReadOnly)
+}
+
 func printLocalVolumeSource(ls *api.LocalVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tLocalVolume (a persistent volume backed by local storage on a node)\n"+
 		"    Path:\t%v\n",
@@ -1135,7 +1153,7 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		case pv.Spec.PortworxVolume != nil:
 			printPortworxVolumeSource(pv.Spec.PortworxVolume, w)
 		case pv.Spec.ScaleIO != nil:
-			printScaleIOVolumeSource(pv.Spec.ScaleIO, w)
+			printScaleIOPersistentVolumeSource(pv.Spec.ScaleIO, w)
 		case pv.Spec.Local != nil:
 			printLocalVolumeSource(pv.Spec.Local, w)
 		case pv.Spec.CephFS != nil:
@@ -2273,7 +2291,8 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 			mountHeader: mountSecretNames,
 			tokenHeader: tokenSecretNames,
 		}
-		for header, names := range types {
+		for _, header := range sets.StringKeySet(types).List() {
+			names := types[header]
 			if len(names) == 0 {
 				w.Write(LEVEL_0, "%s\t<none>\n", header)
 			} else {
@@ -3046,47 +3065,6 @@ func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings 
 			}
 			if events != nil {
 				DescribeEvents(events, w)
-			}
-		}
-		return nil
-	})
-}
-
-type ClusterDescriber struct {
-	fedclientset.Interface
-}
-
-func (d *ClusterDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	cluster, err := d.Federation().Clusters().Get(name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-	return describeCluster(cluster)
-}
-
-func describeCluster(cluster *federation.Cluster) (string, error) {
-	return tabbedString(func(out io.Writer) error {
-		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", cluster.Name)
-		w.Write(LEVEL_0, "Labels:\t%s\n", labels.FormatLabels(cluster.Labels))
-
-		w.Write(LEVEL_0, "ServerAddressByClientCIDRs:\n  ClientCIDR\tServerAddress\n")
-		w.Write(LEVEL_1, "----\t----\n")
-		for _, cidrAddr := range cluster.Spec.ServerAddressByClientCIDRs {
-			w.Write(LEVEL_1, "%v \t%v\n\n", cidrAddr.ClientCIDR, cidrAddr.ServerAddress)
-		}
-
-		if len(cluster.Status.Conditions) > 0 {
-			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tLastUpdateTime\tLastTransitionTime\tReason\tMessage\n")
-			w.Write(LEVEL_1, "----\t------\t-----------------\t------------------\t------\t-------\n")
-			for _, c := range cluster.Status.Conditions {
-				w.Write(LEVEL_1, "%v \t%v \t%s \t%s \t%v \t%v\n",
-					c.Type,
-					c.Status,
-					c.LastProbeTime.Time.Format(time.RFC1123Z),
-					c.LastTransitionTime.Time.Format(time.RFC1123Z),
-					c.Reason,
-					c.Message)
 			}
 		}
 		return nil

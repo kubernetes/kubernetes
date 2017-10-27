@@ -664,7 +664,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 		}
 
 		// Fetch current node object
-		node, fetchErr := og.kubeClient.Core().Nodes().Get(string(nodeName), metav1.GetOptions{})
+		node, fetchErr := og.kubeClient.CoreV1().Nodes().Get(string(nodeName), metav1.GetOptions{})
 		if fetchErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateErrorDetailed("VerifyControllerAttachedVolume failed fetching node from API server", fetchErr)
@@ -698,7 +698,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 func (og *operationGenerator) verifyVolumeIsSafeToDetach(
 	volumeToDetach AttachedVolume) error {
 	// Fetch current node object
-	node, fetchErr := og.kubeClient.Core().Nodes().Get(string(volumeToDetach.NodeName), metav1.GetOptions{})
+	node, fetchErr := og.kubeClient.CoreV1().Nodes().Get(string(volumeToDetach.NodeName), metav1.GetOptions{})
 	if fetchErr != nil {
 		if errors.IsNotFound(fetchErr) {
 			glog.Warningf(volumeToDetach.GenerateMsgDetailed("Node not found on API server. DetachVolume will skip safe to detach check", ""))

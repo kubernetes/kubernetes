@@ -243,7 +243,7 @@ func (rc *ResourceConsumer) sendConsumeCPURequest(millicores int) {
 	defer cancel()
 
 	err := wait.PollImmediate(serviceInitializationInterval, serviceInitializationTimeout, func() (bool, error) {
-		proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.Core().RESTClient().Post())
+		proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
 			Context(ctx).
@@ -270,7 +270,7 @@ func (rc *ResourceConsumer) sendConsumeMemRequest(megabytes int) {
 	defer cancel()
 
 	err := wait.PollImmediate(serviceInitializationInterval, serviceInitializationTimeout, func() (bool, error) {
-		proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.Core().RESTClient().Post())
+		proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
 			Context(ctx).
@@ -297,7 +297,7 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
 	defer cancel()
 
 	err := wait.PollImmediate(serviceInitializationInterval, serviceInitializationTimeout, func() (bool, error) {
-		proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.Core().RESTClient().Post())
+		proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
 			Context(ctx).
@@ -321,7 +321,7 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
 func (rc *ResourceConsumer) GetReplicas() int {
 	switch rc.kind {
 	case KindRC:
-		replicationController, err := rc.clientSet.Core().ReplicationControllers(rc.nsName).Get(rc.name, metav1.GetOptions{})
+		replicationController, err := rc.clientSet.CoreV1().ReplicationControllers(rc.nsName).Get(rc.name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		if replicationController == nil {
 			framework.Failf(rcIsNil)
@@ -404,9 +404,9 @@ func (rc *ResourceConsumer) CleanUp() {
 	kind, err := kindOf(rc.kind)
 	framework.ExpectNoError(err)
 	framework.ExpectNoError(framework.DeleteResourceAndPods(rc.clientSet, rc.internalClientset, kind, rc.nsName, rc.name))
-	framework.ExpectNoError(rc.clientSet.Core().Services(rc.nsName).Delete(rc.name, nil))
+	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(rc.name, nil))
 	framework.ExpectNoError(framework.DeleteResourceAndPods(rc.clientSet, rc.internalClientset, api.Kind("ReplicationController"), rc.nsName, rc.controllerName))
-	framework.ExpectNoError(rc.clientSet.Core().Services(rc.nsName).Delete(rc.controllerName, nil))
+	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(rc.controllerName, nil))
 }
 
 func kindOf(kind string) (schema.GroupKind, error) {
@@ -424,7 +424,7 @@ func kindOf(kind string) (schema.GroupKind, error) {
 
 func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, internalClient internalclientset.Interface, ns, name, kind string, replicas int, cpuLimitMillis, memLimitMb int64) {
 	By(fmt.Sprintf("Running consuming RC %s via %s with %v replicas", name, kind, replicas))
-	_, err := c.Core().Services(ns).Create(&v1.Service{
+	_, err := c.CoreV1().Services(ns).Create(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -478,7 +478,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, internalCli
 
 	By(fmt.Sprintf("Running controller"))
 	controllerName := name + "-ctrl"
-	_, err = c.Core().Services(ns).Create(&v1.Service{
+	_, err = c.CoreV1().Services(ns).Create(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: controllerName,
 		},

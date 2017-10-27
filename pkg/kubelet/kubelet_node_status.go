@@ -97,7 +97,7 @@ func (kl *Kubelet) registerWithAPIServer() {
 // a different externalID value, it attempts to delete that node so that a
 // later attempt can recreate it.
 func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
-	_, err := kl.kubeClient.Core().Nodes().Create(node)
+	_, err := kl.kubeClient.CoreV1().Nodes().Create(node)
 	if err == nil {
 		return true
 	}
@@ -107,7 +107,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 		return false
 	}
 
-	existingNode, err := kl.kubeClient.Core().Nodes().Get(string(kl.nodeName), metav1.GetOptions{})
+	existingNode, err := kl.kubeClient.CoreV1().Nodes().Get(string(kl.nodeName), metav1.GetOptions{})
 	if err != nil {
 		glog.Errorf("Unable to register node %q with API server: error getting existing node: %v", kl.nodeName, err)
 		return false
@@ -146,7 +146,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 		"Previously node %q had externalID %q; now it is %q; will delete and recreate.",
 		kl.nodeName, node.Spec.ExternalID, existingNode.Spec.ExternalID,
 	)
-	if err := kl.kubeClient.Core().Nodes().Delete(node.Name, nil); err != nil {
+	if err := kl.kubeClient.CoreV1().Nodes().Delete(node.Name, nil); err != nil {
 		glog.Errorf("Unable to register node %q with API server: error deleting old node: %v", kl.nodeName, err)
 	} else {
 		glog.Infof("Deleted old node object %q", kl.nodeName)

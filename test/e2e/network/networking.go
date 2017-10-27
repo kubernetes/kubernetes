@@ -76,7 +76,7 @@ var _ = SIGDescribe("Networking", func() {
 		}
 		for _, test := range tests {
 			By(fmt.Sprintf("testing: %s", test.path))
-			data, err := f.ClientSet.Core().RESTClient().Get().
+			data, err := f.ClientSet.CoreV1().RESTClient().Get().
 				AbsPath(test.path).
 				DoRaw()
 			if err != nil {
@@ -106,7 +106,7 @@ var _ = SIGDescribe("Networking", func() {
 			By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, framework.ClusterHttpPort))
 			config.DialFromTestContainer("http", config.ClusterIP, framework.ClusterHttpPort, config.MaxTries, 0, config.EndpointHostnames())
 
-			By(fmt.Sprintf("dialing(http) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.ExternalAddrs[0], config.NodeHttpPort))
+			By(fmt.Sprintf("dialing(http) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.NodeIP, config.NodeHttpPort))
 			config.DialFromTestContainer("http", config.NodeIP, config.NodeHttpPort, config.MaxTries, 0, config.EndpointHostnames())
 		})
 
@@ -115,7 +115,7 @@ var _ = SIGDescribe("Networking", func() {
 			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, framework.ClusterUdpPort))
 			config.DialFromTestContainer("udp", config.ClusterIP, framework.ClusterUdpPort, config.MaxTries, 0, config.EndpointHostnames())
 
-			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.ExternalAddrs[0], config.NodeUdpPort))
+			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.NodeIP, config.NodeUdpPort))
 			config.DialFromTestContainer("udp", config.NodeIP, config.NodeUdpPort, config.MaxTries, 0, config.EndpointHostnames())
 		})
 

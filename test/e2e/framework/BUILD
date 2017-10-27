@@ -12,7 +12,6 @@ go_library(
         "cleanup.go",
         "deployment_util.go",
         "exec_util.go",
-        "federation_util.go",
         "firewall_util.go",
         "framework.go",
         "get-kubemark-resource-usage.go",
@@ -41,7 +40,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/framework",
     deps = [
-        "//federation/apis/federation/v1beta1:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",

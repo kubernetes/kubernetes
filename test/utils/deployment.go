@@ -51,7 +51,7 @@ func LogReplicaSetsOfDeployment(deployment *extensions.Deployment, allOldRSs []*
 func LogPodsOfDeployment(c clientset.Interface, deployment *extensions.Deployment, rsList []*extensions.ReplicaSet, logf LogfFn) {
 	minReadySeconds := deployment.Spec.MinReadySeconds
 	podListFunc := func(namespace string, options metav1.ListOptions) (*v1.PodList, error) {
-		return c.Core().Pods(namespace).List(options)
+		return c.CoreV1().Pods(namespace).List(options)
 	}
 
 	podList, err := deploymentutil.ListPods(deployment, rsList, podListFunc)
@@ -172,7 +172,7 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 	var deployment *extensions.Deployment
 	var newRS *extensions.ReplicaSet
 	var reason string
-	err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
+	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		var err error
 		deployment, err = c.ExtensionsV1beta1().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
 		if err != nil {

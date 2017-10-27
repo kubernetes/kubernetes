@@ -129,10 +129,10 @@ func (nsu *nodeStatusUpdater) updateNodeStatus(nodeName types.NodeName, nodeObj 
 			err)
 	}
 
-	_, err = nsu.kubeClient.Core().Nodes().PatchStatus(string(nodeName), patchBytes)
+	_, err = nsu.kubeClient.CoreV1().Nodes().PatchStatus(string(nodeName), patchBytes)
 	if err != nil {
 		return fmt.Errorf(
-			"failed to kubeClient.Core().Nodes().Patch for node %q. %v",
+			"failed to kubeClient.CoreV1().Nodes().Patch for node %q. %v",
 			nodeName,
 			err)
 	}

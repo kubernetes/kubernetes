@@ -125,7 +125,6 @@ fi
 # If you update this list, please also update build/BUILD.
 readonly KUBE_CLIENT_TARGETS=(
   cmd/kubectl
-  federation/cmd/kubefed
 )
 readonly KUBE_CLIENT_BINARIES=("${KUBE_CLIENT_TARGETS[@]##*/}")
 readonly KUBE_CLIENT_BINARIES_WIN=("${KUBE_CLIENT_BINARIES[@]/%/.exe}")
@@ -140,7 +139,6 @@ kube::golang::test_targets() {
     cmd/genyaml
     cmd/genswaggertypedocs
     cmd/linkcheck
-    federation/cmd/genfeddocs
     vendor/github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
   )
@@ -153,12 +151,10 @@ readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
 readonly KUBE_TEST_PORTABLE=(
   test/e2e/testing-manifests
   test/kubemark
-  federation/develop
   hack/e2e.go
   hack/e2e-internal
   hack/get-build.sh
   hack/ginkgo-e2e.sh
-  hack/federated-ginkgo-e2e.sh
   hack/lib
 )
 

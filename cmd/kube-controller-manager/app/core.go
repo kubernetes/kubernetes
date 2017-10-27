@@ -250,7 +250,7 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 		api.Kind("ConfigMap"),
 	}
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
-		QuotaClient:               resourceQuotaControllerClient.Core(),
+		QuotaClient:               resourceQuotaControllerClient.CoreV1(),
 		ResourceQuotaInformer:     ctx.InformerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.StaticResyncPeriodFunc(ctx.Options.ResourceQuotaSyncPeriod.Duration),
 		Registry:                  resourceQuotaRegistry,
@@ -258,8 +258,8 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 		ReplenishmentResyncPeriod: ResyncPeriod(&ctx.Options),
 		GroupKindsToReplenish:     groupKindsToReplenish,
 	}
-	if resourceQuotaControllerClient.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.Core().RESTClient().GetRateLimiter())
+	if resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	go resourcequotacontroller.NewResourceQuotaController(

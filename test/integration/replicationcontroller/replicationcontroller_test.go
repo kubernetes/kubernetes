@@ -99,8 +99,8 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 // controllers and pods are rcNum and podNum. It returns error if the
 // communication with the API server fails.
 func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespace string, rcNum, podNum int) (bool, error) {
-	rcClient := clientSet.Core().ReplicationControllers(namespace)
-	podClient := clientSet.Core().Pods(namespace)
+	rcClient := clientSet.CoreV1().ReplicationControllers(namespace)
+	podClient := clientSet.CoreV1().Pods(namespace)
 	pods, err := podClient.List(metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list pods: %v", err)
@@ -212,8 +212,8 @@ func TestAdoption(t *testing.T) {
 		ns := framework.CreateTestingNamespace(fmt.Sprintf("adoption-%d", i), s, t)
 		defer framework.DeleteTestingNamespace(ns, s, t)
 
-		rcClient := clientSet.Core().ReplicationControllers(ns.Name)
-		podClient := clientSet.Core().Pods(ns.Name)
+		rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
+		podClient := clientSet.CoreV1().Pods(ns.Name)
 		const rcName = "rc"
 		rc, err := rcClient.Create(newRC(rcName, ns.Name, 1))
 		if err != nil {
@@ -249,8 +249,8 @@ func TestAdoption(t *testing.T) {
 }
 
 func createRCsPods(t *testing.T, clientSet clientset.Interface, rcs []*v1.ReplicationController, pods []*v1.Pod, ns string) {
-	rcClient := clientSet.Core().ReplicationControllers(ns)
-	podClient := clientSet.Core().Pods(ns)
+	rcClient := clientSet.CoreV1().ReplicationControllers(ns)
+	podClient := clientSet.CoreV1().Pods(ns)
 	for _, rc := range rcs {
 		if _, err := rcClient.Create(rc); err != nil {
 			t.Fatalf("Failed to create replication controller %s: %v", rc.Name, err)
@@ -264,7 +264,7 @@ func createRCsPods(t *testing.T, clientSet clientset.Interface, rcs []*v1.Replic
 }
 
 func waitRCStable(t *testing.T, clientSet clientset.Interface, rc *v1.ReplicationController, ns string) {
-	rcClient := clientSet.Core().ReplicationControllers(ns)
+	rcClient := clientSet.CoreV1().ReplicationControllers(ns)
 	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
 		updatedRC, err := rcClient.Get(rc.Name, metav1.GetOptions{})
 		if err != nil {
@@ -304,7 +304,7 @@ func TestUpdateSelectorToAdopt(t *testing.T) {
 
 	// change the rc's selector to match both pods
 	patch := `{"spec":{"selector":{"uniqueKey":null}}}`
-	rcClient := clientSet.Core().ReplicationControllers(ns.Name)
+	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
 	rc, err := rcClient.Patch(rc.Name, types.StrategicMergePatchType, []byte(patch))
 	if err != nil {
 		t.Fatalf("Failed to patch replication controller: %v", err)
@@ -342,7 +342,7 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 
 	// change the rc's selector to match both pods
 	patch := `{"spec":{"selector":{"uniqueKey":"1"},"template":{"metadata":{"labels":{"uniqueKey":"1"}}}}}`
-	rcClient := clientSet.Core().ReplicationControllers(ns.Name)
+	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
 	rc, err := rcClient.Patch(rc.Name, types.StrategicMergePatchType, []byte(patch))
 	if err != nil {
 		t.Fatalf("Failed to patch replication controller: %v", err)
@@ -354,7 +354,7 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	podClient := clientSet.Core().Pods(ns.Name)
+	podClient := clientSet.CoreV1().Pods(ns.Name)
 	pod2, err = podClient.Get(pod2.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get pod2: %v", err)
@@ -385,7 +385,7 @@ func TestUpdateLabelToRemoveControllerRef(t *testing.T) {
 
 	// change the rc's selector to match both pods
 	patch := `{"metadata":{"labels":{"name":null}}}`
-	podClient := clientSet.Core().Pods(ns.Name)
+	podClient := clientSet.CoreV1().Pods(ns.Name)
 	pod2, err := podClient.Patch(pod2.Name, types.StrategicMergePatchType, []byte(patch))
 	if err != nil {
 		t.Fatalf("Failed to patch pod2: %v", err)
@@ -432,7 +432,7 @@ func TestUpdateLabelToBeAdopted(t *testing.T) {
 
 	// change the rc's selector to match both pods
 	patch := `{"metadata":{"labels":{"uniqueKey":"1"}}}`
-	podClient := clientSet.Core().Pods(ns.Name)
+	podClient := clientSet.CoreV1().Pods(ns.Name)
 	pod2, err := podClient.Patch(pod2.Name, types.StrategicMergePatchType, []byte(patch))
 	if err != nil {
 		t.Fatalf("Failed to patch pod2: %v", err)

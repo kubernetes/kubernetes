@@ -3,6 +3,7 @@ package(default_visibility = ["//visibility:public"])
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
+    "go_test",
 )
 
 go_library(
@@ -22,4 +23,15 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["file_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/util/file",
+    library = ":go_default_library",
+    deps = [
+        "//vendor/github.com/spf13/afero:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
+    ],
 )

@@ -565,7 +565,12 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 		}
 	}
 	config.ClusterIP = config.NodePortService.Spec.ClusterIP
-	config.NodeIP = config.ExternalAddrs[0]
+	if len(config.ExternalAddrs) != 0 {
+		config.NodeIP = config.ExternalAddrs[0]
+	} else {
+		internalAddrs := NodeAddresses(nodeList, v1.NodeInternalIP)
+		config.NodeIP = internalAddrs[0]
+	}
 }
 
 func (config *NetworkingTestConfig) cleanup() {
@@ -656,11 +661,11 @@ func (config *NetworkingTestConfig) getPodClient() *PodClient {
 }
 
 func (config *NetworkingTestConfig) getServiceClient() coreclientset.ServiceInterface {
-	return config.f.ClientSet.Core().Services(config.Namespace)
+	return config.f.ClientSet.CoreV1().Services(config.Namespace)
 }
 
 func (config *NetworkingTestConfig) getNamespacesClient() coreclientset.NamespaceInterface {
-	return config.f.ClientSet.Core().Namespaces()
+	return config.f.ClientSet.CoreV1().Namespaces()
 }
 
 func CheckReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {

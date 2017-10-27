@@ -899,7 +899,7 @@ metadata:
 
 			// Node
 			// It should be OK to list unschedulable Nodes here.
-			nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
+			nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			node := nodes.Items[0]
 			output = framework.RunKubectlOrDie("describe", "node", node.Name)
@@ -955,7 +955,7 @@ metadata:
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
 				err := wait.Poll(framework.Poll, timeout, func() (bool, error) {
-					endpoints, err := c.Core().Endpoints(ns).Get(name, metav1.GetOptions{})
+					endpoints, err := c.CoreV1().Endpoints(ns).Get(name, metav1.GetOptions{})
 					if err != nil {
 						// log the real error
 						framework.Logf("Get endpoints failed (interval %v): %v", framework.Poll, err)
@@ -986,7 +986,7 @@ metadata:
 				})
 				Expect(err).NotTo(HaveOccurred())
 
-				service, err := c.Core().Services(ns).Get(name, metav1.GetOptions{})
+				service, err := c.CoreV1().Services(ns).Get(name, metav1.GetOptions{})
 				Expect(err).NotTo(HaveOccurred())
 
 				if len(service.Spec.Ports) != 1 {
@@ -1213,7 +1213,7 @@ metadata:
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", rcName, "--image="+nginxImage, "--generator=run/v1", nsFlag)
 			By("verifying the rc " + rcName + " was created")
-			rc, err := c.Core().ReplicationControllers(ns).Get(rcName, metav1.GetOptions{})
+			rc, err := c.CoreV1().ReplicationControllers(ns).Get(rcName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting rc %s: %v", rcName, err)
 			}
@@ -1269,7 +1269,7 @@ metadata:
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", rcName, "--image="+nginxImage, "--generator=run/v1", nsFlag)
 			By("verifying the rc " + rcName + " was created")
-			rc, err := c.Core().ReplicationControllers(ns).Get(rcName, metav1.GetOptions{})
+			rc, err := c.CoreV1().ReplicationControllers(ns).Get(rcName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting rc %s: %v", rcName, err)
 			}
@@ -1427,7 +1427,7 @@ metadata:
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", podName, "--restart=Never", "--generator=run-pod/v1", "--image="+nginxImage, nsFlag)
 			By("verifying the pod " + podName + " was created")
-			pod, err := c.Core().Pods(ns).Get(podName, metav1.GetOptions{})
+			pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting pod %s: %v", podName, err)
 			}
@@ -1478,7 +1478,7 @@ metadata:
 			framework.RunKubectlOrDieInput(podJson, "replace", "-f", "-", nsFlag)
 
 			By("verifying the pod " + podName + " has the right image " + busyboxImage)
-			pod, err := c.Core().Pods(ns).Get(podName, metav1.GetOptions{})
+			pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting deployment %s: %v", podName, err)
 			}
@@ -1679,7 +1679,7 @@ metadata:
 			framework.RunKubectlOrDie("create", "quota", quotaName, "--hard=pods=1000000,services=1000000", nsFlag)
 
 			By("verifying that the quota was created")
-			quota, err := c.Core().ResourceQuotas(ns).Get(quotaName, metav1.GetOptions{})
+			quota, err := c.CoreV1().ResourceQuotas(ns).Get(quotaName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting quota %s: %v", quotaName, err)
 			}
@@ -1709,7 +1709,7 @@ metadata:
 			framework.RunKubectlOrDie("create", "quota", quotaName, "--hard=pods=1000000", "--scopes=BestEffort,NotTerminating", nsFlag)
 
 			By("verifying that the quota was created")
-			quota, err := c.Core().ResourceQuotas(ns).Get(quotaName, metav1.GetOptions{})
+			quota, err := c.CoreV1().ResourceQuotas(ns).Get(quotaName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting quota %s: %v", quotaName, err)
 			}
@@ -1886,7 +1886,7 @@ func waitForGuestbookResponse(c clientset.Interface, cmd, arg, expectedResponse 
 }
 
 func makeRequestToGuestbook(c clientset.Interface, cmd, value string, ns string) (string, error) {
-	proxyRequest, errProxy := framework.GetServicesProxyRequest(c, c.Core().RESTClient().Get())
+	proxyRequest, errProxy := framework.GetServicesProxyRequest(c, c.CoreV1().RESTClient().Get())
 	if errProxy != nil {
 		return "", errProxy
 	}
@@ -1955,7 +1955,7 @@ func forEachReplicationController(c clientset.Interface, ns, selectorKey, select
 	for t := time.Now(); time.Since(t) < framework.PodListTimeout; time.Sleep(framework.Poll) {
 		label := labels.SelectorFromSet(labels.Set(map[string]string{selectorKey: selectorValue}))
 		options := metav1.ListOptions{LabelSelector: label.String()}
-		rcs, err = c.Core().ReplicationControllers(ns).List(options)
+		rcs, err = c.CoreV1().ReplicationControllers(ns).List(options)
 		Expect(err).NotTo(HaveOccurred())
 		if len(rcs.Items) > 0 {
 			break
@@ -2001,7 +2001,7 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 
 		var body []byte
 		if subResourceProxyAvailable {
-			body, err = c.Core().RESTClient().Get().
+			body, err = c.CoreV1().RESTClient().Get().
 				Namespace(ns).
 				Resource("pods").
 				SubResource("proxy").
@@ -2010,7 +2010,7 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 				Do().
 				Raw()
 		} else {
-			body, err = c.Core().RESTClient().Get().
+			body, err = c.CoreV1().RESTClient().Get().
 				Prefix("proxy").
 				Namespace(ns).
 				Resource("pods").

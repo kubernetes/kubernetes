@@ -1506,8 +1506,6 @@ function check-cluster() {
 
    # Update the user's kubeconfig to include credentials for this apiserver.
    create-kubeconfig
-
-   create-kubeconfig-for-federation
   )
 
   # ensures KUBECONFIG is set

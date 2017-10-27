@@ -241,7 +241,10 @@ func (o *SubjectOptions) Run(f cmdutil.Factory, fn updateSubjects) error {
 		}
 
 		if o.Local || o.DryRun {
-			return o.PrintObject(o.Mapper, info.Object, o.Out)
+			if err := o.PrintObject(o.Mapper, info.Object, o.Out); err != nil {
+				return err
+			}
+			continue
 		}
 
 		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)

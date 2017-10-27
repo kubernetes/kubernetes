@@ -22,17 +22,13 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 type pluginInitializer struct {
 	externalClient    kubernetes.Interface
 	externalInformers informers.SharedInformerFactory
 	authorizer        authorizer.Authorizer
-	// webhookRESTClientConfig provies a client used to contact webhooks
-	// TODO clean out cruft
-	webhookRESTClientConfig *rest.Config
-	scheme                  *runtime.Scheme
+	scheme            *runtime.Scheme
 }
 
 // New creates an instance of admission plugins initializer.
@@ -41,15 +37,13 @@ func New(
 	extClientset kubernetes.Interface,
 	extInformers informers.SharedInformerFactory,
 	authz authorizer.Authorizer,
-	webhookRESTClientConfig *rest.Config,
 	scheme *runtime.Scheme,
 ) (pluginInitializer, error) {
 	return pluginInitializer{
-		externalClient:          extClientset,
-		externalInformers:       extInformers,
-		authorizer:              authz,
-		webhookRESTClientConfig: webhookRESTClientConfig,
-		scheme:                  scheme,
+		externalClient:    extClientset,
+		externalInformers: extInformers,
+		authorizer:        authz,
+		scheme:            scheme,
 	}, nil
 }
 
@@ -66,10 +60,6 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 
 	if wants, ok := plugin.(WantsAuthorizer); ok {
 		wants.SetAuthorizer(i.authorizer)
-	}
-
-	if wants, ok := plugin.(WantsWebhookRESTClientConfig); ok {
-		wants.SetWebhookRESTClientConfig(i.webhookRESTClientConfig)
 	}
 
 	if wants, ok := plugin.(WantsScheme); ok {

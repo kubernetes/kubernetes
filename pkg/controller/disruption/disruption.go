@@ -294,7 +294,7 @@ func (dc *DisruptionController) Run(stopCh <-chan struct{}) {
 
 	if dc.kubeClient != nil {
 		glog.Infof("Sending events to api server.")
-		dc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(dc.kubeClient.Core().RESTClient()).Events("")})
+		dc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(dc.kubeClient.CoreV1().RESTClient()).Events("")})
 	} else {
 		glog.Infof("No api server defined - no events will be sent to API server.")
 	}

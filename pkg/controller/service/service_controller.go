@@ -113,11 +113,11 @@ func New(
 ) (*ServiceController, error) {
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartLogging(glog.Infof)
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
+	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
 
-	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("service_controller", kubeClient.Core().RESTClient().GetRateLimiter())
+	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("service_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	s := &ServiceController{
@@ -327,7 +327,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(key string, service *v1.S
 func (s *ServiceController) persistUpdate(service *v1.Service) error {
 	var err error
 	for i := 0; i < clientRetryCount; i++ {
-		_, err = s.kubeClient.Core().Services(service.Namespace).UpdateStatus(service)
+		_, err = s.kubeClient.CoreV1().Services(service.Namespace).UpdateStatus(service)
 		if err == nil {
 			return nil
 		}

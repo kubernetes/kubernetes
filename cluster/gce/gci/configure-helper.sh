@@ -52,7 +52,7 @@ function config-ip-firewall {
   iptables -N KUBE-METADATA-SERVER
   iptables -I FORWARD -p tcp -d 169.254.169.254 --dport 80 -j KUBE-METADATA-SERVER
 
-  if [[ -n "${KUBE_FIREWALL_METADATA_SERVER:-}" ]]; then
+  if [[ -n "${ENABLE_METADATA_CONCEALMENT:-}" ]]; then
     iptables -A KUBE-METADATA-SERVER -j DROP
   fi
 }
@@ -1862,7 +1862,7 @@ EOF
   if [[ "${ENABLE_IP_MASQ_AGENT:-}" == "true" ]]; then
     setup-addon-manifests "addons" "ip-masq-agent"
   fi
-  if [[ "${ENABLE_METADATA_PROXY:-}" == "simple" ]]; then
+  if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]]; then
     setup-addon-manifests "addons" "metadata-proxy/gce"
   fi
 

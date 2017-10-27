@@ -88,7 +88,7 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 		}
 		var err error
 		for i := 0; i < retries; i++ {
-			err = c.Core().Pods(ns).Delete(name, &metav1.DeleteOptions{})
+			err = c.CoreV1().Pods(ns).Delete(name, &metav1.DeleteOptions{})
 			if err == nil {
 				break
 			}
@@ -110,12 +110,12 @@ func getNoExecuteTaints(taints []v1.Taint) []v1.Taint {
 
 func getPodsAssignedToNode(c clientset.Interface, nodeName string) ([]v1.Pod, error) {
 	selector := fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName})
-	pods, err := c.Core().Pods(v1.NamespaceAll).List(metav1.ListOptions{
+	pods, err := c.CoreV1().Pods(v1.NamespaceAll).List(metav1.ListOptions{
 		FieldSelector: selector.String(),
 		LabelSelector: labels.Everything().String(),
 	})
 	for i := 0; i < retries && err != nil; i++ {
-		pods, err = c.Core().Pods(v1.NamespaceAll).List(metav1.ListOptions{
+		pods, err = c.CoreV1().Pods(v1.NamespaceAll).List(metav1.ListOptions{
 			FieldSelector: selector.String(),
 			LabelSelector: labels.Everything().String(),
 		})
@@ -156,7 +156,7 @@ func NewNoExecuteTaintManager(c clientset.Interface) *NoExecuteTaintManager {
 	eventBroadcaster.StartLogging(glog.Infof)
 	if c != nil {
 		glog.V(0).Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(c.Core().RESTClient()).Events("")})
+		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(c.CoreV1().RESTClient()).Events("")})
 	} else {
 		glog.Fatalf("kubeClient is nil when starting NodeController")
 	}

@@ -35,15 +35,28 @@ var _ = framework.KubeDescribe("Projected", func() {
 	// Part 1/3 - Secrets
 	f := framework.NewDefaultFramework("projected")
 
+	/*
+	   Testname: projected-secret-no-defaultMode
+	   Description: Simple projected Secret test with no defaultMode set.
+	*/
 	It("should be consumable from pods in volume [Conformance] [sig-storage]", func() {
 		doProjectedSecretE2EWithoutMapping(f, nil /* default mode */, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
+	/*
+	   Testname: projected-secret-with-defaultMode
+	   Description: Simple projected Secret test with defaultMode set.
+	*/
 	It("should be consumable from pods in volume with defaultMode set [Conformance] [sig-storage]", func() {
 		defaultMode := int32(0400)
 		doProjectedSecretE2EWithoutMapping(f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
+	/*
+		    Testname: projected-secret-with-nonroot-defaultMode-fsGroup
+		    Description: Simple projected Secret test as non-root with
+			defaultMode and fsGroup set.
+	*/
 	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [Conformance] [sig-storage]", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		fsGroup := int64(1001)
@@ -51,10 +64,21 @@ var _ = framework.KubeDescribe("Projected", func() {
 		doProjectedSecretE2EWithoutMapping(f, &defaultMode, "projected-secret-test-"+string(uuid.NewUUID()), &fsGroup, &uid)
 	})
 
+	/*
+		    Testname: projected-secret-simple-mapped
+		    Description: Simple projected Secret test, by setting a secret and
+			mounting it to a volume with a custom path (mapping) on the pod with
+			no other settings and make sure the pod actually consumes it.
+	*/
 	It("should be consumable from pods in volume with mappings [Conformance] [sig-storage]", func() {
 		doProjectedSecretE2EWithMapping(f, nil)
 	})
 
+	/*
+		    Testname: projected-secret-with-item-mode-mapped
+		    Description: Repeat the projected-secret-simple-mapped but this time
+			with an item mode (e.g. 0400) for the secret map item.
+	*/
 	It("should be consumable from pods in volume with mappings and Item Mode set [Conformance] [sig-storage]", func() {
 		mode := int32(0400)
 		doProjectedSecretE2EWithMapping(f, &mode)
@@ -75,12 +99,17 @@ var _ = framework.KubeDescribe("Projected", func() {
 		secret2.Data = map[string][]byte{
 			"this_should_not_match_content_of_other_secret": []byte("similarly_this_should_not_match_content_of_other_secret\n"),
 		}
-		if secret2, err = f.ClientSet.Core().Secrets(namespace2.Name).Create(secret2); err != nil {
+		if secret2, err = f.ClientSet.CoreV1().Secrets(namespace2.Name).Create(secret2); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret2.Name, err)
 		}
 		doProjectedSecretE2EWithoutMapping(f, nil /* default mode */, secret2.Name, nil, nil)
 	})
 
+	/*
+		    Testname: projected-secret-multiple-volumes
+		    Description: Make sure secrets works when mounted as two different
+			volumes on the same node.
+	*/
 	It("should be consumable in multiple volumes in a pod [Conformance] [sig-storage]", func() {
 		// This test ensures that the same secret can be mounted in multiple
 		// volumes in the same pod.  This test case exists to prevent
@@ -96,7 +125,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 
 		By(fmt.Sprintf("Creating secret with name %s", secret.Name))
 		var err error
-		if secret, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Create(secret); err != nil {
+		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
@@ -170,6 +199,10 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
+	/*
+	   Testname: projected-secret-simple-optional
+	   Description: Make sure secrets works when optional updates included.
+	*/
 	It("optional updates should be reflected in volume [Conformance] [sig-storage]", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
@@ -217,12 +250,12 @@ var _ = framework.KubeDescribe("Projected", func() {
 
 		By(fmt.Sprintf("Creating secret with name %s", deleteSecret.Name))
 		var err error
-		if deleteSecret, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Create(deleteSecret); err != nil {
+		if deleteSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(deleteSecret); err != nil {
 			framework.Failf("unable to create test secret %s: %v", deleteSecret.Name, err)
 		}
 
 		By(fmt.Sprintf("Creating secret with name %s", updateSecret.Name))
-		if updateSecret, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Create(updateSecret); err != nil {
+		if updateSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(updateSecret); err != nil {
 			framework.Failf("unable to create test secret %s: %v", updateSecret.Name, err)
 		}
 
@@ -344,18 +377,18 @@ var _ = framework.KubeDescribe("Projected", func() {
 		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
 
 		By(fmt.Sprintf("Deleting secret %v", deleteSecret.Name))
-		err = f.ClientSet.Core().Secrets(f.Namespace.Name).Delete(deleteSecret.Name, &metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(deleteSecret.Name, &metav1.DeleteOptions{})
 		Expect(err).NotTo(HaveOccurred(), "Failed to delete secret %q in namespace %q", deleteSecret.Name, f.Namespace.Name)
 
 		By(fmt.Sprintf("Updating secret %v", updateSecret.Name))
 		updateSecret.ResourceVersion = "" // to force update
 		delete(updateSecret.Data, "data-1")
 		updateSecret.Data["data-3"] = []byte("value-3")
-		_, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Update(updateSecret)
+		_, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Update(updateSecret)
 		Expect(err).NotTo(HaveOccurred(), "Failed to update secret %q in namespace %q", updateSecret.Name, f.Namespace.Name)
 
 		By(fmt.Sprintf("Creating secret with name %s", createSecret.Name))
-		if createSecret, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Create(createSecret); err != nil {
+		if createSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(createSecret); err != nil {
 			framework.Failf("unable to create test secret %s: %v", createSecret.Name, err)
 		}
 
@@ -367,10 +400,20 @@ var _ = framework.KubeDescribe("Projected", func() {
 	})
 
 	// Part 2/3 - ConfigMaps
+	/*
+		    Testname: projected-volume-configMap-nomappings-succeeds
+		    Description: Make sure that a projected volume with a configMap with
+			no mappings succeeds properly.
+	*/
 	It("should be consumable from pods in volume [Conformance] [sig-storage]", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 0, 0, nil)
 	})
 
+	/*
+		    Testname: projected-volume-configMap-consumable-defaultMode
+		    Description: Make sure that a projected volume configMap is consumable
+			with defaultMode set.
+	*/
 	It("should be consumable from pods in volume with defaultMode set [Conformance] [sig-storage]", func() {
 		defaultMode := int32(0400)
 		doProjectedConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
@@ -381,6 +424,11 @@ var _ = framework.KubeDescribe("Projected", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 1000, 1001, &defaultMode)
 	})
 
+	/*
+		    Testname: projected-volume-configMap-consumable-nonroot
+		    Description: Make sure that a projected volume configMap is consumable
+			by a non-root userID.
+	*/
 	It("should be consumable from pods in volume as non-root [Conformance] [sig-storage]", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 1000, 0, nil)
 	})
@@ -389,15 +437,31 @@ var _ = framework.KubeDescribe("Projected", func() {
 		doProjectedConfigMapE2EWithoutMappings(f, 1000, 1001, nil)
 	})
 
+	/*
+		    Testname: projected-configmap-simple-mapped
+		    Description: Simplest projected ConfigMap test, by setting a config
+			map and mounting it to a volume with a custom path (mapping) on the
+			pod with no other settings and make sure the pod actually consumes it.
+	*/
 	It("should be consumable from pods in volume with mappings [Conformance] [sig-storage]", func() {
 		doProjectedConfigMapE2EWithMappings(f, 0, 0, nil)
 	})
 
+	/*
+		    Testname: projected-secret-with-item-mode-mapped
+		    Description: Repeat the projected-secret-simple-mapped but this time
+			with an item mode (e.g. 0400) for the secret map item
+	*/
 	It("should be consumable from pods in volume with mappings and Item mode set[Conformance] [sig-storage]", func() {
 		mode := int32(0400)
 		doProjectedConfigMapE2EWithMappings(f, 0, 0, &mode)
 	})
 
+	/*
+		    Testname: projected-configmap-simpler-user-mapped
+		    Description: Repeat the projected-config-map-simple-mapped but this
+			time with a user other than root.
+	*/
 	It("should be consumable from pods in volume with mappings as non-root [Conformance] [sig-storage]", func() {
 		doProjectedConfigMapE2EWithMappings(f, 1000, 0, nil)
 	})
@@ -406,6 +470,12 @@ var _ = framework.KubeDescribe("Projected", func() {
 		doProjectedConfigMapE2EWithMappings(f, 1000, 1001, nil)
 	})
 
+	/*
+		    Testname: projected-volume-configMaps-updated-succesfully
+		    Description: Make sure that if a projected volume has configMaps,
+			that the values in these configMaps can be updated, deleted,
+			and created.
+	*/
 	It("updates should be reflected in volume [Conformance] [sig-storage]", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
@@ -426,7 +496,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 
 		By(fmt.Sprintf("Creating projection with configMap that has name %s", configMap.Name))
 		var err error
-		if configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
@@ -482,13 +552,19 @@ var _ = framework.KubeDescribe("Projected", func() {
 		By(fmt.Sprintf("Updating configmap %v", configMap.Name))
 		configMap.ResourceVersion = "" // to force update
 		configMap.Data["data-1"] = "value-2"
-		_, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Update(configMap)
+		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(configMap)
 		Expect(err).NotTo(HaveOccurred(), "Failed to update configmap %q in namespace %q", configMap.Name, f.Namespace.Name)
 
 		By("waiting to observe update in volume")
 		Eventually(pollLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-2"))
 	})
 
+	/*
+		    Testname: projected-volume-optional-configMaps-updated-succesfully
+		    Description: Make sure that if a projected volume has optional
+			configMaps, that the values in these configMaps can be updated,
+			deleted, and created.
+	*/
 	It("optional updates should be reflected in volume [Conformance] [sig-storage]", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
@@ -536,12 +612,12 @@ var _ = framework.KubeDescribe("Projected", func() {
 
 		By(fmt.Sprintf("Creating configMap with name %s", deleteConfigMap.Name))
 		var err error
-		if deleteConfigMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(deleteConfigMap); err != nil {
+		if deleteConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(deleteConfigMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", deleteConfigMap.Name, err)
 		}
 
 		By(fmt.Sprintf("Creating configMap with name %s", updateConfigMap.Name))
-		if updateConfigMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(updateConfigMap); err != nil {
+		if updateConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(updateConfigMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", updateConfigMap.Name, err)
 		}
 
@@ -663,18 +739,18 @@ var _ = framework.KubeDescribe("Projected", func() {
 		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-1"))
 
 		By(fmt.Sprintf("Deleting configmap %v", deleteConfigMap.Name))
-		err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Delete(deleteConfigMap.Name, &metav1.DeleteOptions{})
+		err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Delete(deleteConfigMap.Name, &metav1.DeleteOptions{})
 		Expect(err).NotTo(HaveOccurred(), "Failed to delete configmap %q in namespace %q", deleteConfigMap.Name, f.Namespace.Name)
 
 		By(fmt.Sprintf("Updating configmap %v", updateConfigMap.Name))
 		updateConfigMap.ResourceVersion = "" // to force update
 		delete(updateConfigMap.Data, "data-1")
 		updateConfigMap.Data["data-3"] = "value-3"
-		_, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Update(updateConfigMap)
+		_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Update(updateConfigMap)
 		Expect(err).NotTo(HaveOccurred(), "Failed to update configmap %q in namespace %q", updateConfigMap.Name, f.Namespace.Name)
 
 		By(fmt.Sprintf("Creating configMap with name %s", createConfigMap.Name))
-		if createConfigMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(createConfigMap); err != nil {
+		if createConfigMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(createConfigMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", createConfigMap.Name, err)
 		}
 
@@ -685,6 +761,11 @@ var _ = framework.KubeDescribe("Projected", func() {
 		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/projected-configmap-volumes/delete/data-1"))
 	})
 
+	/*
+		    Testname: projected-configmap-multiple-volumes
+		    Description: Make sure config map works when it mounted as two
+			different volumes on the same node.
+	*/
 	It("should be consumable in multiple volumes in the same pod [Conformance] [sig-storage]", func() {
 		var (
 			name             = "projected-configmap-test-volume-" + string(uuid.NewUUID())
@@ -697,7 +778,7 @@ var _ = framework.KubeDescribe("Projected", func() {
 
 		By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 		var err error
-		if configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
@@ -778,6 +859,11 @@ var _ = framework.KubeDescribe("Projected", func() {
 		podClient = f.PodClient()
 	})
 
+	/*
+		    Testname: projected-downwardapi-volume-podname
+		    Description: Ensure that downward API can provide pod's name through
+			DownwardAPIVolumeFiles in a projected volume.
+	*/
 	It("should provide podname only [Conformance] [sig-storage]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podname")
@@ -787,6 +873,12 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
+	/*
+		    Testname: projected-downwardapi-volume-set-default-mode
+		    Description: Ensure that downward API can set default file premission
+			mode for DownwardAPIVolumeFiles if no mode is specified in a projected
+			volume.
+	*/
 	It("should set DefaultMode on files [Conformance] [sig-storage]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		defaultMode := int32(0400)
@@ -797,6 +889,11 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
+	/*
+		    Testname: projected-downwardapi-volume-set-mode
+		    Description: Ensure that downward API can set file premission mode for
+			DownwardAPIVolumeFiles in a projected volume.
+	*/
 	It("should set mode on item file [Conformance] [sig-storage]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		mode := int32(0400)
@@ -836,6 +933,12 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
+	/*
+		    Testname: projected-downwardapi-volume-update-label
+		    Description: Ensure that downward API updates labels in
+			DownwardAPIVolumeFiles when pod's labels get modified in a projected
+			volume.
+	*/
 	It("should update labels on modification [Conformance] [sig-storage]", func() {
 		labels := map[string]string{}
 		labels["key1"] = "value1"
@@ -863,6 +966,12 @@ var _ = framework.KubeDescribe("Projected", func() {
 			podLogTimeout, framework.Poll).Should(ContainSubstring("key3=\"value3\"\n"))
 	})
 
+	/*
+		    Testname: projected-downwardapi-volume-update-annotation
+		    Description: Ensure that downward API updates annotations in
+			DownwardAPIVolumeFiles when pod's annotations get modified in a
+			projected volume.
+	*/
 	It("should update annotations on modification [Conformance] [sig-storage]", func() {
 		annotations := map[string]string{}
 		annotations["builder"] = "bar"
@@ -892,6 +1001,11 @@ var _ = framework.KubeDescribe("Projected", func() {
 			podLogTimeout, framework.Poll).Should(ContainSubstring("builder=\"foo\"\n"))
 	})
 
+	/*
+		    Testname: projected-downwardapi-volume-cpu-limit
+		    Description: Ensure that downward API can provide container's CPU
+			limit through DownwardAPIVolumeFiles in a projected volume.
+	*/
 	It("should provide container's cpu limit [Conformance] [sig-storage]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/cpu_limit")
@@ -901,6 +1015,11 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
+	/*
+		    Testname: projected-downwardapi-volume-memory-limit
+		    Description: Ensure that downward API can provide container's memory
+			limit through DownwardAPIVolumeFiles in a projected volume.
+	*/
 	It("should provide container's memory limit [Conformance] [sig-storage]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/memory_limit")
@@ -910,6 +1029,11 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
+	/*
+		    Testname: projected-downwardapi-volume-cpu-request
+		    Description: Ensure that downward API can provide container's CPU
+			request through DownwardAPIVolumeFiles in a projected volume.
+	*/
 	It("should provide container's cpu request [Conformance] [sig-storage]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/cpu_request")
@@ -919,6 +1043,11 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
+	/*
+		    Testname: projected-downwardapi-volume-memory-request
+		    Description: Ensure that downward API can provide container's memory
+			request through DownwardAPIVolumeFiles in a projected volume.
+	*/
 	It("should provide container's memory request [Conformance] [sig-storage]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/memory_request")
@@ -928,6 +1057,12 @@ var _ = framework.KubeDescribe("Projected", func() {
 		})
 	})
 
+	/*
+		    Testname: projected-downwardapi-volume-default-cpu
+		    Description: Ensure that downward API can provide default node
+			allocatable value for CPU through DownwardAPIVolumeFiles if CPU limit
+			is not specified for a container in a projected volume.
+	*/
 	It("should provide node allocatable (cpu) as default cpu limit if the limit is not set [Conformance] [sig-storage]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForDefaultContainerResources(podName, "/etc/cpu_limit")
@@ -935,6 +1070,12 @@ var _ = framework.KubeDescribe("Projected", func() {
 		f.TestContainerOutputRegexp("downward API volume plugin", pod, 0, []string{"[1-9]"})
 	})
 
+	/*
+		    Testname: projected-downwardapi-volume-default-memory
+		    Description: Ensure that downward API can provide default node
+			allocatable value for memory through DownwardAPIVolumeFiles if memory
+			limit is not specified for a container in a projected volume.
+	*/
 	It("should provide node allocatable (memory) as default memory limit if the limit is not set [Conformance] [sig-storage]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForDefaultContainerResources(podName, "/etc/memory_limit")
@@ -943,6 +1084,11 @@ var _ = framework.KubeDescribe("Projected", func() {
 	})
 
 	// Test multiple projections
+	/*
+		    Testname: projected-configmap-secret-same-dir
+		    Description: This test projects a secret and configmap into the same
+			directory to ensure projection is working as intended.
+	*/
 	It("should project all components that make up the projection API [Conformance] [sig-storage] [Projection]", func() {
 		var err error
 		podName := "projected-volume-" + string(uuid.NewUUID())
@@ -968,11 +1114,11 @@ var _ = framework.KubeDescribe("Projected", func() {
 		}
 
 		By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
-		if configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 		By(fmt.Sprintf("Creating secret with name %s", secret.Name))
-		if secret, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Create(secret); err != nil {
+		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
@@ -1009,7 +1155,7 @@ func doProjectedSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int
 
 	By(fmt.Sprintf("Creating projection with secret that has name %s", secret.Name))
 	var err error
-	if secret, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Create(secret); err != nil {
+	if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
 		framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 	}
 
@@ -1090,7 +1236,7 @@ func doProjectedSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 
 	By(fmt.Sprintf("Creating projection with secret that has name %s", secret.Name))
 	var err error
-	if secret, err = f.ClientSet.Core().Secrets(f.Namespace.Name).Create(secret); err != nil {
+	if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
 		framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 	}
 
@@ -1172,7 +1318,7 @@ func doProjectedConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup
 
 	By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 	var err error
-	if configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+	if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 
@@ -1257,7 +1403,7 @@ func doProjectedConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup in
 	By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
 
 	var err error
-	if configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+	if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 		framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 	}
 

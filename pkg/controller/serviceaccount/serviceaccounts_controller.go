@@ -67,8 +67,8 @@ func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInforme
 		serviceAccountsToEnsure: options.ServiceAccounts,
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount"),
 	}
-	if cl != nil && cl.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.Core().RESTClient().GetRateLimiter())
+	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	saInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -210,7 +210,7 @@ func (c *ServiceAccountsController) syncNamespace(key string) error {
 		// TODO eliminate this once the fake client can handle creation without NS
 		sa.Namespace = ns.Name
 
-		if _, err := c.client.Core().ServiceAccounts(ns.Name).Create(&sa); err != nil && !apierrs.IsAlreadyExists(err) {
+		if _, err := c.client.CoreV1().ServiceAccounts(ns.Name).Create(&sa); err != nil && !apierrs.IsAlreadyExists(err) {
 			createFailures = append(createFailures, err)
 		}
 	}

@@ -25,9 +25,9 @@ import (
 
 func TestKnownFeatures(t *testing.T) {
 	var someFeatures = FeatureList{
-		"feature2": {Default: true, PreRelease: utilfeature.Alpha},
-		"feature1": {Default: false, PreRelease: utilfeature.Beta},
-		"feature3": {Default: false, PreRelease: utilfeature.GA},
+		"feature2": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Alpha}},
+		"feature1": {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
+		"feature3": {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.GA}},
 	}
 
 	r := KnownFeatures(&someFeatures)
@@ -55,8 +55,8 @@ func TestKnownFeatures(t *testing.T) {
 
 func TestNewFeatureGate(t *testing.T) {
 	var someFeatures = FeatureList{
-		"feature1": {Default: false, PreRelease: utilfeature.Beta},
-		"feature2": {Default: true, PreRelease: utilfeature.Alpha},
+		"feature1": {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
+		"feature2": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Alpha}},
 	}
 
 	var tests = []struct {
@@ -114,6 +114,45 @@ func TestNewFeatureGate(t *testing.T) {
 
 		if !reflect.DeepEqual(r, test.expectedFeaturesGate) {
 			t.Errorf("NewFeatureGate returned a unexpected value")
+		}
+	}
+}
+
+func TestValidateVersion(t *testing.T) {
+	var someFeatures = FeatureList{
+		"feature1": {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
+		"feature2": {FeatureSpec: utilfeature.FeatureSpec{Default: true, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
+	}
+
+	var tests = []struct {
+		requestedVersion  string
+		requestedFeatures map[string]bool
+		expectedError     bool
+	}{
+		{ //no min version
+			requestedFeatures: map[string]bool{"feature1": true},
+			expectedError:     false,
+		},
+		{ //min version but correct value given
+			requestedFeatures: map[string]bool{"feature2": true},
+			requestedVersion:  "v1.9.0",
+			expectedError:     false,
+		},
+		{ //min version and incorrect value given
+			requestedFeatures: map[string]bool{"feature2": true},
+			requestedVersion:  "v1.8.2",
+			expectedError:     true,
+		},
+	}
+
+	for _, test := range tests {
+		err := ValidateVersion(someFeatures, test.requestedFeatures, test.requestedVersion)
+		if !test.expectedError && err != nil {
+			t.Errorf("ValidateVersion failed when not expected: %v", err)
+			continue
+		} else if test.expectedError && err == nil {
+			t.Error("ValidateVersion didn't failed when expected")
+			continue
 		}
 	}
 }

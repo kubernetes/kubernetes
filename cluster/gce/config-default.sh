@@ -103,11 +103,7 @@ MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 # It is the primary range in the subnet and is the range used for node instance IPs.
 NODE_IP_RANGE="$(get-node-ip-range)"
 
-if [[ "${FEDERATION:-}" == true ]]; then
-    NODE_SCOPES="${NODE_SCOPES:-monitoring,logging-write,storage-ro,https://www.googleapis.com/auth/ndev.clouddns.readwrite}"
-else
-    NODE_SCOPES="${NODE_SCOPES:-monitoring,logging-write,storage-ro}"
-fi
+NODE_SCOPES="${NODE_SCOPES:-monitoring,logging-write,storage-ro}"
 
 # Extra docker options for nodes.
 EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS:-}"
@@ -154,12 +150,16 @@ if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
 	NODE_LABELS="${NODE_LABELS},projectcalico.org/ds-ready=true"
 fi
 
-# Currently, ENABLE_METADATA_PROXY supports only "simple".  In the future, we
-# may add other options.
-ENABLE_METADATA_PROXY="${ENABLE_METADATA_PROXY:-}"
-# Apply the right node label if metadata proxy is on.
-if [[ ${ENABLE_METADATA_PROXY:-} == "simple" ]]; then
-        NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
+# Enable metadata concealment by firewalling pod traffic to the metadata server
+# and run a proxy daemonset on nodes.
+#
+# TODO(#8867) Enable by default.
+ENABLE_METADATA_CONCEALMENT="${ENABLE_METADATA_CONCEALMENT:-false}" # true, false
+if [[ ${ENABLE_METADATA_CONCEALMENT:-} == "true" ]]; then
+  # Put the necessary label on the node so the daemonset gets scheduled.
+  NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
+  # Add to the provider custom variables.
+  PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_METADATA_CONCEALMENT"
 fi
 
 # Optional: Enable node logging.

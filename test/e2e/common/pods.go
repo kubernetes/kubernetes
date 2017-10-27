@@ -427,7 +427,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				},
 			},
 		}
-		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(svc)
+		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(svc)
 		Expect(err).NotTo(HaveOccurred(), "failed to create service")
 
 		// Make a client pod that verifies that it has the service environment variables.
@@ -491,7 +491,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		By("submitting the pod to kubernetes")
 		pod = podClient.CreateSync(pod)
 
-		req := f.ClientSet.Core().RESTClient().Get().
+		req := f.ClientSet.CoreV1().RESTClient().Get().
 			Namespace(f.Namespace.Name).
 			Resource("pods").
 			Name(pod.Name).
@@ -561,7 +561,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		By("submitting the pod to kubernetes")
 		podClient.CreateSync(pod)
 
-		req := f.ClientSet.Core().RESTClient().Get().
+		req := f.ClientSet.CoreV1().RESTClient().Get().
 			Namespace(f.Namespace.Name).
 			Resource("pods").
 			Name(pod.Name).

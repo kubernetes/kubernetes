@@ -89,7 +89,7 @@
   - [Downloads for v1.6.0](#downloads-for-v160)
     - [Client Binaries](#client-binaries-12)
     - [Server Binaries](#server-binaries-12)
-  - [WARNING: etcd backup strongly recommended](#warning:-etcd-backup-strongly-recommended)
+  - [WARNING: etcd backup strongly recommended](#warning-etcd-backup-strongly-recommended)
   - [Major updates and release themes](#major-updates-and-release-themes)
   - [Action Required](#action-required-1)
     - [Certificates API](#certificates-api)

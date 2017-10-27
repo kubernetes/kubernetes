@@ -39,7 +39,6 @@ go_library(
     srcs = [
         "e2e.go",
         "events.go",
-        "example_cluster_dns.go",
         "examples.go",
         "gke_local_ssd.go",
         "gke_node_pools.go",
@@ -51,7 +50,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e",
     deps = [
-        "//federation/test/e2e:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1/pod:go_default_library",

@@ -1245,6 +1245,20 @@ func validateScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, fldPath *field.Pa
 	return allErrs
 }
 
+func validateScaleIOPersistentVolumeSource(sio *api.ScaleIOPersistentVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if sio.Gateway == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("gateway"), ""))
+	}
+	if sio.System == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("system"), ""))
+	}
+	if sio.VolumeName == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("volumeName"), ""))
+	}
+	return allErrs
+}
+
 func validateLocalVolumeSource(ls *api.LocalVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if ls.Path == "" {
@@ -1489,7 +1503,7 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 			allErrs = append(allErrs, field.Forbidden(specPath.Child("scaleIO"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
-			allErrs = append(allErrs, validateScaleIOVolumeSource(pv.Spec.ScaleIO, specPath.Child("scaleIO"))...)
+			allErrs = append(allErrs, validateScaleIOPersistentVolumeSource(pv.Spec.ScaleIO, specPath.Child("scaleIO"))...)
 		}
 	}
 	if pv.Spec.Local != nil {
@@ -1935,7 +1949,11 @@ func ValidateVolumeMounts(mounts []api.VolumeMount, volumes sets.String, contain
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("mountPath"), mnt.MountPath, "must be unique"))
 		}
 		if !path.IsAbs(mnt.MountPath) {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("mountPath"), mnt.MountPath, "must be an absolute path"))
+			// also allow windows absolute path
+			p := mnt.MountPath
+			if len(p) < 2 || ((p[0] < 'A' || p[0] > 'Z') && (p[0] < 'a' || p[0] > 'z')) || p[1] != ':' {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("mountPath"), mnt.MountPath, "must be an absolute path"))
+			}
 		}
 		mountpoints.Insert(mnt.MountPath)
 		if len(mnt.SubPath) > 0 {

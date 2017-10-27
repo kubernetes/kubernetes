@@ -45,6 +45,12 @@ func (d durations) Swap(i, j int)      { d[i], d[j] = d[j], d[i] }
 var _ = SIGDescribe("Service endpoints latency", func() {
 	f := framework.NewDefaultFramework("svc-latency")
 
+	/*
+		    Testname: service-endpoint-latency
+		    Description: Ensure service endpoint's latency is not high
+		    (e.g. p50 < 20 seconds and p99 < 50 seconds). If any call to the
+			service endpoint fails, the test will also fail.
+	*/
 	It("should not be very high [Conformance]", func() {
 		const (
 			// These are very generous criteria. Ideally we will
@@ -68,9 +74,9 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 		)
 
 		// Turn off rate limiting--it interferes with our measurements.
-		oldThrottle := f.ClientSet.Core().RESTClient().GetRateLimiter()
-		f.ClientSet.Core().RESTClient().(*restclient.RESTClient).Throttle = flowcontrol.NewFakeAlwaysRateLimiter()
-		defer func() { f.ClientSet.Core().RESTClient().(*restclient.RESTClient).Throttle = oldThrottle }()
+		oldThrottle := f.ClientSet.CoreV1().RESTClient().GetRateLimiter()
+		f.ClientSet.CoreV1().RESTClient().(*restclient.RESTClient).Throttle = flowcontrol.NewFakeAlwaysRateLimiter()
+		defer func() { f.ClientSet.CoreV1().RESTClient().(*restclient.RESTClient).Throttle = oldThrottle }()
 
 		failing := sets.NewString()
 		d, err := runServiceLatencies(f, parallelTrials, totalTrials)
@@ -280,11 +286,11 @@ func startEndpointWatcher(f *framework.Framework, q *endpointQueries) {
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				obj, err := f.ClientSet.Core().Endpoints(f.Namespace.Name).List(options)
+				obj, err := f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).List(options)
 				return runtime.Object(obj), err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return f.ClientSet.Core().Endpoints(f.Namespace.Name).Watch(options)
+				return f.ClientSet.CoreV1().Endpoints(f.Namespace.Name).Watch(options)
 			},
 		},
 		&v1.Endpoints{},
@@ -329,7 +335,7 @@ func singleServiceLatency(f *framework.Framework, name string, q *endpointQuerie
 		},
 	}
 	startTime := time.Now()
-	gotSvc, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(svc)
+	gotSvc, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(svc)
 	if err != nil {
 		return 0, err
 	}

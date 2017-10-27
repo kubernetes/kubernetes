@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/recognizer"
-	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admission"
@@ -53,7 +52,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/settings"
 	"k8s.io/kubernetes/pkg/apis/storage"
 
-	_ "k8s.io/kubernetes/federation/apis/federation/install"
 	_ "k8s.io/kubernetes/pkg/api/install"
 	_ "k8s.io/kubernetes/pkg/apis/admission/install"
 	_ "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
@@ -83,7 +81,6 @@ var (
 	Extensions    TestGroup
 	Apps          TestGroup
 	Policy        TestGroup
-	Federation    TestGroup
 	Rbac          TestGroup
 	Certificates  TestGroup
 	Scheduling    TestGroup
@@ -227,15 +224,6 @@ func init() {
 			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
 		}
 	}
-	if _, ok := Groups[federation.GroupName]; !ok {
-		externalGroupVersion := schema.GroupVersion{Group: federation.GroupName, Version: legacyscheme.Registry.GroupOrDie(federation.GroupName).GroupVersion.Version}
-		Groups[federation.GroupName] = TestGroup{
-			externalGroupVersion: externalGroupVersion,
-			internalGroupVersion: federation.SchemeGroupVersion,
-			internalTypes:        legacyscheme.Scheme.KnownTypes(federation.SchemeGroupVersion),
-			externalTypes:        legacyscheme.Scheme.KnownTypes(externalGroupVersion),
-		}
-	}
 	if _, ok := Groups[rbac.GroupName]; !ok {
 		externalGroupVersion := schema.GroupVersion{Group: rbac.GroupName, Version: legacyscheme.Registry.GroupOrDie(rbac.GroupName).GroupVersion.Version}
 		Groups[rbac.GroupName] = TestGroup{
@@ -334,7 +322,6 @@ func init() {
 	Policy = Groups[policy.GroupName]
 	Certificates = Groups[certificates.GroupName]
 	Extensions = Groups[extensions.GroupName]
-	Federation = Groups[federation.GroupName]
 	Rbac = Groups[rbac.GroupName]
 	Scheduling = Groups[scheduling.GroupName]
 	Settings = Groups[settings.GroupName]

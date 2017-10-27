@@ -179,10 +179,3 @@ var LegacyCategoryExpander CategoryExpander = SimpleCategoryExpander{
 		"all": legacyUserResources,
 	},
 }
-
-// LegacyFederationCategoryExpander is the old hardcoded expansion for federation
-var LegacyFederationCategoryExpander CategoryExpander = SimpleCategoryExpander{
-	Expansions: map[string][]schema.GroupResource{
-		"all": {{Group: "", Resource: "services"}},
-	},
-}
