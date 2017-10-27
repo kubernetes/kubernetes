@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
   name: calico-typha-horizontal-autoscaler
@@ -8,11 +8,16 @@ metadata:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
+  selector:
+    matchLabels:
+      k8s-app: calico-typha-autoscaler
+      name: calico-typha-horizontal-autoscaler
   replicas: 1
   template:
     metadata:
       labels:
         k8s-app: calico-typha-autoscaler
+        name: calico-typha-horizontal-autoscaler
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
