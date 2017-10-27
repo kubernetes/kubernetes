@@ -59,6 +59,10 @@ var _ volume.ProvisionableVolumePlugin = &quobytePlugin{}
 var _ volume.Provisioner = &quobyteVolumeProvisioner{}
 var _ volume.Deleter = &quobyteVolumeDeleter{}
 
+// default name for mount point dir
+var qbMountPointName = "mnt"
+var qbPluginDirName = strings.EscapeQualifiedNameForDisk(quobytePluginName)
+
 const (
 	quobytePluginName = "kubernetes.io/quobyte"
 )
@@ -93,7 +97,7 @@ func (plugin *quobytePlugin) CanSupport(spec *volume.Spec) bool {
 	// If Quobyte is already mounted we don't need to check if the binary is installed
 	if mounter, err := plugin.newMounterInternal(spec, nil, plugin.host.GetMounter(plugin.GetPluginName())); err == nil {
 		qm, _ := mounter.(*quobyteMounter)
-		pluginDir := plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
+		pluginDir := plugin.host.GetPluginDir(qbPluginDirName)
 		if mounted, err := qm.pluginDirIsMounted(pluginDir); mounted && err == nil {
 			glog.V(4).Infof("quobyte: can support")
 			return true
@@ -235,7 +239,7 @@ func (mounter *quobyteMounter) CanMount() error {
 
 // SetUp attaches the disk and bind mounts to the volume path.
 func (mounter *quobyteMounter) SetUp(fsGroup *int64) error {
-	pluginDir := mounter.plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
+	pluginDir := mounter.plugin.host.GetPluginDir(qbPluginDirName)
 	return mounter.SetUpAt(pluginDir, fsGroup)
 }
 
@@ -279,10 +283,10 @@ func (quobyteVolume *quobyte) GetPath() string {
 		group = "nfsnobody"
 	}
 
-	// Quobyte has only one mount in the PluginDir where all Volumes are mounted
+	// Quobyte has only one mount in a subdir of the PluginDir where all Volumes are mounted
 	// The Quobyte client does a fixed-user mapping
-	pluginDir := quobyteVolume.plugin.host.GetPluginDir(strings.EscapeQualifiedNameForDisk(quobytePluginName))
-	return path.Join(pluginDir, fmt.Sprintf("%s#%s@%s", user, group, quobyteVolume.volume))
+	mntDir := strings.JoinQualifiedName(quobyteVolume.plugin.host.GetPluginDir(qbPluginDirName), qbMountPointName)
+	return path.Join(mntDir, fmt.Sprintf("%s#%s@%s", user, group, quobyteVolume.volume))
 }
 
 type quobyteUnmounter struct {

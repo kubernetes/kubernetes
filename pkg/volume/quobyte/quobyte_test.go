@@ -98,8 +98,9 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		t.Error("Got a nil Mounter")
 	}
 
-	if volumePath != fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/root#root@vol", tmpDir) {
-		t.Errorf("Got unexpected path: %s expected: %s", volumePath, fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/root#root@vol", tmpDir))
+	expectedPath := fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/%s/root#root@vol", tmpDir, qbMountPointName)
+	if volumePath != expectedPath {
+		t.Errorf("Got unexpected path: %s expected: %s", volumePath, expectedPath)
 	}
 	if err := mounter.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
