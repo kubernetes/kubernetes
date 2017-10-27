@@ -21,7 +21,6 @@ package v1alpha1
 import (
 	v1alpha1 "k8s.io/api/admissionregistration/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
@@ -55,8 +54,7 @@ func (s *externalAdmissionHookConfigurationLister) List(selector labels.Selector
 
 // Get retrieves the ExternalAdmissionHookConfiguration from the index for a given name.
 func (s *externalAdmissionHookConfigurationLister) Get(name string) (*v1alpha1.ExternalAdmissionHookConfiguration, error) {
-	key := &v1alpha1.ExternalAdmissionHookConfiguration{ObjectMeta: v1.ObjectMeta{Name: name}}
-	obj, exists, err := s.indexer.Get(key)
+	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}
