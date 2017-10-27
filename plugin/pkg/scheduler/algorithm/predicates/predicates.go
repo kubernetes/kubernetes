@@ -165,7 +165,7 @@ func isVolumeConflict(volume v1.Volume, pod *v1.Pod) bool {
 			// two RBDs images are the same if they share the same Ceph monitor, are in the same RADOS Pool, and have the same image name
 			// only one read-write mount is permitted for the same RBD image.
 			// same RBD image mounted by multiple Pods conflicts unless all Pods mount the image read-only
-			if haveSame(mon, emon) && pool == epool && image == eimage && !(volume.RBD.ReadOnly && existingVolume.RBD.ReadOnly) {
+			if haveOverlap(mon, emon) && pool == epool && image == eimage && !(volume.RBD.ReadOnly && existingVolume.RBD.ReadOnly) {
 				return true
 			}
 		}
@@ -911,20 +911,18 @@ func PodFitsHostPorts(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 }
 
 // search two arrays and return true if they have at least one common element; return false otherwise
-func haveSame(a1, a2 []string) bool {
-	m := map[string]int{}
+func haveOverlap(a1, a2 []string) bool {
+	m := map[string]bool{}
 
 	for _, val := range a1 {
-		m[val] = 1
+		m[val] = true
 	}
 	for _, val := range a2 {
-		m[val] = m[val] + 1
-	}
-	for _, val := range m {
-		if val > 1 {
+		if _, ok := m[val]; ok {
 			return true
 		}
 	}
+
 	return false
 }
 
