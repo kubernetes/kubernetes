@@ -85,7 +85,7 @@ func resyncPeriod(s *options.CloudControllerManagerServer) func() time.Duration 
 // Run runs the ExternalCMServer.  This should never exit.
 func Run(s *options.CloudControllerManagerServer) error {
 	if s.CloudProvider == "" {
-		glog.Errorf("--cloud-provider cannot be empty")
+		glog.Fatalf("--cloud-provider cannot be empty")
 	}
 
 	cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
