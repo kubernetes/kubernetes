@@ -65,11 +65,20 @@ var _ = SIGDescribe("Services", func() {
 
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
 
+	/*
+	   Testname: service-kubernetes-exists
+	   Description: Make sure kubernetes service does exist.
+	*/
 	It("should provide secure master service [Conformance]", func() {
 		_, err := cs.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 	})
 
+	/*
+		    Testname: service-valid-endpoints
+		    Description: Ensure a service with no pod, one pod or two pods has
+			valid/accessible endpoints (same port number for service and pods).
+	*/
 	It("should serve a basic endpoint from pods [Conformance]", func() {
 		// TODO: use the ServiceTestJig here
 		serviceName := "endpoint-test2"
@@ -130,6 +139,11 @@ var _ = SIGDescribe("Services", func() {
 		framework.ValidateEndpointsOrFail(cs, ns, serviceName, framework.PortsByPodName{})
 	})
 
+	/*
+		    Testname: service-valid-endpoints-multiple-ports
+		    Description: Ensure a service with no pod, one pod or two pods has
+			valid/accessible endpoints (different port number for pods).
+	*/
 	It("should serve multiport endpoints from pods [Conformance]", func() {
 		// TODO: use the ServiceTestJig here
 		// repacking functionality is intentionally not tested here - it's better to test it in an integration test.
