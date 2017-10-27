@@ -24,7 +24,6 @@ spec:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       dnsPolicy: Default
-      hostNetwork: true
       containers:
       - name: fluentd-gcp
         image: gcr.io/google-containers/fluentd-gcp:2.0.9
