@@ -78,7 +78,7 @@ func TestPodDisruptionBudgetV1Generate(t *testing.T) {
 				"min-available": minAvailable,
 				"selector":      selector,
 			},
-			expectErrMsg: "expected string, found 1 for 'name'",
+			expectErrMsg: "expected string, found int for 'name'",
 		},
 		"test-missing-min-available-param": {
 			params: map[string]interface{}{
@@ -109,7 +109,7 @@ func TestPodDisruptionBudgetV1Generate(t *testing.T) {
 				"min-available": 1,
 				"selector":      selector,
 			},
-			expectErrMsg: "expected string, found 1 for 'min-available'",
+			expectErrMsg: "expected string, found int for 'min-available'",
 		},
 		"test-missing-selector-param": {
 			params: map[string]interface{}{
@@ -132,7 +132,7 @@ func TestPodDisruptionBudgetV1Generate(t *testing.T) {
 				"min-available": minAvailable,
 				"selector":      1,
 			},
-			expectErrMsg: "expected string, found 1 for 'selector'",
+			expectErrMsg: "expected string, found int for 'selector'",
 		},
 	}
 
@@ -233,7 +233,7 @@ func TestPodDisruptionBudgetV2Generate(t *testing.T) {
 				"max-unavailable": "",
 				"selector":        selector,
 			},
-			expectErrMsg: "expected string, found 1 for 'name'",
+			expectErrMsg: "expected string, found int for 'name'",
 		},
 		"test-missing-min-available-param": {
 			params: map[string]interface{}{
@@ -250,7 +250,7 @@ func TestPodDisruptionBudgetV2Generate(t *testing.T) {
 				"max-unavailable": "",
 				"selector":        selector,
 			},
-			expectErrMsg: "expected string, found 1 for 'min-available'",
+			expectErrMsg: "expected string, found int for 'min-available'",
 		},
 		"test-missing-max-available-param": {
 			params: map[string]interface{}{
@@ -267,7 +267,7 @@ func TestPodDisruptionBudgetV2Generate(t *testing.T) {
 				"max-unavailable": 1,
 				"selector":        selector,
 			},
-			expectErrMsg: "expected string, found 1 for 'max-unavailable'",
+			expectErrMsg: "expected string, found int for 'max-unavailable'",
 		},
 		"test-blank-min-available-max-unavailable-param": {
 			params: map[string]interface{}{
@@ -311,7 +311,7 @@ func TestPodDisruptionBudgetV2Generate(t *testing.T) {
 				"max-unavailable": "",
 				"selector":        1,
 			},
-			expectErrMsg: "expected string, found 1 for 'selector'",
+			expectErrMsg: "expected string, found int for 'selector'",
 		},
 	}
 

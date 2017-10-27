@@ -50,15 +50,15 @@ func (s PodDisruptionBudgetV1Generator) Generate(params map[string]interface{}) 
 	}
 	name, isString := params["name"].(string)
 	if !isString {
-		return nil, fmt.Errorf("expected string, found %v for 'name'", params["name"])
+		return nil, fmt.Errorf("expected string, found %T for 'name'", params["name"])
 	}
 	minAvailable, isString := params["min-available"].(string)
 	if !isString {
-		return nil, fmt.Errorf("expected string, found %v for 'min-available'", params["min-available"])
+		return nil, fmt.Errorf("expected string, found %T for 'min-available'", params["min-available"])
 	}
 	selector, isString := params["selector"].(string)
 	if !isString {
-		return nil, fmt.Errorf("expected string, found %v for 'selector'", params["selector"])
+		return nil, fmt.Errorf("expected string, found %T for 'selector'", params["selector"])
 	}
 	delegate := &PodDisruptionBudgetV1Generator{Name: name, MinAvailable: minAvailable, Selector: selector}
 	return delegate.StructuredGenerate()
@@ -134,22 +134,22 @@ func (s PodDisruptionBudgetV2Generator) Generate(params map[string]interface{}) 
 
 	name, isString := params["name"].(string)
 	if !isString {
-		return nil, fmt.Errorf("expected string, found %v for 'name'", params["name"])
+		return nil, fmt.Errorf("expected string, found %T for 'name'", params["name"])
 	}
 
 	minAvailable, isString := params["min-available"].(string)
 	if !isString {
-		return nil, fmt.Errorf("expected string, found %v for 'min-available'", params["min-available"])
+		return nil, fmt.Errorf("expected string, found %T for 'min-available'", params["min-available"])
 	}
 
 	maxUnavailable, isString := params["max-unavailable"].(string)
 	if !isString {
-		return nil, fmt.Errorf("expected string, found %v for 'max-unavailable'", params["max-unavailable"])
+		return nil, fmt.Errorf("expected string, found %T for 'max-unavailable'", params["max-unavailable"])
 	}
 
 	selector, isString := params["selector"].(string)
 	if !isString {
-		return nil, fmt.Errorf("expected string, found %v for 'selector'", params["selector"])
+		return nil, fmt.Errorf("expected string, found %T for 'selector'", params["selector"])
 	}
 	delegate := &PodDisruptionBudgetV2Generator{Name: name, MinAvailable: minAvailable, MaxUnavailable: maxUnavailable, Selector: selector}
 	return delegate.StructuredGenerate()
