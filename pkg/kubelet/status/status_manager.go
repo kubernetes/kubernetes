@@ -268,13 +268,22 @@ func (m *manager) TerminatePod(pod *v1.Pod) {
 // checkContainerStateTransition ensures that no container is trying to transition
 // from a terminated to non-terminated state, which is illegal and indicates a
 // logical error in the kubelet.
-func checkContainerStateTransition(oldStatuses, newStatuses []v1.ContainerStatus) error {
-	for _, newStatus := range newStatuses {
-		for _, oldStatus := range oldStatuses {
-			if newStatus.Name != oldStatus.Name {
-				continue
-			}
-			if oldStatus.State.Terminated != nil && newStatus.State.Terminated == nil {
+func checkContainerStateTransition(oldStatuses, newStatuses []v1.ContainerStatus, restartPolicy v1.RestartPolicy) error {
+	// If we should always restart, containers are allowed to leave the terminated state
+	if restartPolicy == v1.RestartPolicyAlways {
+		return nil
+	}
+	for _, oldStatus := range oldStatuses {
+		// Skip any container that wasn't terminated
+		if oldStatus.State.Terminated == nil {
+			continue
+		}
+		// Skip any container that failed but is allowed to restart
+		if oldStatus.State.Terminated.ExitCode != 0 && restartPolicy == v1.RestartPolicyOnFailure {
+			continue
+		}
+		for _, newStatus := range newStatuses {
+			if oldStatus.Name == newStatus.Name && newStatus.State.Terminated == nil {
 				return fmt.Errorf("terminated container %v attempted illegal transition to non-terminated state", newStatus.Name)
 			}
 		}
@@ -297,15 +306,13 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	}
 
 	// Check for illegal state transition in containers
-	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
-		if err := checkContainerStateTransition(oldStatus.ContainerStatuses, status.ContainerStatuses); err != nil {
-			glog.Errorf("Status update on pod %v/%v aborted: %v", pod.Namespace, pod.Name, err)
-			return false
-		}
-		if err := checkContainerStateTransition(oldStatus.InitContainerStatuses, status.InitContainerStatuses); err != nil {
-			glog.Errorf("Status update on pod %v/%v aborted: %v", pod.Namespace, pod.Name, err)
-			return false
-		}
+	if err := checkContainerStateTransition(oldStatus.ContainerStatuses, status.ContainerStatuses, pod.Spec.RestartPolicy); err != nil {
+		glog.Errorf("Status update on pod %v/%v aborted: %v", pod.Namespace, pod.Name, err)
+		return false
+	}
+	if err := checkContainerStateTransition(oldStatus.InitContainerStatuses, status.InitContainerStatuses, pod.Spec.RestartPolicy); err != nil {
+		glog.Errorf("Status update on pod %v/%v aborted: %v", pod.Namespace, pod.Name, err)
+		return false
 	}
 
 	// Set ReadyCondition.LastTransitionTime.
