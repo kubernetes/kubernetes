@@ -78,6 +78,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
 	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -2833,9 +2834,9 @@ func getRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, n
 	switch kind {
 	case api.Kind("ReplicationController"):
 		return c.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
-	case extensionsinternal.Kind("ReplicaSet"):
+	case extensionsinternal.Kind("ReplicaSet"), appsinternal.Kind("ReplicaSet"):
 		return c.Extensions().ReplicaSets(ns).Get(name, metav1.GetOptions{})
-	case extensionsinternal.Kind("Deployment"):
+	case extensionsinternal.Kind("Deployment"), appsinternal.Kind("Deployment"):
 		return c.Extensions().Deployments(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("DaemonSet"):
 		return c.Extensions().DaemonSets(ns).Get(name, metav1.GetOptions{})
@@ -2850,9 +2851,9 @@ func deleteResource(c clientset.Interface, kind schema.GroupKind, ns, name strin
 	switch kind {
 	case api.Kind("ReplicationController"):
 		return c.CoreV1().ReplicationControllers(ns).Delete(name, deleteOption)
-	case extensionsinternal.Kind("ReplicaSet"):
+	case extensionsinternal.Kind("ReplicaSet"), appsinternal.Kind("ReplicaSet"):
 		return c.Extensions().ReplicaSets(ns).Delete(name, deleteOption)
-	case extensionsinternal.Kind("Deployment"):
+	case extensionsinternal.Kind("Deployment"), appsinternal.Kind("Deployment"):
 		return c.Extensions().Deployments(ns).Delete(name, deleteOption)
 	case extensionsinternal.Kind("DaemonSet"):
 		return c.Extensions().DaemonSets(ns).Delete(name, deleteOption)
