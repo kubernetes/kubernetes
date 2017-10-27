@@ -149,7 +149,7 @@ func (p *azureDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
 		}
 	} else {
 		if kind == v1.AzureDedicatedBlobDisk {
-			_, diskURI, _, err = diskController.CreateVolume(name, account, skuName, location, requestGB)
+			_, diskURI, _, err = diskController.CreateVolume(name, account, storageAccountType, location, requestGB)
 			if err != nil {
 				return nil, err
 			}
