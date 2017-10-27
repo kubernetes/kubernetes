@@ -41,14 +41,12 @@ var (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&rbdPlugin{nil, nil, nil}}
+	return []volume.VolumePlugin{&rbdPlugin{}}
 }
 
 // rbdPlugin implements Volume.VolumePlugin.
 type rbdPlugin struct {
-	host    volume.VolumeHost
-	exec    mount.Exec
-	mounter *mount.SafeFormatAndMount
+	host volume.VolumeHost
 }
 
 var _ volume.VolumePlugin = &rbdPlugin{}
@@ -74,8 +72,6 @@ func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
 
 func (plugin *rbdPlugin) Init(host volume.VolumeHost) error {
 	plugin.host = host
-	plugin.exec = host.GetExec(plugin.GetPluginName())
-	plugin.mounter = volumehelper.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)
 	return nil
 }
 
@@ -505,8 +501,8 @@ func newRBD(podUID types.UID, volName string, image string, pool string, readOnl
 		Pool:            pool,
 		ReadOnly:        readOnly,
 		plugin:          plugin,
-		mounter:         plugin.mounter,
-		exec:            plugin.exec,
+		mounter:         volumehelper.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
+		exec:            plugin.host.GetExec(plugin.GetPluginName()),
 		manager:         manager,
 		MetricsProvider: volume.NewMetricsStatFS(getPath(podUID, volName, plugin.host)),
 	}
