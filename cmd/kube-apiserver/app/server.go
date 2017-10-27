@@ -445,7 +445,9 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 		return nil, nil, nil, nil, nil, fmt.Errorf("invalid authentication config: %v", err)
 	}
 
-	genericConfig.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, sharedInformers)
+	genericConfig.Authorizer, genericConfig.RuleResolver, err =
+		BuildAuthorizer(s, sharedInformers,
+			buildWebhookDialer(serviceResolver, proxyTransport))
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("invalid authorization config: %v", err)
 	}
@@ -545,9 +547,55 @@ func BuildAuthenticator(s *options.ServerRunOptions, storageFactory serverstorag
 	return authenticatorConfig.New()
 }
 
+// buildWebhookDialer constructs a custom dialer function for the authorization webhook
+// that knows how to resolve references to Kubernetes services (of the form "servicename.namespace.svc")
+// to the IP address of the endpoint that currently implements it.
+func buildWebhookDialer(
+	serviceResolver aggregatorapiserver.ServiceResolver,
+	proxyTransport *http.Transport,
+) func(network, address string) (net.Conn, error) {
+	// Following sample code from issue #54163 by liggitt@redhat.com.
+	baseDialer := net.Dial
+	if proxyTransport != nil && proxyTransport.Dial != nil {
+		baseDialer = proxyTransport.Dial
+	}
+
+	return func(network, address string) (net.Conn, error) {
+		host, _, err := net.SplitHostPort(address)
+		if err != nil {
+			glog.V(6).Infof("while splitting hostport: %v", err)
+			return baseDialer(network, address)
+		}
+		// "servicename.namespace.svc"
+		if !strings.HasSuffix(host, ".svc") {
+			return baseDialer(network, address)
+		}
+		segments := strings.Split(host, ".")
+		if len(segments) != 3 {
+			glog.V(6).Infof("Dialer address is not a Kubernetes svc reference: %v", host)
+			return baseDialer(network, address)
+		}
+		namespace := segments[1]
+		service := segments[0]
+		u, err := serviceResolver.ResolveEndpoint(namespace, service)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"while resolving endpoint: namespace=%v, service=%v: %v",
+				namespace, service, err)
+		}
+		glog.V(5).Infof("Resolved: namespace=%v, service=%v to: host=%v",
+			namespace, service, u.Host)
+		return baseDialer(network, u.Host)
+	}
+}
+
 // BuildAuthorizer constructs the authorizer
-func BuildAuthorizer(s *options.ServerRunOptions, sharedInformers informers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, error) {
-	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers)
+func BuildAuthorizer(
+	s *options.ServerRunOptions,
+	sharedInformers informers.SharedInformerFactory,
+	dialer func(network, address string) (net.Conn, error),
+) (authorizer.Authorizer, authorizer.RuleResolver, error) {
+	authorizationConfig := s.Authorization.ToAuthorizationConfig(sharedInformers, dialer)
 	return authorizationConfig.New()
 }
 

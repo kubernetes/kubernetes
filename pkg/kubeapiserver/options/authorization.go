@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"net"
 	"strings"
 	"time"
 
@@ -33,6 +34,8 @@ type BuiltInAuthorizationOptions struct {
 	WebhookConfigFile           string
 	WebhookCacheAuthorizedTTL   time.Duration
 	WebhookCacheUnauthorizedTTL time.Duration
+	// If set, the authorizer webhook will use service resolution.
+	WebhookUseServiceResolution bool
 }
 
 func NewBuiltInAuthorizationOptions() *BuiltInAuthorizationOptions {
@@ -68,6 +71,13 @@ func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 		"authorization-webhook-cache-unauthorized-ttl", s.WebhookCacheUnauthorizedTTL,
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
 
+	fs.BoolVar(&s.WebhookUseServiceResolution,
+		"authorization-webhook-use-service-resolution", s.WebhookUseServiceResolution,
+		"If set, the authorizer webhook code will resolve URLs pointing to hosts of the form "+
+			"https://servicename.namespace.svc:port/somewhere to appropriate endpoint IP addresses. "+
+			"You may want to use this feature if your webhook authorizer is hosted in the cluster itself, "+
+			"and the apiserver has no other ways to resolve the service endpoint.")
+
 	fs.String("authorization-rbac-super-user", "", ""+
 		"If specified, a username which avoids RBAC authorization checks and role binding "+
 		"privilege escalation checks, to be used with --authorization-mode=RBAC.")
@@ -83,13 +93,25 @@ func (s *BuiltInAuthorizationOptions) Modes() []string {
 	return modes
 }
 
-func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(informerFactory informers.SharedInformerFactory) authorizer.AuthorizationConfig {
+// ToAuthorizationConfig creates an active authorization config based on the
+// configuration options (read from the kubeconfig file), and the collaborator
+// objects.  dialer will be called to establish a connection to the webhook
+// server.  Use it to provide custom connection logic, such as a proxy-aware
+// dialer; or pass nil to use the default net.Dial.
+func (s *BuiltInAuthorizationOptions) ToAuthorizationConfig(
+	informerFactory informers.SharedInformerFactory,
+	dialer func(network, address string) (net.Conn, error),
+) authorizer.AuthorizationConfig {
+	if dialer == nil || !s.WebhookUseServiceResolution {
+		dialer = net.Dial
+	}
 	return authorizer.AuthorizationConfig{
 		AuthorizationModes:          s.Modes(),
 		PolicyFile:                  s.PolicyFile,
 		WebhookConfigFile:           s.WebhookConfigFile,
 		WebhookCacheAuthorizedTTL:   s.WebhookCacheAuthorizedTTL,
 		WebhookCacheUnauthorizedTTL: s.WebhookCacheUnauthorizedTTL,
+		WebhookDialer:               dialer,
 		InformerFactory:             informerFactory,
 	}
 }
