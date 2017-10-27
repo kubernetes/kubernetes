@@ -31,8 +31,11 @@ import (
 )
 
 func TestNewDeployment(t *testing.T) {
-	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	s, closeFn, rm, dc, informers, c, err := dcSetup(t)
 	defer closeFn()
+	if err != nil {
+		t.Fatalf("failed to setup deployment controller: %v", err)
+	}
 	name := "test-new-deployment"
 	ns := framework.CreateTestingNamespace(name, s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -42,7 +45,6 @@ func TestNewDeployment(t *testing.T) {
 	tester.deployment.Spec.MinReadySeconds = 4
 
 	tester.deployment.Annotations = map[string]string{"test": "should-copy-to-replica-set", v1.LastAppliedConfigAnnotation: "should-not-copy-to-replica-set"}
-	var err error
 	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
 		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
@@ -143,8 +145,11 @@ func TestDeploymentSelectorImmutability(t *testing.T) {
 
 // Paused deployment should not start new rollout
 func TestPausedDeployment(t *testing.T) {
-	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	s, closeFn, rm, dc, informers, c, err := dcSetup(t)
 	defer closeFn()
+	if err != nil {
+		t.Fatalf("failed to setup deployment controller: %v", err)
+	}
 	name := "test-paused-deployment"
 	ns := framework.CreateTestingNamespace(name, s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -155,7 +160,6 @@ func TestPausedDeployment(t *testing.T) {
 	tgps := int64(1)
 	tester.deployment.Spec.Template.Spec.TerminationGracePeriodSeconds = &tgps
 
-	var err error
 	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
 		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
@@ -245,8 +249,11 @@ func TestPausedDeployment(t *testing.T) {
 
 // Paused deployment can be scaled
 func TestScalePausedDeployment(t *testing.T) {
-	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	s, closeFn, rm, dc, informers, c, err := dcSetup(t)
 	defer closeFn()
+	if err != nil {
+		t.Fatalf("failed to setup deployment controller: %v", err)
+	}
 	name := "test-scale-paused-deployment"
 	ns := framework.CreateTestingNamespace(name, s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -256,7 +263,6 @@ func TestScalePausedDeployment(t *testing.T) {
 	tgps := int64(1)
 	tester.deployment.Spec.Template.Spec.TerminationGracePeriodSeconds = &tgps
 
-	var err error
 	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
 		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
@@ -328,8 +334,11 @@ func TestScalePausedDeployment(t *testing.T) {
 
 // Deployment rollout shouldn't be blocked on hash collisions
 func TestDeploymentHashCollision(t *testing.T) {
-	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	s, closeFn, rm, dc, informers, c, err := dcSetup(t)
 	defer closeFn()
+	if err != nil {
+		t.Fatalf("failed to setup deployment controller: %v", err)
+	}
 	name := "test-hash-collision-deployment"
 	ns := framework.CreateTestingNamespace(name, s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -337,7 +346,6 @@ func TestDeploymentHashCollision(t *testing.T) {
 	replicas := int32(1)
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
 
-	var err error
 	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
 	if err != nil {
 		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
