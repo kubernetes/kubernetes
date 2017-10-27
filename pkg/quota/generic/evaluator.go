@@ -20,33 +20,51 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/informers"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/quota"
 )
 
-// ListResourceUsingInformerFunc returns a listing function based on the shared informer factory for the specified resource.
-func ListResourceUsingInformerFunc(f informers.SharedInformerFactory, resource schema.GroupVersionResource) ListFuncByNamespace {
-	return func(namespace string, options metav1.ListOptions) ([]runtime.Object, error) {
-		labelSelector, err := labels.Parse(options.LabelSelector)
+// InformerForResourceFunc knows how to provision an informer
+type InformerForResourceFunc func(schema.GroupVersionResource) (informers.GenericInformer, error)
+
+// ListerFuncForResourceFunc knows how to provision a lister from an informer func
+func ListerFuncForResourceFunc(f InformerForResourceFunc) quota.ListerForResourceFunc {
+	return func(gvr schema.GroupVersionResource) (cache.GenericLister, error) {
+		informer, err := f(gvr)
 		if err != nil {
 			return nil, err
 		}
-		informer, err := f.ForResource(resource)
-		if err != nil {
-			return nil, err
-		}
-		return informer.Lister().ByNamespace(namespace).List(labelSelector)
+		return informer.Lister(), nil
 	}
 }
 
+// ListResourceUsingListerFunc returns a listing function based on the shared informer factory for the specified resource.
+func ListResourceUsingListerFunc(l quota.ListerForResourceFunc, resource schema.GroupVersionResource) ListFuncByNamespace {
+	return func(namespace string) ([]runtime.Object, error) {
+		lister, err := l(resource)
+		if err != nil {
+			return nil, err
+		}
+		return lister.ByNamespace(namespace).List(labels.Everything())
+	}
+}
+
+// ObjectCountQuotaResourceNameFor returns the object count quota name for specified groupResource
+func ObjectCountQuotaResourceNameFor(groupResource schema.GroupResource) api.ResourceName {
+	if len(groupResource.Group) == 0 {
+		return api.ResourceName("count/" + groupResource.Resource)
+	}
+	return api.ResourceName("count/" + groupResource.Resource + "." + groupResource.Group)
+}
+
 // ListFuncByNamespace knows how to list resources in a namespace
-type ListFuncByNamespace func(namespace string, options metav1.ListOptions) ([]runtime.Object, error)
+type ListFuncByNamespace func(namespace string) ([]runtime.Object, error)
 
 // MatchesScopeFunc knows how to evaluate if an object matches a scope
 type MatchesScopeFunc func(scope api.ResourceQuotaScope, object runtime.Object) (bool, error)
@@ -91,9 +109,7 @@ func CalculateUsageStats(options quota.UsageStatsOptions,
 	for _, resourceName := range options.Resources {
 		result.Used[resourceName] = resource.Quantity{Format: resource.DecimalSI}
 	}
-	items, err := listFunc(options.Namespace, metav1.ListOptions{
-		LabelSelector: labels.Everything().String(),
-	})
+	items, err := listFunc(options.Namespace)
 	if err != nil {
 		return result, fmt.Errorf("failed to list content: %v", err)
 	}
@@ -121,63 +137,86 @@ func CalculateUsageStats(options quota.UsageStatsOptions,
 	return result, nil
 }
 
-// ObjectCountEvaluator provides an implementation for quota.Evaluator
+// objectCountEvaluator provides an implementation for quota.Evaluator
 // that associates usage of the specified resource based on the number of items
 // returned by the specified listing function.
-type ObjectCountEvaluator struct {
-	// AllowCreateOnUpdate if true will ensure the evaluator tracks create
+type objectCountEvaluator struct {
+	// allowCreateOnUpdate if true will ensure the evaluator tracks create
 	// and update operations.
-	AllowCreateOnUpdate bool
-	// GroupKind that this evaluator tracks.
-	InternalGroupKind schema.GroupKind
+	allowCreateOnUpdate bool
+	// GroupResource that this evaluator tracks.
+	// It is used to construct a generic object count quota name
+	groupResource schema.GroupResource
 	// A function that knows how to list resources by namespace.
 	// TODO move to dynamic client in future
-	ListFuncByNamespace ListFuncByNamespace
-	// Name associated with this resource in the quota.
-	ResourceName api.ResourceName
+	listFuncByNamespace ListFuncByNamespace
+	// Names associated with this resource in the quota for generic counting.
+	resourceNames []api.ResourceName
 }
 
 // Constraints returns an error if the configured resource name is not in the required set.
-func (o *ObjectCountEvaluator) Constraints(required []api.ResourceName, item runtime.Object) error {
-	if !quota.Contains(required, o.ResourceName) {
-		return fmt.Errorf("missing %s", o.ResourceName)
-	}
+func (o *objectCountEvaluator) Constraints(required []api.ResourceName, item runtime.Object) error {
+	// no-op for object counting
 	return nil
 }
 
-// GroupKind that this evaluator tracks
-func (o *ObjectCountEvaluator) GroupKind() schema.GroupKind {
-	return o.InternalGroupKind
-}
-
 // Handles returns true if the object count evaluator needs to track this attributes.
-func (o *ObjectCountEvaluator) Handles(a admission.Attributes) bool {
+func (o *objectCountEvaluator) Handles(a admission.Attributes) bool {
 	operation := a.GetOperation()
-	return operation == admission.Create || (o.AllowCreateOnUpdate && operation == admission.Update)
+	return operation == admission.Create || (o.allowCreateOnUpdate && operation == admission.Update)
 }
 
 // Matches returns true if the evaluator matches the specified quota with the provided input item
-func (o *ObjectCountEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Object) (bool, error) {
+func (o *objectCountEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Object) (bool, error) {
 	return Matches(resourceQuota, item, o.MatchingResources, MatchesNoScopeFunc)
 }
 
 // MatchingResources takes the input specified list of resources and returns the set of resources it matches.
-func (o *ObjectCountEvaluator) MatchingResources(input []api.ResourceName) []api.ResourceName {
-	return quota.Intersection(input, []api.ResourceName{o.ResourceName})
+func (o *objectCountEvaluator) MatchingResources(input []api.ResourceName) []api.ResourceName {
+	return quota.Intersection(input, o.resourceNames)
 }
 
 // Usage returns the resource usage for the specified object
-func (o *ObjectCountEvaluator) Usage(object runtime.Object) (api.ResourceList, error) {
+func (o *objectCountEvaluator) Usage(object runtime.Object) (api.ResourceList, error) {
 	quantity := resource.NewQuantity(1, resource.DecimalSI)
-	return api.ResourceList{
-		o.ResourceName: *quantity,
-	}, nil
+	resourceList := api.ResourceList{}
+	for _, resourceName := range o.resourceNames {
+		resourceList[resourceName] = *quantity
+	}
+	return resourceList, nil
+}
+
+// GroupResource tracked by this evaluator
+func (o *objectCountEvaluator) GroupResource() schema.GroupResource {
+	return o.groupResource
 }
 
 // UsageStats calculates aggregate usage for the object.
-func (o *ObjectCountEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageStats, error) {
-	return CalculateUsageStats(options, o.ListFuncByNamespace, MatchesNoScopeFunc, o.Usage)
+func (o *objectCountEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageStats, error) {
+	return CalculateUsageStats(options, o.listFuncByNamespace, MatchesNoScopeFunc, o.Usage)
 }
 
 // Verify implementation of interface at compile time.
-var _ quota.Evaluator = &ObjectCountEvaluator{}
+var _ quota.Evaluator = &objectCountEvaluator{}
+
+// NewObjectCountEvaluator returns an evaluator that can perform generic
+// object quota counting.  It allows an optional alias for backwards compatibilty
+// purposes for the legacy object counting names in quota.  Unless its supporting
+// backward compatibility, alias should not be used.
+func NewObjectCountEvaluator(
+	allowCreateOnUpdate bool,
+	groupResource schema.GroupResource, listFuncByNamespace ListFuncByNamespace,
+	alias api.ResourceName) quota.Evaluator {
+
+	resourceNames := []api.ResourceName{ObjectCountQuotaResourceNameFor(groupResource)}
+	if len(alias) > 0 {
+		resourceNames = append(resourceNames, alias)
+	}
+
+	return &objectCountEvaluator{
+		allowCreateOnUpdate: allowCreateOnUpdate,
+		groupResource:       groupResource,
+		listFuncByNamespace: listFuncByNamespace,
+		resourceNames:       resourceNames,
+	}
+}

@@ -22,10 +22,11 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/quota"
+	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -90,8 +91,7 @@ func TestPodConstraintsFunc(t *testing.T) {
 			err:      `must specify memory`,
 		},
 	}
-	kubeClient := fake.NewSimpleClientset()
-	evaluator := NewPodEvaluator(kubeClient, nil, clock.RealClock{})
+	evaluator := NewPodEvaluator(nil, clock.RealClock{})
 	for testName, test := range testCases {
 		err := evaluator.Constraints(test.required, test.pod)
 		switch {
@@ -104,9 +104,8 @@ func TestPodConstraintsFunc(t *testing.T) {
 }
 
 func TestPodEvaluatorUsage(t *testing.T) {
-	kubeClient := fake.NewSimpleClientset()
 	fakeClock := clock.NewFakeClock(time.Now())
-	evaluator := NewPodEvaluator(kubeClient, nil, fakeClock)
+	evaluator := NewPodEvaluator(nil, fakeClock)
 
 	// fields use to simulate a pod undergoing termination
 	// note: we set the deletion time in the past
@@ -135,6 +134,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				api.ResourceLimitsCPU:   resource.MustParse("2m"),
 				api.ResourcePods:        resource.MustParse("1"),
 				api.ResourceCPU:         resource.MustParse("1m"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
 		"init container MEM": {
@@ -153,6 +153,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				api.ResourceLimitsMemory:   resource.MustParse("2m"),
 				api.ResourcePods:           resource.MustParse("1"),
 				api.ResourceMemory:         resource.MustParse("1m"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
 		"init container local ephemeral storage": {
@@ -171,6 +172,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				api.ResourceRequestsEphemeralStorage: resource.MustParse("32Mi"),
 				api.ResourceLimitsEphemeralStorage:   resource.MustParse("64Mi"),
 				api.ResourcePods:                     resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
 		"container CPU": {
@@ -189,6 +191,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				api.ResourceLimitsCPU:   resource.MustParse("2m"),
 				api.ResourcePods:        resource.MustParse("1"),
 				api.ResourceCPU:         resource.MustParse("1m"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
 		"container MEM": {
@@ -207,6 +210,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				api.ResourceLimitsMemory:   resource.MustParse("2m"),
 				api.ResourcePods:           resource.MustParse("1"),
 				api.ResourceMemory:         resource.MustParse("1m"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
 		"container local ephemeral storage": {
@@ -225,6 +229,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				api.ResourceRequestsEphemeralStorage: resource.MustParse("32Mi"),
 				api.ResourceLimitsEphemeralStorage:   resource.MustParse("64Mi"),
 				api.ResourcePods:                     resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
 		"init container maximums override sum of containers": {
@@ -292,6 +297,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				api.ResourcePods:           resource.MustParse("1"),
 				api.ResourceCPU:            resource.MustParse("4"),
 				api.ResourceMemory:         resource.MustParse("100M"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
 		"pod deletion timestamp exceeded": {
@@ -321,7 +327,9 @@ func TestPodEvaluatorUsage(t *testing.T) {
 					},
 				},
 			},
-			usage: api.ResourceList{},
+			usage: api.ResourceList{
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+			},
 		},
 		"pod deletion timestamp not exceeded": {
 			pod: &api.Pod{
@@ -352,6 +360,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				api.ResourceLimitsCPU:   resource.MustParse("2"),
 				api.ResourcePods:        resource.MustParse("1"),
 				api.ResourceCPU:         resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
 	}

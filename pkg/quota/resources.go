@@ -247,7 +247,7 @@ func CalculateUsage(namespaceName string, scopes []api.ResourceQuotaScope, hardL
 	// look to measure updated usage stats for
 	hardResources := ResourceNames(hardLimits)
 	potentialResources := []api.ResourceName{}
-	evaluators := registry.Evaluators()
+	evaluators := registry.List()
 	for _, evaluator := range evaluators {
 		potentialResources = append(potentialResources, evaluator.MatchingResources(hardResources)...)
 	}

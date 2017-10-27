@@ -506,11 +506,9 @@ func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client interna
 	// TODO: use a dynamic restmapper. See https://github.com/kubernetes/kubernetes/pull/42615.
 	restMapper := legacyscheme.Registry.RESTMapper()
 
-	// NOTE: we do not provide informers to the quota registry because admission level decisions
-	// do not require us to open watches for all items tracked by quota.
-	quotaRegistry := quotainstall.NewRegistry(nil, nil)
+	quotaConfiguration := quotainstall.NewQuotaConfigurationForAdmission()
 
-	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, restMapper, quotaRegistry, webhookAuthWrapper, serviceResolver)
+	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, restMapper, quotaConfiguration, webhookAuthWrapper, serviceResolver)
 
 	return pluginInitializer, nil
 }

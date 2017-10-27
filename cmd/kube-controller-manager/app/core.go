@@ -36,7 +36,6 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
@@ -55,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/expand"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/quota/generic"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
@@ -240,31 +240,34 @@ func startPodGCController(ctx ControllerContext) (bool, error) {
 
 func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 	resourceQuotaControllerClient := ctx.ClientBuilder.ClientOrDie("resourcequota-controller")
-	resourceQuotaRegistry := quotainstall.NewRegistry(resourceQuotaControllerClient, ctx.InformerFactory)
-	groupKindsToReplenish := []schema.GroupKind{
-		api.Kind("Pod"),
-		api.Kind("Service"),
-		api.Kind("ReplicationController"),
-		api.Kind("PersistentVolumeClaim"),
-		api.Kind("Secret"),
-		api.Kind("ConfigMap"),
-	}
+	discoveryFunc := resourceQuotaControllerClient.Discovery().ServerPreferredNamespacedResources
+	listerFuncForResource := generic.ListerFuncForResourceFunc(ctx.InformerFactory.ForResource)
+	quotaConfiguration := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
+
 	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
 		QuotaClient:               resourceQuotaControllerClient.CoreV1(),
 		ResourceQuotaInformer:     ctx.InformerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.StaticResyncPeriodFunc(ctx.Options.ResourceQuotaSyncPeriod.Duration),
-		Registry:                  resourceQuotaRegistry,
-		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(ctx.InformerFactory),
+		InformerFactory:           ctx.InformerFactory,
 		ReplenishmentResyncPeriod: ResyncPeriod(&ctx.Options),
-		GroupKindsToReplenish:     groupKindsToReplenish,
+		DiscoveryFunc:             discoveryFunc,
+		IgnoredResourcesFunc:      quotaConfiguration.IgnoredResources,
+		InformersStarted:          ctx.InformersStarted,
+		Registry:                  generic.NewRegistry(quotaConfiguration.Evaluators()),
 	}
 	if resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
-	go resourcequotacontroller.NewResourceQuotaController(
-		resourceQuotaControllerOptions,
-	).Run(int(ctx.Options.ConcurrentResourceQuotaSyncs), ctx.Stop)
+	resourceQuotaController, err := resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions)
+	if err != nil {
+		return false, err
+	}
+	go resourceQuotaController.Run(int(ctx.Options.ConcurrentResourceQuotaSyncs), ctx.Stop)
+
+	// Periodically the quota controller to detect new resource types
+	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, ctx.Stop)
+
 	return true, nil
 }
 
