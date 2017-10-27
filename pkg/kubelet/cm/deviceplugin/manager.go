@@ -169,15 +169,18 @@ func (m *ManagerImpl) Allocate(resourceName string, devs []string) (*pluginapi.A
 }
 
 // Register registers a device plugin.
-func (m *ManagerImpl) Register(ctx context.Context,
-	r *pluginapi.RegisterRequest) (*pluginapi.Empty, error) {
-	glog.V(2).Infof("Got request for Device Plugin %s", r.ResourceName)
+func (m *ManagerImpl) Register(ctx context.Context, r *pluginapi.RegisterRequest) (*pluginapi.Empty, error) {
+	glog.Infof("Got registration request from device plugin with resource name %q", r.ResourceName)
 	if r.Version != pluginapi.Version {
-		return &pluginapi.Empty{}, fmt.Errorf(errUnsuportedVersion)
+		errorString := fmt.Sprintf(errUnsuportedVersion, r.Version, pluginapi.Version)
+		glog.Infof("Bad registration request from device plugin with resource name %q: %v", r.ResourceName, errorString)
+		return &pluginapi.Empty{}, fmt.Errorf(errorString)
 	}
 
 	if !v1helper.IsExtendedResourceName(v1.ResourceName(r.ResourceName)) {
-		return &pluginapi.Empty{}, fmt.Errorf(errInvalidResourceName, r.ResourceName)
+		errorString := fmt.Sprintf(errInvalidResourceName, r.ResourceName)
+		glog.Infof("Bad registration request from device plugin: %v", errorString)
+		return &pluginapi.Empty{}, fmt.Errorf(errorString)
 	}
 
 	// TODO: for now, always accepts newest device plugin. Later may consider to
