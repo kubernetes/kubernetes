@@ -93,7 +93,7 @@ function config-ip-firewall {
   iptables -N KUBE-METADATA-SERVER
   iptables -I FORWARD -p tcp -d 169.254.169.254 --dport 80 -j KUBE-METADATA-SERVER
 
-  if [[ -n "${KUBE_FIREWALL_METADATA_SERVER:-}" ]]; then
+  if [[ -n "${ENABLE_METADATA_CONCEALMENT:-}" ]]; then
     iptables -A KUBE-METADATA-SERVER -j DROP
   fi
 }
@@ -419,7 +419,7 @@ enable_cluster_ui: '$(echo "$ENABLE_CLUSTER_UI" | sed -e "s/'/''/g")'
 enable_node_problem_detector: '$(echo "$ENABLE_NODE_PROBLEM_DETECTOR" | sed -e "s/'/''/g")'
 enable_l7_loadbalancing: '$(echo "$ENABLE_L7_LOADBALANCING" | sed -e "s/'/''/g")'
 enable_node_logging: '$(echo "$ENABLE_NODE_LOGGING" | sed -e "s/'/''/g")'
-enable_metadata_proxy: '$(echo "$ENABLE_METADATA_PROXY" | sed -e "s/'/''/g")'
+enable_metadata_proxy: '$(echo "$ENABLE_METADATA_CONCEALMENT" | sed -e "s/'/''/g")'
 enable_metrics_server: '$(echo "$ENABLE_METRICS_SERVER" | sed -e "s/'/''/g")'
 enable_rescheduler: '$(echo "$ENABLE_RESCHEDULER" | sed -e "s/'/''/g")'
 logging_destination: '$(echo "$LOGGING_DESTINATION" | sed -e "s/'/''/g")'
