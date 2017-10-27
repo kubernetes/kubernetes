@@ -86,7 +86,6 @@ type genericScheduler struct {
 	predicateMetaProducer algorithm.PredicateMetadataProducer
 	prioritizers          []algorithm.PriorityConfig
 	extenders             []algorithm.SchedulerExtender
-	pods                  algorithm.PodLister
 	lastNodeIndexLock     sync.Mutex
 	lastNodeIndex         uint64
 
