@@ -40,14 +40,14 @@ func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
 	return nil
 }
 
-// ValidatingAdmit performs an admission control check using a chain of handlers, and returns immediately on first error
-func (admissionHandler chainAdmissionHandler) ValidatingAdmit(a Attributes) error {
+// Validate performs an admission control check using a chain of handlers, and returns immediately on first error
+func (admissionHandler chainAdmissionHandler) Validate(a Attributes) error {
 	for _, handler := range admissionHandler {
 		if !handler.Handles(a.GetOperation()) {
 			continue
 		}
 		if validator, ok := handler.(ValidationInterface); ok {
-			err := validator.ValidatingAdmit(a)
+			err := validator.Validate(a)
 			if err != nil {
 				return err
 			}

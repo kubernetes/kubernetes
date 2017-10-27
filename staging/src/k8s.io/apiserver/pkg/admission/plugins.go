@@ -156,18 +156,18 @@ func (ps *Plugins) InitPlugin(name string, config io.Reader, pluginInitializer P
 
 	pluginInitializer.Initialize(plugin)
 	// ensure that plugins have been properly initialized
-	if err := Validate(plugin); err != nil {
+	if err := ValidateInitialization(plugin); err != nil {
 		return nil, err
 	}
 
 	return plugin, nil
 }
 
-// Validate will call the Validate function in each plugin if they implement
-// the Validator interface.
-func Validate(plugin Interface) error {
-	if validater, ok := plugin.(Validator); ok {
-		err := validater.Validate()
+// ValidateInitialization will call the InitializationValidate function in each plugin if they implement
+// the InitializationValidator interface.
+func ValidateInitialization(plugin Interface) error {
+	if validater, ok := plugin.(InitializationValidator); ok {
+		err := validater.ValidateInitialization()
 		if err != nil {
 			return err
 		}

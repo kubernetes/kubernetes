@@ -34,13 +34,13 @@ import (
 // WantsInternalKubeClientSet defines a function which sets ClientSet for admission plugins that need it
 type WantsInternalKubeClientSet interface {
 	SetInternalKubeClientSet(internalclientset.Interface)
-	admission.Validator
+	admission.InitializationValidator
 }
 
 // WantsInternalKubeInformerFactory defines a function which sets InformerFactory for admission plugins that need it
 type WantsInternalKubeInformerFactory interface {
 	SetInternalKubeInformerFactory(informers.SharedInformerFactory)
-	admission.Validator
+	admission.InitializationValidator
 }
 
 // WantsCloudConfig defines a function which sets CloudConfig for admission plugins that need it.
@@ -56,7 +56,7 @@ type WantsRESTMapper interface {
 // WantsQuotaConfiguration defines a function which sets quota configuration for admission plugins that need it.
 type WantsQuotaConfiguration interface {
 	SetQuotaConfiguration(quota.Configuration)
-	admission.Validator
+	admission.InitializationValidator
 }
 
 // WantsServiceResolver defines a fuction that accepts a ServiceResolver for
@@ -75,7 +75,7 @@ type ServiceResolver interface {
 // to allow the apiserver to control what is returned as auth info
 type WantsAuthenticationInfoResolverWrapper interface {
 	SetAuthenticationInfoResolverWrapper(webhook.AuthenticationInfoResolverWrapper)
-	admission.Validator
+	admission.InitializationValidator
 }
 
 type PluginInitializer struct {

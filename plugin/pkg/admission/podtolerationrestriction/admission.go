@@ -202,7 +202,7 @@ func (p *podTolerationsPlugin) SetInternalKubeInformerFactory(f informers.Shared
 
 }
 
-func (p *podTolerationsPlugin) Validate() error {
+func (p *podTolerationsPlugin) ValidateInitialization() error {
 	if p.namespaceLister == nil {
 		return fmt.Errorf("missing namespaceLister")
 	}

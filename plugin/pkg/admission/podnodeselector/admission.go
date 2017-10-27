@@ -183,7 +183,7 @@ func (p *podNodeSelector) SetInternalKubeInformerFactory(f informers.SharedInfor
 	p.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }
 
-func (p *podNodeSelector) Validate() error {
+func (p *podNodeSelector) ValidateInitialization() error {
 	if p.namespaceLister == nil {
 		return fmt.Errorf("missing namespaceLister")
 	}

@@ -214,8 +214,8 @@ func (l *Lifecycle) SetExternalKubeClientSet(client kubernetes.Interface) {
 	l.client = client
 }
 
-// Validate implement the Validator interface.
-func (l *Lifecycle) Validate() error {
+// ValidateInitialization implements the InitializationValidator interface.
+func (l *Lifecycle) ValidateInitialization() error {
 	if l.namespaceLister == nil {
 		return fmt.Errorf("missing namespaceLister")
 	}

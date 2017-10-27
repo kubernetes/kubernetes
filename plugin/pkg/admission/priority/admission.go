@@ -74,8 +74,8 @@ func NewPlugin() *PriorityPlugin {
 	}
 }
 
-// Validate implements the Validator interface.
-func (p *PriorityPlugin) Validate() error {
+// ValidateInitialization implements the InitializationValidator interface.
+func (p *PriorityPlugin) ValidateInitialization() error {
 	if p.client == nil {
 		return fmt.Errorf("%s requires a client", pluginName)
 	}

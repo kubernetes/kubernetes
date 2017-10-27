@@ -84,8 +84,8 @@ func (d *DisallowFlunder) SetInternalWardleInformerFactory(f informers.SharedInf
 	d.lister = f.Wardle().InternalVersion().Fischers().Lister()
 }
 
-// Validate checks whether the plugin was correctly initialized.
-func (d *DisallowFlunder) Validate() error {
+// ValidaValidateInitializationte checks whether the plugin was correctly initialized.
+func (d *DisallowFlunder) ValidateInitialization() error {
 	if d.lister == nil {
 		return fmt.Errorf("missing fischer lister")
 	}

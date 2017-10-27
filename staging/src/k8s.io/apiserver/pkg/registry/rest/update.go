@@ -252,6 +252,6 @@ func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttrib
 		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {
 			return nil
 		}
-		return validatingAdmission.ValidatingAdmit(finalAttributes)
+		return validatingAdmission.Validate(finalAttributes)
 	}
 }

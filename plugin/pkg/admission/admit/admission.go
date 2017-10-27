@@ -38,8 +38,8 @@ func (AlwaysAdmit) Admit(a admission.Attributes) (err error) {
 	return nil
 }
 
-// ValidatingAdmit makes an admission decision based on the request attributes.  It is NOT allowed to mutate
-func (AlwaysAdmit) ValidatingAdmit(a admission.Attributes) (err error) {
+// Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate.
+func (AlwaysAdmit) Validate(a admission.Attributes) (err error) {
 	return nil
 }
 

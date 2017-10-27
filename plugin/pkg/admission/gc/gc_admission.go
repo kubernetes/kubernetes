@@ -260,7 +260,7 @@ func (a *gcPermissionsEnforcement) SetRESTMapper(restMapper meta.RESTMapper) {
 	a.restMapper = restMapper
 }
 
-func (a *gcPermissionsEnforcement) Validate() error {
+func (a *gcPermissionsEnforcement) ValidateInitialization() error {
 	if a.authorizer == nil {
 		return fmt.Errorf("missing authorizer")
 	}

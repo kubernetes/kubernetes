@@ -39,7 +39,7 @@ func newHandlerForTest(c clientset.Interface) (admission.MutationInterface, info
 	handler := NewExists()
 	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
-	err := admission.Validate(handler)
+	err := admission.ValidateInitialization(handler)
 	return handler, f, err
 }
 

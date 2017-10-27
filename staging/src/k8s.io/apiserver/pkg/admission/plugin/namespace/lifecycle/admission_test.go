@@ -53,7 +53,7 @@ func newHandlerForTestWithClock(c clientset.Interface, cacheClock clock.Clock) (
 		return handler, f, err
 	}
 	pluginInitializer.Initialize(handler)
-	err = admission.Validate(handler)
+	err = admission.ValidateInitialization(handler)
 	return handler, f, err
 }
 

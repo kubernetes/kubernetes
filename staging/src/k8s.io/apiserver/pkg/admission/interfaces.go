@@ -69,8 +69,8 @@ type MutationInterface interface {
 type ValidationInterface interface {
 	Interface
 
-	// ValidatingAdmit makes an admission decision based on the request attributes.  It is NOT allowed to mutate
-	ValidatingAdmit(a Attributes) (err error)
+	// Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate
+	Validate(a Attributes) (err error)
 }
 
 // Operation is the type of resource operation being checked for admission control
@@ -90,10 +90,10 @@ type PluginInitializer interface {
 	Initialize(plugin Interface)
 }
 
-// Validator holds Validate functions, which are responsible for validation of initialized shared resources
-// and should be implemented on admission plugins
-type Validator interface {
-	Validate() error
+// InitializationValidator holds ValidateInitialization functions, which are responsible for validation of initialized
+// shared resources and should be implemented on admission plugins
+type InitializationValidator interface {
+	ValidateInitialization() error
 }
 
 // ConfigProvider provides a way to get configuration for an admission plugin based on its name

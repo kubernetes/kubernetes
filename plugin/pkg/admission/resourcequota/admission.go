@@ -100,8 +100,8 @@ func (a *QuotaAdmission) SetQuotaConfiguration(c quota.Configuration) {
 	a.evaluator = NewQuotaEvaluator(a.quotaAccessor, a.quotaConfiguration, nil, a.config, a.numEvaluators, a.stopCh)
 }
 
-// Validate ensures an authorizer is set.
-func (a *QuotaAdmission) Validate() error {
+// ValidateInitialization ensures an authorizer is set.
+func (a *QuotaAdmission) ValidateInitialization() error {
 	if a.quotaAccessor == nil {
 		return fmt.Errorf("missing quotaAccessor")
 	}
