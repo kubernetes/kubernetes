@@ -32,7 +32,9 @@ import (
 	admissionv1alpha1 "k8s.io/api/admission/v1alpha1"
 	"k8s.io/api/admissionregistration/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -41,7 +43,9 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/configuration"
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
 )
 
@@ -123,6 +127,8 @@ type GenericAdmissionWebhook struct {
 	hookSource           WebhookSource
 	serviceResolver      ServiceResolver
 	negotiatedSerializer runtime.NegotiatedSerializer
+	namespaceLister      corelisters.NamespaceLister
+	client               clientset.Interface
 
 	authInfoResolver AuthenticationInfoResolver
 	cache            *lru.Cache
@@ -163,7 +169,15 @@ func (a *GenericAdmissionWebhook) SetScheme(scheme *runtime.Scheme) {
 
 // WantsExternalKubeClientSet defines a function which sets external ClientSet for admission plugins that need it
 func (a *GenericAdmissionWebhook) SetExternalKubeClientSet(client clientset.Interface) {
+	a.client = client
 	a.hookSource = configuration.NewValidatingWebhookConfigurationManager(client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations())
+}
+
+// SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
+func (a *GenericAdmissionWebhook) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	namespaceInformer := f.Core().V1().Namespaces()
+	a.namespaceLister = namespaceInformer.Lister()
+	a.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }
 
 // ValidateInitialization implements the InitializationValidator interface.
@@ -173,6 +187,9 @@ func (a *GenericAdmissionWebhook) ValidateInitialization() error {
 	}
 	if a.negotiatedSerializer == nil {
 		return fmt.Errorf("the GenericAdmissionWebhook admission plugin requires a runtime.Scheme to be provided to derive a serializer")
+	}
+	if a.namespaceLister == nil {
+		return fmt.Errorf("the GenericAdmissionWebhook admission plugin requires a namespaceLister")
 	}
 	go a.hookSource.Run(wait.NeverStop)
 	return nil
@@ -255,7 +272,74 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 	return errs[0]
 }
 
+func (a *GenericAdmissionWebhook) getNamespaceLabels(attr admission.Attributes) (map[string]string, error) {
+	// If the request itself is creating or updating a namespace, then get the
+	// labels from attr.Object, because namespaceLister doesn't have the latest
+	// namespace yet.
+	//
+	// However, if the request is deleting a namespace, then get the label from
+	// the namespace in the namespaceLister, because a delete request is not
+	// going to change the object, and attr.Object will be a DeleteOptions
+	// rather than a namespace object.
+	if attr.GetResource().Resource == "namespaces" &&
+		len(attr.GetSubresource()) == 0 &&
+		(attr.GetOperation() == admission.Create || attr.GetOperation() == admission.Update) {
+		accessor, err := meta.Accessor(attr.GetObject())
+		if err != nil {
+			return nil, err
+		}
+		return accessor.GetLabels(), nil
+	}
+
+	namespaceName := attr.GetNamespace()
+	namespace, err := a.namespaceLister.Get(namespaceName)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+	if apierrors.IsNotFound(err) {
+		// in case of latency in our caches, make a call direct to storage to verify that it truly exists or not
+		namespace, err = a.client.Core().Namespaces().Get(namespaceName, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+	}
+	return namespace.Labels, nil
+}
+
+// whether the request is exempted by the webhook because of the
+// namespaceSelector of the webhook.
+func (a *GenericAdmissionWebhook) exemptedByNamespaceSelector(h *v1alpha1.Webhook, attr admission.Attributes) (bool, error) {
+	namespaceName := attr.GetNamespace()
+	if len(namespaceName) == 0 && attr.GetResource().Resource != "namespaces" {
+		// If the request is about a cluster scoped resource, and it is not a
+		// namespace, it is exempted from all webhooks for now.
+		// TODO: figure out a way selective exempt cluster scoped resources.
+		// Also update the comment in types.go
+		return true, nil
+	}
+	namespaceLabels, err := a.getNamespaceLabels(attr)
+	if apierrors.IsNotFound(err) {
+		return false, err
+	}
+	if err != nil {
+		return false, apierrors.NewInternalError(err)
+	}
+	// TODO: adding an LRU cache to cache the translation
+	selector, err := metav1.LabelSelectorAsSelector(h.NamespaceSelector)
+	if err != nil {
+		return false, apierrors.NewInternalError(err)
+	}
+	return !selector.Matches(labels.Set(namespaceLabels)), nil
+}
+
 func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Webhook, attr admission.Attributes) error {
+	excluded, err := a.exemptedByNamespaceSelector(h, attr)
+	if err != nil {
+		return err
+	}
+	if excluded {
+		return nil
+	}
 	matches := false
 	for _, r := range h.Rules {
 		m := RuleMatcher{Rule: r, Attr: attr}
