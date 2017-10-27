@@ -120,7 +120,6 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 				kubeadmutil.CheckErr(err)
 			}
 
-			legacyscheme.Scheme.Default(cfg)
 			internalcfg := &kubeadmapi.MasterConfiguration{}
 			legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
 
