@@ -42,15 +42,15 @@ import (
 	schedulertesting "k8s.io/kubernetes/plugin/pkg/scheduler/testing"
 )
 
-func falsePredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+var falsePredicate algorithm.FitPredicateFunction = func(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	return false, []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
 }
 
-func truePredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+var truePredicate algorithm.FitPredicateFunction = func(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
-func matchesPredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+var matchesPredicate algorithm.FitPredicateFunction = func(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	node := nodeInfo.Node()
 	if node == nil {
 		return false, nil, fmt.Errorf("node not found")
@@ -61,7 +61,7 @@ func matchesPredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *s
 	return false, []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
 }
 
-func hasNoPodsPredicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+var hasNoPodsPredicate algorithm.FitPredicateFunction = func(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	if len(nodeInfo.Pods()) == 0 {
 		return true, nil, nil
 	}

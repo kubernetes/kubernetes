@@ -27,7 +27,33 @@ import (
 
 // FitPredicate is a function that indicates if a pod fits into an existing node.
 // The failure information is given by the error.
-type FitPredicate func(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []PredicateFailureReason, error)
+type FitPredicate interface {
+	Predicate(*v1.Pod, PredicateMetadata, *schedulercache.NodeInfo) (bool, []PredicateFailureReason, error)
+}
+
+type FitPredicateFunction func(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []PredicateFailureReason, error)
+
+func (f FitPredicateFunction) Predicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []PredicateFailureReason, error) {
+	return f(pod, meta, nodeInfo)
+}
+
+type FitPredicates []FitPredicate
+
+func (fs FitPredicates) Predicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []PredicateFailureReason, error) {
+	var fails []PredicateFailureReason
+
+	for _, f := range fs {
+		fit, reasons, err := f.Predicate(pod, meta, nodeInfo)
+		if err != nil {
+			return false, fails, err
+		}
+		if !fit {
+			fails = append(fails, reasons...)
+		}
+	}
+
+	return len(fails) == 0, fails, nil
+}
 
 // PriorityMapFunction is a function that computes per-node results for a given node.
 // TODO: Figure out the exact API of this method.

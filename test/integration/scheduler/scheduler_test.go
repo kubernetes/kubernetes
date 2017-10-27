@@ -66,11 +66,11 @@ type nodeStateManager struct {
 	makeUnSchedulable nodeMutationFunc
 }
 
-func PredicateOne(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+var PredicateOne algorithm.FitPredicateFunction = func(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
-func PredicateTwo(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+var PredicateTwo algorithm.FitPredicateFunction = func(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
