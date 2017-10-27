@@ -97,7 +97,6 @@ func NewCertificateController(
 	})
 	cc.csrLister = csrInformer.Lister()
 	cc.csrsSynced = csrInformer.Informer().HasSynced
-	cc.handler = handler
 	return cc
 }
 
