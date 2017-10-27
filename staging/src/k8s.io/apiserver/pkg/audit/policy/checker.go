@@ -36,7 +36,24 @@ type Checker interface {
 
 // NewChecker creates a new policy checker.
 func NewChecker(policy *audit.Policy) Checker {
+	for i, rule := range policy.Rules {
+		policy.Rules[i].OmitStages = unionStages(policy.OmitStages, rule.OmitStages)
+	}
 	return &policyChecker{*policy}
+}
+
+func unionStages(stageLists ...[]audit.Stage) []audit.Stage {
+	m := make(map[audit.Stage]bool)
+	for _, sl := range stageLists {
+		for _, s := range sl {
+			m[s] = true
+		}
+	}
+	result := make([]audit.Stage, 0, len(m))
+	for key := range m {
+		result = append(result, key)
+	}
+	return result
 }
 
 // FakeChecker creates a checker that returns a constant level for all requests (for testing).
@@ -54,7 +71,7 @@ func (p *policyChecker) LevelAndStages(attrs authorizer.Attributes) (audit.Level
 			return rule.Level, rule.OmitStages
 		}
 	}
-	return DefaultAuditLevel, nil
+	return DefaultAuditLevel, p.OmitStages
 }
 
 // Check whether the rule matches the request attrs.
