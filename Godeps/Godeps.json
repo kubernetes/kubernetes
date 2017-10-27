@@ -276,11 +276,6 @@
 			"Rev": "63ce630574a5ec05ecd8e8de5cea16332a5a684d"
 		},
 		{
-			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/restxml",
-			"Comment": "v1.6.10",
-			"Rev": "63ce630574a5ec05ecd8e8de5cea16332a5a684d"
-		},
-		{
 			"ImportPath": "github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil",
 			"Comment": "v1.6.10",
 			"Rev": "63ce630574a5ec05ecd8e8de5cea16332a5a684d"
@@ -312,11 +307,6 @@
 		},
 		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/kms",
-			"Comment": "v1.6.10",
-			"Rev": "63ce630574a5ec05ecd8e8de5cea16332a5a684d"
-		},
-		{
-			"ImportPath": "github.com/aws/aws-sdk-go/service/route53",
 			"Comment": "v1.6.10",
 			"Rev": "63ce630574a5ec05ecd8e8de5cea16332a5a684d"
 		},
@@ -1977,11 +1967,6 @@
 			"Rev": "fc2b8d3a73c4867e51861bbdd5ae3c1f0869dd6a"
 		},
 		{
-			"ImportPath": "github.com/miekg/coredns/middleware/etcd/msg",
-			"Comment": "v003",
-			"Rev": "20e25559d5eada5a68a0720816a6e947b94860ce"
-		},
-		{
 			"ImportPath": "github.com/miekg/dns",
 			"Rev": "5d001d020961ae1c184f9f8152fdc73810481677"
 		},
@@ -2879,10 +2864,6 @@
 		},
 		{
 			"ImportPath": "google.golang.org/api/container/v1",
-			"Rev": "654f863362977d69086620b5f72f13e911da2410"
-		},
-		{
-			"ImportPath": "google.golang.org/api/dns/v1",
 			"Rev": "654f863362977d69086620b5f72f13e911da2410"
 		},
 		{
