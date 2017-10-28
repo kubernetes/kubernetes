@@ -12,6 +12,7 @@ go_test(
         "openapi_test.go",
         "server_test.go",
     ],
+    importpath = "k8s.io/kubernetes/cmd/kube-apiserver/app/testing",
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/api/admissionregistration/v1alpha1:go_default_library",
