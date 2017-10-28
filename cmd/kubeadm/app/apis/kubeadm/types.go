@@ -40,6 +40,10 @@ type MasterConfiguration struct {
 	ControllerManagerExtraArgs map[string]string
 	SchedulerExtraArgs         map[string]string
 
+	APIServerExtraVolumes         []HostPathMount
+	ControllerManagerExtraVolumes []HostPathMount
+	SchedulerExtraVolumes         []HostPathMount
+
 	// APIServerCertSANs sets extra Subject Alternative Names for the API Server signing cert
 	APIServerCertSANs []string
 	// CertificatesDir specifies where to store or look for all required certificates
@@ -129,4 +133,12 @@ func (cfg *MasterConfiguration) GetControlPlaneImageRepository() string {
 		return cfg.CIImageRepository
 	}
 	return cfg.ImageRepository
+}
+
+// HostPathMount contains elements describing volumes that are mounted from the
+// host
+type HostPathMount struct {
+	Name      string
+	HostPath  string
+	MountPath string
 }
