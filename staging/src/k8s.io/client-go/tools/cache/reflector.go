@@ -71,6 +71,9 @@ type Reflector struct {
 	lastSyncResourceVersion string
 	// lastSyncResourceVersionMutex guards read/write access to lastSyncResourceVersion
 	lastSyncResourceVersionMutex sync.RWMutex
+
+	// If the last list or watch request returned an error then it will be set here.
+	listWatchError error
 }
 
 var (
@@ -109,13 +112,14 @@ func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, 
 	r := &Reflector{
 		name: name,
 		// we need this to be unique per process (some names are still the same)but obvious who it belongs to
-		metrics:       newReflectorMetrics(makeValidPromethusMetricName(fmt.Sprintf("reflector_"+name+"_%d", reflectorSuffix))),
-		listerWatcher: lw,
-		store:         store,
-		expectedType:  reflect.TypeOf(expectedType),
-		period:        time.Second,
-		resyncPeriod:  resyncPeriod,
-		clock:         &clock.RealClock{},
+		metrics:        newReflectorMetrics(makeValidPromethusMetricName(fmt.Sprintf("reflector_"+name+"_%d", reflectorSuffix))),
+		listerWatcher:  lw,
+		store:          store,
+		expectedType:   reflect.TypeOf(expectedType),
+		period:         time.Second,
+		resyncPeriod:   resyncPeriod,
+		clock:          &clock.RealClock{},
+		listWatchError: nil,
 	}
 	return r
 }
@@ -248,8 +252,10 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	start := r.clock.Now()
 	list, err := r.listerWatcher.List(options)
 	if err != nil {
+		r.setListWatchError(err)
 		return fmt.Errorf("%s: Failed to list %v: %v", r.name, r.expectedType, err)
 	}
+	r.setListWatchError(nil)
 	r.metrics.listDuration.Observe(time.Since(start).Seconds())
 	listMetaInterface, err := meta.ListAccessor(list)
 	if err != nil {
@@ -313,6 +319,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 				glog.V(1).Infof("%s: Watch for %v closed with unexpected EOF: %v", r.name, r.expectedType, err)
 			default:
 				utilruntime.HandleError(fmt.Errorf("%s: Failed to watch %v: %v", r.name, r.expectedType, err))
+				r.setListWatchError(err)
 			}
 			// If this is "connection refused" error, it means that most likely apiserver is not responsive.
 			// It doesn't make sense to re-list all objects because most likely we will be able to restart
@@ -328,6 +335,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			}
 			return nil
 		}
+		r.setListWatchError(nil)
 
 		if err := r.watchHandler(w, &resourceVersion, resyncerrc, stopCh); err != nil {
 			if err != errorStopRequested {
@@ -439,4 +447,18 @@ func (r *Reflector) setLastSyncResourceVersion(v string) {
 	if err == nil {
 		r.metrics.lastResourceVersion.Set(float64(rv))
 	}
+}
+
+func (r *Reflector) setListWatchError(err error) {
+	r.listWatchError = err
+	if err == nil {
+		r.metrics.listWatchError.Set(0)
+	} else {
+		r.metrics.listWatchError.Set(1)
+	}
+}
+
+// ListWatchError returns any error response the reflector has received on its list or watch attempts
+func (r *Reflector) ListWatchError() error {
+	return r.listWatchError
 }
