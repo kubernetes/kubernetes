@@ -265,13 +265,6 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions, nodeTunneler tunnele
 		return nil, nil, nil, nil, nil, utilerrors.NewAggregate(errs)
 	}
 
-	if s.CloudProvider != nil {
-		// Initialize the cloudprovider once, to give it a chance to register KMS plugins, if any.
-		_, err := cloudprovider.InitCloudProvider(s.CloudProvider.CloudProvider, s.CloudProvider.CloudConfigFile)
-		if err != nil {
-			return nil, nil, nil, nil, nil, err
-		}
-	}
 	genericConfig, sharedInformers, versionedInformers, insecureServingOptions, serviceResolver, err := BuildGenericConfig(s, proxyTransport)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
