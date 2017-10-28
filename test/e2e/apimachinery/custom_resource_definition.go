@@ -33,7 +33,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 	f := framework.NewDefaultFramework("custom-resource-definition")
 
 	Context("Simple CustomResourceDefinition", func() {
-		It("creating/deleting custom resource definition objects works [Conformance]", func() {
+		framework.ConformanceIt("creating/deleting custom resource definition objects works ", func() {
 
 			framework.SkipUnlessServerVersionGTE(crdVersion, f.ClientSet.Discovery())
 

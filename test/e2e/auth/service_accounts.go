@@ -158,7 +158,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}
 	})
 
-	It("should mount an API token into pods [Conformance]", func() {
+	framework.ConformanceIt("should mount an API token into pods ", func() {
 		var tokenContent string
 		var rootCAContent string
 
@@ -245,7 +245,7 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}
 	})
 
-	It("should allow opting out of API token automount [Conformance]", func() {
+	framework.ConformanceIt("should allow opting out of API token automount ", func() {
 		framework.SkipUnlessServerVersionGTE(serviceAccountTokenAutomountVersion, f.ClientSet.Discovery())
 
 		var err error

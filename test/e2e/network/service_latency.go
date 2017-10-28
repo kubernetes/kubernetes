@@ -51,7 +51,7 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 		    (e.g. p50 < 20 seconds and p99 < 50 seconds). If any call to the
 			service endpoint fails, the test will also fail.
 	*/
-	It("should not be very high [Conformance]", func() {
+	framework.ConformanceIt("should not be very high ", func() {
 		const (
 			// These are very generous criteria. Ideally we will
 			// get this much lower in the future. See issue

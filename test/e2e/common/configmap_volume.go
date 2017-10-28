@@ -32,11 +32,11 @@ import (
 var _ = Describe("[sig-storage] ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
-	It("should be consumable from pods in volume [Conformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume ", func() {
 		doConfigMapE2EWithoutMappings(f, 0, 0, nil)
 	})
 
-	It("should be consumable from pods in volume with defaultMode set [Conformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set ", func() {
 		defaultMode := int32(0400)
 		doConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
 	})
@@ -46,7 +46,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		doConfigMapE2EWithoutMappings(f, 1000, 1001, &defaultMode)
 	})
 
-	It("should be consumable from pods in volume as non-root [Conformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume as non-root ", func() {
 		doConfigMapE2EWithoutMappings(f, 1000, 0, nil)
 	})
 
@@ -54,16 +54,16 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		doConfigMapE2EWithoutMappings(f, 1000, 1001, nil)
 	})
 
-	It("should be consumable from pods in volume with mappings [Conformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume with mappings ", func() {
 		doConfigMapE2EWithMappings(f, 0, 0, nil)
 	})
 
-	It("should be consumable from pods in volume with mappings and Item mode set[Conformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item mode set", func() {
 		mode := int32(0400)
 		doConfigMapE2EWithMappings(f, 0, 0, &mode)
 	})
 
-	It("should be consumable from pods in volume with mappings as non-root [Conformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume with mappings as non-root ", func() {
 		doConfigMapE2EWithMappings(f, 1000, 0, nil)
 	})
 
@@ -71,7 +71,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		doConfigMapE2EWithMappings(f, 1000, 1001, nil)
 	})
 
-	It("updates should be reflected in volume [Conformance]", func() {
+	framework.ConformanceIt("updates should be reflected in volume ", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 
@@ -149,7 +149,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Eventually(pollLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("value-2"))
 	})
 
-	It("optional updates should be reflected in volume [Conformance]", func() {
+	framework.ConformanceIt("optional updates should be reflected in volume ", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true
@@ -327,7 +327,7 @@ var _ = Describe("[sig-storage] ConfigMap", func() {
 		Eventually(pollDeleteLogs, podLogTimeout, framework.Poll).Should(ContainSubstring("Error reading file /etc/configmap-volumes/delete/data-1"))
 	})
 
-	It("should be consumable in multiple volumes in the same pod [Conformance]", func() {
+	framework.ConformanceIt("should be consumable in multiple volumes in the same pod ", func() {
 		var (
 			name             = "configmap-test-volume-" + string(uuid.NewUUID())
 			volumeName       = "configmap-volume"
