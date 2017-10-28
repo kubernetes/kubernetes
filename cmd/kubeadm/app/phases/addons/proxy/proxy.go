@@ -28,6 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -62,11 +63,12 @@ func EnsureProxyAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Inte
 		return fmt.Errorf("error when parsing kube-proxy configmap template: %v", err)
 	}
 
-	proxyDaemonSetBytes, err := kubeadmutil.ParseTemplate(KubeProxyDaemonSet, struct{ ImageRepository, Arch, Version, ImageOverride, ClusterCIDR, MasterTaintKey, CloudTaintKey string }{
+	proxyDaemonSetBytes, err := kubeadmutil.ParseTemplate(KubeProxyDaemonSet, struct{ ImageRepository, Arch, Version, ImageOverride, ExtraParams, ClusterCIDR, MasterTaintKey, CloudTaintKey string }{
 		ImageRepository: cfg.GetControlPlaneImageRepository(),
 		Arch:            runtime.GOARCH,
 		Version:         kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion),
 		ImageOverride:   cfg.UnifiedControlPlaneImage,
+		ExtraParams:     getParams(cfg.FeatureGates),
 		ClusterCIDR:     getClusterCIDR(cfg.Networking.PodSubnet),
 		MasterTaintKey:  kubeadmconstants.LabelNodeRoleMaster,
 		CloudTaintKey:   algorithm.TaintExternalCloudProvider,
@@ -140,6 +142,13 @@ func createClusterRoleBindings(client clientset.Interface) error {
 			},
 		},
 	})
+}
+
+func getParams(featureList map[string]bool) string {
+	if features.Enabled(featureList, features.SupportIPVSProxyMode) {
+		return "- --proxy-mode=ipvs\n        - --feature-gates=SupportIPVSProxyMode=true"
+	}
+	return ""
 }
 
 func getClusterCIDR(podsubnet string) string {
