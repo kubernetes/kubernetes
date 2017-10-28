@@ -50,6 +50,9 @@ func CreateLocalEtcdStaticPodManifestFile(manifestDir string, cfg *kubeadmapi.Ma
 // NB. GetEtcdPodSpec methods holds the information about how kubeadm creates etcd static pod mainfests.
 func GetEtcdPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.Pod {
 	pathType := v1.HostPathDirectoryOrCreate
+	etcdMounts := map[string]v1.Volume{
+		etcdVolumeName: staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.DataDir, &pathType),
+	}
 	return staticpodutil.ComponentPod(v1.Container{
 		Name:    kubeadmconstants.Etcd,
 		Command: getEtcdCommand(cfg),
@@ -57,7 +60,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.MasterConfiguration) v1.Pod {
 		// Mount the etcd datadir path read-write so etcd can store data in a more persistent manner
 		VolumeMounts:  []v1.VolumeMount{staticpodutil.NewVolumeMount(etcdVolumeName, cfg.Etcd.DataDir, false)},
 		LivenessProbe: staticpodutil.ComponentProbe(2379, "/health", v1.URISchemeHTTP),
-	}, []v1.Volume{staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.DataDir, &pathType)})
+	}, etcdMounts)
 }
 
 // getEtcdCommand builds the right etcd command from the given config object
