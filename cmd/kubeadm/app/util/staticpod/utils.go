@@ -31,7 +31,7 @@ import (
 )
 
 // ComponentPod returns a Pod object from the container and volume specifications
-func ComponentPod(container v1.Container, volumes []v1.Volume) v1.Pod {
+func ComponentPod(container v1.Container, volumes map[string]v1.Volume) v1.Pod {
 	return v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -48,7 +48,7 @@ func ComponentPod(container v1.Container, volumes []v1.Volume) v1.Pod {
 		Spec: v1.PodSpec{
 			Containers:  []v1.Container{container},
 			HostNetwork: true,
-			Volumes:     volumes,
+			Volumes:     VolumeMapToSlice(volumes),
 		},
 	}
 }
@@ -100,6 +100,28 @@ func NewVolumeMount(name, path string, readOnly bool) v1.VolumeMount {
 		MountPath: path,
 		ReadOnly:  readOnly,
 	}
+}
+
+// VolumeMapToSlice returns a slice of volumes from a map's values
+func VolumeMapToSlice(volumes map[string]v1.Volume) []v1.Volume {
+	v := make([]v1.Volume, 0, len(volumes))
+
+	for _, vol := range volumes {
+		v = append(v, vol)
+	}
+
+	return v
+}
+
+// VolumeMountMapToSlice returns a slice of volumes from a map's values
+func VolumeMountMapToSlice(volumeMounts map[string]v1.VolumeMount) []v1.VolumeMount {
+	v := make([]v1.VolumeMount, 0, len(volumeMounts))
+
+	for _, volMount := range volumeMounts {
+		v = append(v, volMount)
+	}
+
+	return v
 }
 
 // GetExtraParameters builds a list of flag arguments two string-string maps, one with default, base commands and one with overrides

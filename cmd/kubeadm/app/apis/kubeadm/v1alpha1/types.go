@@ -42,6 +42,10 @@ type MasterConfiguration struct {
 	ControllerManagerExtraArgs map[string]string `json:"controllerManagerExtraArgs,omitempty"`
 	SchedulerExtraArgs         map[string]string `json:"schedulerExtraArgs,omitempty"`
 
+	APIServerExtraVolumes         []HostPathMount `json:"apiServerExtraVolumes,omitempty"`
+	ControllerManagerExtraVolumes []HostPathMount `json:"controllerManagerExtraVolumes,omitempty"`
+	SchedulerExtraVolumes         []HostPathMount `json:"schedulerExtraVolumes,omitempty"`
+
 	// APIServerCertSANs sets extra Subject Alternative Names for the API Server signing cert
 	APIServerCertSANs []string `json:"apiServerCertSANs,omitempty"`
 	// CertificatesDir specifies where to store or look for all required certificates
@@ -118,4 +122,12 @@ type NodeConfiguration struct {
 	// without CA verification via DiscoveryTokenCACertHashes. This can weaken
 	// the security of kubeadm since other nodes can impersonate the master.
 	DiscoveryTokenUnsafeSkipCAVerification bool `json:"discoveryTokenUnsafeSkipCAVerification"`
+}
+
+// HostPathMount contains elements describing volumes that are mounted from the
+// host
+type HostPathMount struct {
+	Name      string `json:"name"`
+	HostPath  string `json:"hostPath"`
+	MountPath string `json:"mountPath"`
 }
