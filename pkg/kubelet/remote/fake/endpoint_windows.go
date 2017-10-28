@@ -1,4 +1,4 @@
-// +build !freebsd,!linux,!windows,!darwin
+// +build windows
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -16,18 +16,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package fake
 
 import (
 	"fmt"
 	"net"
-	"time"
 )
 
-func CreateListener(endpoint string) (net.Listener, error) {
-	return nil, fmt.Errorf("CreateListener is unsupported in this build")
-}
+// GenerateEndpoint generates a new tcp endpoint of grpc server.
+func GenerateEndpoint() (string, error) {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	if err != nil {
+		return "", nil
+	}
 
-func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
-	return "", nil, fmt.Errorf("GetAddressAndDialer is unsupported in this build")
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return "", err
+	}
+
+	defer l.Close()
+	return fmt.Sprintf("tcp://127.0.0.1:%d", l.Addr().(*net.TCPAddr).Port), nil
 }
