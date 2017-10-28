@@ -34,8 +34,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/server/options/encryptionconfig"
-	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -48,7 +46,6 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	cloudkms "google.golang.org/api/cloudkms/v1"
 	computealpha "google.golang.org/api/compute/v0.alpha"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
@@ -106,7 +103,6 @@ type GCECloud struct {
 	serviceBeta              *computebeta.Service
 	serviceAlpha             *computealpha.Service
 	containerService         *container.Service
-	cloudkmsService          *cloudkms.Service
 	client                   clientset.Interface
 	clientBuilder            controller.ControllerClientBuilder
 	eventBroadcaster         record.EventBroadcaster
@@ -195,10 +191,6 @@ type CloudConfig struct {
 	AlphaFeatureGate   *AlphaFeatureGate
 }
 
-// kmsPluginRegisterOnce prevents the cloudprovider from registering its KMS plugin
-// more than once in the KMS plugin registry.
-var kmsPluginRegisterOnce sync.Once
-
 func init() {
 	cloudprovider.RegisterCloudProvider(
 		ProviderName,
@@ -210,11 +202,6 @@ func init() {
 // Raw access to the underlying GCE service, probably should only be used for e2e tests
 func (g *GCECloud) GetComputeService() *compute.Service {
 	return g.service
-}
-
-// Raw access to the cloudkmsService of GCE cloud. Required for encryption of etcd using Google KMS.
-func (g *GCECloud) GetKMSService() *cloudkms.Service {
-	return g.cloudkmsService
 }
 
 // newGCECloud creates a new instance of GCECloud.
@@ -404,12 +391,6 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	}
 	containerService.UserAgent = userAgent
 
-	cloudkmsService, err := cloudkms.New(client)
-	if err != nil {
-		return nil, err
-	}
-	cloudkmsService.UserAgent = userAgent
-
 	// ProjectID and.NetworkProjectID may be project number or name.
 	projID, netProjID := tryConvertToProjectNames(config.ProjectID, config.NetworkProjectID, service)
 	onXPN := projID != netProjID
@@ -474,7 +455,6 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 		serviceAlpha:             serviceAlpha,
 		serviceBeta:              serviceBeta,
 		containerService:         containerService,
-		cloudkmsService:          cloudkmsService,
 		projectID:                projID,
 		networkProjectID:         netProjID,
 		onXPN:                    onXPN,
@@ -493,14 +473,6 @@ func CreateGCECloud(config *CloudConfig) (*GCECloud, error) {
 	}
 
 	gce.manager = &gceServiceManager{gce}
-
-	// Registering the KMS plugin only the first time.
-	kmsPluginRegisterOnce.Do(func() {
-		// Register the Google Cloud KMS based service in the KMS plugin registry.
-		encryptionconfig.KMSPluginRegistry.Register(KMSServiceName, func(config io.Reader) (envelope.Service, error) {
-			return gce.getGCPCloudKMSService(config)
-		})
-	})
 
 	return gce, nil
 }
