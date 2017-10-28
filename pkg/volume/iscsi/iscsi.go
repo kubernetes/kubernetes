@@ -18,6 +18,8 @@ package iscsi
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -42,6 +44,7 @@ type iscsiPlugin struct {
 
 var _ volume.VolumePlugin = &iscsiPlugin{}
 var _ volume.PersistentVolumePlugin = &iscsiPlugin{}
+var _ volume.BlockVolumePlugin = &iscsiPlugin{}
 
 const (
 	iscsiPluginName = "kubernetes.io/iscsi"
@@ -93,98 +96,27 @@ func (plugin *iscsiPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 }
 
 func (plugin *iscsiPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	// Inject real implementations here, test through the internal function.
-	var secret map[string]string
 	if pod == nil {
 		return nil, fmt.Errorf("nil pod")
 	}
-	chapDiscover, err := getISCSIDiscoveryCHAPInfo(spec)
+	secret, err := createSecretMap(spec, plugin, pod.Namespace)
 	if err != nil {
 		return nil, err
-	}
-	chapSession, err := getISCSISessionCHAPInfo(spec)
-	if err != nil {
-		return nil, err
-	}
-	if chapDiscover || chapSession {
-		secretName, secretNamespace, err := getISCSISecretNameAndNamespace(spec, pod.Namespace)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(secretName) > 0 && len(secretNamespace) > 0 {
-			// if secret is provideded, retrieve it
-			kubeClient := plugin.host.GetKubeClient()
-			if kubeClient == nil {
-				return nil, fmt.Errorf("Cannot get kube client")
-			}
-			secretObj, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
-			if err != nil {
-				err = fmt.Errorf("Couldn't get secret %v/%v error: %v", secretNamespace, secretName, err)
-				return nil, err
-			}
-			secret = make(map[string]string)
-			for name, data := range secretObj.Data {
-				glog.V(4).Infof("retrieving CHAP secret name: %s", name)
-				secret[name] = string(data)
-			}
-		}
 	}
 	return plugin.newMounterInternal(spec, pod.UID, &ISCSIUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()), secret)
 }
 
 func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec, secret map[string]string) (volume.Mounter, error) {
-	// iscsi volumes used directly in a pod have a ReadOnly flag set by the pod author.
-	// iscsi volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
 	readOnly, fsType, err := getISCSIVolumeInfo(spec)
 	if err != nil {
 		return nil, err
 	}
-	tp, portals, iqn, lunStr, err := getISCSITargetInfo(spec)
+	iscsiDisk, err := createISCSIDisk(spec, podUID, plugin, manager, secret)
 	if err != nil {
 		return nil, err
 	}
-
-	lun := strconv.Itoa(int(lunStr))
-	portal := portalMounter(tp)
-	var bkportal []string
-	bkportal = append(bkportal, portal)
-	for _, p := range portals {
-		bkportal = append(bkportal, portalMounter(string(p)))
-	}
-
-	iface, initiatorNamePtr, err := getISCSIInitiatorInfo(spec)
-	if err != nil {
-		return nil, err
-	}
-
-	var initiatorName string
-	if initiatorNamePtr != nil {
-		initiatorName = *initiatorNamePtr
-	}
-	chapDiscovery, err := getISCSIDiscoveryCHAPInfo(spec)
-	if err != nil {
-		return nil, err
-	}
-	chapSession, err := getISCSISessionCHAPInfo(spec)
-	if err != nil {
-		return nil, err
-	}
-
 	return &iscsiDiskMounter{
-		iscsiDisk: &iscsiDisk{
-			podUID:         podUID,
-			VolName:        spec.Name(),
-			Portals:        bkportal,
-			Iqn:            iqn,
-			lun:            lun,
-			Iface:          iface,
-			chap_discovery: chapDiscovery,
-			chap_session:   chapSession,
-			secret:         secret,
-			InitiatorName:  initiatorName,
-			manager:        manager,
-			plugin:         plugin},
+		iscsiDisk:    iscsiDisk,
 		fsType:       fsType,
 		readOnly:     readOnly,
 		mounter:      &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
@@ -194,8 +126,41 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 	}, nil
 }
 
+// NewBlockVolumeMapper creates a new volume.BlockVolumeMapper from an API specification.
+func (plugin *iscsiPlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.BlockVolumeMapper, error) {
+	// If this is called via GenerateUnmapDeviceFunc(), pod is nil.
+	// Pass empty string as dummy uid since uid isn't used in the case.
+	var uid types.UID
+	var secret map[string]string
+	var err error
+	if pod != nil {
+		uid = pod.UID
+		secret, err = createSecretMap(spec, plugin, pod.Namespace)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return plugin.newBlockVolumeMapperInternal(spec, uid, &ISCSIUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()), secret)
+}
+
+func (plugin *iscsiPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec, secret map[string]string) (volume.BlockVolumeMapper, error) {
+	readOnly, _, err := getISCSIVolumeInfo(spec)
+	if err != nil {
+		return nil, err
+	}
+	iscsiDisk, err := createISCSIDisk(spec, podUID, plugin, manager, secret)
+	if err != nil {
+		return nil, err
+	}
+	return &iscsiDiskMapper{
+		iscsiDisk:  iscsiDisk,
+		readOnly:   readOnly,
+		exec:       exec,
+		deviceUtil: ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
+	}, nil
+}
+
 func (plugin *iscsiPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	// Inject real implementations here, test through the internal function.
 	return plugin.newUnmounterInternal(volName, podUID, &ISCSIUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
 }
 
@@ -212,17 +177,80 @@ func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID
 	}, nil
 }
 
+// NewBlockVolumeUnmapper creates a new volume.BlockVolumeUnmapper from recoverable state.
+func (plugin *iscsiPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {
+	return plugin.newUnmapperInternal(volName, podUID, &ISCSIUtil{}, plugin.host.GetExec(plugin.GetPluginName()))
+}
+
+func (plugin *iscsiPlugin) newUnmapperInternal(volName string, podUID types.UID, manager diskManager, exec mount.Exec) (volume.BlockVolumeUnmapper, error) {
+	return &iscsiDiskUnmapper{
+		iscsiDisk: &iscsiDisk{
+			podUID:  podUID,
+			VolName: volName,
+			manager: manager,
+			plugin:  plugin,
+		},
+		exec:       exec,
+		deviceUtil: ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
+	}, nil
+}
+
 func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	// Find globalPDPath from pod volume directory(mountPath)
+	var globalPDPath string
+	mounter := plugin.host.GetMounter(plugin.GetPluginName())
+	paths, err := mount.GetMountRefs(mounter, mountPath)
+	if err != nil {
+		return nil, err
+	}
+	for _, path := range paths {
+		if strings.Contains(path, plugin.host.GetPluginDir(iscsiPluginName)) {
+			globalPDPath = path
+			break
+		}
+	}
+	// Couldn't fetch globalPDPath
+	if len(globalPDPath) == 0 {
+		return nil, fmt.Errorf("couldn't fetch globalPDPath. failed to obtain volume spec")
+	}
+
+	// Obtain iscsi disk configurations from globalPDPath
+	device, _, err := extractDeviceAndPrefix(globalPDPath)
+	if err != nil {
+		return nil, err
+	}
+	bkpPortal, iqn, err := extractPortalAndIqn(device)
+	if err != nil {
+		return nil, err
+	}
+	iface, _ := extractIface(globalPDPath)
 	iscsiVolume := &v1.Volume{
 		Name: volumeName,
 		VolumeSource: v1.VolumeSource{
 			ISCSI: &v1.ISCSIVolumeSource{
-				TargetPortal: volumeName,
-				IQN:          volumeName,
+				TargetPortal:   bkpPortal,
+				IQN:            iqn,
+				ISCSIInterface: iface,
 			},
 		},
 	}
 	return volume.NewSpecFromVolume(iscsiVolume), nil
+}
+
+func (plugin *iscsiPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, mapPath string) (*volume.Spec, error) {
+	pluginDir := plugin.host.GetVolumeDevicePluginDir(iscsiPluginName)
+	blkutil := ioutil.NewBlockVolumePathHandler()
+	globalMapPathUUID, err := blkutil.FindGlobalMapPathUUIDFromPod(pluginDir, mapPath, podUID)
+	if err != nil {
+		return nil, err
+	}
+	glog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
+	// Retreive volume information from globalMapPathUUID
+	// globalMapPathUUID example:
+	// plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid}
+	// plugins/kubernetes.io/iscsi/volumeDevices/iface-default/192.168.0.10:3260-iqn.2017-05.com.example:test-lun-0/{pod uuid}
+	globalMapPath := filepath.Dir(globalMapPathUUID)
+	return getVolumeSpecFromGlobalMapPath(volumeName, globalMapPath)
 }
 
 type iscsiDisk struct {
@@ -230,7 +258,7 @@ type iscsiDisk struct {
 	podUID         types.UID
 	Portals        []string
 	Iqn            string
-	lun            string
+	Lun            string
 	Iface          string
 	chap_discovery bool
 	chap_session   bool
@@ -248,10 +276,25 @@ func (iscsi *iscsiDisk) GetPath() string {
 	return iscsi.plugin.host.GetPodVolumeDir(iscsi.podUID, utilstrings.EscapeQualifiedNameForDisk(name), iscsi.VolName)
 }
 
+func (iscsi *iscsiDisk) iscsiGlobalMapPath(spec *volume.Spec) (string, error) {
+	mounter, err := volumeSpecToMounter(spec, iscsi.plugin.host, nil /* pod */)
+	if err != nil {
+		glog.Warningf("failed to get iscsi mounter: %v", err)
+		return "", err
+	}
+	return iscsi.manager.MakeGlobalVDPDName(*mounter.iscsiDisk), nil
+}
+
+func (iscsi *iscsiDisk) iscsiPodDeviceMapPath() (string, string) {
+	name := iscsiPluginName
+	return iscsi.plugin.host.GetPodVolumeDeviceDir(iscsi.podUID, utilstrings.EscapeQualifiedNameForDisk(name)), iscsi.VolName
+}
+
 type iscsiDiskMounter struct {
 	*iscsiDisk
 	readOnly     bool
 	fsType       string
+	volumeMode   v1.PersistentVolumeMode
 	mounter      *mount.SafeFormatAndMount
 	exec         mount.Exec
 	deviceUtil   ioutil.DeviceUtil
@@ -306,6 +349,58 @@ func (c *iscsiDiskUnmounter) TearDownAt(dir string) error {
 	return ioutil.UnmountPath(dir, c.mounter)
 }
 
+// Block Volumes Support
+type iscsiDiskMapper struct {
+	*iscsiDisk
+	readOnly   bool
+	exec       mount.Exec
+	deviceUtil ioutil.DeviceUtil
+}
+
+var _ volume.BlockVolumeMapper = &iscsiDiskMapper{}
+
+func (b *iscsiDiskMapper) SetUpDevice() (string, error) {
+	return "", nil
+}
+
+type iscsiDiskUnmapper struct {
+	*iscsiDisk
+	exec       mount.Exec
+	deviceUtil ioutil.DeviceUtil
+}
+
+var _ volume.BlockVolumeUnmapper = &iscsiDiskUnmapper{}
+
+// Even though iSCSI plugin has attacher/detacher implementation, iSCSI plugin
+// needs volume detach operation during TearDownDevice(). This method is only
+// chance that operations are done on kubelet node during volume teardown sequences.
+func (c *iscsiDiskUnmapper) TearDownDevice(mapPath, _ string) error {
+	err := c.manager.DetachBlockISCSIDisk(*c, mapPath)
+	if err != nil {
+		return fmt.Errorf("iscsi: failed to detach disk: %s\nError: %v", mapPath, err)
+	}
+	glog.V(4).Infof("iscsi: %q is unmounted, deleting the directory", mapPath)
+	err = os.RemoveAll(mapPath)
+	if err != nil {
+		return fmt.Errorf("iscsi: failed to delete the directory: %s\nError: %v", mapPath, err)
+	}
+	glog.V(4).Infof("iscsi: successfully detached disk: %s", mapPath)
+	return nil
+}
+
+// GetGlobalMapPath returns global map path and error
+// path: plugins/kubernetes.io/{PluginName}/volumeDevices/{ifaceName}/{portal-some_iqn-lun-lun_id}
+func (iscsi *iscsiDisk) GetGlobalMapPath(spec *volume.Spec) (string, error) {
+	return iscsi.iscsiGlobalMapPath(spec)
+}
+
+// GetPodDeviceMapPath returns pod device map path and volume name
+// path: pods/{podUid}/volumeDevices/kubernetes.io~iscsi
+// volumeName: pv0001
+func (iscsi *iscsiDisk) GetPodDeviceMapPath() (string, string) {
+	return iscsi.iscsiPodDeviceMapPath()
+}
+
 func portalMounter(portal string) string {
 	if !strings.Contains(portal, ":") {
 		portal = portal + ":3260"
@@ -316,7 +411,7 @@ func portalMounter(portal string) string {
 // get iSCSI volume info: readOnly and fstype
 func getISCSIVolumeInfo(spec *volume.Spec) (bool, string, error) {
 	// for volume source, readonly is in volume spec
-	// for PV, readonly is in PV spec
+	// for PV, readonly is in PV spec. PV gets the ReadOnly flag indirectly through the PVC source
 	if spec.Volume != nil && spec.Volume.ISCSI != nil {
 		return spec.Volume.ISCSI.ReadOnly, spec.Volume.ISCSI.FSType, nil
 	} else if spec.PersistentVolume != nil &&
@@ -396,4 +491,156 @@ func getISCSISecretNameAndNamespace(spec *volume.Spec, defaultSecretNamespace st
 	}
 
 	return "", "", fmt.Errorf("Spec does not reference an ISCSI volume type")
+}
+
+func createISCSIDisk(spec *volume.Spec, podUID types.UID, plugin *iscsiPlugin, manager diskManager, secret map[string]string) (*iscsiDisk, error) {
+	tp, portals, iqn, lunStr, err := getISCSITargetInfo(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	lun := strconv.Itoa(int(lunStr))
+	portal := portalMounter(tp)
+	var bkportal []string
+	bkportal = append(bkportal, portal)
+	for _, p := range portals {
+		bkportal = append(bkportal, portalMounter(string(p)))
+	}
+
+	iface, initiatorNamePtr, err := getISCSIInitiatorInfo(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	var initiatorName string
+	if initiatorNamePtr != nil {
+		initiatorName = *initiatorNamePtr
+	}
+	chapDiscovery, err := getISCSIDiscoveryCHAPInfo(spec)
+	if err != nil {
+		return nil, err
+	}
+	chapSession, err := getISCSISessionCHAPInfo(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	return &iscsiDisk{
+		podUID:         podUID,
+		VolName:        spec.Name(),
+		Portals:        bkportal,
+		Iqn:            iqn,
+		Lun:            lun,
+		Iface:          iface,
+		chap_discovery: chapDiscovery,
+		chap_session:   chapSession,
+		secret:         secret,
+		InitiatorName:  initiatorName,
+		manager:        manager,
+		plugin:         plugin}, nil
+}
+
+func createSecretMap(spec *volume.Spec, plugin *iscsiPlugin, namespace string) (map[string]string, error) {
+	var secret map[string]string
+	chapDiscover, err := getISCSIDiscoveryCHAPInfo(spec)
+	if err != nil {
+		return nil, err
+	}
+	chapSession, err := getISCSISessionCHAPInfo(spec)
+	if err != nil {
+		return nil, err
+	}
+	if chapDiscover || chapSession {
+		secretName, secretNamespace, err := getISCSISecretNameAndNamespace(spec, namespace)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(secretName) > 0 && len(secretNamespace) > 0 {
+			// if secret is provideded, retrieve it
+			kubeClient := plugin.host.GetKubeClient()
+			if kubeClient == nil {
+				return nil, fmt.Errorf("Cannot get kube client")
+			}
+			secretObj, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(secretName, metav1.GetOptions{})
+			if err != nil {
+				err = fmt.Errorf("Couldn't get secret %v/%v error: %v", secretNamespace, secretName, err)
+				return nil, err
+			}
+			secret = make(map[string]string)
+			for name, data := range secretObj.Data {
+				glog.V(4).Infof("retrieving CHAP secret name: %s", name)
+				secret[name] = string(data)
+			}
+		}
+	}
+	return secret, err
+}
+
+func createVolumeFromISCSIVolumeSource(volumeName string, iscsi v1.ISCSIVolumeSource) *v1.Volume {
+	return &v1.Volume{
+		Name: volumeName,
+		VolumeSource: v1.VolumeSource{
+			ISCSI: &iscsi,
+		},
+	}
+}
+
+func createPersistentVolumeFromISCSIPVSource(volumeName string, iscsi v1.ISCSIPersistentVolumeSource) *v1.PersistentVolume {
+	block := v1.PersistentVolumeBlock
+	return &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: volumeName,
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				ISCSI: &iscsi,
+			},
+			VolumeMode: &block,
+		},
+	}
+}
+
+func getVolumeSpecFromGlobalMapPath(volumeName, globalMapPath string) (*volume.Spec, error) {
+	// Retreive volume spec information from globalMapPath
+	// globalMapPath example:
+	// plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}
+	// plugins/kubernetes.io/iscsi/volumeDevices/iface-default/192.168.0.10:3260-iqn.2017-05.com.example:test-lun-0
+
+	// device: 192.168.0.10:3260-iqn.2017-05.com.example:test-lun-0
+	device, _, err := extractDeviceAndPrefix(globalMapPath)
+	if err != nil {
+		return nil, err
+	}
+	bkpPortal, iqn, err := extractPortalAndIqn(device)
+	if err != nil {
+		return nil, err
+	}
+	arr := strings.Split(device, "-lun-")
+	if len(arr) < 2 {
+		return nil, fmt.Errorf("failed to retreive lun from globalMapPath: %v", globalMapPath)
+	}
+	lun, err := strconv.Atoi(arr[1])
+	if err != nil {
+		return nil, err
+	}
+	iface, found := extractIface(globalMapPath)
+	if !found {
+		return nil, fmt.Errorf("failed to retreive iface from globalMapPath: %v", globalMapPath)
+	}
+	iscsiPV := createPersistentVolumeFromISCSIPVSource(volumeName,
+		v1.ISCSIPersistentVolumeSource{
+			TargetPortal:   bkpPortal,
+			IQN:            iqn,
+			Lun:            int32(lun),
+			ISCSIInterface: iface,
+		},
+	)
+	glog.V(5).Infof("ConstructBlockVolumeSpec: TargetPortal: %v, IQN: %v, Lun: %v, ISCSIInterface: %v",
+		iscsiPV.Spec.PersistentVolumeSource.ISCSI.TargetPortal,
+		iscsiPV.Spec.PersistentVolumeSource.ISCSI.IQN,
+		iscsiPV.Spec.PersistentVolumeSource.ISCSI.Lun,
+		iscsiPV.Spec.PersistentVolumeSource.ISCSI.ISCSIInterface,
+	)
+	return volume.NewSpecFromPersistentVolume(iscsiPV, false), nil
 }
