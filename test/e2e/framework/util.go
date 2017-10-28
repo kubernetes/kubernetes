@@ -1917,7 +1917,6 @@ func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 	if TestContext.KubeConfig == "" {
 		return nil, fmt.Errorf("KubeConfig must be specified to load client config")
 	}
-	//c, err := clientcmd.LoadFromFile(TestContext.KubeConfig)
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	configOverrides := &clientcmd.ConfigOverrides{}
 	// if you want to change override values or bind them to flags, there are methods to help you
