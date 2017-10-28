@@ -2845,10 +2845,6 @@
 			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
 		},
 		{
-			"ImportPath": "google.golang.org/api/cloudkms/v1",
-			"Rev": "654f863362977d69086620b5f72f13e911da2410"
-		},
-		{
 			"ImportPath": "google.golang.org/api/cloudmonitoring/v2beta2",
 			"Rev": "654f863362977d69086620b5f72f13e911da2410"
 		},
