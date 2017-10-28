@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl/util/hash"
 )
 
@@ -87,12 +87,12 @@ func (s SecretForTLSGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	secret := &api.Secret{}
+	secret := &v1.Secret{}
 	secret.Name = s.Name
-	secret.Type = api.SecretTypeTLS
+	secret.Type = v1.SecretTypeTLS
 	secret.Data = map[string][]byte{}
-	secret.Data[api.TLSCertKey] = []byte(tlsCrt)
-	secret.Data[api.TLSPrivateKeyKey] = []byte(tlsKey)
+	secret.Data[v1.TLSCertKey] = []byte(tlsCrt)
+	secret.Data[v1.TLSPrivateKeyKey] = []byte(tlsKey)
 	if s.AppendHash {
 		h, err := hash.SecretHash(secret)
 		if err != nil {
