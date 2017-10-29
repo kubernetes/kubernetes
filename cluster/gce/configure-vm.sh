@@ -93,7 +93,7 @@ function config-ip-firewall {
   iptables -N KUBE-METADATA-SERVER
   iptables -I FORWARD -p tcp -d 169.254.169.254 --dport 80 -j KUBE-METADATA-SERVER
 
-  if [[ -n "${ENABLE_METADATA_CONCEALMENT:-}" ]]; then
+  if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]]; then
     iptables -A KUBE-METADATA-SERVER -j DROP
   fi
 }

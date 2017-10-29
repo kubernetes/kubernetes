@@ -40,7 +40,7 @@ var _ = framework.KubeDescribe("HostPath", func() {
 		_ = os.Remove("/tmp/test-file")
 	})
 
-	It("should give a volume the correct mode [Conformance] [sig-storage]", func() {
+	framework.ConformanceIt("should give a volume the correct mode  [sig-storage]", func() {
 		source := &v1.HostPathVolumeSource{
 			Path: "/tmp",
 		}

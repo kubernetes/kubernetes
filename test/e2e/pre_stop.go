@@ -180,7 +180,7 @@ var _ = framework.KubeDescribe("PreStop", func() {
 		    Description: Makes sure a pod's preStop handler is successfully
 			invoked immediately before a container is terminated.
 	*/
-	It("should call prestop when killing a pod [Conformance]", func() {
+	framework.ConformanceIt("should call prestop when killing a pod ", func() {
 		testPreStop(f.ClientSet, f.Namespace.Name)
 	})
 })

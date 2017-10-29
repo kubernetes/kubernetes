@@ -38,7 +38,7 @@ var _ = Describe("[sig-storage] Secrets", func() {
 		    Description: Ensure that secret can be mounted without mapping to a
 			pod volume.
 	*/
-	It("should be consumable from pods in volume [Conformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume ", func() {
 		doSecretE2EWithoutMapping(f, nil /* default mode */, "secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
 
@@ -47,7 +47,7 @@ var _ = Describe("[sig-storage] Secrets", func() {
 		    Description: Ensure that secret can be mounted without mapping to a
 			pod volume in default mode.
 	*/
-	It("should be consumable from pods in volume with defaultMode set [Conformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume with defaultMode set ", func() {
 		defaultMode := int32(0400)
 		doSecretE2EWithoutMapping(f, &defaultMode, "secret-test-"+string(uuid.NewUUID()), nil, nil)
 	})
@@ -57,7 +57,7 @@ var _ = Describe("[sig-storage] Secrets", func() {
 		    Description: Ensure that secret can be mounted without mapping to a pod
 			volume as non-root in default mode with fsGroup set.
 	*/
-	It("should be consumable from pods in volume as non-root with defaultMode and fsGroup set [Conformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume as non-root with defaultMode and fsGroup set ", func() {
 		defaultMode := int32(0440) /* setting fsGroup sets mode to at least 440 */
 		fsGroup := int64(1001)
 		uid := int64(1000)
@@ -69,7 +69,7 @@ var _ = Describe("[sig-storage] Secrets", func() {
 		    Description: Ensure that secret can be mounted with mapping to a pod
 			volume.
 	*/
-	It("should be consumable from pods in volume with mappings [Conformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume with mappings ", func() {
 		doSecretE2EWithMapping(f, nil)
 	})
 
@@ -78,7 +78,7 @@ var _ = Describe("[sig-storage] Secrets", func() {
 		    Description: Ensure that secret can be mounted with mapping to a pod
 			volume in item mode.
 	*/
-	It("should be consumable from pods in volume with mappings and Item Mode set [Conformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in volume with mappings and Item Mode set ", func() {
 		mode := int32(0400)
 		doSecretE2EWithMapping(f, &mode)
 	})
@@ -108,7 +108,7 @@ var _ = Describe("[sig-storage] Secrets", func() {
 	   Testname: secret-multiple-volume-mounts
 	   Description: Ensure that secret can be mounted to multiple pod volumes.
 	*/
-	It("should be consumable in multiple volumes in a pod [Conformance]", func() {
+	framework.ConformanceIt("should be consumable in multiple volumes in a pod ", func() {
 		// This test ensures that the same secret can be mounted in multiple
 		// volumes in the same pod.  This test case exists to prevent
 		// regressions that break this use-case.
@@ -186,7 +186,7 @@ var _ = Describe("[sig-storage] Secrets", func() {
 		    Description: Ensure that optional update change to secret can be
 			reflected on a mounted volume.
 	*/
-	It("optional updates should be reflected in volume [Conformance]", func() {
+	framework.ConformanceIt("optional updates should be reflected in volume ", func() {
 		podLogTimeout := framework.GetPodSecretUpdateTimeout(f.ClientSet)
 		containerTimeoutArg := fmt.Sprintf("--retry_time=%v", int(podLogTimeout.Seconds()))
 		trueVal := true

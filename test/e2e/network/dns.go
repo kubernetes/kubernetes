@@ -284,7 +284,7 @@ func reverseArray(arr []string) []string {
 var _ = SIGDescribe("DNS", func() {
 	f := framework.NewDefaultFramework("dns")
 
-	It("should provide DNS for the cluster [Conformance]", func() {
+	framework.ConformanceIt("should provide DNS for the cluster ", func() {
 		// All the names we need to be able to resolve.
 		// TODO: Spin up a separate test service and test that dns works for that service.
 		namesToResolve := []string{
@@ -310,7 +310,7 @@ var _ = SIGDescribe("DNS", func() {
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
-	It("should provide DNS for services [Conformance]", func() {
+	framework.ConformanceIt("should provide DNS for services ", func() {
 		// Create a test headless service.
 		By("Creating a test headless service")
 		testServiceSelector := map[string]string{

@@ -37,6 +37,7 @@ go_library(
         "longrunning.go",
         "maxinflight.go",
         "timeout.go",
+        "waitgroup.go",
         "wrap.go",
     ],
     importpath = "k8s.io/apiserver/pkg/server/filters",

@@ -488,6 +488,7 @@ func (gce *GCECloud) getInstanceByName(name string) (*gceInstance, error) {
 			if isHTTPErrorCode(err, http.StatusNotFound) {
 				continue
 			}
+			glog.Errorf("getInstanceByName: failed to get instance %s in zone %s; err: %v", name, zone, err)
 			return nil, err
 		}
 		return instance, nil
@@ -502,7 +503,6 @@ func (gce *GCECloud) getInstanceFromProjectInZoneByName(project, zone, name stri
 	res, err := gce.service.Instances.Get(project, zone, name).Do()
 	mc.Observe(err)
 	if err != nil {
-		glog.Errorf("getInstanceFromProjectInZoneByName: failed to get instance %s; err: %v", name, err)
 		return nil, err
 	}
 

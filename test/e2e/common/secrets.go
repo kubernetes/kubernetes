@@ -35,7 +35,7 @@ var _ = Describe("[sig-api-machinery] Secrets", func() {
 		    Description: Ensure that secret can be consumed via environment
 			variables.
 	*/
-	It("should be consumable from pods in env vars [Conformance]", func() {
+	framework.ConformanceIt("should be consumable from pods in env vars ", func() {
 		name := "secret-test-" + string(uuid.NewUUID())
 		secret := secretForTest(f.Namespace.Name, name)
 
@@ -84,7 +84,7 @@ var _ = Describe("[sig-api-machinery] Secrets", func() {
 		    Description: Ensure that secret can be consumed via source of a set
 			of ConfigMaps.
 	*/
-	It("should be consumable via the environment [Conformance]", func() {
+	framework.ConformanceIt("should be consumable via the environment ", func() {
 		name := "secret-test-" + string(uuid.NewUUID())
 		secret := newEnvFromSecret(f.Namespace.Name, name)
 		By(fmt.Sprintf("creating secret %v/%v", f.Namespace.Name, secret.Name))

@@ -474,6 +474,9 @@ func TestBuildDaemonSet(t *testing.T) {
 
 	for _, rt := range tests {
 		tempFile, err := createTempFileWithContent(rt.podBytes)
+		if err != nil {
+			t.Errorf("error creating tempfile with content:%v", err)
+		}
 		defer os.Remove(tempFile)
 
 		podSpec, err := loadPodSpecFromFile(tempFile)
@@ -546,6 +549,9 @@ spec:
 
 	for _, rt := range tests {
 		tempFile, err := createTempFileWithContent([]byte(rt.content))
+		if err != nil {
+			t.Errorf("error creating tempfile with content:%v", err)
+		}
 		defer os.Remove(tempFile)
 
 		_, err = loadPodSpecFromFile(tempFile)

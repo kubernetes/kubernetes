@@ -323,6 +323,9 @@ func TestNewAPIServerCertAndKey(t *testing.T) {
 			NodeName:   "valid-hostname",
 		}
 		caCert, caKey, err := NewCACertAndKey()
+		if err != nil {
+			t.Fatalf("failed creation of ca cert and key: %v", err)
+		}
 
 		apiServerCert, _, err := NewAPIServerCertAndKey(cfg, caCert, caKey)
 		if err != nil {
@@ -338,6 +341,9 @@ func TestNewAPIServerCertAndKey(t *testing.T) {
 
 func TestNewAPIServerKubeletClientCertAndKey(t *testing.T) {
 	caCert, caKey, err := NewCACertAndKey()
+	if err != nil {
+		t.Fatalf("failed creation of ca cert and key: %v", err)
+	}
 
 	apiClientCert, _, err := NewAPIServerKubeletClientCertAndKey(caCert, caKey)
 	if err != nil {
@@ -372,6 +378,9 @@ func TestNewFrontProxyCACertAndKey(t *testing.T) {
 
 func TestNewFrontProxyClientCertAndKey(t *testing.T) {
 	frontProxyCACert, frontProxyCAKey, err := NewFrontProxyCACertAndKey()
+	if err != nil {
+		t.Fatalf("failed creation of ca cert and key: %v", err)
+	}
 
 	frontProxyClientCert, _, err := NewFrontProxyClientCertAndKey(frontProxyCACert, frontProxyCAKey)
 	if err != nil {

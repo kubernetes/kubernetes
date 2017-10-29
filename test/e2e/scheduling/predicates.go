@@ -242,7 +242,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		    Description: Ensure that scheduler accounts node resources correctly
 			and respects pods' resource requirements during scheduling.
 	*/
-	It("validates resource limits of pods that are allowed to run [Conformance]", func() {
+	framework.ConformanceIt("validates resource limits of pods that are allowed to run ", func() {
 		framework.WaitForStableCluster(cs, masterNodes)
 		nodeMaxAllocatable := int64(0)
 		nodeToAllocatableMap := make(map[string]int64)
@@ -348,7 +348,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		    Description: Ensure that scheduler respects the NodeSelector field of
 			PodSpec during scheduling (when it does not match any node).
 	*/
-	It("validates that NodeSelector is respected if not matching [Conformance]", func() {
+	framework.ConformanceIt("validates that NodeSelector is respected if not matching ", func() {
 		By("Trying to schedule Pod with nonempty NodeSelector.")
 		podName := "restricted-pod"
 
@@ -394,7 +394,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		    Description: Ensure that scheduler respects the NodeSelector field
 			of PodSpec during scheduling (when it matches).
 	*/
-	It("validates that NodeSelector is respected if matching [Conformance]", func() {
+	framework.ConformanceIt("validates that NodeSelector is respected if matching ", func() {
 		nodeName := GetNodeThatCanRunPod(f)
 
 		By("Trying to apply a random label on the found node.")

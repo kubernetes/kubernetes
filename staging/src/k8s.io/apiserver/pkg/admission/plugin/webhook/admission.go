@@ -298,5 +298,6 @@ func (a *GenericAdmissionWebhook) hookClient(h *v1alpha1.ExternalAdmissionHook) 
 	cfg.TLSClientConfig.ServerName = serverName
 	cfg.TLSClientConfig.CAData = h.ClientConfig.CABundle
 	cfg.ContentConfig.NegotiatedSerializer = a.negotiatedSerializer
+	cfg.ContentConfig.ContentType = runtime.ContentTypeJSON
 	return rest.UnversionedRESTClientFor(cfg)
 }

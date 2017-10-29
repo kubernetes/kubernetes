@@ -38,7 +38,7 @@ import (
 var _ = SIGDescribe("ReplicationController", func() {
 	f := framework.NewDefaultFramework("replication-controller")
 
-	It("should serve a basic image on each replica with a public image [Conformance]", func() {
+	framework.ConformanceIt("should serve a basic image on each replica with a public image ", func() {
 		TestReplicationControllerServeImageOrFail(f, "basic", framework.ServeHostnameImage)
 	})
 
