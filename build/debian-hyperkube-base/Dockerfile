@@ -35,6 +35,8 @@ RUN echo CACHEBUST>/dev/null && clean-install \
     openssh-client \
     nfs-common \
     socat \
-    util-linux
+    util-linux && \
+    echo "deb http://ftp.debian.org/debian jessie-backports main contrib" > /etc/apt/sources.list.d/jesse-backports.list \
+    && clean-install zfsutils-linux
 
 COPY cni-bin/bin /opt/cni/bin
