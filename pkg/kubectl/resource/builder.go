@@ -56,6 +56,7 @@ type Builder struct {
 	selector             *string
 	selectAll            bool
 	includeUninitialized bool
+	limitChunks          int64
 
 	resources []string
 
@@ -335,6 +336,14 @@ func (b *Builder) AllNamespaces(allNamespace bool) *Builder {
 // NamespaceParam() an error will be returned.
 func (b *Builder) RequireNamespace() *Builder {
 	b.requireNamespace = true
+	return b
+}
+
+// RequestChunksOf attempts to load responses from the server in batches of size limit
+// to avoid long delays loading and transferring very large lists. If unset defaults to
+// no chunking.
+func (b *Builder) RequestChunksOf(chunkSize int64) *Builder {
+	b.limitChunks = chunkSize
 	return b
 }
 
@@ -636,7 +645,7 @@ func (b *Builder) visitBySelector() *Result {
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
 		}
-		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, *b.selector, b.export, b.includeUninitialized))
+		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, *b.selector, b.export, b.includeUninitialized, b.limitChunks))
 	}
 	if b.continueOnError {
 		result.visitor = EagerVisitorList(visitors)

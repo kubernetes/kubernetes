@@ -359,7 +359,7 @@ func TestHelperList(t *testing.T) {
 			RESTClient:      client,
 			NamespaceScoped: true,
 		}
-		obj, err := modifier.List("bar", legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(), "foo=baz", false, false)
+		obj, err := modifier.List("bar", legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(), false, &metav1.ListOptions{LabelSelector: "foo=baz"})
 		if (err != nil) != test.Err {
 			t.Errorf("unexpected error: %t %v", test.Err, err)
 		}

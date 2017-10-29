@@ -463,7 +463,15 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping, shortOutput,
 		return err
 	}
 
-	objList, err := resource.NewHelper(c, mapping).List(namespace, mapping.GroupVersionKind.Version, p.selector, false, includeUninitialized)
+	objList, err := resource.NewHelper(c, mapping).List(
+		namespace,
+		mapping.GroupVersionKind.Version,
+		false,
+		&metav1.ListOptions{
+			LabelSelector:        p.selector,
+			IncludeUninitialized: includeUninitialized,
+		},
+	)
 	if err != nil {
 		return err
 	}
