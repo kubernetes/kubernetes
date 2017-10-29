@@ -57,7 +57,7 @@ func paramNames() []GeneratorParam {
 		// port will be used if a user specifies --port OR the exposed object
 		// has one port
 		{"port", false},
-		// ports will be used iff a user doesn't specify --port AND the
+		// ports will be used if a user doesn't specify --port AND the
 		// exposed object has multiple ports
 		{"ports", false},
 		{"labels", false},
