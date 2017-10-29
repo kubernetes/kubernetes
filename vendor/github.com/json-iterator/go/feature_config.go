@@ -18,11 +18,14 @@ type Config struct {
 	SortMapKeys             bool
 	UseNumber               bool
 	TagKey                  string
+	ValidateJsonRawMessage  bool
+	AddNewline              bool
 }
 
 type frozenConfig struct {
 	configBeforeFrozen Config
 	sortMapKeys        bool
+	addNewline         bool
 	indentionStep      int
 	decoderCache       unsafe.Pointer
 	encoderCache       unsafe.Pointer
@@ -44,6 +47,7 @@ type API interface {
 	Get(data []byte, path ...interface{}) Any
 	NewEncoder(writer io.Writer) *Encoder
 	NewDecoder(reader io.Reader) *Decoder
+	Valid(data []byte) bool
 }
 
 // ConfigDefault the default API
@@ -53,8 +57,10 @@ var ConfigDefault = Config{
 
 // ConfigCompatibleWithStandardLibrary tries to be 100% compatible with standard library behavior
 var ConfigCompatibleWithStandardLibrary = Config{
-	EscapeHTML:  true,
-	SortMapKeys: true,
+	EscapeHTML:             true,
+	SortMapKeys:            true,
+	ValidateJsonRawMessage: true,
+	AddNewline:             true,
 }.Froze()
 
 // ConfigFastest marshals float with only 6 digits precision
@@ -69,6 +75,7 @@ func (cfg Config) Froze() API {
 	frozenConfig := &frozenConfig{
 		sortMapKeys:   cfg.SortMapKeys,
 		indentionStep: cfg.IndentionStep,
+		addNewline:    cfg.AddNewline,
 		streamPool:    make(chan *Stream, 16),
 		iteratorPool:  make(chan *Iterator, 16),
 	}
@@ -83,8 +90,29 @@ func (cfg Config) Froze() API {
 	if cfg.UseNumber {
 		frozenConfig.useNumber()
 	}
+	if cfg.ValidateJsonRawMessage {
+		frozenConfig.validateJsonRawMessage()
+	}
 	frozenConfig.configBeforeFrozen = cfg
 	return frozenConfig
+}
+
+func (cfg *frozenConfig) validateJsonRawMessage() {
+	encoder := &funcEncoder{func(ptr unsafe.Pointer, stream *Stream) {
+		rawMessage := *(*json.RawMessage)(ptr)
+		iter := cfg.BorrowIterator([]byte(rawMessage))
+		iter.Read()
+		if iter.Error != nil {
+			stream.WriteRaw("null")
+		} else {
+			cfg.ReturnIterator(iter)
+			stream.WriteRaw(string(rawMessage))
+		}
+	}, func(ptr unsafe.Pointer) bool {
+		return false
+	}}
+	cfg.addEncoderToCache(reflect.TypeOf((*json.RawMessage)(nil)).Elem(), encoder)
+	cfg.addEncoderToCache(reflect.TypeOf((*RawMessage)(nil)).Elem(), encoder)
 }
 
 func (cfg *frozenConfig) useNumber() {
@@ -309,4 +337,11 @@ func (cfg *frozenConfig) NewEncoder(writer io.Writer) *Encoder {
 func (cfg *frozenConfig) NewDecoder(reader io.Reader) *Decoder {
 	iter := Parse(cfg, reader, 512)
 	return &Decoder{iter}
+}
+
+func (cfg *frozenConfig) Valid(data []byte) bool {
+	iter := cfg.BorrowIterator(data)
+	defer cfg.ReturnIterator(iter)
+	iter.Skip()
+	return iter.Error == nil
 }

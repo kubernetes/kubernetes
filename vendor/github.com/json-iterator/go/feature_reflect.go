@@ -130,10 +130,28 @@ func (encoder *optionalEncoder) EncodeInterface(val interface{}, stream *Stream)
 }
 
 func (encoder *optionalEncoder) IsEmpty(ptr unsafe.Pointer) bool {
+	return *((*unsafe.Pointer)(ptr)) == nil
+}
+
+type optionalMapEncoder struct {
+	valueEncoder ValEncoder
+}
+
+func (encoder *optionalMapEncoder) Encode(ptr unsafe.Pointer, stream *Stream) {
 	if *((*unsafe.Pointer)(ptr)) == nil {
-		return true
+		stream.WriteNil()
+	} else {
+		encoder.valueEncoder.Encode(*((*unsafe.Pointer)(ptr)), stream)
 	}
-	return false
+}
+
+func (encoder *optionalMapEncoder) EncodeInterface(val interface{}, stream *Stream) {
+	WriteToStream(val, stream, encoder)
+}
+
+func (encoder *optionalMapEncoder) IsEmpty(ptr unsafe.Pointer) bool {
+	p := *((*unsafe.Pointer)(ptr))
+	return p == nil || encoder.valueEncoder.IsEmpty(p)
 }
 
 type placeholderEncoder struct {
@@ -154,11 +172,11 @@ func (encoder *placeholderEncoder) IsEmpty(ptr unsafe.Pointer) bool {
 }
 
 func (encoder *placeholderEncoder) getRealEncoder() ValEncoder {
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 500; i++ {
 		realDecoder := encoder.cfg.getEncoderFromCache(encoder.cacheKey)
 		_, isPlaceholder := realDecoder.(*placeholderEncoder)
 		if isPlaceholder {
-			time.Sleep(time.Second)
+			time.Sleep(10 * time.Millisecond)
 		} else {
 			return realDecoder
 		}
@@ -172,11 +190,11 @@ type placeholderDecoder struct {
 }
 
 func (decoder *placeholderDecoder) Decode(ptr unsafe.Pointer, iter *Iterator) {
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 500; i++ {
 		realDecoder := decoder.cfg.getDecoderFromCache(decoder.cacheKey)
 		_, isPlaceholder := realDecoder.(*placeholderDecoder)
 		if isPlaceholder {
-			time.Sleep(time.Second)
+			time.Sleep(10 * time.Millisecond)
 		} else {
 			realDecoder.Decode(ptr, iter)
 			return
@@ -463,6 +481,18 @@ func createEncoderOfType(cfg *frozenConfig, typ reflect.Type) (ValEncoder, error
 		}
 		if typ.Kind() == reflect.Ptr {
 			encoder = &optionalEncoder{encoder}
+		}
+		return encoder, nil
+	}
+	if reflect.PtrTo(typ).Implements(marshalerType) {
+		checkIsEmpty, err := createCheckIsEmpty(reflect.PtrTo(typ))
+		if err != nil {
+			return nil, err
+		}
+		templateInterface := reflect.New(typ).Interface()
+		var encoder ValEncoder = &marshalerEncoder{
+			templateInterface: extractInterface(templateInterface),
+			checkIsEmpty:      checkIsEmpty,
 		}
 		return encoder, nil
 	}

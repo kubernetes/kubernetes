@@ -1011,7 +1011,7 @@ func checkPatchString(t *testing.T, req *http.Request) {
 
 	resultString := annotationsMap["kubectl.kubernetes.io/last-applied-configuration"]
 	if resultString != checkString {
-		t.Fatalf("patch annotation is not correct, expect:%s\n but got:%s\n", checkString, resultString)
+		t.Fatalf("patch annotation is not correct, expect:|%s|\n but got:|%s|\n", checkString, resultString)
 	}
 }
 
