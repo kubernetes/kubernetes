@@ -1554,6 +1554,12 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 func ValidatePersistentVolumeUpdate(newPv, oldPv *api.PersistentVolume) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = ValidatePersistentVolume(newPv)
+
+	// PersistentVolumeSource should be immutable after creation.
+	if !apiequality.Semantic.DeepEqual(newPv.Spec.PersistentVolumeSource, oldPv.Spec.PersistentVolumeSource) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "persistentvolumesource"), "is immutable after creation"))
+	}
+
 	newPv.Status = oldPv.Status
 	return allErrs
 }

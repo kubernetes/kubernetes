@@ -349,6 +349,67 @@ func TestValidatePersistentVolumes(t *testing.T) {
 
 }
 
+func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
+	validVolume := testVolume("foo", "", api.PersistentVolumeSpec{
+		Capacity: api.ResourceList{
+			api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+		},
+		AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+		PersistentVolumeSource: api.PersistentVolumeSource{
+			HostPath: &api.HostPathVolumeSource{
+				Path: "/foo",
+				Type: newHostPathType(string(api.HostPathDirectory)),
+			},
+		},
+		StorageClassName: "valid",
+	})
+	validPvSourceNoUpdate := validVolume.DeepCopy()
+	invalidPvSourceUpdateType := validVolume.DeepCopy()
+	invalidPvSourceUpdateType.Spec.PersistentVolumeSource = api.PersistentVolumeSource{
+		FlexVolume: &api.FlexVolumeSource{
+			Driver: "kubernetes.io/blue",
+			FSType: "ext4",
+		},
+	}
+	invalidPvSourceUpdateDeep := validVolume.DeepCopy()
+	invalidPvSourceUpdateDeep.Spec.PersistentVolumeSource = api.PersistentVolumeSource{
+		HostPath: &api.HostPathVolumeSource{
+			Path: "/updated",
+			Type: newHostPathType(string(api.HostPathDirectory)),
+		},
+	}
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		oldVolume         *api.PersistentVolume
+		newVolume         *api.PersistentVolume
+	}{
+		"condition-no-update": {
+			isExpectedFailure: false,
+			oldVolume:         validVolume,
+			newVolume:         validPvSourceNoUpdate,
+		},
+		"condition-update-source-type": {
+			isExpectedFailure: true,
+			oldVolume:         validVolume,
+			newVolume:         invalidPvSourceUpdateType,
+		},
+		"condition-update-source-deep": {
+			isExpectedFailure: true,
+			oldVolume:         validVolume,
+			newVolume:         invalidPvSourceUpdateDeep,
+		},
+	}
+	for name, scenario := range scenarios {
+		errs := ValidatePersistentVolumeUpdate(scenario.newVolume, scenario.oldVolume)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
+}
+
 func TestValidateLocalVolumes(t *testing.T) {
 	scenarios := map[string]struct {
 		isExpectedFailure bool
