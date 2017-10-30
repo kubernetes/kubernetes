@@ -29,7 +29,11 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	appsv1beta2 "k8s.io/kubernetes/pkg/apis/apps/v1beta2"
+	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
@@ -127,8 +131,17 @@ type ScaleREST struct {
 var _ = rest.Patcher(&ScaleREST{})
 var _ = rest.GroupVersionKindProvider(&ScaleREST{})
 
-func (r *ScaleREST) GroupVersionKind() schema.GroupVersionKind {
-	return schema.GroupVersionKind{Group: "extensions", Version: "v1beta1", Kind: "Scale"}
+func (r *ScaleREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
+	switch containingGV {
+	case extensionsv1beta1.SchemeGroupVersion:
+		return extensionsv1beta1.SchemeGroupVersion.WithKind("Scale")
+	case appsv1beta1.SchemeGroupVersion:
+		return appsv1beta1.SchemeGroupVersion.WithKind("Scale")
+	case appsv1beta2.SchemeGroupVersion:
+		return appsv1beta2.SchemeGroupVersion.WithKind("Scale")
+	default:
+		return autoscalingv1.SchemeGroupVersion.WithKind("Scale")
+	}
 }
 
 // New creates a new Scale object
