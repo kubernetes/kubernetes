@@ -2916,7 +2916,8 @@ type ServiceSpec struct {
 
 	// ExternalName is the external reference that kubedns or equivalent will
 	// return as a CNAME record for this service. No proxying will be involved.
-	// Must be a valid DNS name and requires Type to be ExternalName.
+	// Must be a valid RFC-1123 hostname (https://tools.ietf.org/html/rfc1123)
+	// and requires Type to be ExternalName.
 	ExternalName string
 
 	// ExternalIPs are used by external load balancers, or can be set by
