@@ -25,6 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -76,6 +77,120 @@ func TestNewDeployment(t *testing.T) {
 	}
 	if newRS.Annotations[v1.LastAppliedConfigAnnotation] != "" {
 		t.Errorf("expected new ReplicaSet last-applied annotation not copied from Deployment %s", tester.deployment.Name)
+	}
+}
+
+// Deployments should support roll out, roll back, and roll over
+func TestDeploymentRollingUpdate(t *testing.T) {
+	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	defer closeFn()
+	name := "test-rolling-update-deployment"
+	ns := framework.CreateTestingNamespace(name, s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	// Start informer and controllers
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go rm.Run(5, stopCh)
+	go dc.Run(5, stopCh)
+
+	replicas := int32(20)
+	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
+	tester.deployment.Spec.MinReadySeconds = 4
+	quarter := intstr.FromString("25%")
+	tester.deployment.Spec.Strategy.RollingUpdate = &v1beta1.RollingUpdateDeployment{
+		MaxUnavailable: &quarter,
+		MaxSurge:       &quarter,
+	}
+
+	// Create a deployment.
+	var err error
+	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	if err != nil {
+		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
+	}
+	oriImage := tester.deployment.Spec.Template.Spec.Containers[0].Image
+	if err := tester.waitForDeploymentRevisionAndImage("1", oriImage); err != nil {
+		t.Fatal(err)
+	}
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Roll out a new image.
+	image := "new-image"
+	if oriImage == image {
+		t.Fatalf("bad test setup, deployment %s roll out with the same image", tester.deployment.Name)
+	}
+	imageFn := func(update *v1beta1.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Image = image
+	}
+	tester.deployment, err = tester.updateDeployment(imageFn)
+	if err != nil {
+		t.Fatalf("failed to update deployment %s: %v", tester.deployment.Name, err)
+	}
+	if err := tester.waitForDeploymentRevisionAndImage("2", image); err != nil {
+		t.Fatal(err)
+	}
+	if err := tester.waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+
+	// 2. Roll back to the last revision.
+	revision := int64(0)
+	rollback := newDeploymentRollback(tester.deployment.Name, nil, revision)
+	if err = c.ExtensionsV1beta1().Deployments(ns.Name).Rollback(rollback); err != nil {
+		t.Fatalf("failed to roll back deployment %s to last revision: %v", tester.deployment.Name, err)
+	}
+	// Wait for the deployment to start rolling back
+	if err = tester.waitForDeploymentRollbackCleared(); err != nil {
+		t.Fatalf("failed to roll back deployment %s to last revision: %v", tester.deployment.Name, err)
+	}
+	// Wait for the deployment to be rolled back to the template stored in revision 1 and rolled forward to revision 3.
+	if err := tester.waitForDeploymentRevisionAndImage("3", oriImage); err != nil {
+		t.Fatal(err)
+	}
+	if err := tester.waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+
+	// 3. Roll over a deployment before the previous rolling update finishes.
+	image = "dont-finish"
+	imageFn = func(update *v1beta1.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Image = image
+	}
+	tester.deployment, err = tester.updateDeployment(imageFn)
+	if err != nil {
+		t.Fatalf("failed to update deployment %s: %v", tester.deployment.Name, err)
+	}
+	if err := tester.waitForDeploymentRevisionAndImage("4", image); err != nil {
+		t.Fatal(err)
+	}
+	// We don't mark pods as ready so that rollout won't finish.
+	// Before the rollout finishes, trigger another rollout.
+	image = "rollover"
+	imageFn = func(update *v1beta1.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Image = image
+	}
+	tester.deployment, err = tester.updateDeployment(imageFn)
+	if err != nil {
+		t.Fatalf("failed to update deployment %s: %v", tester.deployment.Name, err)
+	}
+	if err := tester.waitForDeploymentRevisionAndImage("5", image); err != nil {
+		t.Fatal(err)
+	}
+	if err := tester.waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+	_, allOldRSs, err := deploymentutil.GetOldReplicaSets(tester.deployment, c.ExtensionsV1beta1())
+	if err != nil {
+		t.Fatalf("failed retrieving old replicasets of deployment %s: %v", tester.deployment.Name, err)
+	}
+	for _, oldRS := range allOldRSs {
+		if *oldRS.Spec.Replicas != 0 {
+			t.Errorf("expected old replicaset %s of deployment %s to have 0 replica, got %d", oldRS.Name, tester.deployment.Name, *oldRS.Spec.Replicas)
+		}
 	}
 }
 
