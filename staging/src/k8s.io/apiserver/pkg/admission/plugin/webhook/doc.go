@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package webhook checks a webhook for configured operation admission
-package webhook // import "k8s.io/kubernetes/plugin/pkg/admission/webhook"
+package webhook // import "k8s.io/apiserver/pkg/admission/plugin/webhook"
