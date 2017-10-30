@@ -23,6 +23,7 @@ go_test(
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/networking:go_default_library",
         "//pkg/apis/policy:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
