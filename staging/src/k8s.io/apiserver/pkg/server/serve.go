@@ -17,7 +17,6 @@ limitations under the License.
 package server
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -85,13 +84,13 @@ func (s *GenericAPIServer) serveSecurely(stopCh <-chan struct{}) error {
 
 	glog.Infof("Serving securely on %s", s.SecureServingInfo.BindAddress)
 	var err error
-	s.effectiveSecurePort, err = RunServer(secureServer, s.SecureServingInfo.BindNetwork, s.shutdownTimeout, stopCh)
+	s.effectiveSecurePort, err = RunServer(secureServer, s.SecureServingInfo.BindNetwork, stopCh)
 	return err
 }
 
 // RunServer listens on the given port, then spawns a go-routine continuously serving
 // until the stopCh is closed. The port is returned. This function does not block.
-func RunServer(server *http.Server, network string, shutDownTimeout time.Duration, stopCh <-chan struct{}) (int, error) {
+func RunServer(server *http.Server, network string, stopCh <-chan struct{}) (int, error) {
 	if len(server.Addr) == 0 {
 		return 0, errors.New("address cannot be empty")
 	}
@@ -112,12 +111,10 @@ func RunServer(server *http.Server, network string, shutDownTimeout time.Duratio
 		return 0, fmt.Errorf("invalid listen address: %q", ln.Addr().String())
 	}
 
-	// Shutdown server gracefully.
+	// Stop the server by closing the listener
 	go func() {
 		<-stopCh
-		ctx, cancel := context.WithTimeout(context.Background(), shutDownTimeout)
-		server.Shutdown(ctx)
-		cancel()
+		ln.Close()
 	}()
 
 	go func() {
