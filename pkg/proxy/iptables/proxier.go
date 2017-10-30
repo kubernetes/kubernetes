@@ -1616,14 +1616,22 @@ func (proxier *Proxier) syncProxyRules() {
 		"-m", "addrtype", "--dst-type", "LOCAL",
 		"-j", string(kubeNodePortsChain))
 
+	// If the masqueradeMark has been added then we want to forward that same
+	// traffic, this allows NodePort traffic to be forwarded even if the default
+	// FORWARD policy is not accept.
+	writeLine(proxier.filterRules,
+		"-A", string(kubeForwardChain),
+		"-m", "comment", "--comment", `"kubernetes forwarding rules"`,
+		"-m", "mark", "--mark", proxier.masqueradeMark,
+		"-j", "ACCEPT",
+	)
+
+	// The following rules can only be set if clusterCIDR has been defined.
 	if len(proxier.clusterCIDR) != 0 {
-		glog.Error("Should be adding the rules now")
-		writeLine(proxier.filterRules,
-			"-A", string(kubeForwardChain),
-			"-m", "comment", "--comment", `"kubernetes forwarding rules"`,
-			"-m", "mark", "--mark", proxier.masqueradeMark,
-			"-j", "ACCEPT",
-		)
+		// The following two rules ensure the traffic after the initial packet
+		// accepted by the "kubernetes forwarding rules" rule above will be
+		// accepted, to be as specific as possible the traffic must be sourced
+		// or destined to the clusterCIDR (to/from a pod).
 		writeLine(proxier.filterRules,
 			"-A", string(kubeForwardChain),
 			"-s", proxier.clusterCIDR,
