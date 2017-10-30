@@ -1552,7 +1552,7 @@ func sortMergeListsByName(mapJSON []byte, dataStruct interface{}) ([]byte, error
 	var m map[string]interface{}
 	err := json.Unmarshal(mapJSON, &m)
 	if err != nil {
-		return nil, err
+		return nil, mergepatch.ErrBadJSONDoc
 	}
 
 	newM, err := sortMergeListsByNameMap(m, reflect.TypeOf(dataStruct))
