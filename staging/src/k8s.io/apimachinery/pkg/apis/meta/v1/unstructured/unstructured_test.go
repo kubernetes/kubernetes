@@ -75,4 +75,34 @@ func TestNilDeletionTimestamp(t *testing.T) {
 	if deletionTimestamp != nil {
 		t.Errorf("unexpected deletion timestamp field: %q", deletionTimestamp)
 	}
+
+	u.SetDeletionTimestamp(nil)
+	clone := u.DeepCopy()
+	if got := clone.GetDeletionTimestamp(); got != nil {
+		t.Errorf("unexpected deletion timestamp in clone: %v, wanted %v", got, nil)
+	}
+}
+
+func TestNilDeletionGracePeriod(t *testing.T) {
+	var u Unstructured
+	del := u.GetDeletionGracePeriodSeconds()
+	if del != nil {
+		t.Errorf("unexpected non-nil deletion grace period: %v", del)
+	}
+	u.SetDeletionGracePeriodSeconds(u.GetDeletionGracePeriodSeconds())
+	del = u.GetDeletionGracePeriodSeconds()
+	if del != nil {
+		t.Errorf("unexpected non-nil deletion grace period: %v", del)
+	}
+	metadata := u.Object["metadata"].(map[string]interface{})
+	deleteGracePeriod := metadata["deletionGracePeriod"]
+	if deleteGracePeriod != nil {
+		t.Errorf("unexpected deletion grace period field: %q", deleteGracePeriod)
+	}
+
+	u.SetDeletionGracePeriodSeconds(nil)
+	clone := u.DeepCopy()
+	if got := clone.GetDeletionGracePeriodSeconds(); got != nil {
+		t.Errorf("unexpected deletion timestamp in clone: %v, wanted %v", got, nil)
+	}
 }
