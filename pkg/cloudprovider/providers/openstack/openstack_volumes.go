@@ -29,7 +29,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
-	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/golang/glog"
 )
@@ -115,29 +114,11 @@ func (os *OpenStack) getVolume(diskName string) (volumes.Volume, error) {
 		return volume, err
 	}
 
-	err = volumes.List(sClient, nil).EachPage(func(page pagination.Page) (bool, error) {
-		vols, err := volumes.ExtractVolumes(page)
-		if err != nil {
-			glog.Errorf("Failed to extract volumes: %v", err)
-			return false, err
-		} else {
-			for _, v := range vols {
-				glog.V(4).Infof("%s %s %v", v.ID, v.Name, v.Attachments)
-				if v.Name == diskName || strings.Contains(v.ID, diskName) {
-					volume = v
-					return true, nil
-				}
-			}
-		}
-		// if it reached here then no disk with the given name was found.
-		errmsg := fmt.Sprintf("Unable to find disk: %s in region %s", diskName, os.region)
-		return false, errors.New(errmsg)
-	})
+	vol, err := volumes.Get(sClient, diskName).Extract()
 	if err != nil {
-		glog.Errorf("Error occurred getting volume: %s", diskName)
-		return volume, err
+		glog.Errorf("Cinder show fail %s %s", diskName, err.Error())
 	}
-	return volume, err
+	return *vol, err
 }
 
 // Create a volume of given size (in GiB)
