@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	api "k8s.io/kubernetes/pkg/apis/abac"
+	"k8s.io/kubernetes/pkg/apis/abac"
 	"k8s.io/kubernetes/pkg/apis/abac/v0"
 	"k8s.io/kubernetes/pkg/apis/abac/v1beta1"
 )
@@ -799,8 +799,8 @@ func TestSubjectMatches(t *testing.T) {
 	}
 
 	for k, tc := range testCases {
-		policy := &api.Policy{}
-		if err := api.Scheme.Convert(tc.Policy, policy, nil); err != nil {
+		policy := &abac.Policy{}
+		if err := abac.Scheme.Convert(tc.Policy, policy, nil); err != nil {
 			t.Errorf("%s: error converting: %v", k, err)
 			continue
 		}
@@ -1254,8 +1254,8 @@ func TestPolicy(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		policy := &api.Policy{}
-		if err := api.Scheme.Convert(test.policy, policy, nil); err != nil {
+		policy := &abac.Policy{}
+		if err := abac.Scheme.Convert(test.policy, policy, nil); err != nil {
 			t.Errorf("%s: error converting: %v", test.name, err)
 			continue
 		}
