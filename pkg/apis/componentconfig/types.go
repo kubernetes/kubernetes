@@ -161,6 +161,48 @@ const (
 	ProxyModeIPVS      ProxyMode = "ipvs"
 )
 
+// IPVSSchedulerMethod is the algorithm for allocating TCP connections and
+// UDP datagrams to real servers.  Scheduling algorithms are imple-
+//wanted as kernel modules. Ten are shipped with the Linux Virtual Server.
+type IPVSSchedulerMethod string
+
+const (
+	// Robin Robin distributes jobs equally amongst the available real servers.
+	RoundRobin IPVSSchedulerMethod = "rr"
+	// Weighted Round Robin assigns jobs to real servers proportionally to there real  servers' weight.
+	// Servers  with  higher weights receive new jobs first and get more jobs than servers with lower weights.
+	// Servers with equal weights get an equal distribution of new jobs.
+	WeightedRoundRobin IPVSSchedulerMethod = "wrr"
+	// Least Connection assigns more jobs to real servers with fewer active jobs.
+	LeastConnection IPVSSchedulerMethod = "lc"
+	// Weighted Least Connection assigns more jobs to servers with fewer jobs and
+	// relative to the real servers’weight(Ci/Wi).
+	WeightedLeastConnection IPVSSchedulerMethod = "wlc"
+	// Locality Based Least Connection assigns jobs destined for the same IP address to the same server if
+	// the server is not overloaded and available; otherwise assign jobs to servers with fewer jobs,
+	// and keep it for future assignment.
+	LocalityBasedLeastConnection IPVSSchedulerMethod = "lblc"
+	// Locality Based Least Connection with Replication assigns jobs destined for the same IP address to the
+	// least-connection node in the server set for the IP address.  If all the node in the server set are over loaded,
+	// it picks up a node with fewer jobs in the cluster and adds it in the sever set for the target.
+	// If the server set has not been modified for the specified time, the most loaded node is removed from the server set,
+	// in order to avoid high degree of replication.
+	LocalityBasedLeastConnectionWithReplication IPVSSchedulerMethod = "lblcr"
+	// Source Hashing assigns jobs to servers through looking up a statically assigned hash table
+	// by their source IP addresses.
+	SourceHashing IPVSSchedulerMethod = "sh"
+	// Destination Hashing assigns jobs to servers through looking up a statically assigned hash table
+	// by their destination IP addresses.
+	DestinationHashing IPVSSchedulerMethod = "dh"
+	// Shortest Expected Delay assigns an incoming job to the server with the shortest expected delay.
+	// The expected delay that the job will experience is (Ci + 1) / Ui if sent to the ith server, in which
+	// Ci is the number of jobs on the the ith server and Ui is the fixed service rate (weight) of the ith server.
+	ShortestExpectedDelay IPVSSchedulerMethod = "sed"
+	// Never Queue assigns an incoming job to an idle server if there is, instead of waiting for a fast one;
+	// if all the servers are busy, it adopts the Shortest Expected Delay policy to assign the job.
+	NeverQueue IPVSSchedulerMethod = "nq"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type KubeSchedulerConfiguration struct {

@@ -367,6 +367,23 @@ func (resourceAccessor) SetResourceVersion(obj runtime.Object, version string) e
 	return nil
 }
 
+func (resourceAccessor) Continue(obj runtime.Object) (string, error) {
+	accessor, err := ListAccessor(obj)
+	if err != nil {
+		return "", err
+	}
+	return accessor.GetContinue(), nil
+}
+
+func (resourceAccessor) SetContinue(obj runtime.Object, version string) error {
+	accessor, err := ListAccessor(obj)
+	if err != nil {
+		return err
+	}
+	accessor.SetContinue(version)
+	return nil
+}
+
 // extractFromOwnerReference extracts v to o. v is the OwnerReferences field of an object.
 func extractFromOwnerReference(v reflect.Value, o *metav1.OwnerReference) error {
 	if err := runtime.Field(v, "APIVersion", &o.APIVersion); err != nil {

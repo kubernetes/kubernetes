@@ -57,7 +57,7 @@ func EnsureDNSAddon(cfg *kubeadmapi.MasterConfiguration, client clientset.Interf
 	}
 
 	var dnsBindAddr string
-	if dnsip.To16() != nil {
+	if dnsip.To4() == nil {
 		dnsBindAddr = "::1"
 	} else {
 		dnsBindAddr = "127.0.0.1"

@@ -115,6 +115,56 @@ func RemoveFitPredicate(name string) {
 	mandatoryFitPredicates.Delete(name)
 }
 
+// RemovePredicateKeyFromAlgoProvider removes a fit predicate key from algorithmProvider.
+func RemovePredicateKeyFromAlgoProvider(providerName, key string) error {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
+
+	validateAlgorithmNameOrDie(providerName)
+	provider, ok := algorithmProviderMap[providerName]
+	if !ok {
+		return fmt.Errorf("plugin %v has not been registered", providerName)
+	}
+	provider.FitPredicateKeys.Delete(key)
+	return nil
+}
+
+// RemovePredicateKeyFromAlgoProvider removes a fit predicate key from all algorithmProviders which in algorithmProviderMap.
+func RemovePredicateKeyFromAlgorithmProviderMap(key string) {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
+
+	for _, provider := range algorithmProviderMap {
+		provider.FitPredicateKeys.Delete(key)
+	}
+	return
+}
+
+// InsertPredicateKeyToAlgoProvider insert a fit predicate key to algorithmProvider.
+func InsertPredicateKeyToAlgoProvider(providerName, key string) error {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
+
+	validateAlgorithmNameOrDie(providerName)
+	provider, ok := algorithmProviderMap[providerName]
+	if !ok {
+		return fmt.Errorf("plugin %v has not been registered", providerName)
+	}
+	provider.FitPredicateKeys.Insert(key)
+	return nil
+}
+
+// InsertPredicateKeyToAlgorithmProviderMap insert a fit predicate key to all algorithmProviders which in algorithmProviderMap.
+func InsertPredicateKeyToAlgorithmProviderMap(key string) {
+	schedulerFactoryMutex.Lock()
+	defer schedulerFactoryMutex.Unlock()
+
+	for _, provider := range algorithmProviderMap {
+		provider.FitPredicateKeys.Insert(key)
+	}
+	return
+}
+
 // RegisterMandatoryFitPredicate registers a fit predicate with the algorithm registry, the predicate is used by
 // kubelet, DaemonSet; it is always included in configuration. Returns the name with which the predicate was
 // registered.
