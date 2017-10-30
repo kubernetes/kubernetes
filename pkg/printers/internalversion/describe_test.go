@@ -142,6 +142,28 @@ func TestDescribeNamespace(t *testing.T) {
 	}
 }
 
+func TestDescribePodPriority(t *testing.T) {
+	priority := int32(1000)
+	fake := fake.NewSimpleClientset(&api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+		},
+		Spec: api.PodSpec{
+			PriorityClassName: "high-priority",
+			Priority:          &priority,
+		},
+	})
+	c := &describeClient{T: t, Namespace: "", Interface: fake}
+	d := PodDescriber{c}
+	out, err := d.Describe("", "bar", printers.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "high-priority") || !strings.Contains(out, "1000") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
 func TestDescribeConfigMap(t *testing.T) {
 	fake := fake.NewSimpleClientset(&api.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
