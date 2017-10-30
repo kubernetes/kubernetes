@@ -28,7 +28,6 @@ import (
 
 var _ = SIGDescribe("Metadata Concealment", func() {
 	f := framework.NewDefaultFramework("metadata-concealment")
-	completions := int32(1)
 
 	It("should run a check-metadata-concealment job to completion", func() {
 		framework.SkipUnlessProviderIs("gce")
@@ -58,7 +57,7 @@ var _ = SIGDescribe("Metadata Concealment", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring job reaches completions")
-		err = framework.WaitForJobFinish(f.ClientSet, f.Namespace.Name, job.Name, completions)
+		err = framework.WaitForJobFinish(f.ClientSet, f.Namespace.Name, job.Name, int32(1))
 		Expect(err).NotTo(HaveOccurred())
 	})
 })
