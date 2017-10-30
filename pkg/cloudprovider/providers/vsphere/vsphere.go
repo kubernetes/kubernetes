@@ -849,6 +849,7 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 // DisksAreAttached returns if disks are attached to the VM using controllers supported by the plugin.
 func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) (map[k8stypes.NodeName]map[string]bool, error) {
 	disksAreAttachedInternal := func(nodeVolumes map[k8stypes.NodeName][]string) (map[k8stypes.NodeName]map[string]bool, error) {
+		var nodeName k8stypes.NodeName
 		attached := make(map[k8stypes.NodeName]map[string]bool)
 		if len(nodeVolumes) == 0 {
 			return attached, nil
@@ -856,6 +857,11 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 		// Create context
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+		for node, _ := range nodeVolumes {
+			nodeName = node
+			break
+		}
+
 		vsi, err := vs.getVSphereInstance(nodeName)
 		if err != nil {
 			return nil, err
@@ -865,7 +871,7 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 		if err != nil {
 			return nil, err
 		}
-		dc, err := vclib.GetDatacenter(ctx, vs.conn, vs.cfg.Global.Datacenter)
+		dc, err := vclib.GetDatacenter(ctx, vsi.conn, vs.cfg.Global.Datacenter)
 		if err != nil {
 			return nil, err
 		}
