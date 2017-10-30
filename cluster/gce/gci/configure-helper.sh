@@ -1796,6 +1796,9 @@ function start-kube-addons {
   if [[ "${ENABLE_METRICS_SERVER:-}" == "true" ]]; then
     setup-addon-manifests "addons" "metrics-server"
   fi
+  if [[ "${ENABLE_NVIDIA_GPU_DEVICE_PLUGIN:-}" == "true" ]]; then
+    setup-addon-manifests "addons" "device-plugins/nvidia-gpu"
+  fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns"
     local -r kubedns_file="${dst_dir}/dns/kube-dns.yaml"
