@@ -40,6 +40,7 @@ go_library(
         "//cmd/kube-apiserver/app/options:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library",
+        "//vendor/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/storage/etcd/testing:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
         "//vendor/k8s.io/client-go/rest:go_default_library",
