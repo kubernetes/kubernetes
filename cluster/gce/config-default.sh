@@ -182,7 +182,7 @@ RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
 
 if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
-    FEATURE_GATES="${FEATURE_GATES},Accelerators=true"
+    FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
 fi
 
 # Optional: Install cluster DNS.
