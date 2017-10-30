@@ -20,7 +20,7 @@ package admission
 type chainAdmissionHandler []Interface
 
 // NewChainHandler creates a new chain handler from an array of handlers. Used for testing.
-func NewChainHandler(handlers ...Interface) Interface {
+func NewChainHandler(handlers ...Interface) chainAdmissionHandler {
 	return chainAdmissionHandler(handlers)
 }
 

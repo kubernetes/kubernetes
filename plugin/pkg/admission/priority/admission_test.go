@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
-func addPriorityClasses(ctrl *priorityPlugin, priorityClasses []*scheduling.PriorityClass) {
+func addPriorityClasses(ctrl *PriorityPlugin, priorityClasses []*scheduling.PriorityClass) {
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	ctrl.SetInternalKubeInformerFactory(informerFactory)
 	// First add the existing classes to the cache.
@@ -132,7 +132,7 @@ func TestPriorityClassAdmission(t *testing.T) {
 	for _, test := range tests {
 		glog.V(4).Infof("starting test %q", test.name)
 
-		ctrl := NewPlugin().(*priorityPlugin)
+		ctrl := NewPlugin()
 		// Add existing priority classes.
 		addPriorityClasses(ctrl, test.existingClasses)
 		// Now add the new class.
@@ -209,7 +209,7 @@ func TestDefaultPriority(t *testing.T) {
 
 	for _, test := range tests {
 		glog.V(4).Infof("starting test %q", test.name)
-		ctrl := NewPlugin().(*priorityPlugin)
+		ctrl := NewPlugin()
 		addPriorityClasses(ctrl, test.classesBefore)
 		defaultPriority, err := ctrl.getDefaultPriority()
 		if err != nil {
@@ -383,7 +383,7 @@ func TestPodAdmission(t *testing.T) {
 	for _, test := range tests {
 		glog.V(4).Infof("starting test %q", test.name)
 
-		ctrl := NewPlugin().(*priorityPlugin)
+		ctrl := NewPlugin()
 		// Add existing priority classes.
 		addPriorityClasses(ctrl, test.existingClasses)
 

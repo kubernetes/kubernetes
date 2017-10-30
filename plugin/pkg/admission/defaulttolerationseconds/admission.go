@@ -45,24 +45,25 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-// plugin contains the client used by the admission controller
+// Plugin contains the client used by the admission controller
 // It will add default tolerations for every pod
 // that tolerate taints `notReady:NoExecute` and `unreachable:NoExecute`,
 // with tolerationSeconds of 300s.
 // If the pod already specifies a toleration for taint `notReady:NoExecute`
 // or `unreachable:NoExecute`, the plugin won't touch it.
-type plugin struct {
+type Plugin struct {
 	*admission.Handler
 }
 
 // NewDefaultTolerationSeconds creates a new instance of the DefaultTolerationSeconds admission controller
-func NewDefaultTolerationSeconds() admission.Interface {
-	return &plugin{
+func NewDefaultTolerationSeconds() *Plugin {
+	return &Plugin{
 		Handler: admission.NewHandler(admission.Create, admission.Update),
 	}
 }
 
-func (p *plugin) Admit(attributes admission.Attributes) (err error) {
+// Admit makes an admission decision based on the request attributes
+func (p *Plugin) Admit(attributes admission.Attributes) (err error) {
 	if attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
 	}

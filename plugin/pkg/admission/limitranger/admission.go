@@ -50,8 +50,8 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-// limitRanger enforces usage limits on a per resource basis in the namespace
-type limitRanger struct {
+// LimitRanger enforces usage limits on a per resource basis in the namespace
+type LimitRanger struct {
 	*admission.Handler
 	client  internalclientset.Interface
 	actions LimitRangerActions
@@ -69,13 +69,13 @@ type liveLookupEntry struct {
 	items  []*api.LimitRange
 }
 
-func (l *limitRanger) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
+func (l *LimitRanger) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	limitRangeInformer := f.Core().InternalVersion().LimitRanges()
 	l.SetReadyFunc(limitRangeInformer.Informer().HasSynced)
 	l.lister = limitRangeInformer.Lister()
 }
 
-func (l *limitRanger) Validate() error {
+func (l *LimitRanger) Validate() error {
 	if l.lister == nil {
 		return fmt.Errorf("missing limitRange lister")
 	}
@@ -86,7 +86,7 @@ func (l *limitRanger) Validate() error {
 }
 
 // Admit admits resources into cluster that do not violate any defined LimitRange in the namespace
-func (l *limitRanger) Admit(a admission.Attributes) (err error) {
+func (l *LimitRanger) Admit(a admission.Attributes) (err error) {
 	if !l.actions.SupportsAttributes(a) {
 		return nil
 	}
@@ -150,7 +150,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 }
 
 // NewLimitRanger returns an object that enforces limits based on the supplied limit function
-func NewLimitRanger(actions LimitRangerActions) (admission.Interface, error) {
+func NewLimitRanger(actions LimitRangerActions) (*LimitRanger, error) {
 	liveLookupCache, err := lru.New(10000)
 	if err != nil {
 		return nil, err
@@ -160,7 +160,7 @@ func NewLimitRanger(actions LimitRangerActions) (admission.Interface, error) {
 		actions = &DefaultLimitRangerActions{}
 	}
 
-	return &limitRanger{
+	return &LimitRanger{
 		Handler:         admission.NewHandler(admission.Create, admission.Update),
 		actions:         actions,
 		liveLookupCache: liveLookupCache,
@@ -168,10 +168,10 @@ func NewLimitRanger(actions LimitRangerActions) (admission.Interface, error) {
 	}, nil
 }
 
-var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&limitRanger{})
-var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&limitRanger{})
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&LimitRanger{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&LimitRanger{})
 
-func (a *limitRanger) SetInternalKubeClientSet(client internalclientset.Interface) {
+func (a *LimitRanger) SetInternalKubeClientSet(client internalclientset.Interface) {
 	a.client = client
 }
 

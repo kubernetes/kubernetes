@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
-	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
@@ -70,11 +69,11 @@ func TestQuota(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	admission.(kubeadmission.WantsInternalKubeClientSet).SetInternalKubeClientSet(internalClientset)
+	admission.SetInternalKubeClientSet(internalClientset)
 	internalInformers := internalinformers.NewSharedInformerFactory(internalClientset, controller.NoResyncPeriodFunc())
-	admission.(kubeadmission.WantsInternalKubeInformerFactory).SetInternalKubeInformerFactory(internalInformers)
+	admission.SetInternalKubeInformerFactory(internalInformers)
 	qca := quotainstall.NewQuotaConfigurationForAdmission()
-	admission.(kubeadmission.WantsQuotaConfiguration).SetQuotaConfiguration(qca)
+	admission.SetQuotaConfiguration(qca)
 	defer close(admissionCh)
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
@@ -268,10 +267,10 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	admission.(kubeadmission.WantsInternalKubeClientSet).SetInternalKubeClientSet(internalClientset)
+	admission.SetInternalKubeClientSet(internalClientset)
 	internalInformers := internalinformers.NewSharedInformerFactory(internalClientset, controller.NoResyncPeriodFunc())
-	admission.(kubeadmission.WantsInternalKubeInformerFactory).SetInternalKubeInformerFactory(internalInformers)
-	admission.(kubeadmission.WantsQuotaConfiguration).SetQuotaConfiguration(qca)
+	admission.SetInternalKubeInformerFactory(internalInformers)
+	admission.SetQuotaConfiguration(qca)
 	defer close(admissionCh)
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
