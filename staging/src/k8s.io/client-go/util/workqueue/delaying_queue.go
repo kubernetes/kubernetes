@@ -24,19 +24,23 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
-// DelayingInterface is an Interface that can Add an item at a later time. This makes it easier to
-// requeue items after failures without ending up in a hot-loop.
+// DelayingInterface is an Interface that can Add an item at a later time.
+// This makes it easier to requeue items after failures without ending up in a
+// hot-loop.
 type DelayingInterface interface {
 	Interface
-	// AddAfter adds an item to the workqueue after the indicated duration has passed
+	// AddAfter adds an item to the workqueue after the indicated duration has
+	// passed.
 	AddAfter(item interface{}, duration time.Duration)
 }
 
-// NewDelayingQueue constructs a new workqueue with delayed queuing ability
+// NewDelayingQueue constructs a new workqueue with delayed queuing ability.
 func NewDelayingQueue() DelayingInterface {
 	return newDelayingQueue(clock.RealClock{}, "")
 }
 
+// NewNamedDelayingQueue constructs a new named workqueue with delayed queuing
+// ability.
 func NewNamedDelayingQueue(name string) DelayingInterface {
 	return newDelayingQueue(clock.RealClock{}, name)
 }
@@ -56,7 +60,7 @@ func newDelayingQueue(clock clock.Clock, name string) DelayingInterface {
 	return ret
 }
 
-// delayingType wraps an Interface and provides delayed re-enquing
+// delayingType wraps an Interface and provides delayed requeuing.
 type delayingType struct {
 	Interface
 
@@ -66,24 +70,26 @@ type delayingType struct {
 	// stopCh lets us signal a shutdown to the waiting loop
 	stopCh chan struct{}
 
-	// heartbeat ensures we wait no more than maxWait before firing
+	// heartbeat ensures we wait no more than maxWait before firing.
 	//
 	// TODO: replace with Ticker (and add to clock) so this can be cleaned up.
 	// clock.Tick will leak.
 	heartbeat <-chan time.Time
 
-	// waitingForAddCh is a buffered channel that feeds waitingForAdd
+	// waitingForAddCh is a buffered channel that feeds waitingForAdd.
 	waitingForAddCh chan *waitFor
 
-	// metrics counts the number of retries
+	// metrics counts the number of retries.
 	metrics retryMetrics
 }
 
-// waitFor holds the data to add and the time it should be added
+// waitFor holds the data for future requeue.
 type waitFor struct {
-	data    t
+	// the data to requeue.
+	data t
+	// the time to requeue the data.
 	readyAt time.Time
-	// index in the priority queue (heap)
+	// index in the priority queue (heap).
 	index int
 }
 
@@ -162,12 +168,12 @@ func (q *delayingType) AddAfter(item interface{}, duration time.Duration) {
 	}
 }
 
-// maxWait keeps a max bound on the wait time. It's just insurance against weird things happening.
-// Checking the queue every 10 seconds isn't expensive and we know that we'll never end up with an
-// expired item sitting for more than 10 seconds.
+// maxWait is the maximum amount of time to wait before inserting ready items
+// into the queue.
 const maxWait = 10 * time.Second
 
-// waitingLoop runs until the workqueue is shutdown and keeps a check on the list of items to be added.
+// waitingLoop runs until the workqueue is shutdown and keeps a check on the
+// list of items to be added.
 func (q *delayingType) waitingLoop() {
 	defer utilruntime.HandleCrash()
 
@@ -239,9 +245,11 @@ func (q *delayingType) waitingLoop() {
 	}
 }
 
-// insert adds the entry to the priority queue, or updates the readyAt if it already exists in the queue
+// insert adds the entry to the priority queue, or updates the readyAt if it
+// already exists in the queue.
 func insert(q *waitForPriorityQueue, knownEntries map[t]*waitFor, entry *waitFor) {
-	// if the entry already exists, update the time only if it would cause the item to be queued sooner
+	// if the entry already exists, update the time only if it would cause the
+	// item to be queued sooner
 	existing, exists := knownEntries[entry.data]
 	if exists {
 		if existing.readyAt.After(entry.readyAt) {

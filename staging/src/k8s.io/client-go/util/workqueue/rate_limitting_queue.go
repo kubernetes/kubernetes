@@ -16,24 +16,28 @@ limitations under the License.
 
 package workqueue
 
-// RateLimitingInterface is an interface that rate limits items being added to the queue.
+// RateLimitingInterface is an interface that rate-limits items being added to
+// the queue.
 type RateLimitingInterface interface {
 	DelayingInterface
 
-	// AddRateLimited adds an item to the workqueue after the rate limiter says its ok
+	// AddRateLimited adds an item to the workqueue at the time determined by
+	// the rate limiter.
 	AddRateLimited(item interface{})
 
-	// Forget indicates that an item is finished being retried.  Doesn't matter whether its for perm failing
-	// or for success, we'll stop the rate limiter from tracking it.  This only clears the `rateLimiter`, you
+	// Forget indicates that an item is finished being retried.  Doesn't
+	// matter whether its for perm failing or for success, we'll stop the rate
+	// limiter from tracking it. This only clears the `rateLimiter`, you
 	// still have to call `Done` on the queue.
 	Forget(item interface{})
 
-	// NumRequeues returns back how many times the item was requeued
+	// NumRequeues returns the number of times the item has been requeued.
 	NumRequeues(item interface{}) int
 }
 
-// NewRateLimitingQueue constructs a new workqueue with rateLimited queuing ability
-// Remember to call Forget!  If you don't, you may end up tracking failures forever.
+// NewRateLimitingQueue constructs a new workqueue with rate-limited queuing
+// ability. Remember to call Forget! If you don't, you may end up tracking
+// failures forever.
 func NewRateLimitingQueue(rateLimiter RateLimiter) RateLimitingInterface {
 	return &rateLimitingType{
 		DelayingInterface: NewDelayingQueue(),
@@ -41,6 +45,9 @@ func NewRateLimitingQueue(rateLimiter RateLimiter) RateLimitingInterface {
 	}
 }
 
+// NewNamedRateLimitingQueue constructs a new workqueue with rateLimited
+// queuing ability. Remember to call Forget!  If you don't, you may end up
+// tracking failures forever.
 func NewNamedRateLimitingQueue(rateLimiter RateLimiter, name string) RateLimitingInterface {
 	return &rateLimitingType{
 		DelayingInterface: NewNamedDelayingQueue(name),
@@ -48,14 +55,14 @@ func NewNamedRateLimitingQueue(rateLimiter RateLimiter, name string) RateLimitin
 	}
 }
 
-// rateLimitingType wraps an Interface and provides rateLimited re-enquing
+// rateLimitingType wraps a DelayingInterface and provides rate-limited re-
+// queuing.
 type rateLimitingType struct {
 	DelayingInterface
 
 	rateLimiter RateLimiter
 }
 
-// AddRateLimited AddAfter's the item based on the time when the rate limiter says its ok
 func (q *rateLimitingType) AddRateLimited(item interface{}) {
 	q.DelayingInterface.AddAfter(item, q.rateLimiter.When(item))
 }

@@ -20,6 +20,7 @@ import (
 	"sync"
 )
 
+// Interface defines the basic operations of a work queue.
 type Interface interface {
 	Add(item interface{})
 	Len() int
@@ -34,6 +35,7 @@ func New() *Type {
 	return NewNamed("")
 }
 
+// NewNamed constructs a new work queue with the given name (see the package comment).
 func NewNamed(name string) *Type {
 	return &Type{
 		dirty:      set{},

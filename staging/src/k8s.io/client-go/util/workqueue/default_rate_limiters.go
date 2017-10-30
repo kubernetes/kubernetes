@@ -27,15 +27,18 @@ import (
 type RateLimiter interface {
 	// When gets an item and gets to decide how long that item should wait
 	When(item interface{}) time.Duration
-	// Forget indicates that an item is finished being retried.  Doesn't matter whether its for perm failing
-	// or for success, we'll stop tracking it
+	// Forget indicates that an item is finished being retried.  Forget should
+	// be called when it is desired that the RateLimiter stop tracking an
+	// item, whether processing the item succeeded or failed permanently.
 	Forget(item interface{})
-	// NumRequeues returns back how many failures the item has had
+	// NumRequeues returns the number of times an item has been requeued.
 	NumRequeues(item interface{}) int
 }
 
-// DefaultControllerRateLimiter is a no-arg constructor for a default rate limiter for a workqueue.  It has
-// both overall and per-item rate limitting.  The overall is a token bucket and the per-item is exponential
+// DefaultControllerRateLimiter is a no-arg constructor for a default
+// RateLimiter for a workqueue. It has both overall and per-item rate
+// limiting. The overall rate limit is implemented as a token bucket; the per-
+// item rate limit is exponential.
 func DefaultControllerRateLimiter() RateLimiter {
 	return NewMaxOfRateLimiter(
 		NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
@@ -44,7 +47,8 @@ func DefaultControllerRateLimiter() RateLimiter {
 	)
 }
 
-// BucketRateLimiter adapts a standard bucket to the workqueue ratelimiter API
+// BucketRateLimiter adapts a standard bucket to the workqueue RateLimiter
+// API.
 type BucketRateLimiter struct {
 	*ratelimit.Bucket
 }
@@ -74,6 +78,8 @@ type ItemExponentialFailureRateLimiter struct {
 
 var _ RateLimiter = &ItemExponentialFailureRateLimiter{}
 
+// NewItemExponentatialFailureRateLimiter constructs an exponential rate
+// limiter with the given base and max delays.
 func NewItemExponentialFailureRateLimiter(baseDelay time.Duration, maxDelay time.Duration) RateLimiter {
 	return &ItemExponentialFailureRateLimiter{
 		failures:  map[interface{}]int{},
@@ -82,6 +88,8 @@ func NewItemExponentialFailureRateLimiter(baseDelay time.Duration, maxDelay time
 	}
 }
 
+// DefaultItemBasedRateLimiter returns a default configuration of an item rate
+// limiter.
 func DefaultItemBasedRateLimiter() RateLimiter {
 	return NewItemExponentialFailureRateLimiter(time.Millisecond, 1000*time.Second)
 }
@@ -121,18 +129,26 @@ func (r *ItemExponentialFailureRateLimiter) Forget(item interface{}) {
 	delete(r.failures, item)
 }
 
-// ItemFastSlowRateLimiter does a quick retry for a certain number of attempts, then a slow retry after that
+// ItemFastSlowRateLimiter does a quick retry for a certain number of
+// attempts, then a slow retry after that.
 type ItemFastSlowRateLimiter struct {
 	failuresLock sync.Mutex
-	failures     map[interface{}]int
+	// failures maintains a count of the failures per item.
+	failures map[interface{}]int
 
+	// maxFastAttempts is the number of fast retries to make before switching
+	// to slow retries.
 	maxFastAttempts int
-	fastDelay       time.Duration
-	slowDelay       time.Duration
+	// fastDelay is the fast delay duration.
+	fastDelay time.Duration
+	// slowDelay is the slow delay duration.
+	slowDelay time.Duration
 }
 
 var _ RateLimiter = &ItemFastSlowRateLimiter{}
 
+// NewItemFastSlowRateLimiter constructs a fast-slow rate limiter with the
+// given fast and slow delays and number of fast retry attempts.
 func NewItemFastSlowRateLimiter(fastDelay, slowDelay time.Duration, maxFastAttempts int) RateLimiter {
 	return &ItemFastSlowRateLimiter{
 		failures:        map[interface{}]int{},
@@ -169,9 +185,10 @@ func (r *ItemFastSlowRateLimiter) Forget(item interface{}) {
 	delete(r.failures, item)
 }
 
-// MaxOfRateLimiter calls every RateLimiter and returns the worst case response
-// When used with a token bucket limiter, the burst could be apparently exceeded in cases where particular items
-// were separately delayed a longer time.
+// MaxOfRateLimiter calls every RateLimiter and returns the worst case
+// response. When used with a token bucket limiter, the burst could be
+// apparently exceeded in cases where particular items were separately delayed
+// a longer time.
 type MaxOfRateLimiter struct {
 	limiters []RateLimiter
 }
@@ -188,6 +205,8 @@ func (r *MaxOfRateLimiter) When(item interface{}) time.Duration {
 	return ret
 }
 
+// NewMaxOfRateLimiter constructs a rate limiter that returns the maximum
+// value returned from the given list of rate limiters.
 func NewMaxOfRateLimiter(limiters ...RateLimiter) RateLimiter {
 	return &MaxOfRateLimiter{limiters: limiters}
 }
