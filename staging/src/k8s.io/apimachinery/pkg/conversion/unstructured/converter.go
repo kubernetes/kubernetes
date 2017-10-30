@@ -740,6 +740,9 @@ func structToUnstructured(sv, dv reflect.Value) error {
 			// omitempty fields should be ignored.
 			continue
 		}
+		if fv.Type().Kind() == reflect.Ptr {
+			fv = fv.Elem()
+		}
 		if len(fieldInfo.name) == 0 {
 			// This field is inlined.
 			if err := toUnstructured(fv, dv); err != nil {
