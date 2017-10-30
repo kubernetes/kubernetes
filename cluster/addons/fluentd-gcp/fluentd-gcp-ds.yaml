@@ -10,13 +10,13 @@ metadata:
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
-  name: fluentd-gcp-v2.0.9
+  name: fluentd-gcp-v2.0.10
   namespace: kube-system
   labels:
     k8s-app: fluentd-gcp
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
-    version: v2.0.9
+    version: v2.0.10
 spec:
   updateStrategy:
     type: RollingUpdate
@@ -25,7 +25,7 @@ spec:
       labels:
         k8s-app: fluentd-gcp
         kubernetes.io/cluster-service: "true"
-        version: v2.0.9
+        version: v2.0.10
       # This annotation ensures that fluentd does not get evicted if the node
       # supports critical pod annotation based priority scheme.
       # Note that this does not guarantee admission on the nodes (#40573).
@@ -36,7 +36,7 @@ spec:
       dnsPolicy: Default
       containers:
       - name: fluentd-gcp
-        image: gcr.io/google-containers/fluentd-gcp:2.0.9
+        image: gcr.io/google-containers/fluentd-gcp:2.0.10
         env:
         - name: FLUENTD_ARGS
           value: --no-supervisor -q
