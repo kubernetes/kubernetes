@@ -981,6 +981,13 @@ function start-kubelet {
   if [[ -n "${ROTATE_CERTIFICATES:-}" ]]; then
     flags+=" --rotate-certificates=true"
   fi
+  if [[ -n "${CONTAINER_RUNTIME:-}" ]]; then
+    flags+=" --container-runtime=${CONTAINER_RUNTIME}"
+  fi
+  if [[ -n "${CONTAINER_RUNTIME_ENDPOINT:-}" ]]; then
+    flags+=" --container-runtime-endpoint=${CONTAINER_RUNTIME_ENDPOINT}"
+  fi
+
 
   local -r kubelet_env_file="/etc/default/kubelet"
   echo "KUBELET_OPTS=\"${flags}\"" > "${kubelet_env_file}"
@@ -1014,6 +1021,7 @@ function start-node-problem-detector {
   echo "Start node problem detector"
   local -r npd_bin="${KUBE_HOME}/bin/node-problem-detector"
   local -r km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor.json"
+  # TODO(random-liu): Handle this for alternative container runtime.
   local -r dm_config="${KUBE_HOME}/node-problem-detector/config/docker-monitor.json"
   echo "Using node problem detector binary at ${npd_bin}"
   local flags="${NPD_TEST_LOG_LEVEL:-"--v=2"} ${NPD_TEST_ARGS:-}"
@@ -2009,7 +2017,9 @@ fi
 
 override-kubectl
 # Run the containerized mounter once to pre-cache the container image.
-assemble-docker-flags
+if [[ "${CONTAINER_RUNTIME:-}" == "docker" ]]; then
+  assemble-docker-flags
+fi
 start-kubelet
 
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
