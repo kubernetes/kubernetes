@@ -27,7 +27,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/emicklei/go-restful-swagger12"
@@ -129,8 +128,6 @@ type Config struct {
 
 	// BuildHandlerChainFunc allows you to build custom handler chains by decorating the apiHandler.
 	BuildHandlerChainFunc func(apiHandler http.Handler, c *Config) (secure http.Handler)
-	// HandlerChainWaitGroup allows you to wait for all chain handlers exit after the server shutdown.
-	HandlerChainWaitGroup *sync.WaitGroup
 	// DiscoveryAddresses is used to build the IPs pass to discovery. If nil, the ExternalAddress is
 	// always reported
 	DiscoveryAddresses discovery.Addresses
@@ -239,7 +236,6 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		ReadWritePort:                443,
 		RequestContextMapper:         apirequest.NewRequestContextMapper(),
 		BuildHandlerChainFunc:        DefaultBuildHandlerChain,
-		HandlerChainWaitGroup:        new(sync.WaitGroup),
 		LegacyAPIGroupPrefixes:       sets.NewString(DefaultLegacyAPIPrefix),
 		DisabledPostStartHooks:       sets.NewString(),
 		HealthzChecks:                []healthz.HealthzChecker{healthz.PingHealthz},
@@ -450,10 +446,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		Serializer:             c.Serializer,
 		AuditBackend:           c.AuditBackend,
 		delegationTarget:       delegationTarget,
-		HandlerChainWaitGroup:  c.HandlerChainWaitGroup,
 
 		minRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
-		shutdownTimeout:   c.RequestTimeout,
 
 		SecureServingInfo: c.SecureServingInfo,
 		ExternalAddress:   c.ExternalAddress,
@@ -494,7 +488,6 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 			return nil, err
 		}
 	}
-
 	for _, delegateCheck := range delegationTarget.HealthzChecks() {
 		skip := false
 		for _, existingCheck := range c.HealthzChecks {
@@ -542,7 +535,6 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithAuthentication(handler, c.RequestContextMapper, c.Authenticator, failedHandler)
 	handler = genericfilters.WithCORS(handler, c.CorsAllowedOriginList, nil, nil, nil, "true")
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.RequestContextMapper, c.LongRunningFunc, c.RequestTimeout)
-	handler = genericfilters.WithWaitGroup(handler, c.RequestContextMapper, c.LongRunningFunc, c.HandlerChainWaitGroup)
 	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver, c.RequestContextMapper)
 	handler = apirequest.WithRequestContext(handler, c.RequestContextMapper)
 	handler = genericfilters.WithPanicRecovery(handler)

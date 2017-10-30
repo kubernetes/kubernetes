@@ -156,7 +156,7 @@ func CreateServerChain(runOptions *options.ServerRunOptions, stopCh <-chan struc
 	if len(os.Getenv("KUBE_API_VERSIONS")) > 0 {
 		if insecureServingOptions != nil {
 			insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(kubeAPIServer.GenericAPIServer.UnprotectedHandler(), kubeAPIServerConfig.GenericConfig)
-			if err := kubeserver.NonBlockingRun(insecureServingOptions, insecureHandlerChain, kubeAPIServerConfig.GenericConfig.RequestTimeout, stopCh); err != nil {
+			if err := kubeserver.NonBlockingRun(insecureServingOptions, insecureHandlerChain, stopCh); err != nil {
 				return nil, err
 			}
 		}
@@ -186,7 +186,7 @@ func CreateServerChain(runOptions *options.ServerRunOptions, stopCh <-chan struc
 
 	if insecureServingOptions != nil {
 		insecureHandlerChain := kubeserver.BuildInsecureHandlerChain(aggregatorServer.GenericAPIServer.UnprotectedHandler(), kubeAPIServerConfig.GenericConfig)
-		if err := kubeserver.NonBlockingRun(insecureServingOptions, insecureHandlerChain, kubeAPIServerConfig.GenericConfig.RequestTimeout, stopCh); err != nil {
+		if err := kubeserver.NonBlockingRun(insecureServingOptions, insecureHandlerChain, stopCh); err != nil {
 			return nil, err
 		}
 	}
@@ -488,7 +488,6 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to initialize admission: %v", err)
 	}
-
 	return genericConfig, sharedInformers, versionedInformers, insecureServingOptions, serviceResolver, nil
 }
 
