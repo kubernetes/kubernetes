@@ -83,7 +83,7 @@ func TestPluginEmptyRootContext(t *testing.T) {
 
 func TestPluginHugetlbfs(t *testing.T) {
 	doTestPlugin(t, pluginTestConfig{
-		medium:                        v1.StorageMediumHugepages,
+		medium:                        v1.StorageMediumHugePages,
 		expectedSetupMounts:           1,
 		expectedTeardownMounts:        0,
 		shouldBeMountedBeforeTeardown: true,
