@@ -23,6 +23,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+### Hardcoded constants
+DEFAULT_CNI_TAR="cni-0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff.tar.gz"
+DEFAULT_CNI_SHA1="1d9788b0f5420e1a219aad2cb8681823fc515e7c" 
+DEFAULT_NPD_VERSION="v0.4.1"
+DEFAULT_NPD_SHA1="a57a3fe64cab8a18ec654f5cef0aec59dae62568"
+DEFAULT_MOUNTER_TAR_SHA="8003b798cf33c7f91320cd6ee5cec4fa22244571"
+###
+
 function set-broken-motd {
   cat > /etc/motd <<EOF
 Broken (or in progress) Kubernetes node setup! Check the cluster initialization status
@@ -122,7 +130,7 @@ function split-commas {
 
 function install-gci-mounter-tools {
   CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
-  local -r mounter_tar_sha="8003b798cf33c7f91320cd6ee5cec4fa22244571"
+  local -r mounter_tar_sha="${DEFAULT_MOUNTER_TAR_SHA}"
   if is-preloaded "mounter" "${mounter_tar_sha}"; then
     echo "mounter is preloaded."
     return
@@ -147,8 +155,8 @@ function install-node-problem-detector {
       local -r npd_version="${NODE_PROBLEM_DETECTOR_VERSION}"
       local -r npd_sha1="${NODE_PROBLEM_DETECTOR_TAR_HASH}"
   else
-      local -r npd_version="v0.4.1"
-      local -r npd_sha1="a57a3fe64cab8a18ec654f5cef0aec59dae62568"
+      local -r npd_version="${DEFAULT_NPD_VERSION}"
+      local -r npd_sha1="${DEFAULT_NPD_SHA1}"
   fi
 
   if is-preloaded "node-problem-detector" "${npd_sha1}"; then
@@ -171,8 +179,8 @@ function install-node-problem-detector {
 
 function install-cni-binaries {
   #TODO(andyzheng0831): We should make the cni version number as a k8s env variable.
-  local -r cni_tar="cni-0799f5732f2a11b329d9e3d51b9c8f2e3759f2ff.tar.gz"
-  local -r cni_sha1="1d9788b0f5420e1a219aad2cb8681823fc515e7c"
+  local -r cni_tar="${DEFAULT_CNI_TAR}"
+  local -r cni_sha1="${DEFAULT_CNI_SHA1}"
   if is-preloaded "${cni_tar}" "${cni_sha1}"; then
     echo "${cni_tar} is preloaded."
     return
