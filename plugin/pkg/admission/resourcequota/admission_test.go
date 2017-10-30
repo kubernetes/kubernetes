@@ -135,7 +135,7 @@ func TestAdmissionIgnoresDelete(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -171,7 +171,7 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -216,7 +216,7 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -300,7 +300,7 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -407,7 +407,7 @@ func TestAdmitHandlesNegativePVCUpdates(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -474,7 +474,7 @@ func TestAdmitHandlesPVCUpdates(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -573,7 +573,7 @@ func TestAdmitHandlesCreatingUpdates(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -668,7 +668,7 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -713,7 +713,7 @@ func TestAdmitEnforceQuotaConstraints(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -768,7 +768,7 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -835,7 +835,7 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -941,7 +941,7 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -1034,7 +1034,7 @@ func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -1120,7 +1120,7 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -1166,7 +1166,7 @@ func TestAdmitRejectsNegativeUsage(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -1213,7 +1213,7 @@ func TestAdmitWhenUnrelatedResourceExceedsQuota(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -1250,7 +1250,7 @@ func TestAdmitLimitedResourceNoQuota(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -1284,7 +1284,7 @@ func TestAdmitLimitedResourceNoQuotaIgnoresNonMatchingResources(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -1331,7 +1331,7 @@ func TestAdmitLimitedResourceWithQuota(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -1390,7 +1390,7 @@ func TestAdmitLimitedResourceWithMultipleQuota(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -1439,7 +1439,7 @@ func TestAdmitLimitedResourceWithQuotaThatDoesNotCover(t *testing.T) {
 	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
 	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
