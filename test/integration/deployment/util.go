@@ -211,38 +211,46 @@ func markPodReady(c clientset.Interface, ns string, pod *v1.Pod) error {
 	return err
 }
 
-// markUpdatedPodsReady manually marks updated Deployment pods status to ready
+// markUpdatedPodsReady manually marks updated Deployment pods status to ready,
+// until the deployment is complete
 func (d *deploymentTester) markUpdatedPodsReady() {
 	ns := d.deployment.Namespace
-	var readyPods int32
 	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		readyPods = 0
+		// We're done when the deployment is complete
+		if completed, err := d.deploymentComplete(); err != nil {
+			return false, err
+		} else if completed {
+			return true, nil
+		}
+		// Otherwise, mark remaining pods as ready
 		pods, err := d.listUpdatedPods()
 		if err != nil {
 			d.t.Log(err)
 			return false, nil
 		}
-		if len(pods) != int(*d.deployment.Spec.Replicas) {
-			d.t.Logf("%d/%d of deployment pods are created", len(pods), *d.deployment.Spec.Replicas)
-			return false, nil
-		}
+		d.t.Logf("%d/%d of deployment pods are created", len(pods), *d.deployment.Spec.Replicas)
 		for i := range pods {
 			pod := pods[i]
 			if podutil.IsPodReady(&pod) {
-				readyPods++
 				continue
 			}
 			if err = markPodReady(d.c, ns, &pod); err != nil {
 				d.t.Logf("failed to update Deployment pod %s, will retry later: %v", pod.Name, err)
-			} else {
-				readyPods++
 			}
 		}
-		return readyPods >= *d.deployment.Spec.Replicas, nil
+		return false, nil
 	})
 	if err != nil {
 		d.t.Fatalf("failed to mark updated Deployment pods to ready: %v", err)
 	}
+}
+
+func (d *deploymentTester) deploymentComplete() (bool, error) {
+	latest, err := d.c.ExtensionsV1beta1().Deployments(d.deployment.Namespace).Get(d.deployment.Name, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	return deploymentutil.DeploymentComplete(d.deployment, &latest.Status), nil
 }
 
 // Waits for the deployment to complete, and check rolling update strategy isn't broken at any times.
