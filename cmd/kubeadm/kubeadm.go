@@ -23,6 +23,7 @@ import (
 )
 
 func main() {
+	/* testing */
 	if err := app.Run(); err != nil {
 		os.Exit(1)
 	}

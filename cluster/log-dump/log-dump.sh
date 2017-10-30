@@ -22,6 +22,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+set -x
+echo "======================== in log-dump.sh ========================="
+env
+
 readonly report_dir="${1:-_artifacts}"
 readonly gcs_artifacts_dir="${2:-}"
 readonly logexporter_namespace="${3:-logexporter}"
@@ -151,7 +155,8 @@ function save-logs() {
     fi
     local -r services=( ${systemd_services} ${opt_systemd_services} ${LOG_DUMP_SAVE_SERVICES:-} )
 
-    if log-dump-ssh "${node_name}" "command -v journalctl" &> /dev/null; then
+    if log-dump-ssh "${nodename}" "command -v journalctl" &> /dev/null; then
+        log-dump-ssh "${nodename}" "sudo systemctl list-unit-files" > "${dir}/systemctl-services.log" || true
         if [[ "${on_master}" == "true" ]]; then
           log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-master-installation.service" > "${dir}/kube-master-installation.log" || true
           log-dump-ssh "${node_name}" "sudo journalctl --output=short-precise -u kube-master-configuration.service" > "${dir}/kube-master-configuration.log" || true
