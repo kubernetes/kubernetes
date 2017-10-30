@@ -84,7 +84,7 @@ func testGetOpenAPIDefinitions(ref openapi.ReferenceCallback) map[string]openapi
 
 // setUp is a convience function for setting up for (most) tests.
 func setUp(t *testing.T) (*etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	etcdServer, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, scheme)
+	etcdServer, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 
 	config := NewConfig(codecs)
 	config.PublicAddress = net.ParseIP("192.168.10.4")
