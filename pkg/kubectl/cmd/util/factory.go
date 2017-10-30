@@ -140,8 +140,6 @@ type ClientAccessFactory interface {
 	// BindExternalFlags adds any flags defined by external projects (not part of pflags)
 	BindExternalFlags(flags *pflag.FlagSet)
 
-	// TODO: Break the dependency on cmd here.
-	DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *printers.PrintOptions
 	// DefaultResourceFilterFunc returns a collection of FilterFuncs suitable for filtering specific resource types.
 	DefaultResourceFilterFunc() kubectl.Filters
 
@@ -232,13 +230,12 @@ type BuilderFactory interface {
 	// PrinterForCommand returns the default printer for the command. It requires that certain options
 	// are declared on the command (see AddPrinterFlags). Returns a printer, or an error if a printer
 	// could not be found.
-	// TODO: Break the dependency on cmd here.
-	PrinterForCommand(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error)
+	PrinterForOptions(options printers.PrintOptions) (printers.ResourcePrinter, error)
 	// PrinterForMapping returns a printer suitable for displaying the provided resource type.
 	// Requires that printer flags have been added to cmd (see AddPrinterFlags).
 	// Returns a printer, true if the printer is generic (is not internal), or
 	// an error if a printer could not be found.
-	PrinterForMapping(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error)
+	PrinterForMapping(options printers.PrintOptions, mapping *meta.RESTMapping) (printers.ResourcePrinter, error)
 	// PrintObject prints an api object given command line flags to modify the output format
 	PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	// PrintResourceInfoForCommand receives a *cobra.Command and a *resource.Info and

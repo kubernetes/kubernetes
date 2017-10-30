@@ -47,7 +47,7 @@ func NewBuilderFactory(clientAccessFactory ClientAccessFactory, objectMappingFac
 	return f
 }
 
-func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error) {
+func (f *ring2Factory) PrinterForOptions(options printers.PrintOptions) (printers.ResourcePrinter, error) {
 	var mapper meta.RESTMapper
 	var typer runtime.ObjectTyper
 
@@ -56,27 +56,11 @@ func (f *ring2Factory) PrinterForCommand(cmd *cobra.Command, isLocal bool, outpu
 	// TODO: used by the custom column implementation and the name implementation, break this dependency
 	decoders := []runtime.Decoder{f.clientAccessFactory.Decoder(true), unstructured.UnstructuredJSONScheme}
 	encoder := f.clientAccessFactory.JSONEncoder()
-	return PrinterForCommand(cmd, outputOpts, mapper, typer, encoder, decoders, options)
+	return PrinterForOptions(mapper, typer, encoder, decoders, options)
 }
 
-func (f *ring2Factory) PrinterForMapping(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error) {
-	// Some callers do not have "label-columns" so we can't use the GetFlagStringSlice() helper
-	columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
-	if err != nil {
-		columnLabel = []string{}
-	}
-
-	options := printers.PrintOptions{
-		NoHeaders:          GetFlagBool(cmd, "no-headers"),
-		WithNamespace:      withNamespace,
-		Wide:               GetWideFlag(cmd),
-		ShowAll:            GetFlagBool(cmd, "show-all"),
-		ShowLabels:         GetFlagBool(cmd, "show-labels"),
-		AbsoluteTimestamps: isWatch(cmd),
-		ColumnLabels:       columnLabel,
-	}
-
-	printer, err := f.PrinterForCommand(cmd, isLocal, outputOpts, options)
+func (f *ring2Factory) PrinterForMapping(options printers.PrintOptions, mapping *meta.RESTMapping) (printers.ResourcePrinter, error) {
+	printer, err := f.PrinterForOptions(options)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +124,7 @@ func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta
 		return err
 	}
 
-	printer, err := f.PrinterForMapping(cmd, isLocal, nil, mapping, false)
+	printer, err := f.PrinterForMapping(printers.PrintOptions{}, mapping)
 	if err != nil {
 		return err
 	}
@@ -148,12 +132,12 @@ func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta
 }
 
 func (f *ring2Factory) PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error {
-	printer, err := f.PrinterForCommand(cmd, false, nil, printers.PrintOptions{})
+	printer, err := f.PrinterForOptions(printers.PrintOptions{})
 	if err != nil {
 		return err
 	}
 	if !printer.IsGeneric() {
-		printer, err = f.PrinterForMapping(cmd, false, nil, nil, false)
+		printer, err = f.PrinterForMapping(printers.PrintOptions{}, nil)
 		if err != nil {
 			return err
 		}

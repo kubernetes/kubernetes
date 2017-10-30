@@ -254,12 +254,13 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 		return err
 	}
 
-	printer, err := f.PrinterForCommand(cmd, false, nil, printers.PrintOptions{})
+	printOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
+	printer, err := f.PrinterForOptions(*printOpts)
 	if err != nil {
 		return err
 	}
 
-	filterOpts := f.DefaultResourceFilterOptions(cmd, options.AllNamespaces)
+	filterOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
 	filterFuncs := f.DefaultResourceFilterFunc()
 	if r.TargetsSingleItems() {
 		filterFuncs = nil
@@ -330,14 +331,14 @@ func (options *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []str
 				printWithNamespace = false
 			}
 
-			var outputOpts *printers.OutputOptions
+			printOpts := *cmdutil.ExtractCmdPrintOptions(cmd, printWithNamespace)
 			// if cmd does not specify output format and useOpenAPIPrintColumnFlagLabel flag is true,
 			// then get the default output options for this mapping from OpenAPI schema.
 			if !cmdSpecifiesOutputFmt(cmd) && useOpenAPIPrintColumns {
-				outputOpts, _ = outputOptsForMappingFromOpenAPI(f, mapping)
+				outputOptsForMappingFromOpenAPI(f, mapping, &printOpts)
 			}
 
-			printer, err = f.PrinterForMapping(cmd, false, outputOpts, mapping, printWithNamespace)
+			printer, err = f.PrinterForMapping(printOpts, mapping)
 			if err != nil {
 				if !errs.Has(err.Error()) {
 					errs.Insert(err.Error())
@@ -470,7 +471,7 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 		return i18n.Errorf("watch is only supported on individual resources and resource collections - %d resources were found", len(infos))
 	}
 
-	filterOpts := f.DefaultResourceFilterOptions(cmd, options.AllNamespaces)
+	filterOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
 	filterFuncs := f.DefaultResourceFilterFunc()
 	if r.TargetsSingleItems() {
 		filterFuncs = nil
@@ -478,7 +479,8 @@ func (options *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []s
 
 	info := infos[0]
 	mapping := info.ResourceMapping()
-	printer, err := f.PrinterForMapping(cmd, false, nil, mapping, options.AllNamespaces)
+	printOpts := cmdutil.ExtractCmdPrintOptions(cmd, options.AllNamespaces)
+	printer, err := f.PrinterForMapping(*printOpts, mapping)
 	if err != nil {
 		return err
 	}
@@ -662,43 +664,44 @@ func cmdSpecifiesOutputFmt(cmd *cobra.Command) bool {
 
 // outputOptsForMappingFromOpenAPI looks for the output format metatadata in the
 // openapi schema and returns the output options for the mapping if found.
-func outputOptsForMappingFromOpenAPI(f cmdutil.Factory, mapping *meta.RESTMapping) (*printers.OutputOptions, bool) {
+func outputOptsForMappingFromOpenAPI(f cmdutil.Factory, mapping *meta.RESTMapping, printOpts *printers.PrintOptions) bool {
 
 	// user has not specified any output format, check if OpenAPI has
 	// default specification to print this resource type
 	api, err := f.OpenAPISchema()
 	if err != nil {
 		// Error getting schema
-		return nil, false
+		return false
 	}
 	// Found openapi metadata for this resource
 	schema := api.LookupResource(mapping.GroupVersionKind)
 	if schema == nil {
 		// Schema not found, return empty columns
-		return nil, false
+		return false
 	}
 
 	columns, found := openapi.GetPrintColumns(schema.GetExtensions())
 	if !found {
 		// Extension not found, return empty columns
-		return nil, false
+		return false
 	}
 
-	return outputOptsFromStr(columns)
+	return outputOptsFromStr(columns, printOpts)
 }
 
 // outputOptsFromStr parses the print-column metadata and generates printer.OutputOptions object.
-func outputOptsFromStr(columnStr string) (*printers.OutputOptions, bool) {
+func outputOptsFromStr(columnStr string, printOpts *printers.PrintOptions) bool {
 	if columnStr == "" {
-		return nil, false
+		return false
 	}
 	parts := strings.SplitN(columnStr, "=", 2)
 	if len(parts) < 2 {
-		return nil, false
+		return false
 	}
-	return &printers.OutputOptions{
-		FmtType:          parts[0],
-		FmtArg:           parts[1],
-		AllowMissingKeys: true,
-	}, true
+
+	printOpts.OutputFormatType = parts[0]
+	printOpts.OutputFormatArgument = parts[1]
+	printOpts.AllowMissingKeys = true
+
+	return true
 }
