@@ -3832,6 +3832,19 @@ type NodeStatus struct {
 	// List of volumes that are attached to the node.
 	// +optional
 	VolumesAttached []AttachedVolume `json:"volumesAttached,omitempty" protobuf:"bytes,10,rep,name=volumesAttached"`
+	// List of ports currently used on the Node
+	// +optional
+	UsedPorts []UsedPort `json:"usedPorts,omitempty" protobuf:"bytes,11,rep,name=usedPorts"`
+}
+
+type UsedPort struct {
+	// Protocol for port. Must be UDP or TCP.
+	Protocol Protocol `json:"protocol,omitempty" protobuf:"bytes,1,opt,name=protocol,casttype=Protocol"`
+	// Port number
+	Port int32 `json:"port,omitempty" protobuf:"varint,2,opt,name=port"`
+	// What host IP to bind the port to.
+	// +optional
+	HostIP string `json:"hostIP,omitempty" protobuf:"bytes,3,opt,name=hostIP"`
 }
 
 type UniqueVolumeName string

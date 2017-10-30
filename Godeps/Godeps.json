@@ -1093,6 +1093,10 @@
 			"Rev": "449fdfce4d962303d702fec724ef0ad181c92528"
 		},
 		{
+			"ImportPath": "github.com/drael/GOnetstat",
+			"Rev": "a08125f5157d481dd0d0355c021467bd8c84eb6d"
+		},
+		{
 			"ImportPath": "github.com/elazarl/go-bindata-assetfs",
 			"Rev": "3dcc96556217539f50599357fb481ac0dc7439b9"
 		},

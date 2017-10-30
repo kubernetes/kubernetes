@@ -459,7 +459,7 @@ kube::util::ensure_no_staging_repos_in_gopath() {
   local error=0
   for repo in $(ls ${KUBE_ROOT}/staging/src/k8s.io); do
     if [ -e "${GOPATH}/src/k8s.io/${repo}" ]; then
-      echo "k8s.io/${repo} exists in GOPATH. Remove before running godep-save.sh." 1>&2
+      echo "k8s.io/${repo} exists in GOPATH $GOPATH. Remove before running godep-save.sh." 1>&2
       error=1
     fi
   done

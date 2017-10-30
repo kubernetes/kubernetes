@@ -19,8 +19,11 @@ package kubelet
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"sort"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -427,7 +430,19 @@ func (ls testNodeLister) List(selector labels.Selector) ([]*v1.Node, error) {
 func checkPodStatus(t *testing.T, kl *Kubelet, pod *v1.Pod, phase v1.PodPhase) {
 	status, found := kl.statusManager.GetPodStatus(pod.UID)
 	require.True(t, found, "Status of pod %q is not found in the status map", pod.UID)
-	require.Equal(t, phase, status.Phase)
+	require.Equal(t, phase, status.Phase, "pod status %v", status)
+}
+
+func findAnUnusedPort(protocol string) int {
+	for i := 5000; i < 9000; i++ {
+		listener, err := net.Listen(protocol, ":"+strconv.Itoa(i))
+		if err != nil {
+			continue
+		}
+		listener.Close()
+		return i
+	}
+	return 0
 }
 
 // Tests that we handle port conflicts correctly by setting the failed status in status map.
@@ -448,7 +463,11 @@ func TestHandlePortConflicts(t *testing.T) {
 		},
 	}}
 
-	spec := v1.PodSpec{NodeName: string(kl.nodeName), Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: 80}}}}}
+	port := findAnUnusedPort("tcp")
+	if port == 0 {
+		t.Skip("can't find a unused port")
+	}
+	spec := v1.PodSpec{NodeName: string(kl.nodeName), Containers: []v1.Container{{Ports: []v1.ContainerPort{{HostPort: int32(port), Protocol: v1.ProtocolTCP}}}}}
 	pods := []*v1.Pod{
 		podWithUIDNameNsSpec("123456789", "newpod", "foo", spec),
 		podWithUIDNameNsSpec("987654321", "oldpod", "foo", spec),
@@ -464,7 +483,45 @@ func TestHandlePortConflicts(t *testing.T) {
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, notfittingPod, v1.PodFailed)
-	checkPodStatus(t, kl, fittingPod, v1.PodPending)
+	// Check fit pod status
+	status, found := kl.statusManager.GetPodStatus(fittingPod.UID)
+	require.True(t, found, "Status of pod %q is not found in the status map", fittingPod.UID)
+	if status.Phase != v1.PodPending {
+		// Port maybe taken by others before Admit check, if it's true, skip the test
+		if !strings.Contains(status.Reason, "Port") || !strings.Contains(status.Reason, "already in use") {
+			t.Fatal()
+		}
+	}
+}
+
+func TestHandleUsedPort(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	testKubelet.chainMock()
+	kl := testKubelet.kubelet
+
+	kl.nodeInfo = testNodeInfo{nodes: []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: string(kl.nodeName)},
+			Status: v1.NodeStatus{
+				Allocatable: v1.ResourceList{
+					v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+				},
+			},
+		},
+	}}
+	listener, err := net.Listen("tcp", ":0")
+	assert.Nil(t, err)
+	defer listener.Close()
+	pod := podWithUIDNameNsSpec("123456789", "newpod", "foo", v1.PodSpec{
+		NodeName: string(kl.nodeName),
+		Containers: []v1.Container{{
+			Ports: []v1.ContainerPort{{HostPort: int32(listener.Addr().(*net.TCPAddr).Port),
+				Protocol: v1.ProtocolTCP}}}}})
+
+	kl.HandlePodAdditions([]*v1.Pod{pod})
+	// Pod should fail admit check
+	checkPodStatus(t, kl, pod, v1.PodFailed)
 }
 
 // Tests that we handle host name conflicts correctly by setting the failed status in status map.
