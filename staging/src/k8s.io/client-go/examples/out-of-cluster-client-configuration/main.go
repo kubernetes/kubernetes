@@ -74,9 +74,16 @@ func main() {
 		} else {
 			fmt.Printf("Found pods\n")
 
-			// Example of retrieving pod names and creationtimestamps by iterating through the Items
-			for element := range pods.Items {
-				fmt.Println("Pod name:", pods.Items[element].Name, "Created on:", pods.Items[element].CreationTimestamp)
+			// Example of retrieving pod names, creationtimestamps by iterating through the Items
+			for podindex := range pods.Items {
+				fmt.Println("Pod name:", pods.Items[podindex].Name, "\n",
+					"Created on:", pods.Items[podindex].CreationTimestamp,
+				)
+
+				// Iterate the container image names for each pod
+				for imageindex := range pods.Items[podindex].Spec.Containers {
+					fmt.Println(" Images:", pods.Items[podindex].Spec.Containers[imageindex].Name, "\n")
+				}
 			}
 
 		}

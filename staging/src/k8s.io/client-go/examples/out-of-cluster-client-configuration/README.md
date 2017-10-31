@@ -16,6 +16,7 @@ Make sure your `kubectl` is configured and pointed to a cluster. Run
 Run this application with:
 
     cd out-of-cluster-client-configuration
+    go get -v -u ./...
     go build -o app .
     ./app
 
@@ -24,8 +25,20 @@ cluster, and print the number of nodes in the cluster every 10 seconds:
 
     $ ./app
     There are 3 pods in the cluster
+    Pod name: busybox-4153010557-xm05r
+     Created on: 2017-10-31 17:08:26 +0000 GMT
+     Images: busybox 
+
     There are 3 pods in the cluster
+    Pod name: busybox-4153010557-xm05r
+     Created on: 2017-10-31 17:08:26 +0000 GMT
+     Images: busybox 
+ 
     There are 3 pods in the cluster
+    Pod name: busybox-4153010557-xm05r
+     Created on: 2017-10-31 17:08:26 +0000 GMT
+     Images: busybox 
+ 
     ...
 
 Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to quit this application.
