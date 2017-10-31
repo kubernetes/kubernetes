@@ -17,14 +17,14 @@ limitations under the License.
 package parse
 
 import (
+	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/pkg/kubectl/apply"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
 // typeElement builds a new mapElement from a typeItem
 func (v ElementBuildingVisitor) typeElement(meta apply.FieldMetaImpl, item *typeItem) (*apply.TypeElement, error) {
 	// Function to get the schema of a field from its key
-	var fn schemaFn = func(key string) openapi.Schema {
+	var fn schemaFn = func(key string) proto.Schema {
 		if item.Type != nil && item.Type.Fields != nil {
 			return item.Type.Fields[key]
 		}
@@ -38,5 +38,9 @@ func (v ElementBuildingVisitor) typeElement(meta apply.FieldMetaImpl, item *type
 	}
 
 	// Return the result
-	return &apply.TypeElement{meta, item.MapElementData, values}, nil
+	return &apply.TypeElement{
+		FieldMetaImpl:  meta,
+		MapElementData: item.MapElementData,
+		Values:         values,
+	}, nil
 }

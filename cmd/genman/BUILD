@@ -22,6 +22,7 @@ go_library(
         "//cmd/kube-apiserver/app:go_default_library",
         "//cmd/kube-controller-manager/app:go_default_library",
         "//cmd/kube-proxy/app:go_default_library",
+        "//cmd/kubeadm/app/cmd:go_default_library",
         "//cmd/kubelet/app:go_default_library",
         "//pkg/kubectl/cmd:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",

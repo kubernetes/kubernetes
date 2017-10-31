@@ -91,7 +91,7 @@ type kubenetNetworkPlugin struct {
 	iptables        utiliptables.Interface
 	sysctl          utilsysctl.Interface
 	ebtables        utilebtables.Interface
-	// vendorDir is passed by kubelet network-plugin-dir parameter.
+	// vendorDir is passed by kubelet cni-bin-dir parameter.
 	// kubenet will search for cni binaries in DefaultCNIDir first, then continue to vendorDir.
 	vendorDir         string
 	nonMasqueradeCIDR string

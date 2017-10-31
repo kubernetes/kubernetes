@@ -18,13 +18,17 @@ package e2e_node
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path"
+	"path/filepath"
 	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e_node/services"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -256,11 +260,12 @@ while true; do sleep 1; done
 			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
 			// is v1.PullAlways, so it won't be blocked by framework image white list check.
 			for _, testCase := range []struct {
-				description string
-				image       string
-				secret      bool
-				phase       v1.PodPhase
-				waiting     bool
+				description        string
+				image              string
+				secret             bool
+				credentialProvider bool
+				phase              v1.PodPhase
+				waiting            bool
 			}{
 				{
 					description: "should not be able to pull image from invalid registry",
@@ -299,6 +304,13 @@ while true; do sleep 1; done
 					phase:       v1.PodRunning,
 					waiting:     false,
 				},
+				{
+					description:        "should be able to pull from private registry with credential provider",
+					image:              "gcr.io/authenticated-image-pulling/alpine:3.1",
+					credentialProvider: true,
+					phase:              v1.PodRunning,
+					waiting:            false,
+				},
 			} {
 				testCase := testCase
 				It(testCase.description+" [Conformance]", func() {
@@ -318,10 +330,16 @@ while true; do sleep 1; done
 					if testCase.secret {
 						secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
 						By("create image pull secret")
-						_, err := f.ClientSet.Core().Secrets(f.Namespace.Name).Create(secret)
+						_, err := f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret)
 						Expect(err).NotTo(HaveOccurred())
-						defer f.ClientSet.Core().Secrets(f.Namespace.Name).Delete(secret.Name, nil)
+						defer f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Delete(secret.Name, nil)
 						container.ImagePullSecrets = []string{secret.Name}
+					}
+					if testCase.credentialProvider {
+						configFile := filepath.Join(services.KubeletRootDirectory, "config.json")
+						err := ioutil.WriteFile(configFile, []byte(auth), 0644)
+						Expect(err).NotTo(HaveOccurred())
+						defer os.Remove(configFile)
 					}
 					// checkContainerStatus checks whether the container status matches expectation.
 					checkContainerStatus := func() error {

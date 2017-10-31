@@ -30,6 +30,7 @@ filegroup(
         "//pkg/proxy/healthcheck:all-srcs",
         "//pkg/proxy/iptables:all-srcs",
         "//pkg/proxy/ipvs:all-srcs",
+        "//pkg/proxy/metrics:all-srcs",
         "//pkg/proxy/userspace:all-srcs",
         "//pkg/proxy/util:all-srcs",
         "//pkg/proxy/winkernel:all-srcs",

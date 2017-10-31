@@ -355,6 +355,20 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				r.Keyring = "/etc/ceph/keyring"
 			}
 		},
+		func(r *api.RBDPersistentVolumeSource, c fuzz.Continue) {
+			r.RBDPool = c.RandString()
+			if r.RBDPool == "" {
+				r.RBDPool = "rbd"
+			}
+			r.RadosUser = c.RandString()
+			if r.RadosUser == "" {
+				r.RadosUser = "admin"
+			}
+			r.Keyring = c.RandString()
+			if r.Keyring == "" {
+				r.Keyring = "/etc/ceph/keyring"
+			}
+		},
 		func(obj *api.HostPathVolumeSource, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)
 			types := []api.HostPathType{api.HostPathUnset, api.HostPathDirectoryOrCreate, api.HostPathDirectory,
@@ -396,14 +410,16 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 		},
 		func(sio *api.ScaleIOVolumeSource, c fuzz.Continue) {
-			sio.ProtectionDomain = c.RandString()
-			if sio.ProtectionDomain == "" {
-				sio.ProtectionDomain = "default"
+			sio.StorageMode = c.RandString()
+			if sio.StorageMode == "" {
+				sio.StorageMode = "ThinProvisioned"
 			}
-			sio.StoragePool = c.RandString()
-			if sio.StoragePool == "" {
-				sio.StoragePool = "default"
+			sio.FSType = c.RandString()
+			if sio.FSType == "" {
+				sio.FSType = "xfs"
 			}
+		},
+		func(sio *api.ScaleIOPersistentVolumeSource, c fuzz.Continue) {
 			sio.StorageMode = c.RandString()
 			if sio.StorageMode == "" {
 				sio.StorageMode = "ThinProvisioned"

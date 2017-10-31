@@ -1,7 +1,7 @@
 // +build windows
 
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -93,7 +93,7 @@ type serviceInfo struct {
 	targetPort               int
 	loadBalancerStatus       api.LoadBalancerStatus
 	sessionAffinityType      api.ServiceAffinity
-	stickyMaxAgeMinutes      int
+	stickyMaxAgeSeconds      int
 	externalIPs              []*externalIPInfo
 	loadBalancerIngressIPs   []*loadBalancerIngressInfo
 	loadBalancerSourceRanges []string
@@ -165,6 +165,12 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *api.ServicePort, se
 		onlyNodeLocalEndpoints = true
 	}
 
+	// set default session sticky max age 180min=10800s
+	stickyMaxAgeSeconds := 10800
+	if service.Spec.SessionAffinity == api.ServiceAffinityClientIP {
+		// Kube-apiserver side guarantees SessionAffinityConfig won't be nil when session affinity type is ClientIP
+		stickyMaxAgeSeconds = int(*service.Spec.SessionAffinityConfig.ClientIP.TimeoutSeconds)
+	}
 	info := &serviceInfo{
 		clusterIP:  net.ParseIP(service.Spec.ClusterIP),
 		port:       int(port.Port),
@@ -174,7 +180,7 @@ func newServiceInfo(svcPortName proxy.ServicePortName, port *api.ServicePort, se
 		// Deep-copy in case the service instance changes
 		loadBalancerStatus:       *helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer),
 		sessionAffinityType:      service.Spec.SessionAffinity,
-		stickyMaxAgeMinutes:      180, // TODO: paramaterize this in the API.
+		stickyMaxAgeSeconds:      stickyMaxAgeSeconds,
 		loadBalancerSourceRanges: make([]string, len(service.Spec.LoadBalancerSourceRanges)),
 		onlyNodeLocalEndpoints:   onlyNodeLocalEndpoints,
 	}
@@ -925,8 +931,7 @@ func serviceToServiceMap(service *api.Service) proxyServiceMap {
 	return serviceMap
 }
 
-// This is where all of the hns -save/restore calls happen.
-// The only other hns rules are those that are setup in iptablesInit()
+// This is where all of the hns save/restore calls happen.
 // assumes proxier.mu is held
 func (proxier *Proxier) syncProxyRules() {
 	proxier.mu.Lock()
@@ -970,53 +975,52 @@ func (proxier *Proxier) syncProxyRules() {
 		var hnsEndpoints []hcsshim.HNSEndpoint
 		glog.V(4).Infof("====Applying Policy for %s====", svcName)
 		// Create Remote endpoints for every endpoint, corresponding to the service
-		if len(proxier.endpointsMap[svcName]) > 0 {
-			for _, ep := range proxier.endpointsMap[svcName] {
-				var newHnsEndpoint *hcsshim.HNSEndpoint
-				hnsNetworkName := proxier.network.name
-				var err error
-				if len(ep.hnsID) > 0 {
-					newHnsEndpoint, err = hcsshim.GetHNSEndpointByID(ep.hnsID)
-				}
 
-				if newHnsEndpoint == nil {
-					// First check if an endpoint resource exists for this IP, on the current host
-					// A Local endpoint could exist here already
-					// A remote endpoint was already created and proxy was restarted
-					newHnsEndpoint, err = getHnsEndpointByIpAddress(net.ParseIP(ep.ip), hnsNetworkName)
-				}
-
-				if newHnsEndpoint == nil {
-					if ep.isLocal {
-						glog.Errorf("Local endpoint not found for %v: err : %v on network %s", ep.ip, err, hnsNetworkName)
-						continue
-					}
-					// hns Endpoint resource was not found, create one
-					hnsnetwork, err := hcsshim.GetHNSNetworkByName(hnsNetworkName)
-					if err != nil {
-						glog.Errorf("%v", err)
-						continue
-					}
-
-					hnsEndpoint := &hcsshim.HNSEndpoint{
-						MacAddress: ep.macAddress,
-						IPAddress:  net.ParseIP(ep.ip),
-					}
-
-					newHnsEndpoint, err = hnsnetwork.CreateRemoteEndpoint(hnsEndpoint)
-					if err != nil {
-						glog.Errorf("Remote endpoint creation failed: %v", err)
-						continue
-					}
-				}
-
-				// Save the hnsId for reference
-				LogJson(newHnsEndpoint, "Hns Endpoint resource", 1)
-				hnsEndpoints = append(hnsEndpoints, *newHnsEndpoint)
-				ep.hnsID = newHnsEndpoint.Id
-				ep.refCount++
-				Log(ep, "Endpoint resource found", 3)
+		for _, ep := range proxier.endpointsMap[svcName] {
+			var newHnsEndpoint *hcsshim.HNSEndpoint
+			hnsNetworkName := proxier.network.name
+			var err error
+			if len(ep.hnsID) > 0 {
+				newHnsEndpoint, err = hcsshim.GetHNSEndpointByID(ep.hnsID)
 			}
+
+			if newHnsEndpoint == nil {
+				// First check if an endpoint resource exists for this IP, on the current host
+				// A Local endpoint could exist here already
+				// A remote endpoint was already created and proxy was restarted
+				newHnsEndpoint, err = getHnsEndpointByIpAddress(net.ParseIP(ep.ip), hnsNetworkName)
+			}
+
+			if newHnsEndpoint == nil {
+				if ep.isLocal {
+					glog.Errorf("Local endpoint not found for %v: err: %v on network %s", ep.ip, err, hnsNetworkName)
+					continue
+				}
+				// hns Endpoint resource was not found, create one
+				hnsnetwork, err := hcsshim.GetHNSNetworkByName(hnsNetworkName)
+				if err != nil {
+					glog.Errorf("%v", err)
+					continue
+				}
+
+				hnsEndpoint := &hcsshim.HNSEndpoint{
+					MacAddress: ep.macAddress,
+					IPAddress:  net.ParseIP(ep.ip),
+				}
+
+				newHnsEndpoint, err = hnsnetwork.CreateRemoteEndpoint(hnsEndpoint)
+				if err != nil {
+					glog.Errorf("Remote endpoint creation failed: %v", err)
+					continue
+				}
+			}
+
+			// Save the hnsId for reference
+			LogJson(newHnsEndpoint, "Hns Endpoint resource", 1)
+			hnsEndpoints = append(hnsEndpoints, *newHnsEndpoint)
+			ep.hnsID = newHnsEndpoint.Id
+			ep.refCount++
+			Log(ep, "Endpoint resource found", 3)
 		}
 
 		glog.V(3).Infof("Associated endpoints [%s] for service [%s]", spew.Sdump(hnsEndpoints), svcName)
@@ -1050,7 +1054,7 @@ func (proxier *Proxier) syncProxyRules() {
 		svcInfo.hnsID = hnsLoadBalancer.ID
 		glog.V(3).Infof("Hns LoadBalancer resource created for cluster ip resources %v, Id [%s]", svcInfo.clusterIP, hnsLoadBalancer.ID)
 
-		// If nodePort is speficied, user should be able to use nodeIP:nodePort to reach the backend endpoints
+		// If nodePort is specified, user should be able to use nodeIP:nodePort to reach the backend endpoints
 		if svcInfo.nodePort > 0 {
 			hnsLoadBalancer, err := getHnsLoadBalancer(
 				hnsEndpoints,

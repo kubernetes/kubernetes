@@ -153,11 +153,15 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableLogsHandler, "enable-logs-handler", s.EnableLogsHandler,
 		"If true, install a /logs handler for the apiserver logs.")
 
+	// Deprecated in release 1.9
 	fs.StringVar(&s.SSHUser, "ssh-user", s.SSHUser,
 		"If non-empty, use secure SSH proxy to the nodes, using this user name")
+	fs.MarkDeprecated("ssh-user", "This flag will be removed in a future version.")
 
+	// Deprecated in release 1.9
 	fs.StringVar(&s.SSHKeyfile, "ssh-keyfile", s.SSHKeyfile,
 		"If non-empty, use secure SSH proxy to the nodes, using this user keyfile")
+	fs.MarkDeprecated("ssh-keyfile", "This flag will be removed in a future version.")
 
 	fs.Int64Var(&s.MaxConnectionBytesPerSec, "max-connection-bytes-per-sec", s.MaxConnectionBytesPerSec, ""+
 		"If non-zero, throttle each user connection to this number of bytes/sec. "+
@@ -166,7 +170,7 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.MasterCount, "apiserver-count", s.MasterCount,
 		"The number of apiservers running in the cluster, must be a positive number.")
 
-	fs.StringVar(&s.EndpointReconcilerType, "alpha-endpoint-reconciler-type", string(s.EndpointReconcilerType),
+	fs.StringVar(&s.EndpointReconcilerType, "endpoint-reconciler-type", string(s.EndpointReconcilerType),
 		"Use an endpoint reconciler ("+strings.Join(reconcilers.AllTypes.Names(), ", ")+")")
 
 	// See #14282 for details on how to test/try this option out.

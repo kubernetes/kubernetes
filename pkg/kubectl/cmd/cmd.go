@@ -210,7 +210,6 @@ __custom_func() {
     * certificatesigningrequests (aka 'csr')
     * clusterrolebindings
     * clusterroles
-    * clusters (valid only for federation apiservers)
     * componentstatuses (aka 'cs')
     * configmaps (aka 'cm')
     * controllerrevisions

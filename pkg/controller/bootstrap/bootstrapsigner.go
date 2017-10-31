@@ -99,19 +99,19 @@ func NewBootstrapSigner(cl clientset.Interface, options BootstrapSignerOptions) 
 		secretNamespace: options.TokenSecretNamespace,
 		syncQueue:       workqueue.NewNamed("bootstrap_signer_queue"),
 	}
-	if cl.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("bootstrap_signer", cl.Core().RESTClient().GetRateLimiter())
+	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("bootstrap_signer", cl.CoreV1().RESTClient().GetRateLimiter())
 	}
 	configMapSelector := fields.SelectorFromSet(map[string]string{api.ObjectNameField: options.ConfigMapName})
 	e.configMaps, e.configMapsController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(lo metav1.ListOptions) (runtime.Object, error) {
 				lo.FieldSelector = configMapSelector.String()
-				return e.client.Core().ConfigMaps(options.ConfigMapNamespace).List(lo)
+				return e.client.CoreV1().ConfigMaps(options.ConfigMapNamespace).List(lo)
 			},
 			WatchFunc: func(lo metav1.ListOptions) (watch.Interface, error) {
 				lo.FieldSelector = configMapSelector.String()
-				return e.client.Core().ConfigMaps(options.ConfigMapNamespace).Watch(lo)
+				return e.client.CoreV1().ConfigMaps(options.ConfigMapNamespace).Watch(lo)
 			},
 		},
 		&v1.ConfigMap{},
@@ -127,11 +127,11 @@ func NewBootstrapSigner(cl clientset.Interface, options BootstrapSignerOptions) 
 		&cache.ListWatch{
 			ListFunc: func(lo metav1.ListOptions) (runtime.Object, error) {
 				lo.FieldSelector = secretSelector.String()
-				return e.client.Core().Secrets(e.secretNamespace).List(lo)
+				return e.client.CoreV1().Secrets(e.secretNamespace).List(lo)
 			},
 			WatchFunc: func(lo metav1.ListOptions) (watch.Interface, error) {
 				lo.FieldSelector = secretSelector.String()
-				return e.client.Core().Secrets(e.secretNamespace).Watch(lo)
+				return e.client.CoreV1().Secrets(e.secretNamespace).Watch(lo)
 			},
 		},
 		&v1.Secret{},
@@ -227,7 +227,7 @@ func (e *BootstrapSigner) signConfigMap() {
 }
 
 func (e *BootstrapSigner) updateConfigMap(cm *v1.ConfigMap) {
-	_, err := e.client.Core().ConfigMaps(cm.Namespace).Update(cm)
+	_, err := e.client.CoreV1().ConfigMaps(cm.Namespace).Update(cm)
 	if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
 		glog.V(3).Infof("Error updating ConfigMap: %v", err)
 	}

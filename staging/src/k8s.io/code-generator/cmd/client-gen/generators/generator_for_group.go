@@ -80,7 +80,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	}
 	// allow user to define a group name that's different from the one parsed from the directory.
 	p := c.Universe.Package(path.Vendorless(g.inputPackage))
-	if override := types.ExtractCommentTags("+", p.DocComments)["groupName"]; override != nil {
+	if override := types.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
 		groupName = override[0]
 	}
 

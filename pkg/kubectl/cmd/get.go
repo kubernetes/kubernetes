@@ -51,6 +51,7 @@ type GetOptions struct {
 
 	IgnoreNotFound bool
 	Raw            string
+	ChunkSize      int64
 }
 
 var (
@@ -137,6 +138,7 @@ func NewCmdGet(f cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Comman
 	cmd.Flags().Bool("show-kind", false, "If present, list the resource type for the requested object(s).")
 	cmd.Flags().Bool("all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().BoolVar(&options.IgnoreNotFound, "ignore-not-found", false, "Treat \"resource not found\" as a successful retrieval.")
+	cmd.Flags().Int64Var(&options.ChunkSize, "chunk-size", 500, "Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.")
 	cmd.Flags().StringSliceP("label-columns", "L", []string{}, "Accepts a comma separated list of labels that are going to be presented as columns. Names are case-sensitive. You can also use multiple flag options like -L label1 -L label2...")
 	cmd.Flags().Bool("export", false, "If true, use 'export' for the resources.  Exported resources are stripped of cluster-specific information.")
 	addOpenAPIPrintColumnFlags(cmd)
@@ -223,6 +225,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 			FilenameParam(enforceNamespace, &options.FilenameOptions).
 			SelectorParam(selector).
 			ExportParam(export).
+			RequestChunksOf(options.ChunkSize).
 			IncludeUninitialized(includeUninitialized).
 			ResourceTypeOrNameArgs(true, args...).
 			SingleResourceType().
@@ -244,7 +247,14 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		}
 		info := infos[0]
 		mapping := info.ResourceMapping()
-		printer, err := f.PrinterForMapping(cmd, false, nil, mapping, allNamespaces)
+
+		// no need to print namespace for root-scoped resources
+		printWithNamespace := allNamespaces
+		if mapping != nil && mapping.Scope.Name() == meta.RESTScopeNameRoot {
+			printWithNamespace = false
+		}
+
+		printer, err := f.PrinterForMapping(cmd, false, nil, mapping, printWithNamespace)
 		if err != nil {
 			return err
 		}
@@ -325,6 +335,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		FilenameParam(enforceNamespace, &options.FilenameOptions).
 		SelectorParam(selector).
 		ExportParam(export).
+		RequestChunksOf(options.ChunkSize).
 		IncludeUninitialized(includeUninitialized).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
@@ -493,6 +504,11 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				w.Flush()
 			}
 
+			printWithNamespace := allNamespaces
+			if mapping != nil && mapping.Scope.Name() == meta.RESTScopeNameRoot {
+				printWithNamespace = false
+			}
+
 			var outputOpts *printers.OutputOptions
 			// if cmd does not specify output format and useOpenAPIPrintColumnFlagLabel flag is true,
 			// then get the default output options for this mapping from OpenAPI schema.
@@ -500,7 +516,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				outputOpts, _ = outputOptsForMappingFromOpenAPI(f, mapping)
 			}
 
-			printer, err = f.PrinterForMapping(cmd, false, outputOpts, mapping, allNamespaces)
+			printer, err = f.PrinterForMapping(cmd, false, outputOpts, mapping, printWithNamespace)
 			if err != nil {
 				if !errs.Has(err.Error()) {
 					errs.Insert(err.Error())

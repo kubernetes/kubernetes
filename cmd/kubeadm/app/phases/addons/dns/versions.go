@@ -22,7 +22,7 @@ import (
 
 const (
 	kubeDNSv180AndAboveVersion = "1.14.5"
-	kubeDNSv190AndAboveVersion = "1.14.6"
+	kubeDNSv190AndAboveVersion = "1.14.7"
 
 	kubeDNSProbeSRV = "SRV"
 	kubeDNSProbeA   = "A"
@@ -31,7 +31,7 @@ const (
 // GetKubeDNSVersion returns the right kube-dns version for a specific k8s version
 func GetKubeDNSVersion(kubeVersion *version.Version) string {
 	// v1.8.0+ uses 1.14.5
-	// v1.9.0+ uses 1.14.6
+	// v1.9.0+ uses 1.14.7
 	// In the future when the kube-dns version is bumped at HEAD; add conditional logic to return the right versions
 	// Also, the version might be bumped for different k8s releases on the same branch
 	if kubeVersion.Major() == 1 && kubeVersion.Minor() >= 9 {

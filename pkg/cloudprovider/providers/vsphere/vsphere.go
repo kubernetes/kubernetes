@@ -380,7 +380,35 @@ func (vs *VSphere) ExternalID(nodeName k8stypes.NodeName) (string, error) {
 // InstanceExistsByProviderID returns true if the instance with the given provider id still exists and is running.
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (vs *VSphere) InstanceExistsByProviderID(providerID string) (bool, error) {
-	return false, cloudprovider.NotImplemented
+	vmName := path.Base(providerID)
+	nodeName := vmNameToNodeName(vmName)
+	// Create context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	// Ensure client is logged in and session is valid
+	err := vs.conn.Connect(ctx)
+	if err != nil {
+		return false, err
+	}
+	vm, err := vs.getVMByName(ctx, nodeName)
+	if err != nil {
+		if vclib.IsNotFound(err) {
+			return false, nil
+		}
+		glog.Errorf("Failed to get VM object for node: %q. err: +%v", nodeNameToVMName(nodeName), err)
+		return false, err
+	}
+
+	isActive, err := vm.IsActive(ctx)
+	if err != nil {
+		glog.Errorf("Failed to check whether node %q is active. err: %+v.", nodeNameToVMName(nodeName), err)
+		return false, err
+	}
+	if !isActive {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 // InstanceID returns the cloud provider ID of the node with the specified Name.
@@ -555,7 +583,7 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 			glog.Errorf("Failed to get VM object for node: %q. err: +%v", vSphereInstance, err)
 			return false, err
 		}
-
+		volPath = vclib.RemoveClusterFromVDiskPath(volPath)
 		attached, err := vm.IsDiskAttached(ctx, volPath)
 		if err != nil {
 			glog.Errorf("DiskIsAttached failed to determine whether disk %q is still attached on node %q",
@@ -593,6 +621,7 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 		vmVolumes := make(map[string][]string)
 		for nodeName, volPaths := range nodeVolumes {
 			for i, volPath := range volPaths {
+				volPath = vclib.RemoveClusterFromVDiskPath(volPath)
 				// Get the canonical volume path for volPath.
 				canonicalVolumePath, err := getcanonicalVolumePath(ctx, dc, volPath)
 				if err != nil {

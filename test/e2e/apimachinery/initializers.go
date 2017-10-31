@@ -52,14 +52,14 @@ var _ = SIGDescribe("Initializers [Feature:Initializers]", func() {
 
 		ch := make(chan struct{})
 		go func() {
-			_, err := c.Core().Pods(ns).Create(newUninitializedPod(podName))
+			_, err := c.CoreV1().Pods(ns).Create(newUninitializedPod(podName))
 			Expect(err).NotTo(HaveOccurred())
 			close(ch)
 		}()
 
 		// wait to ensure the scheduler does not act on an uninitialized pod
 		err := wait.PollImmediate(2*time.Second, 15*time.Second, func() (bool, error) {
-			p, err := c.Core().Pods(ns).Get(podName, metav1.GetOptions{})
+			p, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return false, nil
@@ -71,23 +71,23 @@ var _ = SIGDescribe("Initializers [Feature:Initializers]", func() {
 		Expect(err).To(Equal(wait.ErrWaitTimeout))
 
 		// verify that we can update an initializing pod
-		pod, err := c.Core().Pods(ns).Get(podName, metav1.GetOptions{})
+		pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		pod.Annotations = map[string]string{"update-1": "test"}
-		pod, err = c.Core().Pods(ns).Update(pod)
+		pod, err = c.CoreV1().Pods(ns).Update(pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		// verify the list call filters out uninitialized pods
-		pods, err := c.Core().Pods(ns).List(metav1.ListOptions{IncludeUninitialized: true})
+		pods, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{IncludeUninitialized: true})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pods.Items).To(HaveLen(1))
-		pods, err = c.Core().Pods(ns).List(metav1.ListOptions{})
+		pods, err = c.CoreV1().Pods(ns).List(metav1.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pods.Items).To(HaveLen(0))
 
 		// clear initializers
 		pod.Initializers = nil
-		pod, err = c.Core().Pods(ns).Update(pod)
+		pod, err = c.CoreV1().Pods(ns).Update(pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		// pod should now start running
@@ -98,12 +98,12 @@ var _ = SIGDescribe("Initializers [Feature:Initializers]", func() {
 		<-ch
 
 		// verify that we cannot start the pod initializing again
-		pod, err = c.Core().Pods(ns).Get(podName, metav1.GetOptions{})
+		pod, err = c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 		pod.Initializers = &metav1.Initializers{
 			Pending: []metav1.Initializer{{Name: "Other"}},
 		}
-		_, err = c.Core().Pods(ns).Update(pod)
+		_, err = c.CoreV1().Pods(ns).Update(pod)
 		if !errors.IsInvalid(err) || !strings.Contains(err.Error(), "immutable") {
 			Fail(fmt.Sprintf("expected invalid error: %v", err))
 		}
@@ -145,7 +145,7 @@ var _ = SIGDescribe("Initializers [Feature:Initializers]", func() {
 		ch := make(chan struct{})
 		go func() {
 			defer close(ch)
-			_, err := c.Core().Pods(ns).Create(newInitPod(podName))
+			_, err := c.CoreV1().Pods(ns).Create(newInitPod(podName))
 			Expect(err).NotTo(HaveOccurred())
 		}()
 
@@ -153,7 +153,7 @@ var _ = SIGDescribe("Initializers [Feature:Initializers]", func() {
 		By("Waiting until the pod is visible to a client")
 		var pod *v1.Pod
 		err = wait.PollImmediate(2*time.Second, 15*time.Second, func() (bool, error) {
-			pod, err = c.Core().Pods(ns).Get(podName, metav1.GetOptions{IncludeUninitialized: true})
+			pod, err = c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{IncludeUninitialized: true})
 			if errors.IsNotFound(err) {
 				return false, nil
 			}
@@ -170,7 +170,7 @@ var _ = SIGDescribe("Initializers [Feature:Initializers]", func() {
 		// pretend we are an initializer
 		By("Completing initialization")
 		pod.Initializers = nil
-		pod, err = c.Core().Pods(ns).Update(pod)
+		pod, err = c.CoreV1().Pods(ns).Update(pod)
 		Expect(err).NotTo(HaveOccurred())
 
 		// ensure create call returns
@@ -185,7 +185,7 @@ var _ = SIGDescribe("Initializers [Feature:Initializers]", func() {
 		podName = "preinitialized-pod"
 		pod = newUninitializedPod(podName)
 		pod.Initializers.Pending = nil
-		pod, err = c.Core().Pods(ns).Create(pod)
+		pod, err = c.CoreV1().Pods(ns).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pod.Initializers).To(BeNil())
 
@@ -197,7 +197,7 @@ var _ = SIGDescribe("Initializers [Feature:Initializers]", func() {
 			v1.MirrorPodAnnotationKey: "true",
 		}
 		pod.Spec.NodeName = "node-does-not-yet-exist"
-		pod, err = c.Core().Pods(ns).Create(pod)
+		pod, err = c.CoreV1().Pods(ns).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(pod.Initializers).To(BeNil())
 		Expect(pod.Annotations[v1.MirrorPodAnnotationKey]).To(Equal("true"))
@@ -259,7 +259,7 @@ var _ = SIGDescribe("Initializers [Feature:Initializers]", func() {
 			LabelSelector:        selector.String(),
 			IncludeUninitialized: true,
 		}
-		pods, err := c.Core().Pods(ns).List(listOptions)
+		pods, err := c.CoreV1().Pods(ns).List(listOptions)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(len(pods.Items)).Should(Equal(1))
 	})
@@ -349,7 +349,7 @@ func newInitPod(podName string) *v1.Pod {
 // removeInitializersFromAllPods walks all pods and ensures they don't have the provided initializer,
 // to guarantee completing the test doesn't block the entire cluster.
 func removeInitializersFromAllPods(c clientset.Interface, initializerName string) {
-	pods, err := c.Core().Pods("").List(metav1.ListOptions{IncludeUninitialized: true})
+	pods, err := c.CoreV1().Pods("").List(metav1.ListOptions{IncludeUninitialized: true})
 	if err != nil {
 		return
 	}
@@ -358,7 +358,7 @@ func removeInitializersFromAllPods(c clientset.Interface, initializerName string
 			continue
 		}
 		err := clientretry.RetryOnConflict(clientretry.DefaultRetry, func() error {
-			pod, err := c.Core().Pods(p.Namespace).Get(p.Name, metav1.GetOptions{IncludeUninitialized: true})
+			pod, err := c.CoreV1().Pods(p.Namespace).Get(p.Name, metav1.GetOptions{IncludeUninitialized: true})
 			if err != nil {
 				if errors.IsNotFound(err) {
 					return nil
@@ -382,7 +382,7 @@ func removeInitializersFromAllPods(c clientset.Interface, initializerName string
 				pod.Initializers = nil
 			}
 			framework.Logf("Found initializer on pod %s in ns %s", pod.Name, pod.Namespace)
-			_, err = c.Core().Pods(p.Namespace).Update(pod)
+			_, err = c.CoreV1().Pods(p.Namespace).Update(pod)
 			return err
 		})
 		if err != nil {

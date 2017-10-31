@@ -71,7 +71,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 	if eventRecorder == nil {
 		broadcaster := record.NewBroadcaster()
 		broadcaster.StartLogging(glog.Infof)
-		broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(p.KubeClient.Core().RESTClient()).Events("")})
+		broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(p.KubeClient.CoreV1().RESTClient()).Events("")})
 		eventRecorder = broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "persistentvolume-controller"})
 	}
 
@@ -425,7 +425,7 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 	// modify these, therefore create a copy.
 	claimClone := claim.DeepCopy()
 	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, annStorageProvisioner, class.Provisioner)
-	newClaim, err := ctrl.kubeClient.Core().PersistentVolumeClaims(claim.Namespace).Update(claimClone)
+	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(claimClone)
 	if err != nil {
 		return newClaim, err
 	}

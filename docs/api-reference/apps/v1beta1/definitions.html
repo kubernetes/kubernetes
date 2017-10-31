@@ -2112,7 +2112,7 @@ When an object is created, the system will populate this list with the current s
 <div class="sect2">
 <h3 id="_v1_podaffinityterm">v1.PodAffinityTerm</h3>
 <div class="paragraph">
-<p>Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key &lt;topologyKey&gt; tches that of any node on which a pod of the set of pods is running</p>
+<p>Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key &lt;topologyKey&gt; matches that of any node on which a pod of the set of pods is running</p>
 </div>
 <table class="tableblock frame-all grid-all" style="width:100%; ">
 <colgroup>
@@ -4639,21 +4639,21 @@ Examples:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">protectionDomain</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The name of the Protection Domain for the configured storage (defaults to "default").</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The name of the ScaleIO Protection Domain for the configured storage.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">storagePool</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The Storage Pool associated with the protection domain (defaults to "default").</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The ScaleIO Storage Pool associated with the protection domain.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">storageMode</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Indicates whether the storage for a volume should be thick or thin (defaults to "thin").</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -5605,7 +5605,7 @@ Examples:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">securityContext</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Security options the pod should run with. More info: <a href="https://kubernetes.io/docs/concepts/policy/security-context/">https://kubernetes.io/docs/concepts/policy/security-context/</a> More info: <a href="https://git.k8s.io/community/contributors/design-proposals/security_context.md">https://git.k8s.io/community/contributors/design-proposals/security_context.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Security options the pod should run with. More info: <a href="https://kubernetes.io/docs/concepts/policy/security-context/">https://kubernetes.io/docs/concepts/policy/security-context/</a> More info: <a href="https://kubernetes.io/docs/tasks/configure-pod-container/security-context/">https://kubernetes.io/docs/tasks/configure-pod-container/security-context/</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_securitycontext">v1.SecurityContext</a></p></td>
 <td class="tableblock halign-left valign-top"></td>

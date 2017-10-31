@@ -36,7 +36,11 @@ go_library(
     srcs = ["storage.go"],
     importpath = "k8s.io/kubernetes/pkg/registry/extensions/deployment/storage",
     deps = [
+        "//pkg/apis/apps/v1beta1:go_default_library",
+        "//pkg/apis/apps/v1beta2:go_default_library",
+        "//pkg/apis/autoscaling/v1:go_default_library",
         "//pkg/apis/extensions:go_default_library",
+        "//pkg/apis/extensions/v1beta1:go_default_library",
         "//pkg/apis/extensions/validation:go_default_library",
         "//pkg/registry/extensions/deployment:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/quota"
+	"k8s.io/kubernetes/pkg/quota/generic"
 	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
@@ -50,6 +51,9 @@ type quotaEvaluator struct {
 	quotaAccessor QuotaAccessor
 	// lockAcquisitionFunc acquires any required locks and returns a cleanup method to defer
 	lockAcquisitionFunc func([]api.ResourceQuota) func()
+
+	// how quota was configured
+	quotaConfiguration quota.Configuration
 
 	// registry that knows how to measure usage for objects
 	registry quota.Registry
@@ -106,16 +110,18 @@ func newAdmissionWaiter(a admission.Attributes) *admissionWaiter {
 // NewQuotaEvaluator configures an admission controller that can enforce quota constraints
 // using the provided registry.  The registry must have the capability to handle group/kinds that
 // are persisted by the server this admission controller is intercepting
-func NewQuotaEvaluator(quotaAccessor QuotaAccessor, registry quota.Registry, lockAcquisitionFunc func([]api.ResourceQuota) func(), config *resourcequotaapi.Configuration, workers int, stopCh <-chan struct{}) Evaluator {
+func NewQuotaEvaluator(quotaAccessor QuotaAccessor, quotaConfiguration quota.Configuration, lockAcquisitionFunc func([]api.ResourceQuota) func(), config *resourcequotaapi.Configuration, workers int, stopCh <-chan struct{}) Evaluator {
 	// if we get a nil config, just create an empty default.
 	if config == nil {
 		config = &resourcequotaapi.Configuration{}
 	}
+
 	return &quotaEvaluator{
 		quotaAccessor:       quotaAccessor,
 		lockAcquisitionFunc: lockAcquisitionFunc,
 
-		registry: registry,
+		quotaConfiguration: quotaConfiguration,
+		registry:           generic.NewRegistry(quotaConfiguration.Evaluators()),
 
 		queue:      workqueue.NewNamed("admission_quota_controller"),
 		work:       map[string][]*admissionWaiter{},
@@ -365,9 +371,8 @@ func limitedByDefault(usage api.ResourceList, limitedResources []resourcequotaap
 // that capture what the usage would be if the request succeeded.  It return an error if there is insufficient quota to satisfy the request
 func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.Attributes) ([]api.ResourceQuota, error) {
 	namespace := a.GetNamespace()
-	evaluators := e.registry.Evaluators()
-	evaluator, found := evaluators[a.GetKind().GroupKind()]
-	if !found {
+	evaluator := e.registry.Get(a.GetResource().GroupResource())
+	if evaluator == nil {
 		return quotas, nil
 	}
 
@@ -516,18 +521,27 @@ func (e *quotaEvaluator) Evaluate(a admission.Attributes) error {
 		go e.run()
 	})
 
-	// if we do not know how to evaluate use for this kind, just ignore
-	evaluators := e.registry.Evaluators()
-	evaluator, found := evaluators[a.GetKind().GroupKind()]
-	if !found {
+	// is this resource ignored?
+	gvr := a.GetResource()
+	gr := gvr.GroupResource()
+	if _, ok := e.quotaConfiguration.IgnoredResources()[gr]; ok {
 		return nil
+	}
+
+	// if we do not know how to evaluate use for this resource, create an evaluator
+	evaluator := e.registry.Get(gr)
+	if evaluator == nil {
+		// create an object count evaluator if no evaluator previously registered
+		// note, we do not need aggregate usage here, so we pass a nil infomer func
+		evaluator = generic.NewObjectCountEvaluator(false, gr, nil, "")
+		e.registry.Add(evaluator)
+		glog.Infof("quota admission added evaluator for: %s", gr)
 	}
 	// for this kind, check if the operation could mutate any quota resources
 	// if no resources tracked by quota are impacted, then just return
 	if !evaluator.Handles(a) {
 		return nil
 	}
-
 	waiter := newAdmissionWaiter(a)
 
 	e.addWork(waiter)

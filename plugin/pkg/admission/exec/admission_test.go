@@ -30,8 +30,8 @@ import (
 
 // newAllowEscalatingExec returns `admission.Interface` that allows execution on
 // "hostIPC", "hostPID" and "privileged".
-func newAllowEscalatingExec() admission.Interface {
-	return &denyExec{
+func newAllowEscalatingExec() *DenyExec {
+	return &DenyExec{
 		Handler:    admission.NewHandler(admission.Connect),
 		hostIPC:    false,
 		hostPID:    false,
@@ -77,21 +77,21 @@ func TestAdmission(t *testing.T) {
 	}
 
 	// Get the direct object though to allow testAdmission to inject the client
-	handler := NewDenyEscalatingExec().(*denyExec)
+	handler := NewDenyEscalatingExec()
 
 	for _, tc := range testCases {
 		testAdmission(t, tc.pod, handler, tc.shouldAccept)
 	}
 
 	// run with a permissive config and all cases should pass
-	handler = newAllowEscalatingExec().(*denyExec)
+	handler = newAllowEscalatingExec()
 
 	for _, tc := range testCases {
 		testAdmission(t, tc.pod, handler, true)
 	}
 
 	// run against an init container
-	handler = NewDenyEscalatingExec().(*denyExec)
+	handler = NewDenyEscalatingExec()
 
 	for _, tc := range testCases {
 		tc.pod.Spec.InitContainers = tc.pod.Spec.Containers
@@ -100,14 +100,14 @@ func TestAdmission(t *testing.T) {
 	}
 
 	// run with a permissive config and all cases should pass
-	handler = newAllowEscalatingExec().(*denyExec)
+	handler = newAllowEscalatingExec()
 
 	for _, tc := range testCases {
 		testAdmission(t, tc.pod, handler, true)
 	}
 }
 
-func testAdmission(t *testing.T, pod *api.Pod, handler *denyExec, shouldAccept bool) {
+func testAdmission(t *testing.T, pod *api.Pod, handler *DenyExec, shouldAccept bool) {
 	mockClient := &fake.Clientset{}
 	mockClient.AddReactor("get", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		if action.(core.GetAction).GetName() == pod.Name {
@@ -184,7 +184,7 @@ func TestDenyExecOnPrivileged(t *testing.T) {
 	}
 
 	// Get the direct object though to allow testAdmission to inject the client
-	handler := NewDenyExecOnPrivileged().(*denyExec)
+	handler := NewDenyExecOnPrivileged()
 
 	for _, tc := range testCases {
 		testAdmission(t, tc.pod, handler, tc.shouldAccept)

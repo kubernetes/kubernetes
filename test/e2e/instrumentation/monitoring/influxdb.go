@@ -76,7 +76,7 @@ func Query(c clientset.Interface, query string) (*influxdb.Response, error) {
 
 	var result []byte
 	if subResourceProxyAvailable {
-		result, err = c.Core().RESTClient().Get().
+		result, err = c.CoreV1().RESTClient().Get().
 			Context(ctx).
 			Namespace("kube-system").
 			Resource("services").
@@ -89,7 +89,7 @@ func Query(c clientset.Interface, query string) (*influxdb.Response, error) {
 			Do().
 			Raw()
 	} else {
-		result, err = c.Core().RESTClient().Get().
+		result, err = c.CoreV1().RESTClient().Get().
 			Context(ctx).
 			Prefix("proxy").
 			Namespace("kube-system").
@@ -138,7 +138,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c clientset.Interface) ([]string, 
 		if err != nil {
 			return nil, err
 		}
-		rcList, err := c.Core().ReplicationControllers(metav1.NamespaceSystem).List(options)
+		rcList, err := c.CoreV1().ReplicationControllers(metav1.NamespaceSystem).List(options)
 		if err != nil {
 			return nil, err
 		}
@@ -154,7 +154,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c clientset.Interface) ([]string, 
 		for _, rc := range rcList.Items {
 			selector := labels.Set(rc.Spec.Selector).AsSelector()
 			options := metav1.ListOptions{LabelSelector: selector.String()}
-			podList, err := c.Core().Pods(metav1.NamespaceSystem).List(options)
+			podList, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(options)
 			if err != nil {
 				return nil, err
 			}
@@ -169,7 +169,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c clientset.Interface) ([]string, 
 		for _, rc := range deploymentList.Items {
 			selector := labels.Set(rc.Spec.Selector.MatchLabels).AsSelector()
 			options := metav1.ListOptions{LabelSelector: selector.String()}
-			podList, err := c.Core().Pods(metav1.NamespaceSystem).List(options)
+			podList, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(options)
 			if err != nil {
 				return nil, err
 			}
@@ -184,7 +184,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c clientset.Interface) ([]string, 
 		for _, ps := range psList.Items {
 			selector := labels.Set(ps.Spec.Selector.MatchLabels).AsSelector()
 			options := metav1.ListOptions{LabelSelector: selector.String()}
-			podList, err := c.Core().Pods(metav1.NamespaceSystem).List(options)
+			podList, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(options)
 			if err != nil {
 				return nil, err
 			}
@@ -200,7 +200,7 @@ func verifyExpectedRcsExistAndGetExpectedPods(c clientset.Interface) ([]string, 
 }
 
 func expectedServicesExist(c clientset.Interface) error {
-	serviceList, err := c.Core().Services(metav1.NamespaceSystem).List(metav1.ListOptions{})
+	serviceList, err := c.CoreV1().Services(metav1.NamespaceSystem).List(metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -219,7 +219,7 @@ func expectedServicesExist(c clientset.Interface) error {
 
 func getAllNodesInCluster(c clientset.Interface) ([]string, error) {
 	// It should be OK to list unschedulable Nodes here.
-	nodeList, err := c.Core().Nodes().List(metav1.ListOptions{})
+	nodeList, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +331,7 @@ func testMonitoringUsingHeapsterInfluxdb(c clientset.Interface) {
 func printDebugInfo(c clientset.Interface) {
 	set := labels.Set{"k8s-app": "heapster"}
 	options := metav1.ListOptions{LabelSelector: set.AsSelector().String()}
-	podList, err := c.Core().Pods(metav1.NamespaceSystem).List(options)
+	podList, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(options)
 	if err != nil {
 		framework.Logf("Error while listing pods %v", err)
 		return

@@ -220,11 +220,16 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, containerIP, tar
 	Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", maxTries, cmd, eps, expectedEps)
 }
 
-func (config *NetworkingTestConfig) GetEndpointsFromTestContainer(protocol, targetIP string, targetPort, maxTries, minTries int) (sets.String, error) {
-	return config.GetEndpointsFromContainer(protocol, config.TestContainerPod.Status.PodIP, targetIP, TestContainerHttpPort, targetPort, maxTries, minTries)
+func (config *NetworkingTestConfig) GetEndpointsFromTestContainer(protocol, targetIP string, targetPort, tries int) (sets.String, error) {
+	return config.GetEndpointsFromContainer(protocol, config.TestContainerPod.Status.PodIP, targetIP, TestContainerHttpPort, targetPort, tries)
 }
 
-func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containerIP, targetIP string, containerHttpPort, targetPort, maxTries, minTries int) (sets.String, error) {
+// GetEndpointsFromContainer executes a curl via kubectl exec in a test container,
+// which might then translate to a tcp or udp request based on the protocol argument
+// in the url.
+// - tries is the maximum number of curl attempts. If this many attempts pass and
+//   we don't see any endpoints, the test fails.
+func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containerIP, targetIP string, containerHttpPort, targetPort, tries int) (sets.String, error) {
 	cmd := fmt.Sprintf("curl -q -s 'http://%s:%d/dial?request=hostName&protocol=%s&host=%s&port=%d&tries=1'",
 		containerIP,
 		containerHttpPort,
@@ -234,7 +239,7 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 
 	eps := sets.NewString()
 
-	for i := 0; i < maxTries; i++ {
+	for i := 0; i < tries; i++ {
 		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.HostTestContainerPod.Name, cmd)
 		if err != nil {
 			// A failure to kubectl exec counts as a try, not a hard fail.
@@ -242,6 +247,7 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 			// we confirm unreachability.
 			Logf("Failed to execute %q: %v, stdout: %q, stderr: %q", cmd, err, stdout, stderr)
 		} else {
+			Logf("maxTries: %d, in try: %d, stdout: %v, stderr: %v", tries, i, stdout, stderr)
 			var output map[string][]string
 			if err := json.Unmarshal([]byte(stdout), &output); err != nil {
 				Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
@@ -255,10 +261,15 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 					eps.Insert(trimmed)
 				}
 			}
-			return eps, nil
+			// Return immediately when we successfully fetch endpoints
+			if len(eps) > 0 {
+				return eps, nil
+			}
+			// TODO: get rid of this delay #36281
+			time.Sleep(hitEndpointRetryDelay)
 		}
 	}
-	return nil, fmt.Errorf("Failed to get endpoints:\nTries %d\nCommand %v\n", minTries, cmd)
+	return nil, fmt.Errorf("error getting endpoints:\nTries %d\nCommand %v\n", tries, cmd)
 }
 
 // DialFromNode executes a tcp or udp request based on protocol via kubectl exec
@@ -554,7 +565,12 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 		}
 	}
 	config.ClusterIP = config.NodePortService.Spec.ClusterIP
-	config.NodeIP = config.ExternalAddrs[0]
+	if len(config.ExternalAddrs) != 0 {
+		config.NodeIP = config.ExternalAddrs[0]
+	} else {
+		internalAddrs := NodeAddresses(nodeList, v1.NodeInternalIP)
+		config.NodeIP = internalAddrs[0]
+	}
 }
 
 func (config *NetworkingTestConfig) cleanup() {
@@ -645,11 +661,11 @@ func (config *NetworkingTestConfig) getPodClient() *PodClient {
 }
 
 func (config *NetworkingTestConfig) getServiceClient() coreclientset.ServiceInterface {
-	return config.f.ClientSet.Core().Services(config.Namespace)
+	return config.f.ClientSet.CoreV1().Services(config.Namespace)
 }
 
 func (config *NetworkingTestConfig) getNamespacesClient() coreclientset.NamespaceInterface {
-	return config.f.ClientSet.Core().Namespaces()
+	return config.f.ClientSet.CoreV1().Namespaces()
 }
 
 func CheckReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {

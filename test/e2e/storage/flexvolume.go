@@ -43,7 +43,7 @@ const (
 
 // testFlexVolume tests that a client pod using a given flexvolume driver
 // successfully mounts it and runs
-func testFlexVolume(driver string, cs clientset.Interface, config framework.VolumeTestConfig, f *framework.Framework, clean bool) {
+func testFlexVolume(driver string, cs clientset.Interface, config framework.VolumeTestConfig, f *framework.Framework) {
 	tests := []framework.VolumeTest{
 		{
 			Volume: v1.VolumeSource{
@@ -58,9 +58,7 @@ func testFlexVolume(driver string, cs clientset.Interface, config framework.Volu
 	}
 	framework.TestVolumeClient(cs, config, nil, tests)
 
-	if clean {
-		framework.VolumeTestCleanup(f, config)
-	}
+	framework.VolumeTestCleanup(f, config)
 }
 
 // installFlex installs the driver found at filePath on the node, and restarts
@@ -141,9 +139,7 @@ func sshAndLog(cmd, host string) {
 var _ = SIGDescribe("Flexvolumes [Disruptive] [Feature:FlexVolume]", func() {
 	f := framework.NewDefaultFramework("flexvolume")
 
-	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
 	// note that namespace deletion is handled by delete-namespace flag
-	clean := true
 
 	var cs clientset.Interface
 	var ns *v1.Namespace
@@ -176,7 +172,7 @@ var _ = SIGDescribe("Flexvolumes [Disruptive] [Feature:FlexVolume]", func() {
 		By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
 		installFlex(&node, "k8s", driverInstallAs, path.Join(driverDir, driver), true /* restart */)
 
-		testFlexVolume(driverInstallAs, cs, config, f, clean)
+		testFlexVolume(driverInstallAs, cs, config, f)
 
 		By("waiting for flex client pod to terminate")
 		if err := f.WaitForPodTerminated(config.Prefix+"-client", ""); !apierrs.IsNotFound(err) {
@@ -196,7 +192,7 @@ var _ = SIGDescribe("Flexvolumes [Disruptive] [Feature:FlexVolume]", func() {
 		By(fmt.Sprintf("installing flexvolume %s on master as %s", path.Join(driverDir, driver), driverInstallAs))
 		installFlex(nil, "k8s", driverInstallAs, path.Join(driverDir, driver), true /* restart */)
 
-		testFlexVolume(driverInstallAs, cs, config, f, clean)
+		testFlexVolume(driverInstallAs, cs, config, f)
 
 		By("waiting for flex client pod to terminate")
 		if err := f.WaitForPodTerminated(config.Prefix+"-client", ""); !apierrs.IsNotFound(err) {
@@ -216,7 +212,7 @@ var _ = SIGDescribe("Flexvolumes [Disruptive] [Feature:FlexVolume]", func() {
 		By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
 		installFlex(&node, "k8s", driverInstallAs, path.Join(driverDir, driver), false /* restart */)
 
-		testFlexVolume(driverInstallAs, cs, config, f, clean)
+		testFlexVolume(driverInstallAs, cs, config, f)
 
 		By("waiting for flex client pod to terminate")
 		if err := f.WaitForPodTerminated(config.Prefix+"-client", ""); !apierrs.IsNotFound(err) {

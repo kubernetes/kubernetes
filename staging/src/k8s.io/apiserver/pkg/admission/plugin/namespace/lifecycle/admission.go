@@ -165,7 +165,7 @@ func (l *lifecycle) Admit(a admission.Attributes) error {
 	// refuse to operate on non-existent namespaces
 	if !exists || forceLiveLookup {
 		// as a last resort, make a call directly to storage
-		namespace, err = l.client.Core().Namespaces().Get(a.GetNamespace(), metav1.GetOptions{})
+		namespace, err = l.client.CoreV1().Namespaces().Get(a.GetNamespace(), metav1.GetOptions{})
 		switch {
 		case errors.IsNotFound(err):
 			return err
@@ -202,16 +202,19 @@ func newLifecycleWithClock(immortalNamespaces sets.String, clock utilcache.Clock
 	}, nil
 }
 
+// SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
 func (l *lifecycle) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().V1().Namespaces()
 	l.namespaceLister = namespaceInformer.Lister()
 	l.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }
 
+// SetExternalKubeClientSet implements the WantsExternalKubeClientSet interface.
 func (l *lifecycle) SetExternalKubeClientSet(client kubernetes.Interface) {
 	l.client = client
 }
 
+// Validate implement the Validator interface.
 func (l *lifecycle) Validate() error {
 	if l.namespaceLister == nil {
 		return fmt.Errorf("missing namespaceLister")

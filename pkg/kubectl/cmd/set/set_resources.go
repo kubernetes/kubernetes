@@ -238,7 +238,10 @@ func (o *ResourcesOptions) Run() error {
 		}
 
 		if o.Local || cmdutil.GetDryRunFlag(o.Cmd) {
-			return o.PrintObject(o.Cmd, o.Local, o.Mapper, info.Object, o.Out)
+			if err := o.PrintObject(o.Cmd, o.Local, o.Mapper, info.Object, o.Out); err != nil {
+				return err
+			}
+			continue
 		}
 
 		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)

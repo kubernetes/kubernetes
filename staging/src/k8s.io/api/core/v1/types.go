@@ -398,7 +398,7 @@ type PersistentVolumeSource struct {
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime.
 	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md
 	// +optional
-	RBD *RBDVolumeSource `json:"rbd,omitempty" protobuf:"bytes,6,opt,name=rbd"`
+	RBD *RBDPersistentVolumeSource `json:"rbd,omitempty" protobuf:"bytes,6,opt,name=rbd"`
 	// ISCSI represents an ISCSI Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod. Provisioned by an admin.
 	// +optional
@@ -440,7 +440,7 @@ type PersistentVolumeSource struct {
 	PortworxVolume *PortworxVolumeSource `json:"portworxVolume,omitempty" protobuf:"bytes,18,opt,name=portworxVolume"`
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
-	ScaleIO *ScaleIOVolumeSource `json:"scaleIO,omitempty" protobuf:"bytes,19,opt,name=scaleIO"`
+	ScaleIO *ScaleIOPersistentVolumeSource `json:"scaleIO,omitempty" protobuf:"bytes,19,opt,name=scaleIO"`
 	// Local represents directly-attached storage with node affinity
 	// +optional
 	Local *LocalVolumeSource `json:"local,omitempty" protobuf:"bytes,20,opt,name=local"`
@@ -838,6 +838,50 @@ type RBDVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,8,opt,name=readOnly"`
 }
 
+// Represents a Rados Block Device mount that lasts the lifetime of a pod.
+// RBD volumes support ownership management and SELinux relabeling.
+type RBDPersistentVolumeSource struct {
+	// A collection of Ceph monitors.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+	CephMonitors []string `json:"monitors" protobuf:"bytes,1,rep,name=monitors"`
+	// The rados image name.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+	RBDImage string `json:"image" protobuf:"bytes,2,opt,name=image"`
+	// Filesystem type of the volume that you want to mount.
+	// Tip: Ensure that the filesystem type is supported by the host operating system.
+	// Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	// +optional
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,3,opt,name=fsType"`
+	// The rados pool name.
+	// Default is rbd.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+	// +optional
+	RBDPool string `json:"pool,omitempty" protobuf:"bytes,4,opt,name=pool"`
+	// The rados user name.
+	// Default is admin.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+	// +optional
+	RadosUser string `json:"user,omitempty" protobuf:"bytes,5,opt,name=user"`
+	// Keyring is the path to key ring for RBDUser.
+	// Default is /etc/ceph/keyring.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+	// +optional
+	Keyring string `json:"keyring,omitempty" protobuf:"bytes,6,opt,name=keyring"`
+	// SecretRef is name of the authentication secret for RBDUser. If provided
+	// overrides keyring.
+	// Default is nil.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+	// +optional
+	SecretRef *SecretReference `json:"secretRef,omitempty" protobuf:"bytes,7,opt,name=secretRef"`
+	// ReadOnly here will force the ReadOnly setting in VolumeMounts.
+	// Defaults to false.
+	// More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,8,opt,name=readOnly"`
+}
+
 // Represents a cinder volume resource in Openstack.
 // A Cinder volume must exist before mounting to a container.
 // The volume must also be in the same region as the kubelet.
@@ -945,7 +989,7 @@ type StorageMedium string
 const (
 	StorageMediumDefault   StorageMedium = ""          // use whatever the default is for the node
 	StorageMediumMemory    StorageMedium = "Memory"    // use memory (tmpfs)
-	StorageMediumHugepages StorageMedium = "HugePages" // use hugepages
+	StorageMediumHugePages StorageMedium = "HugePages" // use hugepages
 )
 
 // Protocol defines network protocols supported for things like container ports.
@@ -1352,13 +1396,48 @@ type ScaleIOVolumeSource struct {
 	// Flag to enable/disable SSL communication with Gateway, default false
 	// +optional
 	SSLEnabled bool `json:"sslEnabled,omitempty" protobuf:"varint,4,opt,name=sslEnabled"`
-	// The name of the Protection Domain for the configured storage (defaults to "default").
+	// The name of the ScaleIO Protection Domain for the configured storage.
 	// +optional
 	ProtectionDomain string `json:"protectionDomain,omitempty" protobuf:"bytes,5,opt,name=protectionDomain"`
-	// The Storage Pool associated with the protection domain (defaults to "default").
+	// The ScaleIO Storage Pool associated with the protection domain.
 	// +optional
 	StoragePool string `json:"storagePool,omitempty" protobuf:"bytes,6,opt,name=storagePool"`
-	// Indicates whether the storage for a volume should be thick or thin (defaults to "thin").
+	// Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
+	// +optional
+	StorageMode string `json:"storageMode,omitempty" protobuf:"bytes,7,opt,name=storageMode"`
+	// The name of a volume already created in the ScaleIO system
+	// that is associated with this volume source.
+	VolumeName string `json:"volumeName,omitempty" protobuf:"bytes,8,opt,name=volumeName"`
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// +optional
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,9,opt,name=fsType"`
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,10,opt,name=readOnly"`
+}
+
+// ScaleIOPersistentVolumeSource represents a persistent ScaleIO volume
+type ScaleIOPersistentVolumeSource struct {
+	// The host address of the ScaleIO API Gateway.
+	Gateway string `json:"gateway" protobuf:"bytes,1,opt,name=gateway"`
+	// The name of the storage system as configured in ScaleIO.
+	System string `json:"system" protobuf:"bytes,2,opt,name=system"`
+	// SecretRef references to the secret for ScaleIO user and other
+	// sensitive information. If this is not provided, Login operation will fail.
+	SecretRef *SecretReference `json:"secretRef" protobuf:"bytes,3,opt,name=secretRef"`
+	// Flag to enable/disable SSL communication with Gateway, default false
+	// +optional
+	SSLEnabled bool `json:"sslEnabled,omitempty" protobuf:"varint,4,opt,name=sslEnabled"`
+	// The name of the ScaleIO Protection Domain for the configured storage.
+	// +optional
+	ProtectionDomain string `json:"protectionDomain,omitempty" protobuf:"bytes,5,opt,name=protectionDomain"`
+	// The ScaleIO Storage Pool associated with the protection domain.
+	// +optional
+	StoragePool string `json:"storagePool,omitempty" protobuf:"bytes,6,opt,name=storagePool"`
+	// Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
 	// +optional
 	StorageMode string `json:"storageMode,omitempty" protobuf:"bytes,7,opt,name=storageMode"`
 	// The name of a volume already created in the ScaleIO system
@@ -1996,7 +2075,7 @@ type Container struct {
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy,omitempty" protobuf:"bytes,14,opt,name=imagePullPolicy,casttype=PullPolicy"`
 	// Security options the pod should run with.
 	// More info: https://kubernetes.io/docs/concepts/policy/security-context/
-	// More info: https://git.k8s.io/community/contributors/design-proposals/security_context.md
+	// More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 	// +optional
 	SecurityContext *SecurityContext `json:"securityContext,omitempty" protobuf:"bytes,15,opt,name=securityContext"`
 
@@ -2394,7 +2473,7 @@ type WeightedPodAffinityTerm struct {
 // relative to the given namespace(s)) that this pod should be
 // co-located (affinity) or not co-located (anti-affinity) with,
 // where co-located is defined as running on a node whose value of
-// the label with key <topologyKey> tches that of any node on which
+// the label with key <topologyKey> matches that of any node on which
 // a pod of the set of pods is running
 type PodAffinityTerm struct {
 	// A label query over a set of resources, in this case pods.
@@ -3825,7 +3904,7 @@ const (
 // NamespaceSpec describes the attributes on a Namespace.
 type NamespaceSpec struct {
 	// Finalizers is an opaque list of values that must be empty to permanently remove object from storage.
-	// More info: https://git.k8s.io/community/contributors/design-proposals/namespaces.md#finalizers
+	// More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/
 	// +optional
 	Finalizers []FinalizerName `json:"finalizers,omitempty" protobuf:"bytes,1,rep,name=finalizers,casttype=FinalizerName"`
 }
@@ -3833,7 +3912,7 @@ type NamespaceSpec struct {
 // NamespaceStatus is information about the current status of a Namespace.
 type NamespaceStatus struct {
 	// Phase is the current lifecycle phase of the namespace.
-	// More info: https://git.k8s.io/community/contributors/design-proposals/namespaces.md#phases
+	// More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/
 	// +optional
 	Phase NamespacePhase `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase,casttype=NamespacePhase"`
 }
@@ -4376,7 +4455,7 @@ type LimitRangeList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is a list of LimitRange objects.
-	// More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_limit_range.md
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
 	Items []LimitRange `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -4433,7 +4512,7 @@ const (
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota.
 type ResourceQuotaSpec struct {
 	// Hard is the set of desired hard limits for each named resource.
-	// More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md
+	// More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
 	// +optional
 	Hard ResourceList `json:"hard,omitempty" protobuf:"bytes,1,rep,name=hard,casttype=ResourceList,castkey=ResourceName"`
 	// A collection of filters that must match each object tracked by a quota.
@@ -4445,7 +4524,7 @@ type ResourceQuotaSpec struct {
 // ResourceQuotaStatus defines the enforced hard limits and observed use.
 type ResourceQuotaStatus struct {
 	// Hard is the set of enforced hard limits for each named resource.
-	// More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md
+	// More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
 	// +optional
 	Hard ResourceList `json:"hard,omitempty" protobuf:"bytes,1,rep,name=hard,casttype=ResourceList,castkey=ResourceName"`
 	// Used is the current observed total usage of the resource in the namespace.
@@ -4486,7 +4565,7 @@ type ResourceQuotaList struct {
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Items is a list of ResourceQuota objects.
-	// More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md
+	// More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
 	Items []ResourceQuota `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 

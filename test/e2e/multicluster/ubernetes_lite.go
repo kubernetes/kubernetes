@@ -82,7 +82,7 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 			}},
 		},
 	}
-	_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(serviceSpec)
+	_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(serviceSpec)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Now create some pods behind the service
@@ -132,7 +132,7 @@ func getZoneNameForNode(node v1.Node) (string, error) {
 // Find the names of all zones in which we have nodes in this cluster.
 func getZoneNames(c clientset.Interface) ([]string, error) {
 	zoneNames := sets.NewString()
-	nodes, err := c.Core().Nodes().List(metav1.ListOptions{})
+	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +156,7 @@ func getZoneCount(c clientset.Interface) (int, error) {
 // Find the name of the zone in which the pod is scheduled
 func getZoneNameForPod(c clientset.Interface, pod v1.Pod) (string, error) {
 	By(fmt.Sprintf("Getting zone name for pod %s, on node %s", pod.Name, pod.Spec.NodeName))
-	node, err := c.Core().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
+	node, err := c.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	return getZoneNameForNode(*node)
 }
@@ -196,7 +196,7 @@ func checkZoneSpreading(c clientset.Interface, pods *v1.PodList, zoneNames []str
 func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
 	name := "ubelite-spread-rc-" + string(uuid.NewUUID())
 	By(fmt.Sprintf("Creating replication controller %s", name))
-	controller, err := f.ClientSet.Core().ReplicationControllers(f.Namespace.Name).Create(&v1.ReplicationController{
+	controller, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(&v1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: f.Namespace.Name,
 			Name:      name,
@@ -310,7 +310,7 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 	By("Creating pods for each static PV")
 	for _, config := range configs {
 		podConfig := framework.MakePod(ns, []*v1.PersistentVolumeClaim{config.pvc}, false, "")
-		config.pod, err = c.Core().Pods(ns).Create(podConfig)
+		config.pod, err = c.CoreV1().Pods(ns).Create(podConfig)
 		Expect(err).NotTo(HaveOccurred())
 	}
 

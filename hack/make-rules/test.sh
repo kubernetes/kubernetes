@@ -61,7 +61,6 @@ kube::test::find_dirs() {
           -o -path './third_party/*' \
           -o -path './staging/*' \
           -o -path './vendor/*' \
-          -o -path './federation/test/*' \
         \) -prune \
       \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed "s|^\./|${KUBE_GO_PACKAGE}/|" | LC_ALL=C sort -u
 
@@ -113,7 +112,7 @@ KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
 # "v1,compute/v1alpha1,experimental/v1alpha2;v1,compute/v2,experimental/v1alpha3"
 # FIXME: due to current implementation of a test client (see: pkg/api/testapi/testapi.go)
 # ONLY the last version is tested in each group.
-ALL_VERSIONS_CSV=$(IFS=',';echo "${KUBE_AVAILABLE_GROUP_VERSIONS[*]// /,}";IFS=$),federation/v1beta1
+ALL_VERSIONS_CSV=$(IFS=',';echo "${KUBE_AVAILABLE_GROUP_VERSIONS[*]// /,}";IFS=$)
 KUBE_TEST_API_VERSIONS="${KUBE_TEST_API_VERSIONS:-${ALL_VERSIONS_CSV}}"
 # once we have multiple group supports
 # Create a junit-style XML test report in this directory if set.
@@ -289,7 +288,7 @@ runTests() {
       ${KUBE_RACE} ${KUBE_TIMEOUT} "${@}" \
      "${testargs[@]:+${testargs[@]}}" \
      | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
-     | grep "${go_test_grep_pattern}" && rc=$? || rc=$?
+     | grep --binary-files=text "${go_test_grep_pattern}" && rc=$? || rc=$?
     produceJUnitXMLReport "${junit_filename_prefix}"
     return ${rc}
   fi

@@ -197,7 +197,7 @@ var _ = SIGDescribe("Load capacity", func() {
 				services := generateServicesForConfigs(configs)
 				createService := func(i int) {
 					defer GinkgoRecover()
-					_, err := clientset.Core().Services(services[i].Namespace).Create(services[i])
+					_, err := clientset.CoreV1().Services(services[i].Namespace).Create(services[i])
 					framework.ExpectNoError(err)
 				}
 				workqueue.Parallelize(serviceOperationsParallelism, len(services), createService)
@@ -206,7 +206,7 @@ var _ = SIGDescribe("Load capacity", func() {
 					framework.Logf("Starting to delete services...")
 					deleteService := func(i int) {
 						defer GinkgoRecover()
-						err := clientset.Core().Services(services[i].Namespace).Delete(services[i].Name, nil)
+						err := clientset.CoreV1().Services(services[i].Namespace).Delete(services[i].Name, nil)
 						framework.ExpectNoError(err)
 					}
 					workqueue.Parallelize(serviceOperationsParallelism, len(services), deleteService)
@@ -566,7 +566,7 @@ func scaleResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, scaling
 		LabelSelector:   selector.String(),
 		ResourceVersion: "0",
 	}
-	_, err := config.GetClient().Core().Pods(config.GetNamespace()).List(options)
+	_, err := config.GetClient().CoreV1().Pods(config.GetNamespace()).List(options)
 	framework.ExpectNoError(err, fmt.Sprintf("listing pods from rc %v", config.GetName()))
 }
 

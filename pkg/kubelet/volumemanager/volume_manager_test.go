@@ -324,11 +324,11 @@ func delayClaimBecomesBound(
 ) {
 	time.Sleep(500 * time.Millisecond)
 	volumeClaim, _ :=
-		kubeClient.Core().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
+		kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
 	volumeClaim.Status = v1.PersistentVolumeClaimStatus{
 		Phase: v1.ClaimBound,
 	}
-	kubeClient.Core().PersistentVolumeClaims(namespace).Update(volumeClaim)
+	kubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(volumeClaim)
 	return
 }
 

@@ -17,33 +17,34 @@ limitations under the License.
 package core
 
 import (
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 )
 
-// NewRegistry returns a registry that knows how to deal with core kubernetes resources
-// If an informer factory is provided, evaluators will use them.
-func NewRegistry(kubeClient clientset.Interface, f informers.SharedInformerFactory) quota.Registry {
-	pod := NewPodEvaluator(kubeClient, f, clock.RealClock{})
-	service := NewServiceEvaluator(kubeClient, f)
-	replicationController := NewReplicationControllerEvaluator(kubeClient, f)
-	resourceQuota := NewResourceQuotaEvaluator(kubeClient, f)
-	secret := NewSecretEvaluator(kubeClient, f)
-	configMap := NewConfigMapEvaluator(kubeClient, f)
-	persistentVolumeClaim := NewPersistentVolumeClaimEvaluator(kubeClient, f)
-	return &generic.GenericRegistry{
-		InternalEvaluators: map[schema.GroupKind]quota.Evaluator{
-			pod.GroupKind():                   pod,
-			service.GroupKind():               service,
-			replicationController.GroupKind(): replicationController,
-			secret.GroupKind():                secret,
-			configMap.GroupKind():             configMap,
-			resourceQuota.GroupKind():         resourceQuota,
-			persistentVolumeClaim.GroupKind(): persistentVolumeClaim,
-		},
+// legacyObjectCountAliases are what we used to do simple object counting quota with mapped to alias
+var legacyObjectCountAliases = map[schema.GroupVersionResource]api.ResourceName{
+	v1.SchemeGroupVersion.WithResource("configmaps"):             api.ResourceConfigMaps,
+	v1.SchemeGroupVersion.WithResource("resourcequotas"):         api.ResourceQuotas,
+	v1.SchemeGroupVersion.WithResource("replicationcontrollers"): api.ResourceReplicationControllers,
+	v1.SchemeGroupVersion.WithResource("secrets"):                api.ResourceSecrets,
+}
+
+// NewEvaluators returns the list of static evaluators that manage more than counts
+func NewEvaluators(f quota.ListerForResourceFunc) []quota.Evaluator {
+	// these evaluators have special logic
+	result := []quota.Evaluator{
+		NewPodEvaluator(f, clock.RealClock{}),
+		NewServiceEvaluator(f),
+		NewPersistentVolumeClaimEvaluator(f),
 	}
+	// these evaluators require an alias for backwards compatibility
+	for gvr, alias := range legacyObjectCountAliases {
+		result = append(result,
+			generic.NewObjectCountEvaluator(false, gvr.GroupResource(), generic.ListResourceUsingListerFunc(f, gvr), alias))
+	}
+	return result
 }

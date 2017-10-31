@@ -23,10 +23,135 @@ import (
 
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+func TestIsDefaultNamespaceResource(t *testing.T) {
+	testCases := []struct {
+		resourceName v1.ResourceName
+		expectVal    bool
+	}{
+		{
+			resourceName: "pod.alpha.kubernetes.io/opaque-int-resource-foo",
+			expectVal:    true,
+		},
+		{
+			resourceName: "kubernetes.io/resource-foo",
+			expectVal:    true,
+		},
+		{
+			resourceName: "foo",
+			expectVal:    true,
+		},
+		{
+			resourceName: "a/b",
+			expectVal:    false,
+		},
+		{
+			resourceName: "",
+			expectVal:    true,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("resourceName input=%s, expected value=%v", tc.resourceName, tc.expectVal), func(t *testing.T) {
+			t.Parallel()
+			v := IsDefaultNamespaceResource(tc.resourceName)
+			if v != tc.expectVal {
+				t.Errorf("Got %v but expected %v", v, tc.expectVal)
+			}
+		})
+	}
+}
+
+func TestHugePageSizeFromResourceName(t *testing.T) {
+	expected100m, _ := resource.ParseQuantity("100m")
+	testCases := []struct {
+		resourceName v1.ResourceName
+		expectVal    resource.Quantity
+		expectErr    bool
+	}{
+		{
+			resourceName: "pod.alpha.kubernetes.io/opaque-int-resource-foo",
+			expectVal:    resource.Quantity{},
+			expectErr:    true,
+		},
+		{
+			resourceName: "hugepages-",
+			expectVal:    resource.Quantity{},
+			expectErr:    true,
+		},
+		{
+			resourceName: "hugepages-100m",
+			expectVal:    expected100m,
+			expectErr:    false,
+		},
+		{
+			resourceName: "",
+			expectVal:    resource.Quantity{},
+			expectErr:    true,
+		},
+	}
+
+	for i, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("resourceName input=%s, expected value=%v", tc.resourceName, tc.expectVal), func(t *testing.T) {
+			t.Parallel()
+			v, err := HugePageSizeFromResourceName(tc.resourceName)
+			if err == nil && tc.expectErr {
+				t.Errorf("[%v]expected error but got none.", i)
+			}
+			if err != nil && !tc.expectErr {
+				t.Errorf("[%v]did not expect error but got: %v", i, err)
+			}
+			if v != tc.expectVal {
+				t.Errorf("Got %v but expected %v", v, tc.expectVal)
+			}
+		})
+	}
+}
+
+func TestIsOvercommitAllowed(t *testing.T) {
+	testCases := []struct {
+		resourceName v1.ResourceName
+		expectVal    bool
+	}{
+		{
+			resourceName: "pod.alpha.kubernetes.io/opaque-int-resource-foo",
+			expectVal:    true,
+		},
+		{
+			resourceName: "kubernetes.io/resource-foo",
+			expectVal:    true,
+		},
+		{
+			resourceName: "alpha.kubernetes.io/nvidia-gpu",
+			expectVal:    false,
+		},
+		{
+			resourceName: "hugepages-100m",
+			expectVal:    false,
+		},
+		{
+			resourceName: "",
+			expectVal:    true,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("resourceName input=%s, expected value=%v", tc.resourceName, tc.expectVal), func(t *testing.T) {
+			t.Parallel()
+			v := IsOvercommitAllowed(tc.resourceName)
+			if v != tc.expectVal {
+				t.Errorf("Got %v but expected %v", v, tc.expectVal)
+			}
+		})
+	}
+}
 func TestIsOpaqueIntResourceName(t *testing.T) { // resourceName input with the correct OpaqueIntResourceName prefix ("pod.alpha.kubernetes.io/opaque-int-resource-") should pass
 	testCases := []struct {
 		resourceName v1.ResourceName

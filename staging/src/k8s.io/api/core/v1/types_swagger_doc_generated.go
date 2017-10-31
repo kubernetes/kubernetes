@@ -284,7 +284,7 @@ var map_Container = map[string]string{
 	"terminationMessagePath":   "Optional: Path at which the file to which the container's termination message will be written is mounted into the container's filesystem. Message written is intended to be brief final status, such as an assertion failure message. Will be truncated by the node if greater than 4096 bytes. The total message length across all containers will be limited to 12kb. Defaults to /dev/termination-log. Cannot be updated.",
 	"terminationMessagePolicy": "Indicate how the termination message should be populated. File will use the contents of terminationMessagePath to populate the container status message on both success and failure. FallbackToLogsOnError will use the last chunk of container log output if the termination message file is empty and the container exited with an error. The log output is limited to 2048 bytes or 80 lines, whichever is smaller. Defaults to File. Cannot be updated.",
 	"imagePullPolicy":          "Image pull policy. One of Always, Never, IfNotPresent. Defaults to Always if :latest tag is specified, or IfNotPresent otherwise. Cannot be updated. More info: https://kubernetes.io/docs/concepts/containers/images#updating-images",
-	"securityContext":          "Security options the pod should run with. More info: https://kubernetes.io/docs/concepts/policy/security-context/ More info: https://git.k8s.io/community/contributors/design-proposals/security_context.md",
+	"securityContext":          "Security options the pod should run with. More info: https://kubernetes.io/docs/concepts/policy/security-context/ More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/",
 	"stdin":                    "Whether this container should allocate a buffer for stdin in the container runtime. If this is not set, reads from stdin in the container will always result in EOF. Default is false.",
 	"stdinOnce":                "Whether the container runtime should close the stdin channel after it has been opened by a single attach. When stdin is true the stdin stream will remain open across multiple attach sessions. If stdinOnce is set to true, stdin is opened on container start, is empty until the first client attaches to stdin, and then remains open and accepts data until the client disconnects, at which time stdin is closed and remains closed until the container is restarted. If this flag is false, a container processes that reads from stdin will never receive an EOF. Default is false",
 	"tty":                      "Whether this container should allocate a TTY for itself, also requires 'stdin' to be true. Default is false.",
@@ -765,7 +765,7 @@ func (LimitRangeItem) SwaggerDoc() map[string]string {
 var map_LimitRangeList = map[string]string{
 	"":         "LimitRangeList is a list of LimitRange items.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
-	"items":    "Items is a list of LimitRange objects. More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_limit_range.md",
+	"items":    "Items is a list of LimitRange objects. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/",
 }
 
 func (LimitRangeList) SwaggerDoc() map[string]string {
@@ -866,7 +866,7 @@ func (NamespaceList) SwaggerDoc() map[string]string {
 
 var map_NamespaceSpec = map[string]string{
 	"":           "NamespaceSpec describes the attributes on a Namespace.",
-	"finalizers": "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: https://git.k8s.io/community/contributors/design-proposals/namespaces.md#finalizers",
+	"finalizers": "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/",
 }
 
 func (NamespaceSpec) SwaggerDoc() map[string]string {
@@ -875,7 +875,7 @@ func (NamespaceSpec) SwaggerDoc() map[string]string {
 
 var map_NamespaceStatus = map[string]string{
 	"":      "NamespaceStatus is information about the current status of a Namespace.",
-	"phase": "Phase is the current lifecycle phase of the namespace. More info: https://git.k8s.io/community/contributors/design-proposals/namespaces.md#phases",
+	"phase": "Phase is the current lifecycle phase of the namespace. More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/",
 }
 
 func (NamespaceStatus) SwaggerDoc() map[string]string {
@@ -1275,7 +1275,7 @@ func (PodAffinity) SwaggerDoc() map[string]string {
 }
 
 var map_PodAffinityTerm = map[string]string{
-	"":              "Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key <topologyKey> tches that of any node on which a pod of the set of pods is running",
+	"":              "Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key <topologyKey> matches that of any node on which a pod of the set of pods is running",
 	"labelSelector": "A label query over a set of resources, in this case pods.",
 	"namespaces":    "namespaces specifies which namespaces the labelSelector applies to (matches against); null or empty list means \"this pod's namespace\"",
 	"topologyKey":   "This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching the labelSelector in the specified namespaces, where co-located is defined as running on a node whose value of the label with key topologyKey matches that of any node on which any of the selected pods is running. For PreferredDuringScheduling pod anti-affinity, empty topologyKey is interpreted as \"all topologies\" (\"all topologies\" here means all the topologyKeys indicated by scheduler command-line argument --failure-domains); for affinity and for RequiredDuringScheduling pod anti-affinity, empty topologyKey is not allowed.",
@@ -1571,6 +1571,22 @@ func (QuobyteVolumeSource) SwaggerDoc() map[string]string {
 	return map_QuobyteVolumeSource
 }
 
+var map_RBDPersistentVolumeSource = map[string]string{
+	"":          "Represents a Rados Block Device mount that lasts the lifetime of a pod. RBD volumes support ownership management and SELinux relabeling.",
+	"monitors":  "A collection of Ceph monitors. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+	"image":     "The rados image name. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+	"fsType":    "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd",
+	"pool":      "The rados pool name. Default is rbd. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+	"user":      "The rados user name. Default is admin. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+	"keyring":   "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+	"secretRef": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+	"readOnly":  "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
+}
+
+func (RBDPersistentVolumeSource) SwaggerDoc() map[string]string {
+	return map_RBDPersistentVolumeSource
+}
+
 var map_RBDVolumeSource = map[string]string{
 	"":          "Represents a Rados Block Device mount that lasts the lifetime of a pod. RBD volumes support ownership management and SELinux relabeling.",
 	"monitors":  "A collection of Ceph monitors. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it",
@@ -1683,7 +1699,7 @@ func (ResourceQuota) SwaggerDoc() map[string]string {
 var map_ResourceQuotaList = map[string]string{
 	"":         "ResourceQuotaList is a list of ResourceQuota items.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
-	"items":    "Items is a list of ResourceQuota objects. More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md",
+	"items":    "Items is a list of ResourceQuota objects. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/",
 }
 
 func (ResourceQuotaList) SwaggerDoc() map[string]string {
@@ -1692,7 +1708,7 @@ func (ResourceQuotaList) SwaggerDoc() map[string]string {
 
 var map_ResourceQuotaSpec = map[string]string{
 	"":       "ResourceQuotaSpec defines the desired hard limits to enforce for Quota.",
-	"hard":   "Hard is the set of desired hard limits for each named resource. More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md",
+	"hard":   "Hard is the set of desired hard limits for each named resource. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/",
 	"scopes": "A collection of filters that must match each object tracked by a quota. If not specified, the quota matches all objects.",
 }
 
@@ -1702,7 +1718,7 @@ func (ResourceQuotaSpec) SwaggerDoc() map[string]string {
 
 var map_ResourceQuotaStatus = map[string]string{
 	"":     "ResourceQuotaStatus defines the enforced hard limits and observed use.",
-	"hard": "Hard is the set of enforced hard limits for each named resource. More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md",
+	"hard": "Hard is the set of enforced hard limits for each named resource. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/",
 	"used": "Used is the current observed total usage of the resource in the namespace.",
 }
 
@@ -1732,15 +1748,33 @@ func (SELinuxOptions) SwaggerDoc() map[string]string {
 	return map_SELinuxOptions
 }
 
+var map_ScaleIOPersistentVolumeSource = map[string]string{
+	"":                 "ScaleIOPersistentVolumeSource represents a persistent ScaleIO volume",
+	"gateway":          "The host address of the ScaleIO API Gateway.",
+	"system":           "The name of the storage system as configured in ScaleIO.",
+	"secretRef":        "SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail.",
+	"sslEnabled":       "Flag to enable/disable SSL communication with Gateway, default false",
+	"protectionDomain": "The name of the ScaleIO Protection Domain for the configured storage.",
+	"storagePool":      "The ScaleIO Storage Pool associated with the protection domain.",
+	"storageMode":      "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.",
+	"volumeName":       "The name of a volume already created in the ScaleIO system that is associated with this volume source.",
+	"fsType":           "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"readOnly":         "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+}
+
+func (ScaleIOPersistentVolumeSource) SwaggerDoc() map[string]string {
+	return map_ScaleIOPersistentVolumeSource
+}
+
 var map_ScaleIOVolumeSource = map[string]string{
 	"":                 "ScaleIOVolumeSource represents a persistent ScaleIO volume",
 	"gateway":          "The host address of the ScaleIO API Gateway.",
 	"system":           "The name of the storage system as configured in ScaleIO.",
 	"secretRef":        "SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail.",
 	"sslEnabled":       "Flag to enable/disable SSL communication with Gateway, default false",
-	"protectionDomain": "The name of the Protection Domain for the configured storage (defaults to \"default\").",
-	"storagePool":      "The Storage Pool associated with the protection domain (defaults to \"default\").",
-	"storageMode":      "Indicates whether the storage for a volume should be thick or thin (defaults to \"thin\").",
+	"protectionDomain": "The name of the ScaleIO Protection Domain for the configured storage.",
+	"storagePool":      "The ScaleIO Storage Pool associated with the protection domain.",
+	"storageMode":      "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.",
 	"volumeName":       "The name of a volume already created in the ScaleIO system that is associated with this volume source.",
 	"fsType":           "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
 	"readOnly":         "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",

@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -36,8 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/quota/install"
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 )
@@ -135,9 +132,10 @@ func TestAdmissionIgnoresDelete(t *testing.T) {
 	quotaAccessor.client = kubeClient
 	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -170,9 +168,10 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 	quotaAccessor.client = kubeClient
 	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -214,9 +213,10 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 	quotaAccessor.client = kubeClient
 	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -297,9 +297,10 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 	quotaAccessor.client = kubeClient
 	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -403,9 +404,10 @@ func TestAdmitHandlesNegativePVCUpdates(t *testing.T) {
 	quotaAccessor.client = kubeClient
 	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -469,9 +471,10 @@ func TestAdmitHandlesPVCUpdates(t *testing.T) {
 	quotaAccessor.client = kubeClient
 	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -567,9 +570,10 @@ func TestAdmitHandlesCreatingUpdates(t *testing.T) {
 	quotaAccessor.client = kubeClient
 	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -661,9 +665,10 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 	quotaAccessor.client = kubeClient
 	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -705,9 +710,10 @@ func TestAdmitEnforceQuotaConstraints(t *testing.T) {
 	quotaAccessor.client = kubeClient
 	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -759,9 +765,10 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	quotaAccessor.liveLookupCache = liveLookupCache
 	config := &resourcequotaapi.Configuration{}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -825,9 +832,10 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 	quotaAccessor.client = kubeClient
 	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -930,9 +938,10 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 	quotaAccessor.client = kubeClient
 	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -1022,9 +1031,10 @@ func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 	quotaAccessor.client = kubeClient
 	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -1098,17 +1108,6 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 		},
 	}
 
-	// create a dummy evaluator so we can trigger quota
-	podEvaluator := &generic.ObjectCountEvaluator{
-		AllowCreateOnUpdate: false,
-		InternalGroupKind:   api.Kind("Pod"),
-		ResourceName:        api.ResourcePods,
-	}
-	registry := &generic.GenericRegistry{
-		InternalEvaluators: map[schema.GroupKind]quota.Evaluator{
-			podEvaluator.GroupKind(): podEvaluator,
-		},
-	}
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
@@ -1118,10 +1117,10 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	quotaAccessor.client = kubeClient
 	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
-	evaluator.(*quotaEvaluator).registry = registry
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -1164,9 +1163,10 @@ func TestAdmitRejectsNegativeUsage(t *testing.T) {
 	quotaAccessor.client = kubeClient
 	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -1210,9 +1210,10 @@ func TestAdmitWhenUnrelatedResourceExceedsQuota(t *testing.T) {
 	quotaAccessor.client = kubeClient
 	quotaAccessor.lister = informerFactory.Core().InternalVersion().ResourceQuotas().Lister()
 	config := &resourcequotaapi.Configuration{}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -1246,9 +1247,10 @@ func TestAdmitLimitedResourceNoQuota(t *testing.T) {
 			},
 		},
 	}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -1279,9 +1281,10 @@ func TestAdmitLimitedResourceNoQuotaIgnoresNonMatchingResources(t *testing.T) {
 			},
 		},
 	}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -1325,9 +1328,10 @@ func TestAdmitLimitedResourceWithQuota(t *testing.T) {
 			},
 		},
 	}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -1383,9 +1387,10 @@ func TestAdmitLimitedResourceWithMultipleQuota(t *testing.T) {
 			},
 		},
 	}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}
@@ -1431,9 +1436,10 @@ func TestAdmitLimitedResourceWithQuotaThatDoesNotCover(t *testing.T) {
 			},
 		},
 	}
-	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(nil, nil), nil, config, 5, stopCh)
+	quotaConfiguration := install.NewQuotaConfigurationForAdmission()
+	evaluator := NewQuotaEvaluator(quotaAccessor, quotaConfiguration, nil, config, 5, stopCh)
 
-	handler := &quotaAdmission{
+	handler := &QuotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
 	}

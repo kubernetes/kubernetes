@@ -145,48 +145,6 @@ EmptyDir wrapper volumes should not conflict,deads2k,1,node
 Etcd failure should recover from SIGKILL,pmorie,1,api-machinery
 Etcd failure should recover from network partition with master,justinsb,1,api-machinery
 Events should be sent by kubelets and the scheduler about pods scheduling and running,zmerlynn,1,node
-Federated ReplicaSet Features CRUD should be deleted from underlying clusters when OrphanDependents is false,perotinus,0,federation
-Federated ReplicaSet Features CRUD should create and update matching replicasets in underlying clusters,perotinus,0,federation
-Federated ReplicaSet Features CRUD should not be deleted from underlying clusters when OrphanDependents is nil,perotinus,0,federation
-Federated ReplicaSet Features CRUD should not be deleted from underlying clusters when OrphanDependents is true,perotinus,0,federation
-Federated ReplicaSet Features Preferences should create replicasets with max replicas preference,perotinus,0,federation
-Federated ReplicaSet Features Preferences should create replicasets with min replicas preference,perotinus,0,federation
-Federated ReplicaSet Features Preferences should create replicasets with weight preference,perotinus,0,federation
-Federated ReplicaSet ReplicaSet objects should be created and deleted successfully,perotinus,0,federation
-Federated Services Without Clusters should succeed when a service is created,shashidharatd,0,federation
-Federated Services with clusters DNS non-local federated service missing local service should never find DNS entries for a missing local service,shashidharatd,0,federation
-Federated Services with clusters DNS should be able to discover a federated service,shashidharatd,0,federation
-Federated Services with clusters Federated Service should be deleted from underlying clusters when OrphanDependents is false,shashidharatd,0,federation
-Federated Services with clusters Federated Service should create and update matching services in underlying clusters,shashidharatd,0,federation
-Federated Services with clusters Federated Service should not be deleted from underlying clusters when OrphanDependents is nil,shashidharatd,0,federation
-Federated Services with clusters Federated Service should not be deleted from underlying clusters when OrphanDependents is true,shashidharatd,0,federation
-Federated Services with clusters Federated Service should recreate service shard in underlying clusters when service shard is deleted,shashidharatd,0,federation
-Federated ingresses Federated Ingresses should be created and deleted successfully,madhusudancs,0,federation
-Federated ingresses Federated Ingresses should be deleted from underlying clusters when OrphanDependents is false,madhusudancs,0,federation
-Federated ingresses Federated Ingresses should create and update matching ingresses in underlying clusters,madhusudancs,0,federation
-Federated ingresses Federated Ingresses should not be deleted from underlying clusters when OrphanDependents is nil,madhusudancs,0,federation
-Federated ingresses Federated Ingresses should not be deleted from underlying clusters when OrphanDependents is true,madhusudancs,0,federation
-"Federated types Federated %q resources should be created, read, updated and deleted successfully",marun,0,federation
-Federation API server authentication should accept cluster resources when the client has HTTP Basic authentication credentials,nikhiljindal,0,federation
-Federation API server authentication should accept cluster resources when the client has certificate authentication credentials,nikhiljindal,0,federation
-Federation API server authentication should accept cluster resources when the client has token authentication credentials,nikhiljindal,0,federation
-Federation API server authentication should not accept cluster resources when the client has invalid HTTP Basic authentication credentials,nikhiljindal,0,federation
-Federation API server authentication should not accept cluster resources when the client has invalid token authentication credentials,nikhiljindal,0,federation
-Federation API server authentication should not accept cluster resources when the client has no authentication credentials,nikhiljindal,0,federation
-Federation apiserver Admission control should not be able to create resources if namespace does not exist,nikhiljindal,0,federation
-Federation apiserver Cluster objects should be created and deleted successfully,nikhiljindal,0,federation
-Federation deployments Deployment objects should be created and deleted successfully,nikhiljindal,0,federation
-Federation deployments Federated Deployment should be deleted from underlying clusters when OrphanDependents is false,nikhiljindal,0,federation
-Federation deployments Federated Deployment should create and update matching deployments in underlying clusters,nikhiljindal,0,federation
-Federation deployments Federated Deployment should not be deleted from underlying clusters when OrphanDependents is nil,nikhiljindal,0,federation
-Federation deployments Federated Deployment should not be deleted from underlying clusters when OrphanDependents is true,nikhiljindal,0,federation
-Federation events Event objects should be created and deleted successfully,shashidharatd,0,federation
-Federation namespace Namespace objects all resources in the namespace should be deleted when namespace is deleted,nikhiljindal,0,federation
-Federation namespace Namespace objects deletes replicasets in the namespace when the namespace is deleted,nikhiljindal,0,federation
-Federation namespace Namespace objects should be created and deleted successfully,nikhiljindal,0,federation
-Federation namespace Namespace objects should be deleted from underlying clusters when OrphanDependents is false,nikhiljindal,0,federation
-Federation namespace Namespace objects should not be deleted from underlying clusters when OrphanDependents is nil,nikhiljindal,0,federation
-Federation namespace Namespace objects should not be deleted from underlying clusters when OrphanDependents is true,nikhiljindal,0,federation
 Firewall rule should create valid firewall rules for LoadBalancer type service,MrHohn,0,network
 Firewall rule should have correct firewall rules for e2e cluster,MrHohn,0,network
 GCP Volumes GlusterFS should be mountable,nikhiljindal,0,storage
@@ -587,27 +545,6 @@ k8s.io/kubernetes/cmd/libs/go2idl/client-gen/types,caesarxuchao,0,
 k8s.io/kubernetes/cmd/libs/go2idl/go-to-protobuf/protobuf,smarterclayton,0,
 k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators,davidopp,1,
 k8s.io/kubernetes/examples,Random-Liu,0,
-k8s.io/kubernetes/federation/apis/federation/install,nikhiljindal,0,
-k8s.io/kubernetes/federation/apis/federation/validation,nikhiljindal,0,
-k8s.io/kubernetes/federation/cmd/federation-controller-manager/app,kzwang,0,
-k8s.io/kubernetes/federation/pkg/dnsprovider,sttts,1,
-k8s.io/kubernetes/federation/pkg/dnsprovider/providers/aws/route53,cjcullen,1,
-k8s.io/kubernetes/federation/pkg/dnsprovider/providers/coredns,brendandburns,0,
-k8s.io/kubernetes/federation/pkg/dnsprovider/providers/google/clouddns,madhusudancs,1,
-k8s.io/kubernetes/federation/pkg/federation-controller/cluster,nikhiljindal,0,
-k8s.io/kubernetes/federation/pkg/federation-controller/deployment,zmerlynn,1,
-k8s.io/kubernetes/federation/pkg/federation-controller/ingress,vishh,1,
-k8s.io/kubernetes/federation/pkg/federation-controller/replicaset,roberthbailey,1,
-k8s.io/kubernetes/federation/pkg/federation-controller/secret,apelisse,1,
-k8s.io/kubernetes/federation/pkg/federation-controller/service,pmorie,1,
-k8s.io/kubernetes/federation/pkg/federation-controller/util,bgrant0607,1,
-k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink,luxas,1,
-k8s.io/kubernetes/federation/pkg/federation-controller/util/planner,Q-Lee,1,
-k8s.io/kubernetes/federation/pkg/federation-controller/util/podanalyzer,caesarxuchao,1,
-k8s.io/kubernetes/federation/pkg/kubefed,madhusudancs,0,
-k8s.io/kubernetes/federation/pkg/kubefed/init,madhusudancs,0,
-k8s.io/kubernetes/federation/registry/cluster,nikhiljindal,0,
-k8s.io/kubernetes/federation/registry/cluster/etcd,nikhiljindal,0,
 k8s.io/kubernetes/hack,thockin,1,
 k8s.io/kubernetes/hack/cmd/teststale,thockin,1,
 k8s.io/kubernetes/pkg/api,Q-Lee,1,
@@ -944,7 +881,6 @@ k8s.io/kubernetes/test/integration/client,Q-Lee,1,
 k8s.io/kubernetes/test/integration/configmap,Q-Lee,1,
 k8s.io/kubernetes/test/integration/evictions,brendandburns,0,
 k8s.io/kubernetes/test/integration/examples,maisem,1,
-k8s.io/kubernetes/test/integration/federation,rrati,0,
 k8s.io/kubernetes/test/integration/garbagecollector,jlowdermilk,1,
 k8s.io/kubernetes/test/integration/kubeaggregator,deads2k,1,
 k8s.io/kubernetes/test/integration/kubectl,rrati,0,

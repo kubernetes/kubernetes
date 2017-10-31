@@ -56,6 +56,7 @@ type Builder struct {
 	selector             *string
 	selectAll            bool
 	includeUninitialized bool
+	limitChunks          int64
 
 	resources []string
 
@@ -67,9 +68,6 @@ type Builder struct {
 
 	defaultNamespace bool
 	requireNamespace bool
-
-	isLocal        bool
-	isUnstructured bool
 
 	flatten bool
 	latest  bool
@@ -85,8 +83,6 @@ type Builder struct {
 
 	schema validation.Schema
 }
-
-var LocalUnstructuredBuilderError = fmt.Errorf("Unstructured objects cannot be handled with a local builder - Local and Unstructured attributes cannot be used in conjunction")
 
 var missingResourceError = fmt.Errorf(`You must provide one or more resources by argument or filename.
 Example resource specifications include:
@@ -169,12 +165,6 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 
 // Local wraps the builder's clientMapper in a DisabledClientMapperForMapping
 func (b *Builder) Local(mapperFunc ClientMapperFunc) *Builder {
-	if b.isUnstructured {
-		b.errs = append(b.errs, LocalUnstructuredBuilderError)
-		return b
-	}
-
-	b.isLocal = true
 	b.mapper.ClientMapper = DisabledClientForMapping{ClientMapper: ClientMapperFunc(mapperFunc)}
 	return b
 }
@@ -182,12 +172,6 @@ func (b *Builder) Local(mapperFunc ClientMapperFunc) *Builder {
 // Unstructured updates the builder's ClientMapper, RESTMapper,
 // ObjectTyper, and codec for working with unstructured api objects
 func (b *Builder) Unstructured(mapperFunc ClientMapperFunc, mapper meta.RESTMapper, typer runtime.ObjectTyper) *Builder {
-	if b.isLocal {
-		b.errs = append(b.errs, LocalUnstructuredBuilderError)
-		return b
-	}
-
-	b.isUnstructured = true
 	b.mapper.RESTMapper = mapper
 	b.mapper.ObjectTyper = typer
 	b.mapper.Decoder = unstructured.UnstructuredJSONScheme
@@ -352,6 +336,14 @@ func (b *Builder) AllNamespaces(allNamespace bool) *Builder {
 // NamespaceParam() an error will be returned.
 func (b *Builder) RequireNamespace() *Builder {
 	b.requireNamespace = true
+	return b
+}
+
+// RequestChunksOf attempts to load responses from the server in batches of size limit
+// to avoid long delays loading and transferring very large lists. If unset defaults to
+// no chunking.
+func (b *Builder) RequestChunksOf(chunkSize int64) *Builder {
+	b.limitChunks = chunkSize
 	return b
 }
 
@@ -653,7 +645,7 @@ func (b *Builder) visitBySelector() *Result {
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
 		}
-		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, *b.selector, b.export, b.includeUninitialized))
+		visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, *b.selector, b.export, b.includeUninitialized, b.limitChunks))
 	}
 	if b.continueOnError {
 		result.visitor = EagerVisitorList(visitors)

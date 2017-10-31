@@ -52,7 +52,7 @@ const (
 	configDriveID = "configDrive"
 )
 
-var ErrBadMetadata = errors.New("Invalid OpenStack metadata, got empty uuid")
+var ErrBadMetadata = errors.New("invalid OpenStack metadata, got empty uuid")
 
 // Assumes the "2012-08-10" meta_data.json format.
 // See http://docs.openstack.org/user-guide/cli_config_drive.html
@@ -89,8 +89,7 @@ func getMetadataFromConfigDrive() (*Metadata, error) {
 			"-o", "device",
 		).CombinedOutput()
 		if err != nil {
-			glog.V(2).Infof("Unable to run blkid: %v", err)
-			return nil, err
+			return nil, fmt.Errorf("unable to run blkid: %v", err)
 		}
 		dev = strings.TrimSpace(string(out))
 	}
@@ -109,8 +108,7 @@ func getMetadataFromConfigDrive() (*Metadata, error) {
 		err = mounter.Mount(dev, mntdir, "vfat", []string{"ro"})
 	}
 	if err != nil {
-		glog.Errorf("Error mounting configdrive %s: %v", dev, err)
-		return nil, err
+		return nil, fmt.Errorf("error mounting configdrive %s: %v", dev, err)
 	}
 	defer mounter.Unmount(mntdir)
 
@@ -119,8 +117,7 @@ func getMetadataFromConfigDrive() (*Metadata, error) {
 	f, err := os.Open(
 		filepath.Join(mntdir, configDrivePath))
 	if err != nil {
-		glog.Errorf("Error reading %s on config drive: %v", configDrivePath, err)
-		return nil, err
+		return nil, fmt.Errorf("error reading %s on config drive: %v", configDrivePath, err)
 	}
 	defer f.Close()
 
@@ -128,18 +125,16 @@ func getMetadataFromConfigDrive() (*Metadata, error) {
 }
 
 func getMetadataFromMetadataService() (*Metadata, error) {
-	// Try to get JSON from metdata server.
+	// Try to get JSON from metadata server.
 	glog.V(4).Infof("Attempting to fetch metadata from %s", metadataUrl)
 	resp, err := http.Get(metadataUrl)
 	if err != nil {
-		glog.V(3).Infof("Cannot read %s: %v", metadataUrl, err)
-		return nil, err
+		return nil, fmt.Errorf("error fetching %s: %v", metadataUrl, err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("Unexpected status code when reading metadata from %s: %s", metadataUrl, resp.Status)
-		glog.V(3).Infof("%v", err)
+		err = fmt.Errorf("unexpected status code when reading metadata from %s: %s", metadataUrl, resp.Status)
 		return nil, err
 	}
 

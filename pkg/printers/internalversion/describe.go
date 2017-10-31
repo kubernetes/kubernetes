@@ -47,8 +47,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	clientextensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
-	federation "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/helper"
@@ -624,6 +622,10 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pod.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", pod.Namespace)
+		if pod.Spec.Priority != nil {
+			w.Write(LEVEL_0, "Priority:\t%d\n", *pod.Spec.Priority)
+			w.Write(LEVEL_0, "PriorityClassName:\t%s\n", stringOrNone(pod.Spec.PriorityClassName))
+		}
 		if pod.Spec.NodeName == "" {
 			w.Write(LEVEL_0, "Node:\t<none>\n")
 		} else {
@@ -898,6 +900,19 @@ func printRBDVolumeSource(rbd *api.RBDVolumeSource, w PrefixWriter) {
 		rbd.CephMonitors, rbd.RBDImage, rbd.FSType, rbd.RBDPool, rbd.RadosUser, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly)
 }
 
+func printRBDPersistentVolumeSource(rbd *api.RBDPersistentVolumeSource, w PrefixWriter) {
+	w.Write(LEVEL_2, "Type:\tRBD (a Rados Block Device mount on the host that shares a pod's lifetime)\n"+
+		"    CephMonitors:\t%v\n"+
+		"    RBDImage:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    RBDPool:\t%v\n"+
+		"    RadosUser:\t%v\n"+
+		"    Keyring:\t%v\n"+
+		"    SecretRef:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		rbd.CephMonitors, rbd.RBDImage, rbd.FSType, rbd.RBDPool, rbd.RadosUser, rbd.Keyring, rbd.SecretRef, rbd.ReadOnly)
+}
+
 func printDownwardAPIVolumeSource(d *api.DownwardAPIVolumeSource, w PrefixWriter) {
 	w.Write(LEVEL_2, "Type:\tDownwardAPI (a volume populated by information about the pod)\n    Items:\n")
 	for _, mapping := range d.Items {
@@ -955,6 +970,26 @@ func printScaleIOVolumeSource(sio *api.ScaleIOVolumeSource, w PrefixWriter) {
 		"    FSType:\t%v\n"+
 		"    ReadOnly:\t%v\n",
 		sio.Gateway, sio.System, sio.ProtectionDomain, sio.StoragePool, sio.StorageMode, sio.VolumeName, sio.FSType, sio.ReadOnly)
+}
+
+func printScaleIOPersistentVolumeSource(sio *api.ScaleIOPersistentVolumeSource, w PrefixWriter) {
+	var secretNS, secretName string
+	if sio.SecretRef != nil {
+		secretName = sio.SecretRef.Name
+		secretNS = sio.SecretRef.Namespace
+	}
+	w.Write(LEVEL_2, "Type:\tScaleIO (a persistent volume backed by a block device in ScaleIO)\n"+
+		"    Gateway:\t%v\n"+
+		"    System:\t%v\n"+
+		"    Protection Domain:\t%v\n"+
+		"    Storage Pool:\t%v\n"+
+		"    Storage Mode:\t%v\n"+
+		"    VolumeName:\t%v\n"+
+		"    SecretName:\t%v\n"+
+		"    SecretNamespace:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		sio.Gateway, sio.System, sio.ProtectionDomain, sio.StoragePool, sio.StorageMode, sio.VolumeName, secretName, secretNS, sio.FSType, sio.ReadOnly)
 }
 
 func printLocalVolumeSource(ls *api.LocalVolumeSource, w PrefixWriter) {
@@ -1108,7 +1143,7 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		case pv.Spec.Glusterfs != nil:
 			printGlusterfsVolumeSource(pv.Spec.Glusterfs, w)
 		case pv.Spec.RBD != nil:
-			printRBDVolumeSource(pv.Spec.RBD, w)
+			printRBDPersistentVolumeSource(pv.Spec.RBD, w)
 		case pv.Spec.Quobyte != nil:
 			printQuobyteVolumeSource(pv.Spec.Quobyte, w)
 		case pv.Spec.VsphereVolume != nil:
@@ -1122,7 +1157,7 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		case pv.Spec.PortworxVolume != nil:
 			printPortworxVolumeSource(pv.Spec.PortworxVolume, w)
 		case pv.Spec.ScaleIO != nil:
-			printScaleIOVolumeSource(pv.Spec.ScaleIO, w)
+			printScaleIOPersistentVolumeSource(pv.Spec.ScaleIO, w)
 		case pv.Spec.Local != nil:
 			printLocalVolumeSource(pv.Spec.Local, w)
 		case pv.Spec.CephFS != nil:
@@ -2233,7 +2268,6 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 		w.Write(LEVEL_0, "Namespace:\t%s\n", serviceAccount.Namespace)
 		printLabelsMultiline(w, "Labels", serviceAccount.Labels)
 		printAnnotationsMultiline(w, "Annotations", serviceAccount.Annotations)
-		w.WriteLine()
 
 		var (
 			emptyHeader = "                   "
@@ -2261,7 +2295,8 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 			mountHeader: mountSecretNames,
 			tokenHeader: tokenSecretNames,
 		}
-		for header, names := range types {
+		for _, header := range sets.StringKeySet(types).List() {
+			names := types[header]
 			if len(names) == 0 {
 				w.Write(LEVEL_0, "%s\t<none>\n", header)
 			} else {
@@ -2275,7 +2310,6 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 					prefix = emptyHeader
 				}
 			}
-			w.WriteLine()
 		}
 
 		if events != nil {
@@ -3041,47 +3075,6 @@ func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings 
 	})
 }
 
-type ClusterDescriber struct {
-	fedclientset.Interface
-}
-
-func (d *ClusterDescriber) Describe(namespace, name string, describerSettings printers.DescriberSettings) (string, error) {
-	cluster, err := d.Federation().Clusters().Get(name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-	return describeCluster(cluster)
-}
-
-func describeCluster(cluster *federation.Cluster) (string, error) {
-	return tabbedString(func(out io.Writer) error {
-		w := NewPrefixWriter(out)
-		w.Write(LEVEL_0, "Name:\t%s\n", cluster.Name)
-		w.Write(LEVEL_0, "Labels:\t%s\n", labels.FormatLabels(cluster.Labels))
-
-		w.Write(LEVEL_0, "ServerAddressByClientCIDRs:\n  ClientCIDR\tServerAddress\n")
-		w.Write(LEVEL_1, "----\t----\n")
-		for _, cidrAddr := range cluster.Spec.ServerAddressByClientCIDRs {
-			w.Write(LEVEL_1, "%v \t%v\n\n", cidrAddr.ClientCIDR, cidrAddr.ServerAddress)
-		}
-
-		if len(cluster.Status.Conditions) > 0 {
-			w.Write(LEVEL_0, "Conditions:\n  Type\tStatus\tLastUpdateTime\tLastTransitionTime\tReason\tMessage\n")
-			w.Write(LEVEL_1, "----\t------\t-----------------\t------------------\t------\t-------\n")
-			for _, c := range cluster.Status.Conditions {
-				w.Write(LEVEL_1, "%v \t%v \t%s \t%s \t%v \t%v\n",
-					c.Type,
-					c.Status,
-					c.LastProbeTime.Time.Format(time.RFC1123Z),
-					c.LastTransitionTime.Time.Format(time.RFC1123Z),
-					c.Reason,
-					c.Message)
-			}
-		}
-		return nil
-	})
-}
-
 // NetworkPolicyDescriber generates information about a networking.NetworkPolicy
 type NetworkPolicyDescriber struct {
 	clientset.Interface
@@ -3103,11 +3096,61 @@ func describeNetworkPolicy(networkPolicy *networking.NetworkPolicy) (string, err
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", networkPolicy.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", networkPolicy.Namespace)
+		w.Write(LEVEL_0, "Created on:\t%s\n", networkPolicy.CreationTimestamp)
 		printLabelsMultiline(w, "Labels", networkPolicy.Labels)
 		printAnnotationsMultiline(w, "Annotations", networkPolicy.Annotations)
-
+		describeNetworkPolicySpec(networkPolicy.Spec, w)
 		return nil
 	})
+}
+
+func describeNetworkPolicySpec(nps networking.NetworkPolicySpec, w PrefixWriter) {
+	w.Write(LEVEL_0, "Spec:\n")
+	w.Write(LEVEL_1, "Pod Selector: ")
+	if len(nps.PodSelector.MatchLabels) == 0 && len(nps.PodSelector.MatchExpressions) == 0 {
+		w.Write(LEVEL_2, "<none> (Allowing the specific traffic to all pods in this namespace)\n")
+	} else {
+		w.Write(LEVEL_2, "%s\n", metav1.FormatLabelSelector(&nps.PodSelector))
+	}
+	w.Write(LEVEL_1, "Allowing ingress traffic:\n")
+	printNetworkPolicySpecIngressFrom(nps.Ingress, "    ", w)
+}
+
+func printNetworkPolicySpecIngressFrom(npirs []networking.NetworkPolicyIngressRule, initialIndent string, w PrefixWriter) {
+	if len(npirs) == 0 {
+		w.WriteLine("<none> (Selected pods are isolated for ingress connectivity)")
+		return
+	}
+	for i, npir := range npirs {
+		if len(npir.Ports) == 0 {
+			w.Write(LEVEL_0, "%s%s\n", initialIndent, "To Port: <any> (traffic allowed to all ports)")
+		} else {
+			for _, port := range npir.Ports {
+				var proto api.Protocol
+				if port.Protocol != nil {
+					proto = *port.Protocol
+				} else {
+					proto = api.ProtocolTCP
+				}
+				w.Write(LEVEL_0, "%s%s: %s/%s\n", initialIndent, "To Port", port.Port, proto)
+			}
+		}
+		if len(npir.From) == 0 {
+			w.Write(LEVEL_0, "%s%s\n", initialIndent, "From: <any> (traffic not restricted by source)")
+		} else {
+			for _, from := range npir.From {
+				w.Write(LEVEL_0, "%s", initialIndent)
+				if from.PodSelector != nil {
+					w.Write(LEVEL_0, "%s: %s\n", "From Pod Selector", metav1.FormatLabelSelector(from.PodSelector))
+				} else if from.NamespaceSelector != nil {
+					w.Write(LEVEL_0, "%s: %s\n", "From Namespace Selector", metav1.FormatLabelSelector(from.NamespaceSelector))
+				}
+			}
+		}
+		if i != len(npirs)-1 {
+			w.Write(LEVEL_0, "%s%s\n", initialIndent, "----------")
+		}
+	}
 }
 
 type StorageClassDescriber struct {

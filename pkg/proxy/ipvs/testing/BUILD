@@ -9,12 +9,7 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = select({
-        "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "fake.go",
-        ],
-        "//conditions:default": [],
-    }),
+    srcs = ["fake.go"],
     importpath = "k8s.io/kubernetes/pkg/proxy/ipvs/testing",
     tags = ["automanaged"],
 )

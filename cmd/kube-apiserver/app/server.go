@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -452,46 +453,36 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 		genericConfig.DisabledPostStartHooks.Insert(rbacrest.PostStartHookName)
 	}
 
+	webhookAuthResolver := func(delegate webhook.AuthenticationInfoResolver) webhook.AuthenticationInfoResolver {
+		return webhook.AuthenticationInfoResolverFunc(func(server string) (*rest.Config, error) {
+			if server == "kubernetes.default.svc" {
+				return genericConfig.LoopbackClientConfig, nil
+			}
+			ret, err := delegate.ClientConfigFor(server)
+			if err != nil {
+				return nil, err
+			}
+			if proxyTransport != nil && proxyTransport.Dial != nil {
+				ret.Dial = proxyTransport.Dial
+			}
+			return ret, err
+		})
+	}
 	pluginInitializer, err := BuildAdmissionPluginInitializer(
 		s,
 		client,
 		sharedInformers,
 		serviceResolver,
+		webhookAuthResolver,
 	)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %v", err)
 	}
 
-	webhookClientConfig := rest.AnonymousClientConfig(genericConfig.LoopbackClientConfig)
-	if proxyTransport != nil && proxyTransport.Dial != nil {
-		webhookClientConfig.Dial = proxyTransport.Dial
-	}
-	// TODO: this is the wrong cert/key pair.
-	// Given the generic case of webhook admission from a generic apiserver,
-	// this key pair should be signed by the the API server's client CA.
-	// Read client cert/key for plugins that need to make calls out
-	certBytes, keyBytes := []byte{}, []byte{}
-	if len(s.ProxyClientCertFile) > 0 && len(s.ProxyClientKeyFile) > 0 {
-		var err error
-		certBytes, err = ioutil.ReadFile(s.ProxyClientCertFile)
-		if err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("failed to read proxy client cert file from: %s, err: %v", s.ProxyClientCertFile, err)
-		}
-		keyBytes, err = ioutil.ReadFile(s.ProxyClientKeyFile)
-		if err != nil {
-			return nil, nil, nil, nil, nil, fmt.Errorf("failed to read proxy client key file from: %s, err: %v", s.ProxyClientKeyFile, err)
-		}
-		webhookClientConfig.TLSClientConfig.CertData = certBytes
-		webhookClientConfig.TLSClientConfig.KeyData = keyBytes
-	}
-	webhookClientConfig.UserAgent = "kube-apiserver-admission"
-	webhookClientConfig.Timeout = 30 * time.Second
-
 	err = s.Admission.ApplyTo(
 		genericConfig,
 		versionedInformers,
 		kubeClientConfig,
-		webhookClientConfig,
 		legacyscheme.Scheme,
 		pluginInitializer)
 	if err != nil {
@@ -501,7 +492,7 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 }
 
 // BuildAdmissionPluginInitializer constructs the admission plugin initializer
-func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, serviceResolver aggregatorapiserver.ServiceResolver) (admission.PluginInitializer, error) {
+func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client internalclientset.Interface, sharedInformers informers.SharedInformerFactory, serviceResolver aggregatorapiserver.ServiceResolver, webhookAuthWrapper webhook.AuthenticationInfoResolverWrapper) (admission.PluginInitializer, error) {
 	var cloudConfig []byte
 
 	if s.CloudProvider.CloudConfigFile != "" {
@@ -515,13 +506,9 @@ func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client interna
 	// TODO: use a dynamic restmapper. See https://github.com/kubernetes/kubernetes/pull/42615.
 	restMapper := legacyscheme.Registry.RESTMapper()
 
-	// NOTE: we do not provide informers to the quota registry because admission level decisions
-	// do not require us to open watches for all items tracked by quota.
-	quotaRegistry := quotainstall.NewRegistry(nil, nil)
+	quotaConfiguration := quotainstall.NewQuotaConfigurationForAdmission()
 
-	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, restMapper, quotaRegistry)
-
-	pluginInitializer = pluginInitializer.SetServiceResolver(serviceResolver)
+	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, restMapper, quotaConfiguration, webhookAuthWrapper, serviceResolver)
 
 	return pluginInitializer, nil
 }
@@ -627,10 +614,11 @@ func defaultOptions(s *options.ServerRunOptions) error {
 	if err := kubeoptions.DefaultAdvertiseAddress(s.GenericServerRunOptions, s.InsecureServing); err != nil {
 		return err
 	}
-	_, apiServerServiceIP, err := master.DefaultServiceIPRange(s.ServiceClusterIPRange)
+	serviceIPRange, apiServerServiceIP, err := master.DefaultServiceIPRange(s.ServiceClusterIPRange)
 	if err != nil {
 		return fmt.Errorf("error determining service IP ranges: %v", err)
 	}
+	s.ServiceClusterIPRange = serviceIPRange
 	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{apiServerServiceIP}); err != nil {
 		return fmt.Errorf("error creating self-signed certificates: %v", err)
 	}

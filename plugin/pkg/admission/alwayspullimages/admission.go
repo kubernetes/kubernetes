@@ -39,13 +39,14 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-// alwaysPullImages is an implementation of admission.Interface.
+// AlwaysPullImages is an implementation of admission.Interface.
 // It looks at all new pods and overrides each container's image pull policy to Always.
-type alwaysPullImages struct {
+type AlwaysPullImages struct {
 	*admission.Handler
 }
 
-func (a *alwaysPullImages) Admit(attributes admission.Attributes) (err error) {
+// Admit makes an admission decision based on the request attributes
+func (a *AlwaysPullImages) Admit(attributes admission.Attributes) (err error) {
 	// Ignore all calls to subresources or resources other than pods.
 	if len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
@@ -67,8 +68,8 @@ func (a *alwaysPullImages) Admit(attributes admission.Attributes) (err error) {
 }
 
 // NewAlwaysPullImages creates a new always pull images admission control handler
-func NewAlwaysPullImages() admission.Interface {
-	return &alwaysPullImages{
+func NewAlwaysPullImages() *AlwaysPullImages {
+	return &AlwaysPullImages{
 		Handler: admission.NewHandler(admission.Create, admission.Update),
 	}
 }

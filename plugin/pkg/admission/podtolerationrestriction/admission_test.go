@@ -342,7 +342,7 @@ func newHandlerForTest(c clientset.Interface) (*podTolerationsPlugin, informers.
 		return nil, nil, err
 	}
 	handler := NewPodTolerationsPlugin(pluginConfig)
-	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil)
+	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
 	err = admission.Validate(handler)
 	return handler, f, err

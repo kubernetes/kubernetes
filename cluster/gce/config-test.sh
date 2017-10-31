@@ -78,6 +78,7 @@ MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
 NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
+NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
 CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
 GCI_DOCKER_VERSION=${KUBE_GCI_DOCKER_VERSION:-}
 RKT_VERSION=${KUBE_RKT_VERSION:-1.23.0}
@@ -204,9 +205,14 @@ if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
 	NODE_LABELS="$NODE_LABELS,projectcalico.org/ds-ready=true"
 fi
 
-# Apply the right node label if metadata proxy is on.
-if [[ ${ENABLE_METADATA_PROXY:-} == "simple" ]]; then
-        NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
+# Enable metadata concealment by firewalling pod traffic to the metadata server
+# and run a proxy daemonset on nodes.
+ENABLE_METADATA_CONCEALMENT="${ENABLE_METADATA_CONCEALMENT:-true}" # true, false
+if [[ ${ENABLE_METADATA_CONCEALMENT:-} == "true" ]]; then
+  # Put the necessary label on the node so the daemonset gets scheduled.
+  NODE_LABELS="${NODE_LABELS},beta.kubernetes.io/metadata-proxy-ready=true"
+  # Add to the provider custom variables.
+  PROVIDER_VARS="${PROVIDER_VARS:-} ENABLE_METADATA_CONCEALMENT"
 fi
 
 # Optional: Enable node logging.
@@ -293,7 +299,7 @@ if [[ -n "${GCE_GLBC_IMAGE:-}" ]]; then
 fi
 
 # If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
-ADMISSION_CONTROL="${KUBE_ADMISSION_CONTROL:-Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority,ResourceQuota}"
+ADMISSION_CONTROL="${KUBE_ADMISSION_CONTROL:-Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority,ResourceQuota,GenericAdmissionWebhook}"
 
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}

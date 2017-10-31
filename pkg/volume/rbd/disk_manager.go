@@ -23,6 +23,7 @@ limitations under the License.
 package rbd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/golang/glog"
@@ -33,33 +34,39 @@ import (
 
 // Abstract interface to disk operations.
 type diskManager interface {
+	// MakeGlobalPDName creates global persistent disk path.
 	MakeGlobalPDName(disk rbd) string
 	// Attaches the disk to the kubelet's host machine.
-	AttachDisk(disk rbdMounter) error
+	// If it successfully attaches, the path to the device
+	// is returned. Otherwise, an error will be returned.
+	AttachDisk(disk rbdMounter) (string, error)
 	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(disk rbdUnmounter, mntPath string) error
-	// Creates a rbd image
-	CreateImage(provisioner *rbdVolumeProvisioner) (r *v1.RBDVolumeSource, volumeSizeGB int, err error)
-	// Deletes a rbd image
+	DetachDisk(plugin *rbdPlugin, deviceMountPath string, device string) error
+	// Creates a rbd image.
+	CreateImage(provisioner *rbdVolumeProvisioner) (r *v1.RBDPersistentVolumeSource, volumeSizeGB int, err error)
+	// Deletes a rbd image.
 	DeleteImage(deleter *rbdVolumeDeleter) error
 }
 
 // utility to mount a disk based filesystem
 func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.Interface, fsGroup *int64) error {
 	globalPDPath := manager.MakeGlobalPDName(*b.rbd)
-	// TODO: handle failed mounts here.
-	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
+	notMnt, err := mounter.IsLikelyNotMountPoint(globalPDPath)
+	if err != nil && !os.IsNotExist(err) {
+		glog.Errorf("cannot validate mountpoint: %s", globalPDPath)
+		return err
+	}
+	if notMnt {
+		return fmt.Errorf("no device is mounted at %s", globalPDPath)
+	}
 
+	notMnt, err = mounter.IsLikelyNotMountPoint(volPath)
 	if err != nil && !os.IsNotExist(err) {
 		glog.Errorf("cannot validate mountpoint: %s", volPath)
 		return err
 	}
 	if !notMnt {
 		return nil
-	}
-	if err := manager.AttachDisk(b); err != nil {
-		glog.Errorf("failed to attach disk")
-		return err
 	}
 
 	if err := os.MkdirAll(volPath, 0750); err != nil {
@@ -89,43 +96,31 @@ func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.
 // utility to tear down a disk based filesystem
 func diskTearDown(manager diskManager, c rbdUnmounter, volPath string, mounter mount.Interface) error {
 	notMnt, err := mounter.IsLikelyNotMountPoint(volPath)
-	if err != nil {
-		glog.Errorf("cannot validate mountpoint %s", volPath)
+	if err != nil && !os.IsNotExist(err) {
+		glog.Errorf("cannot validate mountpoint: %s", volPath)
 		return err
 	}
 	if notMnt {
+		glog.V(3).Infof("volume path %s is not a mountpoint, deleting", volPath)
 		return os.Remove(volPath)
 	}
 
-	refs, err := mount.GetMountRefs(mounter, volPath)
-	if err != nil {
-		glog.Errorf("failed to get reference count %s", volPath)
-		return err
-	}
+	// Unmount the bind-mount inside this pod.
 	if err := mounter.Unmount(volPath); err != nil {
 		glog.Errorf("failed to umount %s", volPath)
 		return err
 	}
-	// If len(refs) is 1, then all bind mounts have been removed, and the
-	// remaining reference is the global mount. It is safe to detach.
-	if len(refs) == 1 {
-		mntPath := refs[0]
-		if err := manager.DetachDisk(c, mntPath); err != nil {
-			glog.Errorf("failed to detach disk from %s", mntPath)
-			return err
-		}
-	}
 
 	notMnt, mntErr := mounter.IsLikelyNotMountPoint(volPath)
-	if mntErr != nil {
+	if err != nil && !os.IsNotExist(err) {
 		glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 		return err
 	}
 	if notMnt {
 		if err := os.Remove(volPath); err != nil {
+			glog.V(2).Info("Error removing mountpoint ", volPath, ": ", err)
 			return err
 		}
 	}
 	return nil
-
 }

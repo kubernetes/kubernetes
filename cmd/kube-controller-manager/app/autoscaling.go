@@ -21,7 +21,12 @@ limitations under the License.
 package app
 
 import (
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
+	discocache "k8s.io/client-go/discovery/cached" // Saturday Night Fever
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/scale"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	resourceclient "k8s.io/metrics/pkg/client/clientset_generated/clientset/typed/metrics/v1beta1"
@@ -63,16 +68,33 @@ func startHPAControllerWithLegacyClient(ctx ControllerContext) (bool, error) {
 }
 
 func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient metrics.MetricsClient) (bool, error) {
+	hpaClientGoClient := ctx.ClientBuilder.ClientGoClientOrDie("horizontal-pod-autoscaler")
 	hpaClient := ctx.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
+	hpaClientConfig := ctx.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
+
+	// TODO: we need something like deferred discovery REST mapper that calls invalidate
+	// on cache misses.
+	cachedDiscovery := discocache.NewMemCacheClient(hpaClientGoClient.Discovery())
+	restMapper := discovery.NewDeferredDiscoveryRESTMapper(cachedDiscovery, apimeta.InterfacesForUnstructured)
+	restMapper.Reset()
+	// we don't use cached discovery because DiscoveryScaleKindResolver does its own caching,
+	// so we want to re-fetch every time when we actually ask for it
+	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(hpaClientGoClient.Discovery())
+	scaleClient, err := scale.NewForConfig(hpaClientConfig, restMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
+	if err != nil {
+		return false, err
+	}
+
 	replicaCalc := podautoscaler.NewReplicaCalculator(
 		metricsClient,
-		hpaClient.Core(),
+		hpaClient.CoreV1(),
 		ctx.Options.HorizontalPodAutoscalerTolerance,
 	)
 	go podautoscaler.NewHorizontalController(
-		ctx.ClientBuilder.ClientGoClientOrDie("horizontal-pod-autoscaler").Core(),
-		hpaClient.Extensions(),
+		hpaClientGoClient.CoreV1(),
+		scaleClient,
 		hpaClient.Autoscaling(),
+		restMapper,
 		replicaCalc,
 		ctx.InformerFactory.Autoscaling().V1().HorizontalPodAutoscalers(),
 		ctx.Options.HorizontalPodAutoscalerSyncPeriod.Duration,

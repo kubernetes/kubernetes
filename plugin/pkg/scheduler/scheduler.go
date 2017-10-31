@@ -26,7 +26,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -80,10 +79,7 @@ type Configurator interface {
 	GetPredicates(predicateKeys sets.String) (map[string]algorithm.FitPredicate, error)
 	GetHardPodAffinitySymmetricWeight() int
 	GetSchedulerName() string
-	MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue *cache.FIFO) func(pod *v1.Pod, err error)
-
-	// Probably doesn't need to be public.  But exposed for now in case.
-	ResponsibleForPod(pod *v1.Pod) bool
+	MakeDefaultErrorFunc(backoff *util.PodBackoff, podQueue core.SchedulingQueue) func(pod *v1.Pod, err error)
 
 	// Needs to be exposed for things like integration tests where we want to make fake nodes.
 	GetNodeLister() corelisters.NodeLister

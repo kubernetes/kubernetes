@@ -164,7 +164,7 @@ func UnsecuredDependencies(s *options.KubeletServer) (*kubelet.Dependencies, err
 		ExternalKubeClient:  nil,
 		EventClient:         nil,
 		Mounter:             mounter,
-		NetworkPlugins:      ProbeNetworkPlugins(s.NetworkPluginDir, s.CNIConfDir, s.CNIBinDir),
+		NetworkPlugins:      ProbeNetworkPlugins(s.CNIConfDir, s.CNIBinDir),
 		OOMAdjuster:         oom.NewOOMAdjuster(),
 		OSInterface:         kubecontainer.RealOS{},
 		Writer:              writer,
@@ -653,7 +653,7 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 // Eventually, #2 will be replaced with instances of #3
 func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, runOnce bool) error {
 	hostname := nodeutil.GetHostname(kubeFlags.HostnameOverride)
-	// Query the cloud provider for our node name, default to hostname if kcfg.Cloud == nil
+	// Query the cloud provider for our node name, default to hostname if kubeDeps.Cloud == nil
 	nodeName, err := getNodeName(kubeDeps.Cloud, hostname)
 	if err != nil {
 		return err
@@ -898,9 +898,6 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 
 	// Initialize network plugin settings.
 	binDir := r.CNIBinDir
-	if binDir == "" {
-		binDir = r.NetworkPluginDir
-	}
 	nh := &kubelet.NoOpLegacyHost{}
 	pluginSettings := dockershim.NetworkPluginSettings{
 		HairpinMode:       kubeletconfiginternal.HairpinMode(c.HairpinMode),

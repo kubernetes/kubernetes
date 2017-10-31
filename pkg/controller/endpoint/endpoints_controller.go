@@ -75,8 +75,8 @@ var (
 // NewEndpointController returns a new *EndpointController.
 func NewEndpointController(podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
 	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface) *EndpointController {
-	if client != nil && client.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.Core().RESTClient().GetRateLimiter())
+	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.CoreV1().RESTClient().GetRateLimiter())
 	}
 	e := &EndpointController{
 		client:           client,
@@ -395,7 +395,7 @@ func (e *EndpointController) syncService(key string) error {
 		// service is deleted. However, if we're down at the time when
 		// the service is deleted, we will miss that deletion, so this
 		// doesn't completely solve the problem. See #6877.
-		err = e.client.Core().Endpoints(namespace).Delete(name, nil)
+		err = e.client.CoreV1().Endpoints(namespace).Delete(name, nil)
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
@@ -508,10 +508,10 @@ func (e *EndpointController) syncService(key string) error {
 	glog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
 	if createEndpoints {
 		// No previous endpoints, create them
-		_, err = e.client.Core().Endpoints(service.Namespace).Create(newEndpoints)
+		_, err = e.client.CoreV1().Endpoints(service.Namespace).Create(newEndpoints)
 	} else {
 		// Pre-existing
-		_, err = e.client.Core().Endpoints(service.Namespace).Update(newEndpoints)
+		_, err = e.client.CoreV1().Endpoints(service.Namespace).Update(newEndpoints)
 	}
 	if err != nil {
 		if createEndpoints && errors.IsForbidden(err) {

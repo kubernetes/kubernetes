@@ -21,5 +21,8 @@ import "k8s.io/kubernetes/pkg/kubectl/apply"
 // primitiveElement builds a new primitiveElement from a PrimitiveItem
 func (v ElementBuildingVisitor) primitiveElement(item *primitiveItem) (*apply.PrimitiveElement, error) {
 	meta := apply.FieldMetaImpl{Name: item.Name}
-	return &apply.PrimitiveElement{meta, item.RawElementData}, nil
+	return &apply.PrimitiveElement{
+		FieldMetaImpl:  meta,
+		RawElementData: item.RawElementData,
+	}, nil
 }

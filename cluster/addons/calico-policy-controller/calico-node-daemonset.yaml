@@ -29,7 +29,7 @@ spec:
         # container programs network policy and routes on each
         # host.
         - name: calico-node
-          image: calico/node:v2.5.1
+          image: calico/node:v2.6.1
           env:
             - name: CALICO_DISABLE_FILE_LOGGING
               value: "true"
@@ -83,7 +83,7 @@ spec:
         # This container installs the Calico CNI binaries
         # and CNI network config file on each node.
         - name: install-cni
-          image: calico/cni:v1.10.0
+          image: calico/cni:v1.11.0
           command: ["/install-cni.sh"]
           env:
             - name: CNI_CONF_NAME

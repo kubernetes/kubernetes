@@ -71,7 +71,7 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cidrAllocator"})
 	eventBroadcaster.StartLogging(glog.Infof)
 	glog.V(0).Infof("Sending events to api server.")
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(client.Core().RESTClient()).Events("")})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(client.CoreV1().RESTClient()).Events("")})
 
 	gceCloud, ok := cloud.(*gce.GCECloud)
 	if !ok {
@@ -170,7 +170,7 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(data nodeAndCIDR) error {
 	podCIDR := data.cidr.String()
 	for rep := 0; rep < cidrUpdateRetries; rep++ {
 		// TODO: change it to using PATCH instead of full Node updates.
-		node, err = ca.client.Core().Nodes().Get(data.nodeName, metav1.GetOptions{})
+		node, err = ca.client.CoreV1().Nodes().Get(data.nodeName, metav1.GetOptions{})
 		if err != nil {
 			glog.Errorf("Failed while getting node %v to retry updating Node.Spec.PodCIDR: %v", data.nodeName, err)
 			continue
@@ -189,7 +189,7 @@ func (ca *cloudCIDRAllocator) updateCIDRAllocation(data nodeAndCIDR) error {
 			// See https://github.com/kubernetes/kubernetes/pull/42147#discussion_r103357248
 		}
 		node.Spec.PodCIDR = podCIDR
-		if _, err = ca.client.Core().Nodes().Update(node); err == nil {
+		if _, err = ca.client.CoreV1().Nodes().Update(node); err == nil {
 			glog.Infof("Set node %v PodCIDR to %v", node.Name, podCIDR)
 			break
 		}

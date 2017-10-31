@@ -8,4 +8,4 @@ metadata:
 spec:
   containers:
   - name: kubernetes-serve-hostname
-    image: gcr.io/google_containers/serve_hostname:v1.4
+    image: gcr.io/kubernetes-e2e-test-images/serve-hostname-amd64:1.1

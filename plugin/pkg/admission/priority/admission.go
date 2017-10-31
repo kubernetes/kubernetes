@@ -55,8 +55,8 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-// priorityPlugin is an implementation of admission.Interface.
-type priorityPlugin struct {
+// PriorityPlugin is an implementation of admission.Interface.
+type PriorityPlugin struct {
 	*admission.Handler
 	client internalclientset.Interface
 	lister schedulinglisters.PriorityClassLister
@@ -64,17 +64,18 @@ type priorityPlugin struct {
 	globalDefaultPriority *int32
 }
 
-var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&priorityPlugin{})
-var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&priorityPlugin{})
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&PriorityPlugin{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&PriorityPlugin{})
 
 // NewPlugin creates a new priority admission plugin.
-func NewPlugin() admission.Interface {
-	return &priorityPlugin{
+func NewPlugin() *PriorityPlugin {
+	return &PriorityPlugin{
 		Handler: admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 	}
 }
 
-func (p *priorityPlugin) Validate() error {
+// Validate implements the Validator interface.
+func (p *PriorityPlugin) Validate() error {
 	if p.client == nil {
 		return fmt.Errorf("%s requires a client", pluginName)
 	}
@@ -84,11 +85,13 @@ func (p *priorityPlugin) Validate() error {
 	return nil
 }
 
-func (p *priorityPlugin) SetInternalKubeClientSet(client internalclientset.Interface) {
+// SetInternalKubeClientSet implements the WantsInternalKubeClientSet interface.
+func (p *PriorityPlugin) SetInternalKubeClientSet(client internalclientset.Interface) {
 	p.client = client
 }
 
-func (p *priorityPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
+// SetInternalKubeInformerFactory implements the WantsInternalKubeInformerFactory interface.
+func (p *PriorityPlugin) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	priorityInformer := f.Scheduling().InternalVersion().PriorityClasses()
 	p.lister = priorityInformer.Lister()
 	p.SetReadyFunc(priorityInformer.Informer().HasSynced)
@@ -96,11 +99,11 @@ func (p *priorityPlugin) SetInternalKubeInformerFactory(f informers.SharedInform
 
 var (
 	podResource           = api.Resource("pods")
-	priorityClassResource = api.Resource("priorityclasses")
+	priorityClassResource = scheduling.Resource("priorityclasses")
 )
 
 // Admit checks Pods and PriorityClasses and admits or rejects them. It also resolves the priority of pods based on their PriorityClass.
-func (p *priorityPlugin) Admit(a admission.Attributes) error {
+func (p *PriorityPlugin) Admit(a admission.Attributes) error {
 	operation := a.GetOperation()
 	// Ignore all calls to subresources or resources other than pods.
 	// Ignore all operations other than Create and Update.
@@ -132,7 +135,7 @@ func (p *priorityPlugin) Admit(a admission.Attributes) error {
 
 // admitPod makes sure a new pod does not set spec.Priority field. It also makes sure that the PriorityClassName exists if it is provided and resolves the pod priority from the PriorityClassName.
 // Note that pod validation mechanism prevents update of a pod priority.
-func (p *priorityPlugin) admitPod(a admission.Attributes) error {
+func (p *PriorityPlugin) admitPod(a admission.Attributes) error {
 	operation := a.GetOperation()
 	pod, ok := a.GetObject().(*api.Pod)
 	if !ok {
@@ -174,7 +177,7 @@ func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 }
 
 // admitPriorityClass ensures that the value field is not larger than the highest user definable priority. If the GlobalDefault is set, it ensures that there is no other PriorityClass whose GlobalDefault is set.
-func (p *priorityPlugin) admitPriorityClass(a admission.Attributes) error {
+func (p *PriorityPlugin) admitPriorityClass(a admission.Attributes) error {
 	operation := a.GetOperation()
 	pc, ok := a.GetObject().(*scheduling.PriorityClass)
 	if !ok {
@@ -204,7 +207,7 @@ func (p *priorityPlugin) admitPriorityClass(a admission.Attributes) error {
 	return nil
 }
 
-func (p *priorityPlugin) getDefaultPriorityClass() (*scheduling.PriorityClass, error) {
+func (p *PriorityPlugin) getDefaultPriorityClass() (*scheduling.PriorityClass, error) {
 	list, err := p.lister.List(labels.Everything())
 	if err != nil {
 		return nil, err
@@ -217,7 +220,7 @@ func (p *priorityPlugin) getDefaultPriorityClass() (*scheduling.PriorityClass, e
 	return nil, nil
 }
 
-func (p *priorityPlugin) getDefaultPriority() (int32, error) {
+func (p *PriorityPlugin) getDefaultPriority() (int32, error) {
 	// If global default priority is cached, return it.
 	if p.globalDefaultPriority != nil {
 		return *p.globalDefaultPriority, nil
@@ -236,6 +239,6 @@ func (p *priorityPlugin) getDefaultPriority() (int32, error) {
 }
 
 // invalidateCachedDefaultPriority sets global default priority to nil to indicate that it should be looked up again.
-func (p *priorityPlugin) invalidateCachedDefaultPriority() {
+func (p *PriorityPlugin) invalidateCachedDefaultPriority() {
 	p.globalDefaultPriority = nil
 }

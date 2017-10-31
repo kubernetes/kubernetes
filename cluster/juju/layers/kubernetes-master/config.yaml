@@ -46,3 +46,9 @@ options:
         runtime-config=batch/v2alpha1=true profiling=true
       will result in kube-apiserver being run with the following options:
         --runtime-config=batch/v2alpha1=true --profiling=true
+  authorization-mode:
+    type: string
+    default: "AlwaysAllow"
+    description: |
+      Comma separated authorization modes. Allowed values are
+      "RBAC", "Node", "Webhook", "ABAC", "AlwaysDeny" and "AlwaysAllow".

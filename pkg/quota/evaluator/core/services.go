@@ -18,58 +18,34 @@ package core
 
 import (
 	"fmt"
-	"strings"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 )
 
+// the name used for object count quota
+var serviceObjectCountName = generic.ObjectCountQuotaResourceNameFor(v1.SchemeGroupVersion.WithResource("services").GroupResource())
+
 // serviceResources are the set of resources managed by quota associated with services.
 var serviceResources = []api.ResourceName{
+	serviceObjectCountName,
 	api.ResourceServices,
 	api.ResourceServicesNodePorts,
 	api.ResourceServicesLoadBalancers,
 }
 
-// listServicesByNamespaceFuncUsingClient returns a service listing function based on the provided client.
-func listServicesByNamespaceFuncUsingClient(kubeClient clientset.Interface) generic.ListFuncByNamespace {
-	// TODO: ideally, we could pass dynamic client pool down into this code, and have one way of doing this.
-	// unfortunately, dynamic client works with Unstructured objects, and when we calculate Usage, we require
-	// structured objects.
-	return func(namespace string, options metav1.ListOptions) ([]runtime.Object, error) {
-		itemList, err := kubeClient.Core().Services(namespace).List(options)
-		if err != nil {
-			return nil, err
-		}
-		results := make([]runtime.Object, 0, len(itemList.Items))
-		for i := range itemList.Items {
-			results = append(results, &itemList.Items[i])
-		}
-		return results, nil
-	}
-}
-
-// NewServiceEvaluator returns an evaluator that can evaluate services
-// if the specified shared informer factory is not nil, evaluator may use it to support listing functions.
-func NewServiceEvaluator(kubeClient clientset.Interface, f informers.SharedInformerFactory) quota.Evaluator {
-	listFuncByNamespace := listServicesByNamespaceFuncUsingClient(kubeClient)
-	if f != nil {
-		listFuncByNamespace = generic.ListResourceUsingInformerFunc(f, v1.SchemeGroupVersion.WithResource("services"))
-	}
-	return &serviceEvaluator{
-		listFuncByNamespace: listFuncByNamespace,
-	}
+// NewServiceEvaluator returns an evaluator that can evaluate services.
+func NewServiceEvaluator(f quota.ListerForResourceFunc) quota.Evaluator {
+	listFuncByNamespace := generic.ListResourceUsingListerFunc(f, v1.SchemeGroupVersion.WithResource("services"))
+	serviceEvaluator := &serviceEvaluator{listFuncByNamespace: listFuncByNamespace}
+	return serviceEvaluator
 }
 
 // serviceEvaluator knows how to measure usage for services.
@@ -80,31 +56,13 @@ type serviceEvaluator struct {
 
 // Constraints verifies that all required resources are present on the item
 func (p *serviceEvaluator) Constraints(required []api.ResourceName, item runtime.Object) error {
-	service, ok := item.(*api.Service)
-	if !ok {
-		return fmt.Errorf("unexpected input object %v", item)
-	}
-
-	requiredSet := quota.ToSet(required)
-	missingSet := sets.NewString()
-	serviceUsage, err := p.Usage(service)
-	if err != nil {
-		return err
-	}
-	serviceSet := quota.ToSet(quota.ResourceNames(serviceUsage))
-	if diff := requiredSet.Difference(serviceSet); len(diff) > 0 {
-		missingSet.Insert(diff.List()...)
-	}
-
-	if len(missingSet) == 0 {
-		return nil
-	}
-	return fmt.Errorf("must specify %s", strings.Join(missingSet.List(), ","))
+	// this is a no-op for services
+	return nil
 }
 
-// GroupKind that this evaluator tracks
-func (p *serviceEvaluator) GroupKind() schema.GroupKind {
-	return api.Kind("Service")
+// GroupResource that this evaluator tracks
+func (p *serviceEvaluator) GroupResource() schema.GroupResource {
+	return v1.SchemeGroupVersion.WithResource("services").GroupResource()
 }
 
 // Handles returns true of the evaluator should handle the specified operation.
@@ -149,6 +107,7 @@ func (p *serviceEvaluator) Usage(item runtime.Object) (api.ResourceList, error) 
 	}
 	ports := len(svc.Spec.Ports)
 	// default service usage
+	result[serviceObjectCountName] = *(resource.NewQuantity(1, resource.DecimalSI))
 	result[api.ResourceServices] = *(resource.NewQuantity(1, resource.DecimalSI))
 	result[api.ResourceServicesLoadBalancers] = resource.Quantity{Format: resource.DecimalSI}
 	result[api.ResourceServicesNodePorts] = resource.Quantity{Format: resource.DecimalSI}

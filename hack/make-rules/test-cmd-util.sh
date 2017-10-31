@@ -916,7 +916,7 @@ __EOF__
 }
 
 # runs specific kubectl create tests
-run_create_tests() {
+run_create_secret_tests() {
     set -o nounset
     set -o errexit
 
@@ -935,6 +935,9 @@ run_create_tests() {
     output_message=$(kubectl create "${kube_flags[@]}" secret generic mysecret --dry-run --from-literal=foo=bar -o jsonpath='{.metadata.namespace}')
     # Post-condition: jsonpath for .metadata.namespace should be empty for object since --namespace was not explicitly specified
     kube::test::if_empty_string "${output_message}"
+
+    kubectl create configmap tester-create-cm -o json --dry-run | kubectl create "${kube_flags[@]}" --raw /api/v1/namespaces/default/configmaps -f -
+    kubectl delete -ndefault "${kube_flags[@]}" configmap tester-create-cm
 
     set +o nounset
     set +o errexit
@@ -1371,7 +1374,7 @@ run_kubectl_get_tests() {
   fi
 
   ### Test kubectl get all
-  output_message=$(kubectl --v=6 --namespace default get all 2>&1 "${kube_flags[@]}")
+  output_message=$(kubectl --v=6 --namespace default get all --chunk-size=0 2>&1 "${kube_flags[@]}")
   # Post-condition: Check if we get 200 OK from all the url(s)
   kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/pods 200 OK"
   kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/replicationcontrollers 200 OK"
@@ -1381,6 +1384,17 @@ run_kubectl_get_tests() {
   kube::test::if_has_string "${output_message}" "/apis/batch/v1/namespaces/default/jobs 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/deployments 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/replicasets 200 OK"
+
+  ### Test kubectl get chunk size
+  output_message=$(kubectl --v=6 get clusterrole --chunk-size=10 2>&1 "${kube_flags[@]}")
+  # Post-condition: Check if we get a limit and continue
+  kube::test::if_has_string "${output_message}" "/clusterroles?limit=10 200 OK"
+  kube::test::if_has_string "${output_message}" "/v1/clusterroles?continue="
+
+  ### Test kubectl get chunk size defaults to 500
+  output_message=$(kubectl --v=6 get clusterrole 2>&1 "${kube_flags[@]}")
+  # Post-condition: Check if we get a limit and continue
+  kube::test::if_has_string "${output_message}" "/clusterroles?limit=500 200 OK"
 
   ### Test --allow-missing-template-keys
   # Pre-condition: no POD exists
@@ -3674,6 +3688,11 @@ run_kubectl_create_error_tests() {
   fi
   rm "${ERROR_FILE}"
 
+  # Posting a pod to namespaces should fail.  Also tests --raw forcing the post location
+  [ "$( kubectl convert -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml -o json | kubectl create "${kube_flags[@]}" --raw /api/v1/namespaces -f - --v=8 2>&1 | grep 'cannot be handled as a Namespace: converting (v1.Pod)')" ]
+
+  [ "$( kubectl create "${kube_flags[@]}" --raw /api/v1/namespaces -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml --edit 2>&1 | grep 'raw and --edit are mutually exclusive')" ]
+
   set +o nounset
   set +o errexit
 }
@@ -4199,6 +4218,14 @@ run_kubectl_all_namespace_tests() {
   # Post-condition: valid-pod doesn't exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
+  ### Verify flag all-namespaces is ignored for rootScoped resources
+  # Pre-condition: node exists
+  kube::test::get_object_assert nodes "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:'
+  # Command
+  output_message=$(kubectl get nodes --all-namespaces 2>&1)
+  # Post-condition: output with no NAMESPACE field
+  kube::test::if_has_not_string "${output_message}" "NAMESPACE"
+
   set +o nounset
   set +o errexit
 }
@@ -4289,11 +4316,17 @@ run_cluster_management_tests() {
   response=$(! kubectl cordon 2>&1)
   kube::test::if_has_string "${response}" 'error\: USAGE\: cordon NODE'
 
-  ### kubectl cordon selects all nodes with an empty --selector=
+  ### kubectl cordon selects no nodes with an empty --selector=
   # Pre-condition: node "127.0.0.1" is uncordoned
   kubectl uncordon "127.0.0.1"
-  response=$(kubectl cordon --selector=)
+  response=$(! kubectl cordon --selector= 2>&1)
+  kube::test::if_has_string "${response}" 'must provide one or more resources'
+  # test=label matches our node
+  response=$(kubectl cordon --selector test=label)
   kube::test::if_has_string "${response}" 'node "127.0.0.1" cordoned'
+  # invalid=label does not match any nodes
+  response=$(kubectl cordon --selector invalid=label)
+  kube::test::if_has_not_string "${response}" 'cordoned'
   # Post-condition: node "127.0.0.1" is cordoned
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" 'true'
 
@@ -4573,8 +4606,6 @@ runTests() {
   fi
 
   if kube::test::if_supports_resource "${pods}" ; then
-    # TODO: Move apply tests to run on rs instead of pods so that they can be
-    # run for federation apiserver as well.
     record_command run_kubectl_apply_tests
     record_command run_kubectl_run_tests
     record_command run_kubectl_create_filter_tests
@@ -4589,8 +4620,6 @@ runTests() {
   ###############
 
   if kube::test::if_supports_resource "${pods}" ; then
-    # TODO: Move get tests to run on rs instead of pods so that they can be
-    # run for federation apiserver as well.
     record_command run_kubectl_get_tests
   fi
 
@@ -4599,7 +4628,7 @@ runTests() {
   # Create             #
   ######################
   if kube::test::if_supports_resource "${secrets}" ; then
-    record_command run_create_tests
+    record_command run_create_secret_tests
   fi
 
   ##################
@@ -4607,8 +4636,6 @@ runTests() {
   ##################
 
   if kube::test::if_supports_resource "${pods}" ; then
-    # TODO: Move request timeout tests to run on rs instead of pods so that they
-    # can be run for federation apiserver as well.
     record_command run_kubectl_request_timeout_tests
   fi
 
@@ -4888,7 +4915,9 @@ runTests() {
   ############################
 
   if kube::test::if_supports_resource "${pods}" ; then
-    record_command run_kubectl_all_namespace_tests
+    if kube::test::if_supports_resource "${nodes}" ; then
+      record_command run_kubectl_all_namespace_tests
+    fi
   fi
 
   ################

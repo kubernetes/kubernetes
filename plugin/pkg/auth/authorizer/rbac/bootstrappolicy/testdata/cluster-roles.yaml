@@ -639,6 +639,7 @@ items:
     resources:
     - pods/status
     verbs:
+    - patch
     - update
   - apiGroups:
     - ""
@@ -662,6 +663,14 @@ items:
     - apps
     resources:
     - statefulsets
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - policy
+    resources:
+    - poddisruptionbudgets
     verbs:
     - get
     - list

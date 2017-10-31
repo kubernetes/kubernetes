@@ -51,6 +51,7 @@ filegroup(
         "//test/integration/quota:all-srcs",
         "//test/integration/replicaset:all-srcs",
         "//test/integration/replicationcontroller:all-srcs",
+        "//test/integration/scale:all-srcs",
         "//test/integration/scheduler:all-srcs",
         "//test/integration/scheduler_perf:all-srcs",
         "//test/integration/secrets:all-srcs",

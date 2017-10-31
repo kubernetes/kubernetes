@@ -77,7 +77,7 @@ func RunClusterInfo(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error 
 		SelectorParam("kubernetes.io/cluster-service=true").
 		ResourceTypeOrNameArgs(false, []string{"services"}...).
 		Latest()
-	b.Do().Visit(func(r *resource.Info, err error) error {
+	err = b.Do().Visit(func(r *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
@@ -125,7 +125,7 @@ func RunClusterInfo(f cmdutil.Factory, out io.Writer, cmd *cobra.Command) error 
 		return nil
 	})
 	out.Write([]byte("\nTo further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.\n"))
-	return nil
+	return err
 
 	// TODO consider printing more information about cluster
 }

@@ -107,7 +107,7 @@ func listNodes(kubeClient clientset.Interface) (*v1.NodeList, error) {
 	// controller manager to restart.
 	if pollErr := wait.Poll(10*time.Second, apiserverStartupGracePeriod, func() (bool, error) {
 		var err error
-		nodeList, err = kubeClient.Core().Nodes().List(metav1.ListOptions{
+		nodeList, err = kubeClient.CoreV1().Nodes().List(metav1.ListOptions{
 			FieldSelector: fields.Everything().String(),
 			LabelSelector: labels.Everything().String(),
 		})

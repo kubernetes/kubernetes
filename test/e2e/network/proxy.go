@@ -62,20 +62,48 @@ var _ = SIGDescribe("Proxy", func() {
 		prefix := "/api/" + version
 
 		// Port here has to be kept in sync with default kubelet port.
-		It("should proxy logs on node with explicit kubelet port [Conformance]", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":10250/logs/") })
-		It("should proxy logs on node [Conformance]", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", "/logs/") })
+		/*
+			    Testname: proxy-prefix-node-logs-port
+			    Description: Ensure that proxy on node logs works with generic top
+				level prefix proxy and explicit kubelet port.
+		*/
+		framework.ConformanceIt("should proxy logs on node with explicit kubelet port ", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":10250/logs/") })
+
+		/*
+			    Testname: proxy-prefix-node-logs
+			    Description: Ensure that proxy on node logs works with generic top
+				level prefix proxy.
+		*/
+		framework.ConformanceIt("should proxy logs on node ", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", "/logs/") })
 		It("should proxy to cadvisor", func() { nodeProxyTest(f, prefix+"/proxy/nodes/", ":4194/containers/") })
 
-		It("should proxy logs on node with explicit kubelet port using proxy subresource [Conformance]", func() { nodeProxyTest(f, prefix+"/nodes/", ":10250/proxy/logs/") })
-		It("should proxy logs on node using proxy subresource [Conformance]", func() { nodeProxyTest(f, prefix+"/nodes/", "/proxy/logs/") })
+		/*
+			    Testname: proxy-subresource-node-logs-port
+			    Description: Ensure that proxy on node logs works with node proxy
+				subresource and explicit kubelet port.
+		*/
+		framework.ConformanceIt("should proxy logs on node with explicit kubelet port using proxy subresource ", func() { nodeProxyTest(f, prefix+"/nodes/", ":10250/proxy/logs/") })
+
+		/*
+			    Testname: proxy-subresource-node-logs
+			    Description: Ensure that proxy on node logs works with node proxy
+				subresource.
+		*/
+		framework.ConformanceIt("should proxy logs on node using proxy subresource ", func() { nodeProxyTest(f, prefix+"/nodes/", "/proxy/logs/") })
 		It("should proxy to cadvisor using proxy subresource", func() { nodeProxyTest(f, prefix+"/nodes/", ":4194/proxy/containers/") })
 
 		// using the porter image to serve content, access the content
 		// (of multiple pods?) from multiple (endpoints/services?)
-		It("should proxy through a service and a pod [Conformance]", func() {
+
+		/*
+			    Testname: proxy-service-pod
+			    Description: Ensure that proxy through a service and a pod works with
+				both generic top level prefix proxy and proxy subresource.
+		*/
+		framework.ConformanceIt("should proxy through a service and a pod ", func() {
 			start := time.Now()
 			labels := map[string]string{"proxy-service-target": "true"}
-			service, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(&v1.Service{
+			service, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "proxy-service-",
 				},
@@ -265,7 +293,7 @@ var _ = SIGDescribe("Proxy", func() {
 			}
 
 			if len(errs) != 0 {
-				body, err := f.ClientSet.Core().Pods(f.Namespace.Name).GetLogs(pods[0].Name, &v1.PodLogOptions{}).Do().Raw()
+				body, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).GetLogs(pods[0].Name, &v1.PodLogOptions{}).Do().Raw()
 				if err != nil {
 					framework.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
 				} else {
@@ -286,7 +314,7 @@ func doProxy(f *framework.Framework, path string, i int) (body []byte, statusCod
 	//   chance of the things we are talking to being confused for an error
 	//   that apiserver would have emitted.
 	start := time.Now()
-	body, err = f.ClientSet.Core().RESTClient().Get().AbsPath(path).Do().StatusCode(&statusCode).Raw()
+	body, err = f.ClientSet.CoreV1().RESTClient().Get().AbsPath(path).Do().StatusCode(&statusCode).Raw()
 	d = time.Since(start)
 	if len(body) > 0 {
 		framework.Logf("(%v) %v: %s (%v; %v)", i, path, truncate(body, maxDisplayBodyLen), statusCode, d)

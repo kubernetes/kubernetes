@@ -44,14 +44,14 @@ func TestPatchConflicts(t *testing.T) {
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	// Create the object we're going to conflict on
-	clientSet.Core().Secrets(ns.Name).Create(&v1.Secret{
+	clientSet.CoreV1().Secrets(ns.Name).Create(&v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
 			// Populate annotations so the strategic patch descends, compares, and notices the $patch directive
 			Annotations: map[string]string{"initial": "value"},
 		},
 	})
-	client := clientSet.Core().RESTClient()
+	client := clientSet.CoreV1().RESTClient()
 
 	successes := int32(0)
 

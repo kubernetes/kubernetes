@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,11 +39,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -51,7 +50,7 @@ import (
 )
 
 type DrainOptions struct {
-	client             internalclientset.Interface
+	client             kubernetes.Interface
 	restClient         *restclient.RESTClient
 	Factory            cmdutil.Factory
 	Force              bool
@@ -71,7 +70,7 @@ type DrainOptions struct {
 
 // Takes a pod and returns a bool indicating whether or not to operate on the
 // pod, an optional warning message, and an optional fatal error.
-type podFilter func(api.Pod) (include bool, w *warning, f *fatal)
+type podFilter func(corev1.Pod) (include bool, w *warning, f *fatal)
 type warning struct {
 	string
 }
@@ -220,7 +219,7 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 
 	o.DryRun = cmdutil.GetFlagBool(cmd, "dry-run")
 
-	if o.client, err = o.Factory.ClientSet(); err != nil {
+	if o.client, err = o.Factory.KubernetesClientSet(); err != nil {
 		return err
 	}
 
@@ -237,20 +236,18 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	nameArgs := []string{"nodes"}
-	if len(args) > 0 {
-		nameArgs = append(nameArgs, args[0])
-		if strings.Contains(args[0], "/") {
-			nameArgs = []string{args[0]}
-		}
+	builder := o.Factory.NewBuilder().
+		NamespaceParam(cmdNamespace).DefaultNamespace().
+		ResourceNames("nodes", args...).
+		SingleResourceType().
+		Flatten()
+
+	if len(o.Selector) > 0 {
+		builder = builder.SelectorParam(o.Selector).
+			ResourceTypes("nodes")
 	}
 
-	r := o.Factory.NewBuilder().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
-		SelectorParam(o.Selector).
-		ResourceTypeOrNameArgs(true, nameArgs...).
-		Flatten().
-		Do()
+	r := builder.Do()
 
 	if err = r.Err(); err != nil {
 		return err
@@ -260,6 +257,10 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
+		if info.Mapping.Resource != "nodes" {
+			return fmt.Errorf("error: expected resource of type node, got %q", info.Mapping.Resource)
+		}
+
 		o.nodeInfos = append(o.nodeInfos, info)
 		return nil
 	})
@@ -337,12 +338,12 @@ func (o *DrainOptions) getController(namespace string, controllerRef *metav1.Own
 	case "ReplicaSet":
 		return o.client.Extensions().ReplicaSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	case "StatefulSet":
-		return o.client.Apps().StatefulSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
+		return o.client.AppsV1beta1().StatefulSets(namespace).Get(controllerRef.Name, metav1.GetOptions{})
 	}
 	return nil, fmt.Errorf("Unknown controller kind %q", controllerRef.Kind)
 }
 
-func (o *DrainOptions) getPodController(pod api.Pod) (*metav1.OwnerReference, error) {
+func (o *DrainOptions) getPodController(pod corev1.Pod) (*metav1.OwnerReference, error) {
 	controllerRef := metav1.GetControllerOf(&pod)
 	if controllerRef == nil {
 		return nil, nil
@@ -360,9 +361,9 @@ func (o *DrainOptions) getPodController(pod api.Pod) (*metav1.OwnerReference, er
 	return controllerRef, nil
 }
 
-func (o *DrainOptions) unreplicatedFilter(pod api.Pod) (bool, *warning, *fatal) {
+func (o *DrainOptions) unreplicatedFilter(pod corev1.Pod) (bool, *warning, *fatal) {
 	// any finished pod can be removed
-	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+	if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
 		return true, nil, nil
 	}
 
@@ -383,7 +384,7 @@ func (o *DrainOptions) unreplicatedFilter(pod api.Pod) (bool, *warning, *fatal) 
 	return true, &warning{kUnmanagedWarning}, nil
 }
 
-func (o *DrainOptions) daemonsetFilter(pod api.Pod) (bool, *warning, *fatal) {
+func (o *DrainOptions) daemonsetFilter(pod corev1.Pod) (bool, *warning, *fatal) {
 	// Note that we return false in cases where the pod is DaemonSet managed,
 	// regardless of flags.  We never delete them, the only question is whether
 	// their presence constitutes an error.
@@ -411,14 +412,14 @@ func (o *DrainOptions) daemonsetFilter(pod api.Pod) (bool, *warning, *fatal) {
 	return false, &warning{kDaemonsetWarning}, nil
 }
 
-func mirrorPodFilter(pod api.Pod) (bool, *warning, *fatal) {
+func mirrorPodFilter(pod corev1.Pod) (bool, *warning, *fatal) {
 	if _, found := pod.ObjectMeta.Annotations[corev1.MirrorPodAnnotationKey]; found {
 		return false, nil, nil
 	}
 	return true, nil, nil
 }
 
-func hasLocalStorage(pod api.Pod) bool {
+func hasLocalStorage(pod corev1.Pod) bool {
 	for _, volume := range pod.Spec.Volumes {
 		if volume.EmptyDir != nil {
 			return true
@@ -428,7 +429,7 @@ func hasLocalStorage(pod api.Pod) bool {
 	return false
 }
 
-func (o *DrainOptions) localStorageFilter(pod api.Pod) (bool, *warning, *fatal) {
+func (o *DrainOptions) localStorageFilter(pod corev1.Pod) (bool, *warning, *fatal) {
 	if !hasLocalStorage(pod) {
 		return true, nil, nil
 	}
@@ -452,7 +453,7 @@ func (ps podStatuses) Message() string {
 
 // getPodsForDeletion receives resource info for a node, and returns all the pods from the given node that we
 // are planning on deleting. If there are any pods preventing us from deleting, we return that list in an error.
-func (o *DrainOptions) getPodsForDeletion(nodeInfo *resource.Info) (pods []api.Pod, err error) {
+func (o *DrainOptions) getPodsForDeletion(nodeInfo *resource.Info) (pods []corev1.Pod, err error) {
 	podList, err := o.client.Core().Pods(metav1.NamespaceAll).List(metav1.ListOptions{
 		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeInfo.Name}).String()})
 	if err != nil {
@@ -481,7 +482,7 @@ func (o *DrainOptions) getPodsForDeletion(nodeInfo *resource.Info) (pods []api.P
 	}
 
 	if len(fs) > 0 {
-		return []api.Pod{}, errors.New(fs.Message())
+		return []corev1.Pod{}, errors.New(fs.Message())
 	}
 	if len(ws) > 0 {
 		fmt.Fprintf(o.ErrOut, "WARNING: %s\n", ws.Message())
@@ -489,7 +490,7 @@ func (o *DrainOptions) getPodsForDeletion(nodeInfo *resource.Info) (pods []api.P
 	return pods, nil
 }
 
-func (o *DrainOptions) deletePod(pod api.Pod) error {
+func (o *DrainOptions) deletePod(pod corev1.Pod) error {
 	deleteOptions := &metav1.DeleteOptions{}
 	if o.GracePeriodSeconds >= 0 {
 		gracePeriodSeconds := int64(o.GracePeriodSeconds)
@@ -498,13 +499,13 @@ func (o *DrainOptions) deletePod(pod api.Pod) error {
 	return o.client.Core().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
 }
 
-func (o *DrainOptions) evictPod(pod api.Pod, policyGroupVersion string) error {
+func (o *DrainOptions) evictPod(pod corev1.Pod, policyGroupVersion string) error {
 	deleteOptions := &metav1.DeleteOptions{}
 	if o.GracePeriodSeconds >= 0 {
 		gracePeriodSeconds := int64(o.GracePeriodSeconds)
 		deleteOptions.GracePeriodSeconds = &gracePeriodSeconds
 	}
-	eviction := &policy.Eviction{
+	eviction := &policyv1beta1.Eviction{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: policyGroupVersion,
 			Kind:       EvictionKind,
@@ -520,7 +521,7 @@ func (o *DrainOptions) evictPod(pod api.Pod, policyGroupVersion string) error {
 }
 
 // deleteOrEvictPods deletes or evicts the pods on the api server
-func (o *DrainOptions) deleteOrEvictPods(pods []api.Pod) error {
+func (o *DrainOptions) deleteOrEvictPods(pods []corev1.Pod) error {
 	if len(pods) == 0 {
 		return nil
 	}
@@ -530,7 +531,7 @@ func (o *DrainOptions) deleteOrEvictPods(pods []api.Pod) error {
 		return err
 	}
 
-	getPodFn := func(namespace, name string) (*api.Pod, error) {
+	getPodFn := func(namespace, name string) (*corev1.Pod, error) {
 		return o.client.Core().Pods(namespace).Get(name, metav1.GetOptions{})
 	}
 
@@ -541,12 +542,12 @@ func (o *DrainOptions) deleteOrEvictPods(pods []api.Pod) error {
 	}
 }
 
-func (o *DrainOptions) evictPods(pods []api.Pod, policyGroupVersion string, getPodFn func(namespace, name string) (*api.Pod, error)) error {
+func (o *DrainOptions) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
 	doneCh := make(chan bool, len(pods))
 	errCh := make(chan error, 1)
 
 	for _, pod := range pods {
-		go func(pod api.Pod, doneCh chan bool, errCh chan error) {
+		go func(pod corev1.Pod, doneCh chan bool, errCh chan error) {
 			var err error
 			for {
 				err = o.evictPod(pod, policyGroupVersion)
@@ -562,7 +563,7 @@ func (o *DrainOptions) evictPods(pods []api.Pod, policyGroupVersion string, getP
 					return
 				}
 			}
-			podArray := []api.Pod{pod}
+			podArray := []corev1.Pod{pod}
 			_, err = o.waitForDelete(podArray, kubectl.Interval, time.Duration(math.MaxInt64), true, getPodFn)
 			if err == nil {
 				doneCh <- true
@@ -595,7 +596,7 @@ func (o *DrainOptions) evictPods(pods []api.Pod, policyGroupVersion string, getP
 	}
 }
 
-func (o *DrainOptions) deletePods(pods []api.Pod, getPodFn func(namespace, name string) (*api.Pod, error)) error {
+func (o *DrainOptions) deletePods(pods []corev1.Pod, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
 	// 0 timeout means infinite, we use MaxInt64 to represent it.
 	var globalTimeout time.Duration
 	if o.Timeout == 0 {
@@ -613,7 +614,7 @@ func (o *DrainOptions) deletePods(pods []api.Pod, getPodFn func(namespace, name 
 	return err
 }
 
-func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Duration, usingEviction bool, getPodFn func(string, string) (*api.Pod, error)) ([]api.Pod, error) {
+func (o *DrainOptions) waitForDelete(pods []corev1.Pod, interval, timeout time.Duration, usingEviction bool, getPodFn func(string, string) (*corev1.Pod, error)) ([]corev1.Pod, error) {
 	var verbStr string
 	if usingEviction {
 		verbStr = "evicted"
@@ -621,7 +622,7 @@ func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Dura
 		verbStr = "deleted"
 	}
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		pendingPods := []api.Pod{}
+		pendingPods := []corev1.Pod{}
 		for i, pod := range pods {
 			p, err := getPodFn(pod.Namespace, pod.Name)
 			if apierrors.IsNotFound(err) || (p != nil && p.ObjectMeta.UID != pod.ObjectMeta.UID) {
@@ -644,7 +645,7 @@ func (o *DrainOptions) waitForDelete(pods []api.Pod, interval, timeout time.Dura
 
 // SupportEviction uses Discovery API to find out if the server support eviction subresource
 // If support, it will return its groupVersion; Otherwise, it will return ""
-func SupportEviction(clientset internalclientset.Interface) (string, error) {
+func SupportEviction(clientset kubernetes.Interface) (string, error) {
 	discoveryClient := clientset.Discovery()
 	groupList, err := discoveryClient.ServerGroups()
 	if err != nil {

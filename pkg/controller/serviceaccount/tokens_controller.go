@@ -86,8 +86,8 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 
 		maxRetries: maxRetries,
 	}
-	if cl != nil && cl.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_tokens_controller", cl.Core().RESTClient().GetRateLimiter())
+	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_tokens_controller", cl.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	e.serviceAccounts = serviceAccounts.Lister()
@@ -344,7 +344,7 @@ func (e *TokensController) deleteToken(ns, name string, uid types.UID) ( /*retry
 	if len(uid) > 0 {
 		opts = &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &uid}}
 	}
-	err := e.client.Core().Secrets(ns).Delete(name, opts)
+	err := e.client.CoreV1().Secrets(ns).Delete(name, opts)
 	// NotFound doesn't need a retry (it's already been deleted)
 	// Conflict doesn't need a retry (the UID precondition failed)
 	if err == nil || apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
@@ -366,7 +366,7 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 
 	// We don't want to update the cache's copy of the service account
 	// so add the secret to a freshly retrieved copy of the service account
-	serviceAccounts := e.client.Core().ServiceAccounts(serviceAccount.Namespace)
+	serviceAccounts := e.client.CoreV1().ServiceAccounts(serviceAccount.Namespace)
 	liveServiceAccount, err := serviceAccounts.Get(serviceAccount.Name, metav1.GetOptions{})
 	if err != nil {
 		// Retry if we cannot fetch the live service account (for a NotFound error, either the live lookup or our cache are stale)
@@ -405,7 +405,7 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 	}
 
 	// Save the secret
-	createdToken, err := e.client.Core().Secrets(serviceAccount.Namespace).Create(secret)
+	createdToken, err := e.client.CoreV1().Secrets(serviceAccount.Namespace).Create(secret)
 	if err != nil {
 		// retriable error
 		return true, err
@@ -455,7 +455,7 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 		// we weren't able to use the token, try to clean it up.
 		glog.V(2).Infof("deleting secret %s/%s because reference couldn't be added (%v)", secret.Namespace, secret.Name, err)
 		deleteOpts := &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &createdToken.UID}}
-		if deleteErr := e.client.Core().Secrets(createdToken.Namespace).Delete(createdToken.Name, deleteOpts); deleteErr != nil {
+		if deleteErr := e.client.CoreV1().Secrets(createdToken.Namespace).Delete(createdToken.Name, deleteOpts); deleteErr != nil {
 			glog.Error(deleteErr) // if we fail, just log it
 		}
 	}
@@ -513,7 +513,7 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *v1.ServiceAccou
 
 	// We don't want to update the cache's copy of the secret
 	// so add the token to a freshly retrieved copy of the secret
-	secrets := e.client.Core().Secrets(cachedSecret.Namespace)
+	secrets := e.client.CoreV1().Secrets(cachedSecret.Namespace)
 	liveSecret, err := secrets.Get(cachedSecret.Name, metav1.GetOptions{})
 	if err != nil {
 		// Retry for any error other than a NotFound
@@ -577,7 +577,7 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *v1.ServiceAccou
 func (e *TokensController) removeSecretReference(saNamespace string, saName string, saUID types.UID, secretName string) error {
 	// We don't want to update the cache's copy of the service account
 	// so remove the secret from a freshly retrieved copy of the service account
-	serviceAccounts := e.client.Core().ServiceAccounts(saNamespace)
+	serviceAccounts := e.client.CoreV1().ServiceAccounts(saNamespace)
 	serviceAccount, err := serviceAccounts.Get(saName, metav1.GetOptions{})
 	// Ignore NotFound errors when attempting to remove a reference
 	if apierrors.IsNotFound(err) {
@@ -631,7 +631,7 @@ func (e *TokensController) getServiceAccount(ns string, name string, uid types.U
 	}
 
 	// Live lookup
-	sa, err = e.client.Core().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
+	sa, err = e.client.CoreV1().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil, nil
 	}
@@ -667,7 +667,7 @@ func (e *TokensController) getSecret(ns string, name string, uid types.UID, fetc
 	}
 
 	// Live lookup
-	secret, err := e.client.Core().Secrets(ns).Get(name, metav1.GetOptions{})
+	secret, err := e.client.CoreV1().Secrets(ns).Get(name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil, nil
 	}

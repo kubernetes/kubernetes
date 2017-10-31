@@ -439,7 +439,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	serviceIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 	if kubeDeps.KubeClient != nil {
-		serviceLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.Core().RESTClient(), "services", metav1.NamespaceAll, fields.Everything())
+		serviceLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.CoreV1().RESTClient(), "services", metav1.NamespaceAll, fields.Everything())
 		r := cache.NewReflector(serviceLW, &v1.Service{}, serviceIndexer, 0)
 		go r.Run(wait.NeverStop)
 	}
@@ -448,7 +448,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 	if kubeDeps.KubeClient != nil {
 		fieldSelector := fields.Set{api.ObjectNameField: string(nodeName)}.AsSelector()
-		nodeLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.Core().RESTClient(), "nodes", metav1.NamespaceAll, fieldSelector)
+		nodeLW := cache.NewListWatchFromClient(kubeDeps.KubeClient.CoreV1().RESTClient(), "nodes", metav1.NamespaceAll, fieldSelector)
 		r := cache.NewReflector(nodeLW, &v1.Node{}, nodeIndexer, 0)
 		go r.Run(wait.NeverStop)
 	}
@@ -575,9 +575,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	// TODO: These need to become arguments to a standalone docker shim.
 	binDir := crOptions.CNIBinDir
-	if binDir == "" {
-		binDir = crOptions.NetworkPluginDir
-	}
 	pluginSettings := dockershim.NetworkPluginSettings{
 		HairpinMode:       hairpinMode,
 		NonMasqueradeCIDR: nonMasqueradeCIDR,

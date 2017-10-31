@@ -180,7 +180,7 @@ func assertFilesContain(fileNames []string, fileDir string, pod *v1.Pod, client 
 		var contents []byte
 		for _, fileName := range fileNames {
 			if subResourceProxyAvailable {
-				contents, err = client.Core().RESTClient().Get().
+				contents, err = client.CoreV1().RESTClient().Get().
 					Context(ctx).
 					Namespace(pod.Namespace).
 					Resource("pods").
@@ -189,7 +189,7 @@ func assertFilesContain(fileNames []string, fileDir string, pod *v1.Pod, client 
 					Suffix(fileDir, fileName).
 					Do().Raw()
 			} else {
-				contents, err = client.Core().RESTClient().Get().
+				contents, err = client.CoreV1().RESTClient().Get().
 					Context(ctx).
 					Prefix("proxy").
 					Resource("pods").
@@ -221,7 +221,7 @@ func assertFilesContain(fileNames []string, fileDir string, pod *v1.Pod, client 
 
 func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string) {
 	By("submitting the pod to kubernetes")
-	podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
+	podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 	defer func() {
 		By("deleting the pod")
 		defer GinkgoRecover()
@@ -249,7 +249,7 @@ func validateDNSResults(f *framework.Framework, pod *v1.Pod, fileNames []string)
 
 func validateTargetedProbeOutput(f *framework.Framework, pod *v1.Pod, fileNames []string, value string) {
 	By("submitting the pod to kubernetes")
-	podClient := f.ClientSet.Core().Pods(f.Namespace.Name)
+	podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 	defer func() {
 		By("deleting the pod")
 		defer GinkgoRecover()
@@ -284,7 +284,7 @@ func reverseArray(arr []string) []string {
 var _ = SIGDescribe("DNS", func() {
 	f := framework.NewDefaultFramework("dns")
 
-	It("should provide DNS for the cluster [Conformance]", func() {
+	framework.ConformanceIt("should provide DNS for the cluster ", func() {
 		// All the names we need to be able to resolve.
 		// TODO: Spin up a separate test service and test that dns works for that service.
 		namesToResolve := []string{
@@ -310,28 +310,28 @@ var _ = SIGDescribe("DNS", func() {
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
-	It("should provide DNS for services [Conformance]", func() {
+	framework.ConformanceIt("should provide DNS for services ", func() {
 		// Create a test headless service.
 		By("Creating a test headless service")
 		testServiceSelector := map[string]string{
 			"dns-test": "true",
 		}
 		headlessService := framework.CreateServiceSpec(dnsTestServiceName, "", true, testServiceSelector)
-		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(headlessService)
+		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("deleting the test headless service")
 			defer GinkgoRecover()
-			f.ClientSet.Core().Services(f.Namespace.Name).Delete(headlessService.Name, nil)
+			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(headlessService.Name, nil)
 		}()
 
 		regularService := framework.CreateServiceSpec("test-service-2", "", false, testServiceSelector)
-		regularService, err = f.ClientSet.Core().Services(f.Namespace.Name).Create(regularService)
+		regularService, err = f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(regularService)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("deleting the test service")
 			defer GinkgoRecover()
-			f.ClientSet.Core().Services(f.Namespace.Name).Delete(regularService.Name, nil)
+			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(regularService.Name, nil)
 		}()
 
 		// All the names we need to be able to resolve.
@@ -367,12 +367,12 @@ var _ = SIGDescribe("DNS", func() {
 		serviceName := "dns-test-service-2"
 		podHostname := "dns-querier-2"
 		headlessService := framework.CreateServiceSpec(serviceName, "", true, testServiceSelector)
-		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(headlessService)
+		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(headlessService)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("deleting the test headless service")
 			defer GinkgoRecover()
-			f.ClientSet.Core().Services(f.Namespace.Name).Delete(headlessService.Name, nil)
+			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(headlessService.Name, nil)
 		}()
 
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.cluster.local", podHostname, serviceName, f.Namespace.Name)
@@ -398,12 +398,12 @@ var _ = SIGDescribe("DNS", func() {
 		By("Creating a test externalName service")
 		serviceName := "dns-test-service-3"
 		externalNameService := framework.CreateServiceSpec(serviceName, "foo.example.com", false, nil)
-		_, err := f.ClientSet.Core().Services(f.Namespace.Name).Create(externalNameService)
+		_, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Create(externalNameService)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
 			By("deleting the test externalName service")
 			defer GinkgoRecover()
-			f.ClientSet.Core().Services(f.Namespace.Name).Delete(externalNameService.Name, nil)
+			f.ClientSet.CoreV1().Services(f.Namespace.Name).Delete(externalNameService.Name, nil)
 		}()
 
 		hostFQDN := fmt.Sprintf("%s.%s.svc.cluster.local", serviceName, f.Namespace.Name)
@@ -453,7 +453,7 @@ var _ = SIGDescribe("DNS", func() {
 		By("creating a third pod to probe DNS")
 		pod3 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd)
 
-		svc, err := f.ClientSet.Core().Services(f.Namespace.Name).Get(externalNameService.Name, metav1.GetOptions{})
+		svc, err := f.ClientSet.CoreV1().Services(f.Namespace.Name).Get(externalNameService.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		validateTargetedProbeOutput(f, pod3, []string{wheezyFileName, jessieFileName}, svc.Spec.ClusterIP)

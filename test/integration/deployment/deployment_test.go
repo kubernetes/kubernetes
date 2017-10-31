@@ -17,6 +17,7 @@ limitations under the License.
 package deployment
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -59,8 +60,9 @@ func TestNewDeployment(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Make sure the Deployment status becomes valid while manually marking Deployment pods as ready at the same time
-	if err := tester.waitForDeploymentStatusValidAndMarkPodsReady(); err != nil {
+	// Make sure the Deployment completes while manually marking Deployment pods as ready at the same time.
+	// Use soft check because this deployment was just created and rolling update strategy might be violated.
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -187,8 +189,9 @@ func TestPausedDeployment(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Make sure the Deployment status becomes valid while manually marking Deployment pods as ready at the same time
-	if err := tester.waitForDeploymentStatusValidAndMarkPodsReady(); err != nil {
+	// Make sure the Deployment completes while manually marking Deployment pods as ready at the same time.
+	// Use soft check because this deployment was just created and rolling update strategy might be violated.
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -271,8 +274,9 @@ func TestScalePausedDeployment(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Make sure the Deployment status becomes valid while manually marking Deployment pods as ready at the same time
-	if err := tester.waitForDeploymentStatusValidAndMarkPodsReady(); err != nil {
+	// Make sure the Deployment completes while manually marking Deployment pods as ready at the same time.
+	// Use soft check because this deployment was just created and rolling update strategy might be violated.
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
 		t.Fatal(err)
 	}
 
@@ -315,8 +319,9 @@ func TestScalePausedDeployment(t *testing.T) {
 		t.Errorf("expected new replicaset replicas = %d, got %d", newReplicas, *rs.Spec.Replicas)
 	}
 
-	// Make sure the Deployment status becomes valid while manually marking Deployment pods as ready at the same time
-	if err := tester.waitForDeploymentStatusValidAndMarkPodsReady(); err != nil {
+	// Make sure the Deployment completes while manually marking Deployment pods as ready at the same time.
+	// Use soft check because this deployment was just scaled and rolling update strategy might be violated.
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -378,6 +383,300 @@ func TestDeploymentHashCollision(t *testing.T) {
 
 	// Expect a new ReplicaSet to be created
 	if err := tester.waitForDeploymentRevisionAndImage("2", fakeImage); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Deployment supports rollback even when there's old replica set without revision.
+func TestRollbackDeploymentRSNoRevision(t *testing.T) {
+	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	defer closeFn()
+	name := "test-rollback-no-revision-deployment"
+	ns := framework.CreateTestingNamespace(name, s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	// Create an old RS without revision
+	rsName := "test-rollback-no-revision-controller"
+	rsReplicas := int32(1)
+	rs := newReplicaSet(rsName, ns.Name, rsReplicas)
+	rs.Annotations = make(map[string]string)
+	rs.Annotations["make"] = "difference"
+	rs.Spec.Template.Spec.Containers[0].Image = "different-image"
+	_, err := c.ExtensionsV1beta1().ReplicaSets(ns.Name).Create(rs)
+	if err != nil {
+		t.Fatalf("failed to create replicaset %s: %v", rsName, err)
+	}
+
+	replicas := int32(1)
+	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
+	oriImage := tester.deployment.Spec.Template.Spec.Containers[0].Image
+
+	// Create a deployment which have different template than the replica set created above.
+	if tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment); err != nil {
+		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
+	}
+
+	// Start informer and controllers
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go rm.Run(5, stopCh)
+	go dc.Run(5, stopCh)
+
+	// Wait for the Deployment to be updated to revision 1
+	if err = tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Rollback to the last revision
+	//    Since there's only 1 revision in history, it should still be revision 1
+	revision := int64(0)
+	rollback := newDeploymentRollback(tester.deployment.Name, nil, revision)
+	if err = c.ExtensionsV1beta1().Deployments(ns.Name).Rollback(rollback); err != nil {
+		t.Fatalf("failed to roll back deployment %s to last revision: %v", tester.deployment.Name, err)
+	}
+
+	// Wait for the deployment to start rolling back
+	if err = tester.waitForDeploymentRollbackCleared(); err != nil {
+		t.Fatalf("failed to roll back deployment %s to last revision: %v", tester.deployment.Name, err)
+	}
+	// TODO: report RollbackRevisionNotFound in deployment status and check it here
+
+	// The pod template shouldn't change since there's no last revision
+	// Check if the deployment is still revision 1 and still has the old pod template
+	err = tester.checkDeploymentRevisionAndImage("1", oriImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 2. Update the deployment to revision 2.
+	updatedImage := "update"
+	tester.deployment, err = tester.updateDeployment(func(update *v1beta1.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Name = updatedImage
+		update.Spec.Template.Spec.Containers[0].Image = updatedImage
+	})
+	if err != nil {
+		t.Fatalf("failed updating deployment %s: %v", tester.deployment.Name, err)
+	}
+
+	// Use observedGeneration to determine if the controller noticed the pod template update.
+	// Wait for the controller to notice the resume.
+	if err = tester.waitForObservedDeployment(tester.deployment.Generation); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for it to be updated to revision 2
+	if err = tester.waitForDeploymentRevisionAndImage("2", updatedImage); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for the Deployment to complete while manually marking Deployment pods as ready at the same time
+	if err = tester.waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+
+	// 3. Update the deploymentRollback to rollback to revision 1
+	revision = int64(1)
+	rollback = newDeploymentRollback(tester.deployment.Name, nil, revision)
+	if err = c.ExtensionsV1beta1().Deployments(ns.Name).Rollback(rollback); err != nil {
+		t.Fatalf("failed to roll back deployment %s to revision %d: %v", tester.deployment.Name, revision, err)
+	}
+
+	// Wait for the deployment to start rolling back
+	if err = tester.waitForDeploymentRollbackCleared(); err != nil {
+		t.Fatalf("failed to roll back deployment %s to revision %d: %v", tester.deployment.Name, revision, err)
+	}
+	// TODO: report RollbackDone in deployment status and check it here
+
+	// The pod template should be updated to the one in revision 1
+	// Wait for it to be updated to revision 3
+	if err = tester.waitForDeploymentRevisionAndImage("3", oriImage); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for the Deployment to complete while manually marking Deployment pods as ready at the same time
+	if err = tester.waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func checkRSHashLabels(rs *v1beta1.ReplicaSet) (string, error) {
+	hash := rs.Labels[v1beta1.DefaultDeploymentUniqueLabelKey]
+	selectorHash := rs.Spec.Selector.MatchLabels[v1beta1.DefaultDeploymentUniqueLabelKey]
+	templateLabelHash := rs.Spec.Template.Labels[v1beta1.DefaultDeploymentUniqueLabelKey]
+
+	if hash != selectorHash || selectorHash != templateLabelHash {
+		return "", fmt.Errorf("mismatching hash value found in replicaset %s: %#v", rs.Name, rs)
+	}
+	if len(hash) == 0 {
+		return "", fmt.Errorf("unexpected replicaset %s missing required pod-template-hash labels", rs.Name)
+	}
+
+	return hash, nil
+}
+
+func checkPodsHashLabel(pods *v1.PodList) (string, error) {
+	if len(pods.Items) == 0 {
+		return "", fmt.Errorf("no pods given")
+	}
+	var hash string
+	for _, pod := range pods.Items {
+		podHash := pod.Labels[v1beta1.DefaultDeploymentUniqueLabelKey]
+		if len(podHash) == 0 {
+			return "", fmt.Errorf("found pod %s missing pod-template-hash label: %#v", pod.Name, pods)
+		}
+		// Save the first valid hash
+		if len(hash) == 0 {
+			hash = podHash
+		}
+		if podHash != hash {
+			return "", fmt.Errorf("found pod %s with mismatching pod-template-hash value %s: %#v", pod.Name, podHash, pods)
+		}
+	}
+	return hash, nil
+}
+
+// Deployment should label adopted ReplicaSets and Pods.
+func TestDeploymentLabelAdopted(t *testing.T) {
+	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	defer closeFn()
+	name := "test-adopted-deployment"
+	ns := framework.CreateTestingNamespace(name, s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	// Start informer and controllers
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go rm.Run(5, stopCh)
+	go dc.Run(5, stopCh)
+
+	// Create a RS to be adopted by the deployment.
+	rsName := "test-adopted-controller"
+	replicas := int32(1)
+	rs := newReplicaSet(rsName, ns.Name, replicas)
+	_, err := c.ExtensionsV1beta1().ReplicaSets(ns.Name).Create(rs)
+	if err != nil {
+		t.Fatalf("failed to create replicaset %s: %v", rsName, err)
+	}
+	// Mark RS pods as ready.
+	selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
+	if err != nil {
+		t.Fatalf("failed to parse replicaset %s selector: %v", rsName, err)
+	}
+	if err = wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+		pods, err := c.CoreV1().Pods(ns.Name).List(metav1.ListOptions{LabelSelector: selector.String()})
+		if err != nil {
+			return false, err
+		}
+		if len(pods.Items) != int(replicas) {
+			return false, nil
+		}
+		for _, pod := range pods.Items {
+			if err = markPodReady(c, ns.Name, &pod); err != nil {
+				return false, nil
+			}
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("failed to mark pods replicaset %s as ready: %v", rsName, err)
+	}
+
+	// Create a Deployment to adopt the old rs.
+	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
+	if tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment); err != nil {
+		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
+	}
+
+	// Wait for the Deployment to be updated to revision 1
+	if err = tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
+		t.Fatal(err)
+	}
+
+	// The RS and pods should be relabeled after the Deployment finishes adopting it and completes.
+	if err := tester.waitForDeploymentComplete(); err != nil {
+		t.Fatal(err)
+	}
+
+	// There should be no old RSes (overlapping RS)
+	oldRSs, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(tester.deployment, c.ExtensionsV1beta1())
+	if err != nil {
+		t.Fatalf("failed to get all replicasets owned by deployment %s: %v", name, err)
+	}
+	if len(oldRSs) != 0 || len(allOldRSs) != 0 {
+		t.Errorf("expected deployment to have no old replicasets, got %d old replicasets", len(allOldRSs))
+	}
+
+	// New RS should be relabeled, i.e. contain pod-template-hash in its selector, label, and template label
+	rsHash, err := checkRSHashLabels(newRS)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// All pods targeted by the deployment should contain pod-template-hash in their labels, and there should be only 3 pods
+	selector, err = metav1.LabelSelectorAsSelector(tester.deployment.Spec.Selector)
+	if err != nil {
+		t.Fatalf("failed to parse deployment %s selector: %v", name, err)
+	}
+	pods, err := c.CoreV1().Pods(ns.Name).List(metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		t.Fatalf("failed to list pods of deployment %s: %v", name, err)
+	}
+	if len(pods.Items) != int(replicas) {
+		t.Errorf("expected %d pods, got %d pods", replicas, len(pods.Items))
+	}
+	podHash, err := checkPodsHashLabel(pods)
+	if err != nil {
+		t.Error(err)
+	}
+	if rsHash != podHash {
+		t.Errorf("found mismatching pod-template-hash value: rs hash = %s whereas pod hash = %s", rsHash, podHash)
+	}
+}
+
+// Deployment should have a timeout condition when it fails to progress after given deadline.
+func TestFailedDeployment(t *testing.T) {
+	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	defer closeFn()
+	name := "test-failed-deployment"
+	ns := framework.CreateTestingNamespace(name, s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	deploymentName := "progress-check"
+	replicas := int32(1)
+	three := int32(3)
+	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(deploymentName, ns.Name, replicas)}
+	tester.deployment.Spec.ProgressDeadlineSeconds = &three
+	var err error
+	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	if err != nil {
+		t.Fatalf("failed to create deployment %q: %v", deploymentName, err)
+	}
+
+	// Start informer and controllers
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go rm.Run(5, stopCh)
+	go dc.Run(5, stopCh)
+
+	if err = tester.waitForDeploymentUpdatedReplicasLTE(replicas); err != nil {
+		t.Fatal(err)
+	}
+
+	// Pods are not marked as Ready, therefore the deployment progress will eventually timeout after progressDeadlineSeconds has passed.
+	// Wait for the deployment to have a progress timeout condition.
+	if err = tester.waitForDeploymentWithCondition(deploymentutil.TimedOutReason, v1beta1.DeploymentProgressing); err != nil {
+		t.Fatal(err)
+	}
+
+	// Manually mark pods as Ready and wait for deployment to complete.
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+		t.Fatalf("deployment %q fails to have its status becoming valid: %v", deploymentName, err)
+	}
+
+	// Wait for the deployment to have a progress complete condition.
+	if err = tester.waitForDeploymentWithCondition(deploymentutil.NewRSAvailableReason, v1beta1.DeploymentProgressing); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -32,7 +32,7 @@ import (
 )
 
 type mockState struct {
-	assignments   map[string]cpuset.CPUSet
+	assignments   state.ContainerCPUAssignments
 	defaultCPUSet cpuset.CPUSet
 }
 
@@ -62,6 +62,19 @@ func (s *mockState) SetDefaultCPUSet(cset cpuset.CPUSet) {
 
 func (s *mockState) Delete(containerID string) {
 	delete(s.assignments, containerID)
+}
+
+func (s *mockState) ClearState() {
+	s.defaultCPUSet = cpuset.CPUSet{}
+	s.assignments = make(state.ContainerCPUAssignments)
+}
+
+func (s *mockState) SetCPUAssignments(a state.ContainerCPUAssignments) {
+	s.assignments = a.Clone()
+}
+
+func (s *mockState) GetCPUAssignments() state.ContainerCPUAssignments {
+	return s.assignments.Clone()
 }
 
 type mockPolicy struct {
@@ -190,7 +203,7 @@ func TestCPUManagerAdd(t *testing.T) {
 				err: testCase.regErr,
 			},
 			state: &mockState{
-				assignments:   map[string]cpuset.CPUSet{},
+				assignments:   state.ContainerCPUAssignments{},
 				defaultCPUSet: cpuset.NewCPUSet(),
 			},
 			containerRuntime: mockRuntimeService{
@@ -216,7 +229,7 @@ func TestCPUManagerRemove(t *testing.T) {
 			err: nil,
 		},
 		state: &mockState{
-			assignments:   map[string]cpuset.CPUSet{},
+			assignments:   state.ContainerCPUAssignments{},
 			defaultCPUSet: cpuset.NewCPUSet(),
 		},
 		containerRuntime:  mockRuntimeService{},
@@ -251,7 +264,7 @@ func TestReconcileState(t *testing.T) {
 		activePods                []*v1.Pod
 		pspPS                     v1.PodStatus
 		pspFound                  bool
-		stAssignments             map[string]cpuset.CPUSet
+		stAssignments             state.ContainerCPUAssignments
 		stDefaultCPUSet           cpuset.CPUSet
 		updateErr                 error
 		expectFailedContainerName string
@@ -282,7 +295,7 @@ func TestReconcileState(t *testing.T) {
 				},
 			},
 			pspFound: true,
-			stAssignments: map[string]cpuset.CPUSet{
+			stAssignments: state.ContainerCPUAssignments{
 				"fakeID": cpuset.NewCPUSet(1, 2),
 			},
 			stDefaultCPUSet:           cpuset.NewCPUSet(3, 4, 5, 6, 7),
@@ -308,7 +321,7 @@ func TestReconcileState(t *testing.T) {
 			},
 			pspPS:                     v1.PodStatus{},
 			pspFound:                  false,
-			stAssignments:             map[string]cpuset.CPUSet{},
+			stAssignments:             state.ContainerCPUAssignments{},
 			stDefaultCPUSet:           cpuset.NewCPUSet(),
 			updateErr:                 nil,
 			expectFailedContainerName: "fakeName",
@@ -339,7 +352,7 @@ func TestReconcileState(t *testing.T) {
 				},
 			},
 			pspFound:                  true,
-			stAssignments:             map[string]cpuset.CPUSet{},
+			stAssignments:             state.ContainerCPUAssignments{},
 			stDefaultCPUSet:           cpuset.NewCPUSet(),
 			updateErr:                 nil,
 			expectFailedContainerName: "fakeName",
@@ -370,7 +383,7 @@ func TestReconcileState(t *testing.T) {
 				},
 			},
 			pspFound: true,
-			stAssignments: map[string]cpuset.CPUSet{
+			stAssignments: state.ContainerCPUAssignments{
 				"fakeID": cpuset.NewCPUSet(),
 			},
 			stDefaultCPUSet:           cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
@@ -403,7 +416,7 @@ func TestReconcileState(t *testing.T) {
 				},
 			},
 			pspFound: true,
-			stAssignments: map[string]cpuset.CPUSet{
+			stAssignments: state.ContainerCPUAssignments{
 				"fakeID": cpuset.NewCPUSet(1, 2),
 			},
 			stDefaultCPUSet:           cpuset.NewCPUSet(3, 4, 5, 6, 7),

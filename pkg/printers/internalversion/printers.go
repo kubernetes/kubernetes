@@ -41,7 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/events"
 	"k8s.io/kubernetes/pkg/api/helper"
@@ -360,15 +359,6 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(podSecurityPolicyColumnDefinitions, printPodSecurityPolicy)
 	h.TableHandler(podSecurityPolicyColumnDefinitions, printPodSecurityPolicyList)
-
-	clusterColumnDefinitions := []metav1alpha1.TableColumnDefinition{
-		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Status", Type: "string", Description: "Status of the cluster"},
-		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
-		{Name: "Labels", Type: "string", Description: "The labels of the cluster"},
-	}
-	h.TableHandler(clusterColumnDefinitions, printCluster)
-	h.TableHandler(clusterColumnDefinitions, printClusterList)
 
 	networkPolicyColumnDefinitioins := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -740,41 +730,6 @@ func printReplicaSetList(list *extensions.ReplicaSetList, options printers.Print
 	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printReplicaSet(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
-	}
-	return rows, nil
-}
-
-func printCluster(obj *federation.Cluster, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
-	row := metav1alpha1.TableRow{
-		Object: runtime.RawExtension{Object: obj},
-	}
-
-	var statuses []string
-	for _, condition := range obj.Status.Conditions {
-		if condition.Status == api.ConditionTrue {
-			statuses = append(statuses, string(condition.Type))
-		} else {
-			statuses = append(statuses, "Not"+string(condition.Type))
-		}
-	}
-	if len(statuses) == 0 {
-		statuses = append(statuses, "Unknown")
-	}
-	row.Cells = append(row.Cells, obj.Name, strings.Join(statuses, ","), translateTimestamp(obj.CreationTimestamp))
-	if options.ShowLabels {
-		row.Cells = append(row.Cells, labels.FormatLabels(obj.Labels))
-	}
-	return []metav1alpha1.TableRow{row}, nil
-}
-
-func printClusterList(list *federation.ClusterList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
-	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
-	for i := range list.Items {
-		r, err := printCluster(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}
@@ -1753,10 +1708,7 @@ func layoutContainers(containers []api.Container, w io.Writer) error {
 		}
 	}
 	_, err := fmt.Fprintf(w, "\t%s\t%s", namesBuffer.String(), imagesBuffer.String())
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 // Lay out all the containers on one line if use wide output.

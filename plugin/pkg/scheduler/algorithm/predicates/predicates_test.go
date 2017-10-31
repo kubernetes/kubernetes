@@ -18,7 +18,9 @@ package predicates
 
 import (
 	"fmt"
+	"os"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -1989,24 +1991,11 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 		},
 	}
 
-	filter := VolumeFilter{
-		FilterVolume: func(vol *v1.Volume) (string, bool) {
-			if vol.AWSElasticBlockStore != nil {
-				return vol.AWSElasticBlockStore.VolumeID, true
-			}
-			return "", false
-		},
-		FilterPersistentVolume: func(pv *v1.PersistentVolume) (string, bool) {
-			if pv.Spec.AWSElasticBlockStore != nil {
-				return pv.Spec.AWSElasticBlockStore.VolumeID, true
-			}
-			return "", false
-		},
-	}
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrMaxVolumeCountExceeded}
 
 	for _, test := range tests {
-		pred := NewMaxPDVolumeCountPredicate(filter, test.maxVols, pvInfo, pvcInfo)
+		os.Setenv(KubeMaxPDVols, strconv.Itoa(test.maxVols))
+		pred := NewMaxPDVolumeCountPredicate(EBSVolumeFilterType, pvInfo, pvcInfo)
 		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), schedulercache.NewNodeInfo(test.existingPods...))
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
@@ -3891,5 +3880,45 @@ func TestVolumeZonePredicateMultiZone(t *testing.T) {
 			t.Errorf("%s: expected %v got %v", test.Name, test.Fits, fits)
 		}
 
+	}
+}
+
+func TestGetMaxVols(t *testing.T) {
+	previousValue := os.Getenv(KubeMaxPDVols)
+	defaultValue := 39
+
+	tests := []struct {
+		rawMaxVols string
+		expected   int
+		test       string
+	}{
+		{
+			rawMaxVols: "invalid",
+			expected:   defaultValue,
+			test:       "Unable to parse maximum PD volumes value, using default value",
+		},
+		{
+			rawMaxVols: "-2",
+			expected:   defaultValue,
+			test:       "Maximum PD volumes must be a positive value, using default value",
+		},
+		{
+			rawMaxVols: "40",
+			expected:   40,
+			test:       "Parse maximum PD volumes value from env",
+		},
+	}
+
+	for _, test := range tests {
+		os.Setenv(KubeMaxPDVols, test.rawMaxVols)
+		result := getMaxVols(defaultValue)
+		if result != test.expected {
+			t.Errorf("%s: expected %v got %v", test.test, test.expected, result)
+		}
+	}
+
+	os.Unsetenv(KubeMaxPDVols)
+	if previousValue != "" {
+		os.Setenv(KubeMaxPDVols, previousValue)
 	}
 }

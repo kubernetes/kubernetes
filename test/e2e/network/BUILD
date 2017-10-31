@@ -12,6 +12,7 @@ go_library(
         "dns_common.go",
         "dns_configmap.go",
         "doc.go",
+        "example_cluster_dns.go",
         "firewall.go",
         "framework.go",
         "ingress.go",
@@ -31,7 +32,6 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
-        "//pkg/apis/networking:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/cloudprovider/providers/gce:go_default_library",
@@ -47,6 +47,7 @@ go_library(
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/google.golang.org/api/compute/v0.alpha:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/api/networking/v1:go_default_library",
         "//vendor/k8s.io/api/rbac/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

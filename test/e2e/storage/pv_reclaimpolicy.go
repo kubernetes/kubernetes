@@ -25,6 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -86,6 +87,62 @@ var _ = SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 			err = framework.WaitForPersistentVolumeDeleted(c, pv.Name, 3*time.Second, 300*time.Second)
 			Expect(err).NotTo(HaveOccurred())
 
+			pv = nil
+			volumePath = ""
+		})
+
+		/*
+			Test Steps:
+			1. Create vmdk
+			2. Create PV Spec with volume path set to VMDK file created in Step-1, and PersistentVolumeReclaimPolicy is set to Delete
+			3. Create PVC with the storage request set to PV's storage capacity.
+			4. Wait for PV and PVC to bound.
+			5. Delete PVC.
+			6. Verify volume is attached to the node and volume is accessible in the pod.
+			7. Verify PV status should be failed.
+			8. Delete the pod.
+			9. Verify PV should be detached from the node and automatically deleted.
+		*/
+		It("should not detach and unmount PV when associated pvc with delete as reclaimPolicy is deleted when it is in use by the pod", func() {
+			vsp, err := vsphere.GetVSphere()
+			Expect(err).NotTo(HaveOccurred())
+
+			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(vsp, c, ns, v1.PersistentVolumeReclaimDelete)
+			Expect(err).NotTo(HaveOccurred())
+			// Wait for PV and PVC to Bind
+			framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
+
+			By("Creating the Pod")
+			pod, err := framework.CreateClientPod(c, ns, pvc)
+			Expect(err).NotTo(HaveOccurred())
+			node := types.NodeName(pod.Spec.NodeName)
+
+			By("Deleting the Claim")
+			framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
+			pvc = nil
+
+			// Verify PV is Present, after PVC is deleted and PV status should be Failed.
+			pv, err := c.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(framework.WaitForPersistentVolumePhase(v1.VolumeFailed, c, pv.Name, 1*time.Second, 60*time.Second)).NotTo(HaveOccurred())
+
+			By("Verify the volume is attached to the node")
+			isVolumeAttached, verifyDiskAttachedError := verifyVSphereDiskAttached(vsp, pv.Spec.VsphereVolume.VolumePath, node)
+			Expect(verifyDiskAttachedError).NotTo(HaveOccurred())
+			Expect(isVolumeAttached).To(BeTrue())
+
+			By("Verify the volume is accessible and available in the pod")
+			verifyVSphereVolumesAccessible(pod, []*v1.PersistentVolume{pv}, vsp)
+			framework.Logf("Verified that Volume is accessible in the POD after deleting PV claim")
+
+			By("Deleting the Pod")
+			framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod), "Failed to delete pod ", pod.Name)
+
+			By("Verify PV is detached from the node after Pod is deleted")
+			Expect(waitForVSphereDiskToDetach(vsp, pv.Spec.VsphereVolume.VolumePath, types.NodeName(pod.Spec.NodeName))).NotTo(HaveOccurred())
+
+			By("Verify PV should be deleted automatically")
+			framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(c, pv.Name, 1*time.Second, 30*time.Second))
 			pv = nil
 			volumePath = ""
 		})

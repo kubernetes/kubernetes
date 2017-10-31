@@ -111,7 +111,7 @@ func TestPlugin(t *testing.T) {
 	if _, err := os.Stat(volumePath); err == nil {
 		t.Errorf("TearDown() failed, volume path still exists: %s", volumePath)
 	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
+		t.Errorf("TearDown() failed: %v", err)
 	}
 }
 

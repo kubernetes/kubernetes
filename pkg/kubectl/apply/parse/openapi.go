@@ -18,13 +18,14 @@ package parse
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+
+	"k8s.io/kube-openapi/pkg/util/proto"
 )
 
 // Contains functions for casting openapi interfaces to their underlying types
 
 // getSchemaType returns the string type of the schema - e.g. array, primitive, map, kind, reference
-func getSchemaType(schema openapi.Schema) string {
+func getSchemaType(schema proto.Schema) string {
 	if schema == nil {
 		return ""
 	}
@@ -33,8 +34,8 @@ func getSchemaType(schema openapi.Schema) string {
 	return visitor.Kind
 }
 
-// getKind converts schema to an *openapi.Kind object
-func getKind(schema openapi.Schema) (*openapi.Kind, error) {
+// getKind converts schema to an *proto.Kind object
+func getKind(schema proto.Schema) (*proto.Kind, error) {
 	if schema == nil {
 		return nil, nil
 	}
@@ -43,8 +44,8 @@ func getKind(schema openapi.Schema) (*openapi.Kind, error) {
 	return visitor.Result, visitor.Err
 }
 
-// getArray converts schema to an *openapi.Array object
-func getArray(schema openapi.Schema) (*openapi.Array, error) {
+// getArray converts schema to an *proto.Array object
+func getArray(schema proto.Schema) (*proto.Array, error) {
 	if schema == nil {
 		return nil, nil
 	}
@@ -53,8 +54,8 @@ func getArray(schema openapi.Schema) (*openapi.Array, error) {
 	return visitor.Result, visitor.Err
 }
 
-// getMap converts schema to an *openapi.Map object
-func getMap(schema openapi.Schema) (*openapi.Map, error) {
+// getMap converts schema to an *proto.Map object
+func getMap(schema proto.Schema) (*proto.Map, error) {
 	if schema == nil {
 		return nil, nil
 	}
@@ -63,8 +64,8 @@ func getMap(schema openapi.Schema) (*openapi.Map, error) {
 	return visitor.Result, visitor.Err
 }
 
-// getPrimitive converts schema to an *openapi.Primitive object
-func getPrimitive(schema openapi.Schema) (*openapi.Primitive, error) {
+// getPrimitive converts schema to an *proto.Primitive object
+func getPrimitive(schema proto.Schema) (*proto.Primitive, error) {
 	if schema == nil {
 		return nil, nil
 	}
@@ -79,95 +80,95 @@ type baseSchemaVisitor struct {
 }
 
 // VisitArray implements openapi
-func (v *baseSchemaVisitor) VisitArray(array *openapi.Array) {
+func (v *baseSchemaVisitor) VisitArray(array *proto.Array) {
 	v.Kind = "array"
 	v.Err = fmt.Errorf("Array type not expected")
 }
 
 // MergeMap implements openapi
-func (v *baseSchemaVisitor) VisitMap(*openapi.Map) {
+func (v *baseSchemaVisitor) VisitMap(*proto.Map) {
 	v.Kind = "map"
 	v.Err = fmt.Errorf("Map type not expected")
 }
 
 // MergePrimitive implements openapi
-func (v *baseSchemaVisitor) VisitPrimitive(*openapi.Primitive) {
+func (v *baseSchemaVisitor) VisitPrimitive(*proto.Primitive) {
 	v.Kind = "primitive"
 	v.Err = fmt.Errorf("Primitive type not expected")
 }
 
 // VisitKind implements openapi
-func (v *baseSchemaVisitor) VisitKind(*openapi.Kind) {
+func (v *baseSchemaVisitor) VisitKind(*proto.Kind) {
 	v.Kind = "kind"
 	v.Err = fmt.Errorf("Kind type not expected")
 }
 
 // VisitReference implements openapi
-func (v *baseSchemaVisitor) VisitReference(reference openapi.Reference) {
+func (v *baseSchemaVisitor) VisitReference(reference proto.Reference) {
 	v.Kind = "reference"
 	v.Err = fmt.Errorf("Reference type not expected")
 }
 
 type kindSchemaVisitor struct {
 	baseSchemaVisitor
-	Result *openapi.Kind
+	Result *proto.Kind
 }
 
 // VisitKind implements openapi
-func (v *kindSchemaVisitor) VisitKind(result *openapi.Kind) {
+func (v *kindSchemaVisitor) VisitKind(result *proto.Kind) {
 	v.Result = result
 	v.Kind = "kind"
 }
 
 // VisitReference implements openapi
-func (v *kindSchemaVisitor) VisitReference(reference openapi.Reference) {
+func (v *kindSchemaVisitor) VisitReference(reference proto.Reference) {
 	reference.SubSchema().Accept(v)
 }
 
 type mapSchemaVisitor struct {
 	baseSchemaVisitor
-	Result *openapi.Map
+	Result *proto.Map
 }
 
 // MergeMap implements openapi
-func (v *mapSchemaVisitor) VisitMap(result *openapi.Map) {
+func (v *mapSchemaVisitor) VisitMap(result *proto.Map) {
 	v.Result = result
 	v.Kind = "map"
 }
 
 // VisitReference implements openapi
-func (v *mapSchemaVisitor) VisitReference(reference openapi.Reference) {
+func (v *mapSchemaVisitor) VisitReference(reference proto.Reference) {
 	reference.SubSchema().Accept(v)
 }
 
 type arraySchemaVisitor struct {
 	baseSchemaVisitor
-	Result *openapi.Array
+	Result *proto.Array
 }
 
 // VisitArray implements openapi
-func (v *arraySchemaVisitor) VisitArray(result *openapi.Array) {
+func (v *arraySchemaVisitor) VisitArray(result *proto.Array) {
 	v.Result = result
 	v.Kind = "array"
 }
 
 // MergePrimitive implements openapi
-func (v *arraySchemaVisitor) VisitReference(reference openapi.Reference) {
+func (v *arraySchemaVisitor) VisitReference(reference proto.Reference) {
 	reference.SubSchema().Accept(v)
 }
 
 type primitiveSchemaVisitor struct {
 	baseSchemaVisitor
-	Result *openapi.Primitive
+	Result *proto.Primitive
 }
 
 // MergePrimitive implements openapi
-func (v *primitiveSchemaVisitor) VisitPrimitive(result *openapi.Primitive) {
+func (v *primitiveSchemaVisitor) VisitPrimitive(result *proto.Primitive) {
 	v.Result = result
 	v.Kind = "primitive"
 }
 
 // VisitReference implements openapi
-func (v *primitiveSchemaVisitor) VisitReference(reference openapi.Reference) {
+func (v *primitiveSchemaVisitor) VisitReference(reference proto.Reference) {
 	reference.SubSchema().Accept(v)
 }

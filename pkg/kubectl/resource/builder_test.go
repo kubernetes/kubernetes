@@ -72,7 +72,7 @@ func fakeClient() ClientMapper {
 func fakeClientWith(testName string, t *testing.T, data map[string]string) ClientMapper {
 	return ClientMapperFunc(func(*meta.RESTMapping) (RESTClient, error) {
 		return &fake.RESTClient{
-			APIRegistry:          legacyscheme.Registry,
+			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				p := req.URL.Path
@@ -900,11 +900,11 @@ func TestMultipleObject(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expected := &api.List{
-		Items: []runtime.Object{
-			&pods.Items[0],
-			&pods.Items[1],
-			&svc.Items[0],
+	expected := &v1.List{
+		Items: []runtime.RawExtension{
+			{Object: &pods.Items[0]},
+			{Object: &pods.Items[1]},
+			{Object: &svc.Items[0]},
 		},
 	}
 	if !apiequality.Semantic.DeepDerivative(expected, obj) {
@@ -1023,7 +1023,7 @@ func TestListObject(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	list, ok := obj.(*api.List)
+	list, ok := obj.(*v1.List)
 	if !ok {
 		t.Fatalf("unexpected object: %#v", obj)
 	}
@@ -1057,7 +1057,7 @@ func TestListObjectWithDifferentVersions(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	list, ok := obj.(*api.List)
+	list, ok := obj.(*v1.List)
 	if !ok {
 		t.Fatalf("unexpected object: %#v", obj)
 	}

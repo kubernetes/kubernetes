@@ -24,6 +24,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
@@ -79,7 +80,7 @@ func (v *SchemaValidation) validateResource(obj interface{}, gvk schema.GroupVer
 		return nil
 	}
 
-	rootValidation, err := itemFactory(openapi.NewPath(gvk.Kind), obj)
+	rootValidation, err := itemFactory(proto.NewPath(gvk.Kind), obj)
 	if err != nil {
 		return []error{err}
 	}

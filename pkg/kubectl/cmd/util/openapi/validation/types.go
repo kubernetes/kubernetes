@@ -20,19 +20,19 @@ import (
 	"reflect"
 	"sort"
 
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"k8s.io/kube-openapi/pkg/util/proto"
 )
 
 type ValidationItem interface {
-	openapi.SchemaVisitor
+	proto.SchemaVisitor
 
 	Errors() []error
-	Path() *openapi.Path
+	Path() *proto.Path
 }
 
 type baseItem struct {
 	errors Errors
-	path   openapi.Path
+	path   proto.Path
 }
 
 // Errors returns the list of errors found for this item.
@@ -58,7 +58,7 @@ func (item *baseItem) CopyErrors(errs []error) {
 }
 
 // Path returns the path of this item, helps print useful errors.
-func (item *baseItem) Path() *openapi.Path {
+func (item *baseItem) Path() *proto.Path {
 	return &item.path
 }
 
@@ -80,15 +80,15 @@ func (item *mapItem) sortedKeys() []string {
 
 var _ ValidationItem = &mapItem{}
 
-func (item *mapItem) VisitPrimitive(schema *openapi.Primitive) {
+func (item *mapItem) VisitPrimitive(schema *proto.Primitive) {
 	item.AddValidationError(InvalidTypeError{Path: schema.GetPath().String(), Expected: schema.Type, Actual: "map"})
 }
 
-func (item *mapItem) VisitArray(schema *openapi.Array) {
+func (item *mapItem) VisitArray(schema *proto.Array) {
 	item.AddValidationError(InvalidTypeError{Path: schema.GetPath().String(), Expected: "array", Actual: "map"})
 }
 
-func (item *mapItem) VisitMap(schema *openapi.Map) {
+func (item *mapItem) VisitMap(schema *proto.Map) {
 	for _, key := range item.sortedKeys() {
 		subItem, err := itemFactory(item.Path().FieldPath(key), item.Map[key])
 		if err != nil {
@@ -100,7 +100,7 @@ func (item *mapItem) VisitMap(schema *openapi.Map) {
 	}
 }
 
-func (item *mapItem) VisitKind(schema *openapi.Kind) {
+func (item *mapItem) VisitKind(schema *proto.Kind) {
 	// Verify each sub-field.
 	for _, key := range item.sortedKeys() {
 		if item.Map[key] == nil {
@@ -127,7 +127,7 @@ func (item *mapItem) VisitKind(schema *openapi.Kind) {
 	}
 }
 
-func (item *mapItem) VisitReference(schema openapi.Reference) {
+func (item *mapItem) VisitReference(schema proto.Reference) {
 	// passthrough
 	schema.SubSchema().Accept(item)
 }
@@ -141,11 +141,11 @@ type arrayItem struct {
 
 var _ ValidationItem = &arrayItem{}
 
-func (item *arrayItem) VisitPrimitive(schema *openapi.Primitive) {
+func (item *arrayItem) VisitPrimitive(schema *proto.Primitive) {
 	item.AddValidationError(InvalidTypeError{Path: schema.GetPath().String(), Expected: schema.Type, Actual: "array"})
 }
 
-func (item *arrayItem) VisitArray(schema *openapi.Array) {
+func (item *arrayItem) VisitArray(schema *proto.Array) {
 	for i, v := range item.Array {
 		path := item.Path().ArrayPath(i)
 		if v == nil {
@@ -162,15 +162,15 @@ func (item *arrayItem) VisitArray(schema *openapi.Array) {
 	}
 }
 
-func (item *arrayItem) VisitMap(schema *openapi.Map) {
+func (item *arrayItem) VisitMap(schema *proto.Map) {
 	item.AddValidationError(InvalidTypeError{Path: schema.GetPath().String(), Expected: "array", Actual: "map"})
 }
 
-func (item *arrayItem) VisitKind(schema *openapi.Kind) {
+func (item *arrayItem) VisitKind(schema *proto.Kind) {
 	item.AddValidationError(InvalidTypeError{Path: schema.GetPath().String(), Expected: "array", Actual: "map"})
 }
 
-func (item *arrayItem) VisitReference(schema openapi.Reference) {
+func (item *arrayItem) VisitReference(schema proto.Reference) {
 	// passthrough
 	schema.SubSchema().Accept(item)
 }
@@ -185,54 +185,54 @@ type primitiveItem struct {
 
 var _ ValidationItem = &primitiveItem{}
 
-func (item *primitiveItem) VisitPrimitive(schema *openapi.Primitive) {
+func (item *primitiveItem) VisitPrimitive(schema *proto.Primitive) {
 	// Some types of primitives can match more than one (a number
 	// can be a string, but not the other way around). Return from
 	// the switch if we have a valid possible type conversion
 	// NOTE(apelisse): This logic is blindly copied from the
 	// existing swagger logic, and I'm not sure I agree with it.
 	switch schema.Type {
-	case openapi.Boolean:
+	case proto.Boolean:
 		switch item.Kind {
-		case openapi.Boolean:
+		case proto.Boolean:
 			return
 		}
-	case openapi.Integer:
+	case proto.Integer:
 		switch item.Kind {
-		case openapi.Integer, openapi.Number:
+		case proto.Integer, proto.Number:
 			return
 		}
-	case openapi.Number:
+	case proto.Number:
 		switch item.Kind {
-		case openapi.Number:
+		case proto.Number:
 			return
 		}
-	case openapi.String:
+	case proto.String:
 		return
 	}
 
 	item.AddValidationError(InvalidTypeError{Path: schema.GetPath().String(), Expected: schema.Type, Actual: item.Kind})
 }
 
-func (item *primitiveItem) VisitArray(schema *openapi.Array) {
+func (item *primitiveItem) VisitArray(schema *proto.Array) {
 	item.AddValidationError(InvalidTypeError{Path: schema.GetPath().String(), Expected: "array", Actual: item.Kind})
 }
 
-func (item *primitiveItem) VisitMap(schema *openapi.Map) {
+func (item *primitiveItem) VisitMap(schema *proto.Map) {
 	item.AddValidationError(InvalidTypeError{Path: schema.GetPath().String(), Expected: "map", Actual: item.Kind})
 }
 
-func (item *primitiveItem) VisitKind(schema *openapi.Kind) {
+func (item *primitiveItem) VisitKind(schema *proto.Kind) {
 	item.AddValidationError(InvalidTypeError{Path: schema.GetPath().String(), Expected: "map", Actual: item.Kind})
 }
 
-func (item *primitiveItem) VisitReference(schema openapi.Reference) {
+func (item *primitiveItem) VisitReference(schema proto.Reference) {
 	// passthrough
 	schema.SubSchema().Accept(item)
 }
 
 // itemFactory creates the relevant item type/visitor based on the current yaml type.
-func itemFactory(path openapi.Path, v interface{}) (ValidationItem, error) {
+func itemFactory(path proto.Path, v interface{}) (ValidationItem, error) {
 	// We need to special case for no-type fields in yaml (e.g. empty item in list)
 	if v == nil {
 		return nil, InvalidObjectTypeError{Type: "nil", Path: path.String()}
@@ -243,7 +243,7 @@ func itemFactory(path openapi.Path, v interface{}) (ValidationItem, error) {
 		return &primitiveItem{
 			baseItem: baseItem{path: path},
 			Value:    v,
-			Kind:     openapi.Boolean,
+			Kind:     proto.Boolean,
 		}, nil
 	case reflect.Int,
 		reflect.Int8,
@@ -258,20 +258,20 @@ func itemFactory(path openapi.Path, v interface{}) (ValidationItem, error) {
 		return &primitiveItem{
 			baseItem: baseItem{path: path},
 			Value:    v,
-			Kind:     openapi.Integer,
+			Kind:     proto.Integer,
 		}, nil
 	case reflect.Float32,
 		reflect.Float64:
 		return &primitiveItem{
 			baseItem: baseItem{path: path},
 			Value:    v,
-			Kind:     openapi.Number,
+			Kind:     proto.Number,
 		}, nil
 	case reflect.String:
 		return &primitiveItem{
 			baseItem: baseItem{path: path},
 			Value:    v,
-			Kind:     openapi.String,
+			Kind:     proto.String,
 		}, nil
 	case reflect.Array,
 		reflect.Slice:

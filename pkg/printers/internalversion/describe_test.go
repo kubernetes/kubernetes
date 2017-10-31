@@ -33,11 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	versionedfake "k8s.io/client-go/kubernetes/fake"
-	federation "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	fedfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_clientset/fake"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -140,6 +139,28 @@ func TestDescribeNamespace(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "myns") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
+func TestDescribePodPriority(t *testing.T) {
+	priority := int32(1000)
+	fake := fake.NewSimpleClientset(&api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+		},
+		Spec: api.PodSpec{
+			PriorityClassName: "high-priority",
+			Priority:          &priority,
+		},
+	})
+	c := &describeClient{T: t, Namespace: "", Interface: fake}
+	d := PodDescriber{c}
+	out, err := d.Describe("", "bar", printers.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "high-priority") || !strings.Contains(out, "1000") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
@@ -776,7 +797,7 @@ func TestPersistentVolumeDescriber(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 			Spec: api.PersistentVolumeSpec{
 				PersistentVolumeSource: api.PersistentVolumeSource{
-					RBD: &api.RBDVolumeSource{},
+					RBD: &api.RBDPersistentVolumeSource{},
 				},
 			},
 		},
@@ -844,40 +865,6 @@ func TestDescribeDeployment(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if !strings.Contains(out, "bar") || !strings.Contains(out, "foo") || !strings.Contains(out, "Containers:") || !strings.Contains(out, "mytest-image:latest") {
-		t.Errorf("unexpected out: %s", out)
-	}
-}
-
-func TestDescribeCluster(t *testing.T) {
-	cluster := federation.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            "foo",
-			ResourceVersion: "4",
-			Labels: map[string]string{
-				"name": "foo",
-			},
-		},
-		Spec: federation.ClusterSpec{
-			ServerAddressByClientCIDRs: []federation.ServerAddressByClientCIDR{
-				{
-					ClientCIDR:    "0.0.0.0/0",
-					ServerAddress: "localhost:8888",
-				},
-			},
-		},
-		Status: federation.ClusterStatus{
-			Conditions: []federation.ClusterCondition{
-				{Type: federation.ClusterReady, Status: v1.ConditionTrue},
-			},
-		},
-	}
-	fake := fedfake.NewSimpleClientset(&cluster)
-	d := ClusterDescriber{Interface: fake}
-	out, err := d.Describe("any", "foo", printers.DescriberSettings{ShowEvents: true})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if !strings.Contains(out, "foo") {
 		t.Errorf("unexpected out: %s", out)
 	}
 }
@@ -1657,6 +1644,137 @@ func TestDescribeResourceQuota(t *testing.T) {
 			t.Errorf("expected to find %q in output: %q", expected, out)
 		}
 	}
+}
+
+func TestDescribeNetworkPolicies(t *testing.T) {
+	expectedTime, err := time.Parse("2006-01-02 15:04:05 Z0700 MST", "2017-06-04 21:45:56 -0700 PDT")
+	if err != nil {
+		t.Errorf("unable to parse time %q error: %s", "2017-06-04 21:45:56 -0700 PDT", err)
+	}
+	expectedOut := `Name:         network-policy-1
+Namespace:    default
+Created on:   2017-06-04 21:45:56 -0700 PDT
+Labels:       <none>
+Annotations:  <none>
+Spec:
+  Pod Selector:     foo in (bar1,bar2),foo2 notin (bar1,bar2),id1=app1,id2=app2
+  Allowing ingress traffic:
+    To Port: 80/TCP
+    To Port: 82/TCP
+    From Pod Selector: id=app2,id2=app3
+    From Namespace Selector: id=app2,id2=app3
+    From Namespace Selector: foo in (bar1,bar2),id=app2,id2=app3
+    ----------
+    To Port: <any> (traffic allowed to all ports)
+    From: <any> (traffic not restricted by source)
+`
+
+	port80 := intstr.FromInt(80)
+	port82 := intstr.FromInt(82)
+	protoTCP := api.ProtocolTCP
+
+	versionedFake := fake.NewSimpleClientset(&networking.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "network-policy-1",
+			Namespace:         "default",
+			CreationTimestamp: metav1.NewTime(expectedTime),
+		},
+		Spec: networking.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"id1": "app1",
+					"id2": "app2",
+				},
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{Key: "foo", Operator: "In", Values: []string{"bar1", "bar2"}},
+					{Key: "foo2", Operator: "NotIn", Values: []string{"bar1", "bar2"}},
+				},
+			},
+			Ingress: []networking.NetworkPolicyIngressRule{
+				{
+					Ports: []networking.NetworkPolicyPort{
+						{Port: &port80},
+						{Port: &port82, Protocol: &protoTCP},
+					},
+					From: []networking.NetworkPolicyPeer{
+						{
+							PodSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+							},
+						},
+						{
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+							},
+						},
+						{
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{Key: "foo", Operator: "In", Values: []string{"bar1", "bar2"}},
+								},
+							},
+						},
+					},
+				},
+				{},
+			},
+		},
+	})
+	d := NetworkPolicyDescriber{versionedFake}
+	out, err := d.Describe("", "network-policy-1", printers.DescriberSettings{})
+	if err != nil {
+		t.Errorf("unexpected error: %s", err)
+	}
+	if out != expectedOut {
+		t.Errorf("want:\n%s\ngot:\n%s", expectedOut, out)
+	}
+}
+
+func TestDescribeServiceAccount(t *testing.T) {
+	fake := fake.NewSimpleClientset(&api.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Secrets: []api.ObjectReference{
+			{
+				Name: "test-objectref",
+			},
+		},
+		ImagePullSecrets: []api.LocalObjectReference{
+			{
+				Name: "test-local-ref",
+			},
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := ServiceAccountDescriber{c}
+	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	expectedOut := `Name:                bar
+Namespace:           foo
+Labels:              <none>
+Annotations:         <none>
+Image pull secrets:  test-local-ref (not found)
+Mountable secrets:   test-objectref (not found)
+Tokens:              <none>
+Events:              <none>` + "\n"
+	if out != expectedOut {
+		t.Errorf("expected : %q\n but got output:\n %q", expectedOut, out)
+	}
+
 }
 
 // boolPtr returns a pointer to a bool
