@@ -80,7 +80,7 @@ func NewCmdConfigGetContexts(out io.Writer, configAccess clientcmd.ConfigAccess)
 		},
 	}
 	cmdutil.AddOutputFlags(cmd)
-	cmdutil.AddNoHeadersFlags(cmd)
+	cmdutil.AddNoHeadersFlags(cmd, false)
 	return cmd
 }
 

@@ -44,7 +44,7 @@ func AddPrinterFlags(cmd *cobra.Command) {
 // is completely removed, this function can go away.
 func AddNonDeprecatedPrinterFlags(cmd *cobra.Command) {
 	AddOutputFlags(cmd)
-	AddNoHeadersFlags(cmd)
+	AddNoHeadersFlags(cmd, false)
 	cmd.Flags().Bool("show-labels", false, "When printing, show all labels as the last column (default hide labels column)")
 	cmd.Flags().String("template", "", "Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].")
 	cmd.MarkFlagFilename("template")
@@ -69,8 +69,8 @@ func AddOutputFlags(cmd *cobra.Command) {
 }
 
 // AddNoHeadersFlags adds no-headers flags to a command.
-func AddNoHeadersFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool("no-headers", false, "When using the default or custom-column output format, don't print headers (default print headers).")
+func AddNoHeadersFlags(cmd *cobra.Command, b bool) {
+	cmd.Flags().Bool("no-headers", b, "When using the default or custom-column output format, don't print headers (default print headers).")
 }
 
 // PrintSuccess prints message after finishing mutating operations
