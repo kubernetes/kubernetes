@@ -226,8 +226,8 @@ func (config *NetworkingTestConfig) GetEndpointsFromTestContainer(protocol, targ
 
 // GetEndpointsFromContainer executes a curl via kubectl exec in a test container,
 // which might then translate to a tcp or udp request based on the protocol argument
-// in the url.
-// - tries is the maximum number of curl attempts. If this many attempts pass and
+// in the url. It returns all different endpoints from multiple retries.
+// - tries is the number of curl attempts. If this many attempts pass and
 //   we don't see any endpoints, the test fails.
 func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containerIP, targetIP string, containerHttpPort, targetPort, tries int) (sets.String, error) {
 	cmd := fmt.Sprintf("curl -q -s 'http://%s:%d/dial?request=hostName&protocol=%s&host=%s&port=%d&tries=1'",
@@ -247,7 +247,7 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 			// we confirm unreachability.
 			Logf("Failed to execute %q: %v, stdout: %q, stderr: %q", cmd, err, stdout, stderr)
 		} else {
-			Logf("maxTries: %d, in try: %d, stdout: %v, stderr: %v", tries, i, stdout, stderr)
+			Logf("Tries: %d, in try: %d, stdout: %v, stderr: %v, command run in: %#v", tries, i, stdout, stderr, config.HostTestContainerPod)
 			var output map[string][]string
 			if err := json.Unmarshal([]byte(stdout), &output); err != nil {
 				Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
@@ -261,15 +261,11 @@ func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containe
 					eps.Insert(trimmed)
 				}
 			}
-			// Return immediately when we successfully fetch endpoints
-			if len(eps) > 0 {
-				return eps, nil
-			}
 			// TODO: get rid of this delay #36281
 			time.Sleep(hitEndpointRetryDelay)
 		}
 	}
-	return nil, fmt.Errorf("error getting endpoints:\nTries %d\nCommand %v\n", tries, cmd)
+	return eps, nil
 }
 
 // DialFromNode executes a tcp or udp request based on protocol via kubectl exec
