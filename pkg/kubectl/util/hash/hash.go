@@ -21,12 +21,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/api/core/v1"
 )
 
 // ConfigMapHash returns a hash of the ConfigMap.
 // The Data, Kind, and Name are taken into account.
-func ConfigMapHash(cm *api.ConfigMap) (string, error) {
+func ConfigMapHash(cm *v1.ConfigMap) (string, error) {
 	encoded, err := encodeConfigMap(cm)
 	if err != nil {
 		return "", err
@@ -40,7 +40,7 @@ func ConfigMapHash(cm *api.ConfigMap) (string, error) {
 
 // SecretHash returns a hash of the Secret.
 // The Data, Kind, Name, and Type are taken into account.
-func SecretHash(sec *api.Secret) (string, error) {
+func SecretHash(sec *v1.Secret) (string, error) {
 	encoded, err := encodeSecret(sec)
 	if err != nil {
 		return "", err
@@ -54,7 +54,7 @@ func SecretHash(sec *api.Secret) (string, error) {
 
 // encodeConfigMap encodes a ConfigMap.
 // Data, Kind, and Name are taken into account.
-func encodeConfigMap(cm *api.ConfigMap) (string, error) {
+func encodeConfigMap(cm *v1.ConfigMap) (string, error) {
 	// json.Marshal sorts the keys in a stable order in the encoding
 	data, err := json.Marshal(map[string]interface{}{"kind": "ConfigMap", "name": cm.Name, "data": cm.Data})
 	if err != nil {
@@ -65,7 +65,7 @@ func encodeConfigMap(cm *api.ConfigMap) (string, error) {
 
 // encodeSecret encodes a Secret.
 // Data, Kind, Name, and Type are taken into account.
-func encodeSecret(sec *api.Secret) (string, error) {
+func encodeSecret(sec *v1.Secret) (string, error) {
 	// json.Marshal sorts the keys in a stable order in the encoding
 	data, err := json.Marshal(map[string]interface{}{"kind": "Secret", "type": sec.Type, "name": sec.Name, "data": sec.Data})
 	if err != nil {

@@ -21,9 +21,9 @@ import (
 
 	"strings"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 )
 
 // RoleBindingGeneratorV1 supports stable generation of a roleBinding.
@@ -113,35 +113,35 @@ func (s RoleBindingGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
-	roleBinding := &rbac.RoleBinding{}
+	roleBinding := &rbacv1.RoleBinding{}
 	roleBinding.Name = s.Name
 
 	switch {
 	case len(s.Role) > 0:
-		roleBinding.RoleRef = rbac.RoleRef{
-			APIGroup: rbac.GroupName,
+		roleBinding.RoleRef = rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
 			Kind:     "Role",
 			Name:     s.Role,
 		}
 	case len(s.ClusterRole) > 0:
-		roleBinding.RoleRef = rbac.RoleRef{
-			APIGroup: rbac.GroupName,
+		roleBinding.RoleRef = rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
 			Kind:     "ClusterRole",
 			Name:     s.ClusterRole,
 		}
 	}
 
 	for _, user := range sets.NewString(s.Users...).List() {
-		roleBinding.Subjects = append(roleBinding.Subjects, rbac.Subject{
-			Kind:     rbac.UserKind,
-			APIGroup: rbac.GroupName,
+		roleBinding.Subjects = append(roleBinding.Subjects, rbacv1.Subject{
+			Kind:     rbacv1.UserKind,
+			APIGroup: rbacv1.GroupName,
 			Name:     user,
 		})
 	}
 	for _, group := range sets.NewString(s.Groups...).List() {
-		roleBinding.Subjects = append(roleBinding.Subjects, rbac.Subject{
-			Kind:     rbac.GroupKind,
-			APIGroup: rbac.GroupName,
+		roleBinding.Subjects = append(roleBinding.Subjects, rbacv1.Subject{
+			Kind:     rbacv1.GroupKind,
+			APIGroup: rbacv1.GroupName,
 			Name:     group,
 		})
 	}
@@ -150,8 +150,8 @@ func (s RoleBindingGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 		if len(tokens) != 2 || tokens[1] == "" {
 			return nil, fmt.Errorf("serviceaccount must be <namespace>:<name>")
 		}
-		roleBinding.Subjects = append(roleBinding.Subjects, rbac.Subject{
-			Kind:      rbac.ServiceAccountKind,
+		roleBinding.Subjects = append(roleBinding.Subjects, rbacv1.Subject{
+			Kind:      rbacv1.ServiceAccountKind,
 			APIGroup:  "",
 			Namespace: tokens[0],
 			Name:      tokens[1],

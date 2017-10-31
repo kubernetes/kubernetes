@@ -40,12 +40,20 @@ import (
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/api/v1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
+
+// This init should be removed after switching this command and its tests to user external types.
+func init() {
+	api.AddToScheme(scheme.Scheme)
+	scheme.Scheme.AddConversionFuncs(v1.Convert_api_PodSpec_To_v1_PodSpec)
+	scheme.Scheme.AddConversionFuncs(v1.Convert_v1_PodSecurityContext_To_api_PodSecurityContext)
+}
 
 func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList) {
 	pods := &api.PodList{
@@ -126,12 +134,11 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	_, _, codec, _ := cmdtesting.NewTestFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, cmdtesting.NewInternalType("", "", "foo"))},
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
@@ -151,7 +158,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		actualJSON := runtime.EncodeOrDie(legacyscheme.Codecs.LegacyCodec(), obj)
+		actualJSON := runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(), obj)
 		actualMap := map[string]interface{}{}
 		if err := encjson.Unmarshal([]byte(actualJSON), &actualMap); err != nil {
 			t.Fatal(err)
@@ -167,16 +174,15 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 func TestGetSchemaObject(t *testing.T) {
 	f, tf, _, _ := cmdtesting.NewAPIFactory()
 	tf.Mapper = testapi.Default.RESTMapper()
-	tf.Typer = legacyscheme.Scheme
+	tf.Typer = scheme.Scheme
 	codec := testapi.Default.Codec()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &api.ReplicationController{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})},
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: "v1"}}}
+	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
@@ -197,7 +203,6 @@ func TestGetObjectsWithOpenAPIOutputFormatPresent(t *testing.T) {
 	// for Pod type.
 	tf.OpenAPISchemaFunc = testOpenAPISchemaData
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
 	}
@@ -251,7 +256,6 @@ func TestGetObjects(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
 	}
@@ -303,7 +307,7 @@ func TestGetObjectsFiltered(t *testing.T) {
 		f, tf, codec, _ := cmdtesting.NewAPIFactory()
 		tf.Printer = &testPrinter{GenericPrinter: test.genericPrinter}
 		tf.UnstructuredClient = &fake.RESTClient{
-			GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+			GroupVersion:         schema.GroupVersion{Version: "v1"},
 			NegotiatedSerializer: unstructuredSerializer,
 			Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, test.resp)},
 		}
@@ -344,7 +348,6 @@ func TestGetObjectIgnoreNotFound(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{GenericPrinter: true}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -397,7 +400,6 @@ func TestGetSortedObjects(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
@@ -434,8 +436,8 @@ func verifyObjects(t *testing.T, expected, actual []runtime.Object) {
 		switch obj.(type) {
 		case runtime.Unstructured, *runtime.Unknown:
 			actualObj, err = runtime.Decode(
-				legacyscheme.Codecs.UniversalDecoder(),
-				[]byte(runtime.EncodeOrDie(legacyscheme.Codecs.LegacyCodec(), obj)))
+				scheme.Codecs.UniversalDecoder(),
+				[]byte(runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(), obj)))
 		default:
 			actualObj = obj
 			err = nil
@@ -456,7 +458,6 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{GenericPrinter: true}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
 	}
@@ -483,7 +484,6 @@ func TestGetListObjects(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
@@ -524,7 +524,6 @@ func TestGetAllListObjects(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
@@ -554,7 +553,6 @@ func TestGetListComponentStatus(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, statuses)},
 	}
@@ -596,7 +594,6 @@ func TestGetMixedGenericObjects(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{GenericPrinter: true}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
@@ -609,7 +606,7 @@ func TestGetMixedGenericObjects(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
@@ -624,7 +621,7 @@ func TestGetMixedGenericObjects(t *testing.T) {
 
 	actual := tf.Printer.(*testPrinter).Objects
 	fn := func(obj runtime.Object) unstructured.Unstructured {
-		data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), obj)
+		data, err := runtime.Encode(scheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), obj)
 		if err != nil {
 			panic(err)
 		}
@@ -660,7 +657,6 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
@@ -699,7 +695,6 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{GenericPrinter: true}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
@@ -714,7 +709,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion}}
+	tf.ClientConfig = defaultClientConfig()
 	buf := bytes.NewBuffer([]byte{})
 	errBuf := bytes.NewBuffer([]byte{})
 
@@ -726,7 +721,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 
 	actual := tf.Printer.(*testPrinter).Objects
 	fn := func(obj runtime.Object) unstructured.Unstructured {
-		data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), obj)
+		data, err := runtime.Encode(scheme.Codecs.LegacyCodec(schema.GroupVersion{Version: "v1"}), obj)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -764,10 +759,9 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(metav1.LabelSelectorQueryParam(legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String())) != "a=b" {
+			if req.URL.Query().Get(metav1.LabelSelectorQueryParam("v1")) != "a=b" {
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -816,7 +810,6 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
@@ -853,7 +846,6 @@ func TestGetByFormatForcesFlag(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{GenericPrinter: true}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &pods.Items[0])},
 	}
@@ -954,10 +946,9 @@ func TestWatchSelector(t *testing.T) {
 		},
 	}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get(metav1.LabelSelectorQueryParam(legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String())) != "a=b" {
+			if req.URL.Query().Get(metav1.LabelSelectorQueryParam("v1")) != "a=b" {
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -998,7 +989,6 @@ func TestWatchResource(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
@@ -1040,7 +1030,6 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
@@ -1083,7 +1072,6 @@ func TestWatchOnlyResource(t *testing.T) {
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
@@ -1131,7 +1119,6 @@ func TestWatchOnlyList(t *testing.T) {
 		},
 	}
 	tf.UnstructuredClient = &fake.RESTClient{
-		GroupVersion:         legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
 		NegotiatedSerializer: unstructuredSerializer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch req.URL.Path {
