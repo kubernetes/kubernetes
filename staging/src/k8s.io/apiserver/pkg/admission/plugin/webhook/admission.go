@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -234,16 +235,9 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 	for e := range errCh {
 		errs = append(errs, e)
 	}
-	if len(errs) == 0 {
-		return nil
-	}
-	if len(errs) > 1 {
-		for i := 1; i < len(errs); i++ {
-			// TODO: merge status errors; until then, just return the first one.
-			utilruntime.HandleError(errs[i])
-		}
-	}
-	return errs[0]
+	err = utilerrors.NewAggregate(errs)
+	utilruntime.HandleError(err)
+	return err
 }
 
 func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.ExternalAdmissionHook, attr admission.Attributes) error {
