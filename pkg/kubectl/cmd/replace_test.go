@@ -29,7 +29,7 @@ import (
 )
 
 func TestReplaceObject(t *testing.T) {
-	_, _, rc := testData()
+	_, _, rc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -85,7 +85,7 @@ func TestReplaceObject(t *testing.T) {
 }
 
 func TestReplaceMultipleObject(t *testing.T) {
-	_, svc, rc := testData()
+	_, svc, rc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -155,7 +155,7 @@ func TestReplaceMultipleObject(t *testing.T) {
 }
 
 func TestReplaceDirectory(t *testing.T) {
-	_, _, rc := testData()
+	_, _, rc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -212,7 +212,7 @@ func TestReplaceDirectory(t *testing.T) {
 }
 
 func TestForceReplaceObjectNotFound(t *testing.T) {
-	_, _, rc := testData()
+	_, _, rc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
