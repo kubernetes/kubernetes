@@ -22,12 +22,6 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 source "${KUBE_ROOT}/cluster/skeleton/util.sh"
 
-if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
-    KUBERNETES_PROVIDER=""
-else
-    KUBERNETES_PROVIDER="${KUBERNETES_PROVIDER:-gce}"
-fi
-
 # PROVIDER_VARS is a list of cloud provider specific variables. Note:
 # this is a list of the _names_ of the variables, not the value of the
 # variables. Providers can add variables to be appended to kube-env.
