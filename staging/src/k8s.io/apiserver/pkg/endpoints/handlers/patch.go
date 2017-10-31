@@ -216,6 +216,8 @@ func patchResource(
 				if err != nil {
 					return nil, err
 				}
+				// ensure the kind/version fields are populated, even in struct form
+				currentVersionedObject.GetObjectKind().SetGroupVersionKind(kind)
 				versionedObjToUpdate, err := creater.New(kind)
 				if err != nil {
 					return nil, err
@@ -227,6 +229,10 @@ func patchResource(
 				}
 				if err := strategicPatchObject(codec, defaulter, currentVersionedObject, patchJS, versionedObjToUpdate, versionedObj); err != nil {
 					return nil, err
+				}
+				// ensure the patch didn't change the kind/apiVersion
+				if newKind := versionedObjToUpdate.GetObjectKind().GroupVersionKind(); newKind != kind {
+					return nil, errors.NewBadRequest(fmt.Sprintf("cannot change kind or apiVersion (changed from %q to %q)", kind.String(), newKind.String()))
 				}
 				// Convert the object back to unversioned.
 				gvk := kind.GroupKind().WithVersion(runtime.APIVersionInternal)
