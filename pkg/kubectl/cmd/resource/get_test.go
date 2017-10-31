@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd
+package resource
 
 import (
 	"bytes"
 	encjson "encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
@@ -44,6 +46,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/v1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/scheme"
 )
@@ -53,6 +56,75 @@ func init() {
 	api.AddToScheme(scheme.Scheme)
 	scheme.Scheme.AddConversionFuncs(v1.Convert_api_PodSpec_To_v1_PodSpec)
 	scheme.Scheme.AddConversionFuncs(v1.Convert_v1_PodSecurityContext_To_api_PodSecurityContext)
+}
+
+var unstructuredSerializer = dynamic.ContentConfig().NegotiatedSerializer
+
+func defaultHeader() http.Header {
+	header := http.Header{}
+	header.Set("Content-Type", runtime.ContentTypeJSON)
+	return header
+}
+
+func defaultClientConfig() *restclient.Config {
+	return &restclient.Config{
+		APIPath: "/api",
+		ContentConfig: restclient.ContentConfig{
+			NegotiatedSerializer: scheme.Codecs,
+			ContentType:          runtime.ContentTypeJSON,
+			GroupVersion:         &scheme.Registry.GroupOrDie(api.GroupName).GroupVersion,
+		},
+	}
+}
+
+func defaultClientConfigForVersion(version *schema.GroupVersion) *restclient.Config {
+	return &restclient.Config{
+		APIPath: "/api",
+		ContentConfig: restclient.ContentConfig{
+			NegotiatedSerializer: scheme.Codecs,
+			ContentType:          runtime.ContentTypeJSON,
+			GroupVersion:         version,
+		},
+	}
+}
+
+type testPrinter struct {
+	Objects        []runtime.Object
+	Err            error
+	GenericPrinter bool
+}
+
+func (t *testPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
+	t.Objects = append(t.Objects, obj)
+	fmt.Fprintf(out, "%#v", obj)
+	return t.Err
+}
+
+// TODO: implement HandledResources()
+func (t *testPrinter) HandledResources() []string {
+	return []string{}
+}
+
+func (t *testPrinter) AfterPrint(output io.Writer, res string) error {
+	return nil
+}
+
+func (t *testPrinter) IsGeneric() bool {
+	return t.GenericPrinter
+}
+
+func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
+	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
+}
+
+func stringBody(body string) io.ReadCloser {
+	return ioutil.NopCloser(bytes.NewReader([]byte(body)))
+}
+
+func initTestErrorHandler(t *testing.T) {
+	cmdutil.BehaviorOnFatal(func(str string, code int) {
+		t.Errorf("Error running command (exit code %d): %s", code, str)
+	})
 }
 
 func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList) {
@@ -295,7 +367,7 @@ func TestGetObjectsFiltered(t *testing.T) {
 		{args: []string{"pods"}, flags: map[string]string{"show-all": "true"}, resp: pods, expect: []runtime.Object{first, second}},
 		{args: []string{"pods/foo"}, resp: first, expect: []runtime.Object{first}, genericPrinter: true},
 		{args: []string{"pods"}, flags: map[string]string{"output": "yaml"}, resp: pods, expect: []runtime.Object{second}},
-		{args: []string{}, flags: map[string]string{"filename": "../../../examples/storage/cassandra/cassandra-controller.yaml"}, resp: pods, expect: []runtime.Object{first, second}},
+		{args: []string{}, flags: map[string]string{"filename": "../../../../examples/storage/cassandra/cassandra-controller.yaml"}, resp: pods, expect: []runtime.Object{first, second}},
 
 		{args: []string{"pods"}, resp: pods, expect: []runtime.Object{second}},
 		{args: []string{"pods"}, flags: map[string]string{"show-all": "true", "output": "yaml"}, resp: pods, expect: []runtime.Object{first, second}},
@@ -467,7 +539,7 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 
 	cmd := NewCmdGet(f, buf, errBuf)
 	cmd.SetOutput(buf)
-	cmd.Flags().Set("filename", "../../../examples/storage/cassandra/cassandra-controller.yaml")
+	cmd.Flags().Set("filename", "../../../../examples/storage/cassandra/cassandra-controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	expected := []runtime.Object{&pods.Items[0]}
@@ -955,9 +1027,8 @@ func TestWatchSelector(t *testing.T) {
 			case "/namespaces/test/pods":
 				if req.URL.Query().Get("watch") == "true" {
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[2:])}, nil
-				} else {
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
 				}
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
@@ -1055,7 +1126,7 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
-	cmd.Flags().Set("filename", "../../../examples/storage/cassandra/cassandra-controller.yaml")
+	cmd.Flags().Set("filename", "../../../../examples/storage/cassandra/cassandra-controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	expected := []runtime.Object{&pods[1], events[2].Object, events[3].Object}
@@ -1125,9 +1196,8 @@ func TestWatchOnlyList(t *testing.T) {
 			case "/namespaces/test/pods":
 				if req.URL.Query().Get("watch") == "true" {
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[2:])}, nil
-				} else {
-					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
 				}
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
 			default:
 				t.Fatalf("request url: %#v,and request: %#v", req.URL, req)
 				return nil, nil
