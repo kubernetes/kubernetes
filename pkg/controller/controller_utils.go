@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -635,7 +636,17 @@ var _ PodControlInterface = &FakePodControl{}
 func (f *FakePodControl) PatchPod(namespace, name string, data []byte) error {
 	f.Lock()
 	defer f.Unlock()
-	f.Patches = append(f.Patches, data)
+	existed := false
+	for _, value := range f.Patches {
+		if bytes.EqualFold(value, data) {
+			existed = true
+			break
+		}
+	}
+	if !existed {
+		f.Patches = append(f.Patches, data)
+	}
+	//f.Patches = append(f.Patches, data)
 	if f.Err != nil {
 		return f.Err
 	}
