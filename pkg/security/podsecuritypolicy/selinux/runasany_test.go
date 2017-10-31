@@ -58,7 +58,7 @@ func TestRunAsAnyValidate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error initializing NewRunAsAny %v", err)
 	}
-	errs := s.Validate(nil, nil)
+	errs := s.Validate(nil, nil, nil, nil)
 	if len(errs) != 0 {
 		t.Errorf("unexpected errors validating with ")
 	}
@@ -66,7 +66,7 @@ func TestRunAsAnyValidate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error initializing NewRunAsAny %v", err)
 	}
-	errs = s.Validate(nil, nil)
+	errs = s.Validate(nil, nil, nil, nil)
 	if len(errs) != 0 {
 		t.Errorf("unexpected errors validating %v", errs)
 	}

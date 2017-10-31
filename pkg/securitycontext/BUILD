@@ -9,6 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "accessors.go",
         "doc.go",
         "fake.go",
         "util.go",
@@ -21,9 +22,16 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["util_test.go"],
+    srcs = [
+        "accessors_test.go",
+        "util_test.go",
+    ],
     library = ":go_default_library",
-    deps = ["//vendor/k8s.io/api/core/v1:go_default_library"],
+    deps = [
+        "//pkg/api:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
+        "//vendor/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+    ],
 )
 
 filegroup(
