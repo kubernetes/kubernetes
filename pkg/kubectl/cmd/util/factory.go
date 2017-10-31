@@ -243,6 +243,11 @@ type BuilderFactory interface {
 	PrinterForMapping(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error)
 	// PrintObject prints an api object given command line flags to modify the output format
 	PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	// PrintResourceInfoForCommand receives a *cobra.Command and a *resource.Info and
+	// attempts to print an info object based on the specified output format. If the
+	// object passed is non-generic, it attempts to print the object using a HumanReadablePrinter.
+	// Requires that printer flags have been added to cmd (see AddPrinterFlags).
+	PrintResourceInfoForCommand(cmd *cobra.Command, info *resource.Info, out io.Writer) error
 	// One stop shopping for a structured Builder
 	NewBuilder() *resource.Builder
 	// One stop shopping for a unstructured Builder

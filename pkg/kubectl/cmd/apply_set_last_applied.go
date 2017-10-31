@@ -190,7 +190,7 @@ func (o *SetLastAppliedOptions) RunSetLastApplied(f cmdutil.Factory, cmd *cobra.
 
 			if len(o.Output) > 0 && !o.ShortOutput {
 				info.Refresh(patchedObj, false)
-				return cmdutil.PrintResourceInfoForCommand(cmd, info, f, o.Out)
+				return f.PrintResourceInfoForCommand(cmd, info, o.Out)
 			}
 			cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, o.DryRun, "configured")
 

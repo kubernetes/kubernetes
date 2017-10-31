@@ -292,7 +292,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 
 			count++
 			if len(output) > 0 && !shortOutput {
-				return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
+				return f.PrintResourceInfoForCommand(cmd, info, out)
 			}
 			cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "created")
 			return nil
@@ -344,7 +344,7 @@ func RunApply(f cmdutil.Factory, cmd *cobra.Command, out, errOut io.Writer, opti
 		}
 		count++
 		if len(output) > 0 && !shortOutput {
-			return cmdutil.PrintResourceInfoForCommand(cmd, info, f, out)
+			return f.PrintResourceInfoForCommand(cmd, info, out)
 		}
 		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, dryRun, "configured")
 		return nil
