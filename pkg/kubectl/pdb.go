@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"os"
 
+	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/apis/policy"
 )
 
 // PodDisruptionBudgetV1Generator supports stable generation of a pod disruption budget.

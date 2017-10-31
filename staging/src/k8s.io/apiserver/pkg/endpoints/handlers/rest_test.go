@@ -98,6 +98,29 @@ func TestPatchAnonymousField(t *testing.T) {
 	}
 }
 
+func TestPatchInvalid(t *testing.T) {
+	testGV := schema.GroupVersion{Group: "", Version: "v"}
+	scheme.AddKnownTypes(testGV, &testPatchType{})
+	codec := codecs.LegacyCodec(testGV)
+	defaulter := runtime.ObjectDefaulter(scheme)
+
+	original := &testPatchType{
+		TypeMeta:         metav1.TypeMeta{Kind: "testPatchType", APIVersion: "v"},
+		TestPatchSubType: TestPatchSubType{StringField: "my-value"},
+	}
+	patch := `barbaz`
+	expectedError := "invalid character 'b' looking for beginning of value"
+
+	actual := &testPatchType{}
+	err := strategicPatchObject(codec, defaulter, original, []byte(patch), actual, &testPatchType{})
+	if apierrors.IsBadRequest(err) == false {
+		t.Errorf("expected HTTP status: BadRequest, got: %#v", apierrors.ReasonForError(err))
+	}
+	if err.Error() != expectedError {
+		t.Errorf("expected %#v, got %#v", expectedError, err.Error())
+	}
+}
+
 type testPatcher struct {
 	t *testing.T
 

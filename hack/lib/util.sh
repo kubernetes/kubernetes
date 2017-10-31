@@ -775,6 +775,23 @@ function kube::util::ensure_dockerized {
   fi
 }
 
+# kube::util::ensure-gnu-sed
+# Determines which sed binary is gnu-sed on linux/darwin
+#
+# Sets:
+#  SED: The name of the gnu-sed binary
+#
+function kube::util::ensure-gnu-sed {
+  if LANG=C sed --help 2>&1 | grep -q GNU; then
+    SED="sed"
+  elif which gsed &>/dev/null; then
+    SED="gsed"
+  else
+    kube::log::error "Failed to find GNU sed as sed or gsed. If you are on Mac: brew install gnu-sed." >&2
+    return 1
+  fi
+}
+
 # Some useful colors.
 if [[ -z "${color_start-}" ]]; then
   declare -r color_start="\033["

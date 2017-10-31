@@ -247,7 +247,14 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 		}
 		info := infos[0]
 		mapping := info.ResourceMapping()
-		printer, err := f.PrinterForMapping(cmd, false, nil, mapping, allNamespaces)
+
+		// no need to print namespace for root-scoped resources
+		printWithNamespace := allNamespaces
+		if mapping != nil && mapping.Scope.Name() == meta.RESTScopeNameRoot {
+			printWithNamespace = false
+		}
+
+		printer, err := f.PrinterForMapping(cmd, false, nil, mapping, printWithNamespace)
 		if err != nil {
 			return err
 		}
@@ -497,6 +504,11 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				w.Flush()
 			}
 
+			printWithNamespace := allNamespaces
+			if mapping != nil && mapping.Scope.Name() == meta.RESTScopeNameRoot {
+				printWithNamespace = false
+			}
+
 			var outputOpts *printers.OutputOptions
 			// if cmd does not specify output format and useOpenAPIPrintColumnFlagLabel flag is true,
 			// then get the default output options for this mapping from OpenAPI schema.
@@ -504,7 +516,7 @@ func RunGet(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args [
 				outputOpts, _ = outputOptsForMappingFromOpenAPI(f, mapping)
 			}
 
-			printer, err = f.PrinterForMapping(cmd, false, outputOpts, mapping, allNamespaces)
+			printer, err = f.PrinterForMapping(cmd, false, outputOpts, mapping, printWithNamespace)
 			if err != nil {
 				if !errs.Has(err.Error()) {
 					errs.Insert(err.Error())

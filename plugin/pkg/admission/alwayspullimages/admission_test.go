@@ -29,7 +29,7 @@ import (
 // set to Always
 func TestAdmission(t *testing.T) {
 	namespace := "test"
-	handler := &alwaysPullImages{}
+	handler := &AlwaysPullImages{}
 	pod := api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: namespace},
 		Spec: api.PodSpec{
@@ -107,7 +107,7 @@ func TestOtherResources(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		handler := &alwaysPullImages{}
+		handler := &AlwaysPullImages{}
 
 		err := handler.Admit(admission.NewAttributesRecord(tc.object, nil, api.Kind(tc.kind).WithVersion("version"), namespace, name, api.Resource(tc.resource).WithVersion("version"), tc.subresource, admission.Create, nil))
 

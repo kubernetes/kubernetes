@@ -23,7 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/apis/rbac"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
@@ -155,7 +155,7 @@ func (c *CreateClusterRoleOptions) Validate() error {
 }
 
 func (c *CreateClusterRoleOptions) RunCreateRole() error {
-	clusterRole := &rbac.ClusterRole{}
+	clusterRole := &rbacv1.ClusterRole{}
 	clusterRole.Name = c.Name
 	rules, err := generateResourcePolicyRules(c.Mapper, c.Verbs, c.Resources, c.ResourceNames, c.NonResourceURLs)
 	if err != nil {

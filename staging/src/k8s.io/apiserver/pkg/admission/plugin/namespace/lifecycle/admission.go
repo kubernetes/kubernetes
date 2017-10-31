@@ -202,16 +202,19 @@ func newLifecycleWithClock(immortalNamespaces sets.String, clock utilcache.Clock
 	}, nil
 }
 
+// SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
 func (l *lifecycle) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().V1().Namespaces()
 	l.namespaceLister = namespaceInformer.Lister()
 	l.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }
 
+// SetExternalKubeClientSet implements the WantsExternalKubeClientSet interface.
 func (l *lifecycle) SetExternalKubeClientSet(client kubernetes.Interface) {
 	l.client = client
 }
 
+// Validate implement the Validator interface.
 func (l *lifecycle) Validate() error {
 	if l.namespaceLister == nil {
 		return fmt.Errorf("missing namespaceLister")

@@ -446,9 +446,8 @@ func RunDiff(f cmdutil.Factory, diff *DiffProgram, options *DiffOptions, from, t
 			Parser:  parser,
 			Encoder: f.JSONEncoder(),
 		}
-		differ.Diff(obj, printer)
 
-		return nil
+		return differ.Diff(obj, printer)
 	})
 	if err != nil {
 		return err
