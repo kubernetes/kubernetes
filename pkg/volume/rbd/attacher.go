@@ -220,6 +220,6 @@ func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
 }
 
 // Detach implements Detacher.Detach.
-func (detacher *rbdDetacher) Detach(deviceName string, nodeName types.NodeName) error {
+func (detacher *rbdDetacher) Detach(volumeName string, nodeName types.NodeName) error {
 	return nil
 }

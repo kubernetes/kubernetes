@@ -195,8 +195,10 @@ type BulkVolumeVerifier interface {
 
 // Detacher can detach a volume from a node.
 type Detacher interface {
-	// Detach the given device from the node with the given Name.
-	Detach(deviceName string, nodeName types.NodeName) error
+	// Detach the given volume from the node with the given Name.
+	// volumeName is name of the volume as returned from plugin's
+	// GetVolumeName().
+	Detach(volumeName string, nodeName types.NodeName) error
 
 	// UnmountDevice unmounts the global mount of the disk. This
 	// should only be called once all bind mounts have been
