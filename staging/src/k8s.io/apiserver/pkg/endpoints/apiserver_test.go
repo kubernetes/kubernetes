@@ -3870,7 +3870,8 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 }
 
 type SimpleXGSubresourceRESTStorage struct {
-	item genericapitesting.SimpleXGSubresource
+	item    genericapitesting.SimpleXGSubresource
+	itemGVK schema.GroupVersionKind
 }
 
 func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
@@ -3879,6 +3880,12 @@ func (storage *SimpleXGSubresourceRESTStorage) New() runtime.Object {
 
 func (storage *SimpleXGSubresourceRESTStorage) Get(ctx request.Context, id string, options *metav1.GetOptions) (runtime.Object, error) {
 	return storage.item.DeepCopyObject(), nil
+}
+
+var _ = rest.GroupVersionKindProvider(&SimpleXGSubresourceRESTStorage{})
+
+func (storage *SimpleXGSubresourceRESTStorage) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
+	return storage.itemGVK
 }
 
 func TestXGSubresource(t *testing.T) {
@@ -3891,6 +3898,7 @@ func TestXGSubresource(t *testing.T) {
 		item: genericapitesting.SimpleXGSubresource{
 			SubresourceInfo: "foo",
 		},
+		itemGVK: testGroup2Version.WithKind("SimpleXGSubresource"),
 	}
 	storage := map[string]rest.Storage{
 		"simple":           &SimpleRESTStorage{},
@@ -3917,10 +3925,6 @@ func TestXGSubresource(t *testing.T) {
 		GroupVersion:           testGroupVersion,
 		OptionsExternalVersion: &testGroupVersion,
 		Serializer:             codecs,
-
-		SubresourceGroupVersionKind: map[string]schema.GroupVersionKind{
-			"simple/subsimple": testGroup2Version.WithKind("SimpleXGSubresource"),
-		},
 	}
 
 	if err := (&group).InstallREST(container); err != nil {

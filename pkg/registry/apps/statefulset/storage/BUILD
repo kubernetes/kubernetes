@@ -34,6 +34,9 @@ go_library(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/apis/apps:go_default_library",
+        "//pkg/apis/apps/v1beta1:go_default_library",
+        "//pkg/apis/apps/v1beta2:go_default_library",
+        "//pkg/apis/autoscaling/v1:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/extensions/validation:go_default_library",
         "//pkg/printers:go_default_library",
