@@ -105,7 +105,7 @@ func main() {
 	}
 
 	// run the kubelet
-	if err := app.Run(kubeletServer, kubeletDeps); err != nil {		
+	if err := app.Run(kubeletServer, kubeletDeps); err != nil {
 		die(err)
 	}
 }
