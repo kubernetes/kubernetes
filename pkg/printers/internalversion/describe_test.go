@@ -1736,6 +1736,9 @@ Spec:
     From Pod Selector: id=app2,id2=app3
     From Namespace Selector: id=app2,id2=app3
     From Namespace Selector: foo in (bar1,bar2),id=app2,id2=app3
+    From IPBlock:
+        CIDR: 192.168.0.0/16
+        Except: 192.168.3.0/24, 192.168.4.0/24
     ----------
     To Port: <any> (traffic allowed to all ports)
     From: <any> (traffic not restricted by source)
@@ -1794,6 +1797,12 @@ Spec:
 								MatchExpressions: []metav1.LabelSelectorRequirement{
 									{Key: "foo", Operator: "In", Values: []string{"bar1", "bar2"}},
 								},
+							},
+						},
+						{
+							IPBlock: &networking.IPBlock{
+								CIDR:   "192.168.0.0/16",
+								Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
 							},
 						},
 					},
