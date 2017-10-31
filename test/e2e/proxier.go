@@ -33,9 +33,9 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
-	"k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	iptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
+	fakeexec "k8s.io/utils/exec/testing"
 )
 
 func makeNSN(namespace, name string) types.NamespacedName {
@@ -66,7 +66,7 @@ func (f *fakeHealthzUpdater) UpdateTimestamp() {}
 func NewFakeProxier(ipt utiliptables.Interface) *iptables.Proxier {
 	p, err := iptables.NewProxier(ipt,
 		&fakeSysctl{},
-		&exec.FakeExec{},
+		&fakeexec.FakeExec{},
 		time.Microsecond,
 		time.Microsecond,
 		false,
