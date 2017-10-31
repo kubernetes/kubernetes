@@ -455,6 +455,10 @@ func (f *FakeFactory) EditorEnvs() []string {
 	return nil
 }
 
+func (f *FakeFactory) DiffEnvs() []string {
+	return nil
+}
+
 func (f *FakeFactory) PrintObjectSpecificMessage(obj runtime.Object, out io.Writer) {
 }
 
