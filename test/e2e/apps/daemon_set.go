@@ -269,6 +269,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		// Check history and labels
 		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
+		waitForHistoryCreated(c, ns, label, 1)
 		first := curHistory(listDaemonHistories(c, ns, label), ds)
 		firstHash := first.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
 		Expect(first.Revision).To(Equal(int64(1)))
@@ -295,6 +296,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		// Check history and labels
 		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
+		waitForHistoryCreated(c, ns, label, 2)
 		cur := curHistory(listDaemonHistories(c, ns, label), ds)
 		Expect(cur.Revision).To(Equal(int64(2)))
 		Expect(cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]).NotTo(Equal(firstHash))
@@ -324,6 +326,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		// Check history and labels
 		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
+		waitForHistoryCreated(c, ns, label, 1)
 		cur := curHistory(listDaemonHistories(c, ns, label), ds)
 		hash := cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
 		Expect(cur.Revision).To(Equal(int64(1)))
@@ -351,6 +354,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		// Check history and labels
 		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
+		waitForHistoryCreated(c, ns, label, 2)
 		cur = curHistory(listDaemonHistories(c, ns, label), ds)
 		hash = cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
 		Expect(cur.Revision).To(Equal(int64(2)))
@@ -865,6 +869,24 @@ func checkDaemonSetPodsLabels(podList *v1.PodList, hash, templateGeneration stri
 		Expect(len(podTemplate)).To(BeNumerically(">", 0))
 		Expect(podTemplate).To(Equal(templateGeneration))
 	}
+}
+
+func waitForHistoryCreated(c clientset.Interface, ns string, label map[string]string, numHistory int) {
+	listHistoryFn := func() (bool, error) {
+		selector := labels.Set(label).AsSelector()
+		options := metav1.ListOptions{LabelSelector: selector.String()}
+		historyList, err := c.AppsV1beta1().ControllerRevisions(ns).List(options)
+		if err != nil {
+			return false, err
+		}
+		if len(historyList.Items) == numHistory {
+			return true, nil
+		}
+		framework.Logf("%d/%d controllerrevisions created.", len(historyList.Items), numHistory)
+		return false, nil
+	}
+	err := wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, listHistoryFn)
+	Expect(err).NotTo(HaveOccurred(), "error waiting for controllerrevisions to be created")
 }
 
 func listDaemonHistories(c clientset.Interface, ns string, label map[string]string) *apps.ControllerRevisionList {
