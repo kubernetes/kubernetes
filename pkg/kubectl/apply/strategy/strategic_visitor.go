@@ -16,7 +16,9 @@ limitations under the License.
 
 package strategy
 
-import "k8s.io/kubernetes/pkg/kubectl/apply"
+import (
+	"k8s.io/kubernetes/pkg/kubectl/apply"
+)
 
 // delegatingStrategy delegates merging fields to other visitor implementations
 // based on the merge strategy preferred by the field.
@@ -41,9 +43,9 @@ func createDelegatingStrategy(options Options) *delegatingStrategy {
 func (v delegatingStrategy) MergeList(diff apply.ListElement) (apply.Result, error) {
 	// TODO: Support retainkeys
 	switch diff.GetFieldMergeType() {
-	case "merge":
+	case apply.MergeStrategy:
 		return v.merge.MergeList(diff)
-	case "replace":
+	case apply.ReplaceStrategy:
 		return v.replace.MergeList(diff)
 	default:
 		return v.replace.MergeList(diff)
@@ -55,9 +57,9 @@ func (v delegatingStrategy) MergeList(diff apply.ListElement) (apply.Result, err
 func (v delegatingStrategy) MergeMap(diff apply.MapElement) (apply.Result, error) {
 	// TODO: Support retainkeys
 	switch diff.GetFieldMergeType() {
-	case "merge":
+	case apply.MergeStrategy:
 		return v.merge.MergeMap(diff)
-	case "replace":
+	case apply.ReplaceStrategy:
 		return v.replace.MergeMap(diff)
 	default:
 		return v.merge.MergeMap(diff)
@@ -69,9 +71,9 @@ func (v delegatingStrategy) MergeMap(diff apply.MapElement) (apply.Result, error
 func (v delegatingStrategy) MergeType(diff apply.TypeElement) (apply.Result, error) {
 	// TODO: Support retainkeys
 	switch diff.GetFieldMergeType() {
-	case "merge":
+	case apply.MergeStrategy:
 		return v.merge.MergeType(diff)
-	case "replace":
+	case apply.ReplaceStrategy:
 		return v.replace.MergeType(diff)
 	default:
 		return v.merge.MergeType(diff)

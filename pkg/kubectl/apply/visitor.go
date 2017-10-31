@@ -56,8 +56,8 @@ type Result struct {
 	MergedResult interface{}
 }
 
-// MapValuesElement exposes how to get the field / key - value pairs out of a Map or Type Element
-type MapValuesElement interface {
-	Element
-	GetValues() map[string]Element
-}
+const (
+	MergeStrategy      = "merge"
+	RetainKeysStrategy = "retainKeys"
+	ReplaceStrategy    = "replace"
+)
