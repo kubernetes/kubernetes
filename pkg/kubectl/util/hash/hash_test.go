@@ -21,22 +21,23 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestConfigMapHash(t *testing.T) {
 	cases := []struct {
 		desc string
-		cm   *api.ConfigMap
+		cm   *v1.ConfigMap
 		hash string
 		err  string
 	}{
 		// empty map
-		{"empty data", &api.ConfigMap{Data: map[string]string{}}, "42745tchd9", ""},
+		{"empty data", &v1.ConfigMap{Data: map[string]string{}}, "42745tchd9", ""},
 		// one key
-		{"one key", &api.ConfigMap{Data: map[string]string{"one": ""}}, "9g67k2htb6", ""},
+		{"one key", &v1.ConfigMap{Data: map[string]string{"one": ""}}, "9g67k2htb6", ""},
 		// three keys (tests sorting order)
-		{"three keys", &api.ConfigMap{Data: map[string]string{"two": "2", "one": "", "three": "3"}}, "f5h7t85m9b", ""},
+		{"three keys", &v1.ConfigMap{Data: map[string]string{"two": "2", "one": "", "three": "3"}}, "f5h7t85m9b", ""},
 	}
 
 	for _, c := range cases {
@@ -79,16 +80,16 @@ func TestSecretHash(t *testing.T) {
 func TestEncodeConfigMap(t *testing.T) {
 	cases := []struct {
 		desc   string
-		cm     *api.ConfigMap
+		cm     *v1.ConfigMap
 		expect string
 		err    string
 	}{
 		// empty map
-		{"empty data", &api.ConfigMap{Data: map[string]string{}}, `{"data":{},"kind":"ConfigMap","name":""}`, ""},
+		{"empty data", &v1.ConfigMap{Data: map[string]string{}}, `{"data":{},"kind":"ConfigMap","name":""}`, ""},
 		// one key
-		{"one key", &api.ConfigMap{Data: map[string]string{"one": ""}}, `{"data":{"one":""},"kind":"ConfigMap","name":""}`, ""},
+		{"one key", &v1.ConfigMap{Data: map[string]string{"one": ""}}, `{"data":{"one":""},"kind":"ConfigMap","name":""}`, ""},
 		// three keys (tests sorting order)
-		{"three keys", &api.ConfigMap{Data: map[string]string{"two": "2", "one": "", "three": "3"}}, `{"data":{"one":"","three":"3","two":"2"},"kind":"ConfigMap","name":""}`, ""},
+		{"three keys", &v1.ConfigMap{Data: map[string]string{"two": "2", "one": "", "three": "3"}}, `{"data":{"one":"","three":"3","two":"2"},"kind":"ConfigMap","name":""}`, ""},
 	}
 	for _, c := range cases {
 		s, err := encodeConfigMap(c.cm)
