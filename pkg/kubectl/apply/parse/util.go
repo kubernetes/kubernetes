@@ -101,13 +101,21 @@ func getFieldMeta(s proto.Schema, name string) (apply.FieldMetaImpl, error) {
 	m := apply.FieldMetaImpl{}
 	if s != nil {
 		ext := s.GetExtensions()
-		if s, found := ext["x-kubernetes-patch-strategy"]; found {
-			strategy, ok := s.(string)
+		if e, found := ext["x-kubernetes-patch-strategy"]; found {
+			strategy, ok := e.(string)
 			if !ok {
 				return apply.FieldMetaImpl{}, fmt.Errorf("Expected string for x-kubernetes-patch-strategy by got %T", s)
 			}
-			// TODO: Support multi-strategy
-			m.MergeType = strategy
+			if strings.Contains(strategy, ",") {
+				strategies := strings.Split(strategy, ",")
+				if len(strategies) != 2 {
+					return apply.FieldMetaImpl{}, fmt.Errorf("Expected between 0 and 2 elements for x-kubernetes-patch-merge-strategy by got %v", strategies)
+				}
+				// For lists, choose the strategy for this type, not the subtype
+				m.MergeType = strategies[0]
+			} else {
+				m.MergeType = strategy
+			}
 		}
 		if k, found := ext["x-kubernetes-patch-merge-key"]; found {
 			key, ok := k.(string)
