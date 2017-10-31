@@ -1670,6 +1670,18 @@ Spec:
     ----------
     To Port: <any> (traffic allowed to all ports)
     From: <any> (traffic not restricted by source)
+  Allowing egress traffic:
+    From Port: 80/TCP
+    From Port: 82/TCP
+    To Pod Selector: id=app2,id2=app3
+    To Namespace Selector: id=app2,id2=app3
+    To Namespace Selector: foo in (bar1,bar2),id=app2,id2=app3
+    To IPBlock:
+        CIDR: 192.168.0.0/16
+        Except: 192.168.3.0/24, 192.168.4.0/24
+    ----------
+    From Port: <any> (traffic allowed to all ports)
+    To: <any> (traffic not restricted by source)
 `
 
 	port80 := intstr.FromInt(80)
@@ -1700,6 +1712,50 @@ Spec:
 						{Port: &port82, Protocol: &protoTCP},
 					},
 					From: []networking.NetworkPolicyPeer{
+						{
+							PodSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+							},
+						},
+						{
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+							},
+						},
+						{
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{Key: "foo", Operator: "In", Values: []string{"bar1", "bar2"}},
+								},
+							},
+						},
+						{
+							IPBlock: &networking.IPBlock{
+								CIDR:   "192.168.0.0/16",
+								Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
+							},
+						},
+					},
+				},
+				{},
+			},
+			Egress: []networking.NetworkPolicyEgressRule{
+				{
+					Ports: []networking.NetworkPolicyPort{
+						{Port: &port80},
+						{Port: &port82, Protocol: &protoTCP},
+					},
+					To: []networking.NetworkPolicyPeer{
 						{
 							PodSelector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
