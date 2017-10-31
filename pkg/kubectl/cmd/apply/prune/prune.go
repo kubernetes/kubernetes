@@ -46,9 +46,12 @@ type Pruner struct {
 	ShortOutput          bool
 }
 
-func defaultPruneGvks(mapper meta.RESTMapper) ([]*meta.RESTMapping, error) {
+// Param: gvks array of groupVersionKind passed in --prune-whitelist or empty array if no flag.
+// Returns default groupVersionKind mappings to prune, unless overriden by --prune-whitelist flag.
+func ParseGvks(mapper meta.RESTMapper, gvks []string) ([]*meta.RESTMapping, error) {
 
-	var defaultPruneGvks = [][]string{
+	// Default group/version/kind to prune
+	pruneGvks := [][]string{
 		{"", "v1", "ConfigMap"},
 		{"", "v1", "Endpoints"},
 		{"", "v1", "Namespace"},
@@ -67,35 +70,18 @@ func defaultPruneGvks(mapper meta.RESTMapper) ([]*meta.RESTMapping, error) {
 		{"apps", "v1beta1", "Deployment"},
 	}
 
-	var defaultPruneResources []*meta.RESTMapping
-	for _, gvk := range defaultPruneGvks {
-		mapping, err := mapper.RESTMapping(schema.GroupKind{Group: gvk[0], Kind: gvk[2]}, gvk[1])
+	// If group/version/kind specified in "prune-whitelist" flag, then use those values
+	if len(gvks) != 0 {
+		var err error
+		pruneGvks, err = parsePruneWhitelist(gvks)
 		if err != nil {
 			return nil, err
 		}
-		defaultPruneResources = append(defaultPruneResources, mapping)
-	}
-	return defaultPruneResources, nil
-}
-
-// Returns default groupVersionKind mappings to prune, unless overriden by --prune-whitelist flag.
-func ParseGvks(mapper meta.RESTMapper, gvks []string) ([]*meta.RESTMapping, error) {
-
-	// If no group/version/kind specified in "prune-whitelist" flag, then return default.
-	if len(gvks) == 0 {
-		return defaultPruneGvks(mapper)
 	}
 
 	// Parse groupVersionKind from passed prune-whitelist flag values
 	var groupVersionKinds []*meta.RESTMapping
-	for _, groupVersionKind := range gvks {
-		gvk := strings.Split(groupVersionKind, "/")
-		if len(gvk) != 3 {
-			return nil, fmt.Errorf("invalid GroupVersionKind format: %v, please follow <group/version/kind>", groupVersionKind)
-		}
-		if gvk[0] == "core" {
-			gvk[0] = ""
-		}
+	for _, gvk := range pruneGvks {
 		mapping, err := mapper.RESTMapping(schema.GroupKind{Group: gvk[0], Kind: gvk[2]}, gvk[1])
 		if err != nil {
 			return nil, err
@@ -104,6 +90,24 @@ func ParseGvks(mapper meta.RESTMapper, gvks []string) ([]*meta.RESTMapping, erro
 	}
 
 	return groupVersionKinds, nil
+}
+
+// Example gvks: "core/v1/endpoints", "apps/v1beta1/deployment"
+// Returns validated gvks as array of arrays of strings
+func parsePruneWhitelist(gvks []string) ([][]string, error) {
+
+	var parsedGvks [][]string
+	for _, groupVersionKind := range gvks {
+		gvk := strings.Split(groupVersionKind, "/")
+		if len(gvk) != 3 {
+			return nil, fmt.Errorf("invalid GroupVersionKind format: %v, please follow <group/version/kind>", groupVersionKind)
+		}
+		if gvk[0] == "core" {
+			gvk[0] = ""
+		}
+		parsedGvks = append(parsedGvks, gvk)
+	}
+	return parsedGvks, nil
 }
 
 // Prune resources not previously visited.
@@ -129,6 +133,7 @@ func (p *Pruner) Prune(visitedNamespaces sets.String, visitedUids sets.String) e
 	return nil
 }
 
+// Deletes objects in namespace/group/version/kind which have not previously been visited.
 func (p *Pruner) pruneMapping(namespace string, mapping *meta.RESTMapping, visitedUids sets.String) error {
 	c, err := p.ClientFunc(mapping)
 	if err != nil {
