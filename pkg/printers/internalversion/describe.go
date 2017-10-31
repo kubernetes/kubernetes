@@ -2295,7 +2295,10 @@ func describeServiceAccount(serviceAccount *api.ServiceAccount, tokens []api.Sec
 			mountHeader: mountSecretNames,
 			tokenHeader: tokenSecretNames,
 		}
-		for _, header := range sets.StringKeySet(types).List() {
+
+		keys := sets.StringKeySet(types).List()
+		sort.Strings(keys)
+		for _, header := range keys {
 			names := types[header]
 			if len(names) == 0 {
 				w.Write(LEVEL_0, "%s\t<none>\n", header)
