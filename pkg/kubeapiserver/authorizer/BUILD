@@ -41,7 +41,6 @@ go_library(
         "//plugin/pkg/auth/authorizer/node:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
-        "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/k8s.io/api/authorization/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apimachinery/registered:go_default_library",

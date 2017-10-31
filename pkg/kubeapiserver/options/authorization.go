@@ -72,8 +72,8 @@ func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
 
 	fs.BoolVar(&s.WebhookUseServiceResolution,
-		"authorization-webhook-use-service-resolution", s.WebhookUseServiceResolution,
-		"If set, the authorizer webhook code will resolve URLs pointing to hosts of the form "+
+		"authorization-webhook-use-service-resolution", s.WebhookUseServiceResolution, ""+
+			"If set, the authorizer webhook code will resolve URLs pointing to hosts of the form "+
 			"https://servicename.namespace.svc:port/somewhere to appropriate endpoint IP addresses. "+
 			"You may want to use this feature if your webhook authorizer is hosted in the cluster itself, "+
 			"and the apiserver has no other ways to resolve the service endpoint.")

@@ -17,8 +17,10 @@ limitations under the License.
 package app
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -39,17 +41,13 @@ func (r *fakeServiceResolver) ResolveEndpoint(namespace, name string) (*url.URL,
 	return url.Parse(r.resolveHostport)
 }
 
-type fakeDialer struct {
-	network, host string
-}
-
 func TestAuthorizationWebhookDialer(t *testing.T) {
 	tt := []struct {
 		expectedNamespace, expectedName string
 		serverAddress                   string
 		expectedError                   error
-		// If set, passes a nil http.Transport to the function under test.
-		useNilTransport bool
+		// If set, pass a dialer that always return the error "dialer error".
+		useBlackHoleDialer bool
 	}{
 		{
 			expectedNamespace: "servicenamespace",
@@ -60,21 +58,21 @@ func TestAuthorizationWebhookDialer(t *testing.T) {
 			expectedNamespace: "servicenamespace",
 			expectedName:      "servicename",
 			serverAddress:     "http://servicename.servicenamespace.svc",
-			useNilTransport:   true,
 		},
 		{
-			serverAddress: "http://somename.svc",
-			expectedError: fmt.Errorf("no such host"),
+			serverAddress:      "http://somename.svc",
+			expectedError:      fmt.Errorf("some dial error"),
+			useBlackHoleDialer: true,
 		},
 		{
-			serverAddress: "http://servicename.servicenamespace.svc.com",
-			expectedError: fmt.Errorf("no such host"),
+			serverAddress:      "http://servicename.servicenamespace.svc.com",
+			expectedError:      fmt.Errorf("some dial error"),
+			useBlackHoleDialer: true,
 		},
 		{
-			expectedNamespace: "servicenamespace",
-			expectedName:      "servicename",
-			serverAddress:     "http://someunlikelyhostname.someunlikelydomain.someunlikelytld",
-			expectedError:     fmt.Errorf("no such host"),
+			serverAddress:      "http://someunlikelyhostname.someunlikelydomain.someunlikelytld",
+			expectedError:      fmt.Errorf("some dial error"),
+			useBlackHoleDialer: true,
 		},
 	}
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -84,15 +82,18 @@ func TestAuthorizationWebhookDialer(t *testing.T) {
 	resolver := fakeServiceResolver{
 		resolveHostport: testServer.URL,
 	}
+	blackHoleDial := func(string, string) (net.Conn, error) {
+		return nil, errors.New("some dial error")
+	}
 
 	for i, ttt := range tt {
 		var transport *http.Transport
 		defaultTransport := &http.Transport{}
-		if ttt.useNilTransport {
-			defaultTransport = nil
+		if ttt.useBlackHoleDialer {
+			defaultTransport.Dial = blackHoleDial
 		}
 		transport = &http.Transport{
-			Dial: buildWebhookDialer(&resolver, defaultTransport)}
+			Dial: newWebhookDialer(&resolver, defaultTransport)}
 		client := &http.Client{Transport: transport}
 		response, err := client.Get(ttt.serverAddress)
 		if err != nil {

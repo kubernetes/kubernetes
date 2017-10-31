@@ -445,9 +445,8 @@ func BuildGenericConfig(s *options.ServerRunOptions, proxyTransport *http.Transp
 		return nil, nil, nil, nil, nil, fmt.Errorf("invalid authentication config: %v", err)
 	}
 
-	genericConfig.Authorizer, genericConfig.RuleResolver, err =
-		BuildAuthorizer(s, sharedInformers,
-			buildWebhookDialer(serviceResolver, proxyTransport))
+	webhookDialer := newWebhookDialer(serviceResolver, proxyTransport)
+	genericConfig.Authorizer, genericConfig.RuleResolver, err = BuildAuthorizer(s, sharedInformers, webhookDialer)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("invalid authorization config: %v", err)
 	}
@@ -547,10 +546,10 @@ func BuildAuthenticator(s *options.ServerRunOptions, storageFactory serverstorag
 	return authenticatorConfig.New()
 }
 
-// buildWebhookDialer constructs a custom dialer function for the authorization webhook
+// newWebhookDialer constructs a custom dialer function for the authorization webhook
 // that knows how to resolve references to Kubernetes services (of the form "servicename.namespace.svc")
 // to the IP address of the endpoint that currently implements it.
-func buildWebhookDialer(
+func newWebhookDialer(
 	serviceResolver aggregatorapiserver.ServiceResolver,
 	proxyTransport *http.Transport,
 ) func(network, address string) (net.Conn, error) {
@@ -563,7 +562,7 @@ func buildWebhookDialer(
 	return func(network, address string) (net.Conn, error) {
 		host, _, err := net.SplitHostPort(address)
 		if err != nil {
-			glog.V(6).Infof("while splitting hostport: %v", err)
+			glog.V(6).Infof("Error splitting hostport: %v", err)
 			return baseDialer(network, address)
 		}
 		// "servicename.namespace.svc"
@@ -579,12 +578,9 @@ func buildWebhookDialer(
 		service := segments[0]
 		u, err := serviceResolver.ResolveEndpoint(namespace, service)
 		if err != nil {
-			return nil, fmt.Errorf(
-				"while resolving endpoint: namespace=%v, service=%v: %v",
-				namespace, service, err)
+			return nil, fmt.Errorf("Error resolving endpoint %v/%v: %v", namespace, service, err)
 		}
-		glog.V(5).Infof("Resolved: namespace=%v, service=%v to: host=%v",
-			namespace, service, u.Host)
+		glog.V(5).Infof("Resolved %v/%v to %v", namespace, service, u.Host)
 		return baseDialer(network, u.Host)
 	}
 }

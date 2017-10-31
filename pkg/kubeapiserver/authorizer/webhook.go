@@ -21,7 +21,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/golang/glog"
 	"github.com/pkg/errors"
 
 	authorization "k8s.io/api/authorization/v1beta1"
@@ -93,9 +92,7 @@ type subjectAccessReviewClient struct {
 func (t *subjectAccessReviewClient) Create(
 	subjectAccessReview *authorization.SubjectAccessReview,
 ) (*authorization.SubjectAccessReview, error) {
-	glog.V(2).Infof("Create request: %+v", subjectAccessReview)
 	result := &authorization.SubjectAccessReview{}
 	err := t.restClient.Post().Body(subjectAccessReview).Do().Into(result)
-	glog.V(4).Infof("Create response:\n\tresult=%+v\n\terr=%v", result, err)
 	return result, err
 }
