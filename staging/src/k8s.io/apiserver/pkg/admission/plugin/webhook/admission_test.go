@@ -89,6 +89,33 @@ func (f fakeNamespaceLister) Get(name string) (*corev1.Namespace, error) {
 	return nil, errors.NewNotFound(corev1.Resource("namespaces"), name)
 }
 
+// ccfgSVC returns a client config using the service reference mechanism.
+func ccfgSVC(urlPath string) registrationv1alpha1.WebhookClientConfig {
+	return registrationv1alpha1.WebhookClientConfig{
+		Service: &registrationv1alpha1.ServiceReference{
+			Name:      "webhook-test",
+			Namespace: "default",
+			Path:      &urlPath,
+		},
+		CABundle: caCert,
+	}
+}
+
+type urlConfigGenerator struct {
+	baseURL *url.URL
+}
+
+// ccfgURL returns a client config using the URL mechanism.
+func (c urlConfigGenerator) ccfgURL(urlPath string) registrationv1alpha1.WebhookClientConfig {
+	u2 := *c.baseURL
+	u2.Path = urlPath
+	urlString := u2.String()
+	return registrationv1alpha1.WebhookClientConfig{
+		URL:      &urlString,
+		CABundle: caCert,
+	}
+}
+
 // TestAdmit tests that GenericAdmissionWebhook#Admit works as expected
 func TestAdmit(t *testing.T) {
 	scheme := runtime.NewScheme()
@@ -148,12 +175,23 @@ func TestAdmit(t *testing.T) {
 		UID:  "webhook-test",
 	}
 
+	ccfgURL := urlConfigGenerator{serverURL}.ccfgURL
+
 	type test struct {
 		hookSource    fakeHookSource
 		path          string
 		expectAllow   bool
 		errorContains string
 	}
+
+	matchEverythingRules := []registrationv1alpha1.RuleWithOperations{{
+		Operations: []registrationv1alpha1.OperationType{registrationv1alpha1.OperationAll},
+		Rule: registrationv1alpha1.Rule{
+			APIGroups:   []string{"*"},
+			APIVersions: []string{"*"},
+			Resources:   []string{"*/*"},
+		},
+	}}
 
 	policyFail := registrationv1alpha1.Fail
 	policyIgnore := registrationv1alpha1.Ignore
@@ -163,7 +201,7 @@ func TestAdmit(t *testing.T) {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.Webhook{{
 					Name:         "nomatch",
-					ClientConfig: newFakeHookClientConfig("disallow"),
+					ClientConfig: ccfgSVC("disallow"),
 					Rules: []registrationv1alpha1.RuleWithOperations{{
 						Operations: []registrationv1alpha1.OperationType{registrationv1alpha1.Create},
 					}},
@@ -175,8 +213,8 @@ func TestAdmit(t *testing.T) {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.Webhook{{
 					Name:         "allow",
-					ClientConfig: newFakeHookClientConfig("allow"),
-					Rules:        newMatchEverythingRules(),
+					ClientConfig: ccfgSVC("allow"),
+					Rules:        matchEverythingRules,
 				}},
 			},
 			expectAllow: true,
@@ -185,8 +223,8 @@ func TestAdmit(t *testing.T) {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.Webhook{{
 					Name:         "disallow",
-					ClientConfig: newFakeHookClientConfig("disallow"),
-					Rules:        newMatchEverythingRules(),
+					ClientConfig: ccfgSVC("disallow"),
+					Rules:        matchEverythingRules,
 				}},
 			},
 			errorContains: "without explanation",
@@ -195,8 +233,8 @@ func TestAdmit(t *testing.T) {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.Webhook{{
 					Name:         "disallowReason",
-					ClientConfig: newFakeHookClientConfig("disallowReason"),
-					Rules:        newMatchEverythingRules(),
+					ClientConfig: ccfgSVC("disallowReason"),
+					Rules:        matchEverythingRules,
 				}},
 			},
 			errorContains: "you shall not pass",
@@ -205,7 +243,7 @@ func TestAdmit(t *testing.T) {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.Webhook{{
 					Name:         "disallow",
-					ClientConfig: newFakeHookClientConfig("disallow"),
+					ClientConfig: ccfgSVC("disallow"),
 					Rules:        newMatchEverythingRules(),
 					NamespaceSelector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{{
@@ -222,7 +260,7 @@ func TestAdmit(t *testing.T) {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.Webhook{{
 					Name:         "disallow",
-					ClientConfig: newFakeHookClientConfig("disallow"),
+					ClientConfig: ccfgSVC("disallow"),
 					Rules:        newMatchEverythingRules(),
 					NamespaceSelector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{{
@@ -239,18 +277,18 @@ func TestAdmit(t *testing.T) {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.Webhook{{
 					Name:          "internalErr A",
-					ClientConfig:  newFakeHookClientConfig("internalErr"),
-					Rules:         newMatchEverythingRules(),
+					ClientConfig:  ccfgSVC("internalErr"),
+					Rules:         matchEverythingRules,
 					FailurePolicy: &policyIgnore,
 				}, {
 					Name:          "internalErr B",
-					ClientConfig:  newFakeHookClientConfig("internalErr"),
-					Rules:         newMatchEverythingRules(),
+					ClientConfig:  ccfgSVC("internalErr"),
+					Rules:         matchEverythingRules,
 					FailurePolicy: &policyIgnore,
 				}, {
 					Name:          "internalErr C",
-					ClientConfig:  newFakeHookClientConfig("internalErr"),
-					Rules:         newMatchEverythingRules(),
+					ClientConfig:  ccfgSVC("internalErr"),
+					Rules:         matchEverythingRules,
 					FailurePolicy: &policyIgnore,
 				}},
 			},
@@ -260,16 +298,16 @@ func TestAdmit(t *testing.T) {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.Webhook{{
 					Name:         "internalErr A",
-					ClientConfig: newFakeHookClientConfig("internalErr"),
-					Rules:        newMatchEverythingRules(),
+					ClientConfig: ccfgSVC("internalErr"),
+					Rules:        matchEverythingRules,
 				}, {
 					Name:         "internalErr B",
-					ClientConfig: newFakeHookClientConfig("internalErr"),
-					Rules:        newMatchEverythingRules(),
+					ClientConfig: ccfgSVC("internalErr"),
+					Rules:        matchEverythingRules,
 				}, {
 					Name:         "internalErr C",
-					ClientConfig: newFakeHookClientConfig("internalErr"),
-					Rules:        newMatchEverythingRules(),
+					ClientConfig: ccfgSVC("internalErr"),
+					Rules:        matchEverythingRules,
 				}},
 			},
 			expectAllow: false,
@@ -278,23 +316,45 @@ func TestAdmit(t *testing.T) {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.Webhook{{
 					Name:          "internalErr A",
-					ClientConfig:  newFakeHookClientConfig("internalErr"),
-					Rules:         newMatchEverythingRules(),
+					ClientConfig:  ccfgSVC("internalErr"),
+					Rules:         matchEverythingRules,
 					FailurePolicy: &policyFail,
 				}, {
 					Name:          "internalErr B",
-					ClientConfig:  newFakeHookClientConfig("internalErr"),
-					Rules:         newMatchEverythingRules(),
+					ClientConfig:  ccfgSVC("internalErr"),
+					Rules:         matchEverythingRules,
 					FailurePolicy: &policyFail,
 				}, {
 					Name:          "internalErr C",
-					ClientConfig:  newFakeHookClientConfig("internalErr"),
-					Rules:         newMatchEverythingRules(),
+					ClientConfig:  ccfgSVC("internalErr"),
+					Rules:         matchEverythingRules,
 					FailurePolicy: &policyFail,
 				}},
 			},
 			expectAllow: false,
 		},
+		"match & allow (url)": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:         "allow",
+					ClientConfig: ccfgURL("allow"),
+					Rules:        matchEverythingRules,
+				}},
+			},
+			expectAllow: true,
+		},
+		"match & disallow (url)": {
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:         "disallow",
+					ClientConfig: ccfgURL("disallow"),
+					Rules:        matchEverythingRules,
+				}},
+			},
+			errorContains: "without explanation",
+		},
+		// No need to test everything with the url case, since only the
+		// connection is different.
 	}
 
 	for name, tt := range table {
@@ -378,6 +438,7 @@ func TestAdmitCachedClient(t *testing.T) {
 		Name: "webhook-test",
 		UID:  "webhook-test",
 	}
+	ccfgURL := urlConfigGenerator{serverURL}.ccfgURL
 
 	type test struct {
 		name        string
@@ -393,7 +454,7 @@ func TestAdmitCachedClient(t *testing.T) {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.Webhook{{
 					Name:          "cache1",
-					ClientConfig:  newFakeHookClientConfig("allow"),
+					ClientConfig:  ccfgSVC("allow"),
 					Rules:         newMatchEverythingRules(),
 					FailurePolicy: &policyIgnore,
 				}},
@@ -406,7 +467,7 @@ func TestAdmitCachedClient(t *testing.T) {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.Webhook{{
 					Name:          "cache2",
-					ClientConfig:  newFakeHookClientConfig("internalErr"),
+					ClientConfig:  ccfgSVC("internalErr"),
 					Rules:         newMatchEverythingRules(),
 					FailurePolicy: &policyIgnore,
 				}},
@@ -419,7 +480,33 @@ func TestAdmitCachedClient(t *testing.T) {
 			hookSource: fakeHookSource{
 				hooks: []registrationv1alpha1.Webhook{{
 					Name:          "cache3",
-					ClientConfig:  newFakeHookClientConfig("allow"),
+					ClientConfig:  ccfgSVC("allow"),
+					Rules:         newMatchEverythingRules(),
+					FailurePolicy: &policyIgnore,
+				}},
+			},
+			expectAllow: true,
+			expectCache: false,
+		},
+		{
+			name: "cache 4",
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:          "cache4",
+					ClientConfig:  ccfgURL("allow"),
+					Rules:         newMatchEverythingRules(),
+					FailurePolicy: &policyIgnore,
+				}},
+			},
+			expectAllow: true,
+			expectCache: true,
+		},
+		{
+			name: "cache 5",
+			hookSource: fakeHookSource{
+				hooks: []registrationv1alpha1.Webhook{{
+					Name:          "cache5",
+					ClientConfig:  ccfgURL("allow"),
 					Rules:         newMatchEverythingRules(),
 					FailurePolicy: &policyIgnore,
 				}},
@@ -578,17 +665,6 @@ func TestToStatusErr(t *testing.T) {
 		if err == nil || err.Error() != test.expectedError {
 			t.Errorf("%s: expected an error saying %q, but got %v", test.name, test.expectedError, err)
 		}
-	}
-}
-
-func newFakeHookClientConfig(urlPath string) registrationv1alpha1.WebhookClientConfig {
-	return registrationv1alpha1.WebhookClientConfig{
-		Service: registrationv1alpha1.ServiceReference{
-			Name:      "webhook-test",
-			Namespace: "default",
-		},
-		URLPath:  urlPath,
-		CABundle: caCert,
 	}
 }
 
