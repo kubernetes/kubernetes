@@ -61,15 +61,17 @@ func validateApplyArgs(cmd *cobra.Command, args []string) error {
 }
 
 const (
-	filenameRC             = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.yaml"
-	filenameRCNoAnnotation = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-no-annotation.yaml"
-	filenameRCLASTAPPLIED  = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-lastapplied.yaml"
-	filenameSVC            = "../../../test/fixtures/pkg/kubectl/cmd/apply/service.yaml"
-	filenameRCSVC          = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-service.yaml"
-	filenameNoExistRC      = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-noexist.yaml"
-	filenameRCPatchTest    = "../../../test/fixtures/pkg/kubectl/cmd/apply/patch.json"
-	dirName                = "../../../test/fixtures/pkg/kubectl/cmd/apply/testdir"
-	filenameRCJSON         = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.json"
+	filenameRC                = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.yaml"
+	filenameRCArgs            = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-args.yaml"
+	filenameRCLastAppliedArgs = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-lastapplied-args.yaml"
+	filenameRCNoAnnotation    = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-no-annotation.yaml"
+	filenameRCLASTAPPLIED     = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-lastapplied.yaml"
+	filenameSVC               = "../../../test/fixtures/pkg/kubectl/cmd/apply/service.yaml"
+	filenameRCSVC             = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-service.yaml"
+	filenameNoExistRC         = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc-noexist.yaml"
+	filenameRCPatchTest       = "../../../test/fixtures/pkg/kubectl/cmd/apply/patch.json"
+	dirName                   = "../../../test/fixtures/pkg/kubectl/cmd/apply/testdir"
+	filenameRCJSON            = "../../../test/fixtures/pkg/kubectl/cmd/apply/rc.json"
 
 	filenameWidgetClientside = "../../../test/fixtures/pkg/kubectl/cmd/apply/widget-clientside.yaml"
 	filenameWidgetServerside = "../../../test/fixtures/pkg/kubectl/cmd/apply/widget-serverside.yaml"
@@ -227,6 +229,7 @@ func walkMapPath(t *testing.T, start map[string]interface{}, path []string) map[
 
 func TestRunApplyViewLastApplied(t *testing.T) {
 	_, rcBytesWithConfig := readReplicationController(t, filenameRCLASTAPPLIED)
+	_, rcBytesWithArgs := readReplicationController(t, filenameRCLastAppliedArgs)
 	nameRC, rcBytes := readReplicationController(t, filenameRC)
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
@@ -244,6 +247,16 @@ func TestRunApplyViewLastApplied(t *testing.T) {
 			selector:     "",
 			args:         []string{},
 			respBytes:    rcBytesWithConfig,
+		},
+		{
+			name:         "test with file include `%s` in arguments",
+			filePath:     filenameRCArgs,
+			outputFormat: "",
+			expectedErr:  "",
+			expectedOut:  "args: -random_flag=%s@domain.com\n",
+			selector:     "",
+			args:         []string{},
+			respBytes:    rcBytesWithArgs,
 		},
 		{
 			name:         "view with file json format",
