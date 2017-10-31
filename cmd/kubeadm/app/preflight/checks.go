@@ -498,7 +498,9 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errors []error) {
 }
 
 // KubeletVersionCheck validates installed kubelet version
-type KubeletVersionCheck struct{}
+type KubeletVersionCheck struct {
+	KubernetesVersion string
+}
 
 // Check validates kubelet version. It should be not less than minimal supported version
 func (kubever KubeletVersionCheck) Check() (warnings, errors []error) {
@@ -509,7 +511,17 @@ func (kubever KubeletVersionCheck) Check() (warnings, errors []error) {
 	if kubeletVersion.LessThan(kubeadmconstants.MinimumKubeletVersion) {
 		return nil, []error{fmt.Errorf("Kubelet version %q is lower than kubadm can support. Please upgrade kubelet", kubeletVersion)}
 	}
-	return nil, []error{}
+
+	if kubever.KubernetesVersion != "" {
+		k8sVersion, err := versionutil.ParseSemantic(kubever.KubernetesVersion)
+		if err != nil {
+			return nil, []error{fmt.Errorf("couldn't parse kubernetes version %q: %v", kubever.KubernetesVersion, err)}
+		}
+		if kubeletVersion.Major() > k8sVersion.Major() || kubeletVersion.Minor() > k8sVersion.Minor() {
+			return nil, []error{fmt.Errorf("the kubelet version is higher than the control plane version. This is not a supported version skew and may lead to a malfunctional cluster. Kubelet version: %q Control plane version: %q", kubeletVersion, k8sVersion)}
+		}
+	}
+	return nil, nil
 }
 
 // SwapCheck warns if swap is enabled
@@ -688,7 +700,7 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		SystemVerificationCheck{},
 		IsPrivilegedUserCheck{},
 		HostnameCheck{nodeName: cfg.NodeName},
-		KubeletVersionCheck{},
+		KubeletVersionCheck{KubernetesVersion: cfg.KubernetesVersion},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
 		ServiceCheck{Service: "docker", CheckIfActive: true},
 		FirewalldCheck{ports: []int{int(cfg.API.BindPort), 10250}},
