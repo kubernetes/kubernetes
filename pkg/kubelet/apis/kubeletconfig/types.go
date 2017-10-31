@@ -181,9 +181,6 @@ type KubeletConfiguration struct {
 	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
 	// +optional
 	CgroupDriver string
-	// Cgroups that container runtime is expected to be isolated in.
-	// +optional
-	RuntimeCgroups string
 	// SystemCgroups is absolute name of cgroups in which to place
 	// all non-kernel processes that are not already in a container. Empty
 	// for no container. Rolling back the flag requires a reboot.
@@ -193,8 +190,6 @@ type KubeletConfiguration struct {
 	// If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
 	// +optional
 	CgroupRoot string
-	// containerRuntime is the container runtime to use.
-	ContainerRuntime string
 	// CPUManagerPolicy is the name of the policy to use.
 	CPUManagerPolicy string
 	// CPU Manager reconciliation period.

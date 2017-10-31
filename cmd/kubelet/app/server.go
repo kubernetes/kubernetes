@@ -702,6 +702,8 @@ func RunKubelet(kubeFlags *options.KubeletFlags, kubeCfg *kubeletconfiginternal.
 	k, err := builder(kubeCfg,
 		kubeDeps,
 		&kubeFlags.ContainerRuntimeOptions,
+		kubeFlags.ContainerRuntime,
+		kubeFlags.RuntimeCgroups,
 		kubeFlags.HostnameOverride,
 		kubeFlags.NodeIP,
 		kubeFlags.ProviderID,
@@ -769,6 +771,8 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *kubelet.Dependencies,
 	crOptions *config.ContainerRuntimeOptions,
+	containerRuntime string,
+	runtimeCgroups string,
 	hostnameOverride string,
 	nodeIP string,
 	providerID string,
@@ -796,6 +800,8 @@ func CreateAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	k, err = kubelet.NewMainKubelet(kubeCfg,
 		kubeDeps,
 		crOptions,
+		containerRuntime,
+		runtimeCgroups,
 		hostnameOverride,
 		nodeIP,
 		providerID,
@@ -920,7 +926,7 @@ func RunDockershim(f *options.KubeletFlags, c *kubeletconfiginternal.KubeletConf
 	}
 
 	ds, err := dockershim.NewDockerService(dockerClient, r.PodSandboxImage, streamingConfig, &pluginSettings,
-		c.RuntimeCgroups, c.CgroupDriver, r.DockershimRootDirectory, r.DockerDisableSharedPID)
+		f.RuntimeCgroups, c.CgroupDriver, r.DockershimRootDirectory, r.DockerDisableSharedPID)
 	if err != nil {
 		return err
 	}

@@ -22,6 +22,14 @@ import (
 )
 
 type ContainerRuntimeOptions struct {
+
+	// General options.
+
+	// ContainerRuntime is the container runtime to use.
+	ContainerRuntime string
+	// RuntimeCgroups that container runtime is expected to be isolated in.
+	RuntimeCgroups string
+
 	// Docker-specific options.
 
 	// DockershimRootDirectory is the path to the dockershim root directory. Defaults to
@@ -72,6 +80,10 @@ type ContainerRuntimeOptions struct {
 }
 
 func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
+	// General settings.
+	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'rkt'.")
+	fs.StringVar(&s.RuntimeCgroups, "runtime-cgroups", s.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
+
 	// Docker-specific settings.
 	fs.BoolVar(&s.ExperimentalDockershim, "experimental-dockershim", s.ExperimentalDockershim, "Enable dockershim only mode. In this mode, kubelet will only start dockershim without any other functionalities. This flag only serves test purpose, please do not use it unless you are conscious of what you are doing. [default=false]")
 	fs.MarkHidden("experimental-dockershim")
