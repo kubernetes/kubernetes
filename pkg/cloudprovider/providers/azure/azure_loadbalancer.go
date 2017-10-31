@@ -246,10 +246,6 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 	}
 	if sgNeedsUpdate {
 		glog.V(3).Infof("ensure(%s): sg(%s) - updating", serviceName, *sg.Name)
-		// azure-sdk-for-go introduced contraint validation which breaks the updating here if we don't set these
-		// to nil. This is a workaround until https://github.com/Azure/go-autorest/issues/112 is fixed
-		sg.SecurityGroupPropertiesFormat.NetworkInterfaces = nil
-		sg.SecurityGroupPropertiesFormat.Subnets = nil
 		az.operationPollRateLimiter.Accept()
 		glog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%q): start", *sg.Name)
 		respChan, errChan := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *sg.Name, sg, nil)
@@ -347,10 +343,6 @@ func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servi
 		}
 		if sgNeedsUpdate {
 			glog.V(3).Infof("delete(%s): sg(%s) - updating", serviceName, az.SecurityGroupName)
-			// azure-sdk-for-go introduced contraint validation which breaks the updating here if we don't set these
-			// to nil. This is a workaround until https://github.com/Azure/go-autorest/issues/112 is fixed
-			sg.SecurityGroupPropertiesFormat.NetworkInterfaces = nil
-			sg.SecurityGroupPropertiesFormat.Subnets = nil
 			az.operationPollRateLimiter.Accept()
 			glog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%q): start", *reconciledSg.Name)
 			respChan, errChan := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *reconciledSg.Name, reconciledSg, nil)
