@@ -68,6 +68,7 @@ func startServiceController(ctx ControllerContext) (bool, error) {
 		ctx.Options.ClusterName,
 	)
 	if err != nil {
+		// This error shouldn't fail. It lives like this as a legacy.
 		glog.Errorf("Failed to start service controller: %v", err)
 		return false, nil
 	}
@@ -258,7 +259,9 @@ func startResourceQuotaController(ctx ControllerContext) (bool, error) {
 		Registry:                  generic.NewRegistry(quotaConfiguration.Evaluators()),
 	}
 	if resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter())
+		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("resource_quota_controller", resourceQuotaControllerClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+			return true, err
+		}
 	}
 
 	resourceQuotaController, err := resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions)
@@ -302,12 +305,16 @@ func startNamespaceController(ctx ControllerContext) (bool, error) {
 }
 
 func startServiceAccountController(ctx ControllerContext) (bool, error) {
-	go serviceaccountcontroller.NewServiceAccountsController(
+	sac, err := serviceaccountcontroller.NewServiceAccountsController(
 		ctx.InformerFactory.Core().V1().ServiceAccounts(),
 		ctx.InformerFactory.Core().V1().Namespaces(),
 		ctx.ClientBuilder.ClientOrDie("service-account-controller"),
 		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
-	).Run(1, ctx.Stop)
+	)
+	if err != nil {
+		return true, fmt.Errorf("error creating ServiceAccount controller: %v", err)
+	}
+	go sac.Run(1, ctx.Stop)
 	return true, nil
 }
 
