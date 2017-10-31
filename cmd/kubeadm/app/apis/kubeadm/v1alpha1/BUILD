@@ -26,7 +26,10 @@ go_library(
     deps = [
         "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//cmd/kubeadm/app/constants:go_default_library",
+        "//cmd/kubeadm/app/features:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig/v1alpha1:go_default_library",
+        "//pkg/proxy/apis/kubeproxyconfig/scheme:go_default_library",
+        "//pkg/proxy/apis/kubeproxyconfig/v1alpha1:go_default_library",
         "//pkg/util/pointer:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
