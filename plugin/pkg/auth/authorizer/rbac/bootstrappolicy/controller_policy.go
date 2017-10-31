@@ -165,7 +165,7 @@ func buildControllerRoles() ([]rbac.ClusterRole, []rbac.ClusterRoleBinding) {
 			rbac.NewRule("get").Groups(legacyGroup).Resources("services/proxy").Names("https:heapster:", "http:heapster:").RuleOrDie(),
 			// allow listing resource metrics and custom metrics
 			rbac.NewRule("list").Groups(resMetricsGroup).Resources("pods").RuleOrDie(),
-			rbac.NewRule("list").Groups(customMetricsGroup).Resources("*").RuleOrDie(),
+			rbac.NewRule("get", "list").Groups(customMetricsGroup).Resources("*").RuleOrDie(),
 			eventsRule(),
 		},
 	})

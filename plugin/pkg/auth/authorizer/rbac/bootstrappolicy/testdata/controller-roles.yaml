@@ -495,6 +495,7 @@ items:
     resources:
     - '*'
     verbs:
+    - get
     - list
   - apiGroups:
     - ""
