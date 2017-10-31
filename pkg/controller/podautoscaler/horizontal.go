@@ -433,7 +433,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 		scaleUpLimit := calculateScaleUpLimit(currentReplicas)
 
 		switch {
-		case desiredReplicas > scaleUpLimit:
+		case desiredReplicas > scaleUpLimit && desiredReplicas < hpa.Spec.MaxReplicas:
 			setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionTrue, "ScaleUpLimit", "the desired replica count is increasing faster than the maximum scale rate")
 			desiredReplicas = scaleUpLimit
 
