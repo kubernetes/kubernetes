@@ -35,14 +35,24 @@ var (
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
 		},
 	)
+
+	// SyncProxyRulesCount is the number of times kube-proxy has synced proxy rules.
+	SyncProxyRulesCount = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Subsystem: kubeProxySubsystem,
+			Name:      "sync_proxy_rules_count"
+			Help:      "SyncProxyRules count"
+	        },
+	)
 )
 
 var registerMetricsOnce sync.Once
 
-// RegisterMetrics registers sync proxy rules latency metrics
+// RegisterMetrics registers sync proxy rules metrics
 func RegisterMetrics() {
 	registerMetricsOnce.Do(func() {
 		prometheus.MustRegister(SyncProxyRulesLatency)
+		prometheus.MustRegister(SyncProxyRulesCount)
 	})
 }
 
