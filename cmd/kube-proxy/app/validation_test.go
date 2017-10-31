@@ -402,3 +402,40 @@ func TestValidateProxyMode(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateClientConnectionConfiguration(t *testing.T) {
+	newPath := field.NewPath("KubeProxyConfiguration")
+
+	successCases := []componentconfig.ClientConnectionConfiguration{
+		{
+			Burst: 0,
+		},
+		{
+			Burst: 5,
+		},
+	}
+
+	for _, successCase := range successCases {
+		if errs := validateClientConnectionConfiguration(successCase, newPath.Child("Burst")); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := []struct {
+		ccc componentconfig.ClientConnectionConfiguration
+		msg string
+	}{
+		{
+			ccc: componentconfig.ClientConnectionConfiguration{Burst: -5},
+			msg: "must be greater than or equal to 0",
+		},
+	}
+
+	for _, errorCase := range errorCases {
+		if errs := validateClientConnectionConfiguration(errorCase.ccc, newPath.Child("Burst")); len(errs) == 0 {
+			t.Errorf("expected failure for %s", errorCase.msg)
+		} else if !strings.Contains(errs[0].Error(), errorCase.msg) {
+			t.Errorf("unexpected error: %v, expected: %s", errs[0], errorCase.msg)
+		}
+	}
+}
