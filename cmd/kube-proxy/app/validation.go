@@ -38,7 +38,7 @@ func Validate(config *componentconfig.KubeProxyConfiguration) field.ErrorList {
 	allErrs = append(allErrs, validateKubeProxyConntrackConfiguration(config.Conntrack, newPath.Child("KubeProxyConntrackConfiguration"))...)
 	allErrs = append(allErrs, validateProxyMode(config.Mode, newPath.Child("Mode"))...)
 	allErrs = append(allErrs, validateClientConnectionConfiguration(config.ClientConnection, newPath.Child("ClientConnection"))...)
-	allErrs = append(allErrs, validateIPVSSchedulerMethod(config.IPVS.Scheduler, newPath.Child("KubeProxyIPVSConfiguration").Child("Scheduler"))...)
+	allErrs = append(allErrs, validateIPVSSchedulerMethod(componentconfig.IPVSSchedulerMethod(config.IPVS.Scheduler), newPath.Child("KubeProxyIPVSConfiguration").Child("Scheduler"))...)
 
 	if config.OOMScoreAdj != nil && (*config.OOMScoreAdj < -1000 || *config.OOMScoreAdj > 1000) {
 		allErrs = append(allErrs, field.Invalid(newPath.Child("OOMScoreAdj"), *config.OOMScoreAdj, "must be within the range [-1000, 1000]"))
@@ -159,18 +159,18 @@ func validateHostPort(input string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
-func validateIPVSSchedulerMethod(scheduler string, fldPath *field.Path) field.ErrorList {
-	supportedMethod := []string{
-		string(componentconfig.RoundRobin),
-		string(componentconfig.WeightedRoundRobin),
-		string(componentconfig.LeastConnection),
-		string(componentconfig.WeightedLeastConnection),
-		string(componentconfig.LocalityBasedLeastConnection),
-		string(componentconfig.LocalityBasedLeastConnectionWithReplication),
-		string(componentconfig.SourceHashing),
-		string(componentconfig.DestinationHashing),
-		string(componentconfig.ShortestExpectedDelay),
-		string(componentconfig.NeverQueue),
+func validateIPVSSchedulerMethod(scheduler componentconfig.IPVSSchedulerMethod, fldPath *field.Path) field.ErrorList {
+	supportedMethod := []componentconfig.IPVSSchedulerMethod{
+		componentconfig.RoundRobin,
+		componentconfig.WeightedRoundRobin,
+		componentconfig.LeastConnection,
+		componentconfig.WeightedLeastConnection,
+		componentconfig.LocalityBasedLeastConnection,
+		componentconfig.LocalityBasedLeastConnectionWithReplication,
+		componentconfig.SourceHashing,
+		componentconfig.DestinationHashing,
+		componentconfig.ShortestExpectedDelay,
+		componentconfig.NeverQueue,
 		"",
 	}
 	allErrs := field.ErrorList{}

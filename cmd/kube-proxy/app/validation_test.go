@@ -489,3 +489,45 @@ func TestValidateHostPort(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateIPVSSchedulerMethod(t *testing.T) {
+	newPath := field.NewPath("KubeProxyConfiguration")
+
+	successCases := []componentconfig.IPVSSchedulerMethod{
+		componentconfig.RoundRobin,
+		componentconfig.WeightedRoundRobin,
+		componentconfig.LeastConnection,
+		componentconfig.WeightedLeastConnection,
+		componentconfig.LocalityBasedLeastConnection,
+		componentconfig.LocalityBasedLeastConnectionWithReplication,
+		componentconfig.SourceHashing,
+		componentconfig.DestinationHashing,
+		componentconfig.ShortestExpectedDelay,
+		componentconfig.NeverQueue,
+		"",
+	}
+
+	for _, successCase := range successCases {
+		if errs := validateIPVSSchedulerMethod(successCase, newPath.Child("Scheduler")); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := []struct {
+		mode componentconfig.IPVSSchedulerMethod
+		msg  string
+	}{
+		{
+			mode: componentconfig.IPVSSchedulerMethod("non-existing"),
+			msg:  "blank means the default algorithm method (currently rr)",
+		},
+	}
+
+	for _, errorCase := range errorCases {
+		if errs := validateIPVSSchedulerMethod(errorCase.mode, newPath.Child("ProxyMode")); len(errs) == 0 {
+			t.Errorf("expected failure for %s", errorCase.msg)
+		} else if !strings.Contains(errs[0].Error(), errorCase.msg) {
+			t.Errorf("unexpected error: %v, expected: %s", errs[0], errorCase.msg)
+		}
+	}
+}
