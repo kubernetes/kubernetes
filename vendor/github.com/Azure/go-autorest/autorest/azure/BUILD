@@ -6,6 +6,7 @@ go_library(
         "async.go",
         "azure.go",
         "environments.go",
+        "rp.go",
     ],
     visibility = ["//visibility:public"],
     deps = [
