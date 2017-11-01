@@ -45,6 +45,8 @@ from charms.kubernetes.common import get_version
 from charms.kubernetes.common import retry
 from charms.kubernetes.flagmanager import FlagManager
 
+from charms.layer import tls_client
+
 from charmhelpers.core import hookenv
 from charmhelpers.core import host
 from charmhelpers.core import unitdata
@@ -568,7 +570,7 @@ def kick_api_server(tls):
         # certificate changed, so restart the api server
         hookenv.log("Certificate information changed, restarting api server")
         set_state('kube-apiserver.do-restart')
-    remove_state('tls_client.server.certificate.written')
+    tls_client.reset_certificate_write_flag('server')
 
 
 @when('kubernetes-master.components.started')

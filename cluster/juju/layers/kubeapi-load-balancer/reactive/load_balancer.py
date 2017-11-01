@@ -27,6 +27,7 @@ from charmhelpers.contrib.charmsupport import nrpe
 from charms.reactive.helpers import data_changed
 
 from charms.layer import nginx
+from charms.layer import tls_client
 
 from subprocess import Popen
 from subprocess import PIPE
@@ -73,7 +74,7 @@ def kick_nginx(tls):
         # certificate changed, so sighup nginx
         hookenv.log("Certificate information changed, sending SIGHUP to nginx")
         host.service_restart('nginx')
-    remove_state('tls_client.server.certificate.written')
+    tls_client.reset_certificate_write_flag('server')
 
 
 @when('config.changed.port')
