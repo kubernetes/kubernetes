@@ -41,8 +41,6 @@ filegroup(
         "//vendor/github.com/aws/aws-sdk-go/service/elb:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/service/kms:all-srcs",
         "//vendor/github.com/aws/aws-sdk-go/service/sts:all-srcs",
-        "//vendor/github.com/aws/aws-sdk-go/vendor/github.com/go-ini/ini:all-srcs",
-        "//vendor/github.com/aws/aws-sdk-go/vendor/github.com/jmespath/go-jmespath:all-srcs",
         "//vendor/github.com/beorn7/perks/quantile:all-srcs",
         "//vendor/github.com/blang/semver:all-srcs",
         "//vendor/github.com/boltdb/bolt:all-srcs",
