@@ -39,6 +39,9 @@ const ServiceAnnotationLoadBalancerInternal = "service.beta.kubernetes.io/azure-
 // to specify what subnet it is exposed on
 const ServiceAnnotationLoadBalancerInternalSubnet = "service.beta.kubernetes.io/azure-load-balancer-internal-subnet"
 
+// ServiceAnnotationLoadBalancerResourceGroup is the annotation used to specify a resource group other than the default
+const ServiceAnnotationLoadBalancerResourceGroup = "service.beta.kubernetes.io/azure-load-balancer-resource-group"
+
 // GetLoadBalancer returns whether the specified load balancer exists, and
 // if so, what its status is.
 func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
@@ -67,11 +70,11 @@ func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (statu
 		}
 	} else {
 		// TODO: Consider also read address from lb's FrontendIPConfigurations
-		pipName, err := az.determinePublicIPName(clusterName, service)
+		rg, pipName, err := az.determinePublicIPName(clusterName, service)
 		if err != nil {
 			return nil, false, err
 		}
-		pip, existsPip, err := az.getPublicIPAddress(pipName)
+		pip, existsPip, err := az.getPublicIPAddress(rg, pipName)
 		if err != nil {
 			return nil, false, err
 		}
@@ -90,18 +93,25 @@ func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (statu
 	}, true, nil
 }
 
-func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) (string, error) {
+func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) (resourceGroup string, pipName string, err error) {
 	loadBalancerIP := service.Spec.LoadBalancerIP
 	if len(loadBalancerIP) == 0 {
-		return getPublicIPName(clusterName, service), nil
+		return az.ResourceGroup, getPublicIPName(clusterName, service), nil
+	}
+
+	resourceGroup = az.ResourceGroup
+	if service.Annotations != nil {
+		if annotationResourceGroup, found := service.Annotations[ServiceAnnotationLoadBalancerResourceGroup]; found {
+			resourceGroup = annotationResourceGroup
+		}
 	}
 
 	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("PublicIPAddressesClient.List(%v): start", az.ResourceGroup)
-	list, err := az.PublicIPAddressesClient.List(az.ResourceGroup)
-	glog.V(10).Infof("PublicIPAddressesClient.List(%v): end", az.ResourceGroup)
+	glog.V(10).Infof("PublicIPAddressesClient.List(%v): start", resourceGroup)
+	list, err := az.PublicIPAddressesClient.List(resourceGroup)
+	glog.V(10).Infof("PublicIPAddressesClient.List(%v): end", resourceGroup)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	if list.Value != nil {
@@ -109,13 +119,13 @@ func (az *Cloud) determinePublicIPName(clusterName string, service *v1.Service) 
 			ip := &(*list.Value)[ix]
 			if ip.PublicIPAddressPropertiesFormat.IPAddress != nil &&
 				*ip.PublicIPAddressPropertiesFormat.IPAddress == loadBalancerIP {
-				return *ip.Name, nil
+				return resourceGroup, *ip.Name, nil
 			}
 		}
 	}
 	// TODO: follow next link here? Will there really ever be that many public IPs?
 
-	return "", fmt.Errorf("user supplied IP Address %s was not found", loadBalancerIP)
+	return "", "", fmt.Errorf("user supplied IP Address %s was not found", loadBalancerIP)
 }
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
@@ -217,11 +227,11 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 
 		fipConfigurationProperties = &configProperties
 	} else {
-		pipName, err := az.determinePublicIPName(clusterName, service)
+		rg, pipName, err := az.determinePublicIPName(clusterName, service)
 		if err != nil {
 			return nil, err
 		}
-		pip, err := az.ensurePublicIPExists(serviceName, pipName)
+		pip, err := az.ensurePublicIPExists(serviceName, rg, pipName)
 		if err != nil {
 			return nil, err
 		}
@@ -455,8 +465,8 @@ func (az *Cloud) cleanupLoadBalancer(clusterName string, service *v1.Service, is
 	return nil
 }
 
-func (az *Cloud) ensurePublicIPExists(serviceName, pipName string) (*network.PublicIPAddress, error) {
-	pip, existsPip, err := az.getPublicIPAddress(pipName)
+func (az *Cloud) ensurePublicIPExists(serviceName, resourceGroup, pipName string) (*network.PublicIPAddress, error) {
+	pip, existsPip, err := az.getPublicIPAddress(resourceGroup, pipName)
 	if err != nil {
 		return nil, err
 	}
@@ -474,13 +484,13 @@ func (az *Cloud) ensurePublicIPExists(serviceName, pipName string) (*network.Pub
 	glog.V(3).Infof("ensure(%s): pip(%s) - creating", serviceName, *pip.Name)
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("PublicIPAddressesClient.CreateOrUpdate(%q): start", *pip.Name)
-	respChan, errChan := az.PublicIPAddressesClient.CreateOrUpdate(az.ResourceGroup, *pip.Name, pip, nil)
+	respChan, errChan := az.PublicIPAddressesClient.CreateOrUpdate(resourceGroup, *pip.Name, pip, nil)
 	resp := <-respChan
 	err = <-errChan
 	glog.V(10).Infof("PublicIPAddressesClient.CreateOrUpdate(%q): end", *pip.Name)
 	if az.CloudProviderBackoff && shouldRetryAPIRequest(resp.Response, err) {
 		glog.V(2).Infof("ensure(%s) backing off: pip(%s) - creating", serviceName, *pip.Name)
-		retryErr := az.CreateOrUpdatePIPWithRetry(pip)
+		retryErr := az.CreateOrUpdatePIPWithRetry(resourceGroup, pip)
 		if retryErr != nil {
 			glog.V(2).Infof("ensure(%s) abort backoff: pip(%s) - creating", serviceName, *pip.Name)
 			err = retryErr
@@ -492,7 +502,7 @@ func (az *Cloud) ensurePublicIPExists(serviceName, pipName string) (*network.Pub
 
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("PublicIPAddressesClient.Get(%q): start", *pip.Name)
-	pip, err = az.PublicIPAddressesClient.Get(az.ResourceGroup, *pip.Name, "")
+	pip, err = az.PublicIPAddressesClient.Get(resourceGroup, *pip.Name, "")
 	glog.V(10).Infof("PublicIPAddressesClient.Get(%q): end", *pip.Name)
 	if err != nil {
 		return nil, err
