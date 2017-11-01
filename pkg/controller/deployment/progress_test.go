@@ -280,6 +280,14 @@ func TestSyncRolloutStatus(t *testing.T) {
 			conditionReason: util.NewRSAvailableReason,
 		},
 		{
+			name:            "DeploymentComplete: defend against NPE when newRS=nil",
+			d:               currentDeployment(&pds, 0, 3, 3, 3, []extensions.DeploymentCondition{replicaSetUpdated}),
+			allRSs:          []*extensions.ReplicaSet{newRSWithAvailable("foo", 0, 0, 0)},
+			conditionType:   extensions.DeploymentProgressing,
+			conditionStatus: v1.ConditionTrue,
+			conditionReason: util.NewRSAvailableReason,
+		},
+		{
 			name:            "DeploymentTimedOut: update status if rollout exceeds Progress Deadline",
 			d:               currentDeployment(&pds, 3, 2, 2, 2, []extensions.DeploymentCondition{replicaSetUpdated}),
 			allRSs:          []*extensions.ReplicaSet{},
@@ -301,12 +309,12 @@ func TestSyncRolloutStatus(t *testing.T) {
 		},
 	}
 
-	fake := fake.Clientset{}
-	dc := &DeploymentController{
-		client: &fake,
-	}
-
 	for _, test := range tests {
+		fake := fake.Clientset{}
+		dc := &DeploymentController{
+			client: &fake,
+		}
+
 		if test.newRS != nil {
 			test.allRSs = append(test.allRSs, test.newRS)
 		}
