@@ -17,12 +17,14 @@ limitations under the License.
 package proxy
 
 import (
+	"strings"
 	"testing"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -108,8 +110,9 @@ func TestCompileManifests(t *testing.T) {
 	}{
 		{
 			manifest: KubeProxyConfigMap,
-			data: struct{ MasterEndpoint string }{
+			data: struct{ MasterEndpoint, BindAddress string }{
 				MasterEndpoint: "foo",
+				BindAddress:    "0.0.0.0",
 			},
 			expected: true,
 		},
@@ -131,10 +134,97 @@ func TestCompileManifests(t *testing.T) {
 		_, actual := kubeadmutil.ParseTemplate(rt.manifest, rt.data)
 		if (actual == nil) != rt.expected {
 			t.Errorf(
-				"failed CompileManifests:\n\texpected: %t\n\t  actual: %t",
+				"failed to compile %s manifest:\n\texpected: %t\n\t  actual: %t",
+				rt.manifest,
 				rt.expected,
 				(actual == nil),
 			)
+		}
+	}
+}
+
+func TestEnsureProxyAddon(t *testing.T) {
+	type SimulatedError int
+	const (
+		NoError SimulatedError = iota
+		ServiceAccountError
+		InvalidMasterEndpoint
+		InvalidBindAddress
+	)
+
+	var testCases = []struct {
+		name         string
+		simError     SimulatedError
+		expErrString string
+	}{
+		{
+			name:         "Successful proxy addon",
+			simError:     NoError,
+			expErrString: "",
+		}, {
+			name:         "Simulated service account error",
+			simError:     ServiceAccountError,
+			expErrString: "error when creating kube-proxy service account",
+		}, {
+			name:         "Invalid MasterEndpoint",
+			simError:     InvalidMasterEndpoint,
+			expErrString: "error parsing address",
+		}, {
+			name:         "Invalid bind address",
+			simError:     InvalidBindAddress,
+			expErrString: "not a valid IP",
+		},
+	}
+
+	for _, tc := range testCases {
+
+		// Create a fake client and set up default test configuration
+		client := clientsetfake.NewSimpleClientset()
+		masterConfig := kubeadmapi.MasterConfiguration{
+			API: kubeadmapi.API{
+				AdvertiseAddress: "1.2.3.4",
+				BindPort:         1234,
+			},
+			KubeProxy: kubeadmapi.KubeProxy{
+				BindAddress: "0.0.0.0",
+			},
+			Networking: kubeadmapi.Networking{
+				PodSubnet: "5.6.7.8/24",
+			},
+			ImageRepository:          "someRepo",
+			KubernetesVersion:        "1.2.3",
+			UnifiedControlPlaneImage: "someImage",
+		}
+
+		// Simulate an error if neccessary
+		switch tc.simError {
+		case ServiceAccountError:
+			client.PrependReactor("create", "serviceaccounts", func(action core.Action) (bool, runtime.Object, error) {
+				return true, nil, apierrors.NewUnauthorized("")
+			})
+		case InvalidMasterEndpoint:
+			masterConfig.API.AdvertiseAddress = "1.2.3"
+		case InvalidBindAddress:
+			masterConfig.KubeProxy.BindAddress = "5.6.7"
+		}
+
+		err := EnsureProxyAddon(&masterConfig, client)
+
+		// Compare actual to expected errors
+		actErr := "No error"
+		if err != nil {
+			actErr = err.Error()
+		}
+		expErr := "No error"
+		if tc.expErrString != "" {
+			expErr = tc.expErrString
+		}
+		if !strings.Contains(actErr, expErr) {
+			t.Errorf(
+				"%s test failed, expected: %s, got: %s",
+				tc.name,
+				expErr,
+				actErr)
 		}
 	}
 }

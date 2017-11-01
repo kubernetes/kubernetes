@@ -28,6 +28,7 @@ type MasterConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
 	API                API        `json:"api"`
+	KubeProxy          KubeProxy  `json:"kubeProxy"`
 	Etcd               Etcd       `json:"etcd"`
 	Networking         Networking `json:"networking"`
 	KubernetesVersion  string     `json:"kubernetesVersion"`
@@ -62,6 +63,13 @@ type API struct {
 	AdvertiseAddress string `json:"advertiseAddress"`
 	// BindPort sets the secure port for the API Server to bind to
 	BindPort int32 `json:"bindPort"`
+}
+
+// kube-proxy configuration
+type KubeProxy struct {
+	// BindAddress sets the address for the proxy server to serve on
+	// (default 0.0.0.0)
+	BindAddress string `json:"bindAddress"`
 }
 
 // TokenDiscovery contains elements needed for token discovery

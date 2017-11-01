@@ -156,6 +156,10 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 		"Specify range of IP addresses for the pod network; if set, the control plane will automatically allocate CIDRs for every node.",
 	)
 	flagSet.StringVar(
+		&cfg.KubeProxy.BindAddress, "kube-proxy-bind-address", cfg.KubeProxy.BindAddress,
+		"The address the proxy server will serve on. 0.0.0.0 (or ::0 for IPv6) means listen on all interfaces.",
+	)
+	flagSet.StringVar(
 		&cfg.Networking.DNSDomain, "service-dns-domain", cfg.Networking.DNSDomain,
 		`Use alternative domain for services, e.g. "myorg.internal".`,
 	)

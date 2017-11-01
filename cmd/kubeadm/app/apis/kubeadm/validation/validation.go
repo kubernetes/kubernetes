@@ -70,6 +70,7 @@ func ValidateMasterConfiguration(c *kubeadm.MasterConfiguration) field.ErrorList
 	allErrs = append(allErrs, ValidateToken(c.Token, field.NewPath("token"))...)
 	allErrs = append(allErrs, ValidateFeatureGates(c.FeatureGates, field.NewPath("feature-gates"))...)
 	allErrs = append(allErrs, ValidateAPIEndpoint(c, field.NewPath("api-endpoint"))...)
+	allErrs = append(allErrs, ValidateIPFromString(c.KubeProxy.BindAddress, field.NewPath("kube-proxy-bind-address"))...)
 	return allErrs
 }
 

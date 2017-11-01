@@ -44,6 +44,8 @@ const (
 	DefaultEtcdDataDir = "/var/lib/etcd"
 	// DefaultImageRepository defines default image registry
 	DefaultImageRepository = "gcr.io/google_containers"
+	// DefaultKubeProxyBindAddr defines default kube-proxy bind address
+	DefaultKubeProxyBindAddr = "0.0.0.0"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -58,6 +60,10 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 
 	if obj.API.BindPort == 0 {
 		obj.API.BindPort = DefaultAPIBindPort
+	}
+
+	if obj.KubeProxy.BindAddress == "" {
+		obj.KubeProxy.BindAddress = DefaultKubeProxyBindAddr
 	}
 
 	if obj.Networking.ServiceSubnet == "" {
