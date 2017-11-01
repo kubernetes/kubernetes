@@ -31,20 +31,22 @@ type Interface interface {
 }
 
 type version struct {
-	internalinterfaces.SharedInformerFactory
+	factory          internalinterfaces.SharedInformerFactory
+	namespace        string
+	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
 // New returns a new Interface.
-func New(f internalinterfaces.SharedInformerFactory) Interface {
-	return &version{f}
+func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
+	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
 // ExternalAdmissionHookConfigurations returns a ExternalAdmissionHookConfigurationInformer.
 func (v *version) ExternalAdmissionHookConfigurations() ExternalAdmissionHookConfigurationInformer {
-	return &externalAdmissionHookConfigurationInformer{factory: v.SharedInformerFactory}
+	return &externalAdmissionHookConfigurationInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // InitializerConfigurations returns a InitializerConfigurationInformer.
 func (v *version) InitializerConfigurations() InitializerConfigurationInformer {
-	return &initializerConfigurationInformer{factory: v.SharedInformerFactory}
+	return &initializerConfigurationInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

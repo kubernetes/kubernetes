@@ -38,19 +38,33 @@ type ThirdPartyResourceInformer interface {
 }
 
 type thirdPartyResourceInformer struct {
-	factory internalinterfaces.SharedInformerFactory
+	factory          internalinterfaces.SharedInformerFactory
+	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
 // NewThirdPartyResourceInformer constructs a new informer for ThirdPartyResource type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewThirdPartyResourceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredThirdPartyResourceInformer(client, resyncPeriod, indexers, nil)
+}
+
+// NewFilteredThirdPartyResourceInformer constructs a new informer for ThirdPartyResource type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewFilteredThirdPartyResourceInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
 				return client.ExtensionsV1beta1().ThirdPartyResources().List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
 				return client.ExtensionsV1beta1().ThirdPartyResources().Watch(options)
 			},
 		},
@@ -60,12 +74,12 @@ func NewThirdPartyResourceInformer(client kubernetes.Interface, resyncPeriod tim
 	)
 }
 
-func defaultThirdPartyResourceInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewThirdPartyResourceInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+func (f *thirdPartyResourceInformer) defaultInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredThirdPartyResourceInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *thirdPartyResourceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&extensions_v1beta1.ThirdPartyResource{}, defaultThirdPartyResourceInformer)
+	return f.factory.InformerFor(&extensions_v1beta1.ThirdPartyResource{}, f.defaultInformer)
 }
 
 func (f *thirdPartyResourceInformer) Lister() v1beta1.ThirdPartyResourceLister {
