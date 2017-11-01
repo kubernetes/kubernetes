@@ -854,7 +854,7 @@ def fix_iptables_for_docker_1_13():
     https://github.com/kubernetes/kubernetes/issues/40182
     https://github.com/kubernetes/kubernetes/issues/39823
     """
-    cmd = ['iptables', '-P', 'FORWARD', 'ACCEPT']
+    cmd = ['iptables', '-w', '300', '-P', 'FORWARD', 'ACCEPT']
     check_call(cmd)
 
 
