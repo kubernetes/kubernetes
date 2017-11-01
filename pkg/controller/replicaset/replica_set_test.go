@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1370,6 +1371,257 @@ func TestRemoveCondition(t *testing.T) {
 		RemoveCondition(test.status, test.condType)
 		if !reflect.DeepEqual(test.status, test.expectedStatus) {
 			t.Errorf("%s: expected status: %v, got: %v", test.name, test.expectedStatus, test.status)
+		}
+	}
+}
+
+func TestSlowStartBatch(t *testing.T) {
+	fakeErr := fmt.Errorf("fake error")
+	callCnt := 0
+	callLimit := 0
+	var lock sync.Mutex
+	fn := func() error {
+		lock.Lock()
+		defer lock.Unlock()
+		callCnt++
+		if callCnt > callLimit {
+			return fakeErr
+		}
+		return nil
+	}
+
+	tests := []struct {
+		name              string
+		count             int
+		callLimit         int
+		fn                func() error
+		expectedSuccesses int
+		expectedErr       error
+		expectedCallCnt   int
+	}{
+		{
+			name:              "callLimit = 0 (all fail)",
+			count:             10,
+			callLimit:         0,
+			fn:                fn,
+			expectedSuccesses: 0,
+			expectedErr:       fakeErr,
+			expectedCallCnt:   1, // 1(first batch): function will be called at least once
+		},
+		{
+			name:              "callLimit = count (all succeed)",
+			count:             10,
+			callLimit:         10,
+			fn:                fn,
+			expectedSuccesses: 10,
+			expectedErr:       nil,
+			expectedCallCnt:   10, // 1(first batch) + 2(2nd batch) + 4(3rd batch) + 3(4th batch) = 10
+		},
+		{
+			name:              "callLimit < count (some succeed)",
+			count:             10,
+			callLimit:         5,
+			fn:                fn,
+			expectedSuccesses: 5,
+			expectedErr:       fakeErr,
+			expectedCallCnt:   7, // 1(first batch) + 2(2nd batch) + 4(3rd batch) = 7
+		},
+	}
+
+	for _, test := range tests {
+		callCnt = 0
+		callLimit = test.callLimit
+		successes, err := slowStartBatch(test.count, 1, test.fn)
+		if successes != test.expectedSuccesses {
+			t.Errorf("%s: unexpected processed batch size, expected %d, got %d", test.name, test.expectedSuccesses, successes)
+		}
+		if err != test.expectedErr {
+			t.Errorf("%s: unexpected processed batch size, expected %v, got %v", test.name, test.expectedErr, err)
+		}
+		// verify that slowStartBatch stops trying more calls after a batch fails
+		if callCnt != test.expectedCallCnt {
+			t.Errorf("%s: slowStartBatch() still tries calls after a batch fails, expected %d calls, got %d", test.name, test.expectedCallCnt, callCnt)
+		}
+	}
+}
+
+func TestGetPodsToDelete(t *testing.T) {
+	labelMap := map[string]string{"name": "foo"}
+	rs := newReplicaSet(1, labelMap)
+	// an unscheduled, pending pod
+	unscheduledPendingPod := newPod("unscheduled-pending-pod", rs, v1.PodPending, nil, true)
+	// a scheduled, pending pod
+	scheduledPendingPod := newPod("scheduled-pending-pod", rs, v1.PodPending, nil, true)
+	scheduledPendingPod.Spec.NodeName = "fake-node"
+	// a scheduled, running, not-ready pod
+	scheduledRunningNotReadyPod := newPod("scheduled-running-not-ready-pod", rs, v1.PodRunning, nil, true)
+	scheduledRunningNotReadyPod.Spec.NodeName = "fake-node"
+	scheduledRunningNotReadyPod.Status.Conditions = []v1.PodCondition{
+		{
+			Type:   v1.PodReady,
+			Status: v1.ConditionFalse,
+		},
+	}
+	// a scheduled, running, ready pod
+	scheduledRunningReadyPod := newPod("scheduled-running-ready-pod", rs, v1.PodRunning, nil, true)
+	scheduledRunningReadyPod.Spec.NodeName = "fake-node"
+	scheduledRunningReadyPod.Status.Conditions = []v1.PodCondition{
+		{
+			Type:   v1.PodReady,
+			Status: v1.ConditionTrue,
+		},
+	}
+
+	tests := []struct {
+		name                 string
+		pods                 []*v1.Pod
+		diff                 int
+		expectedPodsToDelete []*v1.Pod
+	}{
+		// Order used when selecting pods for deletion:
+		// an unscheduled, pending pod
+		// a scheduled, pending pod
+		// a scheduled, running, not-ready pod
+		// a scheduled, running, ready pod
+		// Note that a pending pod cannot be ready
+		{
+			"len(pods) = 0 (i.e., diff = 0 too)",
+			[]*v1.Pod{},
+			0,
+			[]*v1.Pod{},
+		},
+		{
+			"diff = len(pods)",
+			[]*v1.Pod{
+				scheduledRunningNotReadyPod,
+				scheduledRunningReadyPod,
+			},
+			2,
+			[]*v1.Pod{scheduledRunningNotReadyPod, scheduledRunningReadyPod},
+		},
+		{
+			"diff < len(pods)",
+			[]*v1.Pod{
+				scheduledRunningReadyPod,
+				scheduledRunningNotReadyPod,
+			},
+			1,
+			[]*v1.Pod{scheduledRunningNotReadyPod},
+		},
+		{
+			"various pod phases and conditions, diff = len(pods)",
+			[]*v1.Pod{
+				scheduledRunningReadyPod,
+				scheduledRunningNotReadyPod,
+				scheduledPendingPod,
+				unscheduledPendingPod,
+			},
+			4,
+			[]*v1.Pod{
+				scheduledRunningReadyPod,
+				scheduledRunningNotReadyPod,
+				scheduledPendingPod,
+				unscheduledPendingPod,
+			},
+		},
+		{
+			"scheduled vs unscheduled, diff < len(pods)",
+			[]*v1.Pod{
+				scheduledPendingPod,
+				unscheduledPendingPod,
+			},
+			1,
+			[]*v1.Pod{
+				unscheduledPendingPod,
+			},
+		},
+		{
+			"ready vs not-ready, diff < len(pods)",
+			[]*v1.Pod{
+				scheduledRunningReadyPod,
+				scheduledRunningNotReadyPod,
+				scheduledRunningNotReadyPod,
+			},
+			2,
+			[]*v1.Pod{
+				scheduledRunningNotReadyPod,
+				scheduledRunningNotReadyPod,
+			},
+		},
+		{
+			"pending vs running, diff < len(pods)",
+			[]*v1.Pod{
+				scheduledPendingPod,
+				scheduledRunningNotReadyPod,
+			},
+			1,
+			[]*v1.Pod{
+				scheduledPendingPod,
+			},
+		},
+		{
+			"various pod phases and conditions, diff < len(pods)",
+			[]*v1.Pod{
+				scheduledRunningReadyPod,
+				scheduledRunningNotReadyPod,
+				scheduledPendingPod,
+				unscheduledPendingPod,
+			},
+			3,
+			[]*v1.Pod{
+				unscheduledPendingPod,
+				scheduledPendingPod,
+				scheduledRunningNotReadyPod,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		podsToDelete := getPodsToDelete(test.pods, test.diff)
+		if len(podsToDelete) != len(test.expectedPodsToDelete) {
+			t.Errorf("%s: unexpected pods to delete, expected %v, got %v", test.name, test.expectedPodsToDelete, podsToDelete)
+		}
+		if !reflect.DeepEqual(podsToDelete, test.expectedPodsToDelete) {
+			t.Errorf("%s: unexpected pods to delete, expected %v, got %v", test.name, test.expectedPodsToDelete, podsToDelete)
+		}
+	}
+}
+
+func TestGetPodKeys(t *testing.T) {
+	labelMap := map[string]string{"name": "foo"}
+	rs := newReplicaSet(1, labelMap)
+	pod1 := newPod("pod1", rs, v1.PodRunning, nil, true)
+	pod2 := newPod("pod2", rs, v1.PodRunning, nil, true)
+
+	tests := []struct {
+		name            string
+		pods            []*v1.Pod
+		expectedPodKeys []string
+	}{
+		{
+			"len(pods) = 0 (i.e., pods = nil)",
+			[]*v1.Pod{},
+			[]string{},
+		},
+		{
+			"len(pods) > 0",
+			[]*v1.Pod{
+				pod1,
+				pod2,
+			},
+			[]string{"default/pod1", "default/pod2"},
+		},
+	}
+
+	for _, test := range tests {
+		podKeys := getPodKeys(test.pods)
+		if len(podKeys) != len(test.expectedPodKeys) {
+			t.Errorf("%s: unexpected keys for pods to delete, expected %v, got %v", test.name, test.expectedPodKeys, podKeys)
+		}
+		for i := 0; i < len(podKeys); i++ {
+			if podKeys[i] != test.expectedPodKeys[i] {
+				t.Errorf("%s: unexpected keys for pods to delete, expected %v, got %v", test.name, test.expectedPodKeys, podKeys)
+			}
 		}
 	}
 }
