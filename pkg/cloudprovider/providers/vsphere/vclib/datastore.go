@@ -24,12 +24,23 @@ import (
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 	"golang.org/x/net/context"
+	"fmt"
 )
 
 // Datastore extends the govmomi Datastore object
 type Datastore struct {
 	*object.Datastore
 	Datacenter *Datacenter
+}
+
+// Structure to store the Datastore and it's Info.
+type DatastoreInfo struct {
+	*Datastore
+	Info *types.DatastoreInfo
+}
+
+func (di DatastoreInfo) String() string {
+	return fmt.Sprintf("Datastore: %+v, datastore URL: %s", di.Datastore, di.Info.Url)
 }
 
 // CreateDirectory creates the directory at location specified by directoryPath.

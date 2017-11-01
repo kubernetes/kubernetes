@@ -116,6 +116,7 @@ type VSphereConfig struct {
 		// Datacenter in which VMs are located.
 		Datacenters string `gcfg:"datacenters"`
 		// Datastore in which vmdks are stored.
+		// Deprecated. See Workspace.DefaultDatastore
 		DefaultDatastore string `gcfg:"datastore"`
 		// WorkingDir is path where VMs can be found. Also used to create dummy VMs.
 		// Deprecated.
@@ -148,9 +149,11 @@ type VSphereConfig struct {
 
 	// Endpoint used to create volumes
 	Workspace struct {
-		VCenterIP  string `gcfg:"server"`
-		Datacenter string `gcfg:"datacenter"`
-		Folder     string `gcfg:"folder"`
+		VCenterIP        string `gcfg:"server"`
+		Datacenter       string `gcfg:"datacenter"`
+		Folder           string `gcfg:"folder"`
+		DefaultDatastore string `gcfg:"default-datastore"`
+		ResourcePoolPath string `gcfg:"resourcepool-path"`
 	}
 }
 
@@ -268,6 +271,7 @@ func populateVsphereInstanceMap(cfg *VSphereConfig) (map[string]*VSphereInstance
 		cfg.Workspace.VCenterIP = cfg.Global.VCenterIP
 		cfg.Workspace.Datacenter = cfg.Global.Datacenter
 		cfg.Workspace.Folder = cfg.Global.WorkingDir
+		cfg.Workspace.DefaultDatastore = cfg.Global.DefaultDatastore
 
 		vcConfig := VirtualCenterConfig{
 			User:              cfg.Global.User,
@@ -985,9 +989,9 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 	glog.V(1).Infof("Starting to create a vSphere volume with volumeOptions: %+v", volumeOptions)
 	createVolumeInternal := func(volumeOptions *vclib.VolumeOptions) (canonicalVolumePath string, err error) {
 		var datastore string
-		// Default datastore is the datastore in the vSphere config file that is used to initialize vSphere cloud provider.
+		// If datastore not specified, then use default datastore
 		if volumeOptions.Datastore == "" {
-			datastore = vs.cfg.Global.DefaultDatastore
+			datastore = vs.cfg.Workspace.DefaultDatastore
 		} else {
 			datastore = volumeOptions.Datastore
 		}
@@ -995,16 +999,11 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 		// Create context
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		vsi, err := vs.getVSphereInstance(convertToK8sType(vs.hostName))
+		vsi, err := vs.getVSphereInstanceForServer(vs.cfg.Workspace.VCenterIP, ctx)
 		if err != nil {
 			return "", err
 		}
-		// Ensure client is logged in and session is valid
-		err = vsi.conn.Connect(ctx)
-		if err != nil {
-			return "", err
-		}
-		dc, err := vclib.GetDatacenter(ctx, vsi.conn, vs.cfg.Global.Datacenter)
+		dc, err := vclib.GetDatacenter(ctx, vsi.conn, vs.cfg.Workspace.Datacenter)
 		if err != nil {
 			return "", err
 		}
@@ -1022,17 +1021,36 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 				cleanUpRoutineInitialized = true
 			}
 			cleanUpRoutineInitLock.Unlock()
-			vmOptions, err = vs.setVMOptions(ctx, dc)
+			vmOptions, err = vs.setVMOptions(ctx, dc, vs.cfg.Workspace.ResourcePoolPath)
 			if err != nil {
 				glog.Errorf("Failed to set VM options requires to create a vsphere volume. err: %+v", err)
 				return "", err
 			}
 		}
 		if volumeOptions.StoragePolicyName != "" && volumeOptions.Datastore == "" {
-			datastore, err = getPbmCompatibleDatastore(ctx, dc.Client(), volumeOptions.StoragePolicyName, vmOptions.VMFolder)
+			datastore, err = getPbmCompatibleDatastore(ctx, dc, volumeOptions.StoragePolicyName, vs.nodeManager)
 			if err != nil {
 				glog.Errorf("Failed to get pbm compatible datastore with storagePolicy: %s. err: %+v", volumeOptions.StoragePolicyName, err)
 				return "", err
+			}
+		} else {
+			// Since no storage policy is specified but datastore is specified, check
+			// if the given datastore is a shared datastore across all node VMs.
+			sharedDsList, err := getSharedDatastoresInK8SCluster(ctx, dc, vs.nodeManager)
+			if err != nil {
+				glog.Errorf("Failed to get shared datastore: %+v", err)
+				return "", err
+			}
+			found := false
+			for _, sharedDs := range sharedDsList {
+				if datastore == sharedDs.Info.Name {
+					found = true
+					break
+				}
+			}
+			if !found {
+				msg := fmt.Sprintf("The specified datastore %s is not a shared datastore across node VMs", datastore)
+				return "", errors.New(msg)
 			}
 		}
 		ds, err := dc.GetDatastoreByName(ctx, datastore)
