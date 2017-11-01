@@ -40,8 +40,8 @@ var (
 	SyncProxyRulesCount = prometheus.NewCounter(
 		prometheus.CounterOpts{
 			Subsystem: kubeProxySubsystem,
-			Name:      "sync_proxy_rules_count"
-			Help:      "SyncProxyRules count"
+			Name:      "sync_proxy_rules_count",
+			Help:      "SyncProxyRules count",
 	        },
 	)
 )
