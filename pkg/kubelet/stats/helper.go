@@ -86,29 +86,12 @@ func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo
 
 	if rootFs != nil {
 		// The container logs live on the node rootfs device
-		result.Logs = &statsapi.FsStats{
-			Time:           metav1.NewTime(cstat.Timestamp),
-			AvailableBytes: &rootFs.Available,
-			CapacityBytes:  &rootFs.Capacity,
-			InodesFree:     rootFs.InodesFree,
-			Inodes:         rootFs.Inodes,
-		}
-
-		if rootFs.Inodes != nil && rootFs.InodesFree != nil {
-			logsInodesUsed := *rootFs.Inodes - *rootFs.InodesFree
-			result.Logs.InodesUsed = &logsInodesUsed
-		}
+		result.Logs = buildLogsStats(cstat, rootFs)
 	}
 
 	if imageFs != nil {
 		// The container rootFs lives on the imageFs devices (which may not be the node root fs)
-		result.Rootfs = &statsapi.FsStats{
-			Time:           metav1.NewTime(cstat.Timestamp),
-			AvailableBytes: &imageFs.Available,
-			CapacityBytes:  &imageFs.Capacity,
-			InodesFree:     imageFs.InodesFree,
-			Inodes:         imageFs.Inodes,
-		}
+		result.Rootfs = buildRootfsStats(cstat, imageFs)
 	}
 
 	cfs := cstat.Filesystem
@@ -273,4 +256,30 @@ func getCgroupStats(cadvisor cadvisor.Interface, containerName string) (*cadviso
 		return nil, fmt.Errorf("failed to get latest stats from container info for %q", containerName)
 	}
 	return stats, nil
+}
+
+func buildLogsStats(cstat *cadvisorapiv2.ContainerStats, rootFs *cadvisorapiv2.FsInfo) *statsapi.FsStats {
+	fsStats := &statsapi.FsStats{
+		Time:           metav1.NewTime(cstat.Timestamp),
+		AvailableBytes: &rootFs.Available,
+		CapacityBytes:  &rootFs.Capacity,
+		InodesFree:     rootFs.InodesFree,
+		Inodes:         rootFs.Inodes,
+	}
+
+	if rootFs.Inodes != nil && rootFs.InodesFree != nil {
+		logsInodesUsed := *rootFs.Inodes - *rootFs.InodesFree
+		fsStats.InodesUsed = &logsInodesUsed
+	}
+	return fsStats
+}
+
+func buildRootfsStats(cstat *cadvisorapiv2.ContainerStats, imageFs *cadvisorapiv2.FsInfo) *statsapi.FsStats {
+	return &statsapi.FsStats{
+		Time:           metav1.NewTime(cstat.Timestamp),
+		AvailableBytes: &imageFs.Available,
+		CapacityBytes:  &imageFs.Capacity,
+		InodesFree:     imageFs.InodesFree,
+		Inodes:         imageFs.Inodes,
+	}
 }

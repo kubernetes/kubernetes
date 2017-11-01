@@ -22,9 +22,8 @@ import (
 	"time"
 
 	cadvisorfs "github.com/google/cadvisor/fs"
-	"github.com/stretchr/testify/assert"
-
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	critest "k8s.io/kubernetes/pkg/kubelet/apis/cri/testing"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
