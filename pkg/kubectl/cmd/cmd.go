@@ -37,22 +37,22 @@ import (
 
 const (
 	bashCompletionFunc = `# call kubectl get $1,
-__kubectl_override_flag_list=(kubeconfig cluster user context namespace server)
+__kubectl_override_flag_list=(--kubeconfig --cluster --user --context --namespace --server -n -s)
 __kubectl_override_flags()
 {
-    local ${__kubectl_override_flag_list[*]} two_word_of of
+    local ${__kubectl_override_flag_list[*]##*-} two_word_of of var
     for w in "${words[@]}"; do
         if [ -n "${two_word_of}" ]; then
-            eval "${two_word_of}=\"--${two_word_of}=\${w}\""
+            eval "${two_word_of##*-}=\"${two_word_of}=\${w}\""
             two_word_of=
             continue
         fi
         for of in "${__kubectl_override_flag_list[@]}"; do
             case "${w}" in
-                --${of}=*)
-                    eval "${of}=\"${w}\""
+                ${of}=*)
+                    eval "${of##*-}=\"${w}\""
                     ;;
-                --${of})
+                ${of})
                     two_word_of="${of}"
                     ;;
             esac
@@ -61,9 +61,9 @@ __kubectl_override_flags()
             namespace="--all-namespaces"
         fi
     done
-    for of in "${__kubectl_override_flag_list[@]}"; do
-        if eval "test -n \"\$${of}\""; then
-            eval "echo \${${of}}"
+    for var in "${__kubectl_override_flag_list[@]##*-}"; do
+        if eval "test -n \"\$${var}\""; then
+            eval "echo \${${var}}"
         fi
     done
 }
