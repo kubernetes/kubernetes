@@ -18,6 +18,11 @@ package unstructured
 
 import (
 	"testing"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnstructuredList(t *testing.T) {
@@ -29,12 +34,10 @@ func TestUnstructuredList(t *testing.T) {
 	}
 	content := list.UnstructuredContent()
 	items := content["items"].([]interface{})
-	if len(items) != 1 {
-		t.Fatalf("unexpected items: %#v", items)
-	}
-	if getNestedField(items[0].(map[string]interface{}), "metadata", "name") != "test" {
-		t.Fatalf("unexpected fields: %#v", items[0])
-	}
+	require.Len(t, items, 1)
+	val, ok := NestedFieldCopy(items[0].(map[string]interface{}), "metadata", "name")
+	require.True(t, ok)
+	assert.Equal(t, "test", val)
 }
 
 func TestNilDeletionTimestamp(t *testing.T) {
@@ -48,9 +51,14 @@ func TestNilDeletionTimestamp(t *testing.T) {
 	if del != nil {
 		t.Errorf("unexpected non-nil deletion timestamp: %v", del)
 	}
+	_, ok := u.Object["metadata"]
+	assert.False(t, ok)
+
+	now := metav1.Now()
+	u.SetDeletionTimestamp(&now)
+	assert.Equal(t, now.Unix(), u.GetDeletionTimestamp().Unix())
+	u.SetDeletionTimestamp(nil)
 	metadata := u.Object["metadata"].(map[string]interface{})
-	deletionTimestamp := metadata["deletionTimestamp"]
-	if deletionTimestamp != nil {
-		t.Errorf("unexpected deletion timestamp field: %q", deletionTimestamp)
-	}
+	_, ok = metadata["deletionTimestamp"]
+	assert.False(t, ok)
 }

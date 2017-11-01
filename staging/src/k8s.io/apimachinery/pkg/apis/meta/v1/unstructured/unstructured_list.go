@@ -161,5 +161,5 @@ func (u *UnstructuredList) setNestedField(value interface{}, fields ...string) {
 	if u.Object == nil {
 		u.Object = make(map[string]interface{})
 	}
-	setNestedField(u.Object, value, fields...)
+	SetNestedField(u.Object, value, fields...)
 }

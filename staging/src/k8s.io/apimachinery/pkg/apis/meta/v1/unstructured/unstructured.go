@@ -20,8 +20,6 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/golang/glog"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -122,40 +120,48 @@ func (u *Unstructured) setNestedField(value interface{}, fields ...string) {
 	if u.Object == nil {
 		u.Object = make(map[string]interface{})
 	}
-	setNestedField(u.Object, value, fields...)
+	SetNestedField(u.Object, value, fields...)
 }
 
 func (u *Unstructured) setNestedSlice(value []string, fields ...string) {
 	if u.Object == nil {
 		u.Object = make(map[string]interface{})
 	}
-	setNestedSlice(u.Object, value, fields...)
+	SetNestedStringSlice(u.Object, value, fields...)
 }
 
 func (u *Unstructured) setNestedMap(value map[string]string, fields ...string) {
 	if u.Object == nil {
 		u.Object = make(map[string]interface{})
 	}
-	setNestedMap(u.Object, value, fields...)
+	SetNestedStringMap(u.Object, value, fields...)
 }
 
 func (u *Unstructured) GetOwnerReferences() []metav1.OwnerReference {
-	original, err := getOwnerReferences(u.Object)
-	if err != nil {
-		glog.V(6).Info(err)
+	field, ok := nestedFieldNoCopy(u.Object, "metadata", "ownerReferences")
+	if !ok {
+		return nil
+	}
+	original, ok := field.([]interface{})
+	if !ok {
 		return nil
 	}
 	ret := make([]metav1.OwnerReference, 0, len(original))
-	for i := 0; i < len(original); i++ {
-		ret = append(ret, extractOwnerReference(original[i]))
+	for _, obj := range original {
+		o, ok := obj.(map[string]interface{})
+		if !ok {
+			// expected map[string]interface{}, got something else
+			return nil
+		}
+		ret = append(ret, extractOwnerReference(o))
 	}
 	return ret
 }
 
 func (u *Unstructured) SetOwnerReferences(references []metav1.OwnerReference) {
-	var newReferences = make([]map[string]interface{}, 0, len(references))
-	for i := 0; i < len(references); i++ {
-		newReferences = append(newReferences, setOwnerReference(references[i]))
+	newReferences := make([]interface{}, 0, len(references))
+	for _, reference := range references {
+		newReferences = append(newReferences, setOwnerReference(reference))
 	}
 	u.setNestedField(newReferences, "metadata", "ownerReferences")
 }
@@ -217,7 +223,11 @@ func (u *Unstructured) SetResourceVersion(version string) {
 }
 
 func (u *Unstructured) GetGeneration() int64 {
-	return getNestedInt64(u.Object, "metadata", "generation")
+	val, ok := NestedInt64(u.Object, "metadata", "generation")
+	if !ok {
+		return 0
+	}
+	return val
 }
 
 func (u *Unstructured) SetGeneration(generation int64) {
@@ -262,7 +272,7 @@ func (u *Unstructured) GetDeletionTimestamp() *metav1.Time {
 
 func (u *Unstructured) SetDeletionTimestamp(timestamp *metav1.Time) {
 	if timestamp == nil {
-		u.setNestedField(nil, "metadata", "deletionTimestamp")
+		RemoveNestedField(u.Object, "metadata", "deletionTimestamp")
 		return
 	}
 	ts, _ := timestamp.MarshalQueryParameter()
@@ -270,15 +280,27 @@ func (u *Unstructured) SetDeletionTimestamp(timestamp *metav1.Time) {
 }
 
 func (u *Unstructured) GetDeletionGracePeriodSeconds() *int64 {
-	return getNestedInt64Pointer(u.Object, "metadata", "deletionGracePeriodSeconds")
+	val, ok := NestedInt64(u.Object, "metadata", "deletionGracePeriodSeconds")
+	if !ok {
+		return nil
+	}
+	return &val
 }
 
 func (u *Unstructured) SetDeletionGracePeriodSeconds(deletionGracePeriodSeconds *int64) {
-	u.setNestedField(deletionGracePeriodSeconds, "metadata", "deletionGracePeriodSeconds")
+	if deletionGracePeriodSeconds == nil {
+		RemoveNestedField(u.Object, "metadata", "deletionGracePeriodSeconds")
+		return
+	}
+	u.setNestedField(*deletionGracePeriodSeconds, "metadata", "deletionGracePeriodSeconds")
 }
 
 func (u *Unstructured) GetLabels() map[string]string {
-	return getNestedMap(u.Object, "metadata", "labels")
+	m, ok := NestedStringMap(u.Object, "metadata", "labels")
+	if !ok {
+		return nil
+	}
+	return m
 }
 
 func (u *Unstructured) SetLabels(labels map[string]string) {
@@ -286,7 +308,11 @@ func (u *Unstructured) SetLabels(labels map[string]string) {
 }
 
 func (u *Unstructured) GetAnnotations() map[string]string {
-	return getNestedMap(u.Object, "metadata", "annotations")
+	m, ok := NestedStringMap(u.Object, "metadata", "annotations")
+	if !ok {
+		return nil
+	}
+	return m
 }
 
 func (u *Unstructured) SetAnnotations(annotations map[string]string) {
@@ -308,12 +334,13 @@ func (u *Unstructured) GroupVersionKind() schema.GroupVersionKind {
 }
 
 func (u *Unstructured) GetInitializers() *metav1.Initializers {
-	field := getNestedField(u.Object, "metadata", "initializers")
-	if field == nil {
+	field, ok := nestedFieldNoCopy(u.Object, "metadata", "initializers")
+	if !ok {
 		return nil
 	}
 	obj, ok := field.(map[string]interface{})
 	if !ok {
+		// expected map[string]interface{}, got something else
 		return nil
 	}
 	out := &metav1.Initializers{}
@@ -324,22 +351,23 @@ func (u *Unstructured) GetInitializers() *metav1.Initializers {
 }
 
 func (u *Unstructured) SetInitializers(initializers *metav1.Initializers) {
-	if u.Object == nil {
-		u.Object = make(map[string]interface{})
-	}
 	if initializers == nil {
-		setNestedField(u.Object, nil, "metadata", "initializers")
+		RemoveNestedField(u.Object, "metadata", "initializers")
 		return
 	}
 	out, err := converter.ToUnstructured(initializers)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to retrieve initializers for object: %v", err))
 	}
-	setNestedField(u.Object, out, "metadata", "initializers")
+	u.setNestedField(out, "metadata", "initializers")
 }
 
 func (u *Unstructured) GetFinalizers() []string {
-	return getNestedSlice(u.Object, "metadata", "finalizers")
+	val, ok := NestedStringSlice(u.Object, "metadata", "finalizers")
+	if !ok {
+		return nil
+	}
+	return val
 }
 
 func (u *Unstructured) SetFinalizers(finalizers []string) {
