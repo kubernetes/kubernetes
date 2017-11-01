@@ -374,6 +374,7 @@ func TestProcessEvent(t *testing.T) {
 			},
 			attemptToDelete:  workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 			absentOwnerCache: NewUIDCache(2),
+			restMapper:       legacyscheme.Registry.RESTMapper(),
 		}
 		for i := 0; i < len(scenario.events); i++ {
 			dependencyGraphBuilder.graphChanges.Add(&scenario.events[i])
