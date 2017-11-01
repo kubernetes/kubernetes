@@ -3116,6 +3116,7 @@ func describeNetworkPolicySpec(nps networking.NetworkPolicySpec, w PrefixWriter)
 	printNetworkPolicySpecIngressFrom(nps.Ingress, "    ", w)
 	w.Write(LEVEL_1, "Allowing egress traffic:\n")
 	printNetworkPolicySpecEgressTo(nps.Egress, "    ", w)
+	w.Write(LEVEL_1, "Policy Types: %v\n", nps.PolicyTypes)
 }
 
 func printNetworkPolicySpecIngressFrom(npirs []networking.NetworkPolicyIngressRule, initialIndent string, w PrefixWriter) {

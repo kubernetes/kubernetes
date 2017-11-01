@@ -1682,6 +1682,7 @@ Spec:
     ----------
     From Port: <any> (traffic allowed to all ports)
     To: <any> (traffic not restricted by source)
+  Policy Types: [Ingress Egress]
 `
 
 	port80 := intstr.FromInt(80)
@@ -1793,6 +1794,7 @@ Spec:
 				},
 				{},
 			},
+			PolicyTypes: []networking.PolicyType{networking.PolicyTypeIngress, networking.PolicyTypeEgress},
 		},
 	})
 	d := NetworkPolicyDescriber{versionedFake}
