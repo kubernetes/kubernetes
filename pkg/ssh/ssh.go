@@ -199,11 +199,22 @@ func (d *timeoutDialer) Dial(network, addr string, config *ssh.ClientConfig) (*s
 // host as specific user, along with any SSH-level error.
 // If user=="", it will default (like SSH) to os.Getenv("USER")
 func RunSSHCommand(cmd, user, host string, signer ssh.Signer) (string, string, int, error) {
-	return runSSHCommand(realTimeoutDialer, cmd, user, host, signer, true)
+	return runSSHCommand(realTimeoutDialer, cmd, user, host, nil, signer, true)
+}
+
+// RunSSHCommandWithStdin sends input as stdin and returns the stdout, stderr, and exit code from running cmd on
+// host as specific user, along with any SSH-level error.
+// If user=="", it will default (like SSH) to os.Getenv("USER")
+func RunSSHCommandWithStdin(input, cmd, user, host string, signer ssh.Signer) (string, string, int, error) {
+	var inputreader io.Reader
+	if input != "" {
+		inputreader = strings.NewReader(input)
+	}
+	return runSSHCommand(realTimeoutDialer, cmd, user, host, inputreader, signer, true)
 }
 
 // Internal implementation of runSSHCommand, for testing
-func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer, retry bool) (string, string, int, error) {
+func runSSHCommand(dialer sshDialer, cmd, user, host string, input io.Reader, signer ssh.Signer, retry bool) (string, string, int, error) {
 	if user == "" {
 		user = os.Getenv("USER")
 	}
@@ -236,6 +247,7 @@ func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer, 
 	code := 0
 	var bout, berr bytes.Buffer
 	session.Stdout, session.Stderr = &bout, &berr
+	session.Stdin = input
 	if err = session.Run(cmd); err != nil {
 		// Check whether the command failed to run or didn't complete.
 		if exiterr, ok := err.(*ssh.ExitError); ok {
