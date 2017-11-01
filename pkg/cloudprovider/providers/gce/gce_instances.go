@@ -449,18 +449,12 @@ func (gce *GCECloud) getInstancesByNames(names []string) ([]*gceInstance, error)
 					continue
 				}
 
-				nodeName, err := mapInstanceToNodeName(i)
-				if err != nil {
-					return nil, fmt.Errorf("couldn't get nodeName from Instance: %v", err)
-				}
-
 				instance := &gceInstance{
-					Zone:     zone,
-					Name:     name,
-					NodeName: nodeName,
-					ID:       i.Id,
-					Disks:    i.Disks,
-					Type:     lastComponent(i.MachineType),
+					Zone:  zone,
+					Name:  name,
+					ID:    i.Id,
+					Disks: i.Disks,
+					Type:  lastComponent(i.MachineType),
 				}
 				instances[name] = instance
 				remaining--
@@ -512,17 +506,12 @@ func (gce *GCECloud) getInstanceFromProjectInZoneByName(project, zone, name stri
 		return nil, err
 	}
 
-	nodeName, err := mapInstanceToNodeName(res)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get nodeName from Instance: %v", err)
-	}
 	return &gceInstance{
-		Zone:     lastComponent(res.Zone),
-		Name:     res.Name,
-		NodeName: nodeName,
-		ID:       res.Id,
-		Disks:    res.Disks,
-		Type:     lastComponent(res.MachineType),
+		Zone:  lastComponent(res.Zone),
+		Name:  res.Name,
+		ID:    res.Id,
+		Disks: res.Disks,
+		Type:  lastComponent(res.MachineType),
 	}, nil
 }
 

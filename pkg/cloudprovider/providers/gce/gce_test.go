@@ -688,37 +688,6 @@ func TestLastComponent(t *testing.T) {
 	}
 }
 
-func TestGetNodeName(t *testing.T) {
-	testCases := []struct {
-		intanceName       string
-		instanceHostname  string
-		instanceProjectId string
-		expected          types.NodeName
-	}{
-		{
-			"instance1",
-			"instance1.c.project1.internal",
-			"project1",
-			"instance1.c.project1.internal",
-		},
-		{
-			"instance1",
-			"instance1",
-			"project1",
-			"instance1",
-		},
-	}
-	for _, tc := range testCases {
-		nodeName, err := getNodeName(tc.intanceName, tc.instanceHostname, tc.instanceProjectId)
-		if err != nil {
-			t.Errorf("Failed to getNodeName %v", err)
-		}
-		if tc.expected != nodeName {
-			t.Errorf("Expected nodeName to be %v, but got %v", tc.expected, nodeName)
-		}
-	}
-}
-
 func TestMapNodeNameToInstanceName(t *testing.T) {
 	testCases := []struct {
 		nodeName types.NodeName
