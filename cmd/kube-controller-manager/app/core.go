@@ -76,20 +76,22 @@ func startServiceController(ctx ControllerContext) (bool, error) {
 }
 
 func startNodeController(ctx ControllerContext) (bool, error) {
-	var clusterCIDR *net.IPNet
-	var err error
-	if len(strings.TrimSpace(ctx.Options.ClusterCIDR)) != 0 {
-		_, clusterCIDR, err = net.ParseCIDR(ctx.Options.ClusterCIDR)
-		if err != nil {
-			glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.Options.ClusterCIDR, err)
+	var clusterCIDR *net.IPNet = nil
+	var serviceCIDR *net.IPNet = nil
+	if ctx.Options.AllocateNodeCIDRs {
+		var err error
+		if len(strings.TrimSpace(ctx.Options.ClusterCIDR)) != 0 {
+			_, clusterCIDR, err = net.ParseCIDR(ctx.Options.ClusterCIDR)
+			if err != nil {
+				glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.Options.ClusterCIDR, err)
+			}
 		}
-	}
 
-	var serviceCIDR *net.IPNet
-	if len(strings.TrimSpace(ctx.Options.ServiceCIDR)) != 0 {
-		_, serviceCIDR, err = net.ParseCIDR(ctx.Options.ServiceCIDR)
-		if err != nil {
-			glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.Options.ServiceCIDR, err)
+		if len(strings.TrimSpace(ctx.Options.ServiceCIDR)) != 0 {
+			_, serviceCIDR, err = net.ParseCIDR(ctx.Options.ServiceCIDR)
+			if err != nil {
+				glog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.Options.ServiceCIDR, err)
+			}
 		}
 	}
 
@@ -124,10 +126,6 @@ func startNodeController(ctx ControllerContext) (bool, error) {
 }
 
 func startRouteController(ctx ControllerContext) (bool, error) {
-	_, clusterCIDR, err := net.ParseCIDR(ctx.Options.ClusterCIDR)
-	if err != nil {
-		glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.Options.ClusterCIDR, err)
-	}
 	if !ctx.Options.AllocateNodeCIDRs || !ctx.Options.ConfigureCloudRoutes {
 		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", ctx.Options.AllocateNodeCIDRs, ctx.Options.ConfigureCloudRoutes)
 		return false, nil
@@ -140,6 +138,10 @@ func startRouteController(ctx ControllerContext) (bool, error) {
 	if !ok {
 		glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		return false, nil
+	}
+	_, clusterCIDR, err := net.ParseCIDR(ctx.Options.ClusterCIDR)
+	if err != nil {
+		glog.Warningf("Unsuccessful parsing of cluster CIDR %v: %v", ctx.Options.ClusterCIDR, err)
 	}
 	routeController := routecontroller.New(routes, ctx.ClientBuilder.ClientOrDie("route-controller"), ctx.InformerFactory.Core().V1().Nodes(), ctx.Options.ClusterName, clusterCIDR)
 	go routeController.Run(ctx.Stop, ctx.Options.RouteReconciliationPeriod.Duration)
