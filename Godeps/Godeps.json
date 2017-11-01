@@ -68,33 +68,33 @@
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest",
-			"Comment": "v9.0.0",
-			"Rev": "f6be1abbb5abd0517522f850dd785990d373da7e"
+			"Comment": "v9.1.0",
+			"Rev": "e14a70c556c8e0db173358d1a903dca345a8e75e"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/adal",
-			"Comment": "v9.0.0",
-			"Rev": "f6be1abbb5abd0517522f850dd785990d373da7e"
+			"Comment": "v9.1.0",
+			"Rev": "e14a70c556c8e0db173358d1a903dca345a8e75e"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/azure",
-			"Comment": "v9.0.0",
-			"Rev": "f6be1abbb5abd0517522f850dd785990d373da7e"
+			"Comment": "v9.1.0",
+			"Rev": "e14a70c556c8e0db173358d1a903dca345a8e75e"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/date",
-			"Comment": "v9.0.0",
-			"Rev": "f6be1abbb5abd0517522f850dd785990d373da7e"
+			"Comment": "v9.1.0",
+			"Rev": "e14a70c556c8e0db173358d1a903dca345a8e75e"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/to",
-			"Comment": "v9.0.0",
-			"Rev": "f6be1abbb5abd0517522f850dd785990d373da7e"
+			"Comment": "v9.1.0",
+			"Rev": "e14a70c556c8e0db173358d1a903dca345a8e75e"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/validation",
-			"Comment": "v9.0.0",
-			"Rev": "f6be1abbb5abd0517522f850dd785990d373da7e"
+			"Comment": "v9.1.0",
+			"Rev": "e14a70c556c8e0db173358d1a903dca345a8e75e"
 		},
 		{
 			"ImportPath": "github.com/MakeNowJust/heredoc",
