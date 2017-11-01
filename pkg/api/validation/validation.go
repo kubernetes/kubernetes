@@ -3859,6 +3859,11 @@ func ValidateLimitRange(limitRange *api.LimitRange) field.ErrorList {
 					allErrs = append(allErrs, field.Invalid(idxPath.Child("maxLimitRequestRatio").Key(string(k)), maxRatio, fmt.Sprintf("ratio %s is greater than max/min = %f", maxRatio.String(), maxRatioLimit)))
 				}
 			}
+
+			// for GPU and hugepages, the default value and defaultRequest value must match if both are specified
+			if !helper.IsOvercommitAllowed(api.ResourceName(k)) && defaultQuantityFound && defaultRequestQuantityFound && defaultQuantity.Cmp(defaultRequestQuantity) != 0 {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("defaultRequest").Key(string(k)), defaultRequestQuantity, fmt.Sprintf("default value %s must equal to defaultRequest value %s in %s", defaultQuantity.String(), defaultRequestQuantity.String(), k)))
+			}
 		}
 	}
 
