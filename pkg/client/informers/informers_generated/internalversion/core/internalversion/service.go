@@ -38,19 +38,34 @@ type ServiceInformer interface {
 }
 
 type serviceInformer struct {
-	factory internalinterfaces.SharedInformerFactory
+	factory          internalinterfaces.SharedInformerFactory
+	tweakListOptions internalinterfaces.TweakListOptionsFunc
+	namespace        string
 }
 
 // NewServiceInformer constructs a new informer for Service type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewServiceInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredServiceInformer(client, namespace, resyncPeriod, indexers, nil)
+}
+
+// NewFilteredServiceInformer constructs a new informer for Service type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewFilteredServiceInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
 				return client.Core().Services(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
 				return client.Core().Services(namespace).Watch(options)
 			},
 		},
@@ -60,12 +75,12 @@ func NewServiceInformer(client internalclientset.Interface, namespace string, re
 	)
 }
 
-func defaultServiceInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewServiceInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+func (f *serviceInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredServiceInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *serviceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&core.Service{}, defaultServiceInformer)
+	return f.factory.InformerFor(&core.Service{}, f.defaultInformer)
 }
 
 func (f *serviceInformer) Lister() internalversion.ServiceLister {

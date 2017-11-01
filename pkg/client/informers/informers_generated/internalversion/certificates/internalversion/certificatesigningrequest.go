@@ -38,19 +38,33 @@ type CertificateSigningRequestInformer interface {
 }
 
 type certificateSigningRequestInformer struct {
-	factory internalinterfaces.SharedInformerFactory
+	factory          internalinterfaces.SharedInformerFactory
+	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
 // NewCertificateSigningRequestInformer constructs a new informer for CertificateSigningRequest type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewCertificateSigningRequestInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredCertificateSigningRequestInformer(client, resyncPeriod, indexers, nil)
+}
+
+// NewFilteredCertificateSigningRequestInformer constructs a new informer for CertificateSigningRequest type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewFilteredCertificateSigningRequestInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
 				return client.Certificates().CertificateSigningRequests().List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
 				return client.Certificates().CertificateSigningRequests().Watch(options)
 			},
 		},
@@ -60,12 +74,12 @@ func NewCertificateSigningRequestInformer(client internalclientset.Interface, re
 	)
 }
 
-func defaultCertificateSigningRequestInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewCertificateSigningRequestInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+func (f *certificateSigningRequestInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredCertificateSigningRequestInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *certificateSigningRequestInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&certificates.CertificateSigningRequest{}, defaultCertificateSigningRequestInformer)
+	return f.factory.InformerFor(&certificates.CertificateSigningRequest{}, f.defaultInformer)
 }
 
 func (f *certificateSigningRequestInformer) Lister() internalversion.CertificateSigningRequestLister {
