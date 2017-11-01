@@ -857,7 +857,6 @@ metadata:
 					{"Annotations:"},
 					{"Status:", "Running"},
 					{"IP:"},
-					{"Created By:", "ReplicationController/redis-master"},
 					{"Controlled By:", "ReplicationController/redis-master"},
 					{"Image:", redisImage},
 					{"State:", "Running"},

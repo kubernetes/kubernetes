@@ -19,7 +19,6 @@ package internalversion
 import (
 	"bytes"
 	"crypto/x509"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -649,9 +648,6 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 			w.Write(LEVEL_0, "Message:\t%s\n", pod.Status.Message)
 		}
 		w.Write(LEVEL_0, "IP:\t%s\n", pod.Status.PodIP)
-		if createdBy := printCreator(pod.Annotations); len(createdBy) > 0 {
-			w.Write(LEVEL_0, "Created By:\t%s\n", createdBy)
-		}
 		if controlledBy := printController(pod); len(controlledBy) > 0 {
 			w.Write(LEVEL_0, "Controlled By:\t%s\n", controlledBy)
 		}
@@ -686,18 +682,6 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 func printController(controllee metav1.Object) string {
 	if controllerRef := metav1.GetControllerOf(controllee); controllerRef != nil {
 		return fmt.Sprintf("%s/%s", controllerRef.Kind, controllerRef.Name)
-	}
-	return ""
-}
-
-func printCreator(annotation map[string]string) string {
-	value, ok := annotation[api.CreatedByAnnotation]
-	if ok {
-		var r api.SerializedReference
-		err := json.Unmarshal([]byte(value), &r)
-		if err == nil {
-			return fmt.Sprintf("%s/%s", r.Reference.Kind, r.Reference.Name)
-		}
 	}
 	return ""
 }
@@ -1708,8 +1692,8 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
 		printLabelsMultiline(w, "Labels", job.Labels)
 		printAnnotationsMultiline(w, "Annotations", job.Annotations)
-		if createdBy := printCreator(job.Annotations); len(createdBy) > 0 {
-			w.Write(LEVEL_0, "Created By:\t%s\n", createdBy)
+		if controlledBy := printController(job); len(controlledBy) > 0 {
+			w.Write(LEVEL_0, "Controlled By:\t%s\n", controlledBy)
 		}
 		w.Write(LEVEL_0, "Parallelism:\t%d\n", *job.Spec.Parallelism)
 		if job.Spec.Completions != nil {

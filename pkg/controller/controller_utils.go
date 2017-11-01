@@ -38,10 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/integer"
 	clientretry "k8s.io/client-go/util/retry"
 	_ "k8s.io/kubernetes/pkg/api/install"
@@ -474,29 +472,12 @@ func getPodsFinalizers(template *v1.PodTemplateSpec) []string {
 	return desiredFinalizers
 }
 
-func getPodsAnnotationSet(template *v1.PodTemplateSpec, object runtime.Object) (labels.Set, error) {
+func getPodsAnnotationSet(template *v1.PodTemplateSpec) labels.Set {
 	desiredAnnotations := make(labels.Set)
 	for k, v := range template.Annotations {
 		desiredAnnotations[k] = v
 	}
-	createdByRef, err := ref.GetReference(scheme.Scheme, object)
-	if err != nil {
-		return desiredAnnotations, fmt.Errorf("unable to get controller reference: %v", err)
-	}
-
-	// TODO: this code was not safe previously - as soon as new code came along that switched to v2, old clients
-	//   would be broken upon reading it. This is explicitly hardcoded to v1 to guarantee predictable deployment.
-	//   We need to consistently handle this case of annotation versioning.
-	codec := scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)
-
-	createdByRefJson, err := runtime.Encode(codec, &v1.SerializedReference{
-		Reference: *createdByRef,
-	})
-	if err != nil {
-		return desiredAnnotations, fmt.Errorf("unable to serialize controller reference: %v", err)
-	}
-	desiredAnnotations[v1.CreatedByAnnotation] = string(createdByRefJson)
-	return desiredAnnotations, nil
+	return desiredAnnotations
 }
 
 func getPodsPrefix(controllerName string) string {
@@ -553,10 +534,7 @@ func (r RealPodControl) PatchPod(namespace, name string, data []byte) error {
 func GetPodFromTemplate(template *v1.PodTemplateSpec, parentObject runtime.Object, controllerRef *metav1.OwnerReference) (*v1.Pod, error) {
 	desiredLabels := getPodsLabelSet(template)
 	desiredFinalizers := getPodsFinalizers(template)
-	desiredAnnotations, err := getPodsAnnotationSet(template, parentObject)
-	if err != nil {
-		return nil, err
-	}
+	desiredAnnotations := getPodsAnnotationSet(template)
 	accessor, err := meta.Accessor(parentObject)
 	if err != nil {
 		return nil, fmt.Errorf("parentObject does not have ObjectMeta, %v", err)
