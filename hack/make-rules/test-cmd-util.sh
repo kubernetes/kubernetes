@@ -3752,13 +3752,13 @@ run_client_config_tests() {
   # Pre-condition: context "missing-context" does not exist
   # Command
   output_message=$(! kubectl get pod --context="missing-context" 2>&1)
-  kube::test::if_has_string "${output_message}" 'context "missing-context" does not exist'
+  kube::test::if_has_string "${output_message}" 'context was not found for specified context: missing-context'
   # Post-condition: invalid or missing context returns error
 
   # Pre-condition: cluster "missing-cluster" does not exist
   # Command
   output_message=$(! kubectl get pod --cluster="missing-cluster" 2>&1)
-  kube::test::if_has_string "${output_message}" 'cluster "missing-cluster" does not exist'
+  kube::test::if_has_string "${output_message}" 'no server found for cluster "missing-cluster"'
   # Post-condition: invalid or missing cluster returns error
 
   # Pre-condition: user "missing-user" does not exist
