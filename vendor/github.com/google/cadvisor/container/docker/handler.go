@@ -43,7 +43,8 @@ import (
 
 const (
 	// The read write layers exist here.
-	aufsRWLayer = "diff"
+	aufsRWLayer     = "diff"
+	overlay2RWLayer = "diff"
 
 	// Path to the directory where docker stores log files if the json logging driver is enabled.
 	pathToContainersDir = "containers"
@@ -195,8 +196,10 @@ func newDockerContainerHandler(
 	switch storageDriver {
 	case aufsStorageDriver:
 		rootfsStorageDir = path.Join(storageDir, string(aufsStorageDriver), aufsRWLayer, rwLayerID)
-	case overlayStorageDriver, overlay2StorageDriver:
+	case overlayStorageDriver:
 		rootfsStorageDir = path.Join(storageDir, string(storageDriver), rwLayerID)
+	case overlay2StorageDriver:
+		rootfsStorageDir = path.Join(storageDir, string(storageDriver), rwLayerID, overlay2RWLayer)
 	case zfsStorageDriver:
 		status, err := Status()
 		if err != nil {
