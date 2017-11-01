@@ -671,3 +671,109 @@ func TestOrphanDependentsFailure(t *testing.T) {
 		t.Errorf("expected error contains text %s, got %v", expected, err)
 	}
 }
+
+func TestVirtualNodeScoping(t *testing.T) {
+	makeRef := func(kind, apiVersion, uid, name string) metav1.OwnerReference {
+		return metav1.OwnerReference{
+			Kind:       kind,
+			APIVersion: apiVersion,
+			Name:       name,
+			UID:        types.UID(uid),
+		}
+	}
+	makeNode := func(kind, apiVersion, uid, name, namespace string) *node {
+		return &node{
+			identity: objectReference{
+				OwnerReference: makeRef(kind, apiVersion, uid, name),
+				Namespace:      namespace,
+			},
+			dependents: make(map[*node]struct{}),
+		}
+	}
+
+	type (
+		owner struct {
+			ref metav1.OwnerReference
+			// node is the existing observed node for the owner. If node is nil, a
+			// virtual node will be created by the graph builder.
+			node *node
+		}
+		test struct {
+			dependent *node
+			owner     owner
+			// newOwnerNode is the expected result of addDependentToOwners.
+			newOwnerNode *node
+		}
+	)
+	tests := []test{
+		{
+			// Owner is namespaced and hasn't yet been observed, so a virtual node
+			// should be created matching owner's namespace.
+			//
+			// TODO: This is flaky. Owner is inheriting dependent's namespace, even
+			// though owner could be in another namespace. While it may happen to be
+			// correct most of the time, if owner is in another namespace, dependent
+			// will be considered dangling and will be deleted. Not sure how we can
+			// infer the namespace without a UID based lookup.
+			dependent: makeNode("Pod", "v1", "abcd", "dependent", "test"),
+			owner: owner{
+				ref:  makeRef("Pod", "v1", "1234", "owner"),
+				node: nil,
+			},
+			newOwnerNode: makeNode("Pod", "v1", "1234", "owner", "test"),
+		},
+		{
+			// Owner is namespaced, owner's namespace does not match dependent, and
+			// owner has already been observed. Owner namespace should be preserved.
+			dependent: makeNode("Pod", "v1", "abcd", "dependent", "test"),
+			owner: owner{
+				ref:  makeRef("Pod", "v1", "1234", "owner"),
+				node: makeNode("Pod", "v1", "1234", "owner", "another"),
+			},
+			newOwnerNode: makeNode("Pod", "v1", "1234", "owner", "another"),
+		},
+		{
+			// Owner is cluster scoped, and has not yet been observed. A virtual node
+			// should be created with a valid reference (i.e. an empty namespace).
+			dependent: makeNode("Pod", "v1", "abcd", "dependent", "test"),
+			owner: owner{
+				ref:  makeRef("Node", "v1", "1234", "owner"),
+				node: nil,
+			},
+			newOwnerNode: makeNode("Node", "v1", "1234", "owner", ""),
+		},
+		{
+			// Owner is cluster scoped, and has been observed. A solid reference
+			// should be established.
+			dependent: makeNode("Pod", "v1", "abcd", "dependent", "test"),
+			owner: owner{
+				ref:  makeRef("Node", "v1", "1234", "owner"),
+				node: makeNode("Node", "v1", "1234", "owner", ""),
+			},
+			newOwnerNode: makeNode("Node", "v1", "1234", "owner", ""),
+		},
+	}
+
+	for _, test := range tests {
+		uidToNode := &concurrentUIDToNode{uidToNode: make(map[types.UID]*node)}
+		gb := &GraphBuilder{
+			uidToNode: uidToNode,
+			attemptToDelete: workqueue.NewNamedRateLimitingQueue(
+				workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete"),
+			restMapper: legacyscheme.Registry.RESTMapper(),
+		}
+		if test.owner.node != nil {
+			uidToNode.Write(test.owner.node)
+		}
+
+		gb.addDependentToOwners(test.dependent, []metav1.OwnerReference{test.owner.ref})
+		ownerNode, ownerFound := gb.uidToNode.Read(test.owner.ref.UID)
+		if ownerNode == nil || !ownerFound {
+			t.Errorf("expected an owner node; owner:\n%#v", test.owner)
+			continue
+		}
+		if expected, actual := test.newOwnerNode.identity, ownerNode.identity; !reflect.DeepEqual(expected, actual) {
+			t.Errorf("expected identity:\n%#v\ngot:\n%#v\nowner:\n%#v", expected, actual, test.owner)
+		}
+	}
+}
