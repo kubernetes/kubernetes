@@ -40,6 +40,10 @@ const (
 // AppArmorDistros are distros with AppArmor support
 var AppArmorDistros = []string{"gci", "ubuntu"}
 
+func IsAppArmorSupported() bool {
+	return framework.NodeOSDistroIs(AppArmorDistros...)
+}
+
 func SkipIfAppArmorNotSupported() {
 	framework.SkipUnlessNodeOSDistroIs(AppArmorDistros...)
 }
