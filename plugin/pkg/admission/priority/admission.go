@@ -62,6 +62,8 @@ type PriorityPlugin struct {
 	lister schedulinglisters.PriorityClassLister
 	// globalDefaultPriority caches the value of global default priority class.
 	globalDefaultPriority *int32
+	// globalDefaultPriorityClassName caches the name of global default priority class.
+	globalDefaultPriorityClassName string
 }
 
 var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&PriorityPlugin{})
@@ -149,16 +151,16 @@ func (p *PriorityPlugin) admitPod(a admission.Attributes) error {
 		return admission.NewForbidden(a, fmt.Errorf("the integer value of priority must not be provided in pod spec. Priority admission controller populates the value from the given PriorityClass name"))
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
-		var priority int32
 		if len(pod.Spec.PriorityClassName) == 0 {
-			var err error
-			priority, err = p.getDefaultPriority()
+			priority, priorityClassName, err := p.getDefaultPriority()
 			if err != nil {
 				return fmt.Errorf("failed to get default priority class: %v", err)
 			}
+			pod.Spec.Priority = &priority
+			pod.Spec.PriorityClassName = priorityClassName
 		} else {
 			// First try to resolve by system priority classes.
-			priority, ok = SystemPriorityClasses[pod.Spec.PriorityClassName]
+			priority, ok := SystemPriorityClasses[pod.Spec.PriorityClassName]
 			if !ok {
 				// Now that we didn't find any system priority, try resolving by user defined priority classes.
 				pc, err := p.lister.Get(pod.Spec.PriorityClassName)
@@ -170,8 +172,8 @@ func (p *PriorityPlugin) admitPod(a admission.Attributes) error {
 				}
 				priority = pc.Value
 			}
+			pod.Spec.Priority = &priority
 		}
-		pod.Spec.Priority = &priority
 	}
 	return nil
 }
@@ -220,25 +222,29 @@ func (p *PriorityPlugin) getDefaultPriorityClass() (*scheduling.PriorityClass, e
 	return nil, nil
 }
 
-func (p *PriorityPlugin) getDefaultPriority() (int32, error) {
+func (p *PriorityPlugin) getDefaultPriority() (int32, string, error) {
 	// If global default priority is cached, return it.
-	if p.globalDefaultPriority != nil {
-		return *p.globalDefaultPriority, nil
+	if p.globalDefaultPriority != nil && p.globalDefaultPriorityClassName != "" {
+		return *p.globalDefaultPriority, p.globalDefaultPriorityClassName, nil
 	}
 	dpc, err := p.getDefaultPriorityClass()
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 	priority := int32(scheduling.DefaultPriorityWhenNoDefaultClassExists)
+	var priorityClassName string
 	if dpc != nil {
 		priority = dpc.Value
+		priorityClassName = dpc.Name
 	}
-	// Cache the value.
+	// Cache the value and name.
 	p.globalDefaultPriority = &priority
-	return priority, nil
+	p.globalDefaultPriorityClassName = priorityClassName
+	return priority, priorityClassName, nil
 }
 
 // invalidateCachedDefaultPriority sets global default priority to nil to indicate that it should be looked up again.
 func (p *PriorityPlugin) invalidateCachedDefaultPriority() {
 	p.globalDefaultPriority = nil
+	p.globalDefaultPriorityClassName = ""
 }
