@@ -87,6 +87,8 @@ spec:
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
+      - key: "node-role.kubernetes.io/master"
+        effect: NoSchedule
       volumes:
       - name: kube-dns-config
         configMap:
