@@ -93,7 +93,7 @@ func printerForOptions(mapper meta.RESTMapper, typer runtime.ObjectTyper, encode
 	// we try to convert to HumanReadablePrinter, if return ok, it must be no generic
 	// we execute AddHandlers() here before maybeWrapSortingPrinter so that we don't
 	// need to convert to delegatePrinter again then invoke AddHandlers()
-	if humanReadablePrinter, ok := printer.(*printers.HumanReadablePrinter); ok {
+	if humanReadablePrinter, ok := printer.(printers.PrintHandler); ok {
 		printersinternal.AddHandlers(humanReadablePrinter)
 	}
 
