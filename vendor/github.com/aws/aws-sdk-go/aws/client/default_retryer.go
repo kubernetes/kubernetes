@@ -15,11 +15,11 @@ import (
 // the MaxRetries method:
 //
 //		type retryer struct {
-//      service.DefaultRetryer
+//      client.DefaultRetryer
 //    }
 //
 //    // This implementation always has 100 max retries
-//    func (d retryer) MaxRetries() uint { return 100 }
+//    func (d retryer) MaxRetries() int { return 100 }
 type DefaultRetryer struct {
 	NumMaxRetries int
 }
@@ -54,6 +54,12 @@ func (d DefaultRetryer) RetryRules(r *request.Request) time.Duration {
 
 // ShouldRetry returns true if the request should be retried.
 func (d DefaultRetryer) ShouldRetry(r *request.Request) bool {
+	// If one of the other handlers already set the retry state
+	// we don't want to override it based on the service's state
+	if r.Retryable != nil {
+		return *r.Retryable
+	}
+
 	if r.HTTPResponse.StatusCode >= 500 {
 		return true
 	}

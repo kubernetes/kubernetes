@@ -114,5 +114,5 @@ func (b *WriteAtBuffer) WriteAt(p []byte, pos int64) (n int, err error) {
 func (b *WriteAtBuffer) Bytes() []byte {
 	b.m.Lock()
 	defer b.m.Unlock()
-	return b.buf[:len(b.buf):len(b.buf)]
+	return b.buf
 }
