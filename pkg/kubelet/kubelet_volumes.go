@@ -103,7 +103,7 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 		// If volumes have not been unmounted/detached, do not delete directory.
 		// Doing so may result in corruption of data.
 		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist {
-			glog.V(3).Infof("Orphaned pod %q found, but volumes have not been unmounted/detached. Directories are not cleaned up", uid)
+			glog.V(5).Infof("Orphaned pod %q found, but volumes have not been unmounted/detached. Directories are not cleaned up", uid)
 			continue
 		}
 		// If there are still volume directories, do not delete directory
@@ -127,7 +127,7 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 		if len(errs) > 0 {
 			glog.Errorf("%v : There were a total of %d errors similar to this. Turn up verbosity to see them.", errs[0], len(errs))
 			for _, err := range errs {
-				glog.V(3).Infof("Orphan pod: %v", err)
+				glog.V(5).Infof("Orphan pod: %v", err)
 			}
 		}
 	}
