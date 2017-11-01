@@ -93,15 +93,6 @@ func getTestVolume(readOnly bool, path string) *volume.Spec {
 	return volume.NewSpecFromPersistentVolume(pv, readOnly)
 }
 
-func contains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
-}
-
 func TestCanSupport(t *testing.T) {
 	tmpDir, plug := getPlugin(t)
 	defer os.RemoveAll(tmpDir)
@@ -116,14 +107,14 @@ func TestGetAccessModes(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	modes := plug.GetAccessModes()
-	if !contains(modes, v1.ReadWriteOnce) {
+	if !volumetest.ContainsAccessMode(modes, v1.ReadWriteOnce) {
 		t.Errorf("Expected AccessModeType %q", v1.ReadWriteOnce)
 	}
 
-	if contains(modes, v1.ReadWriteMany) {
+	if volumetest.ContainsAccessMode(modes, v1.ReadWriteMany) {
 		t.Errorf("Found AccessModeType %q, expected not", v1.ReadWriteMany)
 	}
-	if contains(modes, v1.ReadOnlyMany) {
+	if volumetest.ContainsAccessMode(modes, v1.ReadOnlyMany) {
 		t.Errorf("Found AccessModeType %q, expected not", v1.ReadOnlyMany)
 	}
 }
@@ -202,7 +193,7 @@ func TestMountUnmount(t *testing.T) {
 	if _, err := os.Stat(path); err == nil {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
+		t.Errorf("TearDown() failed: %v", err)
 	}
 }
 

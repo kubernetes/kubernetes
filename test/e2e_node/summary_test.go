@@ -342,7 +342,6 @@ func recordSystemCgroupProcesses() {
 	}
 	cgroups := map[string]string{
 		"kubelet": cfg.KubeletCgroups,
-		"runtime": cfg.RuntimeCgroups,
 		"misc":    cfg.SystemCgroups,
 	}
 	for name, cgroup := range cgroups {

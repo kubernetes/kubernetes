@@ -21,7 +21,6 @@ import (
 
 	fuzz "github.com/google/gofuzz"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -82,25 +81,6 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				extensions.FSGroupStrategyRunAsAny,
 			}
 			psp.FSGroup.Rule = fsGroupRules[c.Rand.Intn(len(fsGroupRules))]
-		},
-		func(s *extensions.Scale, c fuzz.Continue) {
-			c.FuzzNoCustom(s) // fuzz self without calling this function again
-			// TODO: Implement a fuzzer to generate valid keys, values and operators for
-			// selector requirements.
-			if s.Status.Selector != nil {
-				s.Status.Selector = &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"testlabelkey": "testlabelval",
-					},
-					MatchExpressions: []metav1.LabelSelectorRequirement{
-						{
-							Key:      "testkey",
-							Operator: metav1.LabelSelectorOpIn,
-							Values:   []string{"val1", "val2", "val3"},
-						},
-					},
-				}
-			}
 		},
 		func(j *extensions.DaemonSetSpec, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again

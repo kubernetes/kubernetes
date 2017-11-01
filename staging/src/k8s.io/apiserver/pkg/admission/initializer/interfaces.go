@@ -42,13 +42,6 @@ type WantsAuthorizer interface {
 	admission.Validator
 }
 
-// WantsClientCert defines a fuction that accepts a cert & key for admission
-// plugins that need to make calls and prove their identity.
-type WantsClientCert interface {
-	SetClientCert(cert, key []byte)
-	admission.Validator
-}
-
 // WantsScheme defines a function that accepts runtime.Scheme for admission plugins that need it.
 type WantsScheme interface {
 	SetScheme(*runtime.Scheme)

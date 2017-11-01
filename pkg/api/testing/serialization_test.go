@@ -104,6 +104,15 @@ func TestSetControllerConversion(t *testing.T) {
 
 	fuzzInternalObject(t, extGroup.InternalGroupVersion(), rs, rand.Int63())
 
+	// explicitly set the selector to something that is convertible to old-style selectors
+	// (since normally we'll fuzz the selectors with things that aren't convertible)
+	rs.Spec.Selector = &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"foo": "bar",
+			"baz": "quux",
+		},
+	}
+
 	t.Logf("rs._internal.extensions -> rs.v1beta1.extensions")
 	data, err := runtime.Encode(extGroup.Codec(), rs)
 	if err != nil {

@@ -326,27 +326,27 @@ var _ = SIGDescribe("Advanced Audit [Feature:Audit]", func() {
 						},
 					}
 
-					_, err := f.ClientSet.Core().ConfigMaps(namespace).Create(configMap)
+					_, err := f.ClientSet.CoreV1().ConfigMaps(namespace).Create(configMap)
 					framework.ExpectNoError(err, "failed to create audit-configmap")
 
-					_, err = f.ClientSet.Core().ConfigMaps(namespace).Get(configMap.Name, metav1.GetOptions{})
+					_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Get(configMap.Name, metav1.GetOptions{})
 					framework.ExpectNoError(err, "failed to get audit-configmap")
 
-					configMapChan, err := f.ClientSet.Core().ConfigMaps(namespace).Watch(watchOptions)
+					configMapChan, err := f.ClientSet.CoreV1().ConfigMaps(namespace).Watch(watchOptions)
 					framework.ExpectNoError(err, "failed to create watch for config maps")
 					for range configMapChan.ResultChan() {
 					}
 
-					_, err = f.ClientSet.Core().ConfigMaps(namespace).Update(configMap)
+					_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Update(configMap)
 					framework.ExpectNoError(err, "failed to update audit-configmap")
 
-					_, err = f.ClientSet.Core().ConfigMaps(namespace).Patch(configMap.Name, types.JSONPatchType, patch)
+					_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Patch(configMap.Name, types.JSONPatchType, patch)
 					framework.ExpectNoError(err, "failed to patch configmap")
 
-					_, err = f.ClientSet.Core().ConfigMaps(namespace).List(metav1.ListOptions{})
+					_, err = f.ClientSet.CoreV1().ConfigMaps(namespace).List(metav1.ListOptions{})
 					framework.ExpectNoError(err, "failed to list config maps")
 
-					err = f.ClientSet.Core().ConfigMaps(namespace).Delete(configMap.Name, &metav1.DeleteOptions{})
+					err = f.ClientSet.CoreV1().ConfigMaps(namespace).Delete(configMap.Name, &metav1.DeleteOptions{})
 					framework.ExpectNoError(err, "failed to delete audit-configmap")
 				},
 				[]auditEvent{
@@ -452,27 +452,27 @@ var _ = SIGDescribe("Advanced Audit [Feature:Audit]", func() {
 							"top-secret": []byte("foo-bar"),
 						},
 					}
-					_, err := f.ClientSet.Core().Secrets(namespace).Create(secret)
+					_, err := f.ClientSet.CoreV1().Secrets(namespace).Create(secret)
 					framework.ExpectNoError(err, "failed to create audit-secret")
 
-					_, err = f.ClientSet.Core().Secrets(namespace).Get(secret.Name, metav1.GetOptions{})
+					_, err = f.ClientSet.CoreV1().Secrets(namespace).Get(secret.Name, metav1.GetOptions{})
 					framework.ExpectNoError(err, "failed to get audit-secret")
 
-					secretChan, err := f.ClientSet.Core().Secrets(namespace).Watch(watchOptions)
+					secretChan, err := f.ClientSet.CoreV1().Secrets(namespace).Watch(watchOptions)
 					framework.ExpectNoError(err, "failed to create watch for secrets")
 					for range secretChan.ResultChan() {
 					}
 
-					_, err = f.ClientSet.Core().Secrets(namespace).Update(secret)
+					_, err = f.ClientSet.CoreV1().Secrets(namespace).Update(secret)
 					framework.ExpectNoError(err, "failed to update audit-secret")
 
-					_, err = f.ClientSet.Core().Secrets(namespace).Patch(secret.Name, types.JSONPatchType, patch)
+					_, err = f.ClientSet.CoreV1().Secrets(namespace).Patch(secret.Name, types.JSONPatchType, patch)
 					framework.ExpectNoError(err, "failed to patch secret")
 
-					_, err = f.ClientSet.Core().Secrets(namespace).List(metav1.ListOptions{})
+					_, err = f.ClientSet.CoreV1().Secrets(namespace).List(metav1.ListOptions{})
 					framework.ExpectNoError(err, "failed to list secrets")
 
-					err = f.ClientSet.Core().Secrets(namespace).Delete(secret.Name, &metav1.DeleteOptions{})
+					err = f.ClientSet.CoreV1().Secrets(namespace).Delete(secret.Name, &metav1.DeleteOptions{})
 					framework.ExpectNoError(err, "failed to delete audit-secret")
 				},
 				[]auditEvent{
@@ -651,7 +651,7 @@ func expectAuditLines(f *framework.Framework, expected []auditEvent) {
 	}
 
 	// Fetch the log stream.
-	stream, err := f.ClientSet.Core().RESTClient().Get().AbsPath("/logs/kube-apiserver-audit.log").Stream()
+	stream, err := f.ClientSet.CoreV1().RESTClient().Get().AbsPath("/logs/kube-apiserver-audit.log").Stream()
 	framework.ExpectNoError(err, "could not read audit log")
 	defer stream.Close()
 

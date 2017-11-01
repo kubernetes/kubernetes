@@ -147,7 +147,7 @@ func (f *fakeVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 
 func (f *fakeVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {
 	return func(namespace, name string) (*v1.Secret, error) {
-		return f.kubeClient.Core().Secrets(namespace).Get(name, metav1.GetOptions{})
+		return f.kubeClient.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
 	}
 }
 
@@ -157,7 +157,7 @@ func (f *fakeVolumeHost) GetExec(pluginName string) mount.Exec {
 
 func (f *fakeVolumeHost) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
 	return func(namespace, name string) (*v1.ConfigMap, error) {
-		return f.kubeClient.Core().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
+		return f.kubeClient.CoreV1().ConfigMaps(namespace).Get(name, metav1.GetOptions{})
 	}
 }
 
@@ -802,4 +802,13 @@ func MetricsEqualIgnoreTimestamp(a *Metrics, b *Metrics) bool {
 	inodesFree := a.InodesFree == b.InodesFree
 	inodesUsed := a.InodesUsed == b.InodesUsed
 	return available && capacity && used && inodes && inodesFree && inodesUsed
+}
+
+func ContainsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
 }

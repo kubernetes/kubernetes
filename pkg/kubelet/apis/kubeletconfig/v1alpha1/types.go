@@ -169,8 +169,6 @@ type KubeletConfiguration struct {
 	VolumePluginDir string `json:"volumePluginDir"`
 	// kubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
 	KubeletCgroups string `json:"kubeletCgroups"`
-	// runtimeCgroups are cgroups that container runtime is expected to be isolated in.
-	RuntimeCgroups string `json:"runtimeCgroups"`
 	// systemCgroups is absolute name of cgroups in which to place
 	// all non-kernel processes that are not already in a container. Empty
 	// for no container. Rolling back the flag requires a reboot.
@@ -186,8 +184,6 @@ type KubeletConfiguration struct {
 	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
 	// +optional
 	CgroupDriver string `json:"cgroupDriver,omitempty"`
-	// containerRuntime is the container runtime to use.
-	ContainerRuntime string `json:"containerRuntime"`
 	// CPUManagerPolicy is the name of the policy to use.
 	CPUManagerPolicy string `json:"cpuManagerPolicy"`
 	// CPU Manager reconciliation period.

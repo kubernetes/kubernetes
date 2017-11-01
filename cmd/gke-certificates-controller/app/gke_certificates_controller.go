@@ -77,14 +77,11 @@ func Run(s *GKECertificatesController) error {
 		return err
 	}
 
-	controller, err := certificates.NewCertificateController(
+	controller := certificates.NewCertificateController(
 		client,
 		sharedInformers.Certificates().V1beta1().CertificateSigningRequests(),
 		signer.handle,
 	)
-	if err != nil {
-		return err
-	}
 
 	sharedInformers.Start(nil)
 	controller.Run(5, nil) // runs forever

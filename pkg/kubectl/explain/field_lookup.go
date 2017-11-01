@@ -19,7 +19,7 @@ package explain
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"k8s.io/kube-openapi/pkg/util/proto"
 )
 
 // fieldLookup walks through a schema by following a path, and returns
@@ -29,13 +29,13 @@ type fieldLookup struct {
 	Path []string
 
 	// Return information: Schema found, or error.
-	Schema openapi.Schema
+	Schema proto.Schema
 	Error  error
 }
 
 // SaveLeafSchema is used to detect if we are done walking the path, and
 // saves the schema as a match.
-func (f *fieldLookup) SaveLeafSchema(schema openapi.Schema) bool {
+func (f *fieldLookup) SaveLeafSchema(schema proto.Schema) bool {
 	if len(f.Path) != 0 {
 		return false
 	}
@@ -46,7 +46,7 @@ func (f *fieldLookup) SaveLeafSchema(schema openapi.Schema) bool {
 }
 
 // VisitArray is mostly a passthrough.
-func (f *fieldLookup) VisitArray(a *openapi.Array) {
+func (f *fieldLookup) VisitArray(a *proto.Array) {
 	if f.SaveLeafSchema(a) {
 		return
 	}
@@ -56,7 +56,7 @@ func (f *fieldLookup) VisitArray(a *openapi.Array) {
 }
 
 // VisitMap is mostly a passthrough.
-func (f *fieldLookup) VisitMap(m *openapi.Map) {
+func (f *fieldLookup) VisitMap(m *proto.Map) {
 	if f.SaveLeafSchema(m) {
 		return
 	}
@@ -67,14 +67,14 @@ func (f *fieldLookup) VisitMap(m *openapi.Map) {
 
 // VisitPrimitive stops the operation and returns itself as the found
 // schema, even if it had more path to walk.
-func (f *fieldLookup) VisitPrimitive(p *openapi.Primitive) {
+func (f *fieldLookup) VisitPrimitive(p *proto.Primitive) {
 	// Even if Path is not empty (we're not expecting a leaf),
 	// return that primitive.
 	f.Schema = p
 }
 
 // VisitKind unstacks fields as it finds them.
-func (f *fieldLookup) VisitKind(k *openapi.Kind) {
+func (f *fieldLookup) VisitKind(k *proto.Kind) {
 	if f.SaveLeafSchema(k) {
 		return
 	}
@@ -90,7 +90,7 @@ func (f *fieldLookup) VisitKind(k *openapi.Kind) {
 }
 
 // VisitReference is mostly a passthrough.
-func (f *fieldLookup) VisitReference(r openapi.Reference) {
+func (f *fieldLookup) VisitReference(r proto.Reference) {
 	if f.SaveLeafSchema(r) {
 		return
 	}
@@ -100,7 +100,7 @@ func (f *fieldLookup) VisitReference(r openapi.Reference) {
 }
 
 // LookupSchemaForField looks for the schema of a given path in a base schema.
-func LookupSchemaForField(schema openapi.Schema, path []string) (openapi.Schema, error) {
+func LookupSchemaForField(schema proto.Schema, path []string) (proto.Schema, error) {
 	f := &fieldLookup{Path: path}
 	schema.Accept(f)
 	return f.Schema, f.Error

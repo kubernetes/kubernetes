@@ -93,8 +93,6 @@ const (
 	DefaultEndpointReconcilerInterval = 10 * time.Second
 	// DefaultEndpointReconcilerTTL is the default TTL timeout for the storage layer
 	DefaultEndpointReconcilerTTL = 15 * time.Second
-	// DefaultStorageEndpoint is the default storage endpoint for the lease controller
-	DefaultStorageEndpoint = "kube-apiserver-endpoint"
 )
 
 type ExtraConfig struct {
@@ -206,7 +204,7 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	if err != nil {
 		glog.Fatalf("Error creating storage factory: %v", err)
 	}
-	endpointConfig, err := c.ExtraConfig.StorageFactory.NewConfig(kapi.Resource(DefaultStorageEndpoint))
+	endpointConfig, err := c.ExtraConfig.StorageFactory.NewConfig(kapi.Resource("endpoints"))
 	if err != nil {
 		glog.Fatalf("Error getting storage config: %v", err)
 	}
@@ -214,7 +212,7 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 		StorageConfig:           endpointConfig,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 0,
-		ResourcePrefix:          c.ExtraConfig.StorageFactory.ResourcePrefix(kapi.Resource(DefaultStorageEndpoint)),
+		ResourcePrefix:          c.ExtraConfig.StorageFactory.ResourcePrefix(kapi.Resource("endpoints")),
 	})
 	endpointRegistry := endpoint.NewRegistry(endpointsStorage)
 	masterLeases := reconcilers.NewLeases(leaseStorage, "/masterleases/", ttl)
@@ -372,9 +370,11 @@ func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.
 	}
 
 	if c.ExtraConfig.EnableCoreControllers {
+		controllerName := "bootstrap-controller"
 		coreClient := coreclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 		bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient)
-		m.GenericAPIServer.AddPostStartHookOrDie("bootstrap-controller", bootstrapController.PostStartHook)
+		m.GenericAPIServer.AddPostStartHookOrDie(controllerName, bootstrapController.PostStartHook)
+		m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)
 	}
 
 	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {

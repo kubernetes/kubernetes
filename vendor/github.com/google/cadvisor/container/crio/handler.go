@@ -18,6 +18,7 @@ package crio
 import (
 	"fmt"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -142,6 +143,12 @@ func newCrioContainerHandler(
 	// get device ID from root, otherwise, it's going to error out as overlay
 	// mounts doesn't have fixed dev ids.
 	rootfsStorageDir = strings.TrimSuffix(rootfsStorageDir, "/merged")
+	switch storageDriver {
+	case overlayStorageDriver, overlay2StorageDriver:
+		// overlay and overlay2 driver are the same "overlay2" driver so treat
+		// them the same.
+		rootfsStorageDir = filepath.Join(rootfsStorageDir, "diff")
+	}
 
 	// TODO: extract object mother method
 	handler := &crioContainerHandler{

@@ -31,7 +31,6 @@ import (
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
-	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -73,25 +72,7 @@ func WaitForObservedDeployment(c clientset.Interface, ns, deploymentName string,
 }
 
 func WaitForDeploymentWithCondition(c clientset.Interface, ns, deploymentName, reason string, condType extensions.DeploymentConditionType) error {
-	var deployment *extensions.Deployment
-	pollErr := wait.PollImmediate(time.Second, 5*time.Minute, func() (bool, error) {
-		d, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		deployment = d
-		cond := deploymentutil.GetDeploymentCondition(deployment.Status, condType)
-		return cond != nil && cond.Reason == reason, nil
-	})
-	if pollErr == wait.ErrWaitTimeout {
-		pollErr = fmt.Errorf("deployment %q never updated with the desired condition and reason: %v", deployment.Name, deployment.Status.Conditions)
-		_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
-		if err == nil {
-			logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
-			logPodsOfDeployment(c, deployment, append(allOldRSs, newRS))
-		}
-	}
-	return pollErr
+	return testutils.WaitForDeploymentWithCondition(c, ns, deploymentName, reason, condType, Logf, Poll, pollLongTimeout)
 }
 
 // WaitForDeploymentRevisionAndImage waits for the deployment's and its new RS's revision and container image to match the given revision and image.
@@ -131,107 +112,28 @@ func NewDeployment(deploymentName string, replicas int32, podLabels map[string]s
 	}
 }
 
-// Waits for the deployment status to become valid (i.e. max unavailable and max surge aren't violated anymore).
-// Note that the status should stay valid at all times unless shortly after a scaling event or the deployment is just created.
-// To verify that the deployment status is valid and wait for the rollout to finish, use WaitForDeploymentStatus instead.
-func WaitForDeploymentStatusValid(c clientset.Interface, d *extensions.Deployment) error {
-	return testutils.WaitForDeploymentStatusValid(c, d, Logf, Poll, pollLongTimeout)
+// Waits for the deployment to complete, and don't check if rolling update strategy is broken.
+// Rolling update strategy is used only during a rolling update, and can be violated in other situations,
+// such as shortly after a scaling event or the deployment is just created.
+func WaitForDeploymentComplete(c clientset.Interface, d *extensions.Deployment) error {
+	return testutils.WaitForDeploymentComplete(c, d, Logf, Poll, pollLongTimeout)
 }
 
-// Waits for the deployment to reach desired state.
-// Returns an error if the deployment's rolling update strategy (max unavailable or max surge) is broken at any times.
-func WaitForDeploymentStatus(c clientset.Interface, d *extensions.Deployment) error {
-	var (
-		oldRSs, allOldRSs, allRSs []*extensions.ReplicaSet
-		newRS                     *extensions.ReplicaSet
-		deployment                *extensions.Deployment
-	)
-
-	err := wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
-		var err error
-		deployment, err = c.Extensions().Deployments(d.Namespace).Get(d.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		oldRSs, allOldRSs, newRS, err = deploymentutil.GetAllReplicaSets(deployment, c.ExtensionsV1beta1())
-		if err != nil {
-			return false, err
-		}
-		if newRS == nil {
-			// New RS hasn't been created yet.
-			return false, nil
-		}
-		allRSs = append(oldRSs, newRS)
-		// The old/new ReplicaSets need to contain the pod-template-hash label
-		for i := range allRSs {
-			if !labelsutil.SelectorHasLabel(allRSs[i].Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
-				return false, nil
-			}
-		}
-		totalCreated := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
-		maxCreated := *(deployment.Spec.Replicas) + deploymentutil.MaxSurge(*deployment)
-		if totalCreated > maxCreated {
-			logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
-			logPodsOfDeployment(c, deployment, allRSs)
-			return false, fmt.Errorf("total pods created: %d, more than the max allowed: %d", totalCreated, maxCreated)
-		}
-		minAvailable := deploymentutil.MinAvailable(deployment)
-		if deployment.Status.AvailableReplicas < minAvailable {
-			logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
-			logPodsOfDeployment(c, deployment, allRSs)
-			return false, fmt.Errorf("total pods available: %d, less than the min required: %d", deployment.Status.AvailableReplicas, minAvailable)
-		}
-
-		// When the deployment status and its underlying resources reach the desired state, we're done
-		return deploymentutil.DeploymentComplete(deployment, &deployment.Status), nil
-	})
-
-	if err == wait.ErrWaitTimeout {
-		logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
-		logPodsOfDeployment(c, deployment, allRSs)
-	}
-	if err != nil {
-		return fmt.Errorf("error waiting for deployment %q status to match expectation: %v", d.Name, err)
-	}
-	return nil
+// Waits for the deployment to complete, and check rolling update strategy isn't broken at any times.
+// Rolling update strategy should not be broken during a rolling update.
+func WaitForDeploymentCompleteAndCheckRolling(c clientset.Interface, d *extensions.Deployment) error {
+	return testutils.WaitForDeploymentCompleteAndCheckRolling(c, d, Logf, Poll, pollLongTimeout)
 }
 
 // WaitForDeploymentUpdatedReplicasLTE waits for given deployment to be observed by the controller and has at least a number of updatedReplicas
 func WaitForDeploymentUpdatedReplicasLTE(c clientset.Interface, ns, deploymentName string, minUpdatedReplicas int32, desiredGeneration int64) error {
-	err := wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
-		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		if deployment.Status.ObservedGeneration >= desiredGeneration && deployment.Status.UpdatedReplicas >= minUpdatedReplicas {
-			return true, nil
-		}
-		return false, nil
-	})
-	if err != nil {
-		return fmt.Errorf("error waiting for deployment %s to have at least %d updpatedReplicas: %v", deploymentName, minUpdatedReplicas, err)
-	}
-	return nil
+	return testutils.WaitForDeploymentUpdatedReplicasLTE(c, ns, deploymentName, minUpdatedReplicas, desiredGeneration, Poll, pollLongTimeout)
 }
 
 // WaitForDeploymentRollbackCleared waits for given deployment either started rolling back or doesn't need to rollback.
 // Note that rollback should be cleared shortly, so we only wait for 1 minute here to fail early.
 func WaitForDeploymentRollbackCleared(c clientset.Interface, ns, deploymentName string) error {
-	err := wait.Poll(Poll, 1*time.Minute, func() (bool, error) {
-		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		// Rollback not set or is kicked off
-		if deployment.Spec.RollbackTo == nil {
-			return true, nil
-		}
-		return false, nil
-	})
-	if err != nil {
-		return fmt.Errorf("error waiting for deployment %s rollbackTo to be cleared: %v", deploymentName, err)
-	}
-	return nil
+	return testutils.WaitForDeploymentRollbackCleared(c, ns, deploymentName, Poll, pollShortTimeout)
 }
 
 // WatchRecreateDeployment watches Recreate deployments and ensures no new pods will run at the same time with
@@ -288,4 +190,24 @@ func RunDeployment(config testutils.DeploymentConfig) error {
 
 func logPodsOfDeployment(c clientset.Interface, deployment *extensions.Deployment, rsList []*extensions.ReplicaSet) {
 	testutils.LogPodsOfDeployment(c, deployment, rsList, Logf)
+}
+
+func WaitForDeploymentRevision(c clientset.Interface, d *extensions.Deployment, targetRevision string) error {
+	err := wait.PollImmediate(Poll, pollLongTimeout, func() (bool, error) {
+		deployment, err := c.ExtensionsV1beta1().Deployments(d.Namespace).Get(d.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		revision := deployment.Annotations[deploymentutil.RevisionAnnotation]
+		return revision == targetRevision, nil
+	})
+	if err != nil {
+		return fmt.Errorf("error waiting for revision to become %q for deployment %q: %v", targetRevision, d.Name, err)
+	}
+	return nil
+}
+
+// CheckDeploymentRevisionAndImage checks if the input deployment's and its new replica set's revision and image are as expected.
+func CheckDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName, revision, image string) error {
+	return testutils.CheckDeploymentRevisionAndImage(c, ns, deploymentName, revision, image)
 }

@@ -343,7 +343,7 @@ type PersistentVolumeSource struct {
 	NFS *NFSVolumeSource
 	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime
 	// +optional
-	RBD *RBDVolumeSource
+	RBD *RBDPersistentVolumeSource
 	// Quobyte represents a Quobyte mount on the host that shares a pod's lifetime
 	// +optional
 	Quobyte *QuobyteVolumeSource
@@ -383,7 +383,7 @@ type PersistentVolumeSource struct {
 	PortworxVolume *PortworxVolumeSource
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
-	ScaleIO *ScaleIOVolumeSource
+	ScaleIO *ScaleIOPersistentVolumeSource
 	// Local represents directly-attached storage with node affinity
 	// +optional
 	Local *LocalVolumeSource
@@ -1006,6 +1006,37 @@ type RBDVolumeSource struct {
 	ReadOnly bool
 }
 
+// Represents a Rados Block Device mount that lasts the lifetime of a pod.
+// RBD volumes support ownership management and SELinux relabeling.
+type RBDPersistentVolumeSource struct {
+	// Required: CephMonitors is a collection of Ceph monitors
+	CephMonitors []string
+	// Required: RBDImage is the rados image name
+	RBDImage string
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	// +optional
+	FSType string
+	// Optional: RadosPool is the rados pool name,default is rbd
+	// +optional
+	RBDPool string
+	// Optional: RBDUser is the rados user name, default is admin
+	// +optional
+	RadosUser string
+	// Optional: Keyring is the path to key ring for RBDUser, default is /etc/ceph/keyring
+	// +optional
+	Keyring string
+	// Optional: SecretRef is reference to the authentication secret for User, default is empty.
+	// +optional
+	SecretRef *SecretReference
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
+}
+
 // Represents a cinder volume resource in Openstack. A Cinder volume
 // must exist before mounting to a container. The volume must also be
 // in the same region as the kubelet. Cinder volumes support ownership
@@ -1254,16 +1285,52 @@ type ScaleIOVolumeSource struct {
 	// Flag to enable/disable SSL communication with Gateway, default false
 	// +optional
 	SSLEnabled bool
-	// The name of the Protection Domain for the configured storage (defaults to "default").
+	// The name of the ScaleIO Protection Domain for the configured storage.
 	// +optional
 	ProtectionDomain string
-	// The Storage Pool associated with the protection domain (defaults to "default").
+	// The ScaleIO Storage Pool associated with the protection domain.
 	// +optional
 	StoragePool string
-	// Indicates whether the storage for a volume should be thick or thin (defaults to "thin").
+	// Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
 	// +optional
 	StorageMode string
 	// The name of a volume already created in the ScaleIO system
+	// that is associated with this volume source.
+	VolumeName string
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	// +optional
+	FSType string
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	// +optional
+	ReadOnly bool
+}
+
+// ScaleIOPersistentVolumeSource represents a persistent ScaleIO volume that can be defined
+// by a an admin via a storage class, for instance.
+type ScaleIOPersistentVolumeSource struct {
+	// The host address of the ScaleIO API Gateway.
+	Gateway string
+	// The name of the storage system as configured in ScaleIO.
+	System string
+	// SecretRef references to the secret for ScaleIO user and other
+	// sensitive information. If this is not provided, Login operation will fail.
+	SecretRef *SecretReference
+	// Flag to enable/disable SSL communication with Gateway, default false
+	// +optional
+	SSLEnabled bool
+	// The name of the ScaleIO Protection Domain for the configured storage.
+	// +optional
+	ProtectionDomain string
+	// The ScaleIO Storage Pool associated with the protection domain.
+	// +optional
+	StoragePool string
+	// Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
+	// +optional
+	StorageMode string
+	// The name of a volume created in the ScaleIO system
 	// that is associated with this volume source.
 	VolumeName string
 	// Filesystem type to mount.

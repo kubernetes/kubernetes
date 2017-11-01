@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestSecretForDockerRegistryGenerate(t *testing.T) {
@@ -37,7 +37,7 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 
 	tests := map[string]struct {
 		params    map[string]interface{}
-		expected  *api.Secret
+		expected  *v1.Secret
 		expectErr bool
 	}{
 		"test-valid-use": {
@@ -48,14 +48,14 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 				"docker-password": password,
 				"docker-email":    email,
 			},
-			expected: &api.Secret{
+			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Data: map[string][]byte{
-					api.DockerConfigKey: secretData,
+					v1.DockerConfigKey: secretData,
 				},
-				Type: api.SecretTypeDockercfg,
+				Type: v1.SecretTypeDockercfg,
 			},
 			expectErr: false,
 		},
@@ -68,14 +68,14 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 				"docker-email":    email,
 				"append-hash":     true,
 			},
-			expected: &api.Secret{
+			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo-gb4kftc655",
+					Name: "foo-94759gc65b",
 				},
 				Data: map[string][]byte{
-					api.DockerConfigKey: secretData,
+					v1.DockerConfigKey: secretData,
 				},
-				Type: api.SecretTypeDockercfg,
+				Type: v1.SecretTypeDockercfg,
 			},
 			expectErr: false,
 		},
@@ -86,14 +86,14 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 				"docker-username": username,
 				"docker-password": password,
 			},
-			expected: &api.Secret{
+			expected: &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Data: map[string][]byte{
-					api.DockerConfigKey: secretDataNoEmail,
+					v1.DockerConfigKey: secretDataNoEmail,
 				},
-				Type: api.SecretTypeDockercfg,
+				Type: v1.SecretTypeDockercfg,
 			},
 			expectErr: false,
 		},
@@ -117,8 +117,8 @@ func TestSecretForDockerRegistryGenerate(t *testing.T) {
 		if test.expectErr && err != nil {
 			continue
 		}
-		if !reflect.DeepEqual(obj.(*api.Secret), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*api.Secret))
+		if !reflect.DeepEqual(obj.(*v1.Secret), test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*v1.Secret))
 		}
 	}
 }

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: hostname
+  annotations:
+    alpha.cloud.google.com/load-balancer-neg: "true"
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 9376
+  selector:
+    run: hostname
+  sessionAffinity: None
+  type: NodePort

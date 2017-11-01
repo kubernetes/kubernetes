@@ -40,12 +40,14 @@ import (
 
 	"net/url"
 
+	netutil "k8s.io/apimachinery/pkg/util/net"
 	apiservoptions "k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	cmoptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/api/validation"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
+	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	versionutil "k8s.io/kubernetes/pkg/util/version"
 	kubeadmversion "k8s.io/kubernetes/pkg/version"
@@ -55,6 +57,7 @@ import (
 
 const (
 	bridgenf                    = "/proc/sys/net/bridge/bridge-nf-call-iptables"
+	bridgenf6                   = "/proc/sys/net/bridge/bridge-nf-call-ip6tables"
 	externalEtcdRequestTimeout  = time.Duration(10 * time.Second)
 	externalEtcdRequestRetries  = 3
 	externalEtcdRequestInterval = time.Duration(5 * time.Second)
@@ -328,6 +331,56 @@ func (hst HTTPProxyCheck) Check() (warnings, errors []error) {
 	}
 	if proxy != nil {
 		return []error{fmt.Errorf("Connection to %q uses proxy %q. If that is not intended, adjust your proxy settings", url, proxy)}, nil
+	}
+	return nil, nil
+}
+
+// HTTPProxyCIDRCheck checks if https connection to specific subnet is going
+// to be done directly or over proxy. If proxy detected, it will return warning.
+// Similar to HTTPProxyCheck above, but operates with subnets and uses API
+// machinery transport defaults to simulate kube-apiserver accessing cluster
+// services and pods.
+type HTTPProxyCIDRCheck struct {
+	Proto string
+	CIDR  string
+}
+
+// Check validates http connectivity to first IP address in the CIDR.
+// If it is not directly connected and goes via proxy it will produce warning.
+func (subnet HTTPProxyCIDRCheck) Check() (warnings, errors []error) {
+
+	if len(subnet.CIDR) == 0 {
+		return nil, nil
+	}
+
+	_, cidr, err := net.ParseCIDR(subnet.CIDR)
+	if err != nil {
+		return nil, []error{fmt.Errorf("error parsing CIDR %q: %v", subnet.CIDR, err)}
+	}
+
+	testIP, err := ipallocator.GetIndexedIP(cidr, 1)
+	if err != nil {
+		return nil, []error{fmt.Errorf("unable to get first IP address from the given CIDR (%s): %v", cidr.String(), err)}
+	}
+
+	testIPstring := testIP.String()
+	if len(testIP) == net.IPv6len {
+		testIPstring = fmt.Sprintf("[%s]:1234", testIP)
+	}
+	url := fmt.Sprintf("%s://%s/", subnet.Proto, testIPstring)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, []error{err}
+	}
+
+	// Utilize same transport defaults as it will be used by API server
+	proxy, err := netutil.SetOldTransportDefaults(&http.Transport{}).Proxy(req)
+	if err != nil {
+		return nil, []error{err}
+	}
+	if proxy != nil {
+		return []error{fmt.Errorf("connection to %q uses proxy %q. This may lead to malfunctional cluster setup. Make sure that Pod and Services IP ranges specified correctly as exceptions in proxy configuration", subnet.CIDR, proxy)}, nil
 	}
 	return nil, nil
 }
@@ -648,7 +701,6 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		PortOpenCheck{port: 10250},
 		PortOpenCheck{port: 10251},
 		PortOpenCheck{port: 10252},
-		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddress, Port: int(cfg.API.BindPort)},
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
 		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 		SwapCheck{},
@@ -666,6 +718,9 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 			ControllerManagerExtraArgs: cfg.ControllerManagerExtraArgs,
 			SchedulerExtraArgs:         cfg.SchedulerExtraArgs,
 		},
+		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddress, Port: int(cfg.API.BindPort)},
+		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.ServiceSubnet},
+		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.PodSubnet},
 	}
 
 	if len(cfg.Etcd.Endpoints) == 0 {
@@ -700,6 +755,13 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		}
 	}
 
+	if ip := net.ParseIP(cfg.API.AdvertiseAddress); ip != nil {
+		if ip.To4() == nil && ip.To16() != nil {
+			checks = append(checks,
+				FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
+			)
+		}
+	}
 	return RunChecks(checks, os.Stderr)
 }
 
@@ -734,6 +796,15 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 		InPathCheck{executable: "touch", mandatory: false},
 	}
 
+	if len(cfg.DiscoveryTokenAPIServers) > 0 {
+		if ip := net.ParseIP(cfg.DiscoveryTokenAPIServers[0]); ip != nil {
+			if ip.To4() == nil && ip.To16() != nil {
+				checks = append(checks,
+					FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
+				)
+			}
+		}
+	}
 	return RunChecks(checks, os.Stderr)
 }
 

@@ -171,7 +171,7 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 		})
 
 		By("Creating a pod with one valid and two invalid sysctls")
-		client := f.ClientSet.Core().Pods(f.Namespace.Name)
+		client := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
 		_, err := client.Create(pod)
 
 		Expect(err).NotTo(BeNil())

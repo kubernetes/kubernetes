@@ -22,6 +22,14 @@ import (
 )
 
 type ContainerRuntimeOptions struct {
+
+	// General options.
+
+	// ContainerRuntime is the container runtime to use.
+	ContainerRuntime string
+	// RuntimeCgroups that container runtime is expected to be isolated in.
+	RuntimeCgroups string
+
 	// Docker-specific options.
 
 	// DockershimRootDirectory is the path to the dockershim root directory. Defaults to
@@ -53,9 +61,6 @@ type ContainerRuntimeOptions struct {
 	// and overrides the default MTU for cases where it cannot be automatically
 	// computed (such as IPSEC).
 	NetworkPluginMTU int32
-	// NetworkPluginDir is the full path of the directory in which to search
-	// for network plugins (and, for backwards-compat, CNI config files)
-	NetworkPluginDir string
 	// CNIConfDir is the full path of the directory in which to search for
 	// CNI config files
 	CNIConfDir string
@@ -75,6 +80,10 @@ type ContainerRuntimeOptions struct {
 }
 
 func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
+	// General settings.
+	fs.StringVar(&s.ContainerRuntime, "container-runtime", s.ContainerRuntime, "The container runtime to use. Possible values: 'docker', 'rkt'.")
+	fs.StringVar(&s.RuntimeCgroups, "runtime-cgroups", s.RuntimeCgroups, "Optional absolute name of cgroups to create and run the runtime in.")
+
 	// Docker-specific settings.
 	fs.BoolVar(&s.ExperimentalDockershim, "experimental-dockershim", s.ExperimentalDockershim, "Enable dockershim only mode. In this mode, kubelet will only start dockershim without any other functionalities. This flag only serves test purpose, please do not use it unless you are conscious of what you are doing. [default=false]")
 	fs.MarkHidden("experimental-dockershim")
@@ -87,9 +96,6 @@ func (s *ContainerRuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 
 	// Network plugin settings. Shared by both docker and rkt.
 	fs.StringVar(&s.NetworkPluginName, "network-plugin", s.NetworkPluginName, "<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle")
-	//TODO(#46410): Remove the network-plugin-dir flag.
-	fs.StringVar(&s.NetworkPluginDir, "network-plugin-dir", s.NetworkPluginDir, "<Warning: Alpha feature> The full path of the directory in which to search for network plugins or CNI config")
-	fs.MarkDeprecated("network-plugin-dir", "Use --cni-bin-dir instead. This flag will be removed in a future version.")
 	fs.StringVar(&s.CNIConfDir, "cni-conf-dir", s.CNIConfDir, "<Warning: Alpha feature> The full path of the directory in which to search for CNI config files. Default: /etc/cni/net.d")
 	fs.StringVar(&s.CNIBinDir, "cni-bin-dir", s.CNIBinDir, "<Warning: Alpha feature> The full path of the directory in which to search for CNI plugin binaries. Default: /opt/cni/bin")
 	fs.Int32Var(&s.NetworkPluginMTU, "network-plugin-mtu", s.NetworkPluginMTU, "<Warning: Alpha feature> The MTU to be passed to the network plugin, to override the default. Set to 0 to use the default 1460 MTU.")

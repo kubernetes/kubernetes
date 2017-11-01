@@ -9,6 +9,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "aggregator.go",
+        "certs.go",
         "chunking.go",
         "custom_resource_definition.go",
         "etcd_failure.go",
@@ -18,6 +19,7 @@ go_library(
         "initializers.go",
         "namespace.go",
         "table_conversion.go",
+        "webhook.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/apimachinery",
     deps = [
@@ -33,6 +35,7 @@ go_library(
         "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/api/admissionregistration/v1alpha1:go_default_library",
         "//vendor/k8s.io/api/batch/v1:go_default_library",
         "//vendor/k8s.io/api/batch/v1beta1:go_default_library",

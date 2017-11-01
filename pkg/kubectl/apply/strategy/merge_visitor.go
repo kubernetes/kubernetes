@@ -51,7 +51,6 @@ func (v mergeStrategy) MergeList(e apply.ListElement) (apply.Result, error) {
 			return apply.Result{}, err
 		}
 
-		fmt.Printf("\nResult %+v\n%+v\n", m.MergedResult, value)
 		switch m.Operation {
 		case apply.SET:
 			// Keep the list item value

@@ -16,9 +16,7 @@ limitations under the License.
 
 package explain
 
-import (
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
-)
+import "k8s.io/kube-openapi/pkg/util/proto"
 
 // fieldIndentLevel is the level of indentation for fields.
 const fieldIndentLevel = 3
@@ -38,12 +36,12 @@ type modelPrinter struct {
 	Error        error
 }
 
-var _ openapi.SchemaVisitor = &modelPrinter{}
+var _ proto.SchemaVisitor = &modelPrinter{}
 
 // PrintDescription prints the description for a given schema. There
 // might be multiple description, since we collect descriptions when we
 // go through references, arrays and maps.
-func (m *modelPrinter) PrintDescription(schema openapi.Schema) error {
+func (m *modelPrinter) PrintDescription(schema proto.Schema) error {
 	if err := m.Writer.Write("DESCRIPTION:"); err != nil {
 		return err
 	}
@@ -65,7 +63,7 @@ func (m *modelPrinter) PrintDescription(schema openapi.Schema) error {
 
 // VisitArray recurses inside the subtype, while collecting the type if
 // not done yet, and the description.
-func (m *modelPrinter) VisitArray(a *openapi.Array) {
+func (m *modelPrinter) VisitArray(a *proto.Array) {
 	m.Descriptions = append(m.Descriptions, a.GetDescription())
 	if m.Type == "" {
 		m.Type = GetTypeName(a)
@@ -74,7 +72,7 @@ func (m *modelPrinter) VisitArray(a *openapi.Array) {
 }
 
 // VisitKind prints a full resource with its fields.
-func (m *modelPrinter) VisitKind(k *openapi.Kind) {
+func (m *modelPrinter) VisitKind(k *proto.Kind) {
 	if m.Type == "" {
 		m.Type = GetTypeName(k)
 	}
@@ -95,7 +93,7 @@ func (m *modelPrinter) VisitKind(k *openapi.Kind) {
 
 // VisitMap recurses inside the subtype, while collecting the type if
 // not done yet, and the description.
-func (m *modelPrinter) VisitMap(om *openapi.Map) {
+func (m *modelPrinter) VisitMap(om *proto.Map) {
 	m.Descriptions = append(m.Descriptions, om.GetDescription())
 	if m.Type == "" {
 		m.Type = GetTypeName(om)
@@ -104,7 +102,7 @@ func (m *modelPrinter) VisitMap(om *openapi.Map) {
 }
 
 // VisitPrimitive prints a field type and its description.
-func (m *modelPrinter) VisitPrimitive(p *openapi.Primitive) {
+func (m *modelPrinter) VisitPrimitive(p *proto.Primitive) {
 	if m.Type == "" {
 		m.Type = GetTypeName(p)
 	}
@@ -116,13 +114,13 @@ func (m *modelPrinter) VisitPrimitive(p *openapi.Primitive) {
 }
 
 // VisitReference recurses inside the subtype, while collecting the description.
-func (m *modelPrinter) VisitReference(r openapi.Reference) {
+func (m *modelPrinter) VisitReference(r proto.Reference) {
 	m.Descriptions = append(m.Descriptions, r.GetDescription())
 	r.SubSchema().Accept(m)
 }
 
 // PrintModel prints the description of a schema in writer.
-func PrintModel(name string, writer *Formatter, builder fieldsPrinterBuilder, schema openapi.Schema) error {
+func PrintModel(name string, writer *Formatter, builder fieldsPrinterBuilder, schema proto.Schema) error {
 	m := &modelPrinter{Name: name, Writer: writer, Builder: builder}
 	schema.Accept(m)
 	return m.Error

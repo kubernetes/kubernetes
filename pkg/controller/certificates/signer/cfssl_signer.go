@@ -50,7 +50,7 @@ func NewCSRSigningController(
 		client,
 		csrInformer,
 		signer.handle,
-	)
+	), nil
 }
 
 type cfsslSigner struct {

@@ -686,11 +686,11 @@ func TestIPTablesWaitFlag(t *testing.T) {
 		{"0.55.55", ""},
 		{"1.0.55", ""},
 		{"1.4.19", ""},
-		{"1.4.20", "-w"},
-		{"1.4.21", "-w"},
-		{"1.4.22", "-w2"},
-		{"1.5.0", "-w2"},
-		{"2.0.0", "-w2"},
+		{"1.4.20", WaitString},
+		{"1.4.21", WaitString},
+		{"1.4.22", WaitSecondsString},
+		{"1.5.0", WaitSecondsString},
+		{"2.0.0", WaitSecondsString},
 	}
 
 	for _, testCase := range testCases {
@@ -730,7 +730,7 @@ func TestWaitFlagUnavailable(t *testing.T) {
 	if fcmd.CombinedOutputCalls != 3 {
 		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if sets.NewString(fcmd.CombinedOutputLog[2]...).HasAny("-w", "-w2") {
+	if sets.NewString(fcmd.CombinedOutputLog[2]...).HasAny(WaitString, WaitSecondsString) {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
 }
@@ -762,10 +762,10 @@ func TestWaitFlagOld(t *testing.T) {
 	if fcmd.CombinedOutputCalls != 3 {
 		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-w") {
+	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", WaitString) {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
-	if sets.NewString(fcmd.CombinedOutputLog[2]...).HasAny("-w2") {
+	if sets.NewString(fcmd.CombinedOutputLog[2]...).HasAny(WaitSecondsString) {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
 }
@@ -797,10 +797,10 @@ func TestWaitFlagNew(t *testing.T) {
 	if fcmd.CombinedOutputCalls != 3 {
 		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
-	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-w2") {
+	if !sets.NewString(fcmd.CombinedOutputLog[2]...).HasAll("iptables", WaitSecondsString) {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
-	if sets.NewString(fcmd.CombinedOutputLog[2]...).HasAny("-w") {
+	if sets.NewString(fcmd.CombinedOutputLog[2]...).HasAny(WaitString) {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
 }

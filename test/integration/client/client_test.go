@@ -789,20 +789,20 @@ func runSelfLinkTestOnNamespace(t *testing.T, c clientset.Interface, namespace s
 			},
 		},
 	}
-	pod, err := c.Core().Pods(namespace).Create(&podBody)
+	pod, err := c.CoreV1().Pods(namespace).Create(&podBody)
 	if err != nil {
 		t.Fatalf("Failed creating selflinktest pod: %v", err)
 	}
-	if err = c.Core().RESTClient().Get().RequestURI(pod.SelfLink).Do().Into(pod); err != nil {
+	if err = c.CoreV1().RESTClient().Get().RequestURI(pod.SelfLink).Do().Into(pod); err != nil {
 		t.Errorf("Failed listing pod with supplied self link '%v': %v", pod.SelfLink, err)
 	}
 
-	podList, err := c.Core().Pods(namespace).List(metav1.ListOptions{})
+	podList, err := c.CoreV1().Pods(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		t.Errorf("Failed listing pods: %v", err)
 	}
 
-	if err = c.Core().RESTClient().Get().RequestURI(podList.SelfLink).Do().Into(podList); err != nil {
+	if err = c.CoreV1().RESTClient().Get().RequestURI(podList.SelfLink).Do().Into(podList); err != nil {
 		t.Errorf("Failed listing pods with supplied self link '%v': %v", podList.SelfLink, err)
 	}
 
@@ -813,7 +813,7 @@ func runSelfLinkTestOnNamespace(t *testing.T, c clientset.Interface, namespace s
 			continue
 		}
 		found = true
-		err = c.Core().RESTClient().Get().RequestURI(item.SelfLink).Do().Into(pod)
+		err = c.CoreV1().RESTClient().Get().RequestURI(item.SelfLink).Do().Into(pod)
 		if err != nil {
 			t.Errorf("Failed listing pod with supplied self link '%v': %v", item.SelfLink, err)
 		}

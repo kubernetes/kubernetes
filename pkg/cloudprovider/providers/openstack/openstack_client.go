@@ -17,10 +17,10 @@ limitations under the License.
 package openstack
 
 import (
+	"fmt"
+
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
-
-	"github.com/golang/glog"
 )
 
 func (os *OpenStack) NewNetworkV2() (*gophercloud.ServiceClient, error) {
@@ -28,8 +28,7 @@ func (os *OpenStack) NewNetworkV2() (*gophercloud.ServiceClient, error) {
 		Region: os.region,
 	})
 	if err != nil {
-		glog.Warningf("Failed to find network v2 endpoint for region %s: %v", os.region, err)
-		return nil, err
+		return nil, fmt.Errorf("failed to find network v2 endpoint for region %s: %v", os.region, err)
 	}
 	return network, nil
 }
@@ -39,8 +38,7 @@ func (os *OpenStack) NewComputeV2() (*gophercloud.ServiceClient, error) {
 		Region: os.region,
 	})
 	if err != nil {
-		glog.Warningf("Failed to find compute v2 endpoint for region %s: %v", os.region, err)
-		return nil, err
+		return nil, fmt.Errorf("failed to find compute v2 endpoint for region %s: %v", os.region, err)
 	}
 	return compute, nil
 }
@@ -50,8 +48,7 @@ func (os *OpenStack) NewBlockStorageV1() (*gophercloud.ServiceClient, error) {
 		Region: os.region,
 	})
 	if err != nil {
-		glog.Errorf("Unable to initialize cinder v1 client for region %s: %v", os.region, err)
-		return nil, err
+		return nil, fmt.Errorf("unable to initialize cinder v1 client for region %s: %v", os.region, err)
 	}
 	return storage, nil
 }
@@ -61,8 +58,7 @@ func (os *OpenStack) NewBlockStorageV2() (*gophercloud.ServiceClient, error) {
 		Region: os.region,
 	})
 	if err != nil {
-		glog.Errorf("Unable to initialize cinder v2 client for region %s: %v", os.region, err)
-		return nil, err
+		return nil, fmt.Errorf("unable to initialize cinder v2 client for region %s: %v", os.region, err)
 	}
 	return storage, nil
 }

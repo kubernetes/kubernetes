@@ -19,7 +19,7 @@ package v1
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/api"
+	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 
 // SchemeGroupVersion is group version used to register these objects
@@ -27,7 +27,7 @@ import (
 var SchemeGroupVersion = schema.GroupVersion{Group: "", Version: "v1"}
 
 func init() {
-	if err := addKnownTypes(api.Scheme); err != nil {
+	if err := addKnownTypes(schedulerapi.Scheme); err != nil {
 		// Programmer error.
 		panic(err)
 	}

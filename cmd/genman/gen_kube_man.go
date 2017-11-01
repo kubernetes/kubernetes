@@ -31,6 +31,7 @@ import (
 	apiservapp "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	cmapp "k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
+	kubeadmapp "k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	kubectlcmd "k8s.io/kubernetes/pkg/kubectl/cmd"
 	kubectlcmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -109,6 +110,13 @@ func main() {
 		genMarkdown(kubectl, "", outDir)
 		for _, c := range kubectl.Commands() {
 			genMarkdown(c, "kubectl", outDir)
+		}
+	case "kubeadm":
+		// generate manpage for kubelet
+		kubeadm := kubeadmapp.NewKubeadmCommand(os.Stdin, os.Stdout, os.Stderr)
+		genMarkdown(kubeadm, "", outDir)
+		for _, c := range kubeadm.Commands() {
+			genMarkdown(c, "kubeadm", outDir)
 		}
 	default:
 		fmt.Fprintf(os.Stderr, "Module %s is not supported", module)

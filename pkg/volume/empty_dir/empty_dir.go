@@ -227,7 +227,7 @@ func (ed *emptyDir) SetUpAt(dir string, fsGroup *int64) error {
 		err = ed.setupDir(dir)
 	case v1.StorageMediumMemory:
 		err = ed.setupTmpfs(dir)
-	case v1.StorageMediumHugepages:
+	case v1.StorageMediumHugePages:
 		err = ed.setupHugepages(dir)
 	default:
 		err = fmt.Errorf("unknown storage medium %q", ed.medium)
@@ -392,7 +392,7 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 			ed.medium = v1.StorageMediumMemory
 			return ed.teardownTmpfsOrHugetlbfs(dir)
 		} else if medium == mediumHugepages {
-			ed.medium = v1.StorageMediumHugepages
+			ed.medium = v1.StorageMediumHugePages
 			return ed.teardownTmpfsOrHugetlbfs(dir)
 		}
 	}

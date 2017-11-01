@@ -72,7 +72,6 @@ PACKAGES=(
   k8s.io/api/admissionregistration/v1alpha1
   k8s.io/api/admission/v1alpha1
   k8s.io/api/networking/v1
-  k8s.io/kubernetes/federation/apis/federation/v1beta1
   k8s.io/metrics/pkg/apis/metrics/v1alpha1
   k8s.io/metrics/pkg/apis/metrics/v1beta1
   k8s.io/metrics/pkg/apis/custom_metrics/v1beta1

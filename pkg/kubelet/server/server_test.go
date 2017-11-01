@@ -205,6 +205,10 @@ type serverTestFramework struct {
 }
 
 func newServerTest() *serverTestFramework {
+	return newServerTestWithDebug(true)
+}
+
+func newServerTestWithDebug(enableDebugging bool) *serverTestFramework {
 	fw := &serverTestFramework{}
 	fw.fakeKubelet = &fakeKubelet{
 		hostnameFunc: func() string {
@@ -239,7 +243,7 @@ func newServerTest() *serverTestFramework {
 		fw.fakeKubelet,
 		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute),
 		fw.fakeAuth,
-		true,
+		enableDebugging,
 		false,
 		&kubecontainertesting.Mock{},
 		fw.criHandler)
@@ -1634,4 +1638,60 @@ func TestCRIHandler(t *testing.T) {
 	assert.Equal(t, "GET", fw.criHandler.RequestReceived.Method)
 	assert.Equal(t, path, fw.criHandler.RequestReceived.URL.Path)
 	assert.Equal(t, query, fw.criHandler.RequestReceived.URL.RawQuery)
+}
+
+func TestDebuggingDisabledHandlers(t *testing.T) {
+	fw := newServerTestWithDebug(false)
+	defer fw.testHTTPServer.Close()
+
+	paths := []string{
+		"/run", "/exec", "/attach", "/portForward", "/containerLogs", "/runningpods",
+		"/run/", "/exec/", "/attach/", "/portForward/", "/containerLogs/", "/runningpods/",
+		"/run/xxx", "/exec/xxx", "/attach/xxx", "/debug/pprof/profile", "/logs/kubelet.log",
+	}
+
+	for _, p := range paths {
+		resp, err := http.Get(fw.testHTTPServer.URL + p)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+		body, err := ioutil.ReadAll(resp.Body)
+		require.NoError(t, err)
+		assert.Equal(t, "Debug endpoints are disabled.\n", string(body))
+
+		resp, err = http.Post(fw.testHTTPServer.URL+p, "", nil)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+		body, err = ioutil.ReadAll(resp.Body)
+		require.NoError(t, err)
+		assert.Equal(t, "Debug endpoints are disabled.\n", string(body))
+	}
+
+	// test some other paths, make sure they're working
+	containerInfo := &cadvisorapi.ContainerInfo{
+		ContainerReference: cadvisorapi.ContainerReference{
+			Name: "/",
+		},
+	}
+	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
+		return map[string]*cadvisorapi.ContainerInfo{
+			containerInfo.Name: containerInfo,
+		}, nil
+	}
+
+	resp, err := http.Get(fw.testHTTPServer.URL + "/stats")
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	machineInfo := &cadvisorapi.MachineInfo{
+		NumCores:       4,
+		MemoryCapacity: 1024,
+	}
+	fw.fakeKubelet.machineInfoFunc = func() (*cadvisorapi.MachineInfo, error) {
+		return machineInfo, nil
+	}
+
+	resp, err = http.Get(fw.testHTTPServer.URL + "/spec")
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
 }

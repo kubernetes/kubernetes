@@ -53,9 +53,9 @@ const (
 	defaultTimeOut   = 60 * time.Second
 )
 
-var ErrNotFound = errors.New("Failed to find object")
-var ErrMultipleResults = errors.New("Multiple results where only one expected")
-var ErrNoAddressFound = errors.New("No address found for host")
+var ErrNotFound = errors.New("failed to find object")
+var ErrMultipleResults = errors.New("multiple results where only one expected")
+var ErrNoAddressFound = errors.New("no address found for host")
 
 // encoding.TextUnmarshaler interface for time.Duration
 type MyDuration struct {
@@ -78,10 +78,11 @@ type LoadBalancer struct {
 }
 
 type LoadBalancerOpts struct {
-	LBVersion            string     `gcfg:"lb-version"`          // overrides autodetection. v1 or v2
+	LBVersion            string     `gcfg:"lb-version"`          // overrides autodetection. Only support v2.
 	SubnetId             string     `gcfg:"subnet-id"`           // overrides autodetection.
 	FloatingNetworkId    string     `gcfg:"floating-network-id"` // If specified, will create floating ip for loadbalancer, or do not create floating ip.
 	LBMethod             string     `gcfg:"lb-method"`           // default to ROUND_ROBIN.
+	LBProvider           string     `gcfg:"lb-provider"`
 	CreateMonitor        bool       `gcfg:"create-monitor"`
 	MonitorDelay         MyDuration `gcfg:"monitor-delay"`
 	MonitorTimeout       MyDuration `gcfg:"monitor-timeout"`
@@ -179,8 +180,7 @@ func (cfg Config) toAuth3Options() tokens3.AuthOptions {
 
 func readConfig(config io.Reader) (Config, error) {
 	if config == nil {
-		err := fmt.Errorf("no OpenStack cloud provider config file given")
-		return Config{}, err
+		return Config{}, fmt.Errorf("no OpenStack cloud provider config file given")
 	}
 
 	var cfg Config
@@ -507,39 +507,17 @@ func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 		return nil, false
 	}
 
+	// LBaaS v1 is deprecated in the OpenStack Liberty release.
+	// Currently kubernetes OpenStack cloud provider just support LBaaS v2.
 	lbVersion := os.lbOpts.LBVersion
-	if lbVersion == "" {
-		// No version specified, try newest supported by server
-		netExts, err := networkExtensions(network)
-		if err != nil {
-			glog.Warningf("Failed to list neutron extensions: %v", err)
-			return nil, false
-		}
-
-		if netExts["lbaasv2"] {
-			lbVersion = "v2"
-		} else if netExts["lbaas"] {
-			lbVersion = "v1"
-		} else {
-			glog.Warningf("Failed to find neutron LBaaS extension (v1 or v2)")
-			return nil, false
-		}
-		glog.V(3).Infof("Using LBaaS extension %v", lbVersion)
+	if lbVersion != "" && lbVersion != "v2" {
+		glog.Warningf("Config error: currently only support LBaaS v2, unrecognised lb-version \"%v\"", lbVersion)
+		return nil, false
 	}
 
 	glog.V(1).Info("Claiming to support LoadBalancer")
 
-	if lbVersion == "v2" {
-		return &LbaasV2{LoadBalancer{network, compute, os.lbOpts}}, true
-	} else if lbVersion == "v1" {
-		// Since LBaaS v1 is deprecated in the OpenStack Liberty release, so deprecate LBaaSV1 at V1.8, then remove LBaaSV1 after V1.9.
-		// Reference OpenStack doc:	https://docs.openstack.org/mitaka/networking-guide/config-lbaas.html
-		glog.Warningf("The LBaaS v1 of OpenStack cloud provider has been deprecated, Please use LBaaS v2")
-		return &LbaasV1{LoadBalancer{network, compute, os.lbOpts}}, true
-	} else {
-		glog.Warningf("Config error: unrecognised lb-version \"%v\"", lbVersion)
-		return nil, false
-	}
+	return &LbaasV2{LoadBalancer{network, compute, os.lbOpts}}, true
 }
 
 func isNotFound(err error) bool {
@@ -549,7 +527,6 @@ func isNotFound(err error) bool {
 
 func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
 	glog.V(1).Info("Claiming to support Zones")
-
 	return os, true
 }
 
@@ -563,8 +540,7 @@ func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
 		FailureDomain: md.AvailabilityZone,
 		Region:        os.region,
 	}
-	glog.V(1).Infof("Current zone is %v", zone)
-
+	glog.V(4).Infof("Current zone is %v", zone)
 	return zone, nil
 }
 
@@ -592,7 +568,6 @@ func (os *OpenStack) GetZoneByProviderID(providerID string) (cloudprovider.Zone,
 		Region:        os.region,
 	}
 	glog.V(4).Infof("The instance %s in zone %v", srv.Name, zone)
-
 	return zone, nil
 }
 
@@ -618,7 +593,6 @@ func (os *OpenStack) GetZoneByNodeName(nodeName types.NodeName) (cloudprovider.Z
 		Region:        os.region,
 	}
 	glog.V(4).Infof("The instance %s in zone %v", srv.Name, zone)
-
 	return zone, nil
 }
 
@@ -653,7 +627,6 @@ func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
 	}
 
 	glog.V(1).Info("Claiming to support Routes")
-
 	return r, true
 }
 
@@ -703,19 +676,18 @@ func (os *OpenStack) volumeService(forceVersion string) (volumeService, error) {
 		}
 	default:
 		err_txt := fmt.Sprintf("Config error: unrecognised bs-version \"%v\"", os.bsOpts.BSVersion)
-		glog.Warningf(err_txt)
 		return nil, errors.New(err_txt)
 	}
 }
 
 func checkMetadataSearchOrder(order string) error {
 	if order == "" {
-		return errors.New("Invalid value in section [Metadata] with key `search-order`. Value cannot be empty")
+		return errors.New("invalid value in section [Metadata] with key `search-order`. Value cannot be empty")
 	}
 
 	elements := strings.Split(order, ",")
 	if len(elements) > 2 {
-		return errors.New("Invalid value in section [Metadata] with key `search-order`. Value cannot contain more than 2 elements")
+		return errors.New("invalid value in section [Metadata] with key `search-order`. Value cannot contain more than 2 elements")
 	}
 
 	for _, id := range elements {
@@ -724,9 +696,8 @@ func checkMetadataSearchOrder(order string) error {
 		case configDriveID:
 		case metadataID:
 		default:
-			errTxt := "Invalid element '%s' found in section [Metadata] with key `search-order`." +
-				"Supported elements include '%s' and '%s'"
-			return fmt.Errorf(errTxt, id, configDriveID, metadataID)
+			return fmt.Errorf("invalid element %q found in section [Metadata] with key `search-order`."+
+				"Supported elements include %q and %q", id, configDriveID, metadataID)
 		}
 	}
 

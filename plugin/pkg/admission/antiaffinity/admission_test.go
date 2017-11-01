@@ -265,7 +265,7 @@ func TestOtherResources(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		handler := &plugin{}
+		handler := &Plugin{}
 
 		err := handler.Admit(admission.NewAttributesRecord(tc.object, nil, api.Kind(tc.kind).WithVersion("version"), namespace, name, api.Resource(tc.resource).WithVersion("version"), tc.subresource, admission.Create, nil))
 

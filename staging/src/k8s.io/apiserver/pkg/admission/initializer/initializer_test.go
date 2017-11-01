@@ -33,7 +33,7 @@ import (
 // the WantsScheme interface is implemented by a plugin.
 func TestWantsScheme(t *testing.T) {
 	scheme := runtime.NewScheme()
-	target, err := initializer.New(nil, nil, nil, nil, nil, scheme)
+	target, err := initializer.New(nil, nil, nil, scheme)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestWantsScheme(t *testing.T) {
 // TestWantsAuthorizer ensures that the authorizer is injected
 // when the WantsAuthorizer interface is implemented by a plugin.
 func TestWantsAuthorizer(t *testing.T) {
-	target, err := initializer.New(nil, nil, &TestAuthorizer{}, nil, nil, nil)
+	target, err := initializer.New(nil, nil, &TestAuthorizer{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestWantsAuthorizer(t *testing.T) {
 // when the WantsExternalKubeClientSet interface is implemented by a plugin.
 func TestWantsExternalKubeClientSet(t *testing.T) {
 	cs := &fake.Clientset{}
-	target, err := initializer.New(cs, nil, &TestAuthorizer{}, nil, nil, nil)
+	target, err := initializer.New(cs, nil, &TestAuthorizer{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestWantsExternalKubeClientSet(t *testing.T) {
 func TestWantsExternalKubeInformerFactory(t *testing.T) {
 	cs := &fake.Clientset{}
 	sf := informers.NewSharedInformerFactory(cs, time.Duration(1)*time.Second)
-	target, err := initializer.New(cs, sf, &TestAuthorizer{}, nil, nil, nil)
+	target, err := initializer.New(cs, sf, &TestAuthorizer{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,20 +86,6 @@ func TestWantsExternalKubeInformerFactory(t *testing.T) {
 	target.Initialize(wantExternalKubeInformerFactory)
 	if wantExternalKubeInformerFactory.sf != sf {
 		t.Errorf("expected informer factory to be initialized")
-	}
-}
-
-// TestWantsClientCert ensures that the client certificate and key are injected
-// when the WantsClientCert interface is implemented by a plugin.
-func TestWantsClientCert(t *testing.T) {
-	target, err := initializer.New(nil, nil, nil, []byte("cert"), []byte("key"), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	wantClientCert := &clientCertWanter{}
-	target.Initialize(wantClientCert)
-	if string(wantClientCert.gotCert) != "cert" || string(wantClientCert.gotKey) != "key" {
-		t.Errorf("expected client cert to be initialized, clientCert = %v, clientKey = %v", wantClientCert.gotCert, wantClientCert.gotKey)
 	}
 }
 

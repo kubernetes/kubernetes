@@ -28,7 +28,6 @@ BINS=(
 	cmd/genkubedocs
 	cmd/genman
 	cmd/genyaml
-	federation/cmd/genfeddocs
 )
 make -C "${KUBE_ROOT}" WHAT="${BINS[*]}"
 

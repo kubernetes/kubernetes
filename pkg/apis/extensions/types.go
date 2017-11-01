@@ -1010,7 +1010,7 @@ type SELinuxStrategyOptions struct {
 	// Rule is the strategy that will dictate the allowable labels that may be set.
 	Rule SELinuxStrategy
 	// seLinuxOptions required to run as; required for MustRunAs
-	// More info: https://git.k8s.io/community/contributors/design-proposals/security_context.md
+	// More info: https://kubernetes.io/docs/concepts/policy/pod-security-policy/#selinux
 	// +optional
 	SELinuxOptions *api.SELinuxOptions
 }

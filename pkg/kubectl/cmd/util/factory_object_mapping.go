@@ -35,7 +35,6 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
@@ -143,9 +142,6 @@ func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RES
 	}
 	gvk := mapping.GroupVersionKind
 	switch gvk.Group {
-	case federation.GroupName:
-		mappingVersion := mapping.GroupVersionKind.GroupVersion()
-		return f.clientAccessFactory.FederationClientForVersion(&mappingVersion)
 	case api.GroupName:
 		cfg.APIPath = "/api"
 	default:
@@ -176,15 +172,6 @@ func (f *ring1Factory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (
 
 func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (printers.Describer, error) {
 	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	if mapping.GroupVersionKind.Group == federation.GroupName {
-		fedClientSet, err := f.clientAccessFactory.FederationClientSetForVersion(&mappingVersion)
-		if err != nil {
-			return nil, err
-		}
-		if mapping.GroupVersionKind.Kind == "Cluster" {
-			return &printersinternal.ClusterDescriber{Interface: fedClientSet}, nil
-		}
-	}
 
 	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
 	if err != nil {

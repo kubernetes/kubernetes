@@ -354,3 +354,12 @@ func verifyVSphereVolumesAccessible(pod *v1.Pod, persistentvolumes []*v1.Persist
 		Expect(err).NotTo(HaveOccurred())
 	}
 }
+
+// Get vSphere Volume Path from PVC
+func getvSphereVolumePathFromClaim(client clientset.Interface, namespace string, claimName string) string {
+	pvclaim, err := client.CoreV1().PersistentVolumeClaims(namespace).Get(claimName, metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+	pv, err := client.CoreV1().PersistentVolumes().Get(pvclaim.Spec.VolumeName, metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+	return pv.Spec.VsphereVolume.VolumePath
+}

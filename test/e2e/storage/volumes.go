@@ -83,9 +83,7 @@ func DeleteCinderVolume(name string) error {
 var _ = SIGDescribe("Volumes", func() {
 	f := framework.NewDefaultFramework("volume")
 
-	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
 	// note that namespace deletion is handled by delete-namespace flag
-	clean := true
 	// filled inside BeforeEach
 	var cs clientset.Interface
 	var namespace *v1.Namespace
@@ -102,11 +100,7 @@ var _ = SIGDescribe("Volumes", func() {
 	Describe("NFS", func() {
 		It("should be mountable", func() {
 			config, _, serverIP := framework.NewNFSServer(cs, namespace.Name, []string{})
-			defer func() {
-				if clean {
-					framework.VolumeTestCleanup(f, config)
-				}
-			}()
+			defer framework.VolumeTestCleanup(f, config)
 
 			tests := []framework.VolumeTest{
 				{
@@ -139,11 +133,9 @@ var _ = SIGDescribe("Volumes", func() {
 			config, _, _ := framework.NewGlusterfsServer(cs, namespace.Name)
 			name := config.Prefix + "-server"
 			defer func() {
-				if clean {
-					framework.VolumeTestCleanup(f, config)
-					err := cs.CoreV1().Endpoints(namespace.Name).Delete(name, nil)
-					Expect(err).NotTo(HaveOccurred(), "defer: Gluster delete endpoints failed")
-				}
+				framework.VolumeTestCleanup(f, config)
+				err := cs.CoreV1().Endpoints(namespace.Name).Delete(name, nil)
+				Expect(err).NotTo(HaveOccurred(), "defer: Gluster delete endpoints failed")
 			}()
 
 			tests := []framework.VolumeTest{
@@ -177,11 +169,7 @@ var _ = SIGDescribe("Volumes", func() {
 	Describe("iSCSI [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			config, _, serverIP := framework.NewISCSIServer(cs, namespace.Name)
-			defer func() {
-				if clean {
-					framework.VolumeTestCleanup(f, config)
-				}
-			}()
+			defer framework.VolumeTestCleanup(f, config)
 
 			tests := []framework.VolumeTest{
 				{
@@ -211,11 +199,7 @@ var _ = SIGDescribe("Volumes", func() {
 	Describe("Ceph RBD [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			config, _, serverIP := framework.NewRBDServer(cs, namespace.Name)
-			defer func() {
-				if clean {
-					framework.VolumeTestCleanup(f, config)
-				}
-			}()
+			defer framework.VolumeTestCleanup(f, config)
 
 			// create secrets for the server
 			secret := v1.Secret{
@@ -236,9 +220,7 @@ var _ = SIGDescribe("Volumes", func() {
 			secClient := cs.CoreV1().Secrets(config.Namespace)
 
 			defer func() {
-				if clean {
-					secClient.Delete(config.Prefix+"-secret", nil)
-				}
+				secClient.Delete(config.Prefix+"-secret", nil)
 			}()
 
 			if _, err := secClient.Create(&secret); err != nil {
@@ -281,11 +263,7 @@ var _ = SIGDescribe("Volumes", func() {
 				ServerPorts: []int{6789},
 			}
 
-			defer func() {
-				if clean {
-					framework.VolumeTestCleanup(f, config)
-				}
-			}()
+			defer framework.VolumeTestCleanup(f, config)
 			_, serverIP := framework.CreateStorageServer(cs, config)
 			By("sleeping a bit to give ceph server time to initialize")
 			time.Sleep(20 * time.Second)
@@ -308,10 +286,8 @@ var _ = SIGDescribe("Volumes", func() {
 			}
 
 			defer func() {
-				if clean {
-					if err := cs.CoreV1().Secrets(namespace.Name).Delete(secret.Name, nil); err != nil {
-						framework.Failf("unable to delete secret %v: %v", secret.Name, err)
-					}
+				if err := cs.CoreV1().Secrets(namespace.Name).Delete(secret.Name, nil); err != nil {
+					framework.Failf("unable to delete secret %v: %v", secret.Name, err)
 				}
 			}()
 
@@ -363,11 +339,7 @@ var _ = SIGDescribe("Volumes", func() {
 			framework.Logf("cinder output:\n%s", outputString)
 			Expect(err).NotTo(HaveOccurred())
 
-			defer func() {
-				// Ignore any cleanup errors, there is not much we can do about
-				// them. They were already logged.
-				DeleteCinderVolume(volumeName)
-			}()
+			defer DeleteCinderVolume(volumeName)
 
 			// Parse 'id'' from stdout. Expected format:
 			// |     attachments     |                  []                  |
@@ -390,10 +362,8 @@ var _ = SIGDescribe("Volumes", func() {
 			Expect(volumeID).NotTo(Equal(""))
 
 			defer func() {
-				if clean {
-					framework.Logf("Running volumeTestCleanup")
-					framework.VolumeTestCleanup(f, config)
-				}
+				framework.Logf("Running volumeTestCleanup")
+				framework.VolumeTestCleanup(f, config)
 			}()
 
 			tests := []framework.VolumeTest{
@@ -439,16 +409,16 @@ var _ = SIGDescribe("Volumes", func() {
 		})
 
 		It("should be mountable with ext3", func() {
-			testGCEPD(f, config, cs, clean, "ext3")
+			testGCEPD(f, config, cs, "ext3")
 		})
 		It("should be mountable with ext4", func() {
-			testGCEPD(f, config, cs, clean, "ext4")
+			testGCEPD(f, config, cs, "ext4")
 		})
 		It("should be mountable with xfs", func() {
 			// xfs is not supported on gci
 			// and not installed by default on debian
 			framework.SkipUnlessNodeOSDistroIs("ubuntu")
-			testGCEPD(f, config, cs, clean, "xfs")
+			testGCEPD(f, config, cs, "xfs")
 		})
 	})
 
@@ -462,11 +432,7 @@ var _ = SIGDescribe("Volumes", func() {
 				Prefix:    "configmap",
 			}
 
-			defer func() {
-				if clean {
-					framework.VolumeTestCleanup(f, config)
-				}
-			}()
+			defer framework.VolumeTestCleanup(f, config)
 			configMap := &v1.ConfigMap{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "ConfigMap",
@@ -535,9 +501,7 @@ var _ = SIGDescribe("Volumes", func() {
 	Describe("vsphere [Feature:Volumes]", func() {
 		It("should be mountable", func() {
 			framework.SkipUnlessProviderIs("vsphere")
-			var (
-				volumePath string
-			)
+			var volumePath string
 			config := framework.VolumeTestConfig{
 				Namespace: namespace.Name,
 				Prefix:    "vsphere",
@@ -554,10 +518,8 @@ var _ = SIGDescribe("Volumes", func() {
 			}()
 
 			defer func() {
-				if clean {
-					framework.Logf("Running volumeTestCleanup")
-					framework.VolumeTestCleanup(f, config)
-				}
+				framework.Logf("Running volumeTestCleanup")
+				framework.VolumeTestCleanup(f, config)
 			}()
 
 			tests := []framework.VolumeTest{
@@ -601,10 +563,8 @@ var _ = SIGDescribe("Volumes", func() {
 			}()
 
 			defer func() {
-				if clean {
-					framework.Logf("Running volumeTestCleanup")
-					framework.VolumeTestCleanup(f, config)
-				}
+				framework.Logf("Running volumeTestCleanup")
+				framework.VolumeTestCleanup(f, config)
 			}()
 			fsType := "ext4"
 			readOnly := false
@@ -634,7 +594,7 @@ var _ = SIGDescribe("Volumes", func() {
 	})
 })
 
-func testGCEPD(f *framework.Framework, config framework.VolumeTestConfig, cs clientset.Interface, clean bool, fs string) {
+func testGCEPD(f *framework.Framework, config framework.VolumeTestConfig, cs clientset.Interface, fs string) {
 	By("creating a test gce pd volume")
 	volumeName, err := framework.CreatePDWithRetry()
 	Expect(err).NotTo(HaveOccurred())
@@ -647,10 +607,8 @@ func testGCEPD(f *framework.Framework, config framework.VolumeTestConfig, cs cli
 	}()
 
 	defer func() {
-		if clean {
-			framework.Logf("Running volumeTestCleanup")
-			framework.VolumeTestCleanup(f, config)
-		}
+		framework.Logf("Running volumeTestCleanup")
+		framework.VolumeTestCleanup(f, config)
 	}()
 
 	tests := []framework.VolumeTest{

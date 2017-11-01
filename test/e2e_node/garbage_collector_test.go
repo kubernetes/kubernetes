@@ -316,7 +316,7 @@ func getRestartingContainerCommand(path string, containerNum int, restarts int32
 }
 
 func verifyPodRestartCount(f *framework.Framework, podName string, expectedNumContainers int, expectedRestartCount int32) error {
-	updatedPod, err := f.ClientSet.Core().Pods(f.Namespace.Name).Get(podName, metav1.GetOptions{})
+	updatedPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(podName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

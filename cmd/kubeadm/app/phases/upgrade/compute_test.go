@@ -399,7 +399,7 @@ func TestGetAvailableUpgrades(t *testing.T) {
 					After: ClusterState{
 						KubeVersion:    "v1.9.0-alpha.1",
 						KubeadmVersion: "v1.9.0-alpha.1",
-						DNSVersion:     "1.14.5",
+						DNSVersion:     "1.14.7",
 					},
 				},
 			},

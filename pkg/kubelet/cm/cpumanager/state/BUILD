@@ -1,9 +1,10 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
     srcs = [
         "state.go",
+        "state_file.go",
         "state_mem.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state",
@@ -12,6 +13,14 @@ go_library(
         "//pkg/kubelet/cm/cpuset:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
     ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["state_file_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state",
+    library = ":go_default_library",
+    deps = ["//pkg/kubelet/cm/cpuset:go_default_library"],
 )
 
 filegroup(

@@ -248,7 +248,7 @@ func getScheduableCores(nodes []v1.Node) int64 {
 }
 
 func fetchDNSScalingConfigMap(c clientset.Interface) (*v1.ConfigMap, error) {
-	cm, err := c.Core().ConfigMaps(metav1.NamespaceSystem).Get(DNSAutoscalerLabelName, metav1.GetOptions{})
+	cm, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(DNSAutoscalerLabelName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +256,7 @@ func fetchDNSScalingConfigMap(c clientset.Interface) (*v1.ConfigMap, error) {
 }
 
 func deleteDNSScalingConfigMap(c clientset.Interface) error {
-	if err := c.Core().ConfigMaps(metav1.NamespaceSystem).Delete(DNSAutoscalerLabelName, nil); err != nil {
+	if err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Delete(DNSAutoscalerLabelName, nil); err != nil {
 		return err
 	}
 	framework.Logf("DNS autoscaling ConfigMap deleted.")
@@ -282,7 +282,7 @@ func packDNSScalingConfigMap(params map[string]string) *v1.ConfigMap {
 }
 
 func updateDNSScalingConfigMap(c clientset.Interface, configMap *v1.ConfigMap) error {
-	_, err := c.Core().ConfigMaps(metav1.NamespaceSystem).Update(configMap)
+	_, err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Update(configMap)
 	if err != nil {
 		return err
 	}
@@ -308,7 +308,7 @@ func getDNSReplicas(c clientset.Interface) (int, error) {
 func deleteDNSAutoscalerPod(c clientset.Interface) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{ClusterAddonLabelKey: DNSAutoscalerLabelName}))
 	listOpts := metav1.ListOptions{LabelSelector: label.String()}
-	pods, err := c.Core().Pods(metav1.NamespaceSystem).List(listOpts)
+	pods, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(listOpts)
 	if err != nil {
 		return err
 	}
@@ -317,7 +317,7 @@ func deleteDNSAutoscalerPod(c clientset.Interface) error {
 	}
 
 	podName := pods.Items[0].Name
-	if err := c.Core().Pods(metav1.NamespaceSystem).Delete(podName, nil); err != nil {
+	if err := c.CoreV1().Pods(metav1.NamespaceSystem).Delete(podName, nil); err != nil {
 		return err
 	}
 	framework.Logf("DNS autoscaling pod %v deleted.", podName)

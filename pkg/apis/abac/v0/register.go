@@ -19,7 +19,7 @@ package v0
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	api "k8s.io/kubernetes/pkg/apis/abac"
+	"k8s.io/kubernetes/pkg/apis/abac"
 )
 
 const GroupName = "abac.authorization.kubernetes.io"
@@ -29,11 +29,11 @@ var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v0"}
 
 func init() {
 	// TODO: Delete this init function, abac should not have its own scheme.
-	if err := addKnownTypes(api.Scheme); err != nil {
+	if err := addKnownTypes(abac.Scheme); err != nil {
 		// Programmer error.
 		panic(err)
 	}
-	if err := addConversionFuncs(api.Scheme); err != nil {
+	if err := addConversionFuncs(abac.Scheme); err != nil {
 		// Programmer error.
 		panic(err)
 	}

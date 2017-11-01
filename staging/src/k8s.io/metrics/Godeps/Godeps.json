@@ -1,6 +1,6 @@
 {
 	"ImportPath": "k8s.io/metrics",
-	"GoVersion": "go1.8",
+	"GoVersion": "go1.9",
 	"GodepVersion": "v79",
 	"Packages": [
 		"./..."
@@ -520,7 +520,7 @@
 		},
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/common",
-			"Rev": "868f2f29720b192240e18284659231b440f9cda5"
+			"Rev": "61b46af70dfed79c6d24530cd23b41440a7f22a5"
 		}
 	]
 }

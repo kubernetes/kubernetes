@@ -19,7 +19,6 @@ package network
 import (
 	"fmt"
 	"net/http"
-	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -77,7 +76,7 @@ var _ = SIGDescribe("Networking", func() {
 		}
 		for _, test := range tests {
 			By(fmt.Sprintf("testing: %s", test.path))
-			data, err := f.ClientSet.Core().RESTClient().Get().
+			data, err := f.ClientSet.CoreV1().RESTClient().Get().
 				AbsPath(test.path).
 				DoRaw()
 			if err != nil {
@@ -107,7 +106,7 @@ var _ = SIGDescribe("Networking", func() {
 			By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, framework.ClusterHttpPort))
 			config.DialFromTestContainer("http", config.ClusterIP, framework.ClusterHttpPort, config.MaxTries, 0, config.EndpointHostnames())
 
-			By(fmt.Sprintf("dialing(http) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.ExternalAddrs[0], config.NodeHttpPort))
+			By(fmt.Sprintf("dialing(http) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.NodeIP, config.NodeHttpPort))
 			config.DialFromTestContainer("http", config.NodeIP, config.NodeHttpPort, config.MaxTries, 0, config.EndpointHostnames())
 		})
 
@@ -116,7 +115,7 @@ var _ = SIGDescribe("Networking", func() {
 			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, framework.ClusterUdpPort))
 			config.DialFromTestContainer("udp", config.ClusterIP, framework.ClusterUdpPort, config.MaxTries, 0, config.EndpointHostnames())
 
-			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.ExternalAddrs[0], config.NodeUdpPort))
+			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.NodeIP, config.NodeUdpPort))
 			config.DialFromTestContainer("udp", config.NodeIP, config.NodeUdpPort, config.MaxTries, 0, config.EndpointHostnames())
 		})
 
@@ -202,50 +201,52 @@ var _ = SIGDescribe("Networking", func() {
 			config.DialFromNode("udp", config.NodeIP, config.NodeUdpPort, config.MaxTries, config.MaxTries, sets.NewString())
 		})
 
-		It("should function for client IP based session affinity: http", func() {
+		It("should function for client IP based session affinity: http [Slow]", func() {
 			config := framework.NewNetworkingTestConfig(f)
 			By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, framework.ClusterHttpPort))
 			updateSessionAffinity := func(svc *v1.Service) {
 				svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 			}
-			framework.UpdateService(f.ClientSet, config.NodePortService.Namespace, config.NodePortService.Name, updateSessionAffinity)
-			firstEndpoints, err := config.GetEndpointsFromTestContainer("http", config.ClusterIP, framework.ClusterHttpPort, config.MaxTries, 0)
+			_, err := framework.UpdateService(f.ClientSet, config.NodePortService.Namespace, config.NodePortService.Name, updateSessionAffinity)
 			if err != nil {
-				framework.Failf("Unable to get endpoints from test containers: %v", err)
+				framework.Failf("Failed to update service session affinity, error: %v", err)
 			}
-			for i := 0; i < framework.SessionAffinityChecks; i++ {
-				eps, err := config.GetEndpointsFromTestContainer("http", config.ClusterIP, framework.ClusterHttpPort, config.MaxTries, 0)
-				if err != nil {
-					framework.Failf("Unable to get endpoints from test containers: %v", err)
-				}
-				if !eps.Equal(firstEndpoints) {
-					framework.Failf("Expect endpoints: %v, got: %v", firstEndpoints, eps)
-				}
+
+			// Check if number of endpoints returned are exactly one.
+			eps, err := config.GetEndpointsFromTestContainer("http", config.ClusterIP, framework.ClusterHttpPort, framework.SessionAffinityChecks)
+			if err != nil {
+				framework.Failf("Failed to get endpoints from test container, error: %v", err)
+			}
+			if len(eps) == 0 {
+				framework.Failf("Unexpected no endpoints return")
+			}
+			if len(eps) > 1 {
+				framework.Failf("Unexpected endpoints return: %v, expect 1 endpoints", eps)
 			}
 		})
 
-		It("should function for client IP based session affinity: udp", func() {
-			startTime := time.Now()
+		It("should function for client IP based session affinity: udp [Slow]", func() {
 			config := framework.NewNetworkingTestConfig(f)
-			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, framework.ClusterHttpPort))
+			By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, framework.ClusterUdpPort))
 			updateSessionAffinity := func(svc *v1.Service) {
 				svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 			}
-			framework.UpdateService(f.ClientSet, config.NodePortService.Namespace, config.NodePortService.Name, updateSessionAffinity)
-			firstEndpoints, err := config.GetEndpointsFromTestContainer("udp", config.ClusterIP, framework.ClusterUdpPort, config.MaxTries, 0)
+			_, err := framework.UpdateService(f.ClientSet, config.NodePortService.Namespace, config.NodePortService.Name, updateSessionAffinity)
 			if err != nil {
-				framework.Failf("Unable to get endpoints from test containers: %v", err)
+				framework.Failf("Failed to update service session affinity, error: %v", err)
 			}
-			for i := 0; i < framework.SessionAffinityChecks; i++ {
-				eps, err := config.GetEndpointsFromTestContainer("http", config.ClusterIP, framework.ClusterUdpPort, config.MaxTries, 0)
-				if err != nil {
-					framework.Failf("Unable to get endpoints from test containers: %v", err)
-				}
-				if !eps.Equal(firstEndpoints) {
-					framework.Failf("Expect endpoints: %v, got: %v", firstEndpoints, eps)
-				}
+
+			// Check if number of endpoints returned are exactly one.
+			eps, err := config.GetEndpointsFromTestContainer("udp", config.ClusterIP, framework.ClusterUdpPort, framework.SessionAffinityChecks)
+			if err != nil {
+				framework.Failf("Failed to get endpoints from test container, error: %v", err)
 			}
-			framework.Failf("test session affinity, cost time: %v", time.Now().Sub(startTime))
+			if len(eps) == 0 {
+				framework.Failf("Unexpected no endpoints return")
+			}
+			if len(eps) > 1 {
+				framework.Failf("Unexpected endpoints return: %v, expect 1 endpoints", eps)
+			}
 		})
 	})
 })

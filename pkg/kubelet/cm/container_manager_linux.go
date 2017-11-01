@@ -45,6 +45,7 @@ import (
 	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/deviceplugin"
 	cmutil "k8s.io/kubernetes/pkg/kubelet/cm/util"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -125,7 +126,7 @@ type containerManagerImpl struct {
 	// Interface for QoS cgroup management
 	qosContainerManager QOSContainerManager
 	// Interface for exporting and allocating devices reported by device plugins.
-	devicePluginHandler DevicePluginHandler
+	devicePluginHandler deviceplugin.Handler
 	// Interface for CPU affinity management.
 	cpuManager cpumanager.Manager
 }
@@ -273,9 +274,9 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 	glog.Infof("Creating device plugin handler: %t", devicePluginEnabled)
 	if devicePluginEnabled {
-		cm.devicePluginHandler, err = NewDevicePluginHandlerImpl(updateDeviceCapacityFunc)
+		cm.devicePluginHandler, err = deviceplugin.NewHandlerImpl(updateDeviceCapacityFunc)
 	} else {
-		cm.devicePluginHandler, err = NewDevicePluginHandlerStub()
+		cm.devicePluginHandler, err = deviceplugin.NewHandlerStub()
 	}
 	if err != nil {
 		return nil, err
@@ -618,68 +619,17 @@ func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Containe
 	opts := &kubecontainer.RunContainerOptions{}
 	// Gets devices, mounts, and envs from device plugin handler.
 	glog.V(3).Infof("Calling devicePluginHandler AllocateDevices")
-	// Maps to detect duplicate settings.
-	devsMap := make(map[string]string)
-	mountsMap := make(map[string]string)
-	envsMap := make(map[string]string)
-	allocResps, err := cm.devicePluginHandler.Allocate(pod, container, activePods)
+	err := cm.devicePluginHandler.Allocate(pod, container, activePods)
 	if err != nil {
 		return opts, err
 	}
-	// Loops through AllocationResponses of all required extended resources.
-	for _, resp := range allocResps {
-		// Loops through runtime spec of all devices of the given resource.
-		for _, devRuntime := range resp.Spec {
-			// Updates RunContainerOptions.Devices.
-			for _, dev := range devRuntime.Devices {
-				if d, ok := devsMap[dev.ContainerPath]; ok {
-					glog.V(3).Infof("skip existing device %s %s", dev.ContainerPath, dev.HostPath)
-					if d != dev.HostPath {
-						glog.Errorf("Container device %s has conflicting mapping host devices: %s and %s",
-							dev.ContainerPath, d, dev.HostPath)
-					}
-					continue
-				}
-				devsMap[dev.ContainerPath] = dev.HostPath
-				opts.Devices = append(opts.Devices, kubecontainer.DeviceInfo{
-					PathOnHost:      dev.HostPath,
-					PathInContainer: dev.ContainerPath,
-					Permissions:     dev.Permissions,
-				})
-			}
-			// Updates RunContainerOptions.Mounts.
-			for _, mount := range devRuntime.Mounts {
-				if m, ok := mountsMap[mount.ContainerPath]; ok {
-					glog.V(3).Infof("skip existing mount %s %s", mount.ContainerPath, mount.HostPath)
-					if m != mount.HostPath {
-						glog.Errorf("Container mount %s has conflicting mapping host mounts: %s and %s",
-							mount.ContainerPath, m, mount.HostPath)
-					}
-					continue
-				}
-				mountsMap[mount.ContainerPath] = mount.HostPath
-				opts.Mounts = append(opts.Mounts, kubecontainer.Mount{
-					Name:           mount.ContainerPath,
-					ContainerPath:  mount.ContainerPath,
-					HostPath:       mount.HostPath,
-					ReadOnly:       mount.ReadOnly,
-					SELinuxRelabel: false,
-				})
-			}
-			// Updates RunContainerOptions.Envs.
-			for k, v := range devRuntime.Envs {
-				if e, ok := envsMap[k]; ok {
-					glog.V(3).Infof("skip existing envs %s %s", k, v)
-					if e != v {
-						glog.Errorf("Environment variable %s has conflicting setting: %s and %s", k, e, v)
-					}
-					continue
-				}
-				envsMap[k] = v
-				opts.Envs = append(opts.Envs, kubecontainer.EnvVar{Name: k, Value: v})
-			}
-		}
+	devOpts := cm.devicePluginHandler.GetDeviceRunContainerOptions(pod, container)
+	if devOpts == nil {
+		return opts, nil
 	}
+	opts.Devices = append(opts.Devices, devOpts.Devices...)
+	opts.Mounts = append(opts.Mounts, devOpts.Mounts...)
+	opts.Envs = append(opts.Envs, devOpts.Envs...)
 	return opts, nil
 }
 

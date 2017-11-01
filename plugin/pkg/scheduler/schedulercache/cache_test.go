@@ -24,9 +24,11 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	schedutil "k8s.io/kubernetes/plugin/pkg/scheduler/util"
@@ -226,7 +228,7 @@ func TestExpirePod(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[1]},
-			usedPorts:           map[int]bool{80: false, 8080: true},
+			usedPorts:           map[int]bool{8080: true},
 		},
 	}}
 
@@ -275,7 +277,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 			},
 			allocatableResource: &Resource{},
 			pods:                []*v1.Pod{testPods[0]},
-			usedPorts:           map[int]bool{80: true, 8080: false},
+			usedPorts:           map[int]bool{80: true},
 		},
 	}}
 
@@ -899,4 +901,108 @@ func setupCacheWithAssumedPods(b *testing.B, podNum int, assumedTime time.Time) 
 		}
 	}
 	return cache
+}
+
+func makePDB(name, namespace string, labels map[string]string, minAvailable int) *v1beta1.PodDisruptionBudget {
+	intstrMin := intstr.FromInt(minAvailable)
+	pdb := &v1beta1.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+			Labels:    labels,
+		},
+		Spec: v1beta1.PodDisruptionBudgetSpec{
+			MinAvailable: &intstrMin,
+			Selector:     &metav1.LabelSelector{MatchLabels: labels},
+		},
+	}
+
+	return pdb
+}
+
+// TestPDBOperations tests that a PDB will be add/updated/deleted correctly.
+func TestPDBOperations(t *testing.T) {
+	ttl := 10 * time.Second
+	testPDBs := []*v1beta1.PodDisruptionBudget{
+		makePDB("pdb0", "ns1", map[string]string{"tkey1": "tval1"}, 3),
+		makePDB("pdb1", "ns1", map[string]string{"tkey1": "tval1", "tkey2": "tval2"}, 1),
+		makePDB("pdb2", "ns3", map[string]string{"tkey3": "tval3", "tkey2": "tval2"}, 10),
+	}
+	updatedPDBs := []*v1beta1.PodDisruptionBudget{
+		makePDB("pdb0", "ns1", map[string]string{"tkey4": "tval4"}, 8),
+		makePDB("pdb1", "ns1", map[string]string{"tkey1": "tval1"}, 1),
+		makePDB("pdb2", "ns3", map[string]string{"tkey3": "tval3", "tkey1": "tval1", "tkey2": "tval2"}, 10),
+	}
+	tests := []struct {
+		pdbsToAdd    []*v1beta1.PodDisruptionBudget
+		pdbsToUpdate []*v1beta1.PodDisruptionBudget
+		pdbsToDelete []*v1beta1.PodDisruptionBudget
+		expectedPDBs []*v1beta1.PodDisruptionBudget // Expected PDBs after all operations
+	}{
+		{
+			pdbsToAdd:    []*v1beta1.PodDisruptionBudget{testPDBs[0]},
+			pdbsToUpdate: []*v1beta1.PodDisruptionBudget{testPDBs[0], testPDBs[1], testPDBs[0]},
+			expectedPDBs: []*v1beta1.PodDisruptionBudget{testPDBs[0], testPDBs[1]}, // both will be in the cache as they have different names
+		},
+		{
+			pdbsToAdd:    []*v1beta1.PodDisruptionBudget{testPDBs[0]},
+			pdbsToUpdate: []*v1beta1.PodDisruptionBudget{testPDBs[0], updatedPDBs[0]},
+			expectedPDBs: []*v1beta1.PodDisruptionBudget{updatedPDBs[0]},
+		},
+		{
+			pdbsToAdd:    []*v1beta1.PodDisruptionBudget{testPDBs[0], testPDBs[2]},
+			pdbsToUpdate: []*v1beta1.PodDisruptionBudget{testPDBs[0], updatedPDBs[0]},
+			pdbsToDelete: []*v1beta1.PodDisruptionBudget{testPDBs[0]},
+			expectedPDBs: []*v1beta1.PodDisruptionBudget{testPDBs[2]},
+		},
+	}
+
+	for _, test := range tests {
+		cache := newSchedulerCache(ttl, time.Second, nil)
+		for _, pdbToAdd := range test.pdbsToAdd {
+			if err := cache.AddPDB(pdbToAdd); err != nil {
+				t.Fatalf("AddPDB failed: %v", err)
+			}
+		}
+
+		for i := range test.pdbsToUpdate {
+			if i == 0 {
+				continue
+			}
+			if err := cache.UpdatePDB(test.pdbsToUpdate[i-1], test.pdbsToUpdate[i]); err != nil {
+				t.Fatalf("UpdatePDB failed: %v", err)
+			}
+		}
+
+		for _, pdb := range test.pdbsToDelete {
+			if err := cache.RemovePDB(pdb); err != nil {
+				t.Fatalf("RemovePDB failed: %v", err)
+			}
+		}
+
+		cachedPDBs, err := cache.ListPDBs(labels.Everything())
+		if err != nil {
+			t.Fatalf("ListPDBs failed: %v", err)
+		}
+		if len(cachedPDBs) != len(test.expectedPDBs) {
+			t.Errorf("Expected %d PDBs, got %d", len(test.expectedPDBs), len(cachedPDBs))
+		}
+		for _, pdb := range test.expectedPDBs {
+			found := false
+			// find it among the cached ones
+			for _, cpdb := range cachedPDBs {
+				if pdb.Name == cpdb.Name {
+					found = true
+					if !reflect.DeepEqual(pdb, cpdb) {
+						t.Errorf("%v is not equal to %v", pdb, cpdb)
+					}
+					break
+				}
+			}
+			if !found {
+				t.Errorf("PDB with name '%v' was not found in the cache.", pdb.Name)
+			}
+
+		}
+	}
 }

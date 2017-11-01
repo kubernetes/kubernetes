@@ -37,7 +37,6 @@ filegroup(
         "//plugin/pkg/admission/securitycontext/scdeny:all-srcs",
         "//plugin/pkg/admission/serviceaccount:all-srcs",
         "//plugin/pkg/admission/storageclass/setdefault:all-srcs",
-        "//plugin/pkg/admission/webhook:all-srcs",
         "//plugin/pkg/auth:all-srcs",
         "//plugin/pkg/scheduler:all-srcs",
     ],

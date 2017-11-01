@@ -17,6 +17,7 @@ limitations under the License.
 package status
 
 import (
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -264,6 +265,23 @@ func (m *manager) TerminatePod(pod *v1.Pod) {
 	m.updateStatusInternal(pod, status, true)
 }
 
+// checkContainerStateTransition ensures that no container is trying to transition
+// from a terminated to non-terminated state, which is illegal and indicates a
+// logical error in the kubelet.
+func checkContainerStateTransition(oldStatuses, newStatuses []v1.ContainerStatus) error {
+	for _, newStatus := range newStatuses {
+		for _, oldStatus := range oldStatuses {
+			if newStatus.Name != oldStatus.Name {
+				continue
+			}
+			if oldStatus.State.Terminated != nil && newStatus.State.Terminated == nil {
+				return fmt.Errorf("terminated container %v attempted illegal transition to non-terminated state", newStatus.Name)
+			}
+		}
+	}
+	return nil
+}
+
 // updateStatusInternal updates the internal status cache, and queues an update to the api server if
 // necessary. Returns whether an update was triggered.
 // This method IS NOT THREAD SAFE and must be called from a locked function.
@@ -276,6 +294,18 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 		oldStatus = mirrorPod.Status
 	} else {
 		oldStatus = pod.Status
+	}
+
+	// Check for illegal state transition in containers
+	if pod.Spec.RestartPolicy == v1.RestartPolicyNever {
+		if err := checkContainerStateTransition(oldStatus.ContainerStatuses, status.ContainerStatuses); err != nil {
+			glog.Errorf("Status update on pod %v/%v aborted: %v", pod.Namespace, pod.Name, err)
+			return false
+		}
+		if err := checkContainerStateTransition(oldStatus.InitContainerStatuses, status.InitContainerStatuses); err != nil {
+			glog.Errorf("Status update on pod %v/%v aborted: %v", pod.Namespace, pod.Name, err)
+			return false
+		}
 	}
 
 	// Set ReadyCondition.LastTransitionTime.
@@ -411,7 +441,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	}
 
 	// TODO: make me easier to express from client code
-	pod, err := m.kubeClient.Core().Pods(status.podNamespace).Get(status.podName, metav1.GetOptions{})
+	pod, err := m.kubeClient.CoreV1().Pods(status.podNamespace).Get(status.podName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		glog.V(3).Infof("Pod %q (%s) does not exist on the server", status.podName, uid)
 		// If the Pod is deleted the status will be cleared in
@@ -432,7 +462,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	}
 	pod.Status = status.status
 	// TODO: handle conflict as a retry, make that easier too.
-	newPod, err := m.kubeClient.Core().Pods(pod.Namespace).UpdateStatus(pod)
+	newPod, err := m.kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(pod)
 	if err != nil {
 		glog.Warningf("Failed to update status for pod %q: %v", format.Pod(pod), err)
 		return
@@ -447,7 +477,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		deleteOptions := metav1.NewDeleteOptions(0)
 		// Use the pod UID as the precondition for deletion to prevent deleting a newly created pod with the same name and namespace.
 		deleteOptions.Preconditions = metav1.NewUIDPreconditions(string(pod.UID))
-		err = m.kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
+		err = m.kubeClient.CoreV1().Pods(pod.Namespace).Delete(pod.Name, deleteOptions)
 		if err != nil {
 			glog.Warningf("Failed to delete status for pod %q: %v", format.Pod(pod), err)
 			return

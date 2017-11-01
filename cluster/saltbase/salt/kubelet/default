@@ -133,7 +133,7 @@
 {% elif pillar.get('network_policy_provider', '').lower() == 'calico' and grains['roles'][0] != 'kubernetes-master' %}
   {% set network_plugin = "--network-plugin=cni --cni-conf-dir=/etc/cni/net.d/ --cni-bin-dir=/home/kubernetes/bin/" %}
 {% elif pillar.get('network_provider', '').lower() == 'kubenet' %}
-  {% set network_plugin = "--network-plugin=kubenet --network-plugin-dir=/home/kubernetes/bin/" -%}
+  {% set network_plugin = "--network-plugin=kubenet --cni-bin-dir=/home/kubernetes/bin/" -%}
 {% endif -%}
 
 # Don't pipe the --hairpin-mode flag by default. This allows the kubelet to pick

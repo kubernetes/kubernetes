@@ -22,6 +22,7 @@ from charms.reactive import is_state
 from charms.reactive import set_state
 from charms.reactive import when
 from charms.reactive import when_not
+from charms.reactive.helpers import data_changed
 
 from charmhelpers.core import hookenv
 
@@ -29,6 +30,9 @@ from shlex import split
 
 from subprocess import check_call
 from subprocess import check_output
+
+
+USER = 'system:e2e'
 
 
 @hook('upgrade-charm')
@@ -87,7 +91,8 @@ def install_snaps():
 
 @when('tls_client.ca.saved', 'tls_client.client.certificate.saved',
       'tls_client.client.key.saved', 'kubernetes-master.available',
-      'kubernetes-e2e.installed', 'kube-control.auth.available')
+      'kubernetes-e2e.installed', 'e2e.auth.bootstrapped',
+      'kube-control.auth.available')
 @when_not('kubeconfig.ready')
 def prepare_kubeconfig_certificates(master, kube_control):
     ''' Prepare the data to feed to create the kubeconfig file. '''
@@ -95,7 +100,8 @@ def prepare_kubeconfig_certificates(master, kube_control):
     layer_options = layer.options('tls-client')
     # Get all the paths to the tls information required for kubeconfig.
     ca = layer_options.get('ca_certificate_path')
-    creds = kube_control.get_auth_credentials()
+    creds = kube_control.get_auth_credentials(USER)
+    data_changed('kube-control.creds', creds)
 
     servers = get_kube_api_servers(master)
 
@@ -118,11 +124,18 @@ def prepare_kubeconfig_certificates(master, kube_control):
 def request_credentials(kube_control):
     """ Request authorization creds."""
 
-    # The kube-cotrol interface is created to support RBAC.
-    # At this point we might as well do the right thing and return the hostname
-    # even if it will only be used when we enable RBAC
-    user = 'system:masters'
-    kube_control.set_auth_request(user)
+    # Ask for a user, although we will be using the 'client_token'
+    kube_control.set_auth_request(USER)
+
+
+@when('kube-control.auth.available')
+def catch_change_in_creds(kube_control):
+    """Request a service restart in case credential updates were detected."""
+    creds = kube_control.get_auth_credentials(USER)
+    if creds \
+            and data_changed('kube-control.creds', creds) \
+            and creds['user'] == USER:
+        set_state('e2e.auth.bootstrapped')
 
 
 @when('kubernetes-e2e.installed', 'kubeconfig.ready')

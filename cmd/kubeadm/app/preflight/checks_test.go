@@ -20,10 +20,12 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"strings"
 	"testing"
 
 	"github.com/renstrom/dedent"
 
+	"net/http"
 	"os"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -205,6 +207,12 @@ func TestRunInitMasterChecks(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadmapi.API{AdvertiseAddress: "2001:1234::1:15"},
+			},
+			expected: false,
+		},
 	}
 
 	for _, rt := range tests {
@@ -227,6 +235,18 @@ func TestRunJoinNodeChecks(t *testing.T) {
 	}{
 		{
 			cfg:      &kubeadmapi.NodeConfiguration{},
+			expected: false,
+		},
+		{
+			cfg: &kubeadmapi.NodeConfiguration{
+				DiscoveryTokenAPIServers: []string{"192.168.1.15"},
+			},
+			expected: false,
+		},
+		{
+			cfg: &kubeadmapi.NodeConfiguration{
+				DiscoveryTokenAPIServers: []string{"2001:1234::1:15"},
+			},
 			expected: false,
 		},
 	}
@@ -430,5 +450,109 @@ func TestKubernetesVersionCheck(t *testing.T) {
 				rt.check.KubernetesVersion,
 			)
 		}
+	}
+}
+
+func TestHTTPProxyCIDRCheck(t *testing.T) {
+	var tests = []struct {
+		check          HTTPProxyCIDRCheck
+		expectWarnings bool
+	}{
+		{
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "127.0.0.0/8",
+			}, // Loopback addresses never should produce proxy warnings
+			expectWarnings: false,
+		},
+		{
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "10.96.0.0/12",
+			}, // Expected to be accessed directly, we set NO_PROXY to 10.0.0.0/8
+			expectWarnings: false,
+		},
+		{
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "192.168.0.0/16",
+			}, // Expected to go via proxy as this range is not listed in NO_PROXY
+			expectWarnings: true,
+		},
+		{
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "2001:db8::/56",
+			}, // Expected to be accessed directly, part of 2001:db8::/48 in NO_PROXY
+			expectWarnings: false,
+		},
+		{
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "2001:db8:1::/56",
+			}, // Expected to go via proxy, range is not in 2001:db8::/48
+			expectWarnings: true,
+		},
+	}
+
+	// Save current content of *_proxy and *_PROXY variables.
+	savedEnv := resetProxyEnv()
+	defer restoreEnv(savedEnv)
+	t.Log("Saved environment: ", savedEnv)
+
+	os.Setenv("HTTP_PROXY", "http://proxy.example.com:3128")
+	os.Setenv("NO_PROXY", "example.com,10.0.0.0/8,2001:db8::/48")
+
+	// Check if we can reliably execute tests:
+	// ProxyFromEnvironment caches the *_proxy environment variables and
+	// if ProxyFromEnvironment already executed before our test with empty
+	// HTTP_PROXY it will make these tests return false positive failures
+	req, err := http.NewRequest("GET", "http://host.fake.tld/", nil)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	proxy, err := http.ProxyFromEnvironment(req)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if proxy == nil {
+		t.Skip("test skipped as ProxyFromEnvironment already initialized in environment without defined HTTP proxy")
+	}
+	t.Log("http.ProxyFromEnvironment is usable, continue executing test")
+
+	for _, rt := range tests {
+		warning, _ := rt.check.Check()
+		if (warning != nil) != rt.expectWarnings {
+			t.Errorf(
+				"failed HTTPProxyCIDRCheck:\n\texpected: %t\n\t  actual: %t (CIDR:%s). Warnings: %v",
+				rt.expectWarnings,
+				(warning != nil),
+				rt.check.CIDR,
+				warning,
+			)
+		}
+	}
+}
+
+// resetProxyEnv is helper function that unsets all *_proxy variables
+// and return previously set values as map. This can be used to restore
+// original state of the environment.
+func resetProxyEnv() map[string]string {
+	savedEnv := make(map[string]string)
+	for _, e := range os.Environ() {
+		pair := strings.Split(e, "=")
+		if strings.HasSuffix(strings.ToLower(pair[0]), "_proxy") {
+			savedEnv[pair[0]] = pair[1]
+			os.Unsetenv(pair[0])
+		}
+	}
+	return savedEnv
+}
+
+// restoreEnv is helper function to restores values
+// of environment variables from saved state in the map
+func restoreEnv(e map[string]string) {
+	for k, v := range e {
+		os.Setenv(k, v)
 	}
 }

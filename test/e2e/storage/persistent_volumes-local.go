@@ -300,9 +300,7 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 	})
 
 	Context("when using local volume provisioner", func() {
-		var (
-			volumePath string
-		)
+		var volumePath string
 
 		BeforeEach(func() {
 			setupLocalVolumeProvisioner(config)
@@ -331,13 +329,13 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 
 			// Create a persistent volume claim for local volume: the above volume will be bound.
 			By("Creating a persistent volume claim")
-			claim, err := config.client.Core().PersistentVolumeClaims(config.ns).Create(newLocalClaim(config))
+			claim, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(newLocalClaim(config))
 			Expect(err).NotTo(HaveOccurred())
 			err = framework.WaitForPersistentVolumeClaimPhase(
 				v1.ClaimBound, config.client, claim.Namespace, claim.Name, framework.Poll, 1*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
 
-			claim, err = config.client.Core().PersistentVolumeClaims(config.ns).Get(claim.Name, metav1.GetOptions{})
+			claim, err = config.client.CoreV1().PersistentVolumeClaims(config.ns).Get(claim.Name, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(claim.Spec.VolumeName).To(Equal(oldPV.Name))
 
@@ -346,7 +344,7 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			writeCmd, _ := createWriteAndReadCmds(volumePath, testFile, testFileContent)
 			err = framework.IssueSSHCommand(writeCmd, framework.TestContext.Provider, config.node0)
 			Expect(err).NotTo(HaveOccurred())
-			err = config.client.Core().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, &metav1.DeleteOptions{})
+			err = config.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, &metav1.DeleteOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Waiting for a new PersistentVolume to be re-created")
@@ -390,7 +388,7 @@ func checkPodEvents(config *localTestConfig, podName string, ep *eventPatterns) 
 		"reason":                   ep.reason,
 	}.AsSelector().String()
 	options := metav1.ListOptions{FieldSelector: selector}
-	events, err := config.client.Core().Events(config.ns).List(options)
+	events, err := config.client.CoreV1().Events(config.ns).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	Expect(len(events.Items)).NotTo(Equal(0))
 	for _, p := range ep.pattern {
@@ -484,7 +482,7 @@ func twoPodsReadWriteSerialTest(config *localTestConfig, testVol *localTestVolum
 
 // podNode wraps RunKubectl to get node where pod is running
 func podNodeName(config *localTestConfig, pod *v1.Pod) (string, error) {
-	runtimePod, runtimePodErr := config.client.Core().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
+	runtimePod, runtimePodErr := config.client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
 	return runtimePod.Spec.NodeName, runtimePodErr
 }
 
@@ -737,7 +735,7 @@ func cleanupLocalVolumeProvisioner(config *localTestConfig, volumePath string) {
 	By("Cleaning up persistent volume")
 	pv, err := findLocalPersistentVolume(config.client, volumePath)
 	Expect(err).NotTo(HaveOccurred())
-	err = config.client.Core().PersistentVolumes().Delete(pv.Name, &metav1.DeleteOptions{})
+	err = config.client.CoreV1().PersistentVolumes().Delete(pv.Name, &metav1.DeleteOptions{})
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -886,7 +884,7 @@ func waitForLocalPersistentVolume(c clientset.Interface, volumePath string) (*v1
 	var pv *v1.PersistentVolume
 
 	for start := time.Now(); time.Since(start) < 10*time.Minute && pv == nil; time.Sleep(5 * time.Second) {
-		pvs, err := c.Core().PersistentVolumes().List(metav1.ListOptions{})
+		pvs, err := c.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -912,7 +910,7 @@ func waitForLocalPersistentVolume(c clientset.Interface, volumePath string) (*v1
 
 // findLocalPersistentVolume finds persistent volume with 'spec.local.path' equals 'volumePath'.
 func findLocalPersistentVolume(c clientset.Interface, volumePath string) (*v1.PersistentVolume, error) {
-	pvs, err := c.Core().PersistentVolumes().List(metav1.ListOptions{})
+	pvs, err := c.CoreV1().PersistentVolumes().List(metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

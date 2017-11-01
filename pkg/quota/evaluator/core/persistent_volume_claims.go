@@ -22,17 +22,13 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/initialization"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
@@ -41,6 +37,9 @@ import (
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 )
+
+// the name used for object count quota
+var pvcObjectCountName = generic.ObjectCountQuotaResourceNameFor(v1.SchemeGroupVersion.WithResource("persistentvolumeclaims").GroupResource())
 
 // pvcResources are the set of static resources managed by quota associated with pvcs.
 // for each resouce in this list, it may be refined dynamically based on storage class.
@@ -67,34 +66,11 @@ func V1ResourceByStorageClass(storageClass string, resourceName v1.ResourceName)
 	return v1.ResourceName(string(storageClass + storageClassSuffix + string(resourceName)))
 }
 
-// listPersistentVolumeClaimsByNamespaceFuncUsingClient returns a pvc listing function based on the provided client.
-func listPersistentVolumeClaimsByNamespaceFuncUsingClient(kubeClient clientset.Interface) generic.ListFuncByNamespace {
-	// TODO: ideally, we could pass dynamic client pool down into this code, and have one way of doing this.
-	// unfortunately, dynamic client works with Unstructured objects, and when we calculate Usage, we require
-	// structured objects.
-	return func(namespace string, options metav1.ListOptions) ([]runtime.Object, error) {
-		itemList, err := kubeClient.Core().PersistentVolumeClaims(namespace).List(options)
-		if err != nil {
-			return nil, err
-		}
-		results := make([]runtime.Object, 0, len(itemList.Items))
-		for i := range itemList.Items {
-			results = append(results, &itemList.Items[i])
-		}
-		return results, nil
-	}
-}
-
 // NewPersistentVolumeClaimEvaluator returns an evaluator that can evaluate persistent volume claims
-// if the specified shared informer factory is not nil, evaluator may use it to support listing functions.
-func NewPersistentVolumeClaimEvaluator(kubeClient clientset.Interface, f informers.SharedInformerFactory) quota.Evaluator {
-	listFuncByNamespace := listPersistentVolumeClaimsByNamespaceFuncUsingClient(kubeClient)
-	if f != nil {
-		listFuncByNamespace = generic.ListResourceUsingInformerFunc(f, v1.SchemeGroupVersion.WithResource("persistentvolumeclaims"))
-	}
-	return &pvcEvaluator{
-		listFuncByNamespace: listFuncByNamespace,
-	}
+func NewPersistentVolumeClaimEvaluator(f quota.ListerForResourceFunc) quota.Evaluator {
+	listFuncByNamespace := generic.ListResourceUsingListerFunc(f, v1.SchemeGroupVersion.WithResource("persistentvolumeclaims"))
+	pvcEvaluator := &pvcEvaluator{listFuncByNamespace: listFuncByNamespace}
+	return pvcEvaluator
 }
 
 // pvcEvaluator knows how to evaluate quota usage for persistent volume claims
@@ -105,45 +81,13 @@ type pvcEvaluator struct {
 
 // Constraints verifies that all required resources are present on the item.
 func (p *pvcEvaluator) Constraints(required []api.ResourceName, item runtime.Object) error {
-	pvc, ok := item.(*api.PersistentVolumeClaim)
-	if !ok {
-		return fmt.Errorf("unexpected input object %v", item)
-	}
-
-	// these are the items that we will be handling based on the objects actual storage-class
-	pvcRequiredSet := append([]api.ResourceName{}, pvcResources...)
-	if storageClassRef := helper.GetPersistentVolumeClaimClass(pvc); len(storageClassRef) > 0 {
-		pvcRequiredSet = append(pvcRequiredSet, ResourceByStorageClass(storageClassRef, api.ResourcePersistentVolumeClaims))
-		pvcRequiredSet = append(pvcRequiredSet, ResourceByStorageClass(storageClassRef, api.ResourceRequestsStorage))
-	}
-
-	// in effect, this will remove things from the required set that are not tied to this pvcs storage class
-	// for example, if a quota has bronze and gold storage class items defined, we should not error a bronze pvc for not being gold.
-	// but we should error a bronze pvc if it doesn't make a storage request size...
-	requiredResources := quota.Intersection(required, pvcRequiredSet)
-	requiredSet := quota.ToSet(requiredResources)
-
-	// usage for this pvc will only include global pvc items + this storage class specific items
-	pvcUsage, err := p.Usage(item)
-	if err != nil {
-		return err
-	}
-
-	// determine what required resources were not tracked by usage.
-	missingSet := sets.NewString()
-	pvcSet := quota.ToSet(quota.ResourceNames(pvcUsage))
-	if diff := requiredSet.Difference(pvcSet); len(diff) > 0 {
-		missingSet.Insert(diff.List()...)
-	}
-	if len(missingSet) == 0 {
-		return nil
-	}
-	return fmt.Errorf("must specify %s", strings.Join(missingSet.List(), ","))
+	// no-op for persistent volume claims
+	return nil
 }
 
-// GroupKind that this evaluator tracks
-func (p *pvcEvaluator) GroupKind() schema.GroupKind {
-	return api.Kind("PersistentVolumeClaim")
+// GroupResource that this evaluator tracks
+func (p *pvcEvaluator) GroupResource() schema.GroupResource {
+	return v1.SchemeGroupVersion.WithResource("persistentvolumeclaims").GroupResource()
 }
 
 // Handles returns true if the evaluator should handle the specified operation.
@@ -183,6 +127,12 @@ func (p *pvcEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Ob
 func (p *pvcEvaluator) MatchingResources(items []api.ResourceName) []api.ResourceName {
 	result := []api.ResourceName{}
 	for _, item := range items {
+		// match object count quota fields
+		if quota.Contains([]api.ResourceName{pvcObjectCountName}, item) {
+			result = append(result, item)
+			continue
+		}
+		// match pvc resources
 		if quota.Contains(pvcResources, item) {
 			result = append(result, item)
 			continue
@@ -208,7 +158,8 @@ func (p *pvcEvaluator) Usage(item runtime.Object) (api.ResourceList, error) {
 	}
 
 	// charge for claim
-	result[api.ResourcePersistentVolumeClaims] = resource.MustParse("1")
+	result[api.ResourcePersistentVolumeClaims] = *(resource.NewQuantity(1, resource.DecimalSI))
+	result[pvcObjectCountName] = *(resource.NewQuantity(1, resource.DecimalSI))
 	if utilfeature.DefaultFeatureGate.Enabled(features.Initializers) {
 		if !initialization.IsInitialized(pvc.Initializers) {
 			// Only charge pvc count for uninitialized pvc.
@@ -218,7 +169,7 @@ func (p *pvcEvaluator) Usage(item runtime.Object) (api.ResourceList, error) {
 	storageClassRef := helper.GetPersistentVolumeClaimClass(pvc)
 	if len(storageClassRef) > 0 {
 		storageClassClaim := api.ResourceName(storageClassRef + storageClassSuffix + string(api.ResourcePersistentVolumeClaims))
-		result[storageClassClaim] = resource.MustParse("1")
+		result[storageClassClaim] = *(resource.NewQuantity(1, resource.DecimalSI))
 	}
 
 	// charge for storage

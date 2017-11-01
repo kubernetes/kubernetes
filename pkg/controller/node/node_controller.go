@@ -55,7 +55,6 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
@@ -65,7 +64,6 @@ func init() {
 }
 
 var (
-	gracefulDeletionVersion = utilversion.MustParseSemantic("v1.1.0")
 	// UnreachableTaintTemplate is the taint for when a node becomes unreachable.
 	UnreachableTaintTemplate = &v1.Taint{
 		Key:    algorithm.TaintNodeUnreachable,
@@ -186,7 +184,6 @@ type Controller struct {
 	cidrAllocator     ipam.CIDRAllocator
 	taintManager      *scheduler.NoExecuteTaintManager
 
-	forcefullyDeletePod        func(*v1.Pod) error
 	nodeExistsInCloudProvider  func(types.NodeName) (bool, error)
 	computeZoneStateFunc       func(nodeConditions []*v1.NodeCondition) (int, ZoneState)
 	enterPartialDisruptionFunc func(nodeNum int) float32
@@ -249,11 +246,11 @@ func NewNodeController(
 	glog.V(0).Infof("Sending events to api server.")
 	eventBroadcaster.StartRecordingToSink(
 		&v1core.EventSinkImpl{
-			Interface: v1core.New(kubeClient.Core().RESTClient()).Events(""),
+			Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events(""),
 		})
 
-	if kubeClient != nil && kubeClient.Core().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("node_controller", kubeClient.Core().RESTClient().GetRateLimiter())
+	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("node_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	if allocateNodeCIDRs {
@@ -285,9 +282,6 @@ func NewNodeController(
 		serviceCIDR:            serviceCIDR,
 		allocateNodeCIDRs:      allocateNodeCIDRs,
 		allocatorType:          allocatorType,
-		forcefullyDeletePod: func(p *v1.Pod) error {
-			return util.ForcefullyDeletePod(kubeClient, p)
-		},
 		nodeExistsInCloudProvider: func(nodeName types.NodeName) (bool, error) {
 			return util.NodeExistsInCloudProvider(cloud, nodeName)
 		},
@@ -654,7 +648,7 @@ func (nc *Controller) monitorNodeStatus() error {
 				return true, nil
 			}
 			name := node.Name
-			node, err = nc.kubeClient.Core().Nodes().Get(name, metav1.GetOptions{})
+			node, err = nc.kubeClient.CoreV1().Nodes().Get(name, metav1.GetOptions{})
 			if err != nil {
 				glog.Errorf("Failed while getting a Node to retry updating NodeStatus. Probably Node %s was deleted.", name)
 				return false, err
@@ -1061,7 +1055,7 @@ func (nc *Controller) tryUpdateNodeStatus(node *v1.Node) (time.Duration, v1.Node
 
 		_, currentCondition := v1node.GetNodeCondition(&node.Status, v1.NodeReady)
 		if !apiequality.Semantic.DeepEqual(currentCondition, &observedReadyCondition) {
-			if _, err = nc.kubeClient.Core().Nodes().UpdateStatus(node); err != nil {
+			if _, err = nc.kubeClient.CoreV1().Nodes().UpdateStatus(node); err != nil {
 				glog.Errorf("Error updating node %s: %v", node.Name, err)
 				return gracePeriod, observedReadyCondition, currentReadyCondition, err
 			}

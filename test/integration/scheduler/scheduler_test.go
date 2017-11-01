@@ -20,13 +20,18 @@ package scheduler
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
 	"k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -134,6 +139,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
+		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
 	)
 	if err != nil {
@@ -186,6 +192,7 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
+		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
 	)
 
@@ -224,6 +231,7 @@ func TestSchedulerCreationInLegacyMode(t *testing.T) {
 		informerFactory.Extensions().V1beta1().ReplicaSets(),
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
+		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
 	)
 	if err != nil {
@@ -384,7 +392,7 @@ func TestUnschedulableNodes(t *testing.T) {
 		}
 
 		// There are no schedulable nodes - the pod shouldn't be scheduled.
-		err = waitForPodToSchedule(context.clientSet, myPod)
+		err = waitForPodToScheduleWithTimeout(context.clientSet, myPod, 2*time.Second)
 		if err == nil {
 			t.Errorf("Pod scheduled successfully on unschedulable nodes")
 		}
@@ -456,6 +464,7 @@ func TestMultiScheduler(t *testing.T) {
 	context.clientSet.CoreV1().Nodes().Create(node)
 
 	// 3. create 3 pods for testing
+	t.Logf("create 3 pods for testing")
 	testPod, err := createPausePodWithResource(context.clientSet, "pod-without-scheduler-name", context.ns.Name, nil)
 	if err != nil {
 		t.Fatalf("Failed to create pod: %v", err)
@@ -476,6 +485,7 @@ func TestMultiScheduler(t *testing.T) {
 	// 4. **check point-1**:
 	//		- testPod, testPodFitsDefault should be scheduled
 	//		- testPodFitsFoo should NOT be scheduled
+	t.Logf("wait for pods scheduled")
 	if err := waitForPodToSchedule(context.clientSet, testPod); err != nil {
 		t.Errorf("Test MultiScheduler: %s Pod not scheduled: %v", testPod.Name, err)
 	} else {
@@ -497,18 +507,20 @@ func TestMultiScheduler(t *testing.T) {
 	// 5. create and start a scheduler with name "foo-scheduler"
 	clientSet2 := clientset.NewForConfigOrDie(&restclient.Config{Host: context.httpServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
 	informerFactory2 := informers.NewSharedInformerFactory(context.clientSet, 0)
+	podInformer2 := factory.NewPodInformer(context.clientSet, 0, fooScheduler)
 
 	schedulerConfigFactory2 := factory.NewConfigFactory(
 		fooScheduler,
 		clientSet2,
 		informerFactory2.Core().V1().Nodes(),
-		informerFactory2.Core().V1().Pods(),
+		podInformer2,
 		informerFactory2.Core().V1().PersistentVolumes(),
 		informerFactory2.Core().V1().PersistentVolumeClaims(),
 		informerFactory2.Core().V1().ReplicationControllers(),
 		informerFactory2.Extensions().V1beta1().ReplicaSets(),
 		informerFactory2.Apps().V1beta1().StatefulSets(),
 		informerFactory2.Core().V1().Services(),
+		informerFactory2.Policy().V1beta1().PodDisruptionBudgets(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
 	)
@@ -519,6 +531,7 @@ func TestMultiScheduler(t *testing.T) {
 	eventBroadcaster2 := record.NewBroadcaster()
 	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: fooScheduler})
 	eventBroadcaster2.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet2.CoreV1().RESTClient()).Events("")})
+	go podInformer2.Informer().Run(schedulerConfig2.StopEverything)
 	informerFactory2.Start(schedulerConfig2.StopEverything)
 
 	sched2, _ := scheduler.NewFromConfigurator(&scheduler.FakeConfigurator{Config: schedulerConfig2}, nil...)
@@ -555,11 +568,11 @@ func TestMultiScheduler(t *testing.T) {
 		//		- note: these two pods belong to default scheduler which no longer exists
 		podWithNoAnnotation2 := createPod("pod-with-no-annotation2", nil)
 		podWithAnnotationFitsDefault2 := createPod("pod-with-annotation-fits-default2", schedulerAnnotationFitsDefault)
-		testPodNoAnnotation2, err := clientSet.Core().Pods(ns.Name).Create(podWithNoAnnotation2)
+		testPodNoAnnotation2, err := clientSet.CoreV1().Pods(ns.Name).Create(podWithNoAnnotation2)
 		if err != nil {
 			t.Fatalf("Failed to create pod: %v", err)
 		}
-		testPodWithAnnotationFitsDefault2, err := clientSet.Core().Pods(ns.Name).Create(podWithAnnotationFitsDefault2)
+		testPodWithAnnotationFitsDefault2, err := clientSet.CoreV1().Pods(ns.Name).Create(podWithAnnotationFitsDefault2)
 		if err != nil {
 			t.Fatalf("Failed to create pod: %v", err)
 		}
@@ -898,5 +911,93 @@ func TestPreemption(t *testing.T) {
 				t.Errorf("Test [%v]: error, %v, while waiting for pod to get deleted.", test.description, err)
 			}
 		}
+	}
+}
+
+// TestPDBCache verifies that scheduler cache works as expected when handling
+// PodDisruptionBudget.
+func TestPDBCache(t *testing.T) {
+	context := initTest(t, "pdbcache")
+	defer cleanupTest(t, context)
+
+	intstrMin := intstr.FromInt(4)
+	pdb := &policy.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: context.ns.Name,
+			Name:      "test-pdb",
+			Labels:    map[string]string{"tkey1": "tval1", "tkey2": "tval2"},
+		},
+		Spec: policy.PodDisruptionBudgetSpec{
+			MinAvailable: &intstrMin,
+			Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"tkey": "tvalue"}},
+		},
+	}
+
+	createdPDB, err := context.clientSet.PolicyV1beta1().PodDisruptionBudgets(context.ns.Name).Create(pdb)
+	if err != nil {
+		t.Errorf("Failed to create PDB: %v", err)
+	}
+	// Wait for PDB to show up in the scheduler's cache.
+	if err = wait.Poll(time.Second, 15*time.Second, func() (bool, error) {
+		cachedPDBs, err := context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
+		if err != nil {
+			t.Errorf("Error while polling for PDB: %v", err)
+			return false, err
+		}
+		return len(cachedPDBs) > 0, err
+	}); err != nil {
+		t.Fatalf("No PDB was added to the cache: %v", err)
+	}
+	// Read PDB from the cache and compare it.
+	cachedPDBs, err := context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
+	if len(cachedPDBs) != 1 {
+		t.Fatalf("Expected to have 1 pdb in cache, but found %d.", len(cachedPDBs))
+	}
+	if !reflect.DeepEqual(createdPDB, cachedPDBs[0]) {
+		t.Errorf("Got different PDB than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(createdPDB, cachedPDBs[0]))
+	}
+
+	// Update PDB and change its labels.
+	pdbCopy := *cachedPDBs[0]
+	pdbCopy.Labels = map[string]string{}
+	updatedPDB, err := context.clientSet.PolicyV1beta1().PodDisruptionBudgets(context.ns.Name).Update(&pdbCopy)
+	if err != nil {
+		t.Errorf("Failed to update PDB: %v", err)
+	}
+	// Wait for PDB to be updated in the scheduler's cache.
+	if err = wait.Poll(time.Second, 15*time.Second, func() (bool, error) {
+		cachedPDBs, err := context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
+		if err != nil {
+			t.Errorf("Error while polling for PDB: %v", err)
+			return false, err
+		}
+		return len(cachedPDBs[0].Labels) == 0, err
+	}); err != nil {
+		t.Fatalf("No PDB was updated in the cache: %v", err)
+	}
+	// Read PDB from the cache and compare it.
+	cachedPDBs, err = context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
+	if len(cachedPDBs) != 1 {
+		t.Errorf("Expected to have 1 pdb in cache, but found %d.", len(cachedPDBs))
+	}
+	if !reflect.DeepEqual(updatedPDB, cachedPDBs[0]) {
+		t.Errorf("Got different PDB than expected.\nDifference detected on:\n%s", diff.ObjectReflectDiff(updatedPDB, cachedPDBs[0]))
+	}
+
+	// Delete PDB.
+	err = context.clientSet.PolicyV1beta1().PodDisruptionBudgets(context.ns.Name).Delete(pdb.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Errorf("Failed to delete PDB: %v", err)
+	}
+	// Wait for PDB to be deleted from the scheduler's cache.
+	if err = wait.Poll(time.Second, 15*time.Second, func() (bool, error) {
+		cachedPDBs, err := context.scheduler.Config().SchedulerCache.ListPDBs(labels.Everything())
+		if err != nil {
+			t.Errorf("Error while polling for PDB: %v", err)
+			return false, err
+		}
+		return len(cachedPDBs) == 0, err
+	}); err != nil {
+		t.Errorf("No PDB was deleted from the cache: %v", err)
 	}
 }

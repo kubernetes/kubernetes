@@ -29,12 +29,12 @@ import (
 var _ = Describe("[sig-api-machinery] ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
-	It("should be consumable via environment variable [Conformance]", func() {
+	framework.ConformanceIt("should be consumable via environment variable ", func() {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
 		By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		var err error
-		if configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 
@@ -72,12 +72,12 @@ var _ = Describe("[sig-api-machinery] ConfigMap", func() {
 		})
 	})
 
-	It("should be consumable via the environment [Conformance]", func() {
+	framework.ConformanceIt("should be consumable via the environment ", func() {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newEnvFromConfigMap(f, name)
 		By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		var err error
-		if configMap, err = f.ClientSet.Core().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+		if configMap, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
 			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
 		}
 

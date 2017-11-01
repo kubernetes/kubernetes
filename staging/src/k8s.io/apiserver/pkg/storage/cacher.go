@@ -649,6 +649,12 @@ func (c *Cacher) isStopped() bool {
 }
 
 func (c *Cacher) Stop() {
+	// TODO : Do not check for isStopped (and return) when PR
+	// https://github.com/kubernetes/kubernetes/pull/50690
+	// merges as that shuts down storage properly
+	if c.isStopped() {
+		return
+	}
 	c.stopLock.Lock()
 	c.stopped = true
 	c.stopLock.Unlock()

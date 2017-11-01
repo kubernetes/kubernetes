@@ -220,11 +220,11 @@ func (na nodeAffinity) mutatePodTemplate(pod *v1.Pod) {
 // generateNodes generates nodes to be used for scheduling.
 func (inputConfig *schedulerPerfConfig) generateNodes(config *testConfig) {
 	for i := 0; i < inputConfig.NodeCount; i++ {
-		config.schedulerSupportFunctions.GetClient().Core().Nodes().Create(config.mutatedNodeTemplate)
+		config.schedulerSupportFunctions.GetClient().CoreV1().Nodes().Create(config.mutatedNodeTemplate)
 
 	}
 	for i := 0; i < config.numNodes-inputConfig.NodeCount; i++ {
-		config.schedulerSupportFunctions.GetClient().Core().Nodes().Create(baseNodeTemplate)
+		config.schedulerSupportFunctions.GetClient().CoreV1().Nodes().Create(baseNodeTemplate)
 
 	}
 }

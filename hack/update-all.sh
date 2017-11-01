@@ -63,10 +63,6 @@ BASH_TARGETS="
 	update-swagger-spec
 	update-openapi-spec
 	update-api-reference-docs
-	update-federation-openapi-spec
-	update-federation-swagger-spec
-	update-federation-generated-swagger-docs
-	update-federation-api-reference-docs
 	update-staging-godeps
 	update-bazel"
 

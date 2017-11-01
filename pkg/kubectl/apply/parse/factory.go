@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kubernetes/pkg/kubectl/apply"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
@@ -60,7 +61,7 @@ func (b *Factory) CreateElement(recorded, local, remote map[string]interface{}) 
 }
 
 // getItem returns the appropriate Item based on the underlying type of the arguments
-func (v *ElementBuildingVisitor) getItem(s openapi.Schema, name string, data apply.RawElementData) (Item, error) {
+func (v *ElementBuildingVisitor) getItem(s proto.Schema, name string, data apply.RawElementData) (Item, error) {
 	kind, err := getType(data.GetRecorded(), data.GetLocal(), data.GetRemote())
 	if err != nil {
 		return nil, err
@@ -85,17 +86,35 @@ func (v *ElementBuildingVisitor) getItem(s openapi.Schema, name string, data app
 		if err != nil {
 			return nil, fmt.Errorf("expected openapi Array, was %T for %v", s, kind)
 		}
-		return &listItem{name, a, apply.ListElementData{data}}, nil
+		return &listItem{
+			Name:  name,
+			Array: a,
+			ListElementData: apply.ListElementData{
+				RawElementData: data,
+			},
+		}, nil
 	case reflect.Map:
 		if k, err := getKind(s); err == nil {
-			return &typeItem{name, k, apply.MapElementData{data}}, nil
+			return &typeItem{
+				Name: name,
+				Type: k,
+				MapElementData: apply.MapElementData{
+					RawElementData: data,
+				},
+			}, nil
 		}
 		// If it looks like a map, and no openapi type is found, default to mapItem
 		m, err := getMap(s)
 		if err != nil {
 			return nil, fmt.Errorf("expected openapi Kind or Map, was %T for %v", s, kind)
 		}
-		return &mapItem{name, m, apply.MapElementData{data}}, nil
+		return &mapItem{
+			Name: name,
+			Map:  m,
+			MapElementData: apply.MapElementData{
+				RawElementData: data,
+			},
+		}, nil
 	}
 	return nil, fmt.Errorf("unsupported type type %v", kind)
 }

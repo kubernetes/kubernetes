@@ -19722,7 +19722,7 @@
       "items": {
        "$ref": "v1.LimitRange"
       },
-      "description": "Items is a list of LimitRange objects. More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_limit_range.md"
+      "description": "Items is a list of LimitRange objects. More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/"
      }
     }
    },
@@ -19857,7 +19857,7 @@
       "items": {
        "$ref": "v1.FinalizerName"
       },
-      "description": "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: https://git.k8s.io/community/contributors/design-proposals/namespaces.md#finalizers"
+      "description": "Finalizers is an opaque list of values that must be empty to permanently remove object from storage. More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/"
      }
     }
    },
@@ -19871,7 +19871,7 @@
     "properties": {
      "phase": {
       "type": "string",
-      "description": "Phase is the current lifecycle phase of the namespace. More info: https://git.k8s.io/community/contributors/design-proposals/namespaces.md#phases"
+      "description": "Phase is the current lifecycle phase of the namespace. More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/"
      }
     }
    },
@@ -20529,7 +20529,7 @@
       "description": "NFS represents an NFS mount on the host. Provisioned by an admin. More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs"
      },
      "rbd": {
-      "$ref": "v1.RBDVolumeSource",
+      "$ref": "v1.RBDPersistentVolumeSource",
       "description": "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md"
      },
      "iscsi": {
@@ -20581,7 +20581,7 @@
       "description": "PortworxVolume represents a portworx volume attached and mounted on kubelets host machine"
      },
      "scaleIO": {
-      "$ref": "v1.ScaleIOVolumeSource",
+      "$ref": "v1.ScaleIOPersistentVolumeSource",
       "description": "ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes."
      },
      "local": {
@@ -20737,8 +20737,8 @@
      }
     }
    },
-   "v1.RBDVolumeSource": {
-    "id": "v1.RBDVolumeSource",
+   "v1.RBDPersistentVolumeSource": {
+    "id": "v1.RBDPersistentVolumeSource",
     "description": "Represents a Rados Block Device mount that lasts the lifetime of a pod. RBD volumes support ownership management and SELinux relabeling.",
     "required": [
      "monitors",
@@ -20773,7 +20773,7 @@
       "description": "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
      },
      "secretRef": {
-      "$ref": "v1.LocalObjectReference",
+      "$ref": "v1.SecretReference",
       "description": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
      },
      "readOnly": {
@@ -20782,13 +20782,17 @@
      }
     }
    },
-   "v1.LocalObjectReference": {
-    "id": "v1.LocalObjectReference",
-    "description": "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
+   "v1.SecretReference": {
+    "id": "v1.SecretReference",
+    "description": "SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace",
     "properties": {
      "name": {
       "type": "string",
-      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names"
+      "description": "Name is unique within a namespace to reference a secret resource."
+     },
+     "namespace": {
+      "type": "string",
+      "description": "Namespace defines the space within which the secret name must be unique."
      }
     }
    },
@@ -20851,6 +20855,16 @@
      }
     }
    },
+   "v1.LocalObjectReference": {
+    "id": "v1.LocalObjectReference",
+    "description": "LocalObjectReference contains enough information to let you locate the referenced object inside the same namespace.",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names"
+     }
+    }
+   },
    "v1.CinderVolumeSource": {
     "id": "v1.CinderVolumeSource",
     "description": "Represents a cinder volume resource in Openstack. A Cinder volume must exist before mounting to a container. The volume must also be in the same region as the kubelet. Cinder volumes support ownership management and SELinux relabeling.",
@@ -20905,20 +20919,6 @@
      "readOnly": {
       "type": "boolean",
       "description": "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: https://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it"
-     }
-    }
-   },
-   "v1.SecretReference": {
-    "id": "v1.SecretReference",
-    "description": "SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace",
-    "properties": {
-     "name": {
-      "type": "string",
-      "description": "Name is unique within a namespace to reference a secret resource."
-     },
-     "namespace": {
-      "type": "string",
-      "description": "Namespace defines the space within which the secret name must be unique."
      }
     }
    },
@@ -21160,9 +21160,9 @@
      }
     }
    },
-   "v1.ScaleIOVolumeSource": {
-    "id": "v1.ScaleIOVolumeSource",
-    "description": "ScaleIOVolumeSource represents a persistent ScaleIO volume",
+   "v1.ScaleIOPersistentVolumeSource": {
+    "id": "v1.ScaleIOPersistentVolumeSource",
+    "description": "ScaleIOPersistentVolumeSource represents a persistent ScaleIO volume",
     "required": [
      "gateway",
      "system",
@@ -21178,7 +21178,7 @@
       "description": "The name of the storage system as configured in ScaleIO."
      },
      "secretRef": {
-      "$ref": "v1.LocalObjectReference",
+      "$ref": "v1.SecretReference",
       "description": "SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail."
      },
      "sslEnabled": {
@@ -21187,15 +21187,15 @@
      },
      "protectionDomain": {
       "type": "string",
-      "description": "The name of the Protection Domain for the configured storage (defaults to \"default\")."
+      "description": "The name of the ScaleIO Protection Domain for the configured storage."
      },
      "storagePool": {
       "type": "string",
-      "description": "The Storage Pool associated with the protection domain (defaults to \"default\")."
+      "description": "The ScaleIO Storage Pool associated with the protection domain."
      },
      "storageMode": {
       "type": "string",
-      "description": "Indicates whether the storage for a volume should be thick or thin (defaults to \"thin\")."
+      "description": "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned."
      },
      "volumeName": {
       "type": "string",
@@ -21674,6 +21674,51 @@
      }
     }
    },
+   "v1.RBDVolumeSource": {
+    "id": "v1.RBDVolumeSource",
+    "description": "Represents a Rados Block Device mount that lasts the lifetime of a pod. RBD volumes support ownership management and SELinux relabeling.",
+    "required": [
+     "monitors",
+     "image"
+    ],
+    "properties": {
+     "monitors": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "A collection of Ceph monitors. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+     },
+     "image": {
+      "type": "string",
+      "description": "The rados image name. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type of the volume that you want to mount. Tip: Ensure that the filesystem type is supported by the host operating system. Examples: \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified. More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd"
+     },
+     "pool": {
+      "type": "string",
+      "description": "The rados pool name. Default is rbd. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+     },
+     "user": {
+      "type": "string",
+      "description": "The rados user name. Default is admin. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+     },
+     "keyring": {
+      "type": "string",
+      "description": "Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it"
+     }
+    }
+   },
    "v1.CephFSVolumeSource": {
     "id": "v1.CephFSVolumeSource",
     "description": "Represents a Ceph Filesystem mount that lasts the lifetime of a pod Cephfs volumes do not support ownership management or SELinux relabeling.",
@@ -21934,6 +21979,57 @@
      }
     }
    },
+   "v1.ScaleIOVolumeSource": {
+    "id": "v1.ScaleIOVolumeSource",
+    "description": "ScaleIOVolumeSource represents a persistent ScaleIO volume",
+    "required": [
+     "gateway",
+     "system",
+     "secretRef"
+    ],
+    "properties": {
+     "gateway": {
+      "type": "string",
+      "description": "The host address of the ScaleIO API Gateway."
+     },
+     "system": {
+      "type": "string",
+      "description": "The name of the storage system as configured in ScaleIO."
+     },
+     "secretRef": {
+      "$ref": "v1.LocalObjectReference",
+      "description": "SecretRef references to the secret for ScaleIO user and other sensitive information. If this is not provided, Login operation will fail."
+     },
+     "sslEnabled": {
+      "type": "boolean",
+      "description": "Flag to enable/disable SSL communication with Gateway, default false"
+     },
+     "protectionDomain": {
+      "type": "string",
+      "description": "The name of the ScaleIO Protection Domain for the configured storage."
+     },
+     "storagePool": {
+      "type": "string",
+      "description": "The ScaleIO Storage Pool associated with the protection domain."
+     },
+     "storageMode": {
+      "type": "string",
+      "description": "Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned."
+     },
+     "volumeName": {
+      "type": "string",
+      "description": "The name of a volume already created in the ScaleIO system that is associated with this volume source."
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     }
+    }
+   },
    "v1.StorageOSVolumeSource": {
     "id": "v1.StorageOSVolumeSource",
     "description": "Represents a StorageOS persistent volume resource.",
@@ -22051,7 +22147,7 @@
      },
      "securityContext": {
       "$ref": "v1.SecurityContext",
-      "description": "Security options the pod should run with. More info: https://kubernetes.io/docs/concepts/policy/security-context/ More info: https://git.k8s.io/community/contributors/design-proposals/security_context.md"
+      "description": "Security options the pod should run with. More info: https://kubernetes.io/docs/concepts/policy/security-context/ More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/"
      },
      "stdin": {
       "type": "boolean",
@@ -22663,7 +22759,7 @@
    },
    "v1.PodAffinityTerm": {
     "id": "v1.PodAffinityTerm",
-    "description": "Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key \u003ctopologyKey\u003e tches that of any node on which a pod of the set of pods is running",
+    "description": "Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key \u003ctopologyKey\u003e matches that of any node on which a pod of the set of pods is running",
     "properties": {
      "labelSelector": {
       "$ref": "v1.LabelSelector",
@@ -23295,7 +23391,7 @@
       "items": {
        "$ref": "v1.ResourceQuota"
       },
-      "description": "Items is a list of ResourceQuota objects. More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md"
+      "description": "Items is a list of ResourceQuota objects. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/"
      }
     }
    },
@@ -23331,7 +23427,7 @@
     "properties": {
      "hard": {
       "type": "object",
-      "description": "Hard is the set of desired hard limits for each named resource. More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md"
+      "description": "Hard is the set of desired hard limits for each named resource. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/"
      },
      "scopes": {
       "type": "array",
@@ -23352,7 +23448,7 @@
     "properties": {
      "hard": {
       "type": "object",
-      "description": "Hard is the set of enforced hard limits for each named resource. More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md"
+      "description": "Hard is the set of enforced hard limits for each named resource. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/"
      },
      "used": {
       "type": "object",

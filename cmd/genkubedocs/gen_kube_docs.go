@@ -26,6 +26,7 @@ import (
 	apiservapp "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	cmapp "k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
+	kubeadmapp "k8s.io/kubernetes/cmd/kubeadm/app/cmd"
 	kubeletapp "k8s.io/kubernetes/cmd/kubelet/app"
 	schapp "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 )
@@ -73,6 +74,10 @@ func main() {
 		// generate docs for kubelet
 		kubelet := kubeletapp.NewKubeletCommand()
 		doc.GenMarkdownTree(kubelet, outDir)
+	case "kubeadm":
+		// generate docs for kubeadm
+		kubeadm := kubeadmapp.NewKubeadmCommand(os.Stdin, os.Stdout, os.Stderr)
+		doc.GenMarkdownTree(kubeadm, outDir)
 	default:
 		fmt.Fprintf(os.Stderr, "Module %s is not supported", module)
 		os.Exit(1)

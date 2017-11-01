@@ -108,7 +108,7 @@ type Rule struct {
 type FailurePolicyType string
 
 const (
-	// Ignore means the initilizer is removed from the initializers list of an
+	// Ignore means the initializer is removed from the initializers list of an
 	// object if the initializer is timed out.
 	Ignore FailurePolicyType = "Ignore"
 	// For 1.7, only "Ignore" is allowed. "Fail" will be allowed when the
@@ -203,6 +203,10 @@ type AdmissionHookClientConfig struct {
 	// ports open, port 443 will be used if it is open, otherwise it is an error.
 	// Required
 	Service ServiceReference `json:"service" protobuf:"bytes,1,opt,name=service"`
+
+	// URLPath is an optional field that specifies the URL path to use when posting the AdmissionReview object.
+	URLPath string `json:"urlPath" protobuf:"bytes,3,opt,name=urlPath"`
+
 	// CABundle is a PEM encoded CA bundle which will be used to validate webhook's server certificate.
 	// Required
 	CABundle []byte `json:"caBundle" protobuf:"bytes,2,opt,name=caBundle"`

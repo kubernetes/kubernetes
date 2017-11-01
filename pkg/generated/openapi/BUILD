@@ -4,12 +4,13 @@
 package(default_visibility = ["//visibility:public"])
 
 load("//pkg/generated/openapi:def.bzl", "openapi_library")
+load("//build:openapi.bzl", "openapi_go_prefix", "openapi_vendor_prefix")
 
 openapi_library(
     name = "go_default_library",
     srcs = ["doc.go"],
+    go_prefix = openapi_go_prefix,
     openapi_targets = [
-        "federation/apis/federation/v1beta1",
         "pkg/apis/abac/v0",
         "pkg/apis/abac/v1beta1",
         "pkg/apis/componentconfig/v1alpha1",
@@ -17,6 +18,7 @@ openapi_library(
         "pkg/version",
     ],
     tags = ["automanaged"],
+    vendor_prefix = openapi_vendor_prefix,
     vendor_targets = [
         "k8s.io/api/admission/v1alpha1",
         "k8s.io/api/admissionregistration/v1alpha1",

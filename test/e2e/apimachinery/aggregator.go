@@ -18,12 +18,9 @@ package apimachinery
 
 import (
 	"crypto/rand"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math/big"
-	"os"
 	"strings"
 	"time"
 
@@ -38,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/util/cert"
 	apiregistrationv1beta1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac"
 	utilversion "k8s.io/kubernetes/pkg/util/version"
@@ -48,18 +44,12 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-type aggregatorContext struct {
-	apiserverCert        []byte
-	apiserverKey         []byte
-	apiserverSigningCert []byte
-}
-
 var serverAggregatorVersion = utilversion.MustParseSemantic("v1.7.0")
 
 var _ = SIGDescribe("Aggregator", func() {
 	f := framework.NewDefaultFramework("aggregator")
 	framework.AddCleanupAction(func() {
-		cleanTest(f, false)
+		cleanTest(f)
 	})
 
 	It("Should be able to support the 1.7 Sample API Server using the current Aggregator", func() {
@@ -68,127 +58,45 @@ var _ = SIGDescribe("Aggregator", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 
 		// Testing a 1.7 version of the sample-apiserver
-		TestSampleAPIServer(f, "gcr.io/kubernetes-e2e-test-images/k8s-aggregator-sample-apiserver-amd64:1.7v2", "sample-system")
+		TestSampleAPIServer(f, "gcr.io/kubernetes-e2e-test-images/k8s-aggregator-sample-apiserver-amd64:1.7v2")
 	})
 })
 
-func cleanTest(f *framework.Framework, block bool) {
+func cleanTest(f *framework.Framework) {
 	// delete the APIService first to avoid causing discovery errors
 	aggrclient := f.AggregatorClient
 	_ = aggrclient.ApiregistrationV1beta1().APIServices().Delete("v1alpha1.wardle.k8s.io", nil)
 
-	namespace := "sample-system"
+	namespace := f.Namespace.Name
 	client := f.ClientSet
 	_ = client.ExtensionsV1beta1().Deployments(namespace).Delete("sample-apiserver", nil)
 	_ = client.CoreV1().Secrets(namespace).Delete("sample-apiserver-secret", nil)
 	_ = client.CoreV1().Services(namespace).Delete("sample-api", nil)
 	_ = client.CoreV1().ServiceAccounts(namespace).Delete("sample-apiserver", nil)
 	_ = client.RbacV1beta1().RoleBindings("kube-system").Delete("wardler-auth-reader", nil)
-	_ = client.CoreV1().Namespaces().Delete(namespace, nil)
 	_ = client.RbacV1beta1().ClusterRoles().Delete("wardler", nil)
-	_ = client.RbacV1beta1().ClusterRoleBindings().Delete("wardler:sample-system:anonymous", nil)
-	if block {
-		_ = wait.Poll(100*time.Millisecond, 5*time.Second, func() (bool, error) {
-			_, err := client.CoreV1().Namespaces().Get("sample-system", metav1.GetOptions{})
-			if err != nil {
-				if apierrs.IsNotFound(err) {
-					return true, nil
-				}
-				return false, err
-			}
-			return false, nil
-		})
-	}
-}
-
-func setupSampleAPIServerCert(namespaceName, serviceName string) *aggregatorContext {
-	aggregatorCertDir, err := ioutil.TempDir("", "test-e2e-aggregator")
-	if err != nil {
-		framework.Failf("Failed to create a temp dir for cert generation %v", err)
-	}
-	defer os.RemoveAll(aggregatorCertDir)
-	apiserverSigningKey, err := cert.NewPrivateKey()
-	if err != nil {
-		framework.Failf("Failed to create CA private key for apiserver %v", err)
-	}
-	apiserverSigningCert, err := cert.NewSelfSignedCACert(cert.Config{CommonName: "e2e-sampleapiserver-ca"}, apiserverSigningKey)
-	if err != nil {
-		framework.Failf("Failed to create CA cert for apiserver %v", err)
-	}
-	apiserverCACertFile, err := ioutil.TempFile(aggregatorCertDir, "apiserver-ca.crt")
-	if err != nil {
-		framework.Failf("Failed to create a temp file for ca cert generation %v", err)
-	}
-	if err := ioutil.WriteFile(apiserverCACertFile.Name(), cert.EncodeCertPEM(apiserverSigningCert), 0644); err != nil {
-		framework.Failf("Failed to write CA cert for apiserver %v", err)
-	}
-	apiserverKey, err := cert.NewPrivateKey()
-	if err != nil {
-		framework.Failf("Failed to create private key for apiserver %v", err)
-	}
-	apiserverCert, err := cert.NewSignedCert(
-		cert.Config{
-			CommonName: serviceName + "." + namespaceName + ".svc",
-			Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		},
-		apiserverKey, apiserverSigningCert, apiserverSigningKey,
-	)
-	if err != nil {
-		framework.Failf("Failed to create cert for apiserver %v", err)
-	}
-	apiserverCertFile, err := ioutil.TempFile(aggregatorCertDir, "apiserver.crt")
-	if err != nil {
-		framework.Failf("Failed to create a temp file for cert generation %v", err)
-	}
-	apiserverKeyFile, err := ioutil.TempFile(aggregatorCertDir, "apiserver.key")
-	if err != nil {
-		framework.Failf("Failed to create a temp file for key generation %v", err)
-	}
-	if err := ioutil.WriteFile(apiserverCertFile.Name(), cert.EncodeCertPEM(apiserverCert), 0600); err != nil {
-		framework.Failf("Failed to write cert file for apiserver %v", err)
-	}
-	if err := ioutil.WriteFile(apiserverKeyFile.Name(), cert.EncodePrivateKeyPEM(apiserverKey), 0644); err != nil {
-		framework.Failf("Failed to write key file for apiserver %v", err)
-	}
-	return &aggregatorContext{
-		apiserverCert:        cert.EncodeCertPEM(apiserverCert),
-		apiserverKey:         cert.EncodePrivateKeyPEM(apiserverKey),
-		apiserverSigningCert: cert.EncodeCertPEM(apiserverSigningCert),
-	}
+	_ = client.RbacV1beta1().ClusterRoleBindings().Delete("wardler:"+namespace+":anonymous", nil)
 }
 
 // A basic test if the sample-apiserver code from 1.7 and compiled against 1.7
 // will work on the current Aggregator/API-Server.
-func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
+func TestSampleAPIServer(f *framework.Framework, image string) {
 	By("Registering the sample API server.")
-	cleanTest(f, true)
 	client := f.ClientSet
 	restClient := client.Discovery().RESTClient()
 	iclient := f.InternalClientset
 	aggrclient := f.AggregatorClient
 
-	context := setupSampleAPIServerCert(namespaceName, "sample-api")
-	ns := f.Namespace.Name
+	namespace := f.Namespace.Name
+	context := setupServerCert(namespace, "sample-api")
 	if framework.ProviderIs("gke") {
 		// kubectl create clusterrolebinding user-cluster-admin-binding --clusterrole=cluster-admin --user=user@domain.com
 		authenticated := rbacv1beta1.Subject{Kind: rbacv1beta1.GroupKind, Name: user.AllAuthenticated}
-		framework.BindClusterRole(client.RbacV1beta1(), "cluster-admin", ns, authenticated)
+		framework.BindClusterRole(client.RbacV1beta1(), "cluster-admin", namespace, authenticated)
 	}
 
 	// kubectl create -f namespace.yaml
-	var namespace string
-	err := wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-		got, err := client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespaceName}})
-		if err != nil {
-			if strings.HasPrefix(err.Error(), "object is being deleted:") {
-				return false, nil
-			}
-			return false, err
-		}
-		namespace = got.Name
-		return true, nil
-	})
-	framework.ExpectNoError(err, "creating namespace %q", namespaceName)
+	// NOTE: aggregated apis should generally be set up in there own namespace. As the test framework is setting up a new namespace, we are just using that.
 
 	// kubectl create -f secret.yaml
 	secretName := "sample-apiserver-secret"
@@ -198,11 +106,11 @@ func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
 		},
 		Type: v1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			"tls.crt": context.apiserverCert,
-			"tls.key": context.apiserverKey,
+			"tls.crt": context.cert,
+			"tls.key": context.key,
 		},
 	}
-	_, err = client.CoreV1().Secrets(namespace).Create(secret)
+	_, err := client.CoreV1().Secrets(namespace).Create(secret)
 	framework.ExpectNoError(err, "creating secret %q in namespace %q", secretName, namespace)
 
 	// kubectl create -f deploy.yaml
@@ -375,7 +283,7 @@ func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
 			},
 			Group:                "wardle.k8s.io",
 			Version:              "v1alpha1",
-			CABundle:             context.apiserverSigningCert,
+			CABundle:             context.signingCert,
 			GroupPriorityMinimum: 2000,
 			VersionPriority:      200,
 		},
@@ -383,8 +291,10 @@ func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
 	framework.ExpectNoError(err, "creating apiservice %s with namespace %s", "v1alpha1.wardle.k8s.io", namespace)
 
 	// Wait for the extension apiserver to be up and healthy
-	// kubectl get deployments -n sample-system && status == Running
-	err = framework.WaitForDeploymentStatusValid(client, deployment)
+	// kubectl get deployments -n <aggregated-api-namespace> && status == Running
+	// NOTE: aggregated apis should generally be set up in there own namespace (<aggregated-api-namespace>). As the test framework
+	// is setting up a new namespace, we are just using that.
+	err = framework.WaitForDeploymentComplete(client, deployment)
 
 	// We seem to need to do additional waiting until the extension api service is actually up.
 	err = wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
@@ -505,12 +415,12 @@ func TestSampleAPIServer(f *framework.Framework, image, namespaceName string) {
 		framework.Failf("failed to get back the correct deleted flunders list %v from the dynamic client", unstructuredList)
 	}
 
-	cleanTest(f, true)
+	cleanTest(f)
 }
 
 func validateErrorWithDebugInfo(f *framework.Framework, err error, pods *v1.PodList, msg string, fields ...interface{}) {
 	if err != nil {
-		namespace := "sample-system"
+		namespace := f.Namespace.Name
 		msg := fmt.Sprintf(msg, fields...)
 		msg += fmt.Sprintf(" but received unexpected error:\n%v", err)
 		client := f.ClientSet
@@ -520,8 +430,8 @@ func validateErrorWithDebugInfo(f *framework.Framework, err error, pods *v1.PodL
 		}
 		pds, err := client.CoreV1().Pods(namespace).List(metav1.ListOptions{})
 		if err == nil {
-			msg += fmt.Sprintf("\nFound pods in sample-system:\n%v", pds)
-			msg += fmt.Sprintf("\nOriginal pods in sample-system:\n%v", pods)
+			msg += fmt.Sprintf("\nFound pods in %s:\n%v", namespace, pds)
+			msg += fmt.Sprintf("\nOriginal pods in %s:\n%v", namespace, pods)
 		}
 
 		framework.Failf(msg)

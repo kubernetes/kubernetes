@@ -291,7 +291,6 @@ else
 test-cmd: generated_files
 	hack/make-rules/test-kubeadm-cmd.sh
 	hack/make-rules/test-cmd.sh
-	hack/make-rules/test-federation-cmd.sh
 endif
 
 define CLEAN_HELP_INFO
@@ -480,21 +479,6 @@ $(notdir $(abspath $(wildcard plugin/cmd/*/))):
 else
 $(notdir $(abspath $(wildcard plugin/cmd/*/))): generated_files
 	hack/make-rules/build.sh plugin/cmd/$@
-endif
-
-define FED_CMD_HELP_INFO
-# Add rules for all directories in federation/cmd/
-#
-# Example:
-#   make federation-apiserver federation-controller-manager
-endef
-.PHONY: $(notdir $(abspath $(wildcard federation/cmd/*/)))
-ifeq ($(PRINT_HELP),y)
-$(notdir $(abspath $(wildcard federation/cmd/*/))):
-	@echo "$$FED_CMD_HELP_INFO"
-else
-$(notdir $(abspath $(wildcard federation/cmd/*/))): generated_files
-	hack/make-rules/build.sh federation/cmd/$@
 endif
 
 define GENERATED_FILES_HELP_INFO

@@ -111,7 +111,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		// If there's a comment of the form "// +groupName=somegroup" or
 		// "// +groupName=somegroup.foo.bar.io", use the first field (somegroup) as the name of the
 		// group when generating.
-		if override := types.ExtractCommentTags("+", p.DocComments)["groupName"]; override != nil {
+		if override := types.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
 			gv.Group = clientgentypes.Group(strings.SplitN(override[0], ".", 2)[0])
 		}
 
@@ -322,8 +322,7 @@ func (s *$.type|private$Lister) $.type|publicPlural$(namespace string) $.type|pu
 var typeLister_NonNamespacedGet = `
 // Get retrieves the $.type|public$ from the index for a given name.
 func (s *$.type|private$Lister) Get(name string) (*$.type|raw$, error) {
-  key := &$.type|raw${ObjectMeta: $.objectMeta|raw${Name: name}}
-  obj, exists, err := s.indexer.Get(key)
+  obj, exists, err := s.indexer.GetByKey(name)
   if err != nil {
     return nil, err
   }

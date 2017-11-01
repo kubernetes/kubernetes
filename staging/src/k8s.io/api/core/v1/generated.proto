@@ -565,7 +565,7 @@ message Container {
 
   // Security options the pod should run with.
   // More info: https://kubernetes.io/docs/concepts/policy/security-context/
-  // More info: https://git.k8s.io/community/contributors/design-proposals/security_context.md
+  // More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
   // +optional
   optional SecurityContext securityContext = 15;
 
@@ -1442,7 +1442,7 @@ message LimitRangeList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of LimitRange objects.
-  // More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_limit_range.md
+  // More info: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/
   repeated LimitRange items = 2;
 }
 
@@ -1593,7 +1593,7 @@ message NamespaceList {
 // NamespaceSpec describes the attributes on a Namespace.
 message NamespaceSpec {
   // Finalizers is an opaque list of values that must be empty to permanently remove object from storage.
-  // More info: https://git.k8s.io/community/contributors/design-proposals/namespaces.md#finalizers
+  // More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/
   // +optional
   repeated string finalizers = 1;
 }
@@ -1601,7 +1601,7 @@ message NamespaceSpec {
 // NamespaceStatus is information about the current status of a Namespace.
 message NamespaceStatus {
   // Phase is the current lifecycle phase of the namespace.
-  // More info: https://git.k8s.io/community/contributors/design-proposals/namespaces.md#phases
+  // More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/
   // +optional
   optional string phase = 1;
 }
@@ -2287,7 +2287,7 @@ message PersistentVolumeSource {
   // RBD represents a Rados Block Device mount on the host that shares a pod's lifetime.
   // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md
   // +optional
-  optional RBDVolumeSource rbd = 6;
+  optional RBDPersistentVolumeSource rbd = 6;
 
   // ISCSI represents an ISCSI Disk resource that is attached to a
   // kubelet's host machine and then exposed to the pod. Provisioned by an admin.
@@ -2342,7 +2342,7 @@ message PersistentVolumeSource {
 
   // ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
   // +optional
-  optional ScaleIOVolumeSource scaleIO = 19;
+  optional ScaleIOPersistentVolumeSource scaleIO = 19;
 
   // Local represents directly-attached storage with node affinity
   // +optional
@@ -2474,7 +2474,7 @@ message PodAffinity {
 // relative to the given namespace(s)) that this pod should be
 // co-located (affinity) or not co-located (anti-affinity) with,
 // where co-located is defined as running on a node whose value of
-// the label with key <topologyKey> tches that of any node on which
+// the label with key <topologyKey> matches that of any node on which
 // a pod of the set of pods is running
 message PodAffinityTerm {
   // A label query over a set of resources, in this case pods.
@@ -3159,6 +3159,57 @@ message QuobyteVolumeSource {
 
 // Represents a Rados Block Device mount that lasts the lifetime of a pod.
 // RBD volumes support ownership management and SELinux relabeling.
+message RBDPersistentVolumeSource {
+  // A collection of Ceph monitors.
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  repeated string monitors = 1;
+
+  // The rados image name.
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  optional string image = 2;
+
+  // Filesystem type of the volume that you want to mount.
+  // Tip: Ensure that the filesystem type is supported by the host operating system.
+  // Examples: "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // More info: https://kubernetes.io/docs/concepts/storage/volumes#rbd
+  // TODO: how do we prevent errors in the filesystem from compromising the machine
+  // +optional
+  optional string fsType = 3;
+
+  // The rados pool name.
+  // Default is rbd.
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // +optional
+  optional string pool = 4;
+
+  // The rados user name.
+  // Default is admin.
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // +optional
+  optional string user = 5;
+
+  // Keyring is the path to key ring for RBDUser.
+  // Default is /etc/ceph/keyring.
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // +optional
+  optional string keyring = 6;
+
+  // SecretRef is name of the authentication secret for RBDUser. If provided
+  // overrides keyring.
+  // Default is nil.
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // +optional
+  optional SecretReference secretRef = 7;
+
+  // ReadOnly here will force the ReadOnly setting in VolumeMounts.
+  // Defaults to false.
+  // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
+  // +optional
+  optional bool readOnly = 8;
+}
+
+// Represents a Rados Block Device mount that lasts the lifetime of a pod.
+// RBD volumes support ownership management and SELinux relabeling.
 message RBDVolumeSource {
   // A collection of Ceph monitors.
   // More info: https://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
@@ -3377,14 +3428,14 @@ message ResourceQuotaList {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // Items is a list of ResourceQuota objects.
-  // More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md
+  // More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
   repeated ResourceQuota items = 2;
 }
 
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota.
 message ResourceQuotaSpec {
   // Hard is the set of desired hard limits for each named resource.
-  // More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md
+  // More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> hard = 1;
 
@@ -3397,7 +3448,7 @@ message ResourceQuotaSpec {
 // ResourceQuotaStatus defines the enforced hard limits and observed use.
 message ResourceQuotaStatus {
   // Hard is the set of enforced hard limits for each named resource.
-  // More info: https://git.k8s.io/community/contributors/design-proposals/admission_control_resource_quota.md
+  // More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> hard = 1;
 
@@ -3440,6 +3491,50 @@ message SELinuxOptions {
   optional string level = 4;
 }
 
+// ScaleIOPersistentVolumeSource represents a persistent ScaleIO volume
+message ScaleIOPersistentVolumeSource {
+  // The host address of the ScaleIO API Gateway.
+  optional string gateway = 1;
+
+  // The name of the storage system as configured in ScaleIO.
+  optional string system = 2;
+
+  // SecretRef references to the secret for ScaleIO user and other
+  // sensitive information. If this is not provided, Login operation will fail.
+  optional SecretReference secretRef = 3;
+
+  // Flag to enable/disable SSL communication with Gateway, default false
+  // +optional
+  optional bool sslEnabled = 4;
+
+  // The name of the ScaleIO Protection Domain for the configured storage.
+  // +optional
+  optional string protectionDomain = 5;
+
+  // The ScaleIO Storage Pool associated with the protection domain.
+  // +optional
+  optional string storagePool = 6;
+
+  // Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
+  // +optional
+  optional string storageMode = 7;
+
+  // The name of a volume already created in the ScaleIO system
+  // that is associated with this volume source.
+  optional string volumeName = 8;
+
+  // Filesystem type to mount.
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  // +optional
+  optional string fsType = 9;
+
+  // Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  // +optional
+  optional bool readOnly = 10;
+}
+
 // ScaleIOVolumeSource represents a persistent ScaleIO volume
 message ScaleIOVolumeSource {
   // The host address of the ScaleIO API Gateway.
@@ -3456,15 +3551,15 @@ message ScaleIOVolumeSource {
   // +optional
   optional bool sslEnabled = 4;
 
-  // The name of the Protection Domain for the configured storage (defaults to "default").
+  // The name of the ScaleIO Protection Domain for the configured storage.
   // +optional
   optional string protectionDomain = 5;
 
-  // The Storage Pool associated with the protection domain (defaults to "default").
+  // The ScaleIO Storage Pool associated with the protection domain.
   // +optional
   optional string storagePool = 6;
 
-  // Indicates whether the storage for a volume should be thick or thin (defaults to "thin").
+  // Indicates whether the storage for a volume should be ThickProvisioned or ThinProvisioned.
   // +optional
   optional string storageMode = 7;
 

@@ -57,7 +57,7 @@ func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error)
 
 	const tty = false
 
-	req := f.ClientSet.Core().RESTClient().Post().
+	req := f.ClientSet.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(options.PodName).
 		Namespace(options.Namespace).
