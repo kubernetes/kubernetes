@@ -23,12 +23,12 @@ import (
 // SysctlsFromPodSecurityPolicyAnnotation parses an annotation value of the key
 // SysctlsSecurityPolocyAnnotationKey into a slice of sysctls. An empty slice
 // is returned if annotation is the empty string.
-func SysctlsFromPodSecurityPolicyAnnotation(annotation string) ([]string, error) {
+func SysctlsFromPodSecurityPolicyAnnotation(annotation string) []string {
 	if len(annotation) == 0 {
-		return []string{}, nil
+		return []string{}
 	}
 
-	return strings.Split(annotation, ","), nil
+	return strings.Split(annotation, ",")
 }
 
 // PodAnnotationsFromSysctls creates an annotation value for a slice of Sysctls.

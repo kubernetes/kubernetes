@@ -79,11 +79,8 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *extensions.PodSecurityPoli
 
 	var unsafeSysctls []string
 	if ann, found := psp.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey]; found {
-		var err error
-		unsafeSysctls, err = extensions.SysctlsFromPodSecurityPolicyAnnotation(ann)
-		if err != nil {
-			errs = append(errs, err)
-		}
+		unsafeSysctls = extensions.SysctlsFromPodSecurityPolicyAnnotation(ann)
+
 	}
 	sysctlsStrat := createSysctlsStrategy(unsafeSysctls)
 

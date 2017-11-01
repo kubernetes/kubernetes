@@ -690,12 +690,8 @@ func ValidatePodSecurityPolicySpecificAnnotations(annotations map[string]string,
 
 	sysctlAnnotation := annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey]
 	sysctlFldPath := fldPath.Key(extensions.SysctlsPodSecurityPolicyAnnotationKey)
-	sysctls, err := extensions.SysctlsFromPodSecurityPolicyAnnotation(sysctlAnnotation)
-	if err != nil {
-		allErrs = append(allErrs, field.Invalid(sysctlFldPath, sysctlAnnotation, err.Error()))
-	} else {
-		allErrs = append(allErrs, validatePodSecurityPolicySysctls(sysctlFldPath, sysctls)...)
-	}
+	sysctls := extensions.SysctlsFromPodSecurityPolicyAnnotation(sysctlAnnotation)
+	allErrs = append(allErrs, validatePodSecurityPolicySysctls(sysctlFldPath, sysctls)...)
 
 	if p := annotations[seccomp.DefaultProfileAnnotationKey]; p != "" {
 		allErrs = append(allErrs, apivalidation.ValidateSeccompProfile(p, fldPath.Key(seccomp.DefaultProfileAnnotationKey))...)
