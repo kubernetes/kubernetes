@@ -629,6 +629,7 @@ type FakePodControl struct {
 	Err             error
 	CreateLimit     int
 	CreateCallCount int
+	OwnPodNames     []string
 }
 
 var _ PodControlInterface = &FakePodControl{}
@@ -716,6 +717,7 @@ func (f *FakePodControl) Clear() {
 	f.Patches = [][]byte{}
 	f.CreateLimit = 0
 	f.CreateCallCount = 0
+	f.OwnPodNames = []string{}
 }
 
 // ByLogging allows custom sorting of pods so the best one can be picked for getting its logs.

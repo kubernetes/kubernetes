@@ -131,13 +131,13 @@ func TestClaimPods(t *testing.T) {
 			controller.UID = types.UID(controllerUID)
 			return test{
 				name: "Controller releases claimed pods when selector doesn't match",
-				manager: NewPodControllerRefManager(&FakePodControl{},
+				manager: NewPodControllerRefManager(&FakePodControl{&OwnPodNames: {"pod1", "pod2"}},
 					&controller,
 					productionLabelSelector,
 					controllerKind,
 					func() error { return nil }),
-				pods:     []*v1.Pod{newPod("pod1", productionLabel, &controller), newPod("pod2", productionLabel, &controller)},
-				claimed:  []*v1.Pod{newPod("pod1", productionLabel, &controller), newPod("pod2", productionLabel, &controller)},
+				pods:     []*v1.Pod{newPod("pod1", productionLabel, &controller), newPod("pod2", testLabel, &controller)},
+				claimed:  nil,
 				released: []*v1.Pod{newPod("pod2", testLabel, &controller)},
 			}
 		}(),
@@ -166,10 +166,11 @@ func TestClaimPods(t *testing.T) {
 		claimed, err := test.manager.ClaimPods(test.pods)
 		if err != nil {
 			t.Errorf("Test case `%s`, unexpected error: %v", test.name, err)
-		} else if !reflect.DeepEqual(test.claimed, claimed) {
+		} else if test.claimed != nil && !reflect.DeepEqual(test.claimed, claimed) {
+			t.Errorf("Test case `%s`, claimed wrong pods. Expected %v, got %v", test.name, podToStringSlice(test.claimed), podToStringSlice(claimed))
+		} else if test.released != nil && !reflect.DeepEqual(test.claimed, claimed) {
 			t.Errorf("Test case `%s`, claimed wrong pods. Expected %v, got %v", test.name, podToStringSlice(test.claimed), podToStringSlice(claimed))
 		}
-
 	}
 }
 
