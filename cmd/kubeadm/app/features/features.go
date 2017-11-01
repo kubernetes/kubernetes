@@ -35,15 +35,19 @@ const (
 
 	// StoreCertsInSecrets is alpha in v1.8
 	StoreCertsInSecrets = "StoreCertsInSecrets"
+
+	// SupportIPVSProxyMode is alpha in v1.8
+	SupportIPVSProxyMode = "SupportIPVSProxyMode"
 )
 
-var v190 = version.MustParseSemantic("v1.9.0")
+var v190 = version.MustParseSemantic("v1.9.0-alpha.1")
 
 // InitFeatureGates are the default feature gates for the init command
 var InitFeatureGates = FeatureList{
-	SelfHosting:         {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
-	StoreCertsInSecrets: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
-	HighAvailability:    {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
+	SelfHosting:          {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Beta}},
+	StoreCertsInSecrets:  {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}},
+	HighAvailability:     {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
+	SupportIPVSProxyMode: {FeatureSpec: utilfeature.FeatureSpec{Default: false, PreRelease: utilfeature.Alpha}, MinimumVersion: v190},
 }
 
 // Feature represents a feature being gated
