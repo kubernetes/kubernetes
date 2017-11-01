@@ -610,15 +610,10 @@ func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
 			return false
 		}
 
-<<<<<<< HEAD
-		if _, hasExcludeBalancerLabel := node.Labels[constants.LabelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
-			return false
-=======
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ServiceNodeExclusion) {
 			if _, hasExcludeBalancerLabel := node.Labels[LabelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
 				return false
 			}
->>>>>>> wqFlag gate node exclusion for service load balancers.
 		}
 
 		// If we have no info, don't accept
