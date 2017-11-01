@@ -827,6 +827,8 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 func truncateBody(body string) string {
 	max := 0
 	switch {
+	case bool(glog.V(10)):
+		return body
 	case bool(glog.V(9)):
 		max = 10240
 	case bool(glog.V(8)):

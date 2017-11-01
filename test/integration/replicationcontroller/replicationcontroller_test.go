@@ -35,6 +35,11 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
+const (
+	pollInterval = 100 * time.Millisecond
+	pollTimeout  = 60 * time.Second
+)
+
 func testLabels() map[string]string {
 	return map[string]string{"name": "test"}
 }
@@ -143,7 +148,7 @@ func rmSetup(t *testing.T, stopCh chan struct{}) (*httptest.Server, framework.Cl
 // running the RC manager to prevent the rc manager from creating new pods
 // rather than adopting the existing ones.
 func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podNum int) {
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		objects := podInformer.GetIndexer().List()
 		if len(objects) == podNum {
 			return true, nil
@@ -230,7 +235,7 @@ func TestAdoption(t *testing.T) {
 		informers.Start(stopCh)
 		waitToObservePods(t, informers.Core().V1().Pods().Informer(), 1)
 		go rm.Run(5, stopCh)
-		if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+		if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 			updatedPod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -265,7 +270,7 @@ func createRCsPods(t *testing.T, clientSet clientset.Interface, rcs []*v1.Replic
 
 func waitRCStable(t *testing.T, clientSet clientset.Interface, rc *v1.ReplicationController, ns string) {
 	rcClient := clientSet.CoreV1().ReplicationControllers(ns)
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		updatedRC, err := rcClient.Get(rc.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -311,7 +316,7 @@ func TestUpdateSelectorToAdopt(t *testing.T) {
 	}
 	t.Logf("patched rc = %#v", rc)
 	// wait for the rc select both pods and delete one of them
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		return verifyRemainingObjects(t, clientSet, ns.Name, 1, 1)
 	}); err != nil {
 		t.Fatal(err)
@@ -349,7 +354,7 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 	}
 	t.Logf("patched rc = %#v", rc)
 	// wait for the rc to create one more pod
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		return verifyRemainingObjects(t, clientSet, ns.Name, 1, 3)
 	}); err != nil {
 		t.Fatal(err)
@@ -392,7 +397,7 @@ func TestUpdateLabelToRemoveControllerRef(t *testing.T) {
 	}
 	t.Logf("patched pod2 = %#v", pod2)
 	// wait for the rc to create one more pod
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		return verifyRemainingObjects(t, clientSet, ns.Name, 1, 3)
 	}); err != nil {
 		t.Fatal(err)
@@ -439,7 +444,7 @@ func TestUpdateLabelToBeAdopted(t *testing.T) {
 	}
 	t.Logf("patched pod2 = %#v", pod2)
 	// wait for the rc to select both pods and delete one of them
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		return verifyRemainingObjects(t, clientSet, ns.Name, 1, 1)
 	}); err != nil {
 		t.Fatal(err)

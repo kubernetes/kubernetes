@@ -90,9 +90,7 @@ var _ = SIGDescribe("Deployment", func() {
 	It("scaled rollout deployment should not block on annotation check", func() {
 		testScaledRolloutDeployment(f)
 	})
-	It("overlapping deployment should not fight with each other", func() {
-		testOverlappingDeployment(f)
-	})
+
 	It("iterative rollouts should eventually progress", func() {
 		testIterativeDeployments(f)
 	})
@@ -774,43 +772,6 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 		err = fmt.Errorf("unexpected desiredReplicas annotation %d for replica set %q", desired, rs.Name)
 		Expect(err).NotTo(HaveOccurred())
 	}
-}
-
-func testOverlappingDeployment(f *framework.Framework) {
-	ns := f.Namespace.Name
-	c := f.ClientSet
-
-	// Create first deployment.
-	deploymentName := "first-deployment"
-	podLabels := map[string]string{"name": RedisImageName}
-	replicas := int32(1)
-	framework.Logf("Creating deployment %q", deploymentName)
-	d := framework.NewDeployment(deploymentName, replicas, podLabels, RedisImageName, RedisImage, extensions.RollingUpdateDeploymentStrategyType)
-	deploy, err := c.Extensions().Deployments(ns).Create(d)
-	Expect(err).NotTo(HaveOccurred(), "Failed creating the first deployment")
-
-	// Wait for it to be updated to revision 1
-	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploy.Name, "1", RedisImage)
-	Expect(err).NotTo(HaveOccurred(), "The first deployment failed to update to revision 1")
-
-	// Create second deployment with overlapping selector.
-	deploymentName = "second-deployment"
-	framework.Logf("Creating deployment %q with overlapping selector", deploymentName)
-	podLabels["other-label"] = "random-label"
-	d = framework.NewDeployment(deploymentName, replicas, podLabels, NginxImageName, NginxImage, extensions.RollingUpdateDeploymentStrategyType)
-	deployOverlapping, err := c.Extensions().Deployments(ns).Create(d)
-	Expect(err).NotTo(HaveOccurred(), "Failed creating the second deployment")
-
-	// Wait for it to be updated to revision 1
-	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deployOverlapping.Name, "1", NginxImage)
-	Expect(err).NotTo(HaveOccurred(), "The second deployment failed to update to revision 1")
-
-	// Both deployments should proceed independently.
-	framework.Logf("Checking each deployment creates its own replica set")
-	options := metav1.ListOptions{}
-	rsList, err := c.Extensions().ReplicaSets(ns).List(options)
-	Expect(err).NotTo(HaveOccurred(), "Failed listing all replica sets in namespace %s", ns)
-	Expect(rsList.Items).To(HaveLen(2))
 }
 
 func randomScale(d *extensions.Deployment, i int) {

@@ -680,3 +680,84 @@ func TestFailedDeployment(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestOverlappingDeployments(t *testing.T) {
+	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	defer closeFn()
+	name := "test-overlapping-deployments"
+	ns := framework.CreateTestingNamespace(name, s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	replicas := int32(1)
+	firstDeploymentName := "first-deployment"
+	secondDeploymentName := "second-deployment"
+	testers := []*deploymentTester{
+		{t: t, c: c, deployment: newDeployment(firstDeploymentName, ns.Name, replicas)},
+		{t: t, c: c, deployment: newDeployment(secondDeploymentName, ns.Name, replicas)},
+	}
+	// Start informer and controllers
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go rm.Run(5, stopCh)
+	go dc.Run(5, stopCh)
+
+	// Create 2 deployments with overlapping selectors
+	var err error
+	var rss []*v1beta1.ReplicaSet
+	for _, tester := range testers {
+		tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+		dname := tester.deployment.Name
+		if err != nil {
+			t.Fatalf("failed to create deployment %q: %v", dname, err)
+		}
+		// Wait for the deployment to be updated to revision 1
+		if err = tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
+			t.Fatalf("failed to update deployment %q to revision 1: %v", dname, err)
+		}
+		// Make sure the deployment completes while manually marking its pods as ready at the same time
+		if err = tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+			t.Fatalf("deployment %q failed to complete: %v", dname, err)
+		}
+		// Get replicaset of the deployment
+		newRS, err := tester.getNewReplicaSet()
+		if err != nil {
+			t.Fatalf("failed to get new replicaset of deployment %q: %v", dname, err)
+		}
+		if newRS == nil {
+			t.Fatalf("unable to find new replicaset of deployment %q", dname)
+		}
+		// Store the replicaset for future usage
+		rss = append(rss, newRS)
+	}
+
+	// Both deployments should proceed independently, so their respective replicaset should not be the same replicaset
+	if rss[0].UID == rss[1].UID {
+		t.Fatalf("overlapping deployments should not share the same replicaset")
+	}
+
+	// Scale only the first deployment by 1
+	newReplicas := replicas + 1
+	testers[0].deployment, err = testers[0].updateDeployment(func(update *v1beta1.Deployment) {
+		update.Spec.Replicas = &newReplicas
+	})
+	if err != nil {
+		t.Fatalf("failed updating deployment %q: %v", firstDeploymentName, err)
+	}
+
+	// Make sure the deployment completes after scaling
+	if err := testers[0].waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+		t.Fatalf("deployment %q failed to complete after scaling: %v", firstDeploymentName, err)
+	}
+
+	// Verify replicaset of both deployments has updated number of replicas
+	for i, tester := range testers {
+		rs, err := c.ExtensionsV1beta1().ReplicaSets(ns.Name).Get(rss[i].Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("failed to get replicaset %q: %v", rss[i].Name, err)
+		}
+		if *rs.Spec.Replicas != *tester.deployment.Spec.Replicas {
+			t.Errorf("expected replicaset %q of deployment %q has %d replicas, but found %d replicas", rs.Name, firstDeploymentName, *tester.deployment.Spec.Replicas, *rs.Spec.Replicas)
+		}
+	}
+}

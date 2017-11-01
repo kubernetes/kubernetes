@@ -247,9 +247,6 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	rc_anno := make(map[string]string)
-	rc_anno[api.CreatedByAnnotation] = refJson(t, &rc)
-
 	rc_pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
@@ -257,7 +254,6 @@ func TestDrain(t *testing.T) {
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
 			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
-			Annotations:       rc_anno,
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "v1",
@@ -286,9 +282,6 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	ds_anno := make(map[string]string)
-	ds_anno[api.CreatedByAnnotation] = refJson(t, &ds)
-
 	ds_pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
@@ -296,7 +289,6 @@ func TestDrain(t *testing.T) {
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
 			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
-			Annotations:       ds_anno,
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "extensions/v1beta1",
@@ -312,21 +304,6 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	missing_ds := extensions.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              "missing-ds",
-			Namespace:         "default",
-			CreationTimestamp: metav1.Time{Time: time.Now()},
-			SelfLink:          testapi.Default.SelfLink("daemonsets", "missing-ds"),
-		},
-		Spec: extensions.DaemonSetSpec{
-			Selector: &metav1.LabelSelector{MatchLabels: labels},
-		},
-	}
-
-	missing_ds_anno := make(map[string]string)
-	missing_ds_anno[api.CreatedByAnnotation] = refJson(t, &missing_ds)
-
 	orphaned_ds_pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
@@ -334,16 +311,6 @@ func TestDrain(t *testing.T) {
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
 			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
-			Annotations:       missing_ds_anno,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion:         "extensions/v1beta1",
-					Kind:               "DaemonSet",
-					Name:               "missing-ds",
-					BlockOwnerDeletion: boolptr(true),
-					Controller:         boolptr(true),
-				},
-			},
 		},
 		Spec: corev1.PodSpec{
 			NodeName: "node",
@@ -369,7 +336,6 @@ func TestDrain(t *testing.T) {
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
 			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
-			Annotations:       map[string]string{api.CreatedByAnnotation: refJson(t, &job)},
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "v1",
@@ -395,9 +361,6 @@ func TestDrain(t *testing.T) {
 		},
 	}
 
-	rs_anno := make(map[string]string)
-	rs_anno[api.CreatedByAnnotation] = refJson(t, &rs)
-
 	rs_pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "bar",
@@ -405,7 +368,6 @@ func TestDrain(t *testing.T) {
 			CreationTimestamp: metav1.Time{Time: time.Now()},
 			Labels:            labels,
 			SelfLink:          testapi.Default.SelfLink("pods", "bar"),
-			Annotations:       rs_anno,
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         "v1",

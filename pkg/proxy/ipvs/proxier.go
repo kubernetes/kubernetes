@@ -1154,7 +1154,7 @@ func (proxier *Proxier) syncProxyRules() {
 					continue
 				}
 				if lp.Protocol == "udp" {
-					isIPv6 := svcInfo.clusterIP.To4() != nil
+					isIPv6 := utilproxy.IsIPv6(svcInfo.clusterIP)
 					utilproxy.ClearUDPConntrackForPort(proxier.exec, lp.Port, isIPv6)
 				}
 				replacementPortsMap[lp] = socket
