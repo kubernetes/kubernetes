@@ -44,6 +44,7 @@ readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
 kube::golang::node_targets() {
   local targets=(
     cmd/kube-proxy
+    cmd/kubeadm
     cmd/kubelet
   )
   echo "${targets[@]}"

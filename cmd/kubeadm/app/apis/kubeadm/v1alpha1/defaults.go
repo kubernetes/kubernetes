@@ -36,8 +36,6 @@ const (
 	DefaultAPIBindPort = 6443
 	// DefaultAuthorizationModes defines default authorization modes
 	DefaultAuthorizationModes = "Node,RBAC"
-	// DefaultCACertPath defines default location of CA certificate
-	DefaultCACertPath = "/etc/kubernetes/pki/ca.crt"
 	// DefaultCertificatesDir defines default certificate directory
 	DefaultCertificatesDir = "/etc/kubernetes/pki"
 	// DefaultImageRepository defines default image registry
