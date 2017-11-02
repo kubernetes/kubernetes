@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
@@ -523,6 +524,16 @@ func sleepUpTo(d time.Duration) {
 	}
 }
 
+func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.ConditionFunc) error {
+	backoff := wait.Backoff{
+		Duration: initialDuration,
+		Factor:   3,
+		Jitter:   0,
+		Steps:    6,
+	}
+	return wait.ExponentialBackoff(backoff, fn)
+}
+
 func createAllResources(configs []testutils.RunObjectConfig, creatingTime time.Duration) {
 	var wg sync.WaitGroup
 	wg.Add(len(configs))
@@ -559,15 +570,26 @@ func scaleResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, scaling
 	newSize := uint(rand.Intn(config.GetReplicas()) + config.GetReplicas()/2)
 	framework.ExpectNoError(framework.ScaleResource(
 		config.GetClient(), config.GetInternalClient(), config.GetNamespace(), config.GetName(), newSize, true, config.GetKind()),
-		fmt.Sprintf("scaling rc %s for the first time", config.GetName()))
+		fmt.Sprintf("scaling %v %v", config.GetKind(), config.GetName()))
 
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.GetName()}))
 	options := metav1.ListOptions{
 		LabelSelector:   selector.String(),
 		ResourceVersion: "0",
 	}
-	_, err := config.GetClient().CoreV1().Pods(config.GetNamespace()).List(options)
-	framework.ExpectNoError(err, fmt.Sprintf("listing pods from rc %v", config.GetName()))
+	listResourcePodsFunc := func() (bool, error) {
+		_, err := config.GetClient().CoreV1().Pods(config.GetNamespace()).List(options)
+		if err == nil {
+			return true, nil
+		}
+		framework.Logf("Failed to list pods from %v %v due to: %v", config.GetKind(), config.GetName(), err)
+		if framework.IsRetryableAPIError(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("Failed to list pods from %v %v with non-retriable error: %v", config.GetKind(), config.GetName(), err)
+	}
+	err := retryWithExponentialBackOff(100*time.Millisecond, listResourcePodsFunc)
+	framework.ExpectNoError(err)
 }
 
 func deleteAllResources(configs []testutils.RunObjectConfig, deletingTime time.Duration) {
