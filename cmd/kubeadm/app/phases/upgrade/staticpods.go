@@ -109,12 +109,54 @@ func (spm *KubeStaticPodPathManager) BackupManifestDir() string {
 	return spm.backupManifestDir
 }
 
+func performStaticPodUpgrade(component string, waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.MasterConfiguration, beforePodHash string) error {
+	// The old manifest is here; in the /etc/kubernetes/manifests/
+	currentManifestPath := pathMgr.RealManifestPath(component)
+	// The new, upgraded manifest will be written here
+	newManifestPath := pathMgr.TempManifestPath(component)
+	// The old manifest will be moved here; into a subfolder of the temporary directory
+	// If a rollback is needed, these manifests will be put back to where they where initially
+	backupManifestPath := pathMgr.BackupManifestPath(component)
+
+	// Store the backup path in the recover list. If something goes wrong now, this component will be rolled back.
+	recoverManifest := backupManifestPath
+
+	// Move the old manifest into the old-manifests directory
+	if err := pathMgr.MoveFile(currentManifestPath, backupManifestPath); err != nil {
+		return rollbackOldManifest(component, recoverManifest, err, pathMgr)
+	}
+
+	// Move the new manifest into the manifests directory
+	if err := pathMgr.MoveFile(newManifestPath, currentManifestPath); err != nil {
+		return rollbackOldManifest(component, recoverManifest, err, pathMgr)
+	}
+
+	fmt.Printf("[upgrade/staticpods] Moved upgraded manifest to %q and backed up old manifest to %q\n", currentManifestPath, backupManifestPath)
+	fmt.Println("[upgrade/staticpods] Waiting for the kubelet to restart the component")
+
+	// Wait for the mirror Pod hash to change; otherwise we'll run into race conditions here when the kubelet hasn't had time to
+	// notice the removal of the Static Pod, leading to a false positive below where we check that the API endpoint is healthy
+	// If we don't do this, there is a case where we remove the Static Pod manifest, kubelet is slow to react, kubeadm checks the
+	// API endpoint below of the OLD Static Pod component and proceeds quickly enough, which might lead to unexpected results.
+	if err := waiter.WaitForStaticPodControlPlaneHashChange(cfg.NodeName, component, beforePodHash); err != nil {
+		return rollbackOldManifest(component, recoverManifest, err, pathMgr)
+	}
+
+	// Wait for the static pod component to come up and register itself as a mirror pod
+	if err := waiter.WaitForPodsWithLabel("component=" + component); err != nil {
+		return rollbackOldManifest(component, recoverManifest, err, pathMgr)
+	}
+
+	fmt.Printf("[upgrade/staticpods] Component %q upgraded successfully!\n", component)
+	return nil
+}
+
 // StaticPodControlPlane upgrades a static pod-hosted control plane
-func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.MasterConfiguration) error {
+func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager, cfg *kubeadmapi.MasterConfiguration, etcdUpgrade bool) error {
 
 	// This string-string map stores the component name and backup filepath (if a rollback is needed).
 	// If a rollback is needed,
-	recoverManifests := map[string]string{}
+	// recoverManifests := map[string]string{}
 
 	beforePodHashMap, err := waiter.WaitForStaticPodControlPlaneHashes(cfg.NodeName)
 	if err != nil {
@@ -128,44 +170,9 @@ func StaticPodControlPlane(waiter apiclient.Waiter, pathMgr StaticPodPathManager
 		return fmt.Errorf("error creating init static pod manifest files: %v", err)
 	}
 	for _, component := range constants.MasterComponents {
-		// The old manifest is here; in the /etc/kubernetes/manifests/
-		currentManifestPath := pathMgr.RealManifestPath(component)
-		// The new, upgraded manifest will be written here
-		newManifestPath := pathMgr.TempManifestPath(component)
-		// The old manifest will be moved here; into a subfolder of the temporary directory
-		// If a rollback is needed, these manifests will be put back to where they where initially
-		backupManifestPath := pathMgr.BackupManifestPath(component)
-
-		// Store the backup path in the recover list. If something goes wrong now, this component will be rolled back.
-		recoverManifests[component] = backupManifestPath
-
-		// Move the old manifest into the old-manifests directory
-		if err := pathMgr.MoveFile(currentManifestPath, backupManifestPath); err != nil {
-			return rollbackOldManifests(recoverManifests, err, pathMgr)
+		if err = performStaticPodUpgrade(component, waiter, pathMgr, cfg, beforePodHashMap[component]); err != nil {
+			return err
 		}
-
-		// Move the new manifest into the manifests directory
-		if err := pathMgr.MoveFile(newManifestPath, currentManifestPath); err != nil {
-			return rollbackOldManifests(recoverManifests, err, pathMgr)
-		}
-
-		fmt.Printf("[upgrade/staticpods] Moved upgraded manifest to %q and backed up old manifest to %q\n", currentManifestPath, backupManifestPath)
-		fmt.Println("[upgrade/staticpods] Waiting for the kubelet to restart the component")
-
-		// Wait for the mirror Pod hash to change; otherwise we'll run into race conditions here when the kubelet hasn't had time to
-		// notice the removal of the Static Pod, leading to a false positive below where we check that the API endpoint is healthy
-		// If we don't do this, there is a case where we remove the Static Pod manifest, kubelet is slow to react, kubeadm checks the
-		// API endpoint below of the OLD Static Pod component and proceeds quickly enough, which might lead to unexpected results.
-		if err := waiter.WaitForStaticPodControlPlaneHashChange(cfg.NodeName, component, beforePodHashMap[component]); err != nil {
-			return rollbackOldManifests(recoverManifests, err, pathMgr)
-		}
-
-		// Wait for the static pod component to come up and register itself as a mirror pod
-		if err := waiter.WaitForPodsWithLabel("component=" + component); err != nil {
-			return rollbackOldManifests(recoverManifests, err, pathMgr)
-		}
-
-		fmt.Printf("[upgrade/staticpods] Component %q upgraded successfully!\n", component)
 	}
 	// Remove the temporary directories used on a best-effort (don't fail if the calls error out)
 	// The calls are set here by design; we should _not_ use "defer" above as that would remove the directories
@@ -188,6 +195,21 @@ func rollbackOldManifests(oldManifests map[string]string, origErr error, pathMgr
 		if err != nil {
 			errs = append(errs, err)
 		}
+	}
+	// Let the user know there we're problems, but we tried to reçover
+	return fmt.Errorf("couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced: %v", errs)
+}
+
+// rollbackOldManifest rolls back the backuped component manifest if something went wrong
+func rollbackOldManifest(component string, oldManifest string, origErr error, pathMgr StaticPodPathManager) error {
+	errs := []error{origErr}
+	// Where we should put back the backed up manifest
+	realManifestPath := pathMgr.RealManifestPath(component)
+
+	// Move the backup manifest back into the manifests directory
+	err := pathMgr.MoveFile(oldManifest, realManifestPath)
+	if err != nil {
+		errs = append(errs, err)
 	}
 	// Let the user know there we're problems, but we tried to reçover
 	return fmt.Errorf("couldn't upgrade control plane. kubeadm has tried to recover everything into the earlier state. Errors faced: %v", errs)

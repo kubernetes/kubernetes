@@ -40,6 +40,8 @@ type Waiter interface {
 	WaitForPodsWithLabel(kvLabel string) error
 	// WaitForPodToDisappear waits for the given Pod in the kube-system namespace to be deleted
 	WaitForPodToDisappear(staticPodName string) error
+	// WaitForStaticPodSingleHash fetches sha256 hash for the control plane static pod
+	WaitForStaticPodSingleHash(nodeName string, component string) (string, error)
 	// WaitForStaticPodControlPlaneHashes fetches sha256 hashes for the control plane static pods
 	WaitForStaticPodControlPlaneHashes(nodeName string) (map[string]string, error)
 	// WaitForStaticPodControlPlaneHashChange waits for the given static pod component's static pod hash to get updated.
@@ -167,6 +169,22 @@ func (w *KubeWaiter) WaitForStaticPodControlPlaneHashes(nodeName string) (map[st
 	return mirrorPodHashes, err
 }
 
+// WaitForStaticPodSingleHash blocks until it timeouts or gets a hash for a single component and its Static Pod
+func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component string) (string, error) {
+
+	mirrorPodHash := ""
+	err := wait.PollImmediate(constants.APICallRetryInterval, w.timeout, func() (bool, error) {
+
+		hash, err := getStaticPodSingleHash(w.client, nodeName, component)
+		if err != nil {
+			return false, nil
+		}
+		mirrorPodHash = hash
+		return true, nil
+	})
+	return mirrorPodHash, err
+}
+
 // WaitForStaticPodControlPlaneHashChange blocks until it timeouts or notices that the Mirror Pod (for the Static Pod, respectively) has changed
 // This implicitely means this function blocks until the kubelet has restarted the Static Pod in question
 func (w *KubeWaiter) WaitForStaticPodControlPlaneHashChange(nodeName, component, previousHash string) error {
@@ -204,6 +222,25 @@ func getStaticPodControlPlaneHashes(client clientset.Interface, nodeName string)
 		mirrorPodHashes[component] = fmt.Sprintf("%x", sha256.Sum256(podBytes))
 	}
 	return mirrorPodHashes, nil
+}
+
+// getStaticSinglePodHash computes hashes for a single Static Pod resource
+func getStaticPodSingleHash(client clientset.Interface, nodeName string, component string) (string, error) {
+
+	mirrorPodHash := ""
+	staticPodName := fmt.Sprintf("%s-%s", component, nodeName)
+	staticPod, err := client.CoreV1().Pods(metav1.NamespaceSystem).Get(staticPodName, metav1.GetOptions{})
+	if err != nil {
+		return mirrorPodHash, err
+	}
+
+	podBytes, err := json.Marshal(staticPod)
+	if err != nil {
+		return mirrorPodHash, err
+	}
+
+	mirrorPodHash = fmt.Sprintf("%x", sha256.Sum256(podBytes))
+	return mirrorPodHash, nil
 }
 
 // TryRunCommand runs a function a maximum of failureThreshold times, and retries on error. If failureThreshold is hit; the last error is returned

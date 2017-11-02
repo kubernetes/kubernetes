@@ -201,7 +201,7 @@ var (
 	DefaultTokenUsages = []string{"signing", "authentication"}
 
 	// MasterComponents defines the master component names
-	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
+	MasterComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler, Etcd}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
 	MinimumControlPlaneVersion = version.MustParseSemantic("v1.8.0")
