@@ -33,6 +33,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 )
 
+const numPods = 20
+
 // fakePodWorkers runs sync pod function in serial, so we can have
 // deterministic behaviour in testing.
 type fakePodWorkers struct {
@@ -129,7 +131,6 @@ func TestUpdatePod(t *testing.T) {
 	podWorkers, processed := createPodWorkers()
 
 	// Check whether all pod updates will be processed.
-	numPods := 20
 	for i := 0; i < numPods; i++ {
 		for j := i; j < numPods; j++ {
 			podWorkers.UpdatePod(&UpdatePodOptions{
@@ -165,7 +166,6 @@ func TestUpdatePod(t *testing.T) {
 
 func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
 	podWorkers, processed := createPodWorkers()
-	numPods := 20
 	for i := 0; i < numPods; i++ {
 		pod := newPod(string(i), string(i))
 		podWorkers.UpdatePod(&UpdatePodOptions{
@@ -206,7 +206,6 @@ func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
 func TestForgetNonExistingPodWorkers(t *testing.T) {
 	podWorkers, _ := createPodWorkers()
 
-	numPods := 20
 	for i := 0; i < numPods; i++ {
 		podWorkers.UpdatePod(&UpdatePodOptions{
 			Pod:        newPod(string(i), "name"),
