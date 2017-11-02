@@ -42,7 +42,7 @@ var (
 			Subsystem: kubeProxySubsystem,
 			Name:      "sync_proxy_rules_count",
 			Help:      "SyncProxyRules count",
-	        },
+		},
 	)
 )
 
