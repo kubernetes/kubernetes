@@ -383,10 +383,20 @@ func (gb *GraphBuilder) addDependentToOwners(n *node, owners []metav1.OwnerRefer
 			// attemptToDelete. The garbage processor will enqueue a virtual delete
 			// event to delete it from the graph if API server confirms this
 			// owner doesn't exist.
+			fqKind := schema.FromAPIVersionAndKind(owner.APIVersion, owner.Kind)
+			mapping, err := gb.restMapper.RESTMapping(fqKind.GroupKind(), owner.APIVersion)
+			// TODO: This assumption won't hold if the owner lives in another namespace.
+			ownerNamespace := n.identity.Namespace
+			if err != nil {
+				// TODO: How should failures be handled? Requeue seems appropriate.
+				glog.V(0).Infof("restmapping failed for owner: %v: %v", owner, err)
+			} else if mapping.Scope.Name() == meta.RESTScopeNameRoot {
+				ownerNamespace = ""
+			}
 			ownerNode = &node{
 				identity: objectReference{
 					OwnerReference: owner,
-					Namespace:      n.identity.Namespace,
+					Namespace:      ownerNamespace,
 				},
 				dependents: make(map[*node]struct{}),
 			}
