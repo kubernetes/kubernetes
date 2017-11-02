@@ -555,7 +555,7 @@ func (vs *VSphere) DiskIsAttached(volPath string, nodeName k8stypes.NodeName) (b
 			glog.Errorf("Failed to get VM object for node: %q. err: +%v", vSphereInstance, err)
 			return false, err
 		}
-
+		volPath = vclib.RemoveClusterFromVDiskPath(volPath)
 		attached, err := vm.IsDiskAttached(ctx, volPath)
 		if err != nil {
 			glog.Errorf("DiskIsAttached failed to determine whether disk %q is still attached on node %q",
@@ -593,6 +593,7 @@ func (vs *VSphere) DisksAreAttached(nodeVolumes map[k8stypes.NodeName][]string) 
 		vmVolumes := make(map[string][]string)
 		for nodeName, volPaths := range nodeVolumes {
 			for i, volPath := range volPaths {
+				volPath = vclib.RemoveClusterFromVDiskPath(volPath)
 				// Get the canonical volume path for volPath.
 				canonicalVolumePath, err := getcanonicalVolumePath(ctx, dc, volPath)
 				if err != nil {
