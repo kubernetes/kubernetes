@@ -36,6 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
+	appsv1beta2 "k8s.io/client-go/kubernetes/typed/apps/v1beta2"
 	v1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	extensionsv1beta1client "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	v1listers "k8s.io/client-go/listers/core/v1"
@@ -186,6 +188,44 @@ func (c clientsetAdapter) ExtensionsV1beta1() extensionsv1beta1client.Extensions
 
 func (c clientsetAdapter) Extensions() extensionsv1beta1client.ExtensionsV1beta1Interface {
 	return conversionExtensionsClient{c.Interface, c.Interface.Extensions()}
+}
+
+func (c clientsetAdapter) AppsV1beta2() appsv1beta2.AppsV1beta2Interface {
+	return conversionAppsV1beta2Client{c.Interface, c.Interface.AppsV1beta2()}
+}
+
+func (c clientsetAdapter) AppsV1() appsv1.AppsV1Interface {
+	return conversionAppsV1Client{c.Interface, c.Interface.AppsV1()}
+}
+
+func (c clientsetAdapter) Apps() appsv1.AppsV1Interface {
+	return conversionAppsV1Client{c.Interface, c.Interface.AppsV1()}
+}
+
+type conversionAppsV1beta2Client struct {
+	clientset clientset.Interface
+	appsv1beta2.AppsV1beta2Interface
+}
+
+func (c conversionAppsV1beta2Client) ReplicaSets(namespace string) appsv1beta2.ReplicaSetInterface {
+	// TODO(enisoc): This will force RC integration tests to fail if anyone tries to update
+	// ReplicaSetController to use apps/v1beta2 without updating this conversion adapter.
+	// Please change conversionClient to use the new RS version instead of extensions/v1beta1,
+	// and then return a conversionClient here.
+	panic("need to update RC/RS conversionClient for apps/v1beta2")
+}
+
+type conversionAppsV1Client struct {
+	clientset clientset.Interface
+	appsv1.AppsV1Interface
+}
+
+func (c conversionAppsV1Client) ReplicaSets(namespace string) appsv1.ReplicaSetInterface {
+	// TODO(enisoc): This will force RC integration tests to fail if anyone tries to update
+	// ReplicaSetController to use apps/v1 without updating this conversion adapter.
+	// Please change conversionClient to use the new RS version instead of extensions/v1beta1,
+	// and then return a conversionClient here.
+	panic("need to update RC/RS conversionClient for apps/v1")
 }
 
 type conversionExtensionsClient struct {
