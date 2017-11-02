@@ -22,6 +22,8 @@ import (
 	"path/filepath"
 )
 
+// OutDir creates the absolute path name from path and checks path exists.
+// Returns absolute path including trailing '/' or error if path does not exist.
 func OutDir(path string) (string, error) {
 	outDir, err := filepath.Abs(path)
 	if err != nil {
@@ -34,7 +36,7 @@ func OutDir(path string) (string, error) {
 	}
 
 	if !stat.IsDir() {
-		return "", fmt.Errorf("output directory %s is not a directory\n", outDir)
+		return "", fmt.Errorf("output directory %s is not a directory", outDir)
 	}
 	outDir = outDir + "/"
 	return outDir, nil
