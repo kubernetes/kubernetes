@@ -101,63 +101,6 @@ type CustomMetricCurrentStatusList struct {
 }
 
 // +genclient
-// +genclient:nonNamespaced
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
-// types to the API.  It consists of one or more Versions of the api.
-type ThirdPartyResource struct {
-	metav1.TypeMeta `json:",inline"`
-
-	// Standard object metadata
-	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// Description is the description of this object.
-	// +optional
-	Description string `json:"description,omitempty" protobuf:"bytes,2,opt,name=description"`
-
-	// Versions are versions for this third party object
-	// +optional
-	Versions []APIVersion `json:"versions,omitempty" protobuf:"bytes,3,rep,name=versions"`
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ThirdPartyResourceList is a list of ThirdPartyResources.
-type ThirdPartyResourceList struct {
-	metav1.TypeMeta `json:",inline"`
-
-	// Standard list metadata.
-	// +optional
-	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// Items is the list of ThirdPartyResources.
-	Items []ThirdPartyResource `json:"items" protobuf:"bytes,2,rep,name=items"`
-}
-
-// An APIVersion represents a single concrete version of an object model.
-type APIVersion struct {
-	// Name of this version (e.g. 'v1').
-	// +optional
-	Name string `json:"name,omitempty" protobuf:"bytes,1,opt,name=name"`
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// An internal object, used for versioned storage in etcd.  Not exposed to the end user.
-type ThirdPartyResourceData struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard object metadata.
-	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// Data is the raw JSON data for this data.
-	// +optional
-	Data []byte `json:"data,omitempty" protobuf:"bytes,2,opt,name=data"`
-}
-
-// +genclient
 // +genclient:method=GetScale,verb=get,subresource=scale,result=Scale
 // +genclient:method=UpdateScale,verb=update,subresource=scale,input=Scale,result=Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -586,20 +529,6 @@ type DaemonSetList struct {
 
 	// A list of daemon sets.
 	Items []DaemonSet `json:"items" protobuf:"bytes,2,rep,name=items"`
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ThirdPartyResrouceDataList is a list of ThirdPartyResourceData.
-type ThirdPartyResourceDataList struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard list metadata
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
-	// +optional
-	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// Items is the list of ThirdpartyResourceData.
-	Items []ThirdPartyResourceData `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // +genclient

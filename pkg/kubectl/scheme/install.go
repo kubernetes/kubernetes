@@ -81,9 +81,6 @@ func init() {
 				"PodProxyOptions",
 				"NodeProxyOptions",
 				"ServiceProxyOptions",
-				"ThirdPartyResource",
-				"ThirdPartyResourceData",
-				"ThirdPartyResourceList",
 			),
 		},
 		announced.VersionToSchemeFunc{
@@ -205,7 +202,7 @@ func init() {
 		&announced.GroupMetaFactoryArgs{
 			GroupName:              extensionsv1beta1.GroupName,
 			VersionPreferenceOrder: []string{extensionsv1beta1.SchemeGroupVersion.Version},
-			RootScopedKinds:        sets.NewString("PodSecurityPolicy", "ThirdPartyResource"),
+			RootScopedKinds:        sets.NewString("PodSecurityPolicy"),
 		},
 		announced.VersionToSchemeFunc{
 			extensionsv1beta1.SchemeGroupVersion.Version: extensionsv1beta1.AddToScheme,

@@ -303,15 +303,6 @@ func AddHandlers(h printers.PrintHandler) {
 	h.TableHandler(componentStatusColumnDefinitions, printComponentStatus)
 	h.TableHandler(componentStatusColumnDefinitions, printComponentStatusList)
 
-	thirdPartyResourceColumnDefinitions := []metav1alpha1.TableColumnDefinition{
-		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Description", Type: "string", Description: extensionsv1beta1.ThirdPartyResource{}.SwaggerDoc()["description"]},
-		{Name: "Version(s)", Type: "string", Description: extensionsv1beta1.ThirdPartyResource{}.SwaggerDoc()["versions"]},
-	}
-
-	h.TableHandler(thirdPartyResourceColumnDefinitions, printThirdPartyResource)
-	h.TableHandler(thirdPartyResourceColumnDefinitions, printThirdPartyResourceList)
-
 	deploymentColumnDefinitions := []metav1alpha1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Desired", Type: "string", Description: extensionsv1beta1.DeploymentSpec{}.SwaggerDoc()["replicas"]},
@@ -1427,33 +1418,6 @@ func printComponentStatusList(list *api.ComponentStatusList, options printers.Pr
 	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printComponentStatus(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
-	}
-	return rows, nil
-}
-
-func printThirdPartyResource(obj *extensions.ThirdPartyResource, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
-	row := metav1alpha1.TableRow{
-		Object: runtime.RawExtension{Object: obj},
-	}
-
-	versions := make([]string, len(obj.Versions))
-	for ix := range obj.Versions {
-		version := &obj.Versions[ix]
-		versions[ix] = fmt.Sprintf("%s", version.Name)
-	}
-	versionsString := strings.Join(versions, ",")
-	row.Cells = append(row.Cells, obj.Name, obj.Description, versionsString)
-	return []metav1alpha1.TableRow{row}, nil
-}
-
-func printThirdPartyResourceList(list *extensions.ThirdPartyResourceList, options printers.PrintOptions) ([]metav1alpha1.TableRow, error) {
-	rows := make([]metav1alpha1.TableRow, 0, len(list.Items))
-	for i := range list.Items {
-		r, err := printThirdPartyResource(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

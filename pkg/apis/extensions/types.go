@@ -111,61 +111,6 @@ type CustomMetricCurrentStatusList struct {
 }
 
 // +genclient
-// +genclient:nonNamespaced
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
-// types to the API.  It consists of one or more Versions of the api.
-type ThirdPartyResource struct {
-	metav1.TypeMeta
-
-	// Standard object metadata
-	// +optional
-	metav1.ObjectMeta
-
-	// Description is the description of this object.
-	// +optional
-	Description string
-
-	// Versions are versions for this third party object
-	Versions []APIVersion
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-type ThirdPartyResourceList struct {
-	metav1.TypeMeta
-
-	// Standard list metadata.
-	// +optional
-	metav1.ListMeta
-
-	// Items is the list of horizontal pod autoscalers.
-	Items []ThirdPartyResource
-}
-
-// An APIVersion represents a single concrete version of an object model.
-// TODO: we should consider merge this struct with GroupVersion in metav1.go
-type APIVersion struct {
-	// Name of this version (e.g. 'v1').
-	Name string
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// An internal object, used for versioned storage in etcd.  Not exposed to the end user.
-type ThirdPartyResourceData struct {
-	metav1.TypeMeta
-	// Standard object metadata.
-	// +optional
-	metav1.ObjectMeta
-
-	// Data is the raw JSON data for this data.
-	// +optional
-	Data []byte
-}
-
-// +genclient
 // +genclient:method=GetScale,verb=get,subresource=scale,result=Scale
 // +genclient:method=UpdateScale,verb=update,subresource=scale,input=Scale,result=Scale
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -571,18 +516,6 @@ type DaemonSetList struct {
 
 	// A list of daemon sets.
 	Items []DaemonSet
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-type ThirdPartyResourceDataList struct {
-	metav1.TypeMeta
-	// Standard list metadata
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
-	// +optional
-	metav1.ListMeta
-	// Items is a list of third party objects
-	Items []ThirdPartyResourceData
 }
 
 // +genclient
