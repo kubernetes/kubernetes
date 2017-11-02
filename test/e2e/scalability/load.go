@@ -226,7 +226,7 @@ var _ = SIGDescribe("Load capacity", func() {
 				configMapConfigs[i].Run()
 				defer configMapConfigs[i].Stop()
 			}
-			// StartDeamon if needed
+			// StartDaemon if needed
 			for i := 0; i < itArg.daemonsPerNode; i++ {
 				daemonName := fmt.Sprintf("load-daemon-%v", i)
 				daemonConfig := &testutils.DaemonConfig{
@@ -262,7 +262,7 @@ var _ = SIGDescribe("Load capacity", func() {
 			// to make it possible to create/schedule them in the meantime.
 			// Currently we assume <throughput> pods/second average throughput.
 			// We may want to revisit it in the future.
-			framework.Logf("Starting to create ReplicationControllers...")
+			framework.Logf("Starting to create %v objects...", itArg.kind)
 			creatingTime := time.Duration(totalPods/throughput) * time.Second
 			createAllResources(configs, creatingTime)
 			By("============================================================================")
@@ -272,11 +272,11 @@ var _ = SIGDescribe("Load capacity", func() {
 			// Currently we assume that <throughput> pods/second average throughput.
 			// The expected number of created/deleted pods is less than totalPods/3.
 			scalingTime := time.Duration(totalPods/(3*throughput)) * time.Second
-			framework.Logf("Starting to scale ReplicationControllers first time...")
+			framework.Logf("Starting to scale %v objects first time...", itArg.kind)
 			scaleAllResources(configs, scalingTime)
 			By("============================================================================")
 
-			framework.Logf("Starting to scale ReplicationControllers second time...")
+			framework.Logf("Starting to scale %v objects second time...", itArg.kind)
 			scaleAllResources(configs, scalingTime)
 			By("============================================================================")
 
@@ -284,7 +284,7 @@ var _ = SIGDescribe("Load capacity", func() {
 			// Currently we assume <throughput> pods/second average deletion throughput.
 			// We may want to revisit it in the future.
 			deletingTime := time.Duration(totalPods/throughput) * time.Second
-			framework.Logf("Starting to delete ReplicationControllers...")
+			framework.Logf("Starting to delete %v objects...", itArg.kind)
 			deleteAllResources(configs, deletingTime)
 		})
 	}
