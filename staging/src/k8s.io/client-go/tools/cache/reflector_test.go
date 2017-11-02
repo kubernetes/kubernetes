@@ -354,6 +354,76 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 	}
 }
 
+func TestReflectorListWatchError(t *testing.T) {
+	mkPod := func(id string, rv string) *v1.Pod {
+		return &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: id, ResourceVersion: rv}}
+	}
+	mkList := func(rv string, pods ...*v1.Pod) *v1.PodList {
+		list := &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: rv}}
+		for _, pod := range pods {
+			list.Items = append(list.Items, *pod)
+		}
+		return list
+	}
+	table := []struct {
+		list     *v1.PodList
+		listErr  error
+		events   []watch.Event
+		watchErr error
+	}{
+		{
+			list:     mkList("5", mkPod("bar", "3"), mkPod("qux", "5")),
+			watchErr: fmt.Errorf("a watch error"),
+		}, {
+			list: mkList("1"),
+			events: []watch.Event{
+				{Type: watch.Added, Object: mkPod("foo", "2")},
+				{Type: watch.Added, Object: mkPod("bar", "3")},
+			},
+			watchErr: nil,
+		},
+	}
+
+	s := NewFIFO(MetaNamespaceKeyFunc)
+	for _, item := range table {
+		watchRet, watchErr := item.events, item.watchErr
+		watchCount := 0
+		var r *Reflector
+		lw := &testLW{
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return item.list, item.listErr
+			},
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				err := r.ListWatchError()
+				if watchCount == 0 && err != nil {
+					t.Errorf("Reflector reporting errors when it should be, got error %v", err)
+				}
+				watchCount = watchCount + 1
+
+				if watchErr != nil {
+					return nil, watchErr
+				}
+				watchErr = fmt.Errorf("second watch")
+				fw := watch.NewFake()
+				go func() {
+					for _, e := range watchRet {
+						fw.Action(e.Type, e.Object)
+					}
+					fw.Stop()
+				}()
+				return fw, nil
+			},
+		}
+
+		r = NewReflector(lw, &v1.Pod{}, s, 0)
+		r.ListAndWatch(wait.NeverStop)
+		err := r.ListWatchError()
+		if watchErr != nil && err == nil {
+			t.Errorf("Reflector not reporting errors when it should be, expected error %v", watchErr)
+		}
+	}
+}
+
 func TestReflectorResync(t *testing.T) {
 	iteration := 0
 	stopCh := make(chan struct{})

@@ -68,6 +68,12 @@ var (
 		Name:      "items_per_watch",
 		Help:      "How many items an API watch returns to the reflectors",
 	}, []string{"name"})
+
+	listWatchError = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Subsystem: reflectorSubsystem,
+		Name:      "list_watch_error",
+		Help:      "Whether or not the reflector received an error on its last list or watch attempt",
+	}, []string{"name"})
 )
 
 func init() {
@@ -78,6 +84,7 @@ func init() {
 	prometheus.MustRegister(shortWatchesTotal)
 	prometheus.MustRegister(watchDuration)
 	prometheus.MustRegister(itemsPerWatch)
+	prometheus.MustRegister(listWatchError)
 
 	cache.SetReflectorMetricsProvider(prometheusMetricsProvider{})
 }
@@ -124,4 +131,8 @@ func (prometheusMetricsProvider) NewLastResourceVersionMetric(name string) cache
 	})
 	prometheus.MustRegister(rv)
 	return rv
+}
+
+func (prometheusMetricsProvider) NewListWatchErrorMetric(name string) cache.GaugeMetric {
+	return listWatchError.WithLabelValues(name)
 }

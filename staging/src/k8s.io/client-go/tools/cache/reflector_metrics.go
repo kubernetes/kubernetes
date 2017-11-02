@@ -58,6 +58,8 @@ type reflectorMetrics struct {
 	numberOfItemsInWatch SummaryMetric
 
 	lastResourceVersion GaugeMetric
+
+	listWatchError GaugeMetric
 }
 
 // MetricsProvider generates various metrics used by the reflector.
@@ -72,6 +74,8 @@ type MetricsProvider interface {
 	NewItemsInWatchMetric(name string) SummaryMetric
 
 	NewLastResourceVersionMetric(name string) GaugeMetric
+
+	NewListWatchErrorMetric(name string) GaugeMetric
 }
 
 type noopMetricsProvider struct{}
@@ -86,6 +90,7 @@ func (noopMetricsProvider) NewItemsInWatchMetric(name string) SummaryMetric  { r
 func (noopMetricsProvider) NewLastResourceVersionMetric(name string) GaugeMetric {
 	return noopMetric{}
 }
+func (noopMetricsProvider) NewListWatchErrorMetric(name string) GaugeMetric { return noopMetric{} }
 
 var metricsFactory = struct {
 	metricsProvider MetricsProvider
@@ -108,6 +113,7 @@ func newReflectorMetrics(name string) *reflectorMetrics {
 		watchDuration:        metricsFactory.metricsProvider.NewWatchDurationMetric(name),
 		numberOfItemsInWatch: metricsFactory.metricsProvider.NewItemsInWatchMetric(name),
 		lastResourceVersion:  metricsFactory.metricsProvider.NewLastResourceVersionMetric(name),
+		listWatchError:       metricsFactory.metricsProvider.NewListWatchErrorMetric(name),
 	}
 }
 
