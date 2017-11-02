@@ -1044,7 +1044,7 @@ func (proxier *Proxier) syncProxyRules() {
 			svcInfo.clusterIP.String(),
 			Enum(svcInfo.protocol),
 			uint16(svcInfo.targetPort),
-			uint16(svcInfo.port),			
+			uint16(svcInfo.port),
 		)
 		if err != nil {
 			glog.Errorf("Policy creation failed: %v", err)
