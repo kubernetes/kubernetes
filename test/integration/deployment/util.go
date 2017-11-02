@@ -19,6 +19,7 @@ package deployment
 import (
 	"fmt"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -213,7 +214,9 @@ func markPodReady(c clientset.Interface, ns string, pod *v1.Pod) error {
 
 // markUpdatedPodsReady manually marks updated Deployment pods status to ready,
 // until the deployment is complete
-func (d *deploymentTester) markUpdatedPodsReady() {
+func (d *deploymentTester) markUpdatedPodsReady(wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	ns := d.deployment.Namespace
 	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		// We're done when the deployment is complete
@@ -270,28 +273,42 @@ func (d *deploymentTester) waitForDeploymentComplete() error {
 // while marking updated Deployment pods as ready at the same time.
 // Uses hard check to make sure rolling update strategy is not violated at any times.
 func (d *deploymentTester) waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady() error {
+	var wg sync.WaitGroup
+
 	// Manually mark updated Deployment pods as ready in a separate goroutine
-	go d.markUpdatedPodsReady()
+	wg.Add(1)
+	go d.markUpdatedPodsReady(&wg)
 
 	// Wait for the Deployment status to complete while Deployment pods are becoming ready
 	err := d.waitForDeploymentCompleteAndCheckRolling()
 	if err != nil {
 		return fmt.Errorf("failed to wait for Deployment %s to complete: %v", d.deployment.Name, err)
 	}
+
+	// Wait for goroutine to finish
+	wg.Wait()
+
 	return nil
 }
 
 // waitForDeploymentCompleteAndMarkPodsReady waits for the Deployment to complete
 // while marking updated Deployment pods as ready at the same time.
 func (d *deploymentTester) waitForDeploymentCompleteAndMarkPodsReady() error {
+	var wg sync.WaitGroup
+
 	// Manually mark updated Deployment pods as ready in a separate goroutine
-	go d.markUpdatedPodsReady()
+	wg.Add(1)
+	go d.markUpdatedPodsReady(&wg)
 
 	// Wait for the Deployment status to complete using soft check, while Deployment pods are becoming ready
 	err := d.waitForDeploymentComplete()
 	if err != nil {
 		return fmt.Errorf("failed to wait for Deployment status %s: %v", d.deployment.Name, err)
 	}
+
+	// Wait for goroutine to finish
+	wg.Wait()
+
 	return nil
 }
 
