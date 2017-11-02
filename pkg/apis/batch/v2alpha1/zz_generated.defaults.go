@@ -66,6 +66,9 @@ func SetObjectDefaults_CronJob(in *v2alpha1.CronJob) {
 		if a.VolumeSource.ConfigMap != nil {
 			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
 		}
+		if a.VolumeSource.Quobyte != nil {
+			v1.SetDefaults_QuobyteVolumeSource(a.VolumeSource.Quobyte)
+		}
 		if a.VolumeSource.AzureDisk != nil {
 			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
 		}
@@ -208,6 +211,9 @@ func SetObjectDefaults_JobTemplate(in *v2alpha1.JobTemplate) {
 		}
 		if a.VolumeSource.ConfigMap != nil {
 			v1.SetDefaults_ConfigMapVolumeSource(a.VolumeSource.ConfigMap)
+		}
+		if a.VolumeSource.Quobyte != nil {
+			v1.SetDefaults_QuobyteVolumeSource(a.VolumeSource.Quobyte)
 		}
 		if a.VolumeSource.AzureDisk != nil {
 			v1.SetDefaults_AzureDiskVolumeSource(a.VolumeSource.AzureDisk)
