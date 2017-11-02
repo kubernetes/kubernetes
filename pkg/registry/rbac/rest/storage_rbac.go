@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	rbacclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/internalversion"
+	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
 	clusterrolepolicybased "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/policybased"
 	clusterrolestore "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/storage"
@@ -90,10 +91,10 @@ func (p RESTStorageProvider) storage(version schema.GroupVersion, apiResourceCon
 	once := new(sync.Once)
 	var (
 		authorizationRuleResolver  rbacregistryvalidation.AuthorizationRuleResolver
-		rolesStorage               rest.StandardStorage
-		roleBindingsStorage        rest.StandardStorage
-		clusterRolesStorage        rest.StandardStorage
-		clusterRoleBindingsStorage rest.StandardStorage
+		rolesStorage               rbacregistry.Registry
+		roleBindingsStorage        rbacregistry.Registry
+		clusterRolesStorage        rbacregistry.Registry
+		clusterRoleBindingsStorage rbacregistry.Registry
 	)
 
 	initializeStorage := func() {
