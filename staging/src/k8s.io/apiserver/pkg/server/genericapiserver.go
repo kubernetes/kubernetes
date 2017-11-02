@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
 	genericapi "k8s.io/apiserver/pkg/endpoints"
@@ -82,6 +83,10 @@ type GenericAPIServer struct {
 
 	// minRequestTimeout is how short the request timeout can be.  This is used to build the RESTHandler
 	minRequestTimeout time.Duration
+
+	// ShutdownTimeout is the timeout used for server shutdown. This specifies the timeout before server
+	// gracefully shutdown returns.
+	ShutdownTimeout time.Duration
 
 	// legacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
 	// to InstallLegacyAPIGroup
@@ -146,6 +151,9 @@ type GenericAPIServer struct {
 
 	// delegationTarget is the next delegate in the chain or nil
 	delegationTarget DelegationTarget
+
+	// HandlerChainWaitGroup allows you to wait for all chain handlers finish after the server shutdown.
+	HandlerChainWaitGroup *utilwaitgroup.SafeWaitGroup
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works
@@ -275,16 +283,28 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 
 	<-stopCh
 
-	return s.RunPreShutdownHooks()
+	err = s.RunPreShutdownHooks()
+	if err != nil {
+		return err
+	}
+
+	// Wait for all requests to finish, which are bounded by the RequestTimeout variable.
+	s.HandlerChainWaitGroup.Wait()
+
+	return nil
 }
 
 // NonBlockingRun spawns the secure http server. An error is
 // returned if the secure port cannot be listened on.
 func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
+	// Use an stop channel to allow graceful shutdown without dropping audit events
+	// after http server shutdown.
+	auditStopCh := make(chan struct{})
+
 	// Start the audit backend before any request comes in. This means we must call Backend.Run
 	// before http server start serving. Otherwise the Backend.ProcessEvents call might block.
 	if s.AuditBackend != nil {
-		if err := s.AuditBackend.Run(stopCh); err != nil {
+		if err := s.AuditBackend.Run(auditStopCh); err != nil {
 			return fmt.Errorf("failed to run the audit backend: %v", err)
 		}
 	}
@@ -305,6 +325,8 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 	go func() {
 		<-stopCh
 		close(internalStopCh)
+		s.HandlerChainWaitGroup.Wait()
+		close(auditStopCh)
 	}()
 
 	s.RunPostStartHooks(stopCh)
