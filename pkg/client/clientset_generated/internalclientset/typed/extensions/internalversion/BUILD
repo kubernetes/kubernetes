@@ -19,7 +19,6 @@ go_library(
         "replicaset.go",
         "scale.go",
         "scale_expansion.go",
-        "thirdpartyresource.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion",
     deps = [
