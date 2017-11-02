@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -41,6 +42,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
@@ -63,6 +65,14 @@ const (
 	notRetryable = false
 
 	doNotRetry = time.Duration(0)
+
+	// LabelNodeRoleMaster specifies that a node is a master
+	// It's copied over to kubeadm until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
+	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
+
+	// LabelNodeRoleExcludeBalancer specifies that the node should be
+	// exclude from load balancers created by a cloud provider.
+	LabelNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
 )
 
 type cachedService struct {
@@ -598,6 +608,12 @@ func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
 		// Recognize nodes labeled as master, and filter them also, as we were doing previously.
 		if _, hasMasterRoleLabel := node.Labels[constants.LabelNodeRoleMaster]; hasMasterRoleLabel {
 			return false
+		}
+
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ServiceNodeExclusion) {
+			if _, hasExcludeBalancerLabel := node.Labels[LabelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
+				return false
+			}
 		}
 
 		// If we have no info, don't accept
