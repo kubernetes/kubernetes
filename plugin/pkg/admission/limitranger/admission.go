@@ -75,7 +75,7 @@ func (l *LimitRanger) SetInternalKubeInformerFactory(f informers.SharedInformerF
 	l.lister = limitRangeInformer.Lister()
 }
 
-func (l *LimitRanger) Validate() error {
+func (l *LimitRanger) ValidateInitialization() error {
 	if l.lister == nil {
 		return fmt.Errorf("missing limitRange lister")
 	}

@@ -19,6 +19,7 @@ package daemonset
 import (
 	"fmt"
 
+	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -126,7 +127,7 @@ func (daemonSetStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old 
 	allErrs := validation.ValidateDaemonSet(obj.(*extensions.DaemonSet))
 	allErrs = append(allErrs, validation.ValidateDaemonSetUpdate(newDaemonSet, oldDaemonSet)...)
 
-	// Update is not allowed to set Spec.Selector for all groups/versions except extensions/v1beta1.
+	// Update is not allowed to set Spec.Selector for apps/v1 and apps/v1beta2 (allowed for extensions/v1beta1).
 	// If RequestInfo is nil, it is better to revert to old behavior (i.e. allow update to set Spec.Selector)
 	// to prevent unintentionally breaking users who may rely on the old behavior.
 	// TODO(#50791): after extensions/v1beta1 is removed, move selector immutability check inside ValidateDaemonSetUpdate().
@@ -135,7 +136,7 @@ func (daemonSetStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old 
 		switch groupVersion {
 		case extensionsv1beta1.SchemeGroupVersion:
 			// no-op for compatibility
-		case appsv1beta2.SchemeGroupVersion:
+		case appsv1beta2.SchemeGroupVersion, appsv1.SchemeGroupVersion:
 			// disallow mutation of selector
 			allErrs = append(allErrs, apivalidation.ValidateImmutableField(newDaemonSet.Spec.Selector, oldDaemonSet.Spec.Selector, field.NewPath("spec").Child("selector"))...)
 		default:

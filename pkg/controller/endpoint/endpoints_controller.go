@@ -215,6 +215,10 @@ func podToEndpointAddress(pod *v1.Pod) *v1.EndpointAddress {
 }
 
 func podChanged(oldPod, newPod *v1.Pod) bool {
+	// If the pod's deletion timestamp is set, remove endpoint from ready address.
+	if newPod.DeletionTimestamp != oldPod.DeletionTimestamp {
+		return true
+	}
 	// If the pod's readiness has changed, the associated endpoint address
 	// will move from the unready endpoints set to the ready endpoints.
 	// So for the purposes of an endpoint, a readiness change on a pod

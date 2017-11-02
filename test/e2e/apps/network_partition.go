@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package apps
 
 import (
 	"fmt"
@@ -43,7 +43,6 @@ import (
 )
 
 const (
-	timeout                = 60 * time.Second
 	podReadyTimeout        = 2 * time.Minute
 	podNotReadyTimeout     = 1 * time.Minute
 	nodeReadinessTimeout   = 3 * time.Minute
@@ -103,7 +102,7 @@ func newPodOnNode(c clientset.Interface, namespace, podName, nodeName string) er
 	return err
 }
 
-var _ = framework.KubeDescribe("[sig-apps] Network Partition [Disruptive] [Slow]", func() {
+var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 	f := framework.NewDefaultFramework("network-partition")
 	var systemPodsNo int32
 	var c clientset.Interface

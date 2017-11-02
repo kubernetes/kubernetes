@@ -43,7 +43,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["replica_set_test.go"],
+    srcs = [
+        "replica_set_test.go",
+        "replica_set_utils_test.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/controller/replicaset",
     library = ":go_default_library",
     deps = [

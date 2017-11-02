@@ -744,7 +744,11 @@ func (plugin *kubenetNetworkPlugin) addContainerToNetwork(config *libcni.Network
 	}
 
 	glog.V(3).Infof("Adding %s/%s to '%s' with CNI '%s' plugin and runtime: %+v", namespace, name, config.Network.Name, config.Network.Type, rt)
+	// The network plugin can take up to 3 seconds to execute,
+	// so yield the lock while it runs.
+	plugin.mu.Unlock()
 	res, err := plugin.cniConfig.AddNetwork(config, rt)
+	plugin.mu.Lock()
 	if err != nil {
 		return nil, fmt.Errorf("Error adding container to network: %v", err)
 	}

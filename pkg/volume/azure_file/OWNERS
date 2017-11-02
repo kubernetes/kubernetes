@@ -2,13 +2,8 @@ approvers:
 - brendandburns
 - rootfs
 reviewers:
-- justinsb
 - rootfs
 - brendandburns
-- thockin
-- smarterclayton
-- derekwaynecarr
-- pmorie
 - saad-ali
 - jsafrane
 - jingxu97

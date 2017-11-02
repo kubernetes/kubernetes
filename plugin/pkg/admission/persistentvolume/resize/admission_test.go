@@ -272,7 +272,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 	ctrl := newPlugin()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	ctrl.SetInternalKubeInformerFactory(informerFactory)
-	err := ctrl.Validate()
+	err := ctrl.ValidateInitialization()
 	if err != nil {
 		t.Fatalf("neither pv lister nor storageclass lister can be nil")
 	}

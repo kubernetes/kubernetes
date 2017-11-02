@@ -115,11 +115,11 @@ func TestPodAdmission(t *testing.T) {
 		{
 			pod: bestEffortPod,
 			defaultClusterTolerations: []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
-			namespaceTolerations:      []api.Toleration{},
+			namespaceTolerations:      nil,
 			podTolerations:            []api.Toleration{},
 			mergedTolerations:         []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			admit:                     true,
-			testName:                  "default cluster tolerations with empty pod tolerations",
+			testName:                  "default cluster tolerations with empty pod tolerations and nil namespace tolerations",
 		},
 		{
 			pod: bestEffortPod,
@@ -161,8 +161,9 @@ func TestPodAdmission(t *testing.T) {
 			defaultClusterTolerations: []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue2", Effect: "NoSchedule", TolerationSeconds: nil}},
 			namespaceTolerations:      []api.Toleration{},
 			podTolerations:            []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule", TolerationSeconds: nil}},
-			admit:                     false,
-			testName:                  "conflicting pod and default cluster tolerations",
+			mergedTolerations:         []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule", TolerationSeconds: nil}},
+			admit:                     true,
+			testName:                  "conflicting pod and default cluster tolerations but overridden by empty namespace tolerations",
 		},
 		{
 			pod: bestEffortPod,
@@ -173,6 +174,24 @@ func TestPodAdmission(t *testing.T) {
 			mergedTolerations:         []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
 			admit:                     true,
 			testName:                  "merged pod tolerations satisfy whitelist",
+		},
+		{
+			pod: bestEffortPod,
+			defaultClusterTolerations: []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
+			namespaceTolerations:      []api.Toleration{},
+			podTolerations:            []api.Toleration{},
+			mergedTolerations:         []api.Toleration{},
+			admit:                     true,
+			testName:                  "Override default cluster toleration by empty namespace level toleration",
+		},
+		{
+			pod:               bestEffortPod,
+			whitelist:         []api.Toleration{},
+			clusterWhitelist:  []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue1", Effect: "NoSchedule", TolerationSeconds: nil}},
+			podTolerations:    []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
+			mergedTolerations: []api.Toleration{{Key: "testKey", Operator: "Equal", Value: "testValue", Effect: "NoSchedule", TolerationSeconds: nil}},
+			admit:             true,
+			testName:          "pod toleration conflicts with default cluster white list which is overridden by empty namespace whitelist",
 		},
 		{
 			pod: bestEffortPod,
@@ -211,7 +230,7 @@ func TestPodAdmission(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if len(test.namespaceTolerations) > 0 {
+		if test.namespaceTolerations != nil {
 			tolerationStr, err := json.Marshal(test.namespaceTolerations)
 			if err != nil {
 				t.Errorf("error in marshalling namespace tolerations %v", test.namespaceTolerations)
@@ -219,7 +238,7 @@ func TestPodAdmission(t *testing.T) {
 			namespace.Annotations = map[string]string{NSDefaultTolerations: string(tolerationStr)}
 		}
 
-		if len(test.whitelist) > 0 {
+		if test.whitelist != nil {
 			tolerationStr, err := json.Marshal(test.whitelist)
 			if err != nil {
 				t.Errorf("error in marshalling namespace whitelist %v", test.whitelist)
@@ -344,6 +363,6 @@ func newHandlerForTest(c clientset.Interface) (*podTolerationsPlugin, informers.
 	handler := NewPodTolerationsPlugin(pluginConfig)
 	pluginInitializer := kubeadmission.NewPluginInitializer(c, f, nil, nil, nil, nil, nil)
 	pluginInitializer.Initialize(handler)
-	err = admission.Validate(handler)
+	err = admission.ValidateInitialization(handler)
 	return handler, f, err
 }

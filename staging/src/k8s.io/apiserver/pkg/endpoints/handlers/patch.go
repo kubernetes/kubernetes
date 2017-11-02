@@ -92,16 +92,25 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 			scope.Serializer.DecoderToVersion(s.Serializer, schema.GroupVersion{Group: gv.Group, Version: runtime.APIVersionInternal}),
 		)
 
-		updateAdmit := func(updatedObject runtime.Object, currentObject runtime.Object) error {
-			if admit != nil && admit.Handles(admission.Update) {
-				userInfo, _ := request.UserFrom(ctx)
-				return admit.Admit(admission.NewAttributesRecord(updatedObject, currentObject, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
+		userInfo, _ := request.UserFrom(ctx)
+		staticAdmissionAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo)
+		updateMutation := func(updatedObject runtime.Object, currentObject runtime.Object) error {
+			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && admit.Handles(admission.Update) {
+				return mutatingAdmission.Admit(admission.NewAttributesRecord(updatedObject, currentObject, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
 			}
-
 			return nil
 		}
 
-		result, err := patchResource(ctx, updateAdmit, timeout, versionedObj, r, name, patchType, patchJS,
+		result, err := patchResource(
+			ctx,
+			updateMutation,
+			rest.AdmissionToValidateObjectFunc(admit, staticAdmissionAttributes),
+			rest.AdmissionToValidateObjectUpdateFunc(admit, staticAdmissionAttributes),
+			timeout, versionedObj,
+			r,
+			name,
+			patchType,
+			patchJS,
 			scope.Namer, scope.Creater, scope.Defaulter, scope.UnsafeConvertor, scope.Kind, scope.Resource, codec)
 		if err != nil {
 			scope.err(err, w, req)
@@ -122,12 +131,14 @@ func PatchResource(r rest.Patcher, scope RequestScope, admit admission.Interface
 	}
 }
 
-type updateAdmissionFunc func(updatedObject runtime.Object, currentObject runtime.Object) error
+type mutateObjectUpdateFunc func(obj, old runtime.Object) error
 
 // patchResource divides PatchResource for easier unit testing
 func patchResource(
 	ctx request.Context,
-	admit updateAdmissionFunc,
+	updateMutation mutateObjectUpdateFunc,
+	createValidation rest.ValidateObjectFunc,
+	updateValidation rest.ValidateObjectUpdateFunc,
 	timeout time.Duration,
 	versionedObj runtime.Object,
 	patcher rest.Patcher,
@@ -341,16 +352,15 @@ func patchResource(
 	// applyAdmission is called every time GuaranteedUpdate asks for the updated object,
 	// and is given the currently persisted object and the patched object as input.
 	applyAdmission := func(ctx request.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
-		return patchedObject, admit(patchedObject, currentObject)
+		return patchedObject, updateMutation(patchedObject, currentObject)
 	}
-
 	updatedObjectInfo := rest.DefaultUpdatedObjectInfo(nil, applyPatch, applyAdmission)
 
 	return finishRequest(timeout, func() (runtime.Object, error) {
-		updateObject, _, updateErr := patcher.Update(ctx, name, updatedObjectInfo)
+		updateObject, _, updateErr := patcher.Update(ctx, name, updatedObjectInfo, createValidation, updateValidation)
 		for i := 0; i < MaxRetryWhenPatchConflicts && (errors.IsConflict(updateErr)); i++ {
 			lastConflictErr = updateErr
-			updateObject, _, updateErr = patcher.Update(ctx, name, updatedObjectInfo)
+			updateObject, _, updateErr = patcher.Update(ctx, name, updatedObjectInfo, createValidation, updateValidation)
 		}
 		return updateObject, updateErr
 	})
@@ -444,7 +454,7 @@ func applyPatchToObject(
 ) error {
 	patchedObjMap, err := strategicpatch.StrategicMergeMapPatch(originalMap, patchMap, versionedObj)
 	if err != nil {
-		return err
+		return interpretPatchError(err)
 	}
 
 	// Rather than serialize the patched map to JSON, then decode it to an object, we go directly from a map to an object
@@ -460,7 +470,7 @@ func applyPatchToObject(
 // interpretPatchError interprets the error type and returns an error with appropriate HTTP code.
 func interpretPatchError(err error) error {
 	switch err {
-	case mergepatch.ErrBadJSONDoc, mergepatch.ErrBadPatchFormatForPrimitiveList, mergepatch.ErrBadPatchFormatForRetainKeys, mergepatch.ErrBadPatchFormatForSetElementOrderList:
+	case mergepatch.ErrBadJSONDoc, mergepatch.ErrBadPatchFormatForPrimitiveList, mergepatch.ErrBadPatchFormatForRetainKeys, mergepatch.ErrBadPatchFormatForSetElementOrderList, mergepatch.ErrUnsupportedStrategicMergePatchFormat:
 		return errors.NewBadRequest(err.Error())
 	case mergepatch.ErrNoListOfLists, mergepatch.ErrPatchContentNotMatchRetainKeys:
 		return errors.NewGenericServerResponse(http.StatusUnprocessableEntity, "", schema.GroupResource{}, "", err.Error(), 0, false)

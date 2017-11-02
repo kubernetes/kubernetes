@@ -157,6 +157,7 @@ go_test(
         "attach_test.go",
         "clusterinfo_dump_test.go",
         "cmd_test.go",
+        "convert_test.go",
         "cp_test.go",
         "create_clusterrole_test.go",
         "create_clusterrolebinding_test.go",

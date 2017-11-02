@@ -10,10 +10,12 @@ package defaults
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/corehandlers"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
@@ -56,7 +58,6 @@ func Config() *aws.Config {
 		WithMaxRetries(aws.UseServiceDefaultRetries).
 		WithLogger(aws.NewDefaultLogger()).
 		WithLogLevel(aws.LogOff).
-		WithSleepDelay(time.Sleep).
 		WithEndpointResolver(endpoints.DefaultResolver())
 }
 
@@ -97,23 +98,51 @@ func CredChain(cfg *aws.Config, handlers request.Handlers) *credentials.Credenti
 	})
 }
 
-// RemoteCredProvider returns a credenitials provider for the default remote
+const (
+	httpProviderEnvVar     = "AWS_CONTAINER_CREDENTIALS_FULL_URI"
+	ecsCredsProviderEnvVar = "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI"
+)
+
+// RemoteCredProvider returns a credentials provider for the default remote
 // endpoints such as EC2 or ECS Roles.
 func RemoteCredProvider(cfg aws.Config, handlers request.Handlers) credentials.Provider {
-	ecsCredURI := os.Getenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI")
+	if u := os.Getenv(httpProviderEnvVar); len(u) > 0 {
+		return localHTTPCredProvider(cfg, handlers, u)
+	}
 
-	if len(ecsCredURI) > 0 {
-		return ecsCredProvider(cfg, handlers, ecsCredURI)
+	if uri := os.Getenv(ecsCredsProviderEnvVar); len(uri) > 0 {
+		u := fmt.Sprintf("http://169.254.170.2%s", uri)
+		return httpCredProvider(cfg, handlers, u)
 	}
 
 	return ec2RoleProvider(cfg, handlers)
 }
 
-func ecsCredProvider(cfg aws.Config, handlers request.Handlers, uri string) credentials.Provider {
-	const host = `169.254.170.2`
+func localHTTPCredProvider(cfg aws.Config, handlers request.Handlers, u string) credentials.Provider {
+	var errMsg string
 
-	return endpointcreds.NewProviderClient(cfg, handlers,
-		fmt.Sprintf("http://%s%s", host, uri),
+	parsed, err := url.Parse(u)
+	if err != nil {
+		errMsg = fmt.Sprintf("invalid URL, %v", err)
+	} else if host := aws.URLHostname(parsed); !(host == "localhost" || host == "127.0.0.1") {
+		errMsg = fmt.Sprintf("invalid host address, %q, only localhost and 127.0.0.1 are valid.", host)
+	}
+
+	if len(errMsg) > 0 {
+		if cfg.Logger != nil {
+			cfg.Logger.Log("Ignoring, HTTP credential provider", errMsg, err)
+		}
+		return credentials.ErrorProvider{
+			Err:          awserr.New("CredentialsEndpointError", errMsg, err),
+			ProviderName: endpointcreds.ProviderName,
+		}
+	}
+
+	return httpCredProvider(cfg, handlers, u)
+}
+
+func httpCredProvider(cfg aws.Config, handlers request.Handlers, u string) credentials.Provider {
+	return endpointcreds.NewProviderClient(cfg, handlers, u,
 		func(p *endpointcreds.Provider) {
 			p.ExpiryWindow = 5 * time.Minute
 		},

@@ -38,6 +38,11 @@ func (AlwaysAdmit) Admit(a admission.Attributes) (err error) {
 	return nil
 }
 
+// Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate.
+func (AlwaysAdmit) Validate(a admission.Attributes) (err error) {
+	return nil
+}
+
 // Handles returns true if this admission controller can handle the given operation
 // where operation can be one of CREATE, UPDATE, DELETE, or CONNECT
 func (AlwaysAdmit) Handles(operation admission.Operation) bool {

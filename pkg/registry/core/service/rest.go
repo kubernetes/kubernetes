@@ -88,7 +88,7 @@ func (rs *REST) Categories() []string {
 }
 
 // TODO: implement includeUninitialized by refactoring this to move to store
-func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
+func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	service := obj.(*api.Service)
 
 	if err := rest.BeforeCreate(Strategy, ctx, obj); err != nil {
@@ -133,7 +133,7 @@ func (rs *REST) Create(ctx genericapirequest.Context, obj runtime.Object, includ
 		}
 	}
 
-	out, err := rs.registry.CreateService(ctx, service)
+	out, err := rs.registry.CreateService(ctx, service, createValidation)
 	if err != nil {
 		err = rest.CheckGeneratedNameError(Strategy, err, service)
 	}
@@ -284,7 +284,7 @@ func (rs *REST) healthCheckNodePortUpdate(oldService, service *api.Service, node
 	return true, nil
 }
 
-func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	oldService, err := rs.registry.GetService(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, err
@@ -360,7 +360,7 @@ func (rs *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.
 		}
 	}
 
-	out, err := rs.registry.UpdateService(ctx, service)
+	out, err := rs.registry.UpdateService(ctx, service, createValidation, updateValidation)
 	if err == nil {
 		el := nodePortOp.Commit()
 		if el != nil {

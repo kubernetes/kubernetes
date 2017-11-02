@@ -269,6 +269,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		// Check history and labels
 		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
+		waitForHistoryCreated(c, ns, label, 1)
 		first := curHistory(listDaemonHistories(c, ns, label), ds)
 		firstHash := first.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
 		Expect(first.Revision).To(Equal(int64(1)))
@@ -295,6 +296,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		// Check history and labels
 		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
+		waitForHistoryCreated(c, ns, label, 2)
 		cur := curHistory(listDaemonHistories(c, ns, label), ds)
 		Expect(cur.Revision).To(Equal(int64(2)))
 		Expect(cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]).NotTo(Equal(firstHash))
@@ -324,6 +326,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		// Check history and labels
 		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
+		waitForHistoryCreated(c, ns, label, 1)
 		cur := curHistory(listDaemonHistories(c, ns, label), ds)
 		hash := cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
 		Expect(cur.Revision).To(Equal(int64(1)))
@@ -351,6 +354,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		// Check history and labels
 		ds, err = c.Extensions().DaemonSets(ns).Get(ds.Name, metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
+		waitForHistoryCreated(c, ns, label, 2)
 		cur = curHistory(listDaemonHistories(c, ns, label), ds)
 		hash = cur.Labels[extensions.DefaultDaemonSetUniqueLabelKey]
 		Expect(cur.Revision).To(Equal(int64(2)))
@@ -660,18 +664,23 @@ func checkDaemonPodOnNodes(f *framework.Framework, ds *extensions.DaemonSet, nod
 
 func checkRunningOnAllNodes(f *framework.Framework, ds *extensions.DaemonSet) func() (bool, error) {
 	return func() (bool, error) {
-		nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
-		framework.ExpectNoError(err)
-		nodeNames := make([]string, 0)
-		for _, node := range nodeList.Items {
-			if !canScheduleOnNode(node, ds) {
-				framework.Logf("DaemonSet pods can't tolerate node %s with taints %+v, skip checking this node", node.Name, node.Spec.Taints)
-				continue
-			}
-			nodeNames = append(nodeNames, node.Name)
-		}
+		nodeNames := schedulableNodes(f.ClientSet, ds)
 		return checkDaemonPodOnNodes(f, ds, nodeNames)()
 	}
+}
+
+func schedulableNodes(c clientset.Interface, ds *extensions.DaemonSet) []string {
+	nodeList, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	framework.ExpectNoError(err)
+	nodeNames := make([]string, 0)
+	for _, node := range nodeList.Items {
+		if !canScheduleOnNode(node, ds) {
+			framework.Logf("DaemonSet pods can't tolerate node %s with taints %+v, skip checking this node", node.Name, node.Spec.Taints)
+			continue
+		}
+		nodeNames = append(nodeNames, node.Name)
+	}
+	return nodeNames
 }
 
 func checkAtLeastOneNewPod(c clientset.Interface, ns string, label map[string]string, newImage string) func() (bool, error) {
@@ -724,15 +733,16 @@ func checkDaemonPodsImageAndAvailability(c clientset.Interface, ds *extensions.D
 		pods := podList.Items
 
 		unavailablePods := 0
-		allImagesUpdated := true
+		nodesToUpdatedPodCount := make(map[string]int)
 		for _, pod := range pods {
 			if !metav1.IsControlledBy(&pod, ds) {
 				continue
 			}
 			podImage := pod.Spec.Containers[0].Image
 			if podImage != image {
-				allImagesUpdated = false
 				framework.Logf("Wrong image for pod: %s. Expected: %s, got: %s.", pod.Name, image, podImage)
+			} else {
+				nodesToUpdatedPodCount[pod.Spec.NodeName] += 1
 			}
 			if !podutil.IsPodAvailable(&pod, ds.Spec.MinReadySeconds, metav1.Now()) {
 				framework.Logf("Pod %s is not available", pod.Name)
@@ -742,8 +752,12 @@ func checkDaemonPodsImageAndAvailability(c clientset.Interface, ds *extensions.D
 		if unavailablePods > maxUnavailable {
 			return false, fmt.Errorf("number of unavailable pods: %d is greater than maxUnavailable: %d", unavailablePods, maxUnavailable)
 		}
-		if !allImagesUpdated {
-			return false, nil
+		// Make sure every daemon pod on the node has been updated
+		nodeNames := schedulableNodes(c, ds)
+		for _, node := range nodeNames {
+			if nodesToUpdatedPodCount[node] == 0 {
+				return false, nil
+			}
 		}
 		return true, nil
 	}
@@ -865,6 +879,24 @@ func checkDaemonSetPodsLabels(podList *v1.PodList, hash, templateGeneration stri
 		Expect(len(podTemplate)).To(BeNumerically(">", 0))
 		Expect(podTemplate).To(Equal(templateGeneration))
 	}
+}
+
+func waitForHistoryCreated(c clientset.Interface, ns string, label map[string]string, numHistory int) {
+	listHistoryFn := func() (bool, error) {
+		selector := labels.Set(label).AsSelector()
+		options := metav1.ListOptions{LabelSelector: selector.String()}
+		historyList, err := c.AppsV1beta1().ControllerRevisions(ns).List(options)
+		if err != nil {
+			return false, err
+		}
+		if len(historyList.Items) == numHistory {
+			return true, nil
+		}
+		framework.Logf("%d/%d controllerrevisions created.", len(historyList.Items), numHistory)
+		return false, nil
+	}
+	err := wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, listHistoryFn)
+	Expect(err).NotTo(HaveOccurred(), "error waiting for controllerrevisions to be created")
 }
 
 func listDaemonHistories(c clientset.Interface, ns string, label map[string]string) *apps.ControllerRevisionList {

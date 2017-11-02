@@ -43,6 +43,12 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.CIImageRepository = ""
 			obj.UnifiedControlPlaneImage = "foo"
 			obj.FeatureGates = map[string]bool{}
+			obj.Etcd.SelfHosted = &kubeadm.SelfHostedEtcd{
+				CertificatesDir:    "/etc/kubernetes/pki/etcd",
+				ClusterServiceName: "etcd-cluster",
+				EtcdVersion:        "v0.1.0",
+				OperatorVersion:    "v0.1.0",
+			}
 		},
 		func(obj *kubeadm.NodeConfiguration, c fuzz.Continue) {
 			c.FuzzNoCustom(obj)

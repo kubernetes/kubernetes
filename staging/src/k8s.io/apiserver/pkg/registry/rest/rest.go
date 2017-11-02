@@ -192,7 +192,7 @@ type Creater interface {
 
 	// Create creates a new version of a resource. If includeUninitialized is set, the object may be returned
 	// without completing initialization.
-	Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error)
+	Create(ctx genericapirequest.Context, obj runtime.Object, createValidation ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error)
 }
 
 // NamedCreater is an object that can create an instance of a RESTful object using a name parameter.
@@ -205,7 +205,7 @@ type NamedCreater interface {
 	// This is needed for create operations on subresources which include the name of the parent
 	// resource in the path. If includeUninitialized is set, the object may be returned without
 	// completing initialization.
-	Create(ctx genericapirequest.Context, name string, obj runtime.Object, includeUninitialized bool) (runtime.Object, error)
+	Create(ctx genericapirequest.Context, name string, obj runtime.Object, createValidation ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error)
 }
 
 // UpdatedObjectInfo provides information about an updated object to an Updater.
@@ -221,6 +221,26 @@ type UpdatedObjectInfo interface {
 	UpdatedObject(ctx genericapirequest.Context, oldObj runtime.Object) (newObj runtime.Object, err error)
 }
 
+// ValidateObjectFunc is a function to act on a given object. An error may be returned
+// if the hook cannot be completed. An ObjectFunc may NOT transform the provided
+// object.
+type ValidateObjectFunc func(obj runtime.Object) error
+
+// ValidateAllObjectFunc is a "admit everything" instance of ValidateObjectFunc.
+func ValidateAllObjectFunc(obj runtime.Object) error {
+	return nil
+}
+
+// ValidateObjectUpdateFunc is a function to act on a given object and its predecessor.
+// An error may be returned if the hook cannot be completed. An UpdateObjectFunc
+// may NOT transform the provided object.
+type ValidateObjectUpdateFunc func(obj, old runtime.Object) error
+
+// ValidateAllObjectUpdateFunc is a "admit everything" instance of ValidateObjectUpdateFunc.
+func ValidateAllObjectUpdateFunc(obj, old runtime.Object) error {
+	return nil
+}
+
 // Updater is an object that can update an instance of a RESTful object.
 type Updater interface {
 	// New returns an empty object that can be used with Update after request data has been put into it.
@@ -230,14 +250,14 @@ type Updater interface {
 	// Update finds a resource in the storage and updates it. Some implementations
 	// may allow updates creates the object - they should set the created boolean
 	// to true.
-	Update(ctx genericapirequest.Context, name string, objInfo UpdatedObjectInfo) (runtime.Object, bool, error)
+	Update(ctx genericapirequest.Context, name string, objInfo UpdatedObjectInfo, createValidation ValidateObjectFunc, updateValidation ValidateObjectUpdateFunc) (runtime.Object, bool, error)
 }
 
 // CreaterUpdater is a storage object that must support both create and update.
 // Go prevents embedded interfaces that implement the same method.
 type CreaterUpdater interface {
 	Creater
-	Update(ctx genericapirequest.Context, name string, objInfo UpdatedObjectInfo) (runtime.Object, bool, error)
+	Update(ctx genericapirequest.Context, name string, objInfo UpdatedObjectInfo, createValidation ValidateObjectFunc, updateValidation ValidateObjectUpdateFunc) (runtime.Object, bool, error)
 }
 
 // CreaterUpdater must satisfy the Updater interface.

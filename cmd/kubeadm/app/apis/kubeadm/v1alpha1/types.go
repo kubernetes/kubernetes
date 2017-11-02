@@ -42,6 +42,10 @@ type MasterConfiguration struct {
 	ControllerManagerExtraArgs map[string]string `json:"controllerManagerExtraArgs,omitempty"`
 	SchedulerExtraArgs         map[string]string `json:"schedulerExtraArgs,omitempty"`
 
+	APIServerExtraVolumes         []HostPathMount `json:"apiServerExtraVolumes,omitempty"`
+	ControllerManagerExtraVolumes []HostPathMount `json:"controllerManagerExtraVolumes,omitempty"`
+	SchedulerExtraVolumes         []HostPathMount `json:"schedulerExtraVolumes,omitempty"`
+
 	// APIServerCertSANs sets extra Subject Alternative Names for the API Server signing cert
 	APIServerCertSANs []string `json:"apiServerCertSANs,omitempty"`
 	// CertificatesDir specifies where to store or look for all required certificates
@@ -87,7 +91,21 @@ type Etcd struct {
 	DataDir   string            `json:"dataDir"`
 	ExtraArgs map[string]string `json:"extraArgs,omitempty"`
 	// Image specifies which container image to use for running etcd. If empty, automatically populated by kubeadm using the image repository and default etcd version
-	Image string `json:"image"`
+	Image      string          `json:"image"`
+	SelfHosted *SelfHostedEtcd `json:"selfHosted,omitempty"`
+}
+
+// SelfHostedEtcd describes options required to configure self-hosted etcd
+type SelfHostedEtcd struct {
+	// CertificatesDir represents the directory where all etcd TLS assets are stored. By default this is
+	// a dir names "etcd" in the main CertificatesDir value.
+	CertificatesDir string `json:"certificatesDir"`
+	// ClusterServiceName is the name of the service that load balances the etcd cluster
+	ClusterServiceName string `json:"clusterServiceName"`
+	// EtcdVersion is the version of etcd running in the cluster.
+	EtcdVersion string `json:"etcdVersion"`
+	// OperatorVersion is the version of the etcd-operator to use.
+	OperatorVersion string `json:"operatorVersion"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -118,4 +136,12 @@ type NodeConfiguration struct {
 	// without CA verification via DiscoveryTokenCACertHashes. This can weaken
 	// the security of kubeadm since other nodes can impersonate the master.
 	DiscoveryTokenUnsafeSkipCAVerification bool `json:"discoveryTokenUnsafeSkipCAVerification"`
+}
+
+// HostPathMount contains elements describing volumes that are mounted from the
+// host
+type HostPathMount struct {
+	Name      string `json:"name"`
+	HostPath  string `json:"hostPath"`
+	MountPath string `json:"mountPath"`
 }

@@ -72,8 +72,8 @@ func (plugin *podSecurityPolicyPlugin) SetAuthorizer(authz authorizer.Authorizer
 	plugin.authz = authz
 }
 
-// Validate ensures an authorizer is set.
-func (plugin *podSecurityPolicyPlugin) Validate() error {
+// ValidateInitialization ensures an authorizer is set.
+func (plugin *podSecurityPolicyPlugin) ValidateInitialization() error {
 	if plugin.authz == nil {
 		return fmt.Errorf("%s requires an authorizer", PluginName)
 	}

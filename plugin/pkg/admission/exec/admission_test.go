@@ -118,7 +118,7 @@ func testAdmission(t *testing.T, pod *api.Pod, handler *DenyExec, shouldAccept b
 	})
 
 	handler.SetInternalKubeClientSet(mockClient)
-	admission.Validate(handler)
+	admission.ValidateInitialization(handler)
 
 	// pods/exec
 	{

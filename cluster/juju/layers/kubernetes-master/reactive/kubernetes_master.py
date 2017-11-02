@@ -45,6 +45,8 @@ from charms.kubernetes.common import get_version
 from charms.kubernetes.common import retry
 from charms.kubernetes.flagmanager import FlagManager
 
+from charms.layer import tls_client
+
 from charmhelpers.core import hookenv
 from charmhelpers.core import host
 from charmhelpers.core import unitdata
@@ -552,15 +554,15 @@ def send_data(tls):
 
 @when('config.changed.extra_sans', 'certificates.available')
 def update_certificate(tls):
-    # I using the config.changed flag instead of something more
-    # specific to try and catch ip changes. Being a little
-    # spammy here is ok because the cert layer checks for
-    # changes to the cert before issuing a new one
+    # Using the config.changed.extra_sans flag to catch changes.
+    # IP changes will take ~5 minutes or so to propagate, but
+    # it will update.
     send_data(tls)
 
 
 @when('certificates.server.cert.available',
-      'kubernetes-master.components.started')
+      'kubernetes-master.components.started',
+      'tls_client.server.certificate.written')
 def kick_api_server(tls):
     # need to be idempotent and don't want to kick the api server
     # without need
@@ -568,6 +570,7 @@ def kick_api_server(tls):
         # certificate changed, so restart the api server
         hookenv.log("Certificate information changed, restarting api server")
         set_state('kube-apiserver.do-restart')
+    tls_client.reset_certificate_write_flag('server')
 
 
 @when('kubernetes-master.components.started')

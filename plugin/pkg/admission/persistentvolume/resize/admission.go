@@ -68,8 +68,8 @@ func (pvcr *persistentVolumeClaimResize) SetInternalKubeInformerFactory(f inform
 	})
 }
 
-// Validate ensures lister is set.
-func (pvcr *persistentVolumeClaimResize) Validate() error {
+// ValidateInitialization ensures lister is set.
+func (pvcr *persistentVolumeClaimResize) ValidateInitialization() error {
 	if pvcr.pvLister == nil {
 		return fmt.Errorf("missing persistent volume lister")
 	}
