@@ -66,7 +66,7 @@ type KubeletConfiguration struct {
 	ManifestURL string `json:"manifestURL"`
 	// manifestURLHeader is the HTTP header to use when accessing the manifest
 	// URL, with the key separated from the value with a ':', as in 'key:value'
-	ManifestURLHeader string `json:"manifestURLHeader"`
+	ManifestURLHeader map[string][]string `json:"manifestURLHeader"`
 	// enableServer enables the Kubelet's server
 	EnableServer *bool `json:"enableServer"`
 	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
@@ -215,7 +215,7 @@ type KubeletConfiguration struct {
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string `json:"podCIDR"`
 	// ResolverConfig is the resolver configuration file used as the basis
-	// for the container DNS resolution configuration."), []
+	// for the container DNS resolution configuration.
 	ResolverConfig string `json:"resolvConf"`
 	// cpuCFSQuota is Enable CPU CFS quota enforcement for containers that
 	// specify CPU limits

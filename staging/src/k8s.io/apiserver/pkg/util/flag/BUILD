@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "colon_separated_multimap_string_string_test.go",
         "map_string_bool_test.go",
         "namedcertkey_flag_test.go",
     ],
@@ -24,6 +25,7 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = [
+        "colon_separated_multimap_string_string.go",
         "configuration_map.go",
         "flags.go",
         "map_string_bool.go",
