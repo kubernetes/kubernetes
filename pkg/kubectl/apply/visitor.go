@@ -56,8 +56,13 @@ type Result struct {
 	MergedResult interface{}
 }
 
-// MapValuesElement exposes how to get the field / key - value pairs out of a Map or Type Element
-type MapValuesElement interface {
-	Element
-	GetValues() map[string]Element
-}
+const (
+	// MergeStrategy is the strategy to merge the local and remote values
+	MergeStrategy = "merge"
+
+	// RetainKeysStrategy is the strategy to merge the local and remote values, but drop any fields not defined locally
+	RetainKeysStrategy = "retainKeys"
+
+	// ReplaceStrategy is the strategy to replace the remote value with the local value
+	ReplaceStrategy = "replace"
+)

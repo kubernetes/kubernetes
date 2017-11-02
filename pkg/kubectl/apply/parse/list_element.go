@@ -45,7 +45,7 @@ func (v ElementBuildingVisitor) mergeListElement(meta apply.FieldMetaImpl, item 
 func (v ElementBuildingVisitor) doPrimitiveList(meta apply.FieldMetaImpl, item *listItem) (*apply.ListElement, error) {
 	result := &apply.ListElement{
 		FieldMetaImpl: apply.FieldMetaImpl{
-			MergeType: "merge",
+			MergeType: apply.MergeStrategy,
 			Name:      item.Name,
 		},
 		ListElementData: item.ListElementData,
@@ -101,7 +101,7 @@ func (v ElementBuildingVisitor) doMapList(meta apply.FieldMetaImpl, item *listIt
 	key := meta.GetFieldMergeKeys()
 	result := &apply.ListElement{
 		FieldMetaImpl: apply.FieldMetaImpl{
-			MergeType: "merge",
+			MergeType: apply.MergeStrategy,
 			MergeKeys: key,
 			Name:      item.Name,
 		},
