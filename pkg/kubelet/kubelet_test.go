@@ -72,6 +72,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/volume/host_path"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 func init() {
@@ -284,7 +285,7 @@ func newTestKubeletWithImageList(
 	kubelet.evictionManager = evictionManager
 	kubelet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
 	// Add this as cleanup predicate pod admitter
-	kubelet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub()))
+	kubelet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources))
 
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
@@ -571,6 +572,116 @@ func TestHandleMemExceeded(t *testing.T) {
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, notfittingPod, v1.PodFailed)
 	checkPodStatus(t, kl, fittingPod, v1.PodPending)
+}
+
+// Tests that we handle result of interface UpdatePluginResources correctly
+// by setting corresponding status in status map.
+func TestHandlePluginResources(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	testKubelet.chainMock()
+	kl := testKubelet.kubelet
+
+	adjustedResource := v1.ResourceName("domain1.com/adjustedResource")
+	unadjustedResouce := v1.ResourceName("domain2.com/unadjustedResouce")
+	failedResource := v1.ResourceName("domain2.com/failedResource")
+	resourceQuantity1 := *resource.NewQuantity(int64(1), resource.DecimalSI)
+	resourceQuantity2 := *resource.NewQuantity(int64(2), resource.DecimalSI)
+	resourceQuantityInvalid := *resource.NewQuantity(int64(-1), resource.DecimalSI)
+	allowedPodQuantity := *resource.NewQuantity(int64(10), resource.DecimalSI)
+	nodes := []*v1.Node{
+		{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+			Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: v1.ResourceList{
+				adjustedResource:  resourceQuantity1,
+				unadjustedResouce: resourceQuantity1,
+				v1.ResourcePods:   allowedPodQuantity,
+			}}},
+	}
+	kl.nodeInfo = testNodeInfo{nodes: nodes}
+
+	updatePluginResourcesFunc := func(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+		// Maps from resourceName to the value we use to set node.allocatableResource[resourceName].
+		// A resource with invalid value (< 0) causes the function to return an error
+		// to emulate resource Allocation failure.
+		// Resources not contained in this map will have their node.allocatableResource
+		// quantity unchanged.
+		updateResourceMap := map[v1.ResourceName]resource.Quantity{
+			adjustedResource: resourceQuantity2,
+			failedResource:   resourceQuantityInvalid,
+		}
+		pod := attrs.Pod
+		allocatableResource := node.AllocatableResource()
+		newAllocatableResource := allocatableResource.Clone()
+		for _, container := range pod.Spec.Containers {
+			for resource := range container.Resources.Requests {
+				newQuantity, exist := updateResourceMap[resource]
+				if !exist {
+					continue
+				}
+				if newQuantity.Value() < 0 {
+					return fmt.Errorf("Allocation failed")
+				}
+				newAllocatableResource.ScalarResources[resource] = newQuantity.Value()
+			}
+		}
+		node.SetAllocatableResource(newAllocatableResource)
+		return nil
+	}
+
+	// add updatePluginResourcesFunc to admission handler, to test it's behavior.
+	kl.admitHandlers = lifecycle.PodAdmitHandlers{}
+	kl.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kl.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), updatePluginResourcesFunc))
+
+	// pod requiring adjustedResource can be successfully allocated because updatePluginResourcesFunc
+	// adjusts node.allocatableResource for this resource to a sufficient value.
+	fittingPodspec := v1.PodSpec{NodeName: string(kl.nodeName),
+		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
+			Limits: v1.ResourceList{
+				adjustedResource: resourceQuantity2,
+			},
+			Requests: v1.ResourceList{
+				adjustedResource: resourceQuantity2,
+			},
+		}}},
+	}
+	// pod requiring unadjustedResouce with insufficient quantity will still fail PredicateAdmit.
+	exceededPodSpec := v1.PodSpec{NodeName: string(kl.nodeName),
+		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
+			Limits: v1.ResourceList{
+				unadjustedResouce: resourceQuantity2,
+			},
+			Requests: v1.ResourceList{
+				unadjustedResouce: resourceQuantity2,
+			},
+		}}},
+	}
+	// pod requiring failedResource will fail with the resource failed to be allocated.
+	failedPodSpec := v1.PodSpec{NodeName: string(kl.nodeName),
+		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
+			Limits: v1.ResourceList{
+				failedResource: resourceQuantity1,
+			},
+			Requests: v1.ResourceList{
+				failedResource: resourceQuantity1,
+			},
+		}}},
+	}
+	pods := []*v1.Pod{
+		podWithUIDNameNsSpec("123", "fittingpod", "foo", fittingPodspec),
+		podWithUIDNameNsSpec("456", "exceededpod", "foo", exceededPodSpec),
+		podWithUIDNameNsSpec("789", "failedpod", "foo", failedPodSpec),
+	}
+	// The latter two pod should be rejected.
+	fittingPod := pods[0]
+	exceededPod := pods[1]
+	failedPod := pods[2]
+
+	kl.HandlePodAdditions(pods)
+
+	// Check pod status stored in the status map.
+	checkPodStatus(t, kl, fittingPod, v1.PodPending)
+	checkPodStatus(t, kl, exceededPod, v1.PodFailed)
+	checkPodStatus(t, kl, failedPod, v1.PodFailed)
 }
 
 // TODO(filipg): This test should be removed once StatusSyncer can do garbage collection without external signal.

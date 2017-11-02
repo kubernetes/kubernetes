@@ -30,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 func TestUpdateCapacity(t *testing.T) {
@@ -224,13 +226,24 @@ func TestCheckpoint(t *testing.T) {
 	as.True(reflect.DeepEqual(expectedAllocatedDevices, testHandler.allocatedDevices))
 }
 
+type activePodsStub struct {
+	activePods []*v1.Pod
+}
+
+func (a *activePodsStub) getActivePods() []*v1.Pod {
+	return a.activePods
+}
+
+func (a *activePodsStub) updateActivePods(newPods []*v1.Pod) {
+	a.activePods = newPods
+}
+
 func TestPodContainerDeviceAllocation(t *testing.T) {
 	flag.Set("alsologtostderr", fmt.Sprintf("%t", true))
 	var logLevel string
 	flag.StringVar(&logLevel, "logLevel", "4", "test")
 	flag.Lookup("v").Value.Set(logLevel)
 
-	var activePods []*v1.Pod
 	resourceName1 := "domain1.com/resource1"
 	resourceQuantity1 := *resource.NewQuantity(int64(2), resource.DecimalSI)
 	devID1 := "dev1"
@@ -244,6 +257,16 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 	as := assert.New(t)
 	as.Nil(err)
 	monitorCallback := func(resourceName string, added, updated, deleted []pluginapi.Device) {}
+	podsStub := activePodsStub{
+		activePods: []*v1.Pod{},
+	}
+	cachedNode := &v1.Node{
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{},
+		},
+	}
+	nodeInfo := &schedulercache.NodeInfo{}
+	nodeInfo.SetNode(cachedNode)
 
 	testHandler := &HandlerImpl{
 		devicePluginManager:                m,
@@ -251,6 +274,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		allDevices:                         make(map[string]sets.String),
 		allocatedDevices:                   make(map[string]sets.String),
 		podDevices:                         make(podDevices),
+		activePods:                         podsStub.getActivePods,
 	}
 	testHandler.allDevices[resourceName1] = sets.NewString()
 	testHandler.allDevices[resourceName1].Insert(devID1)
@@ -288,8 +312,8 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		},
 	}
 
-	activePods = append(activePods, pod)
-	err = testHandler.Allocate(pod, &pod.Spec.Containers[0], activePods)
+	podsStub.updateActivePods([]*v1.Pod{pod})
+	err = testHandler.Allocate(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: pod})
 	as.Nil(err)
 	runContainerOpts := testHandler.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
 	as.Equal(len(runContainerOpts.Devices), 3)
@@ -315,7 +339,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 			},
 		},
 	}
-	err = testHandler.Allocate(failPod, &failPod.Spec.Containers[0], activePods)
+	err = testHandler.Allocate(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: failPod})
 	as.NotNil(err)
 	runContainerOpts2 := testHandler.GetDeviceRunContainerOptions(failPod, &failPod.Spec.Containers[0])
 	as.Nil(runContainerOpts2)
@@ -338,8 +362,53 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 			},
 		},
 	}
-	err = testHandler.Allocate(newPod, &newPod.Spec.Containers[0], activePods)
+	err = testHandler.Allocate(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: newPod})
 	as.Nil(err)
 	runContainerOpts3 := testHandler.GetDeviceRunContainerOptions(newPod, &newPod.Spec.Containers[0])
 	as.Equal(1, len(runContainerOpts3.Envs))
+}
+
+func TestSanitizeNodeAllocatable(t *testing.T) {
+	resourceName1 := "domain1.com/resource1"
+	devID1 := "dev1"
+
+	resourceName2 := "domain2.com/resource2"
+	devID2 := "dev2"
+
+	m, err := NewDevicePluginManagerTestStub()
+	as := assert.New(t)
+	as.Nil(err)
+	monitorCallback := func(resourceName string, added, updated, deleted []pluginapi.Device) {}
+
+	testHandler := &HandlerImpl{
+		devicePluginManager:                m,
+		devicePluginManagerMonitorCallback: monitorCallback,
+		allDevices:                         make(map[string]sets.String),
+		allocatedDevices:                   make(map[string]sets.String),
+		podDevices:                         make(podDevices),
+	}
+	// require one of resource1 and one of resource2
+	testHandler.allocatedDevices[resourceName1] = sets.NewString()
+	testHandler.allocatedDevices[resourceName1].Insert(devID1)
+	testHandler.allocatedDevices[resourceName2] = sets.NewString()
+	testHandler.allocatedDevices[resourceName2].Insert(devID2)
+
+	cachedNode := &v1.Node{
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				// has no resource1 and two of resource2
+				v1.ResourceName(resourceName2): *resource.NewQuantity(int64(2), resource.DecimalSI),
+			},
+		},
+	}
+	nodeInfo := &schedulercache.NodeInfo{}
+	nodeInfo.SetNode(cachedNode)
+
+	testHandler.sanitizeNodeAllocatable(nodeInfo)
+
+	allocatableScalarResources := nodeInfo.AllocatableResource().ScalarResources
+	// allocatable in nodeInfo is less than needed, should update
+	as.Equal(1, int(allocatableScalarResources[v1.ResourceName(resourceName1)]))
+	// allocatable in nodeInfo is more than needed, should skip updating
+	as.Equal(2, int(allocatableScalarResources[v1.ResourceName(resourceName2)]))
 }

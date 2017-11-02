@@ -209,6 +209,7 @@ go_test(
         "//pkg/volume/host_path:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util/volumehelper:go_default_library",
+        "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v2:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

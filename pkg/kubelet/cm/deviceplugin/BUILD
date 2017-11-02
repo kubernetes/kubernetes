@@ -57,6 +57,8 @@ go_test(
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/deviceplugin/v1alpha:go_default_library",
+        "//pkg/kubelet/lifecycle:go_default_library",
+        "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
