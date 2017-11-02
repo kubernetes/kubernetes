@@ -3718,6 +3718,7 @@ func TestValidateVolumeMounts(t *testing.T) {
 		"name not found":                         {{Name: "", MountPath: "/foo"}},
 		"empty mountpath":                        {{Name: "abc", MountPath: ""}},
 		"relative mountpath":                     {{Name: "abc", MountPath: "bar"}},
+		"windows path on linux":                  {{Name: "abc", MountPath: "C:\\some\\path"}},
 		"mountpath collision":                    {{Name: "foo", MountPath: "/path/a"}, {Name: "bar", MountPath: "/path/a"}},
 		"absolute subpath":                       {{Name: "abc", MountPath: "/bar", SubPath: "/baz"}},
 		"subpath in ..":                          {{Name: "abc", MountPath: "/bar", SubPath: "../baz"}},
