@@ -58,7 +58,6 @@ import (
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/util/version"
 	utilsexec "k8s.io/utils/exec"
 )
 
@@ -283,12 +282,6 @@ func (i *Init) Validate(cmd *cobra.Command) error {
 
 // Run executes master node provisioning, including certificates, needed static pod manifests, etc.
 func (i *Init) Run(out io.Writer) error {
-
-	k8sVersion, err := version.ParseSemantic(i.cfg.KubernetesVersion)
-	if err != nil {
-		return fmt.Errorf("could not parse Kubernetes version %q: %v", i.cfg.KubernetesVersion, err)
-	}
-
 	// Get directories to write files to; can be faked if we're dry-running
 	realCertsDir := i.cfg.CertificatesDir
 	certsDirToWriteTo, kubeConfigDir, manifestDir, err := getDirectoriesToUse(i.dryRun, i.cfg.CertificatesDir)
@@ -384,16 +377,16 @@ func (i *Init) Run(out io.Writer) error {
 		return fmt.Errorf("error updating or creating token: %v", err)
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to post CSRs
-	if err := nodebootstraptokenphase.AllowBootstrapTokensToPostCSRs(client, k8sVersion); err != nil {
+	if err := nodebootstraptokenphase.AllowBootstrapTokensToPostCSRs(client); err != nil {
 		return fmt.Errorf("error allowing bootstrap tokens to post CSRs: %v", err)
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
-	if err := nodebootstraptokenphase.AutoApproveNodeBootstrapTokens(client, k8sVersion); err != nil {
+	if err := nodebootstraptokenphase.AutoApproveNodeBootstrapTokens(client); err != nil {
 		return fmt.Errorf("error auto-approving node bootstrap tokens: %v", err)
 	}
 
 	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
-	if err := nodebootstraptokenphase.AutoApproveNodeCertificateRotation(client, k8sVersion); err != nil {
+	if err := nodebootstraptokenphase.AutoApproveNodeCertificateRotation(client); err != nil {
 		return err
 	}
 
