@@ -254,6 +254,7 @@ func ValidResourceTypeList(f ClientAccessFactory) string {
 			* pods (aka 'po')
 			* podsecuritypolicies (aka 'psp')
 			* podtemplates
+			* priorityclasses (aka 'pc')
 			* replicasets (aka 'rs')
 			* replicationcontrollers (aka 'rc')
 			* resourcequotas (aka 'quota')
