@@ -243,6 +243,9 @@ func (ds *dockerService) StopPodSandbox(podSandboxID string) error {
 		// Do not return error if the container does not exist
 		if !libdocker.IsContainerNotFoundError(err) {
 			errList = append(errList, err)
+		} else {
+			// remove the checkpoint for any sandbox that is not found in the runtime
+			ds.checkpointHandler.RemoveCheckpoint(podSandboxID)
 		}
 	}
 	return utilerrors.NewAggregate(errList)
