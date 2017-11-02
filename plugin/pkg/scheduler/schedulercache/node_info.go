@@ -255,6 +255,11 @@ func (n *NodeInfo) AllocatableResource() Resource {
 	return *n.allocatableResource
 }
 
+// SetAllocatableResource sets the allocatableResource information of given node.
+func (n *NodeInfo) SetAllocatableResource(allocatableResource *Resource) {
+	n.allocatableResource = allocatableResource
+}
+
 func (n *NodeInfo) Clone() *NodeInfo {
 	clone := &NodeInfo{
 		node:                    n.node,
