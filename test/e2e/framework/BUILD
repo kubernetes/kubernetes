@@ -161,6 +161,7 @@ filegroup(
         ":package-srcs",
         "//test/e2e/framework/ginkgowrapper:all-srcs",
         "//test/e2e/framework/metrics:all-srcs",
+        "//test/e2e/framework/timer:all-srcs",
     ],
     tags = ["automanaged"],
 )
