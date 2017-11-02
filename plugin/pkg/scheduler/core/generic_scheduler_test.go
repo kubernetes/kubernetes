@@ -522,18 +522,26 @@ func TestZeroRequest(t *testing.T) {
 		priorityConfigs := []algorithm.PriorityConfig{
 			{Map: algorithmpriorities.LeastRequestedPriorityMap, Weight: 1},
 			{Map: algorithmpriorities.BalancedResourceAllocationMap, Weight: 1},
-			{
-				Function: algorithmpriorities.NewSelectorSpreadPriority(
-					schedulertesting.FakeServiceLister([]*v1.Service{}),
-					schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
-					schedulertesting.FakeReplicaSetLister([]*extensions.ReplicaSet{}),
-					schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{})),
-				Weight: 1,
-			},
 		}
+		selectorSpreadPriorityMap, selectorSpreadPriorityReduce := algorithmpriorities.NewSelectorSpreadPriority(
+			schedulertesting.FakeServiceLister([]*v1.Service{}),
+			schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
+			schedulertesting.FakeReplicaSetLister([]*extensions.ReplicaSet{}),
+			schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
+		pc := algorithm.PriorityConfig{Map: selectorSpreadPriorityMap, Reduce: selectorSpreadPriorityReduce, Weight: 1}
+		priorityConfigs = append(priorityConfigs, pc)
+
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
+
+		mataDataProducer := algorithmpriorities.NewPriorityMetadataFactory(
+			schedulertesting.FakeServiceLister([]*v1.Service{}),
+			schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
+			schedulertesting.FakeReplicaSetLister([]*extensions.ReplicaSet{}),
+			schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
+		mataData := mataDataProducer(test.pod, nodeNameToInfo)
+
 		list, err := PrioritizeNodes(
-			test.pod, nodeNameToInfo, algorithm.EmptyMetadataProducer, priorityConfigs,
+			test.pod, nodeNameToInfo, mataData, priorityConfigs,
 			schedulertesting.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)

@@ -108,7 +108,11 @@ func TestNewNodeLabelPriority(t *testing.T) {
 
 	for _, test := range tests {
 		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(nil, test.nodes)
-		list, err := priorityFunction(NewNodeLabelPriority(test.label, test.presence))(nil, nodeNameToInfo, test.nodes)
+		labelPrioritizer := &NodeLabelPrioritizer{
+			label:    test.label,
+			presence: test.presence,
+		}
+		list, err := priorityFunction(labelPrioritizer.CalculateNodeLabelPriorityMap, nil, nil)(nil, nodeNameToInfo, test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
