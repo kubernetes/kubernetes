@@ -36,10 +36,10 @@ spec:
         resources:
           requests:
             memory: "32Mi"
-            cpu: "50m"
+            cpu: "30m"
           limits:
             memory: "32Mi"
-            cpu: "50m"
+            cpu: "30m"
         volumeMounts:
           - name: config-volume
             mountPath: /etc/nginx/
