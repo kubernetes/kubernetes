@@ -490,6 +490,10 @@ func (u *Unstructured) GetDeletionGracePeriodSeconds() *int64 {
 }
 
 func (u *Unstructured) SetDeletionGracePeriodSeconds(deletionGracePeriodSeconds *int64) {
+	if deletionGracePeriodSeconds == nil {
+		u.setNestedField(nil, "metadata", "deletionGracePeriodSeconds")
+		return
+	}
 	u.setNestedField(deletionGracePeriodSeconds, "metadata", "deletionGracePeriodSeconds")
 }
 
