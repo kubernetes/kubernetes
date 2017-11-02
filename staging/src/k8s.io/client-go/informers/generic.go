@@ -170,8 +170,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().V1beta1().PodSecurityPolicies().Informer()}, nil
 	case extensions_v1beta1.SchemeGroupVersion.WithResource("replicasets"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().V1beta1().ReplicaSets().Informer()}, nil
-	case extensions_v1beta1.SchemeGroupVersion.WithResource("thirdpartyresources"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().V1beta1().ThirdPartyResources().Informer()}, nil
 
 		// Group=Networking, Version=V1
 	case networking_v1.SchemeGroupVersion.WithResource("networkpolicies"):
