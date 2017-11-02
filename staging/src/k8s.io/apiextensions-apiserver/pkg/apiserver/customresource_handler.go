@@ -222,7 +222,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, fmt.Sprintf("%v not allowed while CustomResourceDefinition is terminating", requestInfo.Verb), http.StatusMethodNotAllowed)
 			return
 		}
-		handler := handlers.PatchResource(storage, requestScope, r.admission, unstructured.UnstructuredObjectConverter{})
+		handler := handlers.PatchResource(storage, requestScope, r.admission, requestScope.Convertor)
 		handler(w, req)
 		return
 	case "delete":
@@ -350,7 +350,7 @@ func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefiniti
 	}
 
 	clusterScoped := crd.Spec.Scope == apiextensions.ClusterScoped
-
+	converter := crdObjectConverter{gvk: kind, clusterScoped: clusterScoped}
 	requestScope := handlers.RequestScope{
 		Namer: handlers.ContextBasedNaming{
 			GetContext: func(req *http.Request) apirequest.Context {
@@ -369,14 +369,11 @@ func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefiniti
 		Serializer:     unstructuredNegotiatedSerializer{typer: typer, creator: creator},
 		ParameterCodec: parameterCodec,
 
-		Creater: creator,
-		Convertor: crdObjectConverter{
-			UnstructuredObjectConverter: unstructured.UnstructuredObjectConverter{},
-			clusterScoped:               clusterScoped,
-		},
+		Creater:         creator,
+		Convertor:       converter,
 		Defaulter:       unstructuredDefaulter{parameterScheme},
 		Typer:           typer,
-		UnsafeConvertor: unstructured.UnstructuredObjectConverter{},
+		UnsafeConvertor: converter,
 
 		Resource:    schema.GroupVersionResource{Group: crd.Spec.Group, Version: crd.Spec.Version, Resource: crd.Status.AcceptedNames.Plural},
 		Kind:        kind,
@@ -408,7 +405,7 @@ func (r *crdHandler) getServingInfoFor(crd *apiextensions.CustomResourceDefiniti
 
 // crdObjectConverter is a converter that supports field selectors for CRDs.
 type crdObjectConverter struct {
-	unstructured.UnstructuredObjectConverter
+	gvk           schema.GroupVersionKind
 	clusterScoped bool
 }
 
@@ -422,6 +419,40 @@ func (c crdObjectConverter) ConvertFieldLabel(version, kind, label, value string
 	default:
 		return "", "", fmt.Errorf("field label not supported: %s", label)
 	}
+}
+
+func (crdObjectConverter) Convert(in, out, context interface{}) error {
+	unstructIn, ok := in.(*unstructured.Unstructured)
+	if !ok {
+		return fmt.Errorf("input type %T in not valid for unstructured conversion", in)
+	}
+
+	unstructOut, ok := out.(*unstructured.Unstructured)
+	if !ok {
+		return fmt.Errorf("output type %T in not valid for unstructured conversion", out)
+	}
+
+	// maybe deep copy the map? It is documented in the
+	// ObjectConverter interface that this function is not
+	// guaranteeed to not mutate the input. Or maybe set the input
+	// object to nil.
+	unstructOut.Object = unstructIn.Object
+	return nil
+}
+
+func (u crdObjectConverter) ConvertToVersion(in runtime.Object, target runtime.GroupVersioner) (runtime.Object, error) {
+	gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{u.gvk})
+	if !ok {
+		// TODO: should this be a typed error?
+		return nil, fmt.Errorf("%v is unstructured and is not suitable for converting to %q", in.GetObjectKind().GroupVersionKind(), target)
+	}
+	if gvk.Version == runtime.APIVersionInternal {
+		// internal is a special case, in analogy to Scheme.ConvertToVersion.
+		gvk = schema.GroupVersionKind{}
+	}
+	in.GetObjectKind().SetGroupVersionKind(gvk)
+
+	return in, nil
 }
 
 func (c *crdHandler) updateCustomResourceDefinition(oldObj, newObj interface{}) {
