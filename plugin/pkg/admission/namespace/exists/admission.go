@@ -101,8 +101,8 @@ func (e *Exists) SetInternalKubeInformerFactory(f informers.SharedInformerFactor
 	e.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }
 
-// Validate implements the Validator interface.
-func (e *Exists) Validate() error {
+// ValidateInitialization implements the InitializationValidator interface.
+func (e *Exists) ValidateInitialization() error {
 	if e.namespaceLister == nil {
 		return fmt.Errorf("missing namespaceLister")
 	}

@@ -74,8 +74,8 @@ func NewInitializer() admission.Interface {
 	return &initializer{}
 }
 
-// Validate implements the Validator interface.
-func (i *initializer) Validate() error {
+// ValidateInitialization implements the InitializationValidator interface.
+func (i *initializer) ValidateInitialization() error {
 	if i.config == nil {
 		return fmt.Errorf("the Initializer admission plugin requires a Kubernetes client to be provided")
 	}

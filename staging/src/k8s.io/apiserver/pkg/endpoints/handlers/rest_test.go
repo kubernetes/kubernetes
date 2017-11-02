@@ -170,7 +170,7 @@ func (p *testPatcher) New() runtime.Object {
 	return &example.Pod{}
 }
 
-func (p *testPatcher) Update(ctx request.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+func (p *testPatcher) Update(ctx request.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	currentPod := p.startingPod
 	if p.numUpdates > 0 {
 		currentPod = p.updatePod
@@ -235,7 +235,8 @@ type patchTestCase struct {
 	name string
 
 	// admission chain to use, nil is fine
-	admit updateAdmissionFunc
+	admissionMutation   mutateObjectUpdateFunc
+	admissionValidation rest.ValidateObjectUpdateFunc // TODO: add test for this
 
 	// startingPod is used as the starting point for the first Update
 	startingPod *example.Pod
@@ -257,9 +258,16 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	name := tc.startingPod.Name
 
 	codec := codecs.LegacyCodec(examplev1.SchemeGroupVersion)
-	admit := tc.admit
-	if admit == nil {
-		admit = func(updatedObject runtime.Object, currentObject runtime.Object) error {
+
+	admissionMutation := tc.admissionMutation
+	if admissionMutation == nil {
+		admissionMutation = func(updatedObject runtime.Object, currentObject runtime.Object) error {
+			return nil
+		}
+	}
+	admissionValidation := tc.admissionValidation
+	if admissionValidation == nil {
+		admissionValidation = func(updatedObject runtime.Object, currentObject runtime.Object) error {
 			return nil
 		}
 	}
@@ -321,7 +329,18 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 		}
 
-		resultObj, err := patchResource(ctx, admit, 1*time.Second, versionedObj, testPatcher, name, patchType, patch, namer, creater, defaulter, convertor, kind, resource, codec)
+		resultObj, err := patchResource(
+			ctx,
+			admissionMutation,
+			rest.ValidateAllObjectFunc,
+			admissionValidation,
+			1*time.Second,
+			versionedObj,
+			testPatcher,
+			name,
+			patchType,
+			patch,
+			namer, creater, defaulter, convertor, kind, resource, codec)
 		if len(tc.expectedError) != 0 {
 			if err == nil || err.Error() != tc.expectedError {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)
@@ -544,7 +563,7 @@ func TestPatchWithAdmissionRejection(t *testing.T) {
 	tc := &patchTestCase{
 		name: "TestPatchWithAdmissionRejection",
 
-		admit: func(updatedObject runtime.Object, currentObject runtime.Object) error {
+		admissionMutation: func(updatedObject runtime.Object, currentObject runtime.Object) error {
 			return errors.New("admission failure")
 		},
 
@@ -583,7 +602,7 @@ func TestPatchWithVersionConflictThenAdmissionFailure(t *testing.T) {
 	tc := &patchTestCase{
 		name: "TestPatchWithVersionConflictThenAdmissionFailure",
 
-		admit: func(updatedObject runtime.Object, currentObject runtime.Object) error {
+		admissionMutation: func(updatedObject runtime.Object, currentObject runtime.Object) error {
 			if seen {
 				return errors.New("admission failure")
 			}

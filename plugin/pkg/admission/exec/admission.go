@@ -135,8 +135,8 @@ func (d *DenyExec) SetInternalKubeClientSet(client internalclientset.Interface) 
 	d.client = client
 }
 
-// Validate implements the Validator interface.
-func (d *DenyExec) Validate() error {
+// ValidateInitialization implements the InitializationValidator interface.
+func (d *DenyExec) ValidateInitialization() error {
 	if d.client == nil {
 		return fmt.Errorf("missing client")
 	}

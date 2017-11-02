@@ -46,7 +46,7 @@ func newStorage(t *testing.T) (StatefulSetStorage, *etcdtesting.EtcdTestServer) 
 // createStatefulSet is a helper function that returns a StatefulSet with the updated resource version.
 func createStatefulSet(storage *REST, ps apps.StatefulSet, t *testing.T) (apps.StatefulSet, error) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), ps.Namespace)
-	obj, err := storage.Create(ctx, &ps, false)
+	obj, err := storage.Create(ctx, &ps, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Errorf("Failed to create StatefulSet, %v", err)
 	}
@@ -125,7 +125,7 @@ func TestStatusUpdate(t *testing.T) {
 		},
 	}
 
-	if _, _, err := storage.Status.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update)); err != nil {
+	if _, _, err := storage.Status.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	obj, err := storage.StatefulSet.Get(ctx, "foo", &metav1.GetOptions{})
@@ -274,7 +274,7 @@ func TestScaleUpdate(t *testing.T) {
 		},
 	}
 
-	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update)); err != nil {
+	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
 		t.Fatalf("error updating scale %v: %v", update, err)
 	}
 
@@ -290,7 +290,7 @@ func TestScaleUpdate(t *testing.T) {
 	update.ResourceVersion = sts.ResourceVersion
 	update.Spec.Replicas = 15
 
-	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update)); err != nil && !errors.IsConflict(err) {
+	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil && !errors.IsConflict(err) {
 		t.Fatalf("unexpected error, expecting an update conflict but got %v", err)
 	}
 }

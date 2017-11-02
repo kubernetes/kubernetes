@@ -34,6 +34,7 @@ import (
 )
 
 // DeleteResource returns a function that will handle a resource deletion
+// TODO admission here becomes solely validating admission
 func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
@@ -95,11 +96,18 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope RequestSco
 		trace.Step("About to check admission control")
 		if admit != nil && admit.Handles(admission.Delete) {
 			userInfo, _ := request.UserFrom(ctx)
-
-			err = admit.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo))
-			if err != nil {
-				scope.err(err, w, req)
-				return
+			attrs := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Delete, userInfo)
+			if mutatingAdmission, ok := admit.(admission.MutationInterface); ok {
+				if err := mutatingAdmission.Admit(attrs); err != nil {
+					scope.err(err, w, req)
+					return
+				}
+			}
+			if validatingAdmission, ok := admit.(admission.ValidationInterface); ok {
+				if err := validatingAdmission.Validate(attrs); err != nil {
+					scope.err(err, w, req)
+					return
+				}
 			}
 		}
 
@@ -171,10 +179,20 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope RequestSco
 		ctx := scope.ContextFunc(req)
 		ctx = request.WithNamespace(ctx, namespace)
 
-		if admit != nil && admit.Handles(admission.Delete) {
+		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Delete) {
 			userInfo, _ := request.UserFrom(ctx)
 
-			err = admit.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo))
+			err = mutatingAdmission.Admit(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo))
+			if err != nil {
+				scope.err(err, w, req)
+				return
+			}
+		}
+		// TODO: avoid calling Handles twice
+		if validatingAdmission, ok := admit.(admission.ValidationInterface); ok && validatingAdmission.Handles(admission.Delete) {
+			userInfo, _ := request.UserFrom(ctx)
+
+			err = validatingAdmission.Validate(admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, "", scope.Resource, scope.Subresource, admission.Delete, userInfo))
 			if err != nil {
 				scope.err(err, w, req)
 				return

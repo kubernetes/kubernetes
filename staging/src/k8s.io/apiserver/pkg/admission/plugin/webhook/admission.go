@@ -156,9 +156,8 @@ func (a *GenericAdmissionWebhook) SetExternalKubeClientSet(client clientset.Inte
 	a.hookSource = configuration.NewExternalAdmissionHookConfigurationManager(client.Admissionregistration().ExternalAdmissionHookConfigurations())
 }
 
-// Validator holds Validate functions, which are responsible for validation of initialized shared resources
-// and should be implemented on admission plugins
-func (a *GenericAdmissionWebhook) Validate() error {
+// ValidateInitialization implements the InitializationValidator interface.
+func (a *GenericAdmissionWebhook) ValidateInitialization() error {
 	if a.hookSource == nil {
 		return fmt.Errorf("the GenericAdmissionWebhook admission plugin requires a Kubernetes client to be provided")
 	}
