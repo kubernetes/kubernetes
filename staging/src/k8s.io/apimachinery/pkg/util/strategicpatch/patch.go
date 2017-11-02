@@ -22,6 +22,7 @@ import (
 	"sort"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/mergepatch"
 	forkedjson "k8s.io/apimachinery/third_party/forked/golang/json"
@@ -828,7 +829,7 @@ func handleUnmarshal(j []byte) (map[string]interface{}, error) {
 	return m, nil
 }
 
-// StrategicMergePatch applies a strategic merge patch. The original and patch documents
+// StrategicMergeMapPatch applies a strategic merge patch. The original and patch documents
 // must be JSONMap. A patch can be created from an original and modified document by
 // calling CreateTwoWayMergeMapPatch.
 // Warning: the original and patch JSONMap objects are mutated by this function and should not be reused.
@@ -837,6 +838,17 @@ func StrategicMergeMapPatch(original, patch JSONMap, dataStruct interface{}) (JS
 	if err != nil {
 		return nil, err
 	}
+
+	// We need the go struct tags `patchMergeKey` and `patchStrategy` for fields that support a strategic merge patch.
+	// For native resources, we can easily figure out these tags since we know the fields.
+
+	// Because custom resources are decoded as Unstructured and because we're missing the metadata about how to handle
+	// each field in a strategic merge patch, we can't find the go struct tags. Hence, we can't easily  do a strategic merge
+	// for custom resources. So we should fail fast and return an error.
+	if _, ok := dataStruct.(*unstructured.Unstructured); ok {
+		return nil, mergepatch.ErrUnsupportedStrategicMergePatchFormat
+	}
+
 	mergeOptions := MergeOptions{
 		MergeParallelList:    true,
 		IgnoreUnmatchedNulls: true,
@@ -1532,7 +1544,7 @@ func findMapInSliceBasedOnKeyValue(m []interface{}, key string, value interface{
 	for k, v := range m {
 		typedV, ok := v.(map[string]interface{})
 		if !ok {
-			return nil, 0, false, fmt.Errorf("value for key %v is not a map.", k)
+			return nil, 0, false, fmt.Errorf("value for key %v is not a map", k)
 		}
 
 		valueToMatch, ok := typedV[key]
