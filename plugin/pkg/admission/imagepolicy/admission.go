@@ -69,6 +69,8 @@ type Plugin struct {
 	defaultAllow  bool
 }
 
+var _ admission.ValidationInterface = &Plugin{}
+
 func (a *Plugin) statusTTL(status v1alpha1.ImageReviewStatus) time.Duration {
 	if status.Allowed {
 		return a.allowTTL
@@ -107,8 +109,8 @@ func (a *Plugin) webhookError(pod *api.Pod, attributes admission.Attributes, err
 	return nil
 }
 
-// Admit makes an admission decision based on the request attributes
-func (a *Plugin) Admit(attributes admission.Attributes) (err error) {
+// Validate makes an admission decision based on the request attributes
+func (a *Plugin) Validate(attributes admission.Attributes) (err error) {
 	// Ignore all calls to subresources or resources other than pods.
 	if attributes.GetSubresource() != "" || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil

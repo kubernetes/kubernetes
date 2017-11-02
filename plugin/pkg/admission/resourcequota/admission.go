@@ -61,6 +61,7 @@ type QuotaAdmission struct {
 	evaluator          Evaluator
 }
 
+var _ admission.ValidationInterface = &QuotaAdmission{}
 var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&QuotaAdmission{})
 var _ = kubeapiserveradmission.WantsQuotaConfiguration(&QuotaAdmission{})
 
@@ -120,8 +121,8 @@ func (a *QuotaAdmission) ValidateInitialization() error {
 	return nil
 }
 
-// Admit makes admission decisions while enforcing quota
-func (a *QuotaAdmission) Admit(attr admission.Attributes) (err error) {
+// Validate makes admission decisions while enforcing quota
+func (a *QuotaAdmission) Validate(attr admission.Attributes) (err error) {
 	// ignore all operations that correspond to sub-resource actions
 	if attr.GetSubresource() != "" {
 		return nil

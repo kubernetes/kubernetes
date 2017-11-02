@@ -38,6 +38,8 @@ type Plugin struct {
 	*admission.Handler
 }
 
+var _ admission.ValidationInterface = &Plugin{}
+
 // NewInterPodAntiAffinity creates a new instance of the LimitPodHardAntiAffinityTopology admission controller
 func NewInterPodAntiAffinity() *Plugin {
 	return &Plugin{
@@ -45,9 +47,9 @@ func NewInterPodAntiAffinity() *Plugin {
 	}
 }
 
-// Admit will deny any pod that defines AntiAffinity topology key other than kubeletapis.LabelHostname i.e. "kubernetes.io/hostname"
+// Validate will deny any pod that defines AntiAffinity topology key other than kubeletapis.LabelHostname i.e. "kubernetes.io/hostname"
 // in  requiredDuringSchedulingRequiredDuringExecution and requiredDuringSchedulingIgnoredDuringExecution.
-func (p *Plugin) Admit(attributes admission.Attributes) (err error) {
+func (p *Plugin) Validate(attributes admission.Attributes) (err error) {
 	// Ignore all calls to subresources or resources other than pods.
 	if len(attributes.GetSubresource()) != 0 || attributes.GetResource().GroupResource() != api.Resource("pods") {
 		return nil
