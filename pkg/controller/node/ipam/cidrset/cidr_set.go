@@ -43,8 +43,8 @@ const (
 	// TODO: https://github.com/kubernetes/kubernetes/issues/44918
 	// clusterSubnetMaxDiff limited to 16 due to the uncompressed bitmap
 	clusterSubnetMaxDiff = 16
-	// maximum 64 bits of prefix
-	maxPrefixLength = 64
+	// halfIPv6Len is the half of the IPv6 length
+	halfIPv6Len = net.IPv6len / 2
 )
 
 var (
@@ -60,7 +60,7 @@ func NewCIDRSet(clusterCIDR *net.IPNet, subNetMaskSize int) *CidrSet {
 	clusterMaskSize, _ := clusterMask.Size()
 
 	var maxCIDRs int
-	if ((clusterCIDR.IP.To4() == nil) && (subNetMaskSize-clusterMaskSize > clusterSubnetMaxDiff)) || (subNetMaskSize > maxPrefixLength) {
+	if (clusterCIDR.IP.To4() == nil) && (subNetMaskSize-clusterMaskSize > clusterSubnetMaxDiff) {
 		maxCIDRs = 0
 	} else {
 		maxCIDRs = 1 << uint32(subNetMaskSize-clusterMaskSize)
@@ -73,6 +73,48 @@ func NewCIDRSet(clusterCIDR *net.IPNet, subNetMaskSize int) *CidrSet {
 		subNetMaskSize:  subNetMaskSize,
 	}
 }
+
+// TODO: Remove this function when upgrading to go 1.9
+var len8tab = [256]uint8{
+	0x00, 0x01, 0x02, 0x02, 0x03, 0x03, 0x03, 0x03, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04,
+	0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05,
+	0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06,
+	0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06, 0x06,
+	0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
+	0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
+	0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
+	0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07, 0x07,
+	0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+	0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+	0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+	0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+	0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+	0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+	0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+	0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08,
+}
+
+// TODO: Remove this function when upgrading to go 1.9
+// len64 returns the minimum number of bits required to represent x; the result is 0 for x == 0.
+func len64(x uint64) (n int) {
+	if x >= 1<<32 {
+		x >>= 32
+		n = 32
+	}
+	if x >= 1<<16 {
+		x >>= 16
+		n += 16
+	}
+	if x >= 1<<8 {
+		x >>= 8
+		n += 8
+	}
+	return n + int(len8tab[x])
+}
+
+// TODO: Remove this function when upgrading to go 1.9
+// leadingZeros64 returns the number of leading zero bits in x; the result is 64 for x == 0.
+func leadingZeros64(x uint64) int { return 64 - len64(x) }
 
 func (s *CidrSet) indexToCIDRBlock(index int) *net.IPNet {
 	var ip []byte
@@ -89,10 +131,36 @@ func (s *CidrSet) indexToCIDRBlock(index int) *net.IPNet {
 		}
 	case s.clusterIP.To16() != nil:
 		{
-			j := uint64(index) << uint64(64-s.subNetMaskSize)
-			ipInt := (binary.BigEndian.Uint64(s.clusterIP)) | j
-			ip = make([]byte, 16)
-			binary.BigEndian.PutUint64(ip, ipInt)
+			// leftClusterIP      |     rightClusterIP
+			// 2001:0DB8:1234:0000:0000:0000:0000:0000
+			const v6NBits = 128
+			const halfV6NBits = v6NBits / 2
+			leftClusterIP := binary.BigEndian.Uint64(s.clusterIP[:halfIPv6Len])
+			rightClusterIP := binary.BigEndian.Uint64(s.clusterIP[halfIPv6Len:])
+
+			leftIP, rightIP := make([]byte, halfIPv6Len), make([]byte, halfIPv6Len)
+
+			if s.subNetMaskSize <= halfV6NBits {
+				// We only care about left side IP
+				leftClusterIP |= uint64(index) << uint(halfV6NBits-s.subNetMaskSize)
+			} else {
+				if s.clusterMaskSize < halfV6NBits {
+					// see how many bits are needed to reach the left side
+					btl := uint(s.subNetMaskSize - halfV6NBits)
+					// TODO: Replace this with math/bits.LeadingZeros64 when upgrading to go 1.9
+					indexMaxBit := uint(64 - leadingZeros64(uint64(index)))
+					if indexMaxBit > btl {
+						leftClusterIP |= uint64(index) >> btl
+					}
+				}
+				// the right side will be calculated the same way either the
+				// subNetMaskSize affects both left and right sides
+				rightClusterIP |= uint64(index) << uint(v6NBits-s.subNetMaskSize)
+			}
+			binary.BigEndian.PutUint64(leftIP, leftClusterIP)
+			binary.BigEndian.PutUint64(rightIP, rightClusterIP)
+
+			ip = append(leftIP, rightIP...)
 			mask = 128
 		}
 	}
@@ -159,8 +227,12 @@ func (s *CidrSet) getBeginingAndEndIndices(cidr *net.IPNet) (begin, end int, err
 			ipInt := binary.BigEndian.Uint32(cidr.IP) | (^binary.BigEndian.Uint32(cidr.Mask))
 			binary.BigEndian.PutUint32(ip, ipInt)
 		} else {
-			ipInt := binary.BigEndian.Uint64(cidr.IP) | (^binary.BigEndian.Uint64(cidr.Mask))
-			binary.BigEndian.PutUint64(ip, ipInt)
+			// ipIntLeft          |         ipIntRight
+			// 2001:0DB8:1234:0000:0000:0000:0000:0000
+			ipIntLeft := binary.BigEndian.Uint64(cidr.IP[:net.IPv6len/2]) | (^binary.BigEndian.Uint64(cidr.Mask[:net.IPv6len/2]))
+			ipIntRight := binary.BigEndian.Uint64(cidr.IP[net.IPv6len/2:]) | (^binary.BigEndian.Uint64(cidr.Mask[net.IPv6len/2:]))
+			binary.BigEndian.PutUint64(ip[:net.IPv6len/2], ipIntLeft)
+			binary.BigEndian.PutUint64(ip[net.IPv6len/2:], ipIntRight)
 		}
 		end, err = s.getIndexForCIDR(&net.IPNet{
 			IP:   net.IP(ip).Mask(subNetMask),
@@ -217,7 +289,10 @@ func (s *CidrSet) getIndexForIP(ip net.IP) (int, error) {
 		return int(cidrIndex), nil
 	}
 	if ip.To16() != nil {
-		cidrIndex := (binary.BigEndian.Uint64(s.clusterIP) ^ binary.BigEndian.Uint64(ip.To16())) >> uint64(64-s.subNetMaskSize)
+		bigIP := big.NewInt(0).SetBytes(s.clusterIP)
+		bigIP = bigIP.Xor(bigIP, big.NewInt(0).SetBytes(ip))
+		cidrIndexBig := bigIP.Rsh(bigIP, uint(net.IPv6len*8-s.subNetMaskSize))
+		cidrIndex := cidrIndexBig.Uint64()
 		if cidrIndex >= uint64(s.maxCIDRs) {
 			return 0, fmt.Errorf("CIDR: %v/%v is out of the range of CIDR allocator", ip, s.subNetMaskSize)
 		}
