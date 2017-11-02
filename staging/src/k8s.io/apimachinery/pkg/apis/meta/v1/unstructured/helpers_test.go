@@ -42,37 +42,19 @@ func TestCodecOfUnstructuredList(t *testing.T) {
 	wg.Wait()
 }
 
-func TestUnstructuredList(t *testing.T) {
-	list := &UnstructuredList{
-		Object: map[string]interface{}{"kind": "List", "apiVersion": "v1"},
-		Items: []Unstructured{
-			{Object: map[string]interface{}{"kind": "Pod", "apiVersion": "v1", "metadata": map[string]interface{}{"name": "test"}}},
+func TestRemoveNestedField(t *testing.T) {
+	obj := map[string]interface{}{
+		"x": map[string]interface{}{
+			"y": 1,
+			"a": "foo",
 		},
 	}
-	content := list.UnstructuredContent()
-	items := content["items"].([]interface{})
-	if len(items) != 1 {
-		t.Fatalf("unexpected items: %#v", items)
-	}
-	if getNestedField(items[0].(map[string]interface{}), "metadata", "name") != "test" {
-		t.Fatalf("unexpected fields: %#v", items[0])
-	}
-}
-
-func TestNilDeletionTimestamp(t *testing.T) {
-	var u Unstructured
-	del := u.GetDeletionTimestamp()
-	if del != nil {
-		t.Errorf("unexpected non-nil deletion timestamp: %v", del)
-	}
-	u.SetDeletionTimestamp(u.GetDeletionTimestamp())
-	del = u.GetDeletionTimestamp()
-	if del != nil {
-		t.Errorf("unexpected non-nil deletion timestamp: %v", del)
-	}
-	metadata := u.Object["metadata"].(map[string]interface{})
-	deletionTimestamp := metadata["deletionTimestamp"]
-	if deletionTimestamp != nil {
-		t.Errorf("unexpected deletion timestamp field: %q", deletionTimestamp)
-	}
+	RemoveNestedField(obj, "x", "a")
+	assert.Len(t, obj["x"], 1)
+	RemoveNestedField(obj, "x", "y")
+	assert.Empty(t, obj["x"])
+	RemoveNestedField(obj, "x")
+	assert.Empty(t, obj)
+	RemoveNestedField(obj, "x") // Remove of a non-existent field
+	assert.Empty(t, obj)
 }
