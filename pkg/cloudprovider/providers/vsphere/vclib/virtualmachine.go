@@ -222,7 +222,7 @@ func (vm *VirtualMachine) GetAllAccessibleDatastores(ctx context.Context) ([]*Da
 	properties := []string{DatastoreInfoProperty}
 	err = pc.Retrieve(ctx, dsRefList, properties, &dsMoList)
 	if err != nil {
-		glog.Errorf("Failed to get Datastore managed objects from datastore objects." +
+		glog.Errorf("Failed to get Datastore managed objects from datastore objects."+
 			" dsObjList: %+v, properties: %+v, err: %v", dsRefList, properties, err)
 		return nil, err
 	}

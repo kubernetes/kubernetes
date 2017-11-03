@@ -114,7 +114,7 @@ func (dc *Datacenter) GetAllDatastores(ctx context.Context) (map[string]*Datasto
 	properties := []string{DatastoreInfoProperty}
 	err = pc.Retrieve(ctx, dsList, properties, &dsMoList)
 	if err != nil {
-		glog.Errorf("Failed to get Datastore managed objects from datastore objects." +
+		glog.Errorf("Failed to get Datastore managed objects from datastore objects."+
 			" dsObjList: %+v, properties: %+v, err: %v", dsList, properties, err)
 		return nil, err
 	}

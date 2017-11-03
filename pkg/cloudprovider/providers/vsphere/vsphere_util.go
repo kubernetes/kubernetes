@@ -32,6 +32,7 @@ import (
 
 	"fmt"
 
+	"github.com/vmware/govmomi/vim25/mo"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere/vclib/diskmanagers"
