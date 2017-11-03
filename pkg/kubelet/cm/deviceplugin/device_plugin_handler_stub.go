@@ -19,6 +19,8 @@ package deviceplugin
 import (
 	"k8s.io/api/core/v1"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 // HandlerStub provides a simple stub implementation for Handler.
@@ -30,7 +32,7 @@ func NewHandlerStub() (*HandlerStub, error) {
 }
 
 // Start simply returns nil.
-func (h *HandlerStub) Start() error {
+func (h *HandlerStub) Start(activePods ActivePodsFunc) error {
 	return nil
 }
 
@@ -40,7 +42,7 @@ func (h *HandlerStub) Devices() map[string][]pluginapi.Device {
 }
 
 // Allocate simply returns nil.
-func (h *HandlerStub) Allocate(pod *v1.Pod, container *v1.Container, activePods []*v1.Pod) error {
+func (h *HandlerStub) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
 	return nil
 }
 

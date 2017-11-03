@@ -14,26 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dockershim
+package store
 
 import (
 	"io/ioutil"
-	"os"
 	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/errors"
+	"k8s.io/kubernetes/pkg/util/filesystem"
 )
 
 func TestFileStore(t *testing.T) {
 	path, err := ioutil.TempDir("", "FileStore")
 	assert.NoError(t, err)
-	defer cleanUpTestPath(t, path)
-	store, err := NewFileStore(path)
+	store, err := NewFileStore(path, filesystem.NewFakeFs())
 	assert.NoError(t, err)
 
-	Checkpoints := []struct {
+	testCases := []struct {
 		key       string
 		data      string
 		expectErr bool
@@ -70,8 +68,8 @@ func TestFileStore(t *testing.T) {
 		},
 	}
 
-	// Test Add Checkpoint
-	for _, c := range Checkpoints {
+	// Test add data.
+	for _, c := range testCases {
 		_, err = store.Read(c.key)
 		assert.Error(t, err)
 
@@ -83,20 +81,20 @@ func TestFileStore(t *testing.T) {
 			assert.NoError(t, err)
 		}
 
-		// Test Read Checkpoint
+		// Test read data by key.
 		data, err := store.Read(c.key)
 		assert.NoError(t, err)
 		assert.Equal(t, string(data), c.data)
 	}
 
-	// Test list checkpoints.
+	// Test list keys.
 	keys, err := store.List()
 	assert.NoError(t, err)
 	sort.Strings(keys)
 	assert.Equal(t, keys, []string{"id1", "id2"})
 
-	// Test Delete Checkpoint
-	for _, c := range Checkpoints {
+	// Test Delete data
+	for _, c := range testCases {
 		if c.expectErr {
 			continue
 		}
@@ -104,55 +102,15 @@ func TestFileStore(t *testing.T) {
 		err = store.Delete(c.key)
 		assert.NoError(t, err)
 		_, err = store.Read(c.key)
-		assert.EqualValues(t, errors.CheckpointNotFoundError, err)
+		assert.EqualValues(t, ErrKeyNotFound, err)
 	}
 
-	// Test delete non existed checkpoint
+	// Test delete non-existent key.
 	err = store.Delete("id1")
 	assert.NoError(t, err)
 
-	// Test list checkpoints.
+	// Test list keys.
 	keys, err = store.List()
 	assert.NoError(t, err)
 	assert.Equal(t, len(keys), 0)
-}
-
-func TestIsValidKey(t *testing.T) {
-	testcases := []struct {
-		key   string
-		valid bool
-	}{
-		{
-			"    ",
-			false,
-		},
-		{
-			"/foo/bar",
-			false,
-		},
-		{
-			".foo",
-			false,
-		},
-		{
-			"a78768279290d33d0b82eaea43cb8346f500057cb5bd250e88c97a5585385d66",
-			true,
-		},
-	}
-
-	for _, tc := range testcases {
-		if tc.valid {
-			assert.NoError(t, validateKey(tc.key))
-		} else {
-			assert.Error(t, validateKey(tc.key))
-		}
-	}
-}
-
-func cleanUpTestPath(t *testing.T, path string) {
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		if err := os.RemoveAll(path); err != nil {
-			assert.NoError(t, err, "Failed to delete test directory: %v", err)
-		}
-	}
 }

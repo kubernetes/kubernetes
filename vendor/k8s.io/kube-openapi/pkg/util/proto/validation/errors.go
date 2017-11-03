@@ -20,15 +20,15 @@ import (
 	"fmt"
 )
 
-type Errors struct {
+type errors struct {
 	errors []error
 }
 
-func (e *Errors) Errors() []error {
+func (e *errors) Errors() []error {
 	return e.errors
 }
 
-func (e *Errors) AppendErrors(err ...error) {
+func (e *errors) AppendErrors(err ...error) {
 	e.errors = append(e.errors, err...)
 }
 

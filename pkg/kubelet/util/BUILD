@@ -64,6 +64,7 @@ filegroup(
         "//pkg/kubelet/util/ioutils:all-srcs",
         "//pkg/kubelet/util/queue:all-srcs",
         "//pkg/kubelet/util/sliceutils:all-srcs",
+        "//pkg/kubelet/util/store:all-srcs",
     ],
     tags = ["automanaged"],
 )

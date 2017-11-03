@@ -633,6 +633,7 @@ KUBE_PROXY_DAEMONSET: $(yaml-quote ${KUBE_PROXY_DAEMONSET:-false})
 KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
 NODE_PROBLEM_DETECTOR_TOKEN: $(yaml-quote ${NODE_PROBLEM_DETECTOR_TOKEN:-})
 ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
+ENABLE_POD_SECURITY_POLICY: $(yaml-quote ${ENABLE_POD_SECURITY_POLICY:-})
 MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
 RUNTIME_CONFIG: $(yaml-quote ${RUNTIME_CONFIG})
 CA_CERT: $(yaml-quote ${CA_CERT_BASE64:-})
@@ -665,6 +666,9 @@ PROMETHEUS_TO_SD_ENDPOINT: $(yaml-quote ${PROMETHEUS_TO_SD_ENDPOINT:-})
 PROMETHEUS_TO_SD_PREFIX: $(yaml-quote ${PROMETHEUS_TO_SD_PREFIX:-})
 ENABLE_PROMETHEUS_TO_SD: $(yaml-quote ${ENABLE_PROMETHEUS_TO_SD:-false})
 ENABLE_POD_PRIORITY: $(yaml-quote ${ENABLE_POD_PRIORITY:-})
+CONTAINER_RUNTIME: $(yaml-quote ${CONTAINER_RUNTIME:-})
+CONTAINER_RUNTIME_ENDPOINT: $(yaml-quote ${CONTAINER_RUNTIME_ENDPOINT:-})
+LOAD_IMAGE_COMMAND: $(yaml-quote ${LOAD_IMAGE_COMMAND:-})
 EOF
   if [ -n "${KUBELET_PORT:-}" ]; then
     cat >>$file <<EOF
@@ -898,12 +902,17 @@ EOF
       cat >>$file <<EOF
 NODE_LABELS: $(yaml-quote ${NODE_LABELS})
 EOF
-    fi
+  fi
+  if [ -n "${NON_MASTER_NODE_LABELS:-}" ]; then
+    cat >>$file <<EOF
+NON_MASTER_NODE_LABELS: $(yaml-quote ${NON_MASTER_NODE_LABELS})
+EOF
+  fi
   if [ -n "${EVICTION_HARD:-}" ]; then
       cat >>$file <<EOF
 EVICTION_HARD: $(yaml-quote ${EVICTION_HARD})
 EOF
-    fi
+  fi
   if [[ "${master}" == "true" && "${MASTER_OS_DISTRIBUTION}" == "container-linux" ]] || \
      [[ "${master}" == "false" && "${NODE_OS_DISTRIBUTION}" == "container-linux" ]]; then
     # Container-Linux-only env vars. TODO(yifan): Make them available on other distros.

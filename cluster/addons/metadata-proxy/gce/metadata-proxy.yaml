@@ -1,3 +1,13 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: metadata-proxy
+  namespace: kube-system
+  labels:
+    k8s-app: metadata-proxy
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+---
 apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
@@ -23,6 +33,7 @@ spec:
       annotations:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
+      serviceAccountName: metadata-proxy
       hostNetwork: true
       dnsPolicy: Default
       containers:
@@ -36,10 +47,10 @@ spec:
         resources:
           requests:
             memory: "32Mi"
-            cpu: "50m"
+            cpu: "30m"
           limits:
             memory: "32Mi"
-            cpu: "50m"
+            cpu: "30m"
         volumeMounts:
           - name: config-volume
             mountPath: /etc/nginx/

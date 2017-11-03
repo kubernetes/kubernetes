@@ -421,6 +421,7 @@ enable_l7_loadbalancing: '$(echo "$ENABLE_L7_LOADBALANCING" | sed -e "s/'/''/g")
 enable_node_logging: '$(echo "$ENABLE_NODE_LOGGING" | sed -e "s/'/''/g")'
 enable_metadata_proxy: '$(echo "$ENABLE_METADATA_CONCEALMENT" | sed -e "s/'/''/g")'
 enable_metrics_server: '$(echo "$ENABLE_METRICS_SERVER" | sed -e "s/'/''/g")'
+enable_pod_security_policy: '$(echo "$ENABLE_POD_SECURITY_POLICY" | sed -e "s/'/''/g")'
 enable_rescheduler: '$(echo "$ENABLE_RESCHEDULER" | sed -e "s/'/''/g")'
 logging_destination: '$(echo "$LOGGING_DESTINATION" | sed -e "s/'/''/g")'
 elasticsearch_replicas: '$(echo "$ELASTICSEARCH_LOGGING_REPLICAS" | sed -e "s/'/''/g")'
@@ -583,6 +584,11 @@ EOF
     if [ -n "${NODE_LABELS:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 node_labels: '$(echo "${NODE_LABELS}" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [ -n "${NON_MASTER_NODE_LABELS:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+non_master_node_labels: '$(echo "${NON_MASTER_NODE_LABELS}" | sed -e "s/'/''/g")'
 EOF
     fi
     if [ -n "${NODE_TAINTS:-}" ]; then

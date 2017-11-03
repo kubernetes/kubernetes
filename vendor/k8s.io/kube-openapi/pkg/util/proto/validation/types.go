@@ -23,7 +23,7 @@ import (
 	"k8s.io/kube-openapi/pkg/util/proto"
 )
 
-type ValidationItem interface {
+type validationItem interface {
 	proto.SchemaVisitor
 
 	Errors() []error
@@ -31,7 +31,7 @@ type ValidationItem interface {
 }
 
 type baseItem struct {
-	errors Errors
+	errors errors
 	path   proto.Path
 }
 
@@ -78,7 +78,7 @@ func (item *mapItem) sortedKeys() []string {
 	return sortedKeys
 }
 
-var _ ValidationItem = &mapItem{}
+var _ validationItem = &mapItem{}
 
 func (item *mapItem) VisitPrimitive(schema *proto.Primitive) {
 	item.AddValidationError(InvalidTypeError{Path: schema.GetPath().String(), Expected: schema.Type, Actual: "map"})
@@ -139,7 +139,7 @@ type arrayItem struct {
 	Array []interface{}
 }
 
-var _ ValidationItem = &arrayItem{}
+var _ validationItem = &arrayItem{}
 
 func (item *arrayItem) VisitPrimitive(schema *proto.Primitive) {
 	item.AddValidationError(InvalidTypeError{Path: schema.GetPath().String(), Expected: schema.Type, Actual: "array"})
@@ -183,7 +183,7 @@ type primitiveItem struct {
 	Kind  string
 }
 
-var _ ValidationItem = &primitiveItem{}
+var _ validationItem = &primitiveItem{}
 
 func (item *primitiveItem) VisitPrimitive(schema *proto.Primitive) {
 	// Some types of primitives can match more than one (a number
@@ -232,7 +232,7 @@ func (item *primitiveItem) VisitReference(schema proto.Reference) {
 }
 
 // itemFactory creates the relevant item type/visitor based on the current yaml type.
-func itemFactory(path proto.Path, v interface{}) (ValidationItem, error) {
+func itemFactory(path proto.Path, v interface{}) (validationItem, error) {
 	// We need to special case for no-type fields in yaml (e.g. empty item in list)
 	if v == nil {
 		return nil, InvalidObjectTypeError{Type: "nil", Path: path.String()}

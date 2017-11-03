@@ -598,6 +598,9 @@ function start-kubelet {
   if [[ -n "${NODE_LABELS:-}" ]]; then
     node_labels="${node_labels:+${node_labels},}${NODE_LABELS}"
   fi
+  if [[ -n "${NON_MASTER_NODE_LABELS:-}" && "${KUBERNETES_MASTER:-}" != "true" ]]; then
+    node_labels="${node_labels:+${node_labels},}${NON_MASTER_NODE_LABELS}"
+  fi
   if [[ -n "${node_labels:-}" ]]; then
     flags+=" --node-labels=${node_labels}"
   fi
@@ -1494,7 +1497,7 @@ else
   fi
 fi
 
-if [[ "${CONTAINER_RUNTIME:-}" == "rkt" ]]; then
+if [[ "${KUBERNETES_CONTAINER_RUNTIME:-}" == "rkt" ]]; then
   systemctl stop docker
   systemctl disable docker
   setup-rkt

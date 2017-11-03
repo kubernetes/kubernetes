@@ -112,7 +112,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 			config: componentconfig.KubeProxyConfiguration{
 				BindAddress:        "10.10.12.11",
 				HealthzBindAddress: "0.0.0.0:12345",
-				// only HealthzBindAddress is invalid
+				// only MetricsBindAddress is invalid
 				MetricsBindAddress: "127.0.0.1",
 				ClusterCIDR:        "192.168.59.0/24",
 				UDPIdleTimeout:     metav1.Duration{Duration: 1 * time.Second},
@@ -396,6 +396,135 @@ func TestValidateProxyMode(t *testing.T) {
 
 	for _, errorCase := range errorCases {
 		if errs := validateProxyMode(errorCase.mode, newPath.Child("ProxyMode")); len(errs) == 0 {
+			t.Errorf("expected failure for %s", errorCase.msg)
+		} else if !strings.Contains(errs[0].Error(), errorCase.msg) {
+			t.Errorf("unexpected error: %v, expected: %s", errs[0], errorCase.msg)
+		}
+	}
+}
+
+func TestValidateClientConnectionConfiguration(t *testing.T) {
+	newPath := field.NewPath("KubeProxyConfiguration")
+
+	successCases := []componentconfig.ClientConnectionConfiguration{
+		{
+			Burst: 0,
+		},
+		{
+			Burst: 5,
+		},
+	}
+
+	for _, successCase := range successCases {
+		if errs := validateClientConnectionConfiguration(successCase, newPath.Child("Burst")); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := []struct {
+		ccc componentconfig.ClientConnectionConfiguration
+		msg string
+	}{
+		{
+			ccc: componentconfig.ClientConnectionConfiguration{Burst: -5},
+			msg: "must be greater than or equal to 0",
+		},
+	}
+
+	for _, errorCase := range errorCases {
+		if errs := validateClientConnectionConfiguration(errorCase.ccc, newPath.Child("Burst")); len(errs) == 0 {
+			t.Errorf("expected failure for %s", errorCase.msg)
+		} else if !strings.Contains(errs[0].Error(), errorCase.msg) {
+			t.Errorf("unexpected error: %v, expected: %s", errs[0], errorCase.msg)
+		}
+	}
+}
+
+func TestValidateHostPort(t *testing.T) {
+	newPath := field.NewPath("KubeProxyConfiguration")
+
+	successCases := []string{
+		"0.0.0.0:10256",
+		"127.0.0.1:10256",
+		"10.10.10.10:10256",
+	}
+
+	for _, successCase := range successCases {
+		if errs := validateHostPort(successCase, newPath.Child("HealthzBindAddress")); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := []struct {
+		ccc string
+		msg string
+	}{
+		{
+			ccc: "10.10.10.10",
+			msg: "must be IP:port",
+		},
+		{
+			ccc: "123.456.789.10:12345",
+			msg: "must be a valid IP",
+		},
+		{
+			ccc: "10.10.10.10:foo",
+			msg: "must be a valid port",
+		},
+		{
+			ccc: "10.10.10.10:0",
+			msg: "must be a valid port",
+		},
+		{
+			ccc: "10.10.10.10:65536",
+			msg: "must be a valid port",
+		},
+	}
+
+	for _, errorCase := range errorCases {
+		if errs := validateHostPort(errorCase.ccc, newPath.Child("HealthzBindAddress")); len(errs) == 0 {
+			t.Errorf("expected failure for %s", errorCase.msg)
+		} else if !strings.Contains(errs[0].Error(), errorCase.msg) {
+			t.Errorf("unexpected error: %v, expected: %s", errs[0], errorCase.msg)
+		}
+	}
+}
+
+func TestValidateIPVSSchedulerMethod(t *testing.T) {
+	newPath := field.NewPath("KubeProxyConfiguration")
+
+	successCases := []componentconfig.IPVSSchedulerMethod{
+		componentconfig.RoundRobin,
+		componentconfig.WeightedRoundRobin,
+		componentconfig.LeastConnection,
+		componentconfig.WeightedLeastConnection,
+		componentconfig.LocalityBasedLeastConnection,
+		componentconfig.LocalityBasedLeastConnectionWithReplication,
+		componentconfig.SourceHashing,
+		componentconfig.DestinationHashing,
+		componentconfig.ShortestExpectedDelay,
+		componentconfig.NeverQueue,
+		"",
+	}
+
+	for _, successCase := range successCases {
+		if errs := validateIPVSSchedulerMethod(successCase, newPath.Child("Scheduler")); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	errorCases := []struct {
+		mode componentconfig.IPVSSchedulerMethod
+		msg  string
+	}{
+		{
+			mode: componentconfig.IPVSSchedulerMethod("non-existing"),
+			msg:  "blank means the default algorithm method (currently rr)",
+		},
+	}
+
+	for _, errorCase := range errorCases {
+		if errs := validateIPVSSchedulerMethod(errorCase.mode, newPath.Child("ProxyMode")); len(errs) == 0 {
 			t.Errorf("expected failure for %s", errorCase.msg)
 		} else if !strings.Contains(errs[0].Error(), errorCase.msg) {
 			t.Errorf("unexpected error: %v, expected: %s", errs[0], errorCase.msg)

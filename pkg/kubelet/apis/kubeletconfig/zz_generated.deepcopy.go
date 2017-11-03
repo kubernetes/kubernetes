@@ -137,6 +137,18 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
+	if in.ManifestURLHeader != nil {
+		in, out := &in.ManifestURLHeader, &out.ManifestURLHeader
+		*out = make(map[string][]string, len(*in))
+		for key, val := range *in {
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				(*out)[key] = make([]string, len(val))
+				copy((*out)[key], val)
+			}
+		}
+	}
 	out.Authentication = in.Authentication
 	out.Authorization = in.Authorization
 	if in.HostNetworkSources != nil {

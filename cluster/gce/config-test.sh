@@ -80,9 +80,15 @@ NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
 NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-cos-cloud}
 NODE_SERVICE_ACCOUNT=${KUBE_GCE_NODE_SERVICE_ACCOUNT:-default}
 CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
+CONTAINER_RUNTIME_ENDPOINT=${KUBE_CONTAINER_RUNTIME_ENDPOINT:-}
+LOAD_IMAGE_COMMAND=${KUBE_LOAD_IMAGE_COMMAND:-docker load -i}
 GCI_DOCKER_VERSION=${KUBE_GCI_DOCKER_VERSION:-}
 RKT_VERSION=${KUBE_RKT_VERSION:-1.23.0}
 RKT_STAGE1_IMAGE=${KUBE_RKT_STAGE1_IMAGE:-coreos.com/rkt/stage1-coreos}
+# MASTER_EXTRA_METADATA is the extra instance metadata on master instance separated by commas.
+MASTER_EXTRA_METADATA=${KUBE_MASTER_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
+# MASTER_EXTRA_METADATA is the extra instance metadata on node instance separated by commas.
+NODE_EXTRA_METADATA=${KUBE_NODE_EXTRA_METADATA:-${KUBE_EXTRA_METADATA:-}}
 
 NETWORK=${KUBE_GCE_NETWORK:-e2e-test-${USER}}
 if [[ "${CREATE_CUSTOM_NETWORK}" == true ]]; then
@@ -199,10 +205,13 @@ KUBEPROXY_TEST_ARGS="${KUBEPROXY_TEST_ARGS:-} ${TEST_CLUSTER_API_CONTENT_TYPE}"
 # TODO(piosz): remove this in 1.8
 NODE_LABELS="${KUBE_NODE_LABELS:-beta.kubernetes.io/fluentd-ds-ready=true}"
 
+# NON_MASTER_NODE_LABELS are labels will only be applied on non-master nodes.
+NON_MASTER_NODE_LABELS="${KUBE_NON_MASTER_NODE_LABELS:-}"
+
 # To avoid running Calico on a node that is not configured appropriately,
 # label each Node so that the DaemonSet can run the Pods only on ready Nodes.
 if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
-	NODE_LABELS="$NODE_LABELS,projectcalico.org/ds-ready=true"
+	NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}projectcalico.org/ds-ready=true"
 fi
 
 # Enable metadata concealment by firewalling pod traffic to the metadata server
@@ -298,8 +307,16 @@ if [[ -n "${GCE_GLBC_IMAGE:-}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} GCE_GLBC_IMAGE"
 fi
 
-# If we included ResourceQuota, we should keep it at the end of the list to prevent incrementing quota usage prematurely.
-ADMISSION_CONTROL="${KUBE_ADMISSION_CONTROL:-Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority,ResourceQuota,GenericAdmissionWebhook}"
+if [[ -z "${KUBE_ADMISSION_CONTROL:-}" ]]; then
+  ADMISSION_CONTROL="Initializers,NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority"
+  if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
+    ADMISSION_CONTROL="${ADMISSION_CONTROL},PodSecurityPolicy"
+  fi
+  # ResourceQuota must come last, or a creation is recorded, but the pod may be forbidden.
+  ADMISSION_CONTROL="${ADMISSION_CONTROL},ResourceQuota,GenericAdmissionWebhook"
+else
+  ADMISSION_CONTROL=${KUBE_ADMISSION_CONTROL}
+fi
 
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}

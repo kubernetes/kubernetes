@@ -26,7 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 
 	"fmt"
 	"strconv"
@@ -74,7 +76,14 @@ type ContainerManager interface {
 
 	// GetResources returns RunContainerOptions with devices, mounts, and env fields populated for
 	// extended resources required by container.
-	GetResources(pod *v1.Pod, container *v1.Container, activePods []*v1.Pod) (*kubecontainer.RunContainerOptions, error)
+	GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error)
+
+	// UpdatePluginResources calls Allocate of device plugin handler for potential
+	// requests for device plugin resources, and returns an error if fails.
+	// Otherwise, it updates allocatableResource in nodeInfo if necessary,
+	// to make sure it is at least equal to the pod's requested capacity for
+	// any registered device plugin resource
+	UpdatePluginResources(*schedulercache.NodeInfo, *lifecycle.PodAdmitAttributes) error
 
 	InternalContainerLifecycle() InternalContainerLifecycle
 }

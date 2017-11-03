@@ -3,16 +3,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
-        "api.go",
-        "astnodetype_string.go",
-        "functions.go",
-        "interpreter.go",
-        "lexer.go",
-        "parser.go",
-        "toktype_string.go",
-        "util.go",
+        "errors.go",
+        "types.go",
+        "validation.go",
     ],
+    importpath = "k8s.io/kube-openapi/pkg/util/proto/validation",
     visibility = ["//visibility:public"],
+    deps = ["//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library"],
 )
 
 filegroup(
