@@ -33,8 +33,9 @@ import (
 )
 
 const (
-	NEGAnnotation    = "alpha.cloud.google.com/load-balancer-neg"
-	NEGUpdateTimeout = 2 * time.Minute
+	NEGAnnotation           = "alpha.cloud.google.com/load-balancer-neg"
+	NEGUpdateTimeout        = 2 * time.Minute
+	instanceGroupAnnotation = "ingress.gcp.kubernetes.io/instance-groups"
 )
 
 var _ = SIGDescribe("Loadbalancing: L7", func() {
@@ -151,6 +152,29 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			// restarter.restart()
 			// By("should continue serving on provided static-ip for 30 seconds")
 			// framework.ExpectNoError(jig.verifyURL(fmt.Sprintf("https://%v/", ip), "", 30, 1*time.Second, httpClient))
+		})
+
+		It("multicluster ingress should get instance group annotation", func() {
+			name := "echomap"
+			jig.CreateIngress(filepath.Join(framework.IngressManifestPath, "http"), ns, map[string]string{
+				framework.IngressClass: framework.MulticlusterIngressClassValue,
+			}, map[string]string{})
+
+			By(fmt.Sprintf("waiting for Ingress %s to come up", name))
+			pollErr := wait.Poll(2*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
+				ing, err := f.ClientSet.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				annotations := ing.Annotations
+				if annotations == nil || annotations[instanceGroupAnnotation] == "" {
+					framework.Logf("Waiting for ingress to get %s annotation. Found annotations: %v", instanceGroupAnnotation, annotations)
+					return false, nil
+				}
+				return true, nil
+			})
+			if pollErr != nil {
+				framework.ExpectNoError(fmt.Errorf("Timed out waiting for ingress %s to get %s annotation", name, instanceGroupAnnotation))
+			}
+			// TODO(nikhiljindal): Check the instance group annotation value and verify with a multizone cluster.
 		})
 
 		// TODO: Implement a multizone e2e that verifies traffic reaches each
