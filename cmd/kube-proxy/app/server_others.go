@@ -275,8 +275,8 @@ func tryIPVSProxy(iptver iptables.IPTablesVersioner, kcompat iptables.KernelComp
 	// IPVS Proxier relies on iptables
 	useIPVSProxy, err := ipvs.CanUseIPVSProxier()
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("can't determine whether to use ipvs proxy, using userspace proxier: %v", err))
-		return proxyModeUserspace
+		// Try to fallback to iptables before falling back to userspace
+		utilruntime.HandleError(fmt.Errorf("can't determine whether to use ipvs proxy, error: %v", err))
 	}
 	if useIPVSProxy {
 		return proxyModeIPVS
