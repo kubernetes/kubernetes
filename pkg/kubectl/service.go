@@ -87,7 +87,7 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	}
 	selectorString, found := params["selector"]
 	if !found || len(selectorString) == 0 {
-		return nil, fmt.Errorf("'selector' is a required parameter.")
+		return nil, fmt.Errorf("'selector' is a required parameter")
 	}
 	selector, err := ParseLabels(selectorString)
 	if err != nil {
@@ -107,7 +107,7 @@ func generate(genericParams map[string]interface{}) (runtime.Object, error) {
 	if !found || len(name) == 0 {
 		name, found = params["default-name"]
 		if !found || len(name) == 0 {
-			return nil, fmt.Errorf("'name' is a required parameter.")
+			return nil, fmt.Errorf("'name' is a required parameter")
 		}
 	}
 

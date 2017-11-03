@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// A set of common functions needed by cmd/kubectl and pkg/kubectl packages.
+// Package kubectl provides a set of common functions needed by the cmd/kubectl and pkg/kubectl packages.
 package kubectl
 
 import (
