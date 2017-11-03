@@ -1990,34 +1990,19 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 	// getUDData validates data.json in the update-demo (returns nil if data is ok).
 	return func(c clientset.Interface, podID string) error {
 		framework.Logf("validating pod %s", podID)
-		subResourceProxyAvailable, err := framework.ServerVersionGTE(framework.SubResourcePodProxyVersion, c.Discovery())
-		if err != nil {
-			return err
-		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 		defer cancel()
 
-		var body []byte
-		if subResourceProxyAvailable {
-			body, err = c.CoreV1().RESTClient().Get().
-				Namespace(ns).
-				Resource("pods").
-				SubResource("proxy").
-				Name(podID).
-				Suffix("data.json").
-				Do().
-				Raw()
-		} else {
-			body, err = c.CoreV1().RESTClient().Get().
-				Prefix("proxy").
-				Namespace(ns).
-				Resource("pods").
-				Name(podID).
-				Suffix("data.json").
-				Do().
-				Raw()
-		}
+		body, err := c.CoreV1().RESTClient().Get().
+			Prefix("proxy").
+			Namespace(ns).
+			Resource("pods").
+			Name(podID).
+			Suffix("data.json").
+			Do().
+			Raw()
+
 		if err != nil {
 			if ctx.Err() != nil {
 				framework.Failf("Failed to retrieve data from container: %v", err)
