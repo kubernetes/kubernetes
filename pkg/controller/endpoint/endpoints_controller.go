@@ -144,7 +144,7 @@ type EndpointController struct {
 	workerLoopPeriod time.Duration
 }
 
-// Runs e; will not return until stopCh is closed. workers determines how many
+// Run will not return until stopCh is closed. workers determines how many
 // endpoints will be handled in parallel.
 func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
