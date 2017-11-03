@@ -1,3 +1,5 @@
 reviewers:
 - deads2k
 - hongchaodeng
+labels:
+- sig/apps

@@ -11,3 +11,5 @@ reviewers:
 - kow3ns
 - smarterclayton
 - tnozicka
+labels:
+- sig/apps
