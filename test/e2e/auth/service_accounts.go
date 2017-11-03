@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -35,10 +34,6 @@ import (
 )
 
 var mountImage = imageutils.GetE2EImage(imageutils.Mounttest)
-
-var serviceAccountTokenNamespaceVersion = utilversion.MustParseSemantic("v1.2.0")
-
-var serviceAccountTokenAutomountVersion = utilversion.MustParseSemantic("v1.6.0-alpha.2")
 
 var _ = SIGDescribe("ServiceAccounts", func() {
 	f := framework.NewDefaultFramework("svcaccounts")
@@ -220,16 +215,13 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			},
 		}
 
-		supportsTokenNamespace, _ := framework.ServerVersionGTE(serviceAccountTokenNamespaceVersion, f.ClientSet.Discovery())
-		if supportsTokenNamespace {
-			pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
-				Name:  "namespace-test",
-				Image: mountImage,
-				Args: []string{
-					fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountNamespaceKey),
-				},
-			})
-		}
+		pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
+			Name:  "namespace-test",
+			Image: mountImage,
+			Args: []string{
+				fmt.Sprintf("--file_content=%s/%s", serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountNamespaceKey),
+			},
+		})
 
 		f.TestContainerOutput("consume service account token", pod, 0, []string{
 			fmt.Sprintf(`content of file "%s/%s": %s`, serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountTokenKey, tokenContent),
@@ -238,16 +230,12 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 			fmt.Sprintf(`content of file "%s/%s": %s`, serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountRootCAKey, rootCAContent),
 		})
 
-		if supportsTokenNamespace {
-			f.TestContainerOutput("consume service account namespace", pod, 2, []string{
-				fmt.Sprintf(`content of file "%s/%s": %s`, serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountNamespaceKey, f.Namespace.Name),
-			})
-		}
+		f.TestContainerOutput("consume service account namespace", pod, 2, []string{
+			fmt.Sprintf(`content of file "%s/%s": %s`, serviceaccount.DefaultAPITokenMountPath, v1.ServiceAccountNamespaceKey, f.Namespace.Name),
+		})
 	})
 
 	framework.ConformanceIt("should allow opting out of API token automount ", func() {
-		framework.SkipUnlessServerVersionGTE(serviceAccountTokenAutomountVersion, f.ClientSet.Discovery())
-
 		var err error
 		trueValue := true
 		falseValue := false

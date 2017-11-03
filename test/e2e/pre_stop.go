@@ -121,34 +121,20 @@ func testPreStop(c clientset.Interface, ns string) {
 
 	// Validate that the server received the web poke.
 	err = wait.Poll(time.Second*5, time.Second*60, func() (bool, error) {
-		subResourceProxyAvailable, err := framework.ServerVersionGTE(framework.SubResourcePodProxyVersion, c.Discovery())
-		if err != nil {
-			return false, err
-		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 		defer cancel()
 
 		var body []byte
-		if subResourceProxyAvailable {
-			body, err = c.CoreV1().RESTClient().Get().
-				Context(ctx).
-				Namespace(ns).
-				Resource("pods").
-				SubResource("proxy").
-				Name(podDescr.Name).
-				Suffix("read").
-				DoRaw()
-		} else {
-			body, err = c.CoreV1().RESTClient().Get().
-				Context(ctx).
-				Prefix("proxy").
-				Namespace(ns).
-				Resource("pods").
-				Name(podDescr.Name).
-				Suffix("read").
-				DoRaw()
-		}
+		body, err = c.CoreV1().RESTClient().Get().
+			Context(ctx).
+			Namespace(ns).
+			Resource("pods").
+			SubResource("proxy").
+			Name(podDescr.Name).
+			Suffix("read").
+			DoRaw()
+
 		if err != nil {
 			if ctx.Err() != nil {
 				framework.Failf("Error validating prestop: %v", err)
