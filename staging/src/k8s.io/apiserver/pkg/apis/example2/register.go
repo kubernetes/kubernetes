@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package example
+package example2
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/apis/example"
 )
 
 var (
@@ -27,7 +28,7 @@ var (
 )
 
 // GroupName is the group name use in this package
-const GroupName = "example.apiserver.k8s.io"
+const GroupName = "example2.apiserver.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
@@ -45,8 +46,7 @@ func Resource(resource string) schema.GroupResource {
 // Adds the list of known types to the given scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&Pod{},
-		&ReplicaSet{},
+		&example.ReplicaSet{},
 	)
 	return nil
 }

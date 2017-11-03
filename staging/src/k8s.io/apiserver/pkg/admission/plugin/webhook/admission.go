@@ -37,6 +37,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -134,6 +135,8 @@ type GenericAdmissionWebhook struct {
 	negotiatedSerializer runtime.NegotiatedSerializer
 	namespaceLister      corelisters.NamespaceLister
 	client               clientset.Interface
+	convertor            runtime.ObjectConvertor
+	creator              runtime.ObjectCreater
 
 	authInfoResolver AuthenticationInfoResolver
 	cache            *lru.Cache
@@ -169,6 +172,8 @@ func (a *GenericAdmissionWebhook) SetScheme(scheme *runtime.Scheme) {
 		a.negotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{
 			Serializer: serializer.NewCodecFactory(scheme).LegacyCodec(admissionv1alpha1.SchemeGroupVersion),
 		})
+		a.convertor = scheme
+		a.creator = scheme
 	}
 }
 
@@ -219,6 +224,37 @@ func (a *GenericAdmissionWebhook) loadConfiguration(attr admission.Attributes) (
 	return hookConfig, nil
 }
 
+type versionedAttributes struct {
+	admission.Attributes
+	oldObject runtime.Object
+	object    runtime.Object
+}
+
+func (v versionedAttributes) GetObject() runtime.Object {
+	return v.object
+}
+
+func (v versionedAttributes) GetOldObject() runtime.Object {
+	return v.oldObject
+}
+
+func (a *GenericAdmissionWebhook) convertToGVK(obj runtime.Object, gvk schema.GroupVersionKind) (runtime.Object, error) {
+	// Unlike other resources, custom resources do not have internal version, so
+	// if obj is a custom resource, it should not need conversion.
+	if obj.GetObjectKind().GroupVersionKind() == gvk {
+		return obj, nil
+	}
+	out, err := a.creator.New(gvk)
+	if err != nil {
+		return nil, err
+	}
+	err = a.convertor.Convert(obj, out, nil)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Admit makes an admission decision based on the request attributes.
 func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 	hookConfig, err := a.loadConfiguration(attr)
@@ -228,14 +264,49 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 	hooks := hookConfig.Webhooks
 	ctx := context.TODO()
 
-	errCh := make(chan error, len(hooks))
-	wg := sync.WaitGroup{}
-	wg.Add(len(hooks))
+	var relevantHooks []*v1alpha1.Webhook
 	for i := range hooks {
+		call, err := a.shouldCallHook(&hooks[i], attr)
+		if err != nil {
+			return err
+		}
+		if call {
+			relevantHooks = append(relevantHooks, &hooks[i])
+		}
+	}
+
+	if len(relevantHooks) == 0 {
+		// no matching hooks
+		return nil
+	}
+
+	// convert the object to the external version before sending it to the webhook
+	versionedAttr := versionedAttributes{
+		Attributes: attr,
+	}
+	if oldObj := attr.GetOldObject(); oldObj != nil {
+		out, err := a.convertToGVK(oldObj, attr.GetKind())
+		if err != nil {
+			return apierrors.NewInternalError(err)
+		}
+		versionedAttr.oldObject = out
+	}
+	if obj := attr.GetObject(); obj != nil {
+		out, err := a.convertToGVK(obj, attr.GetKind())
+		if err != nil {
+			return apierrors.NewInternalError(err)
+		}
+		versionedAttr.object = out
+	}
+
+	wg := sync.WaitGroup{}
+	errCh := make(chan error, len(relevantHooks))
+	wg.Add(len(relevantHooks))
+	for i := range relevantHooks {
 		go func(hook *v1alpha1.Webhook) {
 			defer wg.Done()
 
-			err := a.callHook(ctx, hook, attr)
+			err := a.callHook(ctx, hook, versionedAttr)
 			if err == nil {
 				return
 			}
@@ -256,7 +327,7 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 
 			glog.Warningf("rejected by webhook %q: %#v", hook.Name, err)
 			errCh <- err
-		}(&hooks[i])
+		}(relevantHooks[i])
 	}
 	wg.Wait()
 	close(errCh)
@@ -313,7 +384,7 @@ func (a *GenericAdmissionWebhook) getNamespaceLabels(attr admission.Attributes) 
 
 // whether the request is exempted by the webhook because of the
 // namespaceSelector of the webhook.
-func (a *GenericAdmissionWebhook) exemptedByNamespaceSelector(h *v1alpha1.Webhook, attr admission.Attributes) (bool, error) {
+func (a *GenericAdmissionWebhook) exemptedByNamespaceSelector(h *v1alpha1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
 	namespaceName := attr.GetNamespace()
 	if len(namespaceName) == 0 && attr.GetResource().Resource != "namespaces" {
 		// If the request is about a cluster scoped resource, and it is not a
@@ -323,8 +394,14 @@ func (a *GenericAdmissionWebhook) exemptedByNamespaceSelector(h *v1alpha1.Webhoo
 		return true, nil
 	}
 	namespaceLabels, err := a.getNamespaceLabels(attr)
+	// this means the namespace is not found, for backwards compatibility,
+	// return a 404
 	if apierrors.IsNotFound(err) {
-		return false, err
+		status, ok := err.(apierrors.APIStatus)
+		if !ok {
+			return false, apierrors.NewInternalError(err)
+		}
+		return false, &apierrors.StatusError{status.Status()}
 	}
 	if err != nil {
 		return false, apierrors.NewInternalError(err)
@@ -337,15 +414,8 @@ func (a *GenericAdmissionWebhook) exemptedByNamespaceSelector(h *v1alpha1.Webhoo
 	return !selector.Matches(labels.Set(namespaceLabels)), nil
 }
 
-func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Webhook, attr admission.Attributes) error {
-	excluded, err := a.exemptedByNamespaceSelector(h, attr)
-	if err != nil {
-		return err
-	}
-	if excluded {
-		return nil
-	}
-	matches := false
+func (a *GenericAdmissionWebhook) shouldCallHook(h *v1alpha1.Webhook, attr admission.Attributes) (bool, *apierrors.StatusError) {
+	var matches bool
 	for _, r := range h.Rules {
 		m := RuleMatcher{Rule: r, Attr: attr}
 		if m.Matches() {
@@ -354,9 +424,17 @@ func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Webh
 		}
 	}
 	if !matches {
-		return nil
+		return false, nil
 	}
 
+	excluded, err := a.exemptedByNamespaceSelector(h, attr)
+	if err != nil {
+		return false, err
+	}
+	return !excluded, nil
+}
+
+func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Webhook, attr admission.Attributes) error {
 	// Make the webhook request
 	request := createAdmissionReview(attr)
 	client, err := a.hookClient(h)
