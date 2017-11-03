@@ -999,7 +999,7 @@ func (proxier *Proxier) syncProxyRules() {
 			"-A", string(kubeServicesChain),
 			"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcNameString),
 			"-m", protocol, "-p", protocol,
-			"-d", fmt.Sprintf("%s/32", svcInfo.clusterIP.String()),
+			"-d", utilproxy.ToCIDR(svcInfo.clusterIP),
 			"--dport", strconv.Itoa(svcInfo.port),
 		)
 		if proxier.masqueradeAll {
@@ -1090,7 +1090,7 @@ func (proxier *Proxier) syncProxyRules() {
 						"-A", string(kubeServicesChain),
 						"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
 						"-m", string(svcInfo.protocol), "-p", string(svcInfo.protocol),
-						"-d", fmt.Sprintf("%s/32", ingress.IP),
+						"-d", utilproxy.ToCIDR(net.ParseIP(ingress.IP)),
 						"--dport", fmt.Sprintf("%d", svcInfo.port),
 					)
 
@@ -1107,7 +1107,7 @@ func (proxier *Proxier) syncProxyRules() {
 					// loadbalancer's backend hosts. In this case, request will not hit the loadbalancer but loop back directly.
 					// Need to add the following rule to allow request on host.
 					if allowFromNode {
-						writeLine(proxier.natRules, append(args, "-s", fmt.Sprintf("%s/32", ingress.IP), "-j", "ACCEPT")...)
+						writeLine(proxier.natRules, append(args, "-s", utilproxy.ToCIDR(net.ParseIP(ingress.IP)), "-j", "ACCEPT")...)
 					}
 
 					// If the packet was able to reach the end of firewall chain, then it did not get DNATed.
