@@ -62,7 +62,12 @@ const (
 	validFor = 365 * 24 * time.Hour
 
 	// Ingress class annotation defined in ingress repository.
-	ingressClass = "kubernetes.io/ingress.class"
+	// TODO: All these annotations should be reused from
+	// ingress-gce/pkg/annotations instead of duplicating them here.
+	IngressClass = "kubernetes.io/ingress.class"
+
+	// Ingress class annotation value for multi cluster ingress.
+	MulticlusterIngressClassValue = "gce-multi-cluster"
 
 	// all cloud resources created by the ingress controller start with this
 	// prefix.
@@ -937,7 +942,7 @@ func (j *IngressTestJig) CreateIngress(manifestPath, ns string, ingAnnotations m
 	j.Ingress, err = manifest.IngressFromManifest(filepath.Join(manifestPath, "ing.yaml"))
 	ExpectNoError(err)
 	j.Ingress.Namespace = ns
-	j.Ingress.Annotations = map[string]string{ingressClass: j.Class}
+	j.Ingress.Annotations = map[string]string{IngressClass: j.Class}
 	for k, v := range ingAnnotations {
 		j.Ingress.Annotations[k] = v
 	}
