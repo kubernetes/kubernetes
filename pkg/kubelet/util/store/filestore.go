@@ -117,14 +117,17 @@ func writeFile(fs utilfs.Filesystem, path string, data []byte) (retErr error) {
 	}
 
 	tmpPath := tmpFile.Name()
+	shouldClose := true
 
 	defer func() {
 		// Close the file.
-		if err := tmpFile.Close(); err != nil {
-			if retErr == nil {
-				retErr = err
-			} else {
-				retErr = fmt.Errorf("failed to close temp file after error %v; close error: %v", retErr, err)
+		if shouldClose {
+			if err := tmpFile.Close(); err != nil {
+				if retErr == nil {
+					retErr = fmt.Errorf("close error: %v", err)
+				} else {
+					retErr = fmt.Errorf("failed to close temp file after error %v; close error: %v", retErr, err)
+				}
 			}
 		}
 
@@ -143,6 +146,13 @@ func writeFile(fs utilfs.Filesystem, path string, data []byte) (retErr error) {
 
 	// Sync file.
 	if err := tmpFile.Sync(); err != nil {
+		return err
+	}
+
+	// Closing the file before renaming.
+	err = tmpFile.Close()
+	shouldClose = false
+	if err != nil {
 		return err
 	}
 
