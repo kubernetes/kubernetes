@@ -408,7 +408,7 @@ func VerifyPodStartupLatency(latency *PodStartupLatency) error {
 		return fmt.Errorf("too high pod startup latency 90th percentile: %v", latency.Latency.Perc90)
 	}
 	if latency.Latency.Perc99 > podStartupThreshold {
-		return fmt.Errorf("too high pod startup latency 99th percentil: %v", latency.Latency.Perc99)
+		return fmt.Errorf("too high pod startup latency 99th percentile: %v", latency.Latency.Perc99)
 	}
 	return nil
 }
