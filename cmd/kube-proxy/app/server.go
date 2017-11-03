@@ -49,6 +49,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
+	"k8s.io/kubernetes/pkg/features"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -163,7 +164,7 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 		"NAT timeout for TCP connections in the CLOSE_WAIT state")
 	fs.BoolVar(&options.config.EnableProfiling, "profiling", options.config.EnableProfiling, "If true enables profiling via web interface on /debug/pprof handler.")
 	fs.StringVar(&options.config.IPVS.Scheduler, "ipvs-scheduler", options.config.IPVS.Scheduler, "The ipvs scheduler type when proxy mode is ipvs")
-	utilfeature.DefaultFeatureGate.AddFlag(fs)
+	utilfeature.DefaultFeatureGate.AddFlag(fs, features.KubeProxy)
 }
 
 func NewOptions() *Options {

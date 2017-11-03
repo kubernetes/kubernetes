@@ -33,7 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 
 	// add the kubernetes feature gates
-	_ "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/features"
 
 	"github.com/cloudflare/cfssl/helpers"
 	"github.com/spf13/pflag"
@@ -223,7 +223,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet, allControllers []string, disabled
 
 	leaderelectionconfig.BindFlags(&s.LeaderElection, fs)
 
-	utilfeature.DefaultFeatureGate.AddFlag(fs)
+	utilfeature.DefaultFeatureGate.AddFlag(fs, features.KubeControllerManager)
 }
 
 // Validate is used to validate the options and config before launching the controller manager

@@ -175,50 +175,60 @@ const (
 	//
 	// Enable running mount utilities in containers.
 	MountContainers utilfeature.Feature = "MountContainers"
+
+	// All components that requires feature gate should be listed here to prevent
+	// accidental naming mismatches
+	KubeAPIServer          utilfeature.Component = "kube-apiserver"
+	KubeControllerManager  utilfeature.Component = "kube-controller-manager"
+	KubeScheduler          utilfeature.Component = "kube-scheduler"
+	KubeProxy              utilfeature.Component = "kube-proxy"
+	Kubelet                utilfeature.Component = "kubelet"
+	CloudControllerManager utilfeature.Component = "cloud-controller-manager"
 )
 
 func init() {
-	utilfeature.DefaultFeatureGate.Add(defaultKubernetesFeatureGates)
+	utilfeature.MustAddDefault(defaultKubernetesFeatureGates)
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
-// To add a new feature, define a key for it above and add it here. The features will be
-// available throughout Kubernetes binaries.
+// To add a new feature, define a key for it above and add it here, sorted alphabetically.
+// The features will be available throughout Kubernetes binaries, but will only be shown
+// in flag help text for its components.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
-	ExternalTrafficLocalOnly:                    {Default: true, PreRelease: utilfeature.GA},
-	AppArmor:                                    {Default: true, PreRelease: utilfeature.Beta},
-	DynamicKubeletConfig:                        {Default: false, PreRelease: utilfeature.Alpha},
-	KubeletConfigFile:                           {Default: false, PreRelease: utilfeature.Alpha},
-	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta},
-	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha},
-	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha},
-	DevicePlugins:                               {Default: false, PreRelease: utilfeature.Alpha},
-	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha},
-	RotateKubeletServerCertificate:              {Default: false, PreRelease: utilfeature.Alpha},
-	RotateKubeletClientCertificate:              {Default: true, PreRelease: utilfeature.Beta},
-	PersistentLocalVolumes:                      {Default: false, PreRelease: utilfeature.Alpha},
-	LocalStorageCapacityIsolation:               {Default: false, PreRelease: utilfeature.Alpha},
-	HugePages:                                   {Default: false, PreRelease: utilfeature.Alpha},
-	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
-	PodPriority:                                 {Default: false, PreRelease: utilfeature.Alpha},
-	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha},
-	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha},
-	MountPropagation:                            {Default: false, PreRelease: utilfeature.Alpha},
-	ExpandPersistentVolumes:                     {Default: false, PreRelease: utilfeature.Alpha},
-	CPUManager:                                  {Default: false, PreRelease: utilfeature.Alpha},
-	ServiceNodeExclusion:                        {Default: false, PreRelease: utilfeature.Alpha},
-	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha},
+	Accelerators:                                {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{Kubelet}},
+	AppArmor:                                    {Default: true, PreRelease: utilfeature.Beta, Components: []utilfeature.Component{Kubelet, KubeAPIServer}},
+	CPUManager:                                  {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{Kubelet, KubeAPIServer}},
+	DebugContainers:                             {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{Kubelet, KubeAPIServer}},
+	DevicePlugins:                               {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{Kubelet}},
+	DynamicKubeletConfig:                        {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{Kubelet, KubeAPIServer}},
+	EnableEquivalenceClassCache:                 {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{KubeScheduler}},
+	ExpandPersistentVolumes:                     {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{KubeControllerManager, KubeAPIServer}},
+	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{Kubelet, KubeControllerManager}},
+	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: utilfeature.Beta, Components: []utilfeature.Component{Kubelet}},
+	ExternalTrafficLocalOnly:                    {Default: true, PreRelease: utilfeature.GA, Components: []utilfeature.Component{KubeProxy, KubeAPIServer}},
+	HugePages:                                   {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{Kubelet, KubeAPIServer}},
+	KubeletConfigFile:                           {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{Kubelet}},
+	LocalStorageCapacityIsolation:               {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{Kubelet, KubeAPIServer}},
+	MountContainers:                             {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{Kubelet}},
+	MountPropagation:                            {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{Kubelet, KubeAPIServer}},
+	PersistentLocalVolumes:                      {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{Kubelet, KubeScheduler, KubeAPIServer}},
+	PodPriority:                                 {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{Kubelet, KubeScheduler, KubeAPIServer}},
+	RotateKubeletClientCertificate:              {Default: true, PreRelease: utilfeature.Beta, Components: []utilfeature.Component{Kubelet}},
+	RotateKubeletServerCertificate:              {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{Kubelet, KubeControllerManager, KubeAPIServer}},
+	ServiceNodeExclusion:                        {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{KubeControllerManager, CloudControllerManager}},
+	SupportIPVSProxyMode:                        {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{KubeProxy}},
+	TaintBasedEvictions:                         {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{KubeControllerManager}},
+	TaintNodesByCondition:                       {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{KubeControllerManager, KubeScheduler, KubeAPIServer}},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
-	genericfeatures.StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
-	genericfeatures.AdvancedAuditing:        {Default: true, PreRelease: utilfeature.Beta},
-	genericfeatures.APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
-	genericfeatures.Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
-	genericfeatures.APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
+	genericfeatures.APIListChunking:         {Default: true, PreRelease: utilfeature.Beta, Components: []utilfeature.Component{KubeAPIServer}},
+	genericfeatures.APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{KubeAPIServer}},
+	genericfeatures.AdvancedAuditing:        {Default: true, PreRelease: utilfeature.Beta, Components: []utilfeature.Component{KubeAPIServer}},
+	genericfeatures.Initializers:            {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{KubeAPIServer, KubeControllerManager}},
+	genericfeatures.StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta, Components: []utilfeature.Component{KubeAPIServer}},
 
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
-	apiextensionsfeatures.CustomResourceValidation: {Default: false, PreRelease: utilfeature.Alpha},
-	SupportIPVSProxyMode:                           {Default: false, PreRelease: utilfeature.Alpha},
+	apiextensionsfeatures.CustomResourceValidation: {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{KubeAPIServer}},
 }

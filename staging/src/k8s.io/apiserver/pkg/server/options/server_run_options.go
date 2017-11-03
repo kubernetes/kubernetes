@@ -27,7 +27,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	// add the generic feature gates
-	_ "k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/features"
 
 	"github.com/spf13/pflag"
 )
@@ -150,5 +150,5 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"handler, which picks a randomized value above this number as the connection timeout, "+
 		"to spread out load.")
 
-	utilfeature.DefaultFeatureGate.AddFlag(fs)
+	utilfeature.DefaultFeatureGate.AddFlag(fs, features.KubeAPIServer)
 }

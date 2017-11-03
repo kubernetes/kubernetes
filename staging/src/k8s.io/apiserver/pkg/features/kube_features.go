@@ -63,19 +63,23 @@ const (
 	// Allow API clients to retrieve resource lists in chunks rather than
 	// all at once.
 	APIListChunking utilfeature.Feature = "APIListChunking"
+
+	KubeAPIServer         utilfeature.Component = "kube-apiserver"
+	KubeControllerManager utilfeature.Component = "kube-controller-manager"
 )
 
 func init() {
-	utilfeature.DefaultFeatureGate.Add(defaultKubernetesFeatureGates)
+	utilfeature.MustAddDefault(defaultKubernetesFeatureGates)
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
-// To add a new feature, define a key for it above and add it here. The features will be
-// available throughout Kubernetes binaries.
+// To add a new feature, define a key for it above and add it here, sorted alphabetically.
+// The features will be available throughout Kubernetes binaries, but will only be shown
+// in flag help text for its components.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
-	StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta},
-	AdvancedAuditing:        {Default: true, PreRelease: utilfeature.Beta},
-	APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha},
-	Initializers:            {Default: false, PreRelease: utilfeature.Alpha},
-	APIListChunking:         {Default: true, PreRelease: utilfeature.Beta},
+	APIListChunking:         {Default: true, PreRelease: utilfeature.Beta, Components: []utilfeature.Component{KubeAPIServer}},
+	APIResponseCompression:  {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{KubeAPIServer}},
+	AdvancedAuditing:        {Default: true, PreRelease: utilfeature.Beta, Components: []utilfeature.Component{KubeAPIServer}},
+	Initializers:            {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{KubeAPIServer, KubeControllerManager}},
+	StreamingProxyRedirects: {Default: true, PreRelease: utilfeature.Beta, Components: []utilfeature.Component{KubeAPIServer}},
 }

@@ -32,15 +32,18 @@ const (
 	//
 	// CustomResourceValidation is a list of validation methods for CustomResources
 	CustomResourceValidation utilfeature.Feature = "CustomResourceValidation"
+
+	KubeAPIServer utilfeature.Component = "kube-apiserver"
 )
 
 func init() {
-	utilfeature.DefaultFeatureGate.Add(defaultKubernetesFeatureGates)
+	utilfeature.MustAddDefault(defaultKubernetesFeatureGates)
 }
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
-// To add a new feature, define a key for it above and add it here. The features will be
-// available throughout Kubernetes binaries.
+// To add a new feature, define a key for it above and add it here, sorted alphabetically.
+// The features will be available throughout Kubernetes binaries, but will only be shown
+// in flag help text for its components.
 var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureSpec{
-	CustomResourceValidation: {Default: false, PreRelease: utilfeature.Alpha},
+	CustomResourceValidation: {Default: false, PreRelease: utilfeature.Alpha, Components: []utilfeature.Component{KubeAPIServer}},
 }

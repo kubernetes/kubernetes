@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 
 	// add the kubernetes feature gates
-	_ "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/features"
 
 	"github.com/spf13/pflag"
 )
@@ -100,5 +100,5 @@ func (s *CloudControllerManagerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&s.ConcurrentServiceSyncs, "concurrent-service-syncs", s.ConcurrentServiceSyncs, "The number of services that are allowed to sync concurrently. Larger number = more responsive service management, but more CPU (and network) load")
 	leaderelectionconfig.BindFlags(&s.LeaderElection, fs)
 
-	utilfeature.DefaultFeatureGate.AddFlag(fs)
+	utilfeature.DefaultFeatureGate.AddFlag(fs, features.CloudControllerManager)
 }

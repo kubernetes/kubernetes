@@ -18,6 +18,7 @@ package feature
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -29,6 +30,7 @@ import (
 )
 
 type Feature string
+type Component string
 
 const (
 	flagName = "feature-gates"
@@ -55,9 +57,34 @@ var (
 	DefaultFeatureGate FeatureGate = NewFeatureGate()
 )
 
+// FeatureSpec describes a feature that can be used by many components
 type FeatureSpec struct {
-	Default    bool
+	// Default enables the feature by default
+	Default bool
+	// PreRelease set the release state of the feature
 	PreRelease prerelease
+	// Components list the components that is using the feature.
+	// Feature with empty components will always be rendered by FeatureGate.
+	Components []Component
+}
+
+// Equals checks if two FeatureSpec are equal
+func (f FeatureSpec) Equals(other FeatureSpec) bool {
+	sort.Slice(f.Components, func(i, j int) bool { return f.Components[i] < f.Components[j] })
+	sort.Slice(other.Components, func(i, j int) bool { return other.Components[i] < other.Components[j] })
+	return reflect.DeepEqual(f, other)
+}
+
+func (f FeatureSpec) hasComponent(component Component) bool {
+	if len(f.Components) == 0 {
+		return true
+	}
+	for _, fc := range f.Components {
+		if fc == component {
+			return true
+		}
+	}
+	return false
 }
 
 type prerelease string
@@ -72,8 +99,8 @@ const (
 // FeatureGate parses and stores flag gates for known features from
 // a string like feature1=true,feature2=false,...
 type FeatureGate interface {
-	// AddFlag adds a flag for setting global feature gates to the specified FlagSet.
-	AddFlag(fs *pflag.FlagSet)
+	// AddFlag adds a flag for setting global feature gates of a component to the specified FlagSet.
+	AddFlag(fs *pflag.FlagSet, component Component)
 	// Set parses and stores flag gates for known features
 	// from a string like feature1=true,feature2=false,...
 	Set(value string) error
@@ -83,8 +110,8 @@ type FeatureGate interface {
 	Enabled(key Feature) bool
 	// Add adds features to the featureGate.
 	Add(features map[Feature]FeatureSpec) error
-	// KnownFeatures returns a slice of strings describing the FeatureGate's known features.
-	KnownFeatures() []string
+	// KnownFeatures returns a slice of strings describing the FeatureGate's known features for a component.
+	KnownFeatures(component Component) []string
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
@@ -252,7 +279,7 @@ func (f *featureGate) Add(features map[Feature]FeatureSpec) error {
 
 	for name, spec := range features {
 		if existingSpec, found := known[name]; found {
-			if existingSpec == spec {
+			if existingSpec.Equals(spec) {
 				continue
 			}
 			return fmt.Errorf("feature gate %q with different spec already exists: %v", name, existingSpec)
@@ -276,21 +303,25 @@ func (f *featureGate) Enabled(key Feature) bool {
 }
 
 // AddFlag adds a flag for setting global feature gates to the specified FlagSet.
-func (f *featureGate) AddFlag(fs *pflag.FlagSet) {
+func (f *featureGate) AddFlag(fs *pflag.FlagSet, component Component) {
 	f.lock.Lock()
 	f.closed = true
 	f.lock.Unlock()
 
-	known := f.KnownFeatures()
+	known := f.KnownFeatures(component)
 	fs.Var(f, flagName, ""+
 		"A set of key=value pairs that describe feature gates for alpha/experimental features. "+
 		"Options are:\n"+strings.Join(known, "\n"))
 }
 
 // KnownFeatures returns a slice of strings describing the FeatureGate's known features.
-func (f *featureGate) KnownFeatures() []string {
+// If component is empty, it should return all known features.
+func (f *featureGate) KnownFeatures(component Component) []string {
 	var known []string
 	for k, v := range f.known.Load().(map[Feature]FeatureSpec) {
+		if !v.hasComponent(component) {
+			continue
+		}
 		pre := ""
 		if v.PreRelease != GA {
 			pre = fmt.Sprintf("%s - ", v.PreRelease)
@@ -299,4 +330,12 @@ func (f *featureGate) KnownFeatures() []string {
 	}
 	sort.Strings(known)
 	return known
+}
+
+// MustAddDefault adds the features to DefaultFeatureGate. Failing to add a
+// feature will panic.
+func MustAddDefault(features map[Feature]FeatureSpec) {
+	if err := DefaultFeatureGate.Add(features); err != nil {
+		panic(fmt.Sprintf("failed to add features: %v", err))
+	}
 }

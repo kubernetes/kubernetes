@@ -133,7 +133,7 @@ func AddFlags(options *Options, fs *pflag.FlagSet) {
 	fs.StringVar(&options.config.FailureDomains, "failure-domains", options.config.FailureDomains, "Indicate the \"all topologies\" set for an empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.")
 	fs.MarkDeprecated("failure-domains", "Doesn't have any effect. Will be removed in future version.")
 	leaderelectionconfig.BindFlags(&options.config.LeaderElection.LeaderElectionConfiguration, fs)
-	utilfeature.DefaultFeatureGate.AddFlag(fs)
+	utilfeature.DefaultFeatureGate.AddFlag(fs, features.KubeScheduler)
 }
 
 func NewOptions() (*Options, error) {
