@@ -37,7 +37,7 @@ from charms.kubernetes.flagmanager import FlagManager
 from charms.reactive.helpers import data_changed, any_file_changed
 from charms.templating.jinja2 import render
 
-from charmhelpers.core import hookenv
+from charmhelpers.core import hookenv, unitdata
 from charmhelpers.core.host import service_stop, service_restart
 from charmhelpers.contrib.charmsupport import nrpe
 
@@ -51,6 +51,7 @@ kubeproxyconfig_path = '/root/cdk/kubeproxyconfig'
 kubeclientconfig_path = '/root/.kube/config'
 
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
+db = unitdata.kv()
 
 
 @hook('upgrade-charm')
@@ -336,8 +337,7 @@ def start_worker(kube_api, kube_control, auth_control, cni):
         hookenv.log('Waiting for cluster cidr.')
         return
 
-    nodeuser = 'system:node:{}'.format(gethostname())
-    creds = kube_control.get_auth_credentials(nodeuser)
+    creds = db.get('credentials')
     data_changed('kube-control.creds', creds)
 
     # set --allow-privileged flag for kubelet
@@ -829,6 +829,10 @@ def catch_change_in_creds(kube_control):
     if creds \
             and data_changed('kube-control.creds', creds) \
             and creds['user'] == nodeuser:
+        # We need to cache the credentials here because if the
+        # master changes (master leader dies and replaced by a new one)
+        # the new master will have no recollection of our certs.
+        db.set('credentials', creds)
         set_state('worker.auth.bootstrapped')
         set_state('kubernetes-worker.restart-needed')
 

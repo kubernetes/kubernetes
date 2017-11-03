@@ -478,24 +478,27 @@ def flush_auth_for_departed(kube_control):
     ''' Unit has left the cluster and needs to have its authentication
     tokens removed from the token registry '''
     token_auth_file = '/root/cdk/known_tokens.csv'
-    departing_unit = kube_control.flush_departed()
-    userid = "kubelet-{}".format(departing_unit.split('/')[1])
-    known_tokens = open(token_auth_file, 'r').readlines()
-    for line in known_tokens[:]:
-        haystack = line.split(',')
-        # skip the entry if we dont have token,user,id,groups format
-        if len(haystack) < 4:
-            continue
-        if haystack[2] == userid:
-            hookenv.log('Found unit {} in token auth. Removing auth'
-                        ' token.'.format(userid))
-            known_tokens.remove(line)
-    # atomically rewrite the file minus any scrubbed units
-    hookenv.log('Rewriting token auth file: {}'.format(token_auth_file))
-    with open(token_auth_file, 'w') as fp:
-        fp.writelines(known_tokens)
-    # Trigger rebroadcast of auth files for followers
-    remove_state('authentication.setup')
+    departing_units = kube_control.flush_departed()
+    if departing_units:
+        userids = []
+        for departing_unit in departing_units:
+            userids.append("kubelet-{}".format(departing_unit.split('/')[1]))
+        known_tokens = open(token_auth_file, 'r').readlines()
+        for line in known_tokens[:]:
+            haystack = line.split(',')
+            # skip the entry if we dont have token,user,id,groups format
+            if len(haystack) < 4:
+                continue
+            if haystack[2] in userids:
+                hookenv.log('Found unit {} in token auth. Removing auth'
+                            ' token.'.format(haystack[2]))
+                known_tokens.remove(line)
+        # atomically rewrite the file minus any scrubbed units
+        hookenv.log('Rewriting token auth file: {}'.format(token_auth_file))
+        with open(token_auth_file, 'w') as fp:
+            fp.writelines(known_tokens)
+        # Trigger rebroadcast of auth files for followers
+        remove_state('authentication.setup')
 
 
 @when_not('kube-control.connected')
