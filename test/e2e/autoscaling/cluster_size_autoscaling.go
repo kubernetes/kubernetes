@@ -106,11 +106,8 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		nodeCount = len(nodes.Items)
 		coreCount = 0
 		for _, node := range nodes.Items {
-			for resourceName, value := range node.Status.Capacity {
-				if resourceName == v1.ResourceCPU {
-					coreCount += value.Value()
-				}
-			}
+			quentity := node.Status.Capacity[v1.ResourceCPU]
+			coreCount += quentity.Value()
 		}
 		By(fmt.Sprintf("Initial number of schedulable nodes: %v", nodeCount))
 		Expect(nodeCount).NotTo(BeZero())
@@ -771,11 +768,10 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.SkipUnlessProviderIs("gke")
 		framework.ExpectNoError(enableAutoprovisioning(""))
 		By("Create first pod")
-		ReserveMemory(f, "memory-reservation1", 1, int(1.1*float64(memAllocatableMb)), true, defaultTimeout)
-		pod1Deleted := false
+		cleanupFunc1 := ReserveMemory(f, "memory-reservation1", 1, int(1.1*float64(memAllocatableMb)), true, defaultTimeout)
 		defer func() {
-			if !pod1Deleted {
-				framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation1")
+			if cleanupFunc1 != nil {
+				cleanupFunc1()
 			}
 		}()
 		By("Waiting for scale up")
@@ -785,11 +781,10 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		By("Check if NAP group was created")
 		Expect(getNAPNodePoolsNumber()).Should(Equal(1))
 		By("Create second pod")
-		ReserveMemory(f, "memory-reservation2", 1, int(1.1*float64(memAllocatableMb)), true, defaultTimeout)
-		pod2Deleted := false
+		cleanupFunc2 := ReserveMemory(f, "memory-reservation2", 1, int(1.1*float64(memAllocatableMb)), true, defaultTimeout)
 		defer func() {
-			if !pod2Deleted {
-				framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation2")
+			if cleanupFunc2 != nil {
+				cleanupFunc2()
 			}
 		}()
 		By("Waiting for scale up")
@@ -797,15 +792,15 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size == nodeCount+2 }, defaultTimeout))
 		By("Delete first pod")
-		pod1Deleted = true
-		framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation1")
+		cleanupFunc1()
+		cleanupFunc1 = nil
 		By("Waiting for scale down to 1")
 		// Verify that cluster size decreased.
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size == nodeCount+1 }, scaleDownTimeout))
 		By("Delete second pod")
-		pod2Deleted = true
-		framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation2")
+		cleanupFunc2()
+		cleanupFunc2 = nil
 		By("Waiting for scale down to 0")
 		// Verify that cluster size decreased.
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
@@ -820,9 +815,9 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.SkipUnlessProviderIs("gke")
 		framework.ExpectNoError(enableAutoprovisioning(""))
 		By("Create pods")
-		// Create nodesCountAfterResize+1 pods allocating 0.7 allocable on present nodes. One more node will have to be created.
-		ReserveMemory(f, "memory-reservation", nodeCount+1, int(float64(nodeCount+1)*float64(0.7)*float64(memAllocatableMb)), true, scaleUpTimeout)
-		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
+		// Create nodesCountAfterResize+1 pods allocating 0.7 allocatable on present nodes. One more node will have to be created.
+		cleanupFunc := ReserveMemory(f, "memory-reservation", nodeCount+1, int(float64(nodeCount+1)*float64(0.7)*float64(memAllocatableMb)), true, scaleUpTimeout)
+		defer cleanupFunc()
 		By("Waiting for scale up")
 		// Verify that cluster size increased.
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
@@ -835,9 +830,9 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.SkipUnlessProviderIs("gke")
 		By(fmt.Sprintf("Set core limit to %d", coreCount))
 		framework.ExpectNoError(enableAutoprovisioning(fmt.Sprintf(`"resource_limits":{"name":"cpu", "minimum":2, "maximum":%d}, "resource_limits":{"name":"memory", "minimum":0, "maximum":10000000}`, coreCount)))
-		// Create pod allocating 1.1 allocable for present nodes. Bigger node will have to be created.
-		ReserveMemory(f, "memory-reservation", 1, int(1.1*float64(memAllocatableMb)), false, time.Second)
-		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
+		// Create pod allocating 1.1 allocatable for present nodes. Bigger node will have to be created.
+		cleanupFunc := ReserveMemory(f, "memory-reservation", 1, int(1.1*float64(memAllocatableMb)), false, time.Second)
+		defer cleanupFunc()
 		By(fmt.Sprintf("Waiting for scale up hoping it won't happen, sleep for %s", scaleUpTimeout.String()))
 		time.Sleep(scaleUpTimeout)
 		// Verify that cluster size is not changed
@@ -848,6 +843,20 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		By("Wait for scale up")
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
 			func(size int) bool { return size == nodeCount+1 }, scaleUpTimeout))
+		By("Check if NAP group was created")
+		Expect(getNAPNodePoolsNumber()).Should(Equal(1))
+	})
+
+	It("should create new node if there is no node for node selector [Feature:ClusterSizeAutoscalingScaleWithNAP]", func() {
+		framework.SkipUnlessProviderIs("gke")
+		framework.ExpectNoError(enableAutoprovisioning(""))
+		// Create pod allocating 0.7 allocatable for present nodes with node selector.
+		cleanupFunc := ReserveMemoryWithSelector(f, "memory-reservation", 1, int(0.7*float64(memAllocatableMb)), true, scaleUpTimeout, map[string]string{"test": "test"})
+		defer cleanupFunc()
+		By("Waiting for scale up")
+		// Verify that cluster size increased.
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size == nodeCount+1 }, defaultTimeout))
 		By("Check if NAP group was created")
 		Expect(getNAPNodePoolsNumber()).Should(Equal(1))
 	})
@@ -1212,9 +1221,9 @@ func doPut(url, content string) (string, error) {
 	return strBody, nil
 }
 
-// ReserveMemory creates a replication controller with pods that, in summation,
+// ReserveMemoryWithSelector creates a replication controller with pods with node selector that, in summation,
 // request the specified amount of memory.
-func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration) func() error {
+func ReserveMemoryWithSelector(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration, selector map[string]string) func() error {
 	By(fmt.Sprintf("Running RC which reserves %v MB of memory", megabytes))
 	request := int64(1024 * 1024 * megabytes / replicas)
 	config := &testutils.RCConfig{
@@ -1226,6 +1235,7 @@ func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, e
 		Image:          framework.GetPauseImageName(f.ClientSet),
 		Replicas:       replicas,
 		MemRequest:     request,
+		NodeSelector:   selector,
 	}
 	for start := time.Now(); time.Since(start) < rcCreationRetryTimeout; time.Sleep(rcCreationRetryDelay) {
 		err := framework.RunRC(*config)
@@ -1242,6 +1252,12 @@ func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, e
 	}
 	framework.Failf("Failed to reserve memory within timeout")
 	return nil
+}
+
+// ReserveMemory creates a replication controller with pods that, in summation,
+// request the specified amount of memory.
+func ReserveMemory(f *framework.Framework, id string, replicas, megabytes int, expectRunning bool, timeout time.Duration) func() error {
+	return ReserveMemoryWithSelector(f, id, replicas, megabytes, expectRunning, timeout, nil)
 }
 
 // WaitForClusterSizeFunc waits until the cluster size matches the given function.
