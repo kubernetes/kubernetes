@@ -427,10 +427,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isDeleter)
 		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false}, isWatcher)
 		// We add "proxy" subresource to remove the need for the generic top level prefix proxy.
-		// The generic top level prefix proxy is deprecated in v1.2, and will be removed in 1.3, or 1.4 at the latest.
-		// TODO: DEPRECATED in v1.2.
+		// The generic top level prefix proxy is deprecated in v1.2, and should be removed in v2 API.
 		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer, false}, isRedirector)
-		// TODO: DEPRECATED in v1.2.
 		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer, false}, isRedirector)
 		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
 		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
@@ -479,10 +477,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer, false}, isDeleter)
 		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer, false}, isWatcher)
 		// We add "proxy" subresource to remove the need for the generic top level prefix proxy.
-		// The generic top level prefix proxy is deprecated in v1.2, and will be removed in 1.3, or 1.4 at the latest.
-		// TODO: DEPRECATED in v1.2.
+		// The generic top level prefix proxy is deprecated in v1.2, and should be removed in v2 API.
 		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer, false}, isRedirector)
-		// TODO: DEPRECATED in v1.2.
 		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer, false}, isRedirector)
 		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer, false}, isConnecter)
 		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", proxyParams, namer, false}, isConnecter && connectSubpath)
@@ -808,8 +804,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addParams(route, action.Params)
 			routes = append(routes, route)
 		// We add "proxy" subresource to remove the need for the generic top level prefix proxy.
-		// The generic top level prefix proxy is deprecated in v1.2, and will be removed in 1.3, or 1.4 at the latest.
-		// TODO: DEPRECATED in v1.2.
+		// The generic top level prefix proxy is deprecated in v1.2, and should be removed in v2 API.
 		case "PROXY": // Proxy requests to a resource.
 			// Accept all methods as per http://issue.k8s.io/3996
 			routes = append(routes, buildProxyRoute(ws, "GET", a.prefix, action.Path, kind, resource, subresource, namespaced, requestScope, hasSubresource, action.Params, proxyHandler, operationSuffix))
