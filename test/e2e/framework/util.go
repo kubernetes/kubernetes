@@ -244,24 +244,8 @@ func GetPauseImageNameForHostArch() string {
 	return currentPodInfraContainerImageName + "-" + goruntime.GOARCH + ":" + currentPodInfraContainerImageVersion
 }
 
-// SubResource proxy should have been functional in v1.0.0, but SubResource
-// proxy via tunneling is known to be broken in v1.0.  See
-// https://github.com/kubernetes/kubernetes/pull/15224#issuecomment-146769463
-//
-// TODO(ihmccreery): remove once we don't care about v1.0 anymore, (tentatively
-// in v1.3).
-var SubResourcePodProxyVersion = utilversion.MustParseSemantic("v1.1.0")
-var SubResourceServiceAndNodeProxyVersion = utilversion.MustParseSemantic("v1.2.0")
-
 func GetServicesProxyRequest(c clientset.Interface, request *restclient.Request) (*restclient.Request, error) {
-	subResourceProxyAvailable, err := ServerVersionGTE(SubResourceServiceAndNodeProxyVersion, c.Discovery())
-	if err != nil {
-		return nil, err
-	}
-	if subResourceProxyAvailable {
-		return request.Resource("services").SubResource("proxy"), nil
-	}
-	return request.Prefix("proxy").Resource("services"), nil
+	return request.Resource("services").SubResource("proxy"), nil
 }
 
 // unique identifier of the e2e run
@@ -1672,34 +1656,19 @@ func (r podProxyResponseChecker) CheckAllResponses() (done bool, err error) {
 		if !isElementOf(pod.UID, currentPods) {
 			return false, fmt.Errorf("pod with UID %s is no longer a member of the replica set.  Must have been restarted for some reason.  Current replica set: %v", pod.UID, currentPods)
 		}
-		subResourceProxyAvailable, err := ServerVersionGTE(SubResourcePodProxyVersion, r.c.Discovery())
-		if err != nil {
-			return false, err
-		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
 		defer cancel()
 
-		var body []byte
-		if subResourceProxyAvailable {
-			body, err = r.c.CoreV1().RESTClient().Get().
-				Context(ctx).
-				Namespace(r.ns).
-				Resource("pods").
-				SubResource("proxy").
-				Name(string(pod.Name)).
-				Do().
-				Raw()
-		} else {
-			body, err = r.c.CoreV1().RESTClient().Get().
-				Context(ctx).
-				Prefix("proxy").
-				Namespace(r.ns).
-				Resource("pods").
-				Name(string(pod.Name)).
-				Do().
-				Raw()
-		}
+		body, err := r.c.CoreV1().RESTClient().Get().
+			Context(ctx).
+			Namespace(r.ns).
+			Resource("pods").
+			SubResource("proxy").
+			Name(string(pod.Name)).
+			Do().
+			Raw()
+
 		if err != nil {
 			if ctx.Err() != nil {
 				// We may encounter errors here because of a race between the pod readiness and apiserver
@@ -4404,29 +4373,16 @@ const proxyTimeout = 2 * time.Minute
 func NodeProxyRequest(c clientset.Interface, node, endpoint string) (restclient.Result, error) {
 	// proxy tends to hang in some cases when Node is not ready. Add an artificial timeout for this call.
 	// This will leak a goroutine if proxy hangs. #22165
-	subResourceProxyAvailable, err := ServerVersionGTE(SubResourceServiceAndNodeProxyVersion, c.Discovery())
-	if err != nil {
-		return restclient.Result{}, err
-	}
 	var result restclient.Result
 	finished := make(chan struct{})
 	go func() {
-		if subResourceProxyAvailable {
-			result = c.CoreV1().RESTClient().Get().
-				Resource("nodes").
-				SubResource("proxy").
-				Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
-				Suffix(endpoint).
-				Do()
+		result = c.CoreV1().RESTClient().Get().
+			Resource("nodes").
+			SubResource("proxy").
+			Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
+			Suffix(endpoint).
+			Do()
 
-		} else {
-			result = c.CoreV1().RESTClient().Get().
-				Prefix("proxy").
-				Resource("nodes").
-				Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
-				Suffix(endpoint).
-				Do()
-		}
 		finished <- struct{}{}
 	}()
 	select {
