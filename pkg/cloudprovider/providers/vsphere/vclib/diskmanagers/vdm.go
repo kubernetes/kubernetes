@@ -73,7 +73,7 @@ func (diskManager virtualDiskManager) Create(ctx context.Context, datastore *vcl
 func (diskManager virtualDiskManager) Delete(ctx context.Context, datacenter *vclib.Datacenter) error {
 	// Create a virtual disk manager
 	virtualDiskManager := object.NewVirtualDiskManager(datacenter.Client())
-	diskPath := vclib.RemoveClusterFromVDiskPath(diskManager.diskPath)
+	diskPath := vclib.RemoveStorageClusterORFolderNameFromVDiskPath(diskManager.diskPath)
 	requestTime := time.Now()
 	// Delete virtual disk
 	task, err := virtualDiskManager.DeleteVirtualDisk(ctx, diskPath, datacenter.Datacenter)

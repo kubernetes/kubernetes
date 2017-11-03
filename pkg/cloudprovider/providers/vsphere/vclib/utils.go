@@ -25,8 +25,9 @@ import (
 	"github.com/golang/glog"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
-	"github.com/vmware/govmomi/vim25/types"
+	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
+	"github.com/vmware/govmomi/vim25/types"
 )
 
 // IsNotFound return true if err is NotFoundError or DefaultNotFoundError
@@ -122,10 +123,10 @@ func getSCSIControllers(vmDevices object.VirtualDeviceList) []*types.VirtualCont
 	return scsiControllers
 }
 
-// RemoveClusterFromVDiskPath removes the cluster or folder path from the vDiskPath
+// RemoveStorageClusterORFolderNameFromVDiskPath removes the cluster or folder path from the vDiskPath
 // for vDiskPath [DatastoreCluster/sharedVmfs-0] kubevols/e2e-vmdk-1234.vmdk, return value is [sharedVmfs-0] kubevols/e2e-vmdk-1234.vmdk
 // for vDiskPath [sharedVmfs-0] kubevols/e2e-vmdk-1234.vmdk, return value remains same [sharedVmfs-0] kubevols/e2e-vmdk-1234.vmdk
-func RemoveClusterFromVDiskPath(vDiskPath string) string {
+func RemoveStorageClusterORFolderNameFromVDiskPath(vDiskPath string) string {
 	datastore := regexp.MustCompile("\\[(.*?)\\]").FindStringSubmatch(vDiskPath)[1]
 	if filepath.Base(datastore) != datastore {
 		vDiskPath = strings.Replace(vDiskPath, datastore, filepath.Base(datastore), 1)
@@ -181,4 +182,32 @@ func IsManagedObjectNotFoundError(err error) bool {
 		_, isManagedObjectNotFoundError = soap.ToSoapFault(err).VimFault().(types.ManagedObjectNotFound)
 	}
 	return isManagedObjectNotFoundError
+}
+
+// VerifyVolumePathsForVM verifies if the volume paths (volPaths) are attached to VM.
+func VerifyVolumePathsForVM(vmMo mo.VirtualMachine, volPaths []string, nodeName string, nodeVolumeMap map[string]map[string]bool) {
+	// Verify if the volume paths are present on the VM backing virtual disk devices
+	vmDevices := object.VirtualDeviceList(vmMo.Config.Hardware.Device)
+	VerifyVolumePathsForVMDevices(vmDevices, volPaths, nodeName, nodeVolumeMap)
+
+}
+
+// VerifyVolumePathsForVMDevices verifies if the volume paths (volPaths) are attached to VM.
+func VerifyVolumePathsForVMDevices(vmDevices object.VirtualDeviceList, volPaths []string, nodeName string, nodeVolumeMap map[string]map[string]bool) {
+	volPathsMap := make(map[string]bool)
+	for _, volPath := range volPaths {
+		volPathsMap[volPath] = true
+	}
+	// Verify if the volume paths are present on the VM backing virtual disk devices
+	for _, device := range vmDevices {
+		if vmDevices.TypeName(device) == "VirtualDisk" {
+			virtualDevice := device.GetVirtualDevice()
+			if backing, ok := virtualDevice.Backing.(*types.VirtualDiskFlatVer2BackingInfo); ok {
+				if volPathsMap[backing.FileName] {
+					setNodeVolumeMap(nodeVolumeMap, backing.FileName, nodeName, true)
+				}
+			}
+		}
+	}
+
 }

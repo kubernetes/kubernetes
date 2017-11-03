@@ -221,7 +221,7 @@ func (nm *NodeManager) GetNode(nodeName k8stypes.NodeName) (v1.Node, error) {
 	node := nm.registeredNodes[convertToString(nodeName)]
 	nm.registeredNodesLock.RUnlock()
 	if node == nil {
-		return v1.Node{}, fmt.Errorf("node %q not found", convertToString(nodeName))
+		return v1.Node{}, vclib.ErrNoVMFound
 	}
 	return *node, nil
 }

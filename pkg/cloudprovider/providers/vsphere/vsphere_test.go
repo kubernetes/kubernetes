@@ -126,10 +126,10 @@ func TestVSphereLogin(t *testing.T) {
 	defer cancel()
 
 	// Create vSphere client
-   var vcInstance* VSphereInstance
-   if vcInstance, ok = vs.vsphereInstanceMap[cfg.Global.VCenterIP]; !ok {
-      t.Fatalf("Couldn't get vSphere instance: %s", cfg.Global.VCenterIP)
-   }
+	var vcInstance *VSphereInstance
+	if vcInstance, ok = vs.vsphereInstanceMap[cfg.Global.VCenterIP]; !ok {
+		t.Fatalf("Couldn't get vSphere instance: %s", cfg.Global.VCenterIP)
+	}
 
 	err = vcInstance.conn.Connect(ctx)
 	if err != nil {
