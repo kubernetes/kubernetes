@@ -25,7 +25,10 @@ import (
 
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/testing/fuzzer"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metaunstruct "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -126,6 +129,43 @@ func TestRoundTrip(t *testing.T) {
 				if t.Failed() {
 					break
 				}
+			}
+		}
+	}
+}
+
+func TestRoundTripWithEmptyCreationTimestamp(t *testing.T) {
+	for groupKey, group := range testapi.Groups {
+		for kind := range group.ExternalTypes() {
+			if nonRoundTrippableTypes.Has(kind) {
+				continue
+			}
+			item, err := legacyscheme.Scheme.New(group.GroupVersion().WithKind(kind))
+			if err != nil {
+				t.Fatalf("Couldn't create external object %v: %v", kind, err)
+			}
+			t.Logf("Testing: %v in %v", kind, groupKey)
+
+			unstrBody, err := unstructured.DefaultConverter.ToUnstructured(item)
+			if err != nil {
+				t.Fatalf("ToUnstructured failed: %v", err)
+			}
+
+			unstructObj := &metaunstruct.Unstructured{}
+			unstructObj.Object = unstrBody
+
+			if meta, err := meta.Accessor(unstructObj); err == nil {
+				meta.SetCreationTimestamp(metav1.Time{})
+			} else {
+				t.Fatalf("Unable to set creation timestamp: %v", err)
+			}
+
+			// attempt to re-convert unstructured object - conversion should not fail
+			// based on empty metadata fields, such as creationTimestamp
+			newObj := reflect.New(reflect.TypeOf(item).Elem()).Interface().(runtime.Object)
+			err = unstructured.DefaultConverter.FromUnstructured(unstructObj.Object, newObj)
+			if err != nil {
+				t.Fatalf("FromUnstructured failed: %v", err)
 			}
 		}
 	}
