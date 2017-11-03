@@ -29,6 +29,8 @@ import (
 
 type getNodeAnyWayFuncType func() (*v1.Node, error)
 
+type pluginResourceUpdateFuncType func(*schedulercache.NodeInfo, *PodAdmitAttributes) error
+
 // AdmissionFailureHandler is an interface which defines how to deal with a failure to admit a pod.
 // This allows for the graceful handling of pod admission failure.
 type AdmissionFailureHandler interface {
@@ -36,15 +38,17 @@ type AdmissionFailureHandler interface {
 }
 
 type predicateAdmitHandler struct {
-	getNodeAnyWayFunc       getNodeAnyWayFuncType
-	admissionFailureHandler AdmissionFailureHandler
+	getNodeAnyWayFunc        getNodeAnyWayFuncType
+	pluginResourceUpdateFunc pluginResourceUpdateFuncType
+	admissionFailureHandler  AdmissionFailureHandler
 }
 
 var _ PodAdmitHandler = &predicateAdmitHandler{}
 
-func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admissionFailureHandler AdmissionFailureHandler) *predicateAdmitHandler {
+func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admissionFailureHandler AdmissionFailureHandler, pluginResourceUpdateFunc pluginResourceUpdateFuncType) *predicateAdmitHandler {
 	return &predicateAdmitHandler{
 		getNodeAnyWayFunc,
+		pluginResourceUpdateFunc,
 		admissionFailureHandler,
 	}
 }
@@ -63,6 +67,16 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	pods := attrs.OtherPods
 	nodeInfo := schedulercache.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
+	// ensure the node has enough plugin resources for that required in pods
+	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
+		message := fmt.Sprintf("Update plugin resources failed due to %v, which is unexpected.", err)
+		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "UnexpectedAdmissionError",
+			Message: message,
+		}
+	}
 	fit, reasons, err := predicates.GeneralPredicates(pod, nil, nodeInfo)
 	if err != nil {
 		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
