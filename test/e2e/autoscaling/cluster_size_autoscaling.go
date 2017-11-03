@@ -757,25 +757,38 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(framework.WaitForReadyNodes(c, len(nodes.Items), nodesRecoverTimeout))
 	})
 
-	It("should add new node and new node pool on too big pod [Feature:ClusterSizeAutoscalingScaleWithNAP]", func() {
+	It("should add new node and new node pool on too big pod, scale down to 1 and scale down to 0 [Feature:ClusterSizeAutoscalingScaleWithNAP]", func() {
 		framework.SkipUnlessProviderIs("gke")
 		Expect(getNAPNodePoolsNumber()).Should(Equal(0))
 		framework.ExpectNoError(enableAutoprovisioning())
-		By("Create pod that is too big")
-		ReserveMemory(f, "memory-reservation", 1, int(1.1*float64(memAllocatableMb)), true, defaultTimeout)
-		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
+		By("Create first pod")
+		ReserveMemory(f, "memory-reservation1", 1, int(1.1*float64(memAllocatableMb)), true, defaultTimeout)
+		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation1")
 		By("Waiting for scale up")
 		// Verify that cluster size increased.
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
-			func(size int) bool { return size > nodeCount }, time.Second))
+			func(size int) bool { return size == nodeCount+1 }, defaultTimeout))
 		By("Check if NAP group was created")
 		Expect(getNAPNodePoolsNumber()).Should(Equal(1))
-		By("Delete pod")
-		framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation")
-		By("Waiting for scale down")
+		By("Create second pod")
+		ReserveMemory(f, "memory-reservation2", 1, int(1.1*float64(memAllocatableMb)), true, defaultTimeout)
+		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation2")
+		By("Waiting for scale up")
+		// Verify that cluster size increased.
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size == nodeCount+2 }, defaultTimeout))
+		By("Delete first pod")
+		framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation1")
+		By("Waiting for scale down to 1")
 		// Verify that cluster size decreased.
 		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
-			func(size int) bool { return size <= nodeCount }, scaleDownTimeout))
+			func(size int) bool { return size == nodeCount+1 }, scaleDownTimeout))
+		By("Delete second pod")
+		framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation2")
+		By("Waiting for scale down to 0")
+		// Verify that cluster size decreased.
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size == nodeCount }, scaleDownTimeout))
 		By("Waiting for NAP group remove")
 		framework.ExpectNoError(waitTillAllNAPNodePoolsAreRemoved())
 		By("Check if NAP group was removeed")
