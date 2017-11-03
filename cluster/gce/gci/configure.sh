@@ -241,7 +241,7 @@ function try-load-docker-image {
   set +e
   local -r max_attempts=5
   local -i attempt_num=1
-  until timeout 30 docker load -i "${img}"; do
+  until timeout 30 ${LOAD_IMAGE_COMMAND} "${img}"; do
     if [[ "${attempt_num}" == "${max_attempts}" ]]; then
       echo "Fail to load docker image file ${img} after ${max_attempts} retries. Exit!!"
       exit 1
