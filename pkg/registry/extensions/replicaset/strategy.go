@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"strconv"
 
+	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -127,7 +128,7 @@ func (rsStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old runtime
 		switch groupVersion {
 		case extensionsv1beta1.SchemeGroupVersion:
 			// no-op for compatibility
-		case appsv1beta2.SchemeGroupVersion:
+		case appsv1beta2.SchemeGroupVersion, appsv1.SchemeGroupVersion:
 			// disallow mutation of selector
 			allErrs = append(allErrs, apivalidation.ValidateImmutableField(newReplicaSet.Spec.Selector, oldReplicaSet.Spec.Selector, field.NewPath("spec").Child("selector"))...)
 		default:

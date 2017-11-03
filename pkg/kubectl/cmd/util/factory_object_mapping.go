@@ -314,21 +314,19 @@ func (f *ring1Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error)
 }
 
 func (f *ring1Factory) HistoryViewer(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	external, err := f.clientAccessFactory.KubernetesClientSet()
 	if err != nil {
 		return nil, err
 	}
-	return kubectl.HistoryViewerFor(mapping.GroupVersionKind.GroupKind(), clientset)
+	return kubectl.HistoryViewerFor(mapping.GroupVersionKind.GroupKind(), external)
 }
 
 func (f *ring1Factory) Rollbacker(mapping *meta.RESTMapping) (kubectl.Rollbacker, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	external, err := f.clientAccessFactory.KubernetesClientSet()
 	if err != nil {
 		return nil, err
 	}
-	return kubectl.RollbackerFor(mapping.GroupVersionKind.GroupKind(), clientset)
+	return kubectl.RollbackerFor(mapping.GroupVersionKind.GroupKind(), external)
 }
 
 func (f *ring1Factory) StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusViewer, error) {
