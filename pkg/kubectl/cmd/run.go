@@ -359,6 +359,10 @@ func RunRun(f cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *c
 					ResourceNames(obj.Mapping.Resource, name).
 					Flatten().
 					Do()
+				err = r.Err()
+				if err != nil {
+					return err
+				}
 				// Note: we pass in "true" for the "quiet" parameter because
 				// ReadResult will only print one thing based on the "quiet"
 				// flag, and that's the "pod xxx deleted" message. If they

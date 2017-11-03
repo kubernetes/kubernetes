@@ -175,6 +175,10 @@ func (options *CertificateOptions) modifyCertificateCondition(f cmdutil.Factory,
 		Flatten().
 		Latest().
 		Do()
+	err = r.Err()
+	if err != nil {
+		return err
+	}
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
