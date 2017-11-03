@@ -3100,7 +3100,7 @@ func describeNetworkPolicySpec(nps networking.NetworkPolicySpec, w PrefixWriter)
 	printNetworkPolicySpecIngressFrom(nps.Ingress, "    ", w)
 	w.Write(LEVEL_1, "Allowing egress traffic:\n")
 	printNetworkPolicySpecEgressTo(nps.Egress, "    ", w)
-	w.Write(LEVEL_1, "Policy Types: %v\n", nps.PolicyTypes)
+	w.Write(LEVEL_1, "Policy Types: %v\n", policyTypesToString(nps.PolicyTypes))
 }
 
 func printNetworkPolicySpecIngressFrom(npirs []networking.NetworkPolicyIngressRule, initialIndent string, w PrefixWriter) {
@@ -3151,7 +3151,7 @@ func printNetworkPolicySpecEgressTo(npers []networking.NetworkPolicyEgressRule, 
 	}
 	for i, nper := range npers {
 		if len(nper.Ports) == 0 {
-			w.Write(LEVEL_0, "%s%s\n", initialIndent, "From Port: <any> (traffic allowed to all ports)")
+			w.Write(LEVEL_0, "%s%s\n", initialIndent, "To Port: <any> (traffic allowed to all ports)")
 		} else {
 			for _, port := range nper.Ports {
 				var proto api.Protocol
@@ -3160,7 +3160,7 @@ func printNetworkPolicySpecEgressTo(npers []networking.NetworkPolicyEgressRule, 
 				} else {
 					proto = api.ProtocolTCP
 				}
-				w.Write(LEVEL_0, "%s%s: %s/%s\n", initialIndent, "From Port", port.Port, proto)
+				w.Write(LEVEL_0, "%s%s: %s/%s\n", initialIndent, "To Port", port.Port, proto)
 			}
 		}
 		if len(nper.To) == 0 {
@@ -3365,13 +3365,6 @@ func describePodSecurityPolicy(psp *extensions.PodSecurityPolicy) (string, error
 	})
 }
 
-func stringOrAll(s string) string {
-	if len(s) > 0 {
-		return s
-	}
-	return "*"
-}
-
 func stringOrNone(s string) string {
 	if len(s) > 0 {
 		return s
@@ -3431,6 +3424,18 @@ func capsToString(caps []api.Capability) string {
 			strCaps = append(strCaps, string(c))
 		}
 		formattedString = strings.Join(strCaps, ",")
+	}
+	return stringOrNone(formattedString)
+}
+
+func policyTypesToString(pts []networking.PolicyType) string {
+	formattedString := ""
+	if pts != nil {
+		strPts := []string{}
+		for _, p := range pts {
+			strPts = append(strPts, string(p))
+		}
+		formattedString = strings.Join(strPts, ", ")
 	}
 	return stringOrNone(formattedString)
 }

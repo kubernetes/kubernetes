@@ -1743,8 +1743,8 @@ Spec:
     To Port: <any> (traffic allowed to all ports)
     From: <any> (traffic not restricted by source)
   Allowing egress traffic:
-    From Port: 80/TCP
-    From Port: 82/TCP
+    To Port: 80/TCP
+    To Port: 82/TCP
     To Pod Selector: id=app2,id2=app3
     To Namespace Selector: id=app2,id2=app3
     To Namespace Selector: foo in (bar1,bar2),id=app2,id2=app3
@@ -1752,9 +1752,9 @@ Spec:
         CIDR: 192.168.0.0/16
         Except: 192.168.3.0/24, 192.168.4.0/24
     ----------
-    From Port: <any> (traffic allowed to all ports)
+    To Port: <any> (traffic allowed to all ports)
     To: <any> (traffic not restricted by source)
-  Policy Types: [Ingress Egress]
+  Policy Types: Ingress, Egress
 `
 
 	port80 := intstr.FromInt(80)
