@@ -162,3 +162,9 @@ type PredicateMetadata interface {
 	AddPod(addedPod *v1.Pod, nodeInfo *schedulercache.NodeInfo) error
 	RemovePod(deletedPod *v1.Pod) error
 }
+
+// NamespaceLister list helps list namespace
+type NamespaceLister interface {
+	// List lists all Namespaces in the indexer.
+	List(selector labels.Selector) (ret []*v1.Namespace, err error)
+}

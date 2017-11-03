@@ -96,6 +96,7 @@ func Run(s *options.SchedulerServer) error {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory.Core().V1().Namespaces(),
 		recorder,
 	)
 	if err != nil {

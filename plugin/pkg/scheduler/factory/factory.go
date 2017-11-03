@@ -99,6 +99,8 @@ type configFactory struct {
 	// a means to list all PodDisruptionBudgets
 	pdbLister policylisters.PodDisruptionBudgetLister
 
+	// a means to list all namespaces
+	namespaceLister corelisters.NamespaceLister
 	// Close this to stop all reflectors
 	StopEverything chan struct{}
 
@@ -136,6 +138,7 @@ func NewConfigFactory(
 	statefulSetInformer appsinformers.StatefulSetInformer,
 	serviceInformer coreinformers.ServiceInformer,
 	pdbInformer policyinformers.PodDisruptionBudgetInformer,
+	namespaceInformer coreinformers.NamespaceInformer,
 	hardPodAffinitySymmetricWeight int,
 	enableEquivalenceClassCache bool,
 ) scheduler.Configurator {
@@ -154,6 +157,7 @@ func NewConfigFactory(
 		replicaSetLister:               replicaSetInformer.Lister(),
 		statefulSetLister:              statefulSetInformer.Lister(),
 		pdbLister:                      pdbInformer.Lister(),
+		namespaceLister:                namespaceInformer.Lister(),
 		schedulerCache:                 schedulerCache,
 		StopEverything:                 stopEverything,
 		schedulerName:                  schedulerName,
@@ -893,6 +897,7 @@ func (f *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 		ControllerLister:  f.controllerLister,
 		ReplicaSetLister:  f.replicaSetLister,
 		StatefulSetLister: f.statefulSetLister,
+		NamespaceLister:   f.namespaceLister,
 		NodeLister:        &nodeLister{f.nodeLister},
 		NodeInfo:          &predicates.CachedNodeInfo{NodeLister: f.nodeLister},
 		PVInfo:            &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: f.pVLister},

@@ -21,8 +21,11 @@ import (
 	"sync"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
+	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 	schedutil "k8s.io/kubernetes/plugin/pkg/scheduler/util"
 
@@ -30,7 +33,8 @@ import (
 )
 
 type PredicateMetadataFactory struct {
-	podLister algorithm.PodLister
+	podLister       algorithm.PodLister
+	namespaceLister algorithm.NamespaceLister
 }
 
 //  Note that predicateMetadata and matchingPodAntiAffinityTerm need to be declared in the same file
@@ -52,6 +56,7 @@ type predicateMetadata struct {
 	serviceAffinityInUse               bool
 	serviceAffinityMatchingPodList     []*v1.Pod
 	serviceAffinityMatchingPodServices []*v1.Service
+	namespaceLister                    algorithm.NamespaceLister
 }
 
 // Ensure that predicateMetadata implements algorithm.PredicateMetadata.
@@ -69,9 +74,10 @@ func RegisterPredicateMetadataProducer(predicateName string, precomp PredicateMe
 	predicateMetadataProducers[predicateName] = precomp
 }
 
-func NewPredicateMetadataFactory(podLister algorithm.PodLister) algorithm.PredicateMetadataProducer {
+func NewPredicateMetadataFactory(podLister algorithm.PodLister, namespaceLister algorithm.NamespaceLister) algorithm.PredicateMetadataProducer {
 	factory := &PredicateMetadataFactory{
-		podLister,
+		podLister:       podLister,
+		namespaceLister: namespaceLister,
 	}
 	return factory.GetMetadata
 }
@@ -82,7 +88,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 	if pod == nil {
 		return nil
 	}
-	matchingTerms, err := getMatchingAntiAffinityTerms(pod, nodeNameToInfoMap)
+	matchingTerms, err := pfactory.getMatchingAntiAffinityTerms(pod, nodeNameToInfoMap)
 	if err != nil {
 		return nil
 	}
@@ -92,6 +98,7 @@ func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInf
 		podRequest:                GetResourceRequest(pod),
 		podPorts:                  schedutil.GetUsedPorts(pod),
 		matchingAntiAffinityTerms: matchingTerms,
+		namespaceLister:           pfactory.namespaceLister,
 	}
 	for predicateName, precomputeFunc := range predicateMetadataProducers {
 		glog.V(10).Infof("Precompute: %v", predicateName)
@@ -138,7 +145,7 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulercache
 		return fmt.Errorf("Invalid node in nodeInfo.")
 	}
 	// Add matching anti-affinity terms of the addedPod to the map.
-	podMatchingTerms, err := getMatchingAntiAffinityTermsOfExistingPod(meta.pod, addedPod, nodeInfo.Node())
+	podMatchingTerms, err := getMatchingAntiAffinityTermsOfExistingPod(meta.pod, addedPod, nodeInfo.Node(), meta.namespaceLister)
 	if err != nil {
 		return err
 	}
@@ -185,4 +192,64 @@ func (meta *predicateMetadata) ShallowCopy() algorithm.PredicateMetadata {
 	newPredMeta.serviceAffinityMatchingPodList = append([]*v1.Pod(nil),
 		meta.serviceAffinityMatchingPodList...)
 	return (algorithm.PredicateMetadata)(newPredMeta)
+}
+
+func (pfactory *PredicateMetadataFactory) getMatchingAntiAffinityTerms(pod *v1.Pod, nodeInfoMap map[string]*schedulercache.NodeInfo) (map[string][]matchingPodAntiAffinityTerm, error) {
+	allNodeNames := make([]string, 0, len(nodeInfoMap))
+	for name := range nodeInfoMap {
+		allNodeNames = append(allNodeNames, name)
+	}
+
+	var lock sync.Mutex
+	var firstError error
+	result := make(map[string][]matchingPodAntiAffinityTerm)
+	appendResult := func(toAppend map[string][]matchingPodAntiAffinityTerm) {
+		lock.Lock()
+		defer lock.Unlock()
+		for uid, terms := range toAppend {
+			result[uid] = append(result[uid], terms...)
+		}
+	}
+	catchError := func(err error) {
+		lock.Lock()
+		defer lock.Unlock()
+		if firstError == nil {
+			firstError = err
+		}
+	}
+
+	processNode := func(i int) {
+		nodeInfo := nodeInfoMap[allNodeNames[i]]
+		node := nodeInfo.Node()
+		if node == nil {
+			catchError(fmt.Errorf("node not found"))
+			return
+		}
+		nodeResult := make(map[string][]matchingPodAntiAffinityTerm)
+		for _, existingPod := range nodeInfo.PodsWithAffinity() {
+			affinity := existingPod.Spec.Affinity
+			if affinity == nil {
+				continue
+			}
+			for _, term := range getPodAntiAffinityTerms(affinity.PodAntiAffinity) {
+				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pfactory.namespaceLister, existingPod, &term)
+				selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
+				if err != nil {
+					catchError(err)
+					return
+				}
+				if priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
+					existingPodFullName := schedutil.GetPodFullName(existingPod)
+					nodeResult[existingPodFullName] = append(
+						nodeResult[existingPodFullName],
+						matchingPodAntiAffinityTerm{term: &term, node: node})
+				}
+			}
+		}
+		if len(nodeResult) > 0 {
+			appendResult(nodeResult)
+		}
+	}
+	workqueue.Parallelize(16, len(allNodeNames), processNode)
+	return result, firstError
 }

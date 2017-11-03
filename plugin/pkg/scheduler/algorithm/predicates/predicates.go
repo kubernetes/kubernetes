@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"sync"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/util/workqueue"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
@@ -997,14 +995,16 @@ func EssentialPredicates(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo
 }
 
 type PodAffinityChecker struct {
-	info      NodeInfo
-	podLister algorithm.PodLister
+	info            NodeInfo
+	podLister       algorithm.PodLister
+	namespaceLister algorithm.NamespaceLister
 }
 
-func NewPodAffinityPredicate(info NodeInfo, podLister algorithm.PodLister) algorithm.FitPredicate {
+func NewPodAffinityPredicate(info NodeInfo, podLister algorithm.PodLister, namespaceLister algorithm.NamespaceLister) algorithm.FitPredicate {
 	checker := &PodAffinityChecker{
-		info:      info,
-		podLister: podLister,
+		info:            info,
+		podLister:       podLister,
+		namespaceLister: namespaceLister,
 	}
 	return checker.InterPodAffinityMatches
 }
@@ -1050,11 +1050,11 @@ func (c *PodAffinityChecker) anyPodMatchesPodAffinityTerm(pod *v1.Pod, allPods [
 		return false, false, fmt.Errorf("empty topologyKey is not allowed except for PreferredDuringScheduling pod anti-affinity")
 	}
 	matchingPodExists := false
-	namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, term)
 	selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 	if err != nil {
 		return false, false, err
 	}
+	namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(c.namespaceLister, pod, term)
 	for _, existingPod := range allPods {
 		match := priorityutil.PodMatchesTermsNamespaceAndSelector(existingPod, namespaces, selector)
 		if match {
@@ -1097,72 +1097,12 @@ func getPodAntiAffinityTerms(podAntiAffinity *v1.PodAntiAffinity) (terms []v1.Po
 	return terms
 }
 
-func getMatchingAntiAffinityTerms(pod *v1.Pod, nodeInfoMap map[string]*schedulercache.NodeInfo) (map[string][]matchingPodAntiAffinityTerm, error) {
-	allNodeNames := make([]string, 0, len(nodeInfoMap))
-	for name := range nodeInfoMap {
-		allNodeNames = append(allNodeNames, name)
-	}
-
-	var lock sync.Mutex
-	var firstError error
-	result := make(map[string][]matchingPodAntiAffinityTerm)
-	appendResult := func(toAppend map[string][]matchingPodAntiAffinityTerm) {
-		lock.Lock()
-		defer lock.Unlock()
-		for uid, terms := range toAppend {
-			result[uid] = append(result[uid], terms...)
-		}
-	}
-	catchError := func(err error) {
-		lock.Lock()
-		defer lock.Unlock()
-		if firstError == nil {
-			firstError = err
-		}
-	}
-
-	processNode := func(i int) {
-		nodeInfo := nodeInfoMap[allNodeNames[i]]
-		node := nodeInfo.Node()
-		if node == nil {
-			catchError(fmt.Errorf("node not found"))
-			return
-		}
-		nodeResult := make(map[string][]matchingPodAntiAffinityTerm)
-		for _, existingPod := range nodeInfo.PodsWithAffinity() {
-			affinity := existingPod.Spec.Affinity
-			if affinity == nil {
-				continue
-			}
-			for _, term := range getPodAntiAffinityTerms(affinity.PodAntiAffinity) {
-				namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
-				selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
-				if err != nil {
-					catchError(err)
-					return
-				}
-				if priorityutil.PodMatchesTermsNamespaceAndSelector(pod, namespaces, selector) {
-					existingPodFullName := schedutil.GetPodFullName(existingPod)
-					nodeResult[existingPodFullName] = append(
-						nodeResult[existingPodFullName],
-						matchingPodAntiAffinityTerm{term: &term, node: node})
-				}
-			}
-		}
-		if len(nodeResult) > 0 {
-			appendResult(nodeResult)
-		}
-	}
-	workqueue.Parallelize(16, len(allNodeNames), processNode)
-	return result, firstError
-}
-
-func getMatchingAntiAffinityTermsOfExistingPod(newPod *v1.Pod, existingPod *v1.Pod, node *v1.Node) ([]matchingPodAntiAffinityTerm, error) {
+func getMatchingAntiAffinityTermsOfExistingPod(newPod *v1.Pod, existingPod *v1.Pod, node *v1.Node, namespaceLister algorithm.NamespaceLister) ([]matchingPodAntiAffinityTerm, error) {
 	var result []matchingPodAntiAffinityTerm
 	affinity := existingPod.Spec.Affinity
 	if affinity != nil && affinity.PodAntiAffinity != nil {
 		for _, term := range getPodAntiAffinityTerms(affinity.PodAntiAffinity) {
-			namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(existingPod, &term)
+			namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(namespaceLister, existingPod, &term)
 			selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 			if err != nil {
 				return nil, err
@@ -1184,7 +1124,7 @@ func (c *PodAffinityChecker) getMatchingAntiAffinityTerms(pod *v1.Pod, allPods [
 			if err != nil {
 				return nil, err
 			}
-			existingPodMatchingTerms, err := getMatchingAntiAffinityTermsOfExistingPod(pod, existingPod, existingPodNode)
+			existingPodMatchingTerms, err := getMatchingAntiAffinityTermsOfExistingPod(pod, existingPod, existingPodNode, c.namespaceLister)
 			if err != nil {
 				return nil, err
 			}
@@ -1274,7 +1214,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod, node
 					podName(pod), node.Name, term)
 				return ErrPodAffinityRulesNotMatch, nil
 			}
-			namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(pod, &term)
+			namespaces := priorityutil.GetNamespacesFromPodAffinityTerm(c.namespaceLister, pod, &term)
 			selector, err := metav1.LabelSelectorAsSelector(term.LabelSelector)
 			if err != nil {
 				errMessage := fmt.Sprintf("Cannot parse selector on term %v for pod %v. Details %v", term, podName(pod), err)

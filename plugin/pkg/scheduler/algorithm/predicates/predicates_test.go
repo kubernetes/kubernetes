@@ -126,7 +126,10 @@ func newResourceInitPod(pod *v1.Pod, usage ...schedulercache.Resource) *v1.Pod {
 }
 
 func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulercache.NodeInfo) algorithm.PredicateMetadata {
-	pm := PredicateMetadataFactory{schedulertesting.FakePodLister{p}}
+	pm := PredicateMetadataFactory{
+		podLister:       schedulertesting.FakePodLister{p},
+		namespaceLister: schedulertesting.FakeNamespaceLister{},
+	}
 	return pm.GetMetadata(p, nodeInfo)
 }
 

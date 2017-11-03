@@ -140,6 +140,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory.Core().V1().Namespaces(),
 		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
 	)
 	if err != nil {
@@ -193,6 +194,7 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory.Core().V1().Namespaces(),
 		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
 	)
 
@@ -232,6 +234,7 @@ func TestSchedulerCreationInLegacyMode(t *testing.T) {
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().Services(),
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory.Core().V1().Namespaces(),
 		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
 	)
 	if err != nil {
@@ -521,6 +524,7 @@ func TestMultiScheduler(t *testing.T) {
 		informerFactory2.Apps().V1beta1().StatefulSets(),
 		informerFactory2.Core().V1().Services(),
 		informerFactory2.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory2.Core().V1().Namespaces(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		enableEquivalenceCache,
 	)
