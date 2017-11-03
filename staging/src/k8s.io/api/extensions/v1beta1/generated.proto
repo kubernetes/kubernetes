@@ -32,13 +32,6 @@ import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
 
-// An APIVersion represents a single concrete version of an object model.
-message APIVersion {
-  // Name of this version (e.g. 'v1').
-  // +optional
-  optional string name = 1;
-}
-
 // defines the host volume conditions that will be enabled by a policy
 // for pods to use. It requires the path prefix to be defined.
 message AllowedHostPath {
@@ -1072,53 +1065,5 @@ message SupplementalGroupsStrategyOptions {
   // supplemental group then supply a single range with the same start and end.
   // +optional
   repeated IDRange ranges = 2;
-}
-
-// A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
-// types to the API.  It consists of one or more Versions of the api.
-message ThirdPartyResource {
-  // Standard object metadata
-  // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // Description is the description of this object.
-  // +optional
-  optional string description = 2;
-
-  // Versions are versions for this third party object
-  // +optional
-  repeated APIVersion versions = 3;
-}
-
-// An internal object, used for versioned storage in etcd.  Not exposed to the end user.
-message ThirdPartyResourceData {
-  // Standard object metadata.
-  // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // Data is the raw JSON data for this data.
-  // +optional
-  optional bytes data = 2;
-}
-
-// ThirdPartyResrouceDataList is a list of ThirdPartyResourceData.
-message ThirdPartyResourceDataList {
-  // Standard list metadata
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
-  // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
-
-  // Items is the list of ThirdpartyResourceData.
-  repeated ThirdPartyResourceData items = 2;
-}
-
-// ThirdPartyResourceList is a list of ThirdPartyResources.
-message ThirdPartyResourceList {
-  // Standard list metadata.
-  // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
-
-  // Items is the list of ThirdPartyResources.
-  repeated ThirdPartyResource items = 2;
 }
 

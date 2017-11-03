@@ -34,8 +34,6 @@ type Interface interface {
 	PodSecurityPolicies() PodSecurityPolicyInformer
 	// ReplicaSets returns a ReplicaSetInformer.
 	ReplicaSets() ReplicaSetInformer
-	// ThirdPartyResources returns a ThirdPartyResourceInformer.
-	ThirdPartyResources() ThirdPartyResourceInformer
 }
 
 type version struct {
@@ -70,9 +68,4 @@ func (v *version) PodSecurityPolicies() PodSecurityPolicyInformer {
 // ReplicaSets returns a ReplicaSetInformer.
 func (v *version) ReplicaSets() ReplicaSetInformer {
 	return &replicaSetInformer{factory: v.SharedInformerFactory}
-}
-
-// ThirdPartyResources returns a ThirdPartyResourceInformer.
-func (v *version) ThirdPartyResources() ThirdPartyResourceInformer {
-	return &thirdPartyResourceInformer{factory: v.SharedInformerFactory}
 }
