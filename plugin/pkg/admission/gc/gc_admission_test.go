@@ -269,7 +269,7 @@ func TestGCAdmission(t *testing.T) {
 		user := &user.DefaultInfo{Name: tc.username}
 		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, user)
 
-		err := gcAdmit.Admit(attributes)
+		err := gcAdmit.Validate(attributes)
 		if !tc.checkError(err) {
 			t.Errorf("%v: unexpected err: %v", tc.name, err)
 		}
@@ -517,7 +517,7 @@ func TestBlockOwnerDeletionAdmission(t *testing.T) {
 		user := &user.DefaultInfo{Name: tc.username}
 		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, user)
 
-		err := gcAdmit.Admit(attributes)
+		err := gcAdmit.Validate(attributes)
 		if !tc.checkError(err) {
 			t.Errorf("%v: unexpected err: %v", tc.name, err)
 		}

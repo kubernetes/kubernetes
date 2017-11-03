@@ -54,6 +54,8 @@ type DenyExec struct {
 	privileged bool
 }
 
+var _ admission.ValidationInterface = &DenyExec{}
+
 var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&DenyExec{})
 
 // NewDenyEscalatingExec creates a new admission controller that denies an exec operation on a pod
@@ -79,8 +81,8 @@ func NewDenyExecOnPrivileged() *DenyExec {
 	}
 }
 
-// Admit makes an admission decision based on the request attributes
-func (d *DenyExec) Admit(a admission.Attributes) (err error) {
+// Validate makes an admission decision based on the request attributes
+func (d *DenyExec) Validate(a admission.Attributes) (err error) {
 	connectRequest, ok := a.GetObject().(*rest.ConnectRequest)
 	if !ok {
 		return errors.NewBadRequest("a connect request was received, but could not convert the request object.")

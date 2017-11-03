@@ -34,8 +34,16 @@ func Register(plugins *admission.Plugins) {
 // It is useful in unit tests to force an operation to be forbidden.
 type AlwaysDeny struct{}
 
+var _ admission.MutationInterface = AlwaysDeny{}
+var _ admission.ValidationInterface = AlwaysDeny{}
+
 // Admit makes an admission decision based on the request attributes.
 func (AlwaysDeny) Admit(a admission.Attributes) (err error) {
+	return admission.NewForbidden(a, errors.New("Admission control is denying all modifications"))
+}
+
+// Validate makes an admission decision based on the request attributes.  It is NOT allowed to mutate.
+func (AlwaysDeny) Validate(a admission.Attributes) (err error) {
 	return admission.NewForbidden(a, errors.New("Admission control is denying all modifications"))
 }
 

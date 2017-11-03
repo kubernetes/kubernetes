@@ -63,6 +63,8 @@ type gcPermissionsEnforcement struct {
 	whiteList []whiteListItem
 }
 
+var _ admission.ValidationInterface = &gcPermissionsEnforcement{}
+
 // whiteListItem describes an entry in a whitelist ignored by gc permission enforcement.
 type whiteListItem struct {
 	groupResource schema.GroupResource
@@ -79,7 +81,7 @@ func (a *gcPermissionsEnforcement) isWhiteListed(groupResource schema.GroupResou
 	return false
 }
 
-func (a *gcPermissionsEnforcement) Admit(attributes admission.Attributes) (err error) {
+func (a *gcPermissionsEnforcement) Validate(attributes admission.Attributes) (err error) {
 	// // if the request is in the whitelist, we skip mutation checks for this resource.
 	if a.isWhiteListed(attributes.GetResource().GroupResource(), attributes.GetSubresource()) {
 		return nil
