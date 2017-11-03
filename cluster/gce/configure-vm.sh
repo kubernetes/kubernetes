@@ -586,6 +586,11 @@ EOF
 node_labels: '$(echo "${NODE_LABELS}" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${NON_MASTER_NODE_LABELS:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+non_master_node_labels: '$(echo "${NON_MASTER_NODE_LABELS}" | sed -e "s/'/''/g")'
+EOF
+    fi
     if [ -n "${NODE_TAINTS:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 node_taints: '$(echo "${NODE_TAINTS}" | sed -e "s/'/''/g")'

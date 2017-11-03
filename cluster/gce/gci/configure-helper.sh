@@ -60,6 +60,20 @@ function config-ip-firewall {
   if [[ "${ENABLE_METADATA_CONCEALMENT:-}" == "true" ]]; then
     iptables -A KUBE-METADATA-SERVER -j DROP
   fi
+
+  # Flush iptables nat table
+  iptables -t nat -F || true
+
+  if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" && "${KUBERNETES_MASTER:-}" == false ]]; then
+    echo "Add rules for ip masquerade"
+    iptables -t nat -N IP-MASQ
+    iptables -t nat -A POSTROUTING -m comment --comment "ip-masq: ensure nat POSTROUTING directs all non-LOCAL destination traffic to our custom IP-MASQ chain" -m addrtype ! --dst-type LOCAL -j IP-MASQ
+    iptables -t nat -A IP-MASQ -d 169.254.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -t nat -A IP-MASQ -d 10.0.0.0/8 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -t nat -A IP-MASQ -d 172.16.0.0/12 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -t nat -A IP-MASQ -d 192.168.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
+    iptables -t nat -A IP-MASQ -m comment --comment "ip-masq: outbound traffic is subject to MASQUERADE (must be last in chain)" -j MASQUERADE
+  fi
 }
 
 function create-dirs {
@@ -938,7 +952,9 @@ function start-kubelet {
     flags+=" --cni-bin-dir=/home/kubernetes/bin"
     if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
       # Calico uses CNI always.
-      if [[ "${KUBERNETES_PRIVATE_MASTER:-}" == "true" ]]; then
+      # Keep KUBERNETES_PRIVATE_MASTER for backward compatibility.
+      # Note that network policy won't work for master node.
+      if [[ "${KUBERNETES_PRIVATE_MASTER:-}" == "true" || "${KUBERNETES_MASTER:-}" == "true" ]]; then
         flags+=" --network-plugin=${NETWORK_PROVIDER}"
       else
         flags+=" --network-plugin=cni"
@@ -970,6 +986,9 @@ function start-kubelet {
   fi
   if [[ -n "${NODE_LABELS:-}" ]]; then
     node_labels="${node_labels:+${node_labels},}${NODE_LABELS}"
+  fi
+  if [[ -n "${NON_MASTER_NODE_LABELS:-}" && "${KUBERNETES_MASTER:-}" != "true" ]]; then
+    node_labels="${node_labels:+${node_labels},}${NON_MASTER_NODE_LABELS}"
   fi
   if [[ -n "${node_labels:-}" ]]; then
     flags+=" --node-labels=${node_labels}"
@@ -1006,9 +1025,6 @@ ExecStart=${kubelet_bin} \$KUBELET_OPTS
 [Install]
 WantedBy=multi-user.target
 EOF
-
-  # Flush iptables nat table
-  iptables -t nat -F || true
 
   systemctl start kubelet.service
 }
