@@ -121,12 +121,12 @@ func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exi
 	return lb, exists, err
 }
 
-func (az *Cloud) getPublicIPAddress(name string) (pip network.PublicIPAddress, exists bool, err error) {
+func (az *Cloud) getPublicIPAddress(rsrcGrp, name string) (pip network.PublicIPAddress, exists bool, err error) {
 	var realErr error
 
 	az.operationPollRateLimiter.Accept()
 	glog.V(10).Infof("PublicIPAddressesClient.Get(%s): start", name)
-	pip, err = az.PublicIPAddressesClient.Get(az.ResourceGroup, name, "")
+	pip, err = az.PublicIPAddressesClient.Get(rsrcGrp, name, "")
 	glog.V(10).Infof("PublicIPAddressesClient.Get(%s): end", name)
 
 	exists, realErr = checkResourceExistsFromError(err)
