@@ -16,23 +16,66 @@ limitations under the License.
 
 package admission
 
-// chainAdmissionHandler is an instance of admission.Interface that performs admission control using a chain of admission handlers
-type chainAdmissionHandler []Interface
+import (
+	"strconv"
 
-// NewChainHandler creates a new chain handler from an array of handlers. Used for testing.
-func NewChainHandler(handlers ...Interface) chainAdmissionHandler {
-	return chainAdmissionHandler(handlers)
+	"github.com/prometheus/client_golang/prometheus"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	metricNamespace = "apiserver"
+	metricSubsystem = "admission"
+)
+
+var (
+	handleCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: metricNamespace,
+			Subsystem: metricSubsystem,
+			Name:      "handle_total",
+			Help:      "Counter of all calls to Admit.",
+		},
+		[]string{"is_system_ns"})
+	rejectCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: metricNamespace,
+			Subsystem: metricSubsystem,
+			Name:      "reject_total",
+			Help:      "Counter of all errors returned during admission.",
+		},
+		[]string{"plugin", "is_system_ns"})
+)
+
+func init() {
+	prometheus.MustRegister(handleCounter)
+	prometheus.MustRegister(rejectCounter)
+}
+
+// chainAdmissionHandler is an instance of admission.Interface that performs admission control using a chain of admission handlers
+type chainAdmissionHandler []namedAdmissionHandler
+
+type namedAdmissionHandler struct {
+	name string
+	Interface
+}
+
+func (admissionHandler chainAdmissionHandler) Append(name string, handler Interface) chainAdmissionHandler {
+	return append(admissionHandler, namedAdmissionHandler{name, handler})
 }
 
 // Admit performs an admission control check using a chain of handlers, and returns immediately on first error
 func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
+	handleCounter.WithLabelValues(isSystemNsLabel(a)).Inc()
 	for _, handler := range admissionHandler {
 		if !handler.Handles(a.GetOperation()) {
 			continue
 		}
-		if mutator, ok := handler.(MutationInterface); ok {
+		if mutator, ok := handler.Interface.(MutationInterface); ok {
 			err := mutator.Admit(a)
 			if err != nil {
+				rejectCounter.WithLabelValues(handler.name, isSystemNsLabel(a)).Inc()
 				return err
 			}
 		}
@@ -46,7 +89,7 @@ func (admissionHandler chainAdmissionHandler) Validate(a Attributes) error {
 		if !handler.Handles(a.GetOperation()) {
 			continue
 		}
-		if validator, ok := handler.(ValidationInterface); ok {
+		if validator, ok := handler.Interface.(ValidationInterface); ok {
 			err := validator.Validate(a)
 			if err != nil {
 				return err
@@ -64,4 +107,9 @@ func (admissionHandler chainAdmissionHandler) Handles(operation Operation) bool 
 		}
 	}
 	return false
+}
+
+// Returns the value to use for the `is_system_ns` metric label.
+func isSystemNsLabel(a Attributes) string {
+	return strconv.FormatBool(a.GetNamespace() == metav1.NamespaceSystem)
 }
