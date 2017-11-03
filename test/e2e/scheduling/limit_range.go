@@ -18,10 +18,14 @@ package scheduling
 
 import (
 	"fmt"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -47,8 +51,33 @@ var _ = SIGDescribe("LimitRange", func() {
 			min, max,
 			defaultLimit, defaultRequest,
 			maxLimitRequestRatio)
-		limitRange, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Create(limitRange)
+
+		By("Setting up watch")
+		selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": limitRange.Name}))
+		options := metav1.ListOptions{LabelSelector: selector.String()}
+		limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(options)
+		Expect(err).NotTo(HaveOccurred(), "failed to query for limitRanges")
+		Expect(len(limitRanges.Items)).To(Equal(0))
+		options = metav1.ListOptions{
+			LabelSelector:   selector.String(),
+			ResourceVersion: limitRanges.ListMeta.ResourceVersion,
+		}
+		w, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Watch(metav1.ListOptions{})
+		Expect(err).NotTo(HaveOccurred(), "failed to set up watch")
+
+		By("Submitting a LimitRange")
+		limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Create(limitRange)
 		Expect(err).NotTo(HaveOccurred())
+
+		By("Verifying LimitRange creation was observed")
+		select {
+		case event, _ := <-w.ResultChan():
+			if event.Type != watch.Added {
+				framework.Failf("Failed to observe pod creation: %v", event)
+			}
+		case <-time.After(framework.ServiceRespondingTimeout):
+			framework.Failf("Timeout while waiting for LimitRange creation")
+		}
 
 		By("Fetching the LimitRange to ensure it has proper values")
 		limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Get(limitRange.Name, metav1.GetOptions{})
@@ -104,6 +133,59 @@ var _ = SIGDescribe("LimitRange", func() {
 		pod = f.NewTestPod(podName, getResourceList("600m", "600Mi"), v1.ResourceList{})
 		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 		Expect(err).To(HaveOccurred())
+
+		By("Updating a LimitRange")
+		newMin := getResourceList("9m", "49Mi")
+		limitRange.Spec.Limits[0].Min = newMin
+		limitRange, err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Update(limitRange)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a Pod with less than former min resources")
+		pod = f.NewTestPod(podName, getResourceList("10m", "50Mi"), v1.ResourceList{})
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Failing to create a Pod with more than max resources")
+		pod = f.NewTestPod(podName, getResourceList("600m", "600Mi"), v1.ResourceList{})
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).To(HaveOccurred())
+
+		By("Deleting a LimitRange")
+		err = f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).Delete(limitRange.Name, metav1.NewDeleteOptions(30))
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Verifying the LimitRange was deleted")
+		Expect(wait.Poll(time.Second*5, time.Second*30, func() (bool, error) {
+			selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": limitRange.Name}))
+			options := metav1.ListOptions{LabelSelector: selector.String()}
+			limitRanges, err := f.ClientSet.CoreV1().LimitRanges(f.Namespace.Name).List(options)
+
+			if err != nil {
+				framework.Logf("Unable to retrieve LimitRanges: %v", err)
+				return false, nil
+			}
+
+			if len(limitRanges.Items) == 0 {
+				framework.Logf("limitRange is already deleted")
+				return true, nil
+			}
+
+			if len(limitRanges.Items) > 0 {
+				if limitRanges.Items[0].ObjectMeta.DeletionTimestamp == nil {
+					framework.Logf("deletion has not yet been observed")
+					return false, nil
+				}
+				return true, nil
+			}
+
+			return false, nil
+
+		})).NotTo(HaveOccurred(), "kubelet never observed the termination notice")
+
+		By("Creating a Pod with more than former max resources")
+		pod = f.NewTestPod(podName+"2", getResourceList("600m", "600Mi"), v1.ResourceList{})
+		pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 })
