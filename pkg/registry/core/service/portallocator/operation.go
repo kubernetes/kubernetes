@@ -16,6 +16,10 @@ limitations under the License.
 
 package portallocator
 
+import (
+	"sync"
+)
+
 // Encapsulates the semantics of a port allocation 'transaction':
 // It is better to leak ports than to double-allocate them,
 // so we allocate immediately, but defer release.
@@ -33,6 +37,7 @@ type PortAllocationOperation struct {
 	allocated       []int
 	releaseDeferred []int
 	shouldRollback  bool
+	lock            sync.Mutex
 }
 
 // Creates a portAllocationOperation, tracking a set of allocations & releases
@@ -95,6 +100,8 @@ func (op *PortAllocationOperation) Commit() []error {
 
 // Allocates a port, and record it for future rollback
 func (op *PortAllocationOperation) Allocate(port int) error {
+	op.lock.Lock()
+	defer op.lock.Unlock()
 	err := op.pa.Allocate(port)
 	if err == nil {
 		op.allocated = append(op.allocated, port)
@@ -104,6 +111,8 @@ func (op *PortAllocationOperation) Allocate(port int) error {
 
 // Allocates a port, and record it for future rollback
 func (op *PortAllocationOperation) AllocateNext() (int, error) {
+	op.lock.Lock()
+	defer op.lock.Unlock()
 	port, err := op.pa.AllocateNext()
 	if err == nil {
 		op.allocated = append(op.allocated, port)
