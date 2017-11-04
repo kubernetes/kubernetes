@@ -374,8 +374,8 @@ func (detacher *cinderDiskDetacher) waitDiskDetached(instanceID, volumeID string
 	return err
 }
 
-func (detacher *cinderDiskDetacher) Detach(deviceMountPath string, nodeName types.NodeName) error {
-	volumeID := path.Base(deviceMountPath)
+func (detacher *cinderDiskDetacher) Detach(volumeName string, nodeName types.NodeName) error {
+	volumeID := path.Base(volumeName)
 	instances, res := detacher.cinderProvider.Instances()
 	if !res {
 		return fmt.Errorf("failed to list openstack instances")

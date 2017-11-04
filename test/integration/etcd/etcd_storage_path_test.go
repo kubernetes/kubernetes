@@ -181,6 +181,26 @@ var etcdStorageData = map[schema.GroupVersionResource]struct {
 		expectedEtcdPath: "/registry/daemonsets/etcdstoragepathtestnamespace/ds6",
 		expectedGVK:      gvkP("extensions", "v1beta1", "DaemonSet"),
 	},
+	gvr("apps", "v1", "deployments"): {
+		stub:             `{"metadata": {"name": "deployment4"}, "spec": {"selector": {"matchLabels": {"f": "z"}}, "template": {"metadata": {"labels": {"f": "z"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container6"}]}}}}`,
+		expectedEtcdPath: "/registry/deployments/etcdstoragepathtestnamespace/deployment4",
+		expectedGVK:      gvkP("extensions", "v1beta1", "Deployment"),
+	},
+	gvr("apps", "v1", "statefulsets"): {
+		stub:             `{"metadata": {"name": "ss3"}, "spec": {"selector": {"matchLabels": {"a": "b"}}, "template": {"metadata": {"labels": {"a": "b"}}}}}`,
+		expectedEtcdPath: "/registry/statefulsets/etcdstoragepathtestnamespace/ss3",
+		expectedGVK:      gvkP("apps", "v1beta1", "StatefulSet"),
+	},
+	gvr("apps", "v1", "replicasets"): {
+		stub:             `{"metadata": {"name": "rs3"}, "spec": {"selector": {"matchLabels": {"g": "h"}}, "template": {"metadata": {"labels": {"g": "h"}}, "spec": {"containers": [{"image": "fedora:latest", "name": "container4"}]}}}}`,
+		expectedEtcdPath: "/registry/replicasets/etcdstoragepathtestnamespace/rs3",
+		expectedGVK:      gvkP("extensions", "v1beta1", "ReplicaSet"),
+	},
+	gvr("apps", "v1", "controllerrevisions"): {
+		stub:             `{"metadata":{"name":"crs3"},"data":{"name":"abc","namespace":"default","creationTimestamp":null,"Spec":{"Replicas":0,"Selector":{"matchLabels":{"foo":"bar"}},"Template":{"creationTimestamp":null,"labels":{"foo":"bar"},"Spec":{"Volumes":null,"InitContainers":null,"Containers":null,"RestartPolicy":"Always","TerminationGracePeriodSeconds":null,"ActiveDeadlineSeconds":null,"DNSPolicy":"ClusterFirst","NodeSelector":null,"ServiceAccountName":"","AutomountServiceAccountToken":null,"NodeName":"","SecurityContext":null,"ImagePullSecrets":null,"Hostname":"","Subdomain":"","Affinity":null,"SchedulerName":"","Tolerations":null,"HostAliases":null}},"VolumeClaimTemplates":null,"ServiceName":""},"Status":{"ObservedGeneration":null,"Replicas":0}},"revision":0}`,
+		expectedEtcdPath: "/registry/controllerrevisions/etcdstoragepathtestnamespace/crs3",
+		expectedGVK:      gvkP("apps", "v1beta1", "ControllerRevision"),
+	},
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/autoscaling/v1
@@ -446,8 +466,6 @@ var ephemeralWhiteList = createEphemeralWhiteList(
 	gvr("extensions", "v1beta1", "deploymentrollbacks"),          // used to rollback deployment, not stored in etcd
 	gvr("extensions", "v1beta1", "replicationcontrollerdummies"), // not stored in etcd
 	gvr("extensions", "v1beta1", "scales"),                       // not stored in etcd, part of kapiv1.ReplicationController
-	gvr("extensions", "v1beta1", "thirdpartyresourcedatas"),      // we cannot create this
-	gvr("extensions", "v1beta1", "thirdpartyresources"),          // these have been removed from the API server, but kept for the client
 	// --
 
 	// k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1

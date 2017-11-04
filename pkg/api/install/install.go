@@ -56,9 +56,6 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 				"PodProxyOptions",
 				"NodeProxyOptions",
 				"ServiceProxyOptions",
-				"ThirdPartyResource",
-				"ThirdPartyResourceData",
-				"ThirdPartyResourceList",
 			),
 		},
 		announced.VersionToSchemeFunc{

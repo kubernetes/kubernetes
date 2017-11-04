@@ -121,6 +121,11 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	AfterEach(func() {
+		if framework.ProviderIs("gke") {
+			By("Remove changes introduced by NAP tests")
+			removeNAPNodePools()
+			disableAutoprovisioning()
+		}
 		By(fmt.Sprintf("Restoring initial size of the cluster"))
 		setMigSizes(originalSizes)
 		expectedNodes := 0
@@ -752,6 +757,44 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectNoError(framework.WaitForReadyNodes(c, len(nodes.Items), nodesRecoverTimeout))
 	})
 
+	It("should add new node and new node pool on too big pod, scale down to 1 and scale down to 0 [Feature:ClusterSizeAutoscalingScaleWithNAP]", func() {
+		framework.SkipUnlessProviderIs("gke")
+		Expect(getNAPNodePoolsNumber()).Should(Equal(0))
+		framework.ExpectNoError(enableAutoprovisioning())
+		By("Create first pod")
+		ReserveMemory(f, "memory-reservation1", 1, int(1.1*float64(memAllocatableMb)), true, defaultTimeout)
+		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation1")
+		By("Waiting for scale up")
+		// Verify that cluster size increased.
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size == nodeCount+1 }, defaultTimeout))
+		By("Check if NAP group was created")
+		Expect(getNAPNodePoolsNumber()).Should(Equal(1))
+		By("Create second pod")
+		ReserveMemory(f, "memory-reservation2", 1, int(1.1*float64(memAllocatableMb)), true, defaultTimeout)
+		defer framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation2")
+		By("Waiting for scale up")
+		// Verify that cluster size increased.
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size == nodeCount+2 }, defaultTimeout))
+		By("Delete first pod")
+		framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation1")
+		By("Waiting for scale down to 1")
+		// Verify that cluster size decreased.
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size == nodeCount+1 }, scaleDownTimeout))
+		By("Delete second pod")
+		framework.DeleteRCAndPods(f.ClientSet, f.InternalClientset, f.Namespace.Name, "memory-reservation2")
+		By("Waiting for scale down to 0")
+		// Verify that cluster size decreased.
+		framework.ExpectNoError(WaitForClusterSizeFunc(f.ClientSet,
+			func(size int) bool { return size == nodeCount }, scaleDownTimeout))
+		By("Waiting for NAP group remove")
+		framework.ExpectNoError(waitTillAllNAPNodePoolsAreRemoved())
+		By("Check if NAP group was removeed")
+		Expect(getNAPNodePoolsNumber()).Should(Equal(0))
+		framework.ExpectNoError(disableAutoprovisioning())
+	})
 })
 
 func execCmd(args ...string) *exec.Cmd {
@@ -795,30 +838,47 @@ func runDrainTest(f *framework.Framework, migSizes map[string]int, namespace str
 	verifyFunction(increasedSize)
 }
 
-func getGKEClusterURL() string {
+func getGKEURL(apiVersion string, suffix string) string {
 	out, err := execCmd("gcloud", "auth", "print-access-token").Output()
 	framework.ExpectNoError(err)
 	token := strings.Replace(string(out), "\n", "", -1)
 
-	return fmt.Sprintf("%s/v1/projects/%s/zones/%s/clusters/%s?access_token=%s",
+	return fmt.Sprintf("%s/%s/%s?access_token=%s",
 		gkeEndpoint,
-		framework.TestContext.CloudConfig.ProjectID,
-		framework.TestContext.CloudConfig.Zone,
-		framework.TestContext.CloudConfig.Cluster,
+		apiVersion,
+		suffix,
 		token)
 }
 
-func isAutoscalerEnabled(expectedMaxNodeCountInTargetPool int) (bool, error) {
-	resp, err := http.Get(getGKEClusterURL())
+func getGKEClusterURL(apiVersion string) string {
+	return getGKEURL(apiVersion, fmt.Sprintf("projects/%s/zones/%s/clusters/%s",
+		framework.TestContext.CloudConfig.ProjectID,
+		framework.TestContext.CloudConfig.Zone,
+		framework.TestContext.CloudConfig.Cluster))
+}
+
+func getCluster(apiVersion string) (string, error) {
+	resp, err := http.Get(getGKEClusterURL(apiVersion))
 	if err != nil {
-		return false, err
+		return "", err
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("error: %s %s", resp.Status, body)
+	}
+
+	return string(body), nil
+}
+
+func isAutoscalerEnabled(expectedMaxNodeCountInTargetPool int) (bool, error) {
+	strBody, err := getCluster("v1")
+	if err != nil {
 		return false, err
 	}
-	strBody := string(body)
 	if strings.Contains(strBody, "\"maxNodeCount\": "+strconv.Itoa(expectedMaxNodeCountInTargetPool)) {
 		return true, nil
 	}
@@ -877,6 +937,161 @@ func disableAutoscaler(nodePool string, minCount, maxCount int) error {
 		finalErr = err
 	}
 	return fmt.Errorf("autoscaler still enabled, last error: %v", finalErr)
+}
+
+func isAutoprovisioningEnabled() (bool, error) {
+	strBody, err := getCluster("v1alpha1")
+	if err != nil {
+		return false, err
+	}
+	if strings.Contains(strBody, "\"enableNodeAutoprovisioning\": true") {
+		return true, nil
+	}
+	return false, nil
+}
+
+func executeHTTPRequest(method string, url string, body string) (string, error) {
+	client := &http.Client{}
+	req, err := http.NewRequest(method, url, strings.NewReader(body))
+	if err != nil {
+		By(fmt.Sprintf("Can't create request: %s", err.Error()))
+		return "", err
+	}
+	resp, err := client.Do(req)
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("error: %s %s", resp.Status, string(respBody))
+	}
+
+	return string(respBody), nil
+}
+
+func enableAutoprovisioning() error {
+	enabled, err := isAutoprovisioningEnabled()
+	if err != nil {
+		glog.Errorf("Error: %s", err.Error())
+		return err
+	}
+	if enabled {
+		By("Autoprovisioning enabled.")
+		return nil
+	}
+	By("Using API to enable autoprovisioning.")
+	_, err = executeHTTPRequest(http.MethodPut, getGKEClusterURL("v1alpha1"), "{\"update\": {\"desired_cluster_autoscaling\": {\"enable_node_autoprovisioning\": true}}}")
+	if err != nil {
+		glog.Errorf("Request error: %s", err.Error())
+		return err
+	}
+	glog.Infof("Wait for enabling autoprovisioning.")
+	for start := time.Now(); time.Since(start) < gkeUpdateTimeout; time.Sleep(30 * time.Second) {
+		enabled, err := isAutoprovisioningEnabled()
+		if err != nil {
+			glog.Errorf("Error: %s", err.Error())
+			return err
+		}
+		if enabled {
+			By("Autoprovisioning enabled.")
+			return nil
+		}
+		glog.Infof("Waiting for enabling autoprovisioning")
+	}
+	return fmt.Errorf("autoprovisioning wasn't enabled (timeout).")
+}
+
+func disableAutoprovisioning() error {
+	enabled, err := isAutoprovisioningEnabled()
+	if err != nil {
+		glog.Errorf("Error: %s", err.Error())
+		return err
+	}
+	if !enabled {
+		By("Autoprovisioning disabled.")
+		return nil
+	}
+	By("Using API to disable autoprovisioning.")
+	_, err = executeHTTPRequest(http.MethodPut, getGKEClusterURL("v1alpha1"), "{\"update\": {\"desired_cluster_autoscaling\": {}}}")
+	if err != nil {
+		glog.Errorf("Request error: %s", err.Error())
+		return err
+	}
+	By("Wait for disabling autoprovisioning.")
+	for start := time.Now(); time.Since(start) < gkeUpdateTimeout; time.Sleep(30 * time.Second) {
+		enabled, err := isAutoprovisioningEnabled()
+		if err != nil {
+			glog.Errorf("Error: %s", err.Error())
+			return err
+		}
+		if !enabled {
+			By("Autoprovisioning disabled.")
+			return nil
+		}
+		By("Waiting for disabling autoprovisioning")
+	}
+	return fmt.Errorf("autoprovisioning wasn't disabled (timeout).")
+}
+
+func getNAPNodePools() ([]string, error) {
+	if framework.ProviderIs("gke") {
+		output, err := exec.Command("gcloud", "container", "node-pools", "list",
+			"--project="+framework.TestContext.CloudConfig.ProjectID,
+			"--zone="+framework.TestContext.CloudConfig.Zone,
+			"--cluster="+framework.TestContext.CloudConfig.Cluster).CombinedOutput()
+		if err != nil {
+			glog.Errorf("Failed to get instance groups: %v", string(output))
+			return nil, err
+		}
+		re := regexp.MustCompile("nap.* ")
+		lines := re.FindAllString(string(output), -1)
+		for i, line := range lines {
+			lines[i] = line[:strings.Index(line, " ")]
+		}
+		return lines, nil
+	} else {
+		return nil, fmt.Errorf("provider does not support NAP")
+	}
+}
+
+func removeNAPNodePools() error {
+	By("Remove NAP node pools")
+	pools, err := getNAPNodePools()
+	if err != nil {
+		return err
+	}
+	for _, pool := range pools {
+		By("Remove node pool: " + pool)
+		suffix := fmt.Sprintf("projects/%s/zones/%s/clusters/%s/nodePools/%s",
+			framework.TestContext.CloudConfig.ProjectID,
+			framework.TestContext.CloudConfig.Zone,
+			framework.TestContext.CloudConfig.Cluster,
+			pool)
+		_, err := executeHTTPRequest(http.MethodDelete, getGKEURL("v1alpha1", suffix), "")
+		if err != nil {
+			glog.Errorf("Request error: %s", err.Error())
+			return err
+		}
+	}
+	err = waitTillAllNAPNodePoolsAreRemoved()
+	if err != nil {
+		glog.Errorf(fmt.Sprintf("Couldn't remove NAP groups: %s", err.Error()))
+	}
+	return err
+}
+
+func getNAPNodePoolsNumber() int {
+	groups, err := getNAPNodePools()
+	framework.ExpectNoError(err)
+	return len(groups)
+}
+
+func waitTillAllNAPNodePoolsAreRemoved() error {
+	By("Wait till all NAP node pools are removed")
+	err := wait.PollImmediate(5*time.Second, defaultTimeout, func() (bool, error) {
+		return getNAPNodePoolsNumber() == 0, nil
+	})
+	return err
 }
 
 func addNodePool(name string, machineType string, numNodes int) {

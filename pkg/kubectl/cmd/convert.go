@@ -52,7 +52,7 @@ var (
 		kubectl convert -f pod.yaml
 
 		# Convert the live state of the resource specified by 'pod.yaml' to the latest version
-		# and print to stdout in json format.
+		# and print to stdout in JSON format.
 		kubectl convert -f pod.yaml --local -o json
 
 		# Convert all files under current directory to latest version and create them all.
@@ -124,7 +124,7 @@ func (o *ConvertOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.C
 		return err
 	}
 	if !scheme.Registry.IsEnabledVersion(o.outputVersion) {
-		cmdutil.UsageErrorf(cmd, "'%s' is not a registered version.", o.outputVersion)
+		return cmdutil.UsageErrorf(cmd, "'%s' is not a registered version.", o.outputVersion)
 	}
 
 	// build the builder
@@ -204,7 +204,7 @@ func (o *ConvertOptions) RunConvert() error {
 	return o.printer.PrintObj(objects, o.out)
 }
 
-// ObjectListToVersionedObject receives a list of api objects and a group version
+// objectListToVersionedObject receives a list of api objects and a group version
 // and squashes the list's items into a single versioned runtime.Object.
 func objectListToVersionedObject(objects []runtime.Object, version schema.GroupVersion) (runtime.Object, error) {
 	objectList := &api.List{Items: objects}
@@ -215,7 +215,7 @@ func objectListToVersionedObject(objects []runtime.Object, version schema.GroupV
 	return converted, nil
 }
 
-// AsVersionedObject converts a list of infos into a single object - either a List containing
+// asVersionedObject converts a list of infos into a single object - either a List containing
 // the objects as children, or if only a single Object is present, as that object. The provided
 // version will be preferred as the conversion target, but the Object's mapping version will be
 // used if that version is not present.
@@ -248,7 +248,7 @@ func asVersionedObject(infos []*resource.Info, forceList bool, version schema.Gr
 	return object, nil
 }
 
-// AsVersionedObjects converts a list of infos into versioned objects. The provided
+// asVersionedObjects converts a list of infos into versioned objects. The provided
 // version will be preferred as the conversion target, but the Object's mapping version will be
 // used if that version is not present.
 func asVersionedObjects(infos []*resource.Info, version schema.GroupVersion, encoder runtime.Encoder) ([]runtime.Object, error) {

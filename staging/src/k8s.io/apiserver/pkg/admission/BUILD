@@ -12,6 +12,7 @@ go_test(
         "chain_test.go",
         "config_test.go",
         "errors_test.go",
+        "handler_test.go",
     ],
     importpath = "k8s.io/apiserver/pkg/admission",
     library = ":go_default_library",

@@ -66,42 +66,21 @@ var (
 
 // Query sends a command to the server and returns the Response
 func Query(c clientset.Interface, query string) (*influxdb.Response, error) {
-	subResourceProxyAvailable, err := framework.ServerVersionGTE(framework.SubResourceServiceAndNodeProxyVersion, c.Discovery())
-	if err != nil {
-		return nil, err
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 	defer cancel()
 
-	var result []byte
-	if subResourceProxyAvailable {
-		result, err = c.CoreV1().RESTClient().Get().
-			Context(ctx).
-			Namespace("kube-system").
-			Resource("services").
-			Name(influxdbService+":api").
-			SubResource("proxy").
-			Suffix("query").
-			Param("q", query).
-			Param("db", influxdbDatabaseName).
-			Param("epoch", "s").
-			Do().
-			Raw()
-	} else {
-		result, err = c.CoreV1().RESTClient().Get().
-			Context(ctx).
-			Prefix("proxy").
-			Namespace("kube-system").
-			Resource("services").
-			Name(influxdbService+":api").
-			Suffix("query").
-			Param("q", query).
-			Param("db", influxdbDatabaseName).
-			Param("epoch", "s").
-			Do().
-			Raw()
-	}
+	result, err := c.CoreV1().RESTClient().Get().
+		Context(ctx).
+		Namespace("kube-system").
+		Resource("services").
+		Name(influxdbService+":api").
+		SubResource("proxy").
+		Suffix("query").
+		Param("q", query).
+		Param("db", influxdbDatabaseName).
+		Param("epoch", "s").
+		Do().
+		Raw()
 
 	if err != nil {
 		if ctx.Err() != nil {

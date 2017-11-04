@@ -54,6 +54,8 @@ type Plugin struct {
 	limitEnforcers []*limitEnforcer
 }
 
+var _ admission.ValidationInterface = &Plugin{}
+
 // newEventRateLimit configures an admission controller that can enforce event rate limits
 func newEventRateLimit(config *eventratelimitapi.Configuration, clock flowcontrol.Clock) (*Plugin, error) {
 	limitEnforcers := make([]*limitEnforcer, 0, len(config.Limits))
@@ -73,8 +75,8 @@ func newEventRateLimit(config *eventratelimitapi.Configuration, clock flowcontro
 	return eventRateLimitAdmission, nil
 }
 
-// Admit makes admission decisions while enforcing event rate limits
-func (a *Plugin) Admit(attr admission.Attributes) (err error) {
+// Validate makes admission decisions while enforcing event rate limits
+func (a *Plugin) Validate(attr admission.Attributes) (err error) {
 	// ignore all operations that do not correspond to an Event kind
 	if attr.GetKind().GroupKind() != api.Kind("Event") {
 		return nil

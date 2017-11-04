@@ -445,6 +445,9 @@ func (kl *Kubelet) setNodeAddress(node *v1.Node) error {
 
 	if kl.externalCloudProvider {
 		if kl.nodeIP != nil {
+			if node.ObjectMeta.Annotations == nil {
+				node.ObjectMeta.Annotations = make(map[string]string)
+			}
 			node.ObjectMeta.Annotations[kubeletapis.AnnotationProvidedIPAddr] = kl.nodeIP.String()
 		}
 		// We rely on the external cloud provider to supply the addresses.

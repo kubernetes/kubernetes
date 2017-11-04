@@ -25,7 +25,11 @@ import (
 
 type AppsV1Interface interface {
 	RESTClient() rest.Interface
+	ControllerRevisionsGetter
 	DaemonSetsGetter
+	DeploymentsGetter
+	ReplicaSetsGetter
+	StatefulSetsGetter
 }
 
 // AppsV1Client is used to interact with features provided by the apps group.
@@ -33,8 +37,24 @@ type AppsV1Client struct {
 	restClient rest.Interface
 }
 
+func (c *AppsV1Client) ControllerRevisions(namespace string) ControllerRevisionInterface {
+	return newControllerRevisions(c, namespace)
+}
+
 func (c *AppsV1Client) DaemonSets(namespace string) DaemonSetInterface {
 	return newDaemonSets(c, namespace)
+}
+
+func (c *AppsV1Client) Deployments(namespace string) DeploymentInterface {
+	return newDeployments(c, namespace)
+}
+
+func (c *AppsV1Client) ReplicaSets(namespace string) ReplicaSetInterface {
+	return newReplicaSets(c, namespace)
+}
+
+func (c *AppsV1Client) StatefulSets(namespace string) StatefulSetInterface {
+	return newStatefulSets(c, namespace)
 }
 
 // NewForConfig creates a new AppsV1Client for the given config.

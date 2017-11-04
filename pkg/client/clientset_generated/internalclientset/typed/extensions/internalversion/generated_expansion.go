@@ -23,5 +23,3 @@ type IngressExpansion interface{}
 type PodSecurityPolicyExpansion interface{}
 
 type ReplicaSetExpansion interface{}
-
-type ThirdPartyResourceExpansion interface{}

@@ -27,8 +27,8 @@ import (
 type detacherDefaults flexVolumeDetacher
 
 // Detach is part of the volume.Detacher interface.
-func (d *detacherDefaults) Detach(deviceName string, hostName types.NodeName) error {
-	glog.Warning(logPrefix(d.plugin.flexVolumePlugin), "using default Detach for device ", deviceName, ", host ", hostName)
+func (d *detacherDefaults) Detach(volumeName string, hostName types.NodeName) error {
+	glog.Warning(logPrefix(d.plugin.flexVolumePlugin), "using default Detach for volume ", volumeName, ", host ", hostName)
 	return nil
 }
 

@@ -498,7 +498,6 @@ Summary API when querying /stats/summary should report resource usage through th
 Sysctls should reject invalid sysctls,davidopp,1,node
 Sysctls should support sysctls,Random-Liu,1,node
 Sysctls should support unsafe sysctls which are actually whitelisted,deads2k,1,node
-ThirdParty resources Simple Third Party creating/deleting thirdparty objects works,luxas,1,api-machinery
 Upgrade cluster upgrade should maintain a functioning cluster,luxas,1,cluster-lifecycle
 Upgrade master upgrade should maintain a functioning cluster,xiang90,1,cluster-lifecycle
 Upgrade node upgrade should maintain a functioning cluster,zmerlynn,1,cluster-lifecycle
@@ -758,10 +757,6 @@ k8s.io/kubernetes/pkg/registry/extensions/podsecuritypolicy/storage,dchen1107,1,
 k8s.io/kubernetes/pkg/registry/extensions/replicaset,rrati,0,
 k8s.io/kubernetes/pkg/registry/extensions/replicaset/storage,wojtek-t,1,
 k8s.io/kubernetes/pkg/registry/extensions/rest,rrati,0,
-k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresource,mwielgus,1,
-k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresource/storage,mikedanese,1,
-k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata,sttts,1,
-k8s.io/kubernetes/pkg/registry/extensions/thirdpartyresourcedata/storage,childsb,1,
 k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget,Q-Lee,1,
 k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget/storage,dchen1107,1,
 k8s.io/kubernetes/pkg/registry/rbac/reconciliation,roberthbailey,1,

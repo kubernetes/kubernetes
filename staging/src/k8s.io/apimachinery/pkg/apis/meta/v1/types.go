@@ -177,15 +177,16 @@ type ObjectMeta struct {
 	// DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This
 	// field is set by the server when a graceful deletion is requested by the user, and is not
 	// directly settable by a client. The resource is expected to be deleted (no longer visible
-	// from resource lists, and not reachable by name) after the time in this field. Once set,
-	// this value may not be unset or be set further into the future, although it may be shortened
-	// or the resource may be deleted prior to this time. For example, a user may request that
-	// a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination
-	// signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard
-	// termination signal (SIGKILL) to the container and after cleanup, remove the pod from the
-	// API. In the presence of network partitions, this object may still exist after this
-	// timestamp, until an administrator or automated process can determine the resource is
-	// fully terminated.
+	// from resource lists, and not reachable by name) after the time in this field, once the
+	// finalizers list is empty. As long as the finalizers list contains items, deletion is blocked.
+	// Once the deletionTimestamp is set, this value may not be unset or be set further into the
+	// future, although it may be shortened or the resource may be deleted prior to this time.
+	// For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react
+	// by sending a graceful termination signal to the containers in the pod. After that 30 seconds,
+	// the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup,
+	// remove the pod from the API. In the presence of network partitions, this object may still
+	// exist after this timestamp, until an administrator or automated process can determine the
+	// resource is fully terminated.
 	// If not set, graceful deletion of the object has not been requested.
 	//
 	// Populated by the system when a graceful deletion is requested.

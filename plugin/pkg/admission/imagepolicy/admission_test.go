@@ -477,7 +477,7 @@ func TestTLSConfig(t *testing.T) {
 			// Allow all and see if we get an error.
 			service.Allow()
 
-			err = wh.Admit(attr)
+			err = wh.Validate(attr)
 			if tt.wantAllowed {
 				if err != nil {
 					t.Errorf("expected successful admission")
@@ -499,7 +499,7 @@ func TestTLSConfig(t *testing.T) {
 			}
 
 			service.Deny()
-			if err := wh.Admit(attr); err == nil {
+			if err := wh.Validate(attr); err == nil {
 				t.Errorf("%s: incorrectly admitted with DenyAll policy", tt.test)
 			}
 		}()
@@ -516,7 +516,7 @@ type webhookCacheTestCase struct {
 func testWebhookCacheCases(t *testing.T, serv *mockService, wh *Plugin, attr admission.Attributes, tests []webhookCacheTestCase) {
 	for _, test := range tests {
 		serv.statusCode = test.statusCode
-		err := wh.Admit(attr)
+		err := wh.Validate(attr)
 		authorized := err == nil
 
 		if test.expectedErr && err == nil {
@@ -749,7 +749,7 @@ func TestContainerCombinations(t *testing.T) {
 
 			attr := admission.NewAttributesRecord(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &user.DefaultInfo{})
 
-			err = wh.Admit(attr)
+			err = wh.Validate(attr)
 			if tt.wantAllowed {
 				if err != nil {
 					t.Errorf("expected successful admission: %s", tt.test)
@@ -827,7 +827,7 @@ func TestDefaultAllow(t *testing.T) {
 
 			attr := admission.NewAttributesRecord(tt.pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &user.DefaultInfo{})
 
-			err = wh.Admit(attr)
+			err = wh.Validate(attr)
 			if tt.wantAllowed {
 				if err != nil {
 					t.Errorf("expected successful admission")
@@ -919,7 +919,7 @@ func TestAnnotationFiltering(t *testing.T) {
 
 			attr := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "namespace", "", api.Resource("pods").WithVersion("version"), "", admission.Create, &user.DefaultInfo{})
 
-			err = wh.Admit(attr)
+			err = wh.Validate(attr)
 			if err != nil {
 				t.Errorf("expected successful admission")
 			}

@@ -62,3 +62,24 @@ func TestNilDeletionTimestamp(t *testing.T) {
 	_, ok = metadata["deletionTimestamp"]
 	assert.False(t, ok)
 }
+
+func TestEmptyCreationTimestampIsOmitted(t *testing.T) {
+	var u Unstructured
+	now := metav1.Now()
+
+	// set an initial creationTimestamp and ensure the field exists
+	u.SetCreationTimestamp(now)
+	metadata := u.Object["metadata"].(map[string]interface{})
+	creationTimestamp, exists := metadata["creationTimestamp"]
+	if !exists {
+		t.Fatalf("unexpected missing creationTimestamp")
+	}
+
+	// set an empty timestamp and ensure the field no longer exists
+	u.SetCreationTimestamp(metav1.Time{})
+	metadata = u.Object["metadata"].(map[string]interface{})
+	creationTimestamp, exists = metadata["creationTimestamp"]
+	if exists {
+		t.Errorf("unexpected creation timestamp field: %q", creationTimestamp)
+	}
+}
