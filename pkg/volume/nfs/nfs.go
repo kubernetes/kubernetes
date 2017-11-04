@@ -22,10 +22,9 @@ import (
 	"runtime"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -105,7 +104,7 @@ func (plugin *nfsPlugin) GetAccessModes() []v1.PersistentVolumeAccessMode {
 }
 
 func (plugin *nfsPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter())
+	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, mounter mount.Interface) (volume.Mounter, error) {
@@ -129,7 +128,7 @@ func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, moun
 }
 
 func (plugin *nfsPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter())
+	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *nfsPlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Unmounter, error) {
@@ -192,22 +191,18 @@ func (nfsVolume *nfs) GetPath() string {
 // to mount the volume are available on the underlying node.
 // If not, it returns an error
 func (nfsMounter *nfsMounter) CanMount() error {
-	exe := exec.New()
+	exec := nfsMounter.plugin.host.GetExec(nfsMounter.plugin.GetPluginName())
 	switch runtime.GOOS {
 	case "linux":
-		_, err1 := exe.Command("/bin/ls", "/sbin/mount.nfs").CombinedOutput()
-		_, err2 := exe.Command("/bin/ls", "/sbin/mount.nfs4").CombinedOutput()
-
-		if err1 != nil {
+		if _, err := exec.Run("/bin/ls", "/sbin/mount.nfs"); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount.nfs is missing")
 		}
-		if err2 != nil {
+		if _, err := exec.Run("/bin/ls", "/sbin/mount.nfs4"); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount.nfs4 is missing")
 		}
 		return nil
 	case "darwin":
-		_, err := exe.Command("/bin/ls", "/sbin/mount_nfs").CombinedOutput()
-		if err != nil {
+		if _, err := exec.Run("/bin/ls", "/sbin/mount_nfs"); err != nil {
 			return fmt.Errorf("Required binary /sbin/mount_nfs is missing")
 		}
 	}

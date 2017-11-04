@@ -19,7 +19,7 @@ package v1
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/api"
+	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 
 // SchemeGroupVersion is group version used to register these objects
@@ -27,16 +27,26 @@ import (
 var SchemeGroupVersion = schema.GroupVersion{Group: "", Version: "v1"}
 
 func init() {
-	if err := addKnownTypes(api.Scheme); err != nil {
+	if err := addKnownTypes(schedulerapi.Scheme); err != nil {
 		// Programmer error.
 		panic(err)
 	}
 }
 
 var (
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	AddToScheme   = SchemeBuilder.AddToScheme
+	// TODO: move SchemeBuilder with zz_generated.deepcopy.go to k8s.io/api.
+	// localSchemeBuilder and AddToScheme will stay in k8s.io/kubernetes.
+	SchemeBuilder      runtime.SchemeBuilder
+	localSchemeBuilder = &SchemeBuilder
+	AddToScheme        = localSchemeBuilder.AddToScheme
 )
+
+func init() {
+	// We only register manually written functions here. The registration of the
+	// generated functions takes place in the generated files. The separation
+	// makes the code compile even when the generated files are missing.
+	localSchemeBuilder.Register(addKnownTypes)
+}
 
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
@@ -44,5 +54,3 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	)
 	return nil
 }
-
-func (obj *Policy) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }

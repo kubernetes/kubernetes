@@ -1,0 +1,8 @@
+{
+	"GoPrefix": "k8s.io/kubernetes",
+	"SkippedPaths": [
+		"^_.*"
+	],
+	"AddSourcesRules": true,
+	"K8sOpenAPIGen": true
+}

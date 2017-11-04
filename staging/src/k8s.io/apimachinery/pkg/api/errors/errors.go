@@ -28,14 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// HTTP Status codes not in the golang http package.
 const (
-	StatusUnprocessableEntity = 422
-	StatusTooManyRequests     = 429
-	// StatusServerTimeout is an indication that a transient server error has
-	// occurred and the client *should* retry, with an optional Retry-After
-	// header to specify the back off window.
-	StatusServerTimeout = 504
+	// StatusTooManyRequests means the server experienced too many requests within a
+	// given window and that the client must wait to perform the action again.
+	StatusTooManyRequests = 429
 )
 
 // StatusError is an error intended for consumption by a REST API server; it can also be
@@ -138,6 +134,14 @@ func NewUnauthorized(reason string) *StatusError {
 
 // NewForbidden returns an error indicating the requested action was forbidden
 func NewForbidden(qualifiedResource schema.GroupResource, name string, err error) *StatusError {
+	var message string
+	if qualifiedResource.Empty() {
+		message = fmt.Sprintf("forbidden: %v", err)
+	} else if name == "" {
+		message = fmt.Sprintf("%s is forbidden: %v", qualifiedResource.String(), err)
+	} else {
+		message = fmt.Sprintf("%s %q is forbidden: %v", qualifiedResource.String(), name, err)
+	}
 	return &StatusError{metav1.Status{
 		Status: metav1.StatusFailure,
 		Code:   http.StatusForbidden,
@@ -147,7 +151,7 @@ func NewForbidden(qualifiedResource schema.GroupResource, name string, err error
 			Kind:  qualifiedResource.Resource,
 			Name:  name,
 		},
-		Message: fmt.Sprintf("%s %q is forbidden: %v", qualifiedResource.String(), name, err),
+		Message: message,
 	}}
 }
 
@@ -176,6 +180,17 @@ func NewGone(message string) *StatusError {
 	}}
 }
 
+// NewResourceExpired creates an error that indicates that the requested resource content has expired from
+// the server (usually due to a resourceVersion that is too old).
+func NewResourceExpired(message string) *StatusError {
+	return &StatusError{metav1.Status{
+		Status:  metav1.StatusFailure,
+		Code:    http.StatusGone,
+		Reason:  metav1.StatusReasonExpired,
+		Message: message,
+	}}
+}
+
 // NewInvalid returns an error indicating the item is invalid and cannot be processed.
 func NewInvalid(qualifiedKind schema.GroupKind, name string, errs field.ErrorList) *StatusError {
 	causes := make([]metav1.StatusCause, 0, len(errs))
@@ -189,7 +204,7 @@ func NewInvalid(qualifiedKind schema.GroupKind, name string, errs field.ErrorLis
 	}
 	return &StatusError{metav1.Status{
 		Status: metav1.StatusFailure,
-		Code:   StatusUnprocessableEntity, // RFC 4918: StatusUnprocessableEntity
+		Code:   http.StatusUnprocessableEntity,
 		Reason: metav1.StatusReasonInvalid,
 		Details: &metav1.StatusDetails{
 			Group:  qualifiedKind.Group,
@@ -208,6 +223,21 @@ func NewBadRequest(reason string) *StatusError {
 		Code:    http.StatusBadRequest,
 		Reason:  metav1.StatusReasonBadRequest,
 		Message: reason,
+	}}
+}
+
+// NewTooManyRequests creates an error that indicates that the client must try again later because
+// the specified endpoint is not accepting requests. More specific details should be provided
+// if client should know why the failure was limited4.
+func NewTooManyRequests(message string, retryAfterSeconds int) *StatusError {
+	return &StatusError{metav1.Status{
+		Status:  metav1.StatusFailure,
+		Code:    http.StatusTooManyRequests,
+		Reason:  metav1.StatusReasonTooManyRequests,
+		Message: message,
+		Details: &metav1.StatusDetails{
+			RetryAfterSeconds: int32(retryAfterSeconds),
+		},
 	}}
 }
 
@@ -276,12 +306,24 @@ func NewInternalError(err error) *StatusError {
 func NewTimeoutError(message string, retryAfterSeconds int) *StatusError {
 	return &StatusError{metav1.Status{
 		Status:  metav1.StatusFailure,
-		Code:    StatusServerTimeout,
+		Code:    http.StatusGatewayTimeout,
 		Reason:  metav1.StatusReasonTimeout,
 		Message: fmt.Sprintf("Timeout: %s", message),
 		Details: &metav1.StatusDetails{
 			RetryAfterSeconds: int32(retryAfterSeconds),
 		},
+	}}
+}
+
+// NewTooManyRequestsError returns an error indicating that the request was rejected because
+// the server has received too many requests. Client should wait and retry. But if the request
+// is perishable, then the client should not retry the request.
+func NewTooManyRequestsError(message string) *StatusError {
+	return &StatusError{metav1.Status{
+		Status:  metav1.StatusFailure,
+		Code:    StatusTooManyRequests,
+		Reason:  metav1.StatusReasonTooManyRequests,
+		Message: fmt.Sprintf("Too many requests: %s", message),
 	}}
 }
 
@@ -313,14 +355,14 @@ func NewGenericServerResponse(code int, verb string, qualifiedResource schema.Gr
 	case http.StatusMethodNotAllowed:
 		reason = metav1.StatusReasonMethodNotAllowed
 		message = "the server does not allow this method on the requested resource"
-	case StatusUnprocessableEntity:
+	case http.StatusUnprocessableEntity:
 		reason = metav1.StatusReasonInvalid
 		message = "the server rejected our request due to an error in our request"
-	case StatusServerTimeout:
-		reason = metav1.StatusReasonServerTimeout
-		message = "the server cannot complete the requested operation at this time, try again later"
-	case StatusTooManyRequests:
+	case http.StatusGatewayTimeout:
 		reason = metav1.StatusReasonTimeout
+		message = "the server was unable to return a response in the time allotted, but may still be processing the request"
+	case http.StatusTooManyRequests:
+		reason = metav1.StatusReasonTooManyRequests
 		message = "the server has received too many requests and has asked us to try again later"
 	default:
 		if code >= 500 {
@@ -363,71 +405,89 @@ func NewGenericServerResponse(code int, verb string, qualifiedResource schema.Gr
 
 // IsNotFound returns true if the specified error was created by NewNotFound.
 func IsNotFound(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonNotFound
+	return ReasonForError(err) == metav1.StatusReasonNotFound
 }
 
 // IsAlreadyExists determines if the err is an error which indicates that a specified resource already exists.
 func IsAlreadyExists(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonAlreadyExists
+	return ReasonForError(err) == metav1.StatusReasonAlreadyExists
 }
 
 // IsConflict determines if the err is an error which indicates the provided update conflicts.
 func IsConflict(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonConflict
+	return ReasonForError(err) == metav1.StatusReasonConflict
 }
 
 // IsInvalid determines if the err is an error which indicates the provided resource is not valid.
 func IsInvalid(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonInvalid
+	return ReasonForError(err) == metav1.StatusReasonInvalid
+}
+
+// IsGone is true if the error indicates the requested resource is no longer available.
+func IsGone(err error) bool {
+	return ReasonForError(err) == metav1.StatusReasonGone
+}
+
+// IsResourceExpired is true if the error indicates the resource has expired and the current action is
+// no longer possible.
+func IsResourceExpired(err error) bool {
+	return ReasonForError(err) == metav1.StatusReasonExpired
 }
 
 // IsMethodNotSupported determines if the err is an error which indicates the provided action could not
 // be performed because it is not supported by the server.
 func IsMethodNotSupported(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonMethodNotAllowed
+	return ReasonForError(err) == metav1.StatusReasonMethodNotAllowed
+}
+
+// IsServiceUnavailable is true if the error indicates the underlying service is no longer available.
+func IsServiceUnavailable(err error) bool {
+	return ReasonForError(err) == metav1.StatusReasonServiceUnavailable
 }
 
 // IsBadRequest determines if err is an error which indicates that the request is invalid.
 func IsBadRequest(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonBadRequest
+	return ReasonForError(err) == metav1.StatusReasonBadRequest
 }
 
 // IsUnauthorized determines if err is an error which indicates that the request is unauthorized and
 // requires authentication by the user.
 func IsUnauthorized(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonUnauthorized
+	return ReasonForError(err) == metav1.StatusReasonUnauthorized
 }
 
 // IsForbidden determines if err is an error which indicates that the request is forbidden and cannot
 // be completed as requested.
 func IsForbidden(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonForbidden
+	return ReasonForError(err) == metav1.StatusReasonForbidden
 }
 
 // IsTimeout determines if err is an error which indicates that request times out due to long
 // processing.
 func IsTimeout(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonTimeout
+	return ReasonForError(err) == metav1.StatusReasonTimeout
 }
 
 // IsServerTimeout determines if err is an error which indicates that the request needs to be retried
 // by the client.
 func IsServerTimeout(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonServerTimeout
+	return ReasonForError(err) == metav1.StatusReasonServerTimeout
 }
 
 // IsInternalError determines if err is an error which indicates an internal server error.
 func IsInternalError(err error) bool {
-	return reasonForError(err) == metav1.StatusReasonInternalError
+	return ReasonForError(err) == metav1.StatusReasonInternalError
 }
 
 // IsTooManyRequests determines if err is an error which indicates that there are too many requests
 // that the server cannot handle.
-// TODO: update IsTooManyRequests() when the TooManyRequests(429) error returned from the API server has a non-empty Reason field
 func IsTooManyRequests(err error) bool {
+	if ReasonForError(err) == metav1.StatusReasonTooManyRequests {
+		return true
+	}
 	switch t := err.(type) {
 	case APIStatus:
-		return t.Status().Code == StatusTooManyRequests
+		return t.Status().Code == http.StatusTooManyRequests
 	}
 	return false
 }
@@ -455,13 +515,20 @@ func IsUnexpectedObjectError(err error) bool {
 }
 
 // SuggestsClientDelay returns true if this error suggests a client delay as well as the
-// suggested seconds to wait, or false if the error does not imply a wait.
+// suggested seconds to wait, or false if the error does not imply a wait. It does not
+// address whether the error *should* be retried, since some errors (like a 3xx) may
+// request delay without retry.
 func SuggestsClientDelay(err error) (int, bool) {
 	switch t := err.(type) {
 	case APIStatus:
 		if t.Status().Details != nil {
 			switch t.Status().Reason {
-			case metav1.StatusReasonServerTimeout, metav1.StatusReasonTimeout:
+			// this StatusReason explicitly requests the caller to delay the action
+			case metav1.StatusReasonServerTimeout:
+				return int(t.Status().Details.RetryAfterSeconds), true
+			}
+			// If the client requests that we retry after a certain number of seconds
+			if t.Status().Details.RetryAfterSeconds > 0 {
 				return int(t.Status().Details.RetryAfterSeconds), true
 			}
 		}
@@ -469,7 +536,8 @@ func SuggestsClientDelay(err error) (int, bool) {
 	return 0, false
 }
 
-func reasonForError(err error) metav1.StatusReason {
+// ReasonForError returns the HTTP status for a particular error.
+func ReasonForError(err error) metav1.StatusReason {
 	switch t := err.(type) {
 	case APIStatus:
 		return t.Status().Reason

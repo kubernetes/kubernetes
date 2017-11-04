@@ -27,14 +27,13 @@ static void sigdown(int signo) {
 }
 
 static void sigreap(int signo) {
-  while (waitpid(-1, NULL, WNOHANG) > 0)
-    ;
+  while (waitpid(-1, NULL, WNOHANG) > 0);
 }
 
 int main() {
   if (getpid() != 1)
     /* Not an error because pause sees use outside of infra containers. */
-    fprintf(stderr, "Warning: pause should be the first process in a pod\n");
+    fprintf(stderr, "Warning: pause should be the first process\n");
 
   if (sigaction(SIGINT, &(struct sigaction){.sa_handler = sigdown}, NULL) < 0)
     return 1;

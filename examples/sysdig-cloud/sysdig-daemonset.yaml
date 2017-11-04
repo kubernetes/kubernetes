@@ -16,6 +16,7 @@ spec:
       - name: docker-sock
         hostPath:
          path: /var/run/docker.sock
+         type: Socket
       - name: dev-vol
         hostPath:
          path: /dev

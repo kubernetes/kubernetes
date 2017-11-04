@@ -59,6 +59,41 @@ func newJobs(c *BatchClient, namespace string) *jobs {
 	}
 }
 
+// Get takes name of the job, and returns the corresponding job object, and an error if there is any.
+func (c *jobs) Get(name string, options v1.GetOptions) (result *batch.Job, err error) {
+	result = &batch.Job{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("jobs").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of Jobs that match those selectors.
+func (c *jobs) List(opts v1.ListOptions) (result *batch.JobList, err error) {
+	result = &batch.JobList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("jobs").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested jobs.
+func (c *jobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("jobs").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a job and creates it.  Returns the server's representation of the job, and an error, if there is any.
 func (c *jobs) Create(job *batch.Job) (result *batch.Job, err error) {
 	result = &batch.Job{}
@@ -85,7 +120,7 @@ func (c *jobs) Update(job *batch.Job) (result *batch.Job, err error) {
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *jobs) UpdateStatus(job *batch.Job) (result *batch.Job, err error) {
 	result = &batch.Job{}
@@ -120,41 +155,6 @@ func (c *jobs) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOp
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the job, and returns the corresponding job object, and an error if there is any.
-func (c *jobs) Get(name string, options v1.GetOptions) (result *batch.Job, err error) {
-	result = &batch.Job{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("jobs").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Jobs that match those selectors.
-func (c *jobs) List(opts v1.ListOptions) (result *batch.JobList, err error) {
-	result = &batch.JobList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("jobs").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested jobs.
-func (c *jobs) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("jobs").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched job.

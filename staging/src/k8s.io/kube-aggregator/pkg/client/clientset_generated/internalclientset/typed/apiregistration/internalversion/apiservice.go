@@ -57,6 +57,38 @@ func newAPIServices(c *ApiregistrationClient) *aPIServices {
 	}
 }
 
+// Get takes name of the aPIService, and returns the corresponding aPIService object, and an error if there is any.
+func (c *aPIServices) Get(name string, options v1.GetOptions) (result *apiregistration.APIService, err error) {
+	result = &apiregistration.APIService{}
+	err = c.client.Get().
+		Resource("apiservices").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of APIServices that match those selectors.
+func (c *aPIServices) List(opts v1.ListOptions) (result *apiregistration.APIServiceList, err error) {
+	result = &apiregistration.APIServiceList{}
+	err = c.client.Get().
+		Resource("apiservices").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested aPIServices.
+func (c *aPIServices) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Resource("apiservices").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a aPIService and creates it.  Returns the server's representation of the aPIService, and an error, if there is any.
 func (c *aPIServices) Create(aPIService *apiregistration.APIService) (result *apiregistration.APIService, err error) {
 	result = &apiregistration.APIService{}
@@ -81,7 +113,7 @@ func (c *aPIServices) Update(aPIService *apiregistration.APIService) (result *ap
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *aPIServices) UpdateStatus(aPIService *apiregistration.APIService) (result *apiregistration.APIService, err error) {
 	result = &apiregistration.APIService{}
@@ -113,38 +145,6 @@ func (c *aPIServices) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the aPIService, and returns the corresponding aPIService object, and an error if there is any.
-func (c *aPIServices) Get(name string, options v1.GetOptions) (result *apiregistration.APIService, err error) {
-	result = &apiregistration.APIService{}
-	err = c.client.Get().
-		Resource("apiservices").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of APIServices that match those selectors.
-func (c *aPIServices) List(opts v1.ListOptions) (result *apiregistration.APIServiceList, err error) {
-	result = &apiregistration.APIServiceList{}
-	err = c.client.Get().
-		Resource("apiservices").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested aPIServices.
-func (c *aPIServices) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Resource("apiservices").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched aPIService.

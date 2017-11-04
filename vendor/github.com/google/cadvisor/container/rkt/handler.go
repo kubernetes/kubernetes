@@ -202,6 +202,15 @@ func (handler *rktContainerHandler) GetSpec() (info.ContainerSpec, error) {
 }
 
 func (handler *rktContainerHandler) getFsStats(stats *info.ContainerStats) error {
+	mi, err := handler.machineInfoFactory.GetMachineInfo()
+	if err != nil {
+		return err
+	}
+
+	if !handler.ignoreMetrics.Has(container.DiskIOMetrics) {
+		common.AssignDeviceNamesToDiskStats((*common.MachineInfoNamer)(mi), &stats.DiskIo)
+	}
+
 	if handler.ignoreMetrics.Has(container.DiskUsageMetrics) {
 		return nil
 	}
@@ -211,10 +220,6 @@ func (handler *rktContainerHandler) getFsStats(stats *info.ContainerStats) error
 		return err
 	}
 
-	mi, err := handler.machineInfoFactory.GetMachineInfo()
-	if err != nil {
-		return err
-	}
 	var limit uint64 = 0
 
 	// Use capacity as limit.

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -11,7 +9,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/test/cmd",
+    deps = ["//vendor/github.com/spf13/cobra:go_default_library"],
 )
 
 go_test(
@@ -21,15 +20,17 @@ go_test(
         "init_test.go",
         "join_test.go",
         "token_test.go",
+        "version_test.go",
     ],
     args = ["--kubeadm-path=../../kubeadm"],
     data = ["//cmd/kubeadm"],
+    importpath = "k8s.io/kubernetes/cmd/kubeadm/test/cmd",
     library = ":go_default_library",
     tags = [
-        "automanaged",
         "integration",
         "skip",
     ],
+    deps = ["//vendor/github.com/ghodss/yaml:go_default_library"],
 )
 
 filegroup(

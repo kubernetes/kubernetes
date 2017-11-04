@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -14,7 +7,8 @@ go_library(
         "timed_store.go",
         "utils.go",
     ],
-    tags = ["automanaged"],
+    importpath = "github.com/google/cadvisor/utils",
+    visibility = ["//visibility:public"],
 )
 
 filegroup(
@@ -34,7 +28,7 @@ filegroup(
         "//vendor/github.com/google/cadvisor/utils/oomparser:all-srcs",
         "//vendor/github.com/google/cadvisor/utils/sysfs:all-srcs",
         "//vendor/github.com/google/cadvisor/utils/sysinfo:all-srcs",
-        "//vendor/github.com/google/cadvisor/utils/tail:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

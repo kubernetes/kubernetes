@@ -110,6 +110,7 @@ kubernetes.tar.gz
 # generated files in any directory
 # TODO(thockin): uncomment this when we stop committing the generated files.
 #zz_generated.*
+zz_generated.openapi.go
 
 # make-related metadata
 /.make/
@@ -118,6 +119,9 @@ kubernetes.tar.gz
 
 # This file used by some vendor repos (e.g. github.com/go-openapi/...) to store secret variables and should not be ignored
 !\.drone\.sec
+
+# Godeps workspace
+/Godeps/_workspace
 
 /bazel-*
 *.pyc

@@ -3,23 +3,18 @@
   {% set daemon_args = "" -%}
 {% endif -%}
 
-{% if grains.api_servers is defined -%}
-  {% set api_servers = "--api-servers=https://" + grains.api_servers -%}
-{% elif grains.apiservers is defined -%} # TODO(remove after 0.16.0): Deprecated form
-  {% set api_servers = "--api-servers=https://" + grains.apiservers -%}
-{% elif grains['roles'][0] == 'kubernetes-master' -%}
-  {% set master_ipv4 = salt['grains.get']('fqdn_ip4')[0] -%}
-  {% set api_servers = "--api-servers=https://" + master_ipv4 -%}
-{% else -%}
-  {% set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() -%}
-  {% set api_servers = "--api-servers=https://" + ips[0][0] -%}
-{% endif -%}
 
-# TODO: remove nginx for other cloud providers.
-{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant', 'photon-controller', 'openstack', 'azure-legacy']  %}
-  {% set api_servers_with_port = api_servers -%}
+# kubeconfig file
+{% set require_kubeconfig = "" %}
+{% if grains.kubelet_bootstrap_kubeconfig is defined -%}
+  {% set bootstrap_kubeconfig = "--bootstrap-kubeconfig=" + grains.kubelet_bootstrap_kubeconfig -%}
 {% else -%}
-  {% set api_servers_with_port = api_servers + ":6443" -%}
+  {% set bootstrap_kubeconfig = "" -%}
+{% endif -%}
+{% if grains.kubelet_kubeconfig is defined -%}
+  {% set kubeconfig = "--kubeconfig=" + grains.kubelet_kubeconfig -%}
+{% else -%}
+  {% set kubeconfig = "" -%}
 {% endif -%}
 
 {% set master_kubelet_args = "" %}
@@ -28,14 +23,10 @@
 
 {% if grains['roles'][0] == 'kubernetes-master' -%}
   {% if grains.cloud in ['aws', 'gce', 'vagrant', 'photon-controller', 'openstack', 'azure-legacy'] -%}
-
     # Unless given a specific directive, disable registration for the kubelet
     # running on the master.
-    {% if grains.kubelet_api_servers is defined -%}
-      {% set api_servers_with_port = "--api-servers=https://" + grains.kubelet_api_servers -%}
+    {% if kubeconfig != "" -%}
       {% set master_kubelet_args = master_kubelet_args + "--register-schedulable=false" -%}
-    {% else -%}
-      {% set api_servers_with_port = "" -%}
     {% endif -%}
 
     # Disable the debugging handlers (/run and /exec) to prevent arbitrary
@@ -113,7 +104,7 @@
 {% if grains['roles'][0] == 'kubernetes-master' %}
   {% if grains.get('cbr-cidr') %}
     {% set pod_cidr = "--pod-cidr=" + grains['cbr-cidr'] %}
-  {% elif api_servers_with_port == '' and pillar.get('network_provider', '').lower() == 'kubenet' %}
+  {% elif kubeconfig == "" and pillar.get('network_provider', '').lower() == 'kubenet' %}
     # Kubelet standalone mode needs a PodCIDR since there is no controller-manager
     {% set pod_cidr = "--pod-cidr=10.76.0.0/16" %}
   {% endif -%}
@@ -138,11 +129,11 @@
 {% if pillar.get('network_provider', '').lower() == 'opencontrail' %}
   {% set network_plugin = "--network-plugin=opencontrail" %}
 {% elif pillar.get('network_provider', '').lower() == 'cni' %}
-  {% set network_plugin = "--network-plugin=cni --network-plugin-dir=/etc/cni/net.d/" %}
-{%elif pillar.get('network_policy_provider', '').lower() == 'calico' and grains['roles'][0] != 'kubernetes-master' -%}
-  {% set network_plugin = "--network-plugin=cni --network-plugin-dir=/etc/cni/net.d/" %}
+  {% set network_plugin = "--network-plugin=cni --cni-conf-dir=/etc/cni/net.d/ --cni-bin-dir=/home/kubernetes/bin/" %}
+{% elif pillar.get('network_policy_provider', '').lower() == 'calico' and grains['roles'][0] != 'kubernetes-master' %}
+  {% set network_plugin = "--network-plugin=cni --cni-conf-dir=/etc/cni/net.d/ --cni-bin-dir=/home/kubernetes/bin/" %}
 {% elif pillar.get('network_provider', '').lower() == 'kubenet' %}
-  {% set network_plugin = "--network-plugin=kubenet" -%}
+  {% set network_plugin = "--network-plugin=kubenet --cni-bin-dir=/home/kubernetes/bin/" -%}
 {% endif -%}
 
 # Don't pipe the --hairpin-mode flag by default. This allows the kubelet to pick
@@ -156,11 +147,6 @@
   {% set hairpin_mode = "--hairpin-mode=none" -%}
 {% elif pillar['hairpin_mode'] is defined and pillar['hairpin_mode'] in ['promiscuous-bridge', 'hairpin-veth', 'none'] -%}
   {% set hairpin_mode = "--hairpin-mode=" + pillar['hairpin_mode'] -%}
-{% endif -%}
-
-{% set babysit_daemons = "" -%}
-{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce' ]  %}
-  {% set babysit_daemons = "--babysit-daemons=true" -%}
 {% endif -%}
 
 {% set kubelet_port = "" -%}
@@ -178,9 +164,23 @@
   {% set enable_custom_metrics="--enable-custom-metrics=" + pillar['enable_custom_metrics'] %}
 {% endif -%}
 
-{% set node_labels = "" %}
-{% if pillar['node_labels'] is defined -%}
-  {% set node_labels="--node-labels=" + pillar['node_labels'] %}
+{% set kube_proxy_ds_label = "" %}
+{% if grains['roles'][0] != 'kubernetes-master' and pillar.get('kube_proxy_daemonset', '').lower() == 'true' %}
+  # Add kube-proxy daemonset label to node to avoid situation during cluster
+  # upgrade/downgrade when there are two instances of kube-proxy running on a node.
+  {% set kube_proxy_ds_label = "beta.kubernetes.io/kube-proxy-ds-ready=true," %}
+{% endif %}
+{% set node_labels = kube_proxy_ds_label + pillar['node_labels'] %}
+{% if grains['roles'][0] != 'kubernetes-master' and pillar['non_master_node_labels'] is defined -%}
+  {% set node_labels = pillar['non_master_node_labels'] + "," + node_labels %}
+{% endif %}
+{% if node_labels != "" %}
+  {% set node_labels="--node-labels=" + node_labels %}
+{% endif %}
+
+{% set node_taints = "" %}
+{% if pillar['node_taints'] is defined -%}
+  {% set node_taints="--register-with-taints=" + pillar['node_taints'] %}
 {% endif -%}
 
 {% set eviction_hard = "" %}
@@ -189,6 +189,7 @@
 {% endif -%}
 
 {% set kubelet_auth = "--anonymous-auth=false --authorization-mode=Webhook --client-ca-file=" + pillar.get('ca_cert_bundle_path', '/var/lib/kubelet/ca.crt') %}
+{% set pki=" --cert-dir=/var/lib/kubelet/pki" -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
-DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{cloud_config}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}}  {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{ hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{node_labels}} {{babysit_daemons}} {{eviction_hard}} {{kubelet_auth}} {{feature_gates}} {{test_args}}"
+DAEMON_ARGS="{{daemon_args}} {{bootstrap_kubeconfig}} {{kubeconfig}} {{require_kubeconfig}} {{debugging_handlers}} {{hostname_override}} {{cloud_provider}} {{cloud_config}} {{config}} {{manifest_url}} --allow-privileged={{pillar['allow_privileged']}} {{log_level}} {{cluster_dns}} {{cluster_domain}} {{docker_root}} {{kubelet_root}}  {{non_masquerade_cidr}} {{cgroup_root}} {{system_container}} {{pod_cidr}} {{ master_kubelet_args }} {{cpu_cfs_quota}} {{network_plugin}} {{kubelet_port}} {{ hairpin_mode }} {{enable_custom_metrics}} {{runtime_container}} {{kubelet_container}} {{node_labels}} {{node_taints}} {{eviction_hard}} {{kubelet_auth}} {{pki}} {{feature_gates}} {{test_args}}"

@@ -100,8 +100,9 @@ func NewSSHTunnelFromBytes(user string, privateKey []byte, host string) (*SSHTun
 
 func makeSSHTunnel(user string, signer ssh.Signer, host string) (*SSHTunnel, error) {
 	config := ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		User:            user,
+		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 	return &SSHTunnel{
 		Config:  &config,
@@ -208,8 +209,9 @@ func runSSHCommand(dialer sshDialer, cmd, user, host string, signer ssh.Signer, 
 	}
 	// Setup the config, dial the server, and open a session.
 	config := &ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		User:            user,
+		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 	client, err := dialer.Dial("tcp", host, config)
 	if err != nil && retry {

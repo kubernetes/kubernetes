@@ -1,5 +1,3 @@
-// +build integration,!no-etcd
-
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -25,16 +23,21 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/test/integration/framework"
+)
+
+const (
+	pollInterval = 100 * time.Millisecond
+	pollTimeout  = 60 * time.Second
 )
 
 func testLabels() map[string]string {
@@ -101,8 +104,8 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 // controllers and pods are rcNum and podNum. It returns error if the
 // communication with the API server fails.
 func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespace string, rcNum, podNum int) (bool, error) {
-	rcClient := clientSet.Core().ReplicationControllers(namespace)
-	podClient := clientSet.Core().Pods(namespace)
+	rcClient := clientSet.CoreV1().ReplicationControllers(namespace)
+	podClient := clientSet.CoreV1().Pods(namespace)
 	pods, err := podClient.List(metav1.ListOptions{})
 	if err != nil {
 		return false, fmt.Errorf("Failed to list pods: %v", err)
@@ -123,9 +126,9 @@ func verifyRemainingObjects(t *testing.T, clientSet clientset.Interface, namespa
 	return ret, nil
 }
 
-func rmSetup(t *testing.T, stopCh chan struct{}) (*httptest.Server, *replication.ReplicationManager, informers.SharedInformerFactory, clientset.Interface) {
+func rmSetup(t *testing.T, stopCh chan struct{}) (*httptest.Server, framework.CloseFunc, *replication.ReplicationManager, informers.SharedInformerFactory, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s := framework.RunAMaster(masterConfig)
+	_, s, closeFn := framework.RunAMaster(masterConfig)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)
@@ -138,14 +141,14 @@ func rmSetup(t *testing.T, stopCh chan struct{}) (*httptest.Server, *replication
 	rm := replication.NewReplicationManager(informers.Core().V1().Pods(), informers.Core().V1().ReplicationControllers(), clientSet, replication.BurstReplicas)
 	informers.Start(stopCh)
 
-	return s, rm, informers, clientSet
+	return s, closeFn, rm, informers, clientSet
 }
 
 // wait for the podInformer to observe the pods. Call this function before
 // running the RC manager to prevent the rc manager from creating new pods
 // rather than adopting the existing ones.
 func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podNum int) {
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		objects := podInformer.GetIndexer().List()
 		if len(objects) == podNum {
 			return true, nil
@@ -209,12 +212,13 @@ func TestAdoption(t *testing.T) {
 	}
 	for i, tc := range testCases {
 		stopCh := make(chan struct{})
-		s, rm, informers, clientSet := rmSetup(t, stopCh)
+		s, closeFn, rm, informers, clientSet := rmSetup(t, stopCh)
+		defer closeFn()
 		ns := framework.CreateTestingNamespace(fmt.Sprintf("adoption-%d", i), s, t)
 		defer framework.DeleteTestingNamespace(ns, s, t)
 
-		rcClient := clientSet.Core().ReplicationControllers(ns.Name)
-		podClient := clientSet.Core().Pods(ns.Name)
+		rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
+		podClient := clientSet.CoreV1().Pods(ns.Name)
 		const rcName = "rc"
 		rc, err := rcClient.Create(newRC(rcName, ns.Name, 1))
 		if err != nil {
@@ -231,7 +235,7 @@ func TestAdoption(t *testing.T) {
 		informers.Start(stopCh)
 		waitToObservePods(t, informers.Core().V1().Pods().Informer(), 1)
 		go rm.Run(5, stopCh)
-		if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+		if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 			updatedPod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, err
@@ -250,8 +254,8 @@ func TestAdoption(t *testing.T) {
 }
 
 func createRCsPods(t *testing.T, clientSet clientset.Interface, rcs []*v1.ReplicationController, pods []*v1.Pod, ns string) {
-	rcClient := clientSet.Core().ReplicationControllers(ns)
-	podClient := clientSet.Core().Pods(ns)
+	rcClient := clientSet.CoreV1().ReplicationControllers(ns)
+	podClient := clientSet.CoreV1().Pods(ns)
 	for _, rc := range rcs {
 		if _, err := rcClient.Create(rc); err != nil {
 			t.Fatalf("Failed to create replication controller %s: %v", rc.Name, err)
@@ -265,8 +269,8 @@ func createRCsPods(t *testing.T, clientSet clientset.Interface, rcs []*v1.Replic
 }
 
 func waitRCStable(t *testing.T, clientSet clientset.Interface, rc *v1.ReplicationController, ns string) {
-	rcClient := clientSet.Core().ReplicationControllers(ns)
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	rcClient := clientSet.CoreV1().ReplicationControllers(ns)
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		updatedRC, err := rcClient.Get(rc.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -286,7 +290,8 @@ func TestUpdateSelectorToAdopt(t *testing.T) {
 	// matches pod1 only; change the selector to match pod2 as well. Verify
 	// there is only one pod left.
 	stopCh := make(chan struct{})
-	s, rm, _, clientSet := rmSetup(t, stopCh)
+	s, closeFn, rm, _, clientSet := rmSetup(t, stopCh)
+	defer closeFn()
 	ns := framework.CreateTestingNamespace("update-selector-to-adopt", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 	rc := newRC("rc", ns.Name, 1)
@@ -304,14 +309,14 @@ func TestUpdateSelectorToAdopt(t *testing.T) {
 
 	// change the rc's selector to match both pods
 	patch := `{"spec":{"selector":{"uniqueKey":null}}}`
-	rcClient := clientSet.Core().ReplicationControllers(ns.Name)
+	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
 	rc, err := rcClient.Patch(rc.Name, types.StrategicMergePatchType, []byte(patch))
 	if err != nil {
 		t.Fatalf("Failed to patch replication controller: %v", err)
 	}
 	t.Logf("patched rc = %#v", rc)
 	// wait for the rc select both pods and delete one of them
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		return verifyRemainingObjects(t, clientSet, ns.Name, 1, 1)
 	}); err != nil {
 		t.Fatal(err)
@@ -325,7 +330,8 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 	// that rc creates one more pod, so there are 3 pods. Also verify that
 	// pod2's controllerRef is cleared.
 	stopCh := make(chan struct{})
-	s, rm, informers, clientSet := rmSetup(t, stopCh)
+	s, closeFn, rm, informers, clientSet := rmSetup(t, stopCh)
+	defer closeFn()
 	ns := framework.CreateTestingNamespace("update-selector-to-remove-controllerref", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 	rc := newRC("rc", ns.Name, 2)
@@ -341,19 +347,19 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 
 	// change the rc's selector to match both pods
 	patch := `{"spec":{"selector":{"uniqueKey":"1"},"template":{"metadata":{"labels":{"uniqueKey":"1"}}}}}`
-	rcClient := clientSet.Core().ReplicationControllers(ns.Name)
+	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
 	rc, err := rcClient.Patch(rc.Name, types.StrategicMergePatchType, []byte(patch))
 	if err != nil {
 		t.Fatalf("Failed to patch replication controller: %v", err)
 	}
 	t.Logf("patched rc = %#v", rc)
 	// wait for the rc to create one more pod
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		return verifyRemainingObjects(t, clientSet, ns.Name, 1, 3)
 	}); err != nil {
 		t.Fatal(err)
 	}
-	podClient := clientSet.Core().Pods(ns.Name)
+	podClient := clientSet.CoreV1().Pods(ns.Name)
 	pod2, err = podClient.Get(pod2.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get pod2: %v", err)
@@ -370,7 +376,8 @@ func TestUpdateLabelToRemoveControllerRef(t *testing.T) {
 	// that rc creates one more pod, so there are 3 pods. Also verify that
 	// pod2's controllerRef is cleared.
 	stopCh := make(chan struct{})
-	s, rm, _, clientSet := rmSetup(t, stopCh)
+	s, closeFn, rm, _, clientSet := rmSetup(t, stopCh)
+	defer closeFn()
 	ns := framework.CreateTestingNamespace("update-label-to-remove-controllerref", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 	rc := newRC("rc", ns.Name, 2)
@@ -383,14 +390,14 @@ func TestUpdateLabelToRemoveControllerRef(t *testing.T) {
 
 	// change the rc's selector to match both pods
 	patch := `{"metadata":{"labels":{"name":null}}}`
-	podClient := clientSet.Core().Pods(ns.Name)
+	podClient := clientSet.CoreV1().Pods(ns.Name)
 	pod2, err := podClient.Patch(pod2.Name, types.StrategicMergePatchType, []byte(patch))
 	if err != nil {
 		t.Fatalf("Failed to patch pod2: %v", err)
 	}
 	t.Logf("patched pod2 = %#v", pod2)
 	// wait for the rc to create one more pod
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		return verifyRemainingObjects(t, clientSet, ns.Name, 1, 3)
 	}); err != nil {
 		t.Fatal(err)
@@ -411,7 +418,8 @@ func TestUpdateLabelToBeAdopted(t *testing.T) {
 	// controller adopts pod2 and delete one of them, so there is only 1 pod
 	// left.
 	stopCh := make(chan struct{})
-	s, rm, _, clientSet := rmSetup(t, stopCh)
+	s, closeFn, rm, _, clientSet := rmSetup(t, stopCh)
+	defer closeFn()
 	ns := framework.CreateTestingNamespace("update-label-to-be-adopted", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 	rc := newRC("rc", ns.Name, 1)
@@ -429,14 +437,14 @@ func TestUpdateLabelToBeAdopted(t *testing.T) {
 
 	// change the rc's selector to match both pods
 	patch := `{"metadata":{"labels":{"uniqueKey":"1"}}}`
-	podClient := clientSet.Core().Pods(ns.Name)
+	podClient := clientSet.CoreV1().Pods(ns.Name)
 	pod2, err := podClient.Patch(pod2.Name, types.StrategicMergePatchType, []byte(patch))
 	if err != nil {
 		t.Fatalf("Failed to patch pod2: %v", err)
 	}
 	t.Logf("patched pod2 = %#v", pod2)
 	// wait for the rc to select both pods and delete one of them
-	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		return verifyRemainingObjects(t, clientSet, ns.Name, 1, 1)
 	}); err != nil {
 		t.Fatal(err)

@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/arm/containerregistry"
@@ -66,7 +67,7 @@ func Test(t *testing.T) {
 	provider := &acrProvider{
 		registryClient: fakeClient,
 	}
-	provider.loadConfig([]byte(configStr))
+	provider.loadConfig(bytes.NewBufferString(configStr))
 
 	creds := provider.Provide()
 

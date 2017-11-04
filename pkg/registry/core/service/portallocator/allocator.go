@@ -34,6 +34,9 @@ type Interface interface {
 	AllocateNext() (int, error)
 	Release(int) error
 	ForEach(func(int))
+
+	// For testing
+	Has(int) bool
 }
 
 var (

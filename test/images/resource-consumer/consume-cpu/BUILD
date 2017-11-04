@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_binary",
@@ -10,14 +8,14 @@ load(
 
 go_binary(
     name = "consume-cpu",
+    importpath = "k8s.io/kubernetes/test/images/resource-consumer/consume-cpu",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["consume_cpu.go"],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/test/images/resource-consumer/consume-cpu",
     deps = ["//vendor/bitbucket.org/bertimus9/systemstat:go_default_library"],
 )
 

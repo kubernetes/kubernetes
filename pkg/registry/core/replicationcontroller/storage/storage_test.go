@@ -55,7 +55,7 @@ func newStorage(t *testing.T) (ControllerStorage, *etcdtesting.EtcdTestServer) {
 // createController is a helper function that returns a controller with the updated resource version.
 func createController(storage *REST, rc api.ReplicationController, t *testing.T) (api.ReplicationController, error) {
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), rc.Namespace)
-	obj, err := storage.Create(ctx, &rc)
+	obj, err := storage.Create(ctx, &rc, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Errorf("Failed to create controller, %v", err)
 	}
@@ -173,7 +173,7 @@ func TestGenerationNumber(t *testing.T) {
 
 	// Updates to spec should increment the generation number
 	controller.Spec.Replicas += 1
-	storage.Controller.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller, api.Scheme))
+	storage.Controller.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestGenerationNumber(t *testing.T) {
 
 	// Updates to status should not increment either spec or status generation numbers
 	controller.Status.Replicas += 1
-	storage.Controller.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller, api.Scheme))
+	storage.Controller.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestScaleUpdate(t *testing.T) {
 		},
 	}
 
-	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil {
+	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
 		t.Fatalf("error updating scale %v: %v", update, err)
 	}
 	obj, err := storage.Scale.Get(ctx, name, &metav1.GetOptions{})
@@ -323,7 +323,7 @@ func TestScaleUpdate(t *testing.T) {
 	update.ResourceVersion = rc.ResourceVersion
 	update.Spec.Replicas = 15
 
-	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil && !errors.IsConflict(err) {
+	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil && !errors.IsConflict(err) {
 		t.Fatalf("unexpected error, expecting an update conflict but got %v", err)
 	}
 }
@@ -334,4 +334,12 @@ func TestShortNames(t *testing.T) {
 	defer storage.Controller.Store.DestroyFunc()
 	expected := []string{"rc"}
 	registrytest.AssertShortNames(t, storage.Controller, expected)
+}
+
+func TestCategories(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Controller.Store.DestroyFunc()
+	expected := []string{"all"}
+	registrytest.AssertCategories(t, storage.Controller, expected)
 }

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_binary",
@@ -10,14 +8,14 @@ load(
 
 go_binary(
     name = "netexec",
+    importpath = "k8s.io/kubernetes/test/images/netexec",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["netexec.go"],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/test/images/netexec",
     deps = ["//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library"],
 )
 

@@ -19,6 +19,7 @@ package watch_test
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	. "k8s.io/apimachinery/pkg/watch"
 )
@@ -26,6 +27,7 @@ import (
 type testType string
 
 func (obj testType) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (obj testType) DeepCopyObject() runtime.Object   { return obj }
 
 func TestFake(t *testing.T) {
 	f := NewFake()

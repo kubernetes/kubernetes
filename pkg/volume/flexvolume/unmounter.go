@@ -21,9 +21,9 @@ import (
 	"os"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/utils/exec"
 )
 
 // FlexVolumeUnmounter is the disk that will be cleaned by this plugin.
@@ -51,22 +51,14 @@ func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 		return nil
 	}
 
-	notmnt, err := isNotMounted(f.mounter, dir)
+	call := f.plugin.NewDriverCall(unmountCmd)
+	call.Append(dir)
+	_, err := call.Run()
+	if isCmdNotSupportedErr(err) {
+		err = (*unmounterDefaults)(f).TearDownAt(dir)
+	}
 	if err != nil {
 		return err
-	}
-	if notmnt {
-		glog.Warningf("Warning: Path: %v already unmounted", dir)
-	} else {
-		call := f.plugin.NewDriverCall(unmountCmd)
-		call.Append(dir)
-		_, err := call.Run()
-		if isCmdNotSupportedErr(err) {
-			err = (*unmounterDefaults)(f).TearDownAt(dir)
-		}
-		if err != nil {
-			return err
-		}
 	}
 
 	// Flexvolume driver may remove the directory. Ignore if it does.

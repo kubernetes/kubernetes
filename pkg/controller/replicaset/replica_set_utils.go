@@ -24,12 +24,12 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
+	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api/v1"
+	unversionedextensions "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	unversionedextensions "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/extensions/v1beta1"
 )
 
 // updateReplicaSetStatus attempts to update the Status.Replicas of the given ReplicaSet, with a single GET/PUT retry.
@@ -126,7 +126,7 @@ func calculateStatus(rs *extensions.ReplicaSet, filteredPods []*v1.Pod, manageRe
 	return newStatus
 }
 
-// NewReplicaSetCondition creates a new replica set condition.
+// NewReplicaSetCondition creates a new replicaset condition.
 func NewReplicaSetCondition(condType extensions.ReplicaSetConditionType, status v1.ConditionStatus, reason, msg string) extensions.ReplicaSetCondition {
 	return extensions.ReplicaSetCondition{
 		Type:               condType,
@@ -137,10 +137,9 @@ func NewReplicaSetCondition(condType extensions.ReplicaSetConditionType, status 
 	}
 }
 
-// GetCondition returns a replica set condition with the provided type if it exists.
+// GetCondition returns a replicaset condition with the provided type if it exists.
 func GetCondition(status extensions.ReplicaSetStatus, condType extensions.ReplicaSetConditionType) *extensions.ReplicaSetCondition {
-	for i := range status.Conditions {
-		c := status.Conditions[i]
+	for _, c := range status.Conditions {
 		if c.Type == condType {
 			return &c
 		}
@@ -148,7 +147,7 @@ func GetCondition(status extensions.ReplicaSetStatus, condType extensions.Replic
 	return nil
 }
 
-// SetCondition adds/replaces the given condition in the replica set status. If the condition that we
+// SetCondition adds/replaces the given condition in the replicaset status. If the condition that we
 // are about to add already exists and has the same status and reason then we are not going to update.
 func SetCondition(status *extensions.ReplicaSetStatus, condition extensions.ReplicaSetCondition) {
 	currentCond := GetCondition(*status, condition.Type)
@@ -159,12 +158,12 @@ func SetCondition(status *extensions.ReplicaSetStatus, condition extensions.Repl
 	status.Conditions = append(newConditions, condition)
 }
 
-// RemoveCondition removes the condition with the provided type from the replica set status.
+// RemoveCondition removes the condition with the provided type from the replicaset status.
 func RemoveCondition(status *extensions.ReplicaSetStatus, condType extensions.ReplicaSetConditionType) {
 	status.Conditions = filterOutCondition(status.Conditions, condType)
 }
 
-// filterOutCondition returns a new slice of replica set conditions without conditions with the provided type.
+// filterOutCondition returns a new slice of replicaset conditions without conditions with the provided type.
 func filterOutCondition(conditions []extensions.ReplicaSetCondition, condType extensions.ReplicaSetConditionType) []extensions.ReplicaSetCondition {
 	var newConditions []extensions.ReplicaSetCondition
 	for _, c := range conditions {

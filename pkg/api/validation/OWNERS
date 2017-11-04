@@ -12,21 +12,19 @@ reviewers:
 - mikedanese
 - liggitt
 - nikhiljindal
-- bprashanth
 - gmarek
 - erictune
 - davidopp
 - pmorie
 - sttts
 - quinton-hoole
-- kargakis
 - dchen1107
 - zmerlynn
 - janetkuo
 - justinsb
 - pwittrock
 - roberthbailey
-- timstclair
+- tallclair
 - eparis
 - soltysh
 - piosz
@@ -37,4 +35,3 @@ reviewers:
 - krousey
 - rootfs
 - markturansky
-- vmarmol

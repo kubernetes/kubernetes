@@ -24,14 +24,13 @@ import (
 	"sync"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/authentication/user"
 	apifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
 func createMaxInflightServer(callsWg, blockWg *sync.WaitGroup, disableCallsWg *bool, disableCallsWgMutex *sync.Mutex, nonMutating, mutating int) *httptest.Server {
-
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
 	requestContextMapper := apirequest.NewRequestContextMapper()
@@ -55,10 +54,28 @@ func createMaxInflightServer(callsWg, blockWg *sync.WaitGroup, disableCallsWg *b
 		requestContextMapper,
 		longRunningRequestCheck,
 	)
+	handler = withFakeUser(handler, requestContextMapper)
 	handler = apifilters.WithRequestInfo(handler, requestInfoFactory, requestContextMapper)
 	handler = apirequest.WithRequestContext(handler, requestContextMapper)
 
 	return httptest.NewServer(handler)
+}
+
+func withFakeUser(handler http.Handler, requestContextMapper apirequest.RequestContextMapper) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, ok := requestContextMapper.Get(r)
+		if !ok {
+			handleError(w, r, fmt.Errorf("no context found for request, handler chain must be wrong"))
+			return
+		}
+
+		if len(r.Header["Groups"]) > 0 {
+			requestContextMapper.Update(r, apirequest.WithUser(ctx, &user.DefaultInfo{
+				Groups: r.Header["Groups"],
+			}))
+		}
+		handler.ServeHTTP(w, r)
+	})
 }
 
 // Tests that MaxInFlightLimit works, i.e.
@@ -130,7 +147,7 @@ func TestMaxInFlightNonMutating(t *testing.T) {
 
 	// Do this multiple times to show that rate limit rejected requests don't block.
 	for i := 0; i < 2; i++ {
-		if err := expectHTTPGet(server.URL, errors.StatusTooManyRequests); err != nil {
+		if err := expectHTTPGet(server.URL, http.StatusTooManyRequests); err != nil {
 			t.Error(err)
 		}
 	}
@@ -195,7 +212,7 @@ func TestMaxInFlightMutating(t *testing.T) {
 
 	// Do this multiple times to show that rate limit rejected requests don't block.
 	for i := 0; i < 2; i++ {
-		if err := expectHTTPPost(server.URL+"/foo/bar/", errors.StatusTooManyRequests); err != nil {
+		if err := expectHTTPPost(server.URL+"/foo/bar/", http.StatusTooManyRequests); err != nil {
 			t.Error(err)
 		}
 	}
@@ -228,8 +245,16 @@ func expectHTTPGet(url string, code int) error {
 }
 
 // We use POST as a sample mutating request.
-func expectHTTPPost(url string, code int) error {
-	r, err := http.Post(url, "text/html", strings.NewReader("foo bar"))
+func expectHTTPPost(url string, code int, groups ...string) error {
+	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader("foo bar"))
+	if err != nil {
+		return err
+	}
+	for _, group := range groups {
+		req.Header.Add("Groups", group)
+	}
+
+	r, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("unexpected error: %v", err)
 	}
@@ -237,4 +262,55 @@ func expectHTTPPost(url string, code int) error {
 		return fmt.Errorf("unexpected response: %v", r.StatusCode)
 	}
 	return nil
+}
+
+func TestMaxInFlightSkipsMasters(t *testing.T) {
+	const AllowedMutatingInflightRequestsNo = 3
+
+	calls := &sync.WaitGroup{}
+	calls.Add(AllowedMutatingInflightRequestsNo)
+
+	responses := &sync.WaitGroup{}
+	responses.Add(AllowedMutatingInflightRequestsNo)
+
+	// Block is used to keep requests in flight for as long as we need to. All requests will
+	// be unblocked at the same time.
+	block := &sync.WaitGroup{}
+	block.Add(1)
+
+	waitForCalls := true
+	waitForCallsMutex := sync.Mutex{}
+
+	server := createMaxInflightServer(calls, block, &waitForCalls, &waitForCallsMutex, 1, AllowedMutatingInflightRequestsNo)
+	defer server.Close()
+
+	// These should hang and be accounted, i.e. saturate the server
+	for i := 0; i < AllowedMutatingInflightRequestsNo; i++ {
+		// These should hang waiting on block...
+		go func() {
+			if err := expectHTTPPost(server.URL+"/foo/bar", http.StatusOK); err != nil {
+				t.Error(err)
+			}
+			responses.Done()
+		}()
+	}
+	// We wait for all calls to be received by the server
+	calls.Wait()
+	// Disable calls notifications in the server
+	// Disable calls notifications in the server
+	waitForCallsMutex.Lock()
+	waitForCalls = false
+	waitForCallsMutex.Unlock()
+
+	// Do this multiple times to show that rate limit rejected requests don't block.
+	for i := 0; i < 2; i++ {
+		if err := expectHTTPPost(server.URL+"/dontwait", http.StatusOK, user.SystemPrivilegedGroup); err != nil {
+			t.Error(err)
+		}
+	}
+
+	// Let all hanging requests finish
+	block.Done()
+
+	responses.Wait()
 }

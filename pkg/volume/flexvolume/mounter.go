@@ -17,11 +17,11 @@ limitations under the License.
 package flexvolume
 
 import (
+	"os"
 	"strconv"
 
-	"k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/utils/exec"
 )
 
 // FlexVolumeMounter is the disk that will be exposed by this plugin.
@@ -29,9 +29,6 @@ type flexVolumeMounter struct {
 	*flexVolume
 	// Runner used to setup the volume.
 	runner exec.Interface
-	// blockDeviceMounter provides the interface to create filesystem if the
-	// filesystem doesn't exist.
-	blockDeviceMounter mount.Interface
 	// the considered volume spec
 	spec     *volume.Spec
 	readOnly bool
@@ -65,14 +62,22 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	extraOptions := make(map[string]string)
 
+	// pod metadata
+	extraOptions[optionKeyPodName] = f.podName
+	extraOptions[optionKeyPodNamespace] = f.podNamespace
+	extraOptions[optionKeyPodUID] = string(f.podUID)
+	// service account metadata
+	extraOptions[optionKeyServiceAccountName] = f.podServiceAccountName
+
 	// Extract secret and pass it as options.
 	if err := addSecretsToOptions(extraOptions, f.spec, f.podNamespace, f.driverName, f.plugin.host); err != nil {
+		os.Remove(dir)
 		return err
 	}
 
 	// Implicit parameters
 	if fsGroup != nil {
-		extraOptions[optionFSGroup] = strconv.FormatInt(*fsGroup, 10)
+		extraOptions[optionFSGroup] = strconv.FormatInt(int64(*fsGroup), 10)
 	}
 
 	call.AppendSpec(f.spec, f.plugin.host, extraOptions)
@@ -83,6 +88,7 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	if err != nil {
+		os.Remove(dir)
 		return err
 	}
 

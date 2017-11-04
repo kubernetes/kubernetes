@@ -43,11 +43,49 @@ func (r TenantPage) NextPageURL() (string, error) {
 	return gophercloud.ExtractNextURL(s.Links)
 }
 
-// ExtractTenants returns a slice of Tenants contained in a single page of results.
+// ExtractTenants returns a slice of Tenants contained in a single page of
+// results.
 func ExtractTenants(r pagination.Page) ([]Tenant, error) {
 	var s struct {
 		Tenants []Tenant `json:"tenants"`
 	}
 	err := (r.(TenantPage)).ExtractInto(&s)
 	return s.Tenants, err
+}
+
+type tenantResult struct {
+	gophercloud.Result
+}
+
+// Extract interprets any tenantResults as a Tenant.
+func (r tenantResult) Extract() (*Tenant, error) {
+	var s struct {
+		Tenant *Tenant `json:"tenant"`
+	}
+	err := r.ExtractInto(&s)
+	return s.Tenant, err
+}
+
+// GetResult is the response from a Get request. Call its Extract method to
+// interpret it as a Tenant.
+type GetResult struct {
+	tenantResult
+}
+
+// CreateResult is the response from a Create request. Call its Extract method
+// to interpret it as a Tenant.
+type CreateResult struct {
+	tenantResult
+}
+
+// DeleteResult is the response from a Get request. Call its ExtractErr method
+// to determine if the call succeeded or failed.
+type DeleteResult struct {
+	gophercloud.ErrResult
+}
+
+// UpdateResult is the response from a Update request. Call its Extract method
+// to interpret it as a Tenant.
+type UpdateResult struct {
+	tenantResult
 }

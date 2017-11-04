@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
+	extensions_v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1beta1 "k8s.io/client-go/listers/extensions/v1beta1"
-	extensions_v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
 	time "time"
 )
@@ -41,8 +41,11 @@ type podSecurityPolicyInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newPodSecurityPolicyInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewPodSecurityPolicyInformer constructs a new informer for PodSecurityPolicy type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewPodSecurityPolicyInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return client.ExtensionsV1beta1().PodSecurityPolicies().List(options)
@@ -53,14 +56,16 @@ func newPodSecurityPolicyInformer(client kubernetes.Interface, resyncPeriod time
 		},
 		&extensions_v1beta1.PodSecurityPolicy{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultPodSecurityPolicyInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewPodSecurityPolicyInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *podSecurityPolicyInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&extensions_v1beta1.PodSecurityPolicy{}, newPodSecurityPolicyInformer)
+	return f.factory.InformerFor(&extensions_v1beta1.PodSecurityPolicy{}, defaultPodSecurityPolicyInformer)
 }
 
 func (f *podSecurityPolicyInformer) Lister() v1beta1.PodSecurityPolicyLister {

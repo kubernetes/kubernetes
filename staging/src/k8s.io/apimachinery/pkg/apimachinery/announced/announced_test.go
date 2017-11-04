@@ -30,7 +30,6 @@ func TestFactoryRegistry(t *testing.T) {
 	if err := regA.AnnounceGroup(&GroupMetaFactoryArgs{
 		GroupName:              "foo",
 		VersionPreferenceOrder: []string{"v2", "v1"},
-		ImportPrefix:           "pkg/apis/foo",
 		RootScopedKinds:        sets.NewString("namespaces"),
 	}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -52,7 +51,6 @@ func TestFactoryRegistry(t *testing.T) {
 		&GroupMetaFactoryArgs{
 			GroupName:              "foo",
 			VersionPreferenceOrder: []string{"v2", "v1"},
-			ImportPrefix:           "pkg/apis/foo",
 			RootScopedKinds:        sets.NewString("namespaces"),
 		},
 		VersionToSchemeFunc{"v1": nil, "v2": nil},

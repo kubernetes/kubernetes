@@ -28,6 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/validation"
 )
 
@@ -39,7 +40,7 @@ type persistentvolumeclaimStrategy struct {
 
 // Strategy is the default logic that applies when creating and updating PersistentVolumeClaim
 // objects via the REST API.
-var Strategy = persistentvolumeclaimStrategy{api.Scheme, names.SimpleNameGenerator}
+var Strategy = persistentvolumeclaimStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 func (persistentvolumeclaimStrategy) NamespaceScoped() bool {
 	return true
@@ -98,12 +99,12 @@ func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx genericapirequest.
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
+func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, bool, error) {
 	persistentvolumeclaimObj, ok := obj.(*api.PersistentVolumeClaim)
 	if !ok {
-		return nil, nil, fmt.Errorf("not a persistentvolumeclaim")
+		return nil, nil, false, fmt.Errorf("not a persistentvolumeclaim")
 	}
-	return labels.Set(persistentvolumeclaimObj.Labels), PersistentVolumeClaimToSelectableFields(persistentvolumeclaimObj), nil
+	return labels.Set(persistentvolumeclaimObj.Labels), PersistentVolumeClaimToSelectableFields(persistentvolumeclaimObj), persistentvolumeclaimObj.Initializers != nil, nil
 }
 
 // MatchPersistentVolumeClaim returns a generic matcher for a given label and field selector.

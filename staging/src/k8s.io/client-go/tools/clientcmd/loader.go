@@ -47,8 +47,11 @@ const (
 	RecommendedSchemaName       = "schema"
 )
 
-var RecommendedHomeFile = path.Join(homedir.HomeDir(), RecommendedHomeDir, RecommendedFileName)
-var RecommendedSchemaFile = path.Join(homedir.HomeDir(), RecommendedHomeDir, RecommendedSchemaName)
+var (
+	RecommendedConfigDir  = path.Join(homedir.HomeDir(), RecommendedHomeDir)
+	RecommendedHomeFile   = path.Join(RecommendedConfigDir, RecommendedFileName)
+	RecommendedSchemaFile = path.Join(RecommendedConfigDir, RecommendedSchemaName)
+)
 
 // currentMigrationRules returns a map that holds the history of recommended home directories used in previous versions.
 // Any future changes to RecommendedHomeFile and related are expected to add a migration rule here, in order to make

@@ -180,7 +180,6 @@ func (c *Config) Exchange(ctx context.Context, code string) (*Token, error) {
 		"grant_type":   {"authorization_code"},
 		"code":         {code},
 		"redirect_uri": internal.CondVal(c.RedirectURL),
-		"scope":        internal.CondVal(strings.Join(c.Scopes, " ")),
 	})
 }
 

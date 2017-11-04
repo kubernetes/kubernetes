@@ -1,3 +1,5 @@
+// +build windows
+
 package winio
 
 import (
@@ -26,8 +28,16 @@ const (
 	BackupReparseData
 	BackupSparseBlock
 	BackupTxfsData
+)
 
+const (
 	StreamSparseAttributes = uint32(8)
+)
+
+const (
+	WRITE_DAC              = 0x40000
+	WRITE_OWNER            = 0x80000
+	ACCESS_SYSTEM_SECURITY = 0x1000000
 )
 
 // BackupHeader represents a backup stream of a file.
@@ -58,10 +68,20 @@ func NewBackupStreamReader(r io.Reader) *BackupStreamReader {
 	return &BackupStreamReader{r, 0}
 }
 
-// Next returns the next backup stream and prepares for calls to Write(). It skips the remainder of the current stream if
+// Next returns the next backup stream and prepares for calls to Read(). It skips the remainder of the current stream if
 // it was not completely read.
 func (r *BackupStreamReader) Next() (*BackupHeader, error) {
 	if r.bytesLeft > 0 {
+		if s, ok := r.r.(io.Seeker); ok {
+			// Make sure Seek on io.SeekCurrent sometimes succeeds
+			// before trying the actual seek.
+			if _, err := s.Seek(0, io.SeekCurrent); err == nil {
+				if _, err = s.Seek(r.bytesLeft, io.SeekCurrent); err != nil {
+					return nil, err
+				}
+				r.bytesLeft = 0
+			}
+		}
 		if _, err := io.Copy(ioutil.Discard, r); err != nil {
 			return nil, err
 		}
@@ -175,7 +195,6 @@ type BackupFileReader struct {
 // Read will attempt to read the security descriptor of the file.
 func NewBackupFileReader(f *os.File, includeSecurity bool) *BackupFileReader {
 	r := &BackupFileReader{f, includeSecurity, 0}
-	runtime.SetFinalizer(r, func(r *BackupFileReader) { r.Close() })
 	return r
 }
 
@@ -186,6 +205,7 @@ func (r *BackupFileReader) Read(b []byte) (int, error) {
 	if err != nil {
 		return 0, &os.PathError{"BackupRead", r.f.Name(), err}
 	}
+	runtime.KeepAlive(r.f)
 	if bytesRead == 0 {
 		return 0, io.EOF
 	}
@@ -197,6 +217,7 @@ func (r *BackupFileReader) Read(b []byte) (int, error) {
 func (r *BackupFileReader) Close() error {
 	if r.ctx != 0 {
 		backupRead(syscall.Handle(r.f.Fd()), nil, nil, true, false, &r.ctx)
+		runtime.KeepAlive(r.f)
 		r.ctx = 0
 	}
 	return nil
@@ -209,11 +230,10 @@ type BackupFileWriter struct {
 	ctx             uintptr
 }
 
-// NewBackupFileWrtier returns a new BackupFileWriter from a file handle. If includeSecurity is true,
+// NewBackupFileWriter returns a new BackupFileWriter from a file handle. If includeSecurity is true,
 // Write() will attempt to restore the security descriptor from the stream.
 func NewBackupFileWriter(f *os.File, includeSecurity bool) *BackupFileWriter {
 	w := &BackupFileWriter{f, includeSecurity, 0}
-	runtime.SetFinalizer(w, func(w *BackupFileWriter) { w.Close() })
 	return w
 }
 
@@ -224,6 +244,7 @@ func (w *BackupFileWriter) Write(b []byte) (int, error) {
 	if err != nil {
 		return 0, &os.PathError{"BackupWrite", w.f.Name(), err}
 	}
+	runtime.KeepAlive(w.f)
 	if int(bytesWritten) != len(b) {
 		return int(bytesWritten), errors.New("not all bytes could be written")
 	}
@@ -235,7 +256,25 @@ func (w *BackupFileWriter) Write(b []byte) (int, error) {
 func (w *BackupFileWriter) Close() error {
 	if w.ctx != 0 {
 		backupWrite(syscall.Handle(w.f.Fd()), nil, nil, true, false, &w.ctx)
+		runtime.KeepAlive(w.f)
 		w.ctx = 0
 	}
 	return nil
+}
+
+// OpenForBackup opens a file or directory, potentially skipping access checks if the backup
+// or restore privileges have been acquired.
+//
+// If the file opened was a directory, it cannot be used with Readdir().
+func OpenForBackup(path string, access uint32, share uint32, createmode uint32) (*os.File, error) {
+	winPath, err := syscall.UTF16FromString(path)
+	if err != nil {
+		return nil, err
+	}
+	h, err := syscall.CreateFile(&winPath[0], access, share, nil, createmode, syscall.FILE_FLAG_BACKUP_SEMANTICS|syscall.FILE_FLAG_OPEN_REPARSE_POINT, 0)
+	if err != nil {
+		err = &os.PathError{Op: "open", Path: path, Err: err}
+		return nil, err
+	}
+	return os.NewFile(uintptr(h), path), nil
 }

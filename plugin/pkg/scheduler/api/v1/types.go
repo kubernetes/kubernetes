@@ -19,10 +19,13 @@ package v1
 import (
 	"time"
 
+	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	restclient "k8s.io/client-go/rest"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 )
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type Policy struct {
 	metav1.TypeMeta `json:",inline"`
@@ -32,6 +35,10 @@ type Policy struct {
 	Priorities []PriorityPolicy `json:"priorities"`
 	// Holds the information to communicate with the extender(s)
 	ExtenderConfigs []ExtenderConfig `json:"extenders"`
+	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
+	// corresponding to every RequiredDuringScheduling affinity rule.
+	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 1-100.
+	HardPodAffinitySymmetricWeight int `json:"hardPodAffinitySymmetricWeight"`
 }
 
 type PredicatePolicy struct {
@@ -55,7 +62,7 @@ type PriorityPolicy struct {
 	Argument *PriorityArgument `json:"argument"`
 }
 
-// Represents the arguments that the different types of predicates take
+// PredicateArgument represents the arguments to configure predicate functions in scheduler policy configuration.
 // Only one of its members may be specified
 type PredicateArgument struct {
 	// The predicate that provides affinity for pods belonging to a service
@@ -66,7 +73,7 @@ type PredicateArgument struct {
 	LabelsPresence *LabelsPresence `json:"labelsPresence"`
 }
 
-// Represents the arguments that the different types of priorities take.
+// PriorityArgument represents the arguments to configure priority functions in scheduler policy configuration.
 // Only one of its members may be specified
 type PriorityArgument struct {
 	// The priority function that ensures a good spread (anti-affinity) for pods belonging to a service
@@ -77,14 +84,14 @@ type PriorityArgument struct {
 	LabelPreference *LabelPreference `json:"labelPreference"`
 }
 
-// Holds the parameters that are used to configure the corresponding predicate
+// ServiceAffinity holds the parameters that are used to configure the corresponding predicate in scheduler policy configuration.
 type ServiceAffinity struct {
 	// The list of labels that identify node "groups"
 	// All of the labels should match for the node to be considered a fit for hosting the pod
 	Labels []string `json:"labels"`
 }
 
-// Holds the parameters that are used to configure the corresponding predicate
+// LabelsPresence holds the parameters that are used to configure the corresponding predicate in scheduler policy configuration.
 type LabelsPresence struct {
 	// The list of labels that identify node "groups"
 	// All of the labels should be either present (or absent) for the node to be considered a fit for hosting the pod
@@ -93,13 +100,13 @@ type LabelsPresence struct {
 	Presence bool `json:"presence"`
 }
 
-// Holds the parameters that are used to configure the corresponding priority function
+// ServiceAntiAffinity holds the parameters that are used to configure the corresponding priority function
 type ServiceAntiAffinity struct {
 	// Used to identify node "groups"
 	Label string `json:"label"`
 }
 
-// Holds the parameters that are used to configure the corresponding priority function
+// LabelPreference holds the parameters that are used to configure the corresponding priority function
 type LabelPreference struct {
 	// Used to identify node "groups"
 	Label string `json:"label"`
@@ -109,7 +116,7 @@ type LabelPreference struct {
 	Presence bool `json:"presence"`
 }
 
-// Holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
+// ExtenderConfig holds the parameters used to communicate with the extender. If a verb is unspecified/empty,
 // it is assumed that the extender chose not to provide that extension.
 type ExtenderConfig struct {
 	// URLPrefix at which the extender is available
@@ -121,6 +128,10 @@ type ExtenderConfig struct {
 	// The numeric multiplier for the node scores that the prioritize call generates.
 	// The weight should be a positive integer
 	Weight int `json:"weight,omitempty"`
+	// Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
+	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
+	// can implement this function.
+	BindVerb string
 	// EnableHttps specifies whether https should be used to communicate with the extender
 	EnableHttps bool `json:"enableHttps,omitempty"`
 	// TLSConfig specifies the transport layer security config
@@ -162,6 +173,24 @@ type ExtenderFilterResult struct {
 	FailedNodes FailedNodesMap `json:"failedNodes,omitempty"`
 	// Error message indicating failure
 	Error string `json:"error,omitempty"`
+}
+
+// ExtenderBindingArgs represents the arguments to an extender for binding a pod to a node.
+type ExtenderBindingArgs struct {
+	// PodName is the name of the pod being bound
+	PodName string
+	// PodNamespace is the namespace of the pod being bound
+	PodNamespace string
+	// PodUID is the UID of the pod being bound
+	PodUID types.UID
+	// Node selected by the scheduler
+	Node string
+}
+
+// ExtenderBindingResult represents the result of binding of a pod to a node from an extender.
+type ExtenderBindingResult struct {
+	// Error message indicating failure
+	Error string
 }
 
 // HostPriority represents the priority of scheduling to a particular host, higher priority is better.

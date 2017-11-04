@@ -19,11 +19,13 @@ package metricsutil
 import (
 	"fmt"
 	"io"
+	"sort"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/printers"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 )
 
 var (
@@ -58,10 +60,14 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metricsapi.NodeMetrics,
 	w := printers.GetNewTabWriter(printer.out)
 	defer w.Flush()
 
+	sort.Slice(metrics, func(i, j int) bool {
+		return metrics[i].Name < metrics[j].Name
+	})
+
 	printColumnNames(w, NodeColumns)
 	var usage api.ResourceList
 	for _, m := range metrics {
-		err := api.Scheme.Convert(&m.Usage, &usage, nil)
+		err := legacyscheme.Scheme.Convert(&m.Usage, &usage, nil)
 		if err != nil {
 			return err
 		}
@@ -87,6 +93,14 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 	if printContainers {
 		printValue(w, PodColumn)
 	}
+
+	sort.Slice(metrics, func(i, j int) bool {
+		if withNamespace && metrics[i].Namespace != metrics[j].Namespace {
+			return metrics[i].Namespace < metrics[j].Namespace
+		}
+		return metrics[i].Name < metrics[j].Name
+	})
+
 	printColumnNames(w, PodColumns)
 	for _, m := range metrics {
 		err := printSinglePodMetrics(w, &m, printContainers, withNamespace)
@@ -113,7 +127,7 @@ func printSinglePodMetrics(out io.Writer, m *metricsapi.PodMetrics, printContain
 
 	for _, c := range m.Containers {
 		var usage api.ResourceList
-		err := api.Scheme.Convert(&c.Usage, &usage, nil)
+		err := legacyscheme.Scheme.Convert(&c.Usage, &usage, nil)
 		if err != nil {
 			return err
 		}

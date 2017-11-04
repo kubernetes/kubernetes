@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -37,7 +30,8 @@ go_library(
         "uuid.go",
         "volume.go",
     ],
-    tags = ["automanaged"],
+    importpath = "github.com/appc/spec/schema/types",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/appc/spec/schema/common:go_default_library",
         "//vendor/github.com/appc/spec/schema/types/resource:go_default_library",
@@ -59,4 +53,5 @@ filegroup(
         "//vendor/github.com/appc/spec/schema/types/resource:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

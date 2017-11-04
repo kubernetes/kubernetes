@@ -26,21 +26,19 @@ export KUBE_CONFIG_FILE=${KUBE_CONFIG_FILE:-${KUBE_ROOT}/cluster/centos/config-d
 
 function deploy_dns {
   echo "Deploying DNS on Kubernetes"
-  sed -e "s/\\\$DNS_DOMAIN/${DNS_DOMAIN}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-controller.yaml.sed" > kubedns-controller.yaml
-  sed -e "s/\\\$DNS_SERVER_IP/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-svc.yaml.sed" > kubedns-svc.yaml
+  cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns.yaml.sed" kube-dns.yaml
+  sed -i -e "s/\\\$DNS_DOMAIN/${DNS_DOMAIN}/g" kube-dns.yaml
+  sed -i -e "s/\\\$DNS_SERVER_IP/${DNS_SERVER_IP}/g" kube-dns.yaml
 
   KUBEDNS=`eval "${KUBECTL} get services --namespace=kube-system | grep kube-dns | cat"`
       
   if [ ! "$KUBEDNS" ]; then
-    # use kubectl to create kube-dns deployment and service
-    ${KUBECTL} --namespace=kube-system create -f kubedns-sa.yaml
-    ${KUBECTL} --namespace=kube-system create -f kubedns-cm.yaml
-    ${KUBECTL} --namespace=kube-system create -f kubedns-controller.yaml
-    ${KUBECTL} --namespace=kube-system create -f kubedns-svc.yaml
+    # use kubectl to create kube-dns addon
+    ${KUBECTL} --namespace=kube-system create -f kube-dns.yaml
 
-    echo "Kube-dns deployment and service is successfully deployed."
+    echo "Kube-dns addon is successfully deployed."
   else
-    echo "Kube-dns deployment and service is already deployed. Skipping."
+    echo "Kube-dns addon is already deployed. Skipping."
   fi
 
   echo

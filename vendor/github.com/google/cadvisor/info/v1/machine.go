@@ -17,6 +17,10 @@ package v1
 type FsInfo struct {
 	// Block device associated with the filesystem.
 	Device string `json:"device"`
+	// DeviceMajor is the major identifier of the device, used for correlation with blkio stats
+	DeviceMajor uint64 `json:"-"`
+	// DeviceMinor is the minor identifier of the device, used for correlation with blkio stats
+	DeviceMinor uint64 `json:"-"`
 
 	// Total number of bytes available on the filesystem.
 	Capacity uint64 `json:"capacity"`
@@ -90,6 +94,14 @@ func (self *Node) AddPerCoreCache(c Cache) {
 	}
 }
 
+type HugePagesInfo struct {
+	// huge page size (in kB)
+	PageSize uint64 `json:"page_size"`
+
+	// number of huge pages
+	NumPages uint64 `json:"num_pages"`
+}
+
 type DiskInfo struct {
 	// device name
 	Name string `json:"name"`
@@ -154,6 +166,9 @@ type MachineInfo struct {
 	// The amount of memory (in bytes) in this machine
 	MemoryCapacity uint64 `json:"memory_capacity"`
 
+	// HugePages on this machine.
+	HugePages []HugePagesInfo `json:"hugepages"`
+
 	// The machine id
 	MachineID string `json:"machine_id"`
 
@@ -195,6 +210,9 @@ type VersionInfo struct {
 
 	// Docker version.
 	DockerVersion string `json:"docker_version"`
+
+	// Docker API Version
+	DockerAPIVersion string `json:"docker_api_version"`
 
 	// cAdvisor version.
 	CadvisorVersion string `json:"cadvisor_version"`

@@ -20,8 +20,8 @@ package testing
 // a fake host is created here that can be used by plugins for testing
 
 import (
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/api/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/network/hostport"

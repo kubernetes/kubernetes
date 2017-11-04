@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -23,7 +16,8 @@ go_library(
         "watcher.go",
         "watcher_group.go",
     ],
-    tags = ["automanaged"],
+    importpath = "github.com/coreos/etcd/mvcc",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/coreos/etcd/lease:go_default_library",
         "//vendor/github.com/coreos/etcd/mvcc/backend:go_default_library",
@@ -52,4 +46,5 @@ filegroup(
         "//vendor/github.com/coreos/etcd/mvcc/mvccpb:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

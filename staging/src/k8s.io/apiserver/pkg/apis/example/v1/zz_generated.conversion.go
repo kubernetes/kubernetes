@@ -29,7 +29,7 @@ import (
 )
 
 func init() {
-	SchemeBuilder.Register(RegisterConversions)
+	localSchemeBuilder.Register(RegisterConversions)
 }
 
 // RegisterConversions adds conversion functions to the given scheme.
@@ -143,7 +143,7 @@ func autoConvert_example_PodList_To_v1_PodList(in *example.PodList, out *PodList
 			}
 		}
 	} else {
-		out.Items = make([]Pod, 0)
+		out.Items = nil
 	}
 	return nil
 }

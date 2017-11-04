@@ -37,6 +37,9 @@ type testDecodable struct {
 func (d *testDecodable) GetObjectKind() schema.ObjectKind                { return d }
 func (d *testDecodable) SetGroupVersionKind(gvk schema.GroupVersionKind) { d.gvk = gvk }
 func (d *testDecodable) GroupVersionKind() schema.GroupVersionKind       { return d.gvk }
+func (d *testDecodable) DeepCopyObject() runtime.Object {
+	panic("testDecodable does not support DeepCopy")
+}
 
 func TestDecode(t *testing.T) {
 	testCases := []struct {
@@ -129,7 +132,7 @@ func TestDecode(t *testing.T) {
 		{
 			data:        []byte(`{"kind":"Test","apiVersion":"other/blah","value":1,"Other":"test"}`),
 			into:        &testDecodable{},
-			typer:       &mockTyper{err: runtime.NewNotRegisteredErr(schema.GroupVersionKind{}, nil)},
+			typer:       &mockTyper{err: runtime.NewNotRegisteredErrForKind(schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"})},
 			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 			expectedObject: &testDecodable{
 				Other: "test",

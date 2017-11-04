@@ -22,7 +22,8 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -33,9 +34,17 @@ const (
 	// managed by the attach/detach controller
 	ControllerManagedAttachAnnotation string = "volumes.kubernetes.io/controller-managed-attach-detach"
 
+	// KeepTerminatedPodVolumesAnnotation is the key of the annotation on Node
+	// that decides if pod volumes are unmounted when pod is terminated
+	KeepTerminatedPodVolumesAnnotation string = "volumes.kubernetes.io/keep-terminated-pod-volumes"
+
 	// VolumeGidAnnotationKey is the of the annotation on the PersistentVolume
 	// object that specifies a supplemental GID.
 	VolumeGidAnnotationKey = "pv.beta.kubernetes.io/gid"
+
+	// VolumeDynamicallyCreatedByKey is the key of the annotation on PersistentVolume
+	// object created dynamically
+	VolumeDynamicallyCreatedByKey = "kubernetes.io/createdby"
 )
 
 // GetUniquePodName returns a unique identifier to reference a pod by
@@ -118,4 +127,12 @@ func SplitUniqueName(uniqueName v1.UniqueVolumeName) (string, string, error) {
 	}
 	pluginName := fmt.Sprintf("%s/%s", components[0], components[1])
 	return pluginName, components[2], nil
+}
+
+// NewSafeFormatAndMountFromHost creates a new SafeFormatAndMount with Mounter
+// and Exec taken from given VolumeHost.
+func NewSafeFormatAndMountFromHost(pluginName string, host volume.VolumeHost) *mount.SafeFormatAndMount {
+	mounter := host.GetMounter(pluginName)
+	exec := host.GetExec(pluginName)
+	return &mount.SafeFormatAndMount{Interface: mounter, Exec: exec}
 }

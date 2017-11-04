@@ -24,11 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
-
-func (obj *MetadataOnlyObject) GetObjectKind() schema.ObjectKind     { return obj }
-func (obj *MetadataOnlyObjectList) GetObjectKind() schema.ObjectKind { return obj }
 
 type metaOnlyJSONScheme struct{}
 
@@ -44,22 +41,22 @@ func gvkToMetadataOnlyObject(gvk schema.GroupVersionKind) runtime.Object {
 }
 
 func NewMetadataCodecFactory() serializer.CodecFactory {
-	// populating another scheme from api.Scheme, registering every kind with
+	// populating another scheme from legacyscheme.Scheme, registering every kind with
 	// MetadataOnlyObject (or MetadataOnlyObjectList).
 	scheme := runtime.NewScheme()
-	allTypes := api.Scheme.AllKnownTypes()
+	allTypes := legacyscheme.Scheme.AllKnownTypes()
 	for kind := range allTypes {
 		if kind.Version == runtime.APIVersionInternal {
 			continue
 		}
-		if kind == api.Unversioned.WithKind("Status") {
+		if kind == metav1.Unversioned.WithKind("Status") {
 			// this is added below as unversioned
 			continue
 		}
 		metaOnlyObject := gvkToMetadataOnlyObject(kind)
 		scheme.AddKnownTypeWithName(kind, metaOnlyObject)
 	}
-	scheme.AddUnversionedTypes(api.Unversioned, &metav1.Status{})
+	scheme.AddUnversionedTypes(metav1.Unversioned, &metav1.Status{})
 	return serializer.NewCodecFactory(scheme)
 }
 

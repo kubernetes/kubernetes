@@ -17,8 +17,9 @@ limitations under the License.
 package predicates
 
 import (
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // FindLabelsInSet gets as many key/value pairs as possible out of a label set.
@@ -63,4 +64,28 @@ func CreateSelectorFromLabels(aL map[string]string) labels.Selector {
 		return labels.Everything()
 	}
 	return labels.Set(aL).AsSelector()
+}
+
+// GetEquivalencePod returns a EquivalencePod which contains a group of pod attributes which can be reused.
+func GetEquivalencePod(pod *v1.Pod) interface{} {
+	// For now we only consider pods:
+	// 1. OwnerReferences is Controller
+	// 2. with same OwnerReferences
+	// to be equivalent
+	if len(pod.OwnerReferences) != 0 {
+		for _, ref := range pod.OwnerReferences {
+			if *ref.Controller {
+				// a pod can only belongs to one controller
+				return &EquivalencePod{
+					ControllerRef: ref,
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// EquivalencePod is a group of pod attributes which can be reused as equivalence to schedule other pods.
+type EquivalencePod struct {
+	ControllerRef metav1.OwnerReference
 }

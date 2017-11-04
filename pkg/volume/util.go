@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 
 	"hash/fnv"
 	"math/rand"
@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 type RecycleEventRecorder func(eventtype, message string)
@@ -48,8 +47,8 @@ type RecycleEventRecorder func(eventtype, message string)
 // attempted before returning.
 //
 // In case there is a pod with the same namespace+name already running, this
-// function assumes it's an older instance of the recycler pod and watches
-// this old pod instead of starting a new one.
+// function deletes it as it is not able to judge if it is an old recycler
+// or user has forged a fake recycler to block Kubernetes from recycling.//
 //
 //  pod - the pod designed by a volume plugin to recycle the volume. pod.Name
 //        will be overwritten with unique name based on PV.Name.
@@ -81,20 +80,44 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Po
 	_, err = recyclerClient.CreatePod(pod)
 	if err != nil {
 		if errors.IsAlreadyExists(err) {
-			glog.V(5).Infof("old recycler pod %q found for volume", pod.Name)
+			deleteErr := recyclerClient.DeletePod(pod.Name, pod.Namespace)
+			if deleteErr != nil {
+				return fmt.Errorf("failed to delete old recycler pod %s/%s: %s", pod.Namespace, pod.Name, deleteErr)
+			}
+			// Recycler will try again and the old pod will be hopefuly deleted
+			// at that time.
+			return fmt.Errorf("old recycler pod found, will retry later")
 		} else {
 			return fmt.Errorf("unexpected error creating recycler pod:  %+v\n", err)
 		}
 	}
-	defer func(pod *v1.Pod) {
-		glog.V(2).Infof("deleting recycler pod %s/%s", pod.Namespace, pod.Name)
-		if err := recyclerClient.DeletePod(pod.Name, pod.Namespace); err != nil {
-			glog.Errorf("failed to delete recycler pod %s/%s: %v", pod.Namespace, pod.Name, err)
-		}
-	}(pod)
+	err = waitForPod(pod, recyclerClient, podCh)
 
-	// Now only the old pod or the new pod run. Watch it until it finishes
-	// and send all events on the pod to the PV
+	// In all cases delete the recycler pod and log its result.
+	glog.V(2).Infof("deleting recycler pod %s/%s", pod.Namespace, pod.Name)
+	deleteErr := recyclerClient.DeletePod(pod.Name, pod.Namespace)
+	if deleteErr != nil {
+		glog.Errorf("failed to delete recycler pod %s/%s: %v", pod.Namespace, pod.Name, err)
+	}
+
+	// Returning recycler error is preferred, the pod will be deleted again on
+	// the next retry.
+	if err != nil {
+		return fmt.Errorf("failed to recycle volume: %s", err)
+	}
+
+	// Recycle succeeded but we failed to delete the recycler pod. Report it,
+	// the controller will re-try recycling the PV again shortly.
+	if deleteErr != nil {
+		return fmt.Errorf("failed to delete recycler pod: %s", deleteErr)
+	}
+
+	return nil
+}
+
+// waitForPod watches the pod it until it finishes and send all events on the
+// pod to the PV.
+func waitForPod(pod *v1.Pod, recyclerClient recyclerClient, podCh <-chan watch.Event) error {
 	for {
 		event, ok := <-podCh
 		if !ok {
@@ -164,15 +187,15 @@ type realRecyclerClient struct {
 }
 
 func (c *realRecyclerClient) CreatePod(pod *v1.Pod) (*v1.Pod, error) {
-	return c.client.Core().Pods(pod.Namespace).Create(pod)
+	return c.client.CoreV1().Pods(pod.Namespace).Create(pod)
 }
 
 func (c *realRecyclerClient) GetPod(name, namespace string) (*v1.Pod, error) {
-	return c.client.Core().Pods(namespace).Get(name, metav1.GetOptions{})
+	return c.client.CoreV1().Pods(namespace).Get(name, metav1.GetOptions{})
 }
 
 func (c *realRecyclerClient) DeletePod(name, namespace string) error {
-	return c.client.Core().Pods(namespace).Delete(name, nil)
+	return c.client.CoreV1().Pods(namespace).Delete(name, nil)
 }
 
 func (c *realRecyclerClient) Event(eventtype, message string) {
@@ -180,19 +203,22 @@ func (c *realRecyclerClient) Event(eventtype, message string) {
 }
 
 func (c *realRecyclerClient) WatchPod(name, namespace string, stopChannel chan struct{}) (<-chan watch.Event, error) {
-	podSelector, _ := fields.ParseSelector("metadata.name=" + name)
+	podSelector, err := fields.ParseSelector("metadata.name=" + name)
+	if err != nil {
+		return nil, err
+	}
 	options := metav1.ListOptions{
 		FieldSelector: podSelector.String(),
 		Watch:         true,
 	}
 
-	podWatch, err := c.client.Core().Pods(namespace).Watch(options)
+	podWatch, err := c.client.CoreV1().Pods(namespace).Watch(options)
 	if err != nil {
 		return nil, err
 	}
 
 	eventSelector, _ := fields.ParseSelector("involvedObject.name=" + name)
-	eventWatch, err := c.client.Core().Events(namespace).Watch(metav1.ListOptions{
+	eventWatch, err := c.client.CoreV1().Events(namespace).Watch(metav1.ListOptions{
 		FieldSelector: eventSelector.String(),
 		Watch:         true,
 	})
@@ -295,9 +321,52 @@ func GetPath(mounter Mounter) (string, error) {
 func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 	// We create the volume in a zone determined by the name
 	// Eventually the scheduler will coordinate placement into an available zone
-	var hash uint32
-	var index uint32
+	hash, index := getPVCNameHashAndIndexOffset(pvcName)
 
+	// Zones.List returns zones in a consistent order (sorted)
+	// We do have a potential failure case where volumes will not be properly spread,
+	// if the set of zones changes during StatefulSet volume creation.  However, this is
+	// probably relatively unlikely because we expect the set of zones to be essentially
+	// static for clusters.
+	// Hopefully we can address this problem if/when we do full scheduler integration of
+	// PVC placement (which could also e.g. avoid putting volumes in overloaded or
+	// unhealthy zones)
+	zoneSlice := zones.List()
+	zone := zoneSlice[(hash+index)%uint32(len(zoneSlice))]
+
+	glog.V(2).Infof("Creating volume for PVC %q; chose zone=%q from zones=%q", pvcName, zone, zoneSlice)
+	return zone
+}
+
+// ChooseZonesForVolume is identical to ChooseZoneForVolume, but selects a multiple zones, for multi-zone disks.
+func ChooseZonesForVolume(zones sets.String, pvcName string, numZones uint32) sets.String {
+	// We create the volume in a zone determined by the name
+	// Eventually the scheduler will coordinate placement into an available zone
+	hash, index := getPVCNameHashAndIndexOffset(pvcName)
+
+	// Zones.List returns zones in a consistent order (sorted)
+	// We do have a potential failure case where volumes will not be properly spread,
+	// if the set of zones changes during StatefulSet volume creation.  However, this is
+	// probably relatively unlikely because we expect the set of zones to be essentially
+	// static for clusters.
+	// Hopefully we can address this problem if/when we do full scheduler integration of
+	// PVC placement (which could also e.g. avoid putting volumes in overloaded or
+	// unhealthy zones)
+	zoneSlice := zones.List()
+	replicaZones := sets.NewString()
+
+	startingIndex := index * numZones
+	for index = startingIndex; index < startingIndex+numZones; index++ {
+		zone := zoneSlice[(hash+index)%uint32(len(zoneSlice))]
+		replicaZones.Insert(zone)
+	}
+
+	glog.V(2).Infof("Creating volume for replicated PVC %q; chosen zones=%q from zones=%q",
+		pvcName, replicaZones.UnsortedList(), zoneSlice)
+	return replicaZones
+}
+
+func getPVCNameHashAndIndexOffset(pvcName string) (hash uint32, index uint32) {
 	if pvcName == "" {
 		// We should always be called with a name; this shouldn't happen
 		glog.Warningf("No name defined during volume create; choosing random zone")
@@ -346,32 +415,13 @@ func ChooseZoneForVolume(zones sets.String, pvcName string) string {
 		hash = h.Sum32()
 	}
 
-	// Zones.List returns zones in a consistent order (sorted)
-	// We do have a potential failure case where volumes will not be properly spread,
-	// if the set of zones changes during StatefulSet volume creation.  However, this is
-	// probably relatively unlikely because we expect the set of zones to be essentially
-	// static for clusters.
-	// Hopefully we can address this problem if/when we do full scheduler integration of
-	// PVC placement (which could also e.g. avoid putting volumes in overloaded or
-	// unhealthy zones)
-	zoneSlice := zones.List()
-	zone := zoneSlice[(hash+index)%uint32(len(zoneSlice))]
-
-	glog.V(2).Infof("Creating volume for PVC %q; chose zone=%q from zones=%q", pvcName, zone, zoneSlice)
-	return zone
+	return hash, index
 }
 
 // UnmountViaEmptyDir delegates the tear down operation for secret, configmap, git_repo and downwardapi
 // to empty_dir
 func UnmountViaEmptyDir(dir string, host VolumeHost, volName string, volSpec Spec, podUID types.UID) error {
 	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", volName, podUID, dir)
-
-	if pathExists, pathErr := volutil.PathExists(dir); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
-	} else if !pathExists {
-		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
-		return nil
-	}
 
 	// Wrap EmptyDir, let it do the teardown.
 	wrapped, err := host.NewWrapperUnmounter(volName, volSpec, podUID)
@@ -386,12 +436,17 @@ func MountOptionFromSpec(spec *Spec, options ...string) []string {
 	pv := spec.PersistentVolume
 
 	if pv != nil {
+		// Use beta annotation first
 		if mo, ok := pv.Annotations[v1.MountOptionAnnotation]; ok {
 			moList := strings.Split(mo, ",")
 			return JoinMountOptions(moList, options)
 		}
 
+		if len(pv.Spec.MountOptions) > 0 {
+			return JoinMountOptions(pv.Spec.MountOptions, options)
+		}
 	}
+
 	return options
 }
 
@@ -409,4 +464,34 @@ func JoinMountOptions(userOptions []string, systemOptions []string) []string {
 		allMountOptions.Insert(mountOption)
 	}
 	return allMountOptions.UnsortedList()
+}
+
+// ValidateZone returns:
+// - an error in case zone is an empty string or contains only any combination of spaces and tab characters
+// - nil otherwise
+func ValidateZone(zone string) error {
+	if strings.TrimSpace(zone) == "" {
+		return fmt.Errorf("the provided %q zone is not valid, it's an empty string or contains only spaces and tab characters", zone)
+	}
+	return nil
+}
+
+// AccessModesContains returns whether the requested mode is contained by modes
+func AccessModesContains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
+}
+
+// AccessModesContainedInAll returns whether all of the requested modes are contained by modes
+func AccessModesContainedInAll(indexedModes []v1.PersistentVolumeAccessMode, requestedModes []v1.PersistentVolumeAccessMode) bool {
+	for _, mode := range requestedModes {
+		if !AccessModesContains(indexedModes, mode) {
+			return false
+		}
+	}
+	return true
 }

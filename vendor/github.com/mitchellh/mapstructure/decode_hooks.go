@@ -1,10 +1,58 @@
 package mapstructure
 
 import (
+	"errors"
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 )
+
+// typedDecodeHook takes a raw DecodeHookFunc (an interface{}) and turns
+// it into the proper DecodeHookFunc type, such as DecodeHookFuncType.
+func typedDecodeHook(h DecodeHookFunc) DecodeHookFunc {
+	// Create variables here so we can reference them with the reflect pkg
+	var f1 DecodeHookFuncType
+	var f2 DecodeHookFuncKind
+
+	// Fill in the variables into this interface and the rest is done
+	// automatically using the reflect package.
+	potential := []interface{}{f1, f2}
+
+	v := reflect.ValueOf(h)
+	vt := v.Type()
+	for _, raw := range potential {
+		pt := reflect.ValueOf(raw).Type()
+		if vt.ConvertibleTo(pt) {
+			return v.Convert(pt).Interface()
+		}
+	}
+
+	return nil
+}
+
+// DecodeHookExec executes the given decode hook. This should be used
+// since it'll naturally degrade to the older backwards compatible DecodeHookFunc
+// that took reflect.Kind instead of reflect.Type.
+func DecodeHookExec(
+	raw DecodeHookFunc,
+	from reflect.Type, to reflect.Type,
+	data interface{}) (interface{}, error) {
+	// Build our arguments that reflect expects
+	argVals := make([]reflect.Value, 3)
+	argVals[0] = reflect.ValueOf(from)
+	argVals[1] = reflect.ValueOf(to)
+	argVals[2] = reflect.ValueOf(data)
+
+	switch f := typedDecodeHook(raw).(type) {
+	case DecodeHookFuncType:
+		return f(from, to, data)
+	case DecodeHookFuncKind:
+		return f(from.Kind(), to.Kind(), data)
+	default:
+		return nil, errors.New("invalid decode hook signature")
+	}
+}
 
 // ComposeDecodeHookFunc creates a single DecodeHookFunc that
 // automatically composes multiple DecodeHookFuncs.
@@ -13,18 +61,21 @@ import (
 // previous transformation.
 func ComposeDecodeHookFunc(fs ...DecodeHookFunc) DecodeHookFunc {
 	return func(
-		f reflect.Kind,
-		t reflect.Kind,
+		f reflect.Type,
+		t reflect.Type,
 		data interface{}) (interface{}, error) {
 		var err error
 		for _, f1 := range fs {
-			data, err = f1(f, t, data)
+			data, err = DecodeHookExec(f1, f, t, data)
 			if err != nil {
 				return nil, err
 			}
 
 			// Modify the from kind to be correct with the new data
-			f = getKind(reflect.ValueOf(data))
+			f = nil
+			if val := reflect.ValueOf(data); val.IsValid() {
+				f = val.Type()
+			}
 		}
 
 		return data, nil
@@ -48,6 +99,25 @@ func StringToSliceHookFunc(sep string) DecodeHookFunc {
 		}
 
 		return strings.Split(raw, sep), nil
+	}
+}
+
+// StringToTimeDurationHookFunc returns a DecodeHookFunc that converts
+// strings to time.Duration.
+func StringToTimeDurationHookFunc() DecodeHookFunc {
+	return func(
+		f reflect.Type,
+		t reflect.Type,
+		data interface{}) (interface{}, error) {
+		if f.Kind() != reflect.String {
+			return data, nil
+		}
+		if t != reflect.TypeOf(time.Duration(5)) {
+			return data, nil
+		}
+
+		// Convert it by parsing
+		return time.ParseDuration(data.(string))
 	}
 }
 

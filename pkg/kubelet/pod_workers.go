@@ -22,11 +22,11 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
@@ -162,6 +162,9 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 			// the previous sync.
 			status, err := p.podCache.GetNewerThan(podUID, lastSyncTime)
 			if err != nil {
+				// This is the legacy event thrown by manage pod loop
+				// all other events are now dispatched from syncPodFn
+				p.recorder.Eventf(update.Pod, v1.EventTypeWarning, events.FailedSync, "error determining status: %v", err)
 				return err
 			}
 			err = p.syncPodFn(syncPodOptions{
@@ -179,8 +182,8 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 			update.OnCompleteFunc(err)
 		}
 		if err != nil {
+			// IMPORTANT: we do not log errors here, the syncPodFn is responsible for logging errors
 			glog.Errorf("Error syncing pod %s (%q), skipping: %v", update.Pod.UID, format.Pod(update.Pod), err)
-			p.recorder.Eventf(update.Pod, v1.EventTypeWarning, events.FailedSync, "Error syncing pod, skipping: %v", err)
 		}
 		p.wrapUp(update.Pod.UID, err)
 	}

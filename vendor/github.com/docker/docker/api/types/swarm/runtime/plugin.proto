@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+// PluginSpec defines the base payload which clients can specify for creating
+// a service with the plugin runtime.
+message PluginSpec {
+	string name = 1;
+	string remote = 2;
+	repeated PluginPrivilege privileges = 3;
+	bool disabled = 4;
+}
+
+// PluginPrivilege describes a permission the user has to accept
+// upon installing a plugin.
+message PluginPrivilege {
+	string name = 1;
+	string description = 2;
+	repeated string value = 3;
+}

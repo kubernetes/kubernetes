@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
+	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1 "k8s.io/client-go/listers/core/v1"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
 	cache "k8s.io/client-go/tools/cache"
 	time "time"
 )
@@ -41,26 +41,31 @@ type limitRangeInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newLimitRangeInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewLimitRangeInformer constructs a new informer for LimitRange type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewLimitRangeInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return client.CoreV1().LimitRanges(meta_v1.NamespaceAll).List(options)
+				return client.CoreV1().LimitRanges(namespace).List(options)
 			},
 			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return client.CoreV1().LimitRanges(meta_v1.NamespaceAll).Watch(options)
+				return client.CoreV1().LimitRanges(namespace).Watch(options)
 			},
 		},
-		&api_v1.LimitRange{},
+		&core_v1.LimitRange{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultLimitRangeInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewLimitRangeInformer(client, meta_v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *limitRangeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api_v1.LimitRange{}, newLimitRangeInformer)
+	return f.factory.InformerFor(&core_v1.LimitRange{}, defaultLimitRangeInformer)
 }
 
 func (f *limitRangeInformer) Lister() v1.LimitRangeLister {

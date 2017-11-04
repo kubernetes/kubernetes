@@ -1,0 +1,28 @@
+apiVersion: apps/v1beta2
+kind: StatefulSet
+metadata:
+  name: nginx
+spec:
+  selector:
+    matchLabels:
+      app: nginx-statefulset
+  updateStrategy:
+    type: RollingUpdate
+  serviceName: "nginx"
+  replicas: 0
+  template:
+    metadata:
+      labels:
+        app: nginx-statefulset
+    spec:
+      terminationGracePeriodSeconds: 5
+      containers:
+      - name: nginx
+        image: gcr.io/google_containers/nginx-slim:0.7
+        ports:
+        - containerPort: 80
+          name: web
+        command:
+        - sh
+        - -c
+        - 'while true; do sleep 1; done'

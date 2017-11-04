@@ -21,17 +21,17 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 	vsphere "k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // Testing configurations of single a PV/PVC pair attached to a vSphere Disk
-var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
+var _ = SIGDescribe("PersistentVolumes:vsphere", func() {
 	var (
 		c          clientset.Interface
 		ns         string
@@ -102,7 +102,7 @@ var _ = framework.KubeDescribe("PersistentVolumes:vsphere", func() {
 		By("Creating the Client Pod")
 		clientPod, err = framework.CreateClientPod(c, ns, pvc)
 		Expect(err).NotTo(HaveOccurred())
-		node := types.NodeName(clientPod.Spec.NodeName)
+		node = types.NodeName(clientPod.Spec.NodeName)
 
 		By("Verify disk should be attached to the node")
 		isAttached, err := verifyVSphereDiskAttached(vsp, volumePath, node)

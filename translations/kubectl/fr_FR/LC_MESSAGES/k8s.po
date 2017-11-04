@@ -19,7 +19,7 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 "Language: fr\n"
 
-# https://github.com/kubernetes/kubernetes/blob/masterpkg/kubectl/cmd/apply.go#L98
+# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/apply.go#L98
 msgid "Apply a configuration to a resource by filename or stdin"
 msgstr ""
 "Appliquer une configuration à une ressource par nom de fichier ou depuis "

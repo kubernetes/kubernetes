@@ -50,10 +50,6 @@ func (c *FakeExtensionsV1beta1) Scales(namespace string) v1beta1.ScaleInterface 
 	return &FakeScales{c, namespace}
 }
 
-func (c *FakeExtensionsV1beta1) ThirdPartyResources() v1beta1.ThirdPartyResourceInterface {
-	return &FakeThirdPartyResources{c}
-}
-
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeExtensionsV1beta1) RESTClient() rest.Interface {

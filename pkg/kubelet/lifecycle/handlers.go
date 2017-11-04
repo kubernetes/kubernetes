@@ -24,9 +24,9 @@ import (
 	"strconv"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/api/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -55,7 +55,7 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod,
 	switch {
 	case handler.Exec != nil:
 		var msg string
-		// TODO(timstclair): Pass a proper timeout value.
+		// TODO(tallclair): Pass a proper timeout value.
 		output, err := hr.commandRunner.RunInContainer(containerID, handler.Exec.Command, 0)
 		if err != nil {
 			msg := fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", handler.Exec.Command, container.Name, format.Pod(pod), err, string(output))
@@ -164,4 +164,69 @@ func (a *appArmorAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
 		Reason:  "AppArmor",
 		Message: fmt.Sprintf("Cannot enforce AppArmor: %v", err),
 	}
+}
+
+func NewNoNewPrivsAdmitHandler(runtime kubecontainer.Runtime) PodAdmitHandler {
+	return &noNewPrivsAdmitHandler{
+		Runtime: runtime,
+	}
+}
+
+type noNewPrivsAdmitHandler struct {
+	kubecontainer.Runtime
+}
+
+func (a *noNewPrivsAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	// If the pod is already running or terminated, no need to recheck NoNewPrivs.
+	if attrs.Pod.Status.Phase != v1.PodPending {
+		return PodAdmitResult{Admit: true}
+	}
+
+	// If the containers in a pod do not require no-new-privs, admit it.
+	if !noNewPrivsRequired(attrs.Pod) {
+		return PodAdmitResult{Admit: true}
+	}
+
+	// Always admit runtimes except docker.
+	if a.Runtime.Type() != kubetypes.DockerContainerRuntime {
+		return PodAdmitResult{Admit: true}
+	}
+
+	// Make sure docker api version is valid.
+	rversion, err := a.Runtime.APIVersion()
+	if err != nil {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "NoNewPrivs",
+			Message: fmt.Sprintf("Cannot enforce NoNewPrivs: %v", err),
+		}
+	}
+	v, err := rversion.Compare("1.23.0")
+	if err != nil {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "NoNewPrivs",
+			Message: fmt.Sprintf("Cannot enforce NoNewPrivs: %v", err),
+		}
+	}
+	// If the version is less than 1.23 it will return -1 above.
+	if v == -1 {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "NoNewPrivs",
+			Message: fmt.Sprintf("Cannot enforce NoNewPrivs: docker runtime API version %q must be greater than or equal to 1.23", rversion.String()),
+		}
+	}
+
+	return PodAdmitResult{Admit: true}
+}
+
+func noNewPrivsRequired(pod *v1.Pod) bool {
+	// Iterate over pod containers and check if we added no-new-privs.
+	for _, c := range pod.Spec.Containers {
+		if c.SecurityContext != nil && c.SecurityContext.AllowPrivilegeEscalation != nil && !*c.SecurityContext.AllowPrivilegeEscalation {
+			return true
+		}
+	}
+	return false
 }

@@ -41,26 +41,31 @@ type daemonSetInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newDaemonSetInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewDaemonSetInformer constructs a new informer for DaemonSet type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewDaemonSetInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Extensions().DaemonSets(v1.NamespaceAll).List(options)
+				return client.Extensions().DaemonSets(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Extensions().DaemonSets(v1.NamespaceAll).Watch(options)
+				return client.Extensions().DaemonSets(namespace).Watch(options)
 			},
 		},
 		&extensions.DaemonSet{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultDaemonSetInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewDaemonSetInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *daemonSetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&extensions.DaemonSet{}, newDaemonSetInformer)
+	return f.factory.InformerFor(&extensions.DaemonSet{}, defaultDaemonSetInformer)
 }
 
 func (f *daemonSetInformer) Lister() internalversion.DaemonSetLister {

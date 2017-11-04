@@ -17,20 +17,18 @@ limitations under the License.
 package endpoints
 
 import (
-	"fmt"
 	"path"
 	"time"
 
 	"github.com/emicklei/go-restful"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/endpoints/handlers"
+	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
@@ -68,7 +66,6 @@ type APIGroupVersion struct {
 	Typer           runtime.ObjectTyper
 	Creater         runtime.ObjectCreater
 	Convertor       runtime.ObjectConvertor
-	Copier          runtime.ObjectCopier
 	Defaulter       runtime.ObjectDefaulter
 	Linker          runtime.SelfLinker
 	UnsafeConvertor runtime.ObjectConvertor
@@ -78,69 +75,28 @@ type APIGroupVersion struct {
 
 	MinRequestTimeout time.Duration
 
-	// SubresourceGroupVersionKind contains the GroupVersionKind overrides for each subresource that is
-	// accessible from this API group version. The GroupVersionKind is that of the external version of
-	// the subresource. The key of this map should be the path of the subresource. The keys here should
-	// match the keys in the Storage map above for subresources.
-	SubresourceGroupVersionKind map[string]schema.GroupVersionKind
-
-	// ResourceLister is an interface that knows how to list resources
-	// for this API Group.
-	ResourceLister handlers.APIResourceLister
+	// EnableAPIResponseCompression indicates whether API Responses should support compression
+	// if the client requests it via Accept-Encoding
+	EnableAPIResponseCompression bool
 }
 
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash.
 func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
-	installer := g.newInstaller()
-	ws := installer.NewWebService()
-	apiResources, registrationErrors := installer.Install(ws)
-	lister := g.ResourceLister
-	if lister == nil {
-		lister = staticLister{apiResources}
-	}
-	AddSupportedResourcesWebService(g.Serializer, ws, g.GroupVersion, lister)
-	container.Add(ws)
-	return utilerrors.NewAggregate(registrationErrors)
-}
-
-// UpdateREST registers the REST handlers for this APIGroupVersion to an existing web service
-// in the restful Container.  It will use the prefix (root/version) to find the existing
-// web service.  If a web service does not exist within the container to support the prefix
-// this method will return an error.
-func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
-	installer := g.newInstaller()
-	var ws *restful.WebService = nil
-
-	for i, s := range container.RegisteredWebServices() {
-		if s.RootPath() == installer.prefix {
-			ws = container.RegisteredWebServices()[i]
-			break
-		}
-	}
-
-	if ws == nil {
-		return apierrors.NewInternalError(fmt.Errorf("unable to find an existing webservice for prefix %s", installer.prefix))
-	}
-	apiResources, registrationErrors := installer.Install(ws)
-	lister := g.ResourceLister
-	if lister == nil {
-		lister = staticLister{apiResources}
-	}
-	AddSupportedResourcesWebService(g.Serializer, ws, g.GroupVersion, lister)
-	return utilerrors.NewAggregate(registrationErrors)
-}
-
-// newInstaller is a helper to create the installer.  Used by InstallREST and UpdateREST.
-func (g *APIGroupVersion) newInstaller() *APIInstaller {
 	prefix := path.Join(g.Root, g.GroupVersion.Group, g.GroupVersion.Version)
 	installer := &APIInstaller{
-		group:             g,
-		prefix:            prefix,
-		minRequestTimeout: g.MinRequestTimeout,
+		group:                        g,
+		prefix:                       prefix,
+		minRequestTimeout:            g.MinRequestTimeout,
+		enableAPIResponseCompression: g.EnableAPIResponseCompression,
 	}
-	return installer
+
+	apiResources, ws, registrationErrors := installer.Install()
+	versionDiscoveryHandler := discovery.NewAPIVersionHandler(g.Serializer, g.GroupVersion, staticLister{apiResources}, g.Context)
+	versionDiscoveryHandler.AddToWebService(ws)
+	container.Add(ws)
+	return utilerrors.NewAggregate(registrationErrors)
 }
 
 // staticLister implements the APIResourceLister interface
@@ -152,4 +108,4 @@ func (s staticLister) ListAPIResources() []metav1.APIResource {
 	return s.list
 }
 
-var _ handlers.APIResourceLister = &staticLister{}
+var _ discovery.APIResourceLister = &staticLister{}

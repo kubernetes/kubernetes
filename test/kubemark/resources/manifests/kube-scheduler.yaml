@@ -40,3 +40,4 @@ spec:
   - name: logfile
     hostPath:
       path: /var/log/kube-scheduler.log
+      type: FileOrCreate

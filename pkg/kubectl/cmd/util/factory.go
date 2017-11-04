@@ -17,45 +17,44 @@ limitations under the License.
 package util
 
 import (
-	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"os"
-	"os/user"
-	"path"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/emicklei/go-restful/swagger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/validation"
+	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	"k8s.io/kubernetes/pkg/kubectl/plugins"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
 const (
 	FlagMatchBinaryVersion = "match-server-version"
+)
+
+var (
+	FlagHTTPCacheDir = "cache-dir"
 )
 
 // Factory provides abstractions that allow the Kubectl command to be extended across multiple types
@@ -77,16 +76,24 @@ type Factory interface {
 type DiscoveryClientFactory interface {
 	// Returns a discovery client
 	DiscoveryClient() (discovery.CachedDiscoveryInterface, error)
+
+	// BindFlags adds any discovery flags that are common to all kubectl sub commands.
+	BindFlags(flags *pflag.FlagSet)
 }
 
 // ClientAccessFactory holds the first level of factory methods.
 // Generally provides discovery, negotiation, and no-dep calls.
 // TODO The polymorphic calls probably deserve their own interface.
 type ClientAccessFactory interface {
-	DiscoveryClientFactory
+	// Returns a discovery client
+	DiscoveryClient() (discovery.CachedDiscoveryInterface, error)
 
 	// ClientSet gives you back an internal, generated clientset
 	ClientSet() (internalclientset.Interface, error)
+
+	// KubernetesClientSet gives you back an external clientset
+	KubernetesClientSet() (*kubernetes.Clientset, error)
+
 	// Returns a RESTClient for accessing Kubernetes resources or an error.
 	RESTClient() (*restclient.RESTClient, error)
 	// Returns a client.Config for accessing the Kubernetes server.
@@ -95,11 +102,6 @@ type ClientAccessFactory interface {
 	// just directions to the server. People use this to build RESTMappers on top of
 	BareClientConfig() (*restclient.Config, error)
 
-	// TODO this should probably be removed and collapsed into whatever we want to use long term
-	// probably returning a restclient for a version and leaving contruction up to someone else
-	FederationClientSetForVersion(version *schema.GroupVersion) (fedclientset.Interface, error)
-	// TODO remove this should be rolled into restclient with the right version
-	FederationClientForVersion(version *schema.GroupVersion) (*restclient.RESTClient, error)
 	// TODO remove.  This should be rolled into `ClientSet`
 	ClientSetForVersion(requiredVersion *schema.GroupVersion) (internalclientset.Interface, error)
 	// TODO remove.  This should be rolled into `ClientConfig`
@@ -215,27 +217,38 @@ type ObjectMappingFactory interface {
 	// AttachablePodForObject returns the pod to which to attach given an object.
 	AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error)
 
+	// ApproximatePodTemplateForObject returns a pod template object for the provided source.
+	// It may return both an error and a object. It attempt to return the best possible template
+	// available at the current time.
+	ApproximatePodTemplateForObject(runtime.Object) (*api.PodTemplateSpec, error)
+
 	// Returns a schema that can validate objects stored on disk.
-	Validator(validate bool, cacheDir string) (validation.Schema, error)
-	// SwaggerSchema returns the schema declaration for the provided group version kind.
-	SwaggerSchema(schema.GroupVersionKind) (*swagger.ApiDeclaration, error)
+	Validator(validate bool) (validation.Schema, error)
+	// OpenAPISchema returns the schema openapi schema definiton
+	OpenAPISchema() (openapi.Resources, error)
 }
 
 // BuilderFactory holds the second level of factory methods.  These functions depend upon ObjectMappingFactory and ClientAccessFactory methods.
 // Generally they depend upon client mapper functions
 type BuilderFactory interface {
 	// PrinterForCommand returns the default printer for the command. It requires that certain options
-	// are declared on the command (see AddPrinterFlags). Returns a printer, true if the printer is
-	// generic (is not internal), or an error if a printer could not be found.
+	// are declared on the command (see AddPrinterFlags). Returns a printer, or an error if a printer
+	// could not be found.
 	// TODO: Break the dependency on cmd here.
-	PrinterForCommand(cmd *cobra.Command) (printers.ResourcePrinter, bool, error)
+	PrinterForCommand(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, options printers.PrintOptions) (printers.ResourcePrinter, error)
 	// PrinterForMapping returns a printer suitable for displaying the provided resource type.
 	// Requires that printer flags have been added to cmd (see AddPrinterFlags).
-	PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error)
+	// Returns a printer, true if the printer is generic (is not internal), or
+	// an error if a printer could not be found.
+	PrinterForMapping(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error)
 	// PrintObject prints an api object given command line flags to modify the output format
-	PrintObject(cmd *cobra.Command, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
+	PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
 	// One stop shopping for a Builder
 	NewBuilder() *resource.Builder
+	// PluginLoader provides the implementation to be used to load cli plugins.
+	PluginLoader() plugins.PluginLoader
+	// PluginRunner provides the implementation to be used to run cli plugins.
+	PluginRunner() plugins.PluginRunner
 }
 
 func getGroupVersionKinds(gvks []schema.GroupVersionKind, group string) []schema.GroupVersionKind {
@@ -271,8 +284,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) Factory {
 
 // GetFirstPod returns a pod matching the namespace and label selector
 // and the number of all pods that match the label selector.
-func GetFirstPod(client coreclient.PodsGetter, namespace string, selector labels.Selector, timeout time.Duration, sortBy func([]*v1.Pod) sort.Interface) (*api.Pod, int, error) {
-	options := metav1.ListOptions{LabelSelector: selector.String()}
+func GetFirstPod(client coreclient.PodsGetter, namespace string, selector string, timeout time.Duration, sortBy func([]*v1.Pod) sort.Interface) (*api.Pod, int, error) {
+	options := metav1.ListOptions{LabelSelector: selector}
 
 	podList, err := client.Pods(namespace).List(options)
 	if err != nil {
@@ -282,13 +295,13 @@ func GetFirstPod(client coreclient.PodsGetter, namespace string, selector labels
 	for i := range podList.Items {
 		pod := podList.Items[i]
 		externalPod := &v1.Pod{}
-		v1.Convert_api_Pod_To_v1_Pod(&pod, externalPod, nil)
+		apiv1.Convert_api_Pod_To_v1_Pod(&pod, externalPod, nil)
 		pods = append(pods, externalPod)
 	}
 	if len(pods) > 0 {
 		sort.Sort(sortBy(pods))
 		internalPod := &api.Pod{}
-		v1.Convert_v1_Pod_To_api_Pod(pods[0], internalPod, nil)
+		apiv1.Convert_v1_Pod_To_api_Pod(pods[0], internalPod, nil)
 		return internalPod, len(podList.Items), nil
 	}
 
@@ -364,145 +377,4 @@ func getServiceProtocols(spec api.ServiceSpec) map[string]string {
 		result[strconv.Itoa(int(servicePort.Port))] = string(servicePort.Protocol)
 	}
 	return result
-}
-
-type clientSwaggerSchema struct {
-	c        restclient.Interface
-	cacheDir string
-}
-
-const schemaFileName = "schema.json"
-
-type schemaClient interface {
-	Get() *restclient.Request
-}
-
-func recursiveSplit(dir string) []string {
-	parent, file := path.Split(dir)
-	if len(parent) == 0 {
-		return []string{file}
-	}
-	return append(recursiveSplit(parent[:len(parent)-1]), file)
-}
-
-func substituteUserHome(dir string) (string, error) {
-	if len(dir) == 0 || dir[0] != '~' {
-		return dir, nil
-	}
-	parts := recursiveSplit(dir)
-	if len(parts[0]) == 1 {
-		parts[0] = os.Getenv("HOME")
-	} else {
-		usr, err := user.Lookup(parts[0][1:])
-		if err != nil {
-			return "", err
-		}
-		parts[0] = usr.HomeDir
-	}
-	return path.Join(parts...), nil
-}
-
-func writeSchemaFile(schemaData []byte, cacheDir, cacheFile, prefix, groupVersion string) error {
-	if err := os.MkdirAll(path.Join(cacheDir, prefix, groupVersion), 0755); err != nil {
-		return err
-	}
-	tmpFile, err := ioutil.TempFile(cacheDir, "schema")
-	if err != nil {
-		// If we can't write, keep going.
-		if os.IsPermission(err) {
-			return nil
-		}
-		return err
-	}
-	if _, err := io.Copy(tmpFile, bytes.NewBuffer(schemaData)); err != nil {
-		return err
-	}
-	if err := os.Link(tmpFile.Name(), cacheFile); err != nil {
-		// If we can't write due to file existing, or permission problems, keep going.
-		if os.IsExist(err) || os.IsPermission(err) {
-			return nil
-		}
-		return err
-	}
-	return nil
-}
-
-func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cacheDir string, delegate validation.Schema) (err error) {
-	var schemaData []byte
-	var firstSeen bool
-	fullDir, err := substituteUserHome(cacheDir)
-	if err != nil {
-		return err
-	}
-	cacheFile := path.Join(fullDir, prefix, groupVersion, schemaFileName)
-
-	if len(cacheDir) != 0 {
-		if schemaData, err = ioutil.ReadFile(cacheFile); err != nil && !os.IsNotExist(err) {
-			return err
-		}
-	}
-	if schemaData == nil {
-		firstSeen = true
-		schemaData, err = downloadSchemaAndStore(c, cacheDir, fullDir, cacheFile, prefix, groupVersion)
-		if err != nil {
-			return err
-		}
-	}
-	schema, err := validation.NewSwaggerSchemaFromBytes(schemaData, delegate)
-	if err != nil {
-		return err
-	}
-	err = schema.ValidateBytes(data)
-	if _, ok := err.(validation.TypeNotFoundError); ok && !firstSeen {
-		// As a temporary hack, kubectl would re-get the schema if validation
-		// fails for type not found reason.
-		// TODO: runtime-config settings needs to make into the file's name
-		schemaData, err = downloadSchemaAndStore(c, cacheDir, fullDir, cacheFile, prefix, groupVersion)
-		if err != nil {
-			return err
-		}
-		schema, err := validation.NewSwaggerSchemaFromBytes(schemaData, delegate)
-		if err != nil {
-			return err
-		}
-		return schema.ValidateBytes(data)
-	}
-
-	return err
-}
-
-// Download swagger schema from apiserver and store it to file.
-func downloadSchemaAndStore(c schemaClient, cacheDir, fullDir, cacheFile, prefix, groupVersion string) (schemaData []byte, err error) {
-	schemaData, err = c.Get().
-		AbsPath("/swaggerapi", prefix, groupVersion).
-		Do().
-		Raw()
-	if err != nil {
-		return
-	}
-	if len(cacheDir) != 0 {
-		if err = writeSchemaFile(schemaData, fullDir, cacheFile, prefix, groupVersion); err != nil {
-			return
-		}
-	}
-	return
-}
-
-func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
-	gvk, err := json.DefaultMetaFactory.Interpret(data)
-	if err != nil {
-		return err
-	}
-	if ok := api.Registry.IsEnabledVersion(gvk.GroupVersion()); !ok {
-		// if we don't have this in our scheme, just skip validation because its an object we don't recognize
-		return nil
-	}
-
-	switch gvk.Group {
-	case api.GroupName:
-		return getSchemaAndValidate(c.c, data, "api", gvk.GroupVersion().String(), c.cacheDir, c)
-
-	default:
-		return getSchemaAndValidate(c.c, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
-	}
 }

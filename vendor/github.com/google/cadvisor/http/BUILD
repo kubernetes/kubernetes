@@ -1,16 +1,10 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = ["handlers.go"],
-    tags = ["automanaged"],
+    importpath = "github.com/google/cadvisor/http",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/abbot/go-http-auth:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -23,6 +17,7 @@ go_library(
         "//vendor/github.com/google/cadvisor/pages/static:go_default_library",
         "//vendor/github.com/google/cadvisor/validate:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus/promhttp:go_default_library",
     ],
 )
 
@@ -40,4 +35,5 @@ filegroup(
         "//vendor/github.com/google/cadvisor/http/mux:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

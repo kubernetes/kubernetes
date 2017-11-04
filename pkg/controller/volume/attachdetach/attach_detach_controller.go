@@ -24,18 +24,17 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	coreinformers "k8s.io/client-go/informers/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	kcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	coreinformers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions/core/v1"
-	corelisters "k8s.io/kubernetes/pkg/client/listers/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
@@ -50,26 +49,38 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
-const (
-	// loopPeriod is the amount of time the reconciler loop waits between
-	// successive executions
-	reconcilerLoopPeriod time.Duration = 100 * time.Millisecond
+// TimerConfig contains configuration of internal attach/detach timers and
+// should be used only to speed up tests. DefaultTimerConfig is the suggested
+// timer configuration for production.
+type TimerConfig struct {
+	// ReconcilerLoopPeriod is the amount of time the reconciler loop waits
+	// between successive executions
+	ReconcilerLoopPeriod time.Duration
 
-	// reconcilerMaxWaitForUnmountDuration is the maximum amount of time the
+	// ReconcilerMaxWaitForUnmountDuration is the maximum amount of time the
 	// attach detach controller will wait for a volume to be safely unmounted
 	// from its node. Once this time has expired, the controller will assume the
 	// node or kubelet are unresponsive and will detach the volume anyway.
-	reconcilerMaxWaitForUnmountDuration time.Duration = 6 * time.Minute
+	ReconcilerMaxWaitForUnmountDuration time.Duration
 
-	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
+	// DesiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
 	// DesiredStateOfWorldPopulator loop waits between successive executions
-	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 1 * time.Minute
+	DesiredStateOfWorldPopulatorLoopSleepPeriod time.Duration
 
-	// desiredStateOfWorldPopulatorListPodsRetryDuration is the amount of
+	// DesiredStateOfWorldPopulatorListPodsRetryDuration is the amount of
 	// time the DesiredStateOfWorldPopulator loop waits between list pods
 	// calls.
-	desiredStateOfWorldPopulatorListPodsRetryDuration time.Duration = 3 * time.Minute
-)
+	DesiredStateOfWorldPopulatorListPodsRetryDuration time.Duration
+}
+
+// DefaultTimerConfig is the default configuration of Attach/Detach controller
+// timers.
+var DefaultTimerConfig TimerConfig = TimerConfig{
+	ReconcilerLoopPeriod:                              100 * time.Millisecond,
+	ReconcilerMaxWaitForUnmountDuration:               6 * time.Minute,
+	DesiredStateOfWorldPopulatorLoopSleepPeriod:       1 * time.Minute,
+	DesiredStateOfWorldPopulatorListPodsRetryDuration: 3 * time.Minute,
+}
 
 // AttachDetachController defines the operations supported by this controller.
 type AttachDetachController interface {
@@ -86,8 +97,10 @@ func NewAttachDetachController(
 	pvInformer coreinformers.PersistentVolumeInformer,
 	cloud cloudprovider.Interface,
 	plugins []volume.VolumePlugin,
+	prober volume.DynamicPluginProber,
 	disableReconciliationSync bool,
-	reconcilerSyncDuration time.Duration) (AttachDetachController, error) {
+	reconcilerSyncDuration time.Duration,
+	timerConfig TimerConfig) (AttachDetachController, error) {
 	// TODO: The default resyncPeriod for shared informers is 12 hours, this is
 	// unacceptable for the attach/detach controller. For example, if a pod is
 	// skipped because the node it is scheduled to didn't set its annotation in
@@ -115,14 +128,14 @@ func NewAttachDetachController(
 		cloud:       cloud,
 	}
 
-	if err := adc.volumePluginMgr.InitPlugins(plugins, adc); err != nil {
+	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
 		return nil, fmt.Errorf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.Core().RESTClient()).Events("")})
-	recorder := eventBroadcaster.NewRecorder(api.Scheme, clientv1.EventSource{Component: "attachdetach"})
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events("")})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "attachdetach-controller"})
 
 	adc.desiredStateOfWorld = cache.NewDesiredStateOfWorld(&adc.volumePluginMgr)
 	adc.actualStateOfWorld = cache.NewActualStateOfWorld(&adc.volumePluginMgr)
@@ -137,18 +150,19 @@ func NewAttachDetachController(
 
 	// Default these to values in options
 	adc.reconciler = reconciler.NewReconciler(
-		reconcilerLoopPeriod,
-		reconcilerMaxWaitForUnmountDuration,
+		timerConfig.ReconcilerLoopPeriod,
+		timerConfig.ReconcilerMaxWaitForUnmountDuration,
 		reconcilerSyncDuration,
 		disableReconciliationSync,
 		adc.desiredStateOfWorld,
 		adc.actualStateOfWorld,
 		adc.attacherDetacher,
-		adc.nodeStatusUpdater)
+		adc.nodeStatusUpdater,
+		recorder)
 
 	adc.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
-		desiredStateOfWorldPopulatorLoopSleepPeriod,
-		desiredStateOfWorldPopulatorListPodsRetryDuration,
+		timerConfig.DesiredStateOfWorldPopulatorLoopSleepPeriod,
+		timerConfig.DesiredStateOfWorldPopulatorListPodsRetryDuration,
 		podInformer.Lister(),
 		adc.desiredStateOfWorld,
 		&adc.volumePluginMgr,
@@ -280,12 +294,8 @@ func (adc *attachDetachController) populateActualStateOfWorld() error {
 				glog.Errorf("Failed to mark the volume as attached: %v", err)
 				continue
 			}
-			adc.processVolumesInUse(nodeName, node.Status.VolumesInUse, true /* forceUnmount */)
-			if _, exists := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]; exists {
-				// Node specifies annotation indicating it should be managed by
-				// attach detach controller. Add it to desired state of world.
-				adc.desiredStateOfWorld.AddNode(types.NodeName(node.Name)) // Needed for DesiredStateOfWorld population
-			}
+			adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
+			adc.addNodeToDswp(node, types.NodeName(node.Name))
 		}
 	}
 	return nil
@@ -385,7 +395,12 @@ func (adc *attachDetachController) podAdd(obj interface{}) {
 		return
 	}
 
-	util.ProcessPodVolumes(pod, true, /* addVolumes */
+	volumeActionFlag := util.DetermineVolumeAction(
+		pod,
+		adc.desiredStateOfWorld,
+		true /* default volume action */)
+
+	util.ProcessPodVolumes(pod, volumeActionFlag, /* addVolumes */
 		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
 }
 
@@ -395,8 +410,22 @@ func (adc *attachDetachController) GetDesiredStateOfWorld() cache.DesiredStateOf
 }
 
 func (adc *attachDetachController) podUpdate(oldObj, newObj interface{}) {
-	// The flow for update is the same as add.
-	adc.podAdd(newObj)
+	pod, ok := newObj.(*v1.Pod)
+	if pod == nil || !ok {
+		return
+	}
+	if pod.Spec.NodeName == "" {
+		// Ignore pods without NodeName, indicating they are not scheduled.
+		return
+	}
+
+	volumeActionFlag := util.DetermineVolumeAction(
+		pod,
+		adc.desiredStateOfWorld,
+		true /* default volume action */)
+
+	util.ProcessPodVolumes(pod, volumeActionFlag, /* addVolumes */
+		adc.desiredStateOfWorld, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister)
 }
 
 func (adc *attachDetachController) podDelete(obj interface{}) {
@@ -433,12 +462,8 @@ func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
 	}
 
 	nodeName := types.NodeName(node.Name)
-	if _, exists := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]; exists {
-		// Node specifies annotation indicating it should be managed by attach
-		// detach controller. Add it to desired state of world.
-		adc.desiredStateOfWorld.AddNode(nodeName)
-	}
-	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse, false /* forceUnmount */)
+	adc.addNodeToDswp(node, nodeName)
+	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
 }
 
 func (adc *attachDetachController) nodeDelete(obj interface{}) {
@@ -449,10 +474,11 @@ func (adc *attachDetachController) nodeDelete(obj interface{}) {
 
 	nodeName := types.NodeName(node.Name)
 	if err := adc.desiredStateOfWorld.DeleteNode(nodeName); err != nil {
-		glog.V(10).Infof("%v", err)
+		// This might happen during drain, but we still want it to appear in our logs
+		glog.Infof("error removing node %q from desired-state-of-world: %v", nodeName, err)
 	}
 
-	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse, false /* forceUnmount */)
+	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
 }
 
 // processVolumesInUse processes the list of volumes marked as "in-use"
@@ -460,7 +486,7 @@ func (adc *attachDetachController) nodeDelete(obj interface{}) {
 // corresponding volume in the actual state of the world to indicate that it is
 // mounted.
 func (adc *attachDetachController) processVolumesInUse(
-	nodeName types.NodeName, volumesInUse []v1.UniqueVolumeName, forceUnmount bool) {
+	nodeName types.NodeName, volumesInUse []v1.UniqueVolumeName) {
 	glog.V(4).Infof("processVolumesInUse for node %q", nodeName)
 	for _, attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName) {
 		mounted := false
@@ -470,8 +496,7 @@ func (adc *attachDetachController) processVolumesInUse(
 				break
 			}
 		}
-		err := adc.actualStateOfWorld.SetVolumeMountedByNode(
-			attachedVolume.VolumeName, nodeName, mounted, forceUnmount)
+		err := adc.actualStateOfWorld.SetVolumeMountedByNode(attachedVolume.VolumeName, nodeName, mounted)
 		if err != nil {
 			glog.Warningf(
 				"SetVolumeMountedByNode(%q, %q, %q) returned an error: %v",
@@ -514,7 +539,7 @@ func (adc *attachDetachController) GetCloudProvider() cloudprovider.Interface {
 	return adc.cloud
 }
 
-func (adc *attachDetachController) GetMounter() mount.Interface {
+func (adc *attachDetachController) GetMounter(pluginName string) mount.Interface {
 	return nil
 }
 
@@ -538,4 +563,32 @@ func (adc *attachDetachController) GetSecretFunc() func(namespace, name string) 
 	return func(_, _ string) (*v1.Secret, error) {
 		return nil, fmt.Errorf("GetSecret unsupported in attachDetachController")
 	}
+}
+
+func (adc *attachDetachController) GetConfigMapFunc() func(namespace, name string) (*v1.ConfigMap, error) {
+	return func(_, _ string) (*v1.ConfigMap, error) {
+		return nil, fmt.Errorf("GetConfigMap unsupported in attachDetachController")
+	}
+}
+
+func (adc *attachDetachController) GetExec(pluginName string) mount.Exec {
+	return mount.NewOsExec()
+}
+
+func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.NodeName) {
+	if _, exists := node.Annotations[volumehelper.ControllerManagedAttachAnnotation]; exists {
+		keepTerminatedPodVolumes := false
+
+		if t, ok := node.Annotations[volumehelper.KeepTerminatedPodVolumesAnnotation]; ok {
+			keepTerminatedPodVolumes = (t == "true")
+		}
+
+		// Node specifies annotation indicating it should be managed by attach
+		// detach controller. Add it to desired state of world.
+		adc.desiredStateOfWorld.AddNode(nodeName, keepTerminatedPodVolumes)
+	}
+}
+
+func (adc *attachDetachController) GetNodeLabels() (map[string]string, error) {
+	return nil, fmt.Errorf("GetNodeLabels() unsupported in Attach/Detach controller")
 }

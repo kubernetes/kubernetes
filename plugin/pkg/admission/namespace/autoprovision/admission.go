@@ -30,25 +30,27 @@ import (
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
-func init() {
-	kubeapiserveradmission.Plugins.Register("NamespaceAutoProvision", func(config io.Reader) (admission.Interface, error) {
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("NamespaceAutoProvision", func(config io.Reader) (admission.Interface, error) {
 		return NewProvision(), nil
 	})
 }
 
-// provision is an implementation of admission.Interface.
+// Provision is an implementation of admission.Interface.
 // It looks at all incoming requests in a namespace context, and if the namespace does not exist, it creates one.
 // It is useful in deployments that do not want to restrict creation of a namespace prior to its usage.
-type provision struct {
+type Provision struct {
 	*admission.Handler
 	client          internalclientset.Interface
 	namespaceLister corelisters.NamespaceLister
 }
 
-var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&provision{})
-var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&provision{})
+var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&Provision{})
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&Provision{})
 
-func (p *provision) Admit(a admission.Attributes) error {
+// Admit makes an admission decision based on the request attributes
+func (p *Provision) Admit(a admission.Attributes) error {
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
 	// if we're here, then the API server has found a route, which means that if we have a non-empty namespace
 	// its a namespaced resource.
@@ -86,23 +88,26 @@ func (p *provision) Admit(a admission.Attributes) error {
 }
 
 // NewProvision creates a new namespace provision admission control handler
-func NewProvision() admission.Interface {
-	return &provision{
+func NewProvision() *Provision {
+	return &Provision{
 		Handler: admission.NewHandler(admission.Create),
 	}
 }
 
-func (p *provision) SetInternalKubeClientSet(client internalclientset.Interface) {
+// SetInternalKubeClientSet implements the WantsInternalKubeClientSet interface.
+func (p *Provision) SetInternalKubeClientSet(client internalclientset.Interface) {
 	p.client = client
 }
 
-func (p *provision) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
+// SetInternalKubeInformerFactory implements the WantsInternalKubeInformerFactory interface.
+func (p *Provision) SetInternalKubeInformerFactory(f informers.SharedInformerFactory) {
 	namespaceInformer := f.Core().InternalVersion().Namespaces()
 	p.namespaceLister = namespaceInformer.Lister()
 	p.SetReadyFunc(namespaceInformer.Informer().HasSynced)
 }
 
-func (p *provision) Validate() error {
+// ValidateInitialization implements the InitializationValidator interface.
+func (p *Provision) ValidateInitialization() error {
 	if p.namespaceLister == nil {
 		return fmt.Errorf("missing namespaceLister")
 	}

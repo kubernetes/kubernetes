@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net/http"
 	"path"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -29,37 +28,36 @@ import (
 	compute "google.golang.org/api/compute/v1"
 )
 
+func newRoutesMetricContext(request string) *metricContext {
+	return newGenericMetricContext("routes", request, unusedMetricLabel, unusedMetricLabel, computeV1Version)
+}
+
 func (gce *GCECloud) ListRoutes(clusterName string) ([]*cloudprovider.Route, error) {
 	var routes []*cloudprovider.Route
 	pageToken := ""
 	page := 0
 	for ; page == 0 || (pageToken != "" && page < maxPages); page++ {
-		listCall := gce.service.Routes.List(gce.projectID)
+		mc := newRoutesMetricContext("list_page")
+		listCall := gce.service.Routes.List(gce.NetworkProjectID())
 
 		prefix := truncateClusterName(clusterName)
-		listCall = listCall.Filter("name eq " + prefix + "-.*")
+		// Filter for routes starting with clustername AND belonging to the
+		// relevant gcp network AND having description = "k8s-node-route".
+		filter := "(name eq " + prefix + "-.*) "
+		filter = filter + "(network eq " + gce.NetworkURL() + ") "
+		filter = filter + "(description eq " + k8sNodeRouteTag + ")"
+		listCall = listCall.Filter(filter)
 		if pageToken != "" {
 			listCall = listCall.PageToken(pageToken)
 		}
 		res, err := listCall.Do()
+		mc.Observe(err)
 		if err != nil {
 			glog.Errorf("Error getting routes from GCE: %v", err)
 			return nil, err
 		}
 		pageToken = res.NextPageToken
 		for _, r := range res.Items {
-			if r.Network != gce.networkURL {
-				continue
-			}
-			// Not managed if route description != "k8s-node-route"
-			if r.Description != k8sNodeRouteTag {
-				continue
-			}
-			// Not managed if route name doesn't start with <clusterName>
-			if !strings.HasPrefix(r.Name, prefix) {
-				continue
-			}
-
 			target := path.Base(r.NextHopInstance)
 			// TODO: Should we lastComponent(target) this?
 			targetNodeName := types.NodeName(target) // NodeName == Instance Name on GCE
@@ -80,31 +78,34 @@ func (gce *GCECloud) CreateRoute(clusterName string, nameHint string, route *clo
 	if err != nil {
 		return err
 	}
-	insertOp, err := gce.service.Routes.Insert(gce.projectID, &compute.Route{
+
+	mc := newRoutesMetricContext("create")
+	insertOp, err := gce.service.Routes.Insert(gce.NetworkProjectID(), &compute.Route{
 		Name:            routeName,
 		DestRange:       route.DestinationCIDR,
 		NextHopInstance: fmt.Sprintf("zones/%s/instances/%s", targetInstance.Zone, targetInstance.Name),
-		Network:         gce.networkURL,
+		Network:         gce.NetworkURL(),
 		Priority:        1000,
 		Description:     k8sNodeRouteTag,
 	}).Do()
 	if err != nil {
 		if isHTTPErrorCode(err, http.StatusConflict) {
-			glog.Info("Route %v already exists.")
+			glog.Infof("Route %v already exists.", routeName)
 			return nil
 		} else {
-			return err
+			return mc.Observe(err)
 		}
 	}
-	return gce.waitForGlobalOp(insertOp)
+	return gce.waitForGlobalOpInProject(insertOp, gce.NetworkProjectID(), mc)
 }
 
 func (gce *GCECloud) DeleteRoute(clusterName string, route *cloudprovider.Route) error {
-	deleteOp, err := gce.service.Routes.Delete(gce.projectID, route.Name).Do()
+	mc := newRoutesMetricContext("delete")
+	deleteOp, err := gce.service.Routes.Delete(gce.NetworkProjectID(), route.Name).Do()
 	if err != nil {
-		return err
+		return mc.Observe(err)
 	}
-	return gce.waitForGlobalOp(deleteOp)
+	return gce.waitForGlobalOpInProject(deleteOp, gce.NetworkProjectID(), mc)
 }
 
 func truncateClusterName(clusterName string) string {

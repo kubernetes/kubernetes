@@ -1,6 +1,20 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
+sh_library(
+    name = "lib",
+    srcs = [
+        "etcd.sh",
+        "golang.sh",
+        "init.sh",
+        "swagger.sh",
+        "test.sh",
+        "util.sh",
+        "version.sh",
+    ],
+    deps = [
+        "//cluster/lib",
+    ],
+)
 
 filegroup(
     name = "package-srcs",

@@ -231,6 +231,26 @@ func (s *Session) RequestSubsystem(subsystem string) error {
 	return err
 }
 
+// RFC 4254 Section 6.7.
+type ptyWindowChangeMsg struct {
+	Columns uint32
+	Rows    uint32
+	Width   uint32
+	Height  uint32
+}
+
+// WindowChange informs the remote host about a terminal window dimension change to h rows and w columns.
+func (s *Session) WindowChange(h, w int) error {
+	req := ptyWindowChangeMsg{
+		Columns: uint32(w),
+		Rows:    uint32(h),
+		Width:   uint32(w * 8),
+		Height:  uint32(h * 8),
+	}
+	_, err := s.ch.SendRequest("window-change", false, Marshal(&req))
+	return err
+}
+
 // RFC 4254 Section 6.9.
 type signalMsg struct {
 	Signal string

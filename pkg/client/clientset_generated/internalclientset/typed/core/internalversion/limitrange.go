@@ -58,6 +58,41 @@ func newLimitRanges(c *CoreClient, namespace string) *limitRanges {
 	}
 }
 
+// Get takes name of the limitRange, and returns the corresponding limitRange object, and an error if there is any.
+func (c *limitRanges) Get(name string, options v1.GetOptions) (result *api.LimitRange, err error) {
+	result = &api.LimitRange{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("limitranges").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of LimitRanges that match those selectors.
+func (c *limitRanges) List(opts v1.ListOptions) (result *api.LimitRangeList, err error) {
+	result = &api.LimitRangeList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("limitranges").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested limitRanges.
+func (c *limitRanges) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("limitranges").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a limitRange and creates it.  Returns the server's representation of the limitRange, and an error, if there is any.
 func (c *limitRanges) Create(limitRange *api.LimitRange) (result *api.LimitRange, err error) {
 	result = &api.LimitRange{}
@@ -103,41 +138,6 @@ func (c *limitRanges) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the limitRange, and returns the corresponding limitRange object, and an error if there is any.
-func (c *limitRanges) Get(name string, options v1.GetOptions) (result *api.LimitRange, err error) {
-	result = &api.LimitRange{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("limitranges").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of LimitRanges that match those selectors.
-func (c *limitRanges) List(opts v1.ListOptions) (result *api.LimitRangeList, err error) {
-	result = &api.LimitRangeList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("limitranges").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested limitRanges.
-func (c *limitRanges) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("limitranges").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched limitRange.

@@ -18,6 +18,8 @@ package apiregistration
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // APIServiceList is a list of APIService objects.
 type APIServiceList struct {
 	metav1.TypeMeta
@@ -53,22 +55,65 @@ type APIServiceSpec struct {
 	// CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate.
 	CABundle []byte
 
-	// Priority controls the ordering of this API group in the overall discovery document that gets served.
-	// Client tools like `kubectl` use this ordering to derive preference, so this ordering mechanism is important.
-	// Values must be between 1 and 1000
-	// The primary sort is based on priority, ordered lowest number to highest (10 before 20).
+	// GroupPriorityMininum is the priority this group should have at least. Higher priority means that the group is preferred by clients over lower priority ones.
+	// Note that other versions of this group might specify even higher GroupPriorityMininum values such that the whole group gets a higher priority.
+	// The primary sort is based on GroupPriorityMinimum, ordered highest number to lowest (20 before 10).
 	// The secondary sort is based on the alphabetical comparison of the name of the object.  (v1.bar before v1.foo)
-	// We'd recommend something like: *.k8s.io (except extensions) at 100, extensions at 150
-	// PaaSes (OpenShift, Deis) are recommended to be in the 200s
-	Priority int64
+	// We'd recommend something like: *.k8s.io (except extensions) at 18000 and
+	// PaaSes (OpenShift, Deis) are recommended to be in the 2000s
+	GroupPriorityMinimum int32
+
+	// VersionPriority controls the ordering of this API version inside of its group.  Must be greater than zero.
+	// The primary sort is based on VersionPriority, ordered highest to lowest (20 before 10).
+	// The secondary sort is based on the alphabetical comparison of the name of the object.  (v1.bar before v1.foo)
+	// Since it's inside of a group, the number can be small, probably in the 10s.
+	VersionPriority int32
+}
+
+type ConditionStatus string
+
+// These are valid condition statuses. "ConditionTrue" means a resource is in the condition;
+// "ConditionFalse" means a resource is not in the condition; "ConditionUnknown" means kubernetes
+// can't decide if a resource is in the condition or not. In the future, we could add other
+// intermediate conditions, e.g. ConditionDegraded.
+const (
+	ConditionTrue    ConditionStatus = "True"
+	ConditionFalse   ConditionStatus = "False"
+	ConditionUnknown ConditionStatus = "Unknown"
+)
+
+// APIConditionConditionType is a valid value for APIServiceCondition.Type
+type APIServiceConditionType string
+
+const (
+	// Available indicates that the service exists and is reachable
+	Available APIServiceConditionType = "Available"
+)
+
+// APIServiceCondition describes conditions for an APIService
+type APIServiceCondition struct {
+	// Type is the type of the condition.
+	Type APIServiceConditionType
+	// Status is the status of the condition.
+	// Can be True, False, Unknown.
+	Status ConditionStatus
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime metav1.Time
+	// Unique, one-word, CamelCase reason for the condition's last transition.
+	Reason string
+	// Human-readable message indicating details about last transition.
+	Message string
 }
 
 // APIServiceStatus contains derived information about an API server
 type APIServiceStatus struct {
+	// Current service state of apiService.
+	Conditions []APIServiceCondition
 }
 
-// +genclient=true
-// +nonNamespaced=true
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // APIService represents a server for a particular GroupVersion.
 // Name must be "version.group".

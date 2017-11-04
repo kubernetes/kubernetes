@@ -24,6 +24,8 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/errors"
+	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
@@ -50,6 +52,7 @@ type PortMapping struct {
 // CheckpointData contains all types of data that can be stored in the checkpoint.
 type CheckpointData struct {
 	PortMappings []*PortMapping `json:"port_mappings,omitempty"`
+	HostNetwork  bool           `json:"host_network,omitempty"`
 }
 
 // PodSandboxCheckpoint is the checkpoint structure for a sandbox
@@ -81,11 +84,11 @@ type CheckpointHandler interface {
 
 // PersistentCheckpointHandler is an implementation of CheckpointHandler. It persists checkpoint in CheckpointStore
 type PersistentCheckpointHandler struct {
-	store CheckpointStore
+	store utilstore.Store
 }
 
 func NewPersistentCheckpointHandler(dockershimRootDir string) (CheckpointHandler, error) {
-	fstore, err := NewFileStore(filepath.Join(dockershimRootDir, sandboxCheckpointDir))
+	fstore, err := utilstore.NewFileStore(filepath.Join(dockershimRootDir, sandboxCheckpointDir), utilfs.DefaultFs{})
 	if err != nil {
 		return nil, err
 	}

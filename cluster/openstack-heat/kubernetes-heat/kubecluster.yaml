@@ -1,4 +1,4 @@
-heat_template_version: 2014-10-16
+heat_template_version: 2016-10-14
 
 description: >
   Kubernetes cluster with one master and one or more worker nodes

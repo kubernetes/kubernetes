@@ -19,6 +19,7 @@ package extensions
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/apis/networking"
 )
 
 // GroupName is the group name use in this package
@@ -42,7 +43,7 @@ var (
 	AddToScheme   = SchemeBuilder.AddToScheme
 )
 
-// Adds the list of known types to api.Scheme.
+// Adds the list of known types to the given scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this gets cleaned up when the types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
@@ -51,20 +52,16 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&DeploymentRollback{},
 		&ReplicationControllerDummy{},
 		&Scale{},
-		&ThirdPartyResource{},
-		&ThirdPartyResourceList{},
 		&DaemonSetList{},
 		&DaemonSet{},
-		&ThirdPartyResourceData{},
-		&ThirdPartyResourceDataList{},
 		&Ingress{},
 		&IngressList{},
 		&ReplicaSet{},
 		&ReplicaSetList{},
 		&PodSecurityPolicy{},
 		&PodSecurityPolicyList{},
-		&NetworkPolicy{},
-		&NetworkPolicyList{},
+		&networking.NetworkPolicy{},
+		&networking.NetworkPolicyList{},
 	)
 	return nil
 }

@@ -36,7 +36,7 @@ type ListMetaAccessor interface {
 // List lets you work with list metadata from any of the versioned or
 // internal API objects. Attempting to set or retrieve a field on an object that does
 // not support that field will be a no-op and return a default value.
-type List metav1.List
+type List metav1.ListInterface
 
 // Type exposes the type and APIVersion of versioned or internal API objects.
 type Type metav1.Type
@@ -74,6 +74,9 @@ type MetadataAccessor interface {
 
 	Annotations(obj runtime.Object) (map[string]string, error)
 	SetAnnotations(obj runtime.Object, annotations map[string]string) error
+
+	Continue(obj runtime.Object) (string, error)
+	SetContinue(obj runtime.Object, c string) error
 
 	runtime.ResourceVersioner
 }

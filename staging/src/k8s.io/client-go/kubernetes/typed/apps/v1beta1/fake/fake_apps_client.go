@@ -26,6 +26,10 @@ type FakeAppsV1beta1 struct {
 	*testing.Fake
 }
 
+func (c *FakeAppsV1beta1) ControllerRevisions(namespace string) v1beta1.ControllerRevisionInterface {
+	return &FakeControllerRevisions{c, namespace}
+}
+
 func (c *FakeAppsV1beta1) Deployments(namespace string) v1beta1.DeploymentInterface {
 	return &FakeDeployments{c, namespace}
 }

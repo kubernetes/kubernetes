@@ -22,37 +22,45 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
+	"reflect"
 	"sort"
+	"sync"
 	"time"
 
-	"github.com/emicklei/go-restful/swagger"
-
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
+	openapivalidation "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubectl/validation"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 )
 
 type ring1Factory struct {
 	clientAccessFactory ClientAccessFactory
+
+	// openAPIGetter loads and caches openapi specs
+	openAPIGetter openAPIGetter
+}
+
+type openAPIGetter struct {
+	once   sync.Once
+	getter openapi.Getter
 }
 
 func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMappingFactory {
@@ -66,13 +74,13 @@ func NewObjectMappingFactory(clientAccessFactory ClientAccessFactory) ObjectMapp
 //   return lazy implementations of mapper and typer that don't hit the wire until they are
 //   invoked.
 func (f *ring1Factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
-	mapper := api.Registry.RESTMapper()
+	mapper := legacyscheme.Registry.RESTMapper()
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
 	if err == nil {
 		mapper = meta.FirstHitRESTMapper{
 			MultiRESTMapper: meta.MultiRESTMapper{
-				discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, api.Registry.InterfacesFor),
-				api.Registry.RESTMapper(), // hardcoded fall back
+				discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, legacyscheme.Registry.InterfacesFor),
+				legacyscheme.Registry.RESTMapper(), // hardcoded fall back
 			},
 		}
 
@@ -82,7 +90,7 @@ func (f *ring1Factory) Object() (meta.RESTMapper, runtime.ObjectTyper) {
 		CheckErr(err)
 	}
 
-	return mapper, api.Scheme
+	return mapper, legacyscheme.Scheme
 }
 
 func (f *ring1Factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper, error) {
@@ -106,17 +114,22 @@ func (f *ring1Factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectType
 }
 
 func (f *ring1Factory) CategoryExpander() resource.CategoryExpander {
-	var categoryExpander resource.CategoryExpander
-	categoryExpander = resource.LegacyCategoryExpander
+	legacyExpander := resource.LegacyCategoryExpander
+
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
 	if err == nil {
-		// wrap with discovery based filtering
-		categoryExpander, err = resource.NewDiscoveryFilteredExpander(categoryExpander, discoveryClient)
-		// you only have an error on missing discoveryClient, so this shouldn't fail.  Check anyway.
+		// fallback is the legacy expander wrapped with discovery based filtering
+		fallbackExpander, err := resource.NewDiscoveryFilteredExpander(legacyExpander, discoveryClient)
 		CheckErr(err)
+
+		// by default use the expander that discovers based on "categories" field from the API
+		discoveryCategoryExpander, err := resource.NewDiscoveryCategoryExpander(fallbackExpander, discoveryClient)
+		CheckErr(err)
+
+		return discoveryCategoryExpander
 	}
 
-	return categoryExpander
+	return legacyExpander
 }
 
 func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
@@ -129,9 +142,6 @@ func (f *ring1Factory) ClientForMapping(mapping *meta.RESTMapping) (resource.RES
 	}
 	gvk := mapping.GroupVersionKind
 	switch gvk.Group {
-	case federation.GroupName:
-		mappingVersion := mapping.GroupVersionKind.GroupVersion()
-		return f.clientAccessFactory.FederationClientForVersion(&mappingVersion)
 	case api.GroupName:
 		cfg.APIPath = "/api"
 	default:
@@ -162,15 +172,6 @@ func (f *ring1Factory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (
 
 func (f *ring1Factory) Describer(mapping *meta.RESTMapping) (printers.Describer, error) {
 	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	if mapping.GroupVersionKind.Group == federation.GroupName {
-		fedClientSet, err := f.clientAccessFactory.FederationClientSetForVersion(&mappingVersion)
-		if err != nil {
-			return nil, err
-		}
-		if mapping.GroupVersionKind.Kind == "Cluster" {
-			return &printersinternal.ClusterDescriber{Interface: fedClientSet}, nil
-		}
-	}
 
 	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
 	if err != nil {
@@ -271,7 +272,7 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout tim
 		}
 
 	default:
-		gvks, _, err := api.Scheme.ObjectKinds(object)
+		gvks, _, err := legacyscheme.Scheme.ObjectKinds(object)
 		if err != nil {
 			return nil, err
 		}
@@ -279,7 +280,7 @@ func (f *ring1Factory) LogsForObject(object, options runtime.Object, timeout tim
 	}
 
 	sortBy := func(pods []*v1.Pod) sort.Interface { return controller.ByLogging(pods) }
-	pod, numPods, err := GetFirstPod(clientset.Core(), namespace, selector, timeout, sortBy)
+	pod, numPods, err := GetFirstPod(clientset.Core(), namespace, selector.String(), timeout, sortBy)
 	if err != nil {
 		return nil, err
 	}
@@ -313,21 +314,19 @@ func (f *ring1Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error)
 }
 
 func (f *ring1Factory) HistoryViewer(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	external, err := f.clientAccessFactory.KubernetesClientSet()
 	if err != nil {
 		return nil, err
 	}
-	return kubectl.HistoryViewerFor(mapping.GroupVersionKind.GroupKind(), clientset)
+	return kubectl.HistoryViewerFor(mapping.GroupVersionKind.GroupKind(), external)
 }
 
 func (f *ring1Factory) Rollbacker(mapping *meta.RESTMapping) (kubectl.Rollbacker, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	external, err := f.clientAccessFactory.KubernetesClientSet()
 	if err != nil {
 		return nil, err
 	}
-	return kubectl.RollbackerFor(mapping.GroupVersionKind.GroupKind(), clientset)
+	return kubectl.RollbackerFor(mapping.GroupVersionKind.GroupKind(), external)
 }
 
 func (f *ring1Factory) StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusViewer, error) {
@@ -337,6 +336,28 @@ func (f *ring1Factory) StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusVi
 		return nil, err
 	}
 	return kubectl.StatusViewerFor(mapping.GroupVersionKind.GroupKind(), clientset)
+}
+
+func (f *ring1Factory) ApproximatePodTemplateForObject(object runtime.Object) (*api.PodTemplateSpec, error) {
+	switch t := object.(type) {
+	case *api.Pod:
+		return &api.PodTemplateSpec{
+			ObjectMeta: t.ObjectMeta,
+			Spec:       t.Spec,
+		}, nil
+	case *api.ReplicationController:
+		return t.Spec.Template, nil
+	case *extensions.ReplicaSet:
+		return &t.Spec.Template, nil
+	case *extensions.DaemonSet:
+		return &t.Spec.Template, nil
+	case *extensions.Deployment:
+		return &t.Spec.Template, nil
+	case *batch.Job:
+		return &t.Spec.Template, nil
+	}
+
+	return nil, fmt.Errorf("unable to extract pod template from type %v", reflect.TypeOf(object))
 }
 
 func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout time.Duration) (*api.Pod, error) {
@@ -380,7 +401,7 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout tim
 		return t, nil
 
 	default:
-		gvks, _, err := api.Scheme.ObjectKinds(object)
+		gvks, _, err := legacyscheme.Scheme.ObjectKinds(object)
 		if err != nil {
 			return nil, err
 		}
@@ -388,42 +409,39 @@ func (f *ring1Factory) AttachablePodForObject(object runtime.Object, timeout tim
 	}
 
 	sortBy := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
-	pod, _, err := GetFirstPod(clientset.Core(), namespace, selector, timeout, sortBy)
+	pod, _, err := GetFirstPod(clientset.Core(), namespace, selector.String(), timeout, sortBy)
 	return pod, err
 }
 
-func (f *ring1Factory) Validator(validate bool, cacheDir string) (validation.Schema, error) {
-	if validate {
-		discovery, err := f.clientAccessFactory.DiscoveryClient()
-		if err != nil {
-			return nil, err
-		}
-		dir := cacheDir
-		if len(dir) > 0 {
-			version, err := discovery.ServerVersion()
-			if err == nil {
-				dir = path.Join(cacheDir, version.String())
-			} else {
-				dir = "" // disable caching as a fallback
-			}
-		}
-		swaggerSchema := &clientSwaggerSchema{
-			c:        discovery.RESTClient(),
-			cacheDir: dir,
-		}
-		return validation.ConjunctiveSchema{
-			swaggerSchema,
-			validation.NoDoubleKeySchema{},
-		}, nil
+func (f *ring1Factory) Validator(validate bool) (validation.Schema, error) {
+	if !validate {
+		return validation.NullSchema{}, nil
 	}
-	return validation.NullSchema{}, nil
+
+	resources, err := f.OpenAPISchema()
+	if err != nil {
+		return nil, err
+	}
+
+	return validation.ConjunctiveSchema{
+		openapivalidation.NewSchemaValidation(resources),
+		validation.NoDoubleKeySchema{},
+	}, nil
 }
 
-func (f *ring1Factory) SwaggerSchema(gvk schema.GroupVersionKind) (*swagger.ApiDeclaration, error) {
-	version := gvk.GroupVersion()
+// OpenAPISchema returns metadata and structural information about Kubernetes object definitions.
+func (f *ring1Factory) OpenAPISchema() (openapi.Resources, error) {
 	discovery, err := f.clientAccessFactory.DiscoveryClient()
 	if err != nil {
 		return nil, err
 	}
-	return discovery.SwaggerSchema(version)
+
+	// Lazily initialize the OpenAPIGetter once
+	f.openAPIGetter.once.Do(func() {
+		// Create the caching OpenAPIGetter
+		f.openAPIGetter.getter = openapi.NewOpenAPIGetter(discovery)
+	})
+
+	// Delegate to the OpenAPIGetter
+	return f.openAPIGetter.getter.Get()
 }

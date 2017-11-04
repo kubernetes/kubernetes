@@ -19,7 +19,7 @@ package flexvolume
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util/exec"
+	exec "k8s.io/utils/exec/testing"
 )
 
 func TestInit(t *testing.T) {
@@ -41,7 +41,7 @@ func TestGetVolumeName(t *testing.T) {
 	spec := fakeVolumeSpec()
 	plugin, _ := testPlugin()
 	plugin.runner = fakeRunner(
-		assertDriverCall(t, fakeVolumeNameOutput("/dev/sdx"), getVolumeNameCmd,
+		assertDriverCall(t, fakeVolumeNameOutput(spec.Name()), getVolumeNameCmd,
 			specJson(plugin, spec, nil)),
 	)
 
@@ -49,7 +49,7 @@ func TestGetVolumeName(t *testing.T) {
 	if err != nil {
 		t.Errorf("GetVolumeName() failed: %v", err)
 	}
-	expectedName := "~dev~sdx"
+	expectedName := spec.Name()
 	if name != expectedName {
 		t.Errorf("GetVolumeName() returned %v instead of %v", name, expectedName)
 	}

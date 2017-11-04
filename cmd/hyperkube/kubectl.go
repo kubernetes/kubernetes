@@ -33,7 +33,7 @@ func NewKubectlServer() *Server {
 		name:        "kubectl",
 		SimpleUsage: "Kubernetes command line client",
 		Long:        "Kubernetes command line client",
-		Run: func(s *Server, args []string) error {
+		Run: func(s *Server, args []string, stopCh <-chan struct{}) error {
 			cmd.SetArgs(args)
 			return cmd.Execute()
 		},

@@ -18,6 +18,10 @@ limitations under the License.
 
 package mount
 
+import (
+	"errors"
+)
+
 type NsenterMounter struct{}
 
 func NewNsenterMounter() *NsenterMounter {
@@ -38,6 +42,14 @@ func (*NsenterMounter) List() ([]MountPoint, error) {
 	return []MountPoint{}, nil
 }
 
+func (m *NsenterMounter) IsNotMountPoint(dir string) (bool, error) {
+	return IsNotMountPoint(m, dir)
+}
+
+func (*NsenterMounter) IsMountPointMatch(mp MountPoint, dir string) bool {
+	return (mp.Path == dir)
+}
+
 func (*NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
@@ -52,4 +64,24 @@ func (*NsenterMounter) PathIsDevice(pathname string) (bool, error) {
 
 func (*NsenterMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
 	return "", nil
+}
+
+func (*NsenterMounter) MakeRShared(path string) error {
+	return nil
+}
+
+func (*NsenterMounter) GetFileType(_ string) (FileType, error) {
+	return FileType("fake"), errors.New("not implemented")
+}
+
+func (*NsenterMounter) MakeDir(pathname string) error {
+	return nil
+}
+
+func (*NsenterMounter) MakeFile(pathname string) error {
+	return nil
+}
+
+func (*NsenterMounter) ExistsPath(pathname string) bool {
+	return true
 }

@@ -25,15 +25,15 @@ import (
 	"syscall"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	nodeutil "k8s.io/kubernetes/pkg/api/v1/node"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -45,7 +45,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 		pollInterval   = 1 * time.Second
 		pollConsistent = 5 * time.Second
 		pollTimeout    = 1 * time.Minute
-		image          = "gcr.io/google_containers/node-problem-detector:v0.3.0"
+		image          = "gcr.io/google_containers/node-problem-detector:v0.4.1"
 	)
 	f := framework.NewDefaultFramework("node-problem-detector")
 	var c clientset.Interface
@@ -155,12 +155,14 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			By("Create the test log file")
 			Expect(err).NotTo(HaveOccurred())
 			By("Create config map for the node problem detector")
-			_, err = c.Core().ConfigMaps(ns).Create(&v1.ConfigMap{
+			_, err = c.CoreV1().ConfigMaps(ns).Create(&v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: configName},
 				Data:       map[string]string{path.Base(configFile): config},
 			})
 			Expect(err).NotTo(HaveOccurred())
 			By("Create the node problem detector")
+			hostPathType := new(v1.HostPathType)
+			*hostPathType = v1.HostPathType(string(v1.HostPathFileOrCreate))
 			f.PodClient().CreateSync(&v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: name,
@@ -186,7 +188,10 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 						{
 							Name: localtimeVolume,
 							VolumeSource: v1.VolumeSource{
-								HostPath: &v1.HostPathVolumeSource{Path: etcLocaltime},
+								HostPath: &v1.HostPathVolumeSource{
+									Path: etcLocaltime,
+									Type: hostPathType,
+								},
 							},
 						},
 					},
@@ -326,20 +331,20 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 
 				By(fmt.Sprintf("Wait for %d events generated", test.events))
 				Eventually(func() error {
-					return verifyEvents(c.Core().Events(eventNamespace), eventListOptions, test.events, tempReason, tempMessage)
+					return verifyEvents(c.CoreV1().Events(eventNamespace), eventListOptions, test.events, tempReason, tempMessage)
 				}, pollTimeout, pollInterval).Should(Succeed())
 				By(fmt.Sprintf("Make sure only %d events generated", test.events))
 				Consistently(func() error {
-					return verifyEvents(c.Core().Events(eventNamespace), eventListOptions, test.events, tempReason, tempMessage)
+					return verifyEvents(c.CoreV1().Events(eventNamespace), eventListOptions, test.events, tempReason, tempMessage)
 				}, pollConsistent, pollInterval).Should(Succeed())
 
 				By(fmt.Sprintf("Make sure node condition %q is set", condition))
 				Eventually(func() error {
-					return verifyNodeCondition(c.Core().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
+					return verifyNodeCondition(c.CoreV1().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
 				}, pollTimeout, pollInterval).Should(Succeed())
 				By(fmt.Sprintf("Make sure node condition %q is stable", condition))
 				Consistently(func() error {
-					return verifyNodeCondition(c.Core().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
+					return verifyNodeCondition(c.CoreV1().Nodes(), condition, test.conditionType, test.conditionReason, test.conditionMessage)
 				}, pollConsistent, pollInterval).Should(Succeed())
 			}
 		})
@@ -356,12 +361,12 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 			By("Wait for the node problem detector to disappear")
 			Expect(framework.WaitForPodToDisappear(c, ns, name, labels.Everything(), pollInterval, pollTimeout)).To(Succeed())
 			By("Delete the config map")
-			c.Core().ConfigMaps(ns).Delete(configName, nil)
+			c.CoreV1().ConfigMaps(ns).Delete(configName, nil)
 			By("Clean up the events")
-			Expect(c.Core().Events(eventNamespace).DeleteCollection(metav1.NewDeleteOptions(0), eventListOptions)).To(Succeed())
+			Expect(c.CoreV1().Events(eventNamespace).DeleteCollection(metav1.NewDeleteOptions(0), eventListOptions)).To(Succeed())
 			By("Clean up the node condition")
 			patch := []byte(fmt.Sprintf(`{"status":{"conditions":[{"$patch":"delete","type":"%s"}]}}`, condition))
-			c.Core().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do()
+			c.CoreV1().RESTClient().Patch(types.StrategicMergePatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do()
 		})
 	})
 })
@@ -372,6 +377,7 @@ func injectLog(file string, timestamp time.Time, log string, num int) error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	for i := 0; i < num; i++ {
 		_, err := f.WriteString(fmt.Sprintf("%s kernel: [0.000000] %s\n", timestamp.Format(time.Stamp), log))
 		if err != nil {

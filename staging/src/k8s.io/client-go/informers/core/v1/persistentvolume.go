@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
+	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1 "k8s.io/client-go/listers/core/v1"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
 	cache "k8s.io/client-go/tools/cache"
 	time "time"
 )
@@ -41,8 +41,11 @@ type persistentVolumeInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newPersistentVolumeInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewPersistentVolumeInformer constructs a new informer for PersistentVolume type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewPersistentVolumeInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
 				return client.CoreV1().PersistentVolumes().List(options)
@@ -51,16 +54,18 @@ func newPersistentVolumeInformer(client kubernetes.Interface, resyncPeriod time.
 				return client.CoreV1().PersistentVolumes().Watch(options)
 			},
 		},
-		&api_v1.PersistentVolume{},
+		&core_v1.PersistentVolume{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultPersistentVolumeInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewPersistentVolumeInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *persistentVolumeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api_v1.PersistentVolume{}, newPersistentVolumeInformer)
+	return f.factory.InformerFor(&core_v1.PersistentVolume{}, defaultPersistentVolumeInformer)
 }
 
 func (f *persistentVolumeInformer) Lister() v1.PersistentVolumeLister {

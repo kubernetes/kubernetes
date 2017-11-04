@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
-	replicaset "k8s.io/kubernetes/pkg/controller/replicaset"
+	"k8s.io/kubernetes/pkg/controller/replicaset"
 )
 
 func startDaemonSetController(ctx ControllerContext) (bool, error) {
@@ -33,6 +33,7 @@ func startDaemonSetController(ctx ControllerContext) (bool, error) {
 	}
 	go daemon.NewDaemonSetsController(
 		ctx.InformerFactory.Extensions().V1beta1().DaemonSets(),
+		ctx.InformerFactory.Apps().V1beta1().ControllerRevisions(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.ClientBuilder.ClientOrDie("daemon-set-controller"),

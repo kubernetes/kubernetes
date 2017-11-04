@@ -17,18 +17,12 @@ limitations under the License.
 package ingress
 
 import (
-	"fmt"
-	"reflect"
-
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 )
@@ -40,7 +34,7 @@ type ingressStrategy struct {
 }
 
 // Strategy is the default logic that applies when creating and updating Replication Ingress objects.
-var Strategy = ingressStrategy{api.Scheme, names.SimpleNameGenerator}
+var Strategy = ingressStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all Ingress' need to be within a namespace.
 func (ingressStrategy) NamespaceScoped() bool {
@@ -66,7 +60,7 @@ func (ingressStrategy) PrepareForUpdate(ctx genericapirequest.Context, obj, old 
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
 	// See metav1.ObjectMeta description for more information on Generation.
-	if !reflect.DeepEqual(oldIngress.Spec, newIngress.Spec) {
+	if !apiequality.Semantic.DeepEqual(oldIngress.Spec, newIngress.Spec) {
 		newIngress.Generation = oldIngress.Generation + 1
 	}
 
@@ -98,31 +92,6 @@ func (ingressStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old ru
 // AllowUnconditionalUpdate is the default update policy for Ingress objects.
 func (ingressStrategy) AllowUnconditionalUpdate() bool {
 	return true
-}
-
-// IngressToSelectableFields returns a field set that represents the object.
-func IngressToSelectableFields(ingress *extensions.Ingress) fields.Set {
-	return generic.ObjectMetaFieldsSet(&ingress.ObjectMeta, true)
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	ingress, ok := obj.(*extensions.Ingress)
-	if !ok {
-		return nil, nil, fmt.Errorf("Given object is not an Ingress.")
-	}
-	return labels.Set(ingress.ObjectMeta.Labels), IngressToSelectableFields(ingress), nil
-}
-
-// MatchIngress is the filter used by the generic etcd backend to ingress
-// watch events from etcd to clients of the apiserver only interested in specific
-// labels/fields.
-func MatchIngress(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
 }
 
 type ingressStatusStrategy struct {

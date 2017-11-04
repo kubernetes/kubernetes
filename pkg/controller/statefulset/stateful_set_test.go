@@ -17,18 +17,19 @@ limitations under the License.
 package statefulset
 
 import (
-	"reflect"
 	"sort"
 	"testing"
 
+	apps "k8s.io/api/apps/v1beta1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api/v1"
-	apps "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
-	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/externalversions"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/history"
 )
 
 func alwaysReady() bool { return true }
@@ -45,7 +46,7 @@ func TestStatefulSetControllerCreates(t *testing.T) {
 		set = obj.(*apps.StatefulSet)
 	}
 	if set.Status.Replicas != 3 {
-		t.Error("Falied to scale statefulset to 3 replicas")
+		t.Errorf("set.Status.Replicas = %v; want 3", set.Status.Replicas)
 	}
 }
 
@@ -61,7 +62,7 @@ func TestStatefulSetControllerDeletes(t *testing.T) {
 		set = obj.(*apps.StatefulSet)
 	}
 	if set.Status.Replicas != 3 {
-		t.Error("Falied to scale statefulset to 3 replicas")
+		t.Errorf("set.Status.Replicas = %v; want 3", set.Status.Replicas)
 	}
 	*set.Spec.Replicas = 0
 	if err := scaleDownStatefulSetController(set, ssc, spc); err != nil {
@@ -73,7 +74,7 @@ func TestStatefulSetControllerDeletes(t *testing.T) {
 		set = obj.(*apps.StatefulSet)
 	}
 	if set.Status.Replicas != 0 {
-		t.Error("Falied to scale statefulset to 3 replicas")
+		t.Errorf("set.Status.Replicas = %v; want 0", set.Status.Replicas)
 	}
 }
 
@@ -89,7 +90,7 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 		set = obj.(*apps.StatefulSet)
 	}
 	if set.Status.Replicas != 3 {
-		t.Error("Falied to scale statefulset to 3 replicas")
+		t.Errorf("set.Status.Replicas = %v; want 3", set.Status.Replicas)
 	}
 	pods, err := spc.addTerminatingPod(set, 3)
 	if err != nil {
@@ -124,7 +125,7 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 		set = obj.(*apps.StatefulSet)
 	}
 	if set.Status.Replicas != 0 {
-		t.Error("Falied to scale statefulset to 3 replicas")
+		t.Errorf("set.Status.Replicas = %v; want 0", set.Status.Replicas)
 	}
 }
 
@@ -140,7 +141,7 @@ func TestStatefulSetControllerBlocksScaling(t *testing.T) {
 		set = obj.(*apps.StatefulSet)
 	}
 	if set.Status.Replicas != 3 {
-		t.Error("Falied to scale statefulset to 3 replicas")
+		t.Errorf("set.Status.Replicas = %v; want 3", set.Status.Replicas)
 	}
 	*set.Spec.Replicas = 5
 	fakeResourceVersion(set)
@@ -520,16 +521,13 @@ func TestGetPodsForStatefulSetAdopt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getPodsForStatefulSet() error: %v", err)
 	}
-	var got []string
+	got := sets.NewString()
 	for _, pod := range pods {
-		got = append(got, pod.Name)
+		got.Insert(pod.Name)
 	}
-
 	// pod2 should be claimed, pod3 and pod4 ignored
-	want := []string{pod1.Name, pod2.Name}
-	sort.Strings(got)
-	sort.Strings(want)
-	if !reflect.DeepEqual(got, want) {
+	want := sets.NewString(pod1.Name, pod2.Name)
+	if !got.Equal(want) {
 		t.Errorf("getPodsForStatefulSet() = %v, want %v", got, want)
 	}
 }
@@ -560,16 +558,14 @@ func TestGetPodsForStatefulSetRelease(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getPodsForStatefulSet() error: %v", err)
 	}
-	var got []string
+	got := sets.NewString()
 	for _, pod := range pods {
-		got = append(got, pod.Name)
+		got.Insert(pod.Name)
 	}
 
 	// Expect only pod1 (pod2 and pod3 should be released, pod4 ignored).
-	want := []string{pod1.Name}
-	sort.Strings(got)
-	sort.Strings(want)
-	if !reflect.DeepEqual(got, want) {
+	want := sets.NewString(pod1.Name)
+	if !got.Equal(want) {
 		t.Errorf("getPodsForStatefulSet() = %v, want %v", got, want)
 	}
 }
@@ -578,15 +574,18 @@ func newFakeStatefulSetController(initialObjects ...runtime.Object) (*StatefulSe
 	client := fake.NewSimpleClientset(initialObjects...)
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	fpc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1beta1().StatefulSets())
+	ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1beta1().StatefulSets())
 	ssc := NewStatefulSetController(
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Apps().V1beta1().StatefulSets(),
 		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Apps().V1beta1().ControllerRevisions(),
 		client,
 	)
+	ssh := history.NewFakeHistory(informerFactory.Apps().V1beta1().ControllerRevisions())
 	ssc.podListerSynced = alwaysReady
 	ssc.setListerSynced = alwaysReady
-	ssc.control = NewDefaultStatefulSetControl(fpc)
+	ssc.control = NewDefaultStatefulSetControl(fpc, ssu, ssh)
 
 	return ssc, fpc
 }
@@ -614,8 +613,11 @@ func scaleUpStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetControl
 	if err != nil {
 		return err
 	}
-	for set.Status.Replicas < *set.Spec.Replicas {
+	for set.Status.ReadyReplicas < *set.Spec.Replicas {
 		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			return err
+		}
 		ord := len(pods) - 1
 		pod := getPodAtOrdinal(pods, ord)
 		if pods, err = spc.setPodPending(set, ord); err != nil {
@@ -640,7 +642,7 @@ func scaleUpStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetControl
 		pod = getPodAtOrdinal(pods, ord)
 		ssc.updatePod(&prev, pod)
 		fakeWorker(ssc)
-		if err := assertInvariants(set, spc); err != nil {
+		if err := assertMonotonicInvariants(set, spc); err != nil {
 			return err
 		}
 		if obj, _, err := spc.setsIndexer.Get(set); err != nil {
@@ -650,7 +652,7 @@ func scaleUpStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetControl
 		}
 
 	}
-	return assertInvariants(set, spc)
+	return assertMonotonicInvariants(set, spc)
 }
 
 func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetController, spc *fakeStatefulPodControl) error {
@@ -670,6 +672,9 @@ func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetContr
 	ssc.enqueueStatefulSet(set)
 	fakeWorker(ssc)
 	pods, err = spc.addTerminatingPod(set, ord)
+	if err != nil {
+		return err
+	}
 	pod = getPodAtOrdinal(pods, ord)
 	ssc.updatePod(&prev, pod)
 	fakeWorker(ssc)
@@ -678,8 +683,15 @@ func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetContr
 	fakeWorker(ssc)
 	for set.Status.Replicas > *set.Spec.Replicas {
 		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+		if err != nil {
+			return err
+		}
+
 		ord := len(pods)
 		pods, err = spc.addTerminatingPod(set, ord)
+		if err != nil {
+			return err
+		}
 		pod = getPodAtOrdinal(pods, ord)
 		ssc.updatePod(&prev, pod)
 		fakeWorker(ssc)
@@ -692,5 +704,5 @@ func scaleDownStatefulSetController(set *apps.StatefulSet, ssc *StatefulSetContr
 			set = obj.(*apps.StatefulSet)
 		}
 	}
-	return assertInvariants(set, spc)
+	return assertMonotonicInvariants(set, spc)
 }

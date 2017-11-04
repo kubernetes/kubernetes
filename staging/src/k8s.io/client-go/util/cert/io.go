@@ -66,10 +66,7 @@ func WriteCert(certPath string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(certPath), os.FileMode(0755)); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(certPath, data, os.FileMode(0644)); err != nil {
-		return err
-	}
-	return nil
+	return ioutil.WriteFile(certPath, data, os.FileMode(0644))
 }
 
 // WriteKey writes the pem-encoded key data to keyPath.
@@ -80,10 +77,7 @@ func WriteKey(keyPath string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(keyPath), os.FileMode(0755)); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(keyPath, data, os.FileMode(0600)); err != nil {
-		return err
-	}
-	return nil
+	return ioutil.WriteFile(keyPath, data, os.FileMode(0600))
 }
 
 // LoadOrGenerateKeyFile looks for a key in the file at the given path. If it
@@ -138,13 +132,27 @@ func CertsFromFile(file string) ([]*x509.Certificate, error) {
 // PrivateKeyFromFile returns the private key in rsa.PrivateKey or ecdsa.PrivateKey format from a given PEM-encoded file.
 // Returns an error if the file could not be read or if the private key could not be parsed.
 func PrivateKeyFromFile(file string) (interface{}, error) {
-	pemBlock, err := ioutil.ReadFile(file)
+	data, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
-	key, err := ParsePrivateKeyPEM(pemBlock)
+	key, err := ParsePrivateKeyPEM(data)
 	if err != nil {
-		return nil, fmt.Errorf("error reading %s: %v", file, err)
+		return nil, fmt.Errorf("error reading private key file %s: %v", file, err)
 	}
 	return key, nil
+}
+
+// PublicKeysFromFile returns the public keys in rsa.PublicKey or ecdsa.PublicKey format from a given PEM-encoded file.
+// Reads public keys from both public and private key files.
+func PublicKeysFromFile(file string) ([]interface{}, error) {
+	data, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	keys, err := ParsePublicKeysPEM(data)
+	if err != nil {
+		return nil, fmt.Errorf("error reading public key file %s: %v", file, err)
+	}
+	return keys, nil
 }

@@ -19,7 +19,7 @@ package app
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 )
 
 func TestValueOfAllocatableResources(t *testing.T) {
@@ -30,19 +30,19 @@ func TestValueOfAllocatableResources(t *testing.T) {
 		name           string
 	}{
 		{
-			kubeReserved:   "cpu=200m,memory=-150G",
+			kubeReserved:   "cpu=200m,memory=-150G,ephemeral-storage=10Gi",
 			systemReserved: "cpu=200m,memory=15Ki",
 			errorExpected:  true,
 			name:           "negative quantity value",
 		},
 		{
-			kubeReserved:   "cpu=200m,memory=150Gi",
+			kubeReserved:   "cpu=200m,memory=150Gi,ephemeral-storage=10Gi",
 			systemReserved: "cpu=200m,memory=15Ky",
 			errorExpected:  true,
 			name:           "invalid quantity unit",
 		},
 		{
-			kubeReserved:   "cpu=200m,memory=15G",
+			kubeReserved:   "cpu=200m,memory=15G,ephemeral-storage=10Gi",
 			systemReserved: "cpu=200m,memory=15Ki",
 			errorExpected:  false,
 			name:           "Valid resource quantity",
@@ -50,8 +50,8 @@ func TestValueOfAllocatableResources(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		kubeReservedCM := make(componentconfig.ConfigurationMap)
-		systemReservedCM := make(componentconfig.ConfigurationMap)
+		kubeReservedCM := make(kubeletconfig.ConfigurationMap)
+		systemReservedCM := make(kubeletconfig.ConfigurationMap)
 
 		kubeReservedCM.Set(test.kubeReserved)
 		systemReservedCM.Set(test.systemReserved)

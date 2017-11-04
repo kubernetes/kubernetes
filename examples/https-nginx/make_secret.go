@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
 	// This installs the legacy v1 API
 	_ "k8s.io/kubernetes/pkg/api/install"
@@ -66,5 +67,5 @@ func main() {
 			"nginx.key": nginxKey,
 		},
 	}
-	fmt.Printf(runtime.EncodeOrDie(api.Codecs.LegacyCodec(api.Registry.EnabledVersions()...), secret))
+	fmt.Printf(runtime.EncodeOrDie(legacyscheme.Codecs.LegacyCodec(legacyscheme.Registry.EnabledVersions()...), secret))
 }

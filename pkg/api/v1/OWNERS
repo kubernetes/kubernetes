@@ -12,13 +12,11 @@ reviewers:
 - mikedanese
 - liggitt
 - nikhiljindal
-- bprashanth
 - gmarek
 - erictune
 - davidopp
 - pmorie
 - sttts
-- kargakis
 - dchen1107
 - saad-ali
 - zmerlynn
@@ -27,7 +25,7 @@ reviewers:
 - justinsb
 - roberthbailey
 - ncdc
-- timstclair
+- tallclair
 - eparis
 - timothysc
 - piosz

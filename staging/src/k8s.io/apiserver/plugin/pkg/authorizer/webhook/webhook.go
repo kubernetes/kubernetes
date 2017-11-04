@@ -19,19 +19,20 @@ package webhook
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/golang/glog"
 
+	authorization "k8s.io/api/authorization/v1beta1"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/cache"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/util/cache"
 	"k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/client-go/kubernetes/scheme"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1beta1"
-	"k8s.io/client-go/pkg/api"
-	authorization "k8s.io/client-go/pkg/apis/authorization/v1beta1"
-
-	_ "k8s.io/client-go/pkg/apis/authorization/install"
 )
 
 var (
@@ -144,6 +145,7 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 	if user := attr.GetUser(); user != nil {
 		r.Spec = authorization.SubjectAccessReviewSpec{
 			User:   user.GetName(),
+			UID:    user.GetUID(),
 			Groups: user.GetGroups(),
 			Extra:  convertToSARExtra(user.GetExtra()),
 		}
@@ -195,6 +197,16 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (authorized bo
 	return r.Status.Allowed, r.Status.Reason, nil
 }
 
+//TODO: need to finish the method to get the rules when using webhook mode
+func (w *WebhookAuthorizer) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+	var (
+		resourceRules    []authorizer.ResourceRuleInfo
+		nonResourceRules []authorizer.NonResourceRuleInfo
+	)
+	incomplete := true
+	return resourceRules, nonResourceRules, incomplete, fmt.Errorf("webhook authorizer does not support user rule resolution")
+}
+
 func convertToSARExtra(extra map[string][]string) map[string]authorization.ExtraValue {
 	if extra == nil {
 		return nil
@@ -207,11 +219,24 @@ func convertToSARExtra(extra map[string][]string) map[string]authorization.Extra
 	return ret
 }
 
+// NOTE: client-go doesn't provide a registry. client-go does registers the
+// authorization/v1beta1. We construct a registry that acknowledges
+// authorization/v1beta1 as an enabled version to pass a check enforced in
+// NewGenericWebhook.
+var registry = registered.NewOrDie("")
+
+func init() {
+	registry.RegisterVersions(groupVersions)
+	if err := registry.EnableVersions(groupVersions...); err != nil {
+		panic(fmt.Sprintf("failed to enable version %v", groupVersions))
+	}
+}
+
 // subjectAccessReviewInterfaceFromKubeconfig builds a client from the specified kubeconfig file,
 // and returns a SubjectAccessReviewInterface that uses that client. Note that the client submits SubjectAccessReview
 // requests to the exact path specified in the kubeconfig file, so arbitrary non-API servers can be targeted.
 func subjectAccessReviewInterfaceFromKubeconfig(kubeConfigFile string) (authorizationclient.SubjectAccessReviewInterface, error) {
-	gw, err := webhook.NewGenericWebhook(api.Registry, api.Codecs, kubeConfigFile, groupVersions, 0)
+	gw, err := webhook.NewGenericWebhook(registry, scheme.Codecs, kubeConfigFile, groupVersions, 0)
 	if err != nil {
 		return nil, err
 	}

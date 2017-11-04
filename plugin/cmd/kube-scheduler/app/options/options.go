@@ -22,9 +22,11 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
-	"k8s.io/kubernetes/pkg/client/leaderelection"
+	"k8s.io/kubernetes/pkg/client/leaderelectionconfig"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 
 	// add the kubernetes feature gates
@@ -48,15 +50,15 @@ type SchedulerServer struct {
 	// Kubeconfig is Path to kubeconfig file with authorization and master
 	// location information.
 	Kubeconfig string
-	// Dynamic conifguration for scheduler features.
+	// Dynamic configuration for scheduler features.
 }
 
 // NewSchedulerServer creates a new SchedulerServer with default parameters
 func NewSchedulerServer() *SchedulerServer {
 	versioned := &v1alpha1.KubeSchedulerConfiguration{}
-	api.Scheme.Default(versioned)
+	legacyscheme.Scheme.Default(versioned)
 	cfg := componentconfig.KubeSchedulerConfiguration{}
-	api.Scheme.Convert(versioned, &cfg, nil)
+	legacyscheme.Scheme.Convert(versioned, &cfg, nil)
 	cfg.LeaderElection.LeaderElect = true
 	s := SchedulerServer{
 		KubeSchedulerConfiguration: cfg,
@@ -87,8 +89,9 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.HardPodAffinitySymmetricWeight, "hard-pod-affinity-symmetric-weight", api.DefaultHardPodAffinitySymmetricWeight,
 		"RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule corresponding "+
 			"to every RequiredDuringScheduling affinity rule. --hard-pod-affinity-symmetric-weight represents the weight of implicit PreferredDuringScheduling affinity rule.")
-	fs.StringVar(&s.FailureDomains, "failure-domains", api.DefaultFailureDomains, "Indicate the \"all topologies\" set for an empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.")
+	fs.MarkDeprecated("hard-pod-affinity-symmetric-weight", "This option was moved to the policy configuration file")
+	fs.StringVar(&s.FailureDomains, "failure-domains", kubeletapis.DefaultFailureDomains, "Indicate the \"all topologies\" set for an empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.")
 	fs.MarkDeprecated("failure-domains", "Doesn't have any effect. Will be removed in future version.")
-	leaderelection.BindFlags(&s.LeaderElection, fs)
+	leaderelectionconfig.BindFlags(&s.LeaderElection, fs)
 	utilfeature.DefaultFeatureGate.AddFlag(fs)
 }

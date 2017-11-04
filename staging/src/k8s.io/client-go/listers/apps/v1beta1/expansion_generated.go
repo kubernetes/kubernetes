@@ -18,12 +18,20 @@ limitations under the License.
 
 package v1beta1
 
+// ControllerRevisionListerExpansion allows custom methods to be added to
+// ControllerRevisionLister.
+type ControllerRevisionListerExpansion interface{}
+
+// ControllerRevisionNamespaceListerExpansion allows custom methods to be added to
+// ControllerRevisionNamespaceLister.
+type ControllerRevisionNamespaceListerExpansion interface{}
+
 // DeploymentListerExpansion allows custom methods to be added to
 // DeploymentLister.
 type DeploymentListerExpansion interface{}
 
 // DeploymentNamespaceListerExpansion allows custom methods to be added to
-// DeploymentNamespaeLister.
+// DeploymentNamespaceLister.
 type DeploymentNamespaceListerExpansion interface{}
 
 // ScaleListerExpansion allows custom methods to be added to
@@ -31,5 +39,5 @@ type DeploymentNamespaceListerExpansion interface{}
 type ScaleListerExpansion interface{}
 
 // ScaleNamespaceListerExpansion allows custom methods to be added to
-// ScaleNamespaeLister.
+// ScaleNamespaceLister.
 type ScaleNamespaceListerExpansion interface{}

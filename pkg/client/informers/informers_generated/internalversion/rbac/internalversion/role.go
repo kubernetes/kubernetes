@@ -41,26 +41,31 @@ type roleInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newRoleInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewRoleInformer constructs a new informer for Role type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewRoleInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Rbac().Roles(v1.NamespaceAll).List(options)
+				return client.Rbac().Roles(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Rbac().Roles(v1.NamespaceAll).Watch(options)
+				return client.Rbac().Roles(namespace).Watch(options)
 			},
 		},
 		&rbac.Role{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultRoleInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewRoleInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *roleInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&rbac.Role{}, newRoleInformer)
+	return f.factory.InformerFor(&rbac.Role{}, defaultRoleInformer)
 }
 
 func (f *roleInformer) Lister() internalversion.RoleLister {

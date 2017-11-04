@@ -25,13 +25,12 @@ import (
 
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 )
 
 const (
@@ -62,13 +61,13 @@ func marshallBody(metrics interface{}) (io.ReadCloser, error) {
 
 func testNodeMetricsData() (*metricsapi.NodeMetricsList, *api.NodeList) {
 	metrics := &metricsapi.NodeMetricsList{
-		ListMeta: unversioned.ListMeta{
+		ListMeta: metav1.ListMeta{
 			ResourceVersion: "1",
 		},
 		Items: []metricsapi.NodeMetrics{
 			{
-				ObjectMeta: v1.ObjectMeta{Name: "node1", ResourceVersion: "10"},
-				Window:     unversioned.Duration{Duration: time.Minute},
+				ObjectMeta: metav1.ObjectMeta{Name: "node1", ResourceVersion: "10"},
+				Window:     metav1.Duration{Duration: time.Minute},
 				Usage: v1.ResourceList{
 					v1.ResourceCPU:     *resource.NewMilliQuantity(1, resource.DecimalSI),
 					v1.ResourceMemory:  *resource.NewQuantity(2*(1024*1024), resource.DecimalSI),
@@ -76,8 +75,8 @@ func testNodeMetricsData() (*metricsapi.NodeMetricsList, *api.NodeList) {
 				},
 			},
 			{
-				ObjectMeta: v1.ObjectMeta{Name: "node2", ResourceVersion: "11"},
-				Window:     unversioned.Duration{Duration: time.Minute},
+				ObjectMeta: metav1.ObjectMeta{Name: "node2", ResourceVersion: "11"},
+				Window:     metav1.Duration{Duration: time.Minute},
 				Usage: v1.ResourceList{
 					v1.ResourceCPU:     *resource.NewMilliQuantity(5, resource.DecimalSI),
 					v1.ResourceMemory:  *resource.NewQuantity(6*(1024*1024), resource.DecimalSI),

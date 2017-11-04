@@ -108,7 +108,7 @@ function create-stack() {
 #   ROOT
 #   KUBERNETES_RELEASE_TAR
 function upload-resources() {
-  swift post kubernetes --read-acl '.r:*,.rlistings'
+  swift post ${SWIFT_OBJECT_STORE} --read-acl '.r:*,.rlistings'
 
   locations=(
     "${ROOT}/../../_output/release-tars/${KUBERNETES_RELEASE_TAR}"
@@ -119,11 +119,11 @@ function upload-resources() {
   RELEASE_TAR_PATH=$(dirname ${RELEASE_TAR_LOCATION})
 
   echo "[INFO] Uploading ${KUBERNETES_RELEASE_TAR}"
-  swift upload kubernetes ${RELEASE_TAR_PATH}/${KUBERNETES_RELEASE_TAR} \
+  swift upload ${SWIFT_OBJECT_STORE} ${RELEASE_TAR_PATH}/${KUBERNETES_RELEASE_TAR} \
     --object-name kubernetes-server.tar.gz
 
   echo "[INFO] Uploading kubernetes-salt.tar.gz"
-  swift upload kubernetes ${RELEASE_TAR_PATH}/kubernetes-salt.tar.gz \
+  swift upload ${SWIFT_OBJECT_STORE} ${RELEASE_TAR_PATH}/kubernetes-salt.tar.gz \
     --object-name kubernetes-salt.tar.gz
 }
 
@@ -196,7 +196,7 @@ function run-heat-script() {
     fi
     SWIFT_SERVER_URL=$(openstack catalog show object-store --format value | egrep -o "$rgx" | cut -d" " -f2 | head -n 1)
   fi
-  local swift_repo_url="${SWIFT_SERVER_URL}/kubernetes"
+  local swift_repo_url="${SWIFT_SERVER_URL}/${SWIFT_OBJECT_STORE}"
 
   if [ $CREATE_IMAGE = true ]; then
     echo "[INFO] Retrieve new image ID"

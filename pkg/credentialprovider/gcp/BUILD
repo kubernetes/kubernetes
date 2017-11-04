@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -15,7 +13,7 @@ go_library(
         "jwt.go",
         "metadata.go",
     ],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/pkg/credentialprovider/gcp",
     deps = [
         "//pkg/credentialprovider:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -33,8 +31,8 @@ go_test(
         "jwt_test.go",
         "metadata_test.go",
     ],
+    importpath = "k8s.io/kubernetes/pkg/credentialprovider/gcp",
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/credentialprovider:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",

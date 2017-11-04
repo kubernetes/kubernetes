@@ -1,3 +1,41 @@
-This staging/src/k8s.io/client-go directory is the staging area of the client repo. It contains a versioned client, tools built around the client like the reflector, and all the client dependencies. The content will be periodically published to k8s.io/client-go repo.
-The staged content is copied from the main repo, i.e., k8s.io/kubernetes, with directory rearrangement and necessary rewritings. To sync the content with the latest code in your local k8s.io/kubernetes, you need to run `godep restore` in k8s root directory, then run staging/copy.sh.
-vendor/k8s.io/client-go is a symlink pointing to this staging area, so to use the packages in the staging area, you can import it as "vendor/client-go/<package-name>", as if the client were vendored. The client will be vendored from k8s.io/client-go for real after the test matrix is converted to vendor k8s components.
+# External Repository Staging Area
+
+This directory is the staging area for packages that have been split to their
+own repository. The content here will be periodically published to respective
+top-level k8s.io repositories.
+
+Repositories currently staged here:
+
+- [`k8s.io/apiextensions-apiserver`](https://github.com/kubernetes/apiextensions-apiserver)
+- [`k8s.io/api`](https://github.com/kubernetes/api)
+- [`k8s.io/apimachinery`](https://github.com/kubernetes/apimachinery)
+- [`k8s.io/apiserver`](https://github.com/kubernetes/apiserver)
+- [`k8s.io/client-go`](https://github.com/kubernetes/client-go)
+- [`k8s.io/kube-aggregator`](https://github.com/kubernetes/kube-aggregator)
+- [`k8s.io/code-generator`](https://github.com/kubernetes/code-generator)
+- [`k8s.io/metrics`](https://github.com/kubernetes/metrics)
+- [`k8s.io/sample-apiserver`](https://github.com/kubernetes/sample-apiserver)
+- [`k8s.io/sample-controller`](https://github.com/kubernetes/sample-controller)
+
+The code in the staging/ directory is authoritative, i.e. the only copy of the
+code. You can directly modify such code.
+
+## Using staged repositories from Kubernetes code
+
+Kubernetes code uses the repositories in this directory via symlinks in the
+`vendor/k8s.io` directory into this staging area.  For example, when
+Kubernetes code imports a package from the `k8s.io/client-go` repository, that
+import is resolved to `staging/src/k8s.io/client-go` relative to the project
+root:
+
+```go
+// pkg/example/some_code.go
+package example
+
+import (
+  "k8s.io/client-go/dynamic" // resolves to staging/src/k8s.io/client-go/dynamic
+)
+```
+
+Once the change-over to external repositories is complete, these repositories
+will actually be vendored from `k8s.io/<package-name>`.

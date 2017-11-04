@@ -17,15 +17,18 @@ limitations under the License.
 package azure
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	serviceapi "k8s.io/kubernetes/pkg/api/v1/service"
 
-	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest/to"
 )
@@ -35,8 +38,41 @@ var testClusterName = "testCluster"
 // Test additional of a new service/port.
 func TestReconcileLoadBalancerAddPort(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicea", 80)
+	svc := getTestService("servicea", v1.ProtocolTCP, 80)
 	configProperties := getTestPublicFipConfigurationProperties()
+	lb := getTestLoadBalancer()
+	nodes := []*v1.Node{}
+
+	svc.Spec.Ports = append(svc.Spec.Ports, v1.ServicePort{
+		Name:     fmt.Sprintf("port-udp-%d", 1234),
+		Protocol: v1.ProtocolUDP,
+		Port:     1234,
+		NodePort: getBackendPort(1234),
+	})
+
+	lb, updated, err := az.reconcileLoadBalancer(lb, &configProperties, testClusterName, &svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error: %q", err)
+	}
+
+	if !updated {
+		t.Error("Expected the loadbalancer to need an update")
+	}
+
+	// ensure we got a frontend ip configuration
+	if len(*lb.FrontendIPConfigurations) != 1 {
+		t.Error("Expected the loadbalancer to have a frontend ip configuration")
+	}
+
+	validateLoadBalancer(t, lb, svc)
+}
+
+// Test addition of a new service on an internal LB with a subnet.
+func TestReconcileLoadBalancerAddServiceOnInternalSubnet(t *testing.T) {
+	az := getTestCloud()
+	svc := getInternalTestService("servicea", 80)
+	addTestSubnet(t, &svc)
+	configProperties := getTestInternalFipConfigurationProperties(to.StringPtr("TestSubnet"))
 	lb := getTestLoadBalancer()
 	nodes := []*v1.Node{}
 
@@ -57,13 +93,80 @@ func TestReconcileLoadBalancerAddPort(t *testing.T) {
 	validateLoadBalancer(t, lb, svc)
 }
 
+// Test addition of services on an internal LB using both default and explicit subnets.
+func TestReconcileLoadBalancerAddServicesOnMultipleSubnets(t *testing.T) {
+	az := getTestCloud()
+	svc1 := getTestService("service1", v1.ProtocolTCP, 8081)
+	svc2 := getInternalTestService("service2", 8081)
+	addTestSubnet(t, &svc2)
+	configProperties1 := getTestPublicFipConfigurationProperties()
+	configProperties2 := getTestInternalFipConfigurationProperties(to.StringPtr("TestSubnet"))
+	lb := getTestLoadBalancer()
+	nodes := []*v1.Node{}
+
+	lb, updated, err := az.reconcileLoadBalancer(lb, &configProperties1, testClusterName, &svc1, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error reconciling svc1: %q", err)
+	}
+
+	lb, updated, err = az.reconcileLoadBalancer(lb, &configProperties2, testClusterName, &svc2, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error reconciling svc2: %q", err)
+	}
+
+	if !updated {
+		t.Error("Expected the loadbalancer to need an update")
+	}
+
+	// ensure we got a frontend ip configuration for each service
+	if len(*lb.FrontendIPConfigurations) != 2 {
+		t.Error("Expected the loadbalancer to have 2 frontend ip configurations")
+	}
+
+	validateLoadBalancer(t, lb, svc1, svc2)
+}
+
+// Test moving a service exposure from one subnet to another.
+func TestReconcileLoadBalancerEditServiceSubnet(t *testing.T) {
+	az := getTestCloud()
+	svc := getInternalTestService("service1", 8081)
+	addTestSubnet(t, &svc)
+	configProperties := getTestInternalFipConfigurationProperties(to.StringPtr("TestSubnet"))
+	lb := getTestLoadBalancer()
+	nodes := []*v1.Node{}
+
+	lb, updated, err := az.reconcileLoadBalancer(lb, &configProperties, testClusterName, &svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error reconciling initial svc: %q", err)
+	}
+
+	validateLoadBalancer(t, lb, svc)
+
+	svc.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = "NewSubnet"
+	configProperties = getTestInternalFipConfigurationProperties(to.StringPtr("NewSubnet"))
+
+	lb, updated, err = az.reconcileLoadBalancer(lb, &configProperties, testClusterName, &svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error reconciling edits to svc: %q", err)
+	}
+
+	if !updated {
+		t.Error("Expected the loadbalancer to need an update")
+	}
+
+	// ensure we got a frontend ip configuration for the service
+	if len(*lb.FrontendIPConfigurations) != 1 {
+		t.Error("Expected the loadbalancer to have 1 frontend ip configuration")
+	}
+
+	validateLoadBalancer(t, lb, svc)
+}
+
 func TestReconcileLoadBalancerNodeHealth(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicea", 80)
-	svc.Annotations = map[string]string{
-		serviceapi.BetaAnnotationExternalTraffic:     serviceapi.AnnotationValueExternalTrafficLocal,
-		serviceapi.BetaAnnotationHealthCheckNodePort: "32456",
-	}
+	svc := getTestService("servicea", v1.ProtocolTCP, 80)
+	svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+	svc.Spec.HealthCheckNodePort = int32(32456)
 	configProperties := getTestPublicFipConfigurationProperties()
 	lb := getTestLoadBalancer()
 
@@ -89,7 +192,7 @@ func TestReconcileLoadBalancerNodeHealth(t *testing.T) {
 // Test removing all services results in removing the frontend ip configuration
 func TestReconcileLoadBalancerRemoveService(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicea", 80, 443)
+	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
 	lb := getTestLoadBalancer()
 	configProperties := getTestPublicFipConfigurationProperties()
 	nodes := []*v1.Node{}
@@ -120,7 +223,7 @@ func TestReconcileLoadBalancerRemoveService(t *testing.T) {
 // Test removing all service ports results in removing the frontend ip configuration
 func TestReconcileLoadBalancerRemoveAllPortsRemovesFrontendConfig(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicea", 80)
+	svc := getTestService("servicea", v1.ProtocolTCP, 80)
 	lb := getTestLoadBalancer()
 	configProperties := getTestPublicFipConfigurationProperties()
 	nodes := []*v1.Node{}
@@ -131,7 +234,7 @@ func TestReconcileLoadBalancerRemoveAllPortsRemovesFrontendConfig(t *testing.T) 
 	}
 	validateLoadBalancer(t, lb, svc)
 
-	svcUpdated := getTestService("servicea")
+	svcUpdated := getTestService("servicea", v1.ProtocolTCP)
 	lb, updated, err = az.reconcileLoadBalancer(lb, nil, testClusterName, &svcUpdated, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
@@ -152,13 +255,13 @@ func TestReconcileLoadBalancerRemoveAllPortsRemovesFrontendConfig(t *testing.T) 
 // Test removal of a port from an existing service.
 func TestReconcileLoadBalancerRemovesPort(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicea", 80, 443)
+	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
 	configProperties := getTestPublicFipConfigurationProperties()
 	nodes := []*v1.Node{}
 
 	existingLoadBalancer := getTestLoadBalancer(svc)
 
-	svcUpdated := getTestService("servicea", 80)
+	svcUpdated := getTestService("servicea", v1.ProtocolTCP, 80)
 	updatedLoadBalancer, _, err := az.reconcileLoadBalancer(existingLoadBalancer, &configProperties, testClusterName, &svcUpdated, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
@@ -170,8 +273,8 @@ func TestReconcileLoadBalancerRemovesPort(t *testing.T) {
 // Test reconciliation of multiple services on same port
 func TestReconcileLoadBalancerMultipleServices(t *testing.T) {
 	az := getTestCloud()
-	svc1 := getTestService("servicea", 80, 443)
-	svc2 := getTestService("serviceb", 80)
+	svc1 := getTestService("servicea", v1.ProtocolTCP, 80, 443)
+	svc2 := getTestService("serviceb", v1.ProtocolTCP, 80)
 	configProperties := getTestPublicFipConfigurationProperties()
 	nodes := []*v1.Node{}
 
@@ -192,7 +295,7 @@ func TestReconcileLoadBalancerMultipleServices(t *testing.T) {
 
 func TestReconcileSecurityGroupNewServiceAddsPort(t *testing.T) {
 	az := getTestCloud()
-	svc1 := getTestService("serviceea", 80)
+	svc1 := getTestService("serviceea", v1.ProtocolTCP, 80)
 
 	sg := getTestSecurityGroup()
 
@@ -219,8 +322,8 @@ func TestReconcileSecurityGroupNewInternalServiceAddsPort(t *testing.T) {
 }
 
 func TestReconcileSecurityGroupRemoveService(t *testing.T) {
-	service1 := getTestService("servicea", 81)
-	service2 := getTestService("serviceb", 82)
+	service1 := getTestService("servicea", v1.ProtocolTCP, 81)
+	service2 := getTestService("serviceb", v1.ProtocolTCP, 82)
 
 	sg := getTestSecurityGroup(service1, service2)
 
@@ -236,11 +339,11 @@ func TestReconcileSecurityGroupRemoveService(t *testing.T) {
 
 func TestReconcileSecurityGroupRemoveServiceRemovesPort(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicea", 80, 443)
+	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
 
 	sg := getTestSecurityGroup(svc)
 
-	svcUpdated := getTestService("servicea", 80)
+	svcUpdated := getTestService("servicea", v1.ProtocolTCP, 80)
 	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &svcUpdated, true)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
@@ -251,10 +354,10 @@ func TestReconcileSecurityGroupRemoveServiceRemovesPort(t *testing.T) {
 
 func TestReconcileSecurityWithSourceRanges(t *testing.T) {
 	az := getTestCloud()
-	svc := getTestService("servicea", 80, 443)
+	svc := getTestService("servicea", v1.ProtocolTCP, 80, 443)
 	svc.Spec.LoadBalancerSourceRanges = []string{
-		"192.168.0.1/24",
-		"10.0.0.1/32",
+		"192.168.0.0/24",
+		"10.0.0.0/32",
 	}
 
 	sg := getTestSecurityGroup(svc)
@@ -291,12 +394,23 @@ func getTestPublicFipConfigurationProperties() network.FrontendIPConfigurationPr
 	}
 }
 
-func getTestService(identifier string, requestedPorts ...int32) v1.Service {
+func getTestInternalFipConfigurationProperties(expectedSubnetName *string) network.FrontendIPConfigurationPropertiesFormat {
+	var expectedSubnet *network.Subnet
+	if expectedSubnetName != nil {
+		expectedSubnet = &network.Subnet{Name: expectedSubnetName}
+	}
+	return network.FrontendIPConfigurationPropertiesFormat{
+		PublicIPAddress: &network.PublicIPAddress{ID: to.StringPtr("/this/is/a/public/ip/address/id")},
+		Subnet:          expectedSubnet,
+	}
+}
+
+func getTestService(identifier string, proto v1.Protocol, requestedPorts ...int32) v1.Service {
 	ports := []v1.ServicePort{}
 	for _, port := range requestedPorts {
 		ports = append(ports, v1.ServicePort{
-			Name:     fmt.Sprintf("port-%d", port),
-			Protocol: v1.ProtocolTCP,
+			Name:     fmt.Sprintf("port-tcp-%d", port),
+			Protocol: proto,
 			Port:     port,
 			NodePort: getBackendPort(port),
 		})
@@ -317,7 +431,7 @@ func getTestService(identifier string, requestedPorts ...int32) v1.Service {
 }
 
 func getInternalTestService(identifier string, requestedPorts ...int32) v1.Service {
-	svc := getTestService(identifier, requestedPorts...)
+	svc := getTestService(identifier, v1.ProtocolTCP, requestedPorts...)
 	svc.Annotations[ServiceAnnotationLoadBalancerInternal] = "true"
 
 	return svc
@@ -329,7 +443,7 @@ func getTestLoadBalancer(services ...v1.Service) network.LoadBalancer {
 
 	for _, service := range services {
 		for _, port := range service.Spec.Ports {
-			ruleName := getRuleName(&service, port)
+			ruleName := getLoadBalancerRuleName(&service, port, nil)
 			rules = append(rules, network.LoadBalancingRule{
 				Name: to.StringPtr(ruleName),
 				LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
@@ -371,10 +485,9 @@ func getTestSecurityGroup(services ...v1.Service) network.SecurityGroup {
 
 	for _, service := range services {
 		for _, port := range service.Spec.Ports {
-			ruleName := getRuleName(&service, port)
-
 			sources := getServiceSourceRanges(&service)
 			for _, src := range sources {
+				ruleName := getSecurityRuleName(&service, port, src)
 				rules = append(rules, network.SecurityRule{
 					Name: to.StringPtr(ruleName),
 					SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
@@ -398,13 +511,20 @@ func getTestSecurityGroup(services ...v1.Service) network.SecurityGroup {
 func validateLoadBalancer(t *testing.T, loadBalancer network.LoadBalancer, services ...v1.Service) {
 	expectedRuleCount := 0
 	expectedFrontendIPCount := 0
+	expectedProbeCount := 0
+	expectedFrontendIPs := []ExpectedFrontendIPInfo{}
 	for _, svc := range services {
 		if len(svc.Spec.Ports) > 0 {
 			expectedFrontendIPCount++
+			expectedFrontendIP := ExpectedFrontendIPInfo{
+				Name:   getFrontendIPConfigName(&svc, subnet(&svc)),
+				Subnet: subnet(&svc),
+			}
+			expectedFrontendIPs = append(expectedFrontendIPs, expectedFrontendIP)
 		}
 		for _, wantedRule := range svc.Spec.Ports {
 			expectedRuleCount++
-			wantedRuleName := getRuleName(&svc, wantedRule)
+			wantedRuleName := getLoadBalancerRuleName(&svc, wantedRule, subnet(&svc))
 			foundRule := false
 			for _, actualRule := range *loadBalancer.LoadBalancingRules {
 				if strings.EqualFold(*actualRule.Name, wantedRuleName) &&
@@ -418,6 +538,12 @@ func validateLoadBalancer(t *testing.T, loadBalancer network.LoadBalancer, servi
 				t.Errorf("Expected load balancer rule but didn't find it: %q", wantedRuleName)
 			}
 
+			// if UDP rule, there is no probe
+			if wantedRule.Protocol == v1.ProtocolUDP {
+				continue
+			}
+
+			expectedProbeCount++
 			foundProbe := false
 			if serviceapi.NeedsHealthCheck(&svc) {
 				path, port := serviceapi.GetServiceHealthCheckPathPort(&svc)
@@ -453,14 +579,60 @@ func validateLoadBalancer(t *testing.T, loadBalancer network.LoadBalancer, servi
 		t.Errorf("Expected the loadbalancer to have %d frontend IPs. Found %d.\n%v", expectedFrontendIPCount, frontendIPCount, loadBalancer.FrontendIPConfigurations)
 	}
 
+	frontendIPs := *loadBalancer.FrontendIPConfigurations
+	for _, expectedFrontendIP := range expectedFrontendIPs {
+		if !expectedFrontendIP.existsIn(frontendIPs) {
+			t.Errorf("Expected the loadbalancer to have frontend IP %s/%s. Found %s", expectedFrontendIP.Name, to.String(expectedFrontendIP.Subnet), describeFIPs(frontendIPs))
+		}
+	}
+
 	lenRules := len(*loadBalancer.LoadBalancingRules)
 	if lenRules != expectedRuleCount {
 		t.Errorf("Expected the loadbalancer to have %d rules. Found %d.\n%v", expectedRuleCount, lenRules, loadBalancer.LoadBalancingRules)
 	}
+
 	lenProbes := len(*loadBalancer.Probes)
-	if lenProbes != expectedRuleCount {
+	if lenProbes != expectedProbeCount {
 		t.Errorf("Expected the loadbalancer to have %d probes. Found %d.", expectedRuleCount, lenProbes)
 	}
+}
+
+type ExpectedFrontendIPInfo struct {
+	Name   string
+	Subnet *string
+}
+
+func (expected ExpectedFrontendIPInfo) matches(frontendIP network.FrontendIPConfiguration) bool {
+	return strings.EqualFold(expected.Name, to.String(frontendIP.Name)) && strings.EqualFold(to.String(expected.Subnet), to.String(subnetName(frontendIP)))
+}
+
+func (expected ExpectedFrontendIPInfo) existsIn(frontendIPs []network.FrontendIPConfiguration) bool {
+	for _, fip := range frontendIPs {
+		if expected.matches(fip) {
+			return true
+		}
+	}
+	return false
+}
+
+func subnetName(frontendIP network.FrontendIPConfiguration) *string {
+	if frontendIP.Subnet != nil {
+		return frontendIP.Subnet.Name
+	}
+	return nil
+}
+
+func describeFIPs(frontendIPs []network.FrontendIPConfiguration) string {
+	description := ""
+	for _, actualFIP := range frontendIPs {
+		actualSubnetName := ""
+		if actualFIP.Subnet != nil {
+			actualSubnetName = to.String(actualFIP.Subnet.Name)
+		}
+		actualFIPText := fmt.Sprintf("%s/%s ", to.String(actualFIP.Name), actualSubnetName)
+		description = description + actualFIPText
+	}
+	return description
 }
 
 func validateSecurityGroup(t *testing.T, securityGroup network.SecurityGroup, services ...v1.Service) {
@@ -468,8 +640,8 @@ func validateSecurityGroup(t *testing.T, securityGroup network.SecurityGroup, se
 	for _, svc := range services {
 		for _, wantedRule := range svc.Spec.Ports {
 			sources := getServiceSourceRanges(&svc)
-			wantedRuleName := getRuleName(&svc, wantedRule)
 			for _, source := range sources {
+				wantedRuleName := getSecurityRuleName(&svc, wantedRule, source)
 				expectedRuleCount++
 				foundRule := false
 				for _, actualRule := range *securityGroup.SecurityRules {
@@ -542,22 +714,28 @@ func TestProtocolTranslationTCP(t *testing.T) {
 		t.Error(err)
 	}
 
-	if transportProto != network.TransportProtocolTCP {
+	if *transportProto != network.TransportProtocolTCP {
 		t.Errorf("Expected TCP LoadBalancer Rule Protocol. Got %v", transportProto)
 	}
-	if securityGroupProto != network.TCP {
+	if *securityGroupProto != network.SecurityRuleProtocolTCP {
 		t.Errorf("Expected TCP SecurityGroup Protocol. Got %v", transportProto)
 	}
-	if probeProto != network.ProbeProtocolTCP {
+	if *probeProto != network.ProbeProtocolTCP {
 		t.Errorf("Expected TCP LoadBalancer Probe Protocol. Got %v", transportProto)
 	}
 }
 
 func TestProtocolTranslationUDP(t *testing.T) {
 	proto := v1.ProtocolUDP
-	_, _, _, err := getProtocolsFromKubernetesProtocol(proto)
-	if err == nil {
-		t.Error("Expected an error. UDP is unsupported.")
+	transportProto, securityGroupProto, probeProto, _ := getProtocolsFromKubernetesProtocol(proto)
+	if *transportProto != network.TransportProtocolUDP {
+		t.Errorf("Expected UDP LoadBalancer Rule Protocol. Got %v", transportProto)
+	}
+	if *securityGroupProto != network.SecurityRuleProtocolUDP {
+		t.Errorf("Expected UDP SecurityGroup Protocol. Got %v", transportProto)
+	}
+	if probeProto != nil {
+		t.Errorf("Expected UDP LoadBalancer Probe Protocol. Got %v", transportProto)
 	}
 }
 
@@ -568,15 +746,44 @@ func TestNewCloudFromJSON(t *testing.T) {
 		"subscriptionId": "--subscription-id--",
 		"aadClientId": "--aad-client-id--",
 		"aadClientSecret": "--aad-client-secret--",
+		"aadClientCertPath": "--aad-client-cert-path--",
+		"aadClientCertPassword": "--aad-client-cert-password--",
 		"resourceGroup": "--resource-group--",
 		"location": "--location--",
 		"subnetName": "--subnet-name--",
 		"securityGroupName": "--security-group-name--",
 		"vnetName": "--vnet-name--",
 		"routeTableName": "--route-table-name--",
-		"primaryAvailabilitySetName": "--primary-availability-set-name--"
+		"primaryAvailabilitySetName": "--primary-availability-set-name--",
+		"cloudProviderBackoff": true,
+		"cloudProviderBackoffRetries": 6,
+		"cloudProviderBackoffExponent": 1.5,
+		"cloudProviderBackoffDuration": 5,
+		"cloudProviderBackoffJitter": 1.0,
+		"cloudProviderRatelimit": true,
+		"cloudProviderRateLimitQPS": 0.5,
+		"cloudProviderRateLimitBucket": 5
 	}`
 	validateConfig(t, config)
+}
+
+// Test Backoff and Rate Limit defaults (json)
+func TestCloudDefaultConfigFromJSON(t *testing.T) {
+	config := `{
+                "aadClientId": "--aad-client-id--",
+                "aadClientSecret": "--aad-client-secret--"
+        }`
+
+	validateEmptyConfig(t, config)
+}
+
+// Test Backoff and Rate Limit defaults (yaml)
+func TestCloudDefaultConfigFromYAML(t *testing.T) {
+	config := `
+aadClientId: --aad-client-id--
+aadClientSecret: --aad-client-secret--
+`
+	validateEmptyConfig(t, config)
 }
 
 // Test Configuration deserialization (yaml)
@@ -586,6 +793,8 @@ tenantId: --tenant-id--
 subscriptionId: --subscription-id--
 aadClientId: --aad-client-id--
 aadClientSecret: --aad-client-secret--
+aadClientCertPath: --aad-client-cert-path--
+aadClientCertPassword: --aad-client-cert-password--
 resourceGroup: --resource-group--
 location: --location--
 subnetName: --subnet-name--
@@ -593,21 +802,20 @@ securityGroupName: --security-group-name--
 vnetName: --vnet-name--
 routeTableName: --route-table-name--
 primaryAvailabilitySetName: --primary-availability-set-name--
+cloudProviderBackoff: true
+cloudProviderBackoffRetries: 6
+cloudProviderBackoffExponent: 1.5
+cloudProviderBackoffDuration: 5
+cloudProviderBackoffJitter: 1.0
+cloudProviderRatelimit: true
+cloudProviderRateLimitQPS: 0.5
+cloudProviderRateLimitBucket: 5
 `
 	validateConfig(t, config)
 }
 
 func validateConfig(t *testing.T, config string) {
-	configReader := strings.NewReader(config)
-	cloud, err := NewCloud(configReader)
-	if err != nil {
-		t.Error(err)
-	}
-
-	azureCloud, ok := cloud.(*Cloud)
-	if !ok {
-		t.Error("NewCloud returned incorrect type")
-	}
+	azureCloud := getCloudFromConfig(t, config)
 
 	if azureCloud.TenantID != "--tenant-id--" {
 		t.Errorf("got incorrect value for TenantID")
@@ -620,6 +828,12 @@ func validateConfig(t *testing.T, config string) {
 	}
 	if azureCloud.AADClientSecret != "--aad-client-secret--" {
 		t.Errorf("got incorrect value for AADClientSecret")
+	}
+	if azureCloud.AADClientCertPath != "--aad-client-cert-path--" {
+		t.Errorf("got incorrect value for AADClientCertPath")
+	}
+	if azureCloud.AADClientCertPassword != "--aad-client-cert-password--" {
+		t.Errorf("got incorrect value for AADClientCertPassword")
 	}
 	if azureCloud.ResourceGroup != "--resource-group--" {
 		t.Errorf("got incorrect value for ResourceGroup")
@@ -642,6 +856,58 @@ func validateConfig(t *testing.T, config string) {
 	if azureCloud.PrimaryAvailabilitySetName != "--primary-availability-set-name--" {
 		t.Errorf("got incorrect value for PrimaryAvailabilitySetName")
 	}
+	if azureCloud.CloudProviderBackoff != true {
+		t.Errorf("got incorrect value for CloudProviderBackoff")
+	}
+	if azureCloud.CloudProviderBackoffRetries != 6 {
+		t.Errorf("got incorrect value for CloudProviderBackoffRetries")
+	}
+	if azureCloud.CloudProviderBackoffExponent != 1.5 {
+		t.Errorf("got incorrect value for CloudProviderBackoffExponent")
+	}
+	if azureCloud.CloudProviderBackoffDuration != 5 {
+		t.Errorf("got incorrect value for CloudProviderBackoffDuration")
+	}
+	if azureCloud.CloudProviderBackoffJitter != 1.0 {
+		t.Errorf("got incorrect value for CloudProviderBackoffJitter")
+	}
+	if azureCloud.CloudProviderRateLimit != true {
+		t.Errorf("got incorrect value for CloudProviderRateLimit")
+	}
+	if azureCloud.CloudProviderRateLimitQPS != 0.5 {
+		t.Errorf("got incorrect value for CloudProviderRateLimitQPS")
+	}
+	if azureCloud.CloudProviderRateLimitBucket != 5 {
+		t.Errorf("got incorrect value for CloudProviderRateLimitBucket")
+	}
+}
+
+func getCloudFromConfig(t *testing.T, config string) *Cloud {
+	configReader := strings.NewReader(config)
+	cloud, err := NewCloud(configReader)
+	if err != nil {
+		t.Error(err)
+	}
+	azureCloud, ok := cloud.(*Cloud)
+	if !ok {
+		t.Error("NewCloud returned incorrect type")
+	}
+	return azureCloud
+}
+
+// TODO include checks for other appropriate default config parameters
+func validateEmptyConfig(t *testing.T, config string) {
+	azureCloud := getCloudFromConfig(t, config)
+
+	// backoff should be disabled by default if not explicitly enabled in config
+	if azureCloud.CloudProviderBackoff != false {
+		t.Errorf("got incorrect value for CloudProviderBackoff")
+	}
+
+	// rate limits should be disabled by default if not explicitly enabled in config
+	if azureCloud.CloudProviderRateLimit != false {
+		t.Errorf("got incorrect value for CloudProviderRateLimit")
+	}
 }
 
 func TestDecodeInstanceInfo(t *testing.T) {
@@ -661,23 +927,127 @@ func TestDecodeInstanceInfo(t *testing.T) {
 	}
 }
 
-func TestFilterNodes(t *testing.T) {
-	nodes := []compute.VirtualMachine{
-		{Name: to.StringPtr("test")},
-		{Name: to.StringPtr("test2")},
-		{Name: to.StringPtr("3test")},
+func TestSplitProviderID(t *testing.T) {
+	providers := []struct {
+		providerID string
+		name       types.NodeName
+
+		fail bool
+	}{
+		{
+			providerID: CloudProviderName + ":///subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/virtualMachines/k8s-agent-AAAAAAAA-0",
+			name:       "k8s-agent-AAAAAAAA-0",
+			fail:       false,
+		},
+		{
+			providerID: CloudProviderName + ":/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/virtualMachines/k8s-agent-AAAAAAAA-0",
+			name:       "",
+			fail:       true,
+		},
+		{
+			providerID: CloudProviderName + "://",
+			name:       "",
+			fail:       true,
+		},
+		{
+			providerID: ":///subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/virtualMachines/k8s-agent-AAAAAAAA-0",
+			name:       "",
+			fail:       true,
+		},
+		{
+			providerID: "aws:///subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/virtualMachines/k8s-agent-AAAAAAAA-0",
+			name:       "",
+			fail:       true,
+		},
 	}
 
-	filteredNodes, err := filterNodes(nodes, "^test$")
-	if err != nil {
-		t.Errorf("Unexpeted error when filtering: %q", err)
+	for _, test := range providers {
+		name, err := splitProviderID(test.providerID)
+		if (err != nil) != test.fail {
+			t.Errorf("Expected to failt=%t, with pattern %v", test.fail, test)
+		}
+
+		if test.fail {
+			continue
+		}
+
+		if name != test.name {
+			t.Errorf("Expected %v, but got %v", test.name, name)
+		}
+
+	}
+}
+
+func TestMetadataURLGeneration(t *testing.T) {
+	metadata := NewInstanceMetadata()
+	fullPath := metadata.makeMetadataURL("some/path")
+	if fullPath != "http://169.254.169.254/metadata/some/path" {
+		t.Errorf("Expected http://169.254.169.254/metadata/some/path saw %s", fullPath)
+	}
+}
+
+func TestMetadataParsing(t *testing.T) {
+	data := `
+{
+    "interface": [
+      {
+        "ipv4": {
+          "ipAddress": [
+            {
+              "privateIpAddress": "10.0.1.4",
+              "publicIpAddress": "X.X.X.X"
+            }
+          ],
+          "subnet": [
+            {
+              "address": "10.0.1.0",
+              "prefix": "24"
+            }
+          ]
+        },
+        "ipv6": {
+          "ipAddress": [
+
+          ]
+        },
+        "macAddress": "002248020E1E"
+      }
+    ]
+}	
+`
+
+	network := NetworkMetadata{}
+	if err := json.Unmarshal([]byte(data), &network); err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
 
-	if len(filteredNodes) != 1 {
-		t.Error("Got too many nodes after filtering")
+	ip := network.Interface[0].IPV4.IPAddress[0].PrivateIP
+	if ip != "10.0.1.4" {
+		t.Errorf("Unexpected value: %s, expected 10.0.1.4", ip)
 	}
 
-	if *filteredNodes[0].Name != "test" {
-		t.Error("Get the wrong node after filtering")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, data)
+	}))
+	defer server.Close()
+
+	metadata := &InstanceMetadata{
+		baseURL: server.URL,
 	}
+
+	networkJSON := NetworkMetadata{}
+	if err := metadata.Object("/some/path", &networkJSON); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if !reflect.DeepEqual(network, networkJSON) {
+		t.Errorf("Unexpected inequality:\n%#v\nvs\n%#v", network, networkJSON)
+	}
+}
+
+func addTestSubnet(t *testing.T, svc *v1.Service) {
+	if svc.Annotations[ServiceAnnotationLoadBalancerInternal] != "true" {
+		t.Error("Subnet added to non-internal service")
+	}
+	svc.Annotations[ServiceAnnotationLoadBalancerInternalSubnet] = "TestSubnet"
 }

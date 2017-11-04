@@ -163,51 +163,70 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 // This type should not propagate beyond the scope of input/output processing.
 type Duration time.Duration
 
+var durationRE = regexp.MustCompile("^([0-9]+)(y|w|d|h|m|s|ms)$")
+
 // StringToDuration parses a string into a time.Duration, assuming that a year
-// a day always has 24h.
+// always has 365d, a week always has 7d, and a day always has 24h.
 func ParseDuration(durationStr string) (Duration, error) {
 	matches := durationRE.FindStringSubmatch(durationStr)
 	if len(matches) != 3 {
 		return 0, fmt.Errorf("not a valid duration string: %q", durationStr)
 	}
-	durSeconds, _ := strconv.Atoi(matches[1])
-	dur := time.Duration(durSeconds) * time.Second
-	unit := matches[2]
-	switch unit {
+	var (
+		n, _ = strconv.Atoi(matches[1])
+		dur  = time.Duration(n) * time.Millisecond
+	)
+	switch unit := matches[2]; unit {
+	case "y":
+		dur *= 1000 * 60 * 60 * 24 * 365
+	case "w":
+		dur *= 1000 * 60 * 60 * 24 * 7
 	case "d":
-		dur *= 60 * 60 * 24
+		dur *= 1000 * 60 * 60 * 24
 	case "h":
-		dur *= 60 * 60
+		dur *= 1000 * 60 * 60
 	case "m":
-		dur *= 60
+		dur *= 1000 * 60
 	case "s":
-		dur *= 1
+		dur *= 1000
+	case "ms":
+		// Value already correct
 	default:
 		return 0, fmt.Errorf("invalid time unit in duration string: %q", unit)
 	}
 	return Duration(dur), nil
 }
 
-var durationRE = regexp.MustCompile("^([0-9]+)([ywdhms]+)$")
-
 func (d Duration) String() string {
-	seconds := int64(time.Duration(d) / time.Second)
+	var (
+		ms   = int64(time.Duration(d) / time.Millisecond)
+		unit = "ms"
+	)
 	factors := map[string]int64{
-		"d": 60 * 60 * 24,
-		"h": 60 * 60,
-		"m": 60,
-		"s": 1,
+		"y":  1000 * 60 * 60 * 24 * 365,
+		"w":  1000 * 60 * 60 * 24 * 7,
+		"d":  1000 * 60 * 60 * 24,
+		"h":  1000 * 60 * 60,
+		"m":  1000 * 60,
+		"s":  1000,
+		"ms": 1,
 	}
-	unit := "s"
+
 	switch int64(0) {
-	case seconds % factors["d"]:
+	case ms % factors["y"]:
+		unit = "y"
+	case ms % factors["w"]:
+		unit = "w"
+	case ms % factors["d"]:
 		unit = "d"
-	case seconds % factors["h"]:
+	case ms % factors["h"]:
 		unit = "h"
-	case seconds % factors["m"]:
+	case ms % factors["m"]:
 		unit = "m"
+	case ms % factors["s"]:
+		unit = "s"
 	}
-	return fmt.Sprintf("%v%v", seconds/factors[unit], unit)
+	return fmt.Sprintf("%v%v", ms/factors[unit], unit)
 }
 
 // MarshalYAML implements the yaml.Marshaler interface.

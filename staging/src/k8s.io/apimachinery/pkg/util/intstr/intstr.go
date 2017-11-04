@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/openapi"
+	openapi "k8s.io/kube-openapi/pkg/common"
 
 	"github.com/go-openapi/spec"
 	"github.com/golang/glog"

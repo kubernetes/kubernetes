@@ -17,6 +17,10 @@ limitations under the License.
 package validation
 
 import (
+	"errors"
+	"path/filepath"
+	"strings"
+
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -52,4 +56,16 @@ func checkMountOption(pv *api.PersistentVolume) field.ErrorList {
 		allErrs = append(allErrs, field.Forbidden(metaField.Child("annotations", api.MountOptionAnnotation), "may not specify mount options for this volume type"))
 	}
 	return allErrs
+}
+
+// ValidatePathNoBacksteps will make sure the targetPath does not have any element which is ".."
+func ValidatePathNoBacksteps(targetPath string) error {
+	parts := strings.Split(filepath.ToSlash(targetPath), "/")
+	for _, item := range parts {
+		if item == ".." {
+			return errors.New("must not contain '..'")
+		}
+	}
+
+	return nil
 }

@@ -22,9 +22,8 @@ import (
 	"strings"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
@@ -33,12 +32,11 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&iscsiPlugin{nil, exec.New()}}
+	return []volume.VolumePlugin{&iscsiPlugin{nil}}
 }
 
 type iscsiPlugin struct {
 	host volume.VolumeHost
-	exe  exec.Interface
 }
 
 var _ volume.VolumePlugin = &iscsiPlugin{}
@@ -112,10 +110,10 @@ func (plugin *iscsiPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.V
 		}
 	}
 
-	return plugin.newMounterInternal(spec, pod.UID, &ISCSIUtil{}, plugin.host.GetMounter(), secret)
+	return plugin.newMounterInternal(spec, pod.UID, &ISCSIUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()), secret)
 }
 
-func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, secret map[string]string) (volume.Mounter, error) {
+func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec, secret map[string]string) (volume.Mounter, error) {
 	// iscsi volumes used directly in a pod have a ReadOnly flag set by the pod author.
 	// iscsi volumes used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
 	iscsi, readOnly, err := getVolumeSource(spec)
@@ -132,22 +130,29 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 	}
 	iface := iscsi.ISCSIInterface
 
+	var initiatorName string
+	if iscsi.InitiatorName != nil {
+		initiatorName = *iscsi.InitiatorName
+	}
+
 	return &iscsiDiskMounter{
 		iscsiDisk: &iscsiDisk{
 			podUID:         podUID,
-			volName:        spec.Name(),
-			portals:        bkportal,
-			iqn:            iscsi.IQN,
+			VolName:        spec.Name(),
+			Portals:        bkportal,
+			Iqn:            iscsi.IQN,
 			lun:            lun,
-			iface:          iface,
+			Iface:          iface,
 			chap_discovery: iscsi.DiscoveryCHAPAuth,
 			chap_session:   iscsi.SessionCHAPAuth,
 			secret:         secret,
+			InitiatorName:  initiatorName,
 			manager:        manager,
 			plugin:         plugin},
 		fsType:       iscsi.FSType,
 		readOnly:     readOnly,
-		mounter:      &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()},
+		mounter:      &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
+		exec:         exec,
 		deviceUtil:   ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
 		mountOptions: volume.MountOptionFromSpec(spec),
 	}, nil
@@ -155,24 +160,20 @@ func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UI
 
 func (plugin *iscsiPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newUnmounterInternal(volName, podUID, &ISCSIUtil{}, plugin.host.GetMounter())
+	return plugin.newUnmounterInternal(volName, podUID, &ISCSIUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
 }
 
-func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Unmounter, error) {
+func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec) (volume.Unmounter, error) {
 	return &iscsiDiskUnmounter{
 		iscsiDisk: &iscsiDisk{
 			podUID:  podUID,
-			volName: volName,
+			VolName: volName,
 			manager: manager,
 			plugin:  plugin,
 		},
 		mounter: mounter,
+		exec:    exec,
 	}, nil
-}
-
-func (plugin *iscsiPlugin) execCommand(command string, args []string) ([]byte, error) {
-	cmd := plugin.exe.Command(command, args...)
-	return cmd.CombinedOutput()
 }
 
 func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
@@ -189,15 +190,16 @@ func (plugin *iscsiPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*v
 }
 
 type iscsiDisk struct {
-	volName        string
+	VolName        string
 	podUID         types.UID
-	portals        []string
-	iqn            string
+	Portals        []string
+	Iqn            string
 	lun            string
-	iface          string
+	Iface          string
 	chap_discovery bool
 	chap_session   bool
 	secret         map[string]string
+	InitiatorName  string
 	plugin         *iscsiPlugin
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
@@ -207,7 +209,7 @@ type iscsiDisk struct {
 func (iscsi *iscsiDisk) GetPath() string {
 	name := iscsiPluginName
 	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
-	return iscsi.plugin.host.GetPodVolumeDir(iscsi.podUID, utilstrings.EscapeQualifiedNameForDisk(name), iscsi.volName)
+	return iscsi.plugin.host.GetPodVolumeDir(iscsi.podUID, utilstrings.EscapeQualifiedNameForDisk(name), iscsi.VolName)
 }
 
 type iscsiDiskMounter struct {
@@ -215,6 +217,7 @@ type iscsiDiskMounter struct {
 	readOnly     bool
 	fsType       string
 	mounter      *mount.SafeFormatAndMount
+	exec         mount.Exec
 	deviceUtil   ioutil.DeviceUtil
 	mountOptions []string
 }
@@ -252,6 +255,7 @@ func (b *iscsiDiskMounter) SetUpAt(dir string, fsGroup *int64) error {
 type iscsiDiskUnmounter struct {
 	*iscsiDisk
 	mounter mount.Interface
+	exec    mount.Exec
 }
 
 var _ volume.Unmounter = &iscsiDiskUnmounter{}
@@ -263,13 +267,7 @@ func (c *iscsiDiskUnmounter) TearDown() error {
 }
 
 func (c *iscsiDiskUnmounter) TearDownAt(dir string) error {
-	if pathExists, pathErr := ioutil.PathExists(dir); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
-	} else if !pathExists {
-		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
-		return nil
-	}
-	return diskTearDown(c.manager, *c, dir, c.mounter)
+	return ioutil.UnmountPath(dir, c.mounter)
 }
 
 func portalMounter(portal string) string {

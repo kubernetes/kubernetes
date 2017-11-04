@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -32,6 +33,8 @@ type IPVSBackendStatus struct {
 	LocalAddress net.IP
 	// The local (virtual) port.
 	LocalPort uint16
+	// The local firewall mark
+	LocalMark string
 	// The transport protocol (TCP, UDP).
 	Proto string
 	// The remote (real) IP address.
@@ -58,7 +61,7 @@ func NewIPVSStats() (IPVSStats, error) {
 
 // NewIPVSStats reads the IPVS statistics from the specified `proc` filesystem.
 func (fs FS) NewIPVSStats() (IPVSStats, error) {
-	file, err := fs.open("net/ip_vs_stats")
+	file, err := os.Open(fs.Path("net/ip_vs_stats"))
 	if err != nil {
 		return IPVSStats{}, err
 	}
@@ -127,7 +130,7 @@ func NewIPVSBackendStatus() ([]IPVSBackendStatus, error) {
 
 // NewIPVSBackendStatus reads and returns the status of all (virtual,real) server pairs from the specified `proc` filesystem.
 func (fs FS) NewIPVSBackendStatus() ([]IPVSBackendStatus, error) {
-	file, err := fs.open("net/ip_vs")
+	file, err := os.Open(fs.Path("net/ip_vs"))
 	if err != nil {
 		return nil, err
 	}
@@ -141,6 +144,7 @@ func parseIPVSBackendStatus(file io.Reader) ([]IPVSBackendStatus, error) {
 		status       []IPVSBackendStatus
 		scanner      = bufio.NewScanner(file)
 		proto        string
+		localMark    string
 		localAddress net.IP
 		localPort    uint16
 		err          error
@@ -159,10 +163,19 @@ func parseIPVSBackendStatus(file io.Reader) ([]IPVSBackendStatus, error) {
 				continue
 			}
 			proto = fields[0]
+			localMark = ""
 			localAddress, localPort, err = parseIPPort(fields[1])
 			if err != nil {
 				return nil, err
 			}
+		case fields[0] == "FWM":
+			if len(fields) < 2 {
+				continue
+			}
+			proto = fields[0]
+			localMark = fields[1]
+			localAddress = nil
+			localPort = 0
 		case fields[0] == "->":
 			if len(fields) < 6 {
 				continue
@@ -186,6 +199,7 @@ func parseIPVSBackendStatus(file io.Reader) ([]IPVSBackendStatus, error) {
 			status = append(status, IPVSBackendStatus{
 				LocalAddress:  localAddress,
 				LocalPort:     localPort,
+				LocalMark:     localMark,
 				RemoteAddress: remoteAddress,
 				RemotePort:    remotePort,
 				Proto:         proto,
@@ -199,22 +213,31 @@ func parseIPVSBackendStatus(file io.Reader) ([]IPVSBackendStatus, error) {
 }
 
 func parseIPPort(s string) (net.IP, uint16, error) {
-	tmp := strings.SplitN(s, ":", 2)
+	var (
+		ip  net.IP
+		err error
+	)
 
-	if len(tmp) != 2 {
-		return nil, 0, fmt.Errorf("invalid IP:Port: %s", s)
+	switch len(s) {
+	case 13:
+		ip, err = hex.DecodeString(s[0:8])
+		if err != nil {
+			return nil, 0, err
+		}
+	case 46:
+		ip = net.ParseIP(s[1:40])
+		if ip == nil {
+			return nil, 0, fmt.Errorf("invalid IPv6 address: %s", s[1:40])
+		}
+	default:
+		return nil, 0, fmt.Errorf("unexpected IP:Port: %s", s)
 	}
 
-	if len(tmp[0]) != 8 && len(tmp[0]) != 32 {
-		return nil, 0, fmt.Errorf("invalid IP: %s", tmp[0])
+	portString := s[len(s)-4:]
+	if len(portString) != 4 {
+		return nil, 0, fmt.Errorf("unexpected port string format: %s", portString)
 	}
-
-	ip, err := hex.DecodeString(tmp[0])
-	if err != nil {
-		return nil, 0, err
-	}
-
-	port, err := strconv.ParseUint(tmp[1], 16, 16)
+	port, err := strconv.ParseUint(portString, 16, 16)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -24,12 +24,11 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -49,10 +48,9 @@ func generateNodeAndTaintedNode(oldTaints []v1.Taint, newTaints []v1.Taint) (*v1
 		},
 		Status: v1.NodeStatus{},
 	}
-	clone, _ := api.Scheme.DeepCopy(node)
 
 	// A copy of the same node, but tainted.
-	taintedNode = clone.(*v1.Node)
+	taintedNode = node.DeepCopy()
 	taintedNode.Spec.Taints = newTaints
 
 	return node, taintedNode
@@ -86,6 +84,7 @@ func TestTaint(t *testing.T) {
 		args        []string
 		expectFatal bool
 		expectTaint bool
+		selector    bool
 	}{
 		// success cases
 		{
@@ -237,17 +236,17 @@ func TestTaint(t *testing.T) {
 
 	for _, test := range tests {
 		oldNode, expectNewNode := generateNodeAndTaintedNode(test.oldTaints, test.newTaints)
-
 		new_node := &v1.Node{}
 		tainted := false
 		f, tf, codec, ns := cmdtesting.NewAPIFactory()
 
 		tf.Client = &fake.RESTClient{
-			APIRegistry:          api.Registry,
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
 				switch {
+				case m.isFor("GET", "/nodes"):
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, oldNode)}, nil
 				case m.isFor("GET", "/nodes/node-name"):
 					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, oldNode)}, nil
 				case m.isFor("PATCH", "/nodes/node-name"):
@@ -328,6 +327,53 @@ func TestTaint(t *testing.T) {
 		if !test.expectTaint {
 			if tainted {
 				t.Fatalf("%s: unexpected taint", test.description)
+			}
+		}
+	}
+}
+
+func TestValidateFlags(t *testing.T) {
+	tests := []struct {
+		taintOpts   TaintOptions
+		description string
+		expectFatal bool
+	}{
+
+		{
+			taintOpts:   TaintOptions{selector: "myLabel=X", all: false},
+			description: "With Selector and without All flag",
+			expectFatal: false,
+		},
+		{
+			taintOpts:   TaintOptions{selector: "", all: true},
+			description: "Without selector and All flag",
+			expectFatal: false,
+		},
+		{
+			taintOpts:   TaintOptions{selector: "myLabel=X", all: true},
+			description: "With Selector and with All flag",
+			expectFatal: true,
+		},
+		{
+			taintOpts:   TaintOptions{selector: "", all: false, resources: []string{"node"}},
+			description: "Without Selector and All flags and if node name is not provided",
+			expectFatal: true,
+		},
+		{
+			taintOpts:   TaintOptions{selector: "", all: false, resources: []string{"node", "node-name"}},
+			description: "Without Selector and ALL flags and if node name is provided",
+			expectFatal: false,
+		},
+	}
+	for _, test := range tests {
+		sawFatal := false
+		err := test.taintOpts.validateFlags()
+		if err != nil {
+			sawFatal = true
+		}
+		if test.expectFatal {
+			if !sawFatal {
+				t.Fatalf("%s expected not to fail", test.description)
 			}
 		}
 	}

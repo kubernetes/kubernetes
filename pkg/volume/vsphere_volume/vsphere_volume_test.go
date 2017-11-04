@@ -22,9 +22,9 @@ import (
 	"path"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -37,7 +37,7 @@ func TestCanSupport(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/vsphere-volume")
 	if err != nil {
@@ -63,8 +63,15 @@ func getFakeDeviceName(host volume.VolumeHost, volPath string) string {
 	return path.Join(host.GetPluginDir(vsphereVolumePluginName), "device", volPath)
 }
 
-func (fake *fakePDManager) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPath string, volumeSizeKB int, fstype string, err error) {
-	return "[local] test-volume-name.vmdk", 100, "ext4", nil
+func (fake *fakePDManager) CreateVolume(v *vsphereVolumeProvisioner) (volSpec *VolumeSpec, err error) {
+	volSpec = &VolumeSpec{
+		Path:              "[local] test-volume-name.vmdk",
+		Size:              100,
+		Fstype:            "ext4",
+		StoragePolicyName: "gold",
+		StoragePolicyID:   "1234",
+	}
+	return volSpec, nil
 }
 
 func (fake *fakePDManager) DeleteVolume(vd *vsphereVolumeDeleter) error {
@@ -83,7 +90,7 @@ func TestPlugin(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/vsphere-volume")
 	if err != nil {
@@ -137,7 +144,7 @@ func TestPlugin(t *testing.T) {
 	if _, err := os.Stat(path); err == nil {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
+		t.Errorf("TearDown() failed: %v", err)
 	}
 
 	// Test Provisioner
@@ -146,6 +153,9 @@ func TestPlugin(t *testing.T) {
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 	provisioner, err := plug.(*vsphereVolumePlugin).newProvisionerInternal(options, &fakePDManager{})
+	if err != nil {
+		t.Errorf("newProvisionerInternal() failed: %v", err)
+	}
 	persistentSpec, err := provisioner.Provision()
 	if err != nil {
 		t.Errorf("Provision() failed: %v", err)
@@ -153,6 +163,10 @@ func TestPlugin(t *testing.T) {
 
 	if persistentSpec.Spec.PersistentVolumeSource.VsphereVolume.VolumePath != "[local] test-volume-name.vmdk" {
 		t.Errorf("Provision() returned unexpected path %s", persistentSpec.Spec.PersistentVolumeSource.VsphereVolume.VolumePath)
+	}
+
+	if persistentSpec.Spec.PersistentVolumeSource.VsphereVolume.StoragePolicyName != "gold" {
+		t.Errorf("Provision() returned unexpected storagepolicy name %s", persistentSpec.Spec.PersistentVolumeSource.VsphereVolume.StoragePolicyName)
 	}
 
 	cap := persistentSpec.Spec.Capacity[v1.ResourceStorage]
@@ -166,6 +180,9 @@ func TestPlugin(t *testing.T) {
 		PersistentVolume: persistentSpec,
 	}
 	deleter, err := plug.(*vsphereVolumePlugin).newDeleterInternal(volSpec, &fakePDManager{})
+	if err != nil {
+		t.Errorf("newDeleterInternal() failed: %v", err)
+	}
 	err = deleter.Delete()
 	if err != nil {
 		t.Errorf("Deleter() failed: %v", err)

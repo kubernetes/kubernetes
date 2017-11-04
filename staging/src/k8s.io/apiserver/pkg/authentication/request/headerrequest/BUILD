@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -11,15 +9,15 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["requestheader_test.go"],
+    importpath = "k8s.io/apiserver/pkg/authentication/request/headerrequest",
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library"],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["requestheader.go"],
-    tags = ["automanaged"],
+    importpath = "k8s.io/apiserver/pkg/authentication/request/headerrequest",
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
@@ -27,4 +25,17 @@ go_library(
         "//vendor/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [":package-srcs"],
+    tags = ["automanaged"],
 )

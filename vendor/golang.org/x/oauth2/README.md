@@ -63,3 +63,12 @@ with the `oauth2` package.
 		client.Get("...")
 	}
 
+## Contributing
+
+We appreciate your help!
+
+To contribute, please read the contribution guidelines:
+	https://golang.org/doc/contribute.html
+
+Note that the Go project does not use GitHub pull requests but
+uses Gerrit for code reviews. See the contribution guide for details.

@@ -137,3 +137,31 @@ func TestCmdInitAPIPort(t *testing.T) {
 		kubeadmReset()
 	}
 }
+
+func TestCmdInitArgsMixed(t *testing.T) {
+	if *kubeadmCmdSkip {
+		t.Log("kubeadm cmd tests being skipped")
+		t.Skip()
+	}
+
+	var initTest = []struct {
+		args     string
+		expected bool
+	}{
+		{"--api-port=1000 --config=/etc/kubernets/kubeadm.config", false},
+	}
+
+	for _, rt := range initTest {
+		_, _, actual := RunCmd(*kubeadmPath, "init", rt.args, "--skip-preflight-checks")
+		if (actual == nil) != rt.expected {
+			t.Errorf(
+				"failed CmdInitArgsMixed running 'kubeadm init %s' with an error: %v\n\texpected: %t\n\t  actual: %t",
+				rt.args,
+				actual,
+				rt.expected,
+				(actual == nil),
+			)
+		}
+		kubeadmReset()
+	}
+}

@@ -10,7 +10,6 @@ reviewers:
 - mikedanese
 - liggitt
 - nikhiljindal
-- bprashanth
 - gmarek
 - erictune
 - pmorie
@@ -22,3 +21,4 @@ reviewers:
 - ddysher
 - mqliang
 - sdminonne
+- enj

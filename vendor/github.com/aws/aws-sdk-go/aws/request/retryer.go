@@ -8,7 +8,7 @@ import (
 )
 
 // Retryer is an interface to control retry logic for a given service.
-// The default implementation used by most services is the service.DefaultRetryer
+// The default implementation used by most services is the client.DefaultRetryer
 // structure, which contains basic retry logic using exponential backoff.
 type Retryer interface {
 	RetryRules(*Request) time.Duration
@@ -26,8 +26,10 @@ func WithRetryer(cfg *aws.Config, retryer Retryer) *aws.Config {
 // retryableCodes is a collection of service response codes which are retry-able
 // without any further action.
 var retryableCodes = map[string]struct{}{
-	"RequestError":   {},
-	"RequestTimeout": {},
+	"RequestError":            {},
+	"RequestTimeout":          {},
+	ErrCodeResponseTimeout:    {},
+	"RequestTimeoutException": {}, // Glacier's flavor of RequestTimeout
 }
 
 var throttleCodes = map[string]struct{}{
@@ -36,7 +38,6 @@ var throttleCodes = map[string]struct{}{
 	"ThrottlingException":                    {},
 	"RequestLimitExceeded":                   {},
 	"RequestThrottled":                       {},
-	"LimitExceededException":                 {}, // Deleting 10+ DynamoDb tables at once
 	"TooManyRequestsException":               {}, // Lambda functions
 	"PriorRequestNotComplete":                {}, // Route53
 }
@@ -68,35 +69,93 @@ func isCodeExpiredCreds(code string) bool {
 	return ok
 }
 
+var validParentCodes = map[string]struct{}{
+	ErrCodeSerialization: {},
+	ErrCodeRead:          {},
+}
+
+type temporaryError interface {
+	Temporary() bool
+}
+
+func isNestedErrorRetryable(parentErr awserr.Error) bool {
+	if parentErr == nil {
+		return false
+	}
+
+	if _, ok := validParentCodes[parentErr.Code()]; !ok {
+		return false
+	}
+
+	err := parentErr.OrigErr()
+	if err == nil {
+		return false
+	}
+
+	if aerr, ok := err.(awserr.Error); ok {
+		return isCodeRetryable(aerr.Code())
+	}
+
+	if t, ok := err.(temporaryError); ok {
+		return t.Temporary()
+	}
+
+	return isErrConnectionReset(err)
+}
+
 // IsErrorRetryable returns whether the error is retryable, based on its Code.
-// Returns false if the request has no Error set.
-func (r *Request) IsErrorRetryable() bool {
-	if r.Error != nil {
-		if err, ok := r.Error.(awserr.Error); ok {
-			return isCodeRetryable(err.Code())
+// Returns false if error is nil.
+func IsErrorRetryable(err error) bool {
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			return isCodeRetryable(aerr.Code()) || isNestedErrorRetryable(aerr)
 		}
 	}
 	return false
 }
 
 // IsErrorThrottle returns whether the error is to be throttled based on its code.
-// Returns false if the request has no Error set
-func (r *Request) IsErrorThrottle() bool {
-	if r.Error != nil {
-		if err, ok := r.Error.(awserr.Error); ok {
-			return isCodeThrottle(err.Code())
+// Returns false if error is nil.
+func IsErrorThrottle(err error) bool {
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			return isCodeThrottle(aerr.Code())
 		}
 	}
 	return false
 }
 
-// IsErrorExpired returns whether the error code is a credential expiry error.
-// Returns false if the request has no Error set.
-func (r *Request) IsErrorExpired() bool {
-	if r.Error != nil {
-		if err, ok := r.Error.(awserr.Error); ok {
-			return isCodeExpiredCreds(err.Code())
+// IsErrorExpiredCreds returns whether the error code is a credential expiry error.
+// Returns false if error is nil.
+func IsErrorExpiredCreds(err error) bool {
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			return isCodeExpiredCreds(aerr.Code())
 		}
 	}
 	return false
+}
+
+// IsErrorRetryable returns whether the error is retryable, based on its Code.
+// Returns false if the request has no Error set.
+//
+// Alias for the utility function IsErrorRetryable
+func (r *Request) IsErrorRetryable() bool {
+	return IsErrorRetryable(r.Error)
+}
+
+// IsErrorThrottle returns whether the error is to be throttled based on its code.
+// Returns false if the request has no Error set
+//
+// Alias for the utility function IsErrorThrottle
+func (r *Request) IsErrorThrottle() bool {
+	return IsErrorThrottle(r.Error)
+}
+
+// IsErrorExpired returns whether the error code is a credential expiry error.
+// Returns false if the request has no Error set.
+//
+// Alias for the utility function IsErrorExpiredCreds
+func (r *Request) IsErrorExpired() bool {
+	return IsErrorExpiredCreds(r.Error)
 }

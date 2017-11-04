@@ -532,7 +532,9 @@ func (m *member) electionTimeout() time.Duration {
 	return time.Duration(m.s.Cfg.ElectionTicks) * time.Millisecond
 }
 
-func (m *member) DropConnections() { m.grpcBridge.Reset() }
+func (m *member) DropConnections()    { m.grpcBridge.Reset() }
+func (m *member) PauseConnections()   { m.grpcBridge.Pause() }
+func (m *member) UnpauseConnections() { m.grpcBridge.Unpause() }
 
 // NewClientV3 creates a new grpc client connection to the member
 func NewClientV3(m *member) (*clientv3.Client, error) {

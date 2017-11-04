@@ -54,7 +54,7 @@ type BaseState struct {
 	InitProcessPid int `json:"init_process_pid"`
 
 	// InitProcessStartTime is the init process start time in clock cycles since boot time.
-	InitProcessStartTime string `json:"init_process_start"`
+	InitProcessStartTime uint64 `json:"init_process_start"`
 
 	// Created is the unix timestamp for the creation time of the container in UTC
 	Created time.Time `json:"created"`
@@ -123,7 +123,7 @@ type BaseContainer interface {
 	// SystemError - System error.
 	Start(process *Process) (err error)
 
-	// Run immediatly starts the process inside the conatiner.  Returns error if process
+	// Run immediately starts the process inside the container.  Returns error if process
 	// fails to start.  It does not block waiting for the exec fifo  after start returns but
 	// opens the fifo after start returns.
 	//
@@ -134,20 +134,29 @@ type BaseContainer interface {
 	// SystemError - System error.
 	Run(process *Process) (err error)
 
-	// Destroys the container after killing all running processes.
+	// Destroys the container, if its in a valid state, after killing any
+	// remaining running processes.
 	//
 	// Any event registrations are removed before the container is destroyed.
 	// No error is returned if the container is already destroyed.
 	//
+	// Running containers must first be stopped using Signal(..).
+	// Paused containers must first be resumed using Resume(..).
+	//
 	// errors:
+	// ContainerNotStopped - Container is still running,
+	// ContainerPaused - Container is paused,
 	// SystemError - System error.
 	Destroy() error
 
 	// Signal sends the provided signal code to the container's initial process.
 	//
+	// If all is specified the signal is sent to all processes in the container
+	// including the initial process.
+	//
 	// errors:
 	// SystemError - System error.
-	Signal(s os.Signal) error
+	Signal(s os.Signal, all bool) error
 
 	// Exec signals the container to exec the users process at the end of the init.
 	//

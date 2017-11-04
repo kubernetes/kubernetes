@@ -56,6 +56,38 @@ func newClusterRoleBindings(c *RbacClient) *clusterRoleBindings {
 	}
 }
 
+// Get takes name of the clusterRoleBinding, and returns the corresponding clusterRoleBinding object, and an error if there is any.
+func (c *clusterRoleBindings) Get(name string, options v1.GetOptions) (result *rbac.ClusterRoleBinding, err error) {
+	result = &rbac.ClusterRoleBinding{}
+	err = c.client.Get().
+		Resource("clusterrolebindings").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of ClusterRoleBindings that match those selectors.
+func (c *clusterRoleBindings) List(opts v1.ListOptions) (result *rbac.ClusterRoleBindingList, err error) {
+	result = &rbac.ClusterRoleBindingList{}
+	err = c.client.Get().
+		Resource("clusterrolebindings").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested clusterRoleBindings.
+func (c *clusterRoleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Resource("clusterrolebindings").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a clusterRoleBinding and creates it.  Returns the server's representation of the clusterRoleBinding, and an error, if there is any.
 func (c *clusterRoleBindings) Create(clusterRoleBinding *rbac.ClusterRoleBinding) (result *rbac.ClusterRoleBinding, err error) {
 	result = &rbac.ClusterRoleBinding{}
@@ -97,38 +129,6 @@ func (c *clusterRoleBindings) DeleteCollection(options *v1.DeleteOptions, listOp
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the clusterRoleBinding, and returns the corresponding clusterRoleBinding object, and an error if there is any.
-func (c *clusterRoleBindings) Get(name string, options v1.GetOptions) (result *rbac.ClusterRoleBinding, err error) {
-	result = &rbac.ClusterRoleBinding{}
-	err = c.client.Get().
-		Resource("clusterrolebindings").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of ClusterRoleBindings that match those selectors.
-func (c *clusterRoleBindings) List(opts v1.ListOptions) (result *rbac.ClusterRoleBindingList, err error) {
-	result = &rbac.ClusterRoleBindingList{}
-	err = c.client.Get().
-		Resource("clusterrolebindings").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested clusterRoleBindings.
-func (c *clusterRoleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Resource("clusterrolebindings").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched clusterRoleBinding.

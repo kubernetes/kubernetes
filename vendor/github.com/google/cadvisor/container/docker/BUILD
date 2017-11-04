@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -15,12 +8,14 @@ go_library(
         "factory.go",
         "handler.go",
     ],
-    tags = ["automanaged"],
+    importpath = "github.com/google/cadvisor/container/docker",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/docker/engine-api/client:go_default_library",
         "//vendor/github.com/docker/engine-api/types:go_default_library",
         "//vendor/github.com/docker/engine-api/types/container:go_default_library",
+        "//vendor/github.com/docker/go-connections/tlsconfig:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/google/cadvisor/container:go_default_library",
         "//vendor/github.com/google/cadvisor/container/common:go_default_library",
@@ -31,6 +26,7 @@ go_library(
         "//vendor/github.com/google/cadvisor/machine:go_default_library",
         "//vendor/github.com/google/cadvisor/manager/watcher:go_default_library",
         "//vendor/github.com/google/cadvisor/utils/docker:go_default_library",
+        "//vendor/github.com/google/cadvisor/zfs:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
         "//vendor/github.com/opencontainers/runc/libcontainer/configs:go_default_library",
@@ -49,4 +45,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

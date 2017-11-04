@@ -64,6 +64,7 @@ func AuthorizationAttributesFrom(spec authorizationapi.SubjectAccessReviewSpec) 
 	userToCheck := &user.DefaultInfo{
 		Name:   spec.User,
 		Groups: spec.Groups,
+		UID:    spec.UID,
 		Extra:  convertToUserInfoExtra(spec.Extra),
 	}
 

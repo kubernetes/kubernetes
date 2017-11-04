@@ -25,12 +25,12 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/pkg/api"
 )
 
 func TestGenericHttpResponseChecker(t *testing.T) {
-	responseChecker := NewGenericHttpResponseChecker(api.Resource("pods"), "foo")
+	responseChecker := NewGenericHttpResponseChecker(v1.Resource("pods"), "foo")
 	tests := []struct {
 		resp        *http.Response
 		expectError bool
@@ -79,7 +79,7 @@ func TestGenericHttpResponseChecker(t *testing.T) {
 }
 
 func TestGenericHttpResponseCheckerLimitReader(t *testing.T) {
-	responseChecker := NewGenericHttpResponseChecker(api.Resource("pods"), "foo")
+	responseChecker := NewGenericHttpResponseChecker(v1.Resource("pods"), "foo")
 	excessedString := strings.Repeat("a", (maxReadLength + 10000))
 	resp := &http.Response{
 		Body:       ioutil.NopCloser(bytes.NewBufferString(excessedString)),

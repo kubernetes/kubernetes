@@ -87,13 +87,16 @@ type goAwayFlowError struct{}
 
 func (goAwayFlowError) Error() string { return "connection exceeded flow control window size" }
 
-// connErrorReason wraps a ConnectionError with an informative error about why it occurs.
-
+// connError represents an HTTP/2 ConnectionError error code, along
+// with a string (for debugging) explaining why.
+//
 // Errors of this type are only returned by the frame parser functions
-// and converted into ConnectionError(ErrCodeProtocol).
+// and converted into ConnectionError(Code), after stashing away
+// the Reason into the Framer's errDetail field, accessible via
+// the (*Framer).ErrorDetail method.
 type connError struct {
-	Code   ErrCode
-	Reason string
+	Code   ErrCode // the ConnectionError error code
+	Reason string  // additional reason
 }
 
 func (e connError) Error() string {

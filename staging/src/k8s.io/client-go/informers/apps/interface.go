@@ -19,14 +19,20 @@ limitations under the License.
 package apps
 
 import (
+	v1 "k8s.io/client-go/informers/apps/v1"
 	v1beta1 "k8s.io/client-go/informers/apps/v1beta1"
+	v1beta2 "k8s.io/client-go/informers/apps/v1beta2"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 )
 
 // Interface provides access to each of this group's versions.
 type Interface interface {
+	// V1 provides access to shared informers for resources in V1.
+	V1() v1.Interface
 	// V1beta1 provides access to shared informers for resources in V1beta1.
 	V1beta1() v1beta1.Interface
+	// V1beta2 provides access to shared informers for resources in V1beta2.
+	V1beta2() v1beta2.Interface
 }
 
 type group struct {
@@ -38,7 +44,17 @@ func New(f internalinterfaces.SharedInformerFactory) Interface {
 	return &group{f}
 }
 
+// V1 returns a new v1.Interface.
+func (g *group) V1() v1.Interface {
+	return v1.New(g.SharedInformerFactory)
+}
+
 // V1beta1 returns a new v1beta1.Interface.
 func (g *group) V1beta1() v1beta1.Interface {
 	return v1beta1.New(g.SharedInformerFactory)
+}
+
+// V1beta2 returns a new v1beta2.Interface.
+func (g *group) V1beta2() v1beta2.Interface {
+	return v1beta2.New(g.SharedInformerFactory)
 }

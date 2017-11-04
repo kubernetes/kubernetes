@@ -88,6 +88,10 @@ func (p *TemplatePrinter) HandledResources() []string {
 	return []string{}
 }
 
+func (p *TemplatePrinter) IsGeneric() bool {
+	return true
+}
+
 // safeExecute tries to execute the template, but catches panics and returns an error
 // should the template engine panic.
 func (p *TemplatePrinter) safeExecute(w io.Writer, obj interface{}) error {

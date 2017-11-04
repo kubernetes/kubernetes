@@ -34,40 +34,9 @@ type FakePodPresets struct {
 
 var podpresetsResource = schema.GroupVersionResource{Group: "settings.k8s.io", Version: "", Resource: "podpresets"}
 
-func (c *FakePodPresets) Create(podPreset *settings.PodPreset) (result *settings.PodPreset, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(podpresetsResource, c.ns, podPreset), &settings.PodPreset{})
+var podpresetsKind = schema.GroupVersionKind{Group: "settings.k8s.io", Version: "", Kind: "PodPreset"}
 
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*settings.PodPreset), err
-}
-
-func (c *FakePodPresets) Update(podPreset *settings.PodPreset) (result *settings.PodPreset, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(podpresetsResource, c.ns, podPreset), &settings.PodPreset{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*settings.PodPreset), err
-}
-
-func (c *FakePodPresets) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(podpresetsResource, c.ns, name), &settings.PodPreset{})
-
-	return err
-}
-
-func (c *FakePodPresets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(podpresetsResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &settings.PodPresetList{})
-	return err
-}
-
+// Get takes name of the podPreset, and returns the corresponding podPreset object, and an error if there is any.
 func (c *FakePodPresets) Get(name string, options v1.GetOptions) (result *settings.PodPreset, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(podpresetsResource, c.ns, name), &settings.PodPreset{})
@@ -78,9 +47,10 @@ func (c *FakePodPresets) Get(name string, options v1.GetOptions) (result *settin
 	return obj.(*settings.PodPreset), err
 }
 
+// List takes label and field selectors, and returns the list of PodPresets that match those selectors.
 func (c *FakePodPresets) List(opts v1.ListOptions) (result *settings.PodPresetList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(podpresetsResource, c.ns, opts), &settings.PodPresetList{})
+		Invokes(testing.NewListAction(podpresetsResource, podpresetsKind, c.ns, opts), &settings.PodPresetList{})
 
 	if obj == nil {
 		return nil, err
@@ -104,6 +74,44 @@ func (c *FakePodPresets) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(podpresetsResource, c.ns, opts))
 
+}
+
+// Create takes the representation of a podPreset and creates it.  Returns the server's representation of the podPreset, and an error, if there is any.
+func (c *FakePodPresets) Create(podPreset *settings.PodPreset) (result *settings.PodPreset, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateAction(podpresetsResource, c.ns, podPreset), &settings.PodPreset{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*settings.PodPreset), err
+}
+
+// Update takes the representation of a podPreset and updates it. Returns the server's representation of the podPreset, and an error, if there is any.
+func (c *FakePodPresets) Update(podPreset *settings.PodPreset) (result *settings.PodPreset, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(podpresetsResource, c.ns, podPreset), &settings.PodPreset{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*settings.PodPreset), err
+}
+
+// Delete takes name of the podPreset and deletes it. Returns an error if one occurs.
+func (c *FakePodPresets) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(podpresetsResource, c.ns, name), &settings.PodPreset{})
+
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakePodPresets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(podpresetsResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &settings.PodPresetList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched podPreset.

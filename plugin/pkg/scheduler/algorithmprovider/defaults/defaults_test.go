@@ -17,46 +17,70 @@ limitations under the License.
 package defaults
 
 import (
-	"os"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-func TestGetMaxVols(t *testing.T) {
-	previousValue := os.Getenv(KubeMaxPDVols)
-	defaultValue := 39
-
-	tests := []struct {
-		rawMaxVols string
-		expected   int
-		test       string
+func TestCopyAndReplace(t *testing.T) {
+	testCases := []struct {
+		set         sets.String
+		replaceWhat string
+		replaceWith string
+		expected    sets.String
 	}{
 		{
-			rawMaxVols: "invalid",
-			expected:   defaultValue,
-			test:       "Unable to parse maxiumum PD volumes value, using default value",
+			set:         sets.String{"A": sets.Empty{}, "B": sets.Empty{}},
+			replaceWhat: "A",
+			replaceWith: "C",
+			expected:    sets.String{"B": sets.Empty{}, "C": sets.Empty{}},
 		},
 		{
-			rawMaxVols: "-2",
-			expected:   defaultValue,
-			test:       "Maximum PD volumes must be a positive value, using default value",
-		},
-		{
-			rawMaxVols: "40",
-			expected:   40,
-			test:       "Parse maximum PD volumes value from env",
+			set:         sets.String{"A": sets.Empty{}, "B": sets.Empty{}},
+			replaceWhat: "D",
+			replaceWith: "C",
+			expected:    sets.String{"A": sets.Empty{}, "B": sets.Empty{}},
 		},
 	}
-
-	for _, test := range tests {
-		os.Setenv(KubeMaxPDVols, test.rawMaxVols)
-		result := getMaxVols(defaultValue)
-		if result != test.expected {
-			t.Errorf("%s: expected %v got %v", test.test, test.expected, result)
+	for _, testCase := range testCases {
+		result := copyAndReplace(testCase.set, testCase.replaceWhat, testCase.replaceWith)
+		if !result.Equal(testCase.expected) {
+			t.Errorf("expected %v got %v", testCase.expected, result)
 		}
 	}
+}
 
-	os.Unsetenv(KubeMaxPDVols)
-	if previousValue != "" {
-		os.Setenv(KubeMaxPDVols, previousValue)
+func TestDefaultPriorities(t *testing.T) {
+	result := sets.NewString(
+		"SelectorSpreadPriority",
+		"InterPodAffinityPriority",
+		"LeastRequestedPriority",
+		"BalancedResourceAllocation",
+		"NodePreferAvoidPodsPriority",
+		"NodeAffinityPriority",
+		"TaintTolerationPriority")
+	if expected := defaultPriorities(); !result.Equal(expected) {
+		t.Errorf("expected %v got %v", expected, result)
+	}
+}
+
+func TestDefaultPredicates(t *testing.T) {
+	result := sets.NewString(
+		"NoVolumeZoneConflict",
+		"MaxEBSVolumeCount",
+		"MaxGCEPDVolumeCount",
+		"MaxAzureDiskVolumeCount",
+		"MatchInterPodAffinity",
+		"NoDiskConflict",
+		"GeneralPredicates",
+		"CheckNodeMemoryPressure",
+		"CheckNodeDiskPressure",
+		"NoVolumeNodeConflict",
+		"CheckNodeCondition",
+		"PodToleratesNodeTaints",
+	)
+
+	if expected := defaultPredicates(); !result.Equal(expected) {
+		t.Errorf("expected %v got %v", expected, result)
 	}
 }

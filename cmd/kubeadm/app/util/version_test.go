@@ -45,6 +45,7 @@ func TestValidVersion(t *testing.T) {
 		"v1.6.0-alpha.0.536+d60d9f3269288f",
 		"v1.5.0-alpha.0.1078+1044b6822497da-pull",
 		"v1.5.0-alpha.1.822+49b9e32fad9f32-pull-gke-gci",
+		"v1.6.1+coreos.0",
 	}
 	for _, s := range validVersions {
 		ver, err := KubernetesReleaseVersion(s)
@@ -61,8 +62,9 @@ func TestValidVersion(t *testing.T) {
 func TestInvalidVersion(t *testing.T) {
 	invalidVersions := []string{
 		"v1.3",
-		"1.4.0",
-		"1.4.5+git",
+		"1.4",
+		"b1.4.0",
+		"c1.4.5+git",
 		"something1.2",
 	}
 	for _, s := range invalidVersions {
@@ -73,6 +75,24 @@ func TestInvalidVersion(t *testing.T) {
 		}
 		if ver != "" {
 			t.Errorf("KubernetesReleaseVersion should return empty string in case of error. Returned %q for version %q", ver, s)
+		}
+	}
+}
+
+func TestValidConvenientForUserVersion(t *testing.T) {
+	validVersions := []string{
+		"1.4.0",
+		"1.4.5+git",
+		"1.6.1_coreos.0",
+	}
+	for _, s := range validVersions {
+		ver, err := KubernetesReleaseVersion(s)
+		t.Log("Valid: ", s, ver, err)
+		if err != nil {
+			t.Errorf("KubernetesReleaseVersion unexpected error for version %q: %v", s, err)
+		}
+		if ver != "v"+s {
+			t.Errorf("KubernetesReleaseVersion should return semantic version string. %q vs. %q", s, ver)
 		}
 	}
 }
@@ -117,6 +137,154 @@ func TestVersionFromNetwork(t *testing.T) {
 			t.Errorf("KubernetesReleaseVersion: error expected for key %q, but result is %q", k, ver)
 		case ver != v.Expected:
 			t.Errorf("KubernetesReleaseVersion: unexpected result for key %q. Expected: %q Actual: %q", k, v.Expected, ver)
+		}
+	}
+}
+
+func TestVersionToTag(t *testing.T) {
+	type T struct {
+		input    string
+		expected string
+	}
+	cases := []T{
+		// NOP
+		{"", ""},
+		// Official releases
+		{"v1.0.0", "v1.0.0"},
+		// CI or custom builds
+		{"v10.1.2-alpha.1.100+0123456789abcdef+SOMETHING", "v10.1.2-alpha.1.100_0123456789abcdef_SOMETHING"},
+		// random and invalid input: should return safe value
+		{"v1,0!0+üñµ", "v1_0_0____"},
+	}
+
+	for _, tc := range cases {
+		tag := KubernetesVersionToImageTag(tc.input)
+		t.Logf("KubernetesVersionToImageTag: Input: %q. Result: %q. Expected: %q", tc.input, tag, tc.expected)
+		if tag != tc.expected {
+			t.Errorf("failed KubernetesVersionToImageTag: Input: %q. Result: %q. Expected: %q", tc.input, tag, tc.expected)
+		}
+	}
+}
+
+func TestSplitVersion(t *testing.T) {
+	type T struct {
+		input  string
+		bucket string
+		label  string
+		valid  bool
+	}
+	cases := []T{
+		// Release area
+		{"v1.7.0", "https://dl.k8s.io/release", "v1.7.0", true},
+		{"v1.8.0-alpha.2.1231+afabd012389d53a", "https://dl.k8s.io/release", "v1.8.0-alpha.2.1231+afabd012389d53a", true},
+		{"release/v1.7.0", "https://dl.k8s.io/release", "v1.7.0", true},
+		{"release/latest-1.7", "https://dl.k8s.io/release", "latest-1.7", true},
+		// CI builds area, lookup actual builds at ci-cross/*.txt
+		{"ci-cross/latest", "https://dl.k8s.io/ci-cross", "latest", true},
+		{"ci/latest-1.7", "https://dl.k8s.io/ci-cross", "latest-1.7", true},
+		// unknown label in default (release) area: splitVersion validate only areas.
+		{"unknown-1", "https://dl.k8s.io/release", "unknown-1", true},
+		// unknown area, not valid input.
+		{"unknown/latest-1", "", "", false},
+	}
+	// kubeReleaseBucketURL can be overriden during network tests, thus ensure
+	// it will contain value corresponding to expected outcome for this unit test
+	kubeReleaseBucketURL = "https://dl.k8s.io"
+
+	for _, tc := range cases {
+		bucket, label, err := splitVersion(tc.input)
+		switch {
+		case err != nil && tc.valid:
+			t.Errorf("splitVersion: unexpected error for %q. Error: %v", tc.input, err)
+		case err == nil && !tc.valid:
+			t.Errorf("splitVersion: error expected for key %q, but result is %q, %q", tc.input, bucket, label)
+		case bucket != tc.bucket:
+			t.Errorf("splitVersion: unexpected bucket result for key %q. Expected: %q Actual: %q", tc.input, tc.bucket, bucket)
+		case label != tc.label:
+			t.Errorf("splitVersion: unexpected label result for key %q. Expected: %q Actual: %q", tc.input, tc.label, label)
+		}
+
+	}
+}
+
+func TestKubernetesIsCIVersion(t *testing.T) {
+	type T struct {
+		input    string
+		expected bool
+	}
+	cases := []T{
+		{"", false},
+		// Official releases
+		{"v1.0.0", false},
+		{"release/v1.0.0", false},
+		// CI builds
+		{"ci/latest-1", true},
+		{"ci-cross/latest", true},
+		{"ci/v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
+		{"ci-cross/v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
+	}
+
+	for _, tc := range cases {
+		result := KubernetesIsCIVersion(tc.input)
+		t.Logf("KubernetesIsCIVersion: Input: %q. Result: %v. Expected: %v", tc.input, result, tc.expected)
+		if result != tc.expected {
+			t.Errorf("failed KubernetesIsCIVersion: Input: %q. Result: %v. Expected: %v", tc.input, result, tc.expected)
+		}
+	}
+
+}
+
+// Validate KubernetesReleaseVersion but with bucket prefixes
+func TestCIBuildVersion(t *testing.T) {
+	type T struct {
+		input    string
+		expected string
+		valid    bool
+	}
+	cases := []T{
+		// Official releases
+		{"v1.7.0", "v1.7.0", true},
+		{"release/v1.8.0", "v1.8.0", true},
+		{"1.4.0-beta.0", "v1.4.0-beta.0", true},
+		{"release/0invalid", "", false},
+		// CI or custom builds
+		{"ci/v1.9.0-alpha.1.123+acbcbfd53bfa0a", "v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
+		{"ci-cross/v1.9.0-alpha.1.123+acbcbfd53bfa0a", "v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
+		{"ci/1.9.0-alpha.1.123+acbcbfd53bfa0a", "v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
+		{"ci-cross/1.9.0-alpha.1.123+acbcbfd53bfa0a", "v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
+		{"ci/0invalid", "", false},
+	}
+
+	for _, tc := range cases {
+		ver, err := KubernetesReleaseVersion(tc.input)
+		t.Logf("Input: %q. Result: %q, Error: %v", tc.input, ver, err)
+		switch {
+		case err != nil && tc.valid:
+			t.Errorf("KubernetesReleaseVersion: unexpected error for input %q. Error: %v", tc.input, err)
+		case err == nil && !tc.valid:
+			t.Errorf("KubernetesReleaseVersion: error expected for input %q, but result is %q", tc.input, ver)
+		case ver != tc.expected:
+			t.Errorf("KubernetesReleaseVersion: unexpected result for input %q. Expected: %q Actual: %q", tc.input, tc.expected, ver)
+		}
+	}
+}
+
+func TestNormalizedBuildVersionVersion(t *testing.T) {
+	type T struct {
+		input    string
+		expected string
+	}
+	cases := []T{
+		{"v1.7.0", "v1.7.0"},
+		{"v1.8.0-alpha.2.1231+afabd012389d53a", "v1.8.0-alpha.2.1231+afabd012389d53a"},
+		{"1.7.0", "v1.7.0"},
+		{"unknown-1", ""},
+	}
+
+	for _, tc := range cases {
+		output := normalizedBuildVersion(tc.input)
+		if output != tc.expected {
+			t.Errorf("normalizedBuildVersion: unexpected output %q for input %q. Expected: %q", output, tc.input, tc.expected)
 		}
 	}
 }

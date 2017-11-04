@@ -45,4 +45,5 @@ const (
 	RELATIME    = 0
 	REMOUNT     = 0
 	STRICTATIME = 0
+	mntDetach   = 0
 )

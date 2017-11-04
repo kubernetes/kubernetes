@@ -12,6 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM busybox
-ADD server server
-ENTRYPOINT ["/server"]
+FROM BASEIMAGE
+COPY n-way-http /
+ENTRYPOINT ["/n-way-http"]

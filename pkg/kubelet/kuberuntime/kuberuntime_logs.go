@@ -31,8 +31,8 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/api/core/v1"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/util/tail"
 )
 
@@ -280,16 +280,14 @@ func parseCRILog(log []byte, msg *logMessage) error {
 	return nil
 }
 
-// dockerJSONLog is the JSON log buffer used in parseDockerJSONLog.
-var dockerJSONLog = &jsonlog.JSONLog{}
-
 // parseDockerJSONLog parses logs in Docker JSON log format. Docker JSON log format
 // example:
 //   {"log":"content 1","stream":"stdout","time":"2016-10-20T18:39:20.57606443Z"}
 //   {"log":"content 2","stream":"stderr","time":"2016-10-20T18:39:20.57606444Z"}
 func parseDockerJSONLog(log []byte, msg *logMessage) error {
-	dockerJSONLog.Reset()
-	l := dockerJSONLog
+	var l = &jsonlog.JSONLog{}
+	l.Reset()
+
 	// TODO: JSON decoding is fairly expensive, we should evaluate this.
 	if err := json.Unmarshal(log, l); err != nil {
 		return fmt.Errorf("failed with %v to unmarshal log %q", err, l)

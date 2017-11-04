@@ -159,7 +159,7 @@ func FormatInt16(value int16) string {
 
 // FormatInt32 turns an int32 into a string
 func FormatInt32(value int32) string {
-	return strconv.FormatInt(int64(value), 10)
+	return strconv.Itoa(int(value))
 }
 
 // FormatInt64 turns an int64 into a string

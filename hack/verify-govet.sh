@@ -28,10 +28,4 @@ if [[ "$#" -gt 0 ]]; then
     ARGHELP="WHAT='$@'"
 fi
 
-echo "NOTE: $0 has been replaced by 'make vet'"
-echo
-echo "The equivalent of this invocation is: "
-echo "    make vet ${ARGHELP}"
-echo
-echo
 make --no-print-directory -C "${KUBE_ROOT}" vet WHAT="$@"

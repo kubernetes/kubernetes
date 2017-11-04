@@ -1,1 +1,0 @@
-This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/devel/local-cluster/docker.md](https://github.com/kubernetes/community/blob/master/contributors/devel/local-cluster/docker.md)

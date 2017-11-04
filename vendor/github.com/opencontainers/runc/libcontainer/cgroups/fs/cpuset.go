@@ -57,13 +57,31 @@ func (s *CpusetGroup) ApplyDir(dir string, cgroup *configs.Cgroup, pid int) erro
 	if dir == "" {
 		return nil
 	}
-	root, err := getCgroupRoot()
+	mountInfo, err := ioutil.ReadFile("/proc/self/mountinfo")
 	if err != nil {
 		return err
 	}
-	if err := s.ensureParent(dir, root); err != nil {
+	root := filepath.Dir(cgroups.GetClosestMountpointAncestor(dir, string(mountInfo)))
+	// 'ensureParent' start with parent because we don't want to
+	// explicitly inherit from parent, it could conflict with
+	// 'cpuset.cpu_exclusive'.
+	if err := s.ensureParent(filepath.Dir(dir), root); err != nil {
 		return err
 	}
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	// We didn't inherit cpuset configs from parent, but we have
+	// to ensure cpuset configs are set before moving task into the
+	// cgroup.
+	// The logic is, if user specified cpuset configs, use these
+	// specified configs, otherwise, inherit from parent. This makes
+	// cpuset configs work correctly with 'cpuset.cpu_exclusive', and
+	// keep backward compatbility.
+	if err := s.ensureCpusAndMems(dir, cgroup); err != nil {
+		return err
+	}
+
 	// because we are not using d.join we need to place the pid into the procs file
 	// unlike the other subsystems
 	if err := cgroups.WriteCgroupProc(dir, pid); err != nil {
@@ -135,4 +153,11 @@ func (s *CpusetGroup) copyIfNeeded(current, parent string) error {
 
 func (s *CpusetGroup) isEmpty(b []byte) bool {
 	return len(bytes.Trim(b, "\n")) == 0
+}
+
+func (s *CpusetGroup) ensureCpusAndMems(path string, cgroup *configs.Cgroup) error {
+	if err := s.Set(path, cgroup); err != nil {
+		return err
+	}
+	return s.copyIfNeeded(path, filepath.Dir(path))
 }

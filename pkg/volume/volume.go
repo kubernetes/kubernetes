@@ -19,10 +19,10 @@ package volume
 import (
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // Volume represents a directory used by pods or hosts on a node. All method
@@ -173,7 +173,7 @@ type Attacher interface {
 	// node. If it successfully attaches, the path to the device
 	// is returned. Otherwise, if the device does not attach after
 	// the given timeout period, an error will be returned.
-	WaitForAttach(spec *Spec, devicePath string, timeout time.Duration) (string, error)
+	WaitForAttach(spec *Spec, devicePath string, pod *v1.Pod, timeout time.Duration) (string, error)
 
 	// GetDeviceMountPath returns a path where the device should
 	// be mounted after it is attached. This is a global mount
@@ -195,8 +195,10 @@ type BulkVolumeVerifier interface {
 
 // Detacher can detach a volume from a node.
 type Detacher interface {
-	// Detach the given device from the node with the given Name.
-	Detach(deviceName string, nodeName types.NodeName) error
+	// Detach the given volume from the node with the given Name.
+	// volumeName is name of the volume as returned from plugin's
+	// GetVolumeName().
+	Detach(volumeName string, nodeName types.NodeName) error
 
 	// UnmountDevice unmounts the global mount of the disk. This
 	// should only be called once all bind mounts have been

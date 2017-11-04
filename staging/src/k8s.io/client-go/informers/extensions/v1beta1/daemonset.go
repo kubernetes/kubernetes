@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
+	extensions_v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1beta1 "k8s.io/client-go/listers/extensions/v1beta1"
-	extensions_v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
 	time "time"
 )
@@ -41,26 +41,31 @@ type daemonSetInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newDaemonSetInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewDaemonSetInformer constructs a new informer for DaemonSet type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewDaemonSetInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.ExtensionsV1beta1().DaemonSets(v1.NamespaceAll).List(options)
+				return client.ExtensionsV1beta1().DaemonSets(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.ExtensionsV1beta1().DaemonSets(v1.NamespaceAll).Watch(options)
+				return client.ExtensionsV1beta1().DaemonSets(namespace).Watch(options)
 			},
 		},
 		&extensions_v1beta1.DaemonSet{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultDaemonSetInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewDaemonSetInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *daemonSetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&extensions_v1beta1.DaemonSet{}, newDaemonSetInformer)
+	return f.factory.InformerFor(&extensions_v1beta1.DaemonSet{}, defaultDaemonSetInformer)
 }
 
 func (f *daemonSetInformer) Lister() v1beta1.DaemonSetLister {

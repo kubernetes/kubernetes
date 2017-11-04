@@ -1,11 +1,11 @@
 package libcontainer
 
-// NewConsole returns an initalized console that can be used within a container
-func NewConsole(uid, gid int) (Console, error) {
+// newConsole returns an initialized console that can be used within a container
+func newConsole() (Console, error) {
 	return &windowsConsole{}, nil
 }
 
-// windowsConsole is a Windows psuedo TTY for use within a container.
+// windowsConsole is a Windows pseudo TTY for use within a container.
 type windowsConsole struct {
 }
 

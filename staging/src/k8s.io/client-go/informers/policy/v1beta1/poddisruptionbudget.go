@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
+	policy_v1beta1 "k8s.io/api/policy/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1beta1 "k8s.io/client-go/listers/policy/v1beta1"
-	policy_v1beta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
 	time "time"
 )
@@ -41,26 +41,31 @@ type podDisruptionBudgetInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newPodDisruptionBudgetInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewPodDisruptionBudgetInformer constructs a new informer for PodDisruptionBudget type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewPodDisruptionBudgetInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.PolicyV1beta1().PodDisruptionBudgets(v1.NamespaceAll).List(options)
+				return client.PolicyV1beta1().PodDisruptionBudgets(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.PolicyV1beta1().PodDisruptionBudgets(v1.NamespaceAll).Watch(options)
+				return client.PolicyV1beta1().PodDisruptionBudgets(namespace).Watch(options)
 			},
 		},
 		&policy_v1beta1.PodDisruptionBudget{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultPodDisruptionBudgetInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewPodDisruptionBudgetInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *podDisruptionBudgetInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&policy_v1beta1.PodDisruptionBudget{}, newPodDisruptionBudgetInformer)
+	return f.factory.InformerFor(&policy_v1beta1.PodDisruptionBudget{}, defaultPodDisruptionBudgetInformer)
 }
 
 func (f *podDisruptionBudgetInformer) Lister() v1beta1.PodDisruptionBudgetLister {

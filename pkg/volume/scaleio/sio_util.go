@@ -26,16 +26,22 @@ import (
 
 	"github.com/golang/glog"
 
-	api "k8s.io/kubernetes/pkg/api/v1"
+	api "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
+
+type volSourceAttribs struct {
+	volName,
+	fsType string
+	readOnly bool
+}
 
 var (
 	confKey = struct {
 		gateway,
 		sslEnabled,
-		secretRef,
+		secretName,
 		system,
 		protectionDomain,
 		storagePool,
@@ -47,11 +53,13 @@ var (
 		readOnly,
 		username,
 		password,
-		namespace string
+		secretNamespace,
+		sdcGuid string
 	}{
 		gateway:          "gateway",
 		sslEnabled:       "sslEnabled",
-		secretRef:        "secretRef",
+		secretName:       "secretRef",
+		secretNamespace:  "secretNamespace",
 		system:           "system",
 		protectionDomain: "protectionDomain",
 		storagePool:      "storagePool",
@@ -63,35 +71,46 @@ var (
 		readOnly:         "readOnly",
 		username:         "username",
 		password:         "password",
-		namespace:        "namespace",
+		sdcGuid:          "sdcGuid",
 	}
-	nsSep       = "%"
-	sdcRootPath = "/opt/emc/scaleio/sdc/bin"
+	sdcGuidLabelName = "scaleio.sdcGuid"
+	sdcRootPath      = "/opt/emc/scaleio/sdc/bin"
 
-	secretNotFoundErr       = errors.New("secret not found")
-	configMapNotFoundErr    = errors.New("configMap not found")
-	gatewayNotProvidedErr   = errors.New("gateway not provided")
-	secretRefNotProvidedErr = errors.New("secret ref not provided")
-	systemNotProvidedErr    = errors.New("secret not provided")
+	secretNotFoundErr              = errors.New("secret not found")
+	configMapNotFoundErr           = errors.New("configMap not found")
+	gatewayNotProvidedErr          = errors.New("ScaleIO gateway not provided")
+	secretRefNotProvidedErr        = errors.New("secret ref not provided")
+	systemNotProvidedErr           = errors.New("ScaleIO system not provided")
+	storagePoolNotProvidedErr      = errors.New("ScaleIO storage pool not provided")
+	protectionDomainNotProvidedErr = errors.New("ScaleIO protection domain not provided")
 )
 
-// mapScaleIOVolumeSource maps attributes from a ScaleIOVolumeSource to config
-func mapVolumeSource(config map[string]string, source *api.ScaleIOVolumeSource) {
-	config[confKey.gateway] = source.Gateway
-	config[confKey.secretRef] = func() string {
-		if source.SecretRef != nil {
-			return string(source.SecretRef.Name)
-		}
-		return ""
-	}()
-	config[confKey.system] = source.System
-	config[confKey.volumeName] = source.VolumeName
-	config[confKey.sslEnabled] = strconv.FormatBool(source.SSLEnabled)
-	config[confKey.protectionDomain] = source.ProtectionDomain
-	config[confKey.storagePool] = source.StoragePool
-	config[confKey.storageMode] = source.StorageMode
-	config[confKey.fsType] = source.FSType
-	config[confKey.readOnly] = strconv.FormatBool(source.ReadOnly)
+// mapVolumeSpec maps attributes from either ScaleIOVolumeSource  or ScaleIOPersistentVolumeSource to config
+func mapVolumeSpec(config map[string]string, spec *volume.Spec) {
+
+	if source, err := getScaleIOPersistentVolumeSourceFromSpec(spec); err == nil {
+		config[confKey.gateway] = source.Gateway
+		config[confKey.system] = source.System
+		config[confKey.volumeName] = source.VolumeName
+		config[confKey.sslEnabled] = strconv.FormatBool(source.SSLEnabled)
+		config[confKey.protectionDomain] = source.ProtectionDomain
+		config[confKey.storagePool] = source.StoragePool
+		config[confKey.storageMode] = source.StorageMode
+		config[confKey.fsType] = source.FSType
+		config[confKey.readOnly] = strconv.FormatBool(source.ReadOnly)
+	}
+
+	if source, err := getScaleIOVolumeSourceFromSpec(spec); err == nil {
+		config[confKey.gateway] = source.Gateway
+		config[confKey.system] = source.System
+		config[confKey.volumeName] = source.VolumeName
+		config[confKey.sslEnabled] = strconv.FormatBool(source.SSLEnabled)
+		config[confKey.protectionDomain] = source.ProtectionDomain
+		config[confKey.storagePool] = source.StoragePool
+		config[confKey.storageMode] = source.StorageMode
+		config[confKey.fsType] = source.FSType
+		config[confKey.readOnly] = strconv.FormatBool(source.ReadOnly)
+	}
 
 	//optionals
 	applyConfigDefaults(config)
@@ -101,11 +120,17 @@ func validateConfigs(config map[string]string) error {
 	if config[confKey.gateway] == "" {
 		return gatewayNotProvidedErr
 	}
-	if config[confKey.secretRef] == "" {
+	if config[confKey.secretName] == "" {
 		return secretRefNotProvidedErr
 	}
 	if config[confKey.system] == "" {
 		return systemNotProvidedErr
+	}
+	if config[confKey.storagePool] == "" {
+		return storagePoolNotProvidedErr
+	}
+	if config[confKey.protectionDomain] == "" {
+		return protectionDomainNotProvidedErr
 	}
 
 	return nil
@@ -119,8 +144,6 @@ func applyConfigDefaults(config map[string]string) {
 		b = false
 	}
 	config[confKey.sslEnabled] = strconv.FormatBool(b)
-	config[confKey.protectionDomain] = defaultString(config[confKey.protectionDomain], "default")
-	config[confKey.storagePool] = defaultString(config[confKey.storagePool], "default")
 	config[confKey.storageMode] = defaultString(config[confKey.storageMode], "ThinProvisioned")
 	config[confKey.fsType] = defaultString(config[confKey.fsType], "xfs")
 	b, err = strconv.ParseBool(config[confKey.readOnly])
@@ -194,7 +217,7 @@ func saveConfig(configName string, data map[string]string) error {
 // attachSecret loads secret object and attaches to configData
 func attachSecret(plug *sioPlugin, namespace string, configData map[string]string) error {
 	// load secret
-	secretRefName := configData[confKey.secretRef]
+	secretRefName := configData[confKey.secretName]
 	kubeClient := plug.host.GetKubeClient()
 	secretMap, err := volutil.GetSecretForPV(namespace, secretRefName, sioPluginName, kubeClient)
 	if err != nil {
@@ -209,8 +232,35 @@ func attachSecret(plug *sioPlugin, namespace string, configData map[string]strin
 	return nil
 }
 
-// getVolumeSourceFromSpec safely extracts ScaleIOVolumeSource from spec
-func getVolumeSourceFromSpec(spec *volume.Spec) (*api.ScaleIOVolumeSource, error) {
+// attachSdcGuid injects the sdc guid node label value into config
+func attachSdcGuid(plug *sioPlugin, conf map[string]string) error {
+	guid, err := getSdcGuidLabel(plug)
+	if err != nil {
+		return err
+	}
+	conf[confKey.sdcGuid] = guid
+	return nil
+}
+
+// getSdcGuidLabel fetches the scaleio.sdcGuid node label
+// associated with the node executing this code.
+func getSdcGuidLabel(plug *sioPlugin) (string, error) {
+	nodeLabels, err := plug.host.GetNodeLabels()
+	if err != nil {
+		return "", err
+	}
+	label, ok := nodeLabels[sdcGuidLabelName]
+	if !ok {
+		glog.V(4).Info(log("node label %s not found", sdcGuidLabelName))
+		return "", nil
+	}
+
+	glog.V(4).Info(log("found node label %s=%s", sdcGuidLabelName, label))
+	return label, nil
+}
+
+// getVolumeSourceFromSpec safely extracts ScaleIOVolumeSource or ScaleIOPersistentVolumeSource from spec
+func getVolumeSourceFromSpec(spec *volume.Spec) (interface{}, error) {
 	if spec.Volume != nil && spec.Volume.ScaleIO != nil {
 		return spec.Volume.ScaleIO, nil
 	}
@@ -220,6 +270,66 @@ func getVolumeSourceFromSpec(spec *volume.Spec) (*api.ScaleIOVolumeSource, error
 	}
 
 	return nil, fmt.Errorf("ScaleIO not defined in spec")
+}
+
+func getVolumeSourceAttribs(spec *volume.Spec) (*volSourceAttribs, error) {
+	attribs := new(volSourceAttribs)
+	if pvSource, err := getScaleIOPersistentVolumeSourceFromSpec(spec); err == nil {
+		attribs.volName = pvSource.VolumeName
+		attribs.fsType = pvSource.FSType
+		attribs.readOnly = pvSource.ReadOnly
+	} else if pSource, err := getScaleIOVolumeSourceFromSpec(spec); err == nil {
+		attribs.volName = pSource.VolumeName
+		attribs.fsType = pSource.FSType
+		attribs.readOnly = pSource.ReadOnly
+	} else {
+		msg := log("failed to get ScaleIOVolumeSource or ScaleIOPersistentVolumeSource from spec")
+		glog.Error(msg)
+		return nil, errors.New(msg)
+	}
+	return attribs, nil
+}
+
+func getScaleIOPersistentVolumeSourceFromSpec(spec *volume.Spec) (*api.ScaleIOPersistentVolumeSource, error) {
+	source, err := getVolumeSourceFromSpec(spec)
+	if err != nil {
+		return nil, err
+	}
+	if val, ok := source.(*api.ScaleIOPersistentVolumeSource); ok {
+		return val, nil
+	}
+	return nil, fmt.Errorf("spec is not a valid ScaleIOPersistentVolume type")
+}
+
+func getScaleIOVolumeSourceFromSpec(spec *volume.Spec) (*api.ScaleIOVolumeSource, error) {
+	source, err := getVolumeSourceFromSpec(spec)
+	if err != nil {
+		return nil, err
+	}
+	if val, ok := source.(*api.ScaleIOVolumeSource); ok {
+		return val, nil
+	}
+	return nil, fmt.Errorf("spec is not a valid ScaleIOVolume type")
+}
+
+func getSecretAndNamespaceFromSpec(spec *volume.Spec, pod *api.Pod) (secretName string, secretNS string, err error) {
+	if source, err := getScaleIOVolumeSourceFromSpec(spec); err == nil {
+		secretName = source.SecretRef.Name
+		if pod != nil {
+			secretNS = pod.Namespace
+		}
+	} else if source, err := getScaleIOPersistentVolumeSourceFromSpec(spec); err == nil {
+		if source.SecretRef != nil {
+			secretName = source.SecretRef.Name
+			secretNS = source.SecretRef.Namespace
+			if secretNS == "" && pod != nil {
+				secretNS = pod.Namespace
+			}
+		}
+	} else {
+		return "", "", errors.New("failed to get ScaleIOVolumeSource or ScaleIOPersistentVolumeSource")
+	}
+	return secretName, secretNS, nil
 }
 
 func log(msg string, parts ...interface{}) string {

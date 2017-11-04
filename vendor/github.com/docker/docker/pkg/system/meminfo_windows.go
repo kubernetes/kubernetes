@@ -1,12 +1,13 @@
 package system
 
 import (
-	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
 var (
-	modkernel32 = syscall.NewLazyDLL("kernel32.dll")
+	modkernel32 = windows.NewLazySystemDLL("kernel32.dll")
 
 	procGlobalMemoryStatusEx = modkernel32.NewProc("GlobalMemoryStatusEx")
 )

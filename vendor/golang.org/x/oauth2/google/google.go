@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/compute/metadata"
+	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/jwt"
 )
@@ -85,26 +86,74 @@ func ConfigFromJSON(jsonKey []byte, scope ...string) (*oauth2.Config, error) {
 // Create a service account on "Credentials" for your project at
 // https://console.developers.google.com to download a JSON key file.
 func JWTConfigFromJSON(jsonKey []byte, scope ...string) (*jwt.Config, error) {
-	var key struct {
-		Email        string `json:"client_email"`
-		PrivateKey   string `json:"private_key"`
-		PrivateKeyID string `json:"private_key_id"`
-		TokenURL     string `json:"token_uri"`
-	}
-	if err := json.Unmarshal(jsonKey, &key); err != nil {
+	var f credentialsFile
+	if err := json.Unmarshal(jsonKey, &f); err != nil {
 		return nil, err
 	}
-	config := &jwt.Config{
-		Email:        key.Email,
-		PrivateKey:   []byte(key.PrivateKey),
-		PrivateKeyID: key.PrivateKeyID,
-		Scopes:       scope,
-		TokenURL:     key.TokenURL,
+	if f.Type != serviceAccountKey {
+		return nil, fmt.Errorf("google: read JWT from JSON credentials: 'type' field is %q (expected %q)", f.Type, serviceAccountKey)
 	}
-	if config.TokenURL == "" {
-		config.TokenURL = JWTTokenURL
+	scope = append([]string(nil), scope...) // copy
+	return f.jwtConfig(scope), nil
+}
+
+// JSON key file types.
+const (
+	serviceAccountKey  = "service_account"
+	userCredentialsKey = "authorized_user"
+)
+
+// credentialsFile is the unmarshalled representation of a credentials file.
+type credentialsFile struct {
+	Type string `json:"type"` // serviceAccountKey or userCredentialsKey
+
+	// Service Account fields
+	ClientEmail  string `json:"client_email"`
+	PrivateKeyID string `json:"private_key_id"`
+	PrivateKey   string `json:"private_key"`
+	TokenURL     string `json:"token_uri"`
+	ProjectID    string `json:"project_id"`
+
+	// User Credential fields
+	// (These typically come from gcloud auth.)
+	ClientSecret string `json:"client_secret"`
+	ClientID     string `json:"client_id"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+func (f *credentialsFile) jwtConfig(scopes []string) *jwt.Config {
+	cfg := &jwt.Config{
+		Email:        f.ClientEmail,
+		PrivateKey:   []byte(f.PrivateKey),
+		PrivateKeyID: f.PrivateKeyID,
+		Scopes:       scopes,
+		TokenURL:     f.TokenURL,
 	}
-	return config, nil
+	if cfg.TokenURL == "" {
+		cfg.TokenURL = JWTTokenURL
+	}
+	return cfg
+}
+
+func (f *credentialsFile) tokenSource(ctx context.Context, scopes []string) (oauth2.TokenSource, error) {
+	switch f.Type {
+	case serviceAccountKey:
+		cfg := f.jwtConfig(scopes)
+		return cfg.TokenSource(ctx), nil
+	case userCredentialsKey:
+		cfg := &oauth2.Config{
+			ClientID:     f.ClientID,
+			ClientSecret: f.ClientSecret,
+			Scopes:       scopes,
+			Endpoint:     Endpoint,
+		}
+		tok := &oauth2.Token{RefreshToken: f.RefreshToken}
+		return cfg.TokenSource(ctx, tok), nil
+	case "":
+		return nil, errors.New("missing 'type' field in credentials")
+	default:
+		return nil, fmt.Errorf("unknown credential type: %q", f.Type)
+	}
 }
 
 // ComputeTokenSource returns a token source that fetches access tokens

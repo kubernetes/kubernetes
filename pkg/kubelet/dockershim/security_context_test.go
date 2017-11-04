@@ -21,11 +21,11 @@ import (
 	"strconv"
 	"testing"
 
-	dockercontainer "github.com/docker/engine-api/types/container"
+	"github.com/blang/semver"
+	dockercontainer "github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools/securitycontext"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 )
 
 func TestModifyContainerConfig(t *testing.T) {
@@ -82,10 +82,10 @@ func TestModifyHostConfig(t *testing.T) {
 	}
 	setSELinuxHC := &dockercontainer.HostConfig{
 		SecurityOpt: []string{
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelUser('='), "user"),
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelRole('='), "role"),
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelType('='), "type"),
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelLevel('='), "level"),
+			fmt.Sprintf("%s:%s", selinuxLabelUser('='), "user"),
+			fmt.Sprintf("%s:%s", selinuxLabelRole('='), "role"),
+			fmt.Sprintf("%s:%s", selinuxLabelType('='), "type"),
+			fmt.Sprintf("%s:%s", selinuxLabelLevel('='), "level"),
 		},
 	}
 
@@ -172,22 +172,25 @@ func TestModifyHostConfigAndNamespaceOptionsForContainer(t *testing.T) {
 		Privileged:  true,
 		IpcMode:     dockercontainer.IpcMode(sandboxNSMode),
 		NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
+		PidMode:     dockercontainer.PidMode(sandboxNSMode),
 	}
 	setCapsHC := &dockercontainer.HostConfig{
 		CapAdd:      []string{"addCapA", "addCapB"},
 		CapDrop:     []string{"dropCapA", "dropCapB"},
 		IpcMode:     dockercontainer.IpcMode(sandboxNSMode),
 		NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
+		PidMode:     dockercontainer.PidMode(sandboxNSMode),
 	}
 	setSELinuxHC := &dockercontainer.HostConfig{
 		SecurityOpt: []string{
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelUser('='), "user"),
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelRole('='), "role"),
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelType('='), "type"),
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelLevel('='), "level"),
+			fmt.Sprintf("%s:%s", selinuxLabelUser('='), "user"),
+			fmt.Sprintf("%s:%s", selinuxLabelRole('='), "role"),
+			fmt.Sprintf("%s:%s", selinuxLabelType('='), "type"),
+			fmt.Sprintf("%s:%s", selinuxLabelLevel('='), "level"),
 		},
 		IpcMode:     dockercontainer.IpcMode(sandboxNSMode),
 		NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
+		PidMode:     dockercontainer.PidMode(sandboxNSMode),
 	}
 
 	cases := []struct {
@@ -286,6 +289,7 @@ func TestModifyContainerNamespaceOptions(t *testing.T) {
 				NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
 				IpcMode:     dockercontainer.IpcMode(sandboxNSMode),
 				UTSMode:     namespaceModeHost,
+				PidMode:     dockercontainer.PidMode(sandboxNSMode),
 			},
 		},
 		{
@@ -296,6 +300,7 @@ func TestModifyContainerNamespaceOptions(t *testing.T) {
 			expected: &dockercontainer.HostConfig{
 				NetworkMode: dockercontainer.NetworkMode(sandboxNSMode),
 				IpcMode:     dockercontainer.IpcMode(sandboxNSMode),
+				PidMode:     dockercontainer.PidMode(sandboxNSMode),
 			},
 		},
 		{
@@ -314,6 +319,63 @@ func TestModifyContainerNamespaceOptions(t *testing.T) {
 		dockerCfg := &dockercontainer.HostConfig{}
 		modifyContainerNamespaceOptions(tc.nsOpt, sandboxID, dockerCfg)
 		assert.Equal(t, tc.expected, dockerCfg, "[Test case %q]", tc.name)
+	}
+}
+
+func TestModifyContainerNamespacePIDOverride(t *testing.T) {
+	cases := []struct {
+		name            string
+		disable         bool
+		version         *semver.Version
+		input, expected dockercontainer.PidMode
+	}{
+		{
+			name:     "SharedPID.Enable",
+			disable:  false,
+			version:  &semver.Version{Major: 1, Minor: 26},
+			input:    "container:sandbox",
+			expected: "container:sandbox",
+		},
+		{
+			name:     "SharedPID.Disable",
+			disable:  true,
+			version:  &semver.Version{Major: 1, Minor: 26},
+			input:    "container:sandbox",
+			expected: "",
+		},
+		{
+			name:     "SharedPID.OldDocker",
+			disable:  false,
+			version:  &semver.Version{Major: 1, Minor: 25},
+			input:    "container:sandbox",
+			expected: "",
+		},
+		{
+			name:     "SharedPID.HostPid",
+			disable:  true,
+			version:  &semver.Version{Major: 1, Minor: 27},
+			input:    "host",
+			expected: "host",
+		},
+		{
+			name:     "SharedPID.DistantFuture",
+			disable:  false,
+			version:  &semver.Version{Major: 2, Minor: 10},
+			input:    "container:sandbox",
+			expected: "container:sandbox",
+		},
+		{
+			name:     "SharedPID.EmptyPidMode",
+			disable:  true,
+			version:  &semver.Version{Major: 1, Minor: 25},
+			input:    "",
+			expected: "",
+		},
+	}
+	for _, tc := range cases {
+		dockerCfg := &dockercontainer.HostConfig{PidMode: tc.input}
+		modifyPIDNamespaceOverrides(tc.disable, tc.version, dockerCfg)
+		assert.Equal(t, tc.expected, dockerCfg.PidMode, "[Test case %q]", tc.name)
 	}
 }
 
@@ -352,10 +414,10 @@ func fullValidHostConfig() *dockercontainer.HostConfig {
 		CapAdd:     []string{"addCapA", "addCapB"},
 		CapDrop:    []string{"dropCapA", "dropCapB"},
 		SecurityOpt: []string{
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelUser('='), "user"),
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelRole('='), "role"),
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelType('='), "type"),
-			fmt.Sprintf("%s:%s", securitycontext.DockerLabelLevel('='), "level"),
+			fmt.Sprintf("%s:%s", selinuxLabelUser('='), "user"),
+			fmt.Sprintf("%s:%s", selinuxLabelRole('='), "role"),
+			fmt.Sprintf("%s:%s", selinuxLabelType('='), "type"),
+			fmt.Sprintf("%s:%s", selinuxLabelLevel('='), "level"),
 		},
 	}
 }

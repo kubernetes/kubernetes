@@ -237,7 +237,7 @@ function verify-cluster {
         echo "Timeout while waiting for echo node to be registered with cloud provider"
         exit 2
       fi
-      local nodes=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o name --api-version=v1)
+      local nodes=$("${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o name)
       validated=$(echo $nodes | grep -c "${NODE_NAMES[i]}") || {
         printf "."
         sleep 2
@@ -296,8 +296,6 @@ function kube-up {
 
    # Update the user's kubeconfig to include credentials for this apiserver.
    create-kubeconfig
-
-   create-kubeconfig-for-federation
   )
 
   verify-cluster

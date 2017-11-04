@@ -26,16 +26,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	kubeconfigmap "k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
@@ -74,7 +75,7 @@ func (m *manager) testSyncBatch() {
 }
 
 func newTestManager(kubeClient clientset.Interface) *manager {
-	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), kubesecret.NewFakeManager())
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), kubesecret.NewFakeManager(), kubeconfigmap.NewFakeManager())
 	podManager.AddPod(getTestPod())
 	return NewManager(kubeClient, podManager, &statustest.FakePodDeletionSafetyProvider{}).(*manager)
 }
@@ -213,7 +214,7 @@ func TestChangedStatusKeepsStartTime(t *testing.T) {
 		t.Errorf("StartTime should not be zero")
 	}
 	expected := now.Rfc3339Copy()
-	if !finalStatus.StartTime.Equal(expected) {
+	if !finalStatus.StartTime.Equal(&expected) {
 		t.Errorf("Expected %v, but got %v", expected, finalStatus.StartTime)
 	}
 }
@@ -243,7 +244,7 @@ func TestChangedStatusUpdatesLastTransitionTime(t *testing.T) {
 	if newReadyCondition.LastTransitionTime.IsZero() {
 		t.Errorf("Unexpected: last transition time not set")
 	}
-	if newReadyCondition.LastTransitionTime.Before(oldReadyCondition.LastTransitionTime) {
+	if newReadyCondition.LastTransitionTime.Before(&oldReadyCondition.LastTransitionTime) {
 		t.Errorf("Unexpected: new transition time %s, is before old transition time %s", newReadyCondition.LastTransitionTime, oldReadyCondition.LastTransitionTime)
 	}
 }
@@ -282,7 +283,7 @@ func TestUnchangedStatusPreservesLastTransitionTime(t *testing.T) {
 	if newReadyCondition.LastTransitionTime.IsZero() {
 		t.Errorf("Unexpected: last transition time not set")
 	}
-	if !oldReadyCondition.LastTransitionTime.Equal(newReadyCondition.LastTransitionTime) {
+	if !oldReadyCondition.LastTransitionTime.Equal(&newReadyCondition.LastTransitionTime) {
 		t.Errorf("Unexpected: new transition time %s, is not equal to old transition time %s", newReadyCondition.LastTransitionTime, oldReadyCondition.LastTransitionTime)
 	}
 }
@@ -324,7 +325,7 @@ func TestSyncPodNoDeadlock(t *testing.T) {
 	pod := getTestPod()
 
 	// Setup fake client.
-	var ret v1.Pod
+	var ret *v1.Pod
 	var err error
 	client.AddReactor("*", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		switch action := action.(type) {
@@ -335,25 +336,26 @@ func TestSyncPodNoDeadlock(t *testing.T) {
 		default:
 			assert.Fail(t, "Unexpected Action: %+v", action)
 		}
-		return true, &ret, err
+		return true, ret, err
 	})
 
 	pod.Status.ContainerStatuses = []v1.ContainerStatus{{State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}}}
 
 	t.Logf("Pod not found.")
-	ret = *pod
+	ret = nil
 	err = errors.NewNotFound(api.Resource("pods"), pod.Name)
 	m.SetPodStatus(pod, getRandomPodStatus())
 	verifyActions(t, m, []core.Action{getAction()})
 
 	t.Logf("Pod was recreated.")
+	ret = getTestPod()
 	ret.UID = "other_pod"
 	err = nil
 	m.SetPodStatus(pod, getRandomPodStatus())
 	verifyActions(t, m, []core.Action{getAction()})
 
 	t.Logf("Pod not deleted (success case).")
-	ret = *pod
+	ret = getTestPod()
 	m.SetPodStatus(pod, getRandomPodStatus())
 	verifyActions(t, m, []core.Action{getAction(), updateAction()})
 
@@ -369,6 +371,7 @@ func TestSyncPodNoDeadlock(t *testing.T) {
 	verifyActions(t, m, []core.Action{getAction(), updateAction()})
 
 	t.Logf("Error case.")
+	ret = nil
 	err = fmt.Errorf("intentional test error")
 	m.SetPodStatus(pod, getRandomPodStatus())
 	verifyActions(t, m, []core.Action{getAction()})
@@ -398,7 +401,8 @@ func TestStaleUpdates(t *testing.T) {
 	verifyUpdates(t, m, 0)
 
 	t.Log("... unless it's stale.")
-	m.apiStatusVersions[pod.UID] = m.apiStatusVersions[pod.UID] - 1
+	mirrorPodUID := kubetypes.MirrorPodUID(pod.UID)
+	m.apiStatusVersions[mirrorPodUID] = m.apiStatusVersions[mirrorPodUID] - 1
 
 	m.SetPodStatus(pod, status)
 	m.syncBatch()
@@ -512,7 +516,7 @@ func TestStaticPod(t *testing.T) {
 	t.Logf("Create the mirror pod")
 	m.podManager.AddPod(mirrorPod)
 	assert.True(t, kubepod.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
-	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID), staticPod.UID)
+	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID), kubetypes.ResolvedPodUID(staticPod.UID))
 
 	t.Logf("Should be able to get the mirror pod status from status manager")
 	retrievedStatus, _ = m.GetPodStatus(mirrorPod.UID)
@@ -665,13 +669,13 @@ func TestSyncBatchCleanupVersions(t *testing.T) {
 	}
 
 	t.Logf("Orphaned pods should be removed.")
-	m.apiStatusVersions[testPod.UID] = 100
-	m.apiStatusVersions[mirrorPod.UID] = 200
+	m.apiStatusVersions[kubetypes.MirrorPodUID(testPod.UID)] = 100
+	m.apiStatusVersions[kubetypes.MirrorPodUID(mirrorPod.UID)] = 200
 	m.syncBatch()
-	if _, ok := m.apiStatusVersions[testPod.UID]; ok {
+	if _, ok := m.apiStatusVersions[kubetypes.MirrorPodUID(testPod.UID)]; ok {
 		t.Errorf("Should have cleared status for testPod")
 	}
-	if _, ok := m.apiStatusVersions[mirrorPod.UID]; ok {
+	if _, ok := m.apiStatusVersions[kubetypes.MirrorPodUID(mirrorPod.UID)]; ok {
 		t.Errorf("Should have cleared status for mirrorPod")
 	}
 
@@ -682,13 +686,13 @@ func TestSyncBatchCleanupVersions(t *testing.T) {
 	staticPod.UID = "static-uid"
 	staticPod.Annotations = map[string]string{kubetypes.ConfigSourceAnnotationKey: "file"}
 	m.podManager.AddPod(staticPod)
-	m.apiStatusVersions[testPod.UID] = 100
-	m.apiStatusVersions[mirrorPod.UID] = 200
+	m.apiStatusVersions[kubetypes.MirrorPodUID(testPod.UID)] = 100
+	m.apiStatusVersions[kubetypes.MirrorPodUID(mirrorPod.UID)] = 200
 	m.testSyncBatch()
-	if _, ok := m.apiStatusVersions[testPod.UID]; !ok {
+	if _, ok := m.apiStatusVersions[kubetypes.MirrorPodUID(testPod.UID)]; !ok {
 		t.Errorf("Should not have cleared status for testPod")
 	}
-	if _, ok := m.apiStatusVersions[mirrorPod.UID]; !ok {
+	if _, ok := m.apiStatusVersions[kubetypes.MirrorPodUID(mirrorPod.UID)]; !ok {
 		t.Errorf("Should not have cleared status for mirrorPod")
 	}
 }
@@ -783,7 +787,7 @@ func TestDoNotDeleteMirrorPods(t *testing.T) {
 	t.Logf("Verify setup.")
 	assert.True(t, kubepod.IsStaticPod(staticPod), "SetUp error: staticPod")
 	assert.True(t, kubepod.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
-	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID), staticPod.UID)
+	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID), kubetypes.ResolvedPodUID(staticPod.UID))
 
 	status := getRandomPodStatus()
 	now := metav1.Now()

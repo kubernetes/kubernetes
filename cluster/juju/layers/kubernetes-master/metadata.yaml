@@ -1,8 +1,12 @@
 name: kubernetes-master
 summary: The Kubernetes control plane.
 maintainers:
-    - Matthew Bruzek <matthew.bruzek@canonical.com>
-    - Charles Butler <charles.butler@canonical.com>
+    - Tim Van Steenburgh <tim.van.steenburgh@canonical.com>
+    - George Kraft <george.kraft@canonical.com>
+    - Rye Terrell <rye.terrell@canonical.com>
+    - Konstantinos Tsakalozos <kos.tsakalozos@canonical.com>
+    - Charles Butler <Chuck@dasroot.net>
+    - Matthew Bruzek <mbruzek@ubuntu.com>
 description: |
   Kubernetes is an open-source platform for deploying, scaling, and operations
   of application containers across a cluster of hosts. Kubernetes is portable

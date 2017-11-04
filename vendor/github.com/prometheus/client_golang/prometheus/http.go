@@ -15,13 +15,114 @@ package prometheus
 
 import (
 	"bufio"
+	"bytes"
+	"compress/gzip"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/prometheus/common/expfmt"
 )
+
+// TODO(beorn7): Remove this whole file. It is a partial mirror of
+// promhttp/http.go (to avoid circular import chains) where everything HTTP
+// related should live. The functions here are just for avoiding
+// breakage. Everything is deprecated.
+
+const (
+	contentTypeHeader     = "Content-Type"
+	contentLengthHeader   = "Content-Length"
+	contentEncodingHeader = "Content-Encoding"
+	acceptEncodingHeader  = "Accept-Encoding"
+)
+
+var bufPool sync.Pool
+
+func getBuf() *bytes.Buffer {
+	buf := bufPool.Get()
+	if buf == nil {
+		return &bytes.Buffer{}
+	}
+	return buf.(*bytes.Buffer)
+}
+
+func giveBuf(buf *bytes.Buffer) {
+	buf.Reset()
+	bufPool.Put(buf)
+}
+
+// Handler returns an HTTP handler for the DefaultGatherer. It is
+// already instrumented with InstrumentHandler (using "prometheus" as handler
+// name).
+//
+// Deprecated: Please note the issues described in the doc comment of
+// InstrumentHandler. You might want to consider using promhttp.Handler instead
+// (which is not instrumented, but can be instrumented with the tooling provided
+// in package promhttp).
+func Handler() http.Handler {
+	return InstrumentHandler("prometheus", UninstrumentedHandler())
+}
+
+// UninstrumentedHandler returns an HTTP handler for the DefaultGatherer.
+//
+// Deprecated: Use promhttp.Handler instead. See there for further documentation.
+func UninstrumentedHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		mfs, err := DefaultGatherer.Gather()
+		if err != nil {
+			http.Error(w, "An error has occurred during metrics collection:\n\n"+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		contentType := expfmt.Negotiate(req.Header)
+		buf := getBuf()
+		defer giveBuf(buf)
+		writer, encoding := decorateWriter(req, buf)
+		enc := expfmt.NewEncoder(writer, contentType)
+		var lastErr error
+		for _, mf := range mfs {
+			if err := enc.Encode(mf); err != nil {
+				lastErr = err
+				http.Error(w, "An error has occurred during metrics encoding:\n\n"+err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+		if closer, ok := writer.(io.Closer); ok {
+			closer.Close()
+		}
+		if lastErr != nil && buf.Len() == 0 {
+			http.Error(w, "No metrics encoded, last error:\n\n"+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		header := w.Header()
+		header.Set(contentTypeHeader, string(contentType))
+		header.Set(contentLengthHeader, fmt.Sprint(buf.Len()))
+		if encoding != "" {
+			header.Set(contentEncodingHeader, encoding)
+		}
+		w.Write(buf.Bytes())
+	})
+}
+
+// decorateWriter wraps a writer to handle gzip compression if requested.  It
+// returns the decorated writer and the appropriate "Content-Encoding" header
+// (which is empty if no compression is enabled).
+func decorateWriter(request *http.Request, writer io.Writer) (io.Writer, string) {
+	header := request.Header.Get(acceptEncodingHeader)
+	parts := strings.Split(header, ",")
+	for _, part := range parts {
+		part := strings.TrimSpace(part)
+		if part == "gzip" || strings.HasPrefix(part, "gzip;") {
+			return gzip.NewWriter(writer), "gzip"
+		}
+	}
+	return writer, ""
+}
 
 var instLabels = []string{"method", "code"}
 
@@ -57,29 +158,52 @@ func nowSeries(t ...time.Time) nower {
 // has a constant label named "handler" with the provided handlerName as
 // value. http_requests_total is a metric vector partitioned by HTTP method
 // (label name "method") and HTTP status code (label name "code").
+//
+// Deprecated: InstrumentHandler has several issues. Use the tooling provided in
+// package promhttp instead. The issues are the following:
+//
+// - It uses Summaries rather than Histograms. Summaries are not useful if
+// aggregation across multiple instances is required.
+//
+// - It uses microseconds as unit, which is deprecated and should be replaced by
+// seconds.
+//
+// - The size of the request is calculated in a separate goroutine. Since this
+// calculator requires access to the request header, it creates a race with
+// any writes to the header performed during request handling.
+// httputil.ReverseProxy is a prominent example for a handler
+// performing such writes.
+//
+// - It has additional issues with HTTP/2, cf.
+// https://github.com/prometheus/client_golang/issues/272.
 func InstrumentHandler(handlerName string, handler http.Handler) http.HandlerFunc {
 	return InstrumentHandlerFunc(handlerName, handler.ServeHTTP)
 }
 
 // InstrumentHandlerFunc wraps the given function for instrumentation. It
-// otherwise works in the same way as InstrumentHandler.
+// otherwise works in the same way as InstrumentHandler (and shares the same
+// issues).
+//
+// Deprecated: InstrumentHandlerFunc is deprecated for the same reasons as
+// InstrumentHandler is. Use the tooling provided in package promhttp instead.
 func InstrumentHandlerFunc(handlerName string, handlerFunc func(http.ResponseWriter, *http.Request)) http.HandlerFunc {
 	return InstrumentHandlerFuncWithOpts(
 		SummaryOpts{
 			Subsystem:   "http",
 			ConstLabels: Labels{"handler": handlerName},
+			Objectives:  map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 		},
 		handlerFunc,
 	)
 }
 
-// InstrumentHandlerWithOpts works like InstrumentHandler but provides more
-// flexibility (at the cost of a more complex call syntax). As
-// InstrumentHandler, this function registers four metric collectors, but it
-// uses the provided SummaryOpts to create them. However, the fields "Name" and
-// "Help" in the SummaryOpts are ignored. "Name" is replaced by
-// "requests_total", "request_duration_microseconds", "request_size_bytes", and
-// "response_size_bytes", respectively. "Help" is replaced by an appropriate
+// InstrumentHandlerWithOpts works like InstrumentHandler (and shares the same
+// issues) but provides more flexibility (at the cost of a more complex call
+// syntax). As InstrumentHandler, this function registers four metric
+// collectors, but it uses the provided SummaryOpts to create them. However, the
+// fields "Name" and "Help" in the SummaryOpts are ignored. "Name" is replaced
+// by "requests_total", "request_duration_microseconds", "request_size_bytes",
+// and "response_size_bytes", respectively. "Help" is replaced by an appropriate
 // help string. The names of the variable labels of the http_requests_total
 // CounterVec are "method" (get, post, etc.), and "code" (HTTP status code).
 //
@@ -98,13 +222,20 @@ func InstrumentHandlerFunc(handlerName string, handlerFunc func(http.ResponseWri
 // cannot use SummaryOpts. Instead, a CounterOpts struct is created internally,
 // and all its fields are set to the equally named fields in the provided
 // SummaryOpts.
+//
+// Deprecated: InstrumentHandlerWithOpts is deprecated for the same reasons as
+// InstrumentHandler is. Use the tooling provided in package promhttp instead.
 func InstrumentHandlerWithOpts(opts SummaryOpts, handler http.Handler) http.HandlerFunc {
 	return InstrumentHandlerFuncWithOpts(opts, handler.ServeHTTP)
 }
 
-// InstrumentHandlerFuncWithOpts works like InstrumentHandlerFunc but provides
-// more flexibility (at the cost of a more complex call syntax). See
-// InstrumentHandlerWithOpts for details how the provided SummaryOpts are used.
+// InstrumentHandlerFuncWithOpts works like InstrumentHandlerFunc (and shares
+// the same issues) but provides more flexibility (at the cost of a more complex
+// call syntax). See InstrumentHandlerWithOpts for details how the provided
+// SummaryOpts are used.
+//
+// Deprecated: InstrumentHandlerFuncWithOpts is deprecated for the same reasons
+// as InstrumentHandler is. Use the tooling provided in package promhttp instead.
 func InstrumentHandlerFuncWithOpts(opts SummaryOpts, handlerFunc func(http.ResponseWriter, *http.Request)) http.HandlerFunc {
 	reqCnt := NewCounterVec(
 		CounterOpts{
@@ -116,34 +247,52 @@ func InstrumentHandlerFuncWithOpts(opts SummaryOpts, handlerFunc func(http.Respo
 		},
 		instLabels,
 	)
+	if err := Register(reqCnt); err != nil {
+		if are, ok := err.(AlreadyRegisteredError); ok {
+			reqCnt = are.ExistingCollector.(*CounterVec)
+		} else {
+			panic(err)
+		}
+	}
 
 	opts.Name = "request_duration_microseconds"
 	opts.Help = "The HTTP request latencies in microseconds."
 	reqDur := NewSummary(opts)
+	if err := Register(reqDur); err != nil {
+		if are, ok := err.(AlreadyRegisteredError); ok {
+			reqDur = are.ExistingCollector.(Summary)
+		} else {
+			panic(err)
+		}
+	}
 
 	opts.Name = "request_size_bytes"
 	opts.Help = "The HTTP request sizes in bytes."
 	reqSz := NewSummary(opts)
+	if err := Register(reqSz); err != nil {
+		if are, ok := err.(AlreadyRegisteredError); ok {
+			reqSz = are.ExistingCollector.(Summary)
+		} else {
+			panic(err)
+		}
+	}
 
 	opts.Name = "response_size_bytes"
 	opts.Help = "The HTTP response sizes in bytes."
 	resSz := NewSummary(opts)
-
-	regReqCnt := MustRegisterOrGet(reqCnt).(*CounterVec)
-	regReqDur := MustRegisterOrGet(reqDur).(Summary)
-	regReqSz := MustRegisterOrGet(reqSz).(Summary)
-	regResSz := MustRegisterOrGet(resSz).(Summary)
+	if err := Register(resSz); err != nil {
+		if are, ok := err.(AlreadyRegisteredError); ok {
+			resSz = are.ExistingCollector.(Summary)
+		} else {
+			panic(err)
+		}
+	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		now := time.Now()
 
 		delegate := &responseWriterDelegator{ResponseWriter: w}
-		out := make(chan int)
-		urlLen := 0
-		if r.URL != nil {
-			urlLen = len(r.URL.String())
-		}
-		go computeApproximateRequestSize(r, out, urlLen)
+		out := computeApproximateRequestSize(r)
 
 		_, cn := w.(http.CloseNotifier)
 		_, fl := w.(http.Flusher)
@@ -161,30 +310,44 @@ func InstrumentHandlerFuncWithOpts(opts SummaryOpts, handlerFunc func(http.Respo
 
 		method := sanitizeMethod(r.Method)
 		code := sanitizeCode(delegate.status)
-		regReqCnt.WithLabelValues(method, code).Inc()
-		regReqDur.Observe(elapsed)
-		regResSz.Observe(float64(delegate.written))
-		regReqSz.Observe(float64(<-out))
+		reqCnt.WithLabelValues(method, code).Inc()
+		reqDur.Observe(elapsed)
+		resSz.Observe(float64(delegate.written))
+		reqSz.Observe(float64(<-out))
 	})
 }
 
-func computeApproximateRequestSize(r *http.Request, out chan int, s int) {
-	s += len(r.Method)
-	s += len(r.Proto)
-	for name, values := range r.Header {
-		s += len(name)
-		for _, value := range values {
-			s += len(value)
+func computeApproximateRequestSize(r *http.Request) <-chan int {
+	// Get URL length in current go routine for avoiding a race condition.
+	// HandlerFunc that runs in parallel may modify the URL.
+	s := 0
+	if r.URL != nil {
+		s += len(r.URL.String())
+	}
+
+	out := make(chan int, 1)
+
+	go func() {
+		s += len(r.Method)
+		s += len(r.Proto)
+		for name, values := range r.Header {
+			s += len(name)
+			for _, value := range values {
+				s += len(value)
+			}
 		}
-	}
-	s += len(r.Host)
+		s += len(r.Host)
 
-	// N.B. r.Form and r.MultipartForm are assumed to be included in r.URL.
+		// N.B. r.Form and r.MultipartForm are assumed to be included in r.URL.
 
-	if r.ContentLength != -1 {
-		s += int(r.ContentLength)
-	}
-	out <- s
+		if r.ContentLength != -1 {
+			s += int(r.ContentLength)
+		}
+		out <- s
+		close(out)
+	}()
+
+	return out
 }
 
 type responseWriterDelegator struct {

@@ -17,15 +17,18 @@ limitations under the License.
 package nvidia
 
 import (
+	"os"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 type testActivePodsLister struct {
@@ -58,6 +61,34 @@ func makeTestPod(numContainers, gpusPerContainer int) *v1.Pod {
 		})
 	}
 	return pod
+}
+
+func TestNewNvidiaGPUManager(t *testing.T) {
+	podLister := &testActivePodsLister{}
+
+	// Expects nil GPUManager and an error with nil dockerClient.
+	testGpuManager1, err := NewNvidiaGPUManager(podLister, nil)
+	as := assert.New(t)
+	as.Nil(testGpuManager1)
+	as.NotNil(err)
+
+	// Expects a GPUManager to be created with non-nil dockerClient.
+	fakeDocker := libdocker.NewFakeDockerClient()
+	testGpuManager2, err := NewNvidiaGPUManager(podLister, fakeDocker)
+	as.NotNil(testGpuManager2)
+	as.Nil(err)
+
+	// Expects zero capacity without any GPUs.
+	gpuCapacity := testGpuManager2.Capacity()
+	as.Equal(len(gpuCapacity), 1)
+	rgpu := gpuCapacity[v1.ResourceNvidiaGPU]
+	as.Equal(rgpu.Value(), int64(0))
+
+	err2 := testGpuManager2.Start()
+	if !os.IsNotExist(err2) {
+		gpus := reflect.ValueOf(testGpuManager2).Elem().FieldByName("allGPUs").Len()
+		as.NotZero(gpus)
+	}
 }
 
 func TestMultiContainerPodGPUAllocation(t *testing.T) {

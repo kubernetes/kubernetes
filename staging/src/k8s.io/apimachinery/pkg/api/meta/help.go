@@ -67,6 +67,9 @@ func GetItemsPtr(list runtime.Object) (interface{}, error) {
 // EachListItem invokes fn on each runtime.Object in the list. Any error immediately terminates
 // the loop.
 func EachListItem(obj runtime.Object, fn func(runtime.Object) error) error {
+	if unstructured, ok := obj.(runtime.Unstructured); ok {
+		return unstructured.EachListItem(fn)
+	}
 	// TODO: Change to an interface call?
 	itemsPtr, err := GetItemsPtr(obj)
 	if err != nil {
@@ -175,6 +178,9 @@ func SetList(list runtime.Object, objects []runtime.Object) error {
 	slice := reflect.MakeSlice(items.Type(), len(objects), len(objects))
 	for i := range objects {
 		dest := slice.Index(i)
+		if dest.Type() == reflect.TypeOf(runtime.RawExtension{}) {
+			dest = dest.FieldByName("Object")
+		}
 
 		// check to see if you're directly assignable
 		if reflect.TypeOf(objects[i]).AssignableTo(dest.Type()) {

@@ -1,1 +1,0 @@
-This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/devel/on-call-build-cop.md](https://github.com/kubernetes/community/blob/master/contributors/devel/on-call-build-cop.md)

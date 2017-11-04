@@ -29,14 +29,17 @@
 "kind": "Pod",
 "metadata": {
   "name":"etcd-server{{ suffix }}",
-  "namespace": "kube-system"
+  "namespace": "kube-system",
+  "annotations": {
+    "scheduler.alpha.kubernetes.io/critical-pod": ""
+  }
 },
 "spec":{
 "hostNetwork": true,
 "containers":[
     {
     "name": "etcd-container",
-    "image": "gcr.io/google_containers/etcd:{{ pillar.get('etcd_docker_tag', '3.0.17') }}",
+    "image": "{{ pillar.get('etcd_docker_repository', 'gcr.io/google_containers/etcd') }}:{{ pillar.get('etcd_docker_tag', '3.1.10') }}",
     "resources": {
       "requests": {
         "cpu": {{ cpulimit }}
@@ -52,7 +55,7 @@
         "value": "{{ pillar.get('storage_backend', 'etcd3') }}"
       },
       { "name": "TARGET_VERSION",
-        "value": "{{ pillar.get('etcd_version', '3.0.17') }}"
+        "value": "{{ pillar.get('etcd_version', '3.1.10') }}"
       },
       { "name": "DATA_DIRECTORY",
         "value": "/var/etcd/data{{ suffix }}"
@@ -100,7 +103,8 @@
   },
   { "name": "varlogetcd",
     "hostPath": {
-        "path": "/var/log/etcd{{ suffix }}.log"}
+        "path": "/var/log/etcd{{ suffix }}.log",
+        "type": "FileOrCreate"}
   },
   { "name": "etc",
     "hostPath": {

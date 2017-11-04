@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -36,7 +36,7 @@ const (
 )
 
 // This test requires Rescheduler to be enabled.
-var _ = framework.KubeDescribe("Rescheduler [Serial]", func() {
+var _ = SIGDescribe("Rescheduler [Serial]", func() {
 	f := framework.NewDefaultFramework("rescheduler")
 	var ns string
 	var totalMillicores int

@@ -48,12 +48,16 @@ var (
 )
 
 func (dec *messageDecoder) decode() (raftpb.Message, error) {
+	return dec.decodeLimit(readBytesLimit)
+}
+
+func (dec *messageDecoder) decodeLimit(numBytes uint64) (raftpb.Message, error) {
 	var m raftpb.Message
 	var l uint64
 	if err := binary.Read(dec.r, binary.BigEndian, &l); err != nil {
 		return m, err
 	}
-	if l > readBytesLimit {
+	if l > numBytes {
 		return m, ErrExceedSizeLimit
 	}
 	buf := make([]byte, int(l))

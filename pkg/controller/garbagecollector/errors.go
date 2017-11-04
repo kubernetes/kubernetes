@@ -20,8 +20,6 @@ import (
 	"fmt"
 )
 
-const nonCoreMessage = `If %s is a non-core resource (e.g. thirdparty resource, custom resource from aggregated apiserver), please note that the garbage collector doesn't support non-core resources yet. Once they are supported, object with ownerReferences referring non-existing non-core objects will be deleted by the garbage collector.`
-
 type restMappingError struct {
 	kind    string
 	version string
@@ -36,7 +34,6 @@ func (r *restMappingError) Error() string {
 func (r *restMappingError) Message() string {
 	versionKind := fmt.Sprintf("%s/%s", r.version, r.kind)
 	errMsg := fmt.Sprintf("unable to get REST mapping for %s. ", versionKind)
-	errMsg += fmt.Sprintf(nonCoreMessage, versionKind)
 	errMsg += fmt.Sprintf(" If %s is an invalid resource, then you should manually remove ownerReferences that refer %s objects.", versionKind, versionKind)
 	return errMsg
 }

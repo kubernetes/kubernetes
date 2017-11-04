@@ -17,7 +17,7 @@ limitations under the License.
 package priorities
 
 import (
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
@@ -38,6 +38,6 @@ func PriorityMetadata(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.Nod
 	return &priorityMetadata{
 		nonZeroRequest: getNonZeroRequests(pod),
 		podTolerations: tolerationsPreferNoSchedule,
-		affinity:       schedulercache.ReconcileAffinity(pod),
+		affinity:       pod.Spec.Affinity,
 	}
 }

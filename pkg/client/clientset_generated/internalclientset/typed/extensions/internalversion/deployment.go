@@ -42,6 +42,9 @@ type DeploymentInterface interface {
 	List(opts v1.ListOptions) (*extensions.DeploymentList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.Deployment, err error)
+	GetScale(deploymentName string, options v1.GetOptions) (*extensions.Scale, error)
+	UpdateScale(deploymentName string, scale *extensions.Scale) (*extensions.Scale, error)
+
 	DeploymentExpansion
 }
 
@@ -57,69 +60,6 @@ func newDeployments(c *ExtensionsClient, namespace string) *deployments {
 		client: c.RESTClient(),
 		ns:     namespace,
 	}
-}
-
-// Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.
-func (c *deployments) Create(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
-	result = &extensions.Deployment{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("deployments").
-		Body(deployment).
-		Do().
-		Into(result)
-	return
-}
-
-// Update takes the representation of a deployment and updates it. Returns the server's representation of the deployment, and an error, if there is any.
-func (c *deployments) Update(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
-	result = &extensions.Deployment{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("deployments").
-		Name(deployment.Name).
-		Body(deployment).
-		Do().
-		Into(result)
-	return
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
-
-func (c *deployments) UpdateStatus(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
-	result = &extensions.Deployment{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("deployments").
-		Name(deployment.Name).
-		SubResource("status").
-		Body(deployment).
-		Do().
-		Into(result)
-	return
-}
-
-// Delete takes name of the deployment and deletes it. Returns an error if one occurs.
-func (c *deployments) Delete(name string, options *v1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("deployments").
-		Name(name).
-		Body(options).
-		Do().
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *deployments) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("deployments").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
-		Body(options).
-		Do().
-		Error()
 }
 
 // Get takes name of the deployment, and returns the corresponding deployment object, and an error if there is any.
@@ -157,6 +97,69 @@ func (c *deployments) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Watch()
 }
 
+// Create takes the representation of a deployment and creates it.  Returns the server's representation of the deployment, and an error, if there is any.
+func (c *deployments) Create(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
+	result = &extensions.Deployment{}
+	err = c.client.Post().
+		Namespace(c.ns).
+		Resource("deployments").
+		Body(deployment).
+		Do().
+		Into(result)
+	return
+}
+
+// Update takes the representation of a deployment and updates it. Returns the server's representation of the deployment, and an error, if there is any.
+func (c *deployments) Update(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
+	result = &extensions.Deployment{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("deployments").
+		Name(deployment.Name).
+		Body(deployment).
+		Do().
+		Into(result)
+	return
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+
+func (c *deployments) UpdateStatus(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
+	result = &extensions.Deployment{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("deployments").
+		Name(deployment.Name).
+		SubResource("status").
+		Body(deployment).
+		Do().
+		Into(result)
+	return
+}
+
+// Delete takes name of the deployment and deletes it. Returns an error if one occurs.
+func (c *deployments) Delete(name string, options *v1.DeleteOptions) error {
+	return c.client.Delete().
+		Namespace(c.ns).
+		Resource("deployments").
+		Name(name).
+		Body(options).
+		Do().
+		Error()
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *deployments) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	return c.client.Delete().
+		Namespace(c.ns).
+		Resource("deployments").
+		VersionedParams(&listOptions, scheme.ParameterCodec).
+		Body(options).
+		Do().
+		Error()
+}
+
 // Patch applies the patch and returns the patched deployment.
 func (c *deployments) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *extensions.Deployment, err error) {
 	result = &extensions.Deployment{}
@@ -166,6 +169,34 @@ func (c *deployments) Patch(name string, pt types.PatchType, data []byte, subres
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Do().
+		Into(result)
+	return
+}
+
+// GetScale takes name of the deployment, and returns the corresponding extensions.Scale object, and an error if there is any.
+func (c *deployments) GetScale(deploymentName string, options v1.GetOptions) (result *extensions.Scale, err error) {
+	result = &extensions.Scale{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("deployments").
+		Name(deploymentName).
+		SubResource("scale").
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
+func (c *deployments) UpdateScale(deploymentName string, scale *extensions.Scale) (result *extensions.Scale, err error) {
+	result = &extensions.Scale{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("deployments").
+		Name(deploymentName).
+		SubResource("scale").
+		Body(scale).
 		Do().
 		Into(result)
 	return

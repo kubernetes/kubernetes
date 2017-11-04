@@ -1,0 +1,15 @@
+description: add a testcase description
+mode: edit
+args:
+- configmap
+namespace: "edit-test"
+expectedStderr:
+- edit cancelled, no objects found.
+expectedExitCode: 1
+steps:
+- type: request
+  expectedMethod: GET
+  expectedPath: /api/v1/namespaces/edit-test/configmaps
+  expectedInput: 0.request
+  resultingStatusCode: 200
+  resultingOutput: 0.response

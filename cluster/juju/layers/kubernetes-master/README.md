@@ -7,7 +7,7 @@ workloads combined with best practices from the community.
 
 The Kubernetes project defines some new terms that may be unfamiliar to users
 or operators. For more information please refer to the concept guide in the 
-[getting started guide](http://kubernetes.io/docs/user-guide/#concept-guide).
+[getting started guide](https://kubernetes.io/docs/home/).
 
 This charm is an encapsulation of the Kubernetes master processes and the 
 operations to run on any cloud for the entire lifecycle of the cluster.
@@ -43,7 +43,7 @@ operator.
 # Configuration
 
 This charm supports some configuration options to set up a Kubernetes cluster 
-that works in your environment:  
+that works in your environment:
 
 #### dns_domain
 
@@ -53,6 +53,10 @@ The domain name to use for the Kubernetes cluster for DNS.
 
 Enables the installation of Kubernetes dashboard, Heapster, Grafana, and
 InfluxDB.
+
+#### enable-rbac
+
+Enable RBAC and Node authorisation.
 
 # DNS for the cluster
 

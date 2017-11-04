@@ -11,7 +11,7 @@ spec:
     spec:
       containers:
       - name: echoheaders
-        image: gcr.io/google_containers/echoserver:1.4
+        image: gcr.io/google_containers/echoserver:1.6
         ports:
         - containerPort: 8080
         readinessProbe:

@@ -1,16 +1,10 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = ["helpers.go"],
-    tags = ["automanaged"],
+    importpath = "github.com/cloudflare/cfssl/helpers",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/cloudflare/cfssl/crypto/pkcs7:go_default_library",
         "//vendor/github.com/cloudflare/cfssl/errors:go_default_library",
@@ -34,4 +28,5 @@ filegroup(
         "//vendor/github.com/cloudflare/cfssl/helpers/derhelpers:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

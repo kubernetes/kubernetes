@@ -183,6 +183,16 @@ func WithBaseURL(baseURL string) PrepareDecorator {
 	}
 }
 
+// WithCustomBaseURL returns a PrepareDecorator that replaces brace-enclosed keys within the
+// request base URL (i.e., http.Request.URL) with the corresponding values from the passed map.
+func WithCustomBaseURL(baseURL string, urlParameters map[string]interface{}) PrepareDecorator {
+	parameters := ensureValueStrings(urlParameters)
+	for key, value := range parameters {
+		baseURL = strings.Replace(baseURL, "{"+key+"}", value, -1)
+	}
+	return WithBaseURL(baseURL)
+}
+
 // WithFormData returns a PrepareDecoratore that "URL encodes" (e.g., bar=baz&foo=quux) into the
 // http.Request body.
 func WithFormData(v url.Values) PrepareDecorator {
@@ -415,19 +425,4 @@ func WithQueryParameters(queryParameters map[string]interface{}) PrepareDecorato
 			return r, err
 		})
 	}
-}
-
-// Authorizer is the interface that provides a PrepareDecorator used to supply request
-// authorization. Most often, the Authorizer decorator runs last so it has access to the full
-// state of the formed HTTP request.
-type Authorizer interface {
-	WithAuthorization() PrepareDecorator
-}
-
-// NullAuthorizer implements a default, "do nothing" Authorizer.
-type NullAuthorizer struct{}
-
-// WithAuthorization returns a PrepareDecorator that does nothing.
-func (na NullAuthorizer) WithAuthorization() PrepareDecorator {
-	return WithNothing()
 }

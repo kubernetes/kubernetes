@@ -19,8 +19,8 @@ limitations under the License.
 package cm
 
 import (
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 type unsupportedPodContainerManager struct {

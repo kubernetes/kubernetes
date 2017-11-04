@@ -20,10 +20,14 @@ import (
 	"reflect"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/api"
 	apivalidation "k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // ValidateStorageClass validates a StorageClass.
@@ -31,6 +35,8 @@ func ValidateStorageClass(storageClass *storage.StorageClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&storageClass.ObjectMeta, false, apivalidation.ValidateClassName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateProvisioner(storageClass.Provisioner, field.NewPath("provisioner"))...)
 	allErrs = append(allErrs, validateParameters(storageClass.Parameters, field.NewPath("parameters"))...)
+	allErrs = append(allErrs, validateReclaimPolicy(storageClass.ReclaimPolicy, field.NewPath("reclaimPolicy"))...)
+	allErrs = append(allErrs, validateAllowVolumeExpansion(storageClass.AllowVolumeExpansion, field.NewPath("allowVolumeExpansion"))...)
 
 	return allErrs
 }
@@ -44,6 +50,10 @@ func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageCl
 
 	if storageClass.Provisioner != oldStorageClass.Provisioner {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("provisioner"), "updates to provisioner are forbidden."))
+	}
+
+	if *storageClass.ReclaimPolicy != *oldStorageClass.ReclaimPolicy {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("reclaimPolicy"), "updates to reclaimPolicy are forbidden."))
 	}
 	return allErrs
 }
@@ -84,6 +94,30 @@ func validateParameters(params map[string]string, fldPath *field.Path) field.Err
 
 	if totalSize > maxProvisionerParameterSize {
 		allErrs = append(allErrs, field.TooLong(fldPath, "", maxProvisionerParameterSize))
+	}
+	return allErrs
+}
+
+var supportedReclaimPolicy = sets.NewString(string(api.PersistentVolumeReclaimDelete), string(api.PersistentVolumeReclaimRetain))
+
+// validateReclaimPolicy tests that the reclaim policy is one of the supported. It is up to the volume plugin to reject
+// provisioning for storage classes with impossible reclaim policies, e.g. EBS is not Recyclable
+func validateReclaimPolicy(reclaimPolicy *api.PersistentVolumeReclaimPolicy, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(string(*reclaimPolicy)) > 0 {
+		if !supportedReclaimPolicy.Has(string(*reclaimPolicy)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath, reclaimPolicy, supportedReclaimPolicy.List()))
+		}
+	}
+	return allErrs
+}
+
+// validateAllowVolumeExpansion tests that if ExpandPersistentVolumes feature gate is disabled, whether the AllowVolumeExpansion filed
+// of storage class is set
+func validateAllowVolumeExpansion(allowExpand *bool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if allowExpand != nil && !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
+		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate ExpandPersistentVolumes"))
 	}
 	return allErrs
 }

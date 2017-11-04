@@ -21,18 +21,19 @@ import (
 	"net/http"
 	"testing"
 
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/api"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
 func TestCreateNamespace(t *testing.T) {
-	namespaceObject := &api.Namespace{}
+	namespaceObject := &v1.Namespace{}
 	namespaceObject.Name = "my-namespace"
 	f, tf, codec, ns := cmdtesting.NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		APIRegistry:          api.Registry,
+		GroupVersion:         schema.GroupVersion{Version: "v1"},
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {

@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -16,9 +9,11 @@ go_library(
         "shared_credentials_provider.go",
         "static_provider.go",
     ],
-    tags = ["automanaged"],
+    importpath = "github.com/aws/aws-sdk-go/aws/credentials",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/aws/aws-sdk-go/aws/awserr:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/internal/shareddefaults:go_default_library",
         "//vendor/github.com/go-ini/ini:go_default_library",
     ],
 )
@@ -39,4 +34,5 @@ filegroup(
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials/stscreds:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

@@ -59,6 +59,41 @@ func newServices(c *CoreClient, namespace string) *services {
 	}
 }
 
+// Get takes name of the service, and returns the corresponding service object, and an error if there is any.
+func (c *services) Get(name string, options v1.GetOptions) (result *api.Service, err error) {
+	result = &api.Service{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("services").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of Services that match those selectors.
+func (c *services) List(opts v1.ListOptions) (result *api.ServiceList, err error) {
+	result = &api.ServiceList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("services").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested services.
+func (c *services) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("services").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a service and creates it.  Returns the server's representation of the service, and an error, if there is any.
 func (c *services) Create(service *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
@@ -85,7 +120,7 @@ func (c *services) Update(service *api.Service) (result *api.Service, err error)
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *services) UpdateStatus(service *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
@@ -120,41 +155,6 @@ func (c *services) DeleteCollection(options *v1.DeleteOptions, listOptions v1.Li
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the service, and returns the corresponding service object, and an error if there is any.
-func (c *services) Get(name string, options v1.GetOptions) (result *api.Service, err error) {
-	result = &api.Service{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("services").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Services that match those selectors.
-func (c *services) List(opts v1.ListOptions) (result *api.ServiceList, err error) {
-	result = &api.ServiceList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("services").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested services.
-func (c *services) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("services").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched service.

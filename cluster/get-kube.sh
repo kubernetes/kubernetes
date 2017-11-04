@@ -36,8 +36,6 @@
 #   * export KUBERNETES_PROVIDER=vagrant; wget -q -O - https://get.k8s.io | bash
 #  VMWare Photon Controller
 #   * export KUBERNETES_PROVIDER=photon-controller; wget -q -O - https://get.k8s.io | bash
-#  Rackspace
-#   * export KUBERNETES_PROVIDER=rackspace; wget -q -O - https://get.k8s.io | bash
 #  OpenStack-Heat
 #   * export KUBERNETES_PROVIDER=openstack-heat; wget -q -O - https://get.k8s.io | bash
 #
@@ -56,6 +54,9 @@
 #  Set KUBERNETES_SKIP_DOWNLOAD to skip downloading a release.
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
 #  Set KUBERNETES_SKIP_CREATE_CLUSTER to skip starting a cluster.
+#  Set KUBERNETES_SKIP_RELEASE_VALIDATION to skip trying to validate the
+#      Kubernetes release string. This implies that you know what you're doing
+#      and have set KUBERNETES_RELEASE and KUBERNETES_RELEASE_URL properly.
 
 set -o errexit
 set -o nounset
@@ -65,8 +66,8 @@ set -o pipefail
 KUBERNETES_CI_RELEASE_URL="${KUBERNETES_CI_RELEASE_URL:-${KUBERNETES_RELEASE_URL:-https://dl.k8s.io/ci}}"
 KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL:-https://dl.k8s.io}"
 
-KUBE_RELEASE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-(beta|alpha|rc)\\.(0|[1-9][0-9]*))?$"
-KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha|rc)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
+KUBE_RELEASE_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-([a-zA-Z0-9]+)\\.(0|[1-9][0-9]*))?$"
+KUBE_CI_VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-([a-zA-Z0-9]+)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[-0-9a-z]*)?$"
 
 # Sets KUBE_VERSION variable if an explicit version number was provided (e.g. "v1.0.6",
 # "v1.2.0-alpha.1.881+376438b69c7612") or resolves the "published" version
@@ -179,13 +180,15 @@ release=${KUBERNETES_RELEASE:-"release/stable"}
 # Validate Kubernetes release version.
 # Translate a published version <bucket>/<version> (e.g. "release/stable") to version number.
 set_binary_version "${release}"
-if [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
-  # Override KUBERNETES_RELEASE_URL to point to the CI bucket;
-  # this will be used by get-kube-binaries.sh.
-  KUBERNETES_RELEASE_URL="${KUBERNETES_CI_RELEASE_URL}"
-elif ! [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
-  echo "Version doesn't match regexp" >&2
-  exit 1
+if [[ -z "${KUBERNETES_SKIP_RELEASE_VALIDATION-}" ]]; then
+  if [[ ${KUBE_VERSION} =~ ${KUBE_CI_VERSION_REGEX} ]]; then
+    # Override KUBERNETES_RELEASE_URL to point to the CI bucket;
+    # this will be used by get-kube-binaries.sh.
+    KUBERNETES_RELEASE_URL="${KUBERNETES_CI_RELEASE_URL}"
+  elif ! [[ ${KUBE_VERSION} =~ ${KUBE_RELEASE_VERSION_REGEX} ]]; then
+    echo "Version doesn't match regexp" >&2
+    exit 1
+  fi
 fi
 kubernetes_tar_url="${KUBERNETES_RELEASE_URL}/${KUBE_VERSION}/${file}"
 

@@ -138,3 +138,243 @@ func TestMakeParams(t *testing.T) {
 		t.Errorf("\nexpected:\n%v\nsaw:\n%v", expected, params)
 	}
 }
+
+func TestGetBool(t *testing.T) {
+	testCases := []struct {
+		name         string
+		parameters   map[string]string
+		key          string
+		defaultValue bool
+		expected     bool
+		expectError  bool
+	}{
+		{
+			name: "found key in parameters, default value is different from key value",
+			parameters: map[string]string{
+				"foo": "false",
+			},
+			key:          "foo",
+			defaultValue: false,
+			expected:     false,
+			expectError:  false,
+		},
+		{
+			name: "found key in parameters, default value is same with key value",
+			parameters: map[string]string{
+				"foo": "true",
+			},
+			key:          "foo",
+			defaultValue: true,
+			expected:     true,
+			expectError:  false,
+		},
+		{
+			name: "key not found in parameters, default value is true",
+			parameters: map[string]string{
+				"foo": "true",
+				"far": "false",
+			},
+			key:          "bar",
+			defaultValue: true,
+			expected:     true,
+			expectError:  false,
+		},
+		{
+			name: "key not found in parameters, default value is false",
+			parameters: map[string]string{
+				"foo": "true",
+				"far": "false",
+			},
+			key:          "bar",
+			defaultValue: false,
+			expected:     false,
+			expectError:  false,
+		},
+		{
+			name:         "parameters is empty",
+			parameters:   map[string]string{},
+			key:          "foo",
+			defaultValue: true,
+			expected:     true,
+			expectError:  false,
+		},
+		{
+			name: "parameters key is not a valid bool value",
+			parameters: map[string]string{
+				"foo": "error",
+			},
+			key:          "foo",
+			defaultValue: true,
+			expected:     false,
+			expectError:  true,
+		},
+	}
+	for _, test := range testCases {
+		got, err := GetBool(test.parameters, test.key, test.defaultValue)
+		if err != nil && test.expectError == false {
+			t.Errorf("%s: unexpected error: %v", test.name, err)
+		}
+		if err == nil && test.expectError == true {
+			t.Errorf("%s: expect error, got nil", test.name)
+		}
+		if got != test.expected {
+			t.Errorf("%s: expect %v, got %v", test.name, test.expected, got)
+		}
+	}
+}
+
+func TestMakeParseLabels(t *testing.T) {
+	successCases := []struct {
+		labels   map[string]string
+		expected map[string]string
+	}{
+		{
+			labels: map[string]string{
+				"foo": "false",
+			},
+			expected: map[string]string{
+				"foo": "false",
+			},
+		},
+		{
+			labels: map[string]string{
+				"foo": "true",
+				"bar": "123",
+			},
+			expected: map[string]string{
+				"foo": "true",
+				"bar": "123",
+			},
+		},
+	}
+	for _, test := range successCases {
+		labelString := MakeLabels(test.labels)
+		got, err := ParseLabels(labelString)
+		if err != nil {
+			t.Errorf("unexpected error :%v", err)
+		}
+		if !reflect.DeepEqual(test.expected, got) {
+			t.Errorf("\nexpected:\n%v\ngot:\n%v", test.expected, got)
+		}
+	}
+
+	errorCases := []struct {
+		name   string
+		labels interface{}
+	}{
+		{
+			name:   "non-string",
+			labels: 123,
+		},
+		{
+			name:   "empty string",
+			labels: "",
+		},
+		{
+			name:   "error format",
+			labels: "abc=456;bcd=789",
+		},
+		{
+			name:   "error format",
+			labels: "abc=456.bcd=789",
+		},
+		{
+			name:   "error format",
+			labels: "abc,789",
+		},
+		{
+			name:   "error format",
+			labels: "abc",
+		},
+		{
+			name:   "error format",
+			labels: "=abc",
+		},
+	}
+	for _, test := range errorCases {
+		_, err := ParseLabels(test.labels)
+		if err == nil {
+			t.Errorf("labels %s expect error, reason: %s, got nil", test.labels, test.name)
+		}
+	}
+}
+
+func TestMakeParseProtocols(t *testing.T) {
+	successCases := []struct {
+		protocols map[string]string
+		expected  map[string]string
+	}{
+		{
+			protocols: map[string]string{
+				"101": "TCP",
+			},
+			expected: map[string]string{
+				"101": "TCP",
+			},
+		},
+		{
+			protocols: map[string]string{
+				"102": "UDP",
+				"101": "TCP",
+			},
+			expected: map[string]string{
+				"102": "UDP",
+				"101": "TCP",
+			},
+		},
+	}
+	for _, test := range successCases {
+		protocolString := MakeProtocols(test.protocols)
+		got, err := ParseProtocols(protocolString)
+		if err != nil {
+			t.Errorf("unexpected error :%v", err)
+		}
+		if !reflect.DeepEqual(test.expected, got) {
+			t.Errorf("\nexpected:\n%v\ngot:\n%v", test.expected, got)
+		}
+	}
+
+	errorCases := []struct {
+		name      string
+		protocols interface{}
+	}{
+		{
+			name:      "non-string",
+			protocols: 123,
+		},
+		{
+			name:      "empty string",
+			protocols: "",
+		},
+		{
+			name:      "error format",
+			protocols: "123/TCP;456/UDP",
+		},
+		{
+			name:      "error format",
+			protocols: "123/TCP.456/UDP",
+		},
+		{
+			name:      "error format",
+			protocols: "123=456",
+		},
+		{
+			name:      "error format",
+			protocols: "123",
+		},
+		{
+			name:      "error format",
+			protocols: "123=",
+		},
+		{
+			name:      "error format",
+			protocols: "=TCP",
+		},
+	}
+	for _, test := range errorCases {
+		_, err := ParseProtocols(test.protocols)
+		if err == nil {
+			t.Errorf("protocols %s expect error, reason: %s, got nil", test.protocols, test.name)
+		}
+	}
+}

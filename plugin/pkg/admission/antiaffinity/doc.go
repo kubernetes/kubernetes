@@ -16,7 +16,7 @@ limitations under the License.
 
 // LimitPodHardAntiAffinityTopology admission controller rejects any pod
 // that specifies "hard" (RequiredDuringScheduling) anti-affinity
-// with a TopologyKey other than metav1.LabelHostname.
+// with a TopologyKey other than kubeletapis.LabelHostname.
 // Because anti-affinity is symmetric, without this admission controller,
 // a user could maliciously or accidentally specify that their pod (once it has scheduled)
 // should block other pods from scheduling into the same zone or some other large topology,

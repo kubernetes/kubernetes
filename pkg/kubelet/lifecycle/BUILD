@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -18,9 +16,8 @@ go_library(
         "interfaces.go",
         "predicate.go",
     ],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/lifecycle",
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
@@ -29,6 +26,7 @@ go_library(
         "//plugin/pkg/scheduler/algorithm/predicates:go_default_library",
         "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
     ],
@@ -37,11 +35,11 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["handlers_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/lifecycle",
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
-        "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/container:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
     ],
 )

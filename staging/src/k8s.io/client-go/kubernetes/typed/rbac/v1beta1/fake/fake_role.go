@@ -17,12 +17,12 @@ limitations under the License.
 package fake
 
 import (
+	v1beta1 "k8s.io/api/rbac/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
-	v1beta1 "k8s.io/client-go/pkg/apis/rbac/v1beta1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -34,40 +34,9 @@ type FakeRoles struct {
 
 var rolesResource = schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Resource: "roles"}
 
-func (c *FakeRoles) Create(role *v1beta1.Role) (result *v1beta1.Role, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(rolesResource, c.ns, role), &v1beta1.Role{})
+var rolesKind = schema.GroupVersionKind{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Kind: "Role"}
 
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.Role), err
-}
-
-func (c *FakeRoles) Update(role *v1beta1.Role) (result *v1beta1.Role, err error) {
-	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(rolesResource, c.ns, role), &v1beta1.Role{})
-
-	if obj == nil {
-		return nil, err
-	}
-	return obj.(*v1beta1.Role), err
-}
-
-func (c *FakeRoles) Delete(name string, options *v1.DeleteOptions) error {
-	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(rolesResource, c.ns, name), &v1beta1.Role{})
-
-	return err
-}
-
-func (c *FakeRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(rolesResource, c.ns, listOptions)
-
-	_, err := c.Fake.Invokes(action, &v1beta1.RoleList{})
-	return err
-}
-
+// Get takes name of the role, and returns the corresponding role object, and an error if there is any.
 func (c *FakeRoles) Get(name string, options v1.GetOptions) (result *v1beta1.Role, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(rolesResource, c.ns, name), &v1beta1.Role{})
@@ -78,9 +47,10 @@ func (c *FakeRoles) Get(name string, options v1.GetOptions) (result *v1beta1.Rol
 	return obj.(*v1beta1.Role), err
 }
 
+// List takes label and field selectors, and returns the list of Roles that match those selectors.
 func (c *FakeRoles) List(opts v1.ListOptions) (result *v1beta1.RoleList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(rolesResource, c.ns, opts), &v1beta1.RoleList{})
+		Invokes(testing.NewListAction(rolesResource, rolesKind, c.ns, opts), &v1beta1.RoleList{})
 
 	if obj == nil {
 		return nil, err
@@ -104,6 +74,44 @@ func (c *FakeRoles) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(rolesResource, c.ns, opts))
 
+}
+
+// Create takes the representation of a role and creates it.  Returns the server's representation of the role, and an error, if there is any.
+func (c *FakeRoles) Create(role *v1beta1.Role) (result *v1beta1.Role, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewCreateAction(rolesResource, c.ns, role), &v1beta1.Role{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.Role), err
+}
+
+// Update takes the representation of a role and updates it. Returns the server's representation of the role, and an error, if there is any.
+func (c *FakeRoles) Update(role *v1beta1.Role) (result *v1beta1.Role, err error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateAction(rolesResource, c.ns, role), &v1beta1.Role{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.Role), err
+}
+
+// Delete takes name of the role and deletes it. Returns an error if one occurs.
+func (c *FakeRoles) Delete(name string, options *v1.DeleteOptions) error {
+	_, err := c.Fake.
+		Invokes(testing.NewDeleteAction(rolesResource, c.ns, name), &v1beta1.Role{})
+
+	return err
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *FakeRoles) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(rolesResource, c.ns, listOptions)
+
+	_, err := c.Fake.Invokes(action, &v1beta1.RoleList{})
+	return err
 }
 
 // Patch applies the patch and returns the patched role.

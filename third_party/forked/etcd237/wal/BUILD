@@ -19,7 +19,7 @@ go_library(
         "util.go",
         "wal.go",
     ],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/third_party/forked/etcd237/wal",
     deps = [
         "//third_party/forked/etcd237/pkg/fileutil:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/crc:go_default_library",

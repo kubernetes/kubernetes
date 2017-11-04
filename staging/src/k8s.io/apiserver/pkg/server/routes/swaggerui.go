@@ -36,5 +36,5 @@ func (l SwaggerUI) Install(c *mux.PathRecorderMux) {
 		Prefix:   "third_party/swagger-ui",
 	})
 	prefix := "/swagger-ui/"
-	c.Handle(prefix, http.StripPrefix(prefix, fileServer))
+	c.HandlePrefix(prefix, http.StripPrefix(prefix, fileServer))
 }

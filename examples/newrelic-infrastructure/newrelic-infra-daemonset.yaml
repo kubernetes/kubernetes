@@ -1,0 +1,58 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: newrelic-infra-agent
+  labels:
+    tier: monitoring
+    app: newrelic-infra-agent
+    version: v1
+spec:
+  template:
+    metadata:
+      labels:
+        name: newrelic
+    spec:
+      # Filter to specific nodes:
+      # nodeSelector:
+      #  app: newrelic
+      hostPID: true
+      hostIPC: true
+      hostNetwork: true
+      containers:
+        - resources:
+            requests:
+              cpu: 0.15
+          securityContext:
+            privileged: true
+          image: newrelic/infrastructure
+          name: newrelic
+          command: [ "bash", "-c", "source /etc/kube-nr-infra/config && /usr/bin/newrelic-infra" ]
+          volumeMounts:
+            - name: newrelic-config
+              mountPath: /etc/kube-nr-infra
+              readOnly: true
+            - name: dev
+              mountPath: /dev
+            - name: run
+              mountPath: /var/run/docker.sock
+            - name: log
+              mountPath: /var/log
+            - name: host-root
+              mountPath: /host
+              readOnly: true
+      volumes:
+        - name: newrelic-config
+          secret:
+            secretName: newrelic-config
+        - name: dev
+          hostPath:
+              path: /dev
+        - name: run
+          hostPath:
+              path: /var/run/docker.sock
+        - name: log
+          hostPath:
+              path: /var/log
+        - name: host-root
+          hostPath:
+              path: /

@@ -28,11 +28,17 @@ const Indentation = `  `
 
 // LongDesc normalizes a command's long description to follow the conventions.
 func LongDesc(s string) string {
+	if len(s) == 0 {
+		return s
+	}
 	return normalizer{s}.heredoc().markdown().trim().string
 }
 
 // Examples normalizes a command's examples to follow the conventions.
 func Examples(s string) string {
+	if len(s) == 0 {
+		return s
+	}
 	return normalizer{s}.trim().indent().string
 }
 

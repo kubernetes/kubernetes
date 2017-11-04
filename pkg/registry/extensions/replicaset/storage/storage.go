@@ -24,14 +24,20 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
+	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
+	appsv1beta2 "k8s.io/kubernetes/pkg/apis/apps/v1beta2"
+	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	extensionsv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
-	"k8s.io/kubernetes/pkg/registry/cachesize"
+	"k8s.io/kubernetes/pkg/printers"
+	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
+	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/extensions/replicaset"
 )
 
@@ -60,16 +66,16 @@ type REST struct {
 // NewREST returns a RESTStorage object that will work against ReplicaSet.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
-		Copier:            api.Scheme,
-		NewFunc:           func() runtime.Object { return &extensions.ReplicaSet{} },
-		NewListFunc:       func() runtime.Object { return &extensions.ReplicaSetList{} },
-		PredicateFunc:     replicaset.MatchReplicaSet,
-		QualifiedResource: extensions.Resource("replicasets"),
-		WatchCacheSize:    cachesize.GetWatchCacheSizeByResource("replicasets"),
+		NewFunc:                  func() runtime.Object { return &extensions.ReplicaSet{} },
+		NewListFunc:              func() runtime.Object { return &extensions.ReplicaSetList{} },
+		PredicateFunc:            replicaset.MatchReplicaSet,
+		DefaultQualifiedResource: extensions.Resource("replicasets"),
 
 		CreateStrategy: replicaset.Strategy,
 		UpdateStrategy: replicaset.Strategy,
 		DeleteStrategy: replicaset.Strategy,
+
+		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: replicaset.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
@@ -90,6 +96,14 @@ func (r *REST) ShortNames() []string {
 	return []string{"rs"}
 }
 
+// Implement CategoriesProvider
+var _ rest.CategoriesProvider = &REST{}
+
+// Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
+func (r *REST) Categories() []string {
+	return []string{"all"}
+}
+
 // StatusREST implements the REST endpoint for changing the status of a ReplicaSet
 type StatusREST struct {
 	store *genericregistry.Store
@@ -105,8 +119,8 @@ func (r *StatusREST) Get(ctx genericapirequest.Context, name string, options *me
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo)
+func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
 }
 
 type ScaleREST struct {
@@ -115,6 +129,20 @@ type ScaleREST struct {
 
 // ScaleREST implements Patcher
 var _ = rest.Patcher(&ScaleREST{})
+var _ = rest.GroupVersionKindProvider(&ScaleREST{})
+
+func (r *ScaleREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
+	switch containingGV {
+	case extensionsv1beta1.SchemeGroupVersion:
+		return extensionsv1beta1.SchemeGroupVersion.WithKind("Scale")
+	case appsv1beta1.SchemeGroupVersion:
+		return appsv1beta1.SchemeGroupVersion.WithKind("Scale")
+	case appsv1beta2.SchemeGroupVersion:
+		return appsv1beta2.SchemeGroupVersion.WithKind("Scale")
+	default:
+		return autoscalingv1.SchemeGroupVersion.WithKind("Scale")
+	}
+}
 
 // New creates a new Scale object
 func (r *ScaleREST) New() runtime.Object {
@@ -133,7 +161,7 @@ func (r *ScaleREST) Get(ctx genericapirequest.Context, name string, options *met
 	return scale, err
 }
 
-func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	rs, err := r.registry.GetReplicaSet(ctx, name, &metav1.GetOptions{})
 	if err != nil {
 		return nil, false, errors.NewNotFound(extensions.Resource("replicasets/scale"), name)
@@ -144,6 +172,7 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 		return nil, false, err
 	}
 
+	// TODO: should this pass admission?
 	obj, err := objInfo.UpdatedObject(ctx, oldScale)
 	if err != nil {
 		return nil, false, err
@@ -162,7 +191,7 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 
 	rs.Spec.Replicas = scale.Spec.Replicas
 	rs.ResourceVersion = scale.ResourceVersion
-	rs, err = r.registry.UpdateReplicaSet(ctx, rs)
+	rs, err = r.registry.UpdateReplicaSet(ctx, rs, createValidation, updateValidation)
 	if err != nil {
 		return nil, false, err
 	}

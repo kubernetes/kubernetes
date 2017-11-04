@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/cookiejar"
+	"runtime"
 	"time"
 )
 
@@ -22,13 +23,24 @@ const (
 	DefaultRetryAttempts = 3
 )
 
-var statusCodesForRetry = []int{
-	http.StatusRequestTimeout,      // 408
-	http.StatusInternalServerError, // 500
-	http.StatusBadGateway,          // 502
-	http.StatusServiceUnavailable,  // 503
-	http.StatusGatewayTimeout,      // 504
-}
+var (
+	// defaultUserAgent builds a string containing the Go version, system archityecture and OS,
+	// and the go-autorest version.
+	defaultUserAgent = fmt.Sprintf("Go/%s (%s-%s) go-autorest/%s",
+		runtime.Version(),
+		runtime.GOARCH,
+		runtime.GOOS,
+		Version(),
+	)
+
+	statusCodesForRetry = []int{
+		http.StatusRequestTimeout,      // 408
+		http.StatusInternalServerError, // 500
+		http.StatusBadGateway,          // 502
+		http.StatusServiceUnavailable,  // 503
+		http.StatusGatewayTimeout,      // 504
+	}
+)
 
 const (
 	requestFormat = `HTTP Request Begin ===================================================
@@ -140,13 +152,24 @@ type Client struct {
 // NewClientWithUserAgent returns an instance of a Client with the UserAgent set to the passed
 // string.
 func NewClientWithUserAgent(ua string) Client {
-	return Client{
+	c := Client{
 		PollingDelay:    DefaultPollingDelay,
 		PollingDuration: DefaultPollingDuration,
 		RetryAttempts:   DefaultRetryAttempts,
 		RetryDuration:   30 * time.Second,
-		UserAgent:       ua,
+		UserAgent:       defaultUserAgent,
 	}
+	c.AddToUserAgent(ua)
+	return c
+}
+
+// AddToUserAgent adds an extension to the current user agent
+func (c *Client) AddToUserAgent(extension string) error {
+	if extension != "" {
+		c.UserAgent = fmt.Sprintf("%s %s", c.UserAgent, extension)
+		return nil
+	}
+	return fmt.Errorf("Extension was empty, User Agent stayed as %s", c.UserAgent)
 }
 
 // Do implements the Sender interface by invoking the active Sender after applying authorization.

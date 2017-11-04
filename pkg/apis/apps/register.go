@@ -43,16 +43,22 @@ func Resource(resource string) schema.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
-// Adds the list of known types to api.Scheme.
+// Adds the list of known types to the given scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this will get cleaned up with the scheme types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
+		&extensions.DaemonSet{},
+		&extensions.DaemonSetList{},
 		&extensions.Deployment{},
 		&extensions.DeploymentList{},
 		&extensions.DeploymentRollback{},
 		&extensions.Scale{},
 		&StatefulSet{},
 		&StatefulSetList{},
+		&ControllerRevision{},
+		&ControllerRevisionList{},
+		&extensions.ReplicaSet{},
+		&extensions.ReplicaSetList{},
 	)
 	return nil
 }

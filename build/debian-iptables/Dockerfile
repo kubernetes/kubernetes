@@ -21,4 +21,5 @@ CROSS_BUILD_COPY qemu-ARCH-static /usr/bin/
 RUN clean-install \
     iptables \
     ebtables \
-    conntrack
+    conntrack \
+    module-init-tools

@@ -17,9 +17,9 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1beta1 "k8s.io/api/extensions/v1beta1"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1beta1 "k8s.io/client-go/pkg/apis/extensions/v1beta1"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -31,7 +31,6 @@ type ExtensionsV1beta1Interface interface {
 	PodSecurityPoliciesGetter
 	ReplicaSetsGetter
 	ScalesGetter
-	ThirdPartyResourcesGetter
 }
 
 // ExtensionsV1beta1Client is used to interact with features provided by the extensions group.
@@ -61,10 +60,6 @@ func (c *ExtensionsV1beta1Client) ReplicaSets(namespace string) ReplicaSetInterf
 
 func (c *ExtensionsV1beta1Client) Scales(namespace string) ScaleInterface {
 	return newScales(c, namespace)
-}
-
-func (c *ExtensionsV1beta1Client) ThirdPartyResources() ThirdPartyResourceInterface {
-	return newThirdPartyResources(c)
 }
 
 // NewForConfig creates a new ExtensionsV1beta1Client for the given config.

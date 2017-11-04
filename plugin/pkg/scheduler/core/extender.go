@@ -20,13 +20,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
+	"k8s.io/api/core/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -41,6 +41,7 @@ type HTTPExtender struct {
 	extenderURL      string
 	filterVerb       string
 	prioritizeVerb   string
+	bindVerb         string
 	weight           int
 	client           *http.Client
 	nodeCacheCapable bool
@@ -86,6 +87,7 @@ func NewHTTPExtender(config *schedulerapi.ExtenderConfig) (algorithm.SchedulerEx
 		extenderURL:      config.URLPrefix,
 		filterVerb:       config.FilterVerb,
 		prioritizeVerb:   config.PrioritizeVerb,
+		bindVerb:         config.BindVerb,
 		weight:           config.Weight,
 		client:           client,
 		nodeCacheCapable: config.NodeCacheCapable,
@@ -193,6 +195,33 @@ func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.
 	return &result, h.weight, nil
 }
 
+// Bind delegates the action of binding a pod to a node to the extender.
+func (h *HTTPExtender) Bind(binding *v1.Binding) error {
+	var result schedulerapi.ExtenderBindingResult
+	if !h.IsBinder() {
+		// This shouldn't happen as this extender wouldn't have become a Binder.
+		return fmt.Errorf("Unexpected empty bindVerb in extender")
+	}
+	req := &schedulerapi.ExtenderBindingArgs{
+		PodName:      binding.Name,
+		PodNamespace: binding.Namespace,
+		PodUID:       binding.UID,
+		Node:         binding.Target.Name,
+	}
+	if err := h.send(h.bindVerb, &req, &result); err != nil {
+		return err
+	}
+	if result.Error != "" {
+		return fmt.Errorf(result.Error)
+	}
+	return nil
+}
+
+// IsBinder returns whether this extender is configured for the Bind method.
+func (h *HTTPExtender) IsBinder() bool {
+	return h.bindVerb != ""
+}
+
 // Helper function to send messages to the extender
 func (h *HTTPExtender) send(action string, args interface{}, result interface{}) error {
 	out, err := json.Marshal(args)
@@ -200,7 +229,7 @@ func (h *HTTPExtender) send(action string, args interface{}, result interface{})
 		return err
 	}
 
-	url := h.extenderURL + "/" + action
+	url := strings.TrimRight(h.extenderURL, "/") + "/" + action
 
 	req, err := http.NewRequest("POST", url, bytes.NewReader(out))
 	if err != nil {
@@ -213,15 +242,11 @@ func (h *HTTPExtender) send(action string, args interface{}, result interface{})
 	if err != nil {
 		return err
 	}
-
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Failed %v with extender at URL %v, code %v", action, h.extenderURL, resp.StatusCode)
 	}
 
-	if err := json.Unmarshal(body, result); err != nil {
-		return err
-	}
-	return nil
+	return json.NewDecoder(resp.Body).Decode(result)
 }

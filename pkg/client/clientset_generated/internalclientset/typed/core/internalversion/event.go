@@ -58,6 +58,41 @@ func newEvents(c *CoreClient, namespace string) *events {
 	}
 }
 
+// Get takes name of the event, and returns the corresponding event object, and an error if there is any.
+func (c *events) Get(name string, options v1.GetOptions) (result *api.Event, err error) {
+	result = &api.Event{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("events").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of Events that match those selectors.
+func (c *events) List(opts v1.ListOptions) (result *api.EventList, err error) {
+	result = &api.EventList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("events").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested events.
+func (c *events) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("events").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a event and creates it.  Returns the server's representation of the event, and an error, if there is any.
 func (c *events) Create(event *api.Event) (result *api.Event, err error) {
 	result = &api.Event{}
@@ -103,41 +138,6 @@ func (c *events) DeleteCollection(options *v1.DeleteOptions, listOptions v1.List
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the event, and returns the corresponding event object, and an error if there is any.
-func (c *events) Get(name string, options v1.GetOptions) (result *api.Event, err error) {
-	result = &api.Event{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("events").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Events that match those selectors.
-func (c *events) List(opts v1.ListOptions) (result *api.EventList, err error) {
-	result = &api.EventList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("events").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested events.
-func (c *events) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("events").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched event.

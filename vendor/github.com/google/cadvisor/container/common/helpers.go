@@ -127,15 +127,13 @@ func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoF
 func readString(dirpath string, file string) string {
 	cgroupFile := path.Join(dirpath, file)
 
-	// Ignore non-existent files
-	if !utils.FileExists(cgroupFile) {
-		return ""
-	}
-
 	// Read
 	out, err := ioutil.ReadFile(cgroupFile)
 	if err != nil {
-		glog.Errorf("readString: Failed to read %q: %s", cgroupFile, err)
+		// Ignore non-existent files
+		if !os.IsNotExist(err) {
+			glog.Errorf("readString: Failed to read %q: %s", cgroupFile, err)
+		}
 		return ""
 	}
 	return strings.TrimSpace(string(out))
@@ -158,13 +156,12 @@ func readUInt64(dirpath string, file string) uint64 {
 
 // Lists all directories under "path" and outputs the results as children of "parent".
 func ListDirectories(dirpath string, parent string, recursive bool, output map[string]struct{}) error {
-	// Ignore if this hierarchy does not exist.
-	if !utils.FileExists(dirpath) {
-		return nil
-	}
-
 	entries, err := ioutil.ReadDir(dirpath)
 	if err != nil {
+		// Ignore if this hierarchy does not exist.
+		if os.IsNotExist(err) {
+			err = nil
+		}
 		return err
 	}
 	for _, entry := range entries {
@@ -222,4 +219,72 @@ func ListContainers(name string, cgroupPaths map[string]string, listType contain
 	}
 
 	return ret, nil
+}
+
+// AssignDeviceNamesToDiskStats assigns the Device field on the provided DiskIoStats by looking up
+// the device major and minor identifiers in the provided device namer.
+func AssignDeviceNamesToDiskStats(namer DeviceNamer, stats *info.DiskIoStats) {
+	assignDeviceNamesToPerDiskStats(
+		namer,
+		stats.IoMerged,
+		stats.IoQueued,
+		stats.IoServiceBytes,
+		stats.IoServiceTime,
+		stats.IoServiced,
+		stats.IoTime,
+		stats.IoWaitTime,
+		stats.Sectors,
+	)
+}
+
+// assignDeviceNamesToPerDiskStats looks up device names for the provided stats, caching names
+// if necessary.
+func assignDeviceNamesToPerDiskStats(namer DeviceNamer, diskStats ...[]info.PerDiskStats) {
+	devices := make(deviceIdentifierMap)
+	for _, stats := range diskStats {
+		for i, stat := range stats {
+			stats[i].Device = devices.Find(stat.Major, stat.Minor, namer)
+		}
+	}
+}
+
+// DeviceNamer returns string names for devices by their major and minor id.
+type DeviceNamer interface {
+	// DeviceName returns the name of the device by its major and minor ids, or false if no
+	// such device is recognized.
+	DeviceName(major, minor uint64) (string, bool)
+}
+
+type MachineInfoNamer info.MachineInfo
+
+func (n *MachineInfoNamer) DeviceName(major, minor uint64) (string, bool) {
+	for _, info := range n.DiskMap {
+		if info.Major == major && info.Minor == minor {
+			return "/dev/" + info.Name, true
+		}
+	}
+	for _, info := range n.Filesystems {
+		if info.DeviceMajor == major && info.DeviceMinor == minor {
+			return info.Device, true
+		}
+	}
+	return "", false
+}
+
+type deviceIdentifier struct {
+	major uint64
+	minor uint64
+}
+
+type deviceIdentifierMap map[deviceIdentifier]string
+
+// Find locates the device name by device identifier out of from, caching the result as necessary.
+func (m deviceIdentifierMap) Find(major, minor uint64, namer DeviceNamer) string {
+	d := deviceIdentifier{major, minor}
+	if s, ok := m[d]; ok {
+		return s
+	}
+	s, _ := namer.DeviceName(major, minor)
+	m[d] = s
+	return s
 }

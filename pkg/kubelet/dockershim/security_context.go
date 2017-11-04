@@ -19,19 +19,19 @@ package dockershim
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
-	dockercontainer "github.com/docker/engine-api/types/container"
+	"github.com/blang/semver"
+	dockercontainer "github.com/docker/docker/api/types/container"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools/securitycontext"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	knetwork "k8s.io/kubernetes/pkg/kubelet/network"
 )
 
 // applySandboxSecurityContext updates docker sandbox options according to security context.
-func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *dockercontainer.Config, hc *dockercontainer.HostConfig, network *knetwork.PluginManager, separator rune) {
+func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *dockercontainer.Config, hc *dockercontainer.HostConfig, network *knetwork.PluginManager, separator rune) error {
 	if lc == nil {
-		return
+		return nil
 	}
 
 	var sc *runtimeapi.LinuxContainerSecurityContext
@@ -46,20 +46,25 @@ func applySandboxSecurityContext(lc *runtimeapi.LinuxPodSandboxConfig, config *d
 	}
 
 	modifyContainerConfig(sc, config)
-	modifyHostConfig(sc, hc, separator)
+	if err := modifyHostConfig(sc, hc, separator); err != nil {
+		return err
+	}
 	modifySandboxNamespaceOptions(sc.GetNamespaceOptions(), hc, network)
+	return nil
 }
 
 // applyContainerSecurityContext updates docker container options according to security context.
-func applyContainerSecurityContext(lc *runtimeapi.LinuxContainerConfig, sandboxID string, config *dockercontainer.Config, hc *dockercontainer.HostConfig, separator rune) {
+func applyContainerSecurityContext(lc *runtimeapi.LinuxContainerConfig, podSandboxID string, config *dockercontainer.Config, hc *dockercontainer.HostConfig, separator rune) error {
 	if lc == nil {
-		return
+		return nil
 	}
 
 	modifyContainerConfig(lc.SecurityContext, config)
-	modifyHostConfig(lc.SecurityContext, hc, separator)
-	modifyContainerNamespaceOptions(lc.SecurityContext.GetNamespaceOptions(), sandboxID, hc)
-	return
+	if err := modifyHostConfig(lc.SecurityContext, hc, separator); err != nil {
+		return err
+	}
+	modifyContainerNamespaceOptions(lc.SecurityContext.GetNamespaceOptions(), podSandboxID, hc)
+	return nil
 }
 
 // modifyContainerConfig applies container security context config to dockercontainer.Config.
@@ -76,9 +81,9 @@ func modifyContainerConfig(sc *runtimeapi.LinuxContainerSecurityContext, config 
 }
 
 // modifyHostConfig applies security context config to dockercontainer.HostConfig.
-func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *dockercontainer.HostConfig, separator rune) {
+func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *dockercontainer.HostConfig, separator rune) error {
 	if sc == nil {
-		return
+		return nil
 	}
 
 	// Apply supplemental groups.
@@ -94,17 +99,25 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *
 		hostConfig.CapDrop = sc.GetCapabilities().DropCapabilities
 	}
 	if sc.SelinuxOptions != nil {
-		hostConfig.SecurityOpt = securitycontext.ModifySecurityOptions(
+		hostConfig.SecurityOpt = addSELinuxOptions(
 			hostConfig.SecurityOpt,
-			&v1.SELinuxOptions{
-				User:  sc.SelinuxOptions.User,
-				Role:  sc.SelinuxOptions.Role,
-				Type:  sc.SelinuxOptions.Type,
-				Level: sc.SelinuxOptions.Level,
-			},
+			sc.SelinuxOptions,
 			separator,
 		)
 	}
+
+	// Apply apparmor options.
+	apparmorSecurityOpts, err := getApparmorSecurityOpts(sc, separator)
+	if err != nil {
+		return fmt.Errorf("failed to generate apparmor security options: %v", err)
+	}
+	hostConfig.SecurityOpt = append(hostConfig.SecurityOpt, apparmorSecurityOpts...)
+
+	if sc.NoNewPrivs {
+		hostConfig.SecurityOpt = append(hostConfig.SecurityOpt, "no-new-privileges")
+	}
+
+	return nil
 }
 
 // modifySandboxNamespaceOptions apply namespace options for sandbox
@@ -118,13 +131,14 @@ func modifySandboxNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfi
 }
 
 // modifyContainerNamespaceOptions apply namespace options for container
-func modifyContainerNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, sandboxID string, hostConfig *dockercontainer.HostConfig) {
+func modifyContainerNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, podSandboxID string, hostConfig *dockercontainer.HostConfig) {
 	hostNetwork := false
 	if nsOpts != nil {
 		hostNetwork = nsOpts.HostNetwork
 	}
+	hostConfig.PidMode = dockercontainer.PidMode(fmt.Sprintf("container:%v", podSandboxID))
 	modifyCommonNamespaceOptions(nsOpts, hostConfig)
-	modifyHostNetworkOptionForContainer(hostNetwork, sandboxID, hostConfig)
+	modifyHostNetworkOptionForContainer(hostNetwork, podSandboxID, hostConfig)
 }
 
 // modifyCommonNamespaceOptions apply common namespace options for sandbox and container
@@ -162,13 +176,29 @@ func modifyHostNetworkOptionForSandbox(hostNetwork bool, network *knetwork.Plugi
 }
 
 // modifyHostNetworkOptionForContainer applies NetworkMode/UTSMode to container's dockercontainer.HostConfig.
-func modifyHostNetworkOptionForContainer(hostNetwork bool, sandboxID string, hc *dockercontainer.HostConfig) {
-	sandboxNSMode := fmt.Sprintf("container:%v", sandboxID)
+func modifyHostNetworkOptionForContainer(hostNetwork bool, podSandboxID string, hc *dockercontainer.HostConfig) {
+	sandboxNSMode := fmt.Sprintf("container:%v", podSandboxID)
 	hc.NetworkMode = dockercontainer.NetworkMode(sandboxNSMode)
 	hc.IpcMode = dockercontainer.IpcMode(sandboxNSMode)
 	hc.UTSMode = ""
 
 	if hostNetwork {
 		hc.UTSMode = namespaceModeHost
+	}
+}
+
+// modifyPIDNamespaceOverrides implements two temporary overrides for the default PID namespace sharing for Docker:
+//     1. Docker engine prior to API Version 1.24 doesn't support attaching to another container's
+//        PID namespace, and it didn't stabilize until 1.26. This check can be removed when Kubernetes'
+//        minimum Docker version is at least 1.13.1 (API version 1.26).
+//     2. The administrator has overridden the default behavior by means of a kubelet flag. This is an
+//        "escape hatch" to return to previous behavior of isolated namespaces and should be removed once
+//        no longer needed.
+func modifyPIDNamespaceOverrides(disableSharedPID bool, version *semver.Version, hc *dockercontainer.HostConfig) {
+	if !strings.HasPrefix(string(hc.PidMode), "container:") {
+		return
+	}
+	if disableSharedPID || version.LT(semver.Version{Major: 1, Minor: 26}) {
+		hc.PidMode = ""
 	}
 }

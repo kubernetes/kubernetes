@@ -91,6 +91,7 @@ func (e *expirationTime) UnmarshalJSON(b []byte) error {
 
 var brokenAuthHeaderProviders = []string{
 	"https://accounts.google.com/",
+	"https://api.codeswholesale.com/oauth/token",
 	"https://api.dropbox.com/",
 	"https://api.dropboxapi.com/",
 	"https://api.instagram.com/",
@@ -101,6 +102,7 @@ var brokenAuthHeaderProviders = []string{
 	"https://api.twitch.tv/",
 	"https://app.box.com/",
 	"https://connect.stripe.com/",
+	"https://graph.facebook.com", // see https://github.com/golang/oauth2/issues/214
 	"https://login.microsoftonline.com/",
 	"https://login.salesforce.com/",
 	"https://oauth.sandbox.trainingpeaks.com/",
@@ -117,6 +119,14 @@ var brokenAuthHeaderProviders = []string{
 	"https://www.strava.com/oauth/",
 	"https://www.wunderlist.com/oauth/",
 	"https://api.patreon.com/",
+	"https://sandbox.codeswholesale.com/oauth/token",
+}
+
+// brokenAuthHeaderDomains lists broken providers that issue dynamic endpoints.
+var brokenAuthHeaderDomains = []string{
+	".force.com",
+	".okta.com",
+	".oktapreview.com",
 }
 
 func RegisterBrokenAuthHeaderProvider(tokenURL string) {
@@ -139,6 +149,14 @@ func providerAuthHeaderWorks(tokenURL string) bool {
 		}
 	}
 
+	if u, err := url.Parse(tokenURL); err == nil {
+		for _, s := range brokenAuthHeaderDomains {
+			if strings.HasSuffix(u.Host, s) {
+				return false
+			}
+		}
+	}
+
 	// Assume the provider implements the spec properly
 	// otherwise. We can add more exceptions as they're
 	// discovered. We will _not_ be adding configurable hooks
@@ -151,10 +169,14 @@ func RetrieveToken(ctx context.Context, clientID, clientSecret, tokenURL string,
 	if err != nil {
 		return nil, err
 	}
-	v.Set("client_id", clientID)
 	bustedAuth := !providerAuthHeaderWorks(tokenURL)
-	if bustedAuth && clientSecret != "" {
-		v.Set("client_secret", clientSecret)
+	if bustedAuth {
+		if clientID != "" {
+			v.Set("client_id", clientID)
+		}
+		if clientSecret != "" {
+			v.Set("client_secret", clientSecret)
+		}
 	}
 	req, err := http.NewRequest("POST", tokenURL, strings.NewReader(v.Encode()))
 	if err != nil {

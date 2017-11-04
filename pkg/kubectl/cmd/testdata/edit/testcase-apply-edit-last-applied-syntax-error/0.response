@@ -1,0 +1,35 @@
+{
+    "kind": "Service",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "svc1",
+        "namespace": "myproject",
+        "selfLink": "/api/v1/namespaces/myproject/services/svc1",
+        "uid": "1e16d988-3d72-11e7-8ef0-c85b76034b7b",
+        "resourceVersion": "3731",
+        "creationTimestamp": "2017-05-20T15:36:39Z",
+        "labels": {
+            "app": "svc1",
+            "new-label": "foo"
+        },
+        "annotations": {
+            "kubectl.kubernetes.io/last-applied-configuration": "{\"kind\":\"Service\",\"metadata\":{\"annotations\":{},\"labels\":{\"app\":\"svc1\",\"new-label\":\"foo\"},\"name\":\"svc1\",\"namespace\":\"myproject\"},\"spec\":{\"ports\":[{\"name\":\"80\",\"port\":81,\"protocol\":\"TCP\",\"targetPort\":81}],\"sessionAffinity\":\"None\",\"type\":\"ClusterIP\"},\"status\":{\"loadBalancer\":{}}}\n"
+        }
+    },
+    "spec": {
+        "ports": [
+            {
+                "name": "80",
+                "protocol": "TCP",
+                "port": 81,
+                "targetPort": 81
+            }
+        ],
+        "clusterIP": "172.30.105.209",
+        "type": "ClusterIP",
+        "sessionAffinity": "None"
+    },
+    "status": {
+        "loadBalancer": {}
+    }
+}

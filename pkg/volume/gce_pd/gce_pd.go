@@ -23,14 +23,15 @@ import (
 	"strconv"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/pkg/util/strings"
+	kstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -52,7 +53,7 @@ const (
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(gcePersistentDiskPluginName), volName)
+	return host.GetPodVolumeDir(uid, kstrings.EscapeQualifiedNameForDisk(gcePersistentDiskPluginName), volName)
 }
 
 func (plugin *gcePersistentDiskPlugin) Init(host volume.VolumeHost) error {
@@ -99,7 +100,7 @@ func (plugin *gcePersistentDiskPlugin) GetAccessModes() []v1.PersistentVolumeAcc
 
 func (plugin *gcePersistentDiskPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newMounterInternal(spec, pod.UID, &GCEDiskUtil{}, plugin.host.GetMounter())
+	return plugin.newMounterInternal(spec, pod.UID, &GCEDiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func getVolumeSource(
@@ -144,7 +145,7 @@ func (plugin *gcePersistentDiskPlugin) newMounterInternal(spec *volume.Spec, pod
 
 func (plugin *gcePersistentDiskPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newUnmounterInternal(volName, podUID, &GCEDiskUtil{}, plugin.host.GetMounter())
+	return plugin.newUnmounterInternal(volName, podUID, &GCEDiskUtil{}, plugin.host.GetMounter(plugin.GetPluginName()))
 }
 
 func (plugin *gcePersistentDiskPlugin) newUnmounterInternal(volName string, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Unmounter, error) {
@@ -190,7 +191,7 @@ func (plugin *gcePersistentDiskPlugin) newProvisionerInternal(options volume.Vol
 }
 
 func (plugin *gcePersistentDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	mounter := plugin.host.GetMounter()
+	mounter := plugin.host.GetMounter(plugin.GetPluginName())
 	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
 	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
 	if err != nil {
@@ -210,7 +211,7 @@ func (plugin *gcePersistentDiskPlugin) ConstructVolumeSpec(volumeName, mountPath
 // Abstract interface to PD operations.
 type pdManager interface {
 	// Creates a volume
-	CreateVolume(provisioner *gcePersistentDiskProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, err error)
+	CreateVolume(provisioner *gcePersistentDiskProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error)
 	// Deletes a volume
 	DeleteVolume(deleter *gcePersistentDiskDeleter) error
 }
@@ -374,9 +375,17 @@ type gcePersistentDiskProvisioner struct {
 var _ volume.Provisioner = &gcePersistentDiskProvisioner{}
 
 func (c *gcePersistentDiskProvisioner) Provision() (*v1.PersistentVolume, error) {
-	volumeID, sizeGB, labels, err := c.manager.CreateVolume(c)
+	if !volume.AccessModesContainedInAll(c.plugin.GetAccessModes(), c.options.PVC.Spec.AccessModes) {
+		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", c.options.PVC.Spec.AccessModes, c.plugin.GetAccessModes())
+	}
+
+	volumeID, sizeGB, labels, fstype, err := c.manager.CreateVolume(c)
 	if err != nil {
 		return nil, err
+	}
+
+	if fstype == "" {
+		fstype = "ext4"
 	}
 
 	pv := &v1.PersistentVolume{
@@ -384,7 +393,7 @@ func (c *gcePersistentDiskProvisioner) Provision() (*v1.PersistentVolume, error)
 			Name:   c.options.PVName,
 			Labels: map[string]string{},
 			Annotations: map[string]string{
-				"kubernetes.io/createdby": "gce-pd-dynamic-provisioner",
+				volumehelper.VolumeDynamicallyCreatedByKey: "gce-pd-dynamic-provisioner",
 			},
 		},
 		Spec: v1.PersistentVolumeSpec{
@@ -398,8 +407,10 @@ func (c *gcePersistentDiskProvisioner) Provision() (*v1.PersistentVolume, error)
 					PDName:    volumeID,
 					Partition: 0,
 					ReadOnly:  false,
+					FSType:    fstype,
 				},
 			},
+			MountOptions: c.options.MountOptions,
 		},
 	}
 	if len(c.options.PVC.Spec.AccessModes) == 0 {

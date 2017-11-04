@@ -1,0 +1,5 @@
+amd64=gcr.io/kubernetes-e2e-test-images/mounttest-amd64:1.0
+arm=gcr.io/kubernetes-e2e-test-images/mounttest-arm:1.0
+arm64=gcr.io/kubernetes-e2e-test-images/mounttest-arm64:1.0
+ppc64le=gcr.io/kubernetes-e2e-test-images/mounttest-ppc64le:1.0
+s390x=gcr.io/kubernetes-e2e-test-images/mounttest-s390x:1.0

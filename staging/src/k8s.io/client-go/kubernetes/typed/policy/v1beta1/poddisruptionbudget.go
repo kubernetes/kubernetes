@@ -17,11 +17,11 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1beta1 "k8s.io/api/policy/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	v1beta1 "k8s.io/client-go/pkg/apis/policy/v1beta1"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -59,6 +59,41 @@ func newPodDisruptionBudgets(c *PolicyV1beta1Client, namespace string) *podDisru
 	}
 }
 
+// Get takes name of the podDisruptionBudget, and returns the corresponding podDisruptionBudget object, and an error if there is any.
+func (c *podDisruptionBudgets) Get(name string, options v1.GetOptions) (result *v1beta1.PodDisruptionBudget, err error) {
+	result = &v1beta1.PodDisruptionBudget{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("poddisruptionbudgets").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of PodDisruptionBudgets that match those selectors.
+func (c *podDisruptionBudgets) List(opts v1.ListOptions) (result *v1beta1.PodDisruptionBudgetList, err error) {
+	result = &v1beta1.PodDisruptionBudgetList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("poddisruptionbudgets").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested podDisruptionBudgets.
+func (c *podDisruptionBudgets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("poddisruptionbudgets").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a podDisruptionBudget and creates it.  Returns the server's representation of the podDisruptionBudget, and an error, if there is any.
 func (c *podDisruptionBudgets) Create(podDisruptionBudget *v1beta1.PodDisruptionBudget) (result *v1beta1.PodDisruptionBudget, err error) {
 	result = &v1beta1.PodDisruptionBudget{}
@@ -85,7 +120,7 @@ func (c *podDisruptionBudgets) Update(podDisruptionBudget *v1beta1.PodDisruption
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *podDisruptionBudgets) UpdateStatus(podDisruptionBudget *v1beta1.PodDisruptionBudget) (result *v1beta1.PodDisruptionBudget, err error) {
 	result = &v1beta1.PodDisruptionBudget{}
@@ -120,41 +155,6 @@ func (c *podDisruptionBudgets) DeleteCollection(options *v1.DeleteOptions, listO
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the podDisruptionBudget, and returns the corresponding podDisruptionBudget object, and an error if there is any.
-func (c *podDisruptionBudgets) Get(name string, options v1.GetOptions) (result *v1beta1.PodDisruptionBudget, err error) {
-	result = &v1beta1.PodDisruptionBudget{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("poddisruptionbudgets").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of PodDisruptionBudgets that match those selectors.
-func (c *podDisruptionBudgets) List(opts v1.ListOptions) (result *v1beta1.PodDisruptionBudgetList, err error) {
-	result = &v1beta1.PodDisruptionBudgetList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("poddisruptionbudgets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested podDisruptionBudgets.
-func (c *podDisruptionBudgets) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("poddisruptionbudgets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched podDisruptionBudget.

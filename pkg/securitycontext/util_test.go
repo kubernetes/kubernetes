@@ -19,7 +19,7 @@ package securitycontext
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 )
 
 func TestParseSELinuxOptions(t *testing.T) {
@@ -89,8 +89,8 @@ func containerWithUser(ptr *int64) *v1.Container {
 }
 
 func TestHaRootUID(t *testing.T) {
-	var nonRoot int64 = 1
-	var root int64 = 0
+	nonRoot := int64(1)
+	root := int64(0)
 
 	tests := map[string]struct {
 		container *v1.Container
@@ -120,7 +120,7 @@ func TestHaRootUID(t *testing.T) {
 }
 
 func TestHasRunAsUser(t *testing.T) {
-	var runAsUser int64 = 0
+	runAsUser := int64(0)
 
 	tests := map[string]struct {
 		container *v1.Container
@@ -147,8 +147,8 @@ func TestHasRunAsUser(t *testing.T) {
 }
 
 func TestHasRootRunAsUser(t *testing.T) {
-	var nonRoot int64 = 1
-	var root int64 = 0
+	nonRoot := int64(1)
+	root := int64(0)
 
 	tests := map[string]struct {
 		container *v1.Container
@@ -171,6 +171,63 @@ func TestHasRootRunAsUser(t *testing.T) {
 
 	for k, v := range tests {
 		actual := HasRootRunAsUser(v.container)
+		if actual != v.expect {
+			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
+		}
+	}
+}
+
+func TestAddNoNewPrivileges(t *testing.T) {
+	var nonRoot int64 = 1000
+	var root int64 = 0
+	pfalse := false
+	ptrue := true
+
+	tests := map[string]struct {
+		sc     v1.SecurityContext
+		expect bool
+	}{
+		"allowPrivilegeEscalation nil security context nil": {},
+		"allowPrivilegeEscalation nil nonRoot": {
+			sc: v1.SecurityContext{
+				RunAsUser: &nonRoot,
+			},
+		},
+		"allowPrivilegeEscalation nil root": {
+			sc: v1.SecurityContext{
+				RunAsUser: &root,
+			},
+		},
+		"allowPrivilegeEscalation false nonRoot": {
+			sc: v1.SecurityContext{
+				RunAsUser:                &nonRoot,
+				AllowPrivilegeEscalation: &pfalse,
+			},
+			expect: true,
+		},
+		"allowPrivilegeEscalation false root": {
+			sc: v1.SecurityContext{
+				RunAsUser:                &root,
+				AllowPrivilegeEscalation: &pfalse,
+			},
+			expect: true,
+		},
+		"allowPrivilegeEscalation true nonRoot": {
+			sc: v1.SecurityContext{
+				RunAsUser:                &nonRoot,
+				AllowPrivilegeEscalation: &ptrue,
+			},
+		},
+		"allowPrivilegeEscalation true root": {
+			sc: v1.SecurityContext{
+				RunAsUser:                &root,
+				AllowPrivilegeEscalation: &ptrue,
+			},
+		},
+	}
+
+	for k, v := range tests {
+		actual := AddNoNewPrivileges(&v.sc)
 		if actual != v.expect {
 			t.Errorf("%s failed, expected %t but received %t", k, v.expect, actual)
 		}

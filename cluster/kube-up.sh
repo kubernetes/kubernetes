@@ -32,6 +32,33 @@ fi
 
 source "${KUBE_ROOT}/cluster/kube-util.sh"
 
+DEPRECATED_PROVIDERS=(
+  "centos"
+  "libvert-coreos"
+  "local"
+  "openstack-heat"
+  "photon-controller"
+  "vagrant"
+  "vsphere"
+  "windows"
+)
+
+for provider in "${DEPRECATED_PROVIDERS[@]}"; do
+  if [[ "${KUBERNETES_PROVIDER}" == "${provider}" ]]; then
+    cat <<EOF 1>&2
+
+!!! DEPRECATION NOTICE !!!
+
+The '${provider}' kube-up provider is deprecated and will be removed in a future
+release of kubernetes. Deprecated providers will be removed within 2 releases.
+
+See https://github.com/kubernetes/kubernetes/issues/49213 for more info.
+
+EOF
+    break
+  fi
+done
+
 if [ -z "${ZONE-}" ]; then
   echo "... Starting cluster using provider: ${KUBERNETES_PROVIDER}" >&2
 else

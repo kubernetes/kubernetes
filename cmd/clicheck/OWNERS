@@ -1,0 +1,4 @@
+approvers:
+- sig-cli-maintainers
+reviewers:
+- sig-cli

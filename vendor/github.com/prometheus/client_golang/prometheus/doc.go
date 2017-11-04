@@ -11,25 +11,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package prometheus provides embeddable metric primitives for servers and
-// standardized exposition of telemetry through a web services interface.
+// Package prometheus provides metrics primitives to instrument code for
+// monitoring. It also offers a registry for metrics. Sub-packages allow to
+// expose the registered metrics via HTTP (package promhttp) or push them to a
+// Pushgateway (package push).
 //
 // All exported functions and methods are safe to be used concurrently unless
 // specified otherwise.
 //
-// To expose metrics registered with the Prometheus registry, an HTTP server
-// needs to know about the Prometheus handler. The usual endpoint is "/metrics".
+// A Basic Example
 //
-//     http.Handle("/metrics", prometheus.Handler())
-//
-// As a starting point a very basic usage example:
+// As a starting point, a very basic usage example:
 //
 //    package main
 //
 //    import (
+//    	"log"
 //    	"net/http"
 //
 //    	"github.com/prometheus/client_golang/prometheus"
+//    	"github.com/prometheus/client_golang/prometheus/promhttp"
 //    )
 //
 //    var (
@@ -37,73 +38,149 @@
 //    		Name: "cpu_temperature_celsius",
 //    		Help: "Current temperature of the CPU.",
 //    	})
-//    	hdFailures = prometheus.NewCounter(prometheus.CounterOpts{
-//    		Name: "hd_errors_total",
-//    		Help: "Number of hard-disk errors.",
-//    	})
+//    	hdFailures = prometheus.NewCounterVec(
+//    		prometheus.CounterOpts{
+//    			Name: "hd_errors_total",
+//    			Help: "Number of hard-disk errors.",
+//    		},
+//    		[]string{"device"},
+//    	)
 //    )
 //
 //    func init() {
+//    	// Metrics have to be registered to be exposed:
 //    	prometheus.MustRegister(cpuTemp)
 //    	prometheus.MustRegister(hdFailures)
 //    }
 //
 //    func main() {
 //    	cpuTemp.Set(65.3)
-//    	hdFailures.Inc()
+//    	hdFailures.With(prometheus.Labels{"device":"/dev/sda"}).Inc()
 //
-//    	http.Handle("/metrics", prometheus.Handler())
-//    	http.ListenAndServe(":8080", nil)
+//    	// The Handler function provides a default handler to expose metrics
+//    	// via an HTTP server. "/metrics" is the usual endpoint for that.
+//    	http.Handle("/metrics", promhttp.Handler())
+//      log.Fatal(http.ListenAndServe(":8080", nil))
 //    }
 //
 //
-// This is a complete program that exports two metrics, a Gauge and a Counter.
-// It also exports some stats about the HTTP usage of the /metrics
-// endpoint. (See the Handler function for more detail.)
+// This is a complete program that exports two metrics, a Gauge and a Counter,
+// the latter with a label attached to turn it into a (one-dimensional) vector.
 //
-// Two more advanced metric types are the Summary and Histogram.
+// Metrics
 //
-// In addition to the fundamental metric types Gauge, Counter, Summary, and
-// Histogram, a very important part of the Prometheus data model is the
-// partitioning of samples along dimensions called labels, which results in
+// The number of exported identifiers in this package might appear a bit
+// overwhelming. However, in addition to the basic plumbing shown in the example
+// above, you only need to understand the different metric types and their
+// vector versions for basic usage.
+//
+// Above, you have already touched the Counter and the Gauge. There are two more
+// advanced metric types: the Summary and Histogram. A more thorough description
+// of those four metric types can be found in the Prometheus docs:
+// https://prometheus.io/docs/concepts/metric_types/
+//
+// A fifth "type" of metric is Untyped. It behaves like a Gauge, but signals the
+// Prometheus server not to assume anything about its type.
+//
+// In addition to the fundamental metric types Gauge, Counter, Summary,
+// Histogram, and Untyped, a very important part of the Prometheus data model is
+// the partitioning of samples along dimensions called labels, which results in
 // metric vectors. The fundamental types are GaugeVec, CounterVec, SummaryVec,
-// and HistogramVec.
+// HistogramVec, and UntypedVec.
 //
-// Those are all the parts needed for basic usage. Detailed documentation and
-// examples are provided below.
+// While only the fundamental metric types implement the Metric interface, both
+// the metrics and their vector versions implement the Collector interface. A
+// Collector manages the collection of a number of Metrics, but for convenience,
+// a Metric can also “collect itself”. Note that Gauge, Counter, Summary,
+// Histogram, and Untyped are interfaces themselves while GaugeVec, CounterVec,
+// SummaryVec, HistogramVec, and UntypedVec are not.
 //
-// Everything else this package offers is essentially for "power users" only. A
-// few pointers to "power user features":
+// To create instances of Metrics and their vector versions, you need a suitable
+// …Opts struct, i.e. GaugeOpts, CounterOpts, SummaryOpts, HistogramOpts, or
+// UntypedOpts.
 //
-// All the various ...Opts structs have a ConstLabels field for labels that
-// never change their value (which is only useful under special circumstances,
-// see documentation of the Opts type).
+// Custom Collectors and constant Metrics
 //
-// The Untyped metric behaves like a Gauge, but signals the Prometheus server
-// not to assume anything about its type.
+// While you could create your own implementations of Metric, most likely you
+// will only ever implement the Collector interface on your own. At a first
+// glance, a custom Collector seems handy to bundle Metrics for common
+// registration (with the prime example of the different metric vectors above,
+// which bundle all the metrics of the same name but with different labels).
 //
-// Functions to fine-tune how the metric registry works: EnableCollectChecks,
-// PanicOnCollectError, Register, Unregister, SetMetricFamilyInjectionHook.
+// There is a more involved use case, too: If you already have metrics
+// available, created outside of the Prometheus context, you don't need the
+// interface of the various Metric types. You essentially want to mirror the
+// existing numbers into Prometheus Metrics during collection. An own
+// implementation of the Collector interface is perfect for that. You can create
+// Metric instances “on the fly” using NewConstMetric, NewConstHistogram, and
+// NewConstSummary (and their respective Must… versions). That will happen in
+// the Collect method. The Describe method has to return separate Desc
+// instances, representative of the “throw-away” metrics to be created later.
+// NewDesc comes in handy to create those Desc instances.
 //
-// For custom metric collection, there are two entry points: Custom Metric
-// implementations and custom Collector implementations. A Metric is the
-// fundamental unit in the Prometheus data model: a sample at a point in time
-// together with its meta-data (like its fully-qualified name and any number of
-// pairs of label name and label value) that knows how to marshal itself into a
-// data transfer object (aka DTO, implemented as a protocol buffer). A Collector
-// gets registered with the Prometheus registry and manages the collection of
-// one or more Metrics. Many parts of this package are building blocks for
-// Metrics and Collectors. Desc is the metric descriptor, actually used by all
-// metrics under the hood, and by Collectors to describe the Metrics to be
-// collected, but only to be dealt with by users if they implement their own
-// Metrics or Collectors. To create a Desc, the BuildFQName function will come
-// in handy. Other useful components for Metric and Collector implementation
-// include: LabelPairSorter to sort the DTO version of label pairs,
-// NewConstMetric and MustNewConstMetric to create "throw away" Metrics at
-// collection time, MetricVec to bundle custom Metrics into a metric vector
-// Collector, SelfCollector to make a custom Metric collect itself.
+// The Collector example illustrates the use case. You can also look at the
+// source code of the processCollector (mirroring process metrics), the
+// goCollector (mirroring Go metrics), or the expvarCollector (mirroring expvar
+// metrics) as examples that are used in this package itself.
 //
-// A good example for a custom Collector is the ExpVarCollector included in this
-// package, which exports variables exported via the "expvar" package as
-// Prometheus metrics.
+// If you just need to call a function to get a single float value to collect as
+// a metric, GaugeFunc, CounterFunc, or UntypedFunc might be interesting
+// shortcuts.
+//
+// Advanced Uses of the Registry
+//
+// While MustRegister is the by far most common way of registering a Collector,
+// sometimes you might want to handle the errors the registration might cause.
+// As suggested by the name, MustRegister panics if an error occurs. With the
+// Register function, the error is returned and can be handled.
+//
+// An error is returned if the registered Collector is incompatible or
+// inconsistent with already registered metrics. The registry aims for
+// consistency of the collected metrics according to the Prometheus data model.
+// Inconsistencies are ideally detected at registration time, not at collect
+// time. The former will usually be detected at start-up time of a program,
+// while the latter will only happen at scrape time, possibly not even on the
+// first scrape if the inconsistency only becomes relevant later. That is the
+// main reason why a Collector and a Metric have to describe themselves to the
+// registry.
+//
+// So far, everything we did operated on the so-called default registry, as it
+// can be found in the global DefaultRegistry variable. With NewRegistry, you
+// can create a custom registry, or you can even implement the Registerer or
+// Gatherer interfaces yourself. The methods Register and Unregister work in the
+// same way on a custom registry as the global functions Register and Unregister
+// on the default registry.
+//
+// There are a number of uses for custom registries: You can use registries with
+// special properties, see NewPedanticRegistry. You can avoid global state, as
+// it is imposed by the DefaultRegistry. You can use multiple registries at the
+// same time to expose different metrics in different ways. You can use separate
+// registries for testing purposes.
+//
+// Also note that the DefaultRegistry comes registered with a Collector for Go
+// runtime metrics (via NewGoCollector) and a Collector for process metrics (via
+// NewProcessCollector). With a custom registry, you are in control and decide
+// yourself about the Collectors to register.
+//
+// HTTP Exposition
+//
+// The Registry implements the Gatherer interface. The caller of the Gather
+// method can then expose the gathered metrics in some way. Usually, the metrics
+// are served via HTTP on the /metrics endpoint. That's happening in the example
+// above. The tools to expose metrics via HTTP are in the promhttp sub-package.
+// (The top-level functions in the prometheus package are deprecated.)
+//
+// Pushing to the Pushgateway
+//
+// Function for pushing to the Pushgateway can be found in the push sub-package.
+//
+// Graphite Bridge
+//
+// Functions and examples to push metrics from a Gatherer to Graphite can be
+// found in the graphite sub-package.
+//
+// Other Means of Exposition
+//
+// More ways of exposing metrics can easily be added by following the approaches
+// of the existing implementations.
 package prometheus

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -10,7 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["doc.go"],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/pkg/registry",
 )
 
 filegroup(
@@ -24,13 +22,18 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/apps/petset:all-srcs",
+        "//pkg/registry/admissionregistration/externaladmissionhookconfiguration:all-srcs",
+        "//pkg/registry/admissionregistration/initializerconfiguration:all-srcs",
+        "//pkg/registry/admissionregistration/rest:all-srcs",
+        "//pkg/registry/apps/controllerrevision:all-srcs",
         "//pkg/registry/apps/rest:all-srcs",
+        "//pkg/registry/apps/statefulset:all-srcs",
         "//pkg/registry/authentication/rest:all-srcs",
         "//pkg/registry/authentication/tokenreview:all-srcs",
         "//pkg/registry/authorization/localsubjectaccessreview:all-srcs",
         "//pkg/registry/authorization/rest:all-srcs",
         "//pkg/registry/authorization/selfsubjectaccessreview:all-srcs",
+        "//pkg/registry/authorization/selfsubjectrulesreview:all-srcs",
         "//pkg/registry/authorization/subjectaccessreview:all-srcs",
         "//pkg/registry/authorization/util:all-srcs",
         "//pkg/registry/autoscaling/horizontalpodautoscaler:all-srcs",
@@ -63,16 +66,17 @@ filegroup(
         "//pkg/registry/extensions/daemonset:all-srcs",
         "//pkg/registry/extensions/deployment:all-srcs",
         "//pkg/registry/extensions/ingress:all-srcs",
-        "//pkg/registry/extensions/networkpolicy:all-srcs",
         "//pkg/registry/extensions/podsecuritypolicy:all-srcs",
         "//pkg/registry/extensions/replicaset:all-srcs",
         "//pkg/registry/extensions/rest:all-srcs",
-        "//pkg/registry/extensions/thirdpartyresource:all-srcs",
-        "//pkg/registry/extensions/thirdpartyresourcedata:all-srcs",
+        "//pkg/registry/networking/networkpolicy:all-srcs",
+        "//pkg/registry/networking/rest:all-srcs",
         "//pkg/registry/policy/poddisruptionbudget:all-srcs",
         "//pkg/registry/policy/rest:all-srcs",
         "//pkg/registry/rbac:all-srcs",
         "//pkg/registry/registrytest:all-srcs",
+        "//pkg/registry/scheduling/priorityclass:all-srcs",
+        "//pkg/registry/scheduling/rest:all-srcs",
         "//pkg/registry/settings/podpreset:all-srcs",
         "//pkg/registry/settings/rest:all-srcs",
         "//pkg/registry/storage/rest:all-srcs",

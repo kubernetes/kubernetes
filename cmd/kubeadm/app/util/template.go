@@ -22,6 +22,7 @@ import (
 	"text/template"
 )
 
+// ParseTemplate validates and parses passed as argument template
 func ParseTemplate(strtmpl string, obj interface{}) ([]byte, error) {
 	var buf bytes.Buffer
 	tmpl, err := template.New("template").Parse(strtmpl)

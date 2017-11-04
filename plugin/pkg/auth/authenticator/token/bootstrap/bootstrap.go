@@ -23,11 +23,13 @@ import (
 	"crypto/subtle"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/kubernetes/pkg/api"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
@@ -50,6 +52,16 @@ type TokenAuthenticator struct {
 	lister internalversion.SecretNamespaceLister
 }
 
+// tokenErrorf prints a error message for a secret that has matched a bearer
+// token but fails to meet some other criteria.
+//
+//    tokenErrorf(secret, "has invalid value for key %s", key)
+//
+func tokenErrorf(s *api.Secret, format string, i ...interface{}) {
+	format = fmt.Sprintf("Bootstrap secret %s/%s matching bearer token ", s.Namespace, s.Name) + format
+	glog.V(3).Infof(format, i...)
+}
+
 // AuthenticateToken tries to match the provided token to a bootstrap token secret
 // in a given namespace. If found, it authenticates the token in the
 // "system:bootstrappers" group and with the "system:bootstrap:(token-id)" username.
@@ -69,6 +81,7 @@ type TokenAuthenticator struct {
 //       token-id: ( token id )
 //       # Required key usage.
 //       usage-bootstrap-authentication: true
+//       auth-extra-groups: "system:bootstrappers:custom-group1,system:bootstrappers:custom-group2"
 //       # May also contain an expiry.
 //
 // Tokens are expected to be of the form:
@@ -86,38 +99,53 @@ func (t *TokenAuthenticator) AuthenticateToken(token string) (user.Info, bool, e
 	secret, err := t.lister.Get(secretName)
 	if err != nil {
 		if errors.IsNotFound(err) {
+			glog.V(3).Infof("No secret of name %s to match bootstrap bearer token", secretName)
 			return nil, false, nil
 		}
 		return nil, false, err
 	}
 
+	if secret.DeletionTimestamp != nil {
+		tokenErrorf(secret, "is deleted and awaiting removal")
+		return nil, false, nil
+	}
+
 	if string(secret.Type) != string(bootstrapapi.SecretTypeBootstrapToken) || secret.Data == nil {
+		tokenErrorf(secret, "has invalid type, expected %s.", bootstrapapi.SecretTypeBootstrapToken)
 		return nil, false, nil
 	}
 
 	ts := getSecretString(secret, bootstrapapi.BootstrapTokenSecretKey)
 	if subtle.ConstantTimeCompare([]byte(ts), []byte(tokenSecret)) != 1 {
+		tokenErrorf(secret, "has invalid value for key %s, expected %s.", bootstrapapi.BootstrapTokenSecretKey, tokenSecret)
 		return nil, false, nil
 	}
 
 	id := getSecretString(secret, bootstrapapi.BootstrapTokenIDKey)
 	if id != tokenID {
+		tokenErrorf(secret, "has invalid value for key %s, expected %s.", bootstrapapi.BootstrapTokenIDKey, tokenID)
 		return nil, false, nil
 	}
 
 	if isSecretExpired(secret) {
+		// logging done in isSecretExpired method.
 		return nil, false, nil
 	}
 
 	if getSecretString(secret, bootstrapapi.BootstrapTokenUsageAuthentication) != "true" {
-		glog.V(3).Infof("Bearer token matching bootstrap Secret %s/%s not marked %s=true.",
-			secret.Namespace, secret.Name, bootstrapapi.BootstrapTokenUsageAuthentication)
+		tokenErrorf(secret, "not marked %s=true.", bootstrapapi.BootstrapTokenUsageAuthentication)
+		return nil, false, nil
+	}
+
+	groups, err := getGroups(secret)
+	if err != nil {
+		tokenErrorf(secret, "has invalid value for key %s: %v.", bootstrapapi.BootstrapTokenExtraGroupsKey, err)
 		return nil, false, nil
 	}
 
 	return &user.DefaultInfo{
 		Name:   bootstrapapi.BootstrapUserPrefix + string(id),
-		Groups: []string{bootstrapapi.BootstrapGroup},
+		Groups: groups,
 	}, true, nil
 }
 
@@ -138,13 +166,11 @@ func isSecretExpired(secret *api.Secret) bool {
 	if len(expiration) > 0 {
 		expTime, err2 := time.Parse(time.RFC3339, expiration)
 		if err2 != nil {
-			glog.V(3).Infof("Unparseable expiration time (%s) in %s/%s Secret: %v. Treating as expired.",
-				expiration, secret.Namespace, secret.Name, err2)
+			tokenErrorf(secret, "has unparsable expiration time (%s). Treating as expired.", expiration)
 			return true
 		}
 		if time.Now().After(expTime) {
-			glog.V(3).Infof("Expired bootstrap token in %s/%s Secret: %v",
-				secret.Namespace, secret.Name, expiration)
+			tokenErrorf(secret, "has expired.", expiration)
 			return true
 		}
 	}
@@ -166,4 +192,29 @@ func parseToken(s string) (string, string, error) {
 		return "", "", fmt.Errorf("token [%q] was not of form [%q]", s, tokenRegexpString)
 	}
 	return split[1], split[2], nil
+}
+
+// getGroups loads and validates the bootstrapapi.BootstrapTokenExtraGroupsKey
+// key from the bootstrap token secret, returning a list of group names or an
+// error if any of the group names are invalid.
+func getGroups(secret *api.Secret) ([]string, error) {
+	// always include the default group
+	groups := sets.NewString(bootstrapapi.BootstrapDefaultGroup)
+
+	// grab any extra groups and if there are none, return just the default
+	extraGroupsString := getSecretString(secret, bootstrapapi.BootstrapTokenExtraGroupsKey)
+	if extraGroupsString == "" {
+		return groups.List(), nil
+	}
+
+	// validate the names of the extra groups
+	for _, group := range strings.Split(extraGroupsString, ",") {
+		if err := bootstrapapi.ValidateBootstrapGroupName(group); err != nil {
+			return nil, err
+		}
+		groups.Insert(group)
+	}
+
+	// return the result as a deduplicated, sorted list
+	return groups.List(), nil
 }

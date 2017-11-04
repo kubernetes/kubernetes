@@ -113,7 +113,7 @@ func (ap *AnsiParser) print() error {
 }
 
 func (ap *AnsiParser) clear() error {
-	ap.context = &AnsiContext{}
+	ap.context = &ansiContext{}
 	return nil
 }
 

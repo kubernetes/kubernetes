@@ -2,166 +2,139 @@ package storage
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
+	"time"
 )
 
 const (
 	// casing is per Golang's http.Header canonicalizing the header names.
-	approximateMessagesCountHeader  = "X-Ms-Approximate-Messages-Count"
-	userDefinedMetadataHeaderPrefix = "X-Ms-Meta-"
+	approximateMessagesCountHeader = "X-Ms-Approximate-Messages-Count"
 )
 
-// QueueServiceClient contains operations for Microsoft Azure Queue Storage
-// Service.
-type QueueServiceClient struct {
-	client Client
+// QueueAccessPolicy represents each access policy in the queue ACL.
+type QueueAccessPolicy struct {
+	ID         string
+	StartTime  time.Time
+	ExpiryTime time.Time
+	CanRead    bool
+	CanAdd     bool
+	CanUpdate  bool
+	CanProcess bool
 }
 
-func pathForQueue(queue string) string         { return fmt.Sprintf("/%s", queue) }
-func pathForQueueMessages(queue string) string { return fmt.Sprintf("/%s/messages", queue) }
-func pathForMessage(queue, name string) string { return fmt.Sprintf("/%s/messages/%s", queue, name) }
-
-type putMessageRequest struct {
-	XMLName     xml.Name `xml:"QueueMessage"`
-	MessageText string   `xml:"MessageText"`
+// QueuePermissions represents the queue ACLs.
+type QueuePermissions struct {
+	AccessPolicies []QueueAccessPolicy
 }
 
-// PutMessageParameters is the set of options can be specified for Put Messsage
-// operation. A zero struct does not use any preferences for the request.
-type PutMessageParameters struct {
-	VisibilityTimeout int
-	MessageTTL        int
+// SetQueuePermissionOptions includes options for a set queue permissions operation
+type SetQueuePermissionOptions struct {
+	Timeout   uint
+	RequestID string `header:"x-ms-client-request-id"`
 }
 
-func (p PutMessageParameters) getParameters() url.Values {
-	out := url.Values{}
-	if p.VisibilityTimeout != 0 {
-		out.Set("visibilitytimeout", strconv.Itoa(p.VisibilityTimeout))
-	}
-	if p.MessageTTL != 0 {
-		out.Set("messagettl", strconv.Itoa(p.MessageTTL))
-	}
-	return out
+// Queue represents an Azure queue.
+type Queue struct {
+	qsc               *QueueServiceClient
+	Name              string
+	Metadata          map[string]string
+	AproxMessageCount uint64
 }
 
-// GetMessagesParameters is the set of options can be specified for Get
-// Messsages operation. A zero struct does not use any preferences for the
-// request.
-type GetMessagesParameters struct {
-	NumOfMessages     int
-	VisibilityTimeout int
+func (q *Queue) buildPath() string {
+	return fmt.Sprintf("/%s", q.Name)
 }
 
-func (p GetMessagesParameters) getParameters() url.Values {
-	out := url.Values{}
-	if p.NumOfMessages != 0 {
-		out.Set("numofmessages", strconv.Itoa(p.NumOfMessages))
-	}
-	if p.VisibilityTimeout != 0 {
-		out.Set("visibilitytimeout", strconv.Itoa(p.VisibilityTimeout))
-	}
-	return out
+func (q *Queue) buildPathMessages() string {
+	return fmt.Sprintf("%s/messages", q.buildPath())
 }
 
-// PeekMessagesParameters is the set of options can be specified for Peek
-// Messsage operation. A zero struct does not use any preferences for the
-// request.
-type PeekMessagesParameters struct {
-	NumOfMessages int
+// QueueServiceOptions includes options for some queue service operations
+type QueueServiceOptions struct {
+	Timeout   uint
+	RequestID string `header:"x-ms-client-request-id"`
 }
 
-func (p PeekMessagesParameters) getParameters() url.Values {
-	out := url.Values{"peekonly": {"true"}} // Required for peek operation
-	if p.NumOfMessages != 0 {
-		out.Set("numofmessages", strconv.Itoa(p.NumOfMessages))
-	}
-	return out
-}
-
-// UpdateMessageParameters is the set of options can be specified for Update Messsage
-// operation. A zero struct does not use any preferences for the request.
-type UpdateMessageParameters struct {
-	PopReceipt        string
-	VisibilityTimeout int
-}
-
-func (p UpdateMessageParameters) getParameters() url.Values {
-	out := url.Values{}
-	if p.PopReceipt != "" {
-		out.Set("popreceipt", p.PopReceipt)
-	}
-	if p.VisibilityTimeout != 0 {
-		out.Set("visibilitytimeout", strconv.Itoa(p.VisibilityTimeout))
-	}
-	return out
-}
-
-// GetMessagesResponse represents a response returned from Get Messages
-// operation.
-type GetMessagesResponse struct {
-	XMLName           xml.Name             `xml:"QueueMessagesList"`
-	QueueMessagesList []GetMessageResponse `xml:"QueueMessage"`
-}
-
-// GetMessageResponse represents a QueueMessage object returned from Get
-// Messages operation response.
-type GetMessageResponse struct {
-	MessageID       string `xml:"MessageId"`
-	InsertionTime   string `xml:"InsertionTime"`
-	ExpirationTime  string `xml:"ExpirationTime"`
-	PopReceipt      string `xml:"PopReceipt"`
-	TimeNextVisible string `xml:"TimeNextVisible"`
-	DequeueCount    int    `xml:"DequeueCount"`
-	MessageText     string `xml:"MessageText"`
-}
-
-// PeekMessagesResponse represents a response returned from Get Messages
-// operation.
-type PeekMessagesResponse struct {
-	XMLName           xml.Name              `xml:"QueueMessagesList"`
-	QueueMessagesList []PeekMessageResponse `xml:"QueueMessage"`
-}
-
-// PeekMessageResponse represents a QueueMessage object returned from Peek
-// Messages operation response.
-type PeekMessageResponse struct {
-	MessageID      string `xml:"MessageId"`
-	InsertionTime  string `xml:"InsertionTime"`
-	ExpirationTime string `xml:"ExpirationTime"`
-	DequeueCount   int    `xml:"DequeueCount"`
-	MessageText    string `xml:"MessageText"`
-}
-
-// QueueMetadataResponse represents user defined metadata and queue
-// properties on a specific queue.
+// Create operation creates a queue under the given account.
 //
-// See https://msdn.microsoft.com/en-us/library/azure/dd179384.aspx
-type QueueMetadataResponse struct {
-	ApproximateMessageCount int
-	UserDefinedMetadata     map[string]string
+// See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Create-Queue4
+func (q *Queue) Create(options *QueueServiceOptions) error {
+	params := url.Values{}
+	headers := q.qsc.client.getStandardHeaders()
+	headers = q.qsc.client.addMetadataToHeaders(headers, q.Metadata)
+
+	if options != nil {
+		params = addTimeout(params, options.Timeout)
+		headers = mergeHeaders(headers, headersFromStruct(*options))
+	}
+	uri := q.qsc.client.getEndpoint(queueServiceName, q.buildPath(), params)
+
+	resp, err := q.qsc.client.exec(http.MethodPut, uri, headers, nil, q.qsc.auth)
+	if err != nil {
+		return err
+	}
+	readAndCloseBody(resp.body)
+	return checkRespCode(resp.statusCode, []int{http.StatusCreated})
+}
+
+// Delete operation permanently deletes the specified queue.
+//
+// See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Delete-Queue3
+func (q *Queue) Delete(options *QueueServiceOptions) error {
+	params := url.Values{}
+	headers := q.qsc.client.getStandardHeaders()
+
+	if options != nil {
+		params = addTimeout(params, options.Timeout)
+		headers = mergeHeaders(headers, headersFromStruct(*options))
+	}
+	uri := q.qsc.client.getEndpoint(queueServiceName, q.buildPath(), params)
+	resp, err := q.qsc.client.exec(http.MethodDelete, uri, headers, nil, q.qsc.auth)
+	if err != nil {
+		return err
+	}
+	readAndCloseBody(resp.body)
+	return checkRespCode(resp.statusCode, []int{http.StatusNoContent})
+}
+
+// Exists returns true if a queue with given name exists.
+func (q *Queue) Exists() (bool, error) {
+	uri := q.qsc.client.getEndpoint(queueServiceName, q.buildPath(), url.Values{"comp": {"metadata"}})
+	resp, err := q.qsc.client.exec(http.MethodGet, uri, q.qsc.client.getStandardHeaders(), nil, q.qsc.auth)
+	if resp != nil {
+		defer readAndCloseBody(resp.body)
+		if resp.statusCode == http.StatusOK || resp.statusCode == http.StatusNotFound {
+			return resp.statusCode == http.StatusOK, nil
+		}
+	}
+	return false, err
 }
 
 // SetMetadata operation sets user-defined metadata on the specified queue.
 // Metadata is associated with the queue as name-value pairs.
 //
-// See https://msdn.microsoft.com/en-us/library/azure/dd179348.aspx
-func (c QueueServiceClient) SetMetadata(name string, metadata map[string]string) error {
-	uri := c.client.getEndpoint(queueServiceName, pathForQueue(name), url.Values{"comp": []string{"metadata"}})
-	headers := c.client.getStandardHeaders()
-	for k, v := range metadata {
-		headers[userDefinedMetadataHeaderPrefix+k] = v
-	}
+// See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Set-Queue-Metadata
+func (q *Queue) SetMetadata(options *QueueServiceOptions) error {
+	params := url.Values{"comp": {"metadata"}}
+	headers := q.qsc.client.getStandardHeaders()
+	headers = q.qsc.client.addMetadataToHeaders(headers, q.Metadata)
 
-	resp, err := c.client.exec("PUT", uri, headers, nil)
+	if options != nil {
+		params = addTimeout(params, options.Timeout)
+		headers = mergeHeaders(headers, headersFromStruct(*options))
+	}
+	uri := q.qsc.client.getEndpoint(queueServiceName, q.buildPath(), params)
+
+	resp, err := q.qsc.client.exec(http.MethodPut, uri, headers, nil, q.qsc.auth)
 	if err != nil {
 		return err
 	}
-	defer resp.body.Close()
-
+	readAndCloseBody(resp.body)
 	return checkRespCode(resp.statusCode, []int{http.StatusNoContent})
 }
 
@@ -169,176 +142,286 @@ func (c QueueServiceClient) SetMetadata(name string, metadata map[string]string)
 // properties on the specified queue. Metadata is associated with
 // the queue as name-values pairs.
 //
-// See https://msdn.microsoft.com/en-us/library/azure/dd179384.aspx
+// See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Set-Queue-Metadata
 //
 // Because the way Golang's http client (and http.Header in particular)
 // canonicalize header names, the returned metadata names would always
 // be all lower case.
-func (c QueueServiceClient) GetMetadata(name string) (QueueMetadataResponse, error) {
-	qm := QueueMetadataResponse{}
-	qm.UserDefinedMetadata = make(map[string]string)
-	uri := c.client.getEndpoint(queueServiceName, pathForQueue(name), url.Values{"comp": []string{"metadata"}})
-	headers := c.client.getStandardHeaders()
-	resp, err := c.client.exec("GET", uri, headers, nil)
-	if err != nil {
-		return qm, err
-	}
-	defer resp.body.Close()
+func (q *Queue) GetMetadata(options *QueueServiceOptions) error {
+	params := url.Values{"comp": {"metadata"}}
+	headers := q.qsc.client.getStandardHeaders()
 
-	for k, v := range resp.headers {
-		if len(v) != 1 {
-			return qm, fmt.Errorf("Unexpected number of values (%d) in response header '%s'", len(v), k)
+	if options != nil {
+		params = addTimeout(params, options.Timeout)
+		headers = mergeHeaders(headers, headersFromStruct(*options))
+	}
+	uri := q.qsc.client.getEndpoint(queueServiceName, q.buildPath(), url.Values{"comp": {"metadata"}})
+
+	resp, err := q.qsc.client.exec(http.MethodGet, uri, headers, nil, q.qsc.auth)
+	if err != nil {
+		return err
+	}
+	defer readAndCloseBody(resp.body)
+
+	if err := checkRespCode(resp.statusCode, []int{http.StatusOK}); err != nil {
+		return err
+	}
+
+	aproxMessagesStr := resp.headers.Get(http.CanonicalHeaderKey(approximateMessagesCountHeader))
+	if aproxMessagesStr != "" {
+		aproxMessages, err := strconv.ParseUint(aproxMessagesStr, 10, 64)
+		if err != nil {
+			return err
 		}
-
-		value := v[0]
-
-		if k == approximateMessagesCountHeader {
-			qm.ApproximateMessageCount, err = strconv.Atoi(value)
-			if err != nil {
-				return qm, fmt.Errorf("Unexpected value in response header '%s': '%s' ", k, value)
-			}
-		} else if strings.HasPrefix(k, userDefinedMetadataHeaderPrefix) {
-			name := strings.TrimPrefix(k, userDefinedMetadataHeaderPrefix)
-			qm.UserDefinedMetadata[strings.ToLower(name)] = value
-		}
+		q.AproxMessageCount = aproxMessages
 	}
 
-	return qm, checkRespCode(resp.statusCode, []int{http.StatusOK})
+	q.Metadata = getMetadataFromHeaders(resp.headers)
+	return nil
 }
 
-// CreateQueue operation creates a queue under the given account.
-//
-// See https://msdn.microsoft.com/en-us/library/azure/dd179342.aspx
-func (c QueueServiceClient) CreateQueue(name string) error {
-	uri := c.client.getEndpoint(queueServiceName, pathForQueue(name), url.Values{})
-	headers := c.client.getStandardHeaders()
-	resp, err := c.client.exec("PUT", uri, headers, nil)
-	if err != nil {
-		return err
+// GetMessageReference returns a message object with the specified text.
+func (q *Queue) GetMessageReference(text string) *Message {
+	return &Message{
+		Queue: q,
+		Text:  text,
 	}
-	defer resp.body.Close()
-	return checkRespCode(resp.statusCode, []int{http.StatusCreated})
 }
 
-// DeleteQueue operation permanently deletes the specified queue.
-//
-// See https://msdn.microsoft.com/en-us/library/azure/dd179436.aspx
-func (c QueueServiceClient) DeleteQueue(name string) error {
-	uri := c.client.getEndpoint(queueServiceName, pathForQueue(name), url.Values{})
-	resp, err := c.client.exec("DELETE", uri, c.client.getStandardHeaders(), nil)
-	if err != nil {
-		return err
-	}
-	defer resp.body.Close()
-	return checkRespCode(resp.statusCode, []int{http.StatusNoContent})
+// GetMessagesOptions is the set of options can be specified for Get
+// Messsages operation. A zero struct does not use any preferences for the
+// request.
+type GetMessagesOptions struct {
+	Timeout           uint
+	NumOfMessages     int
+	VisibilityTimeout int
+	RequestID         string `header:"x-ms-client-request-id"`
 }
 
-// QueueExists returns true if a queue with given name exists.
-func (c QueueServiceClient) QueueExists(name string) (bool, error) {
-	uri := c.client.getEndpoint(queueServiceName, pathForQueue(name), url.Values{"comp": {"metadata"}})
-	resp, err := c.client.exec("GET", uri, c.client.getStandardHeaders(), nil)
-	if resp != nil && (resp.statusCode == http.StatusOK || resp.statusCode == http.StatusNotFound) {
-		return resp.statusCode == http.StatusOK, nil
-	}
-
-	return false, err
-}
-
-// PutMessage operation adds a new message to the back of the message queue.
-//
-// See https://msdn.microsoft.com/en-us/library/azure/dd179346.aspx
-func (c QueueServiceClient) PutMessage(queue string, message string, params PutMessageParameters) error {
-	uri := c.client.getEndpoint(queueServiceName, pathForQueueMessages(queue), params.getParameters())
-	req := putMessageRequest{MessageText: message}
-	body, nn, err := xmlMarshal(req)
-	if err != nil {
-		return err
-	}
-	headers := c.client.getStandardHeaders()
-	headers["Content-Length"] = strconv.Itoa(nn)
-	resp, err := c.client.exec("POST", uri, headers, body)
-	if err != nil {
-		return err
-	}
-	defer resp.body.Close()
-	return checkRespCode(resp.statusCode, []int{http.StatusCreated})
-}
-
-// ClearMessages operation deletes all messages from the specified queue.
-//
-// See https://msdn.microsoft.com/en-us/library/azure/dd179454.aspx
-func (c QueueServiceClient) ClearMessages(queue string) error {
-	uri := c.client.getEndpoint(queueServiceName, pathForQueueMessages(queue), url.Values{})
-	resp, err := c.client.exec("DELETE", uri, c.client.getStandardHeaders(), nil)
-	if err != nil {
-		return err
-	}
-	defer resp.body.Close()
-	return checkRespCode(resp.statusCode, []int{http.StatusNoContent})
+type messages struct {
+	XMLName  xml.Name  `xml:"QueueMessagesList"`
+	Messages []Message `xml:"QueueMessage"`
 }
 
 // GetMessages operation retrieves one or more messages from the front of the
 // queue.
 //
-// See https://msdn.microsoft.com/en-us/library/azure/dd179474.aspx
-func (c QueueServiceClient) GetMessages(queue string, params GetMessagesParameters) (GetMessagesResponse, error) {
-	var r GetMessagesResponse
-	uri := c.client.getEndpoint(queueServiceName, pathForQueueMessages(queue), params.getParameters())
-	resp, err := c.client.exec("GET", uri, c.client.getStandardHeaders(), nil)
-	if err != nil {
-		return r, err
+// See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Get-Messages
+func (q *Queue) GetMessages(options *GetMessagesOptions) ([]Message, error) {
+	query := url.Values{}
+	headers := q.qsc.client.getStandardHeaders()
+
+	if options != nil {
+		if options.NumOfMessages != 0 {
+			query.Set("numofmessages", strconv.Itoa(options.NumOfMessages))
+		}
+		if options.VisibilityTimeout != 0 {
+			query.Set("visibilitytimeout", strconv.Itoa(options.VisibilityTimeout))
+		}
+		query = addTimeout(query, options.Timeout)
+		headers = mergeHeaders(headers, headersFromStruct(*options))
 	}
-	defer resp.body.Close()
-	err = xmlUnmarshal(resp.body, &r)
-	return r, err
+	uri := q.qsc.client.getEndpoint(queueServiceName, q.buildPathMessages(), query)
+
+	resp, err := q.qsc.client.exec(http.MethodGet, uri, headers, nil, q.qsc.auth)
+	if err != nil {
+		return []Message{}, err
+	}
+	defer readAndCloseBody(resp.body)
+
+	var out messages
+	err = xmlUnmarshal(resp.body, &out)
+	if err != nil {
+		return []Message{}, err
+	}
+	for i := range out.Messages {
+		out.Messages[i].Queue = q
+	}
+	return out.Messages, err
+}
+
+// PeekMessagesOptions is the set of options can be specified for Peek
+// Messsage operation. A zero struct does not use any preferences for the
+// request.
+type PeekMessagesOptions struct {
+	Timeout       uint
+	NumOfMessages int
+	RequestID     string `header:"x-ms-client-request-id"`
 }
 
 // PeekMessages retrieves one or more messages from the front of the queue, but
 // does not alter the visibility of the message.
 //
-// See https://msdn.microsoft.com/en-us/library/azure/dd179472.aspx
-func (c QueueServiceClient) PeekMessages(queue string, params PeekMessagesParameters) (PeekMessagesResponse, error) {
-	var r PeekMessagesResponse
-	uri := c.client.getEndpoint(queueServiceName, pathForQueueMessages(queue), params.getParameters())
-	resp, err := c.client.exec("GET", uri, c.client.getStandardHeaders(), nil)
-	if err != nil {
-		return r, err
+// See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Peek-Messages
+func (q *Queue) PeekMessages(options *PeekMessagesOptions) ([]Message, error) {
+	query := url.Values{"peekonly": {"true"}} // Required for peek operation
+	headers := q.qsc.client.getStandardHeaders()
+
+	if options != nil {
+		if options.NumOfMessages != 0 {
+			query.Set("numofmessages", strconv.Itoa(options.NumOfMessages))
+		}
+		query = addTimeout(query, options.Timeout)
+		headers = mergeHeaders(headers, headersFromStruct(*options))
 	}
-	defer resp.body.Close()
-	err = xmlUnmarshal(resp.body, &r)
-	return r, err
+	uri := q.qsc.client.getEndpoint(queueServiceName, q.buildPathMessages(), query)
+
+	resp, err := q.qsc.client.exec(http.MethodGet, uri, headers, nil, q.qsc.auth)
+	if err != nil {
+		return []Message{}, err
+	}
+	defer readAndCloseBody(resp.body)
+
+	var out messages
+	err = xmlUnmarshal(resp.body, &out)
+	if err != nil {
+		return []Message{}, err
+	}
+	for i := range out.Messages {
+		out.Messages[i].Queue = q
+	}
+	return out.Messages, err
 }
 
-// DeleteMessage operation deletes the specified message.
+// ClearMessages operation deletes all messages from the specified queue.
 //
-// See https://msdn.microsoft.com/en-us/library/azure/dd179347.aspx
-func (c QueueServiceClient) DeleteMessage(queue, messageID, popReceipt string) error {
-	uri := c.client.getEndpoint(queueServiceName, pathForMessage(queue, messageID), url.Values{
-		"popreceipt": {popReceipt}})
-	resp, err := c.client.exec("DELETE", uri, c.client.getStandardHeaders(), nil)
+// See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/Clear-Messages
+func (q *Queue) ClearMessages(options *QueueServiceOptions) error {
+	params := url.Values{}
+	headers := q.qsc.client.getStandardHeaders()
+
+	if options != nil {
+		params = addTimeout(params, options.Timeout)
+		headers = mergeHeaders(headers, headersFromStruct(*options))
+	}
+	uri := q.qsc.client.getEndpoint(queueServiceName, q.buildPathMessages(), params)
+
+	resp, err := q.qsc.client.exec(http.MethodDelete, uri, headers, nil, q.qsc.auth)
 	if err != nil {
 		return err
 	}
-	defer resp.body.Close()
+	readAndCloseBody(resp.body)
 	return checkRespCode(resp.statusCode, []int{http.StatusNoContent})
 }
 
-// UpdateMessage operation deletes the specified message.
-//
-// See https://msdn.microsoft.com/en-us/library/azure/hh452234.aspx
-func (c QueueServiceClient) UpdateMessage(queue string, messageID string, message string, params UpdateMessageParameters) error {
-	uri := c.client.getEndpoint(queueServiceName, pathForMessage(queue, messageID), params.getParameters())
-	req := putMessageRequest{MessageText: message}
-	body, nn, err := xmlMarshal(req)
+// SetPermissions sets up queue permissions
+// See https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/set-queue-acl
+func (q *Queue) SetPermissions(permissions QueuePermissions, options *SetQueuePermissionOptions) error {
+	body, length, err := generateQueueACLpayload(permissions.AccessPolicies)
 	if err != nil {
 		return err
 	}
-	headers := c.client.getStandardHeaders()
-	headers["Content-Length"] = fmt.Sprintf("%d", nn)
-	resp, err := c.client.exec("PUT", uri, headers, body)
+
+	params := url.Values{
+		"comp": {"acl"},
+	}
+	headers := q.qsc.client.getStandardHeaders()
+	headers["Content-Length"] = strconv.Itoa(length)
+
+	if options != nil {
+		params = addTimeout(params, options.Timeout)
+		headers = mergeHeaders(headers, headersFromStruct(*options))
+	}
+	uri := q.qsc.client.getEndpoint(queueServiceName, q.buildPath(), params)
+	resp, err := q.qsc.client.exec(http.MethodPut, uri, headers, body, q.qsc.auth)
 	if err != nil {
 		return err
+	}
+	defer readAndCloseBody(resp.body)
+
+	if err := checkRespCode(resp.statusCode, []int{http.StatusNoContent}); err != nil {
+		return errors.New("Unable to set permissions")
+	}
+
+	return nil
+}
+
+func generateQueueACLpayload(policies []QueueAccessPolicy) (io.Reader, int, error) {
+	sil := SignedIdentifiers{
+		SignedIdentifiers: []SignedIdentifier{},
+	}
+	for _, qapd := range policies {
+		permission := qapd.generateQueuePermissions()
+		signedIdentifier := convertAccessPolicyToXMLStructs(qapd.ID, qapd.StartTime, qapd.ExpiryTime, permission)
+		sil.SignedIdentifiers = append(sil.SignedIdentifiers, signedIdentifier)
+	}
+	return xmlMarshal(sil)
+}
+
+func (qapd *QueueAccessPolicy) generateQueuePermissions() (permissions string) {
+	// generate the permissions string (raup).
+	// still want the end user API to have bool flags.
+	permissions = ""
+
+	if qapd.CanRead {
+		permissions += "r"
+	}
+
+	if qapd.CanAdd {
+		permissions += "a"
+	}
+
+	if qapd.CanUpdate {
+		permissions += "u"
+	}
+
+	if qapd.CanProcess {
+		permissions += "p"
+	}
+
+	return permissions
+}
+
+// GetQueuePermissionOptions includes options for a get queue permissions operation
+type GetQueuePermissionOptions struct {
+	Timeout   uint
+	RequestID string `header:"x-ms-client-request-id"`
+}
+
+// GetPermissions gets the queue permissions as per https://docs.microsoft.com/en-us/rest/api/storageservices/fileservices/get-queue-acl
+// If timeout is 0 then it will not be passed to Azure
+func (q *Queue) GetPermissions(options *GetQueuePermissionOptions) (*QueuePermissions, error) {
+	params := url.Values{
+		"comp": {"acl"},
+	}
+	headers := q.qsc.client.getStandardHeaders()
+
+	if options != nil {
+		params = addTimeout(params, options.Timeout)
+		headers = mergeHeaders(headers, headersFromStruct(*options))
+	}
+	uri := q.qsc.client.getEndpoint(queueServiceName, q.buildPath(), params)
+	resp, err := q.qsc.client.exec(http.MethodGet, uri, headers, nil, q.qsc.auth)
+	if err != nil {
+		return nil, err
 	}
 	defer resp.body.Close()
-	return checkRespCode(resp.statusCode, []int{http.StatusNoContent})
+
+	var ap AccessPolicy
+	err = xmlUnmarshal(resp.body, &ap.SignedIdentifiersList)
+	if err != nil {
+		return nil, err
+	}
+	return buildQueueAccessPolicy(ap, &resp.headers), nil
+}
+
+func buildQueueAccessPolicy(ap AccessPolicy, headers *http.Header) *QueuePermissions {
+	permissions := QueuePermissions{
+		AccessPolicies: []QueueAccessPolicy{},
+	}
+
+	for _, policy := range ap.SignedIdentifiersList.SignedIdentifiers {
+		qapd := QueueAccessPolicy{
+			ID:         policy.ID,
+			StartTime:  policy.AccessPolicy.StartTime,
+			ExpiryTime: policy.AccessPolicy.ExpiryTime,
+		}
+		qapd.CanRead = updatePermissions(policy.AccessPolicy.Permission, "r")
+		qapd.CanAdd = updatePermissions(policy.AccessPolicy.Permission, "a")
+		qapd.CanUpdate = updatePermissions(policy.AccessPolicy.Permission, "u")
+		qapd.CanProcess = updatePermissions(policy.AccessPolicy.Permission, "p")
+
+		permissions.AccessPolicies = append(permissions.AccessPolicies, qapd)
+	}
+	return &permissions
 }

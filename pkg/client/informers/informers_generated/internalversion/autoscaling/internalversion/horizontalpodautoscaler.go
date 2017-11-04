@@ -41,26 +41,31 @@ type horizontalPodAutoscalerInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newHorizontalPodAutoscalerInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewHorizontalPodAutoscalerInformer constructs a new informer for HorizontalPodAutoscaler type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewHorizontalPodAutoscalerInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Autoscaling().HorizontalPodAutoscalers(v1.NamespaceAll).List(options)
+				return client.Autoscaling().HorizontalPodAutoscalers(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Autoscaling().HorizontalPodAutoscalers(v1.NamespaceAll).Watch(options)
+				return client.Autoscaling().HorizontalPodAutoscalers(namespace).Watch(options)
 			},
 		},
 		&autoscaling.HorizontalPodAutoscaler{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultHorizontalPodAutoscalerInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewHorizontalPodAutoscalerInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *horizontalPodAutoscalerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&autoscaling.HorizontalPodAutoscaler{}, newHorizontalPodAutoscalerInformer)
+	return f.factory.InformerFor(&autoscaling.HorizontalPodAutoscaler{}, defaultHorizontalPodAutoscalerInformer)
 }
 
 func (f *horizontalPodAutoscalerInformer) Lister() internalversion.HorizontalPodAutoscalerLister {

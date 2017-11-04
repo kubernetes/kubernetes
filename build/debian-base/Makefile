@@ -18,22 +18,22 @@ REGISTRY ?= gcr.io/google-containers
 IMAGE ?= debian-base
 BUILD_IMAGE ?= debian-build
 
-TAG ?= 0.1.0
+TAG ?= 0.2
 
 TAR_FILE ?= rootfs.tar
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
-QEMUVERSION=v2.7.0
+QEMUVERSION=v2.9.1
 
 ifeq ($(ARCH),amd64)
 	BASEIMAGE?=debian:jessie
 endif
 ifeq ($(ARCH),arm)
-	BASEIMAGE?=armhf/debian:jessie
+	BASEIMAGE?=arm32v7/debian:jessie
 	QEMUARCH=arm
 endif
 ifeq ($(ARCH),arm64)
-	BASEIMAGE?=aarch64/debian:jessie
+	BASEIMAGE?=arm64v8/debian:jessie
 	QEMUARCH=aarch64
 endif
 ifeq ($(ARCH),ppc64le)
@@ -69,6 +69,9 @@ endif
 	docker export $(BUILD_IMAGE) > $(TEMP_DIR)/$(TAR_FILE)
 	docker build -t $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG) $(TEMP_DIR)
 	rm -rf $(TEMP_DIR)
+
+push: build
+	gcloud docker -- push $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG)
 
 clean:
 	docker rmi -f $(REGISTRY)/$(IMAGE)-$(ARCH):$(TAG) || true

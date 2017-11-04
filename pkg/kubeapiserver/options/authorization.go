@@ -62,11 +62,11 @@ func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.DurationVar(&s.WebhookCacheAuthorizedTTL, "authorization-webhook-cache-authorized-ttl",
 		s.WebhookCacheAuthorizedTTL,
-		"The duration to cache 'authorized' responses from the webhook authorizer. Default is 5m.")
+		"The duration to cache 'authorized' responses from the webhook authorizer.")
 
 	fs.DurationVar(&s.WebhookCacheUnauthorizedTTL,
 		"authorization-webhook-cache-unauthorized-ttl", s.WebhookCacheUnauthorizedTTL,
-		"The duration to cache 'unauthorized' responses from the webhook authorizer. Default is 30s.")
+		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
 
 	fs.String("authorization-rbac-super-user", "", ""+
 		"If specified, a username which avoids RBAC authorization checks and role binding "+

@@ -38,7 +38,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/kubectl/validation"
 )
 
 const (
@@ -487,11 +487,12 @@ func (v *FileVisitor) Visit(fn VisitorFunc) error {
 		f = os.Stdin
 	} else {
 		var err error
-		if f, err = os.Open(v.Path); err != nil {
+		f, err = os.Open(v.Path)
+		if err != nil {
 			return err
 		}
+		defer f.Close()
 	}
-	defer f.Close()
 
 	// TODO: Consider adding a flag to force to UTF16, apparently some
 	// Windows tools don't write the BOM

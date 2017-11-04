@@ -32,7 +32,7 @@ import (
 // without applying any validations and/or defaults. It shouldn't be considered a replacement
 // for a real clientset and is mostly useful in simple unit tests.
 func NewSimpleClientset(objects ...runtime.Object) *Clientset {
-	o := testing.NewObjectTracker(registry, scheme, codecs.UniversalDecoder())
+	o := testing.NewObjectTracker(scheme, codecs.UniversalDecoder())
 	for _, obj := range objects {
 		if err := o.Add(obj); err != nil {
 			panic(err)
@@ -40,11 +40,10 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 	}
 
 	fakePtr := testing.Fake{}
-	fakePtr.AddReactor("*", "*", testing.ObjectReaction(o, registry.RESTMapper()))
-
+	fakePtr.AddReactor("*", "*", testing.ObjectReaction(o))
 	fakePtr.AddWatchReactor("*", testing.DefaultWatchReactor(watch.NewFake(), nil))
 
-	return &Clientset{fakePtr}
+	return &Clientset{fakePtr, &fakediscovery.FakeDiscovery{Fake: &fakePtr}}
 }
 
 // Clientset implements clientset.Interface. Meant to be embedded into a
@@ -52,10 +51,11 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 // you want to test easier.
 type Clientset struct {
 	testing.Fake
+	discovery *fakediscovery.FakeDiscovery
 }
 
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
-	return &fakediscovery.FakeDiscovery{Fake: &c.Fake}
+	return c.discovery
 }
 
 var _ clientset.Interface = &Clientset{}

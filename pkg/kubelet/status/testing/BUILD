@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -10,11 +8,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["fake_pod_deletion_safety.go"],
-    tags = ["automanaged"],
-    deps = [
-        "//pkg/api/v1:go_default_library",
-        "//pkg/kubelet/pod:go_default_library",
-    ],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/status/testing",
+    deps = ["//vendor/k8s.io/api/core/v1:go_default_library"],
 )
 
 filegroup(

@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
 
 // HasPrivilegedRequest returns the value of SecurityContext.Privileged, taking into account
@@ -133,6 +133,11 @@ func DetermineEffectiveSecurityContext(pod *v1.Pod, container *v1.Container) *v1
 		*effectiveSc.ReadOnlyRootFilesystem = *containerSc.ReadOnlyRootFilesystem
 	}
 
+	if containerSc.AllowPrivilegeEscalation != nil {
+		effectiveSc.AllowPrivilegeEscalation = new(bool)
+		*effectiveSc.AllowPrivilegeEscalation = *containerSc.AllowPrivilegeEscalation
+	}
+
 	return effectiveSc
 }
 
@@ -205,6 +210,11 @@ func InternalDetermineEffectiveSecurityContext(pod *api.Pod, container *api.Cont
 		*effectiveSc.ReadOnlyRootFilesystem = *containerSc.ReadOnlyRootFilesystem
 	}
 
+	if containerSc.AllowPrivilegeEscalation != nil {
+		effectiveSc.AllowPrivilegeEscalation = new(bool)
+		*effectiveSc.AllowPrivilegeEscalation = *containerSc.AllowPrivilegeEscalation
+	}
+
 	return effectiveSc
 }
 
@@ -230,4 +240,19 @@ func internalSecurityContextFromPodSecurityContext(pod *api.Pod) *api.SecurityCo
 	}
 
 	return synthesized
+}
+
+// AddNoNewPrivileges returns if we should add the no_new_privs option.
+func AddNoNewPrivileges(sc *v1.SecurityContext) bool {
+	if sc == nil {
+		return false
+	}
+
+	// handle the case where the user did not set the default and did not explicitly set allowPrivilegeEscalation
+	if sc.AllowPrivilegeEscalation == nil {
+		return false
+	}
+
+	// handle the case where defaultAllowPrivilegeEscalation is false or the user explicitly set allowPrivilegeEscalation to true/false
+	return !*sc.AllowPrivilegeEscalation
 }

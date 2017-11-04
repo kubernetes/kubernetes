@@ -19,13 +19,14 @@ package internalversion
 import (
 	"fmt"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/ref"
-	"k8s.io/kubernetes/pkg/api/v1"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
 // The EventExpansion interface allows manually adding extra methods to the EventInterface.
@@ -154,7 +155,7 @@ type EventSinkImpl struct {
 
 func (e *EventSinkImpl) Create(event *v1.Event) (*v1.Event, error) {
 	internalEvent := &api.Event{}
-	err := v1.Convert_v1_Event_To_api_Event(event, internalEvent, nil)
+	err := k8s_api_v1.Convert_v1_Event_To_api_Event(event, internalEvent, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +168,7 @@ func (e *EventSinkImpl) Create(event *v1.Event) (*v1.Event, error) {
 
 func (e *EventSinkImpl) Update(event *v1.Event) (*v1.Event, error) {
 	internalEvent := &api.Event{}
-	err := v1.Convert_v1_Event_To_api_Event(event, internalEvent, nil)
+	err := k8s_api_v1.Convert_v1_Event_To_api_Event(event, internalEvent, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +181,7 @@ func (e *EventSinkImpl) Update(event *v1.Event) (*v1.Event, error) {
 
 func (e *EventSinkImpl) Patch(event *v1.Event, data []byte) (*v1.Event, error) {
 	internalEvent := &api.Event{}
-	err := v1.Convert_v1_Event_To_api_Event(event, internalEvent, nil)
+	err := k8s_api_v1.Convert_v1_Event_To_api_Event(event, internalEvent, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +190,7 @@ func (e *EventSinkImpl) Patch(event *v1.Event, data []byte) (*v1.Event, error) {
 		return nil, err
 	}
 	externalEvent := &v1.Event{}
-	err = v1.Convert_api_Event_To_v1_Event(internalEvent, externalEvent, nil)
+	err = k8s_api_v1.Convert_api_Event_To_v1_Event(internalEvent, externalEvent, nil)
 	if err != nil {
 		// Patch succeeded, no need to report the failed conversion
 		return event, nil

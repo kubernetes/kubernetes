@@ -17,11 +17,11 @@ limitations under the License.
 package v1beta1
 
 import (
+	v1beta1 "k8s.io/api/rbac/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	v1beta1 "k8s.io/client-go/pkg/apis/rbac/v1beta1"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -56,6 +56,41 @@ func newRoleBindings(c *RbacV1beta1Client, namespace string) *roleBindings {
 		client: c.RESTClient(),
 		ns:     namespace,
 	}
+}
+
+// Get takes name of the roleBinding, and returns the corresponding roleBinding object, and an error if there is any.
+func (c *roleBindings) Get(name string, options v1.GetOptions) (result *v1beta1.RoleBinding, err error) {
+	result = &v1beta1.RoleBinding{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("rolebindings").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of RoleBindings that match those selectors.
+func (c *roleBindings) List(opts v1.ListOptions) (result *v1beta1.RoleBindingList, err error) {
+	result = &v1beta1.RoleBindingList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("rolebindings").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested roleBindings.
+func (c *roleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("rolebindings").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
 }
 
 // Create takes the representation of a roleBinding and creates it.  Returns the server's representation of the roleBinding, and an error, if there is any.
@@ -103,41 +138,6 @@ func (c *roleBindings) DeleteCollection(options *v1.DeleteOptions, listOptions v
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the roleBinding, and returns the corresponding roleBinding object, and an error if there is any.
-func (c *roleBindings) Get(name string, options v1.GetOptions) (result *v1beta1.RoleBinding, err error) {
-	result = &v1beta1.RoleBinding{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("rolebindings").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of RoleBindings that match those selectors.
-func (c *roleBindings) List(opts v1.ListOptions) (result *v1beta1.RoleBindingList, err error) {
-	result = &v1beta1.RoleBindingList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("rolebindings").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested roleBindings.
-func (c *roleBindings) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("rolebindings").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched roleBinding.

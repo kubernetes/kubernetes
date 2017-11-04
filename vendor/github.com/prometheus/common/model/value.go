@@ -16,9 +16,26 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
+)
+
+var (
+	// ZeroSamplePair is the pseudo zero-value of SamplePair used to signal a
+	// non-existing sample pair. It is a SamplePair with timestamp Earliest and
+	// value 0.0. Note that the natural zero value of SamplePair has a timestamp
+	// of 0, which is possible to appear in a real SamplePair and thus not
+	// suitable to signal a non-existing SamplePair.
+	ZeroSamplePair = SamplePair{Timestamp: Earliest}
+
+	// ZeroSample is the pseudo zero-value of Sample used to signal a
+	// non-existing sample. It is a Sample with timestamp Earliest, value 0.0,
+	// and metric nil. Note that the natural zero value of Sample has a timestamp
+	// of 0, which is possible to appear in a real Sample and thus not suitable
+	// to signal a non-existing Sample.
+	ZeroSample = Sample{Timestamp: Earliest}
 )
 
 // A SampleValue is a representation of a value for a given sample at a given
@@ -43,8 +60,14 @@ func (v *SampleValue) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// Equal returns true if the value of v and o is equal or if both are NaN. Note
+// that v==o is false if both are NaN. If you want the conventional float
+// behavior, use == to compare two SampleValues.
 func (v SampleValue) Equal(o SampleValue) bool {
-	return v == o
+	if v == o {
+		return true
+	}
+	return math.IsNaN(float64(v)) && math.IsNaN(float64(o))
 }
 
 func (v SampleValue) String() string {
@@ -77,9 +100,9 @@ func (s *SamplePair) UnmarshalJSON(b []byte) error {
 }
 
 // Equal returns true if this SamplePair and o have equal Values and equal
-// Timestamps.
+// Timestamps. The sematics of Value equality is defined by SampleValue.Equal.
 func (s *SamplePair) Equal(o *SamplePair) bool {
-	return s == o || (s.Value == o.Value && s.Timestamp.Equal(o.Timestamp))
+	return s == o || (s.Value.Equal(o.Value) && s.Timestamp.Equal(o.Timestamp))
 }
 
 func (s SamplePair) String() string {
@@ -93,7 +116,8 @@ type Sample struct {
 	Timestamp Time        `json:"timestamp"`
 }
 
-// Equal compares first the metrics, then the timestamp, then the value.
+// Equal compares first the metrics, then the timestamp, then the value. The
+// sematics of value equality is defined by SampleValue.Equal.
 func (s *Sample) Equal(o *Sample) bool {
 	if s == o {
 		return true
@@ -105,11 +129,8 @@ func (s *Sample) Equal(o *Sample) bool {
 	if !s.Timestamp.Equal(o.Timestamp) {
 		return false
 	}
-	if s.Value != o.Value {
-		return false
-	}
 
-	return true
+	return s.Value.Equal(o.Value)
 }
 
 func (s Sample) String() string {

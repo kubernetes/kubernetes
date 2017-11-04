@@ -33,6 +33,7 @@ func startStatefulSetController(ctx ControllerContext) (bool, error) {
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Apps().V1beta1().StatefulSets(),
 		ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
+		ctx.InformerFactory.Apps().V1beta1().ControllerRevisions(),
 		ctx.ClientBuilder.ClientOrDie("statefulset-controller"),
 	).Run(1, ctx.Stop)
 	return true, nil

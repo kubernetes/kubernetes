@@ -29,7 +29,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/util/system"
 )
 
@@ -83,9 +83,9 @@ func computePercentiles(timeSeries []ResourceUsagePerContainer, percentilesToCom
 		for name, data := range timeSeries[i] {
 			if dataMap[name] == nil {
 				dataMap[name] = &usageDataPerContainer{
-					cpuData:        make([]float64, len(timeSeries)),
-					memUseData:     make([]uint64, len(timeSeries)),
-					memWorkSetData: make([]uint64, len(timeSeries)),
+					cpuData:        make([]float64, 0, len(timeSeries)),
+					memUseData:     make([]uint64, 0, len(timeSeries)),
+					memWorkSetData: make([]uint64, 0, len(timeSeries)),
 				}
 			}
 			dataMap[name].cpuData = append(dataMap[name].cpuData, data.CPUUsageInCores)
@@ -233,7 +233,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 			finished:   false,
 		})
 	} else {
-		pods, err := c.Core().Pods("kube-system").List(metav1.ListOptions{})
+		pods, err := c.CoreV1().Pods("kube-system").List(metav1.ListOptions{})
 		if err != nil {
 			Logf("Error while listing Pods: %v", err)
 			return nil, err
@@ -243,7 +243,7 @@ func NewResourceUsageGatherer(c clientset.Interface, options ResourceGathererOpt
 				g.containerIDs = append(g.containerIDs, container.Name)
 			}
 		}
-		nodeList, err := c.Core().Nodes().List(metav1.ListOptions{})
+		nodeList, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
 		if err != nil {
 			Logf("Error while listing Nodes: %v", err)
 			return nil, err

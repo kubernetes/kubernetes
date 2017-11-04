@@ -21,13 +21,13 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -48,14 +48,14 @@ func ObserveNodeUpdateAfterAction(f *framework.Framework, nodeName string, nodeP
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = nodeSelector.String()
-				ls, err := f.ClientSet.Core().Nodes().List(options)
+				ls, err := f.ClientSet.CoreV1().Nodes().List(options)
 				return ls, err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				// Signal parent goroutine that watching has begun.
 				defer informerStartedGuard.Do(func() { close(informerStartedChan) })
 				options.FieldSelector = nodeSelector.String()
-				w, err := f.ClientSet.Core().Nodes().Watch(options)
+				w, err := f.ClientSet.CoreV1().Nodes().Watch(options)
 				return w, err
 			},
 		},
@@ -105,13 +105,13 @@ func ObserveEventAfterAction(f *framework.Framework, eventPredicate func(*v1.Eve
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				ls, err := f.ClientSet.Core().Events(f.Namespace.Name).List(options)
+				ls, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(options)
 				return ls, err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				// Signal parent goroutine that watching has begun.
 				defer informerStartedGuard.Do(func() { close(informerStartedChan) })
-				w, err := f.ClientSet.Core().Events(f.Namespace.Name).Watch(options)
+				w, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).Watch(options)
 				return w, err
 			},
 		},

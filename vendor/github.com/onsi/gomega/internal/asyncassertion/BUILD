@@ -1,16 +1,10 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = ["async_assertion.go"],
-    tags = ["automanaged"],
+    importpath = "github.com/onsi/gomega/internal/asyncassertion",
+    visibility = ["//vendor/github.com/onsi/gomega:__subpackages__"],
     deps = [
         "//vendor/github.com/onsi/gomega/internal/oraclematcher:go_default_library",
         "//vendor/github.com/onsi/gomega/types:go_default_library",
@@ -28,4 +22,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

@@ -20,8 +20,8 @@ import (
 	"hash/fnv"
 	"sync"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api/v1"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 
@@ -29,33 +29,37 @@ import (
 	"github.com/golang/groupcache/lru"
 )
 
-// we use predicate names as cache's key, its count is limited
+// We use predicate names as cache's key, its count is limited
 const maxCacheEntries = 100
 
+// EquivalenceCache holds:
+// 1. a map of AlgorithmCache with node name as key
+// 2. function to get equivalence pod
+type EquivalenceCache struct {
+	sync.RWMutex
+	getEquivalencePod algorithm.GetEquivalencePodFunc
+	algorithmCache    map[string]AlgorithmCache
+}
+
+// The AlgorithmCache stores PredicateMap with predicate name as key
+type AlgorithmCache struct {
+	// Only consider predicates for now
+	predicatesCache *lru.Cache
+}
+
+// PredicateMap stores HostPrediacte with equivalence hash as key
+type PredicateMap map[uint64]HostPredicate
+
+// HostPredicate is the cached predicate result
 type HostPredicate struct {
 	Fit         bool
 	FailReasons []algorithm.PredicateFailureReason
 }
 
-type AlgorithmCache struct {
-	// Only consider predicates for now, priorities rely on: #31606
-	predicatesCache *lru.Cache
-}
-
-// PredicateMap use equivalence hash as key
-type PredicateMap map[uint64]HostPredicate
-
 func newAlgorithmCache() AlgorithmCache {
 	return AlgorithmCache{
 		predicatesCache: lru.New(maxCacheEntries),
 	}
-}
-
-// Store a map of predicate cache with maxsize
-type EquivalenceCache struct {
-	sync.RWMutex
-	getEquivalencePod algorithm.GetEquivalencePodFunc
-	algorithmCache    map[string]AlgorithmCache
 }
 
 func NewEquivalenceCache(getEquivalencePodFunc algorithm.GetEquivalencePodFunc) *EquivalenceCache {
@@ -66,7 +70,12 @@ func NewEquivalenceCache(getEquivalencePodFunc algorithm.GetEquivalencePodFunc) 
 }
 
 // UpdateCachedPredicateItem updates pod predicate for equivalence class
-func (ec *EquivalenceCache) UpdateCachedPredicateItem(pod *v1.Pod, nodeName, predicateKey string, fit bool, reasons []algorithm.PredicateFailureReason, equivalenceHash uint64) {
+func (ec *EquivalenceCache) UpdateCachedPredicateItem(
+	podName, nodeName, predicateKey string,
+	fit bool,
+	reasons []algorithm.PredicateFailureReason,
+	equivalenceHash uint64,
+) {
 	ec.Lock()
 	defer ec.Unlock()
 	if _, exist := ec.algorithmCache[nodeName]; !exist {
@@ -87,7 +96,7 @@ func (ec *EquivalenceCache) UpdateCachedPredicateItem(pod *v1.Pod, nodeName, pre
 				equivalenceHash: predicateItem,
 			})
 	}
-	glog.V(5).Infof("Updated cached predicate: %v for pod: %v on node: %s, with item %v", predicateKey, pod.GetName(), nodeName, predicateItem)
+	glog.V(5).Infof("Updated cached predicate: %v for pod: %v on node: %s, with item %v", predicateKey, podName, nodeName, predicateItem)
 }
 
 // PredicateWithECache returns:
@@ -95,10 +104,14 @@ func (ec *EquivalenceCache) UpdateCachedPredicateItem(pod *v1.Pod, nodeName, pre
 // 2. reasons if not fit
 // 3. if this cache is invalid
 // based on cached predicate results
-func (ec *EquivalenceCache) PredicateWithECache(pod *v1.Pod, nodeName, predicateKey string, equivalenceHash uint64) (bool, []algorithm.PredicateFailureReason, bool) {
+func (ec *EquivalenceCache) PredicateWithECache(
+	podName, nodeName, predicateKey string,
+	equivalenceHash uint64,
+) (bool, []algorithm.PredicateFailureReason, bool) {
 	ec.RLock()
 	defer ec.RUnlock()
-	glog.V(5).Infof("Begin to calculate predicate: %v for pod: %s on node: %s based on equivalence cache", predicateKey, pod.GetName(), nodeName)
+	glog.V(5).Infof("Begin to calculate predicate: %v for pod: %s on node: %s based on equivalence cache",
+		predicateKey, podName, nodeName)
 	if algorithmCache, exist := ec.algorithmCache[nodeName]; exist {
 		if cachePredicate, exist := algorithmCache.predicatesCache.Get(predicateKey); exist {
 			predicateMap := cachePredicate.(PredicateMap)
@@ -158,30 +171,6 @@ func (ec *EquivalenceCache) InvalidateAllCachedPredicateItemOfNode(nodeName stri
 	glog.V(5).Infof("Done invalidating all cached predicates on node: %s", nodeName)
 }
 
-// InvalidateCachedPredicateItemForPod marks item of given predicateKeys, of given pod, on the given node as invalid
-func (ec *EquivalenceCache) InvalidateCachedPredicateItemForPod(nodeName string, predicateKeys sets.String, pod *v1.Pod) {
-	if len(predicateKeys) == 0 {
-		return
-	}
-	equivalenceHash := ec.getHashEquivalencePod(pod)
-	if equivalenceHash == 0 {
-		// no equivalence pod found, just return
-		return
-	}
-	ec.Lock()
-	defer ec.Unlock()
-	if algorithmCache, exist := ec.algorithmCache[nodeName]; exist {
-		for predicateKey := range predicateKeys {
-			if cachePredicate, exist := algorithmCache.predicatesCache.Get(predicateKey); exist {
-				// got the cached item of by predicateKey & pod
-				predicateMap := cachePredicate.(PredicateMap)
-				delete(predicateMap, equivalenceHash)
-			}
-		}
-	}
-	glog.V(5).Infof("Done invalidating cached predicates %v on node %s, for pod %v", predicateKeys, nodeName, pod.GetName())
-}
-
 // InvalidateCachedPredicateItemForPodAdd is a wrapper of InvalidateCachedPredicateItem for pod add case
 func (ec *EquivalenceCache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, nodeName string) {
 	// MatchInterPodAffinity: we assume scheduler can make sure newly binded pod
@@ -203,13 +192,14 @@ func (ec *EquivalenceCache) InvalidateCachedPredicateItemForPodAdd(pod *v1.Pod, 
 }
 
 // getHashEquivalencePod returns the hash of equivalence pod.
-// if no equivalence pod found, return 0
-func (ec *EquivalenceCache) getHashEquivalencePod(pod *v1.Pod) uint64 {
+// 1. equivalenceHash
+// 2. if equivalence pod is found
+func (ec *EquivalenceCache) getHashEquivalencePod(pod *v1.Pod) (uint64, bool) {
 	equivalencePod := ec.getEquivalencePod(pod)
 	if equivalencePod != nil {
 		hash := fnv.New32a()
 		hashutil.DeepHashObject(hash, equivalencePod)
-		return uint64(hash.Sum32())
+		return uint64(hash.Sum32()), true
 	}
-	return 0
+	return 0, false
 }

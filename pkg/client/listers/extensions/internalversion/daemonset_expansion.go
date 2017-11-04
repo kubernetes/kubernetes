@@ -32,7 +32,7 @@ type DaemonSetListerExpansion interface {
 }
 
 // DaemonSetNamespaceListerExpansion allows custom methods to be added to
-// DaemonSetNamespaeLister.
+// DaemonSetNamespaceLister.
 type DaemonSetNamespaceListerExpansion interface{}
 
 // GetPodDaemonSets returns a list of DaemonSets that potentially match a pod.

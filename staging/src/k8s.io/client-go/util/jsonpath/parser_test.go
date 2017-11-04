@@ -61,6 +61,22 @@ var parserTests = []parserTest{
 		newList(), newIdentifier("end"),
 	}, false},
 	{"malformat input", `{\\\}`, []Node{}, true},
+	{"paired parentheses in quotes", `{[?(@.status.nodeInfo.osImage == "()")]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("status"), newField("nodeInfo"), newField("osImage"), newList(), newText("()")}, false},
+	{"paired parentheses in double quotes and with double quotes escape", `{[?(@.status.nodeInfo.osImage == "(\"\")")]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("status"), newField("nodeInfo"), newField("osImage"), newList(), newText("(\"\")")}, false},
+	{"unregular parentheses in double quotes", `{[?(@.test == "())(")]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("test"), newList(), newText("())(")}, false},
+	{"plain text in single quotes", `{[?(@.status.nodeInfo.osImage == 'Linux')]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("status"), newField("nodeInfo"), newField("osImage"), newList(), newText("Linux")}, false},
+	{"test filter suffix", `{[?(@.status.nodeInfo.osImage == "{[()]}")]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("status"), newField("nodeInfo"), newField("osImage"), newList(), newText("{[()]}")}, false},
+	{"double inside single", `{[?(@.status.nodeInfo.osImage == "''")]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("status"), newField("nodeInfo"), newField("osImage"), newList(), newText("''")}, false},
+	{"single inside double", `{[?(@.status.nodeInfo.osImage == '""')]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("status"), newField("nodeInfo"), newField("osImage"), newList(), newText("\"\"")}, false},
+	{"single containing escaped single", `{[?(@.status.nodeInfo.osImage == '\\\'')]}`,
+		[]Node{newList(), newFilter(newList(), newList(), "=="), newList(), newField("status"), newField("nodeInfo"), newField("osImage"), newList(), newText("\\'")}, false},
 }
 
 func collectNode(nodes []Node, cur Node) []Node {

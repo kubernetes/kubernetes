@@ -23,6 +23,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//hack/boilerplate/test:all-srcs",
+    ],
     tags = ["automanaged"],
 )

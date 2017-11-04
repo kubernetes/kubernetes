@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/api/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -99,6 +99,11 @@ func newWorker(
 // run periodically probes the container.
 func (w *worker) run() {
 	probeTickerPeriod := time.Duration(w.spec.PeriodSeconds) * time.Second
+
+	// If kubelet restarted the probes could be started in rapid succession.
+	// Let the worker wait for a random portion of tickerPeriod before probing.
+	time.Sleep(time.Duration(rand.Float64() * float64(probeTickerPeriod)))
+
 	probeTicker := time.NewTicker(probeTickerPeriod)
 
 	defer func() {
@@ -110,10 +115,6 @@ func (w *worker) run() {
 
 		w.probeManager.removeWorker(w.pod.UID, w.container.Name, w.probeType)
 	}()
-
-	// If kubelet restarted the probes could be started in rapid succession.
-	// Let the worker wait for a random portion of tickerPeriod before probing.
-	time.Sleep(time.Duration(rand.Float64() * float64(probeTickerPeriod)))
 
 probeLoop:
 	for w.doProbe() {
@@ -224,6 +225,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 		// chance of hitting #21751, where running `docker exec` when a
 		// container is being stopped may lead to corrupted container state.
 		w.onHold = true
+		w.resultRun = 1
 	}
 
 	return true

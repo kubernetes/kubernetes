@@ -25,18 +25,17 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 
 	heapster "k8s.io/heapster/metrics/api/v1/types"
-	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -116,11 +115,11 @@ func (tc *legacyReplicaCalcTestCase) prepareTestClient(t *testing.T) *fake.Clien
 					podName = tc.resource.podNames[i]
 				}
 				podMetric := metricsapi.PodMetrics{
-					ObjectMeta: v1.ObjectMeta{
+					ObjectMeta: metav1.ObjectMeta{
 						Name:      podName,
 						Namespace: testNamespace,
 					},
-					Timestamp:  unversioned.Time{Time: tc.timestamp},
+					Timestamp:  metav1.Time{Time: tc.timestamp},
 					Containers: make([]metricsapi.ContainerMetrics, numContainersPerPod),
 				}
 
@@ -189,6 +188,7 @@ func (tc *legacyReplicaCalcTestCase) runTest(t *testing.T) {
 	replicaCalc := &ReplicaCalculator{
 		metricsClient: metricsClient,
 		podsGetter:    testClient.Core(),
+		tolerance:     defaultTestingTolerance,
 	}
 
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
@@ -604,8 +604,8 @@ func LegacyTestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 	perPodRequested := totalRequestedCPUOfAllPods / startPods
 
 	// Force a minimal scaling event by satisfying  (tolerance < 1 - resourcesUsedRatio).
-	target := math.Abs(1/(requestedToUsed*(1-tolerance))) + .01
-	finalCpuPercentTarget := int32(target * 100)
+	target := math.Abs(1/(requestedToUsed*(1-defaultTestingTolerance))) + .01
+	finalCPUPercentTarget := int32(target * 100)
 	resourcesUsedRatio := float64(totalUsedCPUOfAllPods) / float64(float64(totalRequestedCPUOfAllPods)*target)
 
 	// i.e. .60 * 20 -> scaled down expectation.
@@ -642,7 +642,7 @@ func LegacyTestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 				resource.MustParse(fmt.Sprint(perPodRequested) + "m"),
 			},
 
-			targetUtilization:   finalCpuPercentTarget,
+			targetUtilization:   finalCPUPercentTarget,
 			expectedUtilization: int32(totalUsedCPUOfAllPods*100) / totalRequestedCPUOfAllPods,
 			expectedValue:       numContainersPerPod * totalUsedCPUOfAllPods / 10,
 		},
@@ -652,9 +652,9 @@ func LegacyTestReplicaCalcComputedToleranceAlgImplementation(t *testing.T) {
 
 	// Reuse the data structure above, now testing "unscaling".
 	// Now, we test that no scaling happens if we are in a very close margin to the tolerance
-	target = math.Abs(1/(requestedToUsed*(1-tolerance))) + .004
-	finalCpuPercentTarget = int32(target * 100)
-	tc.resource.targetUtilization = finalCpuPercentTarget
+	target = math.Abs(1/(requestedToUsed*(1-defaultTestingTolerance))) + .004
+	finalCPUPercentTarget = int32(target * 100)
+	tc.resource.targetUtilization = finalCPUPercentTarget
 	tc.currentReplicas = startPods
 	tc.expectedReplicas = startPods
 	tc.runTest(t)

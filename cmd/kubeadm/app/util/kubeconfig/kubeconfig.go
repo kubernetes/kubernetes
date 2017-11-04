@@ -72,11 +72,11 @@ func ClientSetFromFile(path string) (*clientset.Clientset, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load admin kubeconfig [%v]", err)
 	}
-	return KubeConfigToClientSet(config)
+	return ToClientSet(config)
 }
 
-// KubeConfigToClientSet converts a KubeConfig object to a client
-func KubeConfigToClientSet(config *clientcmdapi.Config) (*clientset.Clientset, error) {
+// ToClientSet converts a KubeConfig object to a client
+func ToClientSet(config *clientcmdapi.Config) (*clientset.Clientset, error) {
 	clientConfig, err := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create API client configuration from kubeconfig: %v", err)
@@ -96,7 +96,6 @@ func WriteToDisk(filename string, kubeconfig *clientcmdapi.Config) error {
 		return err
 	}
 
-	fmt.Printf("[kubeconfig] Wrote KubeConfig file to disk: %q\n", filename)
 	return nil
 }
 

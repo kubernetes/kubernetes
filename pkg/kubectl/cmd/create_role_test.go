@@ -22,10 +22,10 @@ import (
 	"reflect"
 	"testing"
 
+	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest/fake"
-	"k8s.io/kubernetes/pkg/apis/rbac"
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
@@ -44,6 +44,10 @@ func (t *testRolePrinter) AfterPrint(output io.Writer, res string) error {
 
 func (t *testRolePrinter) HandledResources() []string {
 	return []string{}
+}
+
+func (t *testRolePrinter) IsGeneric() bool {
+	return true
 }
 
 func TestCreateRole(t *testing.T) {
@@ -229,6 +233,45 @@ func TestValidate(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		"test-special-verb": {
+			roleOptions: &CreateRoleOptions{
+				Name:  "my-role",
+				Verbs: []string{"use"},
+				Resources: []ResourceOptions{
+					{
+						Resource: "pods",
+					},
+				},
+			},
+			expectErr: true,
+		},
+		"test-mix-verbs": {
+			roleOptions: &CreateRoleOptions{
+				Name:  "my-role",
+				Verbs: []string{"impersonate", "use"},
+				Resources: []ResourceOptions{
+					{
+						Resource:    "userextras",
+						SubResource: "scopes",
+					},
+				},
+			},
+			expectErr: true,
+		},
+		"test-special-verb-with-wrong-apigroup": {
+			roleOptions: &CreateRoleOptions{
+				Name:  "my-role",
+				Verbs: []string{"impersonate"},
+				Resources: []ResourceOptions{
+					{
+						Resource:    "userextras",
+						SubResource: "scopes",
+						Group:       "extensions",
+					},
+				},
+			},
+			expectErr: true,
+		},
 		"test-invalid-resource": {
 			roleOptions: &CreateRoleOptions{
 				Name:  "my-role",
@@ -286,13 +329,27 @@ func TestValidate(t *testing.T) {
 			},
 			expectErr: false,
 		},
+		"test-valid-case-with-additional-resource": {
+			roleOptions: &CreateRoleOptions{
+				Name:  "my-role",
+				Verbs: []string{"impersonate"},
+				Resources: []ResourceOptions{
+					{
+						Resource:    "userextras",
+						SubResource: "scopes",
+						Group:       "authentication.k8s.io",
+					},
+				},
+			},
+			expectErr: false,
+		},
 	}
 
 	for name, test := range tests {
 		test.roleOptions.Mapper, _ = f.Object()
 		err := test.roleOptions.Validate()
-		if test.expectErr && err != nil {
-			continue
+		if test.expectErr && err == nil {
+			t.Errorf("%s: expect error happens but validate passes.", name)
 		}
 		if !test.expectErr && err != nil {
 			t.Errorf("%s: unexpected error: %v", name, err)
@@ -439,8 +496,13 @@ func TestComplete(t *testing.T) {
 		if !test.expectErr && err != nil {
 			t.Errorf("%s: unexpected error: %v", name, err)
 		}
-		if test.expectErr && err != nil {
-			continue
+
+		if test.expectErr {
+			if err != nil {
+				continue
+			} else {
+				t.Errorf("%s: expect error happens but test passes.", name)
+			}
 		}
 
 		if test.roleOptions.Name != test.expected.Name {

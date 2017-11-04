@@ -19,13 +19,13 @@ limitations under the License.
 package v1beta1
 
 import (
+	certificates_v1beta1 "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1beta1 "k8s.io/client-go/listers/certificates/v1beta1"
-	certificates_v1beta1 "k8s.io/client-go/pkg/apis/certificates/v1beta1"
 	cache "k8s.io/client-go/tools/cache"
 	time "time"
 )
@@ -41,8 +41,11 @@ type certificateSigningRequestInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newCertificateSigningRequestInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewCertificateSigningRequestInformer constructs a new informer for CertificateSigningRequest type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewCertificateSigningRequestInformer(client kubernetes.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return client.CertificatesV1beta1().CertificateSigningRequests().List(options)
@@ -53,14 +56,16 @@ func newCertificateSigningRequestInformer(client kubernetes.Interface, resyncPer
 		},
 		&certificates_v1beta1.CertificateSigningRequest{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultCertificateSigningRequestInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewCertificateSigningRequestInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *certificateSigningRequestInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&certificates_v1beta1.CertificateSigningRequest{}, newCertificateSigningRequestInformer)
+	return f.factory.InformerFor(&certificates_v1beta1.CertificateSigningRequest{}, defaultCertificateSigningRequestInformer)
 }
 
 func (f *certificateSigningRequestInformer) Lister() v1beta1.CertificateSigningRequestLister {

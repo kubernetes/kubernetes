@@ -19,10 +19,9 @@ limitations under the License.
 package v1
 
 import (
+	v1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	batch "k8s.io/client-go/pkg/apis/batch"
-	v1 "k8s.io/client-go/pkg/apis/batch/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -89,7 +88,7 @@ func (s jobNamespaceLister) Get(name string) (*v1.Job, error) {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(batch.Resource("job"), name)
+		return nil, errors.NewNotFound(v1.Resource("job"), name)
 	}
 	return obj.(*v1.Job), nil
 }

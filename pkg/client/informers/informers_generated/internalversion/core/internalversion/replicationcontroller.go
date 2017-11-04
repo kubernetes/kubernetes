@@ -41,26 +41,31 @@ type replicationControllerInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newReplicationControllerInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewReplicationControllerInformer constructs a new informer for ReplicationController type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewReplicationControllerInformer(client internalclientset.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
-				return client.Core().ReplicationControllers(v1.NamespaceAll).List(options)
+				return client.Core().ReplicationControllers(namespace).List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
-				return client.Core().ReplicationControllers(v1.NamespaceAll).Watch(options)
+				return client.Core().ReplicationControllers(namespace).Watch(options)
 			},
 		},
 		&api.ReplicationController{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultReplicationControllerInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewReplicationControllerInformer(client, v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *replicationControllerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api.ReplicationController{}, newReplicationControllerInformer)
+	return f.factory.InformerFor(&api.ReplicationController{}, defaultReplicationControllerInformer)
 }
 
 func (f *replicationControllerInformer) Lister() internalversion.ReplicationControllerLister {

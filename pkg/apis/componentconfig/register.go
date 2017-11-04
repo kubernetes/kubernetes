@@ -47,11 +47,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&KubeProxyConfiguration{},
 		&KubeSchedulerConfiguration{},
-		&KubeletConfiguration{},
 	)
 	return nil
 }
-
-func (obj *KubeProxyConfiguration) GetObjectKind() schema.ObjectKind     { return &obj.TypeMeta }
-func (obj *KubeSchedulerConfiguration) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }
-func (obj *KubeletConfiguration) GetObjectKind() schema.ObjectKind       { return &obj.TypeMeta }

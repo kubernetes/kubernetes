@@ -152,7 +152,7 @@ func TestTimeProto(t *testing.T) {
 		input Time
 	}{
 		{Time{}},
-		{Date(1998, time.May, 5, 1, 5, 5, 50, time.Local)},
+		{Date(1998, time.May, 5, 1, 5, 5, 0, time.Local)},
 		{Date(1998, time.May, 5, 5, 5, 5, 0, time.Local)},
 	}
 
@@ -169,5 +169,29 @@ func TestTimeProto(t *testing.T) {
 		if !reflect.DeepEqual(input, time) {
 			t.Errorf("Marshal->Unmarshal is not idempotent: '%v' vs '%v'", input, time)
 		}
+	}
+}
+
+func TestTimeEqual(t *testing.T) {
+	t1 := NewTime(time.Now())
+	cases := []struct {
+		name   string
+		x      *Time
+		y      *Time
+		result bool
+	}{
+		{"nil =? nil", nil, nil, true},
+		{"!nil =? !nil", &t1, &t1, true},
+		{"nil =? !nil", nil, &t1, false},
+		{"!nil =? nil", &t1, nil, false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := c.x.Equal(c.y)
+			if result != c.result {
+				t.Errorf("Failed equality test for '%v', '%v': expected %+v, got %+v", c.x, c.y, c.result, result)
+			}
+		})
 	}
 }

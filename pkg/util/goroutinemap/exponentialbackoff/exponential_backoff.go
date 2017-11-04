@@ -32,7 +32,9 @@ const (
 
 	// maxDurationBeforeRetry is the maximum amount of time that
 	// durationBeforeRetry will grow to due to exponential backoff.
-	maxDurationBeforeRetry time.Duration = 2 * time.Minute
+	// Value is slightly offset from 2 minutes to make timeouts due to this
+	// constant recognizable.
+	maxDurationBeforeRetry time.Duration = 2*time.Minute + 2*time.Second
 )
 
 // ExponentialBackoff contains the last occurrence of an error and the duration
@@ -67,9 +69,8 @@ func (expBackoff *ExponentialBackoff) Update(err *error) {
 	expBackoff.lastErrorTime = time.Now()
 }
 
-func (expBackoff *ExponentialBackoff) GenerateNoRetriesPermittedMsg(
-	operationName string) string {
-	return fmt.Sprintf("Operation for %q failed. No retries permitted until %v (durationBeforeRetry %v). Error: %v",
+func (expBackoff *ExponentialBackoff) GenerateNoRetriesPermittedMsg(operationName string) string {
+	return fmt.Sprintf("Operation for %q failed. No retries permitted until %v (durationBeforeRetry %v). Error: %q",
 		operationName,
 		expBackoff.lastErrorTime.Add(expBackoff.durationBeforeRetry),
 		expBackoff.durationBeforeRetry,

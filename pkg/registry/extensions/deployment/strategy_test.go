@@ -22,21 +22,19 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
-func TestSelectableFieldLabelConversions(t *testing.T) {
-	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		testapi.Extensions.GroupVersion().String(),
-		"Deployment",
-		DeploymentToSelectableFields(&extensions.Deployment{}),
-		nil,
-	)
-}
+const (
+	fakeImageName  = "fake-name"
+	fakeImage      = "fakeimage"
+	deploymentName = "test-deployment"
+	namespace      = "test-namespace"
+)
 
 func TestStatusUpdates(t *testing.T) {
 	tests := []struct {
@@ -84,6 +82,102 @@ func newDeployment(labels, annotations map[string]string) *extensions.Deployment
 							Image: "test",
 						},
 					},
+				},
+			},
+		},
+	}
+}
+
+func TestSelectorImmutability(t *testing.T) {
+	tests := []struct {
+		requestInfo       genericapirequest.RequestInfo
+		oldSelectorLabels map[string]string
+		newSelectorLabels map[string]string
+		expectedErrorList field.ErrorList
+	}{
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1beta2",
+				Resource:   "deployments",
+			},
+			map[string]string{"a": "b"},
+			map[string]string{"c": "d"},
+			field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: field.NewPath("spec").Child("selector").String(),
+					BadValue: &metav1.LabelSelector{
+						MatchLabels:      map[string]string{"c": "d"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+					Detail: "field is immutable",
+				},
+			},
+		},
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1beta1",
+				Resource:   "deployments",
+			},
+			map[string]string{"a": "b"},
+			map[string]string{"c": "d"},
+			field.ErrorList{},
+		},
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "extensions",
+				APIVersion: "v1beta1",
+			},
+			map[string]string{"a": "b"},
+			map[string]string{"c": "d"},
+			field.ErrorList{},
+		},
+	}
+
+	for _, test := range tests {
+		oldDeployment := newDeploymentWithSelectorLabels(test.oldSelectorLabels)
+		newDeployment := newDeploymentWithSelectorLabels(test.newSelectorLabels)
+		context := genericapirequest.NewContext()
+		context = genericapirequest.WithRequestInfo(context, &test.requestInfo)
+		errorList := deploymentStrategy{}.ValidateUpdate(context, newDeployment, oldDeployment)
+		if len(test.expectedErrorList) == 0 && len(errorList) == 0 {
+			continue
+		}
+		if !reflect.DeepEqual(test.expectedErrorList, errorList) {
+			t.Errorf("Unexpected error list, expected: %v, actual: %v", test.expectedErrorList, errorList)
+		}
+	}
+}
+
+func newDeploymentWithSelectorLabels(selectorLabels map[string]string) *extensions.Deployment {
+	return &extensions.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            deploymentName,
+			Namespace:       namespace,
+			ResourceVersion: "1",
+		},
+		Spec: extensions.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels:      selectorLabels,
+				MatchExpressions: []metav1.LabelSelectorRequirement{},
+			},
+			Strategy: extensions.DeploymentStrategy{
+				Type: extensions.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &extensions.RollingUpdateDeployment{
+					MaxSurge:       intstr.FromInt(1),
+					MaxUnavailable: intstr.FromInt(1),
+				},
+			},
+			Template: api.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: selectorLabels,
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers:    []api.Container{{Name: fakeImageName, Image: fakeImage, ImagePullPolicy: api.PullNever, TerminationMessagePolicy: api.TerminationMessageReadFile}},
 				},
 			},
 		},

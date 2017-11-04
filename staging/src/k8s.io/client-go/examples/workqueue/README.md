@@ -7,7 +7,7 @@ It demonstrates how to:
  * combine the workqueue with a cache to a full controller
  * synchronize the controller on startup
 
-The example is based on https://github.com/kubernetes/community/blob/master/contributors/devel/controllers.md.
+The example is based on https://git.k8s.io/community/contributors/devel/controllers.md.
 
 ## Running
 

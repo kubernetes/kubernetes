@@ -17,18 +17,12 @@ limitations under the License.
 package poddisruptionbudget
 
 import (
-	"fmt"
-	"reflect"
-
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/policy/validation"
 )
@@ -40,7 +34,7 @@ type podDisruptionBudgetStrategy struct {
 }
 
 // Strategy is the default logic that applies when creating and updating PodDisruptionBudget objects.
-var Strategy = podDisruptionBudgetStrategy{api.Scheme, names.SimpleNameGenerator}
+var Strategy = podDisruptionBudgetStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all PodDisruptionBudget' need to be within a namespace.
 func (podDisruptionBudgetStrategy) NamespaceScoped() bool {
@@ -66,7 +60,7 @@ func (podDisruptionBudgetStrategy) PrepareForUpdate(ctx genericapirequest.Contex
 	// Any changes to the spec increment the generation number, any changes to the
 	// status should reflect the generation number of the corresponding object.
 	// See metav1.ObjectMeta description for more information on Generation.
-	if !reflect.DeepEqual(oldPodDisruptionBudget.Spec, newPodDisruptionBudget.Spec) {
+	if !apiequality.Semantic.DeepEqual(oldPodDisruptionBudget.Spec, newPodDisruptionBudget.Spec) {
 		newPodDisruptionBudget.Generation = oldPodDisruptionBudget.Generation + 1
 	}
 }
@@ -97,30 +91,6 @@ func (podDisruptionBudgetStrategy) ValidateUpdate(ctx genericapirequest.Context,
 // only be allowed if version match.
 func (podDisruptionBudgetStrategy) AllowUnconditionalUpdate() bool {
 	return false
-}
-
-// PodDisruptionBudgetToSelectableFields returns a field set that represents the object.
-func PodDisruptionBudgetToSelectableFields(podDisruptionBudget *policy.PodDisruptionBudget) fields.Set {
-	return generic.ObjectMetaFieldsSet(&podDisruptionBudget.ObjectMeta, true)
-}
-
-// GetAttrs returns labels and fields of a given object for filtering purposes.
-func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
-	podDisruptionBudget, ok := obj.(*policy.PodDisruptionBudget)
-	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a PodDisruptionBudget.")
-	}
-	return labels.Set(podDisruptionBudget.ObjectMeta.Labels), PodDisruptionBudgetToSelectableFields(podDisruptionBudget), nil
-}
-
-// MatchPodDisruptionBudget is the filter used by the generic etcd backend to watch events
-// from etcd to clients of the apiserver only interested in specific labels/fields.
-func MatchPodDisruptionBudget(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
-	return storage.SelectionPredicate{
-		Label:    label,
-		Field:    field,
-		GetAttrs: GetAttrs,
-	}
 }
 
 type podDisruptionBudgetStatusStrategy struct {

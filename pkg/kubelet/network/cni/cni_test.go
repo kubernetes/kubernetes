@@ -33,17 +33,18 @@ import (
 
 	types020 "github.com/containernetworking/cni/pkg/types/020"
 	"github.com/stretchr/testify/mock"
+	"k8s.io/api/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/cni/testing"
 	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 	networktest "k8s.io/kubernetes/pkg/kubelet/network/testing"
-	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/utils/exec"
+	fakeexec "k8s.io/utils/exec/testing"
 )
 
 func installPluginUnderTest(t *testing.T, testVendorCNIDirPrefix, testNetworkConfigPath, vendorName string, plugName string) {
@@ -159,10 +160,10 @@ func TestCNIPlugin(t *testing.T) {
 
 	podIP := "10.0.0.2"
 	podIPOutput := fmt.Sprintf("4: eth0    inet %s/24 scope global dynamic eth0\\       valid_lft forever preferred_lft forever", podIP)
-	fakeCmds := []utilexec.FakeCommandAction{
-		func(cmd string, args ...string) utilexec.Cmd {
-			return utilexec.InitFakeCmd(&utilexec.FakeCmd{
-				CombinedOutputScript: []utilexec.FakeCombinedOutputAction{
+	fakeCmds := []fakeexec.FakeCommandAction{
+		func(cmd string, args ...string) exec.Cmd {
+			return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{
+				CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
 					func() ([]byte, error) {
 						return []byte(podIPOutput), nil
 					},
@@ -171,7 +172,7 @@ func TestCNIPlugin(t *testing.T) {
 		},
 	}
 
-	fexec := &utilexec.FakeExec{
+	fexec := &fakeexec.FakeExec{
 		CommandScript: fakeCmds,
 		LookPathFunc: func(file string) (string, error) {
 			return fmt.Sprintf("/fake-bin/%s", file), nil
@@ -227,7 +228,7 @@ func TestCNIPlugin(t *testing.T) {
 	}
 	fakeHost := NewFakeHost(nil, pods, ports)
 
-	plug, err := network.InitNetworkPlugin(plugins, "cni", fakeHost, componentconfig.HairpinNone, "10.0.0.0/8", network.UseDefaultMTU)
+	plug, err := network.InitNetworkPlugin(plugins, "cni", fakeHost, kubeletconfig.HairpinNone, "10.0.0.0/8", network.UseDefaultMTU)
 	if err != nil {
 		t.Fatalf("Failed to select the desired plugin: %v", err)
 	}

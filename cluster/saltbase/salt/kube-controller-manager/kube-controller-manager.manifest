@@ -49,7 +49,7 @@
   {% if grains.cloud in [ 'aws', 'gce' ] and grains.cloud_config is defined -%}
     {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
     {% set cloud_config_mount = "{\"name\": \"cloudconfigmount\",\"mountPath\": \"" + grains.cloud_config + "\", \"readOnly\": true}," -%}
-    {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\"}}," -%}
+    {% set cloud_config_volume = "{\"name\": \"cloudconfigmount\",\"hostPath\": {\"path\": \"" + grains.cloud_config + "\", \"type\": \"FileOrCreate\"}}," -%}
   {% endif -%}
 
   {% if grains.cloud in ['openstack'] -%}
@@ -94,6 +94,9 @@
 "metadata": {
   "name":"kube-controller-manager",
   "namespace": "kube-system",
+  "annotations": {
+    "scheduler.alpha.kubernetes.io/critical-pod": ""
+  },
   "labels": {
     "tier": "control-plane",
     "component": "kube-controller-manager"
@@ -161,7 +164,8 @@
   },
   { "name": "logfile",
     "hostPath": {
-        "path": "/var/log/kube-controller-manager.log"}
+        "path": "/var/log/kube-controller-manager.log",
+        "type": "FileOrCreate"}
   },
   { "name": "etcssl",
     "hostPath": {

@@ -18,6 +18,7 @@ package internalversion
 
 import (
 	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -30,9 +31,12 @@ func Convert_internalversion_ListOptions_To_v1_ListOptions(in *ListOptions, out 
 	if err := metav1.Convert_labels_Selector_To_string(&in.LabelSelector, &out.LabelSelector, s); err != nil {
 		return err
 	}
+	out.IncludeUninitialized = in.IncludeUninitialized
 	out.ResourceVersion = in.ResourceVersion
 	out.TimeoutSeconds = in.TimeoutSeconds
 	out.Watch = in.Watch
+	out.Limit = in.Limit
+	out.Continue = in.Continue
 	return nil
 }
 
@@ -43,9 +47,12 @@ func Convert_v1_ListOptions_To_internalversion_ListOptions(in *metav1.ListOption
 	if err := metav1.Convert_string_To_labels_Selector(&in.LabelSelector, &out.LabelSelector, s); err != nil {
 		return err
 	}
+	out.IncludeUninitialized = in.IncludeUninitialized
 	out.ResourceVersion = in.ResourceVersion
 	out.TimeoutSeconds = in.TimeoutSeconds
 	out.Watch = in.Watch
+	out.Limit = in.Limit
+	out.Continue = in.Continue
 	return nil
 }
 

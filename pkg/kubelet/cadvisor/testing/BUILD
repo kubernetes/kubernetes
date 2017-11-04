@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -13,7 +11,7 @@ go_library(
         "cadvisor_fake.go",
         "cadvisor_mock.go",
     ],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing",
     deps = [
         "//pkg/kubelet/cadvisor:go_default_library",
         "//vendor/github.com/google/cadvisor/events:go_default_library",

@@ -19,8 +19,8 @@ package client
 import (
 	"testing"
 
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
-	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
 )
 
 // Ensure a node client can be used as a NodeGetter.

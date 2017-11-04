@@ -29,6 +29,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -37,10 +38,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	coreclientset "k8s.io/kubernetes/pkg/client/clientset_generated/clientset/typed/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 const (
@@ -49,8 +50,6 @@ const (
 	TestContainerHttpPort = 8080
 	ClusterHttpPort       = 80
 	ClusterUdpPort        = 90
-	NetexecImageName      = "gcr.io/google_containers/netexec:1.7"
-	HostexecImageName     = "gcr.io/google_containers/hostexec:1.2"
 	testPodName           = "test-container-pod"
 	hostTestPodName       = "host-test-container-pod"
 	nodePortServiceName   = "node-port-service"
@@ -62,7 +61,11 @@ const (
 	testTries = 30
 	// Maximum number of pods in a test, to make test work in large clusters.
 	maxNetProxyPodsCount = 10
+	// Number of checks to hit a given set of endpoints when enable session affinity.
+	SessionAffinityChecks = 10
 )
+
+var NetexecImageName = imageutils.GetE2EImage(imageutils.Netexec)
 
 // NewNetworkingTestConfig creates and sets up a new test config helper.
 func NewNetworkingTestConfig(f *Framework) *NetworkingTestConfig {
@@ -214,7 +217,55 @@ func (config *NetworkingTestConfig) DialFromContainer(protocol, containerIP, tar
 	}
 
 	config.diagnoseMissingEndpoints(eps)
-	Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", minTries, cmd, eps, expectedEps)
+	Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", maxTries, cmd, eps, expectedEps)
+}
+
+func (config *NetworkingTestConfig) GetEndpointsFromTestContainer(protocol, targetIP string, targetPort, tries int) (sets.String, error) {
+	return config.GetEndpointsFromContainer(protocol, config.TestContainerPod.Status.PodIP, targetIP, TestContainerHttpPort, targetPort, tries)
+}
+
+// GetEndpointsFromContainer executes a curl via kubectl exec in a test container,
+// which might then translate to a tcp or udp request based on the protocol argument
+// in the url. It returns all different endpoints from multiple retries.
+// - tries is the number of curl attempts. If this many attempts pass and
+//   we don't see any endpoints, the test fails.
+func (config *NetworkingTestConfig) GetEndpointsFromContainer(protocol, containerIP, targetIP string, containerHttpPort, targetPort, tries int) (sets.String, error) {
+	cmd := fmt.Sprintf("curl -q -s 'http://%s:%d/dial?request=hostName&protocol=%s&host=%s&port=%d&tries=1'",
+		containerIP,
+		containerHttpPort,
+		protocol,
+		targetIP,
+		targetPort)
+
+	eps := sets.NewString()
+
+	for i := 0; i < tries; i++ {
+		stdout, stderr, err := config.f.ExecShellInPodWithFullOutput(config.HostTestContainerPod.Name, cmd)
+		if err != nil {
+			// A failure to kubectl exec counts as a try, not a hard fail.
+			// Also note that we will keep failing for maxTries in tests where
+			// we confirm unreachability.
+			Logf("Failed to execute %q: %v, stdout: %q, stderr: %q", cmd, err, stdout, stderr)
+		} else {
+			Logf("Tries: %d, in try: %d, stdout: %v, stderr: %v, command run in: %#v", tries, i, stdout, stderr, config.HostTestContainerPod)
+			var output map[string][]string
+			if err := json.Unmarshal([]byte(stdout), &output); err != nil {
+				Logf("WARNING: Failed to unmarshal curl response. Cmd %v run in %v, output: %s, err: %v",
+					cmd, config.HostTestContainerPod.Name, stdout, err)
+				continue
+			}
+
+			for _, hostName := range output["responses"] {
+				trimmed := strings.TrimSpace(hostName)
+				if trimmed != "" {
+					eps.Insert(trimmed)
+				}
+			}
+			// TODO: get rid of this delay #36281
+			time.Sleep(hitEndpointRetryDelay)
+		}
+	}
+	return eps, nil
 }
 
 // DialFromNode executes a tcp or udp request based on protocol via kubectl exec
@@ -256,29 +307,45 @@ func (config *NetworkingTestConfig) DialFromNode(protocol, targetIP string, targ
 				eps.Insert(trimmed)
 			}
 		}
-		Logf("Waiting for %+v endpoints, got endpoints %+v", expectedEps.Difference(eps), eps)
 
 		// Check against i+1 so we exit if minTries == maxTries.
-		if (eps.Equal(expectedEps) || eps.Len() == 0 && expectedEps.Len() == 0) && i+1 >= minTries {
+		if eps.Equal(expectedEps) && i+1 >= minTries {
+			Logf("Found all expected endpoints: %+v", eps.List())
 			return
 		}
+
+		Logf("Waiting for %+v endpoints (expected=%+v, actual=%+v)", expectedEps.Difference(eps).List(), expectedEps.List(), eps.List())
+
 		// TODO: get rid of this delay #36281
 		time.Sleep(hitEndpointRetryDelay)
 	}
 
 	config.diagnoseMissingEndpoints(eps)
-	Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", minTries, cmd, eps, expectedEps)
+	Failf("Failed to find expected endpoints:\nTries %d\nCommand %v\nretrieved %v\nexpected %v\n", maxTries, cmd, eps, expectedEps)
 }
 
 // GetSelfURL executes a curl against the given path via kubectl exec into a
 // test container running with host networking, and fails if the output
 // doesn't match the expected string.
-func (config *NetworkingTestConfig) GetSelfURL(path string, expected string) {
-	cmd := fmt.Sprintf("curl -q -s --connect-timeout 1 http://localhost:10249%s", path)
+func (config *NetworkingTestConfig) GetSelfURL(port int32, path string, expected string) {
+	cmd := fmt.Sprintf("curl -i -q -s --connect-timeout 1 http://localhost:%d%s", port, path)
 	By(fmt.Sprintf("Getting kube-proxy self URL %s", path))
+	config.executeCurlCmd(cmd, expected)
+}
 
+// GetSelfStatusCode executes a curl against the given path via kubectl exec into a
+// test container running with host networking, and fails if the returned status
+// code doesn't match the expected string.
+func (config *NetworkingTestConfig) GetSelfURLStatusCode(port int32, path string, expected string) {
+	// check status code
+	cmd := fmt.Sprintf("curl -o /dev/null -i -q -s -w %%{http_code} --connect-timeout 1 http://localhost:%d%s", port, path)
+	By(fmt.Sprintf("Checking status code against http://localhost:%d%s", port, path))
+	config.executeCurlCmd(cmd, expected)
+}
+
+func (config *NetworkingTestConfig) executeCurlCmd(cmd string, expected string) {
 	// These are arbitrary timeouts. The curl command should pass on first try,
-	// unless kubeproxy is starved/bootstrapping/restarting etc.
+	// unless remote server is starved/bootstrapping/restarting etc.
 	const retryInterval = 1 * time.Second
 	const retryTimeout = 30 * time.Second
 	podName := config.HostTestContainerPod.Name
@@ -305,7 +372,7 @@ func (config *NetworkingTestConfig) GetSelfURL(path string, expected string) {
 	}
 }
 
-func (config *NetworkingTestConfig) createNetShellPodSpec(podName string, node string) *v1.Pod {
+func (config *NetworkingTestConfig) createNetShellPodSpec(podName, hostname string) *v1.Pod {
 	probe := &v1.Probe{
 		InitialDelaySeconds: 10,
 		TimeoutSeconds:      30,
@@ -322,7 +389,7 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName string, node s
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -355,7 +422,7 @@ func (config *NetworkingTestConfig) createNetShellPodSpec(podName string, node s
 				},
 			},
 			NodeSelector: map[string]string{
-				"kubernetes.io/hostname": node,
+				"kubernetes.io/hostname": hostname,
 			},
 		},
 	}
@@ -366,7 +433,7 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String(),
+			APIVersion: testapi.Groups[v1.GroupName].GroupVersion().String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testPodName,
@@ -476,10 +543,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
 	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
 	config.ExternalAddrs = NodeAddresses(nodeList, v1.NodeExternalIP)
-	if len(config.ExternalAddrs) < 2 {
-		// fall back to legacy IPs
-		config.ExternalAddrs = NodeAddresses(nodeList, v1.NodeLegacyHostIP)
-	}
+
 	SkipUnlessNodeCountIsAtLeast(2)
 	config.Nodes = nodeList.Items
 
@@ -497,7 +561,12 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 		}
 	}
 	config.ClusterIP = config.NodePortService.Spec.ClusterIP
-	config.NodeIP = config.ExternalAddrs[0]
+	if len(config.ExternalAddrs) != 0 {
+		config.NodeIP = config.ExternalAddrs[0]
+	} else {
+		internalAddrs := NodeAddresses(nodeList, v1.NodeInternalIP)
+		config.NodeIP = internalAddrs[0]
+	}
 }
 
 func (config *NetworkingTestConfig) cleanup() {
@@ -539,7 +608,8 @@ func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector 
 	createdPods := make([]*v1.Pod, 0, len(nodes))
 	for i, n := range nodes {
 		podName := fmt.Sprintf("%s-%d", podName, i)
-		pod := config.createNetShellPodSpec(podName, n.Name)
+		hostname, _ := n.Labels["kubernetes.io/hostname"]
+		pod := config.createNetShellPodSpec(podName, hostname)
 		pod.ObjectMeta.Labels = selector
 		createdPod := config.createPod(pod)
 		createdPods = append(createdPods, createdPod)
@@ -587,11 +657,11 @@ func (config *NetworkingTestConfig) getPodClient() *PodClient {
 }
 
 func (config *NetworkingTestConfig) getServiceClient() coreclientset.ServiceInterface {
-	return config.f.ClientSet.Core().Services(config.Namespace)
+	return config.f.ClientSet.CoreV1().Services(config.Namespace)
 }
 
 func (config *NetworkingTestConfig) getNamespacesClient() coreclientset.NamespaceInterface {
-	return config.f.ClientSet.Core().Namespaces()
+	return config.f.ClientSet.CoreV1().Namespaces()
 }
 
 func CheckReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {
@@ -635,11 +705,20 @@ func TestReachableHTTP(ip string, port int, request string, expect string) (bool
 	return TestReachableHTTPWithContent(ip, port, request, expect, nil)
 }
 
+func TestReachableHTTPWithRetriableErrorCodes(ip string, port int, request string, expect string, retriableErrCodes []int) (bool, error) {
+	return TestReachableHTTPWithContentTimeoutWithRetriableErrorCodes(ip, port, request, expect, nil, retriableErrCodes, time.Second*5)
+}
+
 func TestReachableHTTPWithContent(ip string, port int, request string, expect string, content *bytes.Buffer) (bool, error) {
 	return TestReachableHTTPWithContentTimeout(ip, port, request, expect, content, 5*time.Second)
 }
 
 func TestReachableHTTPWithContentTimeout(ip string, port int, request string, expect string, content *bytes.Buffer, timeout time.Duration) (bool, error) {
+	return TestReachableHTTPWithContentTimeoutWithRetriableErrorCodes(ip, port, request, expect, content, []int{}, timeout)
+}
+
+func TestReachableHTTPWithContentTimeoutWithRetriableErrorCodes(ip string, port int, request string, expect string, content *bytes.Buffer, retriableErrCodes []int, timeout time.Duration) (bool, error) {
+
 	url := fmt.Sprintf("http://%s:%d%s", ip, port, request)
 	if ip == "" {
 		Failf("Got empty IP for reachability check (%s)", url)
@@ -664,6 +743,12 @@ func TestReachableHTTPWithContentTimeout(ip string, port int, request string, ex
 		return false, nil
 	}
 	if resp.StatusCode != 200 {
+		for _, code := range retriableErrCodes {
+			if resp.StatusCode == code {
+				Logf("Got non-success status %q when trying to access %s, but the error code is retriable", resp.Status, url)
+				return false, nil
+			}
+		}
 		return false, fmt.Errorf("received non-success return status %q trying to access %s; got body: %s",
 			resp.Status, url, string(body))
 	}

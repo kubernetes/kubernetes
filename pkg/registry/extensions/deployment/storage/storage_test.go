@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+	"net/http"
 	"reflect"
 	"testing"
 
@@ -250,7 +251,7 @@ func TestScaleUpdate(t *testing.T) {
 		},
 	}
 
-	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil {
+	if _, _, err := storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
 		t.Fatalf("error updating scale %v: %v", update, err)
 	}
 	obj, err := storage.Scale.Get(ctx, name, &metav1.GetOptions{})
@@ -265,7 +266,7 @@ func TestScaleUpdate(t *testing.T) {
 	update.ResourceVersion = deployment.ResourceVersion
 	update.Spec.Replicas = 15
 
-	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil && !errors.IsConflict(err) {
+	if _, _, err = storage.Scale.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil && !errors.IsConflict(err) {
 		t.Fatalf("unexpected error, expecting an update conflict but got %v", err)
 	}
 }
@@ -289,7 +290,7 @@ func TestStatusUpdate(t *testing.T) {
 		},
 	}
 
-	if _, _, err := storage.Status.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil {
+	if _, _, err := storage.Status.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	obj, err := storage.Deployment.Get(ctx, name, &metav1.GetOptions{})
@@ -340,13 +341,21 @@ func TestEtcdCreateDeploymentRollback(t *testing.T) {
 		storage, server := newStorage(t)
 		rollbackStorage := storage.Rollback
 
-		if _, err := storage.Deployment.Create(ctx, validNewDeployment()); err != nil {
+		if _, err := storage.Deployment.Create(ctx, validNewDeployment(), rest.ValidateAllObjectFunc, false); err != nil {
 			t.Fatalf("%s: unexpected error: %v", k, err)
 		}
-		if _, err := rollbackStorage.Create(ctx, &test.rollback); !test.errOK(err) {
+		rollbackRespStatus, err := rollbackStorage.Create(ctx, &test.rollback, rest.ValidateAllObjectFunc, false)
+		if !test.errOK(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 		} else if err == nil {
-			// If rollback succeeded, verify Rollback field of deployment
+			// If rollback succeeded, verify Rollback response and Rollback field of deployment
+			status, ok := rollbackRespStatus.(*metav1.Status)
+			if !ok {
+				t.Errorf("%s: unexpected response format", k)
+			}
+			if status.Code != http.StatusOK || status.Status != metav1.StatusSuccess {
+				t.Errorf("%s: unexpected response, code: %d, status: %s", k, status.Code, status.Status)
+			}
 			d, err := storage.Deployment.Get(ctx, validNewDeployment().ObjectMeta.Name, &metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", k, err)
@@ -372,7 +381,7 @@ func TestEtcdCreateDeploymentRollbackNoDeployment(t *testing.T) {
 		Name:               name,
 		UpdatedAnnotations: map[string]string{},
 		RollbackTo:         extensions.RollbackConfig{Revision: 1},
-	})
+	}, rest.ValidateAllObjectFunc, false)
 	if err == nil {
 		t.Fatalf("Expected not-found-error but got nothing")
 	}
@@ -395,4 +404,12 @@ func TestShortNames(t *testing.T) {
 	defer storage.Deployment.Store.DestroyFunc()
 	expected := []string{"deploy"}
 	registrytest.AssertShortNames(t, storage.Deployment, expected)
+}
+
+func TestCategories(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Deployment.Store.DestroyFunc()
+	expected := []string{"all"}
+	registrytest.AssertCategories(t, storage.Deployment, expected)
 }

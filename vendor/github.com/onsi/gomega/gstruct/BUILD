@@ -1,11 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-licenses(["notice"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -16,7 +9,8 @@ go_library(
         "pointer.go",
         "types.go",
     ],
-    tags = ["automanaged"],
+    importpath = "github.com/onsi/gomega/gstruct",
+    visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/onsi/gomega/format:go_default_library",
         "//vendor/github.com/onsi/gomega/gstruct/errors:go_default_library",
@@ -38,4 +32,5 @@ filegroup(
         "//vendor/github.com/onsi/gomega/gstruct/errors:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

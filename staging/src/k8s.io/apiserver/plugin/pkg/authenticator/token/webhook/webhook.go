@@ -18,18 +18,18 @@ limitations under the License.
 package webhook
 
 import (
+	"fmt"
 	"time"
 
+	authentication "k8s.io/api/authentication/v1beta1"
+	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/util/cache"
 	"k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/client-go/kubernetes/scheme"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1beta1"
-	"k8s.io/client-go/pkg/api"
-	authentication "k8s.io/client-go/pkg/apis/authentication/v1beta1"
-
-	_ "k8s.io/client-go/pkg/apis/authentication/install"
 )
 
 var (
@@ -109,11 +109,24 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(token string) (user.Info, 
 	}, true, nil
 }
 
+// NOTE: client-go doesn't provide a registry. client-go does registers the
+// authentication/v1beta1. We construct a registry that acknowledges
+// authentication/v1beta1 as an enabled version to pass a check enforced in
+// NewGenericWebhook.
+var registry = registered.NewOrDie("")
+
+func init() {
+	registry.RegisterVersions(groupVersions)
+	if err := registry.EnableVersions(groupVersions...); err != nil {
+		panic(fmt.Sprintf("failed to enable version %v", groupVersions))
+	}
+}
+
 // tokenReviewInterfaceFromKubeconfig builds a client from the specified kubeconfig file,
 // and returns a TokenReviewInterface that uses that client. Note that the client submits TokenReview
 // requests to the exact path specified in the kubeconfig file, so arbitrary non-API servers can be targeted.
 func tokenReviewInterfaceFromKubeconfig(kubeConfigFile string) (authenticationclient.TokenReviewInterface, error) {
-	gw, err := webhook.NewGenericWebhook(api.Registry, api.Codecs, kubeConfigFile, groupVersions, 0)
+	gw, err := webhook.NewGenericWebhook(registry, scheme.Codecs, kubeConfigFile, groupVersions, 0)
 	if err != nil {
 		return nil, err
 	}

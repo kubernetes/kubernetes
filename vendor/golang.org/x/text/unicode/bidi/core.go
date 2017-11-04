@@ -309,6 +309,9 @@ func (p *paragraph) determineExplicitEmbeddingLevels() {
 			}
 			if isIsolate {
 				p.resultLevels[i] = stack.lastEmbeddingLevel()
+				if stack.lastDirectionalOverrideStatus() != ON {
+					p.resultTypes[i] = stack.lastDirectionalOverrideStatus()
+				}
 			}
 
 			var newLevel level
@@ -723,7 +726,7 @@ loop:
 				continue loop
 			}
 		}
-		log.Panicf("invalid bidi code %s present in assertOnly at position %d", t, s.indexes[i])
+		log.Panicf("invalid bidi code %v present in assertOnly at position %d", t, s.indexes[i])
 	}
 }
 

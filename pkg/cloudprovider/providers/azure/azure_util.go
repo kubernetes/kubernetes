@@ -17,14 +17,19 @@ limitations under the License.
 package azure
 
 import (
+	"errors"
 	"fmt"
+	"hash/crc32"
+	"regexp"
+	"strconv"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
+	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -40,6 +45,8 @@ const (
 	loadBalancerProbeIDTemplate = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers/%s/probes/%s"
 	securityRuleIDTemplate      = "/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/networkSecurityGroups/%s/securityRules/%s"
 )
+
+var providerIDRE = regexp.MustCompile(`^` + CloudProviderName + `://(?:.*)/Microsoft.Compute/virtualMachines/(.+)$`)
 
 // returns the full identifier of a machine
 func (az *Cloud) getMachineID(machineName string) string {
@@ -122,13 +129,25 @@ func getLastSegment(ID string) (string, error) {
 
 // returns the equivalent LoadBalancerRule, SecurityRule and LoadBalancerProbe
 // protocol types for the given Kubernetes protocol type.
-func getProtocolsFromKubernetesProtocol(protocol v1.Protocol) (network.TransportProtocol, network.SecurityRuleProtocol, network.ProbeProtocol, error) {
+func getProtocolsFromKubernetesProtocol(protocol v1.Protocol) (*network.TransportProtocol, *network.SecurityRuleProtocol, *network.ProbeProtocol, error) {
+	var transportProto network.TransportProtocol
+	var securityProto network.SecurityRuleProtocol
+	var probeProto network.ProbeProtocol
+
 	switch protocol {
 	case v1.ProtocolTCP:
-		return network.TransportProtocolTCP, network.TCP, network.ProbeProtocolTCP, nil
+		transportProto = network.TransportProtocolTCP
+		securityProto = network.SecurityRuleProtocolTCP
+		probeProto = network.ProbeProtocolTCP
+		return &transportProto, &securityProto, &probeProto, nil
+	case v1.ProtocolUDP:
+		transportProto = network.TransportProtocolUDP
+		securityProto = network.SecurityRuleProtocolUDP
+		return &transportProto, &securityProto, nil, nil
 	default:
-		return "", "", "", fmt.Errorf("Only TCP is supported for Azure LoadBalancers")
+		return &transportProto, &securityProto, &probeProto, fmt.Errorf("Only TCP and UDP are supported for Azure LoadBalancers")
 	}
+
 }
 
 // This returns the full identifier of the primary NIC for the given VM.
@@ -163,6 +182,7 @@ func getPrimaryIPConfig(nic network.Interface) (*network.InterfaceIPConfiguratio
 // For a load balancer, all frontend ip should reference either a subnet or publicIpAddress.
 // Thus Azure do not allow mixed type (public and internal) load balancer.
 // So we'd have a separate name for internal load balancer.
+// This would be the name for Azure LoadBalancer resource.
 func getLoadBalancerName(clusterName string, isInternal bool) string {
 	if isInternal {
 		return fmt.Sprintf("%s-internal", clusterName)
@@ -175,8 +195,16 @@ func getBackendPoolName(clusterName string) string {
 	return clusterName
 }
 
-func getRuleName(service *v1.Service, port v1.ServicePort) string {
-	return fmt.Sprintf("%s-%s-%d-%d", getRulePrefix(service), port.Protocol, port.Port, port.NodePort)
+func getLoadBalancerRuleName(service *v1.Service, port v1.ServicePort, subnetName *string) string {
+	if subnetName == nil {
+		return fmt.Sprintf("%s-%s-%d", getRulePrefix(service), port.Protocol, port.Port)
+	}
+	return fmt.Sprintf("%s-%s-%s-%d", getRulePrefix(service), *subnetName, port.Protocol, port.Port)
+}
+
+func getSecurityRuleName(service *v1.Service, port v1.ServicePort, sourceAddrPrefix string) string {
+	safePrefix := strings.Replace(sourceAddrPrefix, "/", "_", -1)
+	return fmt.Sprintf("%s-%s-%d-%s", getRulePrefix(service), port.Protocol, port.Port, safePrefix)
 }
 
 // This returns a human-readable version of the Service used to tag some resources.
@@ -190,13 +218,26 @@ func getRulePrefix(service *v1.Service) string {
 	return cloudprovider.GetLoadBalancerName(service)
 }
 
+func getPublicIPName(clusterName string, service *v1.Service) string {
+	return fmt.Sprintf("%s-%s", clusterName, cloudprovider.GetLoadBalancerName(service))
+}
+
 func serviceOwnsRule(service *v1.Service, rule string) bool {
 	prefix := getRulePrefix(service)
 	return strings.HasPrefix(strings.ToUpper(rule), strings.ToUpper(prefix))
 }
 
-func getFrontendIPConfigName(service *v1.Service) string {
-	return cloudprovider.GetLoadBalancerName(service)
+func serviceOwnsFrontendIP(fip network.FrontendIPConfiguration, service *v1.Service) bool {
+	baseName := cloudprovider.GetLoadBalancerName(service)
+	return strings.HasPrefix(*fip.Name, baseName)
+}
+
+func getFrontendIPConfigName(service *v1.Service, subnetName *string) string {
+	baseName := cloudprovider.GetLoadBalancerName(service)
+	if subnetName != nil {
+		return fmt.Sprintf("%s-%s", baseName, *subnetName)
+	}
+	return baseName
 }
 
 // This returns the next available rule priority level for a given set of security rules.
@@ -220,34 +261,107 @@ outer:
 }
 
 func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, error) {
+	az.operationPollRateLimiter.Accept()
 	machine, exists, err := az.getVirtualMachine(nodeName)
 	if !exists {
 		return "", cloudprovider.InstanceNotFound
 	}
 	if err != nil {
+		glog.Errorf("error: az.getIPForMachine(%s), az.getVirtualMachine(%s), err=%v", nodeName, nodeName, err)
 		return "", err
 	}
 
 	nicID, err := getPrimaryInterfaceID(machine)
 	if err != nil {
+		glog.Errorf("error: az.getIPForMachine(%s), getPrimaryInterfaceID(%v), err=%v", nodeName, machine, err)
 		return "", err
 	}
 
 	nicName, err := getLastSegment(nicID)
 	if err != nil {
+		glog.Errorf("error: az.getIPForMachine(%s), getLastSegment(%s), err=%v", nodeName, nicID, err)
 		return "", err
 	}
 
+	az.operationPollRateLimiter.Accept()
+	glog.V(10).Infof("InterfacesClient.Get(%q): start", nicName)
 	nic, err := az.InterfacesClient.Get(az.ResourceGroup, nicName, "")
+	glog.V(10).Infof("InterfacesClient.Get(%q): end", nicName)
 	if err != nil {
+		glog.Errorf("error: az.getIPForMachine(%s), az.InterfacesClient.Get(%s, %s, %s), err=%v", nodeName, az.ResourceGroup, nicName, "", err)
 		return "", err
 	}
 
 	ipConfig, err := getPrimaryIPConfig(nic)
 	if err != nil {
+		glog.Errorf("error: az.getIPForMachine(%s), getPrimaryIPConfig(%v), err=%v", nodeName, nic, err)
 		return "", err
 	}
 
 	targetIP := *ipConfig.PrivateIPAddress
 	return targetIP, nil
+}
+
+// splitProviderID converts a providerID to a NodeName.
+func splitProviderID(providerID string) (types.NodeName, error) {
+	matches := providerIDRE.FindStringSubmatch(providerID)
+	if len(matches) != 2 {
+		return "", errors.New("error splitting providerID")
+	}
+	return types.NodeName(matches[1]), nil
+}
+
+var polyTable = crc32.MakeTable(crc32.Koopman)
+
+//MakeCRC32 : convert string to CRC32 format
+func MakeCRC32(str string) string {
+	crc := crc32.New(polyTable)
+	crc.Write([]byte(str))
+	hash := crc.Sum32()
+	return strconv.FormatUint(uint64(hash), 10)
+}
+
+//ExtractVMData : extract dataDisks, storageProfile from a map struct
+func ExtractVMData(vmData map[string]interface{}) (dataDisks []interface{},
+	storageProfile map[string]interface{},
+	hardwareProfile map[string]interface{}, err error) {
+	props, ok := vmData["properties"].(map[string]interface{})
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("convert vmData(properties) to map error")
+	}
+
+	storageProfile, ok = props["storageProfile"].(map[string]interface{})
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("convert vmData(storageProfile) to map error")
+	}
+
+	hardwareProfile, ok = props["hardwareProfile"].(map[string]interface{})
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("convert vmData(hardwareProfile) to map error")
+	}
+
+	dataDisks, ok = storageProfile["dataDisks"].([]interface{})
+	if !ok {
+		return nil, nil, nil, fmt.Errorf("convert vmData(dataDisks) to map error")
+	}
+	return dataDisks, storageProfile, hardwareProfile, nil
+}
+
+//ExtractDiskData : extract provisioningState, diskState from a map struct
+func ExtractDiskData(diskData interface{}) (provisioningState string, diskState string, err error) {
+	fragment, ok := diskData.(map[string]interface{})
+	if !ok {
+		return "", "", fmt.Errorf("convert diskData to map error")
+	}
+
+	properties, ok := fragment["properties"].(map[string]interface{})
+	if !ok {
+		return "", "", fmt.Errorf("convert diskData(properties) to map error")
+	}
+
+	provisioningState, ok = properties["provisioningState"].(string) // if there is a disk, provisioningState property will be there
+	if ref, ok := properties["diskState"]; ok {
+		diskState = ref.(string)
+	}
+	return provisioningState, diskState, nil
 }

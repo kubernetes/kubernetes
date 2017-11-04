@@ -20,13 +20,14 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"strings"
 	"testing"
 
 	"github.com/renstrom/dedent"
 
+	"net/http"
 	"os"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
@@ -175,12 +176,40 @@ func (pfct preflightCheckTest) Check() (warning, errors []error) {
 
 func TestRunInitMasterChecks(t *testing.T) {
 	var tests = []struct {
+		name     string
 		cfg      *kubeadmapi.MasterConfiguration
 		expected bool
 	}{
+		{name: "Test valid advertised address",
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadmapi.API{AdvertiseAddress: "foo"},
+			},
+			expected: false,
+		},
+		{
+			name: "Test CA file exists if specfied",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{CAFile: "/foo"},
+			},
+			expected: false,
+		},
+		{
+			name: "Test Cert file exists if specfied",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{CertFile: "/foo"},
+			},
+			expected: false,
+		},
+		{
+			name: "Test Key file exists if specfied",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{CertFile: "/foo"},
+			},
+			expected: false,
+		},
 		{
 			cfg: &kubeadmapi.MasterConfiguration{
-				API: kubeadm.API{AdvertiseAddress: "foo"},
+				API: kubeadmapi.API{AdvertiseAddress: "2001:1234::1:15"},
 			},
 			expected: false,
 		},
@@ -190,9 +219,10 @@ func TestRunInitMasterChecks(t *testing.T) {
 		actual := RunInitMasterChecks(rt.cfg)
 		if (actual == nil) != rt.expected {
 			t.Errorf(
-				"failed RunInitMasterChecks:\n\texpected: %t\n\t  actual: %t",
+				"failed RunInitMasterChecks:\n\texpected: %t\n\t  actual: %t\n\t error: %v",
 				rt.expected,
-				(actual != nil),
+				(actual == nil),
+				actual,
 			)
 		}
 	}
@@ -205,6 +235,18 @@ func TestRunJoinNodeChecks(t *testing.T) {
 	}{
 		{
 			cfg:      &kubeadmapi.NodeConfiguration{},
+			expected: false,
+		},
+		{
+			cfg: &kubeadmapi.NodeConfiguration{
+				DiscoveryTokenAPIServers: []string{"192.168.1.15"},
+			},
+			expected: false,
+		},
+		{
+			cfg: &kubeadmapi.NodeConfiguration{
+				DiscoveryTokenAPIServers: []string{"2001:1234::1:15"},
+			},
 			expected: false,
 		},
 	}
@@ -239,6 +281,17 @@ func TestRunChecks(t *testing.T) {
 		{[]Checker{FileContentCheck{Path: "/", Content: []byte("does not exist")}}, false, ""},
 		{[]Checker{InPathCheck{executable: "foobarbaz"}}, true, "[preflight] WARNING: foobarbaz not found in system path\n"},
 		{[]Checker{InPathCheck{executable: "foobarbaz", mandatory: true}}, false, ""},
+		{[]Checker{ExtraArgsCheck{
+			APIServerExtraArgs:         map[string]string{"secure-port": "1234"},
+			ControllerManagerExtraArgs: map[string]string{"use-service-account-credentials": "true"},
+			SchedulerExtraArgs:         map[string]string{"leader-elect": "true"},
+		}}, true, ""},
+		{[]Checker{ExtraArgsCheck{
+			APIServerExtraArgs: map[string]string{"secure-port": "foo"},
+		}}, true, "[preflight] WARNING: kube-apiserver: failed to parse extra argument --secure-port=foo\n"},
+		{[]Checker{ExtraArgsCheck{
+			APIServerExtraArgs: map[string]string{"invalid-argument": "foo"},
+		}}, true, "[preflight] WARNING: kube-apiserver: failed to parse extra argument --invalid-argument=foo\n"},
 	}
 	for _, rt := range tokenTest {
 		buf := new(bytes.Buffer)
@@ -334,5 +387,172 @@ func TestConfigCertAndKey(t *testing.T) {
 			"failed configCertAndKey:\n\texpected: Certificates not equal to nil\n\tactual:%v",
 			config.Certificates,
 		)
+	}
+}
+
+func TestKubernetesVersionCheck(t *testing.T) {
+	var tests = []struct {
+		check          KubernetesVersionCheck
+		expectWarnings bool
+	}{
+		{
+			check: KubernetesVersionCheck{
+				KubeadmVersion:    "v1.6.6", //Same version
+				KubernetesVersion: "v1.6.6",
+			},
+			expectWarnings: false,
+		},
+		{
+			check: KubernetesVersionCheck{
+				KubeadmVersion:    "v1.6.6", //KubernetesVersion version older than KubeadmVersion
+				KubernetesVersion: "v1.5.5",
+			},
+			expectWarnings: false,
+		},
+		{
+			check: KubernetesVersionCheck{
+				KubeadmVersion:    "v1.6.6", //KubernetesVersion newer than KubeadmVersion, within the same minor release (new patch)
+				KubernetesVersion: "v1.6.7",
+			},
+			expectWarnings: false,
+		},
+		{
+			check: KubernetesVersionCheck{
+				KubeadmVersion:    "v1.6.6", //KubernetesVersion newer than KubeadmVersion, in a different minor/in pre-release
+				KubernetesVersion: "v1.7.0-alpha.0",
+			},
+			expectWarnings: true,
+		},
+		{
+			check: KubernetesVersionCheck{
+				KubeadmVersion:    "v1.6.6", //KubernetesVersion newer than KubeadmVersion, in a different minor/stable
+				KubernetesVersion: "v1.7.0",
+			},
+			expectWarnings: true,
+		},
+		{
+			check: KubernetesVersionCheck{
+				KubeadmVersion:    "v0.0.0", //"super-custom" builds - Skip this check
+				KubernetesVersion: "v1.7.0",
+			},
+			expectWarnings: false,
+		},
+	}
+
+	for _, rt := range tests {
+		warning, _ := rt.check.Check()
+		if (warning != nil) != rt.expectWarnings {
+			t.Errorf(
+				"failed KubernetesVersionCheck:\n\texpected: %t\n\t  actual: %t (KubeadmVersion:%s, KubernetesVersion: %s)",
+				rt.expectWarnings,
+				(warning != nil),
+				rt.check.KubeadmVersion,
+				rt.check.KubernetesVersion,
+			)
+		}
+	}
+}
+
+func TestHTTPProxyCIDRCheck(t *testing.T) {
+	var tests = []struct {
+		check          HTTPProxyCIDRCheck
+		expectWarnings bool
+	}{
+		{
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "127.0.0.0/8",
+			}, // Loopback addresses never should produce proxy warnings
+			expectWarnings: false,
+		},
+		{
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "10.96.0.0/12",
+			}, // Expected to be accessed directly, we set NO_PROXY to 10.0.0.0/8
+			expectWarnings: false,
+		},
+		{
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "192.168.0.0/16",
+			}, // Expected to go via proxy as this range is not listed in NO_PROXY
+			expectWarnings: true,
+		},
+		{
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "2001:db8::/56",
+			}, // Expected to be accessed directly, part of 2001:db8::/48 in NO_PROXY
+			expectWarnings: false,
+		},
+		{
+			check: HTTPProxyCIDRCheck{
+				Proto: "https",
+				CIDR:  "2001:db8:1::/56",
+			}, // Expected to go via proxy, range is not in 2001:db8::/48
+			expectWarnings: true,
+		},
+	}
+
+	// Save current content of *_proxy and *_PROXY variables.
+	savedEnv := resetProxyEnv()
+	defer restoreEnv(savedEnv)
+	t.Log("Saved environment: ", savedEnv)
+
+	os.Setenv("HTTP_PROXY", "http://proxy.example.com:3128")
+	os.Setenv("NO_PROXY", "example.com,10.0.0.0/8,2001:db8::/48")
+
+	// Check if we can reliably execute tests:
+	// ProxyFromEnvironment caches the *_proxy environment variables and
+	// if ProxyFromEnvironment already executed before our test with empty
+	// HTTP_PROXY it will make these tests return false positive failures
+	req, err := http.NewRequest("GET", "http://host.fake.tld/", nil)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	proxy, err := http.ProxyFromEnvironment(req)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if proxy == nil {
+		t.Skip("test skipped as ProxyFromEnvironment already initialized in environment without defined HTTP proxy")
+	}
+	t.Log("http.ProxyFromEnvironment is usable, continue executing test")
+
+	for _, rt := range tests {
+		warning, _ := rt.check.Check()
+		if (warning != nil) != rt.expectWarnings {
+			t.Errorf(
+				"failed HTTPProxyCIDRCheck:\n\texpected: %t\n\t  actual: %t (CIDR:%s). Warnings: %v",
+				rt.expectWarnings,
+				(warning != nil),
+				rt.check.CIDR,
+				warning,
+			)
+		}
+	}
+}
+
+// resetProxyEnv is helper function that unsets all *_proxy variables
+// and return previously set values as map. This can be used to restore
+// original state of the environment.
+func resetProxyEnv() map[string]string {
+	savedEnv := make(map[string]string)
+	for _, e := range os.Environ() {
+		pair := strings.Split(e, "=")
+		if strings.HasSuffix(strings.ToLower(pair[0]), "_proxy") {
+			savedEnv[pair[0]] = pair[1]
+			os.Unsetenv(pair[0])
+		}
+	}
+	return savedEnv
+}
+
+// restoreEnv is helper function to restores values
+// of environment variables from saved state in the map
+func restoreEnv(e map[string]string) {
+	for k, v := range e {
+		os.Setenv(k, v)
 	}
 }

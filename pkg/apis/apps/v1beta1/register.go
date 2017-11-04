@@ -17,8 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -34,20 +33,13 @@ func Resource(resource string) schema.GroupResource {
 }
 
 var (
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addDefaultingFuncs, addConversionFuncs)
-	AddToScheme   = SchemeBuilder.AddToScheme
+	localSchemeBuilder = &appsv1beta1.SchemeBuilder
+	AddToScheme        = localSchemeBuilder.AddToScheme
 )
 
-// Adds the list of known types to api.Scheme.
-func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(SchemeGroupVersion,
-		&Deployment{},
-		&DeploymentList{},
-		&DeploymentRollback{},
-		&Scale{},
-		&StatefulSet{},
-		&StatefulSetList{},
-	)
-	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
-	return nil
+func init() {
+	// We only register manually written functions here. The registration of the
+	// generated functions takes place in the generated files. The separation
+	// makes the code compile even when the generated files are missing.
+	localSchemeBuilder.Register(addDefaultingFuncs, addConversionFuncs)
 }

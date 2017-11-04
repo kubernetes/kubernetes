@@ -1,6 +1,10 @@
 reviewers:
-- bprashanth
-- bowei 
+- bowei
 - MrHohn
 - thockin
-- mrubin
+- matchstick
+approvers:
+- bowei
+- MrHohn
+- thockin
+- matchstick

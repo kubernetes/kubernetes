@@ -17,9 +17,9 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/client-go/pkg/api"
-	"k8s.io/client-go/pkg/api/v1"
-	policy "k8s.io/client-go/pkg/apis/policy/v1beta1"
+	"k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1beta1"
+	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -41,5 +41,5 @@ func (c *pods) Evict(eviction *policy.Eviction) error {
 
 // Get constructs a request for getting the logs for a pod
 func (c *pods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Request {
-	return c.client.Get().Namespace(c.ns).Name(name).Resource("pods").SubResource("log").VersionedParams(opts, api.ParameterCodec)
+	return c.client.Get().Namespace(c.ns).Name(name).Resource("pods").SubResource("log").VersionedParams(opts, scheme.ParameterCodec)
 }

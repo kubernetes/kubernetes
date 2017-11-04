@@ -21,16 +21,13 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rsa"
-	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/client-go/util/cert"
-	"k8s.io/kubernetes/pkg/api/v1"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/golang/glog"
@@ -57,75 +54,6 @@ type TokenGenerator interface {
 	// GenerateToken generates a token which will identify the given ServiceAccount.
 	// The returned token will be stored in the given (and yet-unpersisted) Secret.
 	GenerateToken(serviceAccount v1.ServiceAccount, secret v1.Secret) (string, error)
-}
-
-// ReadPrivateKey is a helper function for reading a private key from a PEM-encoded file
-func ReadPrivateKey(file string) (interface{}, error) {
-	data, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil, err
-	}
-	key, err := cert.ParsePrivateKeyPEM(data)
-	if err != nil {
-		return nil, fmt.Errorf("error reading private key file %s: %v", file, err)
-	}
-	return key, nil
-}
-
-// ReadPublicKeys is a helper function for reading an array of rsa.PublicKey or ecdsa.PublicKey from a PEM-encoded file.
-// Reads public keys from both public and private key files.
-func ReadPublicKeys(file string) ([]interface{}, error) {
-	data, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil, err
-	}
-	keys, err := ReadPublicKeysFromPEM(data)
-	if err != nil {
-		return nil, fmt.Errorf("error reading public key file %s: %v", file, err)
-	}
-	return keys, nil
-}
-
-// ReadPublicKeysFromPEM is a helper function for reading an array of rsa.PublicKey or ecdsa.PublicKey from a PEM-encoded byte array.
-// Reads public keys from both public and private key files.
-func ReadPublicKeysFromPEM(data []byte) ([]interface{}, error) {
-	var block *pem.Block
-	keys := []interface{}{}
-	for {
-		// read the next block
-		block, data = pem.Decode(data)
-		if block == nil {
-			break
-		}
-
-		// get PEM bytes for just this block
-		blockData := pem.EncodeToMemory(block)
-		if privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(blockData); err == nil {
-			keys = append(keys, &privateKey.PublicKey)
-			continue
-		}
-		if publicKey, err := jwt.ParseRSAPublicKeyFromPEM(blockData); err == nil {
-			keys = append(keys, publicKey)
-			continue
-		}
-
-		if privateKey, err := jwt.ParseECPrivateKeyFromPEM(blockData); err == nil {
-			keys = append(keys, &privateKey.PublicKey)
-			continue
-		}
-		if publicKey, err := jwt.ParseECPublicKeyFromPEM(blockData); err == nil {
-			keys = append(keys, publicKey)
-			continue
-		}
-
-		// tolerate non-key PEM blocks for backwards compatibility
-		// originally, only the first PEM block was parsed and expected to be a key block
-	}
-
-	if len(keys) == 0 {
-		return nil, fmt.Errorf("data does not contain a valid RSA or ECDSA key")
-	}
-	return keys, nil
 }
 
 // JWTTokenGenerator returns a TokenGenerator that generates signed JWT tokens, using the given privateKey.
@@ -290,6 +218,10 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 				glog.V(4).Infof("Could not retrieve token %s/%s for service account %s/%s: %v", namespace, secretName, namespace, serviceAccountName, err)
 				return nil, false, errors.New("Token has been invalidated")
 			}
+			if secret.DeletionTimestamp != nil {
+				glog.V(4).Infof("Token is deleted and awaiting removal: %s/%s for service account %s/%s", namespace, secretName, namespace, serviceAccountName)
+				return nil, false, errors.New("Token has been invalidated")
+			}
 			if bytes.Compare(secret.Data[v1.ServiceAccountTokenKey], []byte(token)) != 0 {
 				glog.V(4).Infof("Token contents no longer matches %s/%s for service account %s/%s", namespace, secretName, namespace, serviceAccountName)
 				return nil, false, errors.New("Token does not match server's copy")
@@ -300,6 +232,10 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 			if err != nil {
 				glog.V(4).Infof("Could not retrieve service account %s/%s: %v", namespace, serviceAccountName, err)
 				return nil, false, err
+			}
+			if serviceAccount.DeletionTimestamp != nil {
+				glog.V(4).Infof("Service account has been deleted %s/%s", namespace, serviceAccountName)
+				return nil, false, fmt.Errorf("ServiceAccount %s/%s has been deleted", namespace, serviceAccountName)
 			}
 			if string(serviceAccount.UID) != serviceAccountUID {
 				glog.V(4).Infof("Service account UID no longer matches %s/%s: %q != %q", namespace, serviceAccountName, string(serviceAccount.UID), serviceAccountUID)

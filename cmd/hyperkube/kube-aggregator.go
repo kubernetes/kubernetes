@@ -19,7 +19,6 @@ package main
 import (
 	"os"
 
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kube-aggregator/pkg/cmd/server"
 )
 
@@ -33,18 +32,19 @@ func NewKubeAggregator() *Server {
 		AlternativeName: "kube-aggregator",
 		SimpleUsage:     "aggregator",
 		Long:            "Aggregator for Kubernetes-style API servers: dynamic registration, discovery summarization, secure proxy.",
-		Run: func(_ *Server, args []string) error {
+		Run: func(_ *Server, args []string, stopCh <-chan struct{}) error {
 			if err := o.Complete(); err != nil {
 				return err
 			}
 			if err := o.Validate(args); err != nil {
 				return err
 			}
-			if err := o.RunAggregator(wait.NeverStop); err != nil {
+			if err := o.RunAggregator(stopCh); err != nil {
 				return err
 			}
 			return nil
 		},
+		RespectsStopCh: true,
 	}
 
 	o.AddFlags(hks.Flags())

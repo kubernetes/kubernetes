@@ -23,42 +23,42 @@ import (
 )
 
 const (
-	NodeControllerSubsystem = "node_collector"
-	ZoneHealthStatisticKey  = "zone_health"
-	ZoneSizeKey             = "zone_size"
-	ZoneNoUnhealthyNodesKey = "unhealty_nodes_in_zone"
-	EvictionsNumberKey      = "evictions_number"
+	nodeControllerSubsystem = "node_collector"
+	zoneHealthStatisticKey  = "zone_health"
+	zoneSizeKey             = "zone_size"
+	zoneNoUnhealthyNodesKey = "unhealthy_nodes_in_zone"
+	evictionsNumberKey      = "evictions_number"
 )
 
 var (
-	ZoneHealth = prometheus.NewGaugeVec(
+	zoneHealth = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Subsystem: NodeControllerSubsystem,
-			Name:      ZoneHealthStatisticKey,
-			Help:      "Gauge measuring percentage of healty nodes per zone.",
+			Subsystem: nodeControllerSubsystem,
+			Name:      zoneHealthStatisticKey,
+			Help:      "Gauge measuring percentage of healthy nodes per zone.",
 		},
 		[]string{"zone"},
 	)
-	ZoneSize = prometheus.NewGaugeVec(
+	zoneSize = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Subsystem: NodeControllerSubsystem,
-			Name:      ZoneSizeKey,
+			Subsystem: nodeControllerSubsystem,
+			Name:      zoneSizeKey,
 			Help:      "Gauge measuring number of registered Nodes per zones.",
 		},
 		[]string{"zone"},
 	)
-	UnhealthyNodes = prometheus.NewGaugeVec(
+	unhealthyNodes = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Subsystem: NodeControllerSubsystem,
-			Name:      ZoneNoUnhealthyNodesKey,
+			Subsystem: nodeControllerSubsystem,
+			Name:      zoneNoUnhealthyNodesKey,
 			Help:      "Gauge measuring number of not Ready Nodes per zones.",
 		},
 		[]string{"zone"},
 	)
-	EvictionsNumber = prometheus.NewCounterVec(
+	evictionsNumber = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Subsystem: NodeControllerSubsystem,
-			Name:      EvictionsNumberKey,
+			Subsystem: nodeControllerSubsystem,
+			Name:      evictionsNumberKey,
 			Help:      "Number of Node evictions that happened since current instance of NodeController started.",
 		},
 		[]string{"zone"},
@@ -67,11 +67,12 @@ var (
 
 var registerMetrics sync.Once
 
+// Register the metrics that are to be monitored.
 func Register() {
 	registerMetrics.Do(func() {
-		prometheus.MustRegister(ZoneHealth)
-		prometheus.MustRegister(ZoneSize)
-		prometheus.MustRegister(UnhealthyNodes)
-		prometheus.MustRegister(EvictionsNumber)
+		prometheus.MustRegister(zoneHealth)
+		prometheus.MustRegister(zoneSize)
+		prometheus.MustRegister(unhealthyNodes)
+		prometheus.MustRegister(evictionsNumber)
 	})
 }

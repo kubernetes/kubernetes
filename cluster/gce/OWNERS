@@ -1,8 +1,10 @@
 reviewers:
+  - bowei
   - gmarek
   - jszczepkowski
-  - vishh	
+  - vishh
 approvers:
+  - bowei
   - gmarek
   - jszczepkowski
   - vishh

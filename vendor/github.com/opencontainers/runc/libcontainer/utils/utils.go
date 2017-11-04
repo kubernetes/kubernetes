@@ -8,8 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -41,7 +42,7 @@ func ResolveRootfs(uncleanRootfs string) (string, error) {
 
 // ExitStatus returns the correct exit status for a process based on if it
 // was signaled or exited cleanly
-func ExitStatus(status syscall.WaitStatus) int {
+func ExitStatus(status unix.WaitStatus) int {
 	if status.Signaled() {
 		return exitSignalOffset + int(status.Signal())
 	}
@@ -103,7 +104,7 @@ func SearchLabels(labels []string, query string) string {
 }
 
 // Annotations returns the bundle path and user defined annotations from the
-// libcontianer state.  We need to remove the bundle because that is a label
+// libcontainer state.  We need to remove the bundle because that is a label
 // added by libcontainer.
 func Annotations(labels []string) (bundle string, userAnnotations map[string]string) {
 	userAnnotations = make(map[string]string)

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 )
 
 func scheduleSuccessEvent(podName, nodeName string) func(*v1.Event) bool {

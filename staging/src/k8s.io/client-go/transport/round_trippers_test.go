@@ -17,7 +17,11 @@ limitations under the License.
 package transport
 
 import (
+	"bytes"
+	"io/ioutil"
 	"net/http"
+	"net/url"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -214,5 +218,62 @@ func TestAuthProxyRoundTripper(t *testing.T) {
 			t.Errorf("%s expected %v, got %v", n, e, a)
 			continue
 		}
+	}
+}
+
+func TestCacheRoundTripper(t *testing.T) {
+	rt := &testRoundTripper{}
+	cacheDir, err := ioutil.TempDir("", "cache-rt")
+	defer os.RemoveAll(cacheDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cache := NewCacheRoundTripper(cacheDir, rt)
+
+	// First call, caches the response
+	req := &http.Request{
+		Method: http.MethodGet,
+		URL:    &url.URL{Host: "localhost"},
+	}
+	rt.Response = &http.Response{
+		Header:     http.Header{"ETag": []string{`"123456"`}},
+		Body:       ioutil.NopCloser(bytes.NewReader([]byte("Content"))),
+		StatusCode: http.StatusOK,
+	}
+	resp, err := cache.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "Content" {
+		t.Errorf(`Expected Body to be "Content", got %q`, string(content))
+	}
+
+	// Second call, returns cached response
+	req = &http.Request{
+		Method: http.MethodGet,
+		URL:    &url.URL{Host: "localhost"},
+	}
+	rt.Response = &http.Response{
+		StatusCode: http.StatusNotModified,
+		Body:       ioutil.NopCloser(bytes.NewReader([]byte("Other Content"))),
+	}
+
+	resp, err = cache.RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Read body and make sure we have the initial content
+	content, err = ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "Content" {
+		t.Errorf("Invalid content read from cache %q", string(content))
 	}
 }

@@ -20,4 +20,4 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-grep "\[Feature:\w+\]" "${KUBE_ROOT}"/test/e2e/*.go -Poh | LC_ALL=C sort -u
+grep "\[Feature:\w+\]" "${KUBE_ROOT}"/test/e2e/**/*.go -Eoh | LC_ALL=C sort -u

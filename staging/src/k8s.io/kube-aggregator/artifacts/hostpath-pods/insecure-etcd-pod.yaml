@@ -12,7 +12,7 @@ spec:
     args:
     - "/usr/local/bin/kube-aggregator"
     - "--secure-port=9443"
-    - "--core-kubeconfig=/var/run/auth-client/kube-aggregator.kubeconfig"
+    - "--kubeconfig=/var/run/auth-client/kube-aggregator.kubeconfig"
     - "--authentication-kubeconfig=/var/run/auth-client/kube-aggregator.kubeconfig"
     - "--authorization-kubeconfig=/var/run/auth-client/kube-aggregator.kubeconfig"
     - "--proxy-client-cert-file=/var/run/auth-proxy-client/client-auth-proxy.crt"

@@ -22,6 +22,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
 	api "k8s.io/kubernetes/pkg/api"
+	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
@@ -42,6 +43,9 @@ type ReplicationControllerInterface interface {
 	List(opts v1.ListOptions) (*api.ReplicationControllerList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ReplicationController, err error)
+	GetScale(replicationControllerName string, options v1.GetOptions) (*extensions.Scale, error)
+	UpdateScale(replicationControllerName string, scale *extensions.Scale) (*extensions.Scale, error)
+
 	ReplicationControllerExpansion
 }
 
@@ -57,69 +61,6 @@ func newReplicationControllers(c *CoreClient, namespace string) *replicationCont
 		client: c.RESTClient(),
 		ns:     namespace,
 	}
-}
-
-// Create takes the representation of a replicationController and creates it.  Returns the server's representation of the replicationController, and an error, if there is any.
-func (c *replicationControllers) Create(replicationController *api.ReplicationController) (result *api.ReplicationController, err error) {
-	result = &api.ReplicationController{}
-	err = c.client.Post().
-		Namespace(c.ns).
-		Resource("replicationcontrollers").
-		Body(replicationController).
-		Do().
-		Into(result)
-	return
-}
-
-// Update takes the representation of a replicationController and updates it. Returns the server's representation of the replicationController, and an error, if there is any.
-func (c *replicationControllers) Update(replicationController *api.ReplicationController) (result *api.ReplicationController, err error) {
-	result = &api.ReplicationController{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("replicationcontrollers").
-		Name(replicationController.Name).
-		Body(replicationController).
-		Do().
-		Into(result)
-	return
-}
-
-// UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
-
-func (c *replicationControllers) UpdateStatus(replicationController *api.ReplicationController) (result *api.ReplicationController, err error) {
-	result = &api.ReplicationController{}
-	err = c.client.Put().
-		Namespace(c.ns).
-		Resource("replicationcontrollers").
-		Name(replicationController.Name).
-		SubResource("status").
-		Body(replicationController).
-		Do().
-		Into(result)
-	return
-}
-
-// Delete takes name of the replicationController and deletes it. Returns an error if one occurs.
-func (c *replicationControllers) Delete(name string, options *v1.DeleteOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("replicationcontrollers").
-		Name(name).
-		Body(options).
-		Do().
-		Error()
-}
-
-// DeleteCollection deletes a collection of objects.
-func (c *replicationControllers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	return c.client.Delete().
-		Namespace(c.ns).
-		Resource("replicationcontrollers").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
-		Body(options).
-		Do().
-		Error()
 }
 
 // Get takes name of the replicationController, and returns the corresponding replicationController object, and an error if there is any.
@@ -157,6 +98,69 @@ func (c *replicationControllers) Watch(opts v1.ListOptions) (watch.Interface, er
 		Watch()
 }
 
+// Create takes the representation of a replicationController and creates it.  Returns the server's representation of the replicationController, and an error, if there is any.
+func (c *replicationControllers) Create(replicationController *api.ReplicationController) (result *api.ReplicationController, err error) {
+	result = &api.ReplicationController{}
+	err = c.client.Post().
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		Body(replicationController).
+		Do().
+		Into(result)
+	return
+}
+
+// Update takes the representation of a replicationController and updates it. Returns the server's representation of the replicationController, and an error, if there is any.
+func (c *replicationControllers) Update(replicationController *api.ReplicationController) (result *api.ReplicationController, err error) {
+	result = &api.ReplicationController{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		Name(replicationController.Name).
+		Body(replicationController).
+		Do().
+		Into(result)
+	return
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+
+func (c *replicationControllers) UpdateStatus(replicationController *api.ReplicationController) (result *api.ReplicationController, err error) {
+	result = &api.ReplicationController{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		Name(replicationController.Name).
+		SubResource("status").
+		Body(replicationController).
+		Do().
+		Into(result)
+	return
+}
+
+// Delete takes name of the replicationController and deletes it. Returns an error if one occurs.
+func (c *replicationControllers) Delete(name string, options *v1.DeleteOptions) error {
+	return c.client.Delete().
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		Name(name).
+		Body(options).
+		Do().
+		Error()
+}
+
+// DeleteCollection deletes a collection of objects.
+func (c *replicationControllers) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+	return c.client.Delete().
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		VersionedParams(&listOptions, scheme.ParameterCodec).
+		Body(options).
+		Do().
+		Error()
+}
+
 // Patch applies the patch and returns the patched replicationController.
 func (c *replicationControllers) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
@@ -166,6 +170,34 @@ func (c *replicationControllers) Patch(name string, pt types.PatchType, data []b
 		SubResource(subresources...).
 		Name(name).
 		Body(data).
+		Do().
+		Into(result)
+	return
+}
+
+// GetScale takes name of the replicationController, and returns the corresponding extensions.Scale object, and an error if there is any.
+func (c *replicationControllers) GetScale(replicationControllerName string, options v1.GetOptions) (result *extensions.Scale, err error) {
+	result = &extensions.Scale{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		Name(replicationControllerName).
+		SubResource("scale").
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// UpdateScale takes the top resource name and the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
+func (c *replicationControllers) UpdateScale(replicationControllerName string, scale *extensions.Scale) (result *extensions.Scale, err error) {
+	result = &extensions.Scale{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("replicationcontrollers").
+		Name(replicationControllerName).
+		SubResource("scale").
+		Body(scale).
 		Do().
 		Into(result)
 	return

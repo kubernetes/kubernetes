@@ -1,0 +1,1709 @@
+{
+  "servicePath": "",
+  "description": "Manages your Stackdriver Monitoring data and configurations. Most projects must be associated with a Stackdriver account, with a few exceptions as noted on the individual method pages.",
+  "kind": "discovery#restDescription",
+  "basePath": "",
+  "id": "monitoring:v3",
+  "documentationLink": "https://cloud.google.com/monitoring/api/",
+  "revision": "20170911",
+  "discoveryVersion": "v1",
+  "version_module": true,
+  "schemas": {
+    "Option": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "additionalProperties": {
+            "description": "Properties of the object. Contains field @type with type URL.",
+            "type": "any"
+          },
+          "description": "The option's value packed in an Any message. If the value is a primitive, the corresponding wrapper type defined in google/protobuf/wrappers.proto should be used. If the value is an enum, it should be stored as an int32 value using the google.protobuf.Int32Value type.",
+          "type": "object"
+        },
+        "name": {
+          "description": "The option's name. For protobuf built-in options (options defined in descriptor.proto), this is the short name. For example, \"map_entry\". For custom options, it should be the fully-qualified name. For example, \"google.api.http\".",
+          "type": "string"
+        }
+      },
+      "id": "Option",
+      "description": "A protocol buffer option, which can be attached to a message, field, enumeration, etc."
+    },
+    "Empty": {
+      "properties": {},
+      "id": "Empty",
+      "description": "A generic empty message that you can re-use to avoid defining duplicated empty messages in your APIs. A typical example is to use it as the request or the response type of an API method. For instance:\nservice Foo {\n  rpc Bar(google.protobuf.Empty) returns (google.protobuf.Empty);\n}\nThe JSON representation for Empty is empty JSON object {}.",
+      "type": "object"
+    },
+    "TimeInterval": {
+      "type": "object",
+      "properties": {
+        "endTime": {
+          "format": "google-datetime",
+          "description": "Required. The end of the time interval.",
+          "type": "string"
+        },
+        "startTime": {
+          "type": "string",
+          "format": "google-datetime",
+          "description": "Optional. The beginning of the time interval. The default value for the start time is the end time. The start time must not be later than the end time."
+        }
+      },
+      "id": "TimeInterval",
+      "description": "A time interval extending just after a start time through an end time. If the start time is the same as the end time, then the interval represents a single point in time."
+    },
+    "Explicit": {
+      "description": "Specifies a set of buckets with arbitrary widths.There are size(bounds) + 1 (= N) buckets. Bucket i has the following boundaries:Upper bound (0 \u003c= i \u003c N-1): boundsi  Lower bound (1 \u003c= i \u003c N); boundsi - 1The bounds field must contain at least one element. If bounds has only one element, then there are no finite buckets, and that single element is the common boundary of the overflow and underflow buckets.",
+      "type": "object",
+      "properties": {
+        "bounds": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array",
+          "description": "The values must be monotonically increasing."
+        }
+      },
+      "id": "Explicit"
+    },
+    "Exponential": {
+      "description": "Specifies an exponential sequence of buckets that have a width that is proportional to the value of the lower bound. Each bucket represents a constant relative uncertainty on a specific value in the bucket.There are num_finite_buckets + 2 (= N) buckets. Bucket i has the following boundaries:Upper bound (0 \u003c= i \u003c N-1): scale * (growth_factor ^ i).  Lower bound (1 \u003c= i \u003c N): scale * (growth_factor ^ (i - 1)).",
+      "type": "object",
+      "properties": {
+        "growthFactor": {
+          "format": "double",
+          "description": "Must be greater than 1.",
+          "type": "number"
+        },
+        "scale": {
+          "format": "double",
+          "description": "Must be greater than 0.",
+          "type": "number"
+        },
+        "numFiniteBuckets": {
+          "format": "int32",
+          "description": "Must be greater than 0.",
+          "type": "integer"
+        }
+      },
+      "id": "Exponential"
+    },
+    "Point": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "$ref": "TypedValue",
+          "description": "The value of the data point."
+        },
+        "interval": {
+          "$ref": "TimeInterval",
+          "description": "The time interval to which the data point applies. For GAUGE metrics, only the end time of the interval is used. For DELTA metrics, the start and end time should specify a non-zero interval, with subsequent points specifying contiguous and non-overlapping intervals. For CUMULATIVE metrics, the start and end time should specify a non-zero interval, with subsequent points specifying the same start time and increasing end times, until an event resets the cumulative value to zero and sets a new start time for the following points."
+        }
+      },
+      "id": "Point",
+      "description": "A single data point in a time series."
+    },
+    "Metric": {
+      "description": "A specific metric, identified by specifying values for all of the labels of a MetricDescriptor.",
+      "type": "object",
+      "properties": {
+        "type": {
+          "description": "An existing metric type, see google.api.MetricDescriptor. For example, custom.googleapis.com/invoice/paid/amount.",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "The set of label values that uniquely identify this metric. All labels listed in the MetricDescriptor must be assigned values.",
+          "type": "object"
+        }
+      },
+      "id": "Metric"
+    },
+    "Field": {
+      "description": "A single field of a message type.",
+      "type": "object",
+      "properties": {
+        "packed": {
+          "description": "Whether to use alternative packed wire representation.",
+          "type": "boolean"
+        },
+        "cardinality": {
+          "enumDescriptions": [
+            "For fields with unknown cardinality.",
+            "For optional fields.",
+            "For required fields. Proto2 syntax only.",
+            "For repeated fields."
+          ],
+          "enum": [
+            "CARDINALITY_UNKNOWN",
+            "CARDINALITY_OPTIONAL",
+            "CARDINALITY_REQUIRED",
+            "CARDINALITY_REPEATED"
+          ],
+          "description": "The field cardinality.",
+          "type": "string"
+        },
+        "defaultValue": {
+          "description": "The string value of the default value of this field. Proto2 syntax only.",
+          "type": "string"
+        },
+        "name": {
+          "description": "The field name.",
+          "type": "string"
+        },
+        "typeUrl": {
+          "description": "The field type URL, without the scheme, for message or enumeration types. Example: \"type.googleapis.com/google.protobuf.Timestamp\".",
+          "type": "string"
+        },
+        "number": {
+          "format": "int32",
+          "description": "The field number.",
+          "type": "integer"
+        },
+        "jsonName": {
+          "description": "The field JSON name.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "The field type.",
+          "type": "string",
+          "enumDescriptions": [
+            "Field type unknown.",
+            "Field type double.",
+            "Field type float.",
+            "Field type int64.",
+            "Field type uint64.",
+            "Field type int32.",
+            "Field type fixed64.",
+            "Field type fixed32.",
+            "Field type bool.",
+            "Field type string.",
+            "Field type group. Proto2 syntax only, and deprecated.",
+            "Field type message.",
+            "Field type bytes.",
+            "Field type uint32.",
+            "Field type enum.",
+            "Field type sfixed32.",
+            "Field type sfixed64.",
+            "Field type sint32.",
+            "Field type sint64."
+          ],
+          "enum": [
+            "TYPE_UNKNOWN",
+            "TYPE_DOUBLE",
+            "TYPE_FLOAT",
+            "TYPE_INT64",
+            "TYPE_UINT64",
+            "TYPE_INT32",
+            "TYPE_FIXED64",
+            "TYPE_FIXED32",
+            "TYPE_BOOL",
+            "TYPE_STRING",
+            "TYPE_GROUP",
+            "TYPE_MESSAGE",
+            "TYPE_BYTES",
+            "TYPE_UINT32",
+            "TYPE_ENUM",
+            "TYPE_SFIXED32",
+            "TYPE_SFIXED64",
+            "TYPE_SINT32",
+            "TYPE_SINT64"
+          ]
+        },
+        "options": {
+          "description": "The protocol buffer options.",
+          "items": {
+            "$ref": "Option"
+          },
+          "type": "array"
+        },
+        "oneofIndex": {
+          "format": "int32",
+          "description": "The index of the field type in Type.oneofs, for message or enumeration types. The first type has index 1; zero means the type is not in the list.",
+          "type": "integer"
+        }
+      },
+      "id": "Field"
+    },
+    "LabelDescriptor": {
+      "id": "LabelDescriptor",
+      "description": "A description of a label.",
+      "type": "object",
+      "properties": {
+        "key": {
+          "description": "The label key.",
+          "type": "string"
+        },
+        "description": {
+          "description": "A human-readable description for the label.",
+          "type": "string"
+        },
+        "valueType": {
+          "enum": [
+            "STRING",
+            "BOOL",
+            "INT64"
+          ],
+          "description": "The type of data that can be assigned to the label.",
+          "type": "string",
+          "enumDescriptions": [
+            "A variable-length string. This is the default.",
+            "Boolean; true or false.",
+            "A 64-bit signed integer."
+          ]
+        }
+      }
+    },
+    "ListTimeSeriesResponse": {
+      "description": "The ListTimeSeries response.",
+      "type": "object",
+      "properties": {
+        "timeSeries": {
+          "description": "One or more time series that match the filter included in the request.",
+          "items": {
+            "$ref": "TimeSeries"
+          },
+          "type": "array"
+        },
+        "nextPageToken": {
+          "description": "If there are more results than have been returned, then this field is set to a non-empty value. To see the additional results, use that value as pageToken in the next call to this method.",
+          "type": "string"
+        }
+      },
+      "id": "ListTimeSeriesResponse"
+    },
+    "Group": {
+      "description": "The description of a dynamic collection of monitored resources. Each group has a filter that is matched against monitored resources and their associated metadata. If a group's filter matches an available monitored resource, then that resource is a member of that group. Groups can contain any number of monitored resources, and each monitored resource can be a member of any number of groups.Groups can be nested in parent-child hierarchies. The parentName field identifies an optional parent for each group. If a group has a parent, then the only monitored resources available to be matched by the group's filter are the resources contained in the parent group. In other words, a group contains the monitored resources that match its filter and the filters of all the group's ancestors. A group without a parent can contain any monitored resource.For example, consider an infrastructure running a set of instances with two user-defined tags: \"environment\" and \"role\". A parent group has a filter, environment=\"production\". A child of that parent group has a filter, role=\"transcoder\". The parent group contains all instances in the production environment, regardless of their roles. The child group contains instances that have the transcoder role and are in the production environment.The monitored resources contained in a group can change at any moment, depending on what resources exist and what filters are associated with the group and its ancestors.",
+      "type": "object",
+      "properties": {
+        "filter": {
+          "type": "string",
+          "description": "The filter used to determine which monitored resources belong to this group."
+        },
+        "parentName": {
+          "type": "string",
+          "description": "The name of the group's parent, if it has one. The format is \"projects/{project_id_or_number}/groups/{group_id}\". For groups with no parent, parentName is the empty string, \"\"."
+        },
+        "name": {
+          "description": "Output only. The name of this group. The format is \"projects/{project_id_or_number}/groups/{group_id}\". When creating a group, this field is ignored and a new name is created consisting of the project specified in the call to CreateGroup and a unique {group_id} that is generated automatically.",
+          "type": "string"
+        },
+        "displayName": {
+          "description": "A user-assigned name for this group, used only for display purposes.",
+          "type": "string"
+        },
+        "isCluster": {
+          "description": "If true, the members of this group are considered to be a cluster. The system can perform additional analysis on groups that are clusters.",
+          "type": "boolean"
+        }
+      },
+      "id": "Group"
+    },
+    "Type": {
+      "description": "A protocol buffer message type.",
+      "type": "object",
+      "properties": {
+        "syntax": {
+          "description": "The source syntax.",
+          "type": "string",
+          "enumDescriptions": [
+            "Syntax proto2.",
+            "Syntax proto3."
+          ],
+          "enum": [
+            "SYNTAX_PROTO2",
+            "SYNTAX_PROTO3"
+          ]
+        },
+        "sourceContext": {
+          "$ref": "SourceContext",
+          "description": "The source context."
+        },
+        "options": {
+          "description": "The protocol buffer options.",
+          "items": {
+            "$ref": "Option"
+          },
+          "type": "array"
+        },
+        "fields": {
+          "description": "The list of fields.",
+          "items": {
+            "$ref": "Field"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "The fully qualified message name.",
+          "type": "string"
+        },
+        "oneofs": {
+          "description": "The list of types appearing in oneof definitions in this type.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "id": "Type"
+    },
+    "BucketOptions": {
+      "id": "BucketOptions",
+      "description": "BucketOptions describes the bucket boundaries used to create a histogram for the distribution. The buckets can be in a linear sequence, an exponential sequence, or each bucket can be specified explicitly. BucketOptions does not include the number of values in each bucket.A bucket has an inclusive lower bound and exclusive upper bound for the values that are counted for that bucket. The upper bound of a bucket must be strictly greater than the lower bound. The sequence of N buckets for a distribution consists of an underflow bucket (number 0), zero or more finite buckets (number 1 through N - 2) and an overflow bucket (number N - 1). The buckets are contiguous: the lower bound of bucket i (i \u003e 0) is the same as the upper bound of bucket i - 1. The buckets span the whole range of finite values: lower bound of the underflow bucket is -infinity and the upper bound of the overflow bucket is +infinity. The finite buckets are so-called because both bounds are finite.",
+      "type": "object",
+      "properties": {
+        "explicitBuckets": {
+          "description": "The explicit buckets.",
+          "$ref": "Explicit"
+        },
+        "linearBuckets": {
+          "description": "The linear bucket.",
+          "$ref": "Linear"
+        },
+        "exponentialBuckets": {
+          "$ref": "Exponential",
+          "description": "The exponential buckets."
+        }
+      }
+    },
+    "CollectdValue": {
+      "description": "A single data point from a collectd-based plugin.",
+      "type": "object",
+      "properties": {
+        "dataSourceType": {
+          "enum": [
+            "UNSPECIFIED_DATA_SOURCE_TYPE",
+            "GAUGE",
+            "COUNTER",
+            "DERIVE",
+            "ABSOLUTE"
+          ],
+          "description": "The type of measurement.",
+          "type": "string",
+          "enumDescriptions": [
+            "An unspecified data source type. This corresponds to google.api.MetricDescriptor.MetricKind.METRIC_KIND_UNSPECIFIED.",
+            "An instantaneous measurement of a varying quantity. This corresponds to google.api.MetricDescriptor.MetricKind.GAUGE.",
+            "A cumulative value over time. This corresponds to google.api.MetricDescriptor.MetricKind.CUMULATIVE.",
+            "A rate of change of the measurement.",
+            "An amount of change since the last measurement interval. This corresponds to google.api.MetricDescriptor.MetricKind.DELTA."
+          ]
+        },
+        "dataSourceName": {
+          "description": "The data source for the collectd value. For example there are two data sources for network measurements: \"rx\" and \"tx\".",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "TypedValue",
+          "description": "The measurement value."
+        }
+      },
+      "id": "CollectdValue"
+    },
+    "Status": {
+      "description": "The Status type defines a logical error model that is suitable for different programming environments, including REST APIs and RPC APIs. It is used by gRPC (https://github.com/grpc). The error model is designed to be:\nSimple to use and understand for most users\nFlexible enough to meet unexpected needsOverviewThe Status message contains three pieces of data: error code, error message, and error details. The error code should be an enum value of google.rpc.Code, but it may accept additional error codes if needed. The error message should be a developer-facing English message that helps developers understand and resolve the error. If a localized user-facing error message is needed, put the localized message in the error details or localize it in the client. The optional error details may contain arbitrary information about the error. There is a predefined set of error detail types in the package google.rpc that can be used for common error conditions.Language mappingThe Status message is the logical representation of the error model, but it is not necessarily the actual wire format. When the Status message is exposed in different client libraries and different wire protocols, it can be mapped differently. For example, it will likely be mapped to some exceptions in Java, but more likely mapped to some error codes in C.Other usesThe error model and the Status message can be used in a variety of environments, either with or without APIs, to provide a consistent developer experience across different environments.Example uses of this error model include:\nPartial errors. If a service needs to return partial errors to the client, it may embed the Status in the normal response to indicate the partial errors.\nWorkflow errors. A typical workflow has multiple steps. Each step may have a Status message for error reporting.\nBatch operations. If a client uses batch request and batch response, the Status message should be used directly inside batch response, one for each error sub-response.\nAsynchronous operations. If an API call embeds asynchronous operation results in its response, the status of those operations should be represented directly using the Status message.\nLogging. If some API errors are stored in logs, the message Status could be used directly after any stripping needed for security/privacy reasons.",
+      "type": "object",
+      "properties": {
+        "code": {
+          "format": "int32",
+          "description": "The status code, which should be an enum value of google.rpc.Code.",
+          "type": "integer"
+        },
+        "message": {
+          "description": "A developer-facing error message, which should be in English. Any user-facing error message should be localized and sent in the google.rpc.Status.details field, or localized by the client.",
+          "type": "string"
+        },
+        "details": {
+          "description": "A list of messages that carry the error details. There is a common set of message types for APIs to use.",
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "description": "Properties of the object. Contains field @type with type URL.",
+              "type": "any"
+            }
+          },
+          "type": "array"
+        }
+      },
+      "id": "Status"
+    },
+    "SourceContext": {
+      "description": "SourceContext represents information about the source of a protobuf element, like the file in which it is defined.",
+      "type": "object",
+      "properties": {
+        "fileName": {
+          "type": "string",
+          "description": "The path-qualified name of the .proto file that contained the associated protobuf element. For example: \"google/protobuf/source_context.proto\"."
+        }
+      },
+      "id": "SourceContext"
+    },
+    "MetricDescriptor": {
+      "description": "Defines a metric type and its schema. Once a metric descriptor is created, deleting or altering it stops data collection and makes the metric type's existing data unusable.",
+      "type": "object",
+      "properties": {
+        "metricKind": {
+          "enumDescriptions": [
+            "Do not use this default value.",
+            "An instantaneous measurement of a value.",
+            "The change in a value during a time interval.",
+            "A value accumulated over a time interval. Cumulative measurements in a time series should have the same start time and increasing end times, until an event resets the cumulative value to zero and sets a new start time for the following points."
+          ],
+          "enum": [
+            "METRIC_KIND_UNSPECIFIED",
+            "GAUGE",
+            "DELTA",
+            "CUMULATIVE"
+          ],
+          "description": "Whether the metric records instantaneous values, changes to a value, etc. Some combinations of metric_kind and value_type might not be supported.",
+          "type": "string"
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the metric, which can be used in documentation."
+        },
+        "displayName": {
+          "description": "A concise name for the metric, which can be displayed in user interfaces. Use sentence case without an ending period, for example \"Request count\".",
+          "type": "string"
+        },
+        "unit": {
+          "description": "The unit in which the metric value is reported. It is only applicable if the value_type is INT64, DOUBLE, or DISTRIBUTION. The supported units are a subset of The Unified Code for Units of Measure (http://unitsofmeasure.org/ucum.html) standard:Basic units (UNIT)\nbit bit\nBy byte\ns second\nmin minute\nh hour\nd dayPrefixes (PREFIX)\nk kilo (10**3)\nM mega (10**6)\nG giga (10**9)\nT tera (10**12)\nP peta (10**15)\nE exa (10**18)\nZ zetta (10**21)\nY yotta (10**24)\nm milli (10**-3)\nu micro (10**-6)\nn nano (10**-9)\np pico (10**-12)\nf femto (10**-15)\na atto (10**-18)\nz zepto (10**-21)\ny yocto (10**-24)\nKi kibi (2**10)\nMi mebi (2**20)\nGi gibi (2**30)\nTi tebi (2**40)GrammarThe grammar includes the dimensionless unit 1, such as 1/s.The grammar also includes these connectors:\n/ division (as an infix operator, e.g. 1/s).\n. multiplication (as an infix operator, e.g. GBy.d)The grammar for a unit is as follows:\nExpression = Component { \".\" Component } { \"/\" Component } ;\n\nComponent = [ PREFIX ] UNIT [ Annotation ]\n          | Annotation\n          | \"1\"\n          ;\n\nAnnotation = \"{\" NAME \"}\" ;\nNotes:\nAnnotation is just a comment if it follows a UNIT and is  equivalent to 1 if it is used alone. For examples,  {requests}/s == 1/s, By{transmitted}/s == By/s.\nNAME is a sequence of non-blank printable ASCII characters not  containing '{' or '}'.",
+          "type": "string"
+        },
+        "labels": {
+          "description": "The set of labels that can be used to describe a specific instance of this metric type. For example, the appengine.googleapis.com/http/server/response_latencies metric type has a label for the HTTP response code, response_code, so you can look at latencies for successful responses or just for responses that failed.",
+          "items": {
+            "$ref": "LabelDescriptor"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "The resource name of the metric descriptor. Depending on the implementation, the name typically includes: (1) the parent resource name that defines the scope of the metric type or of its data; and (2) the metric's URL-encoded type, which also appears in the type field of this descriptor. For example, following is the resource name of a custom metric within the GCP project my-project-id:\n\"projects/my-project-id/metricDescriptors/custom.googleapis.com%2Finvoice%2Fpaid%2Famount\"\n",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "description": "The metric type, including its DNS name prefix. The type is not URL-encoded. All user-defined custom metric types have the DNS name custom.googleapis.com. Metric types should use a natural hierarchical grouping. For example:\n\"custom.googleapis.com/invoice/paid/amount\"\n\"appengine.googleapis.com/http/server/response_latencies\"\n"
+        },
+        "valueType": {
+          "enumDescriptions": [
+            "Do not use this default value.",
+            "The value is a boolean. This value type can be used only if the metric kind is GAUGE.",
+            "The value is a signed 64-bit integer.",
+            "The value is a double precision floating point number.",
+            "The value is a text string. This value type can be used only if the metric kind is GAUGE.",
+            "The value is a Distribution.",
+            "The value is money."
+          ],
+          "enum": [
+            "VALUE_TYPE_UNSPECIFIED",
+            "BOOL",
+            "INT64",
+            "DOUBLE",
+            "STRING",
+            "DISTRIBUTION",
+            "MONEY"
+          ],
+          "description": "Whether the measurement is an integer, a floating-point number, etc. Some combinations of metric_kind and value_type might not be supported.",
+          "type": "string"
+        }
+      },
+      "id": "MetricDescriptor"
+    },
+    "Range": {
+      "type": "object",
+      "properties": {
+        "min": {
+          "format": "double",
+          "description": "The minimum of the population values.",
+          "type": "number"
+        },
+        "max": {
+          "format": "double",
+          "description": "The maximum of the population values.",
+          "type": "number"
+        }
+      },
+      "id": "Range",
+      "description": "The range of the population values."
+    },
+    "ListGroupsResponse": {
+      "description": "The ListGroups response.",
+      "type": "object",
+      "properties": {
+        "group": {
+          "description": "The groups that match the specified filters.",
+          "items": {
+            "$ref": "Group"
+          },
+          "type": "array"
+        },
+        "nextPageToken": {
+          "description": "If there are more results than have been returned, then this field is set to a non-empty value. To see the additional results, use that value as pageToken in the next call to this method.",
+          "type": "string"
+        }
+      },
+      "id": "ListGroupsResponse"
+    },
+    "CreateCollectdTimeSeriesRequest": {
+      "description": "The CreateCollectdTimeSeries request.",
+      "type": "object",
+      "properties": {
+        "collectdVersion": {
+          "description": "The version of collectd that collected the data. Example: \"5.3.0-192.el6\".",
+          "type": "string"
+        },
+        "collectdPayloads": {
+          "description": "The collectd payloads representing the time series data. You must not include more than a single point for each time series, so no two payloads can have the same values for all of the fields plugin, plugin_instance, type, and type_instance.",
+          "items": {
+            "$ref": "CollectdPayload"
+          },
+          "type": "array"
+        },
+        "resource": {
+          "$ref": "MonitoredResource",
+          "description": "The monitored resource associated with the time series."
+        }
+      },
+      "id": "CreateCollectdTimeSeriesRequest"
+    },
+    "ListGroupMembersResponse": {
+      "id": "ListGroupMembersResponse",
+      "description": "The ListGroupMembers response.",
+      "type": "object",
+      "properties": {
+        "members": {
+          "description": "A set of monitored resources in the group.",
+          "items": {
+            "$ref": "MonitoredResource"
+          },
+          "type": "array"
+        },
+        "nextPageToken": {
+          "description": "If there are more results than have been returned, then this field is set to a non-empty value. To see the additional results, use that value as pageToken in the next call to this method.",
+          "type": "string"
+        },
+        "totalSize": {
+          "format": "int32",
+          "description": "The total number of elements matching this request.",
+          "type": "integer"
+        }
+      }
+    },
+    "ListMonitoredResourceDescriptorsResponse": {
+      "id": "ListMonitoredResourceDescriptorsResponse",
+      "description": "The ListMonitoredResourceDescriptors response.",
+      "type": "object",
+      "properties": {
+        "nextPageToken": {
+          "description": "If there are more results than have been returned, then this field is set to a non-empty value. To see the additional results, use that value as pageToken in the next call to this method.",
+          "type": "string"
+        },
+        "resourceDescriptors": {
+          "description": "The monitored resource descriptors that are available to this project and that match filter, if present.",
+          "items": {
+            "$ref": "MonitoredResourceDescriptor"
+          },
+          "type": "array"
+        }
+      }
+    },
+    "TimeSeries": {
+      "description": "A collection of data points that describes the time-varying values of a metric. A time series is identified by a combination of a fully-specified monitored resource and a fully-specified metric. This type is used for both listing and creating time series.",
+      "type": "object",
+      "properties": {
+        "metricKind": {
+          "enumDescriptions": [
+            "Do not use this default value.",
+            "An instantaneous measurement of a value.",
+            "The change in a value during a time interval.",
+            "A value accumulated over a time interval. Cumulative measurements in a time series should have the same start time and increasing end times, until an event resets the cumulative value to zero and sets a new start time for the following points."
+          ],
+          "enum": [
+            "METRIC_KIND_UNSPECIFIED",
+            "GAUGE",
+            "DELTA",
+            "CUMULATIVE"
+          ],
+          "description": "The metric kind of the time series. When listing time series, this metric kind might be different from the metric kind of the associated metric if this time series is an alignment or reduction of other time series.When creating a time series, this field is optional. If present, it must be the same as the metric kind of the associated metric. If the associated metric's descriptor must be auto-created, then this field specifies the metric kind of the new descriptor and must be either GAUGE (the default) or CUMULATIVE.",
+          "type": "string"
+        },
+        "points": {
+          "description": "The data points of this time series. When listing time series, the order of the points is specified by the list method.When creating a time series, this field must contain exactly one point and the point's type must be the same as the value type of the associated metric. If the associated metric's descriptor must be auto-created, then the value type of the descriptor is determined by the point's type, which must be BOOL, INT64, DOUBLE, or DISTRIBUTION.",
+          "items": {
+            "$ref": "Point"
+          },
+          "type": "array"
+        },
+        "metric": {
+          "description": "The associated metric. A fully-specified metric used to identify the time series.",
+          "$ref": "Metric"
+        },
+        "valueType": {
+          "description": "The value type of the time series. When listing time series, this value type might be different from the value type of the associated metric if this time series is an alignment or reduction of other time series.When creating a time series, this field is optional. If present, it must be the same as the type of the data in the points field.",
+          "type": "string",
+          "enumDescriptions": [
+            "Do not use this default value.",
+            "The value is a boolean. This value type can be used only if the metric kind is GAUGE.",
+            "The value is a signed 64-bit integer.",
+            "The value is a double precision floating point number.",
+            "The value is a text string. This value type can be used only if the metric kind is GAUGE.",
+            "The value is a Distribution.",
+            "The value is money."
+          ],
+          "enum": [
+            "VALUE_TYPE_UNSPECIFIED",
+            "BOOL",
+            "INT64",
+            "DOUBLE",
+            "STRING",
+            "DISTRIBUTION",
+            "MONEY"
+          ]
+        },
+        "resource": {
+          "$ref": "MonitoredResource",
+          "description": "The associated monitored resource. Custom metrics can use only certain monitored resource types in their time series data."
+        }
+      },
+      "id": "TimeSeries"
+    },
+    "CreateTimeSeriesRequest": {
+      "description": "The CreateTimeSeries request.",
+      "type": "object",
+      "properties": {
+        "timeSeries": {
+          "description": "The new data to be added to a list of time series. Adds at most one data point to each of several time series. The new data point must be more recent than any other point in its time series. Each TimeSeries value must fully specify a unique time series by supplying all label values for the metric and the monitored resource.",
+          "items": {
+            "$ref": "TimeSeries"
+          },
+          "type": "array"
+        }
+      },
+      "id": "CreateTimeSeriesRequest"
+    },
+    "Distribution": {
+      "properties": {
+        "sumOfSquaredDeviation": {
+          "format": "double",
+          "description": "The sum of squared deviations from the mean of the values in the population. For values x_i this is:\nSum[i=1..n]((x_i - mean)^2)\nKnuth, \"The Art of Computer Programming\", Vol. 2, page 323, 3rd edition describes Welford's method for accumulating this sum in one pass.If count is zero then this field must be zero.",
+          "type": "number"
+        },
+        "range": {
+          "$ref": "Range",
+          "description": "If specified, contains the range of the population values. The field must not be present if the count is zero. This field is presently ignored by the Stackdriver Monitoring API v3."
+        },
+        "count": {
+          "format": "int64",
+          "description": "The number of values in the population. Must be non-negative. This value must equal the sum of the values in bucket_counts if a histogram is provided.",
+          "type": "string"
+        },
+        "mean": {
+          "format": "double",
+          "description": "The arithmetic mean of the values in the population. If count is zero then this field must be zero.",
+          "type": "number"
+        },
+        "bucketCounts": {
+          "description": "Required in the Stackdriver Monitoring API v3. The values for each bucket specified in bucket_options. The sum of the values in bucketCounts must equal the value in the count field of the Distribution object. The order of the bucket counts follows the numbering schemes described for the three bucket types. The underflow bucket has number 0; the finite buckets, if any, have numbers 1 through N-2; and the overflow bucket has number N-1. The size of bucket_counts must not be greater than N. If the size is less than N, then the remaining buckets are assigned values of zero.",
+          "items": {
+            "format": "int64",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "bucketOptions": {
+          "$ref": "BucketOptions",
+          "description": "Required in the Stackdriver Monitoring API v3. Defines the histogram bucket boundaries."
+        }
+      },
+      "id": "Distribution",
+      "description": "Distribution contains summary statistics for a population of values. It optionally contains a histogram representing the distribution of those values across a set of buckets.The summary statistics are the count, mean, sum of the squared deviation from the mean, the minimum, and the maximum of the set of population of values. The histogram is based on a sequence of buckets and gives a count of values that fall into each bucket. The boundaries of the buckets are given either explicitly or by formulas for buckets of fixed or exponentially increasing widths.Although it is not forbidden, it is generally a bad idea to include non-finite values (infinities or NaNs) in the population of values, as this will render the mean and sum_of_squared_deviation fields meaningless.",
+      "type": "object"
+    },
+    "MonitoredResource": {
+      "description": "An object representing a resource that can be used for monitoring, logging, billing, or other purposes. Examples include virtual machine instances, databases, and storage devices such as disks. The type field identifies a MonitoredResourceDescriptor object that describes the resource's schema. Information in the labels field identifies the actual resource and its attributes according to the schema. For example, a particular Compute Engine VM instance could be represented by the following object, because the MonitoredResourceDescriptor for \"gce_instance\" has labels \"instance_id\" and \"zone\":\n{ \"type\": \"gce_instance\",\n  \"labels\": { \"instance_id\": \"12345678901234\",\n              \"zone\": \"us-central1-a\" }}\n",
+      "type": "object",
+      "properties": {
+        "type": {
+          "description": "Required. The monitored resource type. This field must match the type field of a MonitoredResourceDescriptor object. For example, the type of a Compute Engine VM instance is gce_instance.",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Required. Values for all of the labels listed in the associated monitored resource descriptor. For example, Compute Engine VM instances use the labels \"project_id\", \"instance_id\", and \"zone\".",
+          "type": "object"
+        }
+      },
+      "id": "MonitoredResource"
+    },
+    "ListMetricDescriptorsResponse": {
+      "description": "The ListMetricDescriptors response.",
+      "type": "object",
+      "properties": {
+        "nextPageToken": {
+          "description": "If there are more results than have been returned, then this field is set to a non-empty value. To see the additional results, use that value as pageToken in the next call to this method.",
+          "type": "string"
+        },
+        "metricDescriptors": {
+          "description": "The metric descriptors that are available to the project and that match the value of filter, if present.",
+          "items": {
+            "$ref": "MetricDescriptor"
+          },
+          "type": "array"
+        }
+      },
+      "id": "ListMetricDescriptorsResponse"
+    },
+    "CollectdPayloadError": {
+      "description": "Describes the error status for payloads that were not written.",
+      "type": "object",
+      "properties": {
+        "valueErrors": {
+          "description": "Records the error status for values that were not written due to an error.Failed payloads for which nothing is written will not include partial value errors.",
+          "items": {
+            "$ref": "CollectdValueError"
+          },
+          "type": "array"
+        },
+        "error": {
+          "$ref": "Status",
+          "description": "Records the error status for the payload. If this field is present, the partial errors for nested values won't be populated."
+        },
+        "index": {
+          "type": "integer",
+          "format": "int32",
+          "description": "The zero-based index in CreateCollectdTimeSeriesRequest.collectd_payloads."
+        }
+      },
+      "id": "CollectdPayloadError"
+    },
+    "MonitoredResourceDescriptor": {
+      "description": "An object that describes the schema of a MonitoredResource object using a type name and a set of labels. For example, the monitored resource descriptor for Google Compute Engine VM instances has a type of \"gce_instance\" and specifies the use of the labels \"instance_id\" and \"zone\" to identify particular VM instances.Different APIs can support different monitored resource types. APIs generally provide a list method that returns the monitored resource descriptors used by the API.",
+      "type": "object",
+      "properties": {
+        "labels": {
+          "description": "Required. A set of labels used to describe instances of this monitored resource type. For example, an individual Google Cloud SQL database is identified by values for the labels \"database_id\" and \"zone\".",
+          "items": {
+            "$ref": "LabelDescriptor"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "Optional. The resource name of the monitored resource descriptor: \"projects/{project_id}/monitoredResourceDescriptors/{type}\" where {type} is the value of the type field in this object and {project_id} is a project ID that provides API-specific context for accessing the type. APIs that do not use project information can use the resource name format \"monitoredResourceDescriptors/{type}\".",
+          "type": "string"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional. A detailed description of the monitored resource type that might be used in documentation."
+        },
+        "displayName": {
+          "description": "Optional. A concise name for the monitored resource type that might be displayed in user interfaces. It should be a Title Cased Noun Phrase, without any article or other determiners. For example, \"Google Cloud SQL Database\".",
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "description": "Required. The monitored resource type. For example, the type \"cloudsql_database\" represents databases in Google Cloud SQL. The maximum length of this value is 256 characters."
+        }
+      },
+      "id": "MonitoredResourceDescriptor"
+    },
+    "TypedValue": {
+      "description": "A single strongly-typed value.",
+      "type": "object",
+      "properties": {
+        "distributionValue": {
+          "$ref": "Distribution",
+          "description": "A distribution value."
+        },
+        "stringValue": {
+          "description": "A variable-length string value.",
+          "type": "string"
+        },
+        "boolValue": {
+          "description": "A Boolean value: true or false.",
+          "type": "boolean"
+        },
+        "doubleValue": {
+          "format": "double",
+          "description": "A 64-bit double-precision floating-point number. Its magnitude is approximately &plusmn;10\u003csup\u003e&plusmn;300\u003c/sup\u003e and it has 16 significant digits of precision.",
+          "type": "number"
+        },
+        "int64Value": {
+          "format": "int64",
+          "description": "A 64-bit integer. Its range is approximately &plusmn;9.2x10\u003csup\u003e18\u003c/sup\u003e.",
+          "type": "string"
+        }
+      },
+      "id": "TypedValue"
+    },
+    "CollectdValueError": {
+      "description": "Describes the error status for values that were not written.",
+      "type": "object",
+      "properties": {
+        "index": {
+          "format": "int32",
+          "description": "The zero-based index in CollectdPayload.values within the parent CreateCollectdTimeSeriesRequest.collectd_payloads.",
+          "type": "integer"
+        },
+        "error": {
+          "description": "Records the error status for the value.",
+          "$ref": "Status"
+        }
+      },
+      "id": "CollectdValueError"
+    },
+    "CollectdPayload": {
+      "description": "A collection of data points sent from a collectd-based plugin. See the collectd documentation for more information.",
+      "type": "object",
+      "properties": {
+        "endTime": {
+          "type": "string",
+          "format": "google-datetime",
+          "description": "The end time of the interval."
+        },
+        "startTime": {
+          "format": "google-datetime",
+          "description": "The start time of the interval.",
+          "type": "string"
+        },
+        "values": {
+          "description": "The measured values during this time interval. Each value must have a different dataSourceName.",
+          "items": {
+            "$ref": "CollectdValue"
+          },
+          "type": "array"
+        },
+        "typeInstance": {
+          "description": "The measurement type instance. Example: \"used\".",
+          "type": "string"
+        },
+        "metadata": {
+          "description": "The measurement metadata. Example: \"process_id\" -\u003e 12345",
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "TypedValue"
+          }
+        },
+        "type": {
+          "description": "The measurement type. Example: \"memory\".",
+          "type": "string"
+        },
+        "plugin": {
+          "description": "The name of the plugin. Example: \"disk\".",
+          "type": "string"
+        },
+        "pluginInstance": {
+          "description": "The instance name of the plugin Example: \"hdcl\".",
+          "type": "string"
+        }
+      },
+      "id": "CollectdPayload"
+    },
+    "CreateCollectdTimeSeriesResponse": {
+      "id": "CreateCollectdTimeSeriesResponse",
+      "description": "The CreateCollectdTimeSeries response.",
+      "type": "object",
+      "properties": {
+        "payloadErrors": {
+          "description": "Records the error status for points that were not written due to an error.Failed requests for which nothing is written will return an error response instead.",
+          "items": {
+            "$ref": "CollectdPayloadError"
+          },
+          "type": "array"
+        }
+      }
+    },
+    "Linear": {
+      "description": "Specifies a linear sequence of buckets that all have the same width (except overflow and underflow). Each bucket represents a constant absolute uncertainty on the specific value in the bucket.There are num_finite_buckets + 2 (= N) buckets. Bucket i has the following boundaries:Upper bound (0 \u003c= i \u003c N-1): offset + (width * i).  Lower bound (1 \u003c= i \u003c N): offset + (width * (i - 1)).",
+      "type": "object",
+      "properties": {
+        "numFiniteBuckets": {
+          "type": "integer",
+          "format": "int32",
+          "description": "Must be greater than 0."
+        },
+        "width": {
+          "format": "double",
+          "description": "Must be greater than 0.",
+          "type": "number"
+        },
+        "offset": {
+          "format": "double",
+          "description": "Lower bound of the first bucket.",
+          "type": "number"
+        }
+      },
+      "id": "Linear"
+    }
+  },
+  "protocol": "rest",
+  "icons": {
+    "x32": "http://www.google.com/images/icons/product/search-32.gif",
+    "x16": "http://www.google.com/images/icons/product/search-16.gif"
+  },
+  "canonicalName": "Monitoring",
+  "auth": {
+    "oauth2": {
+      "scopes": {
+        "https://www.googleapis.com/auth/monitoring.write": {
+          "description": "Publish metric data to your Google Cloud projects"
+        },
+        "https://www.googleapis.com/auth/monitoring.read": {
+          "description": "View monitoring data for all of your Google Cloud and third-party projects"
+        },
+        "https://www.googleapis.com/auth/cloud-platform": {
+          "description": "View and manage your data across Google Cloud Platform services"
+        },
+        "https://www.googleapis.com/auth/monitoring": {
+          "description": "View and write monitoring data for all of your Google and third-party Cloud and API projects"
+        }
+      }
+    }
+  },
+  "rootUrl": "https://monitoring.googleapis.com/",
+  "ownerDomain": "google.com",
+  "name": "monitoring",
+  "batchPath": "batch",
+  "fullyEncodeReservedExpansion": true,
+  "title": "Stackdriver Monitoring API",
+  "ownerName": "Google",
+  "resources": {
+    "projects": {
+      "resources": {
+        "collectdTimeSeries": {
+          "methods": {
+            "create": {
+              "request": {
+                "$ref": "CreateCollectdTimeSeriesRequest"
+              },
+              "description": "Stackdriver Monitoring Agent only: Creates a new time series.\u003caside class=\"caution\"\u003eThis method is only for use by the Stackdriver Monitoring Agent. Use projects.timeSeries.create instead.\u003c/aside\u003e",
+              "response": {
+                "$ref": "CreateCollectdTimeSeriesResponse"
+              },
+              "parameterOrder": [
+                "name"
+              ],
+              "httpMethod": "POST",
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring",
+                "https://www.googleapis.com/auth/monitoring.write"
+              ],
+              "parameters": {
+                "name": {
+                  "type": "string",
+                  "required": true,
+                  "pattern": "^projects/[^/]+$",
+                  "location": "path",
+                  "description": "The project in which to create the time series. The format is \"projects/PROJECT_ID_OR_NUMBER\"."
+                }
+              },
+              "flatPath": "v3/projects/{projectsId}/collectdTimeSeries",
+              "id": "monitoring.projects.collectdTimeSeries.create",
+              "path": "v3/{+name}/collectdTimeSeries"
+            }
+          }
+        },
+        "timeSeries": {
+          "methods": {
+            "create": {
+              "id": "monitoring.projects.timeSeries.create",
+              "path": "v3/{+name}/timeSeries",
+              "description": "Creates or adds data to one or more time series. The response is empty if all time series in the request were written. If any time series could not be written, a corresponding failure message is included in the error response.",
+              "request": {
+                "$ref": "CreateTimeSeriesRequest"
+              },
+              "response": {
+                "$ref": "Empty"
+              },
+              "parameterOrder": [
+                "name"
+              ],
+              "httpMethod": "POST",
+              "parameters": {
+                "name": {
+                  "location": "path",
+                  "description": "The project on which to execute the request. The format is \"projects/{project_id_or_number}\".",
+                  "type": "string",
+                  "required": true,
+                  "pattern": "^projects/[^/]+$"
+                }
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring",
+                "https://www.googleapis.com/auth/monitoring.write"
+              ],
+              "flatPath": "v3/projects/{projectsId}/timeSeries"
+            },
+            "list": {
+              "parameterOrder": [
+                "name"
+              ],
+              "httpMethod": "GET",
+              "response": {
+                "$ref": "ListTimeSeriesResponse"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring",
+                "https://www.googleapis.com/auth/monitoring.read"
+              ],
+              "parameters": {
+                "filter": {
+                  "location": "query",
+                  "description": "A monitoring filter that specifies which time series should be returned. The filter must specify a single metric type, and can additionally specify metric labels and other information. For example:\nmetric.type = \"compute.googleapis.com/instance/cpu/usage_time\" AND\n    metric.label.instance_name = \"my-instance-name\"\n",
+                  "type": "string"
+                },
+                "aggregation.perSeriesAligner": {
+                  "location": "query",
+                  "enum": [
+                    "ALIGN_NONE",
+                    "ALIGN_DELTA",
+                    "ALIGN_RATE",
+                    "ALIGN_INTERPOLATE",
+                    "ALIGN_NEXT_OLDER",
+                    "ALIGN_MIN",
+                    "ALIGN_MAX",
+                    "ALIGN_MEAN",
+                    "ALIGN_COUNT",
+                    "ALIGN_SUM",
+                    "ALIGN_STDDEV",
+                    "ALIGN_COUNT_TRUE",
+                    "ALIGN_FRACTION_TRUE",
+                    "ALIGN_PERCENTILE_99",
+                    "ALIGN_PERCENTILE_95",
+                    "ALIGN_PERCENTILE_50",
+                    "ALIGN_PERCENTILE_05"
+                  ],
+                  "description": "The approach to be used to align individual time series. Not all alignment functions may be applied to all time series, depending on the metric type and value type of the original time series. Alignment may change the metric type or the value type of the time series.Time series data must be aligned in order to perform cross-time series reduction. If crossSeriesReducer is specified, then perSeriesAligner must be specified and not equal ALIGN_NONE and alignmentPeriod must be specified; otherwise, an error is returned.",
+                  "type": "string"
+                },
+                "pageToken": {
+                  "description": "If this field is not empty then it must contain the nextPageToken value returned by a previous call to this method. Using this field causes the method to return additional results from the previous method call.",
+                  "type": "string",
+                  "location": "query"
+                },
+                "interval.startTime": {
+                  "location": "query",
+                  "format": "google-datetime",
+                  "description": "Optional. The beginning of the time interval. The default value for the start time is the end time. The start time must not be later than the end time.",
+                  "type": "string"
+                },
+                "view": {
+                  "description": "Specifies which information is returned about the time series.",
+                  "type": "string",
+                  "location": "query",
+                  "enum": [
+                    "FULL",
+                    "HEADERS"
+                  ]
+                },
+                "aggregation.groupByFields": {
+                  "repeated": true,
+                  "location": "query",
+                  "description": "The set of fields to preserve when crossSeriesReducer is specified. The groupByFields determine how the time series are partitioned into subsets prior to applying the aggregation function. Each subset contains time series that have the same value for each of the grouping fields. Each individual time series is a member of exactly one subset. The crossSeriesReducer is applied to each subset of time series. It is not possible to reduce across different resource types, so this field implicitly contains resource.type. Fields not specified in groupByFields are aggregated away. If groupByFields is not specified and all the time series have the same resource type, then the time series are aggregated into a single output time series. If crossSeriesReducer is not defined, this field is ignored.",
+                  "type": "string"
+                },
+                "name": {
+                  "pattern": "^projects/[^/]+$",
+                  "location": "path",
+                  "description": "The project on which to execute the request. The format is \"projects/{project_id_or_number}\".",
+                  "type": "string",
+                  "required": true
+                },
+                "interval.endTime": {
+                  "format": "google-datetime",
+                  "description": "Required. The end of the time interval.",
+                  "type": "string",
+                  "location": "query"
+                },
+                "aggregation.alignmentPeriod": {
+                  "format": "google-duration",
+                  "description": "The alignment period for per-time series alignment. If present, alignmentPeriod must be at least 60 seconds. After per-time series alignment, each time series will contain data points only on the period boundaries. If perSeriesAligner is not specified or equals ALIGN_NONE, then this field is ignored. If perSeriesAligner is specified and does not equal ALIGN_NONE, then this field must be defined; otherwise an error is returned.",
+                  "type": "string",
+                  "location": "query"
+                },
+                "pageSize": {
+                  "location": "query",
+                  "format": "int32",
+                  "description": "A positive number that is the maximum number of results to return. When view field sets to FULL, it limits the number of Points server will return; if view field is HEADERS, it limits the number of TimeSeries server will return.",
+                  "type": "integer"
+                },
+                "orderBy": {
+                  "type": "string",
+                  "location": "query",
+                  "description": "Specifies the order in which the points of the time series should be returned. By default, results are not ordered. Currently, this field must be left blank."
+                },
+                "aggregation.crossSeriesReducer": {
+                  "type": "string",
+                  "location": "query",
+                  "enum": [
+                    "REDUCE_NONE",
+                    "REDUCE_MEAN",
+                    "REDUCE_MIN",
+                    "REDUCE_MAX",
+                    "REDUCE_SUM",
+                    "REDUCE_STDDEV",
+                    "REDUCE_COUNT",
+                    "REDUCE_COUNT_TRUE",
+                    "REDUCE_FRACTION_TRUE",
+                    "REDUCE_PERCENTILE_99",
+                    "REDUCE_PERCENTILE_95",
+                    "REDUCE_PERCENTILE_50",
+                    "REDUCE_PERCENTILE_05"
+                  ],
+                  "description": "The approach to be used to combine time series. Not all reducer functions may be applied to all time series, depending on the metric type and the value type of the original time series. Reduction may change the metric type of value type of the time series.Time series data must be aligned in order to perform cross-time series reduction. If crossSeriesReducer is specified, then perSeriesAligner must be specified and not equal ALIGN_NONE and alignmentPeriod must be specified; otherwise, an error is returned."
+                }
+              },
+              "flatPath": "v3/projects/{projectsId}/timeSeries",
+              "id": "monitoring.projects.timeSeries.list",
+              "path": "v3/{+name}/timeSeries",
+              "description": "Lists time series that match a filter. This method does not require a Stackdriver account."
+            }
+          }
+        },
+        "metricDescriptors": {
+          "methods": {
+            "get": {
+              "response": {
+                "$ref": "MetricDescriptor"
+              },
+              "parameterOrder": [
+                "name"
+              ],
+              "httpMethod": "GET",
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring",
+                "https://www.googleapis.com/auth/monitoring.read",
+                "https://www.googleapis.com/auth/monitoring.write"
+              ],
+              "parameters": {
+                "name": {
+                  "type": "string",
+                  "required": true,
+                  "pattern": "^projects/[^/]+/metricDescriptors/.+$",
+                  "location": "path",
+                  "description": "The metric descriptor on which to execute the request. The format is \"projects/{project_id_or_number}/metricDescriptors/{metric_id}\". An example value of {metric_id} is \"compute.googleapis.com/instance/disk/read_bytes_count\"."
+                }
+              },
+              "flatPath": "v3/projects/{projectsId}/metricDescriptors/{metricDescriptorsId}",
+              "id": "monitoring.projects.metricDescriptors.get",
+              "path": "v3/{+name}",
+              "description": "Gets a single metric descriptor. This method does not require a Stackdriver account."
+            },
+            "list": {
+              "response": {
+                "$ref": "ListMetricDescriptorsResponse"
+              },
+              "parameterOrder": [
+                "name"
+              ],
+              "httpMethod": "GET",
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring",
+                "https://www.googleapis.com/auth/monitoring.read",
+                "https://www.googleapis.com/auth/monitoring.write"
+              ],
+              "parameters": {
+                "pageToken": {
+                  "location": "query",
+                  "description": "If this field is not empty then it must contain the nextPageToken value returned by a previous call to this method. Using this field causes the method to return additional results from the previous method call.",
+                  "type": "string"
+                },
+                "name": {
+                  "pattern": "^projects/[^/]+$",
+                  "location": "path",
+                  "description": "The project on which to execute the request. The format is \"projects/{project_id_or_number}\".",
+                  "type": "string",
+                  "required": true
+                },
+                "pageSize": {
+                  "location": "query",
+                  "format": "int32",
+                  "description": "A positive number that is the maximum number of results to return.",
+                  "type": "integer"
+                },
+                "filter": {
+                  "description": "If this field is empty, all custom and system-defined metric descriptors are returned. Otherwise, the filter specifies which metric descriptors are to be returned. For example, the following filter matches all custom metrics:\nmetric.type = starts_with(\"custom.googleapis.com/\")\n",
+                  "type": "string",
+                  "location": "query"
+                }
+              },
+              "flatPath": "v3/projects/{projectsId}/metricDescriptors",
+              "id": "monitoring.projects.metricDescriptors.list",
+              "path": "v3/{+name}/metricDescriptors",
+              "description": "Lists metric descriptors that match a filter. This method does not require a Stackdriver account."
+            },
+            "create": {
+              "id": "monitoring.projects.metricDescriptors.create",
+              "path": "v3/{+name}/metricDescriptors",
+              "description": "Creates a new metric descriptor. User-created metric descriptors define custom metrics.",
+              "request": {
+                "$ref": "MetricDescriptor"
+              },
+              "response": {
+                "$ref": "MetricDescriptor"
+              },
+              "parameterOrder": [
+                "name"
+              ],
+              "httpMethod": "POST",
+              "parameters": {
+                "name": {
+                  "description": "The project on which to execute the request. The format is \"projects/{project_id_or_number}\".",
+                  "type": "string",
+                  "required": true,
+                  "pattern": "^projects/[^/]+$",
+                  "location": "path"
+                }
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring",
+                "https://www.googleapis.com/auth/monitoring.write"
+              ],
+              "flatPath": "v3/projects/{projectsId}/metricDescriptors"
+            },
+            "delete": {
+              "path": "v3/{+name}",
+              "id": "monitoring.projects.metricDescriptors.delete",
+              "description": "Deletes a metric descriptor. Only user-created custom metrics can be deleted.",
+              "httpMethod": "DELETE",
+              "response": {
+                "$ref": "Empty"
+              },
+              "parameterOrder": [
+                "name"
+              ],
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring"
+              ],
+              "parameters": {
+                "name": {
+                  "pattern": "^projects/[^/]+/metricDescriptors/.+$",
+                  "location": "path",
+                  "description": "The metric descriptor on which to execute the request. The format is \"projects/{project_id_or_number}/metricDescriptors/{metric_id}\". An example of {metric_id} is: \"custom.googleapis.com/my_test_metric\".",
+                  "type": "string",
+                  "required": true
+                }
+              },
+              "flatPath": "v3/projects/{projectsId}/metricDescriptors/{metricDescriptorsId}"
+            }
+          }
+        },
+        "monitoredResourceDescriptors": {
+          "methods": {
+            "get": {
+              "id": "monitoring.projects.monitoredResourceDescriptors.get",
+              "path": "v3/{+name}",
+              "description": "Gets a single monitored resource descriptor. This method does not require a Stackdriver account.",
+              "response": {
+                "$ref": "MonitoredResourceDescriptor"
+              },
+              "parameterOrder": [
+                "name"
+              ],
+              "httpMethod": "GET",
+              "parameters": {
+                "name": {
+                  "description": "The monitored resource descriptor to get. The format is \"projects/{project_id_or_number}/monitoredResourceDescriptors/{resource_type}\". The {resource_type} is a predefined type, such as cloudsql_database.",
+                  "type": "string",
+                  "required": true,
+                  "pattern": "^projects/[^/]+/monitoredResourceDescriptors/[^/]+$",
+                  "location": "path"
+                }
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring",
+                "https://www.googleapis.com/auth/monitoring.read",
+                "https://www.googleapis.com/auth/monitoring.write"
+              ],
+              "flatPath": "v3/projects/{projectsId}/monitoredResourceDescriptors/{monitoredResourceDescriptorsId}"
+            },
+            "list": {
+              "response": {
+                "$ref": "ListMonitoredResourceDescriptorsResponse"
+              },
+              "parameterOrder": [
+                "name"
+              ],
+              "httpMethod": "GET",
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring",
+                "https://www.googleapis.com/auth/monitoring.read",
+                "https://www.googleapis.com/auth/monitoring.write"
+              ],
+              "parameters": {
+                "pageToken": {
+                  "description": "If this field is not empty then it must contain the nextPageToken value returned by a previous call to this method. Using this field causes the method to return additional results from the previous method call.",
+                  "type": "string",
+                  "location": "query"
+                },
+                "name": {
+                  "location": "path",
+                  "description": "The project on which to execute the request. The format is \"projects/{project_id_or_number}\".",
+                  "type": "string",
+                  "required": true,
+                  "pattern": "^projects/[^/]+$"
+                },
+                "pageSize": {
+                  "location": "query",
+                  "format": "int32",
+                  "description": "A positive number that is the maximum number of results to return.",
+                  "type": "integer"
+                },
+                "filter": {
+                  "description": "An optional filter describing the descriptors to be returned. The filter can reference the descriptor's type and labels. For example, the following filter returns only Google Compute Engine descriptors that have an id label:\nresource.type = starts_with(\"gce_\") AND resource.label:id\n",
+                  "type": "string",
+                  "location": "query"
+                }
+              },
+              "flatPath": "v3/projects/{projectsId}/monitoredResourceDescriptors",
+              "id": "monitoring.projects.monitoredResourceDescriptors.list",
+              "path": "v3/{+name}/monitoredResourceDescriptors",
+              "description": "Lists monitored resource descriptors that match a filter. This method does not require a Stackdriver account."
+            }
+          }
+        },
+        "groups": {
+          "methods": {
+            "create": {
+              "description": "Creates a new group.",
+              "request": {
+                "$ref": "Group"
+              },
+              "httpMethod": "POST",
+              "parameterOrder": [
+                "name"
+              ],
+              "response": {
+                "$ref": "Group"
+              },
+              "parameters": {
+                "validateOnly": {
+                  "description": "If true, validate this request but do not create the group.",
+                  "type": "boolean",
+                  "location": "query"
+                },
+                "name": {
+                  "pattern": "^projects/[^/]+$",
+                  "location": "path",
+                  "description": "The project in which to create the group. The format is \"projects/{project_id_or_number}\".",
+                  "type": "string",
+                  "required": true
+                }
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring"
+              ],
+              "flatPath": "v3/projects/{projectsId}/groups",
+              "path": "v3/{+name}/groups",
+              "id": "monitoring.projects.groups.create"
+            },
+            "delete": {
+              "description": "Deletes an existing group.",
+              "response": {
+                "$ref": "Empty"
+              },
+              "parameterOrder": [
+                "name"
+              ],
+              "httpMethod": "DELETE",
+              "parameters": {
+                "name": {
+                  "location": "path",
+                  "description": "The group to delete. The format is \"projects/{project_id_or_number}/groups/{group_id}\".",
+                  "type": "string",
+                  "required": true,
+                  "pattern": "^projects/[^/]+/groups/[^/]+$"
+                }
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring"
+              ],
+              "flatPath": "v3/projects/{projectsId}/groups/{groupsId}",
+              "id": "monitoring.projects.groups.delete",
+              "path": "v3/{+name}"
+            },
+            "get": {
+              "description": "Gets a single group.",
+              "httpMethod": "GET",
+              "parameterOrder": [
+                "name"
+              ],
+              "response": {
+                "$ref": "Group"
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring",
+                "https://www.googleapis.com/auth/monitoring.read"
+              ],
+              "parameters": {
+                "name": {
+                  "pattern": "^projects/[^/]+/groups/[^/]+$",
+                  "location": "path",
+                  "description": "The group to retrieve. The format is \"projects/{project_id_or_number}/groups/{group_id}\".",
+                  "type": "string",
+                  "required": true
+                }
+              },
+              "flatPath": "v3/projects/{projectsId}/groups/{groupsId}",
+              "path": "v3/{+name}",
+              "id": "monitoring.projects.groups.get"
+            },
+            "list": {
+              "description": "Lists the existing groups.",
+              "httpMethod": "GET",
+              "parameterOrder": [
+                "name"
+              ],
+              "response": {
+                "$ref": "ListGroupsResponse"
+              },
+              "parameters": {
+                "name": {
+                  "location": "path",
+                  "description": "The project whose groups are to be listed. The format is \"projects/{project_id_or_number}\".",
+                  "type": "string",
+                  "required": true,
+                  "pattern": "^projects/[^/]+$"
+                },
+                "childrenOfGroup": {
+                  "location": "query",
+                  "description": "A group name: \"projects/{project_id_or_number}/groups/{group_id}\". Returns groups whose parentName field contains the group name. If no groups have this parent, the results are empty.",
+                  "type": "string"
+                },
+                "descendantsOfGroup": {
+                  "description": "A group name: \"projects/{project_id_or_number}/groups/{group_id}\". Returns the descendants of the specified group. This is a superset of the results returned by the childrenOfGroup filter, and includes children-of-children, and so forth.",
+                  "type": "string",
+                  "location": "query"
+                },
+                "pageToken": {
+                  "location": "query",
+                  "description": "If this field is not empty then it must contain the nextPageToken value returned by a previous call to this method. Using this field causes the method to return additional results from the previous method call.",
+                  "type": "string"
+                },
+                "pageSize": {
+                  "location": "query",
+                  "format": "int32",
+                  "description": "A positive number that is the maximum number of results to return.",
+                  "type": "integer"
+                },
+                "ancestorsOfGroup": {
+                  "location": "query",
+                  "description": "A group name: \"projects/{project_id_or_number}/groups/{group_id}\". Returns groups that are ancestors of the specified group. The groups are returned in order, starting with the immediate parent and ending with the most distant ancestor. If the specified group has no immediate parent, the results are empty.",
+                  "type": "string"
+                }
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring",
+                "https://www.googleapis.com/auth/monitoring.read"
+              ],
+              "flatPath": "v3/projects/{projectsId}/groups",
+              "path": "v3/{+name}/groups",
+              "id": "monitoring.projects.groups.list"
+            },
+            "update": {
+              "httpMethod": "PUT",
+              "parameterOrder": [
+                "name"
+              ],
+              "response": {
+                "$ref": "Group"
+              },
+              "parameters": {
+                "validateOnly": {
+                  "location": "query",
+                  "description": "If true, validate this request but do not update the existing group.",
+                  "type": "boolean"
+                },
+                "name": {
+                  "location": "path",
+                  "description": "Output only. The name of this group. The format is \"projects/{project_id_or_number}/groups/{group_id}\". When creating a group, this field is ignored and a new name is created consisting of the project specified in the call to CreateGroup and a unique {group_id} that is generated automatically.",
+                  "type": "string",
+                  "required": true,
+                  "pattern": "^projects/[^/]+/groups/[^/]+$"
+                }
+              },
+              "scopes": [
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/monitoring"
+              ],
+              "flatPath": "v3/projects/{projectsId}/groups/{groupsId}",
+              "path": "v3/{+name}",
+              "id": "monitoring.projects.groups.update",
+              "description": "Updates an existing group. You can change any group attributes except name.",
+              "request": {
+                "$ref": "Group"
+              }
+            }
+          },
+          "resources": {
+            "members": {
+              "methods": {
+                "list": {
+                  "httpMethod": "GET",
+                  "parameterOrder": [
+                    "name"
+                  ],
+                  "response": {
+                    "$ref": "ListGroupMembersResponse"
+                  },
+                  "scopes": [
+                    "https://www.googleapis.com/auth/cloud-platform",
+                    "https://www.googleapis.com/auth/monitoring",
+                    "https://www.googleapis.com/auth/monitoring.read"
+                  ],
+                  "parameters": {
+                    "interval.endTime": {
+                      "format": "google-datetime",
+                      "description": "Required. The end of the time interval.",
+                      "type": "string",
+                      "location": "query"
+                    },
+                    "filter": {
+                      "location": "query",
+                      "description": "An optional list filter describing the members to be returned. The filter may reference the type, labels, and metadata of monitored resources that comprise the group. For example, to return only resources representing Compute Engine VM instances, use this filter:\nresource.type = \"gce_instance\"\n",
+                      "type": "string"
+                    },
+                    "pageToken": {
+                      "location": "query",
+                      "description": "If this field is not empty then it must contain the nextPageToken value returned by a previous call to this method. Using this field causes the method to return additional results from the previous method call.",
+                      "type": "string"
+                    },
+                    "interval.startTime": {
+                      "type": "string",
+                      "location": "query",
+                      "format": "google-datetime",
+                      "description": "Optional. The beginning of the time interval. The default value for the start time is the end time. The start time must not be later than the end time."
+                    },
+                    "pageSize": {
+                      "format": "int32",
+                      "description": "A positive number that is the maximum number of results to return.",
+                      "type": "integer",
+                      "location": "query"
+                    },
+                    "name": {
+                      "description": "The group whose members are listed. The format is \"projects/{project_id_or_number}/groups/{group_id}\".",
+                      "type": "string",
+                      "required": true,
+                      "pattern": "^projects/[^/]+/groups/[^/]+$",
+                      "location": "path"
+                    }
+                  },
+                  "flatPath": "v3/projects/{projectsId}/groups/{groupsId}/members",
+                  "path": "v3/{+name}/members",
+                  "id": "monitoring.projects.groups.members.list",
+                  "description": "Lists the monitored resources that are members of a group."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "parameters": {
+    "upload_protocol": {
+      "description": "Upload protocol for media (e.g. \"raw\", \"multipart\").",
+      "type": "string",
+      "location": "query"
+    },
+    "prettyPrint": {
+      "default": "true",
+      "type": "boolean",
+      "location": "query",
+      "description": "Returns response with indentations and line breaks."
+    },
+    "fields": {
+      "type": "string",
+      "location": "query",
+      "description": "Selector specifying which fields to include in a partial response."
+    },
+    "uploadType": {
+      "location": "query",
+      "description": "Legacy upload protocol for media (e.g. \"media\", \"multipart\").",
+      "type": "string"
+    },
+    "callback": {
+      "description": "JSONP",
+      "type": "string",
+      "location": "query"
+    },
+    "$.xgafv": {
+      "enumDescriptions": [
+        "v1 error format",
+        "v2 error format"
+      ],
+      "location": "query",
+      "enum": [
+        "1",
+        "2"
+      ],
+      "description": "V1 error format.",
+      "type": "string"
+    },
+    "alt": {
+      "enumDescriptions": [
+        "Responses with Content-Type of application/json",
+        "Media download with context-dependent Content-Type",
+        "Responses with Content-Type of application/x-protobuf"
+      ],
+      "location": "query",
+      "description": "Data format for response.",
+      "default": "json",
+      "enum": [
+        "json",
+        "media",
+        "proto"
+      ],
+      "type": "string"
+    },
+    "key": {
+      "description": "API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token.",
+      "type": "string",
+      "location": "query"
+    },
+    "access_token": {
+      "description": "OAuth access token.",
+      "type": "string",
+      "location": "query"
+    },
+    "quotaUser": {
+      "type": "string",
+      "location": "query",
+      "description": "Available to use for quota purposes for server-side applications. Can be any arbitrary string assigned to a user, but should not exceed 40 characters."
+    },
+    "pp": {
+      "description": "Pretty-print response.",
+      "default": "true",
+      "type": "boolean",
+      "location": "query"
+    },
+    "oauth_token": {
+      "description": "OAuth 2.0 token for the current user.",
+      "type": "string",
+      "location": "query"
+    },
+    "bearer_token": {
+      "location": "query",
+      "description": "OAuth bearer token.",
+      "type": "string"
+    }
+  },
+  "version": "v3",
+  "baseUrl": "https://monitoring.googleapis.com/"
+}

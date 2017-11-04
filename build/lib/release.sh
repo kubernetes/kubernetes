@@ -25,7 +25,14 @@
 
 # This is where the final release artifacts are created locally
 readonly RELEASE_STAGE="${LOCAL_OUTPUT_ROOT}/release-stage"
-readonly RELEASE_DIR="${LOCAL_OUTPUT_ROOT}/release-tars"
+readonly RELEASE_TARS="${LOCAL_OUTPUT_ROOT}/release-tars"
+readonly RELEASE_IMAGES="${LOCAL_OUTPUT_ROOT}/release-images"
+
+KUBE_BUILD_HYPERKUBE=${KUBE_BUILD_HYPERKUBE:-n}
+if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
+  # retain legacy behavior of automatically building hyperkube during releases
+  KUBE_BUILD_HYPERKUBE=y
+fi
 
 # Validate a ci version
 #
@@ -45,7 +52,7 @@ readonly RELEASE_DIR="${LOCAL_OUTPUT_ROOT}/release-tars"
 #   VERSION_COMMITS        (e.g. '56')
 function kube::release::parse_and_validate_ci_version() {
   # Accept things like "v1.2.3-alpha.4.56+abcdef12345678" or "v1.2.3-beta.4"
-  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-(beta|alpha|rc)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[0-9a-f]{7,40})?$"
+  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-([a-zA-Z0-9]+)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[0-9a-f]{7,40})?$"
   local -r version="${1-}"
   [[ "${version}" =~ ${version_regex} ]] || {
     kube::log::error "Invalid ci version: '${version}', must match regex ${version_regex}"
@@ -69,20 +76,10 @@ function kube::release::clean_cruft() {
   find ${RELEASE_STAGE} -name '.DS*' -exec rm {} \;
 }
 
-function kube::release::package_hyperkube() {
-  # If we have these variables set then we want to build all docker images.
-  if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
-    for arch in "${KUBE_SERVER_PLATFORMS[@]##*/}"; do
-      kube::log::status "Building hyperkube image for arch: ${arch}"
-      REGISTRY="${KUBE_DOCKER_REGISTRY}" VERSION="${KUBE_DOCKER_IMAGE_TAG}" ARCH="${arch}" make -C cluster/images/hyperkube/ build
-    done
-  fi
-}
-
 function kube::release::package_tarballs() {
   # Clean out any old releases
-  rm -rf "${RELEASE_DIR}"
-  mkdir -p "${RELEASE_DIR}"
+  rm -rf "${RELEASE_STAGE}" "${RELEASE_TARS}" "${RELEASE_IMAGES}"
+  mkdir -p "${RELEASE_TARS}"
   kube::release::package_src_tarball &
   kube::release::package_client_tarballs &
   kube::release::package_salt_tarball &
@@ -112,7 +109,7 @@ function kube::release::package_src_tarball() {
         \) -prune \
       \))
   )
-  "${TAR}" czf "${RELEASE_DIR}/kubernetes-src.tar.gz" -C "${KUBE_ROOT}" "${source_files[@]}"
+  "${TAR}" czf "${RELEASE_TARS}/kubernetes-src.tar.gz" -C "${KUBE_ROOT}" "${source_files[@]}"
 }
 
 # Package up all of the cross compiled clients. Over time this should grow into
@@ -143,7 +140,7 @@ function kube::release::package_client_tarballs() {
 
       kube::release::clean_cruft
 
-      local package_name="${RELEASE_DIR}/kubernetes-client-${platform_tag}.tar.gz"
+      local package_name="${RELEASE_TARS}/kubernetes-client-${platform_tag}.tar.gz"
       kube::release::create_tarball "${package_name}" "${release_stage}/.."
     ) &
   done
@@ -187,11 +184,11 @@ function kube::release::package_node_tarballs() {
 
     cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
 
-    cp "${RELEASE_DIR}/kubernetes-src.tar.gz" "${release_stage}/"
+    cp "${RELEASE_TARS}/kubernetes-src.tar.gz" "${release_stage}/"
 
     kube::release::clean_cruft
 
-    local package_name="${RELEASE_DIR}/kubernetes-node-${platform_tag}.tar.gz"
+    local package_name="${RELEASE_TARS}/kubernetes-node-${platform_tag}.tar.gz"
     kube::release::create_tarball "${package_name}" "${release_stage}/.."
   done
 }
@@ -227,11 +224,11 @@ function kube::release::package_server_tarballs() {
 
     cp "${KUBE_ROOT}/Godeps/LICENSES" "${release_stage}/"
 
-    cp "${RELEASE_DIR}/kubernetes-src.tar.gz" "${release_stage}/"
+    cp "${RELEASE_TARS}/kubernetes-src.tar.gz" "${release_stage}/"
 
     kube::release::clean_cruft
 
-    local package_name="${RELEASE_DIR}/kubernetes-server-${platform_tag}.tar.gz"
+    local package_name="${RELEASE_TARS}/kubernetes-server-${platform_tag}.tar.gz"
     kube::release::create_tarball "${package_name}" "${release_stage}/.."
   done
 }
@@ -252,6 +249,26 @@ function kube::release::sha1() {
   fi
 }
 
+function kube::release::build_hyperkube_image() {
+  local -r arch="$1"
+  local -r registry="$2"
+  local -r version="$3"
+  local -r save_dir="${4-}"
+  kube::log::status "Building hyperkube image for arch: ${arch}"
+  ARCH="${arch}" REGISTRY="${registry}" VERSION="${version}" \
+    make -C cluster/images/hyperkube/ build >/dev/null
+
+  local hyperkube_tag="${registry}/hyperkube-${arch}:${version}"
+  if [[ -n "${save_dir}" ]]; then
+    "${DOCKER[@]}" save "${hyperkube_tag}" > "${save_dir}/hyperkube-${arch}.tar"
+  fi
+  if [[ -z "${KUBE_DOCKER_IMAGE_TAG-}" || -z "${KUBE_DOCKER_REGISTRY-}" ]]; then
+    # not a release
+    kube::log::status "Deleting hyperkube image ${hyperkube_tag}"
+    "${DOCKER[@]}" rmi "${hyperkube_tag}" &>/dev/null || true
+  fi
+}
+
 # This will take binaries that run on master and creates Docker images
 # that wrap the binary in them. (One docker image per binary)
 # Args:
@@ -264,6 +281,16 @@ function kube::release::create_docker_images_for_server() {
     local arch="$2"
     local binary_name
     local binaries=($(kube::build::get_docker_wrapped_binaries ${arch}))
+    local images_dir="${RELEASE_IMAGES}/${arch}"
+    mkdir -p "${images_dir}"
+
+    local -r docker_registry="gcr.io/google_containers"
+    # Docker tags cannot contain '+'
+    local docker_tag="${KUBE_GIT_VERSION/+/_}"
+    if [[ -z "${docker_tag}" ]]; then
+      kube::log::error "git version information missing; cannot create Docker tag"
+      return 1
+    fi
 
     for wrappable in "${binaries[@]}"; do
 
@@ -274,49 +301,56 @@ function kube::release::create_docker_images_for_server() {
 
       local binary_name="$1"
       local base_image="$2"
+      local docker_build_path="${binary_dir}/${binary_name}.dockerbuild"
+      local docker_file_path="${docker_build_path}/Dockerfile"
+      local binary_file_path="${binary_dir}/${binary_name}"
+      local docker_image_tag="${docker_registry}"
+      if [[ ${arch} == "amd64" ]]; then
+        # If we are building a amd64 docker image, preserve the original
+        # image name
+        docker_image_tag+="/${binary_name}:${docker_tag}"
+      else
+        # If we are building a docker image for another architecture,
+        # append the arch in the image tag
+        docker_image_tag+="/${binary_name}-${arch}:${docker_tag}"
+      fi
 
-      kube::log::status "Starting Docker build for image: ${binary_name}"
 
+      kube::log::status "Starting docker build for image: ${binary_name}-${arch}"
       (
-        local md5_sum
-        md5_sum=$(kube::release::md5 "${binary_dir}/${binary_name}")
-
-        local docker_build_path="${binary_dir}/${binary_name}.dockerbuild"
-        local docker_file_path="${docker_build_path}/Dockerfile"
-        local binary_file_path="${binary_dir}/${binary_name}"
-
         rm -rf ${docker_build_path}
         mkdir -p ${docker_build_path}
         ln ${binary_dir}/${binary_name} ${docker_build_path}/${binary_name}
         printf " FROM ${base_image} \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
 
-        if [[ ${arch} == "amd64" ]]; then
-          # If we are building a amd64 docker image, preserve the original image name
-          local docker_image_tag=gcr.io/google_containers/${binary_name}:${md5_sum}
-        else
-          # If we are building a docker image for another architecture, append the arch in the image tag
-          local docker_image_tag=gcr.io/google_containers/${binary_name}-${arch}:${md5_sum}
-        fi
-
         "${DOCKER[@]}" build --pull -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
-        "${DOCKER[@]}" save ${docker_image_tag} > ${binary_dir}/${binary_name}.tar
-        echo $md5_sum > ${binary_dir}/${binary_name}.docker_tag
-
+        "${DOCKER[@]}" save "${docker_image_tag}" > "${binary_dir}/${binary_name}.tar"
+        echo "${docker_tag}" > ${binary_dir}/${binary_name}.docker_tag
         rm -rf ${docker_build_path}
+        ln "${binary_dir}/${binary_name}.tar" "${images_dir}/"
 
-        # If we are building an official/alpha/beta release we want to keep docker images
-        # and tag them appropriately.
+        # If we are building an official/alpha/beta release we want to keep
+        # docker images and tag them appropriately.
         if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
           local release_docker_image_tag="${KUBE_DOCKER_REGISTRY}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
-          kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
-          "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
-          "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
+          # Only rmi and tag if name is different
+          if [[ $docker_image_tag != $release_docker_image_tag ]]; then
+            kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
+            "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
+            "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
+          fi
+        else
+          # not a release
+          kube::log::status "Deleting docker image ${docker_image_tag}"
+          "${DOCKER[@]}" rmi ${docker_image_tag} &>/dev/null || true
         fi
-
-        kube::log::status "Deleting docker image ${docker_image_tag}"
-        "${DOCKER[@]}" rmi ${docker_image_tag} 2>/dev/null || true
       ) &
     done
+
+    if [[ "${KUBE_BUILD_HYPERKUBE}" =~ [yY] ]]; then
+      kube::release::build_hyperkube_image "${arch}" "${docker_registry}" \
+        "${docker_tag}" "${images_dir}" &
+    fi
 
     kube::util::wait-for-jobs || { kube::log::error "previous Docker build failed"; return 1; }
     kube::log::status "Docker builds done"
@@ -345,7 +379,7 @@ function kube::release::package_salt_tarball() {
 
   kube::release::clean_cruft
 
-  local package_name="${RELEASE_DIR}/kubernetes-salt.tar.gz"
+  local package_name="${RELEASE_TARS}/kubernetes-salt.tar.gz"
   kube::release::create_tarball "${package_name}" "${release_stage}/.."
 }
 
@@ -385,10 +419,16 @@ function kube::release::package_kube_manifests_tarball() {
   local objects
   objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
   tar c -C "${KUBE_ROOT}/cluster/addons" ${objects} | tar x -C "${gci_dst_dir}"
+  # Merge GCE-specific addons with general purpose addons.
+  local gce_objects
+  gce_objects=$(cd "${KUBE_ROOT}/cluster/gce/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) \( -not -name \*demo\* \))
+  if [[ -n "${gce_objects}" ]]; then
+    tar c -C "${KUBE_ROOT}/cluster/gce/addons" ${gce_objects} | tar x -C "${gci_dst_dir}"
+  fi
 
   kube::release::clean_cruft
 
-  local package_name="${RELEASE_DIR}/kubernetes-manifests.tar.gz"
+  local package_name="${RELEASE_TARS}/kubernetes-manifests.tar.gz"
   kube::release::create_tarball "${package_name}" "${release_stage}/.."
 }
 
@@ -423,7 +463,7 @@ function kube::release::package_test_tarball() {
 
   kube::release::clean_cruft
 
-  local package_name="${RELEASE_DIR}/kubernetes-test.tar.gz"
+  local package_name="${RELEASE_TARS}/kubernetes-test.tar.gz"
   kube::release::create_tarball "${package_name}" "${release_stage}/.."
 }
 
@@ -458,8 +498,8 @@ EOF
   rm -rf "${release_stage}/cluster/saltbase"
 
   mkdir -p "${release_stage}/server"
-  cp "${RELEASE_DIR}/kubernetes-salt.tar.gz" "${release_stage}/server/"
-  cp "${RELEASE_DIR}/kubernetes-manifests.tar.gz" "${release_stage}/server/"
+  cp "${RELEASE_TARS}/kubernetes-salt.tar.gz" "${release_stage}/server/"
+  cp "${RELEASE_TARS}/kubernetes-manifests.tar.gz" "${release_stage}/server/"
   cat <<EOF > "${release_stage}/server/README"
 Server binary tarballs are no longer included in the Kubernetes final tarball.
 
@@ -468,12 +508,6 @@ EOF
 
   mkdir -p "${release_stage}/third_party"
   cp -R "${KUBE_ROOT}/third_party/htpasswd" "${release_stage}/third_party/htpasswd"
-
-  # Include only federation/cluster, federation/manifests and federation/deploy
-  mkdir "${release_stage}/federation"
-  cp -R "${KUBE_ROOT}/federation/cluster" "${release_stage}/federation/"
-  cp -R "${KUBE_ROOT}/federation/manifests" "${release_stage}/federation/"
-  cp -R "${KUBE_ROOT}/federation/deploy" "${release_stage}/federation/"
 
   # Include hack/lib as a dependency for the cluster/ scripts
   mkdir -p "${release_stage}/hack"
@@ -489,7 +523,7 @@ EOF
 
   kube::release::clean_cruft
 
-  local package_name="${RELEASE_DIR}/kubernetes.tar.gz"
+  local package_name="${RELEASE_TARS}/kubernetes.tar.gz"
   kube::release::create_tarball "${package_name}" "${release_stage}/.."
 }
 

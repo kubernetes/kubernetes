@@ -23,11 +23,8 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
-// LongRunningRequestCheck is a predicate which is true for long-running http requests.
-type LongRunningRequestCheck func(r *http.Request, requestInfo *apirequest.RequestInfo) bool
-
 // BasicLongRunningRequestCheck returns true if the given request has one of the specified verbs or one of the specified subresources
-func BasicLongRunningRequestCheck(longRunningVerbs, longRunningSubresources sets.String) LongRunningRequestCheck {
+func BasicLongRunningRequestCheck(longRunningVerbs, longRunningSubresources sets.String) apirequest.LongRunningRequestCheck {
 	return func(r *http.Request, requestInfo *apirequest.RequestInfo) bool {
 		if longRunningVerbs.Has(requestInfo.Verb) {
 			return true

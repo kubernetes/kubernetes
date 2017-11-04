@@ -34,6 +34,9 @@ type Route struct {
 	ParameterDocs           []*Parameter
 	ResponseErrors          map[int]ResponseError
 	ReadSample, WriteSample interface{} // structs that model an example request or response payload
+
+	// Extra information used to store custom information about the route.
+	Metadata map[string]interface{}
 }
 
 // Initialize for Route

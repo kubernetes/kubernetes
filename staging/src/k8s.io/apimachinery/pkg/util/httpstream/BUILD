@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -11,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["httpstream_test.go"],
+    importpath = "k8s.io/apimachinery/pkg/util/httpstream",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 go_library(
@@ -20,6 +18,22 @@ go_library(
     srcs = [
         "doc.go",
         "httpstream.go",
+    ],
+    importpath = "k8s.io/apimachinery/pkg/util/httpstream",
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/apimachinery/pkg/util/httpstream/spdy:all-srcs",
     ],
     tags = ["automanaged"],
 )

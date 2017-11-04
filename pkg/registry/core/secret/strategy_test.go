@@ -24,7 +24,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+
+	// install all api groups for testing
+	_ "k8s.io/kubernetes/pkg/api/testapi"
 )
 
 func TestExportSecret(t *testing.T) {
@@ -103,7 +107,7 @@ func TestExportSecret(t *testing.T) {
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
-		api.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
+		legacyscheme.Registry.GroupOrDie(api.GroupName).GroupVersion.String(),
 		"Secret",
 		SelectableFields(&api.Secret{}),
 		nil,

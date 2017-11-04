@@ -41,8 +41,11 @@ type namespaceInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newNamespaceInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewNamespaceInformer constructs a new informer for Namespace type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewNamespaceInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				return client.Core().Namespaces().List(options)
@@ -53,14 +56,16 @@ func newNamespaceInformer(client internalclientset.Interface, resyncPeriod time.
 		},
 		&api.Namespace{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultNamespaceInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewNamespaceInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *namespaceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api.Namespace{}, newNamespaceInformer)
+	return f.factory.InformerFor(&api.Namespace{}, defaultNamespaceInformer)
 }
 
 func (f *namespaceInformer) Lister() internalversion.NamespaceLister {

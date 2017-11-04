@@ -23,7 +23,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
-	"syscall"
+
+	"golang.org/x/sys/unix"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -31,8 +32,8 @@ import (
 // FSInfo linux returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
 // for the filesystem that path resides upon.
 func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
-	statfs := &syscall.Statfs_t{}
-	err := syscall.Statfs(path, statfs)
+	statfs := &unix.Statfs_t{}
+	err := unix.Statfs(path, statfs)
 	if err != nil {
 		return 0, 0, 0, 0, 0, 0, err
 	}

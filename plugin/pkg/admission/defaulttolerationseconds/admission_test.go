@@ -19,10 +19,10 @@ package defaulttolerationseconds
 import (
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/helper"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
 func TestForgivenessAdmission(t *testing.T) {
@@ -39,7 +39,7 @@ func TestForgivenessAdmission(t *testing.T) {
 		expectedPod  api.Pod
 	}{
 		{
-			description: "pod has no tolerations, expect add tolerations for `notread:NoExecute` and `unreachable:NoExecute`",
+			description: "pod has no tolerations, expect add tolerations for `notReady:NoExecute` and `unreachable:NoExecute`",
 			requestedPod: api.Pod{
 				Spec: api.PodSpec{},
 			},
@@ -47,13 +47,13 @@ func TestForgivenessAdmission(t *testing.T) {
 				Spec: api.PodSpec{
 					Tolerations: []api.Toleration{
 						{
-							Key:               metav1.TaintNodeNotReady,
+							Key:               algorithm.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
 							TolerationSeconds: &defaultTolerationSeconds,
 						},
 						{
-							Key:               metav1.TaintNodeUnreachable,
+							Key:               algorithm.TaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
 							TolerationSeconds: &defaultTolerationSeconds,
@@ -63,7 +63,7 @@ func TestForgivenessAdmission(t *testing.T) {
 			},
 		},
 		{
-			description: "pod has tolerations, but none is for taint `notread:NoExecute` or `unreachable:NoExecute`, expect add tolerations for `notread:NoExecute` and `unreachable:NoExecute`",
+			description: "pod has tolerations, but none is for taint `notReady:NoExecute` or `unreachable:NoExecute`, expect add tolerations for `notReady:NoExecute` and `unreachable:NoExecute`",
 			requestedPod: api.Pod{
 				Spec: api.PodSpec{
 					Tolerations: []api.Toleration{
@@ -88,13 +88,13 @@ func TestForgivenessAdmission(t *testing.T) {
 							TolerationSeconds: genTolerationSeconds(700),
 						},
 						{
-							Key:               metav1.TaintNodeNotReady,
+							Key:               algorithm.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
 							TolerationSeconds: &defaultTolerationSeconds,
 						},
 						{
-							Key:               metav1.TaintNodeUnreachable,
+							Key:               algorithm.TaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
 							TolerationSeconds: &defaultTolerationSeconds,
@@ -109,7 +109,7 @@ func TestForgivenessAdmission(t *testing.T) {
 				Spec: api.PodSpec{
 					Tolerations: []api.Toleration{
 						{
-							Key:               metav1.TaintNodeNotReady,
+							Key:               algorithm.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
 							TolerationSeconds: genTolerationSeconds(700),
@@ -121,13 +121,13 @@ func TestForgivenessAdmission(t *testing.T) {
 				Spec: api.PodSpec{
 					Tolerations: []api.Toleration{
 						{
-							Key:               metav1.TaintNodeNotReady,
+							Key:               algorithm.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
 							TolerationSeconds: genTolerationSeconds(700),
 						},
 						{
-							Key:               metav1.TaintNodeUnreachable,
+							Key:               algorithm.TaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
 							TolerationSeconds: &defaultTolerationSeconds,
@@ -142,7 +142,7 @@ func TestForgivenessAdmission(t *testing.T) {
 				Spec: api.PodSpec{
 					Tolerations: []api.Toleration{
 						{
-							Key:               metav1.TaintNodeUnreachable,
+							Key:               algorithm.TaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
 							TolerationSeconds: genTolerationSeconds(700),
@@ -154,13 +154,13 @@ func TestForgivenessAdmission(t *testing.T) {
 				Spec: api.PodSpec{
 					Tolerations: []api.Toleration{
 						{
-							Key:               metav1.TaintNodeUnreachable,
+							Key:               algorithm.TaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
 							TolerationSeconds: genTolerationSeconds(700),
 						},
 						{
-							Key:               metav1.TaintNodeNotReady,
+							Key:               algorithm.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
 							TolerationSeconds: &defaultTolerationSeconds,
@@ -170,18 +170,18 @@ func TestForgivenessAdmission(t *testing.T) {
 			},
 		},
 		{
-			description: "pod specified tolerations for both `notread:NoExecute` and `unreachable:NoExecute`, expect no change",
+			description: "pod specified tolerations for both `notReady:NoExecute` and `unreachable:NoExecute`, expect no change",
 			requestedPod: api.Pod{
 				Spec: api.PodSpec{
 					Tolerations: []api.Toleration{
 						{
-							Key:               metav1.TaintNodeNotReady,
+							Key:               algorithm.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
 							TolerationSeconds: genTolerationSeconds(700),
 						},
 						{
-							Key:               metav1.TaintNodeUnreachable,
+							Key:               algorithm.TaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
 							TolerationSeconds: genTolerationSeconds(700),
@@ -193,13 +193,13 @@ func TestForgivenessAdmission(t *testing.T) {
 				Spec: api.PodSpec{
 					Tolerations: []api.Toleration{
 						{
-							Key:               metav1.TaintNodeNotReady,
+							Key:               algorithm.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
 							TolerationSeconds: genTolerationSeconds(700),
 						},
 						{
-							Key:               metav1.TaintNodeUnreachable,
+							Key:               algorithm.TaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
 							TolerationSeconds: genTolerationSeconds(700),
@@ -214,7 +214,7 @@ func TestForgivenessAdmission(t *testing.T) {
 				Spec: api.PodSpec{
 					Tolerations: []api.Toleration{
 						{
-							Key:               metav1.TaintNodeUnreachable,
+							Key:               algorithm.TaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							TolerationSeconds: genTolerationSeconds(700),
 						},
@@ -225,12 +225,12 @@ func TestForgivenessAdmission(t *testing.T) {
 				Spec: api.PodSpec{
 					Tolerations: []api.Toleration{
 						{
-							Key:               metav1.TaintNodeUnreachable,
+							Key:               algorithm.TaintNodeUnreachable,
 							Operator:          api.TolerationOpExists,
 							TolerationSeconds: genTolerationSeconds(700),
 						},
 						{
-							Key:               metav1.TaintNodeNotReady,
+							Key:               algorithm.TaintNodeNotReady,
 							Operator:          api.TolerationOpExists,
 							Effect:            api.TaintEffectNoExecute,
 							TolerationSeconds: genTolerationSeconds(300),

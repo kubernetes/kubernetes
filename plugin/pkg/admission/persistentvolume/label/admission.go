@@ -22,18 +22,20 @@ import (
 	"io"
 	"sync"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/golang/glog"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	vol "k8s.io/kubernetes/pkg/volume"
 )
 
-func init() {
-	kubeapiserveradmission.Plugins.Register("PersistentVolumeLabel", func(config io.Reader) (admission.Interface, error) {
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("PersistentVolumeLabel", func(config io.Reader) (admission.Interface, error) {
 		persistentVolumeLabelAdmission := NewPersistentVolumeLabel()
 		return persistentVolumeLabelAdmission, nil
 	})
@@ -57,6 +59,11 @@ var _ kubeapiserveradmission.WantsCloudConfig = &persistentVolumeLabel{}
 //
 // As a side effect, the cloud provider may block invalid or non-existent volumes.
 func NewPersistentVolumeLabel() *persistentVolumeLabel {
+	// DEPRECATED: cloud-controller-manager will now start NewPersistentVolumeLabelController
+	// which does exactly what this admission controller used to do. So once GCE and AWS can
+	// run externally, we can remove this admission controller.
+	glog.Warning("PersistentVolumeLabel admission controller is deprecated. " +
+		"Please remove this controller from your configuration files and scripts.")
 	return &persistentVolumeLabel{
 		Handler: admission.NewHandler(admission.Create),
 	}
@@ -173,7 +180,7 @@ func (l *persistentVolumeLabel) findGCEPDLabels(volume *api.PersistentVolume) (m
 	}
 
 	// If the zone is already labeled, honor the hint
-	zone := volume.Labels[metav1.LabelZoneFailureDomain]
+	zone := volume.Labels[kubeletapis.LabelZoneFailureDomain]
 
 	labels, err := provider.GetAutoLabelsForPD(volume.Spec.GCEPersistentDisk.PDName, zone)
 	if err != nil {

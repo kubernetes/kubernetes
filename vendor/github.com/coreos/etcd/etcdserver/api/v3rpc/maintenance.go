@@ -185,9 +185,5 @@ func (ams *authMaintenanceServer) Hash(ctx context.Context, r *pb.HashRequest) (
 }
 
 func (ams *authMaintenanceServer) Status(ctx context.Context, ar *pb.StatusRequest) (*pb.StatusResponse, error) {
-	if err := ams.isAuthenticated(ctx); err != nil {
-		return nil, err
-	}
-
 	return ams.maintenanceServer.Status(ctx, ar)
 }

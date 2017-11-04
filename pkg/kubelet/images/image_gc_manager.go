@@ -17,6 +17,7 @@ limitations under the License.
 package images
 
 import (
+	goerrors "errors"
 	"fmt"
 	"math"
 	"sort"
@@ -24,17 +25,24 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	clientv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
+	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 )
+
+// StatsProvider is an interface for fetching stats used during image garbage
+// collection.
+type StatsProvider interface {
+	// ImageFsStats returns the stats of the image filesystem.
+	ImageFsStats() (*statsapi.FsStats, error)
+}
 
 // Manages lifecycle of all images.
 //
@@ -79,14 +87,14 @@ type realImageGCManager struct {
 	// The image garbage collection policy in use.
 	policy ImageGCPolicy
 
-	// cAdvisor instance.
-	cadvisor cadvisor.Interface
+	// statsProvider provides stats used during image garbage collection.
+	statsProvider StatsProvider
 
 	// Recorder for Kubernetes events.
 	recorder record.EventRecorder
 
 	// Reference to this node.
-	nodeRef *clientv1.ObjectReference
+	nodeRef *v1.ObjectReference
 
 	// Track initialization
 	initialized bool
@@ -129,7 +137,7 @@ type imageRecord struct {
 	size int64
 }
 
-func NewImageGCManager(runtime container.Runtime, cadvisorInterface cadvisor.Interface, recorder record.EventRecorder, nodeRef *clientv1.ObjectReference, policy ImageGCPolicy) (ImageGCManager, error) {
+func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, recorder record.EventRecorder, nodeRef *v1.ObjectReference, policy ImageGCPolicy) (ImageGCManager, error) {
 	// Validate policy.
 	if policy.HighThresholdPercent < 0 || policy.HighThresholdPercent > 100 {
 		return nil, fmt.Errorf("invalid HighThresholdPercent %d, must be in range [0-100]", policy.HighThresholdPercent)
@@ -141,13 +149,13 @@ func NewImageGCManager(runtime container.Runtime, cadvisorInterface cadvisor.Int
 		return nil, fmt.Errorf("LowThresholdPercent %d can not be higher than HighThresholdPercent %d", policy.LowThresholdPercent, policy.HighThresholdPercent)
 	}
 	im := &realImageGCManager{
-		runtime:      runtime,
-		policy:       policy,
-		imageRecords: make(map[string]*imageRecord),
-		cadvisor:     cadvisorInterface,
-		recorder:     recorder,
-		nodeRef:      nodeRef,
-		initialized:  false,
+		runtime:       runtime,
+		policy:        policy,
+		imageRecords:  make(map[string]*imageRecord),
+		statsProvider: statsProvider,
+		recorder:      recorder,
+		nodeRef:       nodeRef,
+		initialized:   false,
 	}
 
 	return im, nil
@@ -245,12 +253,19 @@ func (im *realImageGCManager) detectImages(detectTime time.Time) error {
 
 func (im *realImageGCManager) GarbageCollect() error {
 	// Get disk usage on disk holding images.
-	fsInfo, err := im.cadvisor.ImagesFsInfo()
+	fsStats, err := im.statsProvider.ImageFsStats()
 	if err != nil {
 		return err
 	}
-	capacity := int64(fsInfo.Capacity)
-	available := int64(fsInfo.Available)
+
+	var capacity, available int64
+	if fsStats.CapacityBytes != nil {
+		capacity = int64(*fsStats.CapacityBytes)
+	}
+	if fsStats.AvailableBytes != nil {
+		available = int64(*fsStats.AvailableBytes)
+	}
+
 	if available > capacity {
 		glog.Warningf("available %d is larger than capacity %d", available, capacity)
 		available = capacity
@@ -258,7 +273,7 @@ func (im *realImageGCManager) GarbageCollect() error {
 
 	// Check valid capacity.
 	if capacity == 0 {
-		err := fmt.Errorf("invalid capacity %d on device %q at mount point %q", capacity, fsInfo.Device, fsInfo.Mountpoint)
+		err := goerrors.New("invalid capacity 0 on image filesystem")
 		im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.InvalidDiskCapacity, err.Error())
 		return err
 	}
@@ -267,14 +282,14 @@ func (im *realImageGCManager) GarbageCollect() error {
 	usagePercent := 100 - int(available*100/capacity)
 	if usagePercent >= im.policy.HighThresholdPercent {
 		amountToFree := capacity*int64(100-im.policy.LowThresholdPercent)/100 - available
-		glog.Infof("[imageGCManager]: Disk usage on %q (%s) is at %d%% which is over the high threshold (%d%%). Trying to free %d bytes", fsInfo.Device, fsInfo.Mountpoint, usagePercent, im.policy.HighThresholdPercent, amountToFree)
+		glog.Infof("[imageGCManager]: Disk usage on image filesystem is at %d%% which is over the high threshold (%d%%). Trying to free %d bytes", usagePercent, im.policy.HighThresholdPercent, amountToFree)
 		freed, err := im.freeSpace(amountToFree, time.Now())
 		if err != nil {
 			return err
 		}
 
 		if freed < amountToFree {
-			err := fmt.Errorf("failed to garbage collect required amount of images. Wanted to free %d, but freed %d", amountToFree, freed)
+			err := fmt.Errorf("failed to garbage collect required amount of images. Wanted to free %d bytes, but freed %d bytes", amountToFree, freed)
 			im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.FreeDiskSpaceFailed, err.Error())
 			return err
 		}
@@ -347,7 +362,7 @@ func (im *realImageGCManager) freeSpace(bytesToFree int64, freeTime time.Time) (
 	}
 
 	if len(deletionErrors) > 0 {
-		return spaceFreed, fmt.Errorf("wanted to free %d, but freed %d space with errors in image deletion: %v", bytesToFree, spaceFreed, errors.NewAggregate(deletionErrors))
+		return spaceFreed, fmt.Errorf("wanted to free %d bytes, but freed %d bytes space with errors in image deletion: %v", bytesToFree, spaceFreed, errors.NewAggregate(deletionErrors))
 	}
 	return spaceFreed, nil
 }

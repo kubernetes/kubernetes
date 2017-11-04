@@ -25,11 +25,11 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
+	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -272,7 +272,7 @@ func TestCanSupport(t *testing.T) {
 	pluginMgr := volume.VolumePluginMgr{}
 	tempDir, host := newTestHost(t, nil)
 	defer os.RemoveAll(tempDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
@@ -304,7 +304,7 @@ func TestPlugin(t *testing.T) {
 	)
 
 	defer os.RemoveAll(tempDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
@@ -317,7 +317,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
 	if mounter == nil {
-		t.Errorf("Got a nil Mounter")
+		t.Fatalf("Got a nil Mounter")
 	}
 
 	vName, err := plugin.GetVolumeName(volume.NewSpecFromVolume(volumeSpec))
@@ -368,7 +368,7 @@ func TestPluginReboot(t *testing.T) {
 	)
 
 	defer os.RemoveAll(rootDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
@@ -381,7 +381,7 @@ func TestPluginReboot(t *testing.T) {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
 	if mounter == nil {
-		t.Errorf("Got a nil Mounter")
+		t.Fatalf("Got a nil Mounter")
 	}
 
 	podMetadataDir := fmt.Sprintf("%v/pods/test_pod_uid3/plugins/kubernetes.io~configmap/test_volume_name", rootDir)
@@ -424,7 +424,7 @@ func TestPluginOptional(t *testing.T) {
 	volumeSpec.VolumeSource.ConfigMap.Optional = &trueVal
 
 	defer os.RemoveAll(tempDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
@@ -499,7 +499,7 @@ func TestPluginKeysOptional(t *testing.T) {
 	volumeSpec.VolumeSource.ConfigMap.Optional = &trueVal
 
 	defer os.RemoveAll(tempDir)
-	pluginMgr.InitPlugins(ProbeVolumePlugins(), host)
+	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 
 	plugin, err := pluginMgr.FindPluginByName(configMapPluginName)
 	if err != nil {
@@ -597,7 +597,7 @@ func doTestCleanAndTeardown(plugin volume.VolumePlugin, podUID types.UID, testVo
 		t.Errorf("Failed to make a new Unmounter: %v", err)
 	}
 	if unmounter == nil {
-		t.Errorf("Got a nil Unmounter")
+		t.Fatalf("Got a nil Unmounter")
 	}
 
 	if err := unmounter.TearDown(); err != nil {
@@ -606,6 +606,6 @@ func doTestCleanAndTeardown(plugin volume.VolumePlugin, podUID types.UID, testVo
 	if _, err := os.Stat(volumePath); err == nil {
 		t.Errorf("TearDown() failed, volume path still exists: %s", volumePath)
 	} else if !os.IsNotExist(err) {
-		t.Errorf("SetUp() failed: %v", err)
+		t.Errorf("TearDown() failed: %v", err)
 	}
 }

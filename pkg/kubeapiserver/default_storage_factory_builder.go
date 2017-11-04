@@ -26,8 +26,19 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilflag "k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
+
+// specialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
+var specialDefaultResourcePrefixes = map[schema.GroupResource]string{
+	{Group: "", Resource: "replicationControllers"}:        "controllers",
+	{Group: "", Resource: "replicationcontrollers"}:        "controllers",
+	{Group: "", Resource: "endpoints"}:                     "services/endpoints",
+	{Group: "", Resource: "nodes"}:                         "minions",
+	{Group: "", Resource: "services"}:                      "services/specs",
+	{Group: "extensions", Resource: "ingresses"}:           "ingress",
+	{Group: "extensions", Resource: "podsecuritypolicies"}: "podsecuritypolicy",
+}
 
 // NewStorageFactory builds the DefaultStorageFactory.
 // Merges defaultResourceConfig with the user specified overrides and merges
@@ -42,7 +53,7 @@ func NewStorageFactory(storageConfig storagebackend.Config, defaultMediaType str
 	if err != nil {
 		return nil, err
 	}
-	return serverstorage.NewDefaultStorageFactory(storageConfig, defaultMediaType, serializer, resourceEncodingConfig, apiResourceConfig), nil
+	return serverstorage.NewDefaultStorageFactory(storageConfig, defaultMediaType, serializer, resourceEncodingConfig, apiResourceConfig, specialDefaultResourcePrefixes), nil
 }
 
 // Merges the given defaultResourceConfig with specifc GroupvVersionResource overrides.
@@ -74,9 +85,9 @@ func mergeAPIResourceConfigs(defaultAPIResourceConfig *serverstorage.ResourceCon
 	if ok {
 		if allAPIFlagValue == "false" {
 			// Disable all group versions.
-			resourceConfig.DisableVersions(api.Registry.RegisteredGroupVersions()...)
+			resourceConfig.DisableVersions(legacyscheme.Registry.RegisteredGroupVersions()...)
 		} else if allAPIFlagValue == "true" {
-			resourceConfig.EnableVersions(api.Registry.RegisteredGroupVersions()...)
+			resourceConfig.EnableVersions(legacyscheme.Registry.RegisteredGroupVersions()...)
 		}
 	}
 
@@ -110,8 +121,8 @@ func mergeAPIResourceConfigs(defaultAPIResourceConfig *serverstorage.ResourceCon
 		if err != nil {
 			return nil, fmt.Errorf("invalid key %s", key)
 		}
-		// Verify that the groupVersion is api.Registry.
-		if !api.Registry.IsRegisteredVersion(groupVersion) {
+		// Verify that the groupVersion is legacyscheme.Registry.
+		if !legacyscheme.Registry.IsRegisteredVersion(groupVersion) {
 			return nil, fmt.Errorf("group version %s that has not been registered", groupVersion.String())
 		}
 		enabled, err := getRuntimeConfigValue(overrides, key, false)
@@ -142,8 +153,8 @@ func mergeAPIResourceConfigs(defaultAPIResourceConfig *serverstorage.ResourceCon
 			return nil, fmt.Errorf("invalid key %s", key)
 		}
 		resource := tokens[2]
-		// Verify that the groupVersion is api.Registry.
-		if !api.Registry.IsRegisteredVersion(groupVersion) {
+		// Verify that the groupVersion is legacyscheme.Registry.
+		if !legacyscheme.Registry.IsRegisteredVersion(groupVersion) {
 			return nil, fmt.Errorf("group version %s that has not been registered", groupVersion.String())
 		}
 

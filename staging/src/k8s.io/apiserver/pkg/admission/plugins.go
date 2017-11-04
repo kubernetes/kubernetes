@@ -67,13 +67,15 @@ func (ps *Plugins) Registered() []string {
 func (ps *Plugins) Register(name string, plugin Factory) {
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
-	_, found := ps.registry[name]
-	if found {
-		glog.Fatalf("Admission plugin %q was registered twice", name)
-	}
-	if ps.registry == nil {
+	if ps.registry != nil {
+		_, found := ps.registry[name]
+		if found {
+			glog.Fatalf("Admission plugin %q was registered twice", name)
+		}
+	} else {
 		ps.registry = map[string]Factory{}
 	}
+
 	glog.V(1).Infof("Registered admission plugin %q", name)
 	ps.registry[name] = plugin
 }
@@ -154,18 +156,18 @@ func (ps *Plugins) InitPlugin(name string, config io.Reader, pluginInitializer P
 
 	pluginInitializer.Initialize(plugin)
 	// ensure that plugins have been properly initialized
-	if err := Validate(plugin); err != nil {
+	if err := ValidateInitialization(plugin); err != nil {
 		return nil, err
 	}
 
 	return plugin, nil
 }
 
-// Validate will call the Validate function in each plugin if they implement
-// the Validator interface.
-func Validate(plugin Interface) error {
-	if validater, ok := plugin.(Validator); ok {
-		err := validater.Validate()
+// ValidateInitialization will call the InitializationValidate function in each plugin if they implement
+// the InitializationValidator interface.
+func ValidateInitialization(plugin Interface) error {
+	if validater, ok := plugin.(InitializationValidator); ok {
+		err := validater.ValidateInitialization()
 		if err != nil {
 			return err
 		}

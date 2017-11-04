@@ -22,6 +22,8 @@ import (
 	"net"
 	"regexp"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 const qnameCharFmt string = "[A-Za-z0-9]"
@@ -65,6 +67,21 @@ func IsQualifiedName(value string) []string {
 		errs = append(errs, "name part "+RegexError(qualifiedNameErrMsg, qualifiedNameFmt, "MyName", "my.name", "123-abc"))
 	}
 	return errs
+}
+
+// IsFullyQualifiedName checks if the name is fully qualified.
+func IsFullyQualifiedName(fldPath *field.Path, name string) field.ErrorList {
+	var allErrors field.ErrorList
+	if len(name) == 0 {
+		return append(allErrors, field.Required(fldPath, ""))
+	}
+	if errs := IsDNS1123Subdomain(name); len(errs) > 0 {
+		return append(allErrors, field.Invalid(fldPath, name, strings.Join(errs, ",")))
+	}
+	if len(strings.Split(name, ".")) < 3 {
+		return append(allErrors, field.Invalid(fldPath, name, "should be a domain with at least three segments separated by dots"))
+	}
+	return allErrors
 }
 
 const labelValueFmt string = "(" + qualifiedNameFmt + ")?"
@@ -126,7 +143,7 @@ func IsDNS1123Subdomain(value string) []string {
 }
 
 const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
-const dns1035LabelErrMsg string = "a DNS-1035 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character"
+const dns1035LabelErrMsg string = "a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character"
 const DNS1035LabelMaxLength int = 63
 
 var dns1035LabelRegexp = regexp.MustCompile("^" + dns1035LabelFmt + "$")
@@ -188,6 +205,14 @@ func IsValidPortNum(port int) []string {
 	return []string{InclusiveRangeError(1, 65535)}
 }
 
+// IsInRange tests that the argument is in an inclusive range.
+func IsInRange(value int, min int, max int) []string {
+	if value >= min && value <= max {
+		return nil
+	}
+	return []string{InclusiveRangeError(min, max)}
+}
+
 // Now in libcontainer UID/GID limits is 0 ~ 1<<31 - 1
 // TODO: once we have a type for UID/GID we should make these that type.
 const (
@@ -197,16 +222,16 @@ const (
 	maxGroupID = math.MaxInt32
 )
 
-// IsValidGroupId tests that the argument is a valid Unix GID.
-func IsValidGroupId(gid int64) []string {
+// IsValidGroupID tests that the argument is a valid Unix GID.
+func IsValidGroupID(gid int64) []string {
 	if minGroupID <= gid && gid <= maxGroupID {
 		return nil
 	}
 	return []string{InclusiveRangeError(minGroupID, maxGroupID)}
 }
 
-// IsValidUserId tests that the argument is a valid Unix UID.
-func IsValidUserId(uid int64) []string {
+// IsValidUserID tests that the argument is a valid Unix UID.
+func IsValidUserID(uid int64) []string {
 	if minUserID <= uid && uid <= maxUserID {
 		return nil
 	}
@@ -277,6 +302,22 @@ func IsHTTPHeaderName(value string) []string {
 	return nil
 }
 
+const envVarNameFmt = "[-._a-zA-Z][-._a-zA-Z0-9]*"
+const envVarNameFmtErrMsg string = "a valid environment variable name must consist of alphabetic characters, digits, '_', '-', or '.', and must not start with a digit"
+
+var envVarNameRegexp = regexp.MustCompile("^" + envVarNameFmt + "$")
+
+// IsEnvVarName tests if a string is a valid environment variable name.
+func IsEnvVarName(value string) []string {
+	var errs []string
+	if !envVarNameRegexp.MatchString(value) {
+		errs = append(errs, RegexError(envVarNameFmtErrMsg, envVarNameFmt, "my.env-name", "MY_ENV.NAME", "MyEnvName1"))
+	}
+
+	errs = append(errs, hasChDirPrefix(value)...)
+	return errs
+}
+
 const configMapKeyFmt = `[-._a-zA-Z0-9]+`
 const configMapKeyErrMsg string = "a valid config key must consist of alphanumeric characters, '-', '_' or '.'"
 
@@ -291,13 +332,7 @@ func IsConfigMapKey(value string) []string {
 	if !configMapKeyRegexp.MatchString(value) {
 		errs = append(errs, RegexError(configMapKeyErrMsg, configMapKeyFmt, "key.name", "KEY_NAME", "key-name"))
 	}
-	if value == "." {
-		errs = append(errs, `must not be '.'`)
-	} else if value == ".." {
-		errs = append(errs, `must not be '..'`)
-	} else if strings.HasPrefix(value, "..") {
-		errs = append(errs, `must not start with '..'`)
-	}
+	errs = append(errs, hasChDirPrefix(value)...)
 	return errs
 }
 
@@ -340,4 +375,17 @@ func prefixEach(msgs []string, prefix string) []string {
 // between" validation failure.
 func InclusiveRangeError(lo, hi int) string {
 	return fmt.Sprintf(`must be between %d and %d, inclusive`, lo, hi)
+}
+
+func hasChDirPrefix(value string) []string {
+	var errs []string
+	switch {
+	case value == ".":
+		errs = append(errs, `must not be '.'`)
+	case value == "..":
+		errs = append(errs, `must not be '..'`)
+	case strings.HasPrefix(value, ".."):
+		errs = append(errs, `must not start with '..'`)
+	}
+	return errs
 }

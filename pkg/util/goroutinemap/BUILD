@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -11,7 +9,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["goroutinemap.go"],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/pkg/util/goroutinemap",
     deps = [
         "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -22,8 +20,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = ["goroutinemap_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/util/goroutinemap",
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/apimachinery/pkg/util/wait:go_default_library"],
 )
 

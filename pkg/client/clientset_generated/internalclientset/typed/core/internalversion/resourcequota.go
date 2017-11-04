@@ -59,6 +59,41 @@ func newResourceQuotas(c *CoreClient, namespace string) *resourceQuotas {
 	}
 }
 
+// Get takes name of the resourceQuota, and returns the corresponding resourceQuota object, and an error if there is any.
+func (c *resourceQuotas) Get(name string, options v1.GetOptions) (result *api.ResourceQuota, err error) {
+	result = &api.ResourceQuota{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("resourcequotas").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of ResourceQuotas that match those selectors.
+func (c *resourceQuotas) List(opts v1.ListOptions) (result *api.ResourceQuotaList, err error) {
+	result = &api.ResourceQuotaList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("resourcequotas").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested resourceQuotas.
+func (c *resourceQuotas) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("resourcequotas").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a resourceQuota and creates it.  Returns the server's representation of the resourceQuota, and an error, if there is any.
 func (c *resourceQuotas) Create(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
 	result = &api.ResourceQuota{}
@@ -85,7 +120,7 @@ func (c *resourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *api.R
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *resourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
 	result = &api.ResourceQuota{}
@@ -120,41 +155,6 @@ func (c *resourceQuotas) DeleteCollection(options *v1.DeleteOptions, listOptions
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the resourceQuota, and returns the corresponding resourceQuota object, and an error if there is any.
-func (c *resourceQuotas) Get(name string, options v1.GetOptions) (result *api.ResourceQuota, err error) {
-	result = &api.ResourceQuota{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("resourcequotas").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of ResourceQuotas that match those selectors.
-func (c *resourceQuotas) List(opts v1.ListOptions) (result *api.ResourceQuotaList, err error) {
-	result = &api.ResourceQuotaList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("resourcequotas").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested resourceQuotas.
-func (c *resourceQuotas) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("resourcequotas").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched resourceQuota.

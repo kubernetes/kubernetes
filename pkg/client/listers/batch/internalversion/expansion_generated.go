@@ -23,5 +23,5 @@ package internalversion
 type CronJobListerExpansion interface{}
 
 // CronJobNamespaceListerExpansion allows custom methods to be added to
-// CronJobNamespaeLister.
+// CronJobNamespaceLister.
 type CronJobNamespaceListerExpansion interface{}

@@ -19,4 +19,4 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-${KUBE_ROOT}/hack/update-staging-godeps.sh -d -f "$@"
+KUBE_VERBOSE=3 KUBE_RUN_COPY_OUTPUT=N ${KUBE_ROOT}/hack/update-staging-godeps.sh -d -f "$@"

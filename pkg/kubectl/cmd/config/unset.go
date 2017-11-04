@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/util/i18n"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
 type unsetOptions struct {
@@ -48,16 +48,16 @@ func NewCmdConfigUnset(out io.Writer, configAccess clientcmd.ConfigAccess) *cobr
 		Short: i18n.T("Unsets an individual value in a kubeconfig file"),
 		Long:  unset_long,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.complete(cmd))
-			cmdutil.CheckErr(options.run())
-			fmt.Fprintf(out, "Property %q unset.\n", options.propertyName)
+			cmdutil.CheckErr(options.complete(cmd, args))
+			cmdutil.CheckErr(options.run(out))
+
 		},
 	}
 
 	return cmd
 }
 
-func (o unsetOptions) run() error {
+func (o unsetOptions) run(out io.Writer) error {
 	err := o.validate()
 	if err != nil {
 		return err
@@ -80,18 +80,18 @@ func (o unsetOptions) run() error {
 	if err := clientcmd.ModifyConfig(o.configAccess, *config, false); err != nil {
 		return err
 	}
-
+	if _, err := fmt.Fprintf(out, "Property %q unset.\n", o.propertyName); err != nil {
+		return err
+	}
 	return nil
 }
 
-func (o *unsetOptions) complete(cmd *cobra.Command) error {
-	endingArgs := cmd.Flags().Args()
-	if len(endingArgs) != 1 {
-		cmd.Help()
-		return fmt.Errorf("Unexpected args: %v", endingArgs)
+func (o *unsetOptions) complete(cmd *cobra.Command, args []string) error {
+	if len(args) != 1 {
+		return helpErrorf(cmd, "Unexpected args: %v", args)
 	}
 
-	o.propertyName = endingArgs[0]
+	o.propertyName = args[0]
 	return nil
 }
 

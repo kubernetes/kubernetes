@@ -17,9 +17,13 @@ limitations under the License.
 package componentconfig
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 )
 
@@ -31,6 +35,10 @@ type IPVar struct {
 }
 
 func (v IPVar) Set(s string) error {
+	if len(s) == 0 {
+		v.Val = nil
+		return nil
+	}
 	if net.ParseIP(s) == nil {
 		return fmt.Errorf("%q is not a valid IP address", s)
 	}
@@ -94,4 +102,22 @@ func (v PortRangeVar) String() string {
 
 func (v PortRangeVar) Type() string {
 	return "port-range"
+}
+
+// ConvertObjToConfigMap converts an object to a ConfigMap.
+// This is specifically meant for ComponentConfigs.
+func ConvertObjToConfigMap(name string, obj runtime.Object) (*v1.ConfigMap, error) {
+	eJSONBytes, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	cm := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Data: map[string]string{
+			name: string(eJSONBytes[:]),
+		},
+	}
+	return cm, nil
 }

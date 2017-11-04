@@ -21,15 +21,13 @@ import (
 	"crypto/x509"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"time"
 
 	certutil "k8s.io/client-go/util/cert"
 )
 
-// TODO: It should be able to generate different types of private keys, at least: RSA and ECDSA (and in the future maybe Ed25519 as well)
-// TODO: See if it makes sense to move this package directly to pkg/util/cert
-
+// NewCertificateAuthority creates new certificate and private key for the certificate authority
 func NewCertificateAuthority() (*x509.Certificate, *rsa.PrivateKey, error) {
 	key, err := certutil.NewPrivateKey()
 	if err != nil {
@@ -47,6 +45,7 @@ func NewCertificateAuthority() (*x509.Certificate, *rsa.PrivateKey, error) {
 	return cert, key, nil
 }
 
+// NewCertAndKey creates new certificate and key by passing the certificate authority certificate and key
 func NewCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey, config certutil.Config) (*x509.Certificate, *rsa.PrivateKey, error) {
 	key, err := certutil.NewPrivateKey()
 	if err != nil {
@@ -61,18 +60,26 @@ func NewCertAndKey(caCert *x509.Certificate, caKey *rsa.PrivateKey, config certu
 	return cert, key, nil
 }
 
+// HasServerAuth returns true if the given certificate is a ServerAuth
+func HasServerAuth(cert *x509.Certificate) bool {
+	for i := range cert.ExtKeyUsage {
+		if cert.ExtKeyUsage[i] == x509.ExtKeyUsageServerAuth {
+			return true
+		}
+	}
+	return false
+}
+
+// WriteCertAndKey stores certificate and key at the specified location
 func WriteCertAndKey(pkiPath string, name string, cert *x509.Certificate, key *rsa.PrivateKey) error {
 	if err := WriteKey(pkiPath, name, key); err != nil {
 		return err
 	}
 
-	if err := WriteCert(pkiPath, name, cert); err != nil {
-		return err
-	}
-
-	return nil
+	return WriteCert(pkiPath, name, cert)
 }
 
+// WriteCert stores the given certificate at the given location
 func WriteCert(pkiPath, name string, cert *x509.Certificate) error {
 	if cert == nil {
 		return fmt.Errorf("certificate cannot be nil when writing to file")
@@ -86,6 +93,7 @@ func WriteCert(pkiPath, name string, cert *x509.Certificate) error {
 	return nil
 }
 
+// WriteKey stores the given key at the given location
 func WriteKey(pkiPath, name string, key *rsa.PrivateKey) error {
 	if key == nil {
 		return fmt.Errorf("private key cannot be nil when writing to file")
@@ -99,6 +107,7 @@ func WriteKey(pkiPath, name string, key *rsa.PrivateKey) error {
 	return nil
 }
 
+// WritePublicKey stores the given public key at the given location
 func WritePublicKey(pkiPath, name string, key *rsa.PublicKey) error {
 	if key == nil {
 		return fmt.Errorf("public key cannot be nil when writing to file")
@@ -193,18 +202,47 @@ func TryLoadKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, error) {
 	return key, nil
 }
 
+// TryLoadPrivatePublicKeyFromDisk tries to load the key from the disk and validates that it is valid
+func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (*rsa.PrivateKey, *rsa.PublicKey, error) {
+	privateKeyPath := pathForKey(pkiPath, name)
+
+	// Parse the private key from a file
+	privKey, err := certutil.PrivateKeyFromFile(privateKeyPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("couldn't load the private key file %s: %v", privateKeyPath, err)
+	}
+
+	publicKeyPath := pathForPublicKey(pkiPath, name)
+
+	// Parse the public key from a file
+	pubKeys, err := certutil.PublicKeysFromFile(publicKeyPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("couldn't load the public key file %s: %v", publicKeyPath, err)
+	}
+
+	// Allow RSA format only
+	k, ok := privKey.(*rsa.PrivateKey)
+	if !ok {
+		return nil, nil, fmt.Errorf("the private key file %s isn't in RSA format", privateKeyPath)
+	}
+
+	p := pubKeys[0].(*rsa.PublicKey)
+
+	return k, p, nil
+}
+
 func pathsForCertAndKey(pkiPath, name string) (string, string) {
 	return pathForCert(pkiPath, name), pathForKey(pkiPath, name)
 }
 
 func pathForCert(pkiPath, name string) string {
-	return path.Join(pkiPath, fmt.Sprintf("%s.crt", name))
+	return filepath.Join(pkiPath, fmt.Sprintf("%s.crt", name))
 }
 
 func pathForKey(pkiPath, name string) string {
-	return path.Join(pkiPath, fmt.Sprintf("%s.key", name))
+	return filepath.Join(pkiPath, fmt.Sprintf("%s.key", name))
 }
 
 func pathForPublicKey(pkiPath, name string) string {
-	return path.Join(pkiPath, fmt.Sprintf("%s.pub", name))
+	return filepath.Join(pkiPath, fmt.Sprintf("%s.pub", name))
 }

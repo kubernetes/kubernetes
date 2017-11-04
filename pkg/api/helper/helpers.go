@@ -17,22 +17,43 @@ limitations under the License.
 package helper
 
 import (
-	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/api"
 )
+
+// IsHugePageResourceName returns true if the resource name has the huge page
+// resource prefix.
+func IsHugePageResourceName(name api.ResourceName) bool {
+	return strings.HasPrefix(string(name), api.ResourceHugePagesPrefix)
+}
+
+// HugePageResourceName returns a ResourceName with the canonical hugepage
+// prefix prepended for the specified page size.  The page size is converted
+// to its canonical representation.
+func HugePageResourceName(pageSize resource.Quantity) api.ResourceName {
+	return api.ResourceName(fmt.Sprintf("%s%s", api.ResourceHugePagesPrefix, pageSize.String()))
+}
+
+// HugePageSizeFromResourceName returns the page size for the specified huge page
+// resource name.  If the specified input is not a valid huge page resource name
+// an error is returned.
+func HugePageSizeFromResourceName(name api.ResourceName) (resource.Quantity, error) {
+	if !IsHugePageResourceName(name) {
+		return resource.Quantity{}, fmt.Errorf("resource name: %s is not valid hugepage name", name)
+	}
+	pageSize := strings.TrimPrefix(string(name), api.ResourceHugePagesPrefix)
+	return resource.ParseQuantity(pageSize)
+}
 
 // NonConvertibleFields iterates over the provided map and filters out all but
 // any keys with the "non-convertible.kubernetes.io" prefix.
@@ -55,6 +76,9 @@ var Semantic = conversion.EqualitiesOrDie(
 		//
 		// Uninitialized quantities are equivalent to 0 quantities.
 		return a.Cmp(b) == 0
+	},
+	func(a, b metav1.MicroTime) bool {
+		return a.UTC() == b.UTC()
 	},
 	func(a, b metav1.Time) bool {
 		return a.UTC() == b.UTC()
@@ -107,12 +131,28 @@ func IsResourceQuotaScopeValidForResource(scope api.ResourceQuotaScope, resource
 var standardContainerResources = sets.NewString(
 	string(api.ResourceCPU),
 	string(api.ResourceMemory),
+	string(api.ResourceEphemeralStorage),
 )
 
 // IsStandardContainerResourceName returns true if the container can make a resource request
 // for the specified resource
 func IsStandardContainerResourceName(str string) bool {
-	return standardContainerResources.Has(str)
+	return standardContainerResources.Has(str) || IsHugePageResourceName(api.ResourceName(str))
+}
+
+// IsExtendedResourceName returns true if the resource name is not in the
+// default namespace, or it has the opaque integer resource prefix.
+func IsExtendedResourceName(name api.ResourceName) bool {
+	// TODO: Remove OIR part following deprecation.
+	return !IsDefaultNamespaceResource(name) || IsOpaqueIntResourceName(name)
+}
+
+// IsDefaultNamespaceResource returns true if the resource name is in the
+// *kubernetes.io/ namespace. Partially-qualified (unprefixed) names are
+// implicitly in the kubernetes.io/ namespace.
+func IsDefaultNamespaceResource(name api.ResourceName) bool {
+	return !strings.Contains(string(name), "/") ||
+		strings.Contains(string(name), api.ResourceDefaultNamespacePrefix)
 }
 
 // IsOpaqueIntResourceName returns true if the resource name has the opaque
@@ -131,6 +171,16 @@ func OpaqueIntResourceName(name string) api.ResourceName {
 	return api.ResourceName(fmt.Sprintf("%s%s", api.ResourceOpaqueIntPrefix, name))
 }
 
+var overcommitBlacklist = sets.NewString(string(api.ResourceNvidiaGPU))
+
+// IsOvercommitAllowed returns true if the resource is in the default
+// namespace and not blacklisted.
+func IsOvercommitAllowed(name api.ResourceName) bool {
+	return IsDefaultNamespaceResource(name) &&
+		!IsHugePageResourceName(name) &&
+		!overcommitBlacklist.Has(string(name))
+}
+
 var standardLimitRangeTypes = sets.NewString(
 	string(api.LimitTypePod),
 	string(api.LimitTypeContainer),
@@ -145,11 +195,14 @@ func IsStandardLimitRangeType(str string) bool {
 var standardQuotaResources = sets.NewString(
 	string(api.ResourceCPU),
 	string(api.ResourceMemory),
+	string(api.ResourceEphemeralStorage),
 	string(api.ResourceRequestsCPU),
 	string(api.ResourceRequestsMemory),
 	string(api.ResourceRequestsStorage),
+	string(api.ResourceRequestsEphemeralStorage),
 	string(api.ResourceLimitsCPU),
 	string(api.ResourceLimitsMemory),
+	string(api.ResourceLimitsEphemeralStorage),
 	string(api.ResourcePods),
 	string(api.ResourceQuotas),
 	string(api.ResourceServices),
@@ -170,10 +223,13 @@ func IsStandardQuotaResourceName(str string) bool {
 var standardResources = sets.NewString(
 	string(api.ResourceCPU),
 	string(api.ResourceMemory),
+	string(api.ResourceEphemeralStorage),
 	string(api.ResourceRequestsCPU),
 	string(api.ResourceRequestsMemory),
+	string(api.ResourceRequestsEphemeralStorage),
 	string(api.ResourceLimitsCPU),
 	string(api.ResourceLimitsMemory),
+	string(api.ResourceLimitsEphemeralStorage),
 	string(api.ResourcePods),
 	string(api.ResourceQuotas),
 	string(api.ResourceServices),
@@ -183,11 +239,13 @@ var standardResources = sets.NewString(
 	string(api.ResourcePersistentVolumeClaims),
 	string(api.ResourceStorage),
 	string(api.ResourceRequestsStorage),
+	string(api.ResourceServicesNodePorts),
+	string(api.ResourceServicesLoadBalancers),
 )
 
 // IsStandardResourceName returns true if the resource is known to the system
 func IsStandardResourceName(str string) bool {
-	return standardResources.Has(str)
+	return standardResources.Has(str) || IsHugePageResourceName(api.ResourceName(str))
 }
 
 var integerResources = sets.NewString(
@@ -204,7 +262,12 @@ var integerResources = sets.NewString(
 
 // IsIntegerResourceName returns true if the resource is measured in integer values
 func IsIntegerResourceName(str string) bool {
-	return integerResources.Has(str) || IsOpaqueIntResourceName(api.ResourceName(str))
+	return integerResources.Has(str) || IsExtendedResourceName(api.ResourceName(str))
+}
+
+// Extended and HugePages resources
+func IsScalarResourceName(name api.ResourceName) bool {
+	return IsExtendedResourceName(name) || IsHugePageResourceName(name)
 }
 
 // this function aims to check if the service's ClusterIP is set or not
@@ -225,6 +288,7 @@ func IsServiceIPRequested(service *api.Service) bool {
 var standardFinalizers = sets.NewString(
 	string(api.FinalizerKubernetes),
 	metav1.FinalizerOrphanDependents,
+	metav1.FinalizerDeleteDependents,
 )
 
 // HasAnnotation returns a bool if passed in annotation exists
@@ -260,14 +324,6 @@ func AddToNodeAddresses(addresses *[]api.NodeAddress, addAddresses ...api.NodeAd
 			*addresses = append(*addresses, add)
 		}
 	}
-}
-
-func HashObject(obj runtime.Object, codec runtime.Codec) (string, error) {
-	data, err := runtime.Encode(codec, obj)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x", md5.Sum(data)), nil
 }
 
 // TODO: make method on LoadBalancerStatus?
@@ -360,18 +416,6 @@ func containsAccessMode(modes []api.PersistentVolumeAccessMode, mode api.Persist
 		}
 	}
 	return false
-}
-
-// ParseRFC3339 parses an RFC3339 date in either RFC3339Nano or RFC3339 format.
-func ParseRFC3339(s string, nowFn func() metav1.Time) (metav1.Time, error) {
-	if t, timeErr := time.Parse(time.RFC3339Nano, s); timeErr == nil {
-		return metav1.Time{Time: t}, nil
-	}
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		return metav1.Time{}, err
-	}
-	return metav1.Time{Time: t}, nil
 }
 
 // NodeSelectorRequirementsAsSelector converts the []NodeSelectorRequirement api type into a struct that implements
@@ -541,21 +585,6 @@ func PodAnnotationsFromSysctls(sysctls []api.Sysctl) string {
 	return strings.Join(kvs, ",")
 }
 
-// GetAffinityFromPodAnnotations gets the json serialized affinity data from Pod.Annotations
-// and converts it to the Affinity type in api.
-// TODO: remove when alpha support for affinity is removed
-func GetAffinityFromPodAnnotations(annotations map[string]string) (*api.Affinity, error) {
-	if len(annotations) > 0 && annotations[api.AffinityAnnotationKey] != "" {
-		var affinity api.Affinity
-		err := json.Unmarshal([]byte(annotations[api.AffinityAnnotationKey]), &affinity)
-		if err != nil {
-			return nil, err
-		}
-		return &affinity, nil
-	}
-	return nil, nil
-}
-
 // GetPersistentVolumeClass returns StorageClassName.
 func GetPersistentVolumeClass(volume *api.PersistentVolume) string {
 	// Use beta annotation first
@@ -593,4 +622,34 @@ func PersistentVolumeClaimHasClass(claim *api.PersistentVolumeClaim) bool {
 	}
 
 	return false
+}
+
+// GetStorageNodeAffinityFromAnnotation gets the json serialized data from PersistentVolume.Annotations
+// and converts it to the NodeAffinity type in api.
+// TODO: update when storage node affinity graduates to beta
+func GetStorageNodeAffinityFromAnnotation(annotations map[string]string) (*api.NodeAffinity, error) {
+	if len(annotations) > 0 && annotations[api.AlphaStorageNodeAffinityAnnotation] != "" {
+		var affinity api.NodeAffinity
+		err := json.Unmarshal([]byte(annotations[api.AlphaStorageNodeAffinityAnnotation]), &affinity)
+		if err != nil {
+			return nil, err
+		}
+		return &affinity, nil
+	}
+	return nil, nil
+}
+
+// Converts NodeAffinity type to Alpha annotation for use in PersistentVolumes
+// TODO: update when storage node affinity graduates to beta
+func StorageNodeAffinityToAlphaAnnotation(annotations map[string]string, affinity *api.NodeAffinity) error {
+	if affinity == nil {
+		return nil
+	}
+
+	json, err := json.Marshal(*affinity)
+	if err != nil {
+		return err
+	}
+	annotations[api.AlphaStorageNodeAffinityAnnotation] = string(json)
+	return nil
 }

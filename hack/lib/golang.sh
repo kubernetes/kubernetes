@@ -19,7 +19,7 @@ readonly KUBE_GO_PACKAGE=k8s.io/kubernetes
 readonly KUBE_GOPATH="${KUBE_OUTPUT}/go"
 
 # The set of server targets that we are only building for Linux
-# If you update this list, please also update build/release-tars/BUILD.
+# If you update this list, please also update build/BUILD.
 kube::golang::server_targets() {
   local targets=(
     cmd/kube-proxy
@@ -30,6 +30,7 @@ kube::golang::server_targets() {
     cmd/kubeadm
     cmd/hyperkube
     vendor/k8s.io/kube-aggregator
+    vendor/k8s.io/apiextensions-apiserver
     plugin/cmd/kube-scheduler
   )
   echo "${targets[@]}"
@@ -39,10 +40,11 @@ readonly KUBE_SERVER_TARGETS=($(kube::golang::server_targets))
 readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
 
 # The set of server targets that we are only building for Kubernetes nodes
-# If you update this list, please also update build/release-tars/BUILD.
+# If you update this list, please also update build/BUILD.
 kube::golang::node_targets() {
   local targets=(
     cmd/kube-proxy
+    cmd/kubeadm
     cmd/kubelet
   )
   echo "${targets[@]}"
@@ -52,7 +54,12 @@ readonly KUBE_NODE_TARGETS=($(kube::golang::node_targets))
 readonly KUBE_NODE_BINARIES=("${KUBE_NODE_TARGETS[@]##*/}")
 readonly KUBE_NODE_BINARIES_WIN=("${KUBE_NODE_BINARIES[@]/%/.exe}")
 
-if [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
+if [[ -n "${KUBE_BUILD_PLATFORMS:-}" ]]; then
+  readonly KUBE_SERVER_PLATFORMS=(${KUBE_BUILD_PLATFORMS})
+  readonly KUBE_NODE_PLATFORMS=(${KUBE_BUILD_PLATFORMS})
+  readonly KUBE_TEST_PLATFORMS=(${KUBE_BUILD_PLATFORMS})
+  readonly KUBE_CLIENT_PLATFORMS=(${KUBE_BUILD_PLATFORMS})
+elif [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
   readonly KUBE_SERVER_PLATFORMS=(linux/amd64)
   readonly KUBE_NODE_PLATFORMS=(linux/amd64)
   if [[ "${KUBE_BUILDER_OS:-}" == "darwin"* ]]; then
@@ -106,33 +113,33 @@ else
   # Which platforms we should compile test targets for. Not all client platforms need these tests
   readonly KUBE_TEST_PLATFORMS=(
     linux/amd64
+    linux/arm
+    linux/arm64
+    linux/s390x
+    linux/ppc64le
     darwin/amd64
     windows/amd64
   )
 fi
 
 # The set of client targets that we are building for all platforms
-# If you update this list, please also update build/release-tars/BUILD.
+# If you update this list, please also update build/BUILD.
 readonly KUBE_CLIENT_TARGETS=(
   cmd/kubectl
-  federation/cmd/kubefed
 )
 readonly KUBE_CLIENT_BINARIES=("${KUBE_CLIENT_TARGETS[@]##*/}")
 readonly KUBE_CLIENT_BINARIES_WIN=("${KUBE_CLIENT_BINARIES[@]/%/.exe}")
 
 # The set of test targets that we are building for all platforms
-# If you update this list, please also update build/release-tars/BUILD.
+# If you update this list, please also update build/BUILD.
 kube::golang::test_targets() {
   local targets=(
     cmd/gendocs
     cmd/genkubedocs
     cmd/genman
     cmd/genyaml
-    cmd/mungedocs
     cmd/genswaggertypedocs
     cmd/linkcheck
-    examples/k8petstore/web-server/src
-    federation/cmd/genfeddocs
     vendor/github.com/onsi/ginkgo/ginkgo
     test/e2e/e2e.test
   )
@@ -141,23 +148,21 @@ kube::golang::test_targets() {
 readonly KUBE_TEST_TARGETS=($(kube::golang::test_targets))
 readonly KUBE_TEST_BINARIES=("${KUBE_TEST_TARGETS[@]##*/}")
 readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
-# If you update this list, please also update build/release-tars/BUILD.
+# If you update this list, please also update build/BUILD.
 readonly KUBE_TEST_PORTABLE=(
   test/e2e/testing-manifests
   test/kubemark
-  federation/develop
   hack/e2e.go
   hack/e2e-internal
   hack/get-build.sh
   hack/ginkgo-e2e.sh
-  hack/federated-ginkgo-e2e.sh
   hack/lib
 )
 
 # Test targets which run on the Kubernetes clusters directly, so we only
 # need to target server platforms.
 # These binaries will be distributed in the kubernetes-test tarball.
-# If you update this list, please also update build/release-tars/BUILD.
+# If you update this list, please also update build/BUILD.
 kube::golang::server_test_targets() {
   local targets=(
     cmd/kubemark
@@ -241,21 +246,7 @@ kube::golang::host_platform() {
   echo "$(go env GOHOSTOS)/$(go env GOHOSTARCH)"
 }
 
-kube::golang::current_platform() {
-  local os="${GOOS-}"
-  if [[ -z $os ]]; then
-    os=$(go env GOHOSTOS)
-  fi
-
-  local arch="${GOARCH-}"
-  if [[ -z $arch ]]; then
-    arch=$(go env GOHOSTARCH)
-  fi
-
-  echo "$os/$arch"
-}
-
-# Takes the the platform name ($1) and sets the appropriate golang env variables
+# Takes the platform name ($1) and sets the appropriate golang env variables
 # for that platform.
 kube::golang::set_platform_envs() {
   [[ -n ${1-} ]] || {
@@ -267,7 +258,6 @@ kube::golang::set_platform_envs() {
 
   # Do not set CC when building natively on a platform, only if cross-compiling from linux/amd64
   if [[ $(kube::golang::host_platform) == "linux/amd64" ]]; then
-
     # Dynamic CGO linking for other server architectures than linux/amd64 goes here
     # If you want to include support for more server platforms than these, add arch-specific gcc names here
     case "${platform}" in
@@ -330,11 +320,13 @@ EOF
 
   local go_version
   go_version=($(go version))
-  if [[ "${go_version[2]}" < "go1.6" && "${go_version[2]}" != "devel" ]]; then
+  local minimum_go_version
+  minimum_go_version=go1.8.3
+  if [[ "${go_version[2]}" < "${minimum_go_version}" && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
-Kubernetes requires go version 1.6 or greater.
-Please install Go version 1.6 or later.
+Kubernetes requires ${minimum_go_version} or greater.
+Please install ${minimum_go_version} or later.
 EOF
     return 2
   fi
@@ -357,12 +349,15 @@ kube::golang::setup_env() {
 
   kube::golang::create_gopath_tree
 
-  export GOPATH=${KUBE_GOPATH}
+  export GOPATH="${KUBE_GOPATH}"
 
   # Append KUBE_EXTRA_GOPATH to the GOPATH if it is defined.
   if [[ -n ${KUBE_EXTRA_GOPATH:-} ]]; then
     GOPATH="${GOPATH}:${KUBE_EXTRA_GOPATH}"
   fi
+
+  # Make sure our own Go binaries are in PATH.
+  export PATH="${KUBE_GOPATH}/bin:${PATH}"
 
   # Change directories so that we are within the GOPATH.  Some tools get really
   # upset if this is not true.  We use a whole fake GOPATH here to collect the
@@ -378,7 +373,7 @@ kube::golang::setup_env() {
   # Unset GOBIN in case it already exists in the current session.
   unset GOBIN
 
-  # This seems to matter to some tools (godep, ugorji, ginkgo...)
+  # This seems to matter to some tools (godep, ginkgo...)
   export GO15VENDOREXPERIMENT=1
 }
 
@@ -625,9 +620,9 @@ kube::golang::build_binaries() {
 
     # Use eval to preserve embedded quoted strings.
     local goflags goldflags gogcflags
-    eval "goflags=(${KUBE_GOFLAGS:-})"
-    goldflags="${KUBE_GOLDFLAGS:-} $(kube::version::ldflags)"
-    gogcflags="${KUBE_GOGCFLAGS:-}"
+    eval "goflags=(${GOFLAGS:-})"
+    goldflags="${GOLDFLAGS:-} $(kube::version::ldflags)"
+    gogcflags="${GOGCFLAGS:-}"
 
     local use_go_build
     local -a targets=()

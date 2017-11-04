@@ -23,11 +23,13 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	utilexec "k8s.io/kubernetes/pkg/util/exec"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/util"
+	utilexec "k8s.io/utils/exec"
 )
 
 // RemoteRuntimeService is a gRPC implementation of internalapi.RuntimeService.
@@ -37,16 +39,20 @@ type RemoteRuntimeService struct {
 }
 
 // NewRemoteRuntimeService creates a new internalapi.RuntimeService.
-func NewRemoteRuntimeService(addr string, connectionTimout time.Duration) (internalapi.RuntimeService, error) {
-	glog.Infof("Connecting to runtime service %s", addr)
-	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimout), grpc.WithDialer(dial))
+func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration) (internalapi.RuntimeService, error) {
+	glog.Infof("Connecting to runtime service %s", endpoint)
+	addr, dailer, err := util.GetAddressAndDialer(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithTimeout(connectionTimeout), grpc.WithDialer(dailer))
 	if err != nil {
 		glog.Errorf("Connect remote runtime %s failed: %v", addr, err)
 		return nil, err
 	}
 
 	return &RemoteRuntimeService{
-		timeout:       connectionTimout,
+		timeout:       connectionTimeout,
 		runtimeClient: runtimeapi.NewRuntimeServiceClient(conn),
 	}, nil
 }
@@ -160,7 +166,7 @@ func (r *RemoteRuntimeService) ListPodSandbox(filter *runtimeapi.PodSandboxFilte
 		Filter: filter,
 	})
 	if err != nil {
-		glog.Errorf("ListPodSandbox with filter %q from runtime service failed: %v", filter, err)
+		glog.Errorf("ListPodSandbox with filter %+v from runtime service failed: %v", filter, err)
 		return nil, err
 	}
 
@@ -209,7 +215,10 @@ func (r *RemoteRuntimeService) StartContainer(containerID string) error {
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
 func (r *RemoteRuntimeService) StopContainer(containerID string, timeout int64) error {
-	ctx, cancel := getContextWithTimeout(r.timeout)
+	// Use timeout + default timeout (2 minutes) as timeout to leave extra time
+	// for SIGKILL container and request latency.
+	t := r.timeout + time.Duration(timeout)*time.Second
+	ctx, cancel := getContextWithTimeout(t)
 	defer cancel()
 
 	_, err := r.runtimeClient.StopContainer(ctx, &runtimeapi.StopContainerRequest{
@@ -250,7 +259,7 @@ func (r *RemoteRuntimeService) ListContainers(filter *runtimeapi.ContainerFilter
 		Filter: filter,
 	})
 	if err != nil {
-		glog.Errorf("ListContainers with filter %q from runtime service failed: %v", filter, err)
+		glog.Errorf("ListContainers with filter %+v from runtime service failed: %v", filter, err)
 		return nil, err
 	}
 
@@ -280,12 +289,34 @@ func (r *RemoteRuntimeService) ContainerStatus(containerID string) (*runtimeapi.
 	return resp.Status, nil
 }
 
+// UpdateContainerResources updates a containers resource config
+func (r *RemoteRuntimeService) UpdateContainerResources(containerID string, resources *runtimeapi.LinuxContainerResources) error {
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	_, err := r.runtimeClient.UpdateContainerResources(ctx, &runtimeapi.UpdateContainerResourcesRequest{
+		ContainerId: containerID,
+		Linux:       resources,
+	})
+	if err != nil {
+		glog.Errorf("UpdateContainerResources %q from runtime service failed: %v", containerID, err)
+		return err
+	}
+
+	return nil
+}
+
 // ExecSync executes a command in the container, and returns the stdout output.
 // If command exits with a non-zero exit code, an error is returned.
 func (r *RemoteRuntimeService) ExecSync(containerID string, cmd []string, timeout time.Duration) (stdout []byte, stderr []byte, err error) {
-	ctx, cancel := getContextWithTimeout(timeout)
-	if timeout == 0 {
-		// Do not set timeout when timeout is 0.
+	// Do not set timeout when timeout is 0.
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if timeout != 0 {
+		// Use timeout + default timeout (2 minutes) as timeout to leave some time for
+		// the runtime to do cleanup.
+		ctx, cancel = getContextWithTimeout(r.timeout + timeout)
+	} else {
 		ctx, cancel = getContextWithCancel()
 	}
 	defer cancel()
@@ -411,4 +442,37 @@ func (r *RemoteRuntimeService) Status() (*runtimeapi.RuntimeStatus, error) {
 	}
 
 	return resp.Status, nil
+}
+
+// ContainerStats returns the stats of the container.
+func (r *RemoteRuntimeService) ContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	resp, err := r.runtimeClient.ContainerStats(ctx, &runtimeapi.ContainerStatsRequest{
+		ContainerId: containerID,
+	})
+	if err != nil {
+		glog.Errorf("ContainerStatus %q from runtime service failed: %v", containerID, err)
+		return nil, err
+	}
+
+	return resp.GetStats(), nil
+}
+
+func (r *RemoteRuntimeService) ListContainerStats(filter *runtimeapi.ContainerStatsFilter) ([]*runtimeapi.ContainerStats, error) {
+	// Do not set timeout, because writable layer stats collection takes time.
+	// TODO(random-liu): Should we assume runtime should cache the result, and set timeout here?
+	ctx, cancel := getContextWithCancel()
+	defer cancel()
+
+	resp, err := r.runtimeClient.ListContainerStats(ctx, &runtimeapi.ListContainerStatsRequest{
+		Filter: filter,
+	})
+	if err != nil {
+		glog.Errorf("ListContainerStats with filter %+v from runtime service failed: %v", filter, err)
+		return nil, err
+	}
+
+	return resp.GetStats(), nil
 }

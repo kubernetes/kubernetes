@@ -1,1 +1,1 @@
-Please refer to https://github.com/kubernetes/community/tree/master/contributors/devel/flexvolume.md for documentation.
+This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/devel/flexvolume.md](https://github.com/kubernetes/community/blob/master/contributors/devel/flexvolume.md)

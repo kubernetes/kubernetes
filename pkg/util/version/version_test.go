@@ -18,6 +18,7 @@ package version
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 )
 
@@ -44,13 +45,24 @@ func testOne(v *Version, item, prev testItem) error {
 		if err != nil {
 			return fmt.Errorf("unexpected parse error: %v", err)
 		}
+		rv, err := parse(prev.version, v.semver)
+		if err != nil {
+			return fmt.Errorf("unexpected parse error: %v", err)
+		}
+		rcmp, err := rv.Compare(item.version)
+		if err != nil {
+			return fmt.Errorf("unexpected parse error: %v", err)
+		}
+
 		switch {
 		case cmp == -1:
 			return fmt.Errorf("unexpected ordering %q < %q", item.version, prev.version)
 		case cmp == 0 && !item.equalsPrev:
-			return fmt.Errorf("unexpected comparison %q == %q", item.version, item.version)
+			return fmt.Errorf("unexpected comparison %q == %q", item.version, prev.version)
 		case cmp == 1 && item.equalsPrev:
-			return fmt.Errorf("unexpected comparison %q != %q", item.version, item.version)
+			return fmt.Errorf("unexpected comparison %q != %q", item.version, prev.version)
+		case cmp != -rcmp:
+			return fmt.Errorf("unexpected reverse comparison %q <=> %q %v %v %v %v", item.version, prev.version, cmp, rcmp, v.Components(), rv.Components())
 		}
 	}
 
@@ -75,6 +87,8 @@ func TestSemanticVersions(t *testing.T) {
 		{version: "1.0.0-x.7.z.92"},
 		{version: "1.0.0"},
 		{version: "1.0.0+20130313144700", equalsPrev: true},
+		{version: "1.8.0-alpha.3"},
+		{version: "1.8.0-alpha.3.673+73326ef01d2d7c"},
 		{version: "1.9.0"},
 		{version: "1.10.0"},
 		{version: "1.11.0"},
@@ -186,6 +200,7 @@ func TestGenericVersions(t *testing.T) {
 		{version: "1.2", unparsed: "1.2"},
 		{version: "1.2a.3", unparsed: "1.2", equalsPrev: true},
 		{version: "1.2.3", unparsed: "1.2.3"},
+		{version: "1.2.3.0", unparsed: "1.2.3.0", equalsPrev: true},
 		{version: "1.2.3a", unparsed: "1.2.3", equalsPrev: true},
 		{version: "1.2.3-foo.", unparsed: "1.2.3", equalsPrev: true},
 		{version: "1.2.3-.foo", unparsed: "1.2.3", equalsPrev: true},
@@ -200,8 +215,10 @@ func TestGenericVersions(t *testing.T) {
 		{version: "1.2.3.4b3", unparsed: "1.2.3.4", equalsPrev: true},
 		{version: "1.2.3.4.5", unparsed: "1.2.3.4.5"},
 		{version: "1.9.0", unparsed: "1.9.0"},
+		{version: "1.9.0.0.0.0.0.0", unparsed: "1.9.0.0.0.0.0.0", equalsPrev: true},
 		{version: "1.10.0", unparsed: "1.10.0"},
 		{version: "1.11.0", unparsed: "1.11.0"},
+		{version: "1.11.0.0.5", unparsed: "1.11.0.0.5"},
 		{version: "2.0.0", unparsed: "2.0.0"},
 		{version: "2.1.0", unparsed: "2.1.0"},
 		{version: "2.1.1", unparsed: "2.1.1"},
@@ -254,6 +271,78 @@ func TestBadGenericVersions(t *testing.T) {
 		_, err := ParseGeneric(tests[i])
 		if err == nil {
 			t.Errorf("unexpected success parsing invalid version %q", tests[i])
+		}
+	}
+}
+
+func TestComponents(t *testing.T) {
+
+	var tests = []struct {
+		version               string
+		semver                bool
+		expectedComponents    []uint
+		expectedMajor         uint
+		expectedMinor         uint
+		expectedPatch         uint
+		expectedPreRelease    string
+		expectedBuildMetadata string
+	}{
+		{
+			version:            "1.0.2",
+			semver:             true,
+			expectedComponents: []uint{1, 0, 2},
+			expectedMajor:      1,
+			expectedMinor:      0,
+			expectedPatch:      2,
+		},
+		{
+			version:               "1.0.2-alpha+001",
+			semver:                true,
+			expectedComponents:    []uint{1, 0, 2},
+			expectedMajor:         1,
+			expectedMinor:         0,
+			expectedPatch:         2,
+			expectedPreRelease:    "alpha",
+			expectedBuildMetadata: "001",
+		},
+		{
+			version:            "1.2",
+			semver:             false,
+			expectedComponents: []uint{1, 2},
+			expectedMajor:      1,
+			expectedMinor:      2,
+		},
+		{
+			version:               "1.0.2-beta+exp.sha.5114f85",
+			semver:                true,
+			expectedComponents:    []uint{1, 0, 2},
+			expectedMajor:         1,
+			expectedMinor:         0,
+			expectedPatch:         2,
+			expectedPreRelease:    "beta",
+			expectedBuildMetadata: "exp.sha.5114f85",
+		},
+	}
+
+	for _, test := range tests {
+		version, _ := parse(test.version, test.semver)
+		if !reflect.DeepEqual(test.expectedComponents, version.Components()) {
+			t.Error("parse returned un'expected components")
+		}
+		if test.expectedMajor != version.Major() {
+			t.Errorf("parse returned version.Major %d, expected %d", test.expectedMajor, version.Major())
+		}
+		if test.expectedMinor != version.Minor() {
+			t.Errorf("parse returned version.Minor %d, expected %d", test.expectedMinor, version.Minor())
+		}
+		if test.expectedPatch != version.Patch() {
+			t.Errorf("parse returned version.Patch %d, expected %d", test.expectedPatch, version.Patch())
+		}
+		if test.expectedPreRelease != version.PreRelease() {
+			t.Errorf("parse returned version.PreRelease %s, expected %s", test.expectedPreRelease, version.PreRelease())
+		}
+		if test.expectedBuildMetadata != version.BuildMetadata() {
+			t.Errorf("parse returned version.BuildMetadata %s, expected %s", test.expectedBuildMetadata, version.BuildMetadata())
 		}
 	}
 }

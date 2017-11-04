@@ -39,6 +39,9 @@ type GarbageCollectionPolicy string
 const (
 	DeleteDependents GarbageCollectionPolicy = "DeleteDependents"
 	OrphanDependents GarbageCollectionPolicy = "OrphanDependents"
+	// Unsupported means that the resource knows that it cannot be GC'd, so the finalizers
+	// should never be set in storage.
+	Unsupported GarbageCollectionPolicy = "Unsupported"
 )
 
 // GarbageCollectionDeleteStrategy must be implemented by the registry that wants to
@@ -56,12 +59,15 @@ type RESTGracefulDeleteStrategy interface {
 	CheckGracefulDelete(ctx genericapirequest.Context, obj runtime.Object, options *metav1.DeleteOptions) bool
 }
 
-// BeforeDelete tests whether the object can be gracefully deleted. If graceful is set the object
-// should be gracefully deleted, if gracefulPending is set the object has already been gracefully deleted
-// (and the provided grace period is longer than the time to deletion), and an error is returned if the
-// condition cannot be checked or the gracePeriodSeconds is invalid. The options argument may be updated with
-// default values if graceful is true. Second place where we set deletionTimestamp is pkg/registry/generic/registry/store.go
-// this function is responsible for setting deletionTimestamp during gracefulDeletion, other one for cascading deletions.
+// BeforeDelete tests whether the object can be gracefully deleted.
+// If graceful is set, the object should be gracefully deleted.  If gracefulPending
+// is set, the object has already been gracefully deleted (and the provided grace
+// period is longer than the time to deletion). An error is returned if the
+// condition cannot be checked or the gracePeriodSeconds is invalid. The options
+// argument may be updated with default values if graceful is true. Second place
+// where we set deletionTimestamp is pkg/registry/generic/registry/store.go.
+// This function is responsible for setting deletionTimestamp during gracefulDeletion,
+// other one for cascading deletions.
 func BeforeDelete(strategy RESTDeleteStrategy, ctx genericapirequest.Context, obj runtime.Object, options *metav1.DeleteOptions) (graceful, gracefulPending bool, err error) {
 	objectMeta, gvk, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {

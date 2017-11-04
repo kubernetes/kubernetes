@@ -36,7 +36,7 @@ import (
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
-	kubelet "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -54,8 +54,9 @@ const DefaultAPITokenMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
 // PluginName is the name of this admission plugin
 const PluginName = "ServiceAccount"
 
-func init() {
-	kubeapiserveradmission.Plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		serviceAccountAdmission := NewServiceAccount()
 		return serviceAccountAdmission, nil
 	})
@@ -90,7 +91,7 @@ var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&serviceAccount{
 // 5. If MountServiceAccountToken is true, it adds a VolumeMount with the pod's ServiceAccount's api token secret to containers
 func NewServiceAccount() *serviceAccount {
 	return &serviceAccount{
-		Handler: admission.NewHandler(admission.Create),
+		Handler: admission.NewHandler(admission.Create, admission.Update),
 		// TODO: enable this once we've swept secret usage to account for adding secret references to service accounts
 		LimitSecretReferences: false,
 		// Auto mount service account API token secrets
@@ -116,8 +117,8 @@ func (a *serviceAccount) SetInternalKubeInformerFactory(f informers.SharedInform
 	})
 }
 
-// Validate ensures an authorizer is set.
-func (a *serviceAccount) Validate() error {
+// ValidateInitialization ensures an authorizer is set.
+func (a *serviceAccount) ValidateInitialization() error {
 	if a.client == nil {
 		return fmt.Errorf("missing client")
 	}
@@ -143,10 +144,19 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 		return nil
 	}
 
+	updateInitialized, err := util.IsUpdatingInitializedObject(a)
+	if err != nil {
+		return err
+	}
+	if updateInitialized {
+		// related pod spec fields are immutable after the pod is initialized
+		return nil
+	}
+
 	// Don't modify the spec of mirror pods.
 	// That makes the kubelet very angry and confused, and it immediately deletes the pod (because the spec doesn't match)
 	// That said, don't allow mirror pods to reference ServiceAccounts or SecretVolumeSources either
-	if _, isMirrorPod := pod.Annotations[kubelet.ConfigMirrorAnnotationKey]; isMirrorPod {
+	if _, isMirrorPod := pod.Annotations[api.MirrorPodAnnotationKey]; isMirrorPod {
 		if len(pod.Spec.ServiceAccountName) != 0 {
 			return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not reference service accounts"))
 		}

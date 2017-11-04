@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -14,14 +12,14 @@ go_library(
         "doc.go",
         "version.go",
     ],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/pkg/util/version",
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["version_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/util/version",
     library = ":go_default_library",
-    tags = ["automanaged"],
 )
 
 filegroup(

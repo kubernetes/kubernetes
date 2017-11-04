@@ -23,12 +23,16 @@ package internalversion
 type LocalSubjectAccessReviewListerExpansion interface{}
 
 // LocalSubjectAccessReviewNamespaceListerExpansion allows custom methods to be added to
-// LocalSubjectAccessReviewNamespaeLister.
+// LocalSubjectAccessReviewNamespaceLister.
 type LocalSubjectAccessReviewNamespaceListerExpansion interface{}
 
 // SelfSubjectAccessReviewListerExpansion allows custom methods to be added to
 // SelfSubjectAccessReviewLister.
 type SelfSubjectAccessReviewListerExpansion interface{}
+
+// SelfSubjectRulesReviewListerExpansion allows custom methods to be added to
+// SelfSubjectRulesReviewLister.
+type SelfSubjectRulesReviewListerExpansion interface{}
 
 // SubjectAccessReviewListerExpansion allows custom methods to be added to
 // SubjectAccessReviewLister.

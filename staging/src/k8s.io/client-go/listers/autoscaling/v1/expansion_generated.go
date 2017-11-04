@@ -23,5 +23,5 @@ package v1
 type HorizontalPodAutoscalerListerExpansion interface{}
 
 // HorizontalPodAutoscalerNamespaceListerExpansion allows custom methods to be added to
-// HorizontalPodAutoscalerNamespaeLister.
+// HorizontalPodAutoscalerNamespaceLister.
 type HorizontalPodAutoscalerNamespaceListerExpansion interface{}

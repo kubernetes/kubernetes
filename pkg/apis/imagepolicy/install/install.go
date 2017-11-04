@@ -23,13 +23,13 @@ import (
 	"k8s.io/apimachinery/pkg/apimachinery/registered"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/imagepolicy"
 	"k8s.io/kubernetes/pkg/apis/imagepolicy/v1alpha1"
 )
 
 func init() {
-	Install(api.GroupFactoryRegistry, api.Registry, api.Scheme)
+	Install(legacyscheme.GroupFactoryRegistry, legacyscheme.Registry, legacyscheme.Scheme)
 }
 
 // Install registers the API group and adds types to a scheme
@@ -38,7 +38,6 @@ func Install(groupFactoryRegistry announced.APIGroupFactoryRegistry, registry *r
 		&announced.GroupMetaFactoryArgs{
 			GroupName:                  imagepolicy.GroupName,
 			VersionPreferenceOrder:     []string{v1alpha1.SchemeGroupVersion.Version},
-			ImportPrefix:               "k8s.io/kubernetes/pkg/apis/imagepolicy",
 			RootScopedKinds:            sets.NewString("ImageReview"),
 			AddInternalObjectsToScheme: imagepolicy.AddToScheme,
 		},

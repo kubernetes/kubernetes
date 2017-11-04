@@ -1,1 +1,0 @@
-This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/devel/container-runtime-interface.md](https://github.com/kubernetes/community/blob/master/contributors/devel/container-runtime-interface.md)

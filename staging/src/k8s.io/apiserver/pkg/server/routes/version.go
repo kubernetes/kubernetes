@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-	"k8s.io/apiserver/pkg/server/mux"
 )
 
 // Version provides a webservice with version information.
@@ -32,7 +31,7 @@ type Version struct {
 }
 
 // Install registers the APIServer's `/version` handler.
-func (v Version) Install(c *mux.APIContainer) {
+func (v Version) Install(c *restful.Container) {
 	if v.Version == nil {
 		return
 	}

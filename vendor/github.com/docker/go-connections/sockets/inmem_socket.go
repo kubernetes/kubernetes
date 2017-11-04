@@ -79,11 +79,3 @@ func (a dummyAddr) Network() string {
 func (a dummyAddr) String() string {
 	return string(a)
 }
-
-// timeoutError is used when there is a timeout with a connection
-// this implements the net.Error interface
-type timeoutError struct{}
-
-func (e *timeoutError) Error() string   { return "i/o timeout" }
-func (e *timeoutError) Timeout() bool   { return true }
-func (e *timeoutError) Temporary() bool { return true }

@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -11,8 +9,8 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["storage_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/node/storage",
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/kubelet/client:go_default_library",
@@ -30,14 +28,17 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["storage.go"],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/pkg/registry/core/node/storage",
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/kubelet/client:go_default_library",
-        "//pkg/registry/cachesize:go_default_library",
+        "//pkg/printers:go_default_library",
+        "//pkg/printers/internalversion:go_default_library",
+        "//pkg/printers/storage:go_default_library",
         "//pkg/registry/core/node:go_default_library",
         "//pkg/registry/core/node/rest:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/endpoints/request:go_default_library",

@@ -50,20 +50,20 @@ func (p ListedPathProviders) ListedPaths() []string {
 type Index struct{}
 
 // Install adds the Index webservice to the given mux.
-func (i Index) Install(pathProvider ListedPathProvider, mux *mux.PathRecorderMux, delegate http.Handler) {
-	mux.UnlistedHandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		status := http.StatusOK
-		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
-			// Since "/" matches all paths, handleIndex is called for all paths for which there is no handler api.Registry.
-			// if we have a delegate, we should call to it and simply return
-			if delegate != nil {
-				delegate.ServeHTTP(w, r)
-				return
-			}
+func (i Index) Install(pathProvider ListedPathProvider, mux *mux.PathRecorderMux) {
+	handler := IndexLister{StatusCode: http.StatusOK, PathProvider: pathProvider}
 
-			// If we have no delegate, we want to return a 404 status with a list of all valid paths, incase of an invalid URL request.
-			status = http.StatusNotFound
-		}
-		responsewriters.WriteRawJSON(status, metav1.RootPaths{Paths: pathProvider.ListedPaths()}, w)
-	})
+	mux.UnlistedHandle("/", handler)
+	mux.UnlistedHandle("/index.html", handler)
+}
+
+// IndexLister lists the available indexes with the status code provided
+type IndexLister struct {
+	StatusCode   int
+	PathProvider ListedPathProvider
+}
+
+// ServeHTTP serves the available paths.
+func (i IndexLister) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	responsewriters.WriteRawJSON(i.StatusCode, metav1.RootPaths{Paths: i.PathProvider.ListedPaths()}, w)
 }

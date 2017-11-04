@@ -19,13 +19,13 @@ limitations under the License.
 package v1
 
 import (
+	core_v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	internalinterfaces "k8s.io/client-go/informers/internalinterfaces"
 	kubernetes "k8s.io/client-go/kubernetes"
 	v1 "k8s.io/client-go/listers/core/v1"
-	api_v1 "k8s.io/client-go/pkg/api/v1"
 	cache "k8s.io/client-go/tools/cache"
 	time "time"
 )
@@ -41,26 +41,31 @@ type replicationControllerInformer struct {
 	factory internalinterfaces.SharedInformerFactory
 }
 
-func newReplicationControllerInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	sharedIndexInformer := cache.NewSharedIndexInformer(
+// NewReplicationControllerInformer constructs a new informer for ReplicationController type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewReplicationControllerInformer(client kubernetes.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
-				return client.CoreV1().ReplicationControllers(meta_v1.NamespaceAll).List(options)
+				return client.CoreV1().ReplicationControllers(namespace).List(options)
 			},
 			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
-				return client.CoreV1().ReplicationControllers(meta_v1.NamespaceAll).Watch(options)
+				return client.CoreV1().ReplicationControllers(namespace).Watch(options)
 			},
 		},
-		&api_v1.ReplicationController{},
+		&core_v1.ReplicationController{},
 		resyncPeriod,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		indexers,
 	)
+}
 
-	return sharedIndexInformer
+func defaultReplicationControllerInformer(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewReplicationControllerInformer(client, meta_v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 }
 
 func (f *replicationControllerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api_v1.ReplicationController{}, newReplicationControllerInformer)
+	return f.factory.InformerFor(&core_v1.ReplicationController{}, defaultReplicationControllerInformer)
 }
 
 func (f *replicationControllerInformer) Lister() v1.ReplicationControllerLister {

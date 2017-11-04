@@ -27,9 +27,9 @@ import (
 	"strings"
 	"sync"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/pkg/api"
 )
 
 // TODO move to API machinery and re-unify with kubelet/server/portfoward
@@ -207,7 +207,7 @@ func (pf *PortForwarder) listenOnPortAndAddress(port *ForwardedPort, protocol st
 // getListener creates a listener on the interface targeted by the given hostname on the given port with
 // the given protocol. protocol is in net.Listen style which basically admits values like tcp, tcp4, tcp6
 func (pf *PortForwarder) getListener(protocol string, hostname string, port *ForwardedPort) (net.Listener, error) {
-	listener, err := net.Listen(protocol, fmt.Sprintf("%s:%d", hostname, port.Local))
+	listener, err := net.Listen(protocol, net.JoinHostPort(hostname, strconv.Itoa(int(port.Local))))
 	if err != nil {
 		return nil, fmt.Errorf("Unable to create listener: Error %s", err)
 	}
@@ -263,9 +263,9 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 
 	// create error stream
 	headers := http.Header{}
-	headers.Set(api.StreamType, api.StreamTypeError)
-	headers.Set(api.PortHeader, fmt.Sprintf("%d", port.Remote))
-	headers.Set(api.PortForwardRequestIDHeader, strconv.Itoa(requestID))
+	headers.Set(v1.StreamType, v1.StreamTypeError)
+	headers.Set(v1.PortHeader, fmt.Sprintf("%d", port.Remote))
+	headers.Set(v1.PortForwardRequestIDHeader, strconv.Itoa(requestID))
 	errorStream, err := pf.streamConn.CreateStream(headers)
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("error creating error stream for port %d -> %d: %v", port.Local, port.Remote, err))
@@ -287,7 +287,7 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 	}()
 
 	// create data stream
-	headers.Set(api.StreamType, api.StreamTypeData)
+	headers.Set(v1.StreamType, v1.StreamTypeData)
 	dataStream, err := pf.streamConn.CreateStream(headers)
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("error creating forwarding stream for port %d -> %d: %v", port.Local, port.Remote, err))

@@ -19,12 +19,12 @@ package priorities
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/api/core/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-// ImageLocalityPriority is a priority function that favors nodes that already have requested pod container's images.
+// ImageLocalityPriorityMap is a priority function that favors nodes that already have requested pod container's images.
 // It will detect whether the requested images are present on a node, and then calculate a score ranging from 0 to 10
 // based on the total size of those images.
 // - If none of the images are present, this node will be given the lowest priority.
@@ -35,10 +35,8 @@ func ImageLocalityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *scheduler
 		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
 	}
 
-	var sumSize int64
-	for i := range pod.Spec.Containers {
-		sumSize += checkContainerImageOnNode(node, &pod.Spec.Containers[i])
-	}
+	sumSize := totalImageSize(node, pod.Spec.Containers)
+
 	return schedulerapi.HostPriority{
 		Host:  node.Name,
 		Score: calculateScoreFromSize(sumSize),
@@ -49,31 +47,35 @@ func ImageLocalityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *scheduler
 // 1. Split image size range into 10 buckets.
 // 2. Decide the priority of a given sumSize based on which bucket it belongs to.
 func calculateScoreFromSize(sumSize int64) int {
-	var score int
 	switch {
 	case sumSize == 0 || sumSize < minImgSize:
-		// score == 0 means none of the images required by this pod are present on this
+		// 0 means none of the images required by this pod are present on this
 		// node or the total size of the images present is too small to be taken into further consideration.
-		score = 0
-	// If existing images' total size is larger than max, just make it highest priority.
+		return 0
+
 	case sumSize >= maxImgSize:
-		score = 10
-	default:
-		score = int((10 * (sumSize - minImgSize) / (maxImgSize - minImgSize)) + 1)
+		// If existing images' total size is larger than max, just make it highest priority.
+		return schedulerapi.MaxPriority
 	}
-	// Return which bucket the given size belongs to
-	return score
+
+	return int((int64(schedulerapi.MaxPriority) * (sumSize - minImgSize) / (maxImgSize - minImgSize)) + 1)
 }
 
-// checkContainerImageOnNode checks if a container image is present on a node and returns its size.
-func checkContainerImageOnNode(node *v1.Node, container *v1.Container) int64 {
+// totalImageSize returns the total image size of all the containers that are already on the node.
+func totalImageSize(node *v1.Node, containers []v1.Container) int64 {
+	imageSizes := make(map[string]int64)
 	for _, image := range node.Status.Images {
 		for _, name := range image.Names {
-			if container.Image == name {
-				// Should return immediately.
-				return image.SizeBytes
-			}
+			imageSizes[name] = image.SizeBytes
 		}
 	}
-	return 0
+
+	var total int64
+	for _, container := range containers {
+		if size, ok := imageSizes[container.Image]; ok {
+			total += size
+		}
+	}
+
+	return total
 }

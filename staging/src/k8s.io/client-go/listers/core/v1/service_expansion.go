@@ -17,8 +17,8 @@ limitations under the License.
 package v1
 
 import (
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/pkg/api/v1"
 )
 
 // ServiceListerExpansion allows custom methods to be added to
@@ -28,7 +28,7 @@ type ServiceListerExpansion interface {
 }
 
 // ServiceNamespaceListerExpansion allows custom methods to be added to
-// ServiceNamespaeLister.
+// ServiceNamespaceLister.
 type ServiceNamespaceListerExpansion interface{}
 
 // TODO: Move this back to scheduler as a helper function that takes a Store,

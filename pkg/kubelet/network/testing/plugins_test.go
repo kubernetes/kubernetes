@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 
@@ -32,7 +32,7 @@ import (
 
 func TestSelectDefaultPlugin(t *testing.T) {
 	all_plugins := []network.NetworkPlugin{}
-	plug, err := network.InitNetworkPlugin(all_plugins, "", NewFakeHost(nil), componentconfig.HairpinNone, "10.0.0.0/8", network.UseDefaultMTU)
+	plug, err := network.InitNetworkPlugin(all_plugins, "", NewFakeHost(nil), kubeletconfig.HairpinNone, "10.0.0.0/8", network.UseDefaultMTU)
 	if err != nil {
 		t.Fatalf("Unexpected error in selecting default plugin: %v", err)
 	}
@@ -113,7 +113,7 @@ func newHookableFakeNetworkPlugin(setupHook hookableFakeNetworkPluginSetupHook) 
 	}
 }
 
-func (p *hookableFakeNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
+func (p *hookableFakeNetworkPlugin) Init(host network.Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
 	return nil
 }
 

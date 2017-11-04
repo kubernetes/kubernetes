@@ -1,5 +1,3 @@
-// +build integration,!no-etcd
-
 /*
 Copyright 2014 The Kubernetes Authors.
 
@@ -36,6 +34,7 @@ import (
 	"testing"
 	"time"
 
+	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/group"
@@ -49,7 +48,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
@@ -110,7 +108,7 @@ func timeoutPath(resource, namespace, name string) string {
 var aPod string = `
 {
   "kind": "Pod",
-  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
   "metadata": {
     "name": "a",
     "creationTimestamp": null%s
@@ -128,7 +126,7 @@ var aPod string = `
 var aRC string = `
 {
   "kind": "ReplicationController",
-  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
   "metadata": {
     "name": "a",
     "labels": {
@@ -161,7 +159,7 @@ var aRC string = `
 var aService string = `
 {
   "kind": "Service",
-  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
   "metadata": {
     "name": "a",
     "labels": {
@@ -185,7 +183,7 @@ var aService string = `
 var aNode string = `
 {
   "kind": "Node",
-  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -199,7 +197,7 @@ func aEvent(namespace string) string {
 	return `
 {
   "kind": "Event",
-  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -216,7 +214,7 @@ func aEvent(namespace string) string {
 var aBinding string = `
 {
   "kind": "Binding",
-  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -239,7 +237,7 @@ var emptyEndpoints string = `
 var aEndpoints string = `
 {
   "kind": "Endpoints",
-  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
   "metadata": {
     "name": "a"%s
   },
@@ -264,7 +262,7 @@ var aEndpoints string = `
 var deleteNow string = `
 {
   "kind": "DeleteOptions",
-  "apiVersion": "` + api.Registry.GroupOrDie(api.GroupName).GroupVersion.String() + `",
+  "apiVersion": "` + testapi.Groups[api.GroupName].GroupVersion().String() + `",
   "gracePeriodSeconds": 0%s
 }
 `
@@ -405,8 +403,8 @@ func getTestRequests(namespace string) []struct {
 func TestAuthModeAlwaysAllow(t *testing.T) {
 	// Set up a master
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s := framework.RunAMaster(masterConfig)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-always-allow", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -503,8 +501,8 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	// Set up a master
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
-	_, s := framework.RunAMaster(masterConfig)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-always-deny", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -554,8 +552,8 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	masterConfig.GenericConfig.Authenticator = getTestTokenAuth()
 	masterConfig.GenericConfig.Authorizer = allowAliceAuthorizer{}
 	masterConfig.GenericConfig.AdmissionControl = admit.NewAlwaysAdmit()
-	_, s := framework.RunAMaster(masterConfig)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-alice-not-forbidden", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -623,8 +621,8 @@ func TestBobIsForbidden(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authenticator = getTestTokenAuth()
 	masterConfig.GenericConfig.Authorizer = allowAliceAuthorizer{}
-	_, s := framework.RunAMaster(masterConfig)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-bob-forbidden", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -667,8 +665,8 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authenticator = getTestTokenAuth()
 	masterConfig.GenericConfig.Authorizer = allowAliceAuthorizer{}
-	_, s := framework.RunAMaster(masterConfig)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-unknown-unauthorized", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -729,8 +727,8 @@ func TestImpersonateIsForbidden(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authenticator = getTestTokenAuth()
 	masterConfig.GenericConfig.Authorizer = impersonateAuthorizer{}
-	_, s := framework.RunAMaster(masterConfig)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-impersonate-forbidden", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -876,8 +874,8 @@ func TestAuthorizationAttributeDetermination(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authenticator = getTestTokenAuth()
 	masterConfig.GenericConfig.Authorizer = trackingAuthorizer
-	_, s := framework.RunAMaster(masterConfig)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-attribute-determination", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -942,8 +940,8 @@ func TestNamespaceAuthorization(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authenticator = getTestTokenAuth()
 	masterConfig.GenericConfig.Authorizer = a
-	_, s := framework.RunAMaster(masterConfig)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-namespace", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -1040,8 +1038,8 @@ func TestKindAuthorization(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authenticator = getTestTokenAuth()
 	masterConfig.GenericConfig.Authorizer = a
-	_, s := framework.RunAMaster(masterConfig)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-kind", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -1124,8 +1122,8 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authenticator = getTestTokenAuth()
 	masterConfig.GenericConfig.Authorizer = a
-	_, s := framework.RunAMaster(masterConfig)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-read-only", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
@@ -1183,8 +1181,8 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authenticator = authenticator
 	masterConfig.GenericConfig.Authorizer = allowAliceAuthorizer{}
-	_, s := framework.RunAMaster(masterConfig)
-	defer s.Close()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("auth-webhook-token", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)

@@ -43,6 +43,7 @@ type ThreadSafeStore interface {
 	ListKeys() []string
 	Replace(map[string]interface{}, string)
 	Index(indexName string, obj interface{}) ([]interface{}, error)
+	IndexKeys(indexName, indexKey string) ([]string, error)
 	ListIndexFuncValues(name string) []string
 	ByIndex(indexName, indexKey string) ([]interface{}, error)
 	GetIndexers() Indexers
@@ -184,6 +185,23 @@ func (c *threadSafeMap) ByIndex(indexName, indexKey string) ([]interface{}, erro
 	return list, nil
 }
 
+// IndexKeys returns a list of keys that match on the index function.
+// IndexKeys is thread-safe so long as you treat all items as immutable.
+func (c *threadSafeMap) IndexKeys(indexName, indexKey string) ([]string, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	indexFunc := c.indexers[indexName]
+	if indexFunc == nil {
+		return nil, fmt.Errorf("Index with name %s does not exist", indexName)
+	}
+
+	index := c.indices[indexName]
+
+	set := index[indexKey]
+	return set.List(), nil
+}
+
 func (c *threadSafeMap) ListIndexFuncValues(indexName string) []string {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -223,7 +241,7 @@ func (c *threadSafeMap) AddIndexers(newIndexers Indexers) error {
 
 // updateIndices modifies the objects location in the managed indexes, if this is an update, you must provide an oldObj
 // updateIndices must be called from a function that already has a lock on the cache
-func (c *threadSafeMap) updateIndices(oldObj interface{}, newObj interface{}, key string) error {
+func (c *threadSafeMap) updateIndices(oldObj interface{}, newObj interface{}, key string) {
 	// if we got an old object, we need to remove it before we add it again
 	if oldObj != nil {
 		c.deleteFromIndices(oldObj, key)
@@ -231,7 +249,7 @@ func (c *threadSafeMap) updateIndices(oldObj interface{}, newObj interface{}, ke
 	for name, indexFunc := range c.indexers {
 		indexValues, err := indexFunc(newObj)
 		if err != nil {
-			return err
+			panic(fmt.Errorf("unable to calculate an index entry for key %q on index %q: %v", key, name, err))
 		}
 		index := c.indices[name]
 		if index == nil {
@@ -248,16 +266,15 @@ func (c *threadSafeMap) updateIndices(oldObj interface{}, newObj interface{}, ke
 			set.Insert(key)
 		}
 	}
-	return nil
 }
 
 // deleteFromIndices removes the object from each of the managed indexes
 // it is intended to be called from a function that already has a lock on the cache
-func (c *threadSafeMap) deleteFromIndices(obj interface{}, key string) error {
+func (c *threadSafeMap) deleteFromIndices(obj interface{}, key string) {
 	for name, indexFunc := range c.indexers {
 		indexValues, err := indexFunc(obj)
 		if err != nil {
-			return err
+			panic(fmt.Errorf("unable to calculate an index entry for key %q on index %q: %v", key, name, err))
 		}
 
 		index := c.indices[name]
@@ -271,7 +288,6 @@ func (c *threadSafeMap) deleteFromIndices(obj interface{}, key string) error {
 			}
 		}
 	}
-	return nil
 }
 
 func (c *threadSafeMap) Resync() error {

@@ -58,6 +58,41 @@ func newPodPresets(c *SettingsClient, namespace string) *podPresets {
 	}
 }
 
+// Get takes name of the podPreset, and returns the corresponding podPreset object, and an error if there is any.
+func (c *podPresets) Get(name string, options v1.GetOptions) (result *settings.PodPreset, err error) {
+	result = &settings.PodPreset{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("podpresets").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of PodPresets that match those selectors.
+func (c *podPresets) List(opts v1.ListOptions) (result *settings.PodPresetList, err error) {
+	result = &settings.PodPresetList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("podpresets").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested podPresets.
+func (c *podPresets) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("podpresets").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a podPreset and creates it.  Returns the server's representation of the podPreset, and an error, if there is any.
 func (c *podPresets) Create(podPreset *settings.PodPreset) (result *settings.PodPreset, err error) {
 	result = &settings.PodPreset{}
@@ -103,41 +138,6 @@ func (c *podPresets) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the podPreset, and returns the corresponding podPreset object, and an error if there is any.
-func (c *podPresets) Get(name string, options v1.GetOptions) (result *settings.PodPreset, err error) {
-	result = &settings.PodPreset{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("podpresets").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of PodPresets that match those selectors.
-func (c *podPresets) List(opts v1.ListOptions) (result *settings.PodPresetList, err error) {
-	result = &settings.PodPresetList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("podpresets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested podPresets.
-func (c *podPresets) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("podpresets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched podPreset.

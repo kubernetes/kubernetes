@@ -21,6 +21,7 @@ limitations under the License.
 package v2alpha1
 
 import (
+	v2alpha1 "k8s.io/api/batch/v2alpha1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 )
@@ -29,18 +30,21 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
-	scheme.AddTypeDefaultingFunc(&CronJob{}, func(obj interface{}) { SetObjectDefaults_CronJob(obj.(*CronJob)) })
-	scheme.AddTypeDefaultingFunc(&CronJobList{}, func(obj interface{}) { SetObjectDefaults_CronJobList(obj.(*CronJobList)) })
-	scheme.AddTypeDefaultingFunc(&JobTemplate{}, func(obj interface{}) { SetObjectDefaults_JobTemplate(obj.(*JobTemplate)) })
+	scheme.AddTypeDefaultingFunc(&v2alpha1.CronJob{}, func(obj interface{}) { SetObjectDefaults_CronJob(obj.(*v2alpha1.CronJob)) })
+	scheme.AddTypeDefaultingFunc(&v2alpha1.CronJobList{}, func(obj interface{}) { SetObjectDefaults_CronJobList(obj.(*v2alpha1.CronJobList)) })
+	scheme.AddTypeDefaultingFunc(&v2alpha1.JobTemplate{}, func(obj interface{}) { SetObjectDefaults_JobTemplate(obj.(*v2alpha1.JobTemplate)) })
 	return nil
 }
 
-func SetObjectDefaults_CronJob(in *CronJob) {
+func SetObjectDefaults_CronJob(in *v2alpha1.CronJob) {
 	SetDefaults_CronJob(in)
 	v1.SetDefaults_PodSpec(&in.Spec.JobTemplate.Spec.Template.Spec)
 	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Volumes {
 		a := &in.Spec.JobTemplate.Spec.Template.Spec.Volumes[i]
 		v1.SetDefaults_Volume(a)
+		if a.VolumeSource.HostPath != nil {
+			v1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+		}
 		if a.VolumeSource.Secret != nil {
 			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}
@@ -169,18 +173,21 @@ func SetObjectDefaults_CronJob(in *CronJob) {
 	}
 }
 
-func SetObjectDefaults_CronJobList(in *CronJobList) {
+func SetObjectDefaults_CronJobList(in *v2alpha1.CronJobList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_CronJob(a)
 	}
 }
 
-func SetObjectDefaults_JobTemplate(in *JobTemplate) {
+func SetObjectDefaults_JobTemplate(in *v2alpha1.JobTemplate) {
 	v1.SetDefaults_PodSpec(&in.Template.Spec.Template.Spec)
 	for i := range in.Template.Spec.Template.Spec.Volumes {
 		a := &in.Template.Spec.Template.Spec.Volumes[i]
 		v1.SetDefaults_Volume(a)
+		if a.VolumeSource.HostPath != nil {
+			v1.SetDefaults_HostPathVolumeSource(a.VolumeSource.HostPath)
+		}
 		if a.VolumeSource.Secret != nil {
 			v1.SetDefaults_SecretVolumeSource(a.VolumeSource.Secret)
 		}

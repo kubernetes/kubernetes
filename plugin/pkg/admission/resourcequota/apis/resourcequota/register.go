@@ -49,5 +49,3 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	)
 	return nil
 }
-
-func (obj *Configuration) GetObjectKind() schema.ObjectKind { return &obj.TypeMeta }

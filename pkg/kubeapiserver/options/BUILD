@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -15,13 +13,13 @@ go_library(
         "authentication.go",
         "authorization.go",
         "cloudprovider.go",
+        "options.go",
         "serving.go",
         "storage_versions.go",
     ],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/pkg/kubeapiserver/options",
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
+        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/cloudprovider:go_default_library",
         "//pkg/kubeapiserver/authenticator:go_default_library",
@@ -31,6 +29,7 @@ go_library(
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/pborman/uuid:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/server:go_default_library",
@@ -55,7 +54,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = ["storage_versions_test.go"],
+    importpath = "k8s.io/kubernetes/pkg/kubeapiserver/options",
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library"],
 )

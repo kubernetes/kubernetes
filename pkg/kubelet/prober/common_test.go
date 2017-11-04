@@ -20,17 +20,17 @@ import (
 	"reflect"
 	"sync"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset/fake"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/utils/exec"
 )
 
 const (
@@ -99,7 +99,7 @@ func setTestProbe(pod *v1.Pod, probeType probeType, probeSpec v1.Probe) {
 func newTestManager() *manager {
 	refManager := kubecontainer.NewRefManager()
 	refManager.SetRef(testContainerID, &v1.ObjectReference{}) // Suppress prober warnings.
-	podManager := kubepod.NewBasicPodManager(nil, nil)
+	podManager := kubepod.NewBasicPodManager(nil, nil, nil)
 	// Add test pod to pod manager, so that status manager can get the pod from pod manager if needed.
 	podManager.AddPod(getTestPod())
 	m := NewManager(

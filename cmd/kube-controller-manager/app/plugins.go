@@ -36,44 +36,75 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/photon"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
-	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/aws_ebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
 	"k8s.io/kubernetes/pkg/volume/azure_file"
 	"k8s.io/kubernetes/pkg/volume/cinder"
+	"k8s.io/kubernetes/pkg/volume/fc"
 	"k8s.io/kubernetes/pkg/volume/flexvolume"
 	"k8s.io/kubernetes/pkg/volume/flocker"
 	"k8s.io/kubernetes/pkg/volume/gce_pd"
 	"k8s.io/kubernetes/pkg/volume/glusterfs"
 	"k8s.io/kubernetes/pkg/volume/host_path"
+	"k8s.io/kubernetes/pkg/volume/iscsi"
+	"k8s.io/kubernetes/pkg/volume/local"
 	"k8s.io/kubernetes/pkg/volume/nfs"
 	"k8s.io/kubernetes/pkg/volume/photon_pd"
 	"k8s.io/kubernetes/pkg/volume/portworx"
 	"k8s.io/kubernetes/pkg/volume/quobyte"
 	"k8s.io/kubernetes/pkg/volume/rbd"
 	"k8s.io/kubernetes/pkg/volume/scaleio"
+	"k8s.io/kubernetes/pkg/volume/storageos"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
 )
 
 // ProbeAttachableVolumePlugins collects all volume plugins for the attach/
-// detach controller. VolumeConfiguration is used ot get FlexVolumePluginDir
-// which specifies the directory to search for additional third party volume
-// plugins.
+// detach controller.
 // The list of plugins is manually compiled. This code and the plugin
 // initialization code for kubelet really, really need a through refactor.
-func ProbeAttachableVolumePlugins(config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
+func ProbeAttachableVolumePlugins() []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
 	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, flexvolume.ProbeVolumePlugins(config.FlexVolumePluginDir)...)
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, photon_pd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
+	return allPlugins
+}
+
+// GetDynamicPluginProber gets the probers of dynamically discoverable plugins
+// for the attach/detach controller.
+// Currently only Flexvolume plugins are dynamically discoverable.
+func GetDynamicPluginProber(config componentconfig.VolumeConfiguration) volume.DynamicPluginProber {
+	return flexvolume.GetDynamicPluginProber(config.FlexVolumePluginDir)
+}
+
+// ProbeExpandableVolumePlugins returns volume plugins which are expandable
+func ProbeExpandableVolumePlugins(config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
+	allPlugins := []volume.VolumePlugin{}
+
+	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, azure_dd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, photon_pd.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, fc.ProbeVolumePlugins()...)
 	return allPlugins
 }
 
@@ -121,6 +152,8 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 	allPlugins = append(allPlugins, flocker.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, portworx.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, scaleio.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, local.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, storageos.ProbeVolumePlugins()...)
 
 	if cloud != nil {
 		switch {
@@ -147,7 +180,7 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 // If unsuccessful, an error is returned. Function is exported for reuse downstream.
 func AttemptToLoadRecycler(path string, config *volume.VolumeConfig) error {
 	if path != "" {
-		recyclerPod, err := io.LoadPodFromFile(path)
+		recyclerPod, err := volumeutil.LoadPodFromFile(path)
 		if err != nil {
 			return err
 		}

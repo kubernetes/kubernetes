@@ -5,35 +5,36 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 )
 
-// VolumeAttachment controls the attachment of a volume to an instance.
+// VolumeAttachment contains attachment information between a volume
+// and server.
 type VolumeAttachment struct {
-	// ID is a unique id of the attachment
+	// ID is a unique id of the attachment.
 	ID string `json:"id"`
 
-	// Device is what device the volume is attached as
+	// Device is what device the volume is attached as.
 	Device string `json:"device"`
 
-	// VolumeID is the ID of the attached volume
+	// VolumeID is the ID of the attached volume.
 	VolumeID string `json:"volumeId"`
 
-	// ServerID is the ID of the instance that has the volume attached
+	// ServerID is the ID of the instance that has the volume attached.
 	ServerID string `json:"serverId"`
 }
 
-// VolumeAttachmentPage stores a single, only page of VolumeAttachments
+// VolumeAttachmentPage stores a single page all of VolumeAttachment
 // results from a List call.
 type VolumeAttachmentPage struct {
 	pagination.SinglePageBase
 }
 
-// IsEmpty determines whether or not a VolumeAttachmentsPage is empty.
+// IsEmpty determines whether or not a VolumeAttachmentPage is empty.
 func (page VolumeAttachmentPage) IsEmpty() (bool, error) {
 	va, err := ExtractVolumeAttachments(page)
 	return len(va) == 0, err
 }
 
 // ExtractVolumeAttachments interprets a page of results as a slice of
-// VolumeAttachments.
+// VolumeAttachment.
 func ExtractVolumeAttachments(r pagination.Page) ([]VolumeAttachment, error) {
 	var s struct {
 		VolumeAttachments []VolumeAttachment `json:"volumeAttachments"`
@@ -57,20 +58,20 @@ func (r VolumeAttachmentResult) Extract() (*VolumeAttachment, error) {
 	return s.VolumeAttachment, err
 }
 
-// CreateResult is the response from a Create operation. Call its Extract method to interpret it
-// as a VolumeAttachment.
+// CreateResult is the response from a Create operation. Call its Extract method
+// to interpret it as a VolumeAttachment.
 type CreateResult struct {
 	VolumeAttachmentResult
 }
 
-// GetResult is the response from a Get operation. Call its Extract method to interpret it
-// as a VolumeAttachment.
+// GetResult is the response from a Get operation. Call its Extract method to
+// interpret it as a VolumeAttachment.
 type GetResult struct {
 	VolumeAttachmentResult
 }
 
-// DeleteResult is the response from a Delete operation. Call its Extract method to determine if
-// the call succeeded or failed.
+// DeleteResult is the response from a Delete operation. Call its ExtractErr
+// method to determine if the call succeeded or failed.
 type DeleteResult struct {
 	gophercloud.ErrResult
 }

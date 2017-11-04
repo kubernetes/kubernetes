@@ -251,7 +251,7 @@ func (c *Context) ExecutePackage(outDir string, p Package) error {
 				}
 			}
 		}
-		if consts := g.PackageVars(genContext); len(consts) > 0 {
+		if consts := g.PackageConsts(genContext); len(consts) > 0 {
 			addIndentHeaderComment(&f.Consts, "Package-wide consts from generator %q.", g.Name())
 			for _, v := range consts {
 				if _, err := fmt.Fprintf(&f.Consts, "%s\n", v); err != nil {

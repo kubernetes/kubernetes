@@ -22,9 +22,9 @@ import (
 	"path"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -41,7 +41,7 @@ func TestCanSupport(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/portworx-volume")
 	if err != nil {
@@ -65,31 +65,22 @@ func TestGetAccessModes(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/portworx-volume")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
 
-	if !contains(plug.GetAccessModes(), v1.ReadWriteOnce) {
+	if !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadWriteOnce) {
 		t.Errorf("Expected to support AccessModeTypes:  %s", v1.ReadWriteOnce)
 	}
-	if !contains(plug.GetAccessModes(), v1.ReadWriteMany) {
+	if !volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadWriteMany) {
 		t.Errorf("Expected to support AccessModeTypes:  %s", v1.ReadWriteMany)
 	}
-	if contains(plug.GetAccessModes(), v1.ReadOnlyMany) {
+	if volumetest.ContainsAccessMode(plug.GetAccessModes(), v1.ReadOnlyMany) {
 		t.Errorf("Expected not to support AccessModeTypes:  %s", v1.ReadOnlyMany)
 	}
-}
-
-func contains(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
-	for _, m := range modes {
-		if m == mode {
-			return true
-		}
-	}
-	return false
 }
 
 type fakePortworxManager struct {
@@ -97,7 +88,7 @@ type fakePortworxManager struct {
 	mountCalled  bool
 }
 
-func (fake *fakePortworxManager) AttachVolume(b *portworxVolumeMounter) (string, error) {
+func (fake *fakePortworxManager) AttachVolume(b *portworxVolumeMounter, attachOptions map[string]string) (string, error) {
 	fake.attachCalled = true
 	return "", nil
 }
@@ -135,7 +126,7 @@ func TestPlugin(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpDir, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/portworx-volume")
 	if err != nil {
@@ -205,6 +196,9 @@ func TestPlugin(t *testing.T) {
 	}
 
 	provisioner, err := plug.(*portworxVolumePlugin).newProvisionerInternal(options, &fakePortworxManager{})
+	if err != nil {
+		t.Errorf("Error creating a new provisioner:%v", err)
+	}
 	persistentSpec, err := provisioner.Provision()
 	if err != nil {
 		t.Errorf("Provision() failed: %v", err)
@@ -228,6 +222,9 @@ func TestPlugin(t *testing.T) {
 		PersistentVolume: persistentSpec,
 	}
 	deleter, err := plug.(*portworxVolumePlugin).newDeleterInternal(volSpec, &fakePortworxManager{})
+	if err != nil {
+		t.Errorf("Error creating a new Deleter:%v", err)
+	}
 	err = deleter.Delete()
 	if err != nil {
 		t.Errorf("Deleter() failed: %v", err)

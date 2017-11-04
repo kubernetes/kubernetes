@@ -134,6 +134,7 @@ const (
 	SYS_MINHERIT             = 273 // { int|sys||minherit(void *addr, size_t len, int inherit); }
 	SYS_LCHMOD               = 274 // { int|sys||lchmod(const char *path, mode_t mode); }
 	SYS_LCHOWN               = 275 // { int|sys||lchown(const char *path, uid_t uid, gid_t gid); }
+	SYS_MSYNC                = 277 // { int|sys|13|msync(void *addr, size_t len, int flags); }
 	SYS___POSIX_CHOWN        = 283 // { int|sys||__posix_chown(const char *path, uid_t uid, gid_t gid); }
 	SYS___POSIX_FCHOWN       = 284 // { int|sys||__posix_fchown(int fd, uid_t uid, gid_t gid); }
 	SYS___POSIX_LCHOWN       = 285 // { int|sys||__posix_lchown(const char *path, uid_t uid, gid_t gid); }

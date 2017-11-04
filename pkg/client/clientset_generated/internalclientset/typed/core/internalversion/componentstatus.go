@@ -56,6 +56,38 @@ func newComponentStatuses(c *CoreClient) *componentStatuses {
 	}
 }
 
+// Get takes name of the componentStatus, and returns the corresponding componentStatus object, and an error if there is any.
+func (c *componentStatuses) Get(name string, options v1.GetOptions) (result *api.ComponentStatus, err error) {
+	result = &api.ComponentStatus{}
+	err = c.client.Get().
+		Resource("componentstatuses").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of ComponentStatuses that match those selectors.
+func (c *componentStatuses) List(opts v1.ListOptions) (result *api.ComponentStatusList, err error) {
+	result = &api.ComponentStatusList{}
+	err = c.client.Get().
+		Resource("componentstatuses").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested componentStatuses.
+func (c *componentStatuses) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Resource("componentstatuses").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a componentStatus and creates it.  Returns the server's representation of the componentStatus, and an error, if there is any.
 func (c *componentStatuses) Create(componentStatus *api.ComponentStatus) (result *api.ComponentStatus, err error) {
 	result = &api.ComponentStatus{}
@@ -97,38 +129,6 @@ func (c *componentStatuses) DeleteCollection(options *v1.DeleteOptions, listOpti
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the componentStatus, and returns the corresponding componentStatus object, and an error if there is any.
-func (c *componentStatuses) Get(name string, options v1.GetOptions) (result *api.ComponentStatus, err error) {
-	result = &api.ComponentStatus{}
-	err = c.client.Get().
-		Resource("componentstatuses").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of ComponentStatuses that match those selectors.
-func (c *componentStatuses) List(opts v1.ListOptions) (result *api.ComponentStatusList, err error) {
-	result = &api.ComponentStatusList{}
-	err = c.client.Get().
-		Resource("componentstatuses").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested componentStatuses.
-func (c *componentStatuses) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Resource("componentstatuses").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched componentStatus.

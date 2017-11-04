@@ -8,6 +8,7 @@ import (
 
 // PartParser parses and validates the specified string (data) using the specified template
 // e.g. ip:public:private -> 192.168.0.1:80:8000
+// DEPRECATED: do not use, this function may be removed in a future version
 func PartParser(template, data string) (map[string]string, error) {
 	// ip:public:private
 	var (

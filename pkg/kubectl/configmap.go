@@ -23,9 +23,11 @@ import (
 	"path"
 	"strings"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubectl/util"
+	"k8s.io/kubernetes/pkg/kubectl/util/hash"
 )
 
 // ConfigMapGeneratorV1 supports stable generation of a configMap.
@@ -40,6 +42,8 @@ type ConfigMapGeneratorV1 struct {
 	LiteralSources []string
 	// EnvFileSource to derive the configMap from (optional)
 	EnvFileSource string
+	// AppendHash; if true, derive a hash from the ConfigMap and append it to the name
+	AppendHash bool
 }
 
 // Ensure it supports the generator pattern that uses parameter injection.
@@ -73,14 +77,6 @@ func (s ConfigMapGeneratorV1) Generate(genericParams map[string]interface{}) (ru
 		delegate.LiteralSources = fromLiteralArray
 		delete(genericParams, "from-literal")
 	}
-	params := map[string]string{}
-	for key, value := range genericParams {
-		strVal, isString := value.(string)
-		if !isString {
-			return nil, fmt.Errorf("expected string, saw %v for '%s'", value, key)
-		}
-		params[key] = strVal
-	}
 	fromEnvFileString, found := genericParams["from-env-file"]
 	if found {
 		fromEnvFile, isString := fromEnvFileString.(string)
@@ -90,8 +86,26 @@ func (s ConfigMapGeneratorV1) Generate(genericParams map[string]interface{}) (ru
 		delegate.EnvFileSource = fromEnvFile
 		delete(genericParams, "from-env-file")
 	}
+	hashParam, found := genericParams["append-hash"]
+	if found {
+		hashBool, isBool := hashParam.(bool)
+		if !isBool {
+			return nil, fmt.Errorf("expected bool, found :%v", hashParam)
+		}
+		delegate.AppendHash = hashBool
+		delete(genericParams, "append-hash")
+	}
+	params := map[string]string{}
+	for key, value := range genericParams {
+		strVal, isString := value.(string)
+		if !isString {
+			return nil, fmt.Errorf("expected string, saw %v for '%s'", value, key)
+		}
+		params[key] = strVal
+	}
 	delegate.Name = params["name"]
 	delegate.Type = params["type"]
+
 	return delegate.StructuredGenerate()
 }
 
@@ -104,6 +118,7 @@ func (s ConfigMapGeneratorV1) ParamNames() []GeneratorParam {
 		{"from-literal", false},
 		{"from-env-file", false},
 		{"force", false},
+		{"hash", false},
 	}
 }
 
@@ -112,7 +127,7 @@ func (s ConfigMapGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 	if err := s.validate(); err != nil {
 		return nil, err
 	}
-	configMap := &api.ConfigMap{}
+	configMap := &v1.ConfigMap{}
 	configMap.Name = s.Name
 	configMap.Data = map[string]string{}
 	if len(s.FileSources) > 0 {
@@ -130,6 +145,13 @@ func (s ConfigMapGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 			return nil, err
 		}
 	}
+	if s.AppendHash {
+		h, err := hash.ConfigMapHash(configMap)
+		if err != nil {
+			return nil, err
+		}
+		configMap.Name = fmt.Sprintf("%s-%s", configMap.Name, h)
+	}
 	return configMap, nil
 }
 
@@ -146,9 +168,9 @@ func (s ConfigMapGeneratorV1) validate() error {
 
 // handleConfigMapFromLiteralSources adds the specified literal source
 // information into the provided configMap.
-func handleConfigMapFromLiteralSources(configMap *api.ConfigMap, literalSources []string) error {
+func handleConfigMapFromLiteralSources(configMap *v1.ConfigMap, literalSources []string) error {
 	for _, literalSource := range literalSources {
-		keyName, value, err := parseLiteralSource(literalSource)
+		keyName, value, err := util.ParseLiteralSource(literalSource)
 		if err != nil {
 			return err
 		}
@@ -162,9 +184,9 @@ func handleConfigMapFromLiteralSources(configMap *api.ConfigMap, literalSources 
 
 // handleConfigMapFromFileSources adds the specified file source information
 // into the provided configMap
-func handleConfigMapFromFileSources(configMap *api.ConfigMap, fileSources []string) error {
+func handleConfigMapFromFileSources(configMap *v1.ConfigMap, fileSources []string) error {
 	for _, fileSource := range fileSources {
-		keyName, filePath, err := parseFileSource(fileSource)
+		keyName, filePath, err := util.ParseFileSource(fileSource)
 		if err != nil {
 			return err
 		}
@@ -207,7 +229,7 @@ func handleConfigMapFromFileSources(configMap *api.ConfigMap, fileSources []stri
 
 // handleConfigMapFromEnvFileSource adds the specified env file source information
 // into the provided configMap
-func handleConfigMapFromEnvFileSource(configMap *api.ConfigMap, envFileSource string) error {
+func handleConfigMapFromEnvFileSource(configMap *v1.ConfigMap, envFileSource string) error {
 	info, err := os.Stat(envFileSource)
 	if err != nil {
 		switch err := err.(type) {
@@ -218,7 +240,7 @@ func handleConfigMapFromEnvFileSource(configMap *api.ConfigMap, envFileSource st
 		}
 	}
 	if info.IsDir() {
-		return fmt.Errorf("must be a file")
+		return fmt.Errorf("env config file cannot be a directory")
 	}
 
 	return addFromEnvFile(envFileSource, func(key, value string) error {
@@ -228,7 +250,7 @@ func handleConfigMapFromEnvFileSource(configMap *api.ConfigMap, envFileSource st
 
 // addKeyFromFileToConfigMap adds a key with the given name to a ConfigMap, populating
 // the value with the content of the given file path, or returns an error.
-func addKeyFromFileToConfigMap(configMap *api.ConfigMap, keyName, filePath string) error {
+func addKeyFromFileToConfigMap(configMap *v1.ConfigMap, keyName, filePath string) error {
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return err
@@ -238,7 +260,7 @@ func addKeyFromFileToConfigMap(configMap *api.ConfigMap, keyName, filePath strin
 
 // addKeyFromLiteralToConfigMap adds the given key and data to the given config map,
 // returning an error if the key is not valid or if the key already exists.
-func addKeyFromLiteralToConfigMap(configMap *api.ConfigMap, keyName, data string) error {
+func addKeyFromLiteralToConfigMap(configMap *v1.ConfigMap, keyName, data string) error {
 	// Note, the rules for ConfigMap keys are the exact same as the ones for SecretKeys.
 	if errs := validation.IsConfigMapKey(keyName); len(errs) != 0 {
 		return fmt.Errorf("%q is not a valid key name for a ConfigMap: %s", keyName, strings.Join(errs, ";"))

@@ -16,7 +16,10 @@ limitations under the License.
 
 package transport
 
-import "net/http"
+import (
+	"net"
+	"net/http"
+)
 
 // Config holds various options for establishing a transport.
 type Config struct {
@@ -34,6 +37,10 @@ type Config struct {
 	// Bearer token for authentication
 	BearerToken string
 
+	// CacheDir is the directory where we'll store HTTP cached responses.
+	// If set to empty string, no caching mechanism will be used.
+	CacheDir string
+
 	// Impersonate is the config that this Config will impersonate using
 	Impersonate ImpersonationConfig
 
@@ -48,6 +55,9 @@ type Config struct {
 	// config may layer other RoundTrippers on top of the returned
 	// RoundTripper.
 	WrapTransport func(rt http.RoundTripper) http.RoundTripper
+
+	// Dial specifies the dial function for creating unencrypted TCP connections.
+	Dial func(network, addr string) (net.Conn, error)
 }
 
 // ImpersonationConfig has all the available impersonation options

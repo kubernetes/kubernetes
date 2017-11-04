@@ -28,7 +28,7 @@ import (
 )
 
 func init() {
-	SchemeBuilder.Register(RegisterConversions)
+	localSchemeBuilder.Register(RegisterConversions)
 }
 
 // RegisterConversions adds conversion functions to the given scheme.
@@ -53,11 +53,7 @@ func Convert_v1alpha1_Configuration_To_resourcequota_Configuration(in *Configura
 }
 
 func autoConvert_resourcequota_Configuration_To_v1alpha1_Configuration(in *resourcequota.Configuration, out *Configuration, s conversion.Scope) error {
-	if in.LimitedResources == nil {
-		out.LimitedResources = make([]LimitedResource, 0)
-	} else {
-		out.LimitedResources = *(*[]LimitedResource)(unsafe.Pointer(&in.LimitedResources))
-	}
+	out.LimitedResources = *(*[]LimitedResource)(unsafe.Pointer(&in.LimitedResources))
 	return nil
 }
 

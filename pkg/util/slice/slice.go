@@ -26,6 +26,9 @@ import (
 // CopyStrings copies the contents of the specified string slice
 // into a new slice.
 func CopyStrings(s []string) []string {
+	if s == nil {
+		return nil
+	}
 	c := make([]string, len(s))
 	copy(c, s)
 	return c
@@ -41,6 +44,9 @@ func SortStrings(s []string) []string {
 // ShuffleStrings copies strings from the specified slice into a copy in random
 // order. It returns a new slice.
 func ShuffleStrings(s []string) []string {
+	if s == nil {
+		return nil
+	}
 	shuffled := make([]string, len(s))
 	perm := utilrand.Perm(len(s))
 	for i, j := range perm {
@@ -62,14 +68,3 @@ func ContainsString(slice []string, s string, modifier func(s string) string) bo
 	}
 	return false
 }
-
-// Int64Slice attaches the methods of Interface to []int64,
-// sorting in increasing order.
-type Int64Slice []int64
-
-func (p Int64Slice) Len() int           { return len(p) }
-func (p Int64Slice) Less(i, j int) bool { return p[i] < p[j] }
-func (p Int64Slice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-
-// Sorts []int64 in increasing order
-func SortInts64(a []int64) { sort.Sort(Int64Slice(a)) }

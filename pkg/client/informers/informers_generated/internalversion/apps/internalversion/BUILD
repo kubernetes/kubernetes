@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -10,10 +8,11 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "controllerrevision.go",
         "interface.go",
         "statefulset.go",
     ],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/apps/internalversion",
     deps = [
         "//pkg/apis/apps:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",

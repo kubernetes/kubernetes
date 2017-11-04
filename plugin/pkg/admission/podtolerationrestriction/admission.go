@@ -23,21 +23,26 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
+	qoshelper "k8s.io/kubernetes/pkg/api/helper/qos"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	corelisters "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
+	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	"k8s.io/kubernetes/pkg/util/tolerations"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 
-func init() {
-	kubeapiserveradmission.Plugins.Register("PodTolerationRestriction", func(config io.Reader) (admission.Interface, error) {
+// Register registers a plugin
+func Register(plugins *admission.Plugins) {
+	plugins.Register("PodTolerationRestriction", func(config io.Reader) (admission.Interface, error) {
 		pluginConfig, err := loadConfiguration(config)
 		if err != nil {
 			return nil, err
@@ -108,7 +113,11 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 	}
 
 	var finalTolerations []api.Toleration
-	if a.GetOperation() == admission.Create {
+	updateUninitialized, err := util.IsUpdatingUninitializedObject(a)
+	if err != nil {
+		return err
+	}
+	if a.GetOperation() == admission.Create || updateUninitialized {
 		ts, err := p.getNamespaceDefaultTolerations(namespace)
 		if err != nil {
 			return err
@@ -116,7 +125,7 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 
 		// If the namespace has not specified its default tolerations,
 		// fall back to cluster's default tolerations.
-		if len(ts) == 0 {
+		if ts == nil {
 			ts = p.pluginConfig.Default
 		}
 
@@ -148,7 +157,7 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 
 		// If the namespace has not specified its tolerations whitelist,
 		// fall back to cluster's whitelist of tolerations.
-		if len(whitelist) == 0 {
+		if whitelist == nil {
 			whitelist = p.pluginConfig.Whitelist
 		}
 
@@ -158,6 +167,16 @@ func (p *podTolerationsPlugin) Admit(a admission.Attributes) error {
 				return fmt.Errorf("pod tolerations (possibly merged with namespace default tolerations) conflict with its namespace whitelist")
 			}
 		}
+	}
+
+	if qoshelper.GetPodQOS(pod) != api.PodQOSBestEffort {
+		finalTolerations = tolerations.MergeTolerations(finalTolerations, []api.Toleration{
+			{
+				Key:      algorithm.TaintNodeMemoryPressure,
+				Operator: api.TolerationOpExists,
+				Effect:   api.TaintEffectNoSchedule,
+			},
+		})
 	}
 
 	pod.Spec.Tolerations = finalTolerations
@@ -183,7 +202,7 @@ func (p *podTolerationsPlugin) SetInternalKubeInformerFactory(f informers.Shared
 
 }
 
-func (p *podTolerationsPlugin) Validate() error {
+func (p *podTolerationsPlugin) ValidateInitialization() error {
 	if p.namespaceLister == nil {
 		return fmt.Errorf("missing namespaceLister")
 	}
@@ -201,18 +220,37 @@ func (p *podTolerationsPlugin) getNamespaceTolerationsWhitelist(ns *api.Namespac
 	return extractNSTolerations(ns, NSWLTolerations)
 }
 
+// extractNSTolerations extracts default or whitelist of tolerations from
+// following namespace annotations keys: "scheduler.alpha.kubernetes.io/defaultTolerations"
+// and "scheduler.alpha.kubernetes.io/tolerationsWhitelist". If these keys are
+// unset (nil), extractNSTolerations returns nil. If the value to these
+// keys are set to empty, an empty toleration is returned, otherwise
+// configured tolerations are returned.
 func extractNSTolerations(ns *api.Namespace, key string) ([]api.Toleration, error) {
+	// if a namespace does not have any annotations
+	if len(ns.Annotations) == 0 {
+		return nil, nil
+	}
+
+	// if NSWLTolerations or NSDefaultTolerations does not exist
+	if _, ok := ns.Annotations[key]; !ok {
+		return nil, nil
+	}
+
+	// if value is set to empty
+	if len(ns.Annotations[key]) == 0 {
+		return []api.Toleration{}, nil
+	}
+
 	var v1Tolerations []v1.Toleration
-	if len(ns.Annotations) > 0 && ns.Annotations[key] != "" {
-		err := json.Unmarshal([]byte(ns.Annotations[key]), &v1Tolerations)
-		if err != nil {
-			return nil, err
-		}
+	err := json.Unmarshal([]byte(ns.Annotations[key]), &v1Tolerations)
+	if err != nil {
+		return nil, err
 	}
 
 	ts := make([]api.Toleration, len(v1Tolerations))
 	for i := range v1Tolerations {
-		if err := v1.Convert_v1_Toleration_To_api_Toleration(&v1Tolerations[i], &ts[i], nil); err != nil {
+		if err := k8s_api_v1.Convert_v1_Toleration_To_api_Toleration(&v1Tolerations[i], &ts[i], nil); err != nil {
 			return nil, err
 		}
 	}

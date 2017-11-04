@@ -81,6 +81,10 @@ func (s *SecureServingOptions) DefaultExternalAddress() (net.IP, error) {
 }
 
 func (s *SecureServingOptions) Validate() []error {
+	if s == nil {
+		return nil
+	}
+
 	errors := []error{}
 
 	if s.BindPort < 0 || s.BindPort > 65535 {
@@ -91,6 +95,10 @@ func (s *SecureServingOptions) Validate() []error {
 }
 
 func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
+	if s == nil {
+		return
+	}
+
 	fs.IPVar(&s.BindAddress, "bind-address", s.BindAddress, ""+
 		"The IP address on which to listen for the --secure-port port. The "+
 		"associated interface(s) must be reachable by the rest of the cluster, and by CLI/web "+
@@ -101,14 +109,14 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"don't serve HTTPS at all.")
 
 	fs.StringVar(&s.ServerCert.CertDirectory, "cert-dir", s.ServerCert.CertDirectory, ""+
-		"The directory where the TLS certs are located (by default /var/run/kubernetes). "+
+		"The directory where the TLS certs are located. "+
 		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
 
 	fs.StringVar(&s.ServerCert.CertKey.CertFile, "tls-cert-file", s.ServerCert.CertKey.CertFile, ""+
 		"File containing the default x509 Certificate for HTTPS. (CA cert, if any, concatenated "+
 		"after server cert). If HTTPS serving is enabled, and --tls-cert-file and "+
 		"--tls-private-key-file are not provided, a self-signed certificate and key "+
-		"are generated for the public address and saved to /var/run/kubernetes.")
+		"are generated for the public address and saved to the directory specified by --cert-dir.")
 
 	fs.StringVar(&s.ServerCert.CertKey.KeyFile, "tls-private-key-file", s.ServerCert.CertKey.KeyFile,
 		"File containing the default x509 private key matching --tls-cert-file.")
@@ -125,7 +133,7 @@ func (s *SecureServingOptions) AddFlags(fs *pflag.FlagSet) {
 		"extracted. Non-wildcard matches trump over wildcard matches, explicit domain patterns "+
 		"trump over extracted names. For multiple key/certificate pairs, use the "+
 		"--tls-sni-cert-key multiple times. "+
-		"Examples: \"example.key,example.crt\" or \"*.foo.com,foo.com:foo.key,foo.crt\".")
+		"Examples: \"example.crt,example.key\" or \"foo.crt,foo.key:*.foo.com,foo.com\".")
 }
 
 func (s *SecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
@@ -134,7 +142,12 @@ func (s *SecureServingOptions) AddDeprecatedFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("public-address-override", "see --bind-address instead.")
 }
 
+// ApplyTo fills up serving information in the server configuration.
 func (s *SecureServingOptions) ApplyTo(c *server.Config) error {
+	if s == nil {
+		return nil
+	}
+
 	if s.BindPort <= 0 {
 		return nil
 	}

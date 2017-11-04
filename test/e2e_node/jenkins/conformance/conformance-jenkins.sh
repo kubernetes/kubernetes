@@ -32,11 +32,12 @@ TIMEOUT=${TIMEOUT:-"45m"}
 
 mkdir -p ${ARTIFACTS}
 
-go run test/e2e_node/runner/remote/run_remote.go  conformance \
+go run test/e2e_node/runner/remote/run_remote.go  --test-suite=conformance \
   --logtostderr --vmodule=*=4 --ssh-env="gce" --ssh-user="$GCE_USER" \
   --zone="$GCE_ZONE" --project="$GCE_PROJECT" --hosts="$GCE_HOSTS" \
   --images="$GCE_IMAGES" --image-project="$GCE_IMAGE_PROJECT" \
   --image-config-file="$GCE_IMAGE_CONFIG_PATH" --cleanup="$CLEANUP" \
   --results-dir="$ARTIFACTS" --test-timeout="$TIMEOUT" \
   --test_args="--kubelet-flags=\"$KUBELET_ARGS\"" \
-  --instance-metadata="$GCE_INSTANCE_METADATA"
+  --instance-metadata="$GCE_INSTANCE_METADATA" \
+  --system-spec-name="$SYSTEM_SPEC_NAME"

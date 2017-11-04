@@ -1,7 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-licenses(["notice"])
-
 load(
     "@io_bazel_rules_go//go:def.bzl",
     "go_library",
@@ -10,7 +8,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["metrics.go"],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/metrics",
     deps = ["//vendor/github.com/prometheus/client_golang/prometheus:go_default_library"],
 )
 

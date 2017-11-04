@@ -11,14 +11,14 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["expand.go"],
-    tags = ["automanaged"],
+    importpath = "k8s.io/kubernetes/third_party/forked/golang/expansion",
 )
 
 go_test(
     name = "go_default_test",
     srcs = ["expand_test.go"],
+    importpath = "k8s.io/kubernetes/third_party/forked/golang/expansion",
     library = ":go_default_library",
-    tags = ["automanaged"],
     deps = ["//pkg/api:go_default_library"],
 )
 

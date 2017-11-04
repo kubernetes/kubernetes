@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/docker/engine-api/client"
-	"github.com/docker/engine-api/types"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 	"golang.org/x/net/context"
 )
 
@@ -37,9 +37,8 @@ func (d *DockerValidator) Name() string {
 }
 
 const (
-	dockerEndpoint            = "unix:///var/run/docker.sock"
 	dockerConfigPrefix        = "DOCKER_"
-	maxDockerValidatedVersion = "1.12"
+	maxDockerValidatedVersion = "17.03"
 )
 
 // TODO(random-liu): Add more validating items.
@@ -49,6 +48,7 @@ func (d *DockerValidator) Validate(spec SysSpec) (error, error) {
 		// docker, skip the docker configuration validation.
 		return nil, nil
 	}
+
 	c, err := client.NewClient(dockerEndpoint, "", nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create docker client: %v", err)
@@ -71,8 +71,9 @@ func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info types.Info) 
 		}
 	}
 	if !matched {
-		// catch if docker is 1.13+
-		ver := `1\.(1[3-9])\..*|\d{2}\.\d+\.\d+-[a-z]{2}`
+		// If it's of the new Docker version scheme but didn't match above, it
+		// must be a newer version than the most recently validated one.
+		ver := `\d{2}\.\d+\.\d+-[a-z]{2}`
 		r := regexp.MustCompile(ver)
 		if r.MatchString(info.ServerVersion) {
 			d.Reporter.Report(dockerConfigPrefix+"VERSION", info.ServerVersion, good)

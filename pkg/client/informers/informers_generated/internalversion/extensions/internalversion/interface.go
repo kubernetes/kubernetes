@@ -30,14 +30,10 @@ type Interface interface {
 	Deployments() DeploymentInformer
 	// Ingresses returns a IngressInformer.
 	Ingresses() IngressInformer
-	// NetworkPolicies returns a NetworkPolicyInformer.
-	NetworkPolicies() NetworkPolicyInformer
 	// PodSecurityPolicies returns a PodSecurityPolicyInformer.
 	PodSecurityPolicies() PodSecurityPolicyInformer
 	// ReplicaSets returns a ReplicaSetInformer.
 	ReplicaSets() ReplicaSetInformer
-	// ThirdPartyResources returns a ThirdPartyResourceInformer.
-	ThirdPartyResources() ThirdPartyResourceInformer
 }
 
 type version struct {
@@ -64,11 +60,6 @@ func (v *version) Ingresses() IngressInformer {
 	return &ingressInformer{factory: v.SharedInformerFactory}
 }
 
-// NetworkPolicies returns a NetworkPolicyInformer.
-func (v *version) NetworkPolicies() NetworkPolicyInformer {
-	return &networkPolicyInformer{factory: v.SharedInformerFactory}
-}
-
 // PodSecurityPolicies returns a PodSecurityPolicyInformer.
 func (v *version) PodSecurityPolicies() PodSecurityPolicyInformer {
 	return &podSecurityPolicyInformer{factory: v.SharedInformerFactory}
@@ -77,9 +68,4 @@ func (v *version) PodSecurityPolicies() PodSecurityPolicyInformer {
 // ReplicaSets returns a ReplicaSetInformer.
 func (v *version) ReplicaSets() ReplicaSetInformer {
 	return &replicaSetInformer{factory: v.SharedInformerFactory}
-}
-
-// ThirdPartyResources returns a ThirdPartyResourceInformer.
-func (v *version) ThirdPartyResources() ThirdPartyResourceInformer {
-	return &thirdPartyResourceInformer{factory: v.SharedInformerFactory}
 }

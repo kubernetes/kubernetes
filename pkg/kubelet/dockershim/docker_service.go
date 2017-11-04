@@ -20,36 +20,39 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"sync"
 	"time"
 
+	"github.com/armon/circbuf"
 	"github.com/blang/semver"
-	dockertypes "github.com/docker/engine-api/types"
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/golang/glog"
 
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/api"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kubetypes "k8s.io/apimachinery/pkg/types"
+	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
+	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/cm"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/errors"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/cni"
 	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 	"k8s.io/kubernetes/pkg/kubelet/network/kubenet"
 	"k8s.io/kubernetes/pkg/kubelet/server/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
+
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/metrics"
 )
 
 const (
 	dockerRuntimeName = "docker"
 	kubeAPIVersion    = "0.1.0"
-
-	// https://docs.docker.com/engine/reference/api/docker_remote_api/
-	// docker version should be at least 1.10.x
-	minimumDockerAPIVersion = "1.22.0"
 
 	// String used to detect docker host mode for various namespaces (e.g.
 	// networking). Must match the value returned by docker inspect -f
@@ -89,7 +92,7 @@ const (
 // runtime process.
 type NetworkPluginSettings struct {
 	// HairpinMode is best described by comments surrounding the kubelet arg
-	HairpinMode componentconfig.HairpinMode
+	HairpinMode kubeletconfig.HairpinMode
 	// NonMasqueradeCIDR is the range of ips which should *not* be included
 	// in any MASQUERADE rules applied by the plugin
 	NonMasqueradeCIDR string
@@ -146,24 +149,26 @@ type dockerNetworkHost struct {
 var internalLabelKeys []string = []string{containerTypeLabelKey, containerLogPathLabelKey, sandboxIDLabelKey}
 
 // NOTE: Anything passed to DockerService should be eventually handled in another way when we switch to running the shim as a different process.
-func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot string, podSandboxImage string, streamingConfig *streaming.Config,
-	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, execHandler dockertools.ExecHandler, dockershimRootDir string) (DockerService, error) {
-	c := dockertools.NewInstrumentedDockerInterface(client)
+func NewDockerService(client libdocker.Interface, podSandboxImage string, streamingConfig *streaming.Config,
+	pluginSettings *NetworkPluginSettings, cgroupsName string, kubeCgroupDriver string, dockershimRootDir string, disableSharedPID bool) (DockerService, error) {
+	c := libdocker.NewInstrumentedInterface(client)
 	checkpointHandler, err := NewPersistentCheckpointHandler(dockershimRootDir)
 	if err != nil {
 		return nil, err
 	}
+
 	ds := &dockerService{
-		seccompProfileRoot: seccompProfileRoot,
-		client:             c,
-		os:                 kubecontainer.RealOS{},
-		podSandboxImage:    podSandboxImage,
+		client:          c,
+		os:              kubecontainer.RealOS{},
+		podSandboxImage: podSandboxImage,
 		streamingRuntime: &streamingRuntime{
 			client:      client,
-			execHandler: execHandler,
+			execHandler: &NativeExecHandler{},
 		},
 		containerManager:  cm.NewContainerManager(cgroupsName, client),
 		checkpointHandler: checkpointHandler,
+		disableSharedPID:  disableSharedPID,
+		networkReady:      make(map[string]bool),
 	}
 
 	// check docker version compatibility.
@@ -217,6 +222,10 @@ func NewDockerService(client dockertools.DockerInterface, seccompProfileRoot str
 		},
 		versionCacheTTL,
 	)
+
+	// Register prometheus metrics.
+	metrics.Register()
+
 	return ds, nil
 }
 
@@ -231,24 +240,31 @@ type DockerService interface {
 }
 
 type dockerService struct {
-	seccompProfileRoot string
-	client             dockertools.DockerInterface
-	os                 kubecontainer.OSInterface
-	podSandboxImage    string
-	streamingRuntime   *streamingRuntime
-	streamingServer    streaming.Server
-	network            *network.PluginManager
-	containerManager   cm.ContainerManager
+	client           libdocker.Interface
+	os               kubecontainer.OSInterface
+	podSandboxImage  string
+	streamingRuntime *streamingRuntime
+	streamingServer  streaming.Server
+
+	network *network.PluginManager
+	// Map of podSandboxID :: network-is-ready
+	networkReady     map[string]bool
+	networkReadyLock sync.Mutex
+
+	containerManager cm.ContainerManager
 	// cgroup driver used by Docker runtime.
 	cgroupDriver      string
 	checkpointHandler CheckpointHandler
-	// legacyCleanup indicates whether legacy cleanup has finished or not.
-	legacyCleanup legacyCleanupFlag
 	// caches the version of the runtime.
 	// To be compatible with multiple docker versions, we need to perform
 	// version checking for some operations. Use this cache to avoid querying
 	// the docker daemon every time we need to do such checks.
 	versionCache *cache.ObjectCache
+	// This option provides an escape hatch to override the new default behavior for Docker under
+	// the CRI to use a shared PID namespace for all pods. It is temporary and will be removed.
+	// See proposals/pod-pid-namespace.md for details.
+	// TODO: Remove once the escape hatch is no longer used (https://issues.k8s.io/41938)
+	disableSharedPID bool
 }
 
 // Version returns the runtime name, runtime version and runtime API version
@@ -299,7 +315,7 @@ func (ds *dockerService) GetNetNS(podSandboxID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return getNetworkNamespace(r), nil
+	return getNetworkNamespace(r)
 }
 
 // GetPodPortMappings returns the port mappings of the given podSandbox ID.
@@ -311,12 +327,11 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 		if err == errors.CheckpointNotFoundError {
 			glog.Warningf("Failed to retrieve checkpoint for sandbox %q: %v", podSandboxID, err)
 			return nil, nil
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 
-	portMappings := []*hostport.PortMapping{}
+	portMappings := make([]*hostport.PortMapping, 0, len(checkpoint.Data.PortMappings))
 	for _, pm := range checkpoint.Data.PortMappings {
 		proto := toAPIProtocol(*pm.Protocol)
 		portMappings = append(portMappings, &hostport.PortMapping{
@@ -331,7 +346,6 @@ func (ds *dockerService) GetPodPortMappings(podSandboxID string) ([]*hostport.Po
 // Start initializes and starts components in dockerService.
 func (ds *dockerService) Start() error {
 	// Initialize the legacy cleanup flag.
-	ds.LegacyCleanupInit()
 	return ds.containerManager.Start()
 }
 
@@ -394,7 +408,7 @@ func (ds *dockerService) checkVersionCompatibility() error {
 		return err
 	}
 
-	minAPIVersion, err := semver.Parse(minimumDockerAPIVersion)
+	minAPIVersion, err := semver.Parse(libdocker.MinimumDockerAPIVersion)
 	if err != nil {
 		return err
 	}
@@ -402,7 +416,7 @@ func (ds *dockerService) checkVersionCompatibility() error {
 	// Verify the docker version.
 	result := apiVersion.Compare(minAPIVersion)
 	if result < 0 {
-		return fmt.Errorf("docker API version is older than %s", minimumDockerAPIVersion)
+		return fmt.Errorf("docker API version is older than %s", libdocker.MinimumDockerAPIVersion)
 	}
 
 	return nil
@@ -432,9 +446,12 @@ func (ds *dockerService) getDockerVersionFromCache() (*dockertypes.Version, erro
 	// We only store on key in the cache.
 	const dummyKey = "version"
 	value, err := ds.versionCache.Get(dummyKey)
-	dv := value.(*dockertypes.Version)
 	if err != nil {
 		return nil, err
+	}
+	dv, ok := value.(*dockertypes.Version)
+	if !ok {
+		return nil, fmt.Errorf("Converted to *dockertype.Version error")
 	}
 	return dv, nil
 }
@@ -459,10 +476,10 @@ type DockerLegacyService interface {
 // dockerLegacyService implements the DockerLegacyService. We add this for non json-log driver
 // support. (See #41996)
 type dockerLegacyService struct {
-	client dockertools.DockerInterface
+	client libdocker.Interface
 }
 
-func NewDockerLegacyService(client dockertools.DockerInterface) DockerLegacyService {
+func NewDockerLegacyService(client libdocker.Interface) DockerLegacyService {
 	return &dockerLegacyService{client: client}
 }
 
@@ -472,7 +489,62 @@ func (d *dockerLegacyService) GetContainerLogs(pod *v1.Pod, containerID kubecont
 	if err != nil {
 		return err
 	}
-	return dockertools.GetContainerLogs(d.client, pod, containerID, logOptions, stdout, stderr, container.Config.Tty)
+
+	var since int64
+	if logOptions.SinceSeconds != nil {
+		t := metav1.Now().Add(-time.Duration(*logOptions.SinceSeconds) * time.Second)
+		since = t.Unix()
+	}
+	if logOptions.SinceTime != nil {
+		since = logOptions.SinceTime.Unix()
+	}
+	opts := dockertypes.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Since:      strconv.FormatInt(since, 10),
+		Timestamps: logOptions.Timestamps,
+		Follow:     logOptions.Follow,
+	}
+	if logOptions.TailLines != nil {
+		opts.Tail = strconv.FormatInt(*logOptions.TailLines, 10)
+	}
+
+	sopts := libdocker.StreamOptions{
+		OutputStream: stdout,
+		ErrorStream:  stderr,
+		RawTerminal:  container.Config.Tty,
+	}
+	return d.client.Logs(containerID.ID, opts, sopts)
+}
+
+// LegacyLogProvider implements the kuberuntime.LegacyLogProvider interface
+type LegacyLogProvider struct {
+	dls DockerLegacyService
+}
+
+func NewLegacyLogProvider(dls DockerLegacyService) LegacyLogProvider {
+	return LegacyLogProvider{dls: dls}
+}
+
+// GetContainerLogTail attempts to read up to MaxContainerTerminationMessageLogLength
+// from the end of the log when docker is configured with a log driver other than json-log.
+// It reads up to MaxContainerTerminationMessageLogLines lines.
+func (l LegacyLogProvider) GetContainerLogTail(uid kubetypes.UID, name, namespace string, containerId kubecontainer.ContainerID) (string, error) {
+	value := int64(kubecontainer.MaxContainerTerminationMessageLogLines)
+	buf, _ := circbuf.NewBuffer(kubecontainer.MaxContainerTerminationMessageLogLength)
+	// Although this is not a full spec pod, dockerLegacyService.GetContainerLogs() currently completely ignores its pod param
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       uid,
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+	err := l.dls.GetContainerLogs(pod, containerId, &v1.PodLogOptions{TailLines: &value}, buf, buf)
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
 
 // criSupportedLogDrivers are log drivers supported by native CRI integration.
@@ -480,7 +552,7 @@ var criSupportedLogDrivers = []string{"json-file"}
 
 // IsCRISupportedLogDriver checks whether the logging driver used by docker is
 // suppoted by native CRI integration.
-func IsCRISupportedLogDriver(client dockertools.DockerInterface) (bool, error) {
+func IsCRISupportedLogDriver(client libdocker.Interface) (bool, error) {
 	info, err := client.Info()
 	if err != nil {
 		return false, fmt.Errorf("failed to get docker info: %v", err)

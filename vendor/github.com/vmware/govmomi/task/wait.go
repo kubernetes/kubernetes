@@ -68,6 +68,11 @@ func (t *taskCallback) fn(pc []types.PropertyChange) bool {
 		t.info = &ti
 	}
 
+	// t.info could be nil if pc can't satify the rules above
+	if t.info == nil {
+		return false
+	}
+
 	pr := taskProgress{t.info}
 
 	// Store copy of error, so Wait() can return it as well.

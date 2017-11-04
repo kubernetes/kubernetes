@@ -19,10 +19,9 @@ limitations under the License.
 package v1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
-	api "k8s.io/client-go/pkg/api"
-	v1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -89,7 +88,7 @@ func (s persistentVolumeClaimNamespaceLister) Get(name string) (*v1.PersistentVo
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("persistentvolumeclaim"), name)
+		return nil, errors.NewNotFound(v1.Resource("persistentvolumeclaim"), name)
 	}
 	return obj.(*v1.PersistentVolumeClaim), nil
 }

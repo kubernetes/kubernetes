@@ -24,9 +24,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	metricsapi "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 	"k8s.io/kubernetes/pkg/api/validation"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
+	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 )
 
 const (
@@ -97,8 +97,8 @@ func nodeMetricsUrl(name string) (string, error) {
 	return fmt.Sprintf("%s/nodes/%s", metricsRoot, name), nil
 }
 
-func (cli *HeapsterMetricsClient) GetNodeMetrics(nodeName string, selector labels.Selector) ([]metricsapi.NodeMetrics, error) {
-	params := map[string]string{"labelSelector": selector.String()}
+func (cli *HeapsterMetricsClient) GetNodeMetrics(nodeName string, selector string) ([]metricsapi.NodeMetrics, error) {
+	params := map[string]string{"labelSelector": selector}
 	path, err := nodeMetricsUrl(nodeName)
 	if err != nil {
 		return []metricsapi.NodeMetrics{}, err

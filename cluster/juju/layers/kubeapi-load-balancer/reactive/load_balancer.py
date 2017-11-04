@@ -22,13 +22,17 @@ from charms import layer
 from charms.reactive import when, when_any, when_not
 from charms.reactive import set_state, remove_state
 from charmhelpers.core import hookenv
+from charmhelpers.core import host
 from charmhelpers.contrib.charmsupport import nrpe
+from charms.reactive.helpers import data_changed
 
 from charms.layer import nginx
+from charms.layer import tls_client
 
 from subprocess import Popen
 from subprocess import PIPE
 from subprocess import STDOUT
+from subprocess import CalledProcessError
 
 
 @when('certificates.available')
@@ -43,10 +47,46 @@ def request_server_certificates(tls):
         hookenv.unit_private_ip(),
         socket.gethostname(),
     ]
+    # maybe they have extra names they want as SANs
+    extra_sans = hookenv.config('extra_sans')
+    if extra_sans and not extra_sans == "":
+        sans.extend(extra_sans.split())
     # Create a path safe name by removing path characters from the unit name.
     certificate_name = hookenv.local_unit().replace('/', '_')
     # Request a server cert with this information.
     tls.request_server_cert(common_name, sans, certificate_name)
+
+
+@when('config.changed.extra_sans', 'certificates.available')
+def update_certificate(tls):
+    # Using the config.changed.extra_sans flag to catch changes.
+    # IP changes will take ~5 minutes or so to propagate, but
+    # it will update.
+    request_server_certificates(tls)
+
+
+@when('certificates.server.cert.available',
+      'nginx.available', 'tls_client.server.certificate.written')
+def kick_nginx(tls):
+    # we are just going to sighup it, but still want to avoid kicking it
+    # without need
+    if data_changed('cert', tls.get_server_cert()):
+        # certificate changed, so sighup nginx
+        hookenv.log("Certificate information changed, sending SIGHUP to nginx")
+        host.service_restart('nginx')
+    tls_client.reset_certificate_write_flag('server')
+
+
+@when('config.changed.port')
+def close_old_port():
+    config = hookenv.config()
+    old_port = config.previous('port')
+    if not old_port:
+        return
+    try:
+        hookenv.close_port(old_port)
+    except CalledProcessError:
+        hookenv.log('Port %d already closed, skipping.' % old_port)
 
 
 @when('nginx.available', 'apiserver.available',
@@ -59,24 +99,27 @@ def install_load_balancer(apiserver, tls):
     cert_exists = server_cert_path and os.path.isfile(server_cert_path)
     server_key_path = layer_options.get('server_key_path')
     key_exists = server_key_path and os.path.isfile(server_key_path)
-    # Do both the the key and certificate exist?
+    # Do both the key and certificate exist?
     if cert_exists and key_exists:
         # At this point the cert and key exist, and they are owned by root.
         chown = ['chown', 'www-data:www-data', server_cert_path]
+
         # Change the owner to www-data so the nginx process can read the cert.
         subprocess.call(chown)
         chown = ['chown', 'www-data:www-data', server_key_path]
+
         # Change the owner to www-data so the nginx process can read the key.
         subprocess.call(chown)
 
-        hookenv.open_port(hookenv.config('port'))
+        port = hookenv.config('port')
+        hookenv.open_port(port)
         services = apiserver.services()
         nginx.configure_site(
                 'apilb',
                 'apilb.conf',
                 server_name='_',
                 services=services,
-                port=hookenv.config('port'),
+                port=port,
                 server_certificate=server_cert_path,
                 server_key=server_key_path,
         )

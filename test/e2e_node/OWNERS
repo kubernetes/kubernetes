@@ -1,7 +1,8 @@
 approvers:
 - Random-Liu
-- timstclair
+- tallclair
 - vishh
 - derekwaynecarr
+- yujuhong
 reviewers:
 - sig-node-reviewers

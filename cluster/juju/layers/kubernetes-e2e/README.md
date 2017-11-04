@@ -21,7 +21,8 @@ and then relate the `kubernetes-e2e` charm.
 ```shell
 juju deploy kubernetes-core
 juju deploy cs:~containers/kubernetes-e2e
-juju add-relation kubernetes-e2e kubernetes-master
+juju add-relation kubernetes-e2e:kube-control kubernetes-master:kube-control
+juju add-relation kubernetes-e2e:kubernetes-master kubernetes-master:kube-api-endpoint
 juju add-relation kubernetes-e2e easyrsa
 ```
 
@@ -82,13 +83,13 @@ To see the different types of tests the Kubernetes end-to-end charm has access
 to, we encourage you to see the upstream documentation on the different types
 of tests, and to strongly understand what subsets of the tests you are running.
 
-[Kinds of tests](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/e2e-tests.md#kinds-of-tests)
+[Kinds of tests](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-tests.md#kinds-of-tests)
 
 ### More information on end-to-end testing
 
 Along with the above descriptions, end-to-end testing is a much larger subject
 than this readme can encapsulate. There is far more information in the
-[end-to-end testing guide](https://github.com/kubernetes/kubernetes/blob/master/docs/devel/e2e-tests.md).
+[end-to-end testing guide](https://github.com/kubernetes/community/blob/master/contributors/devel/e2e-tests.md).
 
 ### Evaluating end-to-end results
 
@@ -127,14 +128,7 @@ firewall to successfully run e2e test results. Or you may use the exposed
 proxy settings [properly configured](https://github.com/juju-solutions/bundle-canonical-kubernetes#proxy-configuration)
 on the kubernetes-worker units.
 
-## Contact information
-
-Primary Authors: The ~containers team at Canonical
-
-- [Matt Bruzek &lt;matthew.bruzek@canonical.com&gt;](mailto:matthew.bruzek@canonical.com)
-- [Charles Butler &lt;charles.butler@canonical.com&gt;](mailto:charles.butler@canonical.com)
-
-More resources for help:
+## Help resources:
 
 - [Bug Tracker](https://github.com/juju-solutions/bundle-canonical-kubernetes/issues)
 - [Github Repository](https://github.com/kubernetes/kubernetes/)

@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// A PerHost directs connections to a default Dialer unless the hostname
+// A PerHost directs connections to a default Dialer unless the host name
 // requested matches one of a number of exceptions.
 type PerHost struct {
 	def, bypass Dialer
@@ -76,7 +76,7 @@ func (p *PerHost) dialerForRequest(host string) Dialer {
 
 // AddFromString parses a string that contains comma-separated values
 // specifying hosts that should use the bypass proxy. Each value is either an
-// IP address, a CIDR range, a zone (*.example.com) or a hostname
+// IP address, a CIDR range, a zone (*.example.com) or a host name
 // (localhost). A best effort is made to parse the string and errors are
 // ignored.
 func (p *PerHost) AddFromString(s string) {
@@ -131,7 +131,7 @@ func (p *PerHost) AddZone(zone string) {
 	p.bypassZones = append(p.bypassZones, zone)
 }
 
-// AddHost specifies a hostname that will use the bypass proxy.
+// AddHost specifies a host name that will use the bypass proxy.
 func (p *PerHost) AddHost(host string) {
 	if strings.HasSuffix(host, ".") {
 		host = host[:len(host)-1]

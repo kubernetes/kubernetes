@@ -29,7 +29,7 @@ import (
 
 	"github.com/go-openapi/spec"
 	inf "gopkg.in/inf.v0"
-	"k8s.io/apimachinery/pkg/openapi"
+	openapi "k8s.io/kube-openapi/pkg/common"
 )
 
 // Quantity is a fixed-point representation of a number.
@@ -93,6 +93,7 @@ import (
 // +protobuf.embed=string
 // +protobuf.options.marshal=false
 // +protobuf.options.(gogoproto.goproto_stringer)=false
+// +k8s:deepcopy-gen=true
 // +k8s:openapi-gen=true
 type Quantity struct {
 	// i is the quantity in int64 scaled form, if d.Dec == nil
@@ -415,7 +416,7 @@ func (_ Quantity) OpenAPIDefinition() openapi.OpenAPIDefinition {
 // Note about BinarySI:
 // * If q.Format is set to BinarySI and q.Amount represents a non-zero value between
 //   -1 and +1, it will be emitted as if q.Format were DecimalSI.
-// * Otherwise, if q.Format is set to BinarySI, frational parts of q.Amount will be
+// * Otherwise, if q.Format is set to BinarySI, fractional parts of q.Amount will be
 //   rounded up. (1.1i becomes 2i.)
 func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 	if q.IsZero() {

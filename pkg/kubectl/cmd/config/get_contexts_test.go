@@ -123,9 +123,12 @@ func TestGetContextsSelectOneOfTwo(t *testing.T) {
 }
 
 func (test getContextsTest) run(t *testing.T) {
-	fakeKubeFile, _ := ioutil.TempFile("", "")
+	fakeKubeFile, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	defer os.Remove(fakeKubeFile.Name())
-	err := clientcmd.WriteToFile(test.startingConfig, fakeKubeFile.Name())
+	err = clientcmd.WriteToFile(test.startingConfig, fakeKubeFile.Name())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -150,9 +153,5 @@ func (test getContextsTest) run(t *testing.T) {
 			t.Errorf("Expected %v, but got %v", test.expectedOut, buf.String())
 		}
 		return
-	}
-
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
 	}
 }

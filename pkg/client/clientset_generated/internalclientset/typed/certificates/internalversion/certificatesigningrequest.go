@@ -57,6 +57,38 @@ func newCertificateSigningRequests(c *CertificatesClient) *certificateSigningReq
 	}
 }
 
+// Get takes name of the certificateSigningRequest, and returns the corresponding certificateSigningRequest object, and an error if there is any.
+func (c *certificateSigningRequests) Get(name string, options v1.GetOptions) (result *certificates.CertificateSigningRequest, err error) {
+	result = &certificates.CertificateSigningRequest{}
+	err = c.client.Get().
+		Resource("certificatesigningrequests").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of CertificateSigningRequests that match those selectors.
+func (c *certificateSigningRequests) List(opts v1.ListOptions) (result *certificates.CertificateSigningRequestList, err error) {
+	result = &certificates.CertificateSigningRequestList{}
+	err = c.client.Get().
+		Resource("certificatesigningrequests").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested certificateSigningRequests.
+func (c *certificateSigningRequests) Watch(opts v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Resource("certificatesigningrequests").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a certificateSigningRequest and creates it.  Returns the server's representation of the certificateSigningRequest, and an error, if there is any.
 func (c *certificateSigningRequests) Create(certificateSigningRequest *certificates.CertificateSigningRequest) (result *certificates.CertificateSigningRequest, err error) {
 	result = &certificates.CertificateSigningRequest{}
@@ -81,7 +113,7 @@ func (c *certificateSigningRequests) Update(certificateSigningRequest *certifica
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *certificateSigningRequests) UpdateStatus(certificateSigningRequest *certificates.CertificateSigningRequest) (result *certificates.CertificateSigningRequest, err error) {
 	result = &certificates.CertificateSigningRequest{}
@@ -113,38 +145,6 @@ func (c *certificateSigningRequests) DeleteCollection(options *v1.DeleteOptions,
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the certificateSigningRequest, and returns the corresponding certificateSigningRequest object, and an error if there is any.
-func (c *certificateSigningRequests) Get(name string, options v1.GetOptions) (result *certificates.CertificateSigningRequest, err error) {
-	result = &certificates.CertificateSigningRequest{}
-	err = c.client.Get().
-		Resource("certificatesigningrequests").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of CertificateSigningRequests that match those selectors.
-func (c *certificateSigningRequests) List(opts v1.ListOptions) (result *certificates.CertificateSigningRequestList, err error) {
-	result = &certificates.CertificateSigningRequestList{}
-	err = c.client.Get().
-		Resource("certificatesigningrequests").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested certificateSigningRequests.
-func (c *certificateSigningRequests) Watch(opts v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Resource("certificatesigningrequests").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched certificateSigningRequest.

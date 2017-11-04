@@ -21,7 +21,6 @@ usage() {
 	err "\t$0 init"
 	err "\t$0 mount <mount dir> <json params>"
 	err "\t$0 unmount <mount dir>"
-	err "\t$0 getvolumename <json params>"
 	exit 1
 }
 
@@ -49,7 +48,7 @@ domount() {
 	SHARE=$(echo $2 | jq -r '.share')
 
 	if [ $(ismounted) -eq 1 ] ; then
-		log "{\"status\": \"Success\"}"
+		log '{"status": "Success"}'
 		exit 0
 	fi
 
@@ -60,14 +59,14 @@ domount() {
 		err "{ \"status\": \"Failure\", \"message\": \"Failed to mount ${NFS_SERVER}:${SHARE} at ${MNTPATH}\"}"
 		exit 1
 	fi
-	log "{\"status\": \"Success\"}"
+	log '{"status": "Success"}'
 	exit 0
 }
 
 unmount() {
 	MNTPATH=$1
 	if [ $(ismounted) -eq 0 ] ; then
-		log "{\"status\": \"Success\"}"
+		log '{"status": "Success"}'
 		exit 0
 	fi
 
@@ -77,22 +76,19 @@ unmount() {
 		exit 1
 	fi
 
-	log "{\"status\": \"Success\"}"
-	exit 0
-}
-
-getvolumename() {
-	NFS_SERVER=$(echo $1 | jq -r '.server')
-	SHARE=$(echo $1 | jq -r '.share')
-
-	log "{\"status\": \"Success\", \"volumeName\": \"${NFS_SERVER}/${SHARE}\"}"
+	log '{"status": "Success"}'
 	exit 0
 }
 
 op=$1
 
+if ! command -v jq >/dev/null 2>&1; then
+	err "{ \"status\": \"Failure\", \"message\": \"'jq' binary not found. Please install jq package before using this driver\"}"
+	exit 1
+fi
+
 if [ "$op" = "init" ]; then
-	log "{\"status\": \"Success\"}"
+	log '{"status": "Success", "capabilities": {"attach": false}}'
 	exit 0
 fi
 
@@ -109,12 +105,9 @@ case "$op" in
 	unmount)
 		unmount $*
 		;;
-	getvolumename)
-		getvolumename $*
-		;;
 	*)
-		err "{ \"status\": \"Not supported\" }"
-		exit 1
+		log '{"status": "Not supported"}'
+		exit 0
 esac
 
 exit 1

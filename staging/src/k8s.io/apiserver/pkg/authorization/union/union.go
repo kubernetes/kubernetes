@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
@@ -54,4 +55,41 @@ func (authzHandler unionAuthzHandler) Authorize(a authorizer.Attributes) (bool, 
 	}
 
 	return false, strings.Join(reasonlist, "\n"), utilerrors.NewAggregate(errlist)
+}
+
+// unionAuthzRulesHandler authorizer against a chain of authorizer.RuleResolver
+type unionAuthzRulesHandler []authorizer.RuleResolver
+
+// NewRuleResolvers returns an authorizer that authorizes against a chain of authorizer.Authorizer objects
+func NewRuleResolvers(authorizationHandlers ...authorizer.RuleResolver) authorizer.RuleResolver {
+	return unionAuthzRulesHandler(authorizationHandlers)
+}
+
+// RulesFor against a chain of authorizer.RuleResolver objects and returns nil if successful and returns error if unsuccessful
+func (authzHandler unionAuthzRulesHandler) RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
+	var (
+		errList              []error
+		resourceRulesList    []authorizer.ResourceRuleInfo
+		nonResourceRulesList []authorizer.NonResourceRuleInfo
+	)
+	incompleteStatus := false
+
+	for _, currAuthzHandler := range authzHandler {
+		resourceRules, nonResourceRules, incomplete, err := currAuthzHandler.RulesFor(user, namespace)
+
+		if incomplete == true {
+			incompleteStatus = true
+		}
+		if err != nil {
+			errList = append(errList, err)
+		}
+		if len(resourceRules) > 0 {
+			resourceRulesList = append(resourceRulesList, resourceRules...)
+		}
+		if len(nonResourceRules) > 0 {
+			nonResourceRulesList = append(nonResourceRulesList, nonResourceRules...)
+		}
+	}
+
+	return resourceRulesList, nonResourceRulesList, incompleteStatus, utilerrors.NewAggregate(errList)
 }

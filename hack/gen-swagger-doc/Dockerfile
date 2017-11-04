@@ -35,7 +35,7 @@ COPY gen-swagger-docs.sh build/
 # Run the script once to download the dependent java libraries into the image
 RUN mkdir -p /output /swagger-source \
 	&& wget https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/swagger-spec/v1.json -O /swagger-source/v1.json \
-	&& wget https://raw.githubusercontent.com/GoogleCloudPlatform/kubernetes/master/pkg/api/v1/register.go -O /register.go \
+	&& wget https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg/api/v1/register.go -O /register.go \
 	&& build/gen-swagger-docs.sh v1 \
 	&& rm -rf /output/* /swagger-source/* /register.go
 

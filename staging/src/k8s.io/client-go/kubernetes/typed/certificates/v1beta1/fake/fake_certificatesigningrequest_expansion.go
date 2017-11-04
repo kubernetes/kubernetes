@@ -17,7 +17,7 @@ limitations under the License.
 package fake
 
 import (
-	certificates "k8s.io/client-go/pkg/apis/certificates/v1beta1"
+	certificates "k8s.io/api/certificates/v1beta1"
 	core "k8s.io/client-go/testing"
 )
 

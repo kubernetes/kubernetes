@@ -43,7 +43,7 @@ func (a APIObjectVersioner) UpdateObject(obj runtime.Object, resourceVersion uin
 }
 
 // UpdateList implements Versioner
-func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion uint64) error {
+func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion uint64, nextKey string) error {
 	listAccessor, err := meta.ListAccessor(obj)
 	if err != nil || listAccessor == nil {
 		return err
@@ -53,6 +53,18 @@ func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion uint6
 		versionString = strconv.FormatUint(resourceVersion, 10)
 	}
 	listAccessor.SetResourceVersion(versionString)
+	listAccessor.SetContinue(nextKey)
+	return nil
+}
+
+// PrepareObjectForStorage clears resource version and self link prior to writing to etcd.
+func (a APIObjectVersioner) PrepareObjectForStorage(obj runtime.Object) error {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return err
+	}
+	accessor.SetResourceVersion("")
+	accessor.SetSelfLink("")
 	return nil
 }
 

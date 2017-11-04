@@ -24,16 +24,16 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/v1"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
+	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
-	"k8s.io/kubernetes/pkg/quota/evaluator/core"
+	schedulerutils "k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
 
 const (
@@ -61,8 +61,8 @@ var (
 	signalToNodeCondition map[evictionapi.Signal]v1.NodeConditionType
 	// signalToResource maps a Signal to its associated Resource.
 	signalToResource map[evictionapi.Signal]v1.ResourceName
-	// resourceToSignal maps a Resource to its associated Signal
-	resourceToSignal map[v1.ResourceName]evictionapi.Signal
+	// resourceClaimToSignal maps a Resource that can be reclaimed to its associated Signal
+	resourceClaimToSignal map[v1.ResourceName][]evictionapi.Signal
 )
 
 func init() {
@@ -74,19 +74,24 @@ func init() {
 	signalToNodeCondition[evictionapi.SignalNodeFsAvailable] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalImageFsInodesFree] = v1.NodeDiskPressure
 	signalToNodeCondition[evictionapi.SignalNodeFsInodesFree] = v1.NodeDiskPressure
+	signalToNodeCondition[evictionapi.SignalAllocatableNodeFsAvailable] = v1.NodeDiskPressure
 
 	// map signals to resources (and vice-versa)
 	signalToResource = map[evictionapi.Signal]v1.ResourceName{}
 	signalToResource[evictionapi.SignalMemoryAvailable] = v1.ResourceMemory
 	signalToResource[evictionapi.SignalAllocatableMemoryAvailable] = v1.ResourceMemory
+	signalToResource[evictionapi.SignalAllocatableNodeFsAvailable] = resourceNodeFs
 	signalToResource[evictionapi.SignalImageFsAvailable] = resourceImageFs
 	signalToResource[evictionapi.SignalImageFsInodesFree] = resourceImageFsInodes
 	signalToResource[evictionapi.SignalNodeFsAvailable] = resourceNodeFs
 	signalToResource[evictionapi.SignalNodeFsInodesFree] = resourceNodeFsInodes
-	resourceToSignal = map[v1.ResourceName]evictionapi.Signal{}
-	for key, value := range signalToResource {
-		resourceToSignal[value] = key
-	}
+
+	// maps resource to signals (the following resource could be reclaimed)
+	resourceClaimToSignal = map[v1.ResourceName][]evictionapi.Signal{}
+	resourceClaimToSignal[resourceNodeFs] = []evictionapi.Signal{evictionapi.SignalNodeFsAvailable}
+	resourceClaimToSignal[resourceImageFs] = []evictionapi.Signal{evictionapi.SignalImageFsAvailable}
+	resourceClaimToSignal[resourceNodeFsInodes] = []evictionapi.Signal{evictionapi.SignalNodeFsInodesFree}
+	resourceClaimToSignal[resourceImageFsInodes] = []evictionapi.Signal{evictionapi.SignalImageFsInodesFree}
 }
 
 // validSignal returns true if the signal is supported.
@@ -226,6 +231,16 @@ func getAllocatableThreshold(allocatableConfig []string) []evictionapi.Threshold
 			return []evictionapi.Threshold{
 				{
 					Signal:   evictionapi.SignalAllocatableMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalAllocatableNodeFsAvailable,
 					Operator: evictionapi.OpLessThan,
 					Value: evictionapi.ThresholdValue{
 						Quantity: resource.NewQuantity(int64(0), resource.BinarySI),
@@ -378,8 +393,8 @@ func localVolumeNames(pod *v1.Pod) []string {
 	return result
 }
 
-// podDiskUsage aggregates pod disk usage and inode consumption for the specified stats to measure.
-func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsStatsType) (v1.ResourceList, error) {
+// containerUsage aggregates container disk usage and inode consumption for the specified stats to measure.
+func containerUsage(podStats statsapi.PodStats, statsToMeasure []fsStatsType) v1.ResourceList {
 	disk := resource.Quantity{Format: resource.BinarySI}
 	inodes := resource.Quantity{Format: resource.BinarySI}
 	for _, container := range podStats.Containers {
@@ -392,17 +407,45 @@ func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsSt
 			inodes.Add(*inodeUsage(container.Logs))
 		}
 	}
-	if hasFsStatsType(statsToMeasure, fsStatsLocalVolumeSource) {
-		volumeNames := localVolumeNames(pod)
-		for _, volumeName := range volumeNames {
-			for _, volumeStats := range podStats.VolumeStats {
-				if volumeStats.Name == volumeName {
-					disk.Add(*diskUsage(&volumeStats.FsStats))
-					inodes.Add(*inodeUsage(&volumeStats.FsStats))
-					break
-				}
+	return v1.ResourceList{
+		resourceDisk:   disk,
+		resourceInodes: inodes,
+	}
+}
+
+// podLocalVolumeUsage aggregates pod local volumes disk usage and inode consumption for the specified stats to measure.
+func podLocalVolumeUsage(volumeNames []string, podStats statsapi.PodStats) v1.ResourceList {
+	disk := resource.Quantity{Format: resource.BinarySI}
+	inodes := resource.Quantity{Format: resource.BinarySI}
+	for _, volumeName := range volumeNames {
+		for _, volumeStats := range podStats.VolumeStats {
+			if volumeStats.Name == volumeName {
+				disk.Add(*diskUsage(&volumeStats.FsStats))
+				inodes.Add(*inodeUsage(&volumeStats.FsStats))
+				break
 			}
 		}
+	}
+	return v1.ResourceList{
+		resourceDisk:   disk,
+		resourceInodes: inodes,
+	}
+}
+
+// podDiskUsage aggregates pod disk usage and inode consumption for the specified stats to measure.
+func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsStatsType) (v1.ResourceList, error) {
+	disk := resource.Quantity{Format: resource.BinarySI}
+	inodes := resource.Quantity{Format: resource.BinarySI}
+
+	containerUsageList := containerUsage(podStats, statsToMeasure)
+	disk.Add(containerUsageList[resourceDisk])
+	inodes.Add(containerUsageList[resourceInodes])
+
+	if hasFsStatsType(statsToMeasure, fsStatsLocalVolumeSource) {
+		volumeNames := localVolumeNames(pod)
+		podLocalVolumeUsageList := podLocalVolumeUsage(volumeNames, podStats)
+		disk.Add(podLocalVolumeUsageList[resourceDisk])
+		inodes.Add(podLocalVolumeUsageList[resourceInodes])
 	}
 	return v1.ResourceList{
 		resourceDisk:   disk,
@@ -425,6 +468,40 @@ func podMemoryUsage(podStats statsapi.PodStats) (v1.ResourceList, error) {
 	return v1.ResourceList{
 		v1.ResourceMemory: memory,
 		resourceDisk:      disk,
+	}, nil
+}
+
+// localEphemeralVolumeNames returns the set of ephemeral volumes for the pod that are local
+func localEphemeralVolumeNames(pod *v1.Pod) []string {
+	result := []string{}
+	for _, volume := range pod.Spec.Volumes {
+		if volume.GitRepo != nil ||
+			(volume.EmptyDir != nil && volume.EmptyDir.Medium != v1.StorageMediumMemory) ||
+			volume.ConfigMap != nil || volume.DownwardAPI != nil {
+			result = append(result, volume.Name)
+		}
+	}
+	return result
+}
+
+// podLocalEphemeralStorageUsage aggregates pod local ephemeral storage usage and inode consumption for the specified stats to measure.
+func podLocalEphemeralStorageUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsStatsType) (v1.ResourceList, error) {
+	disk := resource.Quantity{Format: resource.BinarySI}
+	inodes := resource.Quantity{Format: resource.BinarySI}
+
+	containerUsageList := containerUsage(podStats, statsToMeasure)
+	disk.Add(containerUsageList[resourceDisk])
+	inodes.Add(containerUsageList[resourceInodes])
+
+	if hasFsStatsType(statsToMeasure, fsStatsLocalVolumeSource) {
+		volumeNames := localEphemeralVolumeNames(pod)
+		podLocalVolumeUsageList := podLocalVolumeUsage(volumeNames, podStats)
+		disk.Add(podLocalVolumeUsageList[resourceDisk])
+		inodes.Add(podLocalVolumeUsageList[resourceInodes])
+	}
+	return v1.ResourceList{
+		resourceDisk:   disk,
+		resourceInodes: inodes,
 	}, nil
 }
 
@@ -511,27 +588,59 @@ func (ms *multiSorter) Less(i, j int) bool {
 	return ms.cmp[k](p1, p2) < 0
 }
 
-// qosComparator compares pods by QoS (BestEffort < Burstable < Guaranteed)
-func qosComparator(p1, p2 *v1.Pod) int {
-	qosP1 := qos.GetPodQOS(p1)
-	qosP2 := qos.GetPodQOS(p2)
-	// its a tie
-	if qosP1 == qosP2 {
+// priority compares pods by Priority, if priority is enabled.
+func priority(p1, p2 *v1.Pod) int {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
+		// If priority is not enabled, all pods are equal.
 		return 0
 	}
-	// if p1 is best effort, we know p2 is burstable or guaranteed
-	if qosP1 == v1.PodQOSBestEffort {
-		return -1
+	priority1 := schedulerutils.GetPodPriority(p1)
+	priority2 := schedulerutils.GetPodPriority(p2)
+	if priority1 == priority2 {
+		return 0
 	}
-	// we know p1 and p2 are not besteffort, so if p1 is burstable, p2 must be guaranteed
-	if qosP1 == v1.PodQOSBurstable {
-		if qosP2 == v1.PodQOSGuaranteed {
+	if priority1 > priority2 {
+		return 1
+	}
+	return -1
+}
+
+// exceedMemoryRequests compares whether or not pods' memory usage exceeds their requests
+func exceedMemoryRequests(stats statsFunc) cmpFunc {
+	return func(p1, p2 *v1.Pod) int {
+		p1Stats, found := stats(p1)
+		// if we have no usage stats for p1, we want p2 first
+		if !found {
+			return -1
+		}
+		// if we have no usage stats for p2, but p1 has usage, we want p1 first.
+		p2Stats, found := stats(p2)
+		if !found {
+			return 1
+		}
+		// if we cant get usage for p1 measured, we want p2 first
+		p1Usage, err := podMemoryUsage(p1Stats)
+		if err != nil {
+			return -1
+		}
+		// if we cant get usage for p2 measured, we want p1 first
+		p2Usage, err := podMemoryUsage(p2Stats)
+		if err != nil {
+			return 1
+		}
+		p1Memory := p1Usage[v1.ResourceMemory]
+		p2Memory := p2Usage[v1.ResourceMemory]
+		p1ExceedsRequests := p1Memory.Cmp(podMemoryRequest(p1)) == 1
+		p2ExceedsRequests := p2Memory.Cmp(podMemoryRequest(p2)) == 1
+		if p1ExceedsRequests == p2ExceedsRequests {
+			return 0
+		}
+		if p1ExceedsRequests && !p2ExceedsRequests {
+			// if p1 exceeds its requests, but p2 does not, then we want p2 first
 			return -1
 		}
 		return 1
 	}
-	// ok, p1 must be guaranteed.
-	return 1
 }
 
 // memory compares pods by largest consumer of memory relative to request.
@@ -560,24 +669,33 @@ func memory(stats statsFunc) cmpFunc {
 
 		// adjust p1, p2 usage relative to the request (if any)
 		p1Memory := p1Usage[v1.ResourceMemory]
-		p1Spec, err := core.PodUsageFunc(p1)
-		if err != nil {
-			return -1
-		}
-		p1Request := p1Spec[api.ResourceRequestsMemory]
+		p1Request := podMemoryRequest(p1)
 		p1Memory.Sub(p1Request)
 
 		p2Memory := p2Usage[v1.ResourceMemory]
-		p2Spec, err := core.PodUsageFunc(p2)
-		if err != nil {
-			return 1
-		}
-		p2Request := p2Spec[api.ResourceRequestsMemory]
+		p2Request := podMemoryRequest(p2)
 		p2Memory.Sub(p2Request)
 
 		// if p2 is using more than p1, we want p2 first
 		return p2Memory.Cmp(p1Memory)
 	}
+}
+
+// podMemoryRequest returns the total memory request of a pod which is the
+// max(sum of init container requests, sum of container requests)
+func podMemoryRequest(pod *v1.Pod) resource.Quantity {
+	containerValue := resource.Quantity{Format: resource.BinarySI}
+	for i := range pod.Spec.Containers {
+		containerValue.Add(*pod.Spec.Containers[i].Resources.Requests.Memory())
+	}
+	initValue := resource.Quantity{Format: resource.BinarySI}
+	for i := range pod.Spec.InitContainers {
+		initValue.Add(*pod.Spec.InitContainers[i].Resources.Requests.Memory())
+	}
+	if containerValue.Cmp(initValue) > 0 {
+		return containerValue
+	}
+	return initValue
 }
 
 // disk compares pods by largest consumer of disk relative to request for the specified disk resource.
@@ -614,14 +732,16 @@ func disk(stats statsFunc, fsStatsToMeasure []fsStatsType, diskResource v1.Resou
 }
 
 // rankMemoryPressure orders the input pods for eviction in response to memory pressure.
+// It ranks by whether or not the pod's usage exceeds its requests, then by priority, and
+// finally by memory usage above requests.
 func rankMemoryPressure(pods []*v1.Pod, stats statsFunc) {
-	orderedBy(qosComparator, memory(stats)).Sort(pods)
+	orderedBy(exceedMemoryRequests(stats), priority, memory(stats)).Sort(pods)
 }
 
 // rankDiskPressureFunc returns a rankFunc that measures the specified fs stats.
 func rankDiskPressureFunc(fsStatsToMeasure []fsStatsType, diskResource v1.ResourceName) rankFunc {
 	return func(pods []*v1.Pod, stats statsFunc) {
-		orderedBy(qosComparator, disk(stats, fsStatsToMeasure, diskResource)).Sort(pods)
+		orderedBy(priority, disk(stats, fsStatsToMeasure, diskResource)).Sort(pods)
 	}
 }
 
@@ -637,16 +757,11 @@ func (a byEvictionPriority) Less(i, j int) bool {
 }
 
 // makeSignalObservations derives observations using the specified summary provider.
-func makeSignalObservations(summaryProvider stats.SummaryProvider, nodeProvider NodeProvider) (signalObservations, statsFunc, error) {
+func makeSignalObservations(summaryProvider stats.SummaryProvider, capacityProvider CapacityProvider, pods []*v1.Pod, withImageFs bool) (signalObservations, statsFunc, error) {
 	summary, err := summaryProvider.Get()
 	if err != nil {
 		return nil, nil, err
 	}
-	node, err := nodeProvider.GetNode()
-	if err != nil {
-		return nil, nil, err
-	}
-
 	// build the function to work against for pod stats
 	statsFunc := cachedStatsFunc(summary.Pods)
 	// build an evaluation context for current eviction signals
@@ -693,8 +808,12 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider, nodeProvider 
 			}
 		}
 	}
-	if memoryAllocatableCapacity, ok := node.Status.Allocatable[v1.ResourceMemory]; ok {
-		memoryAllocatableAvailable := memoryAllocatableCapacity.Copy()
+
+	nodeCapacity := capacityProvider.GetCapacity()
+	allocatableReservation := capacityProvider.GetNodeAllocatableReservation()
+
+	memoryAllocatableCapacity, memoryAllocatableAvailable, exist := getResourceAllocatable(nodeCapacity, allocatableReservation, v1.ResourceMemory)
+	if exist {
 		for _, pod := range summary.Pods {
 			mu, err := podMemoryUsage(pod)
 			if err == nil {
@@ -703,10 +822,53 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider, nodeProvider 
 		}
 		result[evictionapi.SignalAllocatableMemoryAvailable] = signalObservation{
 			available: memoryAllocatableAvailable,
-			capacity:  memoryAllocatableCapacity.Copy(),
+			capacity:  memoryAllocatableCapacity,
 		}
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+		ephemeralStorageCapacity, ephemeralStorageAllocatable, exist := getResourceAllocatable(nodeCapacity, allocatableReservation, v1.ResourceEphemeralStorage)
+		if exist {
+			for _, pod := range pods {
+				podStat, ok := statsFunc(pod)
+				if !ok {
+					continue
+				}
+
+				fsStatsSet := []fsStatsType{}
+				if withImageFs {
+					fsStatsSet = []fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource}
+				} else {
+					fsStatsSet = []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}
+				}
+
+				usage, err := podDiskUsage(podStat, pod, fsStatsSet)
+				if err != nil {
+					glog.Warningf("eviction manager: error getting pod disk usage %v", err)
+					continue
+				}
+				ephemeralStorageAllocatable.Sub(usage[resourceDisk])
+			}
+			result[evictionapi.SignalAllocatableNodeFsAvailable] = signalObservation{
+				available: ephemeralStorageAllocatable,
+				capacity:  ephemeralStorageCapacity,
+			}
+		}
+	}
+
 	return result, statsFunc, nil
+}
+
+func getResourceAllocatable(capacity v1.ResourceList, reservation v1.ResourceList, resourceName v1.ResourceName) (*resource.Quantity, *resource.Quantity, bool) {
+	if capacity, ok := capacity[resourceName]; ok {
+		allocate := capacity.Copy()
+		if reserved, exists := reservation[resourceName]; exists {
+			allocate.Sub(reserved)
+		}
+		return capacity.Copy(), allocate, true
+	}
+	glog.Errorf("Could not find capacity information for resource %v", resourceName)
+	return nil, nil, false
 }
 
 // thresholdsMet returns the set of thresholds that were met independent of grace period
@@ -932,7 +1094,7 @@ func isSoftEvictionThresholds(thresholds []evictionapi.Threshold, starvedResourc
 	return true
 }
 
-// isSoftEviction returns true if the thresholds met for the starved resource are only soft thresholds
+// isHardEvictionThreshold returns true if eviction should immediately occur
 func isHardEvictionThreshold(threshold evictionapi.Threshold) bool {
 	return threshold.GracePeriod == time.Duration(0)
 }
@@ -967,32 +1129,34 @@ func PodIsEvicted(podStatus v1.PodStatus) bool {
 }
 
 // buildResourceToNodeReclaimFuncs returns reclaim functions associated with resources.
-func buildResourceToNodeReclaimFuncs(imageGC ImageGC, withImageFs bool) map[v1.ResourceName]nodeReclaimFuncs {
+func buildResourceToNodeReclaimFuncs(imageGC ImageGC, containerGC ContainerGC, withImageFs bool) map[v1.ResourceName]nodeReclaimFuncs {
 	resourceToReclaimFunc := map[v1.ResourceName]nodeReclaimFuncs{}
 	// usage of an imagefs is optional
 	if withImageFs {
 		// with an imagefs, nodefs pressure should just delete logs
-		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{deleteLogs()}
-		resourceToReclaimFunc[resourceNodeFsInodes] = nodeReclaimFuncs{deleteLogs()}
+		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{}
+		resourceToReclaimFunc[resourceNodeFsInodes] = nodeReclaimFuncs{}
 		// with an imagefs, imagefs pressure should delete unused images
-		resourceToReclaimFunc[resourceImageFs] = nodeReclaimFuncs{deleteImages(imageGC, true)}
-		resourceToReclaimFunc[resourceImageFsInodes] = nodeReclaimFuncs{deleteImages(imageGC, false)}
+		resourceToReclaimFunc[resourceImageFs] = nodeReclaimFuncs{deleteTerminatedContainers(containerGC), deleteImages(imageGC, true)}
+		resourceToReclaimFunc[resourceImageFsInodes] = nodeReclaimFuncs{deleteTerminatedContainers(containerGC), deleteImages(imageGC, false)}
 	} else {
 		// without an imagefs, nodefs pressure should delete logs, and unused images
 		// since imagefs and nodefs share a common device, they share common reclaim functions
-		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{deleteLogs(), deleteImages(imageGC, true)}
-		resourceToReclaimFunc[resourceNodeFsInodes] = nodeReclaimFuncs{deleteLogs(), deleteImages(imageGC, false)}
-		resourceToReclaimFunc[resourceImageFs] = nodeReclaimFuncs{deleteLogs(), deleteImages(imageGC, true)}
-		resourceToReclaimFunc[resourceImageFsInodes] = nodeReclaimFuncs{deleteLogs(), deleteImages(imageGC, false)}
+		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{deleteTerminatedContainers(containerGC), deleteImages(imageGC, true)}
+		resourceToReclaimFunc[resourceNodeFsInodes] = nodeReclaimFuncs{deleteTerminatedContainers(containerGC), deleteImages(imageGC, false)}
+		resourceToReclaimFunc[resourceImageFs] = nodeReclaimFuncs{deleteTerminatedContainers(containerGC), deleteImages(imageGC, true)}
+		resourceToReclaimFunc[resourceImageFsInodes] = nodeReclaimFuncs{deleteTerminatedContainers(containerGC), deleteImages(imageGC, false)}
 	}
 	return resourceToReclaimFunc
 }
 
-// deleteLogs will delete logs to free up disk pressure.
-func deleteLogs() nodeReclaimFunc {
+// deleteTerminatedContainers will delete terminated containers to free up disk pressure.
+func deleteTerminatedContainers(containerGC ContainerGC) nodeReclaimFunc {
 	return func() (*resource.Quantity, error) {
-		// TODO: not yet supported.
-		return resource.NewQuantity(int64(0), resource.BinarySI), nil
+		glog.Infof("eviction manager: attempting to delete unused containers")
+		err := containerGC.DeleteAllUnusedContainers()
+		// Calculating bytes freed is not yet supported.
+		return resource.NewQuantity(int64(0), resource.BinarySI), err
 	}
 }
 
@@ -1001,13 +1165,10 @@ func deleteImages(imageGC ImageGC, reportBytesFreed bool) nodeReclaimFunc {
 	return func() (*resource.Quantity, error) {
 		glog.Infof("eviction manager: attempting to delete unused images")
 		bytesFreed, err := imageGC.DeleteUnusedImages()
-		if err != nil {
-			return nil, err
-		}
 		reclaimed := int64(0)
 		if reportBytesFreed {
 			reclaimed = bytesFreed
 		}
-		return resource.NewQuantity(reclaimed, resource.BinarySI), nil
+		return resource.NewQuantity(reclaimed, resource.BinarySI), err
 	}
 }

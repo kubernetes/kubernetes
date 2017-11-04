@@ -21,6 +21,7 @@ function sql() {
   # output?
   kubectl exec "cockroachdb-${1}" -- /cockroach/cockroach sql \
       --host "cockroachdb-${1}.cockroachdb" \
+      --insecure \
       -e "$(cat /dev/stdin)"
 }
 

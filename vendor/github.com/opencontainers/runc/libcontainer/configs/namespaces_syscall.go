@@ -2,19 +2,19 @@
 
 package configs
 
-import "syscall"
+import "golang.org/x/sys/unix"
 
 func (n *Namespace) Syscall() int {
 	return namespaceInfo[n.Type]
 }
 
 var namespaceInfo = map[NamespaceType]int{
-	NEWNET:  syscall.CLONE_NEWNET,
-	NEWNS:   syscall.CLONE_NEWNS,
-	NEWUSER: syscall.CLONE_NEWUSER,
-	NEWIPC:  syscall.CLONE_NEWIPC,
-	NEWUTS:  syscall.CLONE_NEWUTS,
-	NEWPID:  syscall.CLONE_NEWPID,
+	NEWNET:  unix.CLONE_NEWNET,
+	NEWNS:   unix.CLONE_NEWNS,
+	NEWUSER: unix.CLONE_NEWUSER,
+	NEWIPC:  unix.CLONE_NEWIPC,
+	NEWUTS:  unix.CLONE_NEWUTS,
+	NEWPID:  unix.CLONE_NEWPID,
 }
 
 // CloneFlags parses the container's Namespaces options to set the correct

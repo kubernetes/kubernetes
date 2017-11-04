@@ -14,9 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// This file should be consistent with pkg/api/v1/annotation_key_constants.go.
+
 package api
 
 const (
+	// ImagePolicyFailedOpenKey is added to pods created by failing open when the image policy
+	// webhook backend fails.
+	ImagePolicyFailedOpenKey string = "alpha.image-policy.k8s.io/failed-open"
+
+	// PodPresetOptOutAnnotationKey represents the annotation key for a pod to exempt itself from pod preset manipulation
+	PodPresetOptOutAnnotationKey string = "podpreset.admission.kubernetes.io/exclude"
+
+	// MirrorAnnotationKey represents the annotation key set by kubelets when creating mirror pods
+	MirrorPodAnnotationKey string = "kubernetes.io/config.mirror"
+
 	// TolerationsAnnotationKey represents the key of tolerations data (json serialized)
 	// in the Annotations of a Pod.
 	TolerationsAnnotationKey string = "scheduler.alpha.kubernetes.io/tolerations"
@@ -32,10 +44,6 @@ const (
 	// SeccompContainerAnnotationKeyPrefix represents the key of a seccomp profile applied
 	// to one container of a pod.
 	SeccompContainerAnnotationKeyPrefix string = "container.seccomp.security.alpha.kubernetes.io/"
-
-	// CreatedByAnnotation represents the key used to store the spec(json)
-	// used to create the resource.
-	CreatedByAnnotation = "kubernetes.io/created-by"
 
 	// PreferAvoidPodsAnnotationKey represents the key of preferAvoidPods data (json serialized)
 	// in the Annotations of a Node.
@@ -60,11 +68,21 @@ const (
 	// This annotation can be attached to node.
 	ObjectTTLAnnotationKey string = "node.alpha.kubernetes.io/ttl"
 
-	// AffinityAnnotationKey represents the key of affinity data (json serialized)
-	// in the Annotations of a Pod.
-	// TODO: remove when alpha support for affinity is removed
-	AffinityAnnotationKey string = "scheduler.alpha.kubernetes.io/affinity"
-
 	// annotation key prefix used to identify non-convertible json paths.
 	NonConvertibleAnnotationPrefix = "non-convertible.kubernetes.io"
+
+	kubectlPrefix = "kubectl.kubernetes.io/"
+
+	// LastAppliedConfigAnnotation is the annotation used to store the previous
+	// configuration of a resource for use in a three way diff by UpdateApplyAnnotation.
+	LastAppliedConfigAnnotation = kubectlPrefix + "last-applied-configuration"
+
+	// AnnotationLoadBalancerSourceRangesKey is the key of the annotation on a service to set allowed ingress ranges on their LoadBalancers
+	//
+	// It should be a comma-separated list of CIDRs, e.g. `0.0.0.0/0` to
+	// allow full access (the default) or `18.0.0.0/8,56.0.0.0/8` to allow
+	// access only from the CIDRs currently allocated to MIT & the USPS.
+	//
+	// Not all cloud providers support this annotation, though AWS & GCE do.
+	AnnotationLoadBalancerSourceRangesKey = "service.beta.kubernetes.io/load-balancer-source-ranges"
 )

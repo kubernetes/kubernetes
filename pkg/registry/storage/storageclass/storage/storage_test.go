@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/api"
 	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
@@ -42,6 +43,7 @@ func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 }
 
 func validNewStorageClass(name string) *storageapi.StorageClass {
+	deleteReclaimPolicy := api.PersistentVolumeReclaimDelete
 	return &storageapi.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -50,6 +52,7 @@ func validNewStorageClass(name string) *storageapi.StorageClass {
 		Parameters: map[string]string{
 			"foo": "bar",
 		},
+		ReclaimPolicy: &deleteReclaimPolicy,
 	}
 }
 
@@ -64,12 +67,14 @@ func TestCreate(t *testing.T) {
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	storageClass := validNewStorageClass("foo")
 	storageClass.ObjectMeta = metav1.ObjectMeta{GenerateName: "foo"}
+	deleteReclaimPolicy := api.PersistentVolumeReclaimDelete
 	test.TestCreate(
 		// valid
 		storageClass,
 		// invalid
 		&storageapi.StorageClass{
-			ObjectMeta: metav1.ObjectMeta{Name: "*BadName!"},
+			ObjectMeta:    metav1.ObjectMeta{Name: "*BadName!"},
+			ReclaimPolicy: &deleteReclaimPolicy,
 		},
 	)
 }

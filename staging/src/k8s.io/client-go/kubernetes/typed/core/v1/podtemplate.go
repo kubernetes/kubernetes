@@ -17,11 +17,11 @@ limitations under the License.
 package v1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	scheme "k8s.io/client-go/kubernetes/scheme"
-	v1 "k8s.io/client-go/pkg/api/v1"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -56,6 +56,41 @@ func newPodTemplates(c *CoreV1Client, namespace string) *podTemplates {
 		client: c.RESTClient(),
 		ns:     namespace,
 	}
+}
+
+// Get takes name of the podTemplate, and returns the corresponding podTemplate object, and an error if there is any.
+func (c *podTemplates) Get(name string, options meta_v1.GetOptions) (result *v1.PodTemplate, err error) {
+	result = &v1.PodTemplate{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("podtemplates").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of PodTemplates that match those selectors.
+func (c *podTemplates) List(opts meta_v1.ListOptions) (result *v1.PodTemplateList, err error) {
+	result = &v1.PodTemplateList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("podtemplates").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested podTemplates.
+func (c *podTemplates) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("podtemplates").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
 }
 
 // Create takes the representation of a podTemplate and creates it.  Returns the server's representation of the podTemplate, and an error, if there is any.
@@ -103,41 +138,6 @@ func (c *podTemplates) DeleteCollection(options *meta_v1.DeleteOptions, listOpti
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the podTemplate, and returns the corresponding podTemplate object, and an error if there is any.
-func (c *podTemplates) Get(name string, options meta_v1.GetOptions) (result *v1.PodTemplate, err error) {
-	result = &v1.PodTemplate{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("podtemplates").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of PodTemplates that match those selectors.
-func (c *podTemplates) List(opts meta_v1.ListOptions) (result *v1.PodTemplateList, err error) {
-	result = &v1.PodTemplateList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("podtemplates").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested podTemplates.
-func (c *podTemplates) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("podtemplates").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched podTemplate.

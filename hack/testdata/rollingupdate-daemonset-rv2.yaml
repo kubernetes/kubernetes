@@ -1,0 +1,29 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: bind
+spec:
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10%
+  template:
+    metadata:
+      labels:
+        service: bind
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                - key: "service"
+                  operator: "In"
+                  values: ["bind"]
+              topologyKey: "kubernetes.io/hostname"
+              namespaces: []
+      containers:
+      - name: kubernetes-pause
+        image: gcr.io/google-containers/pause:latest
+      - name: app
+        image: gcr.io/google-containers/nginx:test-cmd
