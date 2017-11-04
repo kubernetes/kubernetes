@@ -47,6 +47,19 @@ func TestValueOfAllocatableResources(t *testing.T) {
 			errorExpected:  false,
 			name:           "Valid resource quantity",
 		},
+		{
+			kubeReserved:   "cpu=200m,memory=15m,ephemeral-storage=10Gi",
+			systemReserved: "cpu=200m,memory=15m,ephemeral-storage=10Gi",
+			errorExpected:  true,
+			name:           "invalid quantity unit for memory",
+		},
+		{
+			kubeReserved:   "cpu=200m,memory=15G,ephemeral-storage=10m",
+			systemReserved: "cpu=200m,memory=15Ki",
+			errorExpected:  true,
+			name:           "invalid quantity unit for ephemeral-storage",
+		},
+
 	}
 
 	for _, test := range testCases {
