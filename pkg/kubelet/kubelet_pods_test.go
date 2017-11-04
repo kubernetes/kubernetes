@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"os"
 	"path/filepath"
 	"sort"
@@ -588,90 +587,6 @@ func TestRunInContainer(t *testing.T) {
 		// this isn't 100% foolproof as a bug in a real ContainerCommandRunner where it fails to copy to stdout/stderr wouldn't be caught by this test
 		assert.Equal(t, "foo", string(actualOutput), "(testError=%v) output", testError)
 		assert.Equal(t, err, testError, "(testError=%v) err", testError)
-	}
-}
-
-func TestGenerateRunContainerOptions_DNSConfigurationParams(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
-
-	clusterNS := "203.0.113.1"
-	kubelet.clusterDomain = "kubernetes.io"
-	kubelet.clusterDNS = []net.IP{net.ParseIP(clusterNS)}
-
-	pods := newTestPods(4)
-	pods[0].Spec.DNSPolicy = v1.DNSClusterFirstWithHostNet
-	pods[1].Spec.DNSPolicy = v1.DNSClusterFirst
-	pods[2].Spec.DNSPolicy = v1.DNSClusterFirst
-	pods[2].Spec.HostNetwork = false
-	pods[3].Spec.DNSPolicy = v1.DNSDefault
-
-	options := make([]*kubecontainer.RunContainerOptions, 4)
-	for i, pod := range pods {
-		var err error
-		options[i], _, err = kubelet.GenerateRunContainerOptions(pod, &v1.Container{}, "")
-		if err != nil {
-			t.Fatalf("failed to generate container options: %v", err)
-		}
-	}
-	if len(options[0].DNS) != 1 || options[0].DNS[0] != clusterNS {
-		t.Errorf("expected nameserver %s, got %+v", clusterNS, options[0].DNS)
-	}
-	if len(options[0].DNSSearch) == 0 || options[0].DNSSearch[0] != ".svc."+kubelet.clusterDomain {
-		t.Errorf("expected search %s, got %+v", ".svc."+kubelet.clusterDomain, options[0].DNSSearch)
-	}
-	if len(options[1].DNS) != 1 || options[1].DNS[0] != "127.0.0.1" {
-		t.Errorf("expected nameserver 127.0.0.1, got %+v", options[1].DNS)
-	}
-	if len(options[1].DNSSearch) != 1 || options[1].DNSSearch[0] != "." {
-		t.Errorf("expected search \".\", got %+v", options[1].DNSSearch)
-	}
-	if len(options[2].DNS) != 1 || options[2].DNS[0] != clusterNS {
-		t.Errorf("expected nameserver %s, got %+v", clusterNS, options[2].DNS)
-	}
-	if len(options[2].DNSSearch) == 0 || options[2].DNSSearch[0] != ".svc."+kubelet.clusterDomain {
-		t.Errorf("expected search %s, got %+v", ".svc."+kubelet.clusterDomain, options[2].DNSSearch)
-	}
-	if len(options[3].DNS) != 1 || options[3].DNS[0] != "127.0.0.1" {
-		t.Errorf("expected nameserver 127.0.0.1, got %+v", options[3].DNS)
-	}
-	if len(options[3].DNSSearch) != 1 || options[3].DNSSearch[0] != "." {
-		t.Errorf("expected search \".\", got %+v", options[3].DNSSearch)
-	}
-
-	kubelet.resolverConfig = "/etc/resolv.conf"
-	for i, pod := range pods {
-		var err error
-		options[i], _, err = kubelet.GenerateRunContainerOptions(pod, &v1.Container{}, "")
-		if err != nil {
-			t.Fatalf("failed to generate container options: %v", err)
-		}
-	}
-	t.Logf("nameservers %+v", options[1].DNS)
-	if len(options[0].DNS) != 1 {
-		t.Errorf("expected cluster nameserver only, got %+v", options[0].DNS)
-	} else if options[0].DNS[0] != clusterNS {
-		t.Errorf("expected nameserver %s, got %v", clusterNS, options[0].DNS[0])
-	}
-	expLength := len(options[1].DNSSearch) + 3
-	if expLength > 6 {
-		expLength = 6
-	}
-	if len(options[0].DNSSearch) != expLength {
-		t.Errorf("expected prepend of cluster domain, got %+v", options[0].DNSSearch)
-	} else if options[0].DNSSearch[0] != ".svc."+kubelet.clusterDomain {
-		t.Errorf("expected domain %s, got %s", ".svc."+kubelet.clusterDomain, options[0].DNSSearch)
-	}
-	if len(options[2].DNS) != 1 {
-		t.Errorf("expected cluster nameserver only, got %+v", options[2].DNS)
-	} else if options[2].DNS[0] != clusterNS {
-		t.Errorf("expected nameserver %s, got %v", clusterNS, options[2].DNS[0])
-	}
-	if len(options[2].DNSSearch) != expLength {
-		t.Errorf("expected prepend of cluster domain, got %+v", options[2].DNSSearch)
-	} else if options[2].DNSSearch[0] != ".svc."+kubelet.clusterDomain {
-		t.Errorf("expected domain %s, got %s", ".svc."+kubelet.clusterDomain, options[0].DNSSearch)
 	}
 }
 
