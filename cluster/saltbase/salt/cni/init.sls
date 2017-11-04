@@ -19,7 +19,7 @@ cni-tar:
     - user: root
     - name: /home/kubernetes/bin
     - makedirs: True
-    - source: https://storage.googleapis.com/kubernetes-release/network-plugins/cni-plugins-amd64-v0.6.0.tgz
+    - source: https://dl.k8s.io/network-plugins/cni-plugins-amd64-v0.6.0.tgz
     - tar_options: v
     - source_hash: md5=9534876FAE7DBE813CDAB404DC1F9219
     - archive_format: tar

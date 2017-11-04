@@ -126,7 +126,7 @@ function create_cluster {
 }
 
 function get_latest_version_number {
-  local -r latest_url="https://storage.googleapis.com/kubernetes-release/release/stable.txt"
+  local -r latest_url="https://dl.k8s.io/release/stable.txt"
   if [[ $(which wget) ]]; then
     wget -qO- ${latest_url}
   elif [[ $(which curl) ]]; then
@@ -168,7 +168,7 @@ else
   exit 3
 fi
 
-kubectl_url="https://storage.googleapis.com/kubernetes-release/release/${release}/bin/${platform}/${arch}/kubectl"
+kubectl_url="https://dl.k8s.io/release/${release}/bin/${platform}/${arch}/kubectl"
 
 if [[ $(ls . | grep ^kubectl$ | wc -l) -lt 1 ]]; then
   echo -n "Downloading kubectl binary..."
