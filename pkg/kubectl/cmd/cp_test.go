@@ -199,7 +199,7 @@ func TestTarUntar(t *testing.T) {
 	}
 
 	for _, file := range files {
-		absPath := dir2 + strings.TrimPrefix(dir, os.TempDir())
+		absPath := path.Join(dir2, strings.TrimPrefix(dir, os.TempDir()))
 		filepath := path.Join(absPath, file.name)
 
 		if file.fileType == RegularFile {
