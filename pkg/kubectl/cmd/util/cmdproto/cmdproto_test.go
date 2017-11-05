@@ -110,4 +110,3 @@ func TestFlags2Proto(t *testing.T) {
 
 func TestFlagsSetup(t *testing.T) {
 }
-
