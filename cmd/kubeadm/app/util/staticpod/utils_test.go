@@ -24,6 +24,9 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func TestComponentResources(t *testing.T) {
@@ -37,43 +40,174 @@ func TestComponentResources(t *testing.T) {
 
 func TestComponentProbe(t *testing.T) {
 	var tests = []struct {
-		port   int
-		path   string
-		scheme v1.URIScheme
+		name      string
+		cfg       *kubeadmapi.MasterConfiguration
+		component string
+		port      int
+		path      string
+		scheme    v1.URIScheme
+		expected  string
 	}{
 		{
-			port:   1,
-			path:   "foo",
-			scheme: v1.URISchemeHTTP,
+			name: "default apiserver advertise address with http",
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadmapi.API{
+					AdvertiseAddress: "",
+				},
+			},
+			component: kubeadmconstants.KubeAPIServer,
+			port:      1,
+			path:      "foo",
+			scheme:    v1.URISchemeHTTP,
+			expected:  "127.0.0.1",
 		},
 		{
-			port:   2,
-			path:   "bar",
-			scheme: v1.URISchemeHTTPS,
+			name: "default apiserver advertise address with https",
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadmapi.API{
+					AdvertiseAddress: "",
+				},
+			},
+			component: kubeadmconstants.KubeAPIServer,
+			port:      2,
+			path:      "bar",
+			scheme:    v1.URISchemeHTTPS,
+			expected:  "127.0.0.1",
+		},
+		{
+			name: "valid ipv4 apiserver advertise address with http",
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadmapi.API{
+					AdvertiseAddress: "1.2.3.4",
+				},
+			},
+			component: kubeadmconstants.KubeAPIServer,
+			port:      1,
+			path:      "foo",
+			scheme:    v1.URISchemeHTTP,
+			expected:  "1.2.3.4",
+		},
+		{
+			name: "valid ipv6 apiserver advertise address with http",
+			cfg: &kubeadmapi.MasterConfiguration{
+				API: kubeadmapi.API{
+					AdvertiseAddress: "2001:db8::1",
+				},
+			},
+			component: kubeadmconstants.KubeAPIServer,
+			port:      1,
+			path:      "foo",
+			scheme:    v1.URISchemeHTTP,
+			expected:  "2001:db8::1",
+		},
+		{
+			name: "valid IPv4 controller-manager probe",
+			cfg: &kubeadmapi.MasterConfiguration{
+				ControllerManagerExtraArgs: map[string]string{"address": "1.2.3.4"},
+			},
+			component: kubeadmconstants.KubeControllerManager,
+			port:      1,
+			path:      "foo",
+			scheme:    v1.URISchemeHTTP,
+			expected:  "1.2.3.4",
+		},
+		{
+			name: "valid IPv6 controller-manager probe",
+			cfg: &kubeadmapi.MasterConfiguration{
+				ControllerManagerExtraArgs: map[string]string{"address": "2001:db8::1"},
+			},
+			component: kubeadmconstants.KubeControllerManager,
+			port:      1,
+			path:      "foo",
+			scheme:    v1.URISchemeHTTP,
+			expected:  "2001:db8::1",
+		},
+		{
+			name: "valid IPv4 scheduler probe",
+			cfg: &kubeadmapi.MasterConfiguration{
+				SchedulerExtraArgs: map[string]string{"address": "1.2.3.4"},
+			},
+			component: kubeadmconstants.KubeScheduler,
+			port:      1,
+			path:      "foo",
+			scheme:    v1.URISchemeHTTP,
+			expected:  "1.2.3.4",
+		},
+		{
+			name: "valid IPv6 scheduler probe",
+			cfg: &kubeadmapi.MasterConfiguration{
+				SchedulerExtraArgs: map[string]string{"address": "2001:db8::1"},
+			},
+			component: kubeadmconstants.KubeScheduler,
+			port:      1,
+			path:      "foo",
+			scheme:    v1.URISchemeHTTP,
+			expected:  "2001:db8::1",
+		},
+		{
+			name: "valid etcd probe using listen-client-urls IPv4 addresses",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{
+					ExtraArgs: map[string]string{
+						"listen-client-urls": "http://1.2.3.4:2379,http://4.3.2.1:2379"},
+				},
+			},
+			component: kubeadmconstants.Etcd,
+			port:      1,
+			path:      "foo",
+			scheme:    v1.URISchemeHTTP,
+			expected:  "1.2.3.4",
+		},
+		{
+			name: "valid etcd probe using listen-client-urls IPv6 addresses",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{
+					ExtraArgs: map[string]string{
+						"listen-client-urls": "http://[2001:db8::1]:2379,http://[2001:db8::2]:2379"},
+				},
+			},
+			component: kubeadmconstants.Etcd,
+			port:      1,
+			path:      "foo",
+			scheme:    v1.URISchemeHTTP,
+			expected:  "2001:db8::1",
+		},
+		{
+			name: "valid IPv4 etcd probe using hostname for listen-client-urls",
+			cfg: &kubeadmapi.MasterConfiguration{
+				Etcd: kubeadmapi.Etcd{
+					ExtraArgs: map[string]string{
+						"listen-client-urls": "http://localhost:2379"},
+				},
+			},
+			component: kubeadmconstants.Etcd,
+			port:      1,
+			path:      "foo",
+			scheme:    v1.URISchemeHTTP,
+			expected:  "127.0.0.1",
 		},
 	}
 	for _, rt := range tests {
-		actual := ComponentProbe(rt.port, rt.path, rt.scheme)
+		actual := ComponentProbe(rt.cfg, rt.component, rt.port, rt.path, rt.scheme)
+		if actual.Handler.HTTPGet.Host != rt.expected {
+			t.Errorf("%s test case failed:\n\texpected: %s\n\t  actual: %s",
+				rt.name, rt.expected,
+				actual.Handler.HTTPGet.Host)
+		}
 		if actual.Handler.HTTPGet.Port != intstr.FromInt(rt.port) {
-			t.Errorf(
-				"failed componentProbe:\n\texpected: %v\n\t  actual: %v",
-				rt.port,
-				actual.Handler.HTTPGet.Port,
-			)
+			t.Errorf("%s test case failed:\n\texpected: %v\n\t  actual: %v",
+				rt.name, rt.port,
+				actual.Handler.HTTPGet.Port)
 		}
 		if actual.Handler.HTTPGet.Path != rt.path {
-			t.Errorf(
-				"failed componentProbe:\n\texpected: %s\n\t  actual: %s",
-				rt.path,
-				actual.Handler.HTTPGet.Path,
-			)
+			t.Errorf("%s test case failed:\n\texpected: %s\n\t  actual: %s",
+				rt.name, rt.path,
+				actual.Handler.HTTPGet.Path)
 		}
 		if actual.Handler.HTTPGet.Scheme != rt.scheme {
-			t.Errorf(
-				"failed componentProbe:\n\texpected: %v\n\t  actual: %v",
-				rt.scheme,
-				actual.Handler.HTTPGet.Scheme,
-			)
+			t.Errorf("%s test case failed:\n\texpected: %v\n\t  actual: %v",
+				rt.name, rt.scheme,
+				actual.Handler.HTTPGet.Scheme)
 		}
 	}
 }

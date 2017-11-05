@@ -17,13 +17,17 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	"k8s.io/utils/exec"
+	fakeexec "k8s.io/utils/exec/testing"
 )
 
 func assertExists(t *testing.T, path string) {
@@ -179,5 +183,131 @@ func TestConfigDirCleaner(t *testing.T) {
 		for _, path := range test.verifyNotExists {
 			assertNotExists(t, filepath.Join(tmpDir, path))
 		}
+	}
+}
+
+type fakeDockerChecker struct {
+	warnings []error
+	errors   []error
+}
+
+func (c *fakeDockerChecker) Check() (warnings, errors []error) {
+	return c.warnings, c.errors
+}
+
+func newFakeDockerChecker(warnings, errors []error) preflight.Checker {
+	return &fakeDockerChecker{warnings: warnings, errors: errors}
+}
+
+func TestResetWithDocker(t *testing.T) {
+	fcmd := fakeexec.FakeCmd{
+		RunScript: []fakeexec.FakeRunAction{
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, errors.New("docker error") },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+		},
+	}
+	fexec := fakeexec.FakeExec{
+		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+	resetWithDocker(&fexec, newFakeDockerChecker(nil, nil))
+	if fcmd.RunCalls != 1 {
+		t.Errorf("expected 1 call to Run, got %d", fcmd.RunCalls)
+	}
+	resetWithDocker(&fexec, newFakeDockerChecker(nil, nil))
+	if fcmd.RunCalls != 2 {
+		t.Errorf("expected 2 calls to Run, got %d", fcmd.RunCalls)
+	}
+	resetWithDocker(&fexec, newFakeDockerChecker(nil, []error{errors.New("test error")}))
+	if fcmd.RunCalls != 2 {
+		t.Errorf("expected 2 calls to Run, got %d", fcmd.RunCalls)
+	}
+}
+
+func TestResetWithCrictl(t *testing.T) {
+	fcmd := fakeexec.FakeCmd{
+		RunScript: []fakeexec.FakeRunAction{
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, errors.New("crictl error") },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+		},
+	}
+	fexec := fakeexec.FakeExec{
+		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+	}
+
+	resetWithCrictl(&fexec, newFakeDockerChecker(nil, nil), "", "crictl")
+	if fcmd.RunCalls != 1 {
+		t.Errorf("expected 1 call to Run, got %d", fcmd.RunCalls)
+	}
+	if !strings.Contains(fcmd.RunLog[0][2], "docker") {
+		t.Errorf("expected a call to docker, got %v", fcmd.RunLog[0])
+	}
+
+	resetWithCrictl(&fexec, newFakeDockerChecker(nil, nil), "/test.sock", "crictl")
+	if fcmd.RunCalls != 2 {
+		t.Errorf("expected 2 calls to Run, got %d", fcmd.RunCalls)
+	}
+	if !strings.Contains(fcmd.RunLog[1][2], "crictl") {
+		t.Errorf("expected a call to crictl, got %v", fcmd.RunLog[0])
+	}
+
+	resetWithCrictl(&fexec, newFakeDockerChecker(nil, nil), "/test.sock", "crictl")
+	if fcmd.RunCalls != 4 {
+		t.Errorf("expected 4 calls to Run, got %d", fcmd.RunCalls)
+	}
+	if !strings.Contains(fcmd.RunLog[2][2], "crictl") {
+		t.Errorf("expected a call to crictl, got %v", fcmd.RunLog[0])
+	}
+	if !strings.Contains(fcmd.RunLog[3][2], "docker") {
+		t.Errorf("expected a call to docker, got %v", fcmd.RunLog[0])
+	}
+
+	resetWithCrictl(&fexec, newFakeDockerChecker(nil, []error{errors.New("test error")}), "", "crictl")
+	if fcmd.RunCalls != 4 {
+		t.Errorf("expected 4 calls to Run, got %d", fcmd.RunCalls)
+	}
+}
+
+func TestReset(t *testing.T) {
+	fcmd := fakeexec.FakeCmd{
+		RunScript: []fakeexec.FakeRunAction{
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+		},
+	}
+	fexec := fakeexec.FakeExec{
+		CommandScript: []fakeexec.FakeCommandAction{
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+		},
+		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
+	}
+
+	reset(&fexec, newFakeDockerChecker(nil, nil), "/test.sock")
+	if fcmd.RunCalls != 1 {
+		t.Errorf("expected 1 call to Run, got %d", fcmd.RunCalls)
+	}
+	if !strings.Contains(fcmd.RunLog[0][2], "crictl") {
+		t.Errorf("expected a call to crictl, got %v", fcmd.RunLog[0])
+	}
+
+	fexec.LookPathFunc = func(cmd string) (string, error) { return "", errors.New("no crictl") }
+	reset(&fexec, newFakeDockerChecker(nil, nil), "/test.sock")
+	if fcmd.RunCalls != 2 {
+		t.Errorf("expected 2 calls to Run, got %d", fcmd.RunCalls)
+	}
+	if !strings.Contains(fcmd.RunLog[1][2], "docker") {
+		t.Errorf("expected a call to docker, got %v", fcmd.RunLog[0])
 	}
 }
