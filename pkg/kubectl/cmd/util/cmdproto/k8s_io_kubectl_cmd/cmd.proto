@@ -9,10 +9,9 @@ message FlagDetail {
   required string shorthand = 3;
   required string usage = 4;
   enum EXT {
-      NONE = 0;
-      ISTIME = 1;
-      ISSTRARRAY = 2;
-      ISSTRSLICE = 3;
+      ISTIME = 0;
+      ISSTRARRAY = 1;
+      ISSTRSLICE = 2;
   }
   optional EXT ext = 5;
 }
@@ -21,22 +20,17 @@ extend google.protobuf.FieldOptions {
   optional FlagDetail info = 1234;
 }
 
+extend google.protobuf.MessageOptions {
+  optional string description = 51234;
+}
+
 message Array {
     repeated string array = 1;
 }
 
-//Flags Description
-
-
-//This is the flag description for `kubectl version`
-message VersionFlags {
-  optional bool client = 2 [ (info) = { name: "client" value: "false" shorthand: "c" usage: "Client version only (no server required)."}];
-  optional bool short = 3  [ (info) = { name: "short" value: "false" shorthand: "" usage: "Print just the version number."}];
-  optional string output = 4 [ (info) = { name: "output" value: "" shorthand: "o" usage: "One of 'yaml' or 'json'."}];
-}
 
 //This is the flag description only for test
-message TestTest {
+message TestCmd {
     optional bool BoolFlag = 1 [ (info) = { name: "bool-flag" value: "false" shorthand: "c" usage: "test"}];
     optional string StringFlag = 2 [ (info) = { name: "string-flag" value: "" shorthand: "o" usage: "test"}];
     optional int32 Int32Flag = 3 [ (info) = { name: "int32-flag" value: "0" shorthand: "" usage: "test"}];
