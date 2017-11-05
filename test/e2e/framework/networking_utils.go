@@ -45,14 +45,15 @@ import (
 )
 
 const (
-	EndpointHttpPort      = 8080
-	EndpointUdpPort       = 8081
-	TestContainerHttpPort = 8080
-	ClusterHttpPort       = 80
-	ClusterUdpPort        = 90
-	testPodName           = "test-container-pod"
-	hostTestPodName       = "host-test-container-pod"
-	nodePortServiceName   = "node-port-service"
+	EndpointHttpPort           = 8080
+	EndpointUdpPort            = 8081
+	TestContainerHttpPort      = 8080
+	ClusterHttpPort            = 80
+	ClusterUdpPort             = 90
+	testPodName                = "test-container-pod"
+	hostTestPodName            = "host-test-container-pod"
+	nodePortServiceName        = "node-port-service"
+	sessionAffinityServiceName = "session-affinity-service"
 	// wait time between poll attempts of a Service vip and/or nodePort.
 	// coupled with testTries to produce a net timeout value.
 	hitEndpointRetryDelay = 2 * time.Second
@@ -110,6 +111,9 @@ type NetworkingTestConfig struct {
 	// NodePortService is a Service with Type=NodePort spanning over all
 	// endpointPods.
 	NodePortService *v1.Service
+	// SessionAffinityService is a Service with SessionAffinity=ClientIP
+	// spanning over all endpointPods.
+	SessionAffinityService *v1.Service
 	// ExternalAddrs is a list of external IPs of nodes in the cluster.
 	ExternalAddrs []string
 	// Nodes is a list of nodes in the cluster.
@@ -463,10 +467,14 @@ func (config *NetworkingTestConfig) createTestPodSpec() *v1.Pod {
 	return pod
 }
 
-func (config *NetworkingTestConfig) createNodePortService(selector map[string]string) {
-	serviceSpec := &v1.Service{
+func (config *NetworkingTestConfig) createNodePortServiceSpec(svcName string, selector map[string]string, enableSessionAffinity bool) *v1.Service {
+	sessionAffinity := v1.ServiceAffinityNone
+	if enableSessionAffinity {
+		sessionAffinity = v1.ServiceAffinityClientIP
+	}
+	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: nodePortServiceName,
+			Name: svcName,
 		},
 		Spec: v1.ServiceSpec{
 			Type: v1.ServiceTypeNodePort,
@@ -474,10 +482,18 @@ func (config *NetworkingTestConfig) createNodePortService(selector map[string]st
 				{Port: ClusterHttpPort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(EndpointHttpPort)},
 				{Port: ClusterUdpPort, Name: "udp", Protocol: v1.ProtocolUDP, TargetPort: intstr.FromInt(EndpointUdpPort)},
 			},
-			Selector: selector,
+			Selector:        selector,
+			SessionAffinity: sessionAffinity,
 		},
 	}
-	config.NodePortService = config.createService(serviceSpec)
+}
+
+func (config *NetworkingTestConfig) createNodePortService(selector map[string]string) {
+	config.NodePortService = config.createService(config.createNodePortServiceSpec(nodePortServiceName, selector, false))
+}
+
+func (config *NetworkingTestConfig) createSessionAffinityService(selector map[string]string) {
+	config.SessionAffinityService = config.createService(config.createNodePortServiceSpec(sessionAffinityServiceName, selector, true))
 }
 
 func (config *NetworkingTestConfig) DeleteNodePortService() {
@@ -549,6 +565,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 
 	By("Creating the service on top of the pods in kubernetes")
 	config.createNodePortService(selector)
+	config.createSessionAffinityService(selector)
 
 	for _, p := range config.NodePortService.Spec.Ports {
 		switch p.Protocol {
