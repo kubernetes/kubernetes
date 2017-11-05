@@ -62,7 +62,9 @@ func main() {
 		// Examples for error handling:
 		// - Use helper functions like e.g. errors.IsNotFound()
 		// - And/or cast to StatusError and use its properties like e.g. ErrStatus.Message
-		namespace := "default"
+
+		// Fill this out if you wish to limit it to a namespace
+		namespace := ""
 
 		pods, err = clientset.CoreV1().Pods(namespace).List(metav1.ListOptions{})
 		if errors.IsNotFound(err) {
@@ -75,15 +77,17 @@ func main() {
 			fmt.Printf("Found pods\n")
 
 			// Example of retrieving pod names, creationtimestamps by iterating through the Items
-			for podindex := range pods.Items {
-				fmt.Println("Pod name:", pods.Items[podindex].Name, "\n",
-					"Created on:", pods.Items[podindex].CreationTimestamp,
-				)
+			for _, pod := range pods.Items {
+				fmt.Println("######################")
+				fmt.Println("Pod name:", pod.Name)
 
-				// Iterate the container image names for each pod
-				for imageindex := range pods.Items[podindex].Spec.Containers {
-					fmt.Println(" Images:", pods.Items[podindex].Spec.Containers[imageindex].Name, "\n")
+				// Iterate the container and image names for each pod
+				for _, container := range pod.Spec.Containers {
+					fmt.Println("  Container:", container.Name)
+					fmt.Println("  Image:", container.Image)
 				}
+				fmt.Println("Created on:", pod.CreationTimestamp)
+				fmt.Println("######################")
 			}
 
 		}
@@ -98,4 +102,3 @@ func homeDir() string {
 	}
 	return os.Getenv("USERPROFILE") // windows
 }
-
