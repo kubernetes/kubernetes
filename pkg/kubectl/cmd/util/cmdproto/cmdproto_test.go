@@ -72,7 +72,7 @@ func TestFlags2Proto(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		testProto := new(cmdproto.TestTest)
+		testProto := new(cmdproto.TestCmd)
 		cmd := &cobra.Command{}
 
 		//Setup flags
