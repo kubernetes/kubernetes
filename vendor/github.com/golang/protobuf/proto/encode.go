@@ -174,11 +174,11 @@ func sizeFixed32(x uint64) int {
 // This is the format used for the sint64 protocol buffer type.
 func (p *Buffer) EncodeZigzag64(x uint64) error {
 	// use signed number to get arithmetic right shift.
-	return p.EncodeVarint(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+	return p.EncodeVarint((x << 1) ^ uint64((int64(x) >> 63)))
 }
 
 func sizeZigzag64(x uint64) int {
-	return sizeVarint(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+	return sizeVarint((x << 1) ^ uint64((int64(x) >> 63)))
 }
 
 // EncodeZigzag32 writes a zigzag-encoded 32-bit integer
@@ -1075,10 +1075,17 @@ func (o *Buffer) enc_map(p *Properties, base structPointer) error {
 
 func (o *Buffer) enc_exts(p *Properties, base structPointer) error {
 	exts := structPointer_Extensions(base, p.field)
-	if err := encodeExtensions(exts); err != nil {
+
+	v, mu := exts.extensionsRead()
+	if v == nil {
+		return nil
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if err := encodeExtensionsMap(v); err != nil {
 		return err
 	}
-	v, _ := exts.extensionsRead()
 
 	return o.enc_map_body(v)
 }
