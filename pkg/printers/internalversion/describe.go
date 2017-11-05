@@ -1136,6 +1136,9 @@ func describePersistentVolume(pv *api.PersistentVolume, events *api.EventList) (
 		}
 		w.Write(LEVEL_0, "Reclaim Policy:\t%v\n", pv.Spec.PersistentVolumeReclaimPolicy)
 		w.Write(LEVEL_0, "Access Modes:\t%s\n", helper.GetAccessModesAsString(pv.Spec.AccessModes))
+		if pv.Spec.VolumeMode != nil {
+			w.Write(LEVEL_0, "VolumeMode:\t%v\n", *pv.Spec.VolumeMode)
+		}
 		storage := pv.Spec.Capacity[api.ResourceStorage]
 		w.Write(LEVEL_0, "Capacity:\t%s\n", storage.String())
 		w.Write(LEVEL_0, "Message:\t%s\n", pv.Status.Message)
@@ -1235,6 +1238,9 @@ func describePersistentVolumeClaim(pvc *api.PersistentVolumeClaim, events *api.E
 		}
 		w.Write(LEVEL_0, "Capacity:\t%s\n", capacity)
 		w.Write(LEVEL_0, "Access Modes:\t%s\n", accessModes)
+		if pvc.Spec.VolumeMode != nil {
+			w.Write(LEVEL_0, "VolumeMode:\t%v\n", *pvc.Spec.VolumeMode)
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}
@@ -1365,6 +1371,7 @@ func describeContainerProbe(container api.Container, w PrefixWriter) {
 }
 
 func describeContainerVolumes(container api.Container, w PrefixWriter) {
+	// Show volumeMounts
 	none := ""
 	if len(container.VolumeMounts) == 0 {
 		none = "\t<none>"
@@ -1382,6 +1389,14 @@ func describeContainerVolumes(container api.Container, w PrefixWriter) {
 			flags = append(flags, fmt.Sprintf("path=%q", mount.SubPath))
 		}
 		w.Write(LEVEL_3, "%s from %s (%s)\n", mount.MountPath, mount.Name, strings.Join(flags, ","))
+	}
+	// Show volumeDevices if exists
+	if len(container.VolumeDevices) > 0 {
+		w.Write(LEVEL_2, "Devices:%s\n", none)
+		sort.Sort(SortableVolumeDevices(container.VolumeDevices))
+		for _, device := range container.VolumeDevices {
+			w.Write(LEVEL_3, "%s from %s\n", device.DevicePath, device.Name)
+		}
 	}
 }
 
@@ -3801,6 +3816,20 @@ func (list SortableVolumeMounts) Swap(i, j int) {
 
 func (list SortableVolumeMounts) Less(i, j int) bool {
 	return list[i].MountPath < list[j].MountPath
+}
+
+type SortableVolumeDevices []api.VolumeDevice
+
+func (list SortableVolumeDevices) Len() int {
+	return len(list)
+}
+
+func (list SortableVolumeDevices) Swap(i, j int) {
+	list[i], list[j] = list[j], list[i]
+}
+
+func (list SortableVolumeDevices) Less(i, j int) bool {
+	return list[i].DevicePath < list[j].DevicePath
 }
 
 // TODO: get rid of this and plumb the caller correctly
