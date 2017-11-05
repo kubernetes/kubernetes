@@ -310,9 +310,6 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 		patch := []byte{}
 		switch patchType {
-		case types.JSONPatchType:
-			continue
-
 		case types.StrategicMergePatchType:
 			patch, err = strategicpatch.CreateTwoWayMergePatch(originalObjJS, changedJS, versionedObj)
 			if err != nil {
