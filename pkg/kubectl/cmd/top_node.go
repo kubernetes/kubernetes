@@ -123,7 +123,13 @@ func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 	o.NodeClient = clientset.Core()
-	o.Client = metricsutil.NewHeapsterMetricsClient(clientset.Core(), o.HeapsterOptions.Namespace, o.HeapsterOptions.Scheme, o.HeapsterOptions.Service, o.HeapsterOptions.Port)
+	o.Client = &metricsutil.HeapsterMetricsClient{
+		SVCClient:         clientset.Core(),
+		HeapsterNamespace: o.HeapsterOptions.Namespace,
+		HeapsterScheme:    o.HeapsterOptions.Scheme,
+		HeapsterService:   o.HeapsterOptions.Service,
+		HeapsterPort:      o.HeapsterOptions.Port,
+	}
 	o.Printer = metricsutil.NewTopCmdPrinter(out)
 	return nil
 }
