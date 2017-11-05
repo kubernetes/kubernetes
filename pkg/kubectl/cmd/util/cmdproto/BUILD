@@ -26,7 +26,10 @@ go_test(
     srcs = ["cmdproto_test.go"],
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/util/cmdproto",
     library = ":go_default_library",
-    deps = ["//pkg/kubectl/cmd/util/cmdproto/k8s_io_kubectl_cmd:go_default_library"],
+    deps = [
+        "//pkg/kubectl/cmd/util/cmdproto/k8s_io_kubectl_cmd:go_default_library",
+        "//vendor/github.com/spf13/cobra:go_default_library",
+    ],
 )
 
 filegroup(
