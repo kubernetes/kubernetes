@@ -19,7 +19,7 @@ func extractFlagDetailFromMessage(i int, msg interface{}) (*cmdproto.FlagDetail,
 	opts := md.Field[i].GetOptions()
 	info, err := proto.GetExtension(opts, cmdproto.E_Info)
 	if err != nil {
-		return &cmdproto.FlagDetail{Name:nil, Shorthand:nil, Value:[]string{""}, Usage:nil, Ext:nil}, err
+		return &cmdproto.FlagDetail{Name: nil, Shorthand: nil, Value: []string{""}, Usage: nil, Ext: nil}, err
 	}
 	return info.(*cmdproto.FlagDetail), nil
 }
