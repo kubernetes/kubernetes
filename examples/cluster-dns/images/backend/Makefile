@@ -13,7 +13,7 @@
 # limitations under the License.
 
 TAG = v1
-PREFIX = gcr.io/google_containers
+PREFIX = k8s.gcr.io
 IMAGE = example-dns-backend
 
 all: push
@@ -22,6 +22,6 @@ image:
 	docker build --pull -t $(PREFIX)/$(IMAGE):$(TAG) .
 
 push: image
-	gcloud docker -- push $(PREFIX)/$(IMAGE)
+	gcloud docker --server=k8s.gcr.io -- push $(PREFIX)/$(IMAGE)
 
 clean:

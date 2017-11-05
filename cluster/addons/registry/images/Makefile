@@ -15,10 +15,10 @@
 .PHONY: build push vet test clean
 
 TAG = 0.4
-REPO = gcr.io/google_containers/kube-registry-proxy
+REPO = k8s.gcr.io/kube-registry-proxy
 
 build:
 	docker build --pull -t $(REPO):$(TAG) .
 
 push:
-	gcloud docker -- push $(REPO):$(TAG)
+	gcloud docker --server=k8s.gcr.io -- push $(REPO):$(TAG)

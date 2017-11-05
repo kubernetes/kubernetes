@@ -185,7 +185,7 @@ func createAppArmorProfileLoader(f *framework.Framework) {
 				Spec: api.PodSpec{
 					Containers: []api.Container{{
 						Name:  "apparmor-loader",
-						Image: "gcr.io/google_containers/apparmor-loader:0.1",
+						Image: "k8s.gcr.io/apparmor-loader:0.1",
 						Args:  []string{"-poll", "10s", "/profiles"},
 						SecurityContext: &api.SecurityContext{
 							Privileged: &True,

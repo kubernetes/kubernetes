@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: sentinel
-        image: gcr.io/google_containers/redis:v1
+        image: k8s.gcr.io/redis:v1
         env:
           - name: SENTINEL
             value: "true"

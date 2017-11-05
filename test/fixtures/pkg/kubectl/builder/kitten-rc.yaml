@@ -13,7 +13,7 @@ spec:
         version: kitten
     spec:
       containers:
-      - image: gcr.io/google_containers/update-demo:kitten
+      - image: k8s.gcr.io/update-demo:kitten
         name: update-demo
         ports:
         - containerPort: 80

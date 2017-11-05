@@ -152,7 +152,7 @@ const (
 	ClaimProvisionTimeout = 5 * time.Minute
 
 	// When these values are updated, also update cmd/kubelet/app/options/options.go
-	currentPodInfraContainerImageName    = "gcr.io/google_containers/pause"
+	currentPodInfraContainerImageName    = "k8s.gcr.io/pause"
 	currentPodInfraContainerImageVersion = "3.0"
 
 	// How long each node is given during a process that restarts all nodes

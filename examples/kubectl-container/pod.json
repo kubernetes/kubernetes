@@ -8,7 +8,7 @@
     "containers": [
       {
         "name": "bb",
-        "image": "gcr.io/google_containers/busybox",
+        "image": "k8s.gcr.io/busybox",
         "command": [
           "sh", "-c", "sleep 5; wget -O - ${KUBERNETES_RO_SERVICE_HOST}:${KUBERNETES_RO_SERVICE_PORT}/api/v1/pods/; sleep 10000"
         ],
@@ -36,7 +36,7 @@
       },
       {
         "name": "kubectl",
-        "image": "gcr.io/google_containers/kubectl:v0.18.0-120-gaeb4ac55ad12b1-dirty",
+        "image": "k8s.gcr.io/kubectl:v0.18.0-120-gaeb4ac55ad12b1-dirty",
         "imagePullPolicy": "Always",
         "args": [
           "proxy", "-p", "8001"

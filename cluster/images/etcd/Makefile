@@ -15,7 +15,7 @@
 # Build the etcd image
 #
 # Usage:
-# 	[TAGS=2.2.1 2.3.7 3.0.17 3.1.10] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
+# 	[TAGS=2.2.1 2.3.7 3.0.17 3.1.10] [REGISTRY=k8s.gcr.io] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 
 # The image contains different etcd versions to simplify
 # upgrades. Thus be careful when removing any tag from here.
@@ -29,7 +29,7 @@
 TAGS?=2.2.1 2.3.7 3.0.17 3.1.10
 REGISTRY_TAG?=3.1.10
 ARCH?=amd64
-REGISTRY?=gcr.io/google_containers
+REGISTRY?=k8s.gcr.io
 GOLANG_VERSION?=1.7.6
 GOARM=7
 TEMP_DIR:=$(shell mktemp -d)
@@ -105,12 +105,12 @@ endif
 	docker build --pull -t $(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG) $(TEMP_DIR)
 
 push: build
-	gcloud docker -- push $(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG)
+	gcloud docker --server=k8s.gcr.io -- push $(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG)
 
 ifeq ($(ARCH),amd64)
 	# Backward compatibility. TODO: deprecate this image tag
 	docker tag $(REGISTRY)/etcd-$(ARCH):$(REGISTRY_TAG) $(REGISTRY)/etcd:$(REGISTRY_TAG)
-	gcloud docker -- push $(REGISTRY)/etcd:$(REGISTRY_TAG)
+	gcloud docker --server=k8s.gcr.io -- push $(REGISTRY)/etcd:$(REGISTRY_TAG)
 endif
 
 all: build
