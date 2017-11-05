@@ -27,6 +27,7 @@ filegroup(
         "//pkg/util/interrupt:all-srcs",
         "//pkg/util/io:all-srcs",
         "//pkg/util/ipconfig:all-srcs",
+        "//pkg/util/ipset:all-srcs",
         "//pkg/util/iptables:all-srcs",
         "//pkg/util/ipvs:all-srcs",
         "//pkg/util/keymutex:all-srcs",
