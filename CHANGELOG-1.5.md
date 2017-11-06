@@ -249,18 +249,18 @@ filename | sha256 hash
 
 * kube-up (with gce/gci and gce/coreos providers) now ensures the authentication token file contains correct tokens for the control plane components, even if the file already exists (ensures upgrades and downgrades work successfully) ([#43676](https://github.com/kubernetes/kubernetes/pull/43676), [@liggitt](https://github.com/liggitt))
 * Patch CVE-2016-8859 in alpine based images: ([#42936](https://github.com/kubernetes/kubernetes/pull/42936), [@timstclair](https://github.com/timstclair))
-    * - k8s.gcr.io/cluster-proportional-autoscaler-amd64
-    * - k8s.gcr.io/dnsmasq-metrics-amd64
-    * - k8s.gcr.io/etcd-empty-dir-cleanup
-    * - k8s.gcr.io/kube-addon-manager
-    * - k8s.gcr.io/kube-dnsmasq-amd64
+    * - gcr.io/google-containers/cluster-proportional-autoscaler-amd64
+    * - gcr.io/google-containers/dnsmasq-metrics-amd64
+    * - gcr.io/google-containers/etcd-empty-dir-cleanup
+    * - gcr.io/google-containers/kube-addon-manager
+    * - gcr.io/google-containers/kube-dnsmasq-amd64
 * - Disable thin_ls due to excessive iops ([#43113](https://github.com/kubernetes/kubernetes/pull/43113), [@dashpole](https://github.com/dashpole))
     * - Ignore .mount cgroups, fixing dissappearing stats
     * - Fix wc goroutine leak
     * - Update aws-sdk-go dependency to 1.6.10
 * PodSecurityPolicy authorization is correctly enforced by the PodSecurityPolicy admission plugin. ([#43489](https://github.com/kubernetes/kubernetes/pull/43489), [@liggitt](https://github.com/liggitt))
-* Bump k8s.gcr.io/glbc from 0.9.1 to 0.9.2. Release notes: [0.9.2](https://github.com/kubernetes/ingress/releases/tag/0.9.2) ([#43097](https://github.com/kubernetes/kubernetes/pull/43097), [@timstclair](https://github.com/timstclair))
-* Update k8s.gcr.io/rescheduler to v0.2.2, which uses busybox as a base image instead of ubuntu. ([#41911](https://github.com/kubernetes/kubernetes/pull/41911), [@ixdy](https://github.com/ixdy))
+* Bump gcr.io/google_containers/glbc from 0.9.1 to 0.9.2. Release notes: [0.9.2](https://github.com/kubernetes/ingress/releases/tag/0.9.2) ([#43097](https://github.com/kubernetes/kubernetes/pull/43097), [@timstclair](https://github.com/timstclair))
+* Update gcr.io/google-containers/rescheduler to v0.2.2, which uses busybox as a base image instead of ubuntu. ([#41911](https://github.com/kubernetes/kubernetes/pull/41911), [@ixdy](https://github.com/ixdy))
 * restored normalization of custom `--etcd-prefix` when `--storage-backend` is set to etcd3 ([#42506](https://github.com/kubernetes/kubernetes/pull/42506), [@liggitt](https://github.com/liggitt))
 
 
@@ -655,7 +655,7 @@ Features for this release were tracked via the use of the [kubernetes/features](
   - [alpha] Introducing the v1alpha1 CRI API to allow pluggable container runtimes; an experimental docker-CRI integration is ready for testing and feedback. ([docs](https://github.com/kubernetes/community/blob/master/contributors/devel/container-runtime-interface.md)) ([kubernetes/features#54](https://github.com/kubernetes/features/issues/54))
   - [alpha] Kubelet launches container in a per pod cgroup hierarchy based on quality of service tier ([kubernetes/features#126](https://github.com/kubernetes/features/issues/126))
   - [beta] Kubelet integrates with memcg notification API to detect when a hard eviction threshold is crossed ([kubernetes/features#125](https://github.com/kubernetes/features/issues/125))
-  - [beta] Introducing the beta version containerized node conformance test k8s.gcr.io/node-test:0.2 for users to verify node setup. ([docs](http://kubernetes.io/docs/admin/node-conformance/)) ([kubernetes/features#84](https://github.com/kubernetes/features/issues/84))
+  - [beta] Introducing the beta version containerized node conformance test gcr.io/google_containers/node-test:0.2 for users to verify node setup. ([docs](http://kubernetes.io/docs/admin/node-conformance/)) ([kubernetes/features#84](https://github.com/kubernetes/features/issues/84))
 - **Scheduling**
   - [alpha] Added support for accounting opaque integer resources. ([docs](http://kubernetes.io/docs/user-guide/compute-resources/#opaque-integer-resources-alpha-feature)) ([kubernetes/features#76](https://github.com/kubernetes/features/issues/76))
   - [beta] PodDisruptionBudget has been promoted to beta, can be used to safely drain nodes while respecting application SLO's ([docs](http://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/)) ([kubernetes/features#85](https://github.com/kubernetes/features/issues/85))
