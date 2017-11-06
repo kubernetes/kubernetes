@@ -134,6 +134,9 @@ func validateProxyMode(mode componentconfig.ProxyMode, fldPath *field.Path) fiel
 func validateClientConnectionConfiguration(config componentconfig.ClientConnectionConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(config.Burst), fldPath.Child("Burst"))...)
+	if config.QPS < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("QPS"), config.QPS, "qps must not be a negative number"))
+	}
 	return allErrs
 }
 
