@@ -445,14 +445,16 @@ func coreFuncs(t apitesting.TestingCommon) []interface{} {
 			}
 		},
 		func(sio *api.ScaleIOVolumeSource, c fuzz.Continue) {
-			sio.ProtectionDomain = c.RandString()
-			if sio.ProtectionDomain == "" {
-				sio.ProtectionDomain = "default"
+			sio.StorageMode = c.RandString()
+			if sio.StorageMode == "" {
+				sio.StorageMode = "ThinProvisioned"
 			}
-			sio.StoragePool = c.RandString()
-			if sio.StoragePool == "" {
-				sio.StoragePool = "default"
+			sio.FSType = c.RandString()
+			if sio.FSType == "" {
+				sio.FSType = "xfs"
 			}
+		},
+		func(sio *api.ScaleIOPersistentVolumeSource, c fuzz.Continue) {
 			sio.StorageMode = c.RandString()
 			if sio.StorageMode == "" {
 				sio.StorageMode = "ThinProvisioned"
