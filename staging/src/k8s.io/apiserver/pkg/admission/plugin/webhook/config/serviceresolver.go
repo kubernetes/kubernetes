@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package webhook checks a webhook for configured operation admission
-package webhook
+package config
 
 import (
 	"errors"
@@ -23,7 +22,16 @@ import (
 	"net/url"
 )
 
+// ServiceResolver knows how to convert a service reference into an actual location.
+type ServiceResolver interface {
+	ResolveEndpoint(namespace, name string) (*url.URL, error)
+}
+
 type defaultServiceResolver struct{}
+
+func NewDefaultServiceResolver() ServiceResolver {
+	return &defaultServiceResolver{}
+}
 
 // ResolveEndpoint constructs a service URL from a given namespace and name
 // note that the name and namespace are required and by default all created addresses use HTTPS scheme.

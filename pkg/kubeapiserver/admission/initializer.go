@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook"
+	webhookconfig "k8s.io/apiserver/pkg/admission/plugin/webhook/config"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -62,7 +62,7 @@ type WantsQuotaConfiguration interface {
 // WantsServiceResolver defines a fuction that accepts a ServiceResolver for
 // admission plugins that need to make calls to services.
 type WantsServiceResolver interface {
-	SetServiceResolver(webhook.ServiceResolver)
+	SetServiceResolver(webhookconfig.ServiceResolver)
 }
 
 // ServiceResolver knows how to convert a service reference into an actual
@@ -74,7 +74,7 @@ type ServiceResolver interface {
 // WantsAuthenticationInfoResolverWrapper defines a function that wraps the standard AuthenticationInfoResolver
 // to allow the apiserver to control what is returned as auth info
 type WantsAuthenticationInfoResolverWrapper interface {
-	SetAuthenticationInfoResolverWrapper(webhook.AuthenticationInfoResolverWrapper)
+	SetAuthenticationInfoResolverWrapper(webhookconfig.AuthenticationInfoResolverWrapper)
 	admission.InitializationValidator
 }
 
@@ -86,8 +86,8 @@ type PluginInitializer struct {
 	cloudConfig                       []byte
 	restMapper                        meta.RESTMapper
 	quotaConfiguration                quota.Configuration
-	serviceResolver                   webhook.ServiceResolver
-	authenticationInfoResolverWrapper webhook.AuthenticationInfoResolverWrapper
+	serviceResolver                   webhookconfig.ServiceResolver
+	authenticationInfoResolverWrapper webhookconfig.AuthenticationInfoResolverWrapper
 }
 
 var _ admission.PluginInitializer = &PluginInitializer{}
@@ -101,8 +101,8 @@ func NewPluginInitializer(
 	cloudConfig []byte,
 	restMapper meta.RESTMapper,
 	quotaConfiguration quota.Configuration,
-	authenticationInfoResolverWrapper webhook.AuthenticationInfoResolverWrapper,
-	serviceResolver webhook.ServiceResolver,
+	authenticationInfoResolverWrapper webhookconfig.AuthenticationInfoResolverWrapper,
+	serviceResolver webhookconfig.ServiceResolver,
 ) *PluginInitializer {
 	return &PluginInitializer{
 		internalClient:                    internalClient,

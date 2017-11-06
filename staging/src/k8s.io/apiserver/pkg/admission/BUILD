@@ -78,7 +78,9 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/admission/initializer:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/initialization:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle:all-srcs",
-        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/config:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/rules:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/validating:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package webhook checks a webhook for configured operation admission
-package webhook // import "k8s.io/apiserver/pkg/admission/plugin/webhook"
+// Package validating checks a non-mutating webhook for configured operation admission
+package validating // import "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
