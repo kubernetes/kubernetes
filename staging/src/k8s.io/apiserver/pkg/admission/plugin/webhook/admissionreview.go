@@ -25,8 +25,8 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 )
 
-// createAdmissionReview creates an AdmissionReview for the provided admission.Attributes
-func createAdmissionReview(attr admission.Attributes) admissionv1alpha1.AdmissionReview {
+// createAdmissionReview creates an AdmissionRequest for the provided admission.Attributes
+func createAdmissionReview(attr admission.Attributes) admissionv1alpha1.AdmissionRequest {
 	gvk := attr.GetKind()
 	gvr := attr.GetResource()
 	aUserInfo := attr.GetUserInfo()
@@ -42,7 +42,7 @@ func createAdmissionReview(attr admission.Attributes) admissionv1alpha1.Admissio
 		userInfo.Extra[key] = authenticationv1.ExtraValue(val)
 	}
 
-	return admissionv1alpha1.AdmissionReview{
+	return admissionv1alpha1.AdmissionRequest{
 		Spec: admissionv1alpha1.AdmissionReviewSpec{
 			Name:      attr.GetName(),
 			Namespace: attr.GetNamespace(),

@@ -441,7 +441,7 @@ func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Webh
 	if err != nil {
 		return &ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
-	response := &admissionv1alpha1.AdmissionReview{}
+	response := &admissionv1alpha1.AdmissionResponse{}
 	if err := client.Post().Context(ctx).Body(&request).Do().Into(response); err != nil {
 		return &ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}

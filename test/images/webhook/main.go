@@ -53,7 +53,7 @@ func toAdmissionReviewStatus(err error) *v1alpha1.AdmissionReviewStatus {
 }
 
 // only allow pods to pull images from specific registry.
-func admitPods(ar v1alpha1.AdmissionReview) *v1alpha1.AdmissionReviewStatus {
+func admitPods(ar v1alpha1.AdmissionReviewRequest) *v1alpha1.AdmissionReviewStatus {
 	glog.V(2).Info("admitting pods")
 	podResource := metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 	if ar.Spec.Resource != podResource {
@@ -92,7 +92,7 @@ func admitPods(ar v1alpha1.AdmissionReview) *v1alpha1.AdmissionReviewStatus {
 }
 
 // deny configmaps with specific key-value pair.
-func admitConfigMaps(ar v1alpha1.AdmissionReview) *v1alpha1.AdmissionReviewStatus {
+func admitConfigMaps(ar v1alpha1.AdmissionReviewRequest) *v1alpha1.AdmissionReviewStatus {
 	glog.V(2).Info("admitting configmaps")
 	configMapResource := metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
 	if ar.Spec.Resource != configMapResource {
@@ -165,7 +165,7 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	}
 
 	var reviewStatus *v1alpha1.AdmissionReviewStatus
-	ar := v1alpha1.AdmissionReview{}
+	ar := v1alpha1.AdmissionReviewRequest{}
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(body, nil, &ar); err != nil {
 		glog.Error(err)
@@ -173,7 +173,6 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	} else {
 		reviewStatus = admit(ar)
 	}
-
 	if reviewStatus != nil {
 		ar.Status = *reviewStatus
 	}
