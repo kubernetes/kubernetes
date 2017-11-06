@@ -291,7 +291,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		for nodeName, cpu := range nodeToAllocatableMap {
 			requestedCPU := cpu * 7 / 10
 			fillerPods = append(fillerPods, createPausePod(f, pausePodConfig{
-				Name: "filler-pod-" + nodeName,
+				Name: "filler-pod-" + string(uuid.NewUUID()),
 				Resources: &v1.ResourceRequirements{
 					Limits: v1.ResourceList{
 						v1.ResourceCPU: *resource.NewMilliQuantity(requestedCPU, "DecimalSI"),
