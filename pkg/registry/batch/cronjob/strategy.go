@@ -39,7 +39,7 @@ var Strategy = cronJobStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // DefaultGarbageCollectionPolicy returns Orphan because that was the default
 // behavior before the server-side garbage collection was implemented.
-func (cronJobStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
+func (cronJobStrategy) DefaultGarbageCollectionPolicy(ctx genericapirequest.Context) rest.GarbageCollectionPolicy {
 	return rest.OrphanDependents
 }
 
