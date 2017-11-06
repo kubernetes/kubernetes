@@ -19,9 +19,8 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-	"strings"
 
-	dockertypes "github.com/docker/engine-api/types"
+	dockertypes "github.com/docker/docker/api/types"
 	"golang.org/x/net/context"
 
 	"github.com/google/cadvisor/info/v1"
@@ -49,7 +48,6 @@ func StatusFromDockerInfo(dockerInfo dockertypes.Info) v1.DockerStatus {
 	out.Hostname = dockerInfo.Name
 	out.RootDir = dockerInfo.DockerRootDir
 	out.Driver = dockerInfo.Driver
-	out.ExecDriver = dockerInfo.ExecutionDriver
 	out.NumImages = dockerInfo.Images
 	out.NumContainers = dockerInfo.Containers
 	out.DriverStatus = make(map[string]string, len(dockerInfo.DriverStatus))
@@ -117,13 +115,6 @@ func ValidateInfo() (*dockertypes.Info, error) {
 
 	if version[0] < 1 {
 		return nil, fmt.Errorf("cAdvisor requires docker version %v or above but we have found version %v reported as %q", []int{1, 0, 0}, version, dockerInfo.ServerVersion)
-	}
-
-	// Check that the libcontainer execdriver is used if the version is < 1.11
-	// (execution drivers are no longer supported as of 1.11).
-	if version[0] <= 1 && version[1] <= 10 &&
-		!strings.HasPrefix(dockerInfo.ExecutionDriver, "native") {
-		return nil, fmt.Errorf("docker found, but not using native exec driver")
 	}
 
 	if dockerInfo.Driver == "" {

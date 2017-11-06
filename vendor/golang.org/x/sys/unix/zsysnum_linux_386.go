@@ -385,4 +385,6 @@ const (
 	SYS_PKEY_MPROTECT          = 380
 	SYS_PKEY_ALLOC             = 381
 	SYS_PKEY_FREE              = 382
+	SYS_STATX                  = 383
+	SYS_ARCH_PRCTL             = 384
 )

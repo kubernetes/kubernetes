@@ -32,8 +32,8 @@ import (
 	dockerutil "github.com/google/cadvisor/utils/docker"
 	"github.com/google/cadvisor/zfs"
 
-	docker "github.com/docker/engine-api/client"
-	dockercontainer "github.com/docker/engine-api/types/container"
+	dockercontainer "github.com/docker/docker/api/types/container"
+	docker "github.com/docker/docker/client"
 	"github.com/golang/glog"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"

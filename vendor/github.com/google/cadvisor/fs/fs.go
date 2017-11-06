@@ -603,10 +603,11 @@ func GetDirInodeUsage(dir string, timeout time.Duration) (uint64, error) {
 		glog.Infof("killing cmd %v due to timeout(%s)", findCmd.Args, timeout.String())
 		findCmd.Process.Kill()
 	})
-	if err := findCmd.Wait(); err != nil {
+	err := findCmd.Wait()
+	timer.Stop()
+	if err != nil {
 		return 0, fmt.Errorf("cmd %v failed. stderr: %s; err: %v", findCmd.Args, stderr.String(), err)
 	}
-	timer.Stop()
 	return counter.bytesWritten, nil
 }
 

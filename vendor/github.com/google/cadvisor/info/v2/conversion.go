@@ -142,6 +142,9 @@ func ContainerStatsFromV1(containerName string, spec *v1.ContainerSpec, stats []
 		if spec.HasCustomMetrics {
 			stat.CustomMetrics = val.CustomMetrics
 		}
+		if len(val.Accelerators) > 0 {
+			stat.Accelerators = val.Accelerators
+		}
 		// TODO(rjnagal): Handle load stats.
 		newStats = append(newStats, stat)
 	}

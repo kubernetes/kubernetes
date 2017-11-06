@@ -34,9 +34,9 @@ func Minor(dev uint64) uint32 {
 // Mkdev returns a Linux device number generated from the given major and minor
 // components.
 func Mkdev(major, minor uint32) uint64 {
-	dev := uint64((major & 0x00000fff) << 8)
-	dev |= uint64((major & 0xfffff000) << 32)
-	dev |= uint64((minor & 0x000000ff) << 0)
-	dev |= uint64((minor & 0xffffff00) << 12)
+	dev := (uint64(major) & 0x00000fff) << 8
+	dev |= (uint64(major) & 0xfffff000) << 32
+	dev |= (uint64(minor) & 0x000000ff) << 0
+	dev |= (uint64(minor) & 0xffffff00) << 12
 	return dev
 }

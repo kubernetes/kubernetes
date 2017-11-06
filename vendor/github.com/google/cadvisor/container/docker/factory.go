@@ -24,7 +24,7 @@ import (
 	"sync"
 
 	"github.com/blang/semver"
-	dockertypes "github.com/docker/engine-api/types"
+	dockertypes "github.com/docker/docker/api/types"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/devicemapper"
@@ -35,7 +35,7 @@ import (
 	dockerutil "github.com/google/cadvisor/utils/docker"
 	"github.com/google/cadvisor/zfs"
 
-	docker "github.com/docker/engine-api/client"
+	docker "github.com/docker/docker/client"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 )

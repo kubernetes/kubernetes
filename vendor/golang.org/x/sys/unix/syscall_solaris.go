@@ -13,7 +13,6 @@
 package unix
 
 import (
-	"sync/atomic"
 	"syscall"
 	"unsafe"
 )
@@ -167,7 +166,7 @@ func Getwd() (wd string, err error) {
 
 func Getgroups() (gids []int, err error) {
 	n, err := getgroups(0, nil)
-	// Check for error and sanity check group count.  Newer versions of
+	// Check for error and sanity check group count. Newer versions of
 	// Solaris allow up to 1024 (NGROUPS_MAX).
 	if n < 0 || n > 1024 {
 		if err != nil {
@@ -351,7 +350,7 @@ func Futimesat(dirfd int, path string, tv []Timeval) error {
 }
 
 // Solaris doesn't have an futimes function because it allows NULL to be
-// specified as the path for futimesat.  However, Go doesn't like
+// specified as the path for futimesat. However, Go doesn't like
 // NULL-style string interfaces, so this simple wrapper is provided.
 func Futimes(fd int, tv []Timeval) error {
 	if tv == nil {
@@ -515,6 +514,24 @@ func Acct(path string) (err error) {
 	return acct(pathp)
 }
 
+//sys	__makedev(version int, major uint, minor uint) (val uint64)
+
+func Mkdev(major, minor uint32) uint64 {
+	return __makedev(NEWDEV, uint(major), uint(minor))
+}
+
+//sys	__major(version int, dev uint64) (val uint)
+
+func Major(dev uint64) uint32 {
+	return uint32(__major(NEWDEV, dev))
+}
+
+//sys	__minor(version int, dev uint64) (val uint)
+
+func Minor(dev uint64) uint32 {
+	return uint32(__minor(NEWDEV, dev))
+}
+
 /*
  * Expose the ioctl function
  */
@@ -559,6 +576,15 @@ func IoctlGetTermio(fd int, req uint) (*Termio, error) {
 	var value Termio
 	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
 	return &value, err
+}
+
+//sys   poll(fds *PollFd, nfds int, timeout int) (n int, err error)
+
+func Poll(fds []PollFd, timeout int) (n int, err error) {
+	if len(fds) == 0 {
+		return poll(nil, 0, timeout)
+	}
+	return poll(&fds[0], len(fds), timeout)
 }
 
 /*
@@ -613,6 +639,7 @@ func IoctlGetTermio(fd int, req uint) (*Termio, error) {
 //sys	Mlock(b []byte) (err error)
 //sys	Mlockall(flags int) (err error)
 //sys	Mprotect(b []byte, prot int) (err error)
+//sys	Msync(b []byte, flags int) (err error)
 //sys	Munlock(b []byte) (err error)
 //sys	Munlockall() (err error)
 //sys	Nanosleep(time *Timespec, leftover *Timespec) (err error)
@@ -698,19 +725,4 @@ func Mmap(fd int, offset int64, length int, prot int, flags int) (data []byte, e
 
 func Munmap(b []byte) (err error) {
 	return mapper.Munmap(b)
-}
-
-//sys	sysconf(name int) (n int64, err error)
-
-// pageSize caches the value of Getpagesize, since it can't change
-// once the system is booted.
-var pageSize int64 // accessed atomically
-
-func Getpagesize() int {
-	n := atomic.LoadInt64(&pageSize)
-	if n == 0 {
-		n, _ = sysconf(_SC_PAGESIZE)
-		atomic.StoreInt64(&pageSize, n)
-	}
-	return int(n)
 }

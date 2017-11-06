@@ -190,7 +190,7 @@ func validateDockerInfo() (string, string) {
 		return Unsupported, fmt.Sprintf("Docker setup is invalid: %v", err)
 	}
 
-	desc := fmt.Sprintf("Docker exec driver is %s. Storage driver is %s.\n", info.ExecutionDriver, info.Driver)
+	desc := fmt.Sprintf("Storage driver is %s.\n", info.Driver)
 	return Recommended, desc
 }
 
