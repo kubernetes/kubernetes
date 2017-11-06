@@ -17,7 +17,6 @@ limitations under the License.
 package statefulset
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -272,43 +271,12 @@ func newVersionedStatefulSetPod(currentSet, updateSet *apps.StatefulSet, current
 	return pod
 }
 
-// Match check if the given StatefulSet's template matches the template stored in the given history.
-func Match(ss *apps.StatefulSet, history *apps.ControllerRevision) (bool, error) {
-	patch, err := getPatch(ss)
-	if err != nil {
-		return false, err
-	}
-	return bytes.Equal(patch, history.Data.Raw), nil
-}
-
-// getPatch returns a strategic merge patch that can be applied to restore a StatefulSet to a
-// previous version. If the returned error is nil the patch is valid. The current state that we save is just the
-// PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
-// recorded patches.
-func getPatch(set *apps.StatefulSet) ([]byte, error) {
-	str, err := runtime.Encode(patchCodec, set)
-	if err != nil {
-		return nil, err
-	}
-	var raw map[string]interface{}
-	json.Unmarshal([]byte(str), &raw)
-	objCopy := make(map[string]interface{})
-	specCopy := make(map[string]interface{})
-	spec := raw["spec"].(map[string]interface{})
-	template := spec["template"].(map[string]interface{})
-	specCopy["template"] = template
-	template["$patch"] = "replace"
-	objCopy["spec"] = specCopy
-	patch, err := json.Marshal(objCopy)
-	return patch, err
-}
-
 // newRevision creates a new ControllerRevision containing a patch that reapplies the target state of set.
 // The Revision of the returned ControllerRevision is set to revision. If the returned error is nil, the returned
 // ControllerRevision is valid. StatefulSet revisions are stored as patches that re-apply the current state of set
 // to a new StatefulSet using a strategic merge patch to replace the saved state of the new StatefulSet.
 func newRevision(set *apps.StatefulSet, revision int64, collisionCount *int32) (*apps.ControllerRevision, error) {
-	patch, err := getPatch(set)
+	patch, err := history.GetPatch(set)
 	if err != nil {
 		return nil, err
 	}

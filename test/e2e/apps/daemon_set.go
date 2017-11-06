@@ -36,6 +36,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller/daemon"
+	ctrlhistory "k8s.io/kubernetes/pkg/controller/history"
 	schedulercache "k8s.io/kubernetes/pkg/scheduler/cache"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -719,7 +720,7 @@ func curHistory(historyList *apps.ControllerRevisionList, ds *apps.DaemonSet) *a
 		history := &historyList.Items[i]
 		// Every history should have the hash label
 		Expect(len(history.Labels[apps.DefaultDaemonSetUniqueLabelKey])).To(BeNumerically(">", 0))
-		match, err := daemon.Match(ds, history)
+		match, err := ctrlhistory.Match(ds, history)
 		Expect(err).NotTo(HaveOccurred())
 		if match {
 			curHistory = history

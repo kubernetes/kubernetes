@@ -22,6 +22,7 @@ import (
 	"hash/fnv"
 	"sort"
 	"strconv"
+	"encoding/json"
 
 	apps "k8s.io/api/apps/v1"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
@@ -44,6 +45,43 @@ import (
 
 // ControllerRevisionHashLabel is the label used to indicate the hash value of a ControllerRevision's Data.
 const ControllerRevisionHashLabel = "controller.kubernetes.io/hash"
+
+// Match check if the given Controller's template matches the template stored in the given history.
+func Match(obj interface{}, history *apps.ControllerRevision) (bool, error) {
+	patch, err := GetPatch(obj)
+	if err != nil {
+		return false, err
+	}
+	return bytes.Equal(patch, history.Data.Raw), nil
+}
+
+// GetPatch returns a strategic merge patch that can be applied to restore a controller(StatefulSet, Daemonset) to a
+// previous version. If the returned error is nil the patch is valid. The current state that we save is just the
+// PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
+// recorded patches.
+func GetPatch(obj interface{}) ([]byte, error) {
+	objBytes, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	var raw map[string]interface{}
+	err = json.Unmarshal(objBytes, &raw)
+	if err != nil {
+		return nil, err
+	}
+
+	objCopy := make(map[string]interface{})
+	specCopy := make(map[string]interface{})
+
+	spec := raw["spec"].(map[string]interface{})
+	template := spec["template"].(map[string]interface{})
+	specCopy["template"] = template
+	template["$patch"] = "replace"
+	objCopy["spec"] = specCopy
+	patch, err := json.Marshal(objCopy)
+	return patch, err
+}
 
 // ControllerRevisionName returns the Name for a ControllerRevision in the form prefix-hash. If the length
 // of prefix is greater than 223 bytes, it is truncated to allow for a name that is no larger than 253 bytes.
@@ -251,8 +289,25 @@ func (rh *realHistory) CreateControllerRevision(parent metav1.Object, revision *
 		hash := HashControllerRevision(revision, collisionCount)
 		// Update the revisions name and labels
 		clone.Name = ControllerRevisionName(parent.GetName(), hash)
+		clone.Labels[ControllerRevisionHashLabel] = strconv.FormatInt(int64(hash), 10)
 		created, err := rh.client.AppsV1().ControllerRevisions(parent.GetNamespace()).Create(clone)
 		if errors.IsAlreadyExists(err) {
+			existedHistory, getErr := rh.client.AppsV1().ControllerRevisions(parent.GetNamespace()).Get(clone.Name, metav1.GetOptions{})
+			if getErr != nil {
+				return nil, getErr
+			}
+
+			// Check if we already created it
+			done, err := Match(parent, existedHistory)
+
+			if err != nil {
+				return nil, err
+			}
+
+			if done {
+				return existedHistory, nil
+			}
+
 			*collisionCount++
 			continue
 		}
@@ -372,8 +427,24 @@ func (fh *fakeHistory) CreateControllerRevision(parent metav1.Object, revision *
 		hash := HashControllerRevision(revision, collisionCount)
 		// Update the revisions name and labels
 		clone.Name = ControllerRevisionName(parent.GetName(), hash)
+		clone.Labels[ControllerRevisionHashLabel] = strconv.FormatInt(int64(hash), 10)
 		created, err := fh.addRevision(clone)
 		if errors.IsAlreadyExists(err) {
+			history, err := fh.lister.ControllerRevisions(parent.GetNamespace()).Get(clone.Name)
+			if err != nil {
+				return nil, err
+			}
+
+			done, err := Match(parent, history)
+
+			if err != nil {
+				return nil, err
+			}
+
+			if done {
+				return history, nil
+			}
+
 			*collisionCount++
 			continue
 		}

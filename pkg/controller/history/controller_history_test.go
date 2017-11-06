@@ -315,7 +315,7 @@ func TestRealHistory_CreateControllerRevision(t *testing.T) {
 	tests := []testcase{
 		{
 			name:     "creates new",
-			parent:   &ss1.ObjectMeta,
+			parent:   ss1,
 			revision: ss1Rev1,
 			existing: nil,
 
@@ -323,7 +323,7 @@ func TestRealHistory_CreateControllerRevision(t *testing.T) {
 		},
 		{
 			name:     "create doesn't conflict when parents differ",
-			parent:   &ss2.ObjectMeta,
+			parent:   ss2,
 			revision: ss2Rev1,
 			existing: []struct {
 				parent   metav1.Object
@@ -339,7 +339,7 @@ func TestRealHistory_CreateControllerRevision(t *testing.T) {
 		},
 		{
 			name:     "create renames on conflict",
-			parent:   &ss1.ObjectMeta,
+			parent:   ss1,
 			revision: ss1Rev1,
 			existing: []struct {
 				parent   metav1.Object
@@ -438,7 +438,7 @@ func TestFakeHistory_CreateControllerRevision(t *testing.T) {
 	tests := []testcase{
 		{
 			name:     "creates new",
-			parent:   &ss1.ObjectMeta,
+			parent:   ss1,
 			revision: ss1Rev1,
 			existing: nil,
 
@@ -446,7 +446,7 @@ func TestFakeHistory_CreateControllerRevision(t *testing.T) {
 		},
 		{
 			name:     "create doesn't conflict when parents differ",
-			parent:   &ss2.ObjectMeta,
+			parent:   ss2,
 			revision: ss2Rev1,
 			existing: []struct {
 				parent   metav1.Object
@@ -462,7 +462,7 @@ func TestFakeHistory_CreateControllerRevision(t *testing.T) {
 		},
 		{
 			name:     "create renames on conflict",
-			parent:   &ss1.ObjectMeta,
+			parent:   ss1,
 			revision: ss1Rev1,
 			existing: []struct {
 				parent   metav1.Object
