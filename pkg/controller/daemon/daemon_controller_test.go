@@ -518,6 +518,12 @@ func resourcePodSpec(nodeName, memory, cpu string) v1.PodSpec {
 	}
 }
 
+func resourceContainerSpec(memory, cpu string) v1.ResourceRequirements {
+	return v1.ResourceRequirements {
+		Requests: allocatableResources(memory, cpu),
+	}
+}
+
 func resourcePodSpecWithoutNodeName(memory, cpu string) v1.PodSpec {
 	return v1.PodSpec{
 		Containers: []v1.Container{{
@@ -1486,6 +1492,62 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			wantToRun:             false,
 			shouldSchedule:        false,
 			shouldContinueRunning: false,
+		},
+		{
+			podsOnNode: []*v1.Pod{
+				{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{
+							Ports: []v1.ContainerPort{{
+								HostPort: 666,
+							}},
+							Resources: resourceContainerSpec("50M", "0.5"),
+						}},
+					},
+				},
+			},
+			ds: &extensions.DaemonSet{
+				Spec: extensions.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: simpleDaemonSetLabel,
+						},
+						Spec: resourcePodSpec("", "100M", "0.5"),
+					},
+				},
+			},
+			wantToRun:             true,
+			shouldSchedule:        false,
+			shouldContinueRunning: true,
+		},
+		{
+			podsOnNode: []*v1.Pod{
+				{
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{
+							Ports: []v1.ContainerPort{{
+								HostPort: 666,
+							}},
+							Resources: resourceContainerSpec("50M", "0.5"),
+						}},
+					},
+				},
+			},
+			ds: &extensions.DaemonSet{
+				Spec: extensions.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: simpleDaemonSetLabel,
+						},
+						Spec: resourcePodSpec("", "50M", "0.5"),
+					},
+				},
+			},
+			wantToRun:             true,
+			shouldSchedule:        true,
+			shouldContinueRunning: true,
 		},
 	}
 
