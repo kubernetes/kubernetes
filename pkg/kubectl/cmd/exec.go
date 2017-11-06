@@ -167,19 +167,19 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 		}
 	}
 
-	cmdParent := cmd.Parent()
-	if cmdParent != nil {
-		p.FullCmdName = cmdParent.CommandPath()
-	}
-	if len(p.FullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
-		p.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe pod/%s' to see all of the containers in this pod.", p.FullCmdName, p.PodName)
-	}
-
 	namespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 	p.Namespace = namespace
+
+	cmdParent := cmd.Parent()
+	if cmdParent != nil {
+		p.FullCmdName = cmdParent.CommandPath()
+	}
+	if len(p.FullCmdName) > 0 && cmdutil.IsSiblingCommandExists(cmd, "describe") {
+		p.SuggestedCmdUsage = fmt.Sprintf("Use '%s describe pod/%s -n %s' to see all of the containers in this pod.", p.FullCmdName, p.PodName, p.Namespace)
+	}
 
 	config, err := f.ClientConfig()
 	if err != nil {
