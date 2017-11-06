@@ -77,7 +77,7 @@ type manager struct {
 
 var _ Manager = &manager{}
 
-// NewManager creates ane returns an empty results manager.
+// NewManager creates and returns an empty results manager.
 func NewManager() Manager {
 	return &manager{
 		cache:   make(map[kubecontainer.ContainerID]Result),
