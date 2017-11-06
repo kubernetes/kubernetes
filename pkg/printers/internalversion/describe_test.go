@@ -1657,13 +1657,13 @@ Created on:   2017-06-04 21:45:56 -0700 PDT
 Labels:       <none>
 Annotations:  <none>
 Spec:
-  Pod Selector:     foo in (bar1,bar2),foo2 notin (bar1,bar2),id1=app1,id2=app2
+  PodSelector:     foo in (bar1,bar2),foo2 notin (bar1,bar2),id1=app1,id2=app2
   Allowing ingress traffic:
     To Port: 80/TCP
     To Port: 82/TCP
-    From Pod Selector: id=app2,id2=app3
-    From Namespace Selector: id=app2,id2=app3
-    From Namespace Selector: foo in (bar1,bar2),id=app2,id2=app3
+    From PodSelector: id=app2,id2=app3
+    From NamespaceSelector: id=app2,id2=app3
+    From NamespaceSelector: foo in (bar1,bar2),id=app2,id2=app3
     From IPBlock:
         CIDR: 192.168.0.0/16
         Except: 192.168.3.0/24, 192.168.4.0/24
@@ -1673,9 +1673,9 @@ Spec:
   Allowing egress traffic:
     To Port: 80/TCP
     To Port: 82/TCP
-    To Pod Selector: id=app2,id2=app3
-    To Namespace Selector: id=app2,id2=app3
-    To Namespace Selector: foo in (bar1,bar2),id=app2,id2=app3
+    To PodSelector: id=app2,id2=app3
+    To NamespaceSelector: id=app2,id2=app3
+    To NamespaceSelector: foo in (bar1,bar2),id=app2,id2=app3
     To IPBlock:
         CIDR: 192.168.0.0/16
         Except: 192.168.3.0/24, 192.168.4.0/24

@@ -3106,7 +3106,7 @@ func describeNetworkPolicy(networkPolicy *networking.NetworkPolicy) (string, err
 
 func describeNetworkPolicySpec(nps networking.NetworkPolicySpec, w PrefixWriter) {
 	w.Write(LEVEL_0, "Spec:\n")
-	w.Write(LEVEL_1, "Pod Selector: ")
+	w.Write(LEVEL_1, "PodSelector: ")
 	if len(nps.PodSelector.MatchLabels) == 0 && len(nps.PodSelector.MatchExpressions) == 0 {
 		w.Write(LEVEL_2, "<none> (Allowing the specific traffic to all pods in this namespace)\n")
 	} else {
@@ -3144,9 +3144,9 @@ func printNetworkPolicySpecIngressFrom(npirs []networking.NetworkPolicyIngressRu
 			for _, from := range npir.From {
 				w.Write(LEVEL_0, "%s", initialIndent)
 				if from.PodSelector != nil {
-					w.Write(LEVEL_0, "%s: %s\n", "From Pod Selector", metav1.FormatLabelSelector(from.PodSelector))
+					w.Write(LEVEL_0, "%s: %s\n", "From PodSelector", metav1.FormatLabelSelector(from.PodSelector))
 				} else if from.NamespaceSelector != nil {
-					w.Write(LEVEL_0, "%s: %s\n", "From Namespace Selector", metav1.FormatLabelSelector(from.NamespaceSelector))
+					w.Write(LEVEL_0, "%s: %s\n", "From NamespaceSelector", metav1.FormatLabelSelector(from.NamespaceSelector))
 				} else if from.IPBlock != nil {
 					w.Write(LEVEL_0, "From IPBlock:\n")
 					w.Write(LEVEL_0, "%s%sCIDR: %s\n", initialIndent, initialIndent, from.IPBlock.CIDR)
@@ -3185,9 +3185,9 @@ func printNetworkPolicySpecEgressTo(npers []networking.NetworkPolicyEgressRule, 
 			for _, to := range nper.To {
 				w.Write(LEVEL_0, "%s", initialIndent)
 				if to.PodSelector != nil {
-					w.Write(LEVEL_0, "%s: %s\n", "To Pod Selector", metav1.FormatLabelSelector(to.PodSelector))
+					w.Write(LEVEL_0, "%s: %s\n", "To PodSelector", metav1.FormatLabelSelector(to.PodSelector))
 				} else if to.NamespaceSelector != nil {
-					w.Write(LEVEL_0, "%s: %s\n", "To Namespace Selector", metav1.FormatLabelSelector(to.NamespaceSelector))
+					w.Write(LEVEL_0, "%s: %s\n", "To NamespaceSelector", metav1.FormatLabelSelector(to.NamespaceSelector))
 				} else if to.IPBlock != nil {
 					w.Write(LEVEL_0, "To IPBlock:\n")
 					w.Write(LEVEL_0, "%s%sCIDR: %s\n", initialIndent, initialIndent, to.IPBlock.CIDR)
