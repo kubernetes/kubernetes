@@ -24,8 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/validation"
-	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics/v1alpha1"
 )
 
@@ -46,14 +46,14 @@ var (
 )
 
 type HeapsterMetricsClient struct {
-	SVCClient         coreclient.ServicesGetter
+	SVCClient         corev1.ServicesGetter
 	HeapsterNamespace string
 	HeapsterScheme    string
 	HeapsterService   string
 	HeapsterPort      string
 }
 
-func NewHeapsterMetricsClient(svcClient coreclient.ServicesGetter, namespace, scheme, service, port string) *HeapsterMetricsClient {
+func NewHeapsterMetricsClient(svcClient corev1.ServicesGetter, namespace, scheme, service, port string) *HeapsterMetricsClient {
 	return &HeapsterMetricsClient{
 		SVCClient:         svcClient,
 		HeapsterNamespace: namespace,
@@ -63,7 +63,7 @@ func NewHeapsterMetricsClient(svcClient coreclient.ServicesGetter, namespace, sc
 	}
 }
 
-func DefaultHeapsterMetricsClient(svcClient coreclient.ServicesGetter) *HeapsterMetricsClient {
+func DefaultHeapsterMetricsClient(svcClient corev1.ServicesGetter) *HeapsterMetricsClient {
 	return NewHeapsterMetricsClient(svcClient, DefaultHeapsterNamespace, DefaultHeapsterScheme, DefaultHeapsterService, DefaultHeapsterPort)
 }
 
