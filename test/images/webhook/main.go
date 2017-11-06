@@ -45,7 +45,7 @@ func (c *Config) addFlags() {
 
 // only allow pods to pull images from specific registry.
 func admit(data []byte) *v1alpha1.AdmissionReviewStatus {
-	ar := v1alpha1.AdmissionReview{}
+	ar := v1alpha1.AdmissionRequest{}
 	if err := json.Unmarshal(data, &ar); err != nil {
 		glog.Error(err)
 		return nil
@@ -102,7 +102,7 @@ func serve(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reviewStatus := admit(body)
-	ar := v1alpha1.AdmissionReview{
+	ar := v1alpha1.AdmissionResponse{
 		Status: *reviewStatus,
 	}
 
