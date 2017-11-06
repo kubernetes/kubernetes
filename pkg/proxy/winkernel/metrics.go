@@ -26,12 +26,22 @@ import (
 const kubeProxySubsystem = "kubeproxy"
 
 var (
+	// SyncProxyRulesLatency is the latency of one round of kube-proxy syncing proxy rules.
 	SyncProxyRulesLatency = prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Subsystem: kubeProxySubsystem,
 			Name:      "sync_proxy_rules_latency_microseconds",
 			Help:      "SyncProxyRules latency",
 			Buckets:   prometheus.ExponentialBuckets(1000, 2, 15),
+		},
+	)
+
+	// SyncProxyRulesCount is the number of times kube-proxy has synced proxy rules.
+	SyncProxyRulesCount = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Subsystem: kubeProxySubsystem,
+			Name:      "sync_proxy_rules_count",
+			Help:      "SyncProxyRules count",
 		},
 	)
 )
@@ -41,6 +51,7 @@ var registerMetricsOnce sync.Once
 func RegisterMetrics() {
 	registerMetricsOnce.Do(func() {
 		prometheus.MustRegister(SyncProxyRulesLatency)
+		prometheus.MustRegister(SyncProxyRulesCount)
 	})
 }
 

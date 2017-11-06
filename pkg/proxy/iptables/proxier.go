@@ -956,6 +956,7 @@ func (proxier *Proxier) syncProxyRules() {
 	start := time.Now()
 	defer func() {
 		metrics.SyncProxyRulesLatency.Observe(metrics.SinceInMicroseconds(start))
+		metrics.SyncProxyRulesCount.Add(1)
 		glog.V(4).Infof("syncProxyRules took %v", time.Since(start))
 	}()
 	// don't sync rules till we've received services and endpoints
