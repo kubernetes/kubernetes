@@ -46,6 +46,24 @@ options:
         runtime-config=batch/v2alpha1=true profiling=true
       will result in kube-apiserver being run with the following options:
         --runtime-config=batch/v2alpha1=true --profiling=true
+  controller-manager-extra-args:
+    type: string
+    default: ""
+    description: |
+      Space separated list of flags and key=value pairs that will be passed as arguments to
+      kube-controller-manager. For example a value like this:
+        runtime-config=batch/v2alpha1=true profiling=true
+      will result in kube-controller-manager being run with the following options:
+        --runtime-config=batch/v2alpha1=true --profiling=true
+  scheduler-extra-args:
+    type: string
+    default: ""
+    description: |
+      Space separated list of flags and key=value pairs that will be passed as arguments to
+      kube-scheduler. For example a value like this:
+        runtime-config=batch/v2alpha1=true profiling=true
+      will result in kube-scheduler being run with the following options:
+        --runtime-config=batch/v2alpha1=true --profiling=true
   authorization-mode:
     type: string
     default: "AlwaysAllow"
