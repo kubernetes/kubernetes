@@ -80871,6 +80871,10 @@
      "reclaimPolicy": {
       "description": "Dynamically provisioned PersistentVolumes of this storage class are created with this reclaimPolicy. Defaults to Delete.",
       "type": "string"
+     },
+     "volumeBindingMode": {
+      "description": "VolumeBindingMode indicates how PersistentVolumeClaims should be provisioned and bound.  When unset, VolumeBindingImmediate is used. This field is alpha-level and is only honored by servers that enable the VolumeScheduling feature.",
+      "type": "string"
      }
     },
     "x-kubernetes-group-version-kind": [
@@ -81097,6 +81101,10 @@
      },
      "reclaimPolicy": {
       "description": "Dynamically provisioned PersistentVolumes of this storage class are created with this reclaimPolicy. Defaults to Delete.",
+      "type": "string"
+     },
+     "volumeBindingMode": {
+      "description": "VolumeBindingMode indicates how PersistentVolumeClaims should be provisioned and bound.  When unset, VolumeBindingImmediate is used. This field is alpha-level and is only honored by servers that enable the VolumeScheduling feature.",
       "type": "string"
      }
     },

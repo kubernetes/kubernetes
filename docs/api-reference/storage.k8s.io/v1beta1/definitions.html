@@ -958,6 +958,13 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">volumeBindingMode</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">VolumeBindingMode indicates how PersistentVolumeClaims should be provisioned and bound.  When unset, VolumeBindingImmediate is used. This field is alpha-level and is only honored by servers that enable the VolumeScheduling feature.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1beta1_volumebindingmode">v1beta1.VolumeBindingMode</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -1226,6 +1233,10 @@ When an object is created, the system will populate this list with the current s
 </div>
 <div class="sect2">
 <h3 id="_v1_persistentvolumereclaimpolicy">v1.PersistentVolumeReclaimPolicy</h3>
+
+</div>
+<div class="sect2">
+<h3 id="_v1beta1_volumebindingmode">v1beta1.VolumeBindingMode</h3>
 
 </div>
 <div class="sect2">
