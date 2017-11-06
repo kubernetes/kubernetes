@@ -64,8 +64,8 @@ function config-ip-firewall {
   # Flush iptables nat table
   iptables -t nat -F || true
 
-  if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" && "${KUBERNETES_MASTER:-}" == false ]]; then
-    echo "Add rules for ip masquerade"
+  echo "Add rules for ip masquerade"
+  if [[ "${NON_MASQUERADE_CIDR:-}" == "0.0.0.0/0" ]]; then
     iptables -t nat -N IP-MASQ
     iptables -t nat -A POSTROUTING -m comment --comment "ip-masq: ensure nat POSTROUTING directs all non-LOCAL destination traffic to our custom IP-MASQ chain" -m addrtype ! --dst-type LOCAL -j IP-MASQ
     iptables -t nat -A IP-MASQ -d 169.254.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
