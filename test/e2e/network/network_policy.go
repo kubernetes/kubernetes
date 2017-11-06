@@ -310,6 +310,48 @@ var _ = SIGDescribe("NetworkPolicy", func() {
 				testCannotConnect(f, f.Namespace, "client-b", service, 81)
 			})
 		})
+
+		It("should allow egress access on one named port [Feature:NetworkPolicy]", func() {
+			clientPodName := "client-a"
+			protocolUDP := v1.ProtocolUDP
+			policy := &networkingv1.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "allow-client-a-via-named-port-egress-rule",
+				},
+				Spec: networkingv1.NetworkPolicySpec{
+					// Apply this policy to client-a
+					PodSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"pod-name": clientPodName,
+						},
+					},
+					// Allow traffic to only one named port: "serve-80".
+					Egress: []networkingv1.NetworkPolicyEgressRule{{
+						Ports: []networkingv1.NetworkPolicyPort{
+							{
+								Port: &intstr.IntOrString{Type: intstr.String, StrVal: "serve-80"},
+							},
+							// Allow DNS look-ups
+							{
+								Protocol: &protocolUDP,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
+							},
+						},
+					}},
+				},
+			}
+
+			policy, err := f.ClientSet.NetworkingV1().NetworkPolicies(f.Namespace.Name).Create(policy)
+			Expect(err).NotTo(HaveOccurred())
+			defer cleanupNetworkPolicy(f, policy)
+
+			By("Creating client-a which should be able to contact the server.", func() {
+				testCanConnect(f, f.Namespace, clientPodName, service, 80)
+			})
+			By("Creating client-a which should not be able to contact the server on port 81.", func() {
+				testCannotConnect(f, f.Namespace, clientPodName, service, 81)
+			})
+		})
 	})
 })
 
