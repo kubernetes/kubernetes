@@ -477,7 +477,6 @@ staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server
 staging/src/k8s.io/apiextensions-apiserver/pkg/controller/finalizer
 staging/src/k8s.io/apiextensions-apiserver/pkg/controller/status
 staging/src/k8s.io/apiextensions-apiserver/pkg/features
-staging/src/k8s.io/apiextensions-apiserver/pkg/registry/customresource
 staging/src/k8s.io/apiextensions-apiserver/pkg/registry/customresourcedefinition
 staging/src/k8s.io/apiextensions-apiserver/test/integration/testserver
 staging/src/k8s.io/apimachinery/pkg/api/meta
