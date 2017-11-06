@@ -70,6 +70,12 @@ type Initializer struct {
 	// The initializer cares about an operation if it matches _any_ Rule.
 	// Rule.Resources must not include subresources.
 	Rules []Rule
+
+	// NamespaceSelector describes what namespace the initializer cares about.
+	// This field follows standard selector semantics.
+	// If present but empty, this selector selects all namespaces.
+	// +optional
+	NamespaceSelector *metav1.LabelSelector
 }
 
 // Rule is a tuple of APIGroups, APIVersion, and Resources.It is recommended

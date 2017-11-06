@@ -72,6 +72,12 @@ type Initializer struct {
 	// The initializer cares about an operation if it matches _any_ Rule.
 	// Rule.Resources must not include subresources.
 	Rules []Rule `json:"rules,omitempty" protobuf:"bytes,2,rep,name=rules"`
+
+	// NamespaceSelector describes what namespace the initializer cares about.
+	// This field follows standard selector semantics.
+	// If present but empty, this selector selects all namespaces.
+	// +optional
+	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty" protobuf:"bytes,3,opt,name=namespaceSelector"`
 }
 
 // Rule is a tuple of APIGroups, APIVersion, and Resources.It is recommended
