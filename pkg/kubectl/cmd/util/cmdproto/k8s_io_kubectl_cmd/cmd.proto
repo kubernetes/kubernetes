@@ -9,9 +9,10 @@ message FlagDetail {
   required string shorthand = 3;
   required string usage = 4;
   enum EXT {
-      ISTIME = 0;
-      ISSTRARRAY = 1;
-      ISSTRSLICE = 2;
+      NONE = 0;
+      ISTIME = 1;
+      ISSTRARRAY = 2;
+      ISSTRSLICE = 3;
   }
   optional EXT ext = 5;
 }
