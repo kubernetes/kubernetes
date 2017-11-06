@@ -61,22 +61,6 @@ func (v IPVar) Type() string {
 	return "ip"
 }
 
-func (m *ProxyMode) Set(s string) error {
-	*m = ProxyMode(s)
-	return nil
-}
-
-func (m *ProxyMode) String() string {
-	if m != nil {
-		return string(*m)
-	}
-	return ""
-}
-
-func (m *ProxyMode) Type() string {
-	return "ProxyMode"
-}
-
 type PortRangeVar struct {
 	Val *string
 }
