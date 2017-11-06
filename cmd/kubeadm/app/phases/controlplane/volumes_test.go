@@ -30,6 +30,7 @@ import (
 
 func TestGetEtcdCertVolumes(t *testing.T) {
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
+	k8sCertifcatesDir := "/etc/kubernetes/pki"
 	var tests = []struct {
 		ca, cert, key string
 		vol           []v1.Volume
@@ -56,6 +57,14 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 			ca:       "/etc/pki/my-etcd-ca.crt",
 			cert:     "/etc/pki/my-etcd.crt",
 			key:      "/etc/pki/my-etcd.key",
+			vol:      []v1.Volume{},
+			volMount: []v1.VolumeMount{},
+		},
+		{
+			// Should ignore files in Kubernetes PKI directory (and subdirs)
+			ca:       k8sCertifcatesDir + "/ca/my-etcd-ca.crt",
+			cert:     k8sCertifcatesDir + "/my-etcd.crt",
+			key:      k8sCertifcatesDir + "/my-etcd.key",
 			vol:      []v1.Volume{},
 			volMount: []v1.VolumeMount{},
 		},
@@ -228,7 +237,7 @@ func TestGetEtcdCertVolumes(t *testing.T) {
 			CAFile:   rt.ca,
 			CertFile: rt.cert,
 			KeyFile:  rt.key,
-		})
+		}, k8sCertifcatesDir)
 		if !reflect.DeepEqual(actualVol, rt.vol) {
 			t.Errorf(
 				"failed getEtcdCertVolumes:\n\texpected: %v\n\t  actual: %v",
@@ -376,14 +385,14 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 			},
 		},
 		{
-			// Should ignore files in /etc/ssl/certs
+			// Should ignore files in /etc/ssl/certs and in CertificatesDir
 			cfg: &kubeadmapi.MasterConfiguration{
 				CertificatesDir: testCertsDir,
 				Etcd: kubeadmapi.Etcd{
 					Endpoints: []string{"foo"},
 					CAFile:    "/etc/certs/etcd/my-etcd-ca.crt",
-					CertFile:  "/var/lib/certs/etcd/my-etcd.crt",
-					KeyFile:   "/var/lib/certs/etcd/my-etcd.key",
+					CertFile:  testCertsDir + "/etcd/my-etcd.crt",
+					KeyFile:   "/var/lib/etcd/certs/my-etcd.key",
 				},
 			},
 			vol: map[string][]v1.Volume{
@@ -419,7 +428,7 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 						Name: "etcd-certs-1",
 						VolumeSource: v1.VolumeSource{
 							HostPath: &v1.HostPathVolumeSource{
-								Path: "/var/lib/certs/etcd",
+								Path: "/var/lib/etcd/certs",
 								Type: &hostPathDirectoryOrCreate,
 							},
 						},
@@ -494,7 +503,7 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 					},
 					{
 						Name:      "etcd-certs-1",
-						MountPath: "/var/lib/certs/etcd",
+						MountPath: "/var/lib/etcd/certs",
 						ReadOnly:  true,
 					},
 				},
