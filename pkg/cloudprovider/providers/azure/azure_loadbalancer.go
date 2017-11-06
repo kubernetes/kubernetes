@@ -923,7 +923,7 @@ func (az *Cloud) ensureHostInPool(serviceName string, nodeName types.NodeName, b
 	// Check availability set
 	if az.PrimaryAvailabilitySetName != "" {
 		expectedAvailabilitySetName := az.getAvailabilitySetID(az.PrimaryAvailabilitySetName)
-		if !strings.EqualFold(*machine.AvailabilitySet.ID, expectedAvailabilitySetName) {
+		if machine.AvailabilitySet == nil || !strings.EqualFold(*machine.AvailabilitySet.ID, expectedAvailabilitySetName) {
 			glog.V(3).Infof(
 				"nicupdate(%s): skipping nic (%s) since it is not in the primaryAvailabilitSet(%s)",
 				serviceName, nicName, az.PrimaryAvailabilitySetName)
