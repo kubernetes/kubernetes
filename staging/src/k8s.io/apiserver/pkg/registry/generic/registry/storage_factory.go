@@ -17,6 +17,8 @@ limitations under the License.
 package registry
 
 import (
+	"fmt"
+	"runtime/debug"
 	"sync"
 
 	"github.com/golang/glog"
@@ -86,15 +88,18 @@ func StorageWithCacher(capacity int) generic.StorageDecorator {
 
 var cleanupLock sync.Mutex
 var cleanup []func() = nil
+var oldTrace string
 
 func TrackStorageCleanup() {
 	cleanupLock.Lock()
 	defer cleanupLock.Unlock()
 
 	if cleanup != nil {
+		fmt.Printf("Old storage tracker trace:\n\n%s\n\n", oldTrace)
 		panic("Conflicting storage tracking")
 	}
 	cleanup = make([]func(), 0)
+	oldTrace = string(debug.Stack())
 }
 
 func RegisterStorageCleanup(fn func()) {
