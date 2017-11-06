@@ -3,19 +3,20 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "conversion.go",
         "doc.go",
         "register.go",
-        "types.go",
-        "zz_generated.deepcopy.go",
+        "zz_generated.conversion.go",
     ],
-    importpath = "k8s.io/client-go/scale/scheme",
+    importpath = "k8s.io/client-go/scale/scheme/appsv1beta1",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/k8s.io/api/autoscaling/v1:go_default_library",
+        "//vendor/k8s.io/api/apps/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/client-go/scale/scheme:go_default_library",
     ],
 )
 
@@ -28,15 +29,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//staging/src/k8s.io/client-go/scale/scheme/appsint:all-srcs",
-        "//staging/src/k8s.io/client-go/scale/scheme/appsv1beta1:all-srcs",
-        "//staging/src/k8s.io/client-go/scale/scheme/appsv1beta2:all-srcs",
-        "//staging/src/k8s.io/client-go/scale/scheme/autoscalingv1:all-srcs",
-        "//staging/src/k8s.io/client-go/scale/scheme/extensionsint:all-srcs",
-        "//staging/src/k8s.io/client-go/scale/scheme/extensionsv1beta1:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )
