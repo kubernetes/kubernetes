@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
@@ -163,6 +164,14 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
+	patched, err := noxuResourceClient.Patch("foo", types.MergePatchType, []byte(`{"metadata": {"annotations": {"patched":"true"}}}`))
+	if err != nil {
+		t.Fatalf("Failed to patch CR foo: %v", err)
+	}
+	if a := patched.GetAnnotations(); a != nil && a["patched"] != "true" {
+		t.Errorf(`expected "patched":"true" annotation, got: %v`, a)
+	}
+
 	if err := noxuResourceClient.Delete("foo", nil); err != nil {
 		t.Fatal(err)
 	}
@@ -175,6 +184,18 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
+	// wait for MODIFIED event from patch
+	select {
+	case watchEvent := <-noxuWatch.ResultChan():
+		if e, a := watch.Modified, watchEvent.Type; e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+		break
+	case <-time.After(5 * time.Second):
+		t.Errorf("missing watch event")
+	}
+
+	// wait for DELETED event from deletion
 	select {
 	case watchEvent := <-noxuWatch.ResultChan():
 		if e, a := watch.Deleted, watchEvent.Type; e != a {
@@ -196,6 +217,69 @@ func testSimpleCRUD(t *testing.T, ns string, noxuDefinition *apiextensionsv1beta
 
 	case <-time.After(5 * time.Second):
 		t.Errorf("missing watch event")
+	}
+}
+
+func TestPatch(t *testing.T) {
+	stopCh, apiExtensionClient, clientPool, err := testserver.StartDefaultServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer close(stopCh)
+
+	noxuDefinition := testserver.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+	noxuVersionClient, err := testserver.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, clientPool)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ns := "not-the-default"
+	noxuNamespacedResourceClient := noxuVersionClient.Resource(&metav1.APIResource{
+		Name:       noxuDefinition.Spec.Names.Plural,
+		Namespaced: true,
+	}, ns)
+
+	noxuInstanceToCreate := testserver.NewNoxuInstance(ns, "foo")
+	createdNoxuInstance, err := noxuNamespacedResourceClient.Create(noxuInstanceToCreate)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	patch := []byte(`{"num": {"num2":999}}`)
+	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// a patch with no change
+	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, patch)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// an empty patch
+	createdNoxuInstance, err = noxuNamespacedResourceClient.Patch("foo", types.MergePatchType, []byte(`{}`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	originalJSON, err := runtime.Encode(unstructured.UnstructuredJSONScheme, createdNoxuInstance)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	gottenNoxuInstance, err := runtime.Decode(unstructured.UnstructuredJSONScheme, originalJSON)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Check if int is preserved.
+	unstructuredObj := gottenNoxuInstance.(*unstructured.Unstructured).Object
+	num := unstructuredObj["num"].(map[string]interface{})
+	num1 := num["num1"].(int64)
+	num2 := num["num2"].(int64)
+	if num1 != 9223372036854775807 || num2 != 999 {
+		t.Errorf("Expected %v, got %v, %v", `9223372036854775807, 999`, num1, num2)
 	}
 }
 
