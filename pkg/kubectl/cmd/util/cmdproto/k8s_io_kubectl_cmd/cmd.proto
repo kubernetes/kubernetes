@@ -21,8 +21,15 @@ extend google.protobuf.FieldOptions {
   optional FlagDetail info = 1234;
 }
 
+message CommandInfo {
+  optional string use = 1;
+  optional string description_short = 2;
+  optional string description_long = 3;
+  optional string example = 4;
+}
+
 extend google.protobuf.MessageOptions {
-  optional string description = 51234;
+    optional CommandInfo cmd = 5678;
 }
 
 message Array {
@@ -32,7 +39,13 @@ message Array {
 
 //This is the flag description only for test
 message TestCmd {
-    optional bool BoolFlag = 1 [ (info) = { name: "bool-flag" value: "false" shorthand: "c" usage: "test"}];
+    option (cmd) = {
+        use: "test"
+        description_short: "Print the client and server version information"
+        description_long: "Print the client and server version information for the current context"
+        example: "# Print the client and server versions for the current context kubectl version"
+    };
+    optional bool BoolFlag = 1 [(info) = { name: "bool-flag" value: "false" shorthand: "c" usage: "test"} ];
     optional string StringFlag = 2 [ (info) = { name: "string-flag" value: "" shorthand: "o" usage: "test"}];
     optional int32 Int32Flag = 3 [ (info) = { name: "int32-flag" value: "0" shorthand: "" usage: "test"}];
     optional Array ArrayFlag = 4 [ (info) = { name: "repeated-string-flag" value: "default1" value: "default2" shorthand: "" usage: "test" ext: ISSTRARRAY}];

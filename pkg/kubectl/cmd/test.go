@@ -48,11 +48,12 @@ type TestOptions struct {
 func NewCmdTest(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := new(TestOptions)
 
+	info := cmdproto.ExtractCommandInfoFromMessage(options.flags)
 	cmd := &cobra.Command{
-		Use:     "version",
-		Short:   i18n.T("Print the client and server version information"),
-		Long:    "Print the client and server version information for the current context",
-		Example: testExample,
+		Use:     info.GetUse(),
+		Short:   i18n.T(info.GetDescriptionShort()),
+		Long:    info.GetDescriptionLong(),
+		Example: info.GetExample(),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete())
 			cmdutil.CheckErr(options.Validate())
