@@ -243,7 +243,7 @@ func (hk *HyperKube) MakeSymlinks(command string) error {
 	}
 
 	if errs {
-		return errors.New("Error creating one or more symlinks.")
+		return errors.New("error creating one or more symlinks")
 	}
 	return nil
 }
