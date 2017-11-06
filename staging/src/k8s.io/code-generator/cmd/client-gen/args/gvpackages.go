@@ -91,8 +91,9 @@ func (s *gvPackagesValue) set(vs []string) error {
 			seenGroups[gv.Group].Versions = append(group.Versions, gv.Version)
 		} else {
 			seenGroups[gv.Group] = &types.GroupVersions{
-				Group:    gv.Group,
-				Versions: []types.Version{gv.Version},
+				PackageName: gv.Group.NonEmpty(),
+				Group:       gv.Group,
+				Versions:    []types.Version{gv.Version},
 			}
 		}
 

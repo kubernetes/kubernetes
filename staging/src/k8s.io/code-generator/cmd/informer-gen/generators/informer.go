@@ -36,7 +36,9 @@ import (
 type informerGenerator struct {
 	generator.DefaultGen
 	outputPackage             string
+	groupPkgName              string
 	groupVersion              clientgentypes.GroupVersion
+	groupGoName               string
 	typeToGenerate            *types.Type
 	imports                   namer.ImportTracker
 	clientSetPackage          string
@@ -66,8 +68,7 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 
 	glog.V(5).Infof("processing type %v", t)
 
-	//listerPackage := "k8s.io/kubernetes/pkg/client/listers/" + g.groupVersion.Group.NonEmpty() + "/" + strings.ToLower(g.groupVersion.Version.NonEmpty())
-	listerPackage := fmt.Sprintf("%s/%s/%s", g.listersPackage, g.groupVersion.Group.NonEmpty(), strings.ToLower(g.groupVersion.Version.NonEmpty()))
+	listerPackage := fmt.Sprintf("%s/%s/%s", g.listersPackage, g.groupPkgName, strings.ToLower(g.groupVersion.Version.NonEmpty()))
 	clientSetInterface := c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"})
 	informerFor := "InformerFor"
 
@@ -85,7 +86,7 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 		"cacheNewSharedIndexInformer":     c.Universe.Function(cacheNewSharedIndexInformer),
 		"cacheSharedIndexInformer":        c.Universe.Type(cacheSharedIndexInformer),
 		"clientSetInterface":              clientSetInterface,
-		"group":                           namer.IC(g.groupVersion.Group.NonEmpty()),
+		"group":                           namer.IC(g.groupGoName),
 		"informerFor":                     informerFor,
 		"interfacesSharedInformerFactory": c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
 		"listOptions":                     c.Universe.Type(listOptions),

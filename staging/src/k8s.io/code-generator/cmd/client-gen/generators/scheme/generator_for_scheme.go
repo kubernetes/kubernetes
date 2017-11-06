@@ -67,10 +67,10 @@ func (g *GenScheme) Imports(c *generator.Context) (imports []string) {
 					packagePath = filepath.Dir(packagePath)
 				}
 				packagePath = filepath.Join(packagePath, "install")
-				imports = append(imports, strings.ToLower(fmt.Sprintf("%s \"%s\"", group.Group.NonEmpty(), path.Vendorless(packagePath))))
+				imports = append(imports, strings.ToLower(fmt.Sprintf("%s \"%s\"", group.PackageName, path.Vendorless(packagePath))))
 				break
 			} else {
-				imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", group.Group.NonEmpty(), version.NonEmpty(), path.Vendorless(packagePath))))
+				imports = append(imports, strings.ToLower(fmt.Sprintf("%s%s \"%s\"", group.PackageName, version.NonEmpty(), path.Vendorless(packagePath))))
 			}
 		}
 	}
@@ -80,7 +80,7 @@ func (g *GenScheme) Imports(c *generator.Context) (imports []string) {
 func (g *GenScheme) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 
-	allGroupVersions := clientgentypes.ToGroupVersionPackages(g.Groups)
+	allGroupVersions := clientgentypes.ToGroupVersionPackages(g.Groups, nil)
 	allInstallGroups := clientgentypes.ToGroupInstallPackages(g.Groups)
 
 	m := map[string]interface{}{

@@ -18,6 +18,7 @@ package generators
 
 import (
 	"io"
+	"path"
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	"k8s.io/gengo/generator"
@@ -34,6 +35,7 @@ type factoryGenerator struct {
 	outputPackage             string
 	imports                   namer.ImportTracker
 	groupVersions             map[string]clientgentypes.GroupVersions
+	gvGoNames                 map[string]string
 	clientSetPackage          string
 	internalInterfacesPackage string
 	filtered                  bool
@@ -67,15 +69,16 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 
 	gvInterfaces := make(map[string]*types.Type)
 	gvNewFuncs := make(map[string]*types.Type)
-	for groupName := range g.groupVersions {
-		gvInterfaces[groupName] = c.Universe.Type(types.Name{Package: packageForGroup(vendorless(g.outputPackage), g.groupVersions[groupName].Group), Name: "Interface"})
-		gvNewFuncs[groupName] = c.Universe.Function(types.Name{Package: packageForGroup(vendorless(g.outputPackage), g.groupVersions[groupName].Group), Name: "New"})
+	for groupPkgName := range g.groupVersions {
+		gvInterfaces[groupPkgName] = c.Universe.Type(types.Name{Package: path.Join(g.outputPackage, groupPkgName), Name: "Interface"})
+		gvNewFuncs[groupPkgName] = c.Universe.Function(types.Name{Package: path.Join(g.outputPackage, groupPkgName), Name: "New"})
 	}
 	m := map[string]interface{}{
 		"cacheSharedIndexInformer":   c.Universe.Type(cacheSharedIndexInformer),
 		"groupVersions":              g.groupVersions,
 		"gvInterfaces":               gvInterfaces,
 		"gvNewFuncs":                 gvNewFuncs,
+		"gvGoNames":                  g.gvGoNames,
 		"interfacesNewInformerFunc":  c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "NewInformerFunc"}),
 		"informerFactoryInterface":   c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
 		"clientSetInterface":         c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"}),
@@ -177,14 +180,16 @@ type SharedInformerFactory interface {
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
 	{{$gvInterfaces := .gvInterfaces}}
-	{{range $groupName, $group := .groupVersions}}{{$groupName}}() {{index $gvInterfaces $groupName|raw}}
+	{{$gvGoNames := .gvGoNames}}
+	{{range $groupName, $group := .groupVersions}}{{index $gvGoNames $groupName}}() {{index $gvInterfaces $groupName|raw}}
 	{{end}}
 }
 
 {{$gvNewFuncs := .gvNewFuncs}}
-{{range $groupName, $group := .groupVersions}}
-func (f *sharedInformerFactory) {{$groupName}}() {{index $gvInterfaces $groupName|raw}} {
-  return {{index $gvNewFuncs $groupName|raw}}(f)
+{{$gvGoNames := .gvGoNames}}
+{{range $groupPkgName, $group := .groupVersions}}
+func (f *sharedInformerFactory) {{index $gvGoNames $groupPkgName}}() {{index $gvInterfaces $groupPkgName|raw}} {
+  return {{index $gvNewFuncs $groupPkgName|raw}}(f)
 }
 {{end}}
 `
