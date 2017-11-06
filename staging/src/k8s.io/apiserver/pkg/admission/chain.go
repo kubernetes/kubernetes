@@ -16,22 +16,38 @@ limitations under the License.
 
 package admission
 
-// chainAdmissionHandler is an instance of admission.Interface that performs admission control using a chain of admission handlers
-type chainAdmissionHandler []Interface
+import "time"
+
+// chainAdmissionHandler is an instance of admission.Interface that performs admission control using
+// a chain of admission handlers
+type chainAdmissionHandler []NamedHandler
 
 // NewChainHandler creates a new chain handler from an array of handlers. Used for testing.
-func NewChainHandler(handlers ...Interface) chainAdmissionHandler {
+func NewChainHandler(handlers ...NamedHandler) chainAdmissionHandler {
 	return chainAdmissionHandler(handlers)
 }
 
+const (
+	stepValidating = "validating"
+	stepMutating   = "mutating"
+)
+
 // Admit performs an admission control check using a chain of handlers, and returns immediately on first error
 func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
+	var err error
+	start := time.Now()
+	defer func() {
+		ObserveAdmissionStep(time.Since(start), err != nil, a, stepMutating)
+	}()
+
 	for _, handler := range admissionHandler {
 		if !handler.Handles(a.GetOperation()) {
 			continue
 		}
 		if mutator, ok := handler.(MutationInterface); ok {
-			err := mutator.Admit(a)
+			t := time.Now()
+			err = mutator.Admit(a)
+			ObserveAdmissionController(time.Since(t), err != nil, handler, a)
 			if err != nil {
 				return err
 			}
@@ -42,12 +58,20 @@ func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
 
 // Validate performs an admission control check using a chain of handlers, and returns immediately on first error
 func (admissionHandler chainAdmissionHandler) Validate(a Attributes) error {
+	var err error
+	start := time.Now()
+	defer func() {
+		ObserveAdmissionStep(time.Since(start), err != nil, a, stepValidating)
+	}()
+
 	for _, handler := range admissionHandler {
 		if !handler.Handles(a.GetOperation()) {
 			continue
 		}
 		if validator, ok := handler.(ValidationInterface); ok {
-			err := validator.Validate(a)
+			t := time.Now()
+			err = validator.Validate(a)
+			ObserveAdmissionController(time.Since(t), err != nil, handler, a)
 			if err != nil {
 				return err
 			}
