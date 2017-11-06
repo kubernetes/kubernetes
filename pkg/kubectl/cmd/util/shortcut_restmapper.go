@@ -79,22 +79,24 @@ func (e shortcutExpander) RESTMappings(gk schema.GroupKind, versions ...string) 
 func (e shortcutExpander) getShortcutMappings() ([]kubectl.ResourceShortcuts, error) {
 	res := []kubectl.ResourceShortcuts{}
 	// get server resources
+	// This can return an error *and* the results it was able to find.  We don't need to fail on the error.
 	apiResList, err := e.discoveryClient.ServerResources()
-	if err == nil {
-		for _, apiResources := range apiResList {
-			for _, apiRes := range apiResources.APIResources {
-				for _, shortName := range apiRes.ShortNames {
-					gv, err := schema.ParseGroupVersion(apiResources.GroupVersion)
-					if err != nil {
-						glog.V(1).Infof("Unable to parse groupversion = %s due to = %s", apiResources.GroupVersion, err.Error())
-						continue
-					}
-					rs := kubectl.ResourceShortcuts{
-						ShortForm: schema.GroupResource{Group: gv.Group, Resource: shortName},
-						LongForm:  schema.GroupResource{Group: gv.Group, Resource: apiRes.Name},
-					}
-					res = append(res, rs)
+	if err != nil {
+		glog.V(1).Infof("Error loading discovery information: %v", err)
+	}
+	for _, apiResources := range apiResList {
+		for _, apiRes := range apiResources.APIResources {
+			for _, shortName := range apiRes.ShortNames {
+				gv, err := schema.ParseGroupVersion(apiResources.GroupVersion)
+				if err != nil {
+					glog.V(1).Infof("Unable to parse groupversion = %s due to = %s", apiResources.GroupVersion, err.Error())
+					continue
 				}
+				rs := kubectl.ResourceShortcuts{
+					ShortForm: schema.GroupResource{Group: gv.Group, Resource: shortName},
+					LongForm:  schema.GroupResource{Group: gv.Group, Resource: apiRes.Name},
+				}
+				res = append(res, rs)
 			}
 		}
 	}
