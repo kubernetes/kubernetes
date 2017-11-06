@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -78,6 +79,11 @@ const (
 	VolumeInUseStatus     = "in-use"
 	VolumeDeletedStatus   = "deleted"
 	VolumeErrorStatus     = "error"
+
+	// On some environments, we need to query the metadata service in order
+	// to locate disks. We'll use the Newton version, which includes device
+	// metadata.
+	NewtonMetadataVersion = "2016-06-30"
 )
 
 func (volumes *VolumesV1) createVolume(opts VolumeCreateOpts) (string, string, error) {
@@ -305,8 +311,9 @@ func (os *OpenStack) CreateVolume(name string, size int, vtype, availability str
 }
 
 // GetDevicePath returns the path of an attached block storage volume, specified by its id.
-func (os *OpenStack) GetDevicePath(volumeID string) string {
-	// Build a list of candidate device paths
+func (os *OpenStack) GetDevicePathBySerialId(volumeID string) string {
+	// Build a list of candidate device paths.
+	// Certain Nova drivers will set the disk serial ID, including the Cinder volume id.
 	candidateDeviceNodes := []string{
 		// KVM
 		fmt.Sprintf("virtio-%s", volumeID[:20]),
@@ -327,8 +334,72 @@ func (os *OpenStack) GetDevicePath(volumeID string) string {
 		}
 	}
 
-	glog.Warningf("Failed to find device for the volumeID: %q\n", volumeID)
+	glog.V(4).Infof("Failed to find device for the volumeID: %q by serial ID", volumeID)
 	return ""
+}
+
+func (os *OpenStack) GetDevicePathFromInstanceMetadata(volumeID string) string {
+	// Nova Hyper-V hosts cannot override disk SCSI IDs. In order to locate
+	// volumes, we're querying the metadata service. Note that the Hyper-V
+	// driver will include device metadata for untagged volumes as well.
+	//
+	// We're avoiding using cached metadata (or the configdrive),
+	// relying on the metadata service.
+	instanceMetadata, err := getMetadataFromMetadataService(
+		NewtonMetadataVersion)
+
+	if err != nil {
+		glog.V(4).Infof(
+			"Could not retrieve instance metadata. Error: %v", err)
+		return ""
+	}
+
+	for _, device := range instanceMetadata.Devices {
+		if device.Type == "disk" && device.Serial == volumeID {
+			glog.V(4).Infof(
+				"Found disk metadata for volumeID %q. Bus: %q, Address: %q",
+				volumeID, device.Bus, device.Address)
+
+			diskPattern := fmt.Sprintf(
+				"/dev/disk/by-path/*-%s-%s",
+				device.Bus, device.Address)
+			diskPaths, err := filepath.Glob(diskPattern)
+			if err != nil {
+				glog.Errorf(
+					"could not retrieve disk path for volumeID: %q. Error filepath.Glob(%q): %v",
+					volumeID, diskPattern, err)
+				return ""
+			}
+
+			if len(diskPaths) == 1 {
+				return diskPaths[0]
+			}
+
+			glog.Errorf(
+				"expecting to find one disk path for volumeID %q, found %d: %v",
+				volumeID, len(diskPaths), diskPaths)
+			return ""
+		}
+	}
+
+	glog.V(4).Infof(
+		"Could not retrieve device metadata for volumeID: %q", volumeID)
+	return ""
+}
+
+// GetDevicePath returns the path of an attached block storage volume, specified by its id.
+func (os *OpenStack) GetDevicePath(volumeID string) string {
+	devicePath := os.GetDevicePathBySerialId(volumeID)
+
+	if devicePath == "" {
+		devicePath = os.GetDevicePathFromInstanceMetadata(volumeID)
+	}
+
+	if devicePath == "" {
+		glog.Warningf("Failed to find device for the volumeID: %q", volumeID)
+	}
+
+	return devicePath
 }
 
 func (os *OpenStack) DeleteVolume(volumeID string) error {
