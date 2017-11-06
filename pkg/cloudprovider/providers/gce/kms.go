@@ -17,9 +17,11 @@ limitations under the License.
 package gce
 
 import (
+	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/golang/glog"
 	cloudkms "google.golang.org/api/cloudkms/v1"
@@ -66,7 +68,11 @@ func readGCPCloudKMSConfig(reader io.Reader) (*gkmsConfig, error) {
 // using Google Cloud KMS service.
 type gkmsService struct {
 	parentName      string
+	parentHash      string
 	cloudkmsService *cloudkms.Service
+
+	// latestKeyName is the key name which was used during the last encrypt request.
+	latestKeyName string
 }
 
 // getGCPCloudKMSService provides a Google Cloud KMS based implementation of envelope.Service.
@@ -112,15 +118,21 @@ func (gce *GCECloud) getGCPCloudKMSService(config io.Reader) (envelope.Service, 
 	if err != nil && unrecoverableCreationError(err) {
 		return nil, err
 	}
+
 	parentName = parentName + "/cryptoKeys/" + cryptoKey
+
+	hasher := sha1.New()
+	hasher.Write([]byte(parentName))
 
 	service := &gkmsService{
 		parentName:      parentName,
+		parentHash:      base64.URLEncoding.EncodeToString(hasher.Sum(nil)),
 		cloudkmsService: cloudkmsService,
 	}
 
 	// Sanity check before startup. For non-GCP clusters, the user's account may not have permissions to create
 	// the key. We need to verify the existence of the key before apiserver startup.
+	// This also sets the latestKeyVersion known to this transformer.
 	_, err = service.Encrypt([]byte("test"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt data using Google cloudkms, using key %s. Ensure that the keyRing and cryptoKey exist. Got error: %v", parentName, err)
@@ -129,11 +141,18 @@ func (gce *GCECloud) getGCPCloudKMSService(config io.Reader) (envelope.Service, 
 	return service, nil
 }
 
-// Decrypt decrypts a base64 representation of encrypted bytes.
+// Decrypt decrypts a base64 representation of ("<parent-name>:<key-used-to-encrypt>:<encrypted bytes>").
 func (t *gkmsService) Decrypt(data string) ([]byte, error) {
+	// Extract the ciphertext and key name from the on-disk data. Verify that the data was encrypted
+	// by this google-cloudkms key.
+	encData, _, err := t.parseDataWithHeader(data)
+	if err != nil {
+		return nil, err
+	}
+
 	resp, err := t.cloudkmsService.Projects.Locations.KeyRings.CryptoKeys.
 		Decrypt(t.parentName, &cloudkms.DecryptRequest{
-			Ciphertext: data,
+			Ciphertext: encData,
 		}).Do()
 	if err != nil {
 		return nil, err
@@ -141,7 +160,7 @@ func (t *gkmsService) Decrypt(data string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(resp.Plaintext)
 }
 
-// Encrypt encrypts bytes, and returns base64 representation of the ciphertext.
+// Encrypt encrypts bytes, and returns base64 representation of ("<parent-name>:<key-used-to-encrypt>:<encrypted bytes>").
 func (t *gkmsService) Encrypt(data []byte) (string, error) {
 	resp, err := t.cloudkmsService.Projects.Locations.KeyRings.CryptoKeys.
 		Encrypt(t.parentName, &cloudkms.EncryptRequest{
@@ -150,7 +169,35 @@ func (t *gkmsService) Encrypt(data []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return resp.Ciphertext, nil
+
+	t.latestKeyName = resp.Name
+	return t.createDataWithHeader(resp.Name, resp.Ciphertext), nil
+}
+
+// createDataWithHeader converts the ciphertext to on-disk representation by storing
+// the parent key name's hash with it, along with the full key name used for encryption.
+// It is assumed that data and keyName do not contain the ":" character.
+func (t *gkmsService) createDataWithHeader(keyVersionName, data string) string {
+	return t.parentHash + ":" + keyVersionName + ":" + data
+}
+
+// parseDataWithHeader parses the on-disk representation of data. It verifies the parent name
+// used to encrypt the data with the parent name of this transformer. It returns the actual
+// cipher text, and the key version (full path) used to encrypt the data.
+func (t *gkmsService) parseDataWithHeader(data string) (string, string, error) {
+	dataChunks := strings.SplitN(data, ":", 3)
+	if len(dataChunks) != 3 {
+		return "", "", fmt.Errorf("invalid data encountered for decryption: %q. Missing key's parent-hash or key-name", data)
+	}
+
+	if t.parentHash != dataChunks[0] {
+		key, err := base64.StdEncoding.DecodeString(dataChunks[0])
+		if err != nil {
+			return "", "", fmt.Errorf("invalid base64 representation of key's parent name encountered with encrypted data: %q", dataChunks[0])
+		}
+		return "", "", fmt.Errorf("data not encrypted by this google-cloudkms key. Key used: %q", key)
+	}
+	return dataChunks[2], dataChunks[1], nil
 }
 
 // unrecoverableCreationError decides if Kubernetes should ignore the encountered Google KMS
