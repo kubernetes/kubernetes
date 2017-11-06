@@ -18,7 +18,13 @@ package admission
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"testing"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -46,7 +52,7 @@ func (h *FakeHandler) Validate(a Attributes) (err error) {
 	return fmt.Errorf("Don't admit")
 }
 
-func makeHandler(name string, admit bool, ops ...Operation) Interface {
+func makeHandler(name string, admit bool, ops ...Operation) *FakeHandler {
 	return &FakeHandler{
 		name:    name,
 		admit:   admit,
@@ -54,18 +60,31 @@ func makeHandler(name string, admit bool, ops ...Operation) Interface {
 	}
 }
 
+func makeChain(handlers ...*FakeHandler) chainAdmissionHandler {
+	chain := chainAdmissionHandler{}
+	for _, fh := range handlers {
+		chain = chain.Append(fh.name, fh)
+	}
+	return chain
+}
+
 func TestAdmit(t *testing.T) {
+	sysns := "kube-system"
+	otherns := "default"
 	tests := []struct {
 		name      string
+		ns        string
 		operation Operation
-		chain     chainAdmissionHandler
+		chain     []*FakeHandler
 		accept    bool
+		reject    string
 		calls     map[string]bool
 	}{
 		{
 			name:      "all accept",
+			ns:        sysns,
 			operation: Create,
-			chain: []Interface{
+			chain: []*FakeHandler{
 				makeHandler("a", true, Update, Delete, Create),
 				makeHandler("b", true, Delete, Create),
 				makeHandler("c", true, Create),
@@ -75,8 +94,9 @@ func TestAdmit(t *testing.T) {
 		},
 		{
 			name:      "ignore handler",
+			ns:        otherns,
 			operation: Create,
-			chain: []Interface{
+			chain: []*FakeHandler{
 				makeHandler("a", true, Update, Delete, Create),
 				makeHandler("b", false, Delete),
 				makeHandler("c", true, Create),
@@ -86,8 +106,9 @@ func TestAdmit(t *testing.T) {
 		},
 		{
 			name:      "ignore all",
+			ns:        sysns,
 			operation: Connect,
-			chain: []Interface{
+			chain: []*FakeHandler{
 				makeHandler("a", true, Update, Delete, Create),
 				makeHandler("b", false, Delete),
 				makeHandler("c", true, Create),
@@ -97,39 +118,44 @@ func TestAdmit(t *testing.T) {
 		},
 		{
 			name:      "reject one",
+			ns:        otherns,
 			operation: Delete,
-			chain: []Interface{
+			chain: []*FakeHandler{
 				makeHandler("a", true, Update, Delete, Create),
 				makeHandler("b", false, Delete),
 				makeHandler("c", true, Create),
 			},
 			calls:  map[string]bool{"a": true, "b": true},
 			accept: false,
+			reject: "b",
 		},
 	}
 	for _, test := range tests {
-		err := test.chain.Admit(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", test.operation, nil))
+		t.Logf("testcase = %s", test.name)
+		chain := makeChain(test.chain...)
+		resetMetrics()
+		err := chain.Admit(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, nil))
 		accepted := (err == nil)
 		if accepted != test.accept {
-			t.Errorf("%s: unexpected result of admit call: %v\n", test.name, accepted)
+			t.Errorf("unexpected result of admit call: %v", accepted)
 		}
-		for _, h := range test.chain {
-			fake := h.(*FakeHandler)
+		for _, fake := range test.chain {
 			_, shouldBeCalled := test.calls[fake.name]
 			if shouldBeCalled != fake.admitCalled {
-				t.Errorf("%s: handler %s not called as expected: %v", test.name, fake.name, fake.admitCalled)
+				t.Errorf("handler %s not called as expected: %v", fake.name, fake.admitCalled)
 				continue
 			}
 		}
+		expectMetrics(t, test.reject, test.ns == sysns)
 	}
 }
 
 func TestHandles(t *testing.T) {
-	chain := chainAdmissionHandler{
+	chain := makeChain(
 		makeHandler("a", true, Update, Delete, Create),
 		makeHandler("b", true, Delete, Create),
 		makeHandler("c", true, Create),
-	}
+	)
 
 	tests := []struct {
 		name      string
@@ -159,4 +185,45 @@ func TestHandles(t *testing.T) {
 			t.Errorf("Unexpected handles result. Expected: %v. Actual: %v", test.expected, handles)
 		}
 	}
+}
+
+// Expect these metrics to be incremented after a single call to Admit.
+func expectMetrics(t *testing.T, reject string, systemNs bool) {
+	metrics, err := prometheus.DefaultGatherer.Gather()
+	require.NoError(t, err)
+
+	for _, mf := range metrics {
+		if !strings.HasPrefix(mf.GetName(), "apiserver_admission_") {
+			continue // Ignore other metrics.
+		}
+		for _, metric := range mf.GetMetric() {
+			for _, lp := range metric.GetLabel() {
+				switch lp.GetName() {
+				case "is_system_ns":
+					assert.Equal(t, strconv.FormatBool(systemNs), lp.GetValue(), "metric=%s", mf.GetName())
+				case "plugin":
+					assert.Equal(t, reject, lp.GetValue(), "metric=%s", mf.GetName())
+				default:
+					t.Errorf("Unexpected metric label %s on %s", lp.GetName(), mf.GetName())
+				}
+			}
+			switch mf.GetName() {
+			case "apiserver_admission_handle_total":
+				assert.EqualValues(t, 1, metric.GetCounter().GetValue())
+			case "apiserver_admission_reject_total":
+				if reject == "" {
+					t.Errorf("Unexpected reject")
+				}
+				assert.EqualValues(t, 1, metric.GetCounter().GetValue())
+			default:
+				t.Errorf("Unexpected metric: %s", mf.GetName())
+				continue
+			}
+		}
+	}
+}
+
+func resetMetrics() {
+	handleCounter.Reset()
+	rejectCounter.Reset()
 }
