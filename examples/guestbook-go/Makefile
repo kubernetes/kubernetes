@@ -15,9 +15,9 @@
 # Build the guestbook-go example
 
 # Usage:
-#   [VERSION=v3] [REGISTRY="gcr.io/google_containers"] make build
+#   [VERSION=v3] [REGISTRY="k8s.gcr.io"] make build
 VERSION?=v3
-REGISTRY?=gcr.io/google_containers
+REGISTRY?=k8s.gcr.io
 
 release: clean build push clean
 
@@ -29,7 +29,7 @@ build:
 
 # push the image to an registry
 push:
-	gcloud docker -- push ${REGISTRY}/guestbook:${VERSION}
+	gcloud docker --server=k8s.gcr.io -- push ${REGISTRY}/guestbook:${VERSION}
 
 # remove previous images and containers
 clean:

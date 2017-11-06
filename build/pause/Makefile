@@ -14,7 +14,7 @@
 
 .PHONY: all push push-legacy container clean orphan
 
-REGISTRY ?= gcr.io/google_containers
+REGISTRY ?= k8s.gcr.io
 IMAGE = $(REGISTRY)/pause-$(ARCH)
 LEGACY_AMD64_IMAGE = $(REGISTRY)/pause
 
@@ -26,7 +26,7 @@ ARCH ?= amd64
 ALL_ARCH = amd64 arm arm64 ppc64le s390x
 
 CFLAGS = -Os -Wall -Werror -static
-KUBE_CROSS_IMAGE ?= gcr.io/google_containers/kube-cross
+KUBE_CROSS_IMAGE ?= k8s.gcr.io/kube-cross
 KUBE_CROSS_VERSION ?= $(shell cat ../build-image/cross/VERSION)
 
 BIN = pause
@@ -87,13 +87,13 @@ endif
 
 push: .push-$(ARCH)
 .push-$(ARCH): .container-$(ARCH)
-	gcloud docker -- push $(IMAGE):$(TAG)
+	gcloud docker --server=k8s.gcr.io -- push $(IMAGE):$(TAG)
 	touch $@
 
 push-legacy: .push-legacy-$(ARCH)
 .push-legacy-$(ARCH): .container-$(ARCH)
 ifeq ($(ARCH),amd64)
-	gcloud docker -- push $(LEGACY_AMD64_IMAGE):$(TAG)
+	gcloud docker --server=k8s.gcr.io -- push $(LEGACY_AMD64_IMAGE):$(TAG)
 endif
 	touch $@
 

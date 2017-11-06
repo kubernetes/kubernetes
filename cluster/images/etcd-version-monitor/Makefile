@@ -15,11 +15,11 @@
 # Build the etcd-version-monitor image
 #
 # Usage:
-# 	[GOLANG_VERSION=1.8.3] [REGISTRY=gcr.io/google-containers] [TAG=test] make (build|push)
+# 	[GOLANG_VERSION=1.8.3] [REGISTRY=k8s.gcr.io] [TAG=test] make (build|push)
 # TODO(shyamjvs): Support architectures other than amd64 if needed.
 ARCH:=amd64
 GOLANG_VERSION?=1.8.3
-REGISTRY?=gcr.io/google-containers
+REGISTRY?=k8s.gcr.io
 TAG?=0.1.0
 IMAGE:=$(REGISTRY)/etcd-version-monitor:$(TAG)
 CURRENT_DIR:=$(pwd)
@@ -36,7 +36,7 @@ build:
 	docker build -t $(IMAGE) $(TEMP_DIR)
 
 push: build
-	gcloud docker -- push $(IMAGE)
+	gcloud docker --server=k8s.gcr.io -- push $(IMAGE)
 
 all: build
 

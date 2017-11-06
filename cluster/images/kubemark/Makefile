@@ -24,7 +24,7 @@ build:
 	docker build --pull -t $(REGISTRY)/$(PROJECT)/kubemark .
 
 gcloudpush: build
-	gcloud docker -- push $(REGISTRY)/$(PROJECT)/kubemark
+	gcloud docker --server=k8s.gcr.io -- push $(REGISTRY)/$(PROJECT)/kubemark
 
 push: build
 	docker -- push $(REGISTRY)/$(PROJECT)/kubemark

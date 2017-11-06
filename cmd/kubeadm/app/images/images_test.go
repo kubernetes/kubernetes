@@ -27,7 +27,7 @@ import (
 const (
 	testversion = "v10.1.2-alpha.1.100+0123456789abcdef+SOMETHING"
 	expected    = "v10.1.2-alpha.1.100_0123456789abcdef_SOMETHING"
-	gcrPrefix   = "gcr.io/google_containers"
+	gcrPrefix   = "k8s.gcr.io"
 )
 
 func TestGetCoreImage(t *testing.T) {

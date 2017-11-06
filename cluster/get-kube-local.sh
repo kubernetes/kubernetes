@@ -97,7 +97,7 @@ function create_cluster {
   --pid=host \
   --privileged=true \
   -d \
-  gcr.io/google_containers/hyperkube-${arch}:${release} \
+  k8s.gcr.io/hyperkube-${arch}:${release} \
     /hyperkube kubelet \
       --containerized \
       --hostname-override="127.0.0.1" \

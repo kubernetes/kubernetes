@@ -4,7 +4,7 @@ metadata:
   name: test-portworx-volume-pod
 spec:
   containers:
-  - image: gcr.io/google_containers/test-webserver
+  - image: k8s.gcr.io/test-webserver
     name: test-container
     volumeMounts:
     - mountPath: /test-portworx-volume

@@ -43,7 +43,7 @@ spec:
         scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       containers:
-        - image: gcr.io/google_containers/heapster-amd64:v1.5.0-beta.0
+        - image: k8s.gcr.io/heapster-amd64:v1.5.0-beta.0
           name: heapster
           livenessProbe:
             httpGet:
@@ -65,7 +65,7 @@ spec:
               readOnly: true
         # BEGIN_PROMETHEUS_TO_SD
         - name: prom-to-sd
-          image: gcr.io/google-containers/prometheus-to-sd:v0.2.2
+          image: k8s.gcr.io/prometheus-to-sd:v0.2.2
           command:
             - /monitor
             - --source=heapster:http://localhost:8082?whitelisted=stackdriver_requests_count,stackdriver_timeseries_count
@@ -83,7 +83,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
         # END_PROMETHEUS_TO_SD
-        - image: gcr.io/google_containers/addon-resizer:1.7
+        - image: k8s.gcr.io/addon-resizer:1.7
           name: heapster-nanny
           resources:
             limits:
