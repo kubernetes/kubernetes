@@ -17,6 +17,8 @@ limitations under the License.
 package registry
 
 import (
+	"sync"
+
 	"github.com/golang/glog"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,13 +84,23 @@ func StorageWithCacher(capacity int) generic.StorageDecorator {
 // only from the test harness, so Register/Cleanup will be
 // no-op at runtime.
 
+var cleanupLock sync.Mutex
 var cleanup []func() = nil
 
 func TrackStorageCleanup() {
+	cleanupLock.Lock()
+	defer cleanupLock.Unlock()
+
+	if cleanup != nil {
+		panic("Conflicting storage tracking")
+	}
 	cleanup = make([]func(), 0)
 }
 
 func RegisterStorageCleanup(fn func()) {
+	cleanupLock.Lock()
+	defer cleanupLock.Unlock()
+
 	if cleanup == nil {
 		return
 	}
@@ -96,11 +108,12 @@ func RegisterStorageCleanup(fn func()) {
 }
 
 func CleanupStorage() {
-	if cleanup == nil {
-		return
-	}
-	for _, d := range cleanup {
+	cleanupLock.Lock()
+	old := cleanup
+	cleanup = nil
+	cleanupLock.Unlock()
+
+	for _, d := range old {
 		d()
 	}
-	cleanup = nil
 }
