@@ -4965,6 +4965,17 @@ runTests() {
   fi
 }
 
+run_check_command_return_code() {
+  set -o nounset
+  set -o errexit
+
+  kube::log::status "Testing command return code"
+  kube::test::check_return_code "kubectl plugin will-fail-plugin" "2"
+
+  set +o nounset
+  set +o errexit
+}
+
 run_initializer_tests() {
   set -o nounset
   set -o errexit
