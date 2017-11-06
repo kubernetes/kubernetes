@@ -92,6 +92,7 @@ func TestSummaryProvider(t *testing.T) {
 		StartTime:          cgroupStatsMap["/kubelet"].cs.StartTime,
 		CPU:                cgroupStatsMap["/kubelet"].cs.CPU,
 		Memory:             cgroupStatsMap["/kubelet"].cs.Memory,
+		Accelerators:       cgroupStatsMap["/kubelet"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/kubelet"].cs.UserDefinedMetrics,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
@@ -99,6 +100,7 @@ func TestSummaryProvider(t *testing.T) {
 		StartTime:          cgroupStatsMap["/misc"].cs.StartTime,
 		CPU:                cgroupStatsMap["/misc"].cs.CPU,
 		Memory:             cgroupStatsMap["/misc"].cs.Memory,
+		Accelerators:       cgroupStatsMap["/misc"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/misc"].cs.UserDefinedMetrics,
 	})
 	assert.Contains(summary.Node.SystemContainers, statsapi.ContainerStats{
@@ -106,6 +108,7 @@ func TestSummaryProvider(t *testing.T) {
 		StartTime:          cgroupStatsMap["/runtime"].cs.StartTime,
 		CPU:                cgroupStatsMap["/runtime"].cs.CPU,
 		Memory:             cgroupStatsMap["/runtime"].cs.Memory,
+		Accelerators:       cgroupStatsMap["/runtime"].cs.Accelerators,
 		UserDefinedMetrics: cgroupStatsMap["/runtime"].cs.UserDefinedMetrics,
 	})
 	assert.Equal(summary.Pods, podStats)

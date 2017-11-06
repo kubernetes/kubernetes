@@ -119,6 +119,17 @@ func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo
 		}
 	}
 
+	for _, acc := range cstat.Accelerators {
+		result.Accelerators = append(result.Accelerators, statsapi.AcceleratorStats{
+			Make:        acc.Make,
+			Model:       acc.Model,
+			ID:          acc.ID,
+			MemoryTotal: acc.MemoryTotal,
+			MemoryUsed:  acc.MemoryUsed,
+			DutyCycle:   acc.DutyCycle,
+		})
+	}
+
 	result.UserDefinedMetrics = cadvisorInfoToUserDefinedMetrics(info)
 
 	return result

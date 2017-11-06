@@ -97,6 +97,7 @@ var _ = framework.KubeDescribe("Summary API", func() {
 						"PageFaults":      bounded(1000, 1E9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),
+					"Accelerators":       BeEmpty(),
 					"Rootfs":             BeNil(),
 					"Logs":               BeNil(),
 					"UserDefinedMetrics": BeEmpty(),
@@ -145,6 +146,7 @@ var _ = framework.KubeDescribe("Summary API", func() {
 							"PageFaults":      bounded(100, 1000000),
 							"MajorPageFaults": bounded(0, 10),
 						}),
+						"Accelerators": BeEmpty(),
 						"Rootfs": ptrMatchAllFields(gstruct.Fields{
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
