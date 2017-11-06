@@ -33,6 +33,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util/cmdproto"
 )
 
 const (
@@ -341,7 +342,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 	cmds.AddCommand(NewCmdVersion(f, out))
 	cmds.AddCommand(NewCmdApiVersions(f, out))
 	cmds.AddCommand(NewCmdOptions(out))
-
+	cmds.AddCommand(cmdproto.CmdSetup(f, in, out, err, new(TestOptions)))
 	return cmds
 }
 
