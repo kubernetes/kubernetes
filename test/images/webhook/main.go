@@ -44,8 +44,8 @@ func (c *Config) addFlags() {
 		"File containing the default x509 private key matching --tls-cert-file.")
 }
 
-func toAdmissionReviewStatus(err error) *v1alpha1.AdmissionReviewStatus {
-	return &v1alpha1.AdmissionReviewStatus{
+func toAdmissionResponse(err error) *v1alpha1.AdmissionResponse {
+	return &v1alpha1.AdmissionResponse{
 		Result: &metav1.Status{
 			Message: err.Error(),
 		},
@@ -53,101 +53,101 @@ func toAdmissionReviewStatus(err error) *v1alpha1.AdmissionReviewStatus {
 }
 
 // only allow pods to pull images from specific registry.
-func admitPods(ar v1alpha1.AdmissionReview) *v1alpha1.AdmissionReviewStatus {
+func admitPods(ar v1alpha1.AdmissionReview) *v1alpha1.AdmissionResponse {
 	glog.V(2).Info("admitting pods")
 	podResource := metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
-	if ar.Spec.Resource != podResource {
+	if ar.Request.Resource != podResource {
 		err := fmt.Errorf("expect resource to be %s", podResource)
 		glog.Error(err)
-		return toAdmissionReviewStatus(err)
+		return toAdmissionResponse(err)
 	}
 
-	raw := ar.Spec.Object.Raw
+	raw := ar.Request.Object.Raw
 	pod := corev1.Pod{}
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(raw, nil, &pod); err != nil {
 		glog.Error(err)
-		return toAdmissionReviewStatus(err)
+		return toAdmissionResponse(err)
 	}
-	reviewStatus := v1alpha1.AdmissionReviewStatus{}
-	reviewStatus.Allowed = true
+	reviewResponse := v1alpha1.AdmissionResponse{}
+	reviewResponse.Allowed = true
 
 	var msg string
 	for k, v := range pod.Labels {
 		if k == "webhook-e2e-test" && v == "webhook-disallow" {
-			reviewStatus.Allowed = false
+			reviewResponse.Allowed = false
 			msg = msg + "the pod contains unwanted label; "
 		}
 	}
 	for _, container := range pod.Spec.Containers {
 		if strings.Contains(container.Name, "webhook-disallow") {
-			reviewStatus.Allowed = false
+			reviewResponse.Allowed = false
 			msg = msg + "the pod contains unwanted container name; "
 		}
 	}
-	if !reviewStatus.Allowed {
-		reviewStatus.Result = &metav1.Status{Message: strings.TrimSpace(msg)}
+	if !reviewResponse.Allowed {
+		reviewResponse.Result = &metav1.Status{Message: strings.TrimSpace(msg)}
 	}
-	return &reviewStatus
+	return &reviewResponse
 }
 
 // deny configmaps with specific key-value pair.
-func admitConfigMaps(ar v1alpha1.AdmissionReview) *v1alpha1.AdmissionReviewStatus {
+func admitConfigMaps(ar v1alpha1.AdmissionReview) *v1alpha1.AdmissionResponse {
 	glog.V(2).Info("admitting configmaps")
 	configMapResource := metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
-	if ar.Spec.Resource != configMapResource {
+	if ar.Request.Resource != configMapResource {
 		glog.Errorf("expect resource to be %s", configMapResource)
 		return nil
 	}
 
-	raw := ar.Spec.Object.Raw
+	raw := ar.Request.Object.Raw
 	configmap := corev1.ConfigMap{}
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(raw, nil, &configmap); err != nil {
 		glog.Error(err)
-		return toAdmissionReviewStatus(err)
+		return toAdmissionResponse(err)
 	}
-	reviewStatus := v1alpha1.AdmissionReviewStatus{}
-	reviewStatus.Allowed = true
+	reviewResponse := v1alpha1.AdmissionResponse{}
+	reviewResponse.Allowed = true
 	for k, v := range configmap.Data {
 		if k == "webhook-e2e-test" && v == "webhook-disallow" {
-			reviewStatus.Allowed = false
-			reviewStatus.Result = &metav1.Status{
+			reviewResponse.Allowed = false
+			reviewResponse.Result = &metav1.Status{
 				Reason: "the configmap contains unwanted key and value",
 			}
 		}
 	}
-	return &reviewStatus
+	return &reviewResponse
 }
 
-func admitCRD(ar v1alpha1.AdmissionReview) *v1alpha1.AdmissionReviewStatus {
+func admitCRD(ar v1alpha1.AdmissionReview) *v1alpha1.AdmissionResponse {
 	glog.V(2).Info("admitting crd")
 	cr := struct {
 		metav1.ObjectMeta
 		Data map[string]string
 	}{}
 
-	raw := ar.Spec.Object.Raw
+	raw := ar.Request.Object.Raw
 	err := json.Unmarshal(raw, &cr)
 	if err != nil {
 		glog.Error(err)
-		return toAdmissionReviewStatus(err)
+		return toAdmissionResponse(err)
 	}
 
-	reviewStatus := v1alpha1.AdmissionReviewStatus{}
-	reviewStatus.Allowed = true
+	reviewResponse := v1alpha1.AdmissionResponse{}
+	reviewResponse.Allowed = true
 	for k, v := range cr.Data {
 		if k == "webhook-e2e-test" && v == "webhook-disallow" {
-			reviewStatus.Allowed = false
-			reviewStatus.Result = &metav1.Status{
+			reviewResponse.Allowed = false
+			reviewResponse.Result = &metav1.Status{
 				Reason: "the custom resource contains unwanted data",
 			}
 		}
 	}
-	return &reviewStatus
+	return &reviewResponse
 }
 
-type admitFunc func(v1alpha1.AdmissionReview) *v1alpha1.AdmissionReviewStatus
+type admitFunc func(v1alpha1.AdmissionReview) *v1alpha1.AdmissionResponse
 
 func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 	var body []byte
@@ -164,21 +164,23 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 		return
 	}
 
-	var reviewStatus *v1alpha1.AdmissionReviewStatus
+	var reviewResponse *v1alpha1.AdmissionResponse
 	ar := v1alpha1.AdmissionReview{}
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(body, nil, &ar); err != nil {
 		glog.Error(err)
-		reviewStatus = toAdmissionReviewStatus(err)
+		reviewResponse = toAdmissionResponse(err)
 	} else {
-		reviewStatus = admit(ar)
+		reviewResponse = admit(ar)
 	}
 
-	if reviewStatus != nil {
-		ar.Status = *reviewStatus
+	response := v1alpha1.AdmissionReview{}
+	if reviewResponse != nil {
+		response.Response = reviewResponse
+		response.Response.UID = ar.Request.UID
 	}
 
-	resp, err := json.Marshal(ar)
+	resp, err := json.Marshal(response)
 	if err != nil {
 		glog.Error(err)
 	}

@@ -308,9 +308,11 @@ func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Webh
 		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 
-	if response.Status.Allowed {
+	if response.Response == nil {
+		return &webhookerrors.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook response was absent")}
+	}
+	if response.Response.Allowed {
 		return nil
 	}
-
-	return webhookerrors.ToStatusErr(h.Name, response.Status.Result)
+	return webhookerrors.ToStatusErr(h.Name, response.Response.Result)
 }
