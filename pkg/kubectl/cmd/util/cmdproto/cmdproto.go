@@ -18,6 +18,7 @@ package cmdproto
 
 import (
 	"fmt"
+	"io"
 	"reflect"
 	"strconv"
 	"time"
@@ -27,10 +28,13 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	cmdproto "k8s.io/kubernetes/pkg/kubectl/cmd/util/cmdproto/k8s_io_kubectl_cmd"
+	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
-func ExtractCommandInfoFromMessage(msg interface{}) *cmdproto.CommandInfo {
+func extractCommandInfoFromMessage(msg interface{}) *cmdproto.CommandInfo {
 	_, md := descriptor.ForMessage(msg.(descriptor.Message))
 	info, err := proto.GetExtension(md.GetOptions(), cmdproto.E_Cmd)
 	if err != nil {
@@ -49,9 +53,33 @@ func extractFlagDetailFromMessage(i int, msg interface{}) (*cmdproto.FlagDetail,
 	return info.(*cmdproto.FlagDetail), nil
 }
 
-func FlagsSetup(cmd *cobra.Command, msg interface{}) {
-	v := reflect.ValueOf(msg).Elem()
+type CommandExecutor interface {
+	Complete(f cmdutil.Factory, in io.Reader, out, err io.Writer) error
+	Validate(f cmdutil.Factory, in io.Reader, out, err io.Writer) error
+	Run(f cmdutil.Factory, in io.Reader, out, err io.Writer) error
+}
 
+func CmdSetup(f cmdutil.Factory, in io.Reader, out, err io.Writer, msg interface{}) *cobra.Command {
+	flagProto := reflect.ValueOf(msg).Field(0).Interface()
+	info := extractCommandInfoFromMessage(flagProto)
+	var cmd *cobra.Command
+	cmd = &cobra.Command{
+		Use:     info.GetUse(),
+		Short:   i18n.T(info.GetDescriptionShort()),
+		Long:    i18n.T(info.GetDescriptionLong()),
+		Example: templates.Examples(i18n.T(info.GetExample())),
+		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.CheckErr(msg.(CommandExecutor).Complete(f, in, out, err))
+			cmdutil.CheckErr(msg.(CommandExecutor).Validate(f, in, out, err))
+			cmdutil.CheckErr(msg.(CommandExecutor).Run(f, in, out, err))
+		},
+	}
+	flagsSetup(cmd, flagProto)
+	return cmd
+}
+
+func flagsSetup(cmd *cobra.Command, msg interface{}) {
+	v := reflect.ValueOf(msg).Elem()
 	for i := 0; i < v.NumField()-1; i++ {
 		d, err := extractFlagDetailFromMessage(i, msg)
 		if err != nil {

@@ -17,64 +17,50 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
-	"github.com/spf13/cobra"
-
-	apimachineryversion "k8s.io/apimachinery/pkg/version"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util/cmdproto"
 	protofile "k8s.io/kubernetes/pkg/kubectl/cmd/util/cmdproto/k8s_io_kubectl_cmd"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
-var (
-	testExample = templates.Examples(i18n.T(`
-		# Print the client and server versions for the current context
-		kubectl version`))
-)
-
-type Test struct {
-	ClientVersion *apimachineryversion.Info `json:"clientVersion,omitempty" yaml:"clientVersion,omitempty"`
-	ServerVersion *apimachineryversion.Info `json:"serverVersion,omitempty" yaml:"serverVersion,omitempty"`
-}
+//TODO: those whole file could be generated since it's templated
 
 // TestOptions
 type TestOptions struct {
-	flags protofile.TestCmd
+	//Flags must be the first element of Options struct, and must be exposed
+	Flags protofile.TestCmd
 }
 
-func NewCmdTest(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := new(TestOptions)
-
-	info := cmdproto.ExtractCommandInfoFromMessage(options.flags)
-	cmd := &cobra.Command{
-		Use:     info.GetUse(),
-		Short:   i18n.T(info.GetDescriptionShort()),
-		Long:    info.GetDescriptionLong(),
-		Example: info.GetExample(),
-		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete())
-			cmdutil.CheckErr(options.Validate())
-			cmdutil.CheckErr(options.Run(f, out))
-		},
-	}
-
-	cmdproto.FlagsSetup(cmd, &options.flags)
-
-	cmd.Flags().MarkShorthandDeprecated("client", "please use --client instead.")
-	return cmd
-}
-
-func (o *TestOptions) Run(f cmdutil.Factory, out io.Writer) error {
+func (o *TestOptions) Complete(f cmdutil.Factory, in io.Reader, out, err io.Writer) error {
+	fmt.Println("This is Complete function")
+	o.Flags.GetInt32Flag()
+	o.Flags.GetBoolFlag()
+	o.Flags.GetArrayFlag()
+	o.Flags.GetTimeFlag()
+	o.Flags.GetStringFlag()
+	o.Flags.GetInt64Flag()
 	return nil
 }
 
-func (o *TestOptions) Complete() error {
+func (o *TestOptions) Validate(f cmdutil.Factory, in io.Reader, out, err io.Writer) error {
+	fmt.Println("This is Validate function")
+	o.Flags.GetInt32Flag()
+	o.Flags.GetBoolFlag()
+	o.Flags.GetArrayFlag()
+	o.Flags.GetTimeFlag()
+	o.Flags.GetStringFlag()
+	o.Flags.GetInt64Flag()
 	return nil
 }
 
-func (o *TestOptions) Validate() error {
+func (o *TestOptions) Run(f cmdutil.Factory, in io.Reader, out, err io.Writer) error {
+	fmt.Println("This is Run function")
+	o.Flags.GetInt32Flag()
+	o.Flags.GetBoolFlag()
+	o.Flags.GetArrayFlag()
+	o.Flags.GetTimeFlag()
+	o.Flags.GetStringFlag()
+	o.Flags.GetInt64Flag()
 	return nil
 }

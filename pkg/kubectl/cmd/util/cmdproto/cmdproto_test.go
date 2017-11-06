@@ -20,14 +20,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/spf13/cobra"
-
 	cmdproto "k8s.io/kubernetes/pkg/kubectl/cmd/util/cmdproto/k8s_io_kubectl_cmd"
 )
 
 func TestCommandInfoFromMessage(t *testing.T) {
 	testProto := new(cmdproto.TestCmd)
-	expected := ExtractCommandInfoFromMessage(testProto)
+	expected := extractCommandInfoFromMessage(testProto)
 
 	use := "test"
 	short := "Print the client and server version information"
@@ -106,10 +104,14 @@ func TestFlags2Proto(t *testing.T) {
 
 	for _, test := range tests {
 		testProto := new(cmdproto.TestCmd)
-		cmd := &cobra.Command{}
+		st := struct {
+			Flags *cmdproto.TestCmd
+		}{
+			Flags: testProto,
+		}
 
-		//Setup flags
-		FlagsSetup(cmd, testProto)
+		cmd := CmdSetup(nil, nil, nil, nil, st)
+
 		//stimulate user to input flags
 		for index, v := range test.flagName {
 			err := cmd.Flags().Set(v, test.flagValue[index])
