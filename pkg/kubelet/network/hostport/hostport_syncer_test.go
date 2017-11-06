@@ -223,3 +223,16 @@ func matchRule(chain *fakeChain, match string) bool {
 	}
 	return false
 }
+
+func TestHostportChainName(t *testing.T) {
+	m := make(map[string]int)
+	chain := hostportChainName(&PortMapping{HostPort: 57119, Protocol: "TCP", ContainerPort: 57119}, "testrdma-2")
+	m[string(chain)] = 1
+	chain = hostportChainName(&PortMapping{HostPort: 55429, Protocol: "TCP", ContainerPort: 55429}, "testrdma-2")
+	m[string(chain)] = 1
+	chain = hostportChainName(&PortMapping{HostPort: 56833, Protocol: "TCP", ContainerPort: 56833}, "testrdma-2")
+	m[string(chain)] = 1
+	if len(m) != 3 {
+		t.Fatal(m)
+	}
+}

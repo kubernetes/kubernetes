@@ -198,3 +198,16 @@ func TestHostportManager(t *testing.T) {
 		assert.EqualValues(t, true, port.closed)
 	}
 }
+
+func TestGetHostportChain(t *testing.T) {
+	m := make(map[string]int)
+	chain := getHostportChain("testrdma-2", &PortMapping{HostPort: 57119, Protocol: "TCP", ContainerPort: 57119})
+	m[string(chain)] = 1
+	chain = getHostportChain("testrdma-2", &PortMapping{HostPort: 55429, Protocol: "TCP", ContainerPort: 55429})
+	m[string(chain)] = 1
+	chain = getHostportChain("testrdma-2", &PortMapping{HostPort: 56833, Protocol: "TCP", ContainerPort: 56833})
+	m[string(chain)] = 1
+	if len(m) != 3 {
+		t.Fatal(m)
+	}
+}
