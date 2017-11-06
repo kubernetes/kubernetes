@@ -261,6 +261,26 @@ kube::test::if_sort_by_has_correct_order() {
   kube::test::if_has_string "$var" "${@:$#}"
 }
 
+kube::test::check_return_code() {
+    local command=$1
+    local code=$2
+
+    eval $1
+    message=$(echo $?)
+    if echo "$message" | grep -q "$match"; then
+      echo "Successful"
+      echo "expect return code:$code"
+      echo "has:$message"
+      return 0
+    else
+      echo "FAIL!"
+      echo "expect return code:$code"
+      echo "has not:$message"
+      caller
+      return 1
+    fi
+}
+
 kube::test::if_has_string() {
   local message=$1
   local match=$2
