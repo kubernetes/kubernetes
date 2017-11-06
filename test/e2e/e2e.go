@@ -222,7 +222,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	}
 
 	// Log the version of the server and this client.
-	framework.Logf("Client version: %s", version.Get().GitVersion)
+	framework.Logf("e2e test version: %s", version.Get().GitVersion)
 
 	dc := c.DiscoveryClient
 
@@ -231,7 +231,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		framework.Logf("Unexpected server error retrieving version: %v", serverErr)
 	}
 	if serverVersion != nil {
-		framework.Logf("Server version: %s", serverVersion.GitVersion)
+		framework.Logf("kube-apiserver version: %s", serverVersion.GitVersion)
 	}
 
 	// Reference common test to make the import valid.
