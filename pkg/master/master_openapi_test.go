@@ -74,7 +74,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 	if !assert.NoError(err) {
 		t.Errorf("unexpected error: %v", err)
 	}
-	assert.Equal(http.StatusOK, resp.StatusCode)
+	assert.Equal(http.StatusNotFound, resp.StatusCode)
 
 	// as json schema
 	var sch spec.Schema
