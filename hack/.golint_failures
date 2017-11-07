@@ -1,3 +1,4 @@
+
 cluster/images/etcd-version-monitor
 cmd/gke-certificates-controller/app
 cmd/hyperkube
@@ -236,9 +237,10 @@ pkg/proxy/util
 pkg/proxy/winkernel
 pkg/proxy/winuserspace
 pkg/quota/evaluator/core
-pkg/registry/admissionregistration/externaladmissionhookconfiguration/storage
 pkg/registry/admissionregistration/initializerconfiguration/storage
+pkg/registry/admissionregistration/mutatingwebhookconfiguration/storage
 pkg/registry/admissionregistration/rest
+pkg/registry/admissionregistration/validatingwebhookconfiguration/storage
 pkg/registry/apps/rest
 pkg/registry/apps/statefulset
 pkg/registry/apps/statefulset/storage
