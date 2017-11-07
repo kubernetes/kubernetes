@@ -56,7 +56,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		framework.SkipUnlessServerVersionGTE(serverWebhookVersion, f.ClientSet.Discovery())
 		framework.SkipUnlessProviderIs("gce", "gke")
 
-		_, err := f.ClientSet.AdmissionregistrationV1alpha1().ExternalAdmissionHookConfigurations().List(metav1.ListOptions{})
+		_, err := f.ClientSet.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().List(metav1.ListOptions{})
 		if errors.IsNotFound(err) {
 			framework.Skipf("dynamic configuration of webhooks requires the alpha admissionregistration.k8s.io group to be enabled")
 		}
@@ -217,11 +217,11 @@ func registerWebhook(f *framework.Framework, context *certContext) {
 	By("Registering the webhook via the AdmissionRegistration API")
 
 	namespace := f.Namespace.Name
-	_, err := client.AdmissionregistrationV1alpha1().ExternalAdmissionHookConfigurations().Create(&v1alpha1.ExternalAdmissionHookConfiguration{
+	_, err := client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().Create(&v1alpha1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: webhookConfigName,
 		},
-		ExternalAdmissionHooks: []v1alpha1.ExternalAdmissionHook{
+		Webhooks: []v1alpha1.Webhook{
 			{
 				Name: "e2e-test-webhook.k8s.io",
 				Rules: []v1alpha1.RuleWithOperations{{
@@ -232,7 +232,7 @@ func registerWebhook(f *framework.Framework, context *certContext) {
 						Resources:   []string{"pods"},
 					},
 				}},
-				ClientConfig: v1alpha1.AdmissionHookClientConfig{
+				ClientConfig: v1alpha1.WebhookClientConfig{
 					Service: v1alpha1.ServiceReference{
 						Namespace: namespace,
 						Name:      serviceName,
@@ -285,7 +285,7 @@ func nonCompliantPod(f *framework.Framework) *v1.Pod {
 
 func cleanWebhookTest(f *framework.Framework) {
 	client := f.ClientSet
-	_ = client.AdmissionregistrationV1alpha1().ExternalAdmissionHookConfigurations().Delete(webhookConfigName, nil)
+	_ = client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations().Delete(webhookConfigName, nil)
 	namespaceName := f.Namespace.Name
 	_ = client.CoreV1().Services(namespaceName).Delete(serviceName, nil)
 	_ = client.ExtensionsV1beta1().Deployments(namespaceName).Delete(deploymentName, nil)

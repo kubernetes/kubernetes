@@ -75,7 +75,7 @@ func Register(plugins *admission.Plugins) {
 // WebhookSource can list dynamic webhook plugins.
 type WebhookSource interface {
 	Run(stopCh <-chan struct{})
-	ExternalAdmissionHooks() (*v1alpha1.ExternalAdmissionHookConfiguration, error)
+	Webhooks() (*v1alpha1.ValidatingWebhookConfiguration, error)
 }
 
 // NewGenericAdmissionWebhook returns a generic admission webhook plugin.
@@ -153,7 +153,7 @@ func (a *GenericAdmissionWebhook) SetScheme(scheme *runtime.Scheme) {
 
 // WantsExternalKubeClientSet defines a function which sets external ClientSet for admission plugins that need it
 func (a *GenericAdmissionWebhook) SetExternalKubeClientSet(client clientset.Interface) {
-	a.hookSource = configuration.NewExternalAdmissionHookConfigurationManager(client.AdmissionregistrationV1alpha1().ExternalAdmissionHookConfigurations())
+	a.hookSource = configuration.NewValidatingWebhookConfigurationManager(client.AdmissionregistrationV1alpha1().ValidatingWebhookConfigurations())
 }
 
 // ValidateInitialization implements the InitializationValidator interface.
@@ -168,19 +168,19 @@ func (a *GenericAdmissionWebhook) ValidateInitialization() error {
 	return nil
 }
 
-func (a *GenericAdmissionWebhook) loadConfiguration(attr admission.Attributes) (*v1alpha1.ExternalAdmissionHookConfiguration, error) {
-	hookConfig, err := a.hookSource.ExternalAdmissionHooks()
-	// if ExternalAdmissionHook configuration is disabled, fail open
+func (a *GenericAdmissionWebhook) loadConfiguration(attr admission.Attributes) (*v1alpha1.ValidatingWebhookConfiguration, error) {
+	hookConfig, err := a.hookSource.Webhooks()
+	// if Webhook configuration is disabled, fail open
 	if err == configuration.ErrDisabled {
-		return &v1alpha1.ExternalAdmissionHookConfiguration{}, nil
+		return &v1alpha1.ValidatingWebhookConfiguration{}, nil
 	}
 	if err != nil {
 		e := apierrors.NewServerTimeout(attr.GetResource().GroupResource(), string(attr.GetOperation()), 1)
-		e.ErrStatus.Message = fmt.Sprintf("Unable to refresh the ExternalAdmissionHook configuration: %v", err)
+		e.ErrStatus.Message = fmt.Sprintf("Unable to refresh the Webhook configuration: %v", err)
 		e.ErrStatus.Reason = "LoadingConfiguration"
 		e.ErrStatus.Details.Causes = append(e.ErrStatus.Details.Causes, metav1.StatusCause{
-			Type:    "ExternalAdmissionHookConfigurationFailure",
-			Message: "An error has occurred while refreshing the externalAdmissionHook configuration, no resources can be created/updated/deleted/connected until a refresh succeeds.",
+			Type:    "ValidatingWebhookConfigurationFailure",
+			Message: "An error has occurred while refreshing the ValidatingWebhook configuration, no resources can be created/updated/deleted/connected until a refresh succeeds.",
 		})
 		return nil, e
 	}
@@ -193,14 +193,14 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 	if err != nil {
 		return err
 	}
-	hooks := hookConfig.ExternalAdmissionHooks
+	hooks := hookConfig.Webhooks
 	ctx := context.TODO()
 
 	errCh := make(chan error, len(hooks))
 	wg := sync.WaitGroup{}
 	wg.Add(len(hooks))
 	for i := range hooks {
-		go func(hook *v1alpha1.ExternalAdmissionHook) {
+		go func(hook *v1alpha1.Webhook) {
 			defer wg.Done()
 
 			err := a.callHook(ctx, hook, attr)
@@ -245,7 +245,7 @@ func (a *GenericAdmissionWebhook) Admit(attr admission.Attributes) error {
 	return errs[0]
 }
 
-func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.ExternalAdmissionHook, attr admission.Attributes) error {
+func (a *GenericAdmissionWebhook) callHook(ctx context.Context, h *v1alpha1.Webhook, attr admission.Attributes) error {
 	matches := false
 	for _, r := range h.Rules {
 		m := RuleMatcher{Rule: r, Attr: attr}
@@ -299,7 +299,7 @@ func toStatusErr(name string, result *metav1.Status) *apierrors.StatusError {
 	}
 }
 
-func (a *GenericAdmissionWebhook) hookClient(h *v1alpha1.ExternalAdmissionHook) (*rest.RESTClient, error) {
+func (a *GenericAdmissionWebhook) hookClient(h *v1alpha1.Webhook) (*rest.RESTClient, error) {
 	serverName := h.ClientConfig.Service.Name + "." + h.ClientConfig.Service.Namespace + ".svc"
 	u, err := a.serviceResolver.ResolveEndpoint(h.ClientConfig.Service.Namespace, h.ClientConfig.Service.Name)
 	if err != nil {
