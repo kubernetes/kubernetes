@@ -1406,7 +1406,7 @@ func setDaemonSetCritical(ds *extensions.DaemonSet) {
 
 func TestNodeShouldRunDaemonPod(t *testing.T) {
 	cases := []struct {
-		predicateName									 string
+		predicateName					 string
 		podsOnNode                                       []*v1.Pod
 		nodeCondition                                    []v1.NodeCondition
 		ds                                               *extensions.DaemonSet
