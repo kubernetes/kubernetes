@@ -617,9 +617,8 @@ func (rs *REST) updateNodePorts(oldService, newService *api.Service, nodePortOp 
 			servicePort.NodePort = int32(nodePortNumber)
 			nodePort.NodePort = servicePort.NodePort
 		}
-		// Detect duplicate node ports; this should have been caught by validation, so we panic
 		if containsNodePort(newNodePorts, nodePort) {
-			panic("duplicate node port")
+			return fmt.Errorf("duplicate nodePort: %v", nodePort)
 		}
 		newNodePorts = append(newNodePorts, nodePort)
 	}
