@@ -100,6 +100,8 @@ func TrackStorageCleanup() {
 	}
 	cleanup = make([]func(), 0)
 	oldTrace = string(debug.Stack())
+
+	fmt.Printf("################### Tracking storages\n")
 }
 
 func RegisterStorageCleanup(fn func()) {
@@ -117,6 +119,8 @@ func CleanupStorage() {
 	old := cleanup
 	cleanup = nil
 	cleanupLock.Unlock()
+
+	fmt.Printf("################### Cleaning up %d storages\n", len(old))
 
 	for _, d := range old {
 		d()
