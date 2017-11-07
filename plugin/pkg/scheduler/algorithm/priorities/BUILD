@@ -18,6 +18,7 @@ go_library(
         "node_affinity.go",
         "node_label.go",
         "node_prefer_avoid_pods.go",
+        "reduce.go",
         "selector_spreading.go",
         "taint_toleration.go",
         "test_util.go",

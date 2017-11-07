@@ -433,6 +433,11 @@ func PrioritizeNodes(
 			if err := config.Reduce(pod, meta, nodeNameToInfo, results[index]); err != nil {
 				appendError(err)
 			}
+			if glog.V(10) {
+				for _, hostPriority := range results[index] {
+					glog.Infof("%v -> %v: %v, Score: (%d)", pod.Name, hostPriority.Host, config.Name, hostPriority.Score)
+				}
+			}
 		}(i, priorityConfig)
 	}
 	// Wait for all computations to be finished.

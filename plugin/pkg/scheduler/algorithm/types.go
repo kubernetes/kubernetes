@@ -53,6 +53,7 @@ type MetadataProducer func(pod *v1.Pod, nodeNameToInfo map[string]*schedulercach
 type PriorityFunction func(pod *v1.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error)
 
 type PriorityConfig struct {
+	Name   string
 	Map    PriorityMapFunction
 	Reduce PriorityReduceFunction
 	// TODO: Remove it after migrating all functions to
