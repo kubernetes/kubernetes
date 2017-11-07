@@ -72,7 +72,7 @@ type ContainerRuntimeOptions struct {
 
 	// rktPath is the path of rkt binary. Leave empty to use the first rkt in $PATH.
 	RktPath string
-	// rktApiEndpoint is the endpoint of the rkt API service to communicate with.
+	// rktAPIEndpoint is the endpoint of the rkt API service to communicate with.
 	RktAPIEndpoint string
 	// rktStage1Image is the image to use as stage1. Local paths and
 	// http/https URLs are supported.
