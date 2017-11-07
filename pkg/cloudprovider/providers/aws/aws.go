@@ -1039,7 +1039,7 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 		if err != nil || len(internalDNS) == 0 {
 			//TODO: It would be nice to be able to determine the reason for the failure,
 			// but the AWS client masks all failures with the same error description.
-			glog.V(2).Info("Could not determine private DNS from AWS metadata.")
+			glog.V(4).Info("Could not determine private DNS from AWS metadata.")
 		} else {
 			addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalDNS, Address: internalDNS})
 		}
@@ -1048,7 +1048,7 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 		if err != nil || len(externalDNS) == 0 {
 			//TODO: It would be nice to be able to determine the reason for the failure,
 			// but the AWS client masks all failures with the same error description.
-			glog.V(2).Info("Could not determine public DNS from AWS metadata.")
+			glog.V(4).Info("Could not determine public DNS from AWS metadata.")
 		} else {
 			addresses = append(addresses, v1.NodeAddress{Type: v1.NodeExternalDNS, Address: externalDNS})
 		}
