@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package node
 
 import (
 	"crypto/tls"
@@ -38,7 +38,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-var _ = framework.KubeDescribe("Pods Extended", func() {
+var _ = SIGDescribe("Pods Extended", func() {
 	f := framework.NewDefaultFramework("pods")
 
 	framework.KubeDescribe("Delete Grace Period", func() {
