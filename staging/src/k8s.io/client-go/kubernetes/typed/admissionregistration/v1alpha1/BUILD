@@ -10,9 +10,9 @@ go_library(
     srcs = [
         "admissionregistration_client.go",
         "doc.go",
-        "externaladmissionhookconfiguration.go",
         "generated_expansion.go",
         "initializerconfiguration.go",
+        "validatingwebhookconfiguration.go",
     ],
     importpath = "k8s.io/client-go/kubernetes/typed/admissionregistration/v1alpha1",
     deps = [

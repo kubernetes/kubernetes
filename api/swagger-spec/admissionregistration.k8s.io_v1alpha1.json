@@ -13,10 +13,10 @@
     "description": "API at /apis/admissionregistration.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.ExternalAdmissionHookConfigurationList",
+      "type": "v1alpha1.ValidatingWebhookConfigurationList",
       "method": "GET",
-      "summary": "list or watch objects of kind ExternalAdmissionHookConfiguration",
-      "nickname": "listExternalAdmissionHookConfiguration",
+      "summary": "list or watch objects of kind ValidatingWebhookConfiguration",
+      "nickname": "listValidatingWebhookConfiguration",
       "parameters": [
        {
         "type": "string",
@@ -95,7 +95,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.ExternalAdmissionHookConfigurationList"
+        "responseModel": "v1alpha1.ValidatingWebhookConfigurationList"
        }
       ],
       "produces": [
@@ -110,10 +110,10 @@
       ]
      },
      {
-      "type": "v1alpha1.ExternalAdmissionHookConfiguration",
+      "type": "v1alpha1.ValidatingWebhookConfiguration",
       "method": "POST",
-      "summary": "create an ExternalAdmissionHookConfiguration",
-      "nickname": "createExternalAdmissionHookConfiguration",
+      "summary": "create a ValidatingWebhookConfiguration",
+      "nickname": "createValidatingWebhookConfiguration",
       "parameters": [
        {
         "type": "string",
@@ -124,7 +124,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1alpha1.ExternalAdmissionHookConfiguration",
+        "type": "v1alpha1.ValidatingWebhookConfiguration",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -136,17 +136,17 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.ExternalAdmissionHookConfiguration"
+        "responseModel": "v1alpha1.ValidatingWebhookConfiguration"
        },
        {
         "code": 201,
         "message": "Created",
-        "responseModel": "v1alpha1.ExternalAdmissionHookConfiguration"
+        "responseModel": "v1alpha1.ValidatingWebhookConfiguration"
        },
        {
         "code": 202,
         "message": "Accepted",
-        "responseModel": "v1alpha1.ExternalAdmissionHookConfiguration"
+        "responseModel": "v1alpha1.ValidatingWebhookConfiguration"
        }
       ],
       "produces": [
@@ -161,8 +161,8 @@
      {
       "type": "v1.Status",
       "method": "DELETE",
-      "summary": "delete collection of ExternalAdmissionHookConfiguration",
-      "nickname": "deletecollectionExternalAdmissionHookConfiguration",
+      "summary": "delete collection of ValidatingWebhookConfiguration",
+      "nickname": "deletecollectionValidatingWebhookConfiguration",
       "parameters": [
        {
         "type": "string",
@@ -262,8 +262,8 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch individual changes to a list of ExternalAdmissionHookConfiguration",
-      "nickname": "watchExternalAdmissionHookConfigurationList",
+      "summary": "watch individual changes to a list of ValidatingWebhookConfiguration",
+      "nickname": "watchValidatingWebhookConfigurationList",
       "parameters": [
        {
         "type": "string",
@@ -363,10 +363,10 @@
     "description": "API at /apis/admissionregistration.k8s.io/v1alpha1",
     "operations": [
      {
-      "type": "v1alpha1.ExternalAdmissionHookConfiguration",
+      "type": "v1alpha1.ValidatingWebhookConfiguration",
       "method": "GET",
-      "summary": "read the specified ExternalAdmissionHookConfiguration",
-      "nickname": "readExternalAdmissionHookConfiguration",
+      "summary": "read the specified ValidatingWebhookConfiguration",
+      "nickname": "readValidatingWebhookConfiguration",
       "parameters": [
        {
         "type": "string",
@@ -396,7 +396,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the ExternalAdmissionHookConfiguration",
+        "description": "name of the ValidatingWebhookConfiguration",
         "required": true,
         "allowMultiple": false
        }
@@ -405,7 +405,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.ExternalAdmissionHookConfiguration"
+        "responseModel": "v1alpha1.ValidatingWebhookConfiguration"
        }
       ],
       "produces": [
@@ -418,10 +418,10 @@
       ]
      },
      {
-      "type": "v1alpha1.ExternalAdmissionHookConfiguration",
+      "type": "v1alpha1.ValidatingWebhookConfiguration",
       "method": "PUT",
-      "summary": "replace the specified ExternalAdmissionHookConfiguration",
-      "nickname": "replaceExternalAdmissionHookConfiguration",
+      "summary": "replace the specified ValidatingWebhookConfiguration",
+      "nickname": "replaceValidatingWebhookConfiguration",
       "parameters": [
        {
         "type": "string",
@@ -432,7 +432,7 @@
         "allowMultiple": false
        },
        {
-        "type": "v1alpha1.ExternalAdmissionHookConfiguration",
+        "type": "v1alpha1.ValidatingWebhookConfiguration",
         "paramType": "body",
         "name": "body",
         "description": "",
@@ -443,7 +443,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the ExternalAdmissionHookConfiguration",
+        "description": "name of the ValidatingWebhookConfiguration",
         "required": true,
         "allowMultiple": false
        }
@@ -452,12 +452,12 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.ExternalAdmissionHookConfiguration"
+        "responseModel": "v1alpha1.ValidatingWebhookConfiguration"
        },
        {
         "code": 201,
         "message": "Created",
-        "responseModel": "v1alpha1.ExternalAdmissionHookConfiguration"
+        "responseModel": "v1alpha1.ValidatingWebhookConfiguration"
        }
       ],
       "produces": [
@@ -470,10 +470,10 @@
       ]
      },
      {
-      "type": "v1alpha1.ExternalAdmissionHookConfiguration",
+      "type": "v1alpha1.ValidatingWebhookConfiguration",
       "method": "PATCH",
-      "summary": "partially update the specified ExternalAdmissionHookConfiguration",
-      "nickname": "patchExternalAdmissionHookConfiguration",
+      "summary": "partially update the specified ValidatingWebhookConfiguration",
+      "nickname": "patchValidatingWebhookConfiguration",
       "parameters": [
        {
         "type": "string",
@@ -495,7 +495,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the ExternalAdmissionHookConfiguration",
+        "description": "name of the ValidatingWebhookConfiguration",
         "required": true,
         "allowMultiple": false
        }
@@ -504,7 +504,7 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1alpha1.ExternalAdmissionHookConfiguration"
+        "responseModel": "v1alpha1.ValidatingWebhookConfiguration"
        }
       ],
       "produces": [
@@ -521,8 +521,8 @@
      {
       "type": "v1.Status",
       "method": "DELETE",
-      "summary": "delete an ExternalAdmissionHookConfiguration",
-      "nickname": "deleteExternalAdmissionHookConfiguration",
+      "summary": "delete a ValidatingWebhookConfiguration",
+      "nickname": "deleteValidatingWebhookConfiguration",
       "parameters": [
        {
         "type": "string",
@@ -568,7 +568,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the ExternalAdmissionHookConfiguration",
+        "description": "name of the ValidatingWebhookConfiguration",
         "required": true,
         "allowMultiple": false
        }
@@ -598,8 +598,8 @@
      {
       "type": "v1.WatchEvent",
       "method": "GET",
-      "summary": "watch changes to an object of kind ExternalAdmissionHookConfiguration",
-      "nickname": "watchExternalAdmissionHookConfiguration",
+      "summary": "watch changes to an object of kind ValidatingWebhookConfiguration",
+      "nickname": "watchValidatingWebhookConfiguration",
       "parameters": [
        {
         "type": "string",
@@ -677,7 +677,7 @@
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the ExternalAdmissionHookConfiguration",
+        "description": "name of the ValidatingWebhookConfiguration",
         "required": true,
         "allowMultiple": false
        }
@@ -1421,9 +1421,9 @@
    }
   ],
   "models": {
-   "v1alpha1.ExternalAdmissionHookConfigurationList": {
-    "id": "v1alpha1.ExternalAdmissionHookConfigurationList",
-    "description": "ExternalAdmissionHookConfigurationList is a list of ExternalAdmissionHookConfiguration.",
+   "v1alpha1.ValidatingWebhookConfigurationList": {
+    "id": "v1alpha1.ValidatingWebhookConfigurationList",
+    "description": "ValidatingWebhookConfigurationList is a list of ValidatingWebhookConfiguration.",
     "required": [
      "items"
     ],
@@ -1443,9 +1443,9 @@
      "items": {
       "type": "array",
       "items": {
-       "$ref": "v1alpha1.ExternalAdmissionHookConfiguration"
+       "$ref": "v1alpha1.ValidatingWebhookConfiguration"
       },
-      "description": "List of ExternalAdmissionHookConfiguration."
+      "description": "List of ValidatingWebhookConfiguration."
      }
     }
    },
@@ -1467,9 +1467,9 @@
      }
     }
    },
-   "v1alpha1.ExternalAdmissionHookConfiguration": {
-    "id": "v1alpha1.ExternalAdmissionHookConfiguration",
-    "description": "ExternalAdmissionHookConfiguration describes the configuration of initializers.",
+   "v1alpha1.ValidatingWebhookConfiguration": {
+    "id": "v1alpha1.ValidatingWebhookConfiguration",
+    "description": "ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.",
     "properties": {
      "kind": {
       "type": "string",
@@ -1483,12 +1483,12 @@
       "$ref": "v1.ObjectMeta",
       "description": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata."
      },
-     "externalAdmissionHooks": {
+     "Webhooks": {
       "type": "array",
       "items": {
-       "$ref": "v1alpha1.ExternalAdmissionHook"
+       "$ref": "v1alpha1.Webhook"
       },
-      "description": "ExternalAdmissionHooks is a list of external admission webhooks and the affected resources and operations."
+      "description": "Webhooks is a list of webhooks and the affected resources and operations."
      }
     }
    },
@@ -1730,9 +1730,9 @@
      }
     }
    },
-   "v1alpha1.ExternalAdmissionHook": {
-    "id": "v1alpha1.ExternalAdmissionHook",
-    "description": "ExternalAdmissionHook describes an external admission webhook and the resources and operations it applies to.",
+   "v1alpha1.Webhook": {
+    "id": "v1alpha1.Webhook",
+    "description": "Webhook describes an admission webhook and the resources and operations it applies to.",
     "required": [
      "name",
      "clientConfig"
@@ -1740,10 +1740,10 @@
     "properties": {
      "name": {
       "type": "string",
-      "description": "The name of the external admission webhook. Name should be fully qualified, e.g., imagepolicy.kubernetes.io, where \"imagepolicy\" is the name of the webhook, and kubernetes.io is the name of the organization. Required."
+      "description": "The name of the admission webhook. Name should be fully qualified, e.g., imagepolicy.kubernetes.io, where \"imagepolicy\" is the name of the webhook, and kubernetes.io is the name of the organization. Required."
      },
      "clientConfig": {
-      "$ref": "v1alpha1.AdmissionHookClientConfig",
+      "$ref": "v1alpha1.WebhookClientConfig",
       "description": "ClientConfig defines how to communicate with the hook. Required"
      },
      "rules": {
@@ -1759,9 +1759,9 @@
      }
     }
    },
-   "v1alpha1.AdmissionHookClientConfig": {
-    "id": "v1alpha1.AdmissionHookClientConfig",
-    "description": "AdmissionHookClientConfig contains the information to make a TLS connection with the webhook",
+   "v1alpha1.WebhookClientConfig": {
+    "id": "v1alpha1.WebhookClientConfig",
+    "description": "WebhookClientConfig contains the information to make a TLS connection with the webhook",
     "required": [
      "service",
      "urlPath",
