@@ -1601,13 +1601,6 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			node := newNode("test-node", simpleDaemonSetLabel)
 			node.Status.Conditions = append(node.Status.Conditions, c.nodeCondition...)
 			node.Status.Allocatable = allocatableResources("100M", "1")
-
-			attachedVolumes := make([]v1.AttachedVolume, 1)
-			attachedVolumes[0] = v1.AttachedVolume{
-				Name: v1.UniqueVolumeName("test"),
-			}
-			node.Status.VolumesAttached = attachedVolumes
-
 			manager, _, _ := newTestController()
 			manager.nodeStore.Add(node)
 			for _, p := range c.podsOnNode {
