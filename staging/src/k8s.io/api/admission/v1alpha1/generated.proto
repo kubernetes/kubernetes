@@ -30,17 +30,25 @@ import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
 
-// AdmissionReview describes an admission request.
-message AdmissionReview {
+// AdmissionRequest describes an admission request.
+message AdmissionRequest {
   // Spec describes the attributes for the admission request.
   // Since this admission controller is non-mutating the webhook should avoid setting this in its response to avoid the
   // cost of deserializing it.
   // +optional
   optional AdmissionReviewSpec spec = 1;
+}
 
-  // Status is filled in by the webhook and indicates whether the admission request should be permitted.
+// AdmissionResponse describes an admission response.
+message AdmissionResponse {
+  // Status is filled in by the webhook and indicates whether the admission
+  // request should be permitted.
   // +optional
-  optional AdmissionReviewStatus status = 2;
+  optional AdmissionReviewStatus status = 1;
+
+  // The json-patch body. Must be in compliance with RFC 6902.
+  // +optional
+  optional bytes patchBody = 2;
 }
 
 // AdmissionReviewSpec describes the admission.Attributes for the admission request.
