@@ -48,7 +48,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&InitializerConfigurationList{},
 		&ValidatingWebhookConfiguration{},
 		&ValidatingWebhookConfigurationList{},
-		// TODO add mutating configs here too
+		&MutatingWebhookConfiguration{},
+		&MutatingWebhookConfigurationList{},
 	)
 	return nil
 }

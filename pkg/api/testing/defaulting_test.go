@@ -137,6 +137,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "settings.k8s.io", Version: "v1alpha1", Kind: "PodPresetList"}:                                   {},
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ValidatingWebhookConfiguration"}:     {},
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ValidatingWebhookConfigurationList"}: {},
+		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "MutatingWebhookConfiguration"}:       {},
+		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "MutatingWebhookConfigurationList"}:   {},
 		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicy"}:                                       {},
 		{Group: "networking.k8s.io", Version: "v1", Kind: "NetworkPolicyList"}:                                   {},
 		{Group: "storage.k8s.io", Version: "v1beta1", Kind: "StorageClass"}:                                      {},

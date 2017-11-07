@@ -166,7 +166,15 @@ func ValidateInitializerConfigurationUpdate(newIC, oldIC *admissionregistration.
 func ValidateValidatingWebhookConfiguration(e *admissionregistration.ValidatingWebhookConfiguration) field.ErrorList {
 	allErrors := genericvalidation.ValidateObjectMeta(&e.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
 	for i, hook := range e.Webhooks {
-		allErrors = append(allErrors, validateWebhook(&hook, field.NewPath("validatingWebhooks").Index(i))...)
+		allErrors = append(allErrors, validateWebhook(&hook, field.NewPath("webhooks").Index(i))...)
+	}
+	return allErrors
+}
+
+func ValidateMutatingWebhookConfiguration(e *admissionregistration.MutatingWebhookConfiguration) field.ErrorList {
+	allErrors := genericvalidation.ValidateObjectMeta(&e.ObjectMeta, false, genericvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	for i, hook := range e.Webhooks {
+		allErrors = append(allErrors, validateWebhook(&hook, field.NewPath("webhooks").Index(i))...)
 	}
 	return allErrors
 }
@@ -263,6 +271,10 @@ func validateRuleWithOperations(ruleWithOperations *admissionregistration.RuleWi
 	return allErrors
 }
 
-func ValidateValidatingwebhookConfigurationUpdate(newC, oldC *admissionregistration.ValidatingWebhookConfiguration) field.ErrorList {
+func ValidateValidatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.ValidatingWebhookConfiguration) field.ErrorList {
 	return ValidateValidatingWebhookConfiguration(newC)
+}
+
+func ValidateMutatingWebhookConfigurationUpdate(newC, oldC *admissionregistration.MutatingWebhookConfiguration) field.ErrorList {
+	return ValidateMutatingWebhookConfiguration(newC)
 }

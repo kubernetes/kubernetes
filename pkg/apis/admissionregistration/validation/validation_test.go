@@ -231,7 +231,7 @@ func TestValidateInitializerConfiguration(t *testing.T) {
 	}
 }
 
-func getValidatingWebhookConfiguration(hooks []admissionregistration.Webhook) *admissionregistration.ValidatingWebhookConfiguration {
+func newValidatingWebhookConfiguration(hooks []admissionregistration.Webhook) *admissionregistration.ValidatingWebhookConfiguration {
 	return &admissionregistration.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "config",
@@ -239,6 +239,8 @@ func getValidatingWebhookConfiguration(hooks []admissionregistration.Webhook) *a
 		Webhooks: hooks,
 	}
 }
+
+// TODO: Add TestValidateMutatingWebhookConfiguration to test validation for mutating webhooks.
 
 func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 	tests := []struct {
@@ -248,7 +250,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 	}{
 		{
 			name: "all Webhooks must have a fully qualified name",
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
@@ -260,11 +262,11 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 						Name: "",
 					},
 				}),
-			expectedError: `validatingWebhooks[1].name: Invalid value: "k8s.io": should be a domain with at least three segments separated by dots, validatingWebhooks[2].name: Required value`,
+			expectedError: `webhooks[1].name: Invalid value: "k8s.io": should be a domain with at least three segments separated by dots, webhooks[2].name: Required value`,
 		},
 		{
 			name: "Operations must not be empty or nil",
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
@@ -288,11 +290,11 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 						},
 					},
 				}),
-			expectedError: `validatingWebhooks[0].rules[0].operations: Required value, validatingWebhooks[0].rules[1].operations: Required value`,
+			expectedError: `webhooks[0].rules[0].operations: Required value, webhooks[0].rules[1].operations: Required value`,
 		},
 		{
 			name: "\"\" is NOT a valid operation",
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
@@ -312,7 +314,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "operation must be either create/update/delete/connect",
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
@@ -332,7 +334,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "wildcard operation cannot be mixed with other strings",
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
@@ -352,7 +354,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: `resource "*" can co-exist with resources that have subresources`,
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
@@ -371,7 +373,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: `resource "*" cannot mix with resources that don't have subresources`,
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
@@ -391,7 +393,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "resource a/* cannot mix with a/x",
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
@@ -407,11 +409,11 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 						},
 					},
 				}),
-			expectedError: `validatingWebhooks[0].rules[0].resources[1]: Invalid value: "a/x": if 'a/*' is present, must not specify a/x`,
+			expectedError: `webhooks[0].rules[0].resources[1]: Invalid value: "a/x": if 'a/*' is present, must not specify a/x`,
 		},
 		{
 			name: "resource a/* can mix with a",
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
@@ -430,7 +432,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "resource */a cannot mix with x/a",
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
@@ -446,11 +448,11 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 						},
 					},
 				}),
-			expectedError: `validatingWebhooks[0].rules[0].resources[1]: Invalid value: "x/a": if '*/a' is present, must not specify x/a`,
+			expectedError: `webhooks[0].rules[0].resources[1]: Invalid value: "x/a": if '*/a' is present, must not specify x/a`,
 		},
 		{
 			name: "resource */* cannot mix with other resources",
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
@@ -466,11 +468,11 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 						},
 					},
 				}),
-			expectedError: `validatingWebhooks[0].rules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
+			expectedError: `webhooks[0].rules[0].resources: Invalid value: []string{"*/*", "a"}: if '*/*' is present, must not specify other resources`,
 		},
 		{
 			name: "FailurePolicy can only be \"Ignore\" or \"Fail\"",
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
@@ -480,11 +482,11 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 						}(),
 					},
 				}),
-			expectedError: `validatingWebhooks[0].failurePolicy: Unsupported value: "other": supported values: "Fail", "Ignore"`,
+			expectedError: `webhooks[0].failurePolicy: Unsupported value: "other": supported values: "Fail", "Ignore"`,
 		},
 		{
 			name: "URLPath must start with slash",
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
@@ -497,7 +499,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "URLPath accepts slash",
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
@@ -510,7 +512,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "URLPath accepts no trailing slash",
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
@@ -523,7 +525,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "URLPath fails //",
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
@@ -536,7 +538,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "URLPath no empty step",
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
@@ -548,7 +550,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 			expectedError: `clientConfig.urlPath: Invalid value: "/foo//bar/": segment[1] may not be empty`,
 		}, {
 			name: "URLPath no empty step 2",
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",
@@ -561,7 +563,7 @@ func TestValidateValidatingWebhookConfiguration(t *testing.T) {
 		},
 		{
 			name: "URLPath no non-subdomain",
-			config: getValidatingWebhookConfiguration(
+			config: newValidatingWebhookConfiguration(
 				[]admissionregistration.Webhook{
 					{
 						Name: "webhook.k8s.io",

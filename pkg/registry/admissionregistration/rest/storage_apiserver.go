@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	initializerconfigurationstorage "k8s.io/kubernetes/pkg/registry/admissionregistration/initializerconfiguration/storage"
+	mutatingwebhookconfigurationstorage "k8s.io/kubernetes/pkg/registry/admissionregistration/mutatingwebhookconfiguration/storage"
 	validatingwebhookconfigurationstorage "k8s.io/kubernetes/pkg/registry/admissionregistration/validatingwebhookconfiguration/storage"
 )
 
@@ -52,6 +53,10 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("validatingwebhookconfigurations")) {
 		s := validatingwebhookconfigurationstorage.NewREST(restOptionsGetter)
 		storage["validatingwebhookconfigurations"] = s
+	}
+	if apiResourceConfigSource.ResourceEnabled(version.WithResource("mutatingwebhookconfigurations")) {
+		s := mutatingwebhookconfigurationstorage.NewREST(restOptionsGetter)
+		storage["mutatingwebhookconfigurations"] = s
 	}
 	return storage
 }

@@ -18,7 +18,7 @@ limitations under the License.
 
 // Package admissionregistration is the internal version of the API.
 // AdmissionConfiguration and AdmissionPluginConfiguration are legacy static admission plugin configuration
-// InitializerConfiguration and ValidatingWebhookConfiguration is for the
+// InitializerConfiguration, ValidatingWebhookConfiguration, and MutatingWebhookConfiguration are for the
 // new dynamic admission controller configuration.
 // +groupName=admissionregistration.k8s.io
 package admissionregistration // import "k8s.io/kubernetes/pkg/apis/admissionregistration"
