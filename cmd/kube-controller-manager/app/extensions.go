@@ -21,6 +21,8 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
@@ -31,13 +33,17 @@ func startDaemonSetController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "daemonsets"}] {
 		return false, nil
 	}
-	go daemon.NewDaemonSetsController(
+	dsc, err := daemon.NewDaemonSetsController(
 		ctx.InformerFactory.Extensions().V1beta1().DaemonSets(),
 		ctx.InformerFactory.Apps().V1beta1().ControllerRevisions(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.ClientBuilder.ClientOrDie("daemon-set-controller"),
-	).Run(int(ctx.Options.ConcurrentDaemonSetSyncs), ctx.Stop)
+	)
+	if err != nil {
+		return true, fmt.Errorf("error creating DaemonSets controller: %v", err)
+	}
+	go dsc.Run(int(ctx.Options.ConcurrentDaemonSetSyncs), ctx.Stop)
 	return true, nil
 }
 
@@ -45,12 +51,16 @@ func startDeploymentController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"}] {
 		return false, nil
 	}
-	go deployment.NewDeploymentController(
+	dc, err := deployment.NewDeploymentController(
 		ctx.InformerFactory.Extensions().V1beta1().Deployments(),
 		ctx.InformerFactory.Extensions().V1beta1().ReplicaSets(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("deployment-controller"),
-	).Run(int(ctx.Options.ConcurrentDeploymentSyncs), ctx.Stop)
+	)
+	if err != nil {
+		return true, fmt.Errorf("error creating Deployment controller: %v", err)
+	}
+	go dc.Run(int(ctx.Options.ConcurrentDeploymentSyncs), ctx.Stop)
 	return true, nil
 }
 

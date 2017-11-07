@@ -35,6 +35,11 @@ func TestRegisterMetricAndTrackRateLimiterUsage(t *testing.T) {
 			err:         "",
 		},
 		{
+			ownerName:   "owner_name",
+			rateLimiter: flowcontrol.NewTokenBucketRateLimiter(1, 1),
+			err:         "already registered",
+		},
+		{
 			ownerName:   "invalid-owner-name",
 			rateLimiter: flowcontrol.NewTokenBucketRateLimiter(1, 1),
 			err:         "error registering rate limiter usage metric",
@@ -49,6 +54,30 @@ func TestRegisterMetricAndTrackRateLimiterUsage(t *testing.T) {
 			} else if !strings.Contains(e.Error(), tc.err) {
 				t.Errorf("[%d] expected an error containing %q: %v", i, tc.err, e)
 			}
+		}
+	}
+}
+
+func TestUnregisterMetricAndUntrackRateLimiterUsage(t *testing.T) {
+	RegisterMetricAndTrackRateLimiterUsage("owner_name", flowcontrol.NewTokenBucketRateLimiter(1, 1))
+	testCases := []struct {
+		ownerName string
+		ok        bool
+	}{
+		{
+			ownerName: "owner_name",
+			ok:        true,
+		},
+		{
+			ownerName: "owner_name",
+			ok:        false,
+		},
+	}
+
+	for i, tc := range testCases {
+		ok := UnregisterMetricAndUntrackRateLimiterUsage(tc.ownerName)
+		if tc.ok != ok {
+			t.Errorf("Case[%d] Expected %v, got %v", i, tc.ok, ok)
 		}
 	}
 }
