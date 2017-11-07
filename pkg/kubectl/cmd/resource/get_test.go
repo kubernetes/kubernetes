@@ -825,7 +825,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	}
 }
 
-func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
+func TestGetMultipleTypeObjectsWithLabelSelector(t *testing.T) {
 	pods, svc, _ := testData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
@@ -865,6 +865,49 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")
+	}
+}
+
+func TestGetMultipleTypeObjectsWithFieldSelector(t *testing.T) {
+	pods, svc, _ := testData()
+
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Query().Get(metav1.FieldSelectorQueryParam("v1")) != "a=b" {
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+			}
+			switch req.URL.Path {
+			case "/namespaces/test/pods":
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)}, nil
+			case "/namespaces/test/services":
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, svc)}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdGet(f, buf, errBuf)
+	cmd.SetOutput(buf)
+
+	cmd.Flags().Set("field-selector", "a=b")
+	cmd.Run(cmd, []string{"pods,services"})
+
+	expected, err := extractResourceList([]runtime.Object{pods, svc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+
+	if len(buf.String()) == 0 {
+		t.Errorf("unexpected empty output")
 	}
 }
 
@@ -1006,7 +1049,7 @@ func watchTestData() ([]api.Pod, []watch.Event) {
 	return pods, events
 }
 
-func TestWatchSelector(t *testing.T) {
+func TestWatchLabelSelector(t *testing.T) {
 	pods, events := watchTestData()
 
 	f, tf, codec, _ := cmdtesting.NewAPIFactory()
@@ -1051,6 +1094,54 @@ func TestWatchSelector(t *testing.T) {
 
 	if len(buf.String()) == 0 {
 		t.Error("unexpected empty output")
+	}
+}
+
+func TestWatchFieldSelector(t *testing.T) {
+	pods, events := watchTestData()
+
+	f, tf, codec, _ := cmdtesting.NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	podList := &api.PodList{
+		Items: pods,
+		ListMeta: metav1.ListMeta{
+			ResourceVersion: "10",
+		},
+	}
+	tf.UnstructuredClient = &fake.RESTClient{
+		NegotiatedSerializer: unstructuredSerializer,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			if req.URL.Query().Get(metav1.FieldSelectorQueryParam("v1")) != "a=b" {
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+			}
+			switch req.URL.Path {
+			case "/namespaces/test/pods":
+				if req.URL.Query().Get("watch") == "true" {
+					return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: watchBody(codec, events[2:])}, nil
+				}
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, podList)}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdGet(f, buf, errBuf)
+	cmd.SetOutput(buf)
+
+	cmd.Flags().Set("watch", "true")
+	cmd.Flags().Set("field-selector", "a=b")
+	cmd.Run(cmd, []string{"pods"})
+
+	expected := []runtime.Object{&pods[0], &pods[1], events[2].Object, events[3].Object}
+	verifyObjects(t, expected, tf.Printer.(*testPrinter).Objects)
+
+	if len(buf.String()) == 0 {
+		t.Errorf("unexpected empty output")
 	}
 }
 

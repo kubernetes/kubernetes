@@ -243,7 +243,7 @@ func (o *DrainOptions) SetupDrain(cmd *cobra.Command, args []string) error {
 		Flatten()
 
 	if len(o.Selector) > 0 {
-		builder = builder.SelectorParam(o.Selector).
+		builder = builder.LabelSelectorParam(o.Selector).
 			ResourceTypes("nodes")
 	}
 
