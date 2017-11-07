@@ -18,10 +18,10 @@ limitations under the License.
 
 package internalversion
 
-// ExternalAdmissionHookConfigurationListerExpansion allows custom methods to be added to
-// ExternalAdmissionHookConfigurationLister.
-type ExternalAdmissionHookConfigurationListerExpansion interface{}
-
 // InitializerConfigurationListerExpansion allows custom methods to be added to
 // InitializerConfigurationLister.
 type InitializerConfigurationListerExpansion interface{}
+
+// ValidatingWebhookConfigurationListerExpansion allows custom methods to be added to
+// ValidatingWebhookConfigurationLister.
+type ValidatingWebhookConfigurationListerExpansion interface{}

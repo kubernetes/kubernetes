@@ -18837,7 +18837,7 @@
    },
    "/apis/admissionregistration.k8s.io/v1alpha1/externaladmissionhookconfigurations": {
     "get": {
-     "description": "list or watch objects of kind ExternalAdmissionHookConfiguration",
+     "description": "list or watch objects of kind ValidatingWebhookConfiguration",
      "consumes": [
       "*/*"
      ],
@@ -18854,7 +18854,7 @@
      "tags": [
       "admissionregistration_v1alpha1"
      ],
-     "operationId": "listAdmissionregistrationV1alpha1ExternalAdmissionHookConfiguration",
+     "operationId": "listAdmissionregistrationV1alpha1ValidatingWebhookConfiguration",
      "parameters": [
       {
        "uniqueItems": true,
@@ -18917,7 +18917,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfigurationList"
+        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ValidatingWebhookConfigurationList"
        }
       },
       "401": {
@@ -18927,12 +18927,12 @@
      "x-kubernetes-action": "list",
      "x-kubernetes-group-version-kind": {
       "group": "admissionregistration.k8s.io",
-      "kind": "ExternalAdmissionHookConfiguration",
+      "kind": "ValidatingWebhookConfiguration",
       "version": "v1alpha1"
      }
     },
     "post": {
-     "description": "create an ExternalAdmissionHookConfiguration",
+     "description": "create a ValidatingWebhookConfiguration",
      "consumes": [
       "*/*"
      ],
@@ -18947,14 +18947,14 @@
      "tags": [
       "admissionregistration_v1alpha1"
      ],
-     "operationId": "createAdmissionregistrationV1alpha1ExternalAdmissionHookConfiguration",
+     "operationId": "createAdmissionregistrationV1alpha1ValidatingWebhookConfiguration",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration"
+        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ValidatingWebhookConfiguration"
        }
       }
      ],
@@ -18962,19 +18962,19 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration"
+        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ValidatingWebhookConfiguration"
        }
       },
       "201": {
        "description": "Created",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration"
+        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ValidatingWebhookConfiguration"
        }
       },
       "202": {
        "description": "Accepted",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration"
+        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ValidatingWebhookConfiguration"
        }
       },
       "401": {
@@ -18984,12 +18984,12 @@
      "x-kubernetes-action": "post",
      "x-kubernetes-group-version-kind": {
       "group": "admissionregistration.k8s.io",
-      "kind": "ExternalAdmissionHookConfiguration",
+      "kind": "ValidatingWebhookConfiguration",
       "version": "v1alpha1"
      }
     },
     "delete": {
-     "description": "delete collection of ExternalAdmissionHookConfiguration",
+     "description": "delete collection of ValidatingWebhookConfiguration",
      "consumes": [
       "*/*"
      ],
@@ -19004,7 +19004,7 @@
      "tags": [
       "admissionregistration_v1alpha1"
      ],
-     "operationId": "deleteAdmissionregistrationV1alpha1CollectionExternalAdmissionHookConfiguration",
+     "operationId": "deleteAdmissionregistrationV1alpha1CollectionValidatingWebhookConfiguration",
      "parameters": [
       {
        "uniqueItems": true,
@@ -19077,7 +19077,7 @@
      "x-kubernetes-action": "deletecollection",
      "x-kubernetes-group-version-kind": {
       "group": "admissionregistration.k8s.io",
-      "kind": "ExternalAdmissionHookConfiguration",
+      "kind": "ValidatingWebhookConfiguration",
       "version": "v1alpha1"
      }
     },
@@ -19093,7 +19093,7 @@
    },
    "/apis/admissionregistration.k8s.io/v1alpha1/externaladmissionhookconfigurations/{name}": {
     "get": {
-     "description": "read the specified ExternalAdmissionHookConfiguration",
+     "description": "read the specified ValidatingWebhookConfiguration",
      "consumes": [
       "*/*"
      ],
@@ -19108,7 +19108,7 @@
      "tags": [
       "admissionregistration_v1alpha1"
      ],
-     "operationId": "readAdmissionregistrationV1alpha1ExternalAdmissionHookConfiguration",
+     "operationId": "readAdmissionregistrationV1alpha1ValidatingWebhookConfiguration",
      "parameters": [
       {
        "uniqueItems": true,
@@ -19129,7 +19129,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration"
+        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ValidatingWebhookConfiguration"
        }
       },
       "401": {
@@ -19139,12 +19139,12 @@
      "x-kubernetes-action": "get",
      "x-kubernetes-group-version-kind": {
       "group": "admissionregistration.k8s.io",
-      "kind": "ExternalAdmissionHookConfiguration",
+      "kind": "ValidatingWebhookConfiguration",
       "version": "v1alpha1"
      }
     },
     "put": {
-     "description": "replace the specified ExternalAdmissionHookConfiguration",
+     "description": "replace the specified ValidatingWebhookConfiguration",
      "consumes": [
       "*/*"
      ],
@@ -19159,14 +19159,14 @@
      "tags": [
       "admissionregistration_v1alpha1"
      ],
-     "operationId": "replaceAdmissionregistrationV1alpha1ExternalAdmissionHookConfiguration",
+     "operationId": "replaceAdmissionregistrationV1alpha1ValidatingWebhookConfiguration",
      "parameters": [
       {
        "name": "body",
        "in": "body",
        "required": true,
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration"
+        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ValidatingWebhookConfiguration"
        }
       }
      ],
@@ -19174,13 +19174,13 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration"
+        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ValidatingWebhookConfiguration"
        }
       },
       "201": {
        "description": "Created",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration"
+        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ValidatingWebhookConfiguration"
        }
       },
       "401": {
@@ -19190,12 +19190,12 @@
      "x-kubernetes-action": "put",
      "x-kubernetes-group-version-kind": {
       "group": "admissionregistration.k8s.io",
-      "kind": "ExternalAdmissionHookConfiguration",
+      "kind": "ValidatingWebhookConfiguration",
       "version": "v1alpha1"
      }
     },
     "delete": {
-     "description": "delete an ExternalAdmissionHookConfiguration",
+     "description": "delete a ValidatingWebhookConfiguration",
      "consumes": [
       "*/*"
      ],
@@ -19210,7 +19210,7 @@
      "tags": [
       "admissionregistration_v1alpha1"
      ],
-     "operationId": "deleteAdmissionregistrationV1alpha1ExternalAdmissionHookConfiguration",
+     "operationId": "deleteAdmissionregistrationV1alpha1ValidatingWebhookConfiguration",
      "parameters": [
       {
        "name": "body",
@@ -19256,12 +19256,12 @@
      "x-kubernetes-action": "delete",
      "x-kubernetes-group-version-kind": {
       "group": "admissionregistration.k8s.io",
-      "kind": "ExternalAdmissionHookConfiguration",
+      "kind": "ValidatingWebhookConfiguration",
       "version": "v1alpha1"
      }
     },
     "patch": {
-     "description": "partially update the specified ExternalAdmissionHookConfiguration",
+     "description": "partially update the specified ValidatingWebhookConfiguration",
      "consumes": [
       "application/json-patch+json",
       "application/merge-patch+json",
@@ -19278,7 +19278,7 @@
      "tags": [
       "admissionregistration_v1alpha1"
      ],
-     "operationId": "patchAdmissionregistrationV1alpha1ExternalAdmissionHookConfiguration",
+     "operationId": "patchAdmissionregistrationV1alpha1ValidatingWebhookConfiguration",
      "parameters": [
       {
        "name": "body",
@@ -19293,7 +19293,7 @@
       "200": {
        "description": "OK",
        "schema": {
-        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration"
+        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ValidatingWebhookConfiguration"
        }
       },
       "401": {
@@ -19303,7 +19303,7 @@
      "x-kubernetes-action": "patch",
      "x-kubernetes-group-version-kind": {
       "group": "admissionregistration.k8s.io",
-      "kind": "ExternalAdmissionHookConfiguration",
+      "kind": "ValidatingWebhookConfiguration",
       "version": "v1alpha1"
      }
     },
@@ -19311,7 +19311,7 @@
      {
       "uniqueItems": true,
       "type": "string",
-      "description": "name of the ExternalAdmissionHookConfiguration",
+      "description": "name of the ValidatingWebhookConfiguration",
       "name": "name",
       "in": "path",
       "required": true
@@ -19817,7 +19817,7 @@
    },
    "/apis/admissionregistration.k8s.io/v1alpha1/watch/externaladmissionhookconfigurations": {
     "get": {
-     "description": "watch individual changes to a list of ExternalAdmissionHookConfiguration",
+     "description": "watch individual changes to a list of ValidatingWebhookConfiguration",
      "consumes": [
       "*/*"
      ],
@@ -19834,7 +19834,7 @@
      "tags": [
       "admissionregistration_v1alpha1"
      ],
-     "operationId": "watchAdmissionregistrationV1alpha1ExternalAdmissionHookConfigurationList",
+     "operationId": "watchAdmissionregistrationV1alpha1ValidatingWebhookConfigurationList",
      "responses": {
       "200": {
        "description": "OK",
@@ -19849,7 +19849,7 @@
      "x-kubernetes-action": "watchlist",
      "x-kubernetes-group-version-kind": {
       "group": "admissionregistration.k8s.io",
-      "kind": "ExternalAdmissionHookConfiguration",
+      "kind": "ValidatingWebhookConfiguration",
       "version": "v1alpha1"
      }
     },
@@ -19921,7 +19921,7 @@
    },
    "/apis/admissionregistration.k8s.io/v1alpha1/watch/externaladmissionhookconfigurations/{name}": {
     "get": {
-     "description": "watch changes to an object of kind ExternalAdmissionHookConfiguration",
+     "description": "watch changes to an object of kind ValidatingWebhookConfiguration",
      "consumes": [
       "*/*"
      ],
@@ -19938,7 +19938,7 @@
      "tags": [
       "admissionregistration_v1alpha1"
      ],
-     "operationId": "watchAdmissionregistrationV1alpha1ExternalAdmissionHookConfiguration",
+     "operationId": "watchAdmissionregistrationV1alpha1ValidatingWebhookConfiguration",
      "responses": {
       "200": {
        "description": "OK",
@@ -19953,7 +19953,7 @@
      "x-kubernetes-action": "watch",
      "x-kubernetes-group-version-kind": {
       "group": "admissionregistration.k8s.io",
-      "kind": "ExternalAdmissionHookConfiguration",
+      "kind": "ValidatingWebhookConfiguration",
       "version": "v1alpha1"
      }
     },
@@ -19996,7 +19996,7 @@
      {
       "uniqueItems": true,
       "type": "string",
-      "description": "name of the ExternalAdmissionHookConfiguration",
+      "description": "name of the ValidatingWebhookConfiguration",
       "name": "name",
       "in": "path",
       "required": true
@@ -67002,124 +67002,6 @@
    }
   },
   "definitions": {
-   "io.k8s.api.admissionregistration.v1alpha1.AdmissionHookClientConfig": {
-    "description": "AdmissionHookClientConfig contains the information to make a TLS connection with the webhook",
-    "required": [
-     "service",
-     "urlPath",
-     "caBundle"
-    ],
-    "properties": {
-     "caBundle": {
-      "description": "CABundle is a PEM encoded CA bundle which will be used to validate webhook's server certificate. Required",
-      "type": "string",
-      "format": "byte"
-     },
-     "service": {
-      "description": "Service is a reference to the service for this webhook. If there is only one port open for the service, that port will be used. If there are multiple ports open, port 443 will be used if it is open, otherwise it is an error. Required",
-      "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ServiceReference"
-     },
-     "urlPath": {
-      "description": "URLPath is an optional field that specifies the URL path to use when posting the AdmissionReview object.",
-      "type": "string"
-     }
-    }
-   },
-   "io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHook": {
-    "description": "ExternalAdmissionHook describes an external admission webhook and the resources and operations it applies to.",
-    "required": [
-     "name",
-     "clientConfig"
-    ],
-    "properties": {
-     "clientConfig": {
-      "description": "ClientConfig defines how to communicate with the hook. Required",
-      "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.AdmissionHookClientConfig"
-     },
-     "failurePolicy": {
-      "description": "FailurePolicy defines how unrecognized errors from the admission endpoint are handled - allowed values are Ignore or Fail. Defaults to Ignore.",
-      "type": "string"
-     },
-     "name": {
-      "description": "The name of the external admission webhook. Name should be fully qualified, e.g., imagepolicy.kubernetes.io, where \"imagepolicy\" is the name of the webhook, and kubernetes.io is the name of the organization. Required.",
-      "type": "string"
-     },
-     "rules": {
-      "description": "Rules describes what operations on what resources/subresources the webhook cares about. The webhook cares about an operation if it matches _any_ Rule.",
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.RuleWithOperations"
-      }
-     }
-    }
-   },
-   "io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration": {
-    "description": "ExternalAdmissionHookConfiguration describes the configuration of initializers.",
-    "properties": {
-     "apiVersion": {
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
-      "type": "string"
-     },
-     "externalAdmissionHooks": {
-      "description": "ExternalAdmissionHooks is a list of external admission webhooks and the affected resources and operations.",
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHook"
-      },
-      "x-kubernetes-patch-merge-key": "name",
-      "x-kubernetes-patch-strategy": "merge"
-     },
-     "kind": {
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
-      "type": "string"
-     },
-     "metadata": {
-      "description": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.",
-      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
-     }
-    },
-    "x-kubernetes-group-version-kind": [
-     {
-      "group": "admissionregistration.k8s.io",
-      "kind": "ExternalAdmissionHookConfiguration",
-      "version": "v1alpha1"
-     }
-    ]
-   },
-   "io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfigurationList": {
-    "description": "ExternalAdmissionHookConfigurationList is a list of ExternalAdmissionHookConfiguration.",
-    "required": [
-     "items"
-    ],
-    "properties": {
-     "apiVersion": {
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
-      "type": "string"
-     },
-     "items": {
-      "description": "List of ExternalAdmissionHookConfiguration.",
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration"
-      }
-     },
-     "kind": {
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
-      "type": "string"
-     },
-     "metadata": {
-      "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
-      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
-     }
-    },
-    "x-kubernetes-group-version-kind": [
-     {
-      "group": "admissionregistration.k8s.io",
-      "kind": "ExternalAdmissionHookConfigurationList",
-      "version": "v1alpha1"
-     }
-    ]
-   },
    "io.k8s.api.admissionregistration.v1alpha1.Initializer": {
     "description": "Initializer describes the name and the failure policy of an initializer, and what resources it applies to.",
     "required": [
@@ -67278,6 +67160,124 @@
      },
      "namespace": {
       "description": "Namespace is the namespace of the service Required",
+      "type": "string"
+     }
+    }
+   },
+   "io.k8s.api.admissionregistration.v1alpha1.ValidatingWebhookConfiguration": {
+    "description": "ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.",
+    "properties": {
+     "Webhooks": {
+      "description": "Webhooks is a list of webhooks and the affected resources and operations.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.Webhook"
+      },
+      "x-kubernetes-patch-merge-key": "name",
+      "x-kubernetes-patch-strategy": "merge"
+     },
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "description": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "admissionregistration.k8s.io",
+      "kind": "ValidatingWebhookConfiguration",
+      "version": "v1alpha1"
+     }
+    ]
+   },
+   "io.k8s.api.admissionregistration.v1alpha1.ValidatingWebhookConfigurationList": {
+    "description": "ValidatingWebhookConfigurationList is a list of ValidatingWebhookConfiguration.",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+      "type": "string"
+     },
+     "items": {
+      "description": "List of ValidatingWebhookConfiguration.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ValidatingWebhookConfiguration"
+      }
+     },
+     "kind": {
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "type": "string"
+     },
+     "metadata": {
+      "description": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta"
+     }
+    },
+    "x-kubernetes-group-version-kind": [
+     {
+      "group": "admissionregistration.k8s.io",
+      "kind": "ValidatingWebhookConfigurationList",
+      "version": "v1alpha1"
+     }
+    ]
+   },
+   "io.k8s.api.admissionregistration.v1alpha1.Webhook": {
+    "description": "Webhook describes an admission webhook and the resources and operations it applies to.",
+    "required": [
+     "name",
+     "clientConfig"
+    ],
+    "properties": {
+     "clientConfig": {
+      "description": "ClientConfig defines how to communicate with the hook. Required",
+      "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.WebhookClientConfig"
+     },
+     "failurePolicy": {
+      "description": "FailurePolicy defines how unrecognized errors from the admission endpoint are handled - allowed values are Ignore or Fail. Defaults to Ignore.",
+      "type": "string"
+     },
+     "name": {
+      "description": "The name of the admission webhook. Name should be fully qualified, e.g., imagepolicy.kubernetes.io, where \"imagepolicy\" is the name of the webhook, and kubernetes.io is the name of the organization. Required.",
+      "type": "string"
+     },
+     "rules": {
+      "description": "Rules describes what operations on what resources/subresources the webhook cares about. The webhook cares about an operation if it matches _any_ Rule.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.RuleWithOperations"
+      }
+     }
+    }
+   },
+   "io.k8s.api.admissionregistration.v1alpha1.WebhookClientConfig": {
+    "description": "WebhookClientConfig contains the information to make a TLS connection with the webhook",
+    "required": [
+     "service",
+     "urlPath",
+     "caBundle"
+    ],
+    "properties": {
+     "caBundle": {
+      "description": "CABundle is a PEM encoded CA bundle which will be used to validate webhook's server certificate. Required",
+      "type": "string",
+      "format": "byte"
+     },
+     "service": {
+      "description": "Service is a reference to the service for this webhook. If there is only one port open for the service, that port will be used. If there are multiple ports open, port 443 will be used if it is open, otherwise it is an error. Required",
+      "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ServiceReference"
+     },
+     "urlPath": {
+      "description": "URLPath is an optional field that specifies the URL path to use when posting the AdmissionReview object.",
       "type": "string"
      }
     }
@@ -81406,22 +81406,6 @@
     "description": "Deprecated. Please use io.k8s.api.core.v1.WeightedPodAffinityTerm instead.",
     "$ref": "#/definitions/io.k8s.api.core.v1.WeightedPodAffinityTerm"
    },
-   "io.k8s.kubernetes.pkg.apis.admissionregistration.v1alpha1.AdmissionHookClientConfig": {
-    "description": "Deprecated. Please use io.k8s.api.admissionregistration.v1alpha1.AdmissionHookClientConfig instead.",
-    "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.AdmissionHookClientConfig"
-   },
-   "io.k8s.kubernetes.pkg.apis.admissionregistration.v1alpha1.ExternalAdmissionHook": {
-    "description": "Deprecated. Please use io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHook instead.",
-    "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHook"
-   },
-   "io.k8s.kubernetes.pkg.apis.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration": {
-    "description": "Deprecated. Please use io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration instead.",
-    "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfiguration"
-   },
-   "io.k8s.kubernetes.pkg.apis.admissionregistration.v1alpha1.ExternalAdmissionHookConfigurationList": {
-    "description": "Deprecated. Please use io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfigurationList instead.",
-    "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ExternalAdmissionHookConfigurationList"
-   },
    "io.k8s.kubernetes.pkg.apis.admissionregistration.v1alpha1.Initializer": {
     "description": "Deprecated. Please use io.k8s.api.admissionregistration.v1alpha1.Initializer instead.",
     "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.Initializer"
@@ -81445,6 +81429,18 @@
    "io.k8s.kubernetes.pkg.apis.admissionregistration.v1alpha1.ServiceReference": {
     "description": "Deprecated. Please use io.k8s.api.admissionregistration.v1alpha1.ServiceReference instead.",
     "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ServiceReference"
+   },
+   "io.k8s.kubernetes.pkg.apis.admissionregistration.v1alpha1.ValidatingWebhookConfiguration": {
+    "description": "Deprecated. Please use io.k8s.api.admissionregistration.v1alpha1.ValidatingWebhookConfiguration instead.",
+    "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ValidatingWebhookConfiguration"
+   },
+   "io.k8s.kubernetes.pkg.apis.admissionregistration.v1alpha1.ValidatingWebhookConfigurationList": {
+    "description": "Deprecated. Please use io.k8s.api.admissionregistration.v1alpha1.ValidatingWebhookConfigurationList instead.",
+    "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.ValidatingWebhookConfigurationList"
+   },
+   "io.k8s.kubernetes.pkg.apis.admissionregistration.v1alpha1.Webhook": {
+    "description": "Deprecated. Please use io.k8s.api.admissionregistration.v1alpha1.Webhook instead.",
+    "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.Webhook"
    },
    "io.k8s.kubernetes.pkg.apis.apps.v1beta1.ControllerRevision": {
     "description": "Deprecated. Please use io.k8s.api.apps.v1beta1.ControllerRevision instead.",

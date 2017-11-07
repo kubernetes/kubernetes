@@ -22,9 +22,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/admissionregistration/externaladmissionhookconfiguration:all-srcs",
         "//pkg/registry/admissionregistration/initializerconfiguration:all-srcs",
         "//pkg/registry/admissionregistration/rest:all-srcs",
+        "//pkg/registry/admissionregistration/validatingwebhookconfiguration:all-srcs",
         "//pkg/registry/apps/controllerrevision:all-srcs",
         "//pkg/registry/apps/rest:all-srcs",
         "//pkg/registry/apps/statefulset:all-srcs",

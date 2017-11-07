@@ -30,58 +30,58 @@ import (
 	time "time"
 )
 
-// ExternalAdmissionHookConfigurationInformer provides access to a shared informer and lister for
-// ExternalAdmissionHookConfigurations.
-type ExternalAdmissionHookConfigurationInformer interface {
+// ValidatingWebhookConfigurationInformer provides access to a shared informer and lister for
+// ValidatingWebhookConfigurations.
+type ValidatingWebhookConfigurationInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() internalversion.ExternalAdmissionHookConfigurationLister
+	Lister() internalversion.ValidatingWebhookConfigurationLister
 }
 
-type externalAdmissionHookConfigurationInformer struct {
+type validatingWebhookConfigurationInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
-// NewExternalAdmissionHookConfigurationInformer constructs a new informer for ExternalAdmissionHookConfiguration type.
+// NewValidatingWebhookConfigurationInformer constructs a new informer for ValidatingWebhookConfiguration type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewExternalAdmissionHookConfigurationInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredExternalAdmissionHookConfigurationInformer(client, resyncPeriod, indexers, nil)
+func NewValidatingWebhookConfigurationInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredValidatingWebhookConfigurationInformer(client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredExternalAdmissionHookConfigurationInformer constructs a new informer for ExternalAdmissionHookConfiguration type.
+// NewFilteredValidatingWebhookConfigurationInformer constructs a new informer for ValidatingWebhookConfiguration type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredExternalAdmissionHookConfigurationInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredValidatingWebhookConfigurationInformer(client internalclientset.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Admissionregistration().ExternalAdmissionHookConfigurations().List(options)
+				return client.Admissionregistration().ValidatingWebhookConfigurations().List(options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.Admissionregistration().ExternalAdmissionHookConfigurations().Watch(options)
+				return client.Admissionregistration().ValidatingWebhookConfigurations().Watch(options)
 			},
 		},
-		&admissionregistration.ExternalAdmissionHookConfiguration{},
+		&admissionregistration.ValidatingWebhookConfiguration{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *externalAdmissionHookConfigurationInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredExternalAdmissionHookConfigurationInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *validatingWebhookConfigurationInformer) defaultInformer(client internalclientset.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredValidatingWebhookConfigurationInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *externalAdmissionHookConfigurationInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&admissionregistration.ExternalAdmissionHookConfiguration{}, f.defaultInformer)
+func (f *validatingWebhookConfigurationInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&admissionregistration.ValidatingWebhookConfiguration{}, f.defaultInformer)
 }
 
-func (f *externalAdmissionHookConfigurationInformer) Lister() internalversion.ExternalAdmissionHookConfigurationLister {
-	return internalversion.NewExternalAdmissionHookConfigurationLister(f.Informer().GetIndexer())
+func (f *validatingWebhookConfigurationInformer) Lister() internalversion.ValidatingWebhookConfigurationLister {
+	return internalversion.NewValidatingWebhookConfigurationLister(f.Informer().GetIndexer())
 }

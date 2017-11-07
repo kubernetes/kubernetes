@@ -11,7 +11,7 @@ go_library(
         "doc.go",
         "strategy.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/registry/admissionregistration/externaladmissionhookconfiguration",
+    importpath = "k8s.io/kubernetes/pkg/registry/admissionregistration/validatingwebhookconfiguration",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/admissionregistration:go_default_library",
@@ -34,7 +34,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/registry/admissionregistration/externaladmissionhookconfiguration/storage:all-srcs",
+        "//pkg/registry/admissionregistration/validatingwebhookconfiguration/storage:all-srcs",
     ],
     tags = ["automanaged"],
 )

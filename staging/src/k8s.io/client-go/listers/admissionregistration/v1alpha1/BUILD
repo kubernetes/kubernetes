@@ -9,8 +9,8 @@ go_library(
     name = "go_default_library",
     srcs = [
         "expansion_generated.go",
-        "externaladmissionhookconfiguration.go",
         "initializerconfiguration.go",
+        "validatingwebhookconfiguration.go",
     ],
     importpath = "k8s.io/client-go/listers/admissionregistration/v1alpha1",
     deps = [
