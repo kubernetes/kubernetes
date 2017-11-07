@@ -73,24 +73,6 @@ type KubeSchedulerConfiguration struct {
 	UseLegacyPolicyConfig bool `json:"useLegacyPolicyConfig"`
 }
 
-// HairpinMode denotes how the kubelet should configure networking to handle
-// hairpin packets.
-type HairpinMode string
-
-// Enum settings for different ways to handle hairpin packets.
-const (
-	// Set the hairpin flag on the veth of containers in the respective
-	// container runtime.
-	HairpinVeth = "hairpin-veth"
-	// Make the container bridge promiscuous. This will force it to accept
-	// hairpin packets, even if the flag isn't set on ports of the bridge.
-	PromiscuousBridge = "promiscuous-bridge"
-	// Neither of the above. If the kubelet is started in this hairpin mode
-	// and kube-proxy is running in iptables mode, hairpin packets will be
-	// dropped by the container bridge.
-	HairpinNone = "none"
-)
-
 // LeaderElectionConfiguration defines the configuration of leader election
 // clients for components that can run with leader election enabled.
 type LeaderElectionConfiguration struct {
