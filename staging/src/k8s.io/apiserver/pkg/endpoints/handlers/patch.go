@@ -354,13 +354,13 @@ func patchResource(
 	applyAdmission := func(ctx request.Context, patchedObject runtime.Object, currentObject runtime.Object) (runtime.Object, error) {
 		return patchedObject, updateMutation(patchedObject, currentObject)
 	}
-	updatedObjectInfo := rest.DefaultUpdatedObjectInfo(nil, applyPatch, applyAdmission)
+	updatedObjectInfo := rest.DefaultUpdatedObjectInfo(nil, createValidation, updateValidation, applyPatch, applyAdmission)
 
 	return finishRequest(timeout, func() (runtime.Object, error) {
-		updateObject, _, updateErr := patcher.Update(ctx, name, updatedObjectInfo, createValidation, updateValidation)
+		updateObject, _, updateErr := patcher.Update(ctx, name, updatedObjectInfo)
 		for i := 0; i < MaxRetryWhenPatchConflicts && (errors.IsConflict(updateErr)); i++ {
 			lastConflictErr = updateErr
-			updateObject, _, updateErr = patcher.Update(ctx, name, updatedObjectInfo, createValidation, updateValidation)
+			updateObject, _, updateErr = patcher.Update(ctx, name, updatedObjectInfo)
 		}
 		return updateObject, updateErr
 	})

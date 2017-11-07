@@ -70,7 +70,7 @@ type RESTCreateStrategy interface {
 // BeforeCreate ensures that common operations for all resources are performed on creation. It only returns
 // errors that can be converted to api.Status. It invokes PrepareForCreate, then GenerateName, then Validate.
 // It returns nil if the object should be created.
-func BeforeCreate(strategy RESTCreateStrategy, ctx genericapirequest.Context, obj runtime.Object) error {
+func BeforeCreate(strategy RESTCreateStrategy, ctx genericapirequest.Context, obj runtime.Object, createValidation ValidateObjectFunc) error {
 	objectMeta, kind, kerr := objectMetaAndKind(strategy, obj)
 	if kerr != nil {
 		return kerr
@@ -111,6 +111,14 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx genericapirequest.Context, ob
 	}
 
 	strategy.Canonicalize(obj)
+
+	// at this point we have a fully formed object.  It is time to call the validators that the apiserver
+	// handling chain wants to enforce.
+	if createValidation != nil {
+		if err := createValidation(obj.DeepCopyObject()); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }

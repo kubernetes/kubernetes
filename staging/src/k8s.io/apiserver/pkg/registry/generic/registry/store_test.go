@@ -446,7 +446,7 @@ func TestStoreCreateInitialized(t *testing.T) {
 		}
 
 		pod.Initializers = nil
-		updated, _, err := registry.Update(ctx, podA.Name, rest.DefaultUpdatedObjectInfo(pod), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+		updated, _, err := registry.Update(ctx, podA.Name, rest.DefaultUpdatedObjectInfo(pod, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -539,7 +539,7 @@ func TestStoreCreateInitializedFailed(t *testing.T) {
 		}
 		pod.Initializers.Pending = nil
 		pod.Initializers.Result = &metav1.Status{Status: metav1.StatusFailure, Code: 403, Reason: metav1.StatusReasonForbidden, Message: "induced failure"}
-		updated, _, err := registry.Update(ctx, podA.Name, rest.DefaultUpdatedObjectInfo(pod), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+		updated, _, err := registry.Update(ctx, podA.Name, rest.DefaultUpdatedObjectInfo(pod, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -580,7 +580,7 @@ func TestStoreCreateInitializedFailed(t *testing.T) {
 }
 
 func updateAndVerify(t *testing.T, ctx genericapirequest.Context, registry *Store, pod *example.Pod) bool {
-	obj, _, err := registry.Update(ctx, pod.Name, rest.DefaultUpdatedObjectInfo(pod), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	obj, _, err := registry.Update(ctx, pod.Name, rest.DefaultUpdatedObjectInfo(pod, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 		return false
@@ -616,7 +616,7 @@ func TestStoreUpdate(t *testing.T) {
 	defer destroyFunc()
 
 	// try to update a non-existing node with denying admission, should still return NotFound
-	_, _, err := registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podA), denyCreateValidation, denyUpdateValidation)
+	_, _, err := registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podA, denyCreateValidation, denyUpdateValidation))
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -645,7 +645,7 @@ func TestStoreUpdate(t *testing.T) {
 	registry.UpdateStrategy.(*testRESTStrategy).allowCreateOnUpdate = false
 
 	// outofDate
-	_, _, err = registry.Update(testContext, podAWithResourceVersion.Name, rest.DefaultUpdatedObjectInfo(podAWithResourceVersion), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	_, _, err = registry.Update(testContext, podAWithResourceVersion.Name, rest.DefaultUpdatedObjectInfo(podAWithResourceVersion, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc))
 	if !errors.IsConflict(err) {
 		t.Errorf("Unexpected error updating podAWithResourceVersion: %v", err)
 	}
@@ -699,7 +699,7 @@ func TestNoOpUpdates(t *testing.T) {
 
 	var updateResult runtime.Object
 	p := newPod()
-	if updateResult, _, err = registry.Update(genericapirequest.NewDefaultContext(), p.Name, rest.DefaultUpdatedObjectInfo(p), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
+	if updateResult, _, err = registry.Update(genericapirequest.NewDefaultContext(), p.Name, rest.DefaultUpdatedObjectInfo(p, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
@@ -1000,7 +1000,7 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
 			Spec:       example.PodSpec{NodeName: "machine"},
 		}
-		_, _, err = registry.Update(testContext, updatedPodWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(updatedPodWithFinalizer), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+		_, _, err = registry.Update(testContext, updatedPodWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(updatedPodWithFinalizer, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc))
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -1015,7 +1015,7 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
 			Spec:       example.PodSpec{NodeName: "anothermachine"},
 		}
-		_, _, err = registry.Update(testContext, podWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(podWithNoFinalizer), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+		_, _, err = registry.Update(testContext, podWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(podWithNoFinalizer, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc))
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -1052,7 +1052,7 @@ func TestFailedInitializationStoreUpdate(t *testing.T) {
 
 	// update the pod with initialization failure, the pod should be deleted
 	pod.Initializers.Result = &metav1.Status{Status: metav1.StatusFailure}
-	result, _, err := registry.Update(testContext, podInitializing.Name, rest.DefaultUpdatedObjectInfo(pod), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	result, _, err := registry.Update(testContext, podInitializing.Name, rest.DefaultUpdatedObjectInfo(pod, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc))
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -1120,7 +1120,7 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "foo", Finalizers: []string{"foo.com/x"}, ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
 			Spec:       example.PodSpec{NodeName: "machine"},
 		}
-		_, _, err = registry.Update(testContext, updatedPodWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(updatedPodWithFinalizer), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+		_, _, err = registry.Update(testContext, updatedPodWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(updatedPodWithFinalizer, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc))
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -1139,7 +1139,7 @@ func TestNonGracefulStoreHandleFinalizers(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "foo", ResourceVersion: podWithFinalizer.ObjectMeta.ResourceVersion},
 			Spec:       example.PodSpec{NodeName: "anothermachine"},
 		}
-		_, _, err = registry.Update(testContext, podWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(podWithNoFinalizer), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+		_, _, err = registry.Update(testContext, podWithFinalizer.ObjectMeta.Name, rest.DefaultUpdatedObjectInfo(podWithNoFinalizer, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc))
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -1950,7 +1950,7 @@ func TestQualifiedResource(t *testing.T) {
 	defer destroyFunc()
 
 	// update a non-exist object
-	_, _, err := registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podA), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	_, _, err := registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podA, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc))
 	if !errors.IsNotFound(err) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
