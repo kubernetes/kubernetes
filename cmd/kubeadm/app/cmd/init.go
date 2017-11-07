@@ -30,6 +30,7 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -103,6 +104,7 @@ var (
 // NewCmdInit returns "kubeadm init" command.
 func NewCmdInit(out io.Writer) *cobra.Command {
 	cfg := &kubeadmapiext.MasterConfiguration{}
+	cfg.TokenTTL = &metav1.Duration{Duration: 24 * time.Hour}
 	legacyscheme.Scheme.Default(cfg)
 
 	var cfgPath string
@@ -181,7 +183,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 	)
 	flagSet.DurationVar(
 		&cfg.TokenTTL.Duration, "token-ttl", cfg.TokenTTL.Duration,
-		"The duration before the bootstrap token is automatically deleted. 0 means 'never expires'.",
+		"The duration before the bootstrap token is automatically deleted. 0 means 'never expires'. If unset, the TTL defaults to 24 hours.",
 	)
 	flagSet.StringVar(featureGatesString, "feature-gates", *featureGatesString, "A set of key=value pairs that describe feature gates for various features. "+
 		"Options are:\n"+strings.Join(features.KnownFeatures(&features.InitFeatureGates), "\n"))

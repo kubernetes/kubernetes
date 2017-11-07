@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -134,6 +135,7 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 // NewCmdConfigUploadFromFlags returs cobra.Command for "kubeadm config upload from-flags" command
 func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	cfg := &kubeadmapiext.MasterConfiguration{}
+	cfg.TokenTTL = &metav1.Duration{Duration: 24 * time.Hour}
 	legacyscheme.Scheme.Default(cfg)
 
 	var featureGatesString string
