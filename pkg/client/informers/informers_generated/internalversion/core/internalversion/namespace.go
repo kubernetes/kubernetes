@@ -23,7 +23,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/internalinterfaces"
 	internalversion "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
@@ -54,7 +54,7 @@ func NewNamespaceInformer(client internalclientset.Interface, resyncPeriod time.
 				return client.Core().Namespaces().Watch(options)
 			},
 		},
-		&api.Namespace{},
+		&core.Namespace{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,7 +65,7 @@ func defaultNamespaceInformer(client internalclientset.Interface, resyncPeriod t
 }
 
 func (f *namespaceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api.Namespace{}, defaultNamespaceInformer)
+	return f.factory.InformerFor(&core.Namespace{}, defaultNamespaceInformer)
 }
 
 func (f *namespaceInformer) Lister() internalversion.NamespaceLister {

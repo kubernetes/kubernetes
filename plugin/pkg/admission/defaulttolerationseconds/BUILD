@@ -12,8 +12,8 @@ go_test(
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/helper:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/helper:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",
     ],
@@ -24,8 +24,8 @@ go_library(
     srcs = ["admission.go"],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds",
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/helper:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/helper:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//vendor/k8s.io/apiserver/pkg/admission:go_default_library",

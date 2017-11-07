@@ -14,9 +14,9 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/endpoint",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/v1/endpoints:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
@@ -43,10 +43,10 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/controller/endpoint",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/v1/endpoints:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
