@@ -235,13 +235,13 @@ func makeFakeImageFsUsage(fsUUID string) *runtimeapi.FilesystemUsage {
 func checkCRICPUAndMemoryStats(assert *assert.Assertions, actual statsapi.ContainerStats, cs *runtimeapi.ContainerStats) {
 	assert.Equal(cs.Cpu.Timestamp, actual.CPU.Time.UnixNano())
 	assert.Equal(cs.Cpu.UsageCoreNanoSeconds.Value, *actual.CPU.UsageCoreNanoSeconds)
-	assert.Nil(actual.CPU.UsageNanoCores)
+	assert.Zero(*actual.CPU.UsageNanoCores)
 
 	assert.Equal(cs.Memory.Timestamp, actual.Memory.Time.UnixNano())
 	assert.Nil(actual.Memory.AvailableBytes)
 	assert.Nil(actual.Memory.UsageBytes)
 	assert.Equal(cs.Memory.WorkingSetBytes.Value, *actual.Memory.WorkingSetBytes)
-	assert.Nil(actual.Memory.RSSBytes)
+	assert.Zero(*actual.Memory.RSSBytes)
 	assert.Nil(actual.Memory.PageFaults)
 	assert.Nil(actual.Memory.MajorPageFaults)
 }
