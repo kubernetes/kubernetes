@@ -45,7 +45,9 @@ var _ volume.Mounter = &azureDiskMounter{}
 func (m *azureDiskMounter) GetAttributes() volume.Attributes {
 	readOnly := false
 	volumeSource, err := getVolumeSource(m.spec)
-	if err != nil && volumeSource.ReadOnly != nil {
+	if err != nil {
+		glog.Infof("azureDisk - mounter failed to get volume source for spec %s %v", m.spec.Name(), err)
+	} else if volumeSource.ReadOnly != nil {
 		readOnly = *volumeSource.ReadOnly
 	}
 	return volume.Attributes{
