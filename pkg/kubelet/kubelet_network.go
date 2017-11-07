@@ -21,13 +21,17 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -45,6 +49,77 @@ const (
 	// KubeFirewallChain is kubernetes firewall rules
 	KubeFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
 )
+
+// This just exports required functions from kubelet proper, for use by network
+// plugins.
+// TODO(#35457): get rid of this backchannel to the kubelet. The scope of
+// the back channel is restricted to host-ports/testing, and restricted
+// to kubenet. No other network plugin wrapper needs it. Other plugins
+// only require a way to access namespace information, which they can do
+// directly through the methods implemented by criNetworkHost.
+type networkHost struct {
+	kubelet *Kubelet
+}
+
+func (nh *networkHost) GetPodByName(name, namespace string) (*v1.Pod, bool) {
+	return nh.kubelet.GetPodByName(name, namespace)
+}
+
+func (nh *networkHost) GetKubeClient() clientset.Interface {
+	return nh.kubelet.kubeClient
+}
+
+func (nh *networkHost) GetRuntime() kubecontainer.Runtime {
+	return nh.kubelet.GetRuntime()
+}
+
+func (nh *networkHost) SupportsLegacyFeatures() bool {
+	return true
+}
+
+// criNetworkHost implements the part of network.Host required by the
+// cri (NamespaceGetter). It leechs off networkHost for all other
+// methods, because networkHost is slated for deletion.
+type criNetworkHost struct {
+	*networkHost
+	// criNetworkHost currently support legacy features. Hence no need to support PortMappingGetter
+	*network.NoopPortMappingGetter
+}
+
+// GetNetNS returns the network namespace of the given containerID.
+// This method satisfies the network.NamespaceGetter interface for
+// networkHost. It's only meant to be used from network plugins
+// that are directly invoked by the kubelet (aka: legacy, pre-cri).
+// Any network plugin invoked by a cri must implement NamespaceGetter
+// to talk directly to the runtime instead.
+func (c *criNetworkHost) GetNetNS(containerID string) (string, error) {
+	return c.kubelet.GetRuntime().GetNetNS(kubecontainer.ContainerID{Type: "", ID: containerID})
+}
+
+// NoOpLegacyHost implements the network.LegacyHost interface for the remote
+// runtime shim by just returning empties. It doesn't support legacy features
+// like host port and bandwidth shaping.
+type NoOpLegacyHost struct{}
+
+// GetPodByName always returns "nil, true" for 'NoOpLegacyHost'
+func (n *NoOpLegacyHost) GetPodByName(namespace, name string) (*v1.Pod, bool) {
+	return nil, true
+}
+
+// GetKubeClient always returns "nil" for 'NoOpLegacyHost'
+func (n *NoOpLegacyHost) GetKubeClient() clientset.Interface {
+	return nil
+}
+
+// GetRuntime always returns "nil" for 'NoOpLegacyHost'
+func (n *NoOpLegacyHost) GetRuntime() kubecontainer.Runtime {
+	return nil
+}
+
+// SupportsLegacyFeatures always returns "false" for 'NoOpLegacyHost'
+func (n *NoOpLegacyHost) SupportsLegacyFeatures() bool {
+	return false
+}
 
 // effectiveHairpinMode determines the effective hairpin mode given the
 // configured mode, container runtime, and whether cbr0 should be configured.
@@ -89,7 +164,7 @@ func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
 	return supported
 }
 
-func omitDuplicates(kl *Kubelet, pod *v1.Pod, combinedSearch []string) []string {
+func omitDuplicates(pod *v1.Pod, combinedSearch []string) []string {
 	uniqueDomains := map[string]bool{}
 
 	for _, dnsDomain := range combinedSearch {
@@ -101,7 +176,7 @@ func omitDuplicates(kl *Kubelet, pod *v1.Pod, combinedSearch []string) []string 
 	return combinedSearch[:len(uniqueDomains)]
 }
 
-func formDNSSearchFitsLimits(kl *Kubelet, pod *v1.Pod, composedSearch []string) []string {
+func (kl *Kubelet) formDNSSearchFitsLimits(pod *v1.Pod, composedSearch []string) []string {
 	// resolver file Search line current limitations
 	resolvSearchLineDNSDomainsLimit := 6
 	resolvSearchLineLenLimit := 255
@@ -137,12 +212,12 @@ func formDNSSearchFitsLimits(kl *Kubelet, pod *v1.Pod, composedSearch []string) 
 }
 
 func (kl *Kubelet) formDNSSearchForDNSDefault(hostSearch []string, pod *v1.Pod) []string {
-	return formDNSSearchFitsLimits(kl, pod, hostSearch)
+	return kl.formDNSSearchFitsLimits(pod, hostSearch)
 }
 
 func (kl *Kubelet) formDNSSearch(hostSearch []string, pod *v1.Pod) []string {
 	if kl.clusterDomain == "" {
-		formDNSSearchFitsLimits(kl, pod, hostSearch)
+		kl.formDNSSearchFitsLimits(pod, hostSearch)
 		return hostSearch
 	}
 
@@ -152,8 +227,8 @@ func (kl *Kubelet) formDNSSearch(hostSearch []string, pod *v1.Pod) []string {
 
 	combinedSearch := append(dnsSearch, hostSearch...)
 
-	combinedSearch = omitDuplicates(kl, pod, combinedSearch)
-	return formDNSSearchFitsLimits(kl, pod, combinedSearch)
+	combinedSearch = omitDuplicates(pod, combinedSearch)
+	return kl.formDNSSearchFitsLimits(pod, combinedSearch)
 }
 
 func (kl *Kubelet) checkLimitsForResolvConf() {
@@ -244,6 +319,94 @@ func (kl *Kubelet) parseResolvConf(reader io.Reader) (nameservers []string, sear
 	// contact @thockin or @wlan0 for more information
 
 	return nameservers, searches, options, nil
+}
+
+// GetClusterDNS returns a list of the DNS servers, a list of the DNS search
+// domains of the cluster, and a list of resolv.conf options.
+func (kl *Kubelet) GetClusterDNS(pod *v1.Pod) ([]string, []string, []string, bool, error) {
+	var hostDNS, hostSearch, hostOptions []string
+	// Get host DNS settings
+	if kl.resolverConfig != "" {
+		f, err := os.Open(kl.resolverConfig)
+		if err != nil {
+			return nil, nil, nil, false, err
+		}
+		defer f.Close()
+
+		hostDNS, hostSearch, hostOptions, err = kl.parseResolvConf(f)
+		if err != nil {
+			return nil, nil, nil, false, err
+		}
+	}
+	useClusterFirstPolicy := ((pod.Spec.DNSPolicy == v1.DNSClusterFirst && !kubecontainer.IsHostNetworkPod(pod)) || pod.Spec.DNSPolicy == v1.DNSClusterFirstWithHostNet)
+	if useClusterFirstPolicy && len(kl.clusterDNS) == 0 {
+		// clusterDNS is not known.
+		// pod with ClusterDNSFirst Policy cannot be created
+		kl.recorder.Eventf(pod, v1.EventTypeWarning, "MissingClusterDNS", "kubelet does not have ClusterDNS IP configured and cannot create Pod using %q policy. Falling back to DNSDefault policy.", pod.Spec.DNSPolicy)
+		log := fmt.Sprintf("kubelet does not have ClusterDNS IP configured and cannot create Pod using %q policy. pod: %q. Falling back to DNSDefault policy.", pod.Spec.DNSPolicy, format.Pod(pod))
+		kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, "MissingClusterDNS", log)
+
+		// fallback to DNSDefault
+		useClusterFirstPolicy = false
+	}
+
+	if !useClusterFirstPolicy {
+		// When the kubelet --resolv-conf flag is set to the empty string, use
+		// DNS settings that override the docker default (which is to use
+		// /etc/resolv.conf) and effectively disable DNS lookups. According to
+		// the bind documentation, the behavior of the DNS client library when
+		// "nameservers" are not specified is to "use the nameserver on the
+		// local machine". A nameserver setting of localhost is equivalent to
+		// this documented behavior.
+		if kl.resolverConfig == "" {
+			hostDNS = []string{"127.0.0.1"}
+			hostSearch = []string{"."}
+		} else {
+			hostSearch = kl.formDNSSearchForDNSDefault(hostSearch, pod)
+		}
+		return hostDNS, hostSearch, hostOptions, useClusterFirstPolicy, nil
+	}
+
+	// for a pod with DNSClusterFirst policy, the cluster DNS server is the only nameserver configured for
+	// the pod. The cluster DNS server itself will forward queries to other nameservers that is configured to use,
+	// in case the cluster DNS server cannot resolve the DNS query itself
+	dns := make([]string, len(kl.clusterDNS))
+	for i, ip := range kl.clusterDNS {
+		dns[i] = ip.String()
+	}
+	dnsSearch := kl.formDNSSearch(hostSearch, pod)
+
+	return dns, dnsSearch, hostOptions, useClusterFirstPolicy, nil
+}
+
+// Replace the nameserver in containerized-mounter's rootfs/etc/resolve.conf with kubelet.ClusterDNS
+func (kl *Kubelet) setupDNSinContainerizedMounter(mounterPath string) {
+	resolvePath := filepath.Join(strings.TrimSuffix(mounterPath, "/mounter"), "rootfs", "etc", "resolv.conf")
+	dnsString := ""
+	for _, dns := range kl.clusterDNS {
+		dnsString = dnsString + fmt.Sprintf("nameserver %s\n", dns)
+	}
+	if kl.resolverConfig != "" {
+		f, err := os.Open(kl.resolverConfig)
+		defer f.Close()
+		if err != nil {
+			glog.Error("Could not open resolverConf file")
+		} else {
+			_, hostSearch, _, err := kl.parseResolvConf(f)
+			if err != nil {
+				glog.Errorf("Error for parsing the reslov.conf file: %v", err)
+			} else {
+				dnsString = dnsString + "search"
+				for _, search := range hostSearch {
+					dnsString = dnsString + fmt.Sprintf(" %s", search)
+				}
+				dnsString = dnsString + "\n"
+			}
+		}
+	}
+	if err := ioutil.WriteFile(resolvePath, []byte(dnsString), 0600); err != nil {
+		glog.Errorf("Could not write dns nameserver in file %s, with error %v", resolvePath, err)
+	}
 }
 
 // syncNetworkStatus updates the network state

@@ -19,13 +19,11 @@ package kubelet
 import (
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
-	"path/filepath"
 	goruntime "runtime"
 	"sort"
 	"strings"
@@ -1401,64 +1399,6 @@ func (kl *Kubelet) GetKubeClient() clientset.Interface {
 	return kl.kubeClient
 }
 
-// GetClusterDNS returns a list of the DNS servers, a list of the DNS search
-// domains of the cluster, and a list of resolv.conf options.
-func (kl *Kubelet) GetClusterDNS(pod *v1.Pod) ([]string, []string, []string, bool, error) {
-	var hostDNS, hostSearch, hostOptions []string
-	// Get host DNS settings
-	if kl.resolverConfig != "" {
-		f, err := os.Open(kl.resolverConfig)
-		if err != nil {
-			return nil, nil, nil, false, err
-		}
-		defer f.Close()
-
-		hostDNS, hostSearch, hostOptions, err = kl.parseResolvConf(f)
-		if err != nil {
-			return nil, nil, nil, false, err
-		}
-	}
-	useClusterFirstPolicy := ((pod.Spec.DNSPolicy == v1.DNSClusterFirst && !kubecontainer.IsHostNetworkPod(pod)) || pod.Spec.DNSPolicy == v1.DNSClusterFirstWithHostNet)
-	if useClusterFirstPolicy && len(kl.clusterDNS) == 0 {
-		// clusterDNS is not known.
-		// pod with ClusterDNSFirst Policy cannot be created
-		kl.recorder.Eventf(pod, v1.EventTypeWarning, "MissingClusterDNS", "kubelet does not have ClusterDNS IP configured and cannot create Pod using %q policy. Falling back to DNSDefault policy.", pod.Spec.DNSPolicy)
-		log := fmt.Sprintf("kubelet does not have ClusterDNS IP configured and cannot create Pod using %q policy. pod: %q. Falling back to DNSDefault policy.", pod.Spec.DNSPolicy, format.Pod(pod))
-		kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, "MissingClusterDNS", log)
-
-		// fallback to DNSDefault
-		useClusterFirstPolicy = false
-	}
-
-	if !useClusterFirstPolicy {
-		// When the kubelet --resolv-conf flag is set to the empty string, use
-		// DNS settings that override the docker default (which is to use
-		// /etc/resolv.conf) and effectively disable DNS lookups. According to
-		// the bind documentation, the behavior of the DNS client library when
-		// "nameservers" are not specified is to "use the nameserver on the
-		// local machine". A nameserver setting of localhost is equivalent to
-		// this documented behavior.
-		if kl.resolverConfig == "" {
-			hostDNS = []string{"127.0.0.1"}
-			hostSearch = []string{"."}
-		} else {
-			hostSearch = kl.formDNSSearchForDNSDefault(hostSearch, pod)
-		}
-		return hostDNS, hostSearch, hostOptions, useClusterFirstPolicy, nil
-	}
-
-	// for a pod with DNSClusterFirst policy, the cluster DNS server is the only nameserver configured for
-	// the pod. The cluster DNS server itself will forward queries to other nameservers that is configured to use,
-	// in case the cluster DNS server cannot resolve the DNS query itself
-	dns := make([]string, len(kl.clusterDNS))
-	for i, ip := range kl.clusterDNS {
-		dns[i] = ip.String()
-	}
-	dnsSearch := kl.formDNSSearch(hostSearch, pod)
-
-	return dns, dnsSearch, hostOptions, useClusterFirstPolicy, nil
-}
-
 // syncPod is the transaction script for the sync of a single pod.
 //
 // Arguments:
@@ -2221,36 +2161,6 @@ func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID str
 			removeAll = eviction.PodIsEvicted(syncedPod.Status) || (syncedPod.DeletionTimestamp != nil && notRunning(apiPodStatus.ContainerStatuses))
 		}
 		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
-	}
-}
-
-// Replace the nameserver in containerized-mounter's rootfs/etc/resolve.conf with kubelet.ClusterDNS
-func (kl *Kubelet) setupDNSinContainerizedMounter(mounterPath string) {
-	resolvePath := filepath.Join(strings.TrimSuffix(mounterPath, "/mounter"), "rootfs", "etc", "resolv.conf")
-	dnsString := ""
-	for _, dns := range kl.clusterDNS {
-		dnsString = dnsString + fmt.Sprintf("nameserver %s\n", dns)
-	}
-	if kl.resolverConfig != "" {
-		f, err := os.Open(kl.resolverConfig)
-		defer f.Close()
-		if err != nil {
-			glog.Error("Could not open resolverConf file")
-		} else {
-			_, hostSearch, _, err := kl.parseResolvConf(f)
-			if err != nil {
-				glog.Errorf("Error for parsing the reslov.conf file: %v", err)
-			} else {
-				dnsString = dnsString + "search"
-				for _, search := range hostSearch {
-					dnsString = dnsString + fmt.Sprintf(" %s", search)
-				}
-				dnsString = dnsString + "\n"
-			}
-		}
-	}
-	if err := ioutil.WriteFile(resolvePath, []byte(dnsString), 0600); err != nil {
-		glog.Errorf("Could not write dns nameserver in file %s, with error %v", resolvePath, err)
 	}
 }
 
