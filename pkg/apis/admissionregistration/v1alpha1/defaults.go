@@ -25,7 +25,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_ExternalAdmissionHook(obj *admissionregistrationv1alpha1.ExternalAdmissionHook) {
+func SetDefaults_Webhook(obj *admissionregistrationv1alpha1.Webhook) {
 	if obj.FailurePolicy == nil {
 		policy := admissionregistrationv1alpha1.Ignore
 		obj.FailurePolicy = &policy

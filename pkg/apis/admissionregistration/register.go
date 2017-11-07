@@ -46,8 +46,9 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&InitializerConfiguration{},
 		&InitializerConfigurationList{},
-		&ExternalAdmissionHookConfiguration{},
-		&ExternalAdmissionHookConfigurationList{},
+		&ValidatingWebhookConfiguration{},
+		&ValidatingWebhookConfigurationList{},
+		// TODO add mutating configs here too
 	)
 	return nil
 }

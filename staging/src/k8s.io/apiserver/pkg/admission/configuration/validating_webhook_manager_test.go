@@ -25,15 +25,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-type disabledWebhookConfigLister struct{}
+type disabledValidatingWebhookConfigLister struct{}
 
-func (l *disabledWebhookConfigLister) List(options metav1.ListOptions) (*v1alpha1.ExternalAdmissionHookConfigurationList, error) {
-	return nil, errors.NewNotFound(schema.GroupResource{Group: "admissionregistration", Resource: "externalAdmissionHookConfigurations"}, "")
+func (l *disabledValidatingWebhookConfigLister) List(options metav1.ListOptions) (*v1alpha1.ValidatingWebhookConfigurationList, error) {
+	return nil, errors.NewNotFound(schema.GroupResource{Group: "admissionregistration", Resource: "ValidatingWebhookConfigurations"}, "")
 }
 func TestWebhookConfigDisabled(t *testing.T) {
-	manager := NewExternalAdmissionHookConfigurationManager(&disabledWebhookConfigLister{})
+	manager := NewValidatingWebhookConfigurationManager(&disabledValidatingWebhookConfigLister{})
 	manager.sync()
-	_, err := manager.ExternalAdmissionHooks()
+	_, err := manager.Webhooks()
 	if err.Error() != ErrDisabled.Error() {
 		t.Errorf("expected %v, got %v", ErrDisabled, err)
 	}
