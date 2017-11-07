@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/golang/protobuf/proto"
 	cadvisorfs "github.com/google/cadvisor/fs"
 
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
@@ -221,9 +222,15 @@ func (p *criStatsProvider) makeContainerStats(
 		Name: stats.Attributes.Metadata.Name,
 		// The StartTime in the summary API is the container creation time.
 		StartTime: metav1.NewTime(time.Unix(0, container.CreatedAt)),
-		CPU:       &statsapi.CPUStats{},
-		Memory:    &statsapi.MemoryStats{},
-		Rootfs:    &statsapi.FsStats{},
+		// Work around heapster bug. https://github.com/kubernetes/kubernetes/issues/54962
+		// TODO(random-liu): Remove this after heapster is updated to newer than 1.5.0-beta.0.
+		CPU: &statsapi.CPUStats{
+			UsageNanoCores: proto.Uint64(0),
+		},
+		Memory: &statsapi.MemoryStats{
+			RSSBytes: proto.Uint64(0),
+		},
+		Rootfs: &statsapi.FsStats{},
 		Logs: &statsapi.FsStats{
 			Time:           metav1.NewTime(rootFsInfo.Timestamp),
 			AvailableBytes: &rootFsInfo.Available,
