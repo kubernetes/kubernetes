@@ -17,6 +17,7 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -37,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -670,4 +672,110 @@ func TestOrphanDependentsFailure(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), expected) {
 		t.Errorf("expected error contains text %s, got %v", expected, err)
 	}
+}
+
+// TestGetDeletableResources ensures GetDeletableResources always returns
+// something usable regardless of discovery output.
+func TestGetDeletableResources(t *testing.T) {
+	tests := map[string]struct {
+		serverResources    []*metav1.APIResourceList
+		err                error
+		deletableResources map[schema.GroupVersionResource]struct{}
+	}{
+		"no error": {
+			serverResources: []*metav1.APIResourceList{
+				{
+					// Valid GroupVersion
+					GroupVersion: "apps/v1",
+					APIResources: []metav1.APIResource{
+						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"delete"}},
+						{Name: "services", Namespaced: true, Kind: "Service"},
+					},
+				},
+				{
+					// Invalid GroupVersion, should be ignored
+					GroupVersion: "foo//whatever",
+					APIResources: []metav1.APIResource{
+						{Name: "bars", Namespaced: true, Kind: "Bar", Verbs: metav1.Verbs{"delete"}},
+					},
+				},
+			},
+			err: nil,
+			deletableResources: map[schema.GroupVersionResource]struct{}{
+				{Group: "apps", Version: "v1", Resource: "pods"}: {},
+			},
+		},
+		"nonspecific failure, includes usable results": {
+			serverResources: []*metav1.APIResourceList{
+				{
+					GroupVersion: "apps/v1",
+					APIResources: []metav1.APIResource{
+						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"delete"}},
+						{Name: "services", Namespaced: true, Kind: "Service"},
+					},
+				},
+			},
+			err: fmt.Errorf("internal error"),
+			deletableResources: map[schema.GroupVersionResource]struct{}{
+				{Group: "apps", Version: "v1", Resource: "pods"}: {},
+			},
+		},
+		"partial discovery failure, includes usable results": {
+			serverResources: []*metav1.APIResourceList{
+				{
+					GroupVersion: "apps/v1",
+					APIResources: []metav1.APIResource{
+						{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"delete"}},
+						{Name: "services", Namespaced: true, Kind: "Service"},
+					},
+				},
+			},
+			err: &discovery.ErrGroupDiscoveryFailed{
+				Groups: map[schema.GroupVersion]error{
+					{Group: "foo", Version: "v1"}: fmt.Errorf("discovery failure"),
+				},
+			},
+			deletableResources: map[schema.GroupVersionResource]struct{}{
+				{Group: "apps", Version: "v1", Resource: "pods"}: {},
+			},
+		},
+		"discovery failure, no results": {
+			serverResources:    nil,
+			err:                fmt.Errorf("internal error"),
+			deletableResources: map[schema.GroupVersionResource]struct{}{},
+		},
+	}
+
+	for name, test := range tests {
+		t.Logf("testing %q", name)
+		client := &fakeServerResources{
+			PreferredResources: test.serverResources,
+			Error:              test.err,
+		}
+		actual := GetDeletableResources(client)
+		if !reflect.DeepEqual(test.deletableResources, actual) {
+			t.Errorf("expected resources:\n%v\ngot:\n%v", test.deletableResources, actual)
+		}
+	}
+}
+
+type fakeServerResources struct {
+	PreferredResources []*metav1.APIResourceList
+	Error              error
+}
+
+func (_ *fakeServerResources) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
+	return nil, nil
+}
+
+func (_ *fakeServerResources) ServerResources() ([]*metav1.APIResourceList, error) {
+	return nil, nil
+}
+
+func (f *fakeServerResources) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+	return f.PreferredResources, f.Error
+}
+
+func (_ *fakeServerResources) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
+	return nil, nil
 }
