@@ -63,6 +63,22 @@ nrpe.Check.shortname_re = '[\.A-Za-z0-9-_]+$'
 os.environ['PATH'] += os.pathsep + os.path.join(os.sep, 'snap', 'bin')
 
 
+def set_upgrade_needed():
+    set_state('kubernetes-master.upgrade-needed')
+    config = hookenv.config()
+    previous_channel = config.previous('channel')
+    require_manual = config.get('require-manual-upgrade')
+    hookenv.log('set upgrade needed')
+    if previous_channel is None or not require_manual:
+        hookenv.log('forcing upgrade')
+        set_state('kubernetes-master.upgrade-specified')
+
+
+@when('config.changed.channel')
+def channel_changed():
+    set_upgrade_needed()
+
+
 def service_cidr():
     ''' Return the charm's service-cidr config '''
     db = unitdata.kv()
@@ -78,13 +94,20 @@ def freeze_service_cidr():
 
 
 @hook('upgrade-charm')
-def reset_states_for_delivery():
+def check_for_upgrade_needed():
     '''An upgrade charm event was triggered by Juju, react to that here.'''
+    hookenv.status_set('maintenance', 'Checking resources')
+
     migrate_from_pre_snaps()
-    install_snaps()
     add_rbac_roles()
     set_state('reconfigure.authentication.setup')
     remove_state('authentication.setup')
+
+    resources = ['kubectl', 'kube-apiserver', 'kube-controller-manager',
+                 'kube-scheduler', 'cdk-addons']
+    paths = [hookenv.resource_get(resource) for resource in resources]
+    if any_file_changed(paths):
+        set_upgrade_needed()
 
 
 def add_rbac_roles():
@@ -172,6 +195,20 @@ def migrate_from_pre_snaps():
             os.remove(file)
 
 
+@when('kubernetes-master.upgrade-needed')
+@when_not('kubernetes-master.upgrade-specified')
+def upgrade_needed_status():
+    msg = 'Needs manual upgrade, run the upgrade action'
+    hookenv.status_set('blocked', msg)
+
+
+@when('kubernetes-master.upgrade-specified')
+def do_upgrade():
+    install_snaps()
+    remove_state('kubernetes-master.upgrade-needed')
+    remove_state('kubernetes-master.upgrade-specified')
+
+
 def install_snaps():
     channel = hookenv.config('channel')
     hookenv.status_set('maintenance', 'Installing kubectl snap')
@@ -187,11 +224,6 @@ def install_snaps():
     snap.install('cdk-addons', channel=channel)
     set_state('kubernetes-master.snaps.installed')
     remove_state('kubernetes-master.components.started')
-
-
-@when('config.changed.channel')
-def channel_changed():
-    install_snaps()
 
 
 @when('config.changed.client_password', 'leadership.is_leader')
