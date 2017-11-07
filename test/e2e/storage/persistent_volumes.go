@@ -292,7 +292,7 @@ var _ = SIGDescribe("PersistentVolumes", func() {
 				// If a file is detected in /mnt, fail the pod and do not restart it.
 				By("Verifying the mount has been cleaned.")
 				mount := pod.Spec.Containers[0].VolumeMounts[0].MountPath
-				pod = framework.MakePod(ns, []*v1.PersistentVolumeClaim{pvc}, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
+				pod = framework.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
 				pod, err = c.CoreV1().Pods(ns).Create(pod)
 				Expect(err).NotTo(HaveOccurred())
 				framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(c, pod.Name, ns))
