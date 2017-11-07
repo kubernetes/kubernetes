@@ -8,3 +8,4 @@ test/test_owners.csv merge=union
 **/types_swagger_doc_generated.go -diff linguist-generated=true
 docs/api-reference/** -diff linguist-generated=true
 api/swagger-spec/*.json -diff linguist-generated=true
+api/openapi-spec/*.json -diff linguist-generated=true
