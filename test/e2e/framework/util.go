@@ -158,14 +158,6 @@ const (
 	currentPodInfraContainerImageName    = "gcr.io/google_containers/pause"
 	currentPodInfraContainerImageVersion = "3.0"
 
-	// How long each node is given during a process that restarts all nodes
-	// before the test is considered failed. (Note that the total time to
-	// restart all nodes will be this number times the number of nodes.)
-	RestartPerNodeTimeout = 5 * time.Minute
-
-	// How often to Poll the statues of a restart.
-	RestartPoll = 20 * time.Second
-
 	// How long a node is allowed to become "Ready" after it is restarted before
 	// the test is considered failed.
 	RestartNodeReadyAgainTimeout = 5 * time.Minute
