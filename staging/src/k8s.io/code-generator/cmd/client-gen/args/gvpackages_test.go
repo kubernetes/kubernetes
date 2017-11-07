@@ -49,8 +49,8 @@ func TestGVPackageFlag(t *testing.T) {
 				{Group: "foo", Version: "v1"}: "foo/v1",
 			},
 			expectedGroups: []types.GroupVersions{
-				{Group: types.Group("bar"), Versions: []types.Version{types.Version("v1"), types.Version("v2"), types.Version("")}},
-				{Group: types.Group("foo"), Versions: []types.Version{types.Version("v1")}},
+				{PackageName: "bar", Group: types.Group("bar"), Versions: []types.Version{types.Version("v1"), types.Version("v2"), types.Version("")}},
+				{PackageName: "foo", Group: types.Group("foo"), Versions: []types.Version{types.Version("v1")}},
 			},
 		},
 		{
@@ -63,8 +63,8 @@ func TestGVPackageFlag(t *testing.T) {
 				{Group: "foo", Version: "v1"}: "foo/v1",
 			},
 			expectedGroups: []types.GroupVersions{
-				{Group: types.Group("bar"), Versions: []types.Version{types.Version("v1"), types.Version("v2"), types.Version("")}},
-				{Group: types.Group("foo"), Versions: []types.Version{types.Version("v1")}},
+				{PackageName: "bar", Group: types.Group("bar"), Versions: []types.Version{types.Version("v1"), types.Version("v2"), types.Version("")}},
+				{PackageName: "foo", Group: types.Group("foo"), Versions: []types.Version{types.Version("v1")}},
 			},
 		},
 		{
@@ -74,7 +74,7 @@ func TestGVPackageFlag(t *testing.T) {
 				{Group: "api", Version: ""}:   "../api",
 			},
 			expectedGroups: []types.GroupVersions{
-				{Group: types.Group("api"), Versions: []types.Version{types.Version("v1"), types.Version("")}},
+				{PackageName: "core", Group: types.Group("api"), Versions: []types.Version{types.Version("v1"), types.Version("")}},
 			},
 		},
 	}

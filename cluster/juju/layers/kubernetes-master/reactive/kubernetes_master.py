@@ -472,32 +472,6 @@ def create_service_configs(kube_control):
         remove_state('authentication.setup')
 
 
-@when('kube-control.departed')
-@when('leadership.is_leader')
-def flush_auth_for_departed(kube_control):
-    ''' Unit has left the cluster and needs to have its authentication
-    tokens removed from the token registry '''
-    token_auth_file = '/root/cdk/known_tokens.csv'
-    departing_unit = kube_control.flush_departed()
-    userid = "kubelet-{}".format(departing_unit.split('/')[1])
-    known_tokens = open(token_auth_file, 'r').readlines()
-    for line in known_tokens[:]:
-        haystack = line.split(',')
-        # skip the entry if we dont have token,user,id,groups format
-        if len(haystack) < 4:
-            continue
-        if haystack[2] == userid:
-            hookenv.log('Found unit {} in token auth. Removing auth'
-                        ' token.'.format(userid))
-            known_tokens.remove(line)
-    # atomically rewrite the file minus any scrubbed units
-    hookenv.log('Rewriting token auth file: {}'.format(token_auth_file))
-    with open(token_auth_file, 'w') as fp:
-        fp.writelines(known_tokens)
-    # Trigger rebroadcast of auth files for followers
-    remove_state('authentication.setup')
-
-
 @when_not('kube-control.connected')
 def missing_kube_control():
     """Inform the operator master is waiting for a relation to workers.
@@ -798,6 +772,18 @@ def on_config_api_extra_args_change():
     configure_apiserver()
 
 
+@when('config.changed.controller-manager-extra-args')
+@when('kubernetes-master.components.started')
+def on_config_controller_manager_extra_args_change():
+    configure_controller_manager()
+
+
+@when('config.changed.scheduler-extra-args')
+@when('kubernetes-master.components.started')
+def on_config_scheduler_extra_args_change():
+    configure_scheduler()
+
+
 @when('kube-control.gpu.available')
 @when('kubernetes-master.components.started')
 @when_not('kubernetes-master.gpu.enabled')
@@ -1001,27 +987,27 @@ def handle_etcd_relation(reldata):
     api_opts.add('etcd-servers', connection_string, strict=True)
 
 
-def get_config_args():
+def get_config_args(key):
     db = unitdata.kv()
-    old_config_args = db.get('api-extra-args', [])
+    old_config_args = db.get(key, [])
     # We have to convert them to tuples becuase we use sets
     old_config_args = [tuple(i) for i in old_config_args]
     new_config_args = []
     new_config_arg_names = []
-    for arg in hookenv.config().get('api-extra-args', '').split():
+    for arg in hookenv.config().get(key, '').split():
         new_config_arg_names.append(arg.split('=', 1)[0])
         if len(arg.split('=', 1)) == 1:  # handle flags ie. --profiling
             new_config_args.append(tuple([arg, 'true']))
         else:
             new_config_args.append(tuple(arg.split('=', 1)))
 
-    hookenv.log('Handling "api-extra-args" option.')
+    hookenv.log('Handling "%s" option.' % key)
     hookenv.log('Old arguments: {}'.format(old_config_args))
     hookenv.log('New arguments: {}'.format(new_config_args))
     if set(new_config_args) == set(old_config_args):
         return (new_config_args, [])
     # Store new args
-    db.set('api-extra-args', new_config_args)
+    db.set(key, new_config_args)
     to_add = set(new_config_args)
     to_remove = set(old_config_args) - set(new_config_args)
     # Extract option names only
@@ -1029,22 +1015,39 @@ def get_config_args():
     return (to_add, to_remove)
 
 
-def configure_apiserver():
-    # TODO: investigate if it's possible to use config file to store args
-    # https://github.com/juju-solutions/bundle-canonical-kubernetes/issues/315
+def configure_kubernetes_service(service, base_args, extra_args_key):
     # Handle api-extra-args config option
-    to_add, to_remove = get_config_args()
+    to_add, to_remove = get_config_args(extra_args_key)
 
-    api_opts = FlagManager('kube-apiserver')
+    flag_manager = FlagManager(service)
 
     # Remove arguments that are no longer provided as config option
     # this allows them to be reverted to charm defaults
     for arg in to_remove:
         hookenv.log('Removing option: {}'.format(arg))
-        api_opts.destroy(arg)
-        # We need to "unset" options by settig their value to "null" string
-        cmd = ['snap', 'set', 'kube-apiserver', '{}=null'.format(arg)]
+        flag_manager.destroy(arg)
+        # We need to "unset" options by setting their value to "null" string
+        cmd = ['snap', 'set', service, '{}=null'.format(arg)]
         check_call(cmd)
+
+    # Add base arguments
+    for k, v in base_args.items():
+        flag_manager.add(k, v, strict=True)
+
+    # Add operator-provided arguments, this allows operators
+    # to override defaults
+    for arg in to_add:
+        hookenv.log('Adding option: {} {}'.format(arg[0], arg[1]))
+        # Make sure old value is gone
+        flag_manager.destroy(arg[0])
+        flag_manager.add(arg[0], arg[1], strict=True)
+
+    cmd = ['snap', 'set', service] + flag_manager.to_s().split(' ')
+    check_call(cmd)
+
+
+def configure_apiserver():
+    api_opts = {}
 
     # Get the tls paths from the layer data.
     layer_options = layer.options('tls-client')
@@ -1055,25 +1058,25 @@ def configure_apiserver():
     server_key_path = layer_options.get('server_key_path')
 
     if is_privileged():
-        api_opts.add('allow-privileged', 'true', strict=True)
+        api_opts['allow-privileged'] = 'true'
         set_state('kubernetes-master.privileged')
     else:
-        api_opts.add('allow-privileged', 'false', strict=True)
+        api_opts['allow-privileged'] = 'false'
         remove_state('kubernetes-master.privileged')
 
     # Handle static options for now
-    api_opts.add('service-cluster-ip-range', service_cidr())
-    api_opts.add('min-request-timeout', '300')
-    api_opts.add('v', '4')
-    api_opts.add('tls-cert-file', server_cert_path)
-    api_opts.add('tls-private-key-file', server_key_path)
-    api_opts.add('kubelet-certificate-authority', ca_cert_path)
-    api_opts.add('kubelet-client-certificate', client_cert_path)
-    api_opts.add('kubelet-client-key', client_key_path)
-    api_opts.add('logtostderr', 'true')
-    api_opts.add('insecure-bind-address', '127.0.0.1')
-    api_opts.add('insecure-port', '8080')
-    api_opts.add('storage-backend', 'etcd2')  # FIXME: add etcd3 support
+    api_opts['service-cluster-ip-range'] = service_cidr()
+    api_opts['min-request-timeout'] = '300'
+    api_opts['v'] = '4'
+    api_opts['tls-cert-file'] = server_cert_path
+    api_opts['tls-private-key-file'] = server_key_path
+    api_opts['kubelet-certificate-authority'] = ca_cert_path
+    api_opts['kubelet-client-certificate'] = client_cert_path
+    api_opts['kubelet-client-key'] = client_key_path
+    api_opts['logtostderr'] = 'true'
+    api_opts['insecure-bind-address'] = '127.0.0.1'
+    api_opts['insecure-port'] = '8080'
+    api_opts['storage-backend'] = 'etcd2'  # FIXME: add etcd3 support
 
     admission_control = [
         'Initializers',
@@ -1088,7 +1091,7 @@ def configure_apiserver():
     if 'Node' in auth_mode:
         admission_control.append('NodeRestriction')
 
-    api_opts.add('authorization-mode', auth_mode, strict=True)
+    api_opts['authorization-mode'] = auth_mode
 
     if get_version('kube-apiserver') < (1, 6):
         hookenv.log('Removing DefaultTolerationSeconds from admission-control')
@@ -1096,52 +1099,43 @@ def configure_apiserver():
     if get_version('kube-apiserver') < (1, 7):
         hookenv.log('Removing Initializers from admission-control')
         admission_control.remove('Initializers')
-    api_opts.add('admission-control', ','.join(admission_control), strict=True)
+    api_opts['admission-control'] = ','.join(admission_control)
 
-    # Add operator-provided arguments, this allows operators
-    # to override defaults
-    for arg in to_add:
-        hookenv.log('Adding option: {} {}'.format(arg[0], arg[1]))
-        # Make sure old value is gone
-        api_opts.destroy(arg[0])
-        api_opts.add(arg[0], arg[1])
+    configure_kubernetes_service('kube-apiserver', api_opts, 'api-extra-args')
 
-    cmd = ['snap', 'set', 'kube-apiserver'] + api_opts.to_s().split(' ')
-    check_call(cmd)
     set_state('kube-apiserver.do-restart')
 
 
 def configure_controller_manager():
-    controller_opts = FlagManager('kube-controller-manager')
+    controller_opts = {}
 
     # Get the tls paths from the layer data.
     layer_options = layer.options('tls-client')
     ca_cert_path = layer_options.get('ca_certificate_path')
 
     # Default to 3 minute resync. TODO: Make this configureable?
-    controller_opts.add('min-resync-period', '3m')
-    controller_opts.add('v', '2')
-    controller_opts.add('root-ca-file', ca_cert_path)
-    controller_opts.add('logtostderr', 'true')
-    controller_opts.add('master', 'http://127.0.0.1:8080')
+    controller_opts['min-resync-period'] = '3m'
+    controller_opts['v'] = '2'
+    controller_opts['root-ca-file'] = ca_cert_path
+    controller_opts['logtostderr'] = 'true'
+    controller_opts['master'] = 'http://127.0.0.1:8080'
 
-    cmd = (
-        ['snap', 'set', 'kube-controller-manager'] +
-        controller_opts.to_s().split(' ')
-    )
-    check_call(cmd)
+    configure_kubernetes_service('kube-controller-manager', controller_opts,
+                                 'controller-manager-extra-args')
+
     set_state('kube-controller-manager.do-restart')
 
 
 def configure_scheduler():
-    scheduler_opts = FlagManager('kube-scheduler')
+    scheduler_opts = {}
 
-    scheduler_opts.add('v', '2')
-    scheduler_opts.add('logtostderr', 'true')
-    scheduler_opts.add('master', 'http://127.0.0.1:8080')
+    scheduler_opts['v'] = '2'
+    scheduler_opts['logtostderr'] = 'true'
+    scheduler_opts['master'] = 'http://127.0.0.1:8080'
 
-    cmd = ['snap', 'set', 'kube-scheduler'] + scheduler_opts.to_s().split(' ')
-    check_call(cmd)
+    configure_kubernetes_service('kube-scheduler', scheduler_opts,
+                                 'scheduler-extra-args')
+
     set_state('kube-scheduler.do-restart')
 
 

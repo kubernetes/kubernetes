@@ -277,50 +277,97 @@ func getResourceList(cpu, memory string) api.ResourceList {
 }
 
 func TestDescribeService(t *testing.T) {
-	fake := fake.NewSimpleClientset(&api.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "bar",
-			Namespace: "foo",
+	testCases := []struct {
+		service *api.Service
+		expect  []string
+	}{
+		{
+			service: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{{
+						Name:       "port-tcp",
+						Port:       8080,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromInt(9527),
+						NodePort:   31111,
+					}},
+					Selector:              map[string]string{"blah": "heh"},
+					ClusterIP:             "1.2.3.4",
+					LoadBalancerIP:        "5.6.7.8",
+					SessionAffinity:       "None",
+					ExternalTrafficPolicy: "Local",
+					HealthCheckNodePort:   32222,
+				},
+			},
+			expect: []string{
+				"Name", "bar",
+				"Namespace", "foo",
+				"Selector", "blah=heh",
+				"Type", "LoadBalancer",
+				"IP", "1.2.3.4",
+				"Port", "port-tcp", "8080/TCP",
+				"TargetPort", "9527/TCP",
+				"NodePort", "port-tcp", "31111/TCP",
+				"Session Affinity", "None",
+				"External Traffic Policy", "Local",
+				"HealthCheck NodePort", "32222",
+			},
 		},
-		Spec: api.ServiceSpec{
-			Type: api.ServiceTypeLoadBalancer,
-			Ports: []api.ServicePort{{
-				Name:       "port-tcp",
-				Port:       8080,
-				Protocol:   api.ProtocolTCP,
-				TargetPort: intstr.FromInt(9527),
-				NodePort:   31111,
-			}},
-			Selector:              map[string]string{"blah": "heh"},
-			ClusterIP:             "1.2.3.4",
-			LoadBalancerIP:        "5.6.7.8",
-			SessionAffinity:       "None",
-			ExternalTrafficPolicy: "Local",
-			HealthCheckNodePort:   32222,
+		{
+			service: &api.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+					Ports: []api.ServicePort{{
+						Name:       "port-tcp",
+						Port:       8080,
+						Protocol:   api.ProtocolTCP,
+						TargetPort: intstr.FromString("targetPort"),
+						NodePort:   31111,
+					}},
+					Selector:              map[string]string{"blah": "heh"},
+					ClusterIP:             "1.2.3.4",
+					LoadBalancerIP:        "5.6.7.8",
+					SessionAffinity:       "None",
+					ExternalTrafficPolicy: "Local",
+					HealthCheckNodePort:   32222,
+				},
+			},
+			expect: []string{
+				"Name", "bar",
+				"Namespace", "foo",
+				"Selector", "blah=heh",
+				"Type", "LoadBalancer",
+				"IP", "1.2.3.4",
+				"Port", "port-tcp", "8080/TCP",
+				"TargetPort", "targetPort/TCP",
+				"NodePort", "port-tcp", "31111/TCP",
+				"Session Affinity", "None",
+				"External Traffic Policy", "Local",
+				"HealthCheck NodePort", "32222",
+			},
 		},
-	})
-	expectedElements := []string{
-		"Name", "bar",
-		"Namespace", "foo",
-		"Selector", "blah=heh",
-		"Type", "LoadBalancer",
-		"IP", "1.2.3.4",
-		"Port", "port-tcp", "8080/TCP",
-		"TargetPort", "9527/TCP",
-		"NodePort", "port-tcp", "31111/TCP",
-		"Session Affinity", "None",
-		"External Traffic Policy", "Local",
-		"HealthCheck NodePort", "32222",
 	}
-	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
-	d := ServiceDescriber{c}
-	out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	for _, expected := range expectedElements {
-		if !strings.Contains(out, expected) {
-			t.Errorf("expected to find %q in output: %q", expected, out)
+	for _, testCase := range testCases {
+		fake := fake.NewSimpleClientset(testCase.service)
+		c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+		d := ServiceDescriber{c}
+		out, err := d.Describe("foo", "bar", printers.DescriberSettings{ShowEvents: true})
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		for _, expected := range testCase.expect {
+			if !strings.Contains(out, expected) {
+				t.Errorf("expected to find %q in output: %q", expected, out)
+			}
 		}
 	}
 }
@@ -1682,16 +1729,32 @@ Created on:   2017-06-04 21:45:56 -0700 PDT
 Labels:       <none>
 Annotations:  <none>
 Spec:
-  Pod Selector:     foo in (bar1,bar2),foo2 notin (bar1,bar2),id1=app1,id2=app2
+  PodSelector:     foo in (bar1,bar2),foo2 notin (bar1,bar2),id1=app1,id2=app2
   Allowing ingress traffic:
     To Port: 80/TCP
     To Port: 82/TCP
-    From Pod Selector: id=app2,id2=app3
-    From Namespace Selector: id=app2,id2=app3
-    From Namespace Selector: foo in (bar1,bar2),id=app2,id2=app3
+    From PodSelector: id=app2,id2=app3
+    From NamespaceSelector: id=app2,id2=app3
+    From NamespaceSelector: foo in (bar1,bar2),id=app2,id2=app3
+    From IPBlock:
+        CIDR: 192.168.0.0/16
+        Except: 192.168.3.0/24, 192.168.4.0/24
     ----------
     To Port: <any> (traffic allowed to all ports)
     From: <any> (traffic not restricted by source)
+  Allowing egress traffic:
+    To Port: 80/TCP
+    To Port: 82/TCP
+    To PodSelector: id=app2,id2=app3
+    To NamespaceSelector: id=app2,id2=app3
+    To NamespaceSelector: foo in (bar1,bar2),id=app2,id2=app3
+    To IPBlock:
+        CIDR: 192.168.0.0/16
+        Except: 192.168.3.0/24, 192.168.4.0/24
+    ----------
+    To Port: <any> (traffic allowed to all ports)
+    To: <any> (traffic not restricted by source)
+  Policy Types: Ingress, Egress
 `
 
 	port80 := intstr.FromInt(80)
@@ -1749,10 +1812,61 @@ Spec:
 								},
 							},
 						},
+						{
+							IPBlock: &networking.IPBlock{
+								CIDR:   "192.168.0.0/16",
+								Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
+							},
+						},
 					},
 				},
 				{},
 			},
+			Egress: []networking.NetworkPolicyEgressRule{
+				{
+					Ports: []networking.NetworkPolicyPort{
+						{Port: &port80},
+						{Port: &port82, Protocol: &protoTCP},
+					},
+					To: []networking.NetworkPolicyPeer{
+						{
+							PodSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+							},
+						},
+						{
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+							},
+						},
+						{
+							NamespaceSelector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									"id":  "app2",
+									"id2": "app3",
+								},
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{Key: "foo", Operator: "In", Values: []string{"bar1", "bar2"}},
+								},
+							},
+						},
+						{
+							IPBlock: &networking.IPBlock{
+								CIDR:   "192.168.0.0/16",
+								Except: []string{"192.168.3.0/24", "192.168.4.0/24"},
+							},
+						},
+					},
+				},
+				{},
+			},
+			PolicyTypes: []networking.PolicyType{networking.PolicyTypeIngress, networking.PolicyTypeEgress},
 		},
 	})
 	d := NetworkPolicyDescriber{versionedFake}

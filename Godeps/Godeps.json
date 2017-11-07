@@ -30,33 +30,33 @@
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/compute",
-			"Comment": "v10.0.4-beta-1-g786cc841",
-			"Rev": "786cc84138518bf7fd6d60e92fad1ac9d1a117ad"
+			"Comment": "v11.1.1-beta",
+			"Rev": "509eea43b93cec2f3f17acbe2578ef58703923f8"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/containerregistry",
-			"Comment": "v10.0.4-beta-1-g786cc841",
-			"Rev": "786cc84138518bf7fd6d60e92fad1ac9d1a117ad"
+			"Comment": "v11.1.1-beta",
+			"Rev": "509eea43b93cec2f3f17acbe2578ef58703923f8"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/disk",
-			"Comment": "v10.0.4-beta-1-g786cc841",
-			"Rev": "786cc84138518bf7fd6d60e92fad1ac9d1a117ad"
+			"Comment": "v11.1.1-beta",
+			"Rev": "509eea43b93cec2f3f17acbe2578ef58703923f8"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/network",
-			"Comment": "v10.0.4-beta-1-g786cc841",
-			"Rev": "786cc84138518bf7fd6d60e92fad1ac9d1a117ad"
+			"Comment": "v11.1.1-beta",
+			"Rev": "509eea43b93cec2f3f17acbe2578ef58703923f8"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/storage",
-			"Comment": "v10.0.4-beta-1-g786cc841",
-			"Rev": "786cc84138518bf7fd6d60e92fad1ac9d1a117ad"
+			"Comment": "v11.1.1-beta",
+			"Rev": "509eea43b93cec2f3f17acbe2578ef58703923f8"
 		},
 		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/storage",
-			"Comment": "v10.0.4-beta-1-g786cc841",
-			"Rev": "786cc84138518bf7fd6d60e92fad1ac9d1a117ad"
+			"Comment": "v11.1.1-beta",
+			"Rev": "509eea43b93cec2f3f17acbe2578ef58703923f8"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-ansiterm",
@@ -68,37 +68,37 @@
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest",
-			"Comment": "v8.0.0",
-			"Rev": "58f6f26e200fa5dfb40c9cd1c83f3e2c860d779d"
+			"Comment": "v9.1.0",
+			"Rev": "e14a70c556c8e0db173358d1a903dca345a8e75e"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/adal",
-			"Comment": "v8.0.0",
-			"Rev": "58f6f26e200fa5dfb40c9cd1c83f3e2c860d779d"
+			"Comment": "v9.1.0",
+			"Rev": "e14a70c556c8e0db173358d1a903dca345a8e75e"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/azure",
-			"Comment": "v8.0.0",
-			"Rev": "58f6f26e200fa5dfb40c9cd1c83f3e2c860d779d"
+			"Comment": "v9.1.0",
+			"Rev": "e14a70c556c8e0db173358d1a903dca345a8e75e"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/date",
-			"Comment": "v8.0.0",
-			"Rev": "58f6f26e200fa5dfb40c9cd1c83f3e2c860d779d"
+			"Comment": "v9.1.0",
+			"Rev": "e14a70c556c8e0db173358d1a903dca345a8e75e"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/to",
-			"Comment": "v8.0.0",
-			"Rev": "58f6f26e200fa5dfb40c9cd1c83f3e2c860d779d"
+			"Comment": "v9.1.0",
+			"Rev": "e14a70c556c8e0db173358d1a903dca345a8e75e"
 		},
 		{
 			"ImportPath": "github.com/Azure/go-autorest/autorest/validation",
-			"Comment": "v8.0.0",
-			"Rev": "58f6f26e200fa5dfb40c9cd1c83f3e2c860d779d"
+			"Comment": "v9.1.0",
+			"Rev": "e14a70c556c8e0db173358d1a903dca345a8e75e"
 		},
 		{
 			"ImportPath": "github.com/MakeNowJust/heredoc",
-			"Rev": "1d91351acdc1cb2f2c995864674b754134b86ca7"
+			"Rev": "bb23615498cded5e105af4ce27de75b089cbe851"
 		},
 		{
 			"ImportPath": "github.com/Microsoft/go-winio",
@@ -1344,27 +1344,31 @@
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/jsonpb",
-			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
+			"Rev": "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/proto",
-			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
+			"Rev": "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes",
-			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
+			"Rev": "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/any",
-			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
+			"Rev": "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/duration",
-			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
+			"Rev": "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/ptypes/struct",
+			"Rev": "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
 		},
 		{
 			"ImportPath": "github.com/golang/protobuf/ptypes/timestamp",
-			"Rev": "4bd1920723d7b7c925de087aa32e2187708897f7"
+			"Rev": "1643683e1b54a9e88ad26d98f81400c8c9d9f4f9"
 		},
 		{
 			"ImportPath": "github.com/google/btree",
@@ -2843,10 +2847,6 @@
 		{
 			"ImportPath": "golang.org/x/tools/go/vcs",
 			"Rev": "2382e3994d48b1d22acc2c86bcad0a2aff028e32"
-		},
-		{
-			"ImportPath": "google.golang.org/api/cloudkms/v1",
-			"Rev": "654f863362977d69086620b5f72f13e911da2410"
 		},
 		{
 			"ImportPath": "google.golang.org/api/cloudmonitoring/v2beta2",

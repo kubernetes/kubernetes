@@ -64,8 +64,8 @@ function config-ip-firewall {
   # Flush iptables nat table
   iptables -t nat -F || true
 
-  if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" && "${KUBERNETES_MASTER:-}" == false ]]; then
-    echo "Add rules for ip masquerade"
+  echo "Add rules for ip masquerade"
+  if [[ "${NON_MASQUERADE_CIDR:-}" == "0.0.0.0/0" ]]; then
     iptables -t nat -N IP-MASQ
     iptables -t nat -A POSTROUTING -m comment --comment "ip-masq: ensure nat POSTROUTING directs all non-LOCAL destination traffic to our custom IP-MASQ chain" -m addrtype ! --dst-type LOCAL -j IP-MASQ
     iptables -t nat -A IP-MASQ -d 169.254.0.0/16 -m comment --comment "ip-masq: local traffic is not subject to MASQUERADE" -j RETURN
@@ -1520,10 +1520,6 @@ function start-kube-apiserver {
 
   if [[ -n "${ENCRYPTION_PROVIDER_CONFIG:-}" ]]; then
     local encryption_provider_config_path="/etc/srv/kubernetes/encryption-provider-config.yml"
-    if [[ -n "${GOOGLE_CLOUD_KMS_CONFIG_FILE_NAME:-}" && -n "${GOOGLE_CLOUD_KMS_CONFIG:-}" ]]; then
-        echo "${GOOGLE_CLOUD_KMS_CONFIG}" | base64 --decode > "${GOOGLE_CLOUD_KMS_CONFIG_FILE_NAME}"
-    fi
-
     echo "${ENCRYPTION_PROVIDER_CONFIG}" | base64 --decode > "${encryption_provider_config_path}"
     params+=" --experimental-encryption-provider-config=${encryption_provider_config_path}"
   fi
@@ -1772,7 +1768,13 @@ function start-kube-addons {
   local -r dst_dir="/etc/kubernetes/addons"
 
   # prep addition kube-up specific rbac objects
-  setup-addon-manifests "addons" "rbac"
+  setup-addon-manifests "addons" "rbac/kubelet-api-auth"
+  setup-addon-manifests "addons" "rbac/kubelet-cert-rotation"
+  if [[ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]]; then
+    setup-addon-manifests "addons" "rbac/legacy-kubelet-user"
+  else
+    setup-addon-manifests "addons" "rbac/legacy-kubelet-user-disabled"
+  fi
 
   if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
       setup-addon-manifests "addons" "podsecuritypolicies"
@@ -1780,6 +1782,13 @@ function start-kube-addons {
 
   # Set up manifests of other addons.
   if [[ "${KUBE_PROXY_DAEMONSET:-}" == "true" ]]; then
+    if [ -n "${CUSTOM_KUBE_PROXY_YAML:-}" ]; then
+      # Replace with custom GKE kube proxy.
+      cat > "$src_dir/kube-proxy/kube-proxy-ds.yaml" <<EOF
+$(echo "$CUSTOM_KUBE_PROXY_YAML")
+EOF
+      update-prometheus-to-sd-parameters "$src_dir/kube-proxy/kube-proxy-ds.yaml"
+    fi
     prepare-kube-proxy-manifest-variables "$src_dir/kube-proxy/kube-proxy-ds.yaml"
     setup-addon-manifests "addons" "kube-proxy"
   fi
