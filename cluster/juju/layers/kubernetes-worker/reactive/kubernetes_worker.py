@@ -32,7 +32,6 @@ from charms.reactive import set_state, remove_state, is_state
 from charms.reactive import when, when_any, when_not
 
 from charms.kubernetes.common import get_version
-from charms.kubernetes.flagmanager import FlagManager
 
 from charms.reactive.helpers import data_changed, any_file_changed
 from charms.templating.jinja2 import render
@@ -66,9 +65,6 @@ def upgrade_charm():
     # Remove gpu.enabled state so we can reconfigure gpu-related kubelet flags,
     # since they can differ between k8s versions
     remove_state('kubernetes-worker.gpu.enabled')
-    kubelet_opts = FlagManager('kubelet')
-    kubelet_opts.destroy('feature-gates')
-    kubelet_opts.destroy('experimental-nvidia-gpus')
 
     remove_state('kubernetes-worker.cni-plugins.installed')
     remove_state('kubernetes-worker.config.created')
@@ -123,10 +119,6 @@ def cleanup_pre_snap_services():
         elif os.path.isfile(file):
             hookenv.log("Removing file: " + file)
             os.remove(file)
-
-    # cleanup old flagmanagers
-    FlagManager('kubelet').destroy_all()
-    FlagManager('kube-proxy').destroy_all()
 
 
 @when('config.changed.channel')
@@ -344,7 +336,8 @@ def start_worker(kube_api, kube_control, auth_control, cni):
     set_privileged()
 
     create_config(random.choice(servers), creds)
-    configure_worker_services(servers, dns, cluster_cidr)
+    configure_kubelet(dns)
+    configure_kube_proxy(servers, cluster_cidr)
     set_state('kubernetes-worker.config.created')
     restart_unit_services()
     update_kubelet_status()
@@ -436,6 +429,12 @@ def apply_node_labels():
         _apply_node_label(label, overwrite=True)
 
 
+@when_any('config.changed.kubelet-extra-args',
+          'config.changed.proxy-extra-args')
+def extra_args_changed():
+    set_state('kubernetes-worker.restart-needed')
+
+
 def arch():
     '''Return the package architecture as a string. Raise an exception if the
     architecture is not supported by kubernetes.'''
@@ -469,44 +468,92 @@ def create_config(server, creds):
                       token=creds['proxy_token'], user='kube-proxy')
 
 
-def configure_worker_services(api_servers, dns, cluster_cidr):
-    ''' Add remaining flags for the worker services and configure snaps to use
-    them '''
+def parse_extra_args(config_key):
+    elements = hookenv.config().get(config_key, '').split()
+    args = {}
+
+    for element in elements:
+        if '=' in element:
+            key, _, value = element.partition('=')
+            args[key] = value
+        else:
+            args[element] = 'true'
+
+    return args
+
+
+def configure_kubernetes_service(service, base_args, extra_args_key):
+    db = unitdata.kv()
+
+    prev_args_key = 'kubernetes-worker.prev_args.' + service
+    prev_args = db.get(prev_args_key) or {}
+
+    extra_args = parse_extra_args(extra_args_key)
+
+    args = {}
+    for arg in prev_args:
+        # remove previous args by setting to null
+        args[arg] = 'null'
+    for k, v in base_args.items():
+        args[k] = v
+    for k, v in extra_args.items():
+        args[k] = v
+
+    cmd = ['snap', 'set', service] + ['%s=%s' % item for item in args.items()]
+    check_call(cmd)
+
+    db.set(prev_args_key, args)
+
+
+def configure_kubelet(dns):
     layer_options = layer.options('tls-client')
     ca_cert_path = layer_options.get('ca_certificate_path')
     server_cert_path = layer_options.get('server_certificate_path')
     server_key_path = layer_options.get('server_key_path')
 
-    kubelet_opts = FlagManager('kubelet')
-    kubelet_opts.add('require-kubeconfig', 'true')
-    kubelet_opts.add('kubeconfig', kubeconfig_path)
-    kubelet_opts.add('network-plugin', 'cni')
-    kubelet_opts.add('v', '0')
-    kubelet_opts.add('address', '0.0.0.0')
-    kubelet_opts.add('port', '10250')
-    kubelet_opts.add('cluster-dns', dns['sdn-ip'])
-    kubelet_opts.add('cluster-domain', dns['domain'])
-    kubelet_opts.add('anonymous-auth', 'false')
-    kubelet_opts.add('client-ca-file', ca_cert_path)
-    kubelet_opts.add('tls-cert-file', server_cert_path)
-    kubelet_opts.add('tls-private-key-file', server_key_path)
-    kubelet_opts.add('logtostderr', 'true')
-    kubelet_opts.add('fail-swap-on', 'false')
+    kubelet_opts = {}
+    kubelet_opts['require-kubeconfig'] = 'true'
+    kubelet_opts['kubeconfig'] = kubeconfig_path
+    kubelet_opts['network-plugin'] = 'cni'
+    kubelet_opts['v'] = '0'
+    kubelet_opts['address'] = '0.0.0.0'
+    kubelet_opts['port'] = '10250'
+    kubelet_opts['cluster-dns'] = dns['sdn-ip']
+    kubelet_opts['cluster-domain'] = dns['domain']
+    kubelet_opts['anonymous-auth'] = 'false'
+    kubelet_opts['client-ca-file'] = ca_cert_path
+    kubelet_opts['tls-cert-file'] = server_cert_path
+    kubelet_opts['tls-private-key-file'] = server_key_path
+    kubelet_opts['logtostderr'] = 'true'
+    kubelet_opts['fail-swap-on'] = 'false'
 
-    kube_proxy_opts = FlagManager('kube-proxy')
-    kube_proxy_opts.add('cluster-cidr', cluster_cidr)
-    kube_proxy_opts.add('kubeconfig', kubeproxyconfig_path)
-    kube_proxy_opts.add('logtostderr', 'true')
-    kube_proxy_opts.add('v', '0')
-    kube_proxy_opts.add('master', random.choice(api_servers), strict=True)
+    privileged = is_state('kubernetes-worker.privileged')
+    kubelet_opts['allow-privileged'] = 'true' if privileged else 'false'
+
+    if is_state('kubernetes-worker.gpu.enabled'):
+        if get_version('kubelet') < (1, 6):
+            hookenv.log('Adding --experimental-nvidia-gpus=1 to kubelet')
+            kubelet_opts['experimental-nvidia-gpus'] = '1'
+        else:
+            hookenv.log('Adding --feature-gates=Accelerators=true to kubelet')
+            kubelet_opts['feature-gates'] = 'Accelerators=true'
+
+    configure_kubernetes_service('kubelet', kubelet_opts, 'kubelet-extra-args')
+
+
+def configure_kube_proxy(api_servers, cluster_cidr):
+    kube_proxy_opts = {}
+    kube_proxy_opts['cluster-cidr'] = cluster_cidr
+    kube_proxy_opts['kubeconfig'] = kubeproxyconfig_path
+    kube_proxy_opts['logtostderr'] = 'true'
+    kube_proxy_opts['v'] = '0'
+    kube_proxy_opts['master'] = random.choice(api_servers)
 
     if b'lxc' in check_output('virt-what', shell=True):
-        kube_proxy_opts.add('conntrack-max-per-core', '0')
+        kube_proxy_opts['conntrack-max-per-core'] = '0'
 
-    cmd = ['snap', 'set', 'kubelet'] + kubelet_opts.to_s().split(' ')
-    check_call(cmd)
-    cmd = ['snap', 'set', 'kube-proxy'] + kube_proxy_opts.to_s().split(' ')
-    check_call(cmd)
+    configure_kubernetes_service('kube-proxy', kube_proxy_opts,
+                                 'proxy-extra-args')
 
 
 def create_kubeconfig(kubeconfig, server, ca, key=None, certificate=None,
@@ -700,12 +747,6 @@ def set_privileged():
         gpu_enabled = is_state('kubernetes-worker.gpu.enabled')
         privileged = 'true' if gpu_enabled else 'false'
 
-    flag = 'allow-privileged'
-    hookenv.log('Setting {}={}'.format(flag, privileged))
-
-    kubelet_opts = FlagManager('kubelet')
-    kubelet_opts.add(flag, privileged)
-
     if privileged == 'true':
         set_state('kubernetes-worker.privileged')
     else:
@@ -748,14 +789,6 @@ def enable_gpu():
         hookenv.log(cpe)
         return
 
-    kubelet_opts = FlagManager('kubelet')
-    if get_version('kubelet') < (1, 6):
-        hookenv.log('Adding --experimental-nvidia-gpus=1 to kubelet')
-        kubelet_opts.add('experimental-nvidia-gpus', '1')
-    else:
-        hookenv.log('Adding --feature-gates=Accelerators=true to kubelet')
-        kubelet_opts.add('feature-gates', 'Accelerators=true')
-
     # Apply node labels
     _apply_node_label('gpu=true', overwrite=True)
     _apply_node_label('cuda=true', overwrite=True)
@@ -776,12 +809,6 @@ def disable_gpu():
 
     """
     hookenv.log('Disabling gpu mode')
-
-    kubelet_opts = FlagManager('kubelet')
-    if get_version('kubelet') < (1, 6):
-        kubelet_opts.destroy('experimental-nvidia-gpus')
-    else:
-        kubelet_opts.remove('feature-gates', 'Accelerators=true')
 
     # Remove node labels
     _apply_node_label('gpu', delete=True)
