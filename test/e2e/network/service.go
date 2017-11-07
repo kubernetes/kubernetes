@@ -1450,6 +1450,10 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 		// requires cloud load-balancer support - this feature currently supported only on GCE/GKE
 		framework.SkipUnlessProviderIs("gce", "gke")
 
+		// Skipping this test for too large clusters due to issue #52495.
+		// TODO(MrHohn): Get rid of this when gce-side load-balancer improvements are done.
+		framework.SkipUnlessNodeCountIsAtMost(framework.GCPMaxInstancesInInstanceGroup)
+
 		cs = f.ClientSet
 		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > framework.LargeClusterMinNodesNumber {
 			loadBalancerCreateTimeout = framework.LoadBalancerCreateTimeoutLarge
