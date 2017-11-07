@@ -437,9 +437,9 @@ type mockAuthorizer struct {
 	lastURI string
 }
 
-func (authz *mockAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
+func (authz *mockAuthorizer) Authorize(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	authz.lastURI = a.GetPath()
-	return true, "", nil
+	return authorizer.DecisionAllow, "", nil
 }
 
 type mockAuthenticator struct {

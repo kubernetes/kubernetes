@@ -34,40 +34,40 @@ import (
 
 type fakeAuthorizer struct{}
 
-func (fakeAuthorizer) Authorize(a authorizer.Attributes) (bool, string, error) {
+func (fakeAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
 	username := a.GetUser().GetName()
 
 	if username == "non-deleter" {
 		if a.GetVerb() == "delete" {
-			return false, "", nil
+			return authorizer.DecisionNoOpinion, "", nil
 		}
 		if a.GetVerb() == "update" && a.GetSubresource() == "finalizers" {
-			return false, "", nil
+			return authorizer.DecisionNoOpinion, "", nil
 		}
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
 
 	if username == "non-pod-deleter" {
 		if a.GetVerb() == "delete" && a.GetResource() == "pods" {
-			return false, "", nil
+			return authorizer.DecisionNoOpinion, "", nil
 		}
 		if a.GetVerb() == "update" && a.GetResource() == "pods" && a.GetSubresource() == "finalizers" {
-			return false, "", nil
+			return authorizer.DecisionNoOpinion, "", nil
 		}
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
 
 	if username == "non-rc-deleter" {
 		if a.GetVerb() == "delete" && a.GetResource() == "replicationcontrollers" {
-			return false, "", nil
+			return authorizer.DecisionNoOpinion, "", nil
 		}
 		if a.GetVerb() == "update" && a.GetResource() == "replicationcontrollers" && a.GetSubresource() == "finalizers" {
-			return false, "", nil
+			return authorizer.DecisionNoOpinion, "", nil
 		}
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
 
-	return true, "", nil
+	return authorizer.DecisionAllow, "", nil
 }
 
 // newGCPermissionsEnforcement returns the admission controller configured for testing.

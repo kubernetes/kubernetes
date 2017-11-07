@@ -133,8 +133,8 @@ var _ initializer.WantsAuthorizer = &WantAuthorizerAdmission{}
 // TestAuthorizer is a test stub that fulfills the WantsAuthorizer interface.
 type TestAuthorizer struct{}
 
-func (t *TestAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
-	return false, "", nil
+func (t *TestAuthorizer) Authorize(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+	return authorizer.DecisionNoOpinion, "", nil
 }
 
 // wantClientCert is a test stub for testing that fulfulls the WantsClientCert interface.
