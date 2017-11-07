@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package node
 
 import (
 	"context"
@@ -158,7 +158,7 @@ func testPreStop(c clientset.Interface, ns string) {
 	framework.ExpectNoError(err, "validating pre-stop.")
 }
 
-var _ = framework.KubeDescribe("PreStop", func() {
+var _ = SIGDescribe("PreStop", func() {
 	f := framework.NewDefaultFramework("prestop")
 
 	/*

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package node
 
 import (
 	"fmt"
@@ -33,7 +33,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Events", func() {
+var _ = SIGDescribe("Events", func() {
 	f := framework.NewDefaultFramework("events")
 
 	framework.ConformanceIt("should be sent by kubelets and the scheduler about pods scheduling and running ", func() {
