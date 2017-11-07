@@ -195,6 +195,27 @@ type StatefulSetStatus struct {
 	// newest ControllerRevision.
 	// +optional
 	CollisionCount *int32
+
+	// Represents the latest available observations of a statefulset's current state.
+	Conditions []StatefulSetCondition
+}
+
+type StatefulSetConditionType string
+
+// TODO: Add valid condition types for Statefulsets.
+
+// StatefulSetCondition describes the state of a statefulset at a certain point.
+type StatefulSetCondition struct {
+	// Type of statefulset condition.
+	Type StatefulSetConditionType
+	// Status of the condition, one of True, False, Unknown.
+	Status api.ConditionStatus
+	// The last time this condition was updated.
+	LastTransitionTime metav1.Time
+	// The reason for the condition's last transition.
+	Reason string
+	// A human readable message indicating details about the transition.
+	Message string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

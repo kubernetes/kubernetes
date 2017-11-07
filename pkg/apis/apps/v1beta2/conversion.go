@@ -225,6 +225,12 @@ func Convert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus(in *appsv1beta2
 		out.CollisionCount = new(int32)
 		*out.CollisionCount = *in.CollisionCount
 	}
+	out.Conditions = make([]apps.StatefulSetCondition, len(in.Conditions))
+	for i := range in.Conditions {
+		if err := Convert_v1beta2_StatefulSetCondition_To_apps_StatefulSetCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -241,6 +247,12 @@ func Convert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus(in *apps.Statef
 	if in.CollisionCount != nil {
 		out.CollisionCount = new(int32)
 		*out.CollisionCount = *in.CollisionCount
+	}
+	out.Conditions = make([]appsv1beta2.StatefulSetCondition, len(in.Conditions))
+	for i := range in.Conditions {
+		if err := Convert_apps_StatefulSetCondition_To_v1beta2_StatefulSetCondition(&in.Conditions[i], &out.Conditions[i], s); err != nil {
+			return err
+		}
 	}
 	return nil
 }
