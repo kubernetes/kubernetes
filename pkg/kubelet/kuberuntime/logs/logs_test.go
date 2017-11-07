@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2017 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kuberuntime
+package logs
 
 import (
 	"bytes"
@@ -36,31 +36,31 @@ func TestLogOptions(t *testing.T) {
 	)
 	for c, test := range []struct {
 		apiOpts *v1.PodLogOptions
-		expect  *logOptions
+		expect  *LogOptions
 	}{
 		{ // empty options
 			apiOpts: &v1.PodLogOptions{},
-			expect:  &logOptions{tail: -1, bytes: -1},
+			expect:  &LogOptions{tail: -1, bytes: -1},
 		},
 		{ // test tail lines
 			apiOpts: &v1.PodLogOptions{TailLines: &line},
-			expect:  &logOptions{tail: line, bytes: -1},
+			expect:  &LogOptions{tail: line, bytes: -1},
 		},
 		{ // test limit bytes
 			apiOpts: &v1.PodLogOptions{LimitBytes: &bytes},
-			expect:  &logOptions{tail: -1, bytes: bytes},
+			expect:  &LogOptions{tail: -1, bytes: bytes},
 		},
 		{ // test since timestamp
 			apiOpts: &v1.PodLogOptions{SinceTime: &timestamp},
-			expect:  &logOptions{tail: -1, bytes: -1, since: timestamp.Time},
+			expect:  &LogOptions{tail: -1, bytes: -1, since: timestamp.Time},
 		},
 		{ // test since seconds
 			apiOpts: &v1.PodLogOptions{SinceSeconds: &sinceseconds},
-			expect:  &logOptions{tail: -1, bytes: -1, since: timestamp.Add(-10 * time.Second)},
+			expect:  &LogOptions{tail: -1, bytes: -1, since: timestamp.Add(-10 * time.Second)},
 		},
 	} {
 		t.Logf("TestCase #%d: %+v", c, test)
-		opts := newLogOptions(test.apiOpts, timestamp.Time)
+		opts := NewLogOptions(test.apiOpts, timestamp.Time)
 		assert.Equal(t, test.expect, opts)
 	}
 }
@@ -162,7 +162,7 @@ func TestWriteLogs(t *testing.T) {
 		}
 		stdoutBuf := bytes.NewBuffer(nil)
 		stderrBuf := bytes.NewBuffer(nil)
-		w := newLogWriter(stdoutBuf, stderrBuf, &logOptions{since: test.since, timestamp: test.timestamp, bytes: -1})
+		w := newLogWriter(stdoutBuf, stderrBuf, &LogOptions{since: test.since, timestamp: test.timestamp, bytes: -1})
 		err := w.write(msg)
 		assert.NoError(t, err)
 		assert.Equal(t, test.expectStdout, stdoutBuf.String())
@@ -224,7 +224,7 @@ func TestWriteLogsWithBytesLimit(t *testing.T) {
 		}
 		stdoutBuf := bytes.NewBuffer(nil)
 		stderrBuf := bytes.NewBuffer(nil)
-		w := newLogWriter(stdoutBuf, stderrBuf, &logOptions{timestamp: test.timestamp, bytes: int64(test.bytes)})
+		w := newLogWriter(stdoutBuf, stderrBuf, &LogOptions{timestamp: test.timestamp, bytes: int64(test.bytes)})
 		for i := 0; i < test.stdoutLines; i++ {
 			msg.stream = stdoutType
 			if err := w.write(msg); err != nil {
