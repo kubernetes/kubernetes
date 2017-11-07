@@ -1043,8 +1043,8 @@ func (proxier *Proxier) syncProxyRules() {
 			false,
 			svcInfo.clusterIP.String(),
 			Enum(svcInfo.protocol),
-			uint16(svcInfo.port),
 			uint16(svcInfo.targetPort),
+			uint16(svcInfo.port),
 		)
 		if err != nil {
 			glog.Errorf("Policy creation failed: %v", err)
@@ -1081,8 +1081,8 @@ func (proxier *Proxier) syncProxyRules() {
 				false,
 				externalIp.ip,
 				Enum(svcInfo.protocol),
-				uint16(svcInfo.port),
 				uint16(svcInfo.targetPort),
+				uint16(svcInfo.port),
 			)
 			if err != nil {
 				glog.Errorf("Policy creation failed: %v", err)
@@ -1099,8 +1099,8 @@ func (proxier *Proxier) syncProxyRules() {
 				false,
 				lbIngressIp.ip,
 				Enum(svcInfo.protocol),
-				uint16(svcInfo.port),
 				uint16(svcInfo.targetPort),
+				uint16(svcInfo.port),
 			)
 			if err != nil {
 				glog.Errorf("Policy creation failed: %v", err)
