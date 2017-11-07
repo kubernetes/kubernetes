@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/test/integration/apps/common"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -398,7 +399,7 @@ func TestRollbackDeploymentRSNoRevision(t *testing.T) {
 	// Create an old RS without revision
 	rsName := "test-rollback-no-revision-controller"
 	rsReplicas := int32(1)
-	rs := newReplicaSet(rsName, ns.Name, rsReplicas)
+	rs := common.NewReplicaSet(rsName, ns.Name, rsReplicas, testLabels())
 	rs.Annotations = make(map[string]string)
 	rs.Annotations["make"] = "difference"
 	rs.Spec.Template.Spec.Containers[0].Image = "different-image"

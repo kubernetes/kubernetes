@@ -793,12 +793,13 @@ test/images/resource-consumer
 test/images/resource-consumer/common
 test/images/resource-consumer/controller
 test/integration
+test/integration/apps/daemonset
+test/integration/apps/replicaset
+test/integration/apps/replicationcontroller
 test/integration/auth
 test/integration/evictions
 test/integration/framework
 test/integration/master
-test/integration/replicaset
-test/integration/replicationcontroller
 test/integration/scheduler
 test/integration/scheduler_perf
 test/integration/volume

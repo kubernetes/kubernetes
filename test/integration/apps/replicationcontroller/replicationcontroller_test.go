@@ -32,6 +32,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller/replication"
+	"k8s.io/kubernetes/test/integration/apps/common"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -71,31 +72,6 @@ func newRC(name, namespace string, replicas int) *v1.ReplicationController {
 					},
 				},
 			},
-		},
-	}
-}
-
-func newMatchingPod(podName, namespace string) *v1.Pod {
-	return &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      podName,
-			Namespace: namespace,
-			Labels:    testLabels(),
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "fake-name",
-					Image: "fakeimage",
-				},
-			},
-		},
-		Status: v1.PodStatus{
-			Phase: v1.PodRunning,
 		},
 	}
 }
@@ -225,7 +201,7 @@ func TestAdoption(t *testing.T) {
 			t.Fatalf("Failed to create replication controller: %v", err)
 		}
 		podName := fmt.Sprintf("pod%d", i)
-		pod := newMatchingPod(podName, ns.Name)
+		pod := common.NewMatchingPod(podName, ns.Name, testLabels())
 		pod.OwnerReferences = tc.existingOwnerReferences(rc)
 		_, err = podClient.Create(pod)
 		if err != nil {
@@ -298,9 +274,9 @@ func TestUpdateSelectorToAdopt(t *testing.T) {
 	// let rc's selector only match pod1
 	rc.Spec.Selector["uniqueKey"] = "1"
 	rc.Spec.Template.Labels["uniqueKey"] = "1"
-	pod1 := newMatchingPod("pod1", ns.Name)
+	pod1 := common.NewMatchingPod("pod1", ns.Name, testLabels())
 	pod1.Labels["uniqueKey"] = "1"
-	pod2 := newMatchingPod("pod2", ns.Name)
+	pod2 := common.NewMatchingPod("pod2", ns.Name, testLabels())
 	pod2.Labels["uniqueKey"] = "2"
 	createRCsPods(t, clientSet, []*v1.ReplicationController{rc}, []*v1.Pod{pod1, pod2}, ns.Name)
 
@@ -335,9 +311,9 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 	ns := framework.CreateTestingNamespace("update-selector-to-remove-controllerref", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 	rc := newRC("rc", ns.Name, 2)
-	pod1 := newMatchingPod("pod1", ns.Name)
+	pod1 := common.NewMatchingPod("pod1", ns.Name, testLabels())
 	pod1.Labels["uniqueKey"] = "1"
-	pod2 := newMatchingPod("pod2", ns.Name)
+	pod2 := common.NewMatchingPod("pod2", ns.Name, testLabels())
 	pod2.Labels["uniqueKey"] = "2"
 	createRCsPods(t, clientSet, []*v1.ReplicationController{rc}, []*v1.Pod{pod1, pod2}, ns.Name)
 
@@ -381,8 +357,8 @@ func TestUpdateLabelToRemoveControllerRef(t *testing.T) {
 	ns := framework.CreateTestingNamespace("update-label-to-remove-controllerref", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 	rc := newRC("rc", ns.Name, 2)
-	pod1 := newMatchingPod("pod1", ns.Name)
-	pod2 := newMatchingPod("pod2", ns.Name)
+	pod1 := common.NewMatchingPod("pod1", ns.Name, testLabels())
+	pod2 := common.NewMatchingPod("pod2", ns.Name, testLabels())
 	createRCsPods(t, clientSet, []*v1.ReplicationController{rc}, []*v1.Pod{pod1, pod2}, ns.Name)
 
 	go rm.Run(5, stopCh)
@@ -426,9 +402,9 @@ func TestUpdateLabelToBeAdopted(t *testing.T) {
 	// let rc's selector only matches pod1
 	rc.Spec.Selector["uniqueKey"] = "1"
 	rc.Spec.Template.Labels["uniqueKey"] = "1"
-	pod1 := newMatchingPod("pod1", ns.Name)
+	pod1 := common.NewMatchingPod("pod1", ns.Name, testLabels())
 	pod1.Labels["uniqueKey"] = "1"
-	pod2 := newMatchingPod("pod2", ns.Name)
+	pod2 := common.NewMatchingPod("pod2", ns.Name, testLabels())
 	pod2.Labels["uniqueKey"] = "2"
 	createRCsPods(t, clientSet, []*v1.ReplicationController{rc}, []*v1.Pod{pod1, pod2}, ns.Name)
 
