@@ -74,39 +74,44 @@ func TestParseResolvConf(t *testing.T) {
 		data        string
 		nameservers []string
 		searches    []string
+		options     []string
 	}{
-		{"", []string{}, []string{}},
-		{" ", []string{}, []string{}},
-		{"\n", []string{}, []string{}},
-		{"\t\n\t", []string{}, []string{}},
-		{"#comment\n", []string{}, []string{}},
-		{" #comment\n", []string{}, []string{}},
-		{"#comment\n#comment", []string{}, []string{}},
-		{"#comment\nnameserver", []string{}, []string{}},
-		{"#comment\nnameserver\nsearch", []string{}, []string{}},
-		{"nameserver 1.2.3.4", []string{"1.2.3.4"}, []string{}},
-		{" nameserver 1.2.3.4", []string{"1.2.3.4"}, []string{}},
-		{"\tnameserver 1.2.3.4", []string{"1.2.3.4"}, []string{}},
-		{"nameserver\t1.2.3.4", []string{"1.2.3.4"}, []string{}},
-		{"nameserver \t 1.2.3.4", []string{"1.2.3.4"}, []string{}},
-		{"nameserver 1.2.3.4\nnameserver 5.6.7.8", []string{"1.2.3.4", "5.6.7.8"}, []string{}},
-		{"nameserver 1.2.3.4 #comment", []string{"1.2.3.4"}, []string{}},
-		{"search foo", []string{}, []string{"foo"}},
-		{"search foo bar", []string{}, []string{"foo", "bar"}},
-		{"search foo bar bat\n", []string{}, []string{"foo", "bar", "bat"}},
-		{"search foo\nsearch bar", []string{}, []string{"bar"}},
-		{"nameserver 1.2.3.4\nsearch foo bar", []string{"1.2.3.4"}, []string{"foo", "bar"}},
-		{"nameserver 1.2.3.4\nsearch foo\nnameserver 5.6.7.8\nsearch bar", []string{"1.2.3.4", "5.6.7.8"}, []string{"bar"}},
-		{"#comment\nnameserver 1.2.3.4\n#comment\nsearch foo\ncomment", []string{"1.2.3.4"}, []string{"foo"}},
+		{"", []string{}, []string{}, []string{}},
+		{" ", []string{}, []string{}, []string{}},
+		{"\n", []string{}, []string{}, []string{}},
+		{"\t\n\t", []string{}, []string{}, []string{}},
+		{"#comment\n", []string{}, []string{}, []string{}},
+		{" #comment\n", []string{}, []string{}, []string{}},
+		{"#comment\n#comment", []string{}, []string{}, []string{}},
+		{"#comment\nnameserver", []string{}, []string{}, []string{}},
+		{"#comment\nnameserver\nsearch", []string{}, []string{}, []string{}},
+		{"nameserver 1.2.3.4", []string{"1.2.3.4"}, []string{}, []string{}},
+		{" nameserver 1.2.3.4", []string{"1.2.3.4"}, []string{}, []string{}},
+		{"\tnameserver 1.2.3.4", []string{"1.2.3.4"}, []string{}, []string{}},
+		{"nameserver\t1.2.3.4", []string{"1.2.3.4"}, []string{}, []string{}},
+		{"nameserver \t 1.2.3.4", []string{"1.2.3.4"}, []string{}, []string{}},
+		{"nameserver 1.2.3.4\nnameserver 5.6.7.8", []string{"1.2.3.4", "5.6.7.8"}, []string{}, []string{}},
+		{"nameserver 1.2.3.4 #comment", []string{"1.2.3.4"}, []string{}, []string{}},
+		{"search foo", []string{}, []string{"foo"}, []string{}},
+		{"search foo bar", []string{}, []string{"foo", "bar"}, []string{}},
+		{"search foo bar bat\n", []string{}, []string{"foo", "bar", "bat"}, []string{}},
+		{"search foo\nsearch bar", []string{}, []string{"bar"}, []string{}},
+		{"nameserver 1.2.3.4\nsearch foo bar", []string{"1.2.3.4"}, []string{"foo", "bar"}, []string{}},
+		{"nameserver 1.2.3.4\nsearch foo\nnameserver 5.6.7.8\nsearch bar", []string{"1.2.3.4", "5.6.7.8"}, []string{"bar"}, []string{}},
+		{"#comment\nnameserver 1.2.3.4\n#comment\nsearch foo\ncomment", []string{"1.2.3.4"}, []string{"foo"}, []string{}},
+		{"options ndots:5 attempts:2", []string{}, []string{}, []string{"ndots:5", "attempts:2"}},
+		{"options ndots:1\noptions ndots:5 attempts:3", []string{}, []string{}, []string{"ndots:5", "attempts:3"}},
+		{"nameserver 1.2.3.4\nsearch foo\nnameserver 5.6.7.8\nsearch bar\noptions ndots:5 attempts:4", []string{"1.2.3.4", "5.6.7.8"}, []string{"bar"}, []string{"ndots:5", "attempts:4"}},
 	}
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	for i, tc := range testCases {
-		ns, srch, err := kubelet.parseResolvConf(strings.NewReader(tc.data))
+		ns, srch, opts, err := kubelet.parseResolvConf(strings.NewReader(tc.data))
 		require.NoError(t, err)
 		assert.EqualValues(t, tc.nameservers, ns, "test case [%d]: name servers", i)
 		assert.EqualValues(t, tc.searches, srch, "test case [%d] searches", i)
+		assert.EqualValues(t, tc.options, opts, "test case [%d] options", i)
 	}
 }
 

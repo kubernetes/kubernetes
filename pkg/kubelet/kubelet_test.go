@@ -2194,7 +2194,7 @@ func TestGetClusterDNS(t *testing.T) {
 	}, 4)
 	for i, pod := range pods {
 		var err error
-		options[i].DNS, options[i].DNSSearch, _, err = kubelet.GetClusterDNS(pod)
+		options[i].DNS, options[i].DNSSearch, _, _, err = kubelet.GetClusterDNS(pod)
 		if err != nil {
 			t.Fatalf("failed to generate container options: %v", err)
 		}
@@ -2227,7 +2227,7 @@ func TestGetClusterDNS(t *testing.T) {
 	kubelet.resolverConfig = "/etc/resolv.conf"
 	for i, pod := range pods {
 		var err error
-		options[i].DNS, options[i].DNSSearch, _, err = kubelet.GetClusterDNS(pod)
+		options[i].DNS, options[i].DNSSearch, _, _, err = kubelet.GetClusterDNS(pod)
 		if err != nil {
 			t.Fatalf("failed to generate container options: %v", err)
 		}

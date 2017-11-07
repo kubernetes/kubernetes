@@ -1041,7 +1041,7 @@ func (r *Runtime) generateRunCommand(pod *v1.Pod, uuid, networkNamespaceID strin
 		}
 	} else {
 		// Setup DNS.
-		dnsServers, dnsSearches, _, err := r.runtimeHelper.GetClusterDNS(pod)
+		dnsServers, dnsSearches, _, _, err := r.runtimeHelper.GetClusterDNS(pod)
 		if err != nil {
 			return "", err
 		}

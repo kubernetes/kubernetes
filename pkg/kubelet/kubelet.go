@@ -1401,21 +1401,21 @@ func (kl *Kubelet) GetKubeClient() clientset.Interface {
 	return kl.kubeClient
 }
 
-// GetClusterDNS returns a list of the DNS servers and a list of the DNS search
-// domains of the cluster.
-func (kl *Kubelet) GetClusterDNS(pod *v1.Pod) ([]string, []string, bool, error) {
-	var hostDNS, hostSearch []string
+// GetClusterDNS returns a list of the DNS servers, a list of the DNS search
+// domains of the cluster, and a list of resolv.conf options.
+func (kl *Kubelet) GetClusterDNS(pod *v1.Pod) ([]string, []string, []string, bool, error) {
+	var hostDNS, hostSearch, hostOptions []string
 	// Get host DNS settings
 	if kl.resolverConfig != "" {
 		f, err := os.Open(kl.resolverConfig)
 		if err != nil {
-			return nil, nil, false, err
+			return nil, nil, nil, false, err
 		}
 		defer f.Close()
 
-		hostDNS, hostSearch, err = kl.parseResolvConf(f)
+		hostDNS, hostSearch, hostOptions, err = kl.parseResolvConf(f)
 		if err != nil {
-			return nil, nil, false, err
+			return nil, nil, nil, false, err
 		}
 	}
 	useClusterFirstPolicy := ((pod.Spec.DNSPolicy == v1.DNSClusterFirst && !kubecontainer.IsHostNetworkPod(pod)) || pod.Spec.DNSPolicy == v1.DNSClusterFirstWithHostNet)
@@ -1444,7 +1444,7 @@ func (kl *Kubelet) GetClusterDNS(pod *v1.Pod) ([]string, []string, bool, error) 
 		} else {
 			hostSearch = kl.formDNSSearchForDNSDefault(hostSearch, pod)
 		}
-		return hostDNS, hostSearch, useClusterFirstPolicy, nil
+		return hostDNS, hostSearch, hostOptions, useClusterFirstPolicy, nil
 	}
 
 	// for a pod with DNSClusterFirst policy, the cluster DNS server is the only nameserver configured for
@@ -1456,7 +1456,7 @@ func (kl *Kubelet) GetClusterDNS(pod *v1.Pod) ([]string, []string, bool, error) 
 	}
 	dnsSearch := kl.formDNSSearch(hostSearch, pod)
 
-	return dns, dnsSearch, useClusterFirstPolicy, nil
+	return dns, dnsSearch, hostOptions, useClusterFirstPolicy, nil
 }
 
 // syncPod is the transaction script for the sync of a single pod.
@@ -2237,7 +2237,7 @@ func (kl *Kubelet) setupDNSinContainerizedMounter(mounterPath string) {
 		if err != nil {
 			glog.Error("Could not open resolverConf file")
 		} else {
-			_, hostSearch, err := kl.parseResolvConf(f)
+			_, hostSearch, _, err := kl.parseResolvConf(f)
 			if err != nil {
 				glog.Errorf("Error for parsing the reslov.conf file: %v", err)
 			} else {

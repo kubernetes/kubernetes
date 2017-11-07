@@ -169,7 +169,7 @@ func (kl *Kubelet) checkLimitsForResolvConf() {
 	}
 	defer f.Close()
 
-	_, hostSearch, err := kl.parseResolvConf(f)
+	_, hostSearch, _, err := kl.parseResolvConf(f)
 	if err != nil {
 		kl.recorder.Event(kl.nodeRef, v1.EventTypeWarning, "checkLimitsForResolvConf", err.Error())
 		glog.Error("checkLimitsForResolvConf: " + err.Error())
@@ -200,12 +200,12 @@ func (kl *Kubelet) checkLimitsForResolvConf() {
 }
 
 // parseResolveConf reads a resolv.conf file from the given reader, and parses
-// it into nameservers and searches, possibly returning an error.
+// it into nameservers, searches and options, possibly returning an error.
 // TODO: move to utility package
-func (kl *Kubelet) parseResolvConf(reader io.Reader) (nameservers []string, searches []string, err error) {
+func (kl *Kubelet) parseResolvConf(reader io.Reader) (nameservers []string, searches []string, options []string, err error) {
 	file, err := ioutil.ReadAll(reader)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Lines of the form "nameserver 1.2.3.4" accumulate.
@@ -213,6 +213,10 @@ func (kl *Kubelet) parseResolvConf(reader io.Reader) (nameservers []string, sear
 
 	// Lines of the form "search example.com" overrule - last one wins.
 	searches = []string{}
+
+	// Lines of the form "option ndots:5 attempts:2" overrule - last one wins.
+	// Each option is recorded as an element in the array.
+	options = []string{}
 
 	lines := strings.Split(string(file), "\n")
 	for l := range lines {
@@ -230,13 +234,16 @@ func (kl *Kubelet) parseResolvConf(reader io.Reader) (nameservers []string, sear
 		if fields[0] == "search" {
 			searches = fields[1:]
 		}
+		if fields[0] == "options" {
+			options = fields[1:]
+		}
 	}
 
 	// There used to be code here to scrub DNS for each cloud, but doesn't
 	// make sense anymore since cloudproviders are being factored out.
 	// contact @thockin or @wlan0 for more information
 
-	return nameservers, searches, nil
+	return nameservers, searches, options, nil
 }
 
 // syncNetworkStatus updates the network state
