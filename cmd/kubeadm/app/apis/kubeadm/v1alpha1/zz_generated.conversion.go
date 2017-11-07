@@ -28,8 +28,8 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	kubeadm "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	v1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	kubeproxyconfig_v1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	kubeletconfig_v1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
+	v1beta1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1beta1"
 )
 
 func init() {
@@ -172,7 +172,7 @@ func Convert_kubeadm_HostPathMount_To_v1alpha1_HostPathMount(in *kubeadm.HostPat
 }
 
 func autoConvert_v1alpha1_KubeProxy_To_kubeadm_KubeProxy(in *KubeProxy, out *kubeadm.KubeProxy, s conversion.Scope) error {
-	out.Config = (*kubeproxyconfig_v1alpha1.KubeProxyConfiguration)(unsafe.Pointer(in.Config))
+	out.Config = (*v1beta1.KubeProxyConfiguration)(unsafe.Pointer(in.Config))
 	return nil
 }
 
@@ -182,7 +182,7 @@ func Convert_v1alpha1_KubeProxy_To_kubeadm_KubeProxy(in *KubeProxy, out *kubeadm
 }
 
 func autoConvert_kubeadm_KubeProxy_To_v1alpha1_KubeProxy(in *kubeadm.KubeProxy, out *KubeProxy, s conversion.Scope) error {
-	out.Config = (*kubeproxyconfig_v1alpha1.KubeProxyConfiguration)(unsafe.Pointer(in.Config))
+	out.Config = (*v1beta1.KubeProxyConfiguration)(unsafe.Pointer(in.Config))
 	return nil
 }
 
@@ -192,7 +192,7 @@ func Convert_kubeadm_KubeProxy_To_v1alpha1_KubeProxy(in *kubeadm.KubeProxy, out 
 }
 
 func autoConvert_v1alpha1_KubeletConfiguration_To_kubeadm_KubeletConfiguration(in *KubeletConfiguration, out *kubeadm.KubeletConfiguration, s conversion.Scope) error {
-	out.BaseConfig = (*v1beta1.KubeletConfiguration)(unsafe.Pointer(in.BaseConfig))
+	out.BaseConfig = (*kubeletconfig_v1beta1.KubeletConfiguration)(unsafe.Pointer(in.BaseConfig))
 	return nil
 }
 
@@ -202,7 +202,7 @@ func Convert_v1alpha1_KubeletConfiguration_To_kubeadm_KubeletConfiguration(in *K
 }
 
 func autoConvert_kubeadm_KubeletConfiguration_To_v1alpha1_KubeletConfiguration(in *kubeadm.KubeletConfiguration, out *KubeletConfiguration, s conversion.Scope) error {
-	out.BaseConfig = (*v1beta1.KubeletConfiguration)(unsafe.Pointer(in.BaseConfig))
+	out.BaseConfig = (*kubeletconfig_v1beta1.KubeletConfiguration)(unsafe.Pointer(in.BaseConfig))
 	return nil
 }
 

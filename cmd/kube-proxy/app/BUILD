@@ -59,7 +59,7 @@ go_library(
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig/scheme:go_default_library",
-        "//pkg/proxy/apis/kubeproxyconfig/v1alpha1:go_default_library",
+        "//pkg/proxy/apis/kubeproxyconfig/v1beta1:go_default_library",
         "//pkg/proxy/apis/kubeproxyconfig/validation:go_default_library",
         "//pkg/proxy/config:go_default_library",
         "//pkg/proxy/healthcheck:go_default_library",

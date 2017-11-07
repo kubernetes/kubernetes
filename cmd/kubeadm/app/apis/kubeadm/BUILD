@@ -1,9 +1,4 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
@@ -14,9 +9,10 @@ go_library(
         "zz_generated.deepcopy.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm",
+    visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubelet/apis/kubeletconfig/v1beta1:go_default_library",
-        "//pkg/proxy/apis/kubeproxyconfig/v1alpha1:go_default_library",
+        "//pkg/proxy/apis/kubeproxyconfig/v1beta1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -41,4 +37,5 @@ filegroup(
         "//cmd/kubeadm/app/apis/kubeadm/validation:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

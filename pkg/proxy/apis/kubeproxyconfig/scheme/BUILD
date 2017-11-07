@@ -7,7 +7,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/proxy/apis/kubeproxyconfig:go_default_library",
-        "//pkg/proxy/apis/kubeproxyconfig/v1alpha1:go_default_library",
+        "//pkg/proxy/apis/kubeproxyconfig/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
     ],
