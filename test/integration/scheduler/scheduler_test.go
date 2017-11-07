@@ -43,9 +43,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
-	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
+	schedulerapp "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
@@ -107,7 +107,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	policyConfigMap := v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: configPolicyName},
 		Data: map[string]string{
-			options.SchedulerPolicyConfigMapKey: `{
+			componentconfig.SchedulerPolicyConfigMapKey: `{
 			"kind" : "Policy",
 			"apiVersion" : "v1",
 			"predicates" : [
@@ -127,29 +127,34 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.CoreV1().RESTClient()).Events("")})
-	ss := options.NewSchedulerServer()
-	ss.HardPodAffinitySymmetricWeight = v1.DefaultHardPodAffinitySymmetricWeight
-	ss.PolicyConfigMapName = configPolicyName
-	sched, err := app.CreateScheduler(ss, clientSet,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Extensions().V1beta1().ReplicaSets(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
-	)
-	if err != nil {
-		t.Fatalf("Error creating scheduler: %v", err)
+
+	ss := &schedulerapp.SchedulerServer{
+		SchedulerName: v1.DefaultSchedulerName,
+		AlgorithmSource: componentconfig.SchedulerAlgorithmSource{
+			Policy: &componentconfig.SchedulerPolicySource{
+				ConfigMap: &componentconfig.SchedulerPolicyConfigMapSource{
+					Namespace: policyConfigMap.Namespace,
+					Name:      policyConfigMap.Name,
+				},
+			},
+		},
+		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+		Client:          clientSet,
+		InformerFactory: informerFactory,
+		PodInformer:     factory.NewPodInformer(clientSet, 0, v1.DefaultSchedulerName),
+		EventClient:     clientSet.CoreV1(),
+		Recorder:        eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
+		Broadcaster:     eventBroadcaster,
 	}
-	defer close(sched.Config().StopEverything)
+
+	config, err := ss.SchedulerConfig()
+	if err != nil {
+		t.Fatalf("couldn't make scheduler config: %v", err)
+	}
 
 	// Verify that the config is applied correctly.
-	schedPredicates := sched.Config().Algorithm.Predicates()
-	schedPrioritizers := sched.Config().Algorithm.Prioritizers()
+	schedPredicates := config.Algorithm.Predicates()
+	schedPrioritizers := config.Algorithm.Prioritizers()
 	// Includes one mandatory predicates.
 	if len(schedPredicates) != 3 || len(schedPrioritizers) != 2 {
 		t.Errorf("Unexpected number of predicates or priority functions. Number of predicates: %v, number of prioritizers: %v", len(schedPredicates), len(schedPrioritizers))
@@ -180,80 +185,28 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.CoreV1().RESTClient()).Events("")})
 
-	ss := options.NewSchedulerServer()
-	ss.PolicyConfigMapName = "non-existent-config"
+	ss := &schedulerapp.SchedulerServer{
+		SchedulerName: v1.DefaultSchedulerName,
+		AlgorithmSource: componentconfig.SchedulerAlgorithmSource{
+			Policy: &componentconfig.SchedulerPolicySource{
+				ConfigMap: &componentconfig.SchedulerPolicyConfigMapSource{
+					Namespace: "non-existent-config",
+					Name:      "non-existent-config",
+				},
+			},
+		},
+		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+		Client:          clientSet,
+		InformerFactory: informerFactory,
+		PodInformer:     factory.NewPodInformer(clientSet, 0, v1.DefaultSchedulerName),
+		EventClient:     clientSet.CoreV1(),
+		Recorder:        eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
+		Broadcaster:     eventBroadcaster,
+	}
 
-	_, err := app.CreateScheduler(ss, clientSet,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Extensions().V1beta1().ReplicaSets(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
-	)
-
+	_, err := ss.SchedulerConfig()
 	if err == nil {
 		t.Fatalf("Creation of scheduler didn't fail while the policy ConfigMap didn't exist.")
-	}
-}
-
-// TestSchedulerCreationInLegacyMode ensures that creation of the scheduler
-// works fine when legacy mode is enabled.
-func TestSchedulerCreationInLegacyMode(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
-	defer closeFn()
-
-	ns := framework.CreateTestingNamespace("configmap", s, t)
-	defer framework.DeleteTestingNamespace(ns, s, t)
-
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Groups[v1.GroupName].GroupVersion()}})
-	defer clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
-	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
-
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientv1core.New(clientSet.CoreV1().RESTClient()).Events("")})
-
-	ss := options.NewSchedulerServer()
-	ss.HardPodAffinitySymmetricWeight = v1.DefaultHardPodAffinitySymmetricWeight
-	ss.PolicyConfigMapName = "non-existent-configmap"
-	ss.UseLegacyPolicyConfig = true
-
-	sched, err := app.CreateScheduler(ss, clientSet,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Extensions().V1beta1().ReplicaSets(),
-		informerFactory.Apps().V1beta1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
-	)
-	if err != nil {
-		t.Fatalf("Creation of scheduler in legacy mode failed: %v", err)
-	}
-	informerFactory.Start(sched.Config().StopEverything)
-	defer close(sched.Config().StopEverything)
-	sched.Run()
-
-	_, err = createNode(clientSet, "test-node", nil)
-	if err != nil {
-		t.Fatalf("Failed to create node: %v", err)
-	}
-	pod, err := createPausePodWithResource(clientSet, "test-pod", "configmap", nil)
-	if err != nil {
-		t.Fatalf("Failed to create pod: %v", err)
-	}
-	err = waitForPodToSchedule(clientSet, pod)
-	if err != nil {
-		t.Errorf("Failed to schedule a pod: %v", err)
-	} else {
-		t.Logf("Pod got scheduled on a node.")
 	}
 }
 

@@ -17,27 +17,31 @@ limitations under the License.
 package main
 
 import (
-	"k8s.io/apiserver/pkg/util/flag"
-	"k8s.io/apiserver/pkg/util/logs"
-	"k8s.io/kubernetes/pkg/version/verflag"
-	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
-	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
+	goflag "flag"
+	"os"
 
-	"github.com/golang/glog"
 	"github.com/spf13/pflag"
+
+	utilflag "k8s.io/apiserver/pkg/util/flag"
+	"k8s.io/apiserver/pkg/util/logs"
+	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
+	_ "k8s.io/kubernetes/pkg/version/prometheus"        // for version metric registration
+	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 )
 
 func main() {
-	s := options.NewSchedulerServer()
-	s.AddFlags(pflag.CommandLine)
+	command := app.NewSchedulerCommand()
 
-	flag.InitFlags()
+	// TODO: once we switch everything over to Cobra commands, we can go back to calling
+	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
+	// normalize func and add the go flag set by hand.
+	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
+	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
+	// utilflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
-	verflag.PrintAndExitIfRequested()
-
-	if err := app.Run(s); err != nil {
-		glog.Fatalf("scheduler app failed to run: %v", err)
+	if err := command.Execute(); err != nil {
+		os.Exit(1)
 	}
 }
