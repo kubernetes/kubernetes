@@ -93,24 +93,24 @@ func validateKubeProxyIPTablesConfiguration(config kubeproxyconfig.KubeProxyIPTa
 func validateKubeProxyConntrackConfiguration(config kubeproxyconfig.KubeProxyConntrackConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if config.Max < 0 {
+	if config.Max != nil && *config.Max < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("Max"), config.Max, "must be greater than or equal to 0"))
 	}
 
-	if config.MaxPerCore < 0 {
+	if config.MaxPerCore != nil && *config.MaxPerCore < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("MaxPerCore"), config.MaxPerCore, "must be greater than or equal to 0"))
 	}
 
-	if config.Min < 0 {
+	if config.Min != nil && *config.Min < 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("Min"), config.Min, "must be greater than or equal to 0"))
 	}
 
-	if config.TCPEstablishedTimeout.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("TCPEstablishedTimeout"), config.TCPEstablishedTimeout, "must be greater than 0"))
+	if config.TCPEstablishedTimeout.Duration < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("TCPEstablishedTimeout"), config.TCPEstablishedTimeout, "must be greater than or equal to 0"))
 	}
 
-	if config.TCPCloseWaitTimeout.Duration <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("TCPCloseWaitTimeout"), config.TCPCloseWaitTimeout, "must be greater than 0"))
+	if config.TCPCloseWaitTimeout.Duration < 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("TCPCloseWaitTimeout"), config.TCPCloseWaitTimeout, "must be greater than or equal to 0"))
 	}
 
 	return allErrs

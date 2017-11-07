@@ -25,6 +25,7 @@ import (
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/util/pointer"
 )
 
 func addDefaultingFuncs(scheme *kruntime.Scheme) error {
@@ -63,23 +64,23 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 		obj.UDPIdleTimeout = metav1.Duration{Duration: 250 * time.Millisecond}
 	}
 	// If ConntrackMax is set, respect it.
-	if obj.Conntrack.Max == 0 {
+	if obj.Conntrack.Max == nil {
 		// If ConntrackMax is *not* set, use per-core scaling.
-		if obj.Conntrack.MaxPerCore == 0 {
-			obj.Conntrack.MaxPerCore = 32 * 1024
+		if obj.Conntrack.MaxPerCore == nil {
+			obj.Conntrack.MaxPerCore = pointer.Int32Ptr(32 * 1024)
 		}
-		if obj.Conntrack.Min == 0 {
-			obj.Conntrack.Min = 128 * 1024
+		if obj.Conntrack.Min == nil {
+			obj.Conntrack.Min = pointer.Int32Ptr(128 * 1024)
 		}
 	}
 	if obj.IPTables.MasqueradeBit == nil {
 		temp := int32(14)
 		obj.IPTables.MasqueradeBit = &temp
 	}
-	if obj.Conntrack.TCPEstablishedTimeout == zero {
-		obj.Conntrack.TCPEstablishedTimeout = metav1.Duration{Duration: 24 * time.Hour} // 1 day (1/5 default)
+	if obj.Conntrack.TCPEstablishedTimeout == nil {
+		obj.Conntrack.TCPEstablishedTimeout = &metav1.Duration{Duration: 24 * time.Hour} // 1 day (1/5 default)
 	}
-	if obj.Conntrack.TCPCloseWaitTimeout == zero {
+	if obj.Conntrack.TCPCloseWaitTimeout == nil {
 		// See https://github.com/kubernetes/kubernetes/issues/32551.
 		//
 		// CLOSE_WAIT conntrack state occurs when the Linux kernel
@@ -100,7 +101,7 @@ func SetDefaults_KubeProxyConfiguration(obj *KubeProxyConfiguration) {
 		//
 		// We set CLOSE_WAIT to one hour by default to better match
 		// typical server timeouts.
-		obj.Conntrack.TCPCloseWaitTimeout = metav1.Duration{Duration: 1 * time.Hour}
+		obj.Conntrack.TCPCloseWaitTimeout = &metav1.Duration{Duration: 1 * time.Hour}
 	}
 	if obj.ConfigSyncPeriod.Duration == 0 {
 		obj.ConfigSyncPeriod.Duration = 15 * time.Minute
