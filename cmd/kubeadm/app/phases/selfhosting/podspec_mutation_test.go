@@ -22,8 +22,11 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
+
+var defaultCfg = &kubeadmapi.MasterConfiguration{}
 
 func TestMutatePodSpec(t *testing.T) {
 	var tests = []struct {
@@ -73,7 +76,8 @@ func TestMutatePodSpec(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		mutatePodSpec(GetDefaultMutators(), rt.component, rt.podSpec)
+		mutatators := GetDefault(defaultCfg)
+		mutatators.mutatePodSpec(rt.component, rt.podSpec)
 
 		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
 			t.Errorf("failed mutatePodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
@@ -110,7 +114,7 @@ func TestAddNodeSelectorToPodSpec(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		addNodeSelectorToPodSpec(rt.podSpec)
+		addNodeSelectorToPodSpec(defaultCfg, rt.podSpec)
 
 		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
 			t.Errorf("failed addNodeSelectorToPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
@@ -147,7 +151,7 @@ func TestSetMasterTolerationOnPodSpec(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		setMasterTolerationOnPodSpec(rt.podSpec)
+		setMasterTolerationOnPodSpec(defaultCfg, rt.podSpec)
 
 		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
 			t.Errorf("failed setMasterTolerationOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
@@ -177,7 +181,7 @@ func TestSetRightDNSPolicyOnPodSpec(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		setRightDNSPolicyOnPodSpec(rt.podSpec)
+		setRightDNSPolicyOnPodSpec(defaultCfg, rt.podSpec)
 
 		if !reflect.DeepEqual(*rt.podSpec, rt.expected) {
 			t.Errorf("failed setRightDNSPolicyOnPodSpec:\nexpected:\n%v\nsaw:\n%v", rt.expected, *rt.podSpec)
@@ -269,7 +273,7 @@ func TestSetSelfHostedVolumesForAPIServer(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		setSelfHostedVolumesForAPIServer(rt.podSpec)
+		setSelfHostedVolumesForAPIServer(defaultCfg, rt.podSpec)
 		sort.Strings(rt.podSpec.Containers[0].Command)
 		sort.Strings(rt.expected.Containers[0].Command)
 
@@ -387,7 +391,7 @@ func TestSetSelfHostedVolumesForControllerManager(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		setSelfHostedVolumesForControllerManager(rt.podSpec)
+		setSelfHostedVolumesForControllerManager(defaultCfg, rt.podSpec)
 		sort.Strings(rt.podSpec.Containers[0].Command)
 		sort.Strings(rt.expected.Containers[0].Command)
 
@@ -457,7 +461,7 @@ func TestSetSelfHostedVolumesForScheduler(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		setSelfHostedVolumesForScheduler(rt.podSpec)
+		setSelfHostedVolumesForScheduler(defaultCfg, rt.podSpec)
 		sort.Strings(rt.podSpec.Containers[0].Command)
 		sort.Strings(rt.expected.Containers[0].Command)
 

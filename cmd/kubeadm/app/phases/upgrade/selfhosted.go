@@ -160,7 +160,7 @@ func SelfHostedControlPlane(client clientset.Interface, waiter apiclient.Waiter,
 // BuildUpgradedDaemonSetsFromConfig takes a config object and the current version and returns the DaemonSet objects to post to the master
 func BuildUpgradedDaemonSetsFromConfig(cfg *kubeadmapi.MasterConfiguration, k8sVersion *version.Version) map[string]*apps.DaemonSet {
 	// Here the map of different mutators to use for the control plane's podspec is stored
-	mutators := selfhosting.GetMutatorsFromFeatureGates(cfg.FeatureGates)
+	mutators := selfhosting.GetMutatorsFromFeatureGates(cfg)
 	// Get the new PodSpecs to use
 	controlPlanePods := controlplane.GetStaticPodSpecs(cfg, k8sVersion)
 	// Store the created DaemonSets in this map

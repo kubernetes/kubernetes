@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 
 	"k8s.io/api/core/v1"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -33,11 +34,17 @@ const (
 )
 
 // PodSpecMutatorFunc is a function capable of mutating a PodSpec
-type PodSpecMutatorFunc func(*v1.PodSpec)
+type PodSpecMutatorFunc func(*kubeadmapi.MasterConfiguration, *v1.PodSpec)
 
-// GetDefaultMutators gets the mutator functions that alwasy should be used
-func GetDefaultMutators() map[string][]PodSpecMutatorFunc {
-	return map[string][]PodSpecMutatorFunc{
+// PodSpecMutator wraps a list of PodSpecMutatorFunc and holds a minimal context.
+type PodSpecMutator struct {
+	mutatorList map[string][]PodSpecMutatorFunc
+	cfg         *kubeadmapi.MasterConfiguration
+}
+
+// GetDefault gets the default mutator functions that should always be used
+func GetDefault(cfg *kubeadmapi.MasterConfiguration) PodSpecMutator {
+	list := map[string][]PodSpecMutatorFunc{
 		kubeadmconstants.KubeAPIServer: {
 			addNodeSelectorToPodSpec,
 			setMasterTolerationOnPodSpec,
@@ -54,35 +61,41 @@ func GetDefaultMutators() map[string][]PodSpecMutatorFunc {
 			setRightDNSPolicyOnPodSpec,
 		},
 	}
+	return PodSpecMutator{mutatorList: list, cfg: cfg}
 }
 
 // GetMutatorsFromFeatureGates returns all mutators needed based on the feature gates passed
-func GetMutatorsFromFeatureGates(featureGates map[string]bool) map[string][]PodSpecMutatorFunc {
+func GetMutatorsFromFeatureGates(cfg *kubeadmapi.MasterConfiguration) PodSpecMutator {
 	// Here the map of different mutators to use for the control plane's podspec is stored
-	mutators := GetDefaultMutators()
+	mutator := GetDefault(cfg)
 
 	// Some extra work to be done if we should store the control plane certificates in Secrets
-	if features.Enabled(featureGates, features.StoreCertsInSecrets) {
-
+	if features.Enabled(cfg.FeatureGates, features.StoreCertsInSecrets) {
 		// Add the store-certs-in-secrets-specific mutators here so that the self-hosted component starts using them
-		mutators[kubeadmconstants.KubeAPIServer] = append(mutators[kubeadmconstants.KubeAPIServer], setSelfHostedVolumesForAPIServer)
-		mutators[kubeadmconstants.KubeControllerManager] = append(mutators[kubeadmconstants.KubeControllerManager], setSelfHostedVolumesForControllerManager)
-		mutators[kubeadmconstants.KubeScheduler] = append(mutators[kubeadmconstants.KubeScheduler], setSelfHostedVolumesForScheduler)
+		mutator.appendFn(kubeadmconstants.KubeAPIServer, setSelfHostedVolumesForAPIServer)
+		mutator.appendFn(kubeadmconstants.KubeControllerManager, setSelfHostedVolumesForControllerManager)
+		mutator.appendFn(kubeadmconstants.KubeScheduler, setSelfHostedVolumesForScheduler)
 	}
-	return mutators
+
+	return mutator
+}
+
+func (psm *PodSpecMutator) appendFn(key string, fn PodSpecMutatorFunc) {
+	psm.mutatorList[key] = append(psm.mutatorList[key], fn)
 }
 
 // mutatePodSpec makes a Static Pod-hosted PodSpec suitable for self-hosting
-func mutatePodSpec(mutators map[string][]PodSpecMutatorFunc, name string, podSpec *v1.PodSpec) {
+func (psm *PodSpecMutator) mutatePodSpec(name string, podSpec *v1.PodSpec) {
 	// Get the mutator functions for the component in question, then loop through and execute them
-	mutatorsForComponent := mutators[name]
-	for _, mutateFunc := range mutatorsForComponent {
-		mutateFunc(podSpec)
+	if fns, ok := psm.mutatorList[name]; ok {
+		for _, mutateFunc := range fns {
+			mutateFunc(psm.cfg, podSpec)
+		}
 	}
 }
 
 // addNodeSelectorToPodSpec makes Pod require to be scheduled on a node marked with the master label
-func addNodeSelectorToPodSpec(podSpec *v1.PodSpec) {
+func addNodeSelectorToPodSpec(_ *kubeadmapi.MasterConfiguration, podSpec *v1.PodSpec) {
 	if podSpec.NodeSelector == nil {
 		podSpec.NodeSelector = map[string]string{kubeadmconstants.LabelNodeRoleMaster: ""}
 		return
@@ -92,7 +105,7 @@ func addNodeSelectorToPodSpec(podSpec *v1.PodSpec) {
 }
 
 // setMasterTolerationOnPodSpec makes the Pod tolerate the master taint
-func setMasterTolerationOnPodSpec(podSpec *v1.PodSpec) {
+func setMasterTolerationOnPodSpec(_ *kubeadmapi.MasterConfiguration, podSpec *v1.PodSpec) {
 	if podSpec.Tolerations == nil {
 		podSpec.Tolerations = []v1.Toleration{kubeadmconstants.MasterToleration}
 		return
@@ -102,12 +115,12 @@ func setMasterTolerationOnPodSpec(podSpec *v1.PodSpec) {
 }
 
 // setRightDNSPolicyOnPodSpec makes sure the self-hosted components can look up things via kube-dns if necessary
-func setRightDNSPolicyOnPodSpec(podSpec *v1.PodSpec) {
+func setRightDNSPolicyOnPodSpec(_ *kubeadmapi.MasterConfiguration, podSpec *v1.PodSpec) {
 	podSpec.DNSPolicy = v1.DNSClusterFirstWithHostNet
 }
 
 // setSelfHostedVolumesForAPIServer makes sure the self-hosted api server has the right volume source coming from a self-hosted cluster
-func setSelfHostedVolumesForAPIServer(podSpec *v1.PodSpec) {
+func setSelfHostedVolumesForAPIServer(_ *kubeadmapi.MasterConfiguration, podSpec *v1.PodSpec) {
 	for i, v := range podSpec.Volumes {
 		// If the volume name matches the expected one; switch the volume source from hostPath to cluster-hosted
 		if v.Name == kubeadmconstants.KubeCertificatesVolumeName {
@@ -117,7 +130,7 @@ func setSelfHostedVolumesForAPIServer(podSpec *v1.PodSpec) {
 }
 
 // setSelfHostedVolumesForControllerManager makes sure the self-hosted controller manager has the right volume source coming from a self-hosted cluster
-func setSelfHostedVolumesForControllerManager(podSpec *v1.PodSpec) {
+func setSelfHostedVolumesForControllerManager(_ *kubeadmapi.MasterConfiguration, podSpec *v1.PodSpec) {
 	for i, v := range podSpec.Volumes {
 		// If the volume name matches the expected one; switch the volume source from hostPath to cluster-hosted
 		if v.Name == kubeadmconstants.KubeCertificatesVolumeName {
@@ -144,7 +157,7 @@ func setSelfHostedVolumesForControllerManager(podSpec *v1.PodSpec) {
 }
 
 // setSelfHostedVolumesForScheduler makes sure the self-hosted scheduler has the right volume source coming from a self-hosted cluster
-func setSelfHostedVolumesForScheduler(podSpec *v1.PodSpec) {
+func setSelfHostedVolumesForScheduler(_ *kubeadmapi.MasterConfiguration, podSpec *v1.PodSpec) {
 	for i, v := range podSpec.Volumes {
 		// If the volume name matches the expected one; switch the volume source from hostPath to cluster-hosted
 		if v.Name == kubeadmconstants.KubeConfigVolumeName {
