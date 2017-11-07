@@ -56,17 +56,22 @@ func makeHandler(name string, accept bool, ops ...Operation) Interface {
 }
 
 func TestAdmitAndValidate(t *testing.T) {
+	sysns := "kube-system"
+	otherns := "default"
 	tests := []struct {
 		name      string
+		ns        string
 		operation Operation
 		chain     chainAdmissionHandler
 		accept    bool
+		reject    bool
 		calls     map[string]bool
 	}{
 		{
 			name:      "all accept",
+			ns:        sysns,
 			operation: Create,
-			chain: []Interface{
+			chain: []NamedHandler{
 				makeHandler("a", true, Update, Delete, Create),
 				makeHandler("b", true, Delete, Create),
 				makeHandler("c", true, Create),
@@ -76,8 +81,9 @@ func TestAdmitAndValidate(t *testing.T) {
 		},
 		{
 			name:      "ignore handler",
+			ns:        otherns,
 			operation: Create,
-			chain: []Interface{
+			chain: []NamedHandler{
 				makeHandler("a", true, Update, Delete, Create),
 				makeHandler("b", false, Delete),
 				makeHandler("c", true, Create),
@@ -87,8 +93,9 @@ func TestAdmitAndValidate(t *testing.T) {
 		},
 		{
 			name:      "ignore all",
+			ns:        sysns,
 			operation: Connect,
-			chain: []Interface{
+			chain: []NamedHandler{
 				makeHandler("a", true, Update, Delete, Create),
 				makeHandler("b", false, Delete),
 				makeHandler("c", true, Create),
@@ -98,22 +105,26 @@ func TestAdmitAndValidate(t *testing.T) {
 		},
 		{
 			name:      "reject one",
+			ns:        otherns,
 			operation: Delete,
-			chain: []Interface{
+			chain: []NamedHandler{
 				makeHandler("a", true, Update, Delete, Create),
 				makeHandler("b", false, Delete),
 				makeHandler("c", true, Create),
 			},
 			calls:  map[string]bool{"a": true, "b": true},
 			accept: false,
+			reject: true,
 		},
 	}
 	for _, test := range tests {
+		Metrics.reset()
+		t.Logf("testcase = %s", test.name)
 		// call admit and check that validate was not called at all
-		err := test.chain.Admit(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", test.operation, nil))
+		err = test.chain.Admit(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", test.operation, nil))
 		accepted := (err == nil)
 		if accepted != test.accept {
-			t.Errorf("%s: unexpected result of admit call: %v\n", test.name, accepted)
+			t.Errorf("unexpected result of admit call: %v", accepted)
 		}
 		for _, h := range test.chain {
 			fake := h.(*FakeHandler)
@@ -148,6 +159,18 @@ func TestAdmitAndValidate(t *testing.T) {
 				t.Errorf("%s: admit handler %s called during admit", test.name, fake.name)
 			}
 		}
+
+		labels := metricLabels{
+			isSystemNs: test.ns == sysns,
+		}
+		if test.reject {
+			expectCountMetric(t, "apiserver_admission_step_rejected_total", labels, 1)
+		}
+
+		if test.accept {
+			expectCountMetric(t, "apiserver_admission_step_total", labels, 1)
+		}
+
 	}
 }
 

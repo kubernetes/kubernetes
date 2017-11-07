@@ -136,12 +136,9 @@ func TestIgnoreAdmission(t *testing.T) {
 		t.Errorf("unexpected error initializing handler: %v", err)
 	}
 	informerFactory.Start(wait.NeverStop)
-	chainHandler := admission.NewChainHandler(handler)
 
-	pod := newPod(namespace)
-	err = chainHandler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
-	if err != nil {
-		t.Errorf("unexpected error returned from admission handler")
+	if handler.Handles(admission.Update) {
+		t.Errorf("expected not to handle Update")
 	}
 	if hasCreateNamespaceAction(mockClient) {
 		t.Errorf("unexpected create namespace action")

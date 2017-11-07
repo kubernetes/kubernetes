@@ -77,8 +77,7 @@ func mockVolumeLabels(labels map[string]string) *mockVolumes {
 
 // TestAdmission
 func TestAdmission(t *testing.T) {
-	pvHandler := NewPersistentVolumeLabel()
-	handler := admission.NewChainHandler(pvHandler)
+	handler := NewPersistentVolumeLabel()
 	ignoredPV := api.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{Name: "noncloud", Namespace: "myns"},
 		Spec: api.PersistentVolumeSpec{
@@ -101,9 +100,8 @@ func TestAdmission(t *testing.T) {
 	}
 
 	// Non-cloud PVs are ignored
-	err := handler.Admit(admission.NewAttributesRecord(&ignoredPV, nil, api.Kind("PersistentVolume").WithVersion("version"), ignoredPV.Namespace, ignoredPV.Name, api.Resource("persistentvolumes").WithVersion("version"), "", admission.Create, nil))
-	if err != nil {
-		t.Errorf("Unexpected error returned from admission handler (on ignored pv): %v", err)
+	if handler.Handles(admission.Delete) {
+		t.Errorf("Expected to only handle create")
 	}
 
 	// We only add labels on creation
@@ -113,7 +111,7 @@ func TestAdmission(t *testing.T) {
 	}
 
 	// Errors from the cloudprovider block creation of the volume
-	pvHandler.ebsVolumes = mockVolumeFailure(fmt.Errorf("invalid volume"))
+	handler.ebsVolumes = mockVolumeFailure(fmt.Errorf("invalid volume"))
 	err = handler.Admit(admission.NewAttributesRecord(&awsPV, nil, api.Kind("PersistentVolume").WithVersion("version"), awsPV.Namespace, awsPV.Name, api.Resource("persistentvolumes").WithVersion("version"), "", admission.Create, nil))
 	if err == nil {
 		t.Errorf("Expected error when aws pv info fails")
@@ -121,7 +119,7 @@ func TestAdmission(t *testing.T) {
 
 	// Don't add labels if the cloudprovider doesn't return any
 	labels := make(map[string]string)
-	pvHandler.ebsVolumes = mockVolumeLabels(labels)
+	handler.ebsVolumes = mockVolumeLabels(labels)
 	err = handler.Admit(admission.NewAttributesRecord(&awsPV, nil, api.Kind("PersistentVolume").WithVersion("version"), awsPV.Namespace, awsPV.Name, api.Resource("persistentvolumes").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Expected no error when creating aws pv")
@@ -131,7 +129,7 @@ func TestAdmission(t *testing.T) {
 	}
 
 	// Don't panic if the cloudprovider returns nil, nil
-	pvHandler.ebsVolumes = mockVolumeFailure(nil)
+	handler.ebsVolumes = mockVolumeFailure(nil)
 	err = handler.Admit(admission.NewAttributesRecord(&awsPV, nil, api.Kind("PersistentVolume").WithVersion("version"), awsPV.Namespace, awsPV.Name, api.Resource("persistentvolumes").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Expected no error when cloud provider returns empty labels")
@@ -141,7 +139,7 @@ func TestAdmission(t *testing.T) {
 	labels = make(map[string]string)
 	labels["a"] = "1"
 	labels["b"] = "2"
-	pvHandler.ebsVolumes = mockVolumeLabels(labels)
+	handler.ebsVolumes = mockVolumeLabels(labels)
 	err = handler.Admit(admission.NewAttributesRecord(&awsPV, nil, api.Kind("PersistentVolume").WithVersion("version"), awsPV.Namespace, awsPV.Name, api.Resource("persistentvolumes").WithVersion("version"), "", admission.Create, nil))
 	if err != nil {
 		t.Errorf("Expected no error when creating aws pv")

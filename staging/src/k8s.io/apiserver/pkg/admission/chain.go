@@ -37,7 +37,7 @@ func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
 	var err error
 	start := time.Now()
 	defer func() {
-		ObserveAdmissionStep(time.Since(start), err != nil, a, stepMutating)
+		Metrics.ObserveAdmissionStep(time.Since(start), err != nil, a, stepMutating)
 	}()
 
 	for _, handler := range admissionHandler {
@@ -47,7 +47,7 @@ func (admissionHandler chainAdmissionHandler) Admit(a Attributes) error {
 		if mutator, ok := handler.(MutationInterface); ok {
 			t := time.Now()
 			err = mutator.Admit(a)
-			ObserveAdmissionController(time.Since(t), err != nil, handler, a)
+			Metrics.ObserveAdmissionController(time.Since(t), err != nil, handler, a)
 			if err != nil {
 				return err
 			}
@@ -61,7 +61,7 @@ func (admissionHandler chainAdmissionHandler) Validate(a Attributes) error {
 	var err error
 	start := time.Now()
 	defer func() {
-		ObserveAdmissionStep(time.Since(start), err != nil, a, stepValidating)
+		Metrics.ObserveAdmissionStep(time.Since(start), err != nil, a, stepValidating)
 	}()
 
 	for _, handler := range admissionHandler {
@@ -71,7 +71,7 @@ func (admissionHandler chainAdmissionHandler) Validate(a Attributes) error {
 		if validator, ok := handler.(ValidationInterface); ok {
 			t := time.Now()
 			err = validator.Validate(a)
-			ObserveAdmissionController(time.Since(t), err != nil, handler, a)
+			Metrics.ObserveAdmissionController(time.Since(t), err != nil, handler, a)
 			if err != nil {
 				return err
 			}
