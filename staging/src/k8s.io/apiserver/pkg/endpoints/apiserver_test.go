@@ -82,13 +82,23 @@ func (alwaysAdmit) Handles(operation admission.Operation) bool {
 	return true
 }
 
-type alwaysDeny struct{}
+type alwaysMutatingDeny struct{}
 
-func (alwaysDeny) Admit(a admission.Attributes) (err error) {
-	return admission.NewForbidden(a, errors.New("Admission control is denying all modifications"))
+func (alwaysMutatingDeny) Admit(a admission.Attributes) (err error) {
+	return admission.NewForbidden(a, errors.New("Mutating admission control is denying all modifications"))
 }
 
-func (alwaysDeny) Handles(operation admission.Operation) bool {
+func (alwaysMutatingDeny) Handles(operation admission.Operation) bool {
+	return true
+}
+
+type alwaysValidatingDeny struct{}
+
+func (alwaysValidatingDeny) Validate(a admission.Attributes) (err error) {
+	return admission.NewForbidden(a, errors.New("Validating admission control is denying all modifications"))
+}
+
+func (alwaysValidatingDeny) Handles(operation admission.Operation) bool {
 	return true
 }
 
@@ -256,11 +266,6 @@ type defaultAPIServer struct {
 // uses the default settings
 func handle(storage map[string]rest.Storage) http.Handler {
 	return handleInternal(storage, admissionControl, selfLinker, nil)
-}
-
-// tests with a deny admission controller
-func handleDeny(storage map[string]rest.Storage) http.Handler {
-	return handleInternal(storage, alwaysDeny{}, selfLinker, nil)
 }
 
 // tests using the new namespace scope mechanism
@@ -529,6 +534,9 @@ func (storage *SimpleRESTStorage) Create(ctx request.Context, obj runtime.Object
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(obj)
 	}
+	if err := createValidation(obj); err != nil {
+		return nil, err
+	}
 	return obj, err
 }
 
@@ -544,6 +552,9 @@ func (storage *SimpleRESTStorage) Update(ctx request.Context, name string, objIn
 	}
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(obj)
+	}
+	if err := updateValidation(&storage.item, obj); err != nil {
+		return nil, false, err
 	}
 	return obj, false, err
 }
@@ -724,6 +735,9 @@ func (storage *NamedCreaterRESTStorage) Create(ctx request.Context, name string,
 	var err error
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(obj)
+	}
+	if err := createValidation(obj); err != nil {
+		return nil, err
 	}
 	return obj, err
 }
@@ -2813,22 +2827,27 @@ func TestLegacyDeleteIgnoresOptions(t *testing.T) {
 }
 
 func TestDeleteInvokesAdmissionControl(t *testing.T) {
-	storage := map[string]rest.Storage{}
-	simpleStorage := SimpleRESTStorage{}
-	ID := "id"
-	storage["simple"] = &simpleStorage
-	handler := handleDeny(storage)
-	server := httptest.NewServer(handler)
-	defer server.Close()
+	// TODO: remove mutating deny when we removed it from the endpoint implementation and ported all plugins
+	for _, admit := range []admission.Interface{alwaysMutatingDeny{}, alwaysValidatingDeny{}} {
+		t.Logf("Testing %T", admit)
 
-	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
-	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if response.StatusCode != http.StatusForbidden {
-		t.Errorf("Unexpected response %#v", response)
+		storage := map[string]rest.Storage{}
+		simpleStorage := SimpleRESTStorage{}
+		ID := "id"
+		storage["simple"] = &simpleStorage
+		handler := handleInternal(storage, admit, selfLinker, nil)
+		server := httptest.NewServer(handler)
+		defer server.Close()
+
+		client := http.Client{}
+		request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
+		response, err := client.Do(request)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if response.StatusCode != http.StatusForbidden {
+			t.Errorf("Unexpected response %#v", response)
+		}
 	}
 }
 
@@ -2971,38 +2990,42 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestUpdateInvokesAdmissionControl(t *testing.T) {
-	storage := map[string]rest.Storage{}
-	simpleStorage := SimpleRESTStorage{}
-	ID := "id"
-	storage["simple"] = &simpleStorage
-	handler := handleDeny(storage)
-	server := httptest.NewServer(handler)
-	defer server.Close()
+	for _, admit := range []admission.Interface{alwaysMutatingDeny{}, alwaysValidatingDeny{}} {
+		t.Logf("Testing %T", admit)
 
-	item := &genericapitesting.Simple{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      ID,
-			Namespace: metav1.NamespaceDefault,
-		},
-		Other: "bar",
-	}
-	body, err := runtime.Encode(testCodec, item)
-	if err != nil {
-		// The following cases will fail, so die now
-		t.Fatalf("unexpected error: %v", err)
-	}
+		storage := map[string]rest.Storage{}
+		simpleStorage := SimpleRESTStorage{}
+		ID := "id"
+		storage["simple"] = &simpleStorage
+		handler := handleInternal(storage, admit, selfLinker, nil)
+		server := httptest.NewServer(handler)
+		defer server.Close()
 
-	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	dump, _ := httputil.DumpResponse(response, true)
-	t.Log(string(dump))
+		item := &genericapitesting.Simple{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      ID,
+				Namespace: metav1.NamespaceDefault,
+			},
+			Other: "bar",
+		}
+		body, err := runtime.Encode(testCodec, item)
+		if err != nil {
+			// The following cases will fail, so die now
+			t.Fatalf("unexpected error: %v", err)
+		}
 
-	if response.StatusCode != http.StatusForbidden {
-		t.Errorf("Unexpected response %#v", response)
+		client := http.Client{}
+		request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
+		response, err := client.Do(request)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		dump, _ := httputil.DumpResponse(response, true)
+		t.Log(string(dump))
+
+		if response.StatusCode != http.StatusForbidden {
+			t.Errorf("Unexpected response %#v", response)
+		}
 	}
 }
 
@@ -3602,49 +3625,53 @@ func TestCreateInNamespace(t *testing.T) {
 	}
 }
 
-func TestCreateInvokesAdmissionControl(t *testing.T) {
-	storage := SimpleRESTStorage{
-		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
-			time.Sleep(5 * time.Millisecond)
-			return obj, nil
-		},
-	}
-	selfLinker := &setTestSelfLinker{
-		t:           t,
-		name:        "bar",
-		namespace:   "other",
-		expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/foo/bar",
-	}
-	handler := handleInternal(map[string]rest.Storage{"foo": &storage}, alwaysDeny{}, selfLinker, nil)
-	server := httptest.NewServer(handler)
-	defer server.Close()
-	client := http.Client{}
+func TestCreateInvokeAdmissionControl(t *testing.T) {
+	for _, admit := range []admission.Interface{alwaysMutatingDeny{}, alwaysValidatingDeny{}} {
+		t.Logf("Testing %T", admit)
 
-	simple := &genericapitesting.Simple{
-		Other: "bar",
-	}
-	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/foo", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+		storage := SimpleRESTStorage{
+			injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
+				time.Sleep(5 * time.Millisecond)
+				return obj, nil
+			},
+		}
+		selfLinker := &setTestSelfLinker{
+			t:           t,
+			name:        "bar",
+			namespace:   "other",
+			expectedSet: "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/foo/bar",
+		}
+		handler := handleInternal(map[string]rest.Storage{"foo": &storage}, admit, selfLinker, nil)
+		server := httptest.NewServer(handler)
+		defer server.Close()
+		client := http.Client{}
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	var response *http.Response
-	go func() {
-		response, err = client.Do(request)
-		wg.Done()
-	}()
-	wg.Wait()
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if response.StatusCode != http.StatusForbidden {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusForbidden, response)
+		simple := &genericapitesting.Simple{
+			Other: "bar",
+		}
+		data, err := runtime.Encode(testCodec, simple)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/foo", bytes.NewBuffer(data))
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		var response *http.Response
+		go func() {
+			response, err = client.Do(request)
+			wg.Done()
+		}()
+		wg.Wait()
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if response.StatusCode != http.StatusForbidden {
+			t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusForbidden, response)
+		}
 	}
 }
 
