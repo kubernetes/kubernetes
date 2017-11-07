@@ -150,11 +150,7 @@ func rmSetup(t *testing.T, stopCh chan struct{}) (*httptest.Server, framework.Cl
 func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podNum int) {
 	if err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		objects := podInformer.GetIndexer().List()
-		if len(objects) == podNum {
-			return true, nil
-		} else {
-			return false, nil
-		}
+		return len(objects) == podNum, nil
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -275,11 +271,7 @@ func waitRCStable(t *testing.T, clientSet clientset.Interface, rc *v1.Replicatio
 		if err != nil {
 			return false, err
 		}
-		if updatedRC.Status.Replicas != *rc.Spec.Replicas {
-			return false, nil
-		} else {
-			return true, nil
-		}
+		return updatedRC.Status.Replicas == *rc.Spec.Replicas, nil
 	}); err != nil {
 		t.Fatal(err)
 	}
