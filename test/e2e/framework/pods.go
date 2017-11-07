@@ -24,12 +24,15 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 
@@ -184,7 +187,6 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 	}
 }
 
-// TODO(random-liu): Move pod wait function into this file
 // WaitForSuccess waits for pod to succeed.
 func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 	f := c.f
@@ -258,4 +260,29 @@ func (c *PodClient) MatchContainerOutput(name string, containerName string, expe
 		return fmt.Errorf("failed to match regexp %q in output %q", expectedRegexp, output)
 	}
 	return nil
+}
+
+func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeout time.Duration, condition podCondition) error {
+	Logf("Waiting up to %v for pod %q in namespace %q to be %q", timeout, podName, ns, desc)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
+		pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
+		if err != nil {
+			if apierrs.IsNotFound(err) {
+				Logf("Pod %q in namespace %q not found. Error: %v", podName, ns, err)
+				return err
+			}
+			Logf("Get pod %q in namespace %q failed, ignoring for %v. Error: %v", podName, ns, Poll, err)
+			continue
+		}
+		// log now so that current pod info is reported before calling `condition()`
+		Logf("Pod %q: Phase=%q, Reason=%q, readiness=%t. Elapsed: %v",
+			podName, pod.Status.Phase, pod.Status.Reason, podutil.IsPodReady(pod), time.Since(start))
+		if done, err := condition(pod); done {
+			if err == nil {
+				Logf("Pod %q satisfied condition %q", podName, desc)
+			}
+			return err
+		}
+	}
+	return fmt.Errorf("Gave up after waiting %v for pod %q to be %q", timeout, podName, desc)
 }
