@@ -1797,7 +1797,7 @@ func TestStoreWatch(t *testing.T) {
 
 func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheEnabled bool) (factory.DestroyFunc, *Store) {
 	podPrefix := "/pods"
-	server, sc := etcdtesting.NewUnsecuredEtcd3TestClientServer(t, scheme)
+	server, sc := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 	strategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
 
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
