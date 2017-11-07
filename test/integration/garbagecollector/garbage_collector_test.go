@@ -233,10 +233,7 @@ func setup(t *testing.T, workerCount int) *testContext {
 	discoveryClient := cacheddiscovery.NewMemCacheClient(clientSet.Discovery())
 	restMapper := discovery.NewDeferredDiscoveryRESTMapper(discoveryClient, meta.InterfacesForUnstructured)
 	restMapper.Reset()
-	deletableResources, err := garbagecollector.GetDeletableResources(discoveryClient)
-	if err != nil {
-		t.Fatalf("unable to get deletable resources: %v", err)
-	}
+	deletableResources := garbagecollector.GetDeletableResources(discoveryClient)
 	config := *masterConfig
 	config.ContentConfig = dynamic.ContentConfig()
 	metaOnlyClientPool := dynamic.NewClientPool(&config, restMapper, dynamic.LegacyAPIPathResolverFunc)

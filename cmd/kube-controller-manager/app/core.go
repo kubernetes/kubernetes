@@ -335,10 +335,7 @@ func startGarbageCollectorController(ctx ControllerContext) (bool, error) {
 	clientPool := dynamic.NewClientPool(config, restMapper, dynamic.LegacyAPIPathResolverFunc)
 
 	// Get an initial set of deletable resources to prime the garbage collector.
-	deletableResources, err := garbagecollector.GetDeletableResources(discoveryClient)
-	if err != nil {
-		return true, err
-	}
+	deletableResources := garbagecollector.GetDeletableResources(discoveryClient)
 	ignoredResources := make(map[schema.GroupResource]struct{})
 	for _, r := range ctx.Options.GCIgnoredResources {
 		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
