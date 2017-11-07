@@ -30,7 +30,7 @@ go_library(
         "//pkg/util/initsystem:go_default_library",
         "//pkg/util/version:go_default_library",
         "//pkg/version:go_default_library",
-        "//plugin/cmd/kube-scheduler/app/options:go_default_library",
+        "//plugin/cmd/kube-scheduler/app:go_default_library",
         "//test/e2e_node/system:go_default_library",
         "//vendor/github.com/PuerkitoBio/purell:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
