@@ -469,6 +469,27 @@ type DaemonSetStatus struct {
 	// create the name for the newest ControllerRevision.
 	// +optional
 	CollisionCount *int32
+
+	// Represents the latest available observations of a DaemonSet's current state.
+	Conditions []DaemonSetCondition
+}
+
+type DaemonSetConditionType string
+
+// TODO: Add valid condition types of a DaemonSet.
+
+// DaemonSetCondition describes the state of a DaemonSet at a certain point.
+type DaemonSetCondition struct {
+	// Type of DaemonSet condition.
+	Type DaemonSetConditionType
+	// Status of the condition, one of True, False, Unknown.
+	Status api.ConditionStatus
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime metav1.Time
+	// The reason for the condition's last transition.
+	Reason string
+	// A human readable message indicating details about the transition.
+	Message string
 }
 
 // +genclient
