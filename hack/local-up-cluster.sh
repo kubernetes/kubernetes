@@ -737,7 +737,7 @@ function start_kubeproxy {
     PROXY_LOG=${LOG_DIR}/kube-proxy.log
 
     cat <<EOF > /tmp/kube-proxy.yaml
-apiVersion: componentconfig/v1alpha1
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
 kind: KubeProxyConfiguration
 clientConnection:
   kubeconfig: ${CERT_DIR}/kube-proxy.kubeconfig
