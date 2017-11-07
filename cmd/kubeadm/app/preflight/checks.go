@@ -52,7 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	versionutil "k8s.io/kubernetes/pkg/util/version"
 	kubeadmversion "k8s.io/kubernetes/pkg/version"
-	schoptions "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
+	schedulerapp "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 	"k8s.io/kubernetes/test/e2e_node/system"
 )
 
@@ -409,9 +409,9 @@ func (eac ExtraArgsCheck) Check() (warnings, errors []error) {
 		warnings = append(warnings, argsCheck("kube-controller-manager", eac.ControllerManagerExtraArgs, flags)...)
 	}
 	if len(eac.SchedulerExtraArgs) > 0 {
+		command := schedulerapp.NewSchedulerCommand()
 		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-		s := schoptions.NewSchedulerServer()
-		s.AddFlags(flags)
+		flags.AddFlagSet(command.Flags())
 		warnings = append(warnings, argsCheck("kube-scheduler", eac.SchedulerExtraArgs, flags)...)
 	}
 	return warnings, nil

@@ -151,6 +151,14 @@ func NewFromConfigurator(c Configurator, modifiers ...func(c *Config)) (*Schedul
 	return s, nil
 }
 
+// NewFromConfig returns a new scheduler using the provided Config.
+func NewFromConfig(config *Config) *Scheduler {
+	metrics.Register()
+	return &Scheduler{
+		config: config,
+	}
+}
+
 // Run begins watching and scheduling. It waits for cache to be synced, then starts a goroutine and returns immediately.
 func (sched *Scheduler) Run() {
 	if !sched.config.WaitForCacheSync() {

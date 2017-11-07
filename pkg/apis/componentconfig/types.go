@@ -20,58 +20,107 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// ClientConnectionConfiguration contains details for constructing a client.
+type ClientConnectionConfiguration struct {
+	// kubeConfigFile is the path to a kubeconfig file.
+	KubeConfigFile string
+	// acceptContentTypes defines the Accept header sent by clients when connecting to a server, overriding the
+	// default value of 'application/json'. This field will control all connections to the server used by a particular
+	// client.
+	AcceptContentTypes string
+	// contentType is the content type used when sending data to the server from this client.
+	ContentType string
+	// cps controls the number of queries per second allowed for this connection.
+	QPS float32
+	// burst allows extra queries to accumulate when a client is exceeding its rate.
+	Burst int
+}
+
+// SchedulerPolicyConfigMapKey defines the key of the element in the
+// scheduler's policy ConfigMap that contains scheduler's policy config.
+const SchedulerPolicyConfigMapKey string = "policy.cfg"
+
+// SchedulerPolicySource configures a means to obtain a scheduler Policy. One
+// source field must be specified, and source fields are mutually exclusive.
+type SchedulerPolicySource struct {
+	// File is a file policy source.
+	File *SchedulerPolicyFileSource
+	// ConfigMap is a config map policy source.
+	ConfigMap *SchedulerPolicyConfigMapSource
+}
+
+// SchedulerPolicyFileSource is a policy serialized to disk and accessed via
+// path.
+type SchedulerPolicyFileSource struct {
+	// Path is the location of a serialized policy.
+	Path string
+}
+
+// SchedulerPolicyConfigMapSource is a policy serialized into a config map value
+// under the SchedulerPolicyConfigMapKey key.
+type SchedulerPolicyConfigMapSource struct {
+	// Namespace is the namespace of the policy config map.
+	Namespace string
+	// Name is the name of hte policy config map.
+	Name string
+}
+
+// SchedulerAlgorithmSource is the source of a scheduler algorithm. One source
+// field must be specified, and source fields are mutually exclusive.
+type SchedulerAlgorithmSource struct {
+	// Policy is a policy based algorithm source.
+	Policy *SchedulerPolicySource
+	// Provider is the name of a scheduling algorithm provider to use.
+	Provider *string
+}
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type KubeSchedulerConfiguration struct {
 	metav1.TypeMeta
 
-	// port is the port that the scheduler's http service runs on.
-	Port int32
-	// address is the IP address to serve on.
-	Address string
-	// algorithmProvider is the scheduling algorithm provider to use.
-	AlgorithmProvider string
-	// policyConfigFile is the filepath to the scheduler policy configuration.
-	PolicyConfigFile string
-	// enableProfiling enables profiling via web interface.
-	EnableProfiling bool
-	// enableContentionProfiling enables lock contention profiling, if enableProfiling is true.
-	EnableContentionProfiling bool
-	// contentType is contentType of requests sent to apiserver.
-	ContentType string
-	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver.
-	KubeAPIQPS float32
-	// kubeAPIBurst is the QPS burst to use while talking with kubernetes apiserver.
-	KubeAPIBurst int32
 	// schedulerName is name of the scheduler, used to select which pods
 	// will be processed by this scheduler, based on pod's "spec.SchedulerName".
 	SchedulerName string
+	// AlgorithmSource specifies the scheduler algorithm source.
+	AlgorithmSource SchedulerAlgorithmSource
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.
 	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
 	HardPodAffinitySymmetricWeight int
+
+	// LeaderElection defines the configuration of leader election client.
+	LeaderElection KubeSchedulerLeaderElectionConfiguration
+
+	// ClientConnection specifies the kubeconfig file and client connection
+	// settings for the proxy server to use when communicating with the apiserver.
+	ClientConnection ClientConnectionConfiguration
+	// HealthzBindAddress is the IP address and port for the health check server to serve on,
+	// defaulting to 0.0.0.0:10251
+	HealthzBindAddress string
+	// MetricsBindAddress is the IP address and port for the metrics server to
+	// serve on, defaulting to 0.0.0.0:10251.
+	MetricsBindAddress string
+	// EnableProfiling enables profiling via web interface on /debug/pprof
+	// handler. Profiling handlers will be handled by metrics server.
+	EnableProfiling bool
+	// EnableContentionProfiling enables lock contention profiling, if
+	// EnableProfiling is true.
+	EnableContentionProfiling bool
+
 	// Indicate the "all topologies" set for empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.
 	// DEPRECATED: This is no longer used.
 	FailureDomains string
-	// leaderElection defines the configuration of leader election client.
-	LeaderElection LeaderElectionConfiguration
+}
+
+// KubeSchedulerLeaderElectionConfiguration expands LeaderElectionConfiguration
+// to include scheduler specific configuration.
+type KubeSchedulerLeaderElectionConfiguration struct {
+	LeaderElectionConfiguration
 	// LockObjectNamespace defines the namespace of the lock object
 	LockObjectNamespace string
 	// LockObjectName defines the lock object name
 	LockObjectName string
-	// PolicyConfigMapName is the name of the ConfigMap object that specifies
-	// the scheduler's policy config. If UseLegacyPolicyConfig is true, scheduler
-	// uses PolicyConfigFile. If UseLegacyPolicyConfig is false and
-	// PolicyConfigMapName is not empty, the ConfigMap object with this name must
-	// exist in PolicyConfigMapNamespace before scheduler initialization.
-	PolicyConfigMapName string
-	// PolicyConfigMapNamespace is the namespace where the above policy config map
-	// is located. If none is provided default system namespace ("kube-system")
-	// will be used.
-	PolicyConfigMapNamespace string
-	// UseLegacyPolicyConfig tells the scheduler to ignore Policy ConfigMap and
-	// to use PolicyConfigFile if available.
-	UseLegacyPolicyConfig bool
 }
 
 // LeaderElectionConfiguration defines the configuration of leader election
