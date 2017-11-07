@@ -102,7 +102,7 @@ func esetup(t *testing.T, devs []*pluginapi.Device, socket, resourceName string,
 	err := p.Start()
 	require.NoError(t, err)
 
-	e, err := newEndpoint(socket, "mock", func(n string, a, u, r []pluginapi.Device) {})
+	e, err := newEndpoint(socket, "mock", make(map[string]pluginapi.Device), func(n string, a, u, r []pluginapi.Device) {})
 	require.NoError(t, err)
 
 	return p, e

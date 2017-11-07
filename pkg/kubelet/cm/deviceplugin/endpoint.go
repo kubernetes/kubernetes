@@ -46,7 +46,7 @@ type endpoint struct {
 }
 
 // newEndpoint creates a new endpoint for the given resourceName.
-func newEndpoint(socketPath, resourceName string, callback MonitorCallback) (*endpoint, error) {
+func newEndpoint(socketPath, resourceName string, devices map[string]pluginapi.Device, callback MonitorCallback) (*endpoint, error) {
 	client, c, err := dial(socketPath)
 	if err != nil {
 		glog.Errorf("Can't create new endpoint with path %s err %v", socketPath, err)
@@ -60,7 +60,7 @@ func newEndpoint(socketPath, resourceName string, callback MonitorCallback) (*en
 		socketPath:   socketPath,
 		resourceName: resourceName,
 
-		devices:  make(map[string]pluginapi.Device),
+		devices:  devices,
 		callback: callback,
 	}, nil
 }
