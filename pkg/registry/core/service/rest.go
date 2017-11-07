@@ -22,7 +22,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"reflect"
 	"strconv"
 
 	"github.com/golang/glog"
@@ -461,7 +460,7 @@ func containsNumber(haystack []int, needle int) bool {
 // so small that we expect a linear search to be faster
 func containsNodePort(serviceNodePorts []ServiceNodePort, serviceNodePort ServiceNodePort) bool {
 	for _, snp := range serviceNodePorts {
-		if reflect.DeepEqual(snp, serviceNodePort) {
+		if snp == serviceNodePort {
 			return true
 		}
 	}
