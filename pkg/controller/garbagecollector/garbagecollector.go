@@ -171,11 +171,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.DiscoveryInterface, p
 	oldResources := make(map[schema.GroupVersionResource]struct{})
 	wait.Until(func() {
 		// Get the current resource list from discovery.
-		newResources, err := GetDeletableResources(discoveryClient)
-		if err != nil {
-			utilruntime.HandleError(err)
-			return
-		}
+		newResources := GetDeletableResources(discoveryClient)
 
 		// Detect first or abnormal sync and try again later.
 		if oldResources == nil || len(oldResources) == 0 {
@@ -592,15 +588,37 @@ func (gc *GarbageCollector) GraphHasUID(UIDs []types.UID) bool {
 // GetDeletableResources returns all resources from discoveryClient that the
 // garbage collector should recognize and work with. More specifically, all
 // preferred resources which support the 'delete' verb.
-func GetDeletableResources(discoveryClient discovery.DiscoveryInterface) (map[schema.GroupVersionResource]struct{}, error) {
+//
+// All discovery errors are considered temporary. Upon encountering any error,
+// GetDeletableResources will log and return any discovered resources it was
+// able to process (which may be none).
+func GetDeletableResources(discoveryClient discovery.ServerResourcesInterface) map[schema.GroupVersionResource]struct{} {
 	preferredResources, err := discoveryClient.ServerPreferredResources()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get supported resources from server: %v", err)
+		if discovery.IsGroupDiscoveryFailedError(err) {
+			glog.Warning("failed to discover some groups: %v", err.(*discovery.ErrGroupDiscoveryFailed).Groups)
+		} else {
+			glog.Warning("failed to discover preferred resources: %v", err)
+		}
 	}
+	if preferredResources == nil {
+		return map[schema.GroupVersionResource]struct{}{}
+	}
+
+	// This is extracted from discovery.GroupVersionResources to allow tolerating
+	// failures on a per-resource basis.
 	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, preferredResources)
-	deletableGroupVersionResources, err := discovery.GroupVersionResources(deletableResources)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to parse resources from server: %v", err)
+	deletableGroupVersionResources := map[schema.GroupVersionResource]struct{}{}
+	for _, rl := range deletableResources {
+		gv, err := schema.ParseGroupVersion(rl.GroupVersion)
+		if err != nil {
+			glog.Warning("ignoring invalid discovered resource %q: %v", rl.GroupVersion, err)
+			continue
+		}
+		for i := range rl.APIResources {
+			deletableGroupVersionResources[schema.GroupVersionResource{Group: gv.Group, Version: gv.Version, Resource: rl.APIResources[i].Name}] = struct{}{}
+		}
 	}
-	return deletableGroupVersionResources, nil
+
+	return deletableGroupVersionResources
 }
