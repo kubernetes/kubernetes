@@ -79,7 +79,7 @@ func (s *storage) DeleteService(ctx genericapirequest.Context, name string) erro
 }
 
 func (s *storage) UpdateService(ctx genericapirequest.Context, svc *api.Service, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.Service, error) {
-	obj, _, err := s.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(svc), createValidation, updateValidation)
+	obj, _, err := s.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(svc, createValidation, updateValidation))
 	if err != nil {
 		return nil, err
 	}

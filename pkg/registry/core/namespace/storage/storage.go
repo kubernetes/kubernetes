@@ -93,8 +93,8 @@ func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createV
 	return r.store.Create(ctx, obj, createValidation, includeUninitialized)
 }
 
-func (r *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
+func (r *REST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo)
 }
 
 func (r *REST) Get(ctx genericapirequest.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
@@ -219,8 +219,8 @@ func (r *StatusREST) Get(ctx genericapirequest.Context, name string, options *me
 }
 
 // Update alters the status subset of an object.
-func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
+func (r *StatusREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo)
 }
 
 func (r *FinalizeREST) New() runtime.Object {
@@ -228,6 +228,6 @@ func (r *FinalizeREST) New() runtime.Object {
 }
 
 // Update alters the status finalizers subset of an object.
-func (r *FinalizeREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation)
+func (r *FinalizeREST) Update(ctx genericapirequest.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo)
 }

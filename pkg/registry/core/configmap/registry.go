@@ -78,7 +78,7 @@ func (s *storage) CreateConfigMap(ctx genericapirequest.Context, cfg *api.Config
 }
 
 func (s *storage) UpdateConfigMap(ctx genericapirequest.Context, cfg *api.ConfigMap, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.ConfigMap, error) {
-	obj, _, err := s.Update(ctx, cfg.Name, rest.DefaultUpdatedObjectInfo(cfg), createValidation, updateValidation)
+	obj, _, err := s.Update(ctx, cfg.Name, rest.DefaultUpdatedObjectInfo(cfg, createValidation, updateValidation))
 	if err != nil {
 		return nil, err
 	}

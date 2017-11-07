@@ -61,7 +61,7 @@ func (s *storage) CreateCSR(ctx genericapirequest.Context, csr *certificates.Cer
 }
 
 func (s *storage) UpdateCSR(ctx genericapirequest.Context, csr *certificates.CertificateSigningRequest, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, csr.Name, rest.DefaultUpdatedObjectInfo(csr), createValidation, updateValidation)
+	_, _, err := s.Update(ctx, csr.Name, rest.DefaultUpdatedObjectInfo(csr, createValidation, updateValidation))
 	return err
 }
 

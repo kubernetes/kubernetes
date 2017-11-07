@@ -72,7 +72,7 @@ func (s *storage) CreateNamespace(ctx genericapirequest.Context, namespace *api.
 }
 
 func (s *storage) UpdateNamespace(ctx genericapirequest.Context, namespace *api.Namespace, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) error {
-	_, _, err := s.Update(ctx, namespace.Name, rest.DefaultUpdatedObjectInfo(namespace), createValidation, updateValidation)
+	_, _, err := s.Update(ctx, namespace.Name, rest.DefaultUpdatedObjectInfo(namespace, createValidation, updateValidation))
 	return err
 }
 

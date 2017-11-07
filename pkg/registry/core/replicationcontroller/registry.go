@@ -82,7 +82,7 @@ func (s *storage) CreateController(ctx genericapirequest.Context, controller *ap
 }
 
 func (s *storage) UpdateController(ctx genericapirequest.Context, controller *api.ReplicationController, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*api.ReplicationController, error) {
-	obj, _, err := s.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller), createValidation, updateValidation)
+	obj, _, err := s.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller, createValidation, updateValidation))
 	if err != nil {
 		return nil, err
 	}

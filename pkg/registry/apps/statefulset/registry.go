@@ -81,7 +81,7 @@ func (s *storage) CreateStatefulSet(ctx genericapirequest.Context, statefulSet *
 }
 
 func (s *storage) UpdateStatefulSet(ctx genericapirequest.Context, statefulSet *apps.StatefulSet, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (*apps.StatefulSet, error) {
-	obj, _, err := s.Update(ctx, statefulSet.Name, rest.DefaultUpdatedObjectInfo(statefulSet), createValidation, updateValidation)
+	obj, _, err := s.Update(ctx, statefulSet.Name, rest.DefaultUpdatedObjectInfo(statefulSet, createValidation, updateValidation))
 	if err != nil {
 		return nil, err
 	}
