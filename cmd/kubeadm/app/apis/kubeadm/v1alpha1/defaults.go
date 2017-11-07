@@ -27,7 +27,7 @@ import (
 	kubeletscheme "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/scheme"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
 	kubeproxyscheme "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	kubeproxyconfigv1beta1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1beta1"
 )
 
 const (
@@ -135,7 +135,7 @@ func SetDefaults_MasterConfiguration(obj *MasterConfiguration) {
 // SetDefaults_ProxyConfiguration assigns default values for the Proxy
 func SetDefaults_ProxyConfiguration(obj *MasterConfiguration) {
 	if obj.KubeProxy.Config == nil {
-		obj.KubeProxy.Config = &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
+		obj.KubeProxy.Config = &kubeproxyconfigv1beta1.KubeProxyConfiguration{}
 	}
 	if obj.KubeProxy.Config.ClusterCIDR == "" && obj.Networking.PodSubnet != "" {
 		obj.KubeProxy.Config.ClusterCIDR = obj.Networking.PodSubnet

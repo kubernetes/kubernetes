@@ -20,7 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	kubeproxyconfigv1beta1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1beta1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -255,7 +255,7 @@ type HostPathMount struct {
 
 // KubeProxy contains elements describing the proxy configuration.
 type KubeProxy struct {
-	Config *kubeproxyconfigv1alpha1.KubeProxyConfiguration `json:"config,omitempty"`
+	Config *kubeproxyconfigv1beta1.KubeProxyConfiguration `json:"config,omitempty"`
 }
 
 // AuditPolicyConfiguration holds the options for configuring the api server audit policy.

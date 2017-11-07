@@ -398,7 +398,7 @@ func TestGetConntrackMax(t *testing.T) {
 // TestLoadConfig tests proper operation of loadConfig()
 func TestLoadConfig(t *testing.T) {
 
-	yamlTemplate := `apiVersion: kubeproxy.config.k8s.io/v1alpha1
+	yamlTemplate := `apiVersion: kubeproxy.config.k8s.io/v1beta1
 bindAddress: %s
 clientConnection:
   acceptContentTypes: "abc"
@@ -583,7 +583,7 @@ func TestLoadConfigFailures(t *testing.T) {
 			expErr: "mapping values are not allowed in this context",
 		},
 	}
-	version := "apiVersion: kubeproxy.config.k8s.io/v1alpha1"
+	version := "apiVersion: kubeproxy.config.k8s.io/v1beta1"
 	for _, tc := range testCases {
 		options := NewOptions()
 		config := fmt.Sprintf("%s\n%s", version, tc.config)

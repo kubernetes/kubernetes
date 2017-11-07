@@ -25,7 +25,7 @@ import (
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeletconfigv1beta1 "k8s.io/kubernetes/pkg/kubelet/apis/kubeletconfig/v1beta1"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	kubeproxyconfigv1beta1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1beta1"
 	utilpointer "k8s.io/kubernetes/pkg/util/pointer"
 )
 
@@ -77,7 +77,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			}
 			kubeletconfigv1beta1.SetDefaults_KubeletConfiguration(obj.KubeletConfiguration.BaseConfig)
 			obj.KubeProxy = kubeadm.KubeProxy{
-				Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+				Config: &kubeproxyconfigv1beta1.KubeProxyConfiguration{
 					FeatureGates:       map[string]bool{"foo": true},
 					BindAddress:        "foo",
 					HealthzBindAddress: "foo:10256",
@@ -85,24 +85,24 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 					EnableProfiling:    bool(true),
 					ClusterCIDR:        "foo",
 					HostnameOverride:   "foo",
-					ClientConnection: kubeproxyconfigv1alpha1.ClientConnectionConfiguration{
+					ClientConnection: kubeproxyconfigv1beta1.ClientConnectionConfiguration{
 						KubeConfigFile:     "foo",
 						AcceptContentTypes: "foo",
 						ContentType:        "foo",
 						QPS:                float32(5),
 						Burst:              10,
 					},
-					IPVS: kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{
+					IPVS: kubeproxyconfigv1beta1.KubeProxyIPVSConfiguration{
 						SyncPeriod: metav1.Duration{Duration: 1},
 					},
-					IPTables: kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{
+					IPTables: kubeproxyconfigv1beta1.KubeProxyIPTablesConfiguration{
 						MasqueradeBit: utilpointer.Int32Ptr(0),
 						SyncPeriod:    metav1.Duration{Duration: 1},
 					},
 					OOMScoreAdj:       utilpointer.Int32Ptr(0),
 					ResourceContainer: "foo",
 					UDPIdleTimeout:    metav1.Duration{Duration: 1},
-					Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+					Conntrack: kubeproxyconfigv1beta1.KubeProxyConntrackConfiguration{
 						MaxPerCore: utilpointer.Int32Ptr(2),
 						Min:        utilpointer.Int32Ptr(1),
 						TCPEstablishedTimeout: &metav1.Duration{Duration: 5},

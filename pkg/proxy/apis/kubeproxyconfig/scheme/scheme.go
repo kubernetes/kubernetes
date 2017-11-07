@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1beta1"
 )
 
 var (
@@ -37,6 +37,6 @@ func init() {
 
 // AddToScheme adds the types of this group into the given scheme.
 func AddToScheme(scheme *runtime.Scheme) {
-	v1alpha1.AddToScheme(scheme)
+	v1beta1.AddToScheme(scheme)
 	kubeproxyconfig.AddToScheme(scheme)
 }

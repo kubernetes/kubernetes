@@ -30,7 +30,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	kubeproxyconfigv1beta1 "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1beta1"
 	"k8s.io/kubernetes/pkg/util/pointer"
 )
 
@@ -180,11 +180,11 @@ func TestEnsureProxyAddon(t *testing.T) {
 				BindPort:         1234,
 			},
 			KubeProxy: kubeadmapiext.KubeProxy{
-				Config: &kubeproxyconfigv1alpha1.KubeProxyConfiguration{
+				Config: &kubeproxyconfigv1beta1.KubeProxyConfiguration{
 					BindAddress:        "",
 					HealthzBindAddress: "0.0.0.0:10256",
 					MetricsBindAddress: "127.0.0.1:10249",
-					Conntrack: kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{
+					Conntrack: kubeproxyconfigv1beta1.KubeProxyConntrackConfiguration{
 						Max:        pointer.Int32Ptr(2),
 						MaxPerCore: pointer.Int32Ptr(1),
 						Min:        pointer.Int32Ptr(1),

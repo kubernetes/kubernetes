@@ -57,7 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/scheme"
-	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1alpha1"
+	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/v1beta1"
 	"k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig/validation"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
@@ -246,7 +246,7 @@ func (o *Options) writeConfigFile() error {
 		return errors.New("unable to locate yaml encoder")
 	}
 	encoder = json.NewYAMLSerializer(json.DefaultMetaFactory, o.scheme, o.scheme)
-	encoder = o.codecs.EncoderForVersion(encoder, v1alpha1.SchemeGroupVersion)
+	encoder = o.codecs.EncoderForVersion(encoder, v1beta1.SchemeGroupVersion)
 
 	configFile, err := os.Create(o.WriteConfigTo)
 	if err != nil {
@@ -308,7 +308,7 @@ func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfigurati
 }
 
 func (o *Options) ApplyDefaults(in *kubeproxyconfig.KubeProxyConfiguration) (*kubeproxyconfig.KubeProxyConfiguration, error) {
-	external, err := o.scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
+	external, err := o.scheme.ConvertToVersion(in, v1beta1.SchemeGroupVersion)
 	if err != nil {
 		return nil, err
 	}
