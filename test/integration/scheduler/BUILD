@@ -23,6 +23,7 @@ go_test(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
+        "//pkg/apis/componentconfig:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//pkg/client/informers/informers_generated/internalversion:go_default_library",
         "//pkg/controller/node:go_default_library",
@@ -30,7 +31,6 @@ go_test(
         "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/admission:go_default_library",
         "//plugin/cmd/kube-scheduler/app:go_default_library",
-        "//plugin/cmd/kube-scheduler/app/options:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction:go_default_library",
         "//plugin/pkg/scheduler:go_default_library",

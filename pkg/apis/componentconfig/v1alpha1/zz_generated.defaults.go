@@ -34,5 +34,5 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_KubeSchedulerConfiguration(in *KubeSchedulerConfiguration) {
 	SetDefaults_KubeSchedulerConfiguration(in)
-	SetDefaults_LeaderElectionConfiguration(&in.LeaderElection)
+	SetDefaults_LeaderElectionConfiguration(&in.LeaderElection.LeaderElectionConfiguration)
 }
