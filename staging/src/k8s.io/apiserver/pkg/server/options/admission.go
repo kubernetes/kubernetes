@@ -99,10 +99,7 @@ func (a *AdmissionOptions) ApplyTo(
 	if err != nil {
 		return err
 	}
-	genericInitializer, err := initializer.New(clientset, informers, c.Authorizer, scheme)
-	if err != nil {
-		return err
-	}
+	genericInitializer := initializer.New(clientset, informers, c.Authorizer, scheme)
 	initializersChain := admission.PluginInitializers{}
 	pluginInitializers = append(pluginInitializers, genericInitializer)
 	initializersChain = append(initializersChain, pluginInitializers...)
