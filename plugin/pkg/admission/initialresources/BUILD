@@ -17,7 +17,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/initialresources",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//vendor/cloud.google.com/go/compute/metadata:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/github.com/hawkular/hawkular-client-go/metrics:go_default_library",
@@ -46,7 +46,7 @@ go_test(
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/initialresources",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/golang.org/x/oauth2:go_default_library",
         "//vendor/golang.org/x/oauth2/google:go_default_library",

@@ -24,7 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/helper"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 )
 

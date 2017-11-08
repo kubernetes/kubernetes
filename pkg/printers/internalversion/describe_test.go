@@ -33,8 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	versionedfake "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -682,7 +682,7 @@ func TestDescribers(t *testing.T) {
 		t.Errorf("unexpected result: %s %v", out, err)
 	} else {
 		if noDescriber, ok := err.(printers.ErrNoDescriber); ok {
-			if !reflect.DeepEqual(noDescriber.Types, []string{"*api.Event", "*api.Pod", "*api.Pod"}) {
+			if !reflect.DeepEqual(noDescriber.Types, []string{"*core.Event", "*core.Pod", "*core.Pod"}) {
 				t.Errorf("unexpected describer: %v", err)
 			}
 		} else {

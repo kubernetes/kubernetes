@@ -15,8 +15,8 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/resourcequota",
     deps = [
-        "//pkg/api:go_default_library",
-        "//pkg/api/v1:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/v1:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/quota:go_default_library",
         "//pkg/quota/evaluator/core:go_default_library",

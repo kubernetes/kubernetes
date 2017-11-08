@@ -25,7 +25,7 @@ import (
 	v1 "k8s.io/api/storage/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
 	unsafe "unsafe"
 )
@@ -49,7 +49,7 @@ func autoConvert_v1_StorageClass_To_storage_StorageClass(in *v1.StorageClass, ou
 	out.ObjectMeta = in.ObjectMeta
 	out.Provisioner = in.Provisioner
 	out.Parameters = *(*map[string]string)(unsafe.Pointer(&in.Parameters))
-	out.ReclaimPolicy = (*api.PersistentVolumeReclaimPolicy)(unsafe.Pointer(in.ReclaimPolicy))
+	out.ReclaimPolicy = (*core.PersistentVolumeReclaimPolicy)(unsafe.Pointer(in.ReclaimPolicy))
 	out.MountOptions = *(*[]string)(unsafe.Pointer(&in.MountOptions))
 	out.AllowVolumeExpansion = (*bool)(unsafe.Pointer(in.AllowVolumeExpansion))
 	return nil

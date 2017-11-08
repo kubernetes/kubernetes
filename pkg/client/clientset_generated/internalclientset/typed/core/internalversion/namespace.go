@@ -21,7 +21,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
@@ -33,15 +33,15 @@ type NamespacesGetter interface {
 
 // NamespaceInterface has methods to work with Namespace resources.
 type NamespaceInterface interface {
-	Create(*api.Namespace) (*api.Namespace, error)
-	Update(*api.Namespace) (*api.Namespace, error)
-	UpdateStatus(*api.Namespace) (*api.Namespace, error)
+	Create(*core.Namespace) (*core.Namespace, error)
+	Update(*core.Namespace) (*core.Namespace, error)
+	UpdateStatus(*core.Namespace) (*core.Namespace, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*api.Namespace, error)
-	List(opts v1.ListOptions) (*api.NamespaceList, error)
+	Get(name string, options v1.GetOptions) (*core.Namespace, error)
+	List(opts v1.ListOptions) (*core.NamespaceList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Namespace, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Namespace, err error)
 	NamespaceExpansion
 }
 
@@ -58,8 +58,8 @@ func newNamespaces(c *CoreClient) *namespaces {
 }
 
 // Get takes name of the namespace, and returns the corresponding namespace object, and an error if there is any.
-func (c *namespaces) Get(name string, options v1.GetOptions) (result *api.Namespace, err error) {
-	result = &api.Namespace{}
+func (c *namespaces) Get(name string, options v1.GetOptions) (result *core.Namespace, err error) {
+	result = &core.Namespace{}
 	err = c.client.Get().
 		Resource("namespaces").
 		Name(name).
@@ -70,8 +70,8 @@ func (c *namespaces) Get(name string, options v1.GetOptions) (result *api.Namesp
 }
 
 // List takes label and field selectors, and returns the list of Namespaces that match those selectors.
-func (c *namespaces) List(opts v1.ListOptions) (result *api.NamespaceList, err error) {
-	result = &api.NamespaceList{}
+func (c *namespaces) List(opts v1.ListOptions) (result *core.NamespaceList, err error) {
+	result = &core.NamespaceList{}
 	err = c.client.Get().
 		Resource("namespaces").
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -90,8 +90,8 @@ func (c *namespaces) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a namespace and creates it.  Returns the server's representation of the namespace, and an error, if there is any.
-func (c *namespaces) Create(namespace *api.Namespace) (result *api.Namespace, err error) {
-	result = &api.Namespace{}
+func (c *namespaces) Create(namespace *core.Namespace) (result *core.Namespace, err error) {
+	result = &core.Namespace{}
 	err = c.client.Post().
 		Resource("namespaces").
 		Body(namespace).
@@ -101,8 +101,8 @@ func (c *namespaces) Create(namespace *api.Namespace) (result *api.Namespace, er
 }
 
 // Update takes the representation of a namespace and updates it. Returns the server's representation of the namespace, and an error, if there is any.
-func (c *namespaces) Update(namespace *api.Namespace) (result *api.Namespace, err error) {
-	result = &api.Namespace{}
+func (c *namespaces) Update(namespace *core.Namespace) (result *core.Namespace, err error) {
+	result = &core.Namespace{}
 	err = c.client.Put().
 		Resource("namespaces").
 		Name(namespace.Name).
@@ -115,8 +115,8 @@ func (c *namespaces) Update(namespace *api.Namespace) (result *api.Namespace, er
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
-func (c *namespaces) UpdateStatus(namespace *api.Namespace) (result *api.Namespace, err error) {
-	result = &api.Namespace{}
+func (c *namespaces) UpdateStatus(namespace *core.Namespace) (result *core.Namespace, err error) {
+	result = &core.Namespace{}
 	err = c.client.Put().
 		Resource("namespaces").
 		Name(namespace.Name).
@@ -148,8 +148,8 @@ func (c *namespaces) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 }
 
 // Patch applies the patch and returns the patched namespace.
-func (c *namespaces) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.Namespace, err error) {
-	result = &api.Namespace{}
+func (c *namespaces) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.Namespace, err error) {
+	result = &core.Namespace{}
 	err = c.client.Patch(pt).
 		Resource("namespaces").
 		SubResource(subresources...).

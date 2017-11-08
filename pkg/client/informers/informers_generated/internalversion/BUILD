@@ -13,12 +13,12 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/admissionregistration:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/batch:go_default_library",
         "//pkg/apis/certificates:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/apis/networking:go_default_library",
         "//pkg/apis/policy:go_default_library",

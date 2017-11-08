@@ -6,7 +6,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/resource",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/api:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/kubectl:go_default_library",
         "//pkg/kubectl/cmd/templates:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
@@ -38,10 +38,10 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/resource",
     library = ":go_default_library",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/testapi:go_default_library",
         "//pkg/api/testing:go_default_library",
-        "//pkg/api/v1:go_default_library",
+        "//pkg/apis/core:go_default_library",
+        "//pkg/apis/core/v1:go_default_library",
         "//pkg/kubectl/cmd/testing:go_default_library",
         "//pkg/kubectl/cmd/util:go_default_library",
         "//pkg/kubectl/cmd/util/openapi:go_default_library",
