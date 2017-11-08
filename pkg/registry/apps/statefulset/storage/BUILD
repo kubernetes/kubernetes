@@ -15,6 +15,7 @@ go_test(
         "//pkg/api:go_default_library",
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
+        "//pkg/apis/extensions:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/errors:go_default_library",

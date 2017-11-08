@@ -19,7 +19,6 @@ package apps
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -53,7 +52,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&extensions.Deployment{},
 		&extensions.DeploymentList{},
 		&extensions.DeploymentRollback{},
-		&autoscaling.Scale{},
+		&extensions.Scale{},
 		&StatefulSet{},
 		&StatefulSetList{},
 		&ControllerRevision{},
