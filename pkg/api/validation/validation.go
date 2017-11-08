@@ -4525,3 +4525,13 @@ func validateStorageNodeAffinityAnnotation(annotations map[string]string, fldPat
 	}
 	return policySpecified, allErrs
 }
+
+func IsDecremented(update, old *int32) bool {
+	if update == nil && old != nil {
+		return true
+	}
+	if update == nil || old == nil {
+		return false
+	}
+	return *update < *old
+}
