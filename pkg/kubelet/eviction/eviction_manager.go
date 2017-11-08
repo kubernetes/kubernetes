@@ -233,7 +233,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	activePods := podFunc()
 	// make observations and get a function to derive pod usage stats relative to those observations.
-	observations, statsFunc, err := makeSignalObservations(m.summaryProvider, capacityProvider, activePods, *m.dedicatedImageFs)
+	observations, statsFunc, err := makeSignalObservations(m.summaryProvider, capacityProvider, activePods)
 	if err != nil {
 		glog.Errorf("eviction manager: unexpected err: %v", err)
 		return nil
