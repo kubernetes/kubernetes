@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"fmt"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -241,6 +242,39 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 	// If the binding fails, scheduler will release resources allocated to assumed pod
 	// immediately.
 	assumed.Spec.NodeName = host
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeTopologyBinding) {
+		// AssumeVolume first
+		// If no volumes need binding, then continue with AssumePod.
+		// Otherwise, don't AssumePod, and continue to BindVolumes.
+		// After BindVolumes completes, the Pod will be sent back through the scheduler
+		// for a second pass where it can AssumePod once all the volumes are bound.
+		//
+		// TODO: can we distingush between fully bound and waiting for binding to complete?
+		// If it's waiting for binding to complete, then we can return early here instead of
+		// spawning a go routine for bindVolumes to do nothing...
+		bindingRequired, err := sched.config.VolumeBinder.AssumePodVolumes(assumed, host)
+		if err != nil {
+			sched.config.Error(assumed, err)
+			sched.config.Recorder.Eventf(assumed, v1.EventTypeWarning, "FailedScheduling", "AssumePod failed: %v", err)
+			sched.config.PodConditionUpdater.Update(assumed, &v1.PodCondition{
+				Type:    v1.PodScheduled,
+				Status:  v1.ConditionFalse,
+				Reason:  "SchedulerError",
+				Message: err.Error(),
+			})
+			return err
+		}
+		if bindingRequired {
+			if sched.config.Ecache != nil {
+				invalidPredicates := sets.NewString("NoVolumeBindConflict", "NoVolumeZoneConflict")
+				sched.config.Ecache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
+			}
+			return nil
+		}
+		// Pass through to AssumePod if binding is not required
+	}
+
 	if err := sched.config.SchedulerCache.AssumePod(assumed); err != nil {
 		glog.Errorf("scheduler cache AssumePod failed: %v", err)
 
@@ -269,9 +303,48 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 	return nil
 }
 
+func (sched *Scheduler) bindVolume(assumed *v1.Pod, b *v1.Binding) error {
+	// TODO: add metrics
+	var reason string
+
+	glog.V(5).Infof("Trying to bind volumes for pod \"%v/%v\"", assumed.Namespace, assumed.Name)
+
+	bindingRequired, err := sched.config.VolumeBinder.BindPodVolumes(assumed)
+	if err != nil {
+		glog.V(1).Infof("Failed to bind volumes for pod \"%v/%v\"", assumed.Namespace, assumed.Name, err)
+		reason = "VolumeBindingFailed"
+	} else if bindingRequired {
+		glog.V(4).Infof("Successfully bound volumes for pod \"%v/%v\"", assumed.Namespace, assumed.Name)
+		err = fmt.Errorf("Volume binding started, waiting for completion")
+		reason = "VolumeBindingWaiting"
+	} else {
+		// This pod didn't need any volume binding.  Continue to bindPod.
+		return nil
+	}
+
+	// Always fail if bindingRequired
+	// The Pod needs to be sent back through the scheduler for a second pass to
+	// run through the predicates that require volumes to be bound and also
+	// to bind the Pod to the Node
+	sched.config.Error(assumed, err)
+	sched.config.Recorder.Eventf(assumed, v1.EventTypeWarning, "FailedScheduling", "%v", err)
+	sched.config.PodConditionUpdater.Update(assumed, &v1.PodCondition{
+		Type:   v1.PodScheduled,
+		Status: v1.ConditionFalse,
+		Reason: reason,
+	})
+	return err
+}
+
 // bind binds a pod to a given node defined in a binding object.  We expect this to run asynchronously, so we
 // handle binding metrics internally.
 func (sched *Scheduler) bind(assumed *v1.Pod, b *v1.Binding) error {
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeTopologyBinding) {
+		if err := sched.bindVolume(assumed, b); err != nil {
+			return err
+		}
+	}
+
 	bindingStart := time.Now()
 	// If binding succeeded then PodScheduled condition will be updated in apiserver so that
 	// it's atomic with setting host.
@@ -309,6 +382,11 @@ func (sched *Scheduler) scheduleOne() {
 	}
 
 	glog.V(3).Infof("Attempting to schedule pod: %v/%v", pod.Namespace, pod.Name)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeTopologyBinding) {
+		// TODO: find a better way to do this
+		sched.config.VolumeBinder.InitTmpData(pod)
+	}
 
 	// Synchronously attempt to find a fit for the pod.
 	start := time.Now()

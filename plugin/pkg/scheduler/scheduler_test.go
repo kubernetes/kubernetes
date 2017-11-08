@@ -29,9 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientcache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/core"
@@ -402,7 +404,7 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 func setupTestSchedulerWithOnePodOnNode(t *testing.T, queuedPodStore *clientcache.FIFO, scache schedulercache.Cache,
 	nodeLister schedulertesting.FakeNodeLister, predicateMap map[string]algorithm.FitPredicate, pod *v1.Pod, node *v1.Node) (*Scheduler, chan *v1.Binding, chan error) {
 
-	scheduler, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, nodeLister, predicateMap)
+	scheduler, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, nodeLister, predicateMap, nil)
 
 	queuedPodStore.Add(pod)
 	// queuedPodStore: [foo:8080]
@@ -477,7 +479,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 			predicates.NewInsufficientResourceError(v1.ResourceMemory, 500, 0, 100),
 		}
 	}
-	scheduler, _, errChan := setupTestScheduler(queuedPodStore, scache, nodeLister, predicateMap)
+	scheduler, _, errChan := setupTestScheduler(queuedPodStore, scache, nodeLister, predicateMap, nil)
 
 	queuedPodStore.Add(podWithTooBigResourceRequests)
 	scheduler.scheduleOne()
@@ -501,7 +503,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 
 // queuedPodStore: pods queued before processing.
 // scache: scheduler cache that might contain assumed pods.
-func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.Cache, nodeLister schedulertesting.FakeNodeLister, predicateMap map[string]algorithm.FitPredicate) (*Scheduler, chan *v1.Binding, chan error) {
+func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.Cache, nodeLister schedulertesting.FakeNodeLister, predicateMap map[string]algorithm.FitPredicate, recorder record.EventRecorder) (*Scheduler, chan *v1.Binding, chan error) {
 	algo := core.NewGenericScheduler(
 		scache,
 		nil,
@@ -531,6 +533,10 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 			Recorder:            &record.FakeRecorder{},
 			PodConditionUpdater: fakePodConditionUpdater{},
 		},
+	}
+
+	if recorder != nil {
+		configurator.Config.Recorder = recorder
 	}
 
 	sched, _ := NewFromConfigurator(configurator, nil...)
@@ -577,4 +583,181 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 	sched, _ := NewFromConfigurator(configurator, nil...)
 
 	return sched, bindingChan
+}
+
+func setupTestSchedulerWithVolumeBinding(fakeVolumeBinder *persistentvolume.FakeVolumeBinder, stop <-chan struct{}, broadcaster record.EventBroadcaster) (*Scheduler, chan *v1.Binding, chan error) {
+	testNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1"}}
+	nodeLister := schedulertesting.FakeNodeLister([]*v1.Node{&testNode})
+	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
+	queuedPodStore.Add(podWithID("foo", ""))
+	scache := schedulercache.New(10*time.Minute, stop)
+	scache.AddNode(&testNode)
+
+	predicateMap := map[string]algorithm.FitPredicate{
+		"VolumeBindingChecker": predicates.NewVolumeBindingPredicate(fakeVolumeBinder),
+	}
+
+	recorder := broadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "scheduler"})
+	s, bindingChan, errChan := setupTestScheduler(queuedPodStore, scache, nodeLister, predicateMap, recorder)
+	s.config.VolumeBinder = fakeVolumeBinder
+	return s, bindingChan, errChan
+}
+
+// This is a workaround because golint complains that errors cannot
+// end with punctuation.  However, the real predicate error message does
+// end with a period.
+func makePredicateError(failReason string) error {
+	s := fmt.Sprintf("0/1 nodes are available: 1 %v.", failReason)
+	return fmt.Errorf(s)
+}
+
+func TestSchedulerWithVolumeBinding(t *testing.T) {
+	findErr := fmt.Errorf("find err")
+	assumeErr := fmt.Errorf("assume err")
+	bindErr := fmt.Errorf("bind err")
+
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(t.Logf).Stop()
+
+	// This can be small because we wait for pod to finish scheduling first
+	chanTimeout := 2 * time.Second
+
+	err := utilfeature.DefaultFeatureGate.Set("VolumeTopologyBinding=true")
+	if err != nil {
+		t.Fatalf("Failed to enable feature gate for VolumeTopologyBinding: %v", err)
+	}
+
+	table := map[string]struct {
+		expectError        error
+		expectPodBind      *v1.Binding
+		expectAssumeCalled bool
+		expectBindCalled   bool
+		eventReason        string
+		volumeBinderConfig *persistentvolume.FakeVolumeBinderConfig
+	}{
+		"all-bound": {
+			volumeBinderConfig: &persistentvolume.FakeVolumeBinderConfig{
+				AllBound:     true,
+				FindFoundPVs: true,
+			},
+			expectAssumeCalled: true,
+			expectBindCalled:   true,
+			expectPodBind:      &v1.Binding{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Target: v1.ObjectReference{Kind: "Node", Name: "machine1"}},
+			eventReason:        "Scheduled",
+		},
+		"bound,invalid-pv-affinity": {
+			volumeBinderConfig: &persistentvolume.FakeVolumeBinderConfig{
+				AllBound:     true,
+				FindFoundPVs: false,
+			},
+			eventReason: "FailedScheduling",
+			expectError: makePredicateError("NoVolumeNodeConflict"),
+		},
+		"unbound,no-matches": {
+			volumeBinderConfig: &persistentvolume.FakeVolumeBinderConfig{
+				FindFoundPVs: false,
+			},
+			eventReason: "FailedScheduling",
+			expectError: makePredicateError("NoVolumeBindConflict"),
+		},
+		"unbound,found-matches": {
+			volumeBinderConfig: &persistentvolume.FakeVolumeBinderConfig{
+				FindFoundPVs: true,
+			},
+			expectAssumeCalled: true,
+			expectBindCalled:   true,
+			eventReason:        "FailedScheduling",
+			expectError:        fmt.Errorf("Volume binding started, waiting for completion"),
+		},
+		"predicate-error": {
+			volumeBinderConfig: &persistentvolume.FakeVolumeBinderConfig{
+				FindErr: findErr,
+			},
+			eventReason: "FailedScheduling",
+			expectError: findErr,
+		},
+		"assume-error": {
+			volumeBinderConfig: &persistentvolume.FakeVolumeBinderConfig{
+				FindFoundPVs: true,
+				AssumeErr:    assumeErr,
+			},
+			expectAssumeCalled: true,
+			eventReason:        "FailedScheduling",
+			expectError:        assumeErr,
+		},
+		"bind-error": {
+			volumeBinderConfig: &persistentvolume.FakeVolumeBinderConfig{
+				FindFoundPVs: true,
+				BindErr:      bindErr,
+			},
+			expectAssumeCalled: true,
+			expectBindCalled:   true,
+			eventReason:        "FailedScheduling",
+			expectError:        bindErr,
+		},
+	}
+
+	for name, item := range table {
+		stop := make(chan struct{})
+		fakeVolumeBinder := persistentvolume.NewFakeVolumeBinder(item.volumeBinderConfig)
+		s, bindingChan, errChan := setupTestSchedulerWithVolumeBinding(fakeVolumeBinder, stop, eventBroadcaster)
+
+		eventChan := make(chan struct{})
+		events := eventBroadcaster.StartEventWatcher(func(e *v1.Event) {
+			if e, a := item.eventReason, e.Reason; e != a {
+				t.Errorf("%v: expected %v, got %v", name, e, a)
+			}
+			close(eventChan)
+		})
+
+		s.scheduleOne()
+
+		// Wait for pod to succeed or fail scheduling
+		select {
+		case <-eventChan:
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Fatalf("%v: scheduling timeout after %v", name, wait.ForeverTestTimeout)
+		}
+
+		events.Stop()
+
+		// Wait for scheduling to return an error
+		select {
+		case err := <-errChan:
+			if item.expectError == nil || !reflect.DeepEqual(item.expectError.Error(), err.Error()) {
+				t.Errorf("%v: \n err \nWANT=%+v,\nGOT=%+v", name, item.expectError, err)
+			}
+		case <-time.After(chanTimeout):
+			if item.expectError != nil {
+				t.Errorf("%v: did not receive error after %v", name, chanTimeout)
+			}
+		}
+
+		// Wait for pod to succeed binding
+		select {
+		case b := <-bindingChan:
+			if !reflect.DeepEqual(item.expectPodBind, b) {
+				t.Errorf("%v: \n err \nWANT=%+v,\nGOT=%+v", name, item.expectPodBind, b)
+			}
+		case <-time.After(chanTimeout):
+			if item.expectPodBind != nil {
+				t.Errorf("%v: did not receive pod binding after %v", name, chanTimeout)
+			}
+		}
+
+		if item.expectAssumeCalled != fakeVolumeBinder.AssumeCalled {
+			t.Errorf("%v: expectedAssumeCall %v", name, item.expectAssumeCalled)
+		}
+
+		if item.expectBindCalled != fakeVolumeBinder.BindCalled {
+			t.Errorf("%v: expectedBindCall %v", name, item.expectBindCalled)
+		}
+
+		close(stop)
+	}
+
+	err = utilfeature.DefaultFeatureGate.Set("VolumeTopologyBinding=false")
+	if err != nil {
+		t.Fatalf("Failed to disable feature gate for VolumeTopologyBinding: %v", err)
+	}
 }
