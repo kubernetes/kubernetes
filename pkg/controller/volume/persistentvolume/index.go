@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	"k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // persistentVolumeOrderedIndex is a cache.Store that keeps persistent volumes
@@ -72,7 +73,7 @@ func (pvIndex *persistentVolumeOrderedIndex) listByAccessModes(modes []v1.Persis
 }
 
 // find returns the nearest PV from the ordered list or nil if a match is not found
-func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
+func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVolumeClaim, delayBinding bool) (*v1.PersistentVolume, error) {
 	// PVs are indexed by their access modes to allow easier searching.  Each
 	// index is the string representation of a set of access modes. There is a
 	// finite number of possible sets and PVs will only be indexed in one of
@@ -94,7 +95,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 			return nil, err
 		}
 
-		bestVol, err := findMatchingVolume(claim, volumes)
+		bestVol, err := findMatchingVolume(claim, volumes, nil /* node for topology binding*/, nil /* exclusion map */, delayBinding)
 		if err != nil {
 			return nil, err
 		}
@@ -106,7 +107,13 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 	return nil, nil
 }
 
-func findMatchingVolume(claim *v1.PersistentVolumeClaim, volumes []*v1.PersistentVolume) (*v1.PersistentVolume, error) {
+func findMatchingVolume(
+	claim *v1.PersistentVolumeClaim,
+	volumes []*v1.PersistentVolume,
+	node *v1.Node,
+	excludedVolumes map[string]*v1.PersistentVolume,
+	delayBinding bool) (*v1.PersistentVolume, error) {
+
 	var smallestVolume *v1.PersistentVolume
 	var smallestVolumeQty resource.Quantity
 	requestedQty := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
@@ -129,6 +136,11 @@ func findMatchingVolume(claim *v1.PersistentVolumeClaim, volumes []*v1.Persisten
 	// - find the smallest matching one if there is no volume pre-bound to
 	//   the claim.
 	for _, volume := range volumes {
+		if _, ok := excludedVolumes[volume.Name]; ok {
+			// Skip volumes in the excluded list
+			continue
+		}
+
 		volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
 
 		if isVolumeBoundToClaim(volume, claim) {
@@ -138,7 +150,20 @@ func findMatchingVolume(claim *v1.PersistentVolumeClaim, volumes []*v1.Persisten
 			if volumeQty.Cmp(requestedQty) < 0 {
 				continue
 			}
+			if node != nil {
+				// Scheduler path
+				err := volumeutil.CheckNodeAffinity(volume, node.Labels)
+				if err != nil {
+					return nil, nil
+				}
+			}
 			return volume, nil
+		}
+
+		if node == nil && delayBinding {
+			// Scheduler will handle binding unbound volumes
+			// Scheduler path will have node != nil
+			continue
 		}
 
 		// filter out:
@@ -152,6 +177,17 @@ func findMatchingVolume(claim *v1.PersistentVolumeClaim, volumes []*v1.Persisten
 		}
 		if v1helper.GetPersistentVolumeClass(volume) != requestedClass {
 			continue
+		}
+
+		if node != nil {
+			// Scheduler path
+			if !checkAccessModes(claim, volume) {
+				continue
+			}
+			err := volumeutil.CheckNodeAffinity(volume, node.Labels)
+			if err != nil {
+				continue
+			}
 		}
 
 		if volumeQty.Cmp(requestedQty) >= 0 {
@@ -171,8 +207,8 @@ func findMatchingVolume(claim *v1.PersistentVolumeClaim, volumes []*v1.Persisten
 }
 
 // findBestMatchForClaim is a convenience method that finds a volume by the claim's AccessModes and requests for Storage
-func (pvIndex *persistentVolumeOrderedIndex) findBestMatchForClaim(claim *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
-	return pvIndex.findByClaim(claim)
+func (pvIndex *persistentVolumeOrderedIndex) findBestMatchForClaim(claim *v1.PersistentVolumeClaim, delayBinding bool) (*v1.PersistentVolume, error) {
+	return pvIndex.findByClaim(claim, delayBinding)
 }
 
 // allPossibleMatchingAccessModes returns an array of AccessMode arrays that
@@ -253,4 +289,20 @@ func claimToClaimKey(claim *v1.PersistentVolumeClaim) string {
 
 func claimrefToClaimKey(claimref *v1.ObjectReference) string {
 	return fmt.Sprintf("%s/%s", claimref.Namespace, claimref.Name)
+}
+
+// Returns true if PV satisfies all the PVC's requested AccessModes
+func checkAccessModes(claim *v1.PersistentVolumeClaim, volume *v1.PersistentVolume) bool {
+	pvModesMap := map[v1.PersistentVolumeAccessMode]bool{}
+	for _, mode := range volume.Spec.AccessModes {
+		pvModesMap[mode] = true
+	}
+
+	for _, mode := range claim.Spec.AccessModes {
+		_, ok := pvModesMap[mode]
+		if !ok {
+			return false
+		}
+	}
+	return true
 }

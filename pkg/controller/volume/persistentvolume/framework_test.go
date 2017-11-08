@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -806,6 +807,9 @@ var (
 	classUnknownInternal         string = "unknown-internal"
 	classUnsupportedMountOptions string = "unsupported-mountoptions"
 	classLarge                   string = "large"
+	classWait                    string = "wait"
+
+	modeWait = storage.VolumeBindingWaitForFirstConsumer
 )
 
 // wrapTestWithPluginCalls returns a testCall that:
@@ -903,6 +907,11 @@ func evaluateTestResults(ctrl *PersistentVolumeController, reactor *volumeReacto
 //    controllerTest.testCall *once*.
 // 3. Compare resulting volumes and claims with expected volumes and claims.
 func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storage.StorageClass) {
+	err := utilfeature.DefaultFeatureGate.Set("VolumeTopologyBinding=true")
+	if err != nil {
+		t.Fatalf("Failed to enable feature gate for VolumeTopologyBinding: %v", err)
+	}
+
 	for _, test := range tests {
 		glog.V(4).Infof("starting test %q", test.name)
 
@@ -942,6 +951,11 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 		}
 
 		evaluateTestResults(ctrl, reactor, test, t)
+	}
+
+	err = utilfeature.DefaultFeatureGate.Set("VolumeTopologyBinding=false")
+	if err != nil {
+		t.Fatalf("Failed to disable feature gate for VolumeTopologyBinding: %v", err)
 	}
 }
 
