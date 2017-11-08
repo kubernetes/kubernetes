@@ -519,7 +519,7 @@ func resourcePodSpec(nodeName, memory, cpu string) v1.PodSpec {
 }
 
 func resourceContainerSpec(memory, cpu string) v1.ResourceRequirements {
-	return v1.ResourceRequirements {
+	return v1.ResourceRequirements{
 		Requests: allocatableResources(memory, cpu),
 	}
 }
@@ -1406,7 +1406,7 @@ func setDaemonSetCritical(ds *extensions.DaemonSet) {
 
 func TestNodeShouldRunDaemonPod(t *testing.T) {
 	cases := []struct {
-		predicateName					 string
+		predicateName                                    string
 		podsOnNode                                       []*v1.Pod
 		nodeCondition                                    []v1.NodeCondition
 		ds                                               *extensions.DaemonSet
