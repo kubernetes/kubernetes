@@ -2173,7 +2173,7 @@ When an object is created, the system will populate this list with the current s
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">concurrencyPolicy</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies how to treat concurrent executions of a Job. Defaults to Allow.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies how to treat concurrent executions of a Job. Valid values are: - "Allow" (default): allows CronJobs to run concurrently; - "Forbid": forbids concurrent runs, skipping next run if previous run hasn&#8217;t finished yet; - "Replace": cancels currently running job and replaces it with a new one</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
