@@ -126,7 +126,7 @@ func (m *ListAndWatchResponse) GetDevices() []*Device {
 // E.g:
 // struct Device {
 //    ID: "GPU-fef8089b-4820-abfc-e83e-94318197576e",
-//    State: "Healthy",
+//    health: "Healthy",
 // }
 type Device struct {
 	// A unique ID assigned by the device plugin used
