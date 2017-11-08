@@ -1594,6 +1594,76 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 			shouldSchedule:        true,
 			shouldContinueRunning: true,
 		},
+		{
+			predicateName: "ErrPodAffinityNotMatch",
+			ds: &extensions.DaemonSet{
+				Spec: extensions.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: simpleDaemonSetLabel,
+						},
+						Spec: v1.PodSpec{
+							Affinity: &v1.Affinity{
+								NodeAffinity: &v1.NodeAffinity{
+									RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+										NodeSelectorTerms: []v1.NodeSelectorTerm{
+											{
+												MatchExpressions: []v1.NodeSelectorRequirement{
+													{
+														Key:      "type",
+														Operator: v1.NodeSelectorOpIn,
+														Values:   []string{"test"},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantToRun:             false,
+			shouldSchedule:        false,
+			shouldContinueRunning: false,
+		},
+		{
+			predicateName: "ShouldRunDaemonPod",
+			ds: &extensions.DaemonSet{
+				Spec: extensions.DaemonSetSpec{
+					Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: simpleDaemonSetLabel,
+						},
+						Spec: v1.PodSpec{
+							Affinity: &v1.Affinity{
+								NodeAffinity: &v1.NodeAffinity{
+									RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+										NodeSelectorTerms: []v1.NodeSelectorTerm{
+											{
+												MatchExpressions: []v1.NodeSelectorRequirement{
+													{
+														Key:      "type",
+														Operator: v1.NodeSelectorOpIn,
+														Values:   []string{"production"},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantToRun:             true,
+			shouldSchedule:        true,
+			shouldContinueRunning: true,
+		},
 	}
 
 	for i, c := range cases {
