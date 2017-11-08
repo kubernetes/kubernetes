@@ -1335,15 +1335,6 @@ func TestValidateDeploymentStatus(t *testing.T) {
 			observedGeneration: 1,
 			expectedErr:        true,
 		},
-		// TODO: Remove the following test case once we stop supporting upgrades from 1.5.
-		{
-			name:               "don't validate readyReplicas when it's zero",
-			replicas:           3,
-			readyReplicas:      0,
-			availableReplicas:  3,
-			observedGeneration: 1,
-			expectedErr:        false,
-		},
 		{
 			name:               "invalid collisionCount",
 			replicas:           3,
