@@ -213,4 +213,133 @@ spec:
   selector:
     k8s-app: kube-dns
 `
+
+	// CoreDNSDeployment is the CoreDNS Deployment manifest
+	CoreDNSDeployment = `
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: coredns
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: kube-dns
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-dns
+    spec:
+      serviceAccountName: coredns
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - key: {{ .MasterTaintKey }}
+        effect: NoSchedule
+      containers:
+      - name: coredns
+        image: coredns/coredns:{{ .Version }}
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            memory: 170Mi
+          requests:
+            cpu: 100m
+            memory: 70Mi
+        args: [ "-conf", "/etc/coredns/Corefile" ]
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/coredns
+        ports:
+        - containerPort: 53
+          name: dns
+          protocol: UDP
+        - containerPort: 53
+          name: dns-tcp
+          protocol: TCP
+        - containerPort: 9153
+          name: metrics
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+      dnsPolicy: Default
+      volumes:
+        - name: config-volume
+          configMap:
+            name: coredns
+            items:
+            - key: Corefile
+              path: Corefile
+`
+
+	// CoreDNSConfigMap is the CoreDNS ConfigMap manifest
+	CoreDNSConfigMap = `
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
+data:
+  Corefile: |
+    .:53 {
+        errors
+        log stdout
+        health
+        kubernetes {{ .DNSDomain }} {{ .ServiceCIDR }}
+        prometheus
+        proxy . /etc/resolv.conf
+        cache 30
+    }
+`
+	// CoreDNSClusterRole is the CoreDNS ClusterRole manifest
+	CoreDNSClusterRole = `
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:coredns
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  - services
+  - pods
+  - namespaces
+  verbs:
+  - list
+  - watch
+`
+	// CoreDNSClusterRoleBinding is the CoreDNS Clusterrolebinding manifest
+	CoreDNSClusterRoleBinding = `
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:coredns
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:coredns
+subjects:
+- kind: ServiceAccount
+  name: coredns
+  namespace: kube-system
+`
+	// CoreDNSServiceAccount is the CoreDNS ServiceAccount manifest
+	CoreDNSServiceAccount = `
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: coredns
+  namespace: kube-system
+`
 )

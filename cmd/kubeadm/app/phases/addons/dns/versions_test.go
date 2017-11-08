@@ -19,6 +19,7 @@ package dns
 import (
 	"testing"
 
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/pkg/util/version"
 )
 
@@ -62,10 +63,10 @@ func TestGetKubeDNSVersion(t *testing.T) {
 			t.Fatalf("couldn't parse kubernetes version %q: %v", rt.k8sVersion, err)
 		}
 
-		actualDNSVersion := GetKubeDNSVersion(k8sVersion)
+		actualDNSVersion := GetDNSVersion(k8sVersion, kubeadmconstants.KubeDNS)
 		if actualDNSVersion != rt.expected {
 			t.Errorf(
-				"failed GetKubeDNSVersion:\n\texpected: %s\n\t  actual: %s",
+				"failed GetDNSVersion:\n\texpected: %s\n\t  actual: %s",
 				rt.expected,
 				actualDNSVersion,
 			)
