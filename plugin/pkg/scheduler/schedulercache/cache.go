@@ -238,6 +238,7 @@ func (cache *schedulerCache) AddPod(pod *v1.Pod) error {
 		}
 		delete(cache.assumedPods, key)
 		cache.podStates[key].deadline = nil
+		cache.podStates[key].pod = pod
 	case !ok:
 		// Pod was expired. We should add it back.
 		cache.addPod(pod)
