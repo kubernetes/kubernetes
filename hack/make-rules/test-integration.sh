@@ -39,6 +39,9 @@ LOG_LEVEL=${LOG_LEVEL:-2}
 KUBE_TEST_ARGS=${KUBE_TEST_ARGS:-}
 # Default glog module settings.
 KUBE_TEST_VMODULE=${KUBE_TEST_VMODULE:-"garbagecollector*=6,graph_builder*=6"}
+# Allows the passthrough of flags to the test binary itself (e.g. '-v=2' to
+# enable apiserver logging).
+KUBE_TEST_BINARY_ARGS=${KUBE_TEST_BINARY_ARGS:-}
 
 kube::test::find_integration_test_dirs() {
   (
@@ -73,7 +76,7 @@ runTests() {
   make -C "${KUBE_ROOT}" test \
       WHAT="${WHAT:-$(kube::test::find_integration_test_dirs | paste -sd' ' -)}" \
       GOFLAGS="${GOFLAGS:-}" \
-      KUBE_TEST_ARGS="${KUBE_TEST_ARGS:-} ${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} --alsologtostderr=true" \
+      KUBE_TEST_ARGS="${KUBE_TEST_ARGS:-} ${SHORT:--short=true} --vmodule=${KUBE_TEST_VMODULE} --alsologtostderr=true -args ${KUBE_TEST_BINARY_ARGS:-}" \
       KUBE_RACE="" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
       KUBE_TEST_API_VERSIONS="$1"
