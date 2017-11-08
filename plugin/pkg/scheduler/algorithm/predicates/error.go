@@ -50,7 +50,8 @@ var (
 	ErrNodeNetworkUnavailable                = newPredicateFailureError("NodeNetworkUnavailable")
 	ErrNodeUnschedulable                     = newPredicateFailureError("NodeUnschedulable")
 	ErrNodeUnknownCondition                  = newPredicateFailureError("NodeUnknownCondition")
-	ErrVolumeNodeConflict                    = newPredicateFailureError("NoVolumeNodeConflict")
+	ErrVolumeNodeConflict                    = newPredicateFailureError("VolumeNodeAffinityConflict")
+	ErrVolumeBindConflict                    = newPredicateFailureError("VolumeBindingNoMatch")
 	// ErrFakePredicate is used for test only. The fake predicates returning false also returns error
 	// as ErrFakePredicate.
 	ErrFakePredicate = newPredicateFailureError("FakePredicateError")
