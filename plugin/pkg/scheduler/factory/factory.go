@@ -37,18 +37,23 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsinformers "k8s.io/client-go/informers/apps/v1beta1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	extensionsinformers "k8s.io/client-go/informers/extensions/v1beta1"
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
+	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	appslisters "k8s.io/client-go/listers/apps/v1beta1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	extensionslisters "k8s.io/client-go/listers/extensions/v1beta1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
+	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/helper"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -98,6 +103,8 @@ type configFactory struct {
 	statefulSetLister appslisters.StatefulSetLister
 	// a means to list all PodDisruptionBudgets
 	pdbLister policylisters.PodDisruptionBudgetLister
+	// a means to list all StorageClasses
+	storageClassLister storagelisters.StorageClassLister
 
 	// Close this to stop all reflectors
 	StopEverything chan struct{}
@@ -120,6 +127,9 @@ type configFactory struct {
 
 	// Enable equivalence class cache
 	enableEquivalenceClassCache bool
+
+	// Handles volume binding decisions
+	volumeBinder persistentvolume.TopologyAwareVolumeBinder
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator To encourage eventual privatization of the struct type, we only
@@ -136,6 +146,7 @@ func NewConfigFactory(
 	statefulSetInformer appsinformers.StatefulSetInformer,
 	serviceInformer coreinformers.ServiceInformer,
 	pdbInformer policyinformers.PodDisruptionBudgetInformer,
+	storageClassInformer storageinformers.StorageClassInformer,
 	hardPodAffinitySymmetricWeight int,
 	enableEquivalenceClassCache bool,
 ) scheduler.Configurator {
@@ -154,6 +165,7 @@ func NewConfigFactory(
 		replicaSetLister:               replicaSetInformer.Lister(),
 		statefulSetLister:              statefulSetInformer.Lister(),
 		pdbLister:                      pdbInformer.Lister(),
+		storageClassLister:             storageClassInformer.Lister(),
 		schedulerCache:                 schedulerCache,
 		StopEverything:                 stopEverything,
 		schedulerName:                  schedulerName,
@@ -272,6 +284,9 @@ func NewConfigFactory(
 	// Existing equivalence cache should not be affected by add/delete RC/Deployment etc,
 	// it only make sense when pod is scheduled or deleted
 
+	// Setup volume binder
+	c.volumeBinder = persistentvolume.NewTopologyAwareVolumeBinder(client, pvcInformer, pvInformer, nodeInformer, storageClassInformer)
+
 	return c
 }
 
@@ -365,6 +380,12 @@ func (c *configFactory) invalidatePredicatesForPv(pv *v1.PersistentVolume) {
 	if pv.Spec.AzureDisk != nil {
 		invalidPredicates.Insert("MaxAzureDiskVolumeCount")
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeTopologyBinding) {
+		// Add/delete impacts the available PVs to choose from
+		invalidPredicates.Insert("NoVolumeBindConflict")
+	}
+
 	c.equivalencePodCache.InvalidateCachedPredicateItemOfAllNodes(invalidPredicates)
 }
 
@@ -820,7 +841,7 @@ func (f *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		f.equivalencePodCache = core.NewEquivalenceCache(getEquivalencePodFunc)
 		glog.Info("Created equivalence class cache")
 	}
-	algo := core.NewGenericScheduler(f.schedulerCache, f.equivalencePodCache, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders)
+	algo := core.NewGenericScheduler(f.schedulerCache, f.equivalencePodCache, predicateFuncs, predicateMetaProducer, priorityConfigs, priorityMetaProducer, extenders, f.volumeBinder)
 
 	podBackoff := util.CreateDefaultPodBackoff()
 	return &scheduler.Config{
@@ -840,6 +861,7 @@ func (f *configFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		},
 		Error:          f.MakeDefaultErrorFunc(podBackoff, f.podQueue),
 		StopEverything: f.StopEverything,
+		VolumeBinder:   f.volumeBinder,
 	}, nil
 }
 
@@ -888,15 +910,17 @@ func (f *configFactory) GetPredicates(predicateKeys sets.String) (map[string]alg
 
 func (f *configFactory) getPluginArgs() (*PluginFactoryArgs, error) {
 	return &PluginFactoryArgs{
-		PodLister:         f.podLister,
-		ServiceLister:     f.serviceLister,
-		ControllerLister:  f.controllerLister,
-		ReplicaSetLister:  f.replicaSetLister,
-		StatefulSetLister: f.statefulSetLister,
-		NodeLister:        &nodeLister{f.nodeLister},
-		NodeInfo:          &predicates.CachedNodeInfo{NodeLister: f.nodeLister},
-		PVInfo:            &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: f.pVLister},
-		PVCInfo:           &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: f.pVCLister},
+		PodLister:                      f.podLister,
+		ServiceLister:                  f.serviceLister,
+		ControllerLister:               f.controllerLister,
+		ReplicaSetLister:               f.replicaSetLister,
+		StatefulSetLister:              f.statefulSetLister,
+		NodeLister:                     &nodeLister{f.nodeLister},
+		NodeInfo:                       &predicates.CachedNodeInfo{NodeLister: f.nodeLister},
+		PVInfo:                         &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: f.pVLister},
+		PVCInfo:                        &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: f.pVCLister},
+		StorageClassInfo:               &predicates.CachedStorageClassInfo{StorageClassLister: f.storageClassLister},
+		VolumeBinder:                   f.volumeBinder,
 		HardPodAffinitySymmetricWeight: f.hardPodAffinitySymmetricWeight,
 	}, nil
 }

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	utiltrace "k8s.io/apiserver/pkg/util/trace"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
@@ -90,6 +91,7 @@ type genericScheduler struct {
 	lastNodeIndex         uint64
 
 	cachedNodeInfoMap map[string]*schedulercache.NodeInfo
+	volumeBinder      persistentvolume.TopologyAwareVolumeBinder
 }
 
 // Schedule tries to schedule the given pod to one of node in the node list.
@@ -781,7 +783,8 @@ func NewGenericScheduler(
 	predicateMetaProducer algorithm.PredicateMetadataProducer,
 	prioritizers []algorithm.PriorityConfig,
 	priorityMetaProducer algorithm.MetadataProducer,
-	extenders []algorithm.SchedulerExtender) algorithm.ScheduleAlgorithm {
+	extenders []algorithm.SchedulerExtender,
+	volumeBinder persistentvolume.TopologyAwareVolumeBinder) algorithm.ScheduleAlgorithm {
 	return &genericScheduler{
 		cache:                 cache,
 		equivalenceCache:      eCache,
@@ -791,5 +794,6 @@ func NewGenericScheduler(
 		priorityMetaProducer:  priorityMetaProducer,
 		extenders:             extenders,
 		cachedNodeInfoMap:     make(map[string]*schedulercache.NodeInfo),
+		volumeBinder:          volumeBinder,
 	}
 }

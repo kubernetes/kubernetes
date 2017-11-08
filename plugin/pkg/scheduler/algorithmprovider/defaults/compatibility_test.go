@@ -506,6 +506,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			informerFactory.Apps().V1beta1().StatefulSets(),
 			informerFactory.Core().V1().Services(),
 			informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+			informerFactory.Storage().V1().StorageClasses(),
 			v1.DefaultHardPodAffinitySymmetricWeight,
 			enableEquivalenceCache,
 		).CreateFromConfig(policy); err != nil {
