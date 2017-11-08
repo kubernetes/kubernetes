@@ -93,6 +93,27 @@ message DaemonSet {
   optional DaemonSetStatus status = 3;
 }
 
+// DaemonSetCondition describes the state of a DaemonSet at a certain point.
+message DaemonSetCondition {
+  // Type of DaemonSet condition.
+  optional string type = 1;
+
+  // Status of the condition, one of True, False, Unknown.
+  optional string status = 2;
+
+  // Last time the condition transitioned from one status to another.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 3;
+
+  // The reason for the condition's last transition.
+  // +optional
+  optional string reason = 4;
+
+  // A human readable message indicating details about the transition.
+  // +optional
+  optional string message = 5;
+}
+
 // DaemonSetList is a collection of daemon sets.
 message DaemonSetList {
   // Standard list metadata.
@@ -190,6 +211,12 @@ message DaemonSetStatus {
   // create the name for the newest ControllerRevision.
   // +optional
   optional int32 collisionCount = 9;
+
+  // Represents the latest available observations of a DaemonSet's current state.
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  repeated DaemonSetCondition conditions = 10;
 }
 
 message DaemonSetUpdateStrategy {
