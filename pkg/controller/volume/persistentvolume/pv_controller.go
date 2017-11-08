@@ -26,6 +26,7 @@ import (
 	storage "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -37,6 +38,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	vol "k8s.io/kubernetes/pkg/volume"
@@ -254,6 +256,30 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 	return nil
 }
 
+func (ctrl *PersistentVolumeController) shouldDelayBinding(claim *v1.PersistentVolumeClaim) (bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeScheduling) {
+		return false, nil
+	}
+
+	className := v1helper.GetPersistentVolumeClaimClass(claim)
+	if className == "" {
+		return false, nil
+	}
+
+	class, err := ctrl.classLister.Get(className)
+	if err != nil {
+		return false, nil
+	}
+
+	if class.VolumeBindingMode == nil {
+		return false, fmt.Errorf("VolumeBindingMode not set for StorageClass %q", className)
+	}
+
+	// TODO: add check to handle dynamic provisioning later
+
+	return *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer, nil
+}
+
 // syncUnboundClaim is the main controller method to decide what to do with an
 // unbound claim.
 func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVolumeClaim) error {
@@ -261,9 +287,13 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 	// OBSERVATION: pvc is "Pending"
 	if claim.Spec.VolumeName == "" {
 		// User did not care which PV they get.
+		delayBinding, err := ctrl.shouldDelayBinding(claim)
+		if err != nil {
+			return err
+		}
 
 		// [Unit test set 1]
-		volume, err := ctrl.volumes.findBestMatchForClaim(claim)
+		volume, err := ctrl.volumes.findBestMatchForClaim(claim, delayBinding)
 		if err != nil {
 			glog.V(2).Infof("synchronizing unbound PersistentVolumeClaim[%s]: Error finding PV for claim: %v", claimToClaimKey(claim), err)
 			return fmt.Errorf("Error finding PV for claim %q: %v", claimToClaimKey(claim), err)
@@ -272,15 +302,21 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 			glog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: no volume found", claimToClaimKey(claim))
 			// No PV could be found
 			// OBSERVATION: pvc is "Pending", will retry
-			if v1helper.GetPersistentVolumeClaimClass(claim) != "" {
+			switch {
+			case delayBinding:
+				// TODO: Skip dynamic provisioning for now
+				ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.WaitForFirstConsumer, "waiting for first consumer to be created before binding")
+			case v1helper.GetPersistentVolumeClaimClass(claim) != "":
 				if err = ctrl.provisionClaim(claim); err != nil {
 					return err
 				}
 				return nil
+			default:
+				ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.FailedBinding, "no persistent volumes available for this claim and no storage class is set")
 			}
+
 			// Mark the claim as Pending and try to find a match in the next
 			// periodic syncClaim
-			ctrl.eventRecorder.Event(claim, v1.EventTypeNormal, events.FailedBinding, "no persistent volumes available for this claim and no storage class is set")
 			if _, err = ctrl.updateClaimStatus(claim, v1.ClaimPending, nil); err != nil {
 				return err
 			}

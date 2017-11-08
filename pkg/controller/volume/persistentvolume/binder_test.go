@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
@@ -177,6 +178,25 @@ func TestSync(t *testing.T) {
 			withLabelSelector(labels, newClaimArray("claim1-1", "uid1-1", "1Gi", "", v1.ClaimPending, nil)),
 			[]string{"Normal FailedBinding"},
 			noerrors, testSyncClaim,
+		},
+		{
+			// syncClaim does not do anything when binding is delayed
+			"1-13 - delayed binding",
+			newVolumeArray("volume1-1", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, classWait),
+			newVolumeArray("volume1-1", "1Gi", "", "", v1.VolumePending, v1.PersistentVolumeReclaimRetain, classWait),
+			newClaimArray("claim1-1", "uid1-1", "1Gi", "", v1.ClaimPending, &classWait),
+			newClaimArray("claim1-1", "uid1-1", "1Gi", "", v1.ClaimPending, &classWait),
+			[]string{"Normal WaitForFirstConsumer"},
+			noerrors, testSyncClaim,
+		},
+		{
+			// syncClaim binds when binding is delayed but PV is prebound to PVC
+			"1-14 - successful prebound PV",
+			newVolumeArray("volume1-1", "1Gi", "", "claim1-1", v1.VolumePending, v1.PersistentVolumeReclaimRetain, classWait),
+			newVolumeArray("volume1-1", "1Gi", "uid1-1", "claim1-1", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classWait),
+			newClaimArray("claim1-1", "uid1-1", "1Gi", "", v1.ClaimPending, &classWait),
+			newClaimArray("claim1-1", "uid1-1", "1Gi", "volume1-1", v1.ClaimBound, &classWait, annBoundByController, annBindCompleted),
+			noevents, noerrors, testSyncClaim,
 		},
 
 		// [Unit test set 2] User asked for a specific PV.
@@ -570,7 +590,15 @@ func TestSync(t *testing.T) {
 		},
 	}
 
-	runSyncTests(t, tests, []*storage.StorageClass{})
+	utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
+	defer utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
+
+	runSyncTests(t, tests, []*storage.StorageClass{
+		{
+			ObjectMeta:        metav1.ObjectMeta{Name: classWait},
+			VolumeBindingMode: &modeWait,
+		},
+	})
 }
 
 func TestSyncAlphaBlockVolume(t *testing.T) {
