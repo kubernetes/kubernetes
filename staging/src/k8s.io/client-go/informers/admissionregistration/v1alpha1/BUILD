@@ -10,6 +10,7 @@ go_library(
     srcs = [
         "initializerconfiguration.go",
         "interface.go",
+        "mutatingwebhookconfiguration.go",
         "validatingwebhookconfiguration.go",
     ],
     importpath = "k8s.io/client-go/informers/admissionregistration/v1alpha1",

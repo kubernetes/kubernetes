@@ -10,6 +10,7 @@ go_library(
     srcs = [
         "initializerconfiguration.go",
         "interface.go",
+        "mutatingwebhookconfiguration.go",
         "validatingwebhookconfiguration.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/admissionregistration/internalversion",

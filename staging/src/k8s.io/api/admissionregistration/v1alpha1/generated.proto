@@ -75,6 +75,30 @@ message InitializerConfigurationList {
   repeated InitializerConfiguration items = 2;
 }
 
+// MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.
+message MutatingWebhookConfiguration {
+  // Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Webhooks is a list of webhooks and the affected resources and operations.
+  // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  repeated Webhook Webhooks = 2;
+}
+
+// MutatingWebhookConfigurationList is a list of MutatingWebhookConfiguration.
+message MutatingWebhookConfigurationList {
+  // Standard list metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // List of MutatingWebhookConfiguration.
+  repeated MutatingWebhookConfiguration items = 2;
+}
+
 // Rule is a tuple of APIGroups, APIVersion, and Resources.It is recommended
 // to make sure that all the tuple expansions are valid.
 message Rule {

@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "expansion_generated.go",
         "initializerconfiguration.go",
-        "validatingwebhookconfiguration.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/listers/apis/admissionregistration",
     visibility = ["//visibility:public"],

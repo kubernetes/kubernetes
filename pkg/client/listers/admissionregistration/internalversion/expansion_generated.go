@@ -22,6 +22,10 @@ package internalversion
 // InitializerConfigurationLister.
 type InitializerConfigurationListerExpansion interface{}
 
+// MutatingWebhookConfigurationListerExpansion allows custom methods to be added to
+// MutatingWebhookConfigurationLister.
+type MutatingWebhookConfigurationListerExpansion interface{}
+
 // ValidatingWebhookConfigurationListerExpansion allows custom methods to be added to
 // ValidatingWebhookConfigurationLister.
 type ValidatingWebhookConfigurationListerExpansion interface{}

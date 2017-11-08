@@ -18,4 +18,6 @@ package v1alpha1
 
 type InitializerConfigurationExpansion interface{}
 
+type MutatingWebhookConfigurationExpansion interface{}
+
 type ValidatingWebhookConfigurationExpansion interface{}

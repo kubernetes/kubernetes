@@ -12,6 +12,7 @@ go_library(
         "doc.go",
         "generated_expansion.go",
         "initializerconfiguration.go",
+        "mutatingwebhookconfiguration.go",
         "validatingwebhookconfiguration.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/admissionregistration/internalversion",

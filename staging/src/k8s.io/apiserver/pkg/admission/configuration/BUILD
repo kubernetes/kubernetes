@@ -11,6 +11,7 @@ go_test(
     srcs = [
         "configuration_manager_test.go",
         "initializer_manager_test.go",
+        "mutating_webhook_manager_test.go",
         "validating_webhook_manager_test.go",
     ],
     importpath = "k8s.io/apiserver/pkg/admission/configuration",
@@ -30,6 +31,7 @@ go_library(
     srcs = [
         "configuration_manager.go",
         "initializer_manager.go",
+        "mutating_webhook_manager.go",
         "validating_webhook_manager.go",
     ],
     importpath = "k8s.io/apiserver/pkg/admission/configuration",
