@@ -18,7 +18,7 @@ package fake
 
 import (
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func (c *FakeNamespaces) Finalize(namespace *api.Namespace) (*api.Namespace, error) {

@@ -31,7 +31,7 @@ import (
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"

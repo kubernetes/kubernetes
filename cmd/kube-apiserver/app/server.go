@@ -86,7 +86,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 
 	"k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
 )

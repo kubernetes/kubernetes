@@ -40,8 +40,8 @@ import (
 	// TODO: remove this import if
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
 	// to "v1"?
-	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"

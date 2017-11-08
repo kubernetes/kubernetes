@@ -25,7 +25,7 @@ import (
 	v1alpha1 "k8s.io/api/settings/v1alpha1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	settings "k8s.io/kubernetes/pkg/apis/settings"
 	unsafe "unsafe"
 )

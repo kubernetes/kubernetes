@@ -41,10 +41,11 @@ import (
 	"k8s.io/client-go/rest/fake"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/kube-openapi/pkg/util/proto"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/api/v1"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/v1"
+
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
@@ -54,8 +55,8 @@ import (
 // This init should be removed after switching this command and its tests to user external types.
 func init() {
 	api.AddToScheme(scheme.Scheme)
-	scheme.Scheme.AddConversionFuncs(v1.Convert_api_PodSpec_To_v1_PodSpec)
-	scheme.Scheme.AddConversionFuncs(v1.Convert_v1_PodSecurityContext_To_api_PodSecurityContext)
+	scheme.Scheme.AddConversionFuncs(v1.Convert_core_PodSpec_To_v1_PodSpec)
+	scheme.Scheme.AddConversionFuncs(v1.Convert_v1_PodSecurityContext_To_core_PodSecurityContext)
 }
 
 var unstructuredSerializer = dynamic.ContentConfig().NegotiatedSerializer

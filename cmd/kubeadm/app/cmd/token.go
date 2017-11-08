@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	tokenutil "k8s.io/kubernetes/cmd/kubeadm/app/util/token"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	bootstrapapi "k8s.io/kubernetes/pkg/bootstrap/api"
 	"k8s.io/kubernetes/pkg/printers"
 )

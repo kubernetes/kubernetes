@@ -42,9 +42,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/integer"
 	clientretry "k8s.io/client-go/util/retry"
-	_ "k8s.io/kubernetes/pkg/api/install"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/api/validation"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 

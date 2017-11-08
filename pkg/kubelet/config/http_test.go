@@ -29,11 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/validation"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 

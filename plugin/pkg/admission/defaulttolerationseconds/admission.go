@@ -23,8 +23,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 )
 

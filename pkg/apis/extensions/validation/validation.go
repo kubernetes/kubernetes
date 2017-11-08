@@ -33,8 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/api"
-	apivalidation "k8s.io/kubernetes/pkg/api/validation"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
@@ -353,7 +353,7 @@ func ValidateDeploymentStatusUpdate(update, old *extensions.Deployment) field.Er
 	return allErrs
 }
 
-// TODO: Move in "k8s.io/kubernetes/pkg/api/validation"
+// TODO: Move in "k8s.io/kubernetes/pkg/apis/core/validation"
 func isDecremented(update, old *int32) bool {
 	if update == nil && old != nil {
 		return true

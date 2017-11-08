@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	// util.go uses api.Codecs.LegacyCodec so import this package to do some
 	// resource initialization.
-	_ "k8s.io/kubernetes/pkg/api/install"
-	"k8s.io/kubernetes/pkg/api/v1/helper"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 var nodeLabels map[string]string = map[string]string{

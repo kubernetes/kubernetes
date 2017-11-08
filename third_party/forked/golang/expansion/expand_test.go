@@ -2,8 +2,7 @@ package expansion
 
 import (
 	"testing"
-
-	"k8s.io/kubernetes/pkg/api"
+api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestMapReference(t *testing.T) {

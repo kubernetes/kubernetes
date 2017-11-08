@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
-	kubeapi "k8s.io/kubernetes/pkg/api"
+	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"

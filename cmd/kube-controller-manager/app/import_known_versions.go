@@ -22,7 +22,6 @@ package app
 import (
 	"fmt"
 
-	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
@@ -30,6 +29,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/certificates/install"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	_ "k8s.io/kubernetes/pkg/apis/policy/install"
 	_ "k8s.io/kubernetes/pkg/apis/rbac/install"

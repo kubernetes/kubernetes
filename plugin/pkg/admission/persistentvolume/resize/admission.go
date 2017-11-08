@@ -21,8 +21,8 @@ import (
 	"io"
 
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
-	apihelper "k8s.io/kubernetes/pkg/api/helper"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	apihelper "k8s.io/kubernetes/pkg/apis/core/helper"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	pvlister "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	storagelisters "k8s.io/kubernetes/pkg/client/listers/storage/internalversion"

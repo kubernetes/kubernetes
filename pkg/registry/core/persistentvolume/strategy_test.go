@@ -19,9 +19,9 @@ package persistentvolume
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 
 	// install all api groups for testing
 	_ "k8s.io/kubernetes/pkg/api/testapi"
