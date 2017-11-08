@@ -48,10 +48,7 @@ func newHandlerForTestWithClock(c clientset.Interface, cacheClock clock.Clock) (
 	if err != nil {
 		return nil, f, err
 	}
-	pluginInitializer, err := kubeadmission.New(c, f, nil, nil)
-	if err != nil {
-		return handler, f, err
-	}
+	pluginInitializer := kubeadmission.New(c, f, nil, nil)
 	pluginInitializer.Initialize(handler)
 	err = admission.ValidateInitialization(handler)
 	return handler, f, err
