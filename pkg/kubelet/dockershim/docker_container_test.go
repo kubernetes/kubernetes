@@ -90,10 +90,21 @@ func TestListContainers(t *testing.T) {
 			Annotations:  configs[i].Annotations,
 		}}, expected...)
 	}
+	filter := &runtimeapi.ContainerFilter{
+		Id:            expected[1].Id,
+		State:         &runtimeapi.ContainerStateValue{State: expected[1].State},
+		PodSandboxId:  expected[1].PodSandboxId,
+		LabelSelector: expected[1].Labels,
+	}
 	containers, err := ds.ListContainers(nil)
 	assert.NoError(t, err)
 	assert.Len(t, containers, len(expected))
 	assert.Equal(t, expected, containers)
+
+	containers, err = ds.ListContainers(filter)
+	assert.NoError(t, err)
+	assert.Len(t, containers, 1)
+	assert.Contains(t, containers, expected[1])
 }
 
 // TestContainerStatus tests the basic lifecycle operations and verify that
