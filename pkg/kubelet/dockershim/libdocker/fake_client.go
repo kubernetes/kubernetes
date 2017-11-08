@@ -376,6 +376,21 @@ func (f *FakeDockerClient) popError(op string) error {
 	return nil
 }
 
+func toCRIContainerState(state string) string {
+	// Convert the status of a container returned by ListContainers
+	// to docker container status
+	switch {
+	case strings.HasPrefix(state, StatusCreatedPrefix):
+		return "created"
+	case strings.HasPrefix(state, StatusRunningPrefix):
+		return "running"
+	case strings.HasPrefix(state, StatusExitedPrefix):
+		return "exited"
+	default:
+		return "unknown"
+	}
+}
+
 // ListContainers is a test-spy implementation of Interface.ListContainers.
 // It adds an entry "list" to the internal method call record.
 func (f *FakeDockerClient) ListContainers(options dockertypes.ContainerListOptions) ([]dockertypes.Container, error) {
@@ -410,7 +425,7 @@ func (f *FakeDockerClient) ListContainers(options dockertypes.ContainerListOptio
 		var filtered []dockertypes.Container
 		for _, container := range containerList {
 			for _, statusFilter := range statusFilters {
-				if container.Status == statusFilter {
+				if statusFilter == toCRIContainerState(container.Status) {
 					filtered = append(filtered, container)
 					break
 				}

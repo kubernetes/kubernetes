@@ -17,6 +17,7 @@ limitations under the License.
 package dockershim
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -27,6 +28,34 @@ import (
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
+
+func TestListImage(t *testing.T) {
+	ds, fakeDocker, _ := newTestDockerService()
+	fakeDocker.InjectError("list_images", errors.New("imageTestErr"))
+	_, err := ds.ListImages(nil)
+	assert.Error(t, err, "list_images")
+	assert.Contains(t, err.Error(), "imageTestErr")
+
+	fakeDocker.InjectImages([]dockertypes.ImageSummary{{ID: "testImage1"}, {ID: "testImage2"}})
+	tests := map[string]struct {
+		filter *runtimeapi.ImageFilter
+		result []*runtimeapi.Image
+	}{
+		"With filter": {
+			&runtimeapi.ImageFilter{Image: &runtimeapi.ImageSpec{Image: "testImage2"}},
+			[]*runtimeapi.Image{{Id: "testImage2"}},
+		},
+		"Without filter": {
+			nil,
+			[]*runtimeapi.Image{{Id: "testImage1"}, {Id: "testImage2"}},
+		},
+	}
+	for key, test := range tests {
+		images, err := ds.ListImages(test.filter)
+		assert.NoError(t, err, fmt.Sprintf("TestCase [%s]", key))
+		assert.Equal(t, test.result, images)
+	}
+}
 
 func TestRemoveImage(t *testing.T) {
 	ds, fakeDocker, _ := newTestDockerService()
@@ -45,6 +74,15 @@ func TestRemoveImageWithMultipleTags(t *testing.T) {
 	fakeDocker.AssertCallDetails(libdocker.NewCalledDetail("inspect_image", nil),
 		libdocker.NewCalledDetail("remove_image", []interface{}{"foo", dockertypes.ImageRemoveOptions{PruneChildren: true}}),
 		libdocker.NewCalledDetail("remove_image", []interface{}{"bar", dockertypes.ImageRemoveOptions{PruneChildren: true}}))
+}
+
+func TestImagePull(t *testing.T) {
+	ds, fakeDocker, _ := newTestDockerService()
+	imageRef, err := ds.PullImage(&runtimeapi.ImageSpec{Image: "imagePullTest"}, &runtimeapi.AuthConfig{})
+	assert.NoError(t, err, "TestCase [pull-image]")
+	assert.Equal(t, "imagePullTest", imageRef)
+	assert.Contains(t, fakeDocker.ImagesPulled, imageRef)
+	assert.Contains(t, fakeDocker.Images[0].ID, imageRef)
 }
 
 func TestPullWithJSONError(t *testing.T) {
