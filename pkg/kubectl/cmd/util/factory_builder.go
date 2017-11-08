@@ -138,8 +138,7 @@ func (f *ring2Factory) PrintObject(cmd *cobra.Command, isLocal bool, mapper meta
 	return printer.PrintObj(obj, out)
 }
 
-// NewBuilder returns a new resource builder.
-// Receives a bool flag and avoids remote calls if set to false
+// NewBuilder returns a new resource builder for structured api objects.
 func (f *ring2Factory) NewBuilder() *resource.Builder {
 	clientMapperFunc := resource.ClientMapperFunc(f.objectMappingFactory.ClientForMapping)
 
@@ -147,6 +146,18 @@ func (f *ring2Factory) NewBuilder() *resource.Builder {
 	categoryExpander := f.objectMappingFactory.CategoryExpander()
 
 	return resource.NewBuilder(mapper, categoryExpander, typer, clientMapperFunc, f.clientAccessFactory.Decoder(true))
+}
+
+// NewUnstructuredBuilder returns a new resource builder for unstructured api objects.
+func (f *ring2Factory) NewUnstructuredBuilder() *resource.Builder {
+	clientMapperFunc := resource.ClientMapperFunc(f.objectMappingFactory.UnstructuredClientForMapping)
+	mapper, typer, err := f.objectMappingFactory.UnstructuredObject()
+	if err != nil {
+		CheckErr(err)
+	}
+	categoryExpander := f.objectMappingFactory.CategoryExpander()
+
+	return resource.NewBuilder(mapper, categoryExpander, typer, clientMapperFunc, unstructured.UnstructuredJSONScheme)
 }
 
 // PluginLoader loads plugins from a path set by the KUBECTL_PLUGINS_PATH env var.
