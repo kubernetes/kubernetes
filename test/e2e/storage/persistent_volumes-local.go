@@ -19,6 +19,7 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"path"
 	"path/filepath"
 	"time"
@@ -26,34 +27,40 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 type localTestConfig struct {
-	ns     string
-	nodes  *v1.NodeList
-	node0  *v1.Node
-	client clientset.Interface
-	scName string
+	ns       string
+	nodes    []v1.Node
+	node0    *v1.Node
+	client   clientset.Interface
+	scName   string
+	ssTester *framework.StatefulSetTester
 }
 
-type LocalVolumeType string
+type localVolumeType string
 
 const (
 	// default local volume type, aka a directory
-	DirectoryLocalVolumeType LocalVolumeType = "dir"
+	DirectoryLocalVolumeType localVolumeType = "dir"
 	// creates a tmpfs and mounts it
-	TmpfsLocalVolumeType LocalVolumeType = "tmpfs"
+	TmpfslocalVolumeType localVolumeType = "tmpfs"
 )
 
 type localTestVolume struct {
@@ -66,7 +73,7 @@ type localTestVolume struct {
 	// PV for this volume
 	pv *v1.PersistentVolume
 	// Type of local volume
-	localVolumeType LocalVolumeType
+	localVolumeType localVolumeType
 }
 
 const (
@@ -105,9 +112,17 @@ const (
 	testRequestSize = "10Mi"
 )
 
-// Common selinux labels
-var selinuxLabel = &v1.SELinuxOptions{
-	Level: "s0:c0,c1"}
+var (
+	// storage class volume binding modes
+	waitMode      = storagev1.VolumeBindingWaitForFirstConsumer
+	immediateMode = storagev1.VolumeBindingImmediate
+
+	// Common selinux labels
+	selinuxLabel = &v1.SELinuxOptions{
+		Level: "s0:c0,c1"}
+
+	localVolumeTypes = []localVolumeType{DirectoryLocalVolumeType, TmpfslocalVolumeType}
+)
 
 var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [Serial]", func() {
 	f := framework.NewDefaultFramework("persistent-local-volumes-test")
@@ -121,16 +136,18 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 		// Get all the schedulable nodes
 		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		Expect(len(nodes.Items)).NotTo(BeZero(), "No available nodes for scheduling")
-		scName = fmt.Sprintf("%v-%v", testSCPrefix, f.Namespace.Name)
+		scName = fmt.Sprintf("%v-%v-%v", testSCPrefix, f.Namespace.Name, rand.Int())
 		// Choose the first node
 		node0 := &nodes.Items[0]
 
+		ssTester := framework.NewStatefulSetTester(f.ClientSet)
 		config = &localTestConfig{
-			ns:     f.Namespace.Name,
-			client: f.ClientSet,
-			nodes:  nodes,
-			node0:  node0,
-			scName: scName,
+			ns:       f.Namespace.Name,
+			client:   f.ClientSet,
+			nodes:    nodes.Items,
+			node0:    node0,
+			scName:   scName,
+			ssTester: ssTester,
 		}
 	})
 
@@ -139,22 +156,21 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 		var testVol *localTestVolume
 
 		BeforeEach(func() {
-			testVol = setupLocalVolumePVCPV(config, DirectoryLocalVolumeType)
+			setupStorageClass(config, &waitMode)
+			testVols := setupLocalVolumesPVCsPVs(config, DirectoryLocalVolumeType, config.node0, 1, waitMode)
+			testVol = testVols[0]
 		})
 
 		AfterEach(func() {
-			cleanupLocalVolume(config, testVol)
+			cleanupLocalVolumes(config, []*localTestVolume{testVol})
+			cleanupStorageClass(config)
 		})
 
 		It("should be able to mount volume and read from pod1", func() {
 			By("Creating pod1")
 			pod1, pod1Err := createLocalPod(config, testVol)
 			Expect(pod1Err).NotTo(HaveOccurred())
-
-			pod1NodeName, pod1NodeNameErr := podNodeName(config, pod1)
-			Expect(pod1NodeNameErr).NotTo(HaveOccurred())
-			framework.Logf("pod1 %q created on Node %q", pod1.Name, pod1NodeName)
-			Expect(pod1NodeName).To(Equal(config.node0.Name))
+			verifyLocalPod(config, testVol, pod1, config.node0.Name)
 
 			By("Reading in pod1")
 			// testFileContent was written during setupLocalVolume
@@ -168,11 +184,7 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			By("Creating pod1")
 			pod1, pod1Err := createLocalPod(config, testVol)
 			Expect(pod1Err).NotTo(HaveOccurred())
-
-			pod1NodeName, pod1NodeNameErr := podNodeName(config, pod1)
-			Expect(pod1NodeNameErr).NotTo(HaveOccurred())
-			framework.Logf("pod1 %q created on Node %q", pod1.Name, pod1NodeName)
-			Expect(pod1NodeName).To(Equal(config.node0.Name))
+			verifyLocalPod(config, testVol, pod1, config.node0.Name)
 
 			// testFileContent was written during setupLocalVolume
 			testReadFileContent(volumeDir, testFile, testFileContent, pod1)
@@ -186,42 +198,40 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 		})
 	})
 
-	Context("when two pods request one prebound PVC one after other", func() {
-
-		var testVol *localTestVolume
+	Context("when two pods share the same volume", func() {
 
 		BeforeEach(func() {
-			testVol = setupLocalVolumePVCPV(config, DirectoryLocalVolumeType)
+			setupStorageClass(config, &waitMode)
 		})
 
 		AfterEach(func() {
-			cleanupLocalVolume(config, testVol)
+			cleanupStorageClass(config)
 		})
-	})
 
-	LocalVolumeTypes := []LocalVolumeType{DirectoryLocalVolumeType, TmpfsLocalVolumeType}
-
-	Context("when two pods mount a local volume at the same time", func() {
-		It("should be able to write from pod1 and read from pod2", func() {
-			for _, testVolType := range LocalVolumeTypes {
-				var testVol *localTestVolume
-				By(fmt.Sprintf("local-volume-type: %s", testVolType))
-				testVol = setupLocalVolumePVCPV(config, testVolType)
-				twoPodsReadWriteTest(config, testVol)
-				cleanupLocalVolume(config, testVol)
-			}
+		Context("when two pods mount a local volume at the same time", func() {
+			It("should be able to write from pod1 and read from pod2", func() {
+				for _, testVolType := range localVolumeTypes {
+					var testVol *localTestVolume
+					By(fmt.Sprintf("local-volume-type: %s", testVolType))
+					testVols := setupLocalVolumesPVCsPVs(config, testVolType, config.node0, 1, waitMode)
+					testVol = testVols[0]
+					twoPodsReadWriteTest(config, testVol)
+					cleanupLocalVolumes(config, []*localTestVolume{testVol})
+				}
+			})
 		})
-	})
 
-	Context("when two pods mount a local volume one after the other", func() {
-		It("should be able to write from pod1 and read from pod2", func() {
-			for _, testVolType := range LocalVolumeTypes {
-				var testVol *localTestVolume
-				By(fmt.Sprintf("local-volume-type: %s", testVolType))
-				testVol = setupLocalVolumePVCPV(config, testVolType)
-				twoPodsReadWriteSerialTest(config, testVol)
-				cleanupLocalVolume(config, testVol)
-			}
+		Context("when two pods mount a local volume one after the other", func() {
+			It("should be able to write from pod1 and read from pod2", func() {
+				for _, testVolType := range localVolumeTypes {
+					var testVol *localTestVolume
+					By(fmt.Sprintf("local-volume-type: %s", testVolType))
+					testVols := setupLocalVolumesPVCsPVs(config, testVolType, config.node0, 1, waitMode)
+					testVol = testVols[0]
+					twoPodsReadWriteSerialTest(config, testVol)
+					cleanupLocalVolumes(config, []*localTestVolume{testVol})
+				}
+			})
 		})
 	})
 
@@ -232,8 +242,16 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 		ep.pattern = append(ep.pattern, "MountVolume.SetUp failed")
 		ep.pattern = append(ep.pattern, "does not exist")
 
+		BeforeEach(func() {
+			setupStorageClass(config, &waitMode)
+		})
+
+		AfterEach(func() {
+			cleanupStorageClass(config)
+		})
+
 		It("should not be able to mount", func() {
-			for _, testVolType := range LocalVolumeTypes {
+			for _, testVolType := range localVolumeTypes {
 				By(fmt.Sprintf("local-volume-type: %s", testVolType))
 				testVol := &localTestVolume{
 					node:            config.node0,
@@ -241,10 +259,12 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 					localVolumeType: testVolType,
 				}
 				By("Creating local PVC and PV")
-				createLocalPVCPV(config, testVol)
+				createLocalPVCsPVs(config, []*localTestVolume{testVol}, waitMode)
 				pod, err := createLocalPod(config, testVol)
 				Expect(err).To(HaveOccurred())
 				checkPodEvents(config, pod.Name, ep)
+				verifyLocalVolume(config, testVol)
+				cleanupLocalPVCsPVs(config, []*localTestVolume{testVol})
 			}
 		})
 	})
@@ -252,26 +272,31 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 	Context("when pod's node is different from PV's NodeAffinity", func() {
 
 		BeforeEach(func() {
-			if len(config.nodes.Items) < 2 {
+			if len(config.nodes) < 2 {
 				framework.Skipf("Runs only when number of nodes >= 2")
 			}
+			setupStorageClass(config, &waitMode)
+		})
+
+		AfterEach(func() {
+			cleanupStorageClass(config)
 		})
 
 		ep := &eventPatterns{
 			reason:  "FailedScheduling",
 			pattern: make([]string, 2)}
 		ep.pattern = append(ep.pattern, "MatchNodeSelector")
-		ep.pattern = append(ep.pattern, "NoVolumeNodeConflict")
-		for _, testVolType := range LocalVolumeTypes {
+		ep.pattern = append(ep.pattern, "NoVolumeBindConflict")
+		for _, testVolType := range localVolumeTypes {
 
 			It("should not be able to mount due to different NodeAffinity", func() {
 
-				testPodWithNodeName(config, testVolType, ep, config.nodes.Items[1].Name, makeLocalPodWithNodeAffinity)
+				testPodWithNodeName(config, testVolType, ep, config.nodes[1].Name, makeLocalPodWithNodeAffinity, waitMode)
 			})
 
 			It("should not be able to mount due to different NodeSelector", func() {
 
-				testPodWithNodeName(config, testVolType, ep, config.nodes.Items[1].Name, makeLocalPodWithNodeSelector)
+				testPodWithNodeName(config, testVolType, ep, config.nodes[1].Name, makeLocalPodWithNodeSelector, waitMode)
 			})
 
 		}
@@ -280,9 +305,14 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 	Context("when pod's node is different from PV's NodeName", func() {
 
 		BeforeEach(func() {
-			if len(config.nodes.Items) < 2 {
+			if len(config.nodes) < 2 {
 				framework.Skipf("Runs only when number of nodes >= 2")
 			}
+			setupStorageClass(config, &immediateMode)
+		})
+
+		AfterEach(func() {
+			cleanupStorageClass(config)
 		})
 
 		ep := &eventPatterns{
@@ -290,11 +320,11 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			pattern: make([]string, 2)}
 		ep.pattern = append(ep.pattern, "NodeSelectorTerm")
 		ep.pattern = append(ep.pattern, "Storage node affinity check failed")
-		for _, testVolType := range LocalVolumeTypes {
+		for _, testVolType := range localVolumeTypes {
 
 			It("should not be able to mount due to different NodeName", func() {
 
-				testPodWithNodeName(config, testVolType, ep, config.nodes.Items[1].Name, makeLocalPodWithNodeName)
+				testPodWithNodeName(config, testVolType, ep, config.nodes[1].Name, makeLocalPodWithNodeName, immediateMode)
 			})
 		}
 	})
@@ -303,6 +333,7 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 		var volumePath string
 
 		BeforeEach(func() {
+			setupStorageClass(config, &immediateMode)
 			setupLocalVolumeProvisioner(config)
 			volumePath = path.Join(
 				hostBase, discoveryDir, fmt.Sprintf("vol-%v", string(uuid.NewUUID())))
@@ -310,6 +341,7 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 
 		AfterEach(func() {
 			cleanupLocalVolumeProvisioner(config, volumePath)
+			cleanupStorageClass(config)
 		})
 
 		It("should create and recreate local persistent volume", func() {
@@ -356,14 +388,52 @@ var _ = SIGDescribe("PersistentVolumes-local [Feature:LocalPersistentVolumes] [S
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
+
+	Context("when StatefulSet has pod anti-affinity", func() {
+		var testVols map[string][]*localTestVolume
+		const (
+			ssReplicas  = 3
+			volsPerNode = 2
+		)
+
+		BeforeEach(func() {
+			if len(config.nodes) < ssReplicas {
+				framework.Skipf("Runs only when number of nodes >= %v", ssReplicas)
+			}
+			setupStorageClass(config, &waitMode)
+
+			testVols = map[string][]*localTestVolume{}
+			for i, node := range config.nodes {
+				// The PVCs created here won't be used
+				By(fmt.Sprintf("Setting up local volumes on node %q", node.Name))
+				vols := setupLocalVolumesPVCsPVs(config, DirectoryLocalVolumeType, &config.nodes[i], volsPerNode, waitMode)
+				testVols[node.Name] = vols
+			}
+		})
+
+		AfterEach(func() {
+			for _, vols := range testVols {
+				cleanupLocalVolumes(config, vols)
+			}
+			cleanupStorageClass(config)
+		})
+
+		It("should use volumes spread across nodes", func() {
+			By("Creating a StatefulSet with pod anti-affinity on nodes")
+			ss := createStatefulSet(config, ssReplicas, volsPerNode)
+			validateStatefulSet(config, ss)
+		})
+	})
+
+	// TODO: add stress test that creates many pods in parallel across multiple nodes
 })
 
 type makeLocalPodWith func(config *localTestConfig, volume *localTestVolume, nodeName string) *v1.Pod
 
-func testPodWithNodeName(config *localTestConfig, testVolType LocalVolumeType, ep *eventPatterns, nodeName string, makeLocalPodFunc makeLocalPodWith) {
-	var testVol *localTestVolume
+func testPodWithNodeName(config *localTestConfig, testVolType localVolumeType, ep *eventPatterns, nodeName string, makeLocalPodFunc makeLocalPodWith, bindingMode storagev1.VolumeBindingMode) {
 	By(fmt.Sprintf("local-volume-type: %s", testVolType))
-	testVol = setupLocalVolumePVCPV(config, testVolType)
+	testVols := setupLocalVolumesPVCsPVs(config, testVolType, config.node0, 1, bindingMode)
+	testVol := testVols[0]
 
 	pod := makeLocalPodFunc(config, testVol, nodeName)
 	pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
@@ -371,7 +441,8 @@ func testPodWithNodeName(config *localTestConfig, testVolType LocalVolumeType, e
 	err = framework.WaitForPodRunningInNamespace(config.client, pod)
 	Expect(err).To(HaveOccurred())
 	checkPodEvents(config, pod.Name, ep)
-	cleanupLocalVolume(config, testVol)
+
+	cleanupLocalVolumes(config, []*localTestVolume{testVol})
 }
 
 type eventPatterns struct {
@@ -403,12 +474,7 @@ func twoPodsReadWriteTest(config *localTestConfig, testVol *localTestVolume) {
 	By("Creating pod1 to write to the PV")
 	pod1, pod1Err := createLocalPod(config, testVol)
 	Expect(pod1Err).NotTo(HaveOccurred())
-
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(config.client, pod1))
-	pod1NodeName, pod1NodeNameErr := podNodeName(config, pod1)
-	Expect(pod1NodeNameErr).NotTo(HaveOccurred())
-	framework.Logf("Pod1 %q created on Node %q", pod1.Name, pod1NodeName)
-	Expect(pod1NodeName).To(Equal(config.node0.Name))
+	verifyLocalPod(config, testVol, pod1, config.node0.Name)
 
 	// testFileContent was written during setupLocalVolume
 	testReadFileContent(volumeDir, testFile, testFileContent, pod1)
@@ -416,12 +482,7 @@ func twoPodsReadWriteTest(config *localTestConfig, testVol *localTestVolume) {
 	By("Creating pod2 to read from the PV")
 	pod2, pod2Err := createLocalPod(config, testVol)
 	Expect(pod2Err).NotTo(HaveOccurred())
-
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(config.client, pod2))
-	pod2NodeName, pod2NodeNameErr := podNodeName(config, pod2)
-	Expect(pod2NodeNameErr).NotTo(HaveOccurred())
-	framework.Logf("Pod2 %q created on Node %q", pod2.Name, pod2NodeName)
-	Expect(pod2NodeName).To(Equal(config.node0.Name))
+	verifyLocalPod(config, testVol, pod2, config.node0.Name)
 
 	// testFileContent was written during setupLocalVolume
 	testReadFileContent(volumeDir, testFile, testFileContent, pod2)
@@ -445,12 +506,7 @@ func twoPodsReadWriteSerialTest(config *localTestConfig, testVol *localTestVolum
 	By("Creating pod1")
 	pod1, pod1Err := createLocalPod(config, testVol)
 	Expect(pod1Err).NotTo(HaveOccurred())
-
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(config.client, pod1))
-	pod1NodeName, pod1NodeNameErr := podNodeName(config, pod1)
-	Expect(pod1NodeNameErr).NotTo(HaveOccurred())
-	framework.Logf("Pod1 %q created on Node %q", pod1.Name, pod1NodeName)
-	Expect(pod1NodeName).To(Equal(config.node0.Name))
+	verifyLocalPod(config, testVol, pod1, config.node0.Name)
 
 	// testFileContent was written during setupLocalVolume
 	testReadFileContent(volumeDir, testFile, testFileContent, pod1)
@@ -466,12 +522,7 @@ func twoPodsReadWriteSerialTest(config *localTestConfig, testVol *localTestVolum
 	By("Creating pod2")
 	pod2, pod2Err := createLocalPod(config, testVol)
 	Expect(pod2Err).NotTo(HaveOccurred())
-
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(config.client, pod2))
-	pod2NodeName, pod2NodeNameErr := podNodeName(config, pod2)
-	Expect(pod2NodeNameErr).NotTo(HaveOccurred())
-	framework.Logf("Pod2 %q created on Node %q", pod2.Name, pod2NodeName)
-	Expect(pod2NodeName).To(Equal(config.node0.Name))
+	verifyLocalPod(config, testVol, pod2, config.node0.Name)
 
 	By("Reading in pod2")
 	testReadFileContent(volumeDir, testFile, testVol.hostDir, pod2)
@@ -480,53 +531,90 @@ func twoPodsReadWriteSerialTest(config *localTestConfig, testVol *localTestVolum
 	framework.DeletePodOrFail(config.client, config.ns, pod2.Name)
 }
 
+func setupStorageClass(config *localTestConfig, mode *storagev1.VolumeBindingMode) {
+	sc := &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: config.scName,
+		},
+		Provisioner:       storagev1.NoProvisioner,
+		VolumeBindingMode: mode,
+	}
+
+	sc, err := config.client.StorageV1().StorageClasses().Create(sc)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func cleanupStorageClass(config *localTestConfig) {
+	framework.ExpectNoError(config.client.StorageV1().StorageClasses().Delete(config.scName, nil))
+}
+
 // podNode wraps RunKubectl to get node where pod is running
 func podNodeName(config *localTestConfig, pod *v1.Pod) (string, error) {
 	runtimePod, runtimePodErr := config.client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
 	return runtimePod.Spec.NodeName, runtimePodErr
 }
 
-// setupLocalVolume setups a directory to user for local PV
-func setupLocalVolume(config *localTestConfig, localVolumeType LocalVolumeType) *localTestVolume {
-	testDirName := "local-volume-test-" + string(uuid.NewUUID())
-	hostDir := filepath.Join(hostBase, testDirName)
+// setupLocalVolumes sets up directories to use for local PV
+func setupLocalVolumes(config *localTestConfig, localVolumeType localVolumeType, node *v1.Node, count int) []*localTestVolume {
+	vols := []*localTestVolume{}
+	for i := 0; i < count; i++ {
+		testDirName := "local-volume-test-" + string(uuid.NewUUID())
+		hostDir := filepath.Join(hostBase, testDirName)
 
-	if localVolumeType == TmpfsLocalVolumeType {
-		createAndMountTmpfsLocalVolume(config, hostDir)
+		if localVolumeType == TmpfslocalVolumeType {
+			createAndMountTmpfsLocalVolume(config, hostDir)
+		}
+
+		// populate volume with testFile containing testFileContent
+		writeCmd, _ := createWriteAndReadCmds(hostDir, testFile, testFileContent)
+		By(fmt.Sprintf("Creating local volume on node %q at path %q", node.Name, hostDir))
+		err := framework.IssueSSHCommand(writeCmd, framework.TestContext.Provider, node)
+		Expect(err).NotTo(HaveOccurred())
+
+		vols = append(vols, &localTestVolume{
+			node:            node,
+			hostDir:         hostDir,
+			localVolumeType: localVolumeType,
+		})
 	}
+	return vols
+}
 
-	// populate volume with testFile containing testFileContent
-	writeCmd, _ := createWriteAndReadCmds(hostDir, testFile, testFileContent)
-	By(fmt.Sprintf("Creating local volume on node %q at path %q", config.node0.Name, hostDir))
-	err := framework.IssueSSHCommand(writeCmd, framework.TestContext.Provider, config.node0)
-	Expect(err).NotTo(HaveOccurred())
-	return &localTestVolume{
-		node:            config.node0,
-		hostDir:         hostDir,
-		localVolumeType: localVolumeType,
+func cleanupLocalPVCsPVs(config *localTestConfig, volumes []*localTestVolume) {
+	for _, volume := range volumes {
+		By("Cleaning up PVC and PV")
+		errs := framework.PVPVCCleanup(config.client, config.ns, volume.pv, volume.pvc)
+		if len(errs) > 0 {
+			framework.Failf("Failed to delete PV and/or PVC: %v", utilerrors.NewAggregate(errs))
+		}
 	}
 }
 
 // Deletes the PVC/PV, and launches a pod with hostpath volume to remove the test directory
-func cleanupLocalVolume(config *localTestConfig, volume *localTestVolume) {
-	if volume == nil {
-		return
-	}
+func cleanupLocalVolumes(config *localTestConfig, volumes []*localTestVolume) {
+	cleanupLocalPVCsPVs(config, volumes)
 
-	By("Cleaning up PVC and PV")
-	errs := framework.PVPVCCleanup(config.client, config.ns, volume.pv, volume.pvc)
-	if len(errs) > 0 {
-		framework.Failf("Failed to delete PV and/or PVC: %v", utilerrors.NewAggregate(errs))
-	}
+	for _, volume := range volumes {
+		if volume.localVolumeType == TmpfslocalVolumeType {
+			unmountTmpfsLocalVolume(config, volume.hostDir)
+		}
 
-	if volume.localVolumeType == TmpfsLocalVolumeType {
-		unmountTmpfsLocalVolume(config, volume.hostDir)
+		By("Removing the test directory")
+		removeCmd := fmt.Sprintf("rm -r %s", volume.hostDir)
+		err := framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, volume.node)
+		Expect(err).NotTo(HaveOccurred())
 	}
+}
 
-	By("Removing the test directory")
-	removeCmd := fmt.Sprintf("rm -r %s", volume.hostDir)
-	err := framework.IssueSSHCommand(removeCmd, framework.TestContext.Provider, config.node0)
+func verifyLocalVolume(config *localTestConfig, volume *localTestVolume) {
+	framework.ExpectNoError(framework.WaitOnPVandPVC(config.client, config.ns, volume.pv, volume.pvc))
+}
+
+func verifyLocalPod(config *localTestConfig, volume *localTestVolume, pod *v1.Pod, expectedNodeName string) {
+	podNodeName, err := podNodeName(config, pod)
 	Expect(err).NotTo(HaveOccurred())
+	framework.Logf("pod %q created on Node %q", pod.Name, podNodeName)
+	Expect(podNodeName).To(Equal(expectedNodeName))
 }
 
 func makeLocalPVCConfig(config *localTestConfig) framework.PersistentVolumeClaimConfig {
@@ -574,13 +662,33 @@ func makeLocalPVConfig(config *localTestConfig, volume *localTestVolume) framewo
 }
 
 // Creates a PVC and PV with prebinding
-func createLocalPVCPV(config *localTestConfig, volume *localTestVolume) {
-	pvcConfig := makeLocalPVCConfig(config)
-	pvConfig := makeLocalPVConfig(config, volume)
+func createLocalPVCsPVs(config *localTestConfig, volumes []*localTestVolume, mode storagev1.VolumeBindingMode) {
 	var err error
-	volume.pv, volume.pvc, err = framework.CreatePVPVC(config.client, pvConfig, pvcConfig, config.ns, true)
-	framework.ExpectNoError(err)
-	framework.ExpectNoError(framework.WaitOnPVandPVC(config.client, config.ns, volume.pv, volume.pvc))
+
+	for _, volume := range volumes {
+		pvcConfig := makeLocalPVCConfig(config)
+		pvConfig := makeLocalPVConfig(config, volume)
+		volume.pv, volume.pvc, err = framework.CreatePVPVC(config.client, pvConfig, pvcConfig, config.ns, false)
+		framework.ExpectNoError(err)
+	}
+
+	if mode == storagev1.VolumeBindingImmediate {
+		for _, volume := range volumes {
+			verifyLocalVolume(config, volume)
+		}
+	} else {
+		// Verify PVCs are not bound
+		// There isn't really a great way to verify this without making the test be slow...
+		err = wait.PollImmediate(time.Second, 10*time.Second, func() (done bool, err error) {
+			for _, volume := range volumes {
+				pvc, err := config.client.CoreV1().PersistentVolumeClaims(volume.pvc.Namespace).Get(volume.pvc.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				Expect(pvc.Status.Phase).To(Equal(v1.ClaimPending))
+			}
+			return false, nil
+		})
+		Expect(err).To(HaveOccurred())
+	}
 }
 
 func makeLocalPod(config *localTestConfig, volume *localTestVolume, cmd string) *v1.Pod {
@@ -701,14 +809,20 @@ func podRWCmdExec(pod *v1.Pod, cmd string) string {
 
 // Initialize test volume on node
 // and create local PVC and PV
-func setupLocalVolumePVCPV(config *localTestConfig, localVolumeType LocalVolumeType) *localTestVolume {
-	By("Initializing test volume")
-	testVol := setupLocalVolume(config, localVolumeType)
+func setupLocalVolumesPVCsPVs(
+	config *localTestConfig,
+	localVolumeType localVolumeType,
+	node *v1.Node,
+	count int,
+	mode storagev1.VolumeBindingMode) []*localTestVolume {
 
-	By("Creating local PVC and PV")
-	createLocalPVCPV(config, testVol)
+	By("Initializing test volumes")
+	testVols := setupLocalVolumes(config, localVolumeType, node, count)
 
-	return testVol
+	By("Creating local PVCs and PVs")
+	createLocalPVCsPVs(config, testVols, mode)
+
+	return testVols
 }
 
 func setupLocalVolumeProvisioner(config *localTestConfig) {
@@ -879,6 +993,29 @@ func newLocalClaim(config *localTestConfig) *v1.PersistentVolumeClaim {
 	return &claim
 }
 
+// newLocalClaim creates a new persistent volume claim.
+func newLocalClaimWithName(config *localTestConfig, name string) *v1.PersistentVolumeClaim {
+	claim := v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: config.ns,
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			StorageClassName: &config.scName,
+			AccessModes: []v1.PersistentVolumeAccessMode{
+				v1.ReadWriteOnce,
+			},
+			Resources: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceName(v1.ResourceStorage): resource.MustParse(testRequestSize),
+				},
+			},
+		},
+	}
+
+	return &claim
+}
+
 // waitForLocalPersistentVolume waits a local persistent volume with 'volumePath' to be available.
 func waitForLocalPersistentVolume(c clientset.Interface, volumePath string) (*v1.PersistentVolume, error) {
 	var pv *v1.PersistentVolume
@@ -920,4 +1057,85 @@ func findLocalPersistentVolume(c clientset.Interface, volumePath string) (*v1.Pe
 		}
 	}
 	return nil, fmt.Errorf("Unable to find local persistent volume with path %v", volumePath)
+}
+
+func createStatefulSet(config *localTestConfig, ssReplicas int32, volumeCount int) *appsv1beta1.StatefulSet {
+	mounts := []v1.VolumeMount{}
+	claims := []v1.PersistentVolumeClaim{}
+	for i := 0; i < volumeCount; i++ {
+		name := fmt.Sprintf("vol%v", i+1)
+		pvc := newLocalClaimWithName(config, name)
+		mounts = append(mounts, v1.VolumeMount{Name: name, MountPath: "/" + name})
+		claims = append(claims, *pvc)
+	}
+
+	affinity := v1.Affinity{
+		PodAntiAffinity: &v1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "app",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"local-volume-statefulset"},
+							},
+						},
+					},
+					TopologyKey: "kubernetes.io/hostname",
+				},
+			},
+		},
+	}
+
+	labels := map[string]string{"app": "local-volume-test"}
+	spec := &appsv1beta1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "local-volume-statefulset",
+			Namespace: config.ns,
+		},
+		Spec: appsv1beta1.StatefulSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "local-volume-test"},
+			},
+			Replicas: &ssReplicas,
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: labels,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:         "nginx",
+							Image:        imageutils.GetE2EImage(imageutils.NginxSlim),
+							VolumeMounts: mounts,
+						},
+					},
+					Affinity: &affinity,
+				},
+			},
+			VolumeClaimTemplates: claims,
+			ServiceName:          "test-service",
+		},
+	}
+
+	ss, err := config.client.AppsV1beta1().StatefulSets(config.ns).Create(spec)
+	Expect(err).NotTo(HaveOccurred())
+
+	config.ssTester.WaitForRunningAndReady(ssReplicas, ss)
+	return ss
+}
+
+func validateStatefulSet(config *localTestConfig, ss *appsv1beta1.StatefulSet) {
+	pods := config.ssTester.GetPodList(ss)
+
+	// Verify that each pod is on a different node
+	nodes := sets.NewString()
+	for _, pod := range pods.Items {
+		nodes.Insert(pod.Spec.NodeName)
+	}
+
+	Expect(nodes.Len()).To(Equal(len(pods.Items)))
+
+	// TODO: validate all PVCs are bound
 }
