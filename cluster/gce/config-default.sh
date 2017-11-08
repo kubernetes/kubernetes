@@ -260,7 +260,7 @@ if [[ -n "${GCE_ALPHA_FEATURES:-}" ]]; then
 fi
 
 # Disable Docker live-restore.
-if [[ -n "${DISABLE_DOCKER_LIVE_RESTORE:-}" ]]; then
+if [[ -n "${DISABLE_DOCKER_LIVE_RESTORE:-true}" ]]; then
   PROVIDER_VARS="${PROVIDER_VARS:-} DISABLE_DOCKER_LIVE_RESTORE"
 fi
 
