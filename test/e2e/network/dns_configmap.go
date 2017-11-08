@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -90,8 +91,8 @@ func (t *dnsFederationsConfigMapTest) validate() {
 		By(fmt.Sprintf("Validating federation labels %v do not exist", t.labels))
 
 		for _, label := range t.labels {
-			var federationDNS = fmt.Sprintf("e2e-dns-configmap.%s.%s.svc.cluster.local.",
-				t.f.Namespace.Name, label)
+			var federationDNS = fmt.Sprintf("e2e-dns-configmap.%s.%s.svc.%s.",
+				t.f.Namespace.Name, label, framework.TestContext.DNSDomain)
 			predicate := func(actual []string) bool {
 				return len(actual) == 0
 			}
@@ -99,10 +100,10 @@ func (t *dnsFederationsConfigMapTest) validate() {
 		}
 	} else {
 		for label := range federations {
-			var federationDNS = fmt.Sprintf("%s.%s.%s.svc.cluster.local.",
-				t.utilService.ObjectMeta.Name, t.f.Namespace.Name, label)
-			var localDNS = fmt.Sprintf("%s.%s.svc.cluster.local.",
-				t.utilService.ObjectMeta.Name, t.f.Namespace.Name)
+			var federationDNS = fmt.Sprintf("%s.%s.%s.svc.%s.",
+				t.utilService.ObjectMeta.Name, t.f.Namespace.Name, label, framework.TestContext.DNSDomain)
+			var localDNS = fmt.Sprintf("%s.%s.svc.%s.",
+				t.utilService.ObjectMeta.Name, t.f.Namespace.Name, framework.TestContext.DNSDomain)
 			// Check local mapping. Checking a remote mapping requires
 			// creating an arbitrary DNS record which is not possible at the
 			// moment.
