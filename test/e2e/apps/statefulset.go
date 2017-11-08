@@ -359,7 +359,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		It("should perform canary updates and phased rolling updates of template modifications", func() {
-			By("Creating a new StaefulSet")
+			By("Creating a new StatefulSet")
 			ss := framework.NewStatefulSet("ss2", ns, headlessSvcName, 3, nil, nil, labels)
 			sst := framework.NewStatefulSetTester(c)
 			sst.SetHttpProbe(ss)
