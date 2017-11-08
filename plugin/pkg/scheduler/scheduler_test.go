@@ -509,7 +509,8 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.
 		algorithm.EmptyPredicateMetadataProducer,
 		[]algorithm.PriorityConfig{},
 		algorithm.EmptyMetadataProducer,
-		[]algorithm.SchedulerExtender{})
+		[]algorithm.SchedulerExtender{},
+		nil)
 	bindingChan := make(chan *v1.Binding, 1)
 	errChan := make(chan error, 1)
 	configurator := &FakeConfigurator{
@@ -545,7 +546,8 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		algorithm.EmptyPredicateMetadataProducer,
 		[]algorithm.PriorityConfig{},
 		algorithm.EmptyMetadataProducer,
-		[]algorithm.SchedulerExtender{})
+		[]algorithm.SchedulerExtender{},
+		nil)
 	bindingChan := make(chan *v1.Binding, 2)
 	configurator := &FakeConfigurator{
 		Config: &Config{

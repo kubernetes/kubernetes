@@ -131,6 +131,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 		informers.Apps().V1beta1().StatefulSets(),
 		informers.Core().V1().Services(),
 		informers.Policy().V1beta1().PodDisruptionBudgets(),
+		informers.Storage().V1().StorageClasses(),
 		v1.DefaultHardPodAffinitySymmetricWeight,
 		true, // Enable EqualCache by default.
 	)

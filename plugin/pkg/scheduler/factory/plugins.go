@@ -24,6 +24,7 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
@@ -43,6 +44,8 @@ type PluginFactoryArgs struct {
 	NodeInfo                       predicates.NodeInfo
 	PVInfo                         predicates.PersistentVolumeInfo
 	PVCInfo                        predicates.PersistentVolumeClaimInfo
+	StorageClassInfo               predicates.StorageClassInfo
+	VolumeBinder                   persistentvolume.SchedulerVolumeBinder
 	HardPodAffinitySymmetricWeight int32
 }
 
