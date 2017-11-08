@@ -17,7 +17,6 @@ limitations under the License.
 package priorities
 
 import (
-	"fmt"
 	"math"
 
 	"k8s.io/api/core/v1"
@@ -50,9 +49,6 @@ func getNonZeroRequests(pod *v1.Pod) *schedulercache.Resource {
 
 func calculateBalancedResourceAllocation(pod *v1.Pod, podRequests *schedulercache.Resource, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
-	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
-	}
 
 	allocatableResources := nodeInfo.AllocatableResource()
 	totalResources := *podRequests

@@ -17,8 +17,6 @@ limitations under the License.
 package priorities
 
 import (
-	"fmt"
-
 	"k8s.io/api/core/v1"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
@@ -61,9 +59,6 @@ func calculateUnusedScore(requested int64, capacity int64, node string) int64 {
 // 'pods' is a list of pods currently scheduled on the node.
 func calculateUnusedPriority(pod *v1.Pod, podRequests *schedulercache.Resource, nodeInfo *schedulercache.NodeInfo) (schedulerapi.HostPriority, error) {
 	node := nodeInfo.Node()
-	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
-	}
 
 	allocatableResources := nodeInfo.AllocatableResource()
 	totalResources := *podRequests
