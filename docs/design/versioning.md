@@ -1,1 +1,1 @@
-This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/design-proposals/versioning.md](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/versioning.md)
+This file has moved to [https://github.com/kubernetes/community/blob/master/contributors/design-proposals/release/versioning.md](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/release/versioning.md)
