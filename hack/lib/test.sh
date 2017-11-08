@@ -77,7 +77,7 @@ kube::test::object_assert() {
 
   for j in $(seq 1 ${tries}); do
     res=$(eval kubectl get -a "${kube_flags[@]}" ${args} $object -o go-template=\"$request\")
-    if [[ "$res" =~ ^$expected$ ]]; then
+    if [[ '$res' =~ ^$expected$ ]]; then
         echo -n ${green}
         echo "$(kube::test::get_caller 3): Successful get $object $request: $res"
         echo -n ${reset}

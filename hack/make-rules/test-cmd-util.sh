@@ -4963,6 +4963,11 @@ runTests() {
   # Impersonation #
   #################
   record_command run_impersonation_tests
+  
+  #################
+  #  Initializer  #
+  #################
+  record_command run_initializer_tests
 
   kube::test::clear_all
 
