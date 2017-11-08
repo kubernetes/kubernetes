@@ -24,16 +24,20 @@ import (
 	"sync"
 
 	"k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/rand"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/util/workqueue"
 	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
+	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
+	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
@@ -125,6 +129,19 @@ func (c *CachedNodeInfo) GetNodeInfo(id string) (*v1.Node, error) {
 	}
 
 	return node, nil
+}
+
+type StorageClassInfo interface {
+	GetStorageClassInfo(className string) (*storagev1.StorageClass, error)
+}
+
+// CachedStorageClassInfo implements StorageClassInfo
+type CachedStorageClassInfo struct {
+	storagelisters.StorageClassLister
+}
+
+func (c *CachedStorageClassInfo) GetStorageClassInfo(className string) (*storagev1.StorageClass, error) {
+	return c.Get(className)
 }
 
 func isVolumeConflict(volume v1.Volume, pod *v1.Pod) bool {
@@ -416,8 +433,9 @@ var AzureDiskVolumeFilter VolumeFilter = VolumeFilter{
 }
 
 type VolumeZoneChecker struct {
-	pvInfo  PersistentVolumeInfo
-	pvcInfo PersistentVolumeClaimInfo
+	pvInfo    PersistentVolumeInfo
+	pvcInfo   PersistentVolumeClaimInfo
+	classInfo StorageClassInfo
 }
 
 // NewVolumeZonePredicate evaluates if a pod can fit due to the volumes it requests, given
@@ -434,10 +452,11 @@ type VolumeZoneChecker struct {
 // determining the zone of a volume during scheduling, and that is likely to
 // require calling out to the cloud provider.  It seems that we are moving away
 // from inline volume declarations anyway.
-func NewVolumeZonePredicate(pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) algorithm.FitPredicate {
+func NewVolumeZonePredicate(pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo, classInfo StorageClassInfo) algorithm.FitPredicate {
 	c := &VolumeZoneChecker{
-		pvInfo:  pvInfo,
-		pvcInfo: pvcInfo,
+		pvInfo:    pvInfo,
+		pvcInfo:   pvcInfo,
+		classInfo: classInfo,
 	}
 	return c.predicate
 }
@@ -489,6 +508,16 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta algorithm.PredicateMetad
 
 			pvName := pvc.Spec.VolumeName
 			if pvName == "" {
+				if utilfeature.DefaultFeatureGate.Enabled(features.VolumeTopologyBinding) {
+					scName := pvc.Spec.StorageClassName
+					if scName != nil && *scName != "" {
+						class, _ := c.classInfo.GetStorageClassInfo(*scName)
+						if class != nil && storageutil.IsBindingModeWaitForFirstConsumer(class) {
+							// Skip unbound volumes
+							continue
+						}
+					}
+				}
 				return false, nil, fmt.Errorf("PersistentVolumeClaim is not bound: %q", pvcName)
 			}
 
@@ -1408,74 +1437,73 @@ type VolumeNodeChecker struct {
 	client  clientset.Interface
 }
 
+// This predicate has been replaced by the VolumeBinding predicate
 // NewVolumeNodePredicate evaluates if a pod can fit due to the volumes it requests, given
 // that some volumes have node topology constraints, particularly when using Local PVs.
 // The requirement is that any pod that uses a PVC that is bound to a PV with topology constraints
 // must be scheduled to a node that satisfies the PV's topology labels.
-func NewVolumeNodePredicate(pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo, client clientset.Interface) algorithm.FitPredicate {
+func NewVolumeNodePredicate(pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) algorithm.FitPredicate {
 	c := &VolumeNodeChecker{
 		pvInfo:  pvInfo,
 		pvcInfo: pvcInfo,
-		client:  client,
 	}
 	return c.predicate
 }
 
 func (c *VolumeNodeChecker) predicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentLocalVolumes) {
-		return true, nil, nil
-	}
+	return true, nil, nil
+}
 
-	// If a pod doesn't have any volume attached to it, the predicate will always be true.
-	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
-	if len(pod.Spec.Volumes) == 0 {
+type VolumeBindingChecker struct {
+	binder persistentvolume.TopologyAwareVolumeBinder
+}
+
+// NewVolumeBindingPredicate evaluates if a pod can fit due to the volumes it requests,
+// for both bound and unbound PVCs.
+//
+// For PVCs that are bound, then it checks that the corresponding PV's node affinity is
+// satisfied by the given node.
+//
+// For PVCs that are unbound, it tries to find available PVs that can satisfy the PVC requirements
+// and that the PV node affinity is satisfied by the given node.
+//
+// The predicate returns true if all bound PVCs have compatible PVs with the node, and if all unbound
+// PVCs can be matched with an available and node-compatible PV.
+func NewVolumeBindingPredicate(binder persistentvolume.TopologyAwareVolumeBinder) algorithm.FitPredicate {
+	c := &VolumeBindingChecker{
+		binder: binder,
+	}
+	return c.predicate
+}
+
+func (c *VolumeBindingChecker) predicate(pod *v1.Pod, meta algorithm.PredicateMetadata, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeTopologyBinding) {
 		return true, nil, nil
 	}
 
 	node := nodeInfo.Node()
 	if node == nil {
-		return false, nil, fmt.Errorf("node not found")
+		return false, nil, fmt.Errorf("Node not found")
 	}
 
-	glog.V(2).Infof("Checking for prebound volumes with node affinity")
-	namespace := pod.Namespace
-	manifest := &(pod.Spec)
-	for i := range manifest.Volumes {
-		volume := &manifest.Volumes[i]
-		if volume.PersistentVolumeClaim == nil {
-			continue
-		}
-		pvcName := volume.PersistentVolumeClaim.ClaimName
-		if pvcName == "" {
-			return false, nil, fmt.Errorf("PersistentVolumeClaim had no name")
-		}
-		pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
-		if err != nil {
-			return false, nil, err
-		}
+	needsBinding, foundPVs, err := c.binder.FindPodVolumes(pod, node.Name)
+	if err != nil {
+		return false, nil, err
+	}
 
-		if pvc == nil {
-			return false, nil, fmt.Errorf("PersistentVolumeClaim was not found: %q", pvcName)
-		}
-		pvName := pvc.Spec.VolumeName
-		if pvName == "" {
-			return false, nil, fmt.Errorf("PersistentVolumeClaim is not bound: %q", pvcName)
-		}
-
-		pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
-		if err != nil {
-			return false, nil, err
-		}
-		if pv == nil {
-			return false, nil, fmt.Errorf("PersistentVolume not found: %q", pvName)
-		}
-
-		err = volumeutil.CheckNodeAffinity(pv, node.Labels)
-		if err != nil {
-			glog.V(2).Infof("Won't schedule pod %q onto node %q due to volume %q node mismatch: %v", pod.Name, node.Name, pvName, err.Error())
+	if !foundPVs {
+		if needsBinding {
+			// Couldn't find matching PVs for unbound PVCs
+			glog.V(5).Info("Couldn't find matching PVs for pod \"%v/%v\", node %q", pod.Namespace, pod.Name, node.Name)
+			return false, []algorithm.PredicateFailureReason{ErrVolumeBindConflict}, nil
+		} else {
+			// Bound PVCs are not satisfied by this node
+			glog.V(5).Info("Bound PVs not satisfied for pod \"%v/%v\", node %q", pod.Namespace, pod.Name, node.Name)
 			return false, []algorithm.PredicateFailureReason{ErrVolumeNodeConflict}, nil
 		}
-		glog.V(4).Infof("VolumeNode predicate allows node %q for pod %q due to volume %q", node.Name, pod.Name, pvName)
 	}
+
+	// All volumes bound or matching PVs found for all unbound PVCs
+	glog.V(5).Info("All PVCs found matches for pod \"%v/%v\", node %q", pod.Namespace, pod.Name, node.Name)
 	return true, nil, nil
 }

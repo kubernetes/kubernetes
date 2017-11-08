@@ -76,6 +76,7 @@ func TestDefaultPredicates(t *testing.T) {
 		"CheckNodeMemoryPressure",
 		"CheckNodeDiskPressure",
 		"NoVolumeNodeConflict",
+		"NoVolumeBindConflict",
 		"CheckNodeCondition",
 		"PodToleratesNodeTaints",
 	)
