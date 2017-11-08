@@ -19,6 +19,7 @@ package deployment
 import (
 	"fmt"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -211,38 +212,48 @@ func markPodReady(c clientset.Interface, ns string, pod *v1.Pod) error {
 	return err
 }
 
-// markUpdatedPodsReady manually marks updated Deployment pods status to ready
-func (d *deploymentTester) markUpdatedPodsReady() {
+// markUpdatedPodsReady manually marks updated Deployment pods status to ready,
+// until the deployment is complete
+func (d *deploymentTester) markUpdatedPodsReady(wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	ns := d.deployment.Namespace
-	var readyPods int32
 	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		readyPods = 0
+		// We're done when the deployment is complete
+		if completed, err := d.deploymentComplete(); err != nil {
+			return false, err
+		} else if completed {
+			return true, nil
+		}
+		// Otherwise, mark remaining pods as ready
 		pods, err := d.listUpdatedPods()
 		if err != nil {
 			d.t.Log(err)
 			return false, nil
 		}
-		if len(pods) != int(*d.deployment.Spec.Replicas) {
-			d.t.Logf("%d/%d of deployment pods are created", len(pods), *d.deployment.Spec.Replicas)
-			return false, nil
-		}
+		d.t.Logf("%d/%d of deployment pods are created", len(pods), *d.deployment.Spec.Replicas)
 		for i := range pods {
 			pod := pods[i]
 			if podutil.IsPodReady(&pod) {
-				readyPods++
 				continue
 			}
 			if err = markPodReady(d.c, ns, &pod); err != nil {
 				d.t.Logf("failed to update Deployment pod %s, will retry later: %v", pod.Name, err)
-			} else {
-				readyPods++
 			}
 		}
-		return readyPods >= *d.deployment.Spec.Replicas, nil
+		return false, nil
 	})
 	if err != nil {
 		d.t.Fatalf("failed to mark updated Deployment pods to ready: %v", err)
 	}
+}
+
+func (d *deploymentTester) deploymentComplete() (bool, error) {
+	latest, err := d.c.ExtensionsV1beta1().Deployments(d.deployment.Namespace).Get(d.deployment.Name, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	return deploymentutil.DeploymentComplete(d.deployment, &latest.Status), nil
 }
 
 // Waits for the deployment to complete, and check rolling update strategy isn't broken at any times.
@@ -262,28 +273,42 @@ func (d *deploymentTester) waitForDeploymentComplete() error {
 // while marking updated Deployment pods as ready at the same time.
 // Uses hard check to make sure rolling update strategy is not violated at any times.
 func (d *deploymentTester) waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady() error {
+	var wg sync.WaitGroup
+
 	// Manually mark updated Deployment pods as ready in a separate goroutine
-	go d.markUpdatedPodsReady()
+	wg.Add(1)
+	go d.markUpdatedPodsReady(&wg)
 
 	// Wait for the Deployment status to complete while Deployment pods are becoming ready
 	err := d.waitForDeploymentCompleteAndCheckRolling()
 	if err != nil {
 		return fmt.Errorf("failed to wait for Deployment %s to complete: %v", d.deployment.Name, err)
 	}
+
+	// Wait for goroutine to finish
+	wg.Wait()
+
 	return nil
 }
 
 // waitForDeploymentCompleteAndMarkPodsReady waits for the Deployment to complete
 // while marking updated Deployment pods as ready at the same time.
 func (d *deploymentTester) waitForDeploymentCompleteAndMarkPodsReady() error {
+	var wg sync.WaitGroup
+
 	// Manually mark updated Deployment pods as ready in a separate goroutine
-	go d.markUpdatedPodsReady()
+	wg.Add(1)
+	go d.markUpdatedPodsReady(&wg)
 
 	// Wait for the Deployment status to complete using soft check, while Deployment pods are becoming ready
 	err := d.waitForDeploymentComplete()
 	if err != nil {
 		return fmt.Errorf("failed to wait for Deployment status %s: %v", d.deployment.Name, err)
 	}
+
+	// Wait for goroutine to finish
+	wg.Wait()
+
 	return nil
 }
 
