@@ -88,6 +88,25 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 	// example above).
 	allPossibleModes := pvIndex.allPossibleMatchingAccessModes(claim.Spec.AccessModes)
 
+	for _, modes := range allPossibleModes {
+		volumes, err := pvIndex.listByAccessModes(modes)
+		if err != nil {
+			return nil, err
+		}
+
+		bestVol, err := findMatchingVolume(claim, volumes)
+		if err != nil {
+			return nil, err
+		}
+
+		if bestVol != nil {
+			return bestVol, nil
+		}
+	}
+	return nil, nil
+}
+
+func findMatchingVolume(claim *v1.PersistentVolumeClaim, volumes []*v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	var smallestVolume *v1.PersistentVolume
 	var smallestVolumeQty resource.Quantity
 	requestedQty := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
@@ -103,57 +122,51 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *v1.PersistentVol
 		selector = internalSelector
 	}
 
-	for _, modes := range allPossibleModes {
-		volumes, err := pvIndex.listByAccessModes(modes)
-		if err != nil {
-			return nil, err
+	// Go through all available volumes with two goals:
+	// - find a volume that is either pre-bound by user or dynamically
+	//   provisioned for this claim. Because of this we need to loop through
+	//   all volumes.
+	// - find the smallest matching one if there is no volume pre-bound to
+	//   the claim.
+	for _, volume := range volumes {
+		volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
+
+		if isVolumeBoundToClaim(volume, claim) {
+			// this claim and volume are pre-bound; return
+			// the volume if the size request is satisfied,
+			// otherwise continue searching for a match
+			if volumeQty.Cmp(requestedQty) < 0 {
+				continue
+			}
+			return volume, nil
 		}
 
-		// Go through all available volumes with two goals:
-		// - find a volume that is either pre-bound by user or dynamically
-		//   provisioned for this claim. Because of this we need to loop through
-		//   all volumes.
-		// - find the smallest matching one if there is no volume pre-bound to
-		//   the claim.
-		for _, volume := range volumes {
-			if isVolumeBoundToClaim(volume, claim) {
-				// this claim and volume are pre-bound; return
-				// the volume if the size request is satisfied,
-				// otherwise continue searching for a match
-				volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
-				if volumeQty.Cmp(requestedQty) < 0 {
-					continue
-				}
-				return volume, nil
-			}
-
-			// filter out:
-			// - volumes bound to another claim
-			// - volumes whose labels don't match the claim's selector, if specified
-			// - volumes in Class that is not requested
-			if volume.Spec.ClaimRef != nil {
-				continue
-			} else if selector != nil && !selector.Matches(labels.Set(volume.Labels)) {
-				continue
-			}
-			if v1helper.GetPersistentVolumeClass(volume) != requestedClass {
-				continue
-			}
-
-			volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
-			if volumeQty.Cmp(requestedQty) >= 0 {
-				if smallestVolume == nil || smallestVolumeQty.Cmp(volumeQty) > 0 {
-					smallestVolume = volume
-					smallestVolumeQty = volumeQty
-				}
-			}
+		// filter out:
+		// - volumes bound to another claim
+		// - volumes whose labels don't match the claim's selector, if specified
+		// - volumes in Class that is not requested
+		if volume.Spec.ClaimRef != nil {
+			continue
+		} else if selector != nil && !selector.Matches(labels.Set(volume.Labels)) {
+			continue
+		}
+		if v1helper.GetPersistentVolumeClass(volume) != requestedClass {
+			continue
 		}
 
-		if smallestVolume != nil {
-			// Found a matching volume
-			return smallestVolume, nil
+		if volumeQty.Cmp(requestedQty) >= 0 {
+			if smallestVolume == nil || smallestVolumeQty.Cmp(volumeQty) > 0 {
+				smallestVolume = volume
+				smallestVolumeQty = volumeQty
+			}
 		}
 	}
+
+	if smallestVolume != nil {
+		// Found a matching volume
+		return smallestVolume, nil
+	}
+
 	return nil, nil
 }
 
