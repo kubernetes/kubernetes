@@ -347,8 +347,4 @@ func AfterReadingAllFlags(t *TestContextType) {
 			t.Host = defaultHost
 		}
 	}
-	// Reset the cluster IP range flag to CLUSTER_IP_RANGE env var, if defined.
-	if clusterIPRange := os.Getenv("CLUSTER_IP_RANGE"); clusterIPRange != "" {
-		t.CloudConfig.ClusterIPRange = clusterIPRange
-	}
 }
