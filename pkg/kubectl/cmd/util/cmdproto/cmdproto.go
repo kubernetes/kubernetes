@@ -53,14 +53,21 @@ func extractFlagDetailFromMessage(i int, msg interface{}) (*cmdproto.FlagDetail,
 	return info.(*cmdproto.FlagDetail), nil
 }
 
-type CommandExecutor interface {
-	Complete(f cmdutil.Factory, in io.Reader, out, err io.Writer) error
-	Validate(f cmdutil.Factory, in io.Reader, out, err io.Writer) error
-	Run(f cmdutil.Factory, in io.Reader, out, err io.Writer) error
-}
+//type CommandExecutor interface {
+//	Complete(f cmdutil.Factory, in io.Reader, out, err io.Writer) error
+//	Validate(f cmdutil.Factory, in io.Reader, out, err io.Writer) error
+//	Run(f cmdutil.Factory, in io.Reader, out, err io.Writer) error
+//}
 
 func CmdSetup(f cmdutil.Factory, in io.Reader, out, err io.Writer, msg interface{}) *cobra.Command {
-	flagProto := reflect.ValueOf(msg).Field(0).Interface()
+	flagProto := reflect.ValueOf(msg).Elem().Field(0).Interface()
+
+	params := make([]reflect.Value, 4)
+	params[0] = reflect.ValueOf(f)
+	params[1] = reflect.ValueOf(in)
+	params[2] = reflect.ValueOf(out)
+	params[3] = reflect.ValueOf(err)
+
 	info := extractCommandInfoFromMessage(flagProto)
 	var cmd *cobra.Command
 	cmd = &cobra.Command{
@@ -69,9 +76,18 @@ func CmdSetup(f cmdutil.Factory, in io.Reader, out, err io.Writer, msg interface
 		Long:    i18n.T(info.GetDescriptionLong()),
 		Example: templates.Examples(i18n.T(info.GetExample())),
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(msg.(CommandExecutor).Complete(f, in, out, err))
-			cmdutil.CheckErr(msg.(CommandExecutor).Validate(f, in, out, err))
-			cmdutil.CheckErr(msg.(CommandExecutor).Run(f, in, out, err))
+			errors := reflect.ValueOf(msg).MethodByName("Complete").Call(params)[0].Interface()
+			if errors != nil {
+				cmdutil.CheckErr(errors.(error))
+			}
+			errors = reflect.ValueOf(msg).MethodByName("Validate").Call(params)[0].Interface()
+			if errors != nil {
+				cmdutil.CheckErr(errors.(error))
+			}
+			errors = reflect.ValueOf(msg).MethodByName("Run").Call(params)[0].Interface()
+			if errors != nil {
+				cmdutil.CheckErr(errors.(error))
+			}
 		},
 	}
 	flagsSetup(cmd, flagProto)
@@ -85,7 +101,6 @@ func flagsSetup(cmd *cobra.Command, msg interface{}) {
 		if err != nil {
 			panic(err)
 		}
-
 		switch v.Field(i).Interface().(type) {
 		case *bool:
 			var tmpBool bool

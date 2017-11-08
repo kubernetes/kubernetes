@@ -29,38 +29,44 @@ import (
 // TestOptions
 type TestOptions struct {
 	//Flags must be the first element of Options struct, and must be exposed
-	Flags protofile.TestCmd
+	Flags *protofile.TestCmd
 }
 
 func (o *TestOptions) Complete(f cmdutil.Factory, in io.Reader, out, err io.Writer) error {
 	fmt.Println("This is Complete function")
-	o.Flags.GetInt32Flag()
-	o.Flags.GetBoolFlag()
-	o.Flags.GetArrayFlag()
-	o.Flags.GetTimeFlag()
-	o.Flags.GetStringFlag()
-	o.Flags.GetInt64Flag()
+	fmt.Println("int32 is", o.Flags.GetInt32Flag())
+	fmt.Println("bool is", o.Flags.GetBoolFlag())
+	fmt.Println("array is", o.Flags.GetArrayFlag())
+	fmt.Println("time is", o.Flags.GetTimeFlag())
+	fmt.Println("string is", o.Flags.GetStringFlag())
+	fmt.Println("int64 is", o.Flags.GetInt64Flag())
+	fmt.Println("===============================")
+	fmt.Println()
 	return nil
 }
 
 func (o *TestOptions) Validate(f cmdutil.Factory, in io.Reader, out, err io.Writer) error {
 	fmt.Println("This is Validate function")
-	o.Flags.GetInt32Flag()
-	o.Flags.GetBoolFlag()
-	o.Flags.GetArrayFlag()
-	o.Flags.GetTimeFlag()
-	o.Flags.GetStringFlag()
-	o.Flags.GetInt64Flag()
+	fmt.Println("int32 is", o.Flags.GetInt32Flag())
+	fmt.Println("bool is", o.Flags.GetBoolFlag())
+	fmt.Println("array is", o.Flags.GetArrayFlag())
+	fmt.Println("time is", o.Flags.GetTimeFlag())
+	fmt.Println("string is", o.Flags.GetStringFlag())
+	fmt.Println("int64 is", o.Flags.GetInt64Flag())
+	fmt.Println("===============================")
+	fmt.Println()
 	return nil
 }
 
 func (o *TestOptions) Run(f cmdutil.Factory, in io.Reader, out, err io.Writer) error {
 	fmt.Println("This is Run function")
-	o.Flags.GetInt32Flag()
-	o.Flags.GetBoolFlag()
-	o.Flags.GetArrayFlag()
-	o.Flags.GetTimeFlag()
-	o.Flags.GetStringFlag()
-	o.Flags.GetInt64Flag()
+	fmt.Println("int32 is", o.Flags.GetInt32Flag())
+	fmt.Println("bool is", o.Flags.GetBoolFlag())
+	fmt.Println("array is", o.Flags.GetArrayFlag())
+	fmt.Println("time is", o.Flags.GetTimeFlag())
+	fmt.Println("string is", o.Flags.GetStringFlag())
+	fmt.Println("int64 is", o.Flags.GetInt64Flag())
+	fmt.Println("===============================")
+	fmt.Println()
 	return nil
 }

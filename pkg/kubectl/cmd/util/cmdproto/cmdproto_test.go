@@ -110,7 +110,7 @@ func TestFlags2Proto(t *testing.T) {
 			Flags: testProto,
 		}
 
-		cmd := CmdSetup(nil, nil, nil, nil, st)
+		cmd := CmdSetup(nil, nil, nil, nil, &st)
 
 		//stimulate user to input flags
 		for index, v := range test.flagName {
