@@ -26,9 +26,9 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/api"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	batch_v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	unsafe "unsafe"
 )
 

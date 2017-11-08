@@ -26,7 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/quota"
 )
 
