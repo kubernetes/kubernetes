@@ -748,6 +748,42 @@ func (ctrl *PersistentVolumeController) updateVolumePhaseWithEvent(volume *v1.Pe
 func (ctrl *PersistentVolumeController) bindVolumeToClaim(volume *v1.PersistentVolume, claim *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
 	glog.V(4).Infof("updating PersistentVolume[%s]: binding to %q", volume.Name, claimToClaimKey(claim))
 
+	volumeClone, dirty, err := ctrl.getBindVolumeToClaim(volume, claim)
+	if err != nil {
+		return nil, err
+	}
+
+	// Save the volume only if something was changed
+	if dirty {
+		return ctrl.updateBindVolumeToClaim(volumeClone, claim, true)
+	}
+
+	glog.V(4).Infof("updating PersistentVolume[%s]: already bound to %q", volume.Name, claimToClaimKey(claim))
+	return volume, nil
+}
+
+// bindVolumeToClaim modifies given volume to be bound to a claim and saves it to
+// API server. The claim is not modified in this method!
+func (ctrl *PersistentVolumeController) updateBindVolumeToClaim(volumeClone *v1.PersistentVolume, claim *v1.PersistentVolumeClaim, updateCache bool) (*v1.PersistentVolume, error) {
+	glog.V(2).Infof("claim %q bound to volume %q", claimToClaimKey(claim), volumeClone.Name)
+	newVol, err := ctrl.kubeClient.Core().PersistentVolumes().Update(volumeClone)
+	if err != nil {
+		glog.V(4).Infof("updating PersistentVolume[%s]: binding to %q failed: %v", volumeClone.Name, claimToClaimKey(claim), err)
+		return newVol, err
+	}
+	if updateCache {
+		_, err = ctrl.storeVolumeUpdate(newVol)
+		if err != nil {
+			glog.V(4).Infof("updating PersistentVolume[%s]: cannot update internal cache: %v", volumeClone.Name, err)
+			return newVol, err
+		}
+	}
+	glog.V(4).Infof("updating PersistentVolume[%s]: bound to %q", newVol.Name, claimToClaimKey(claim))
+	return newVol, nil
+}
+
+// Get new PV object only, no API or cache update
+func (ctrl *PersistentVolumeController) getBindVolumeToClaim(volume *v1.PersistentVolume, claim *v1.PersistentVolumeClaim) (*v1.PersistentVolume, bool, error) {
 	dirty := false
 
 	// Check if the volume was already bound (either by user or by controller)
@@ -768,7 +804,7 @@ func (ctrl *PersistentVolumeController) bindVolumeToClaim(volume *v1.PersistentV
 
 		claimRef, err := ref.GetReference(scheme.Scheme, claim)
 		if err != nil {
-			return nil, fmt.Errorf("Unexpected error getting claim reference: %v", err)
+			return nil, false, fmt.Errorf("Unexpected error getting claim reference: %v", err)
 		}
 		volumeClone.Spec.ClaimRef = claimRef
 		dirty = true
@@ -780,25 +816,7 @@ func (ctrl *PersistentVolumeController) bindVolumeToClaim(volume *v1.PersistentV
 		dirty = true
 	}
 
-	// Save the volume only if something was changed
-	if dirty {
-		glog.V(2).Infof("claim %q bound to volume %q", claimToClaimKey(claim), volume.Name)
-		newVol, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Update(volumeClone)
-		if err != nil {
-			glog.V(4).Infof("updating PersistentVolume[%s]: binding to %q failed: %v", volume.Name, claimToClaimKey(claim), err)
-			return newVol, err
-		}
-		_, err = ctrl.storeVolumeUpdate(newVol)
-		if err != nil {
-			glog.V(4).Infof("updating PersistentVolume[%s]: cannot update internal cache: %v", volume.Name, err)
-			return newVol, err
-		}
-		glog.V(4).Infof("updating PersistentVolume[%s]: bound to %q", newVol.Name, claimToClaimKey(claim))
-		return newVol, nil
-	}
-
-	glog.V(4).Infof("updating PersistentVolume[%s]: already bound to %q", volume.Name, claimToClaimKey(claim))
-	return volume, nil
+	return volumeClone, dirty, nil
 }
 
 // bindClaimToVolume modifies the given claim to be bound to a volume and
