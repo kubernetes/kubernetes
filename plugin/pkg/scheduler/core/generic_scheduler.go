@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/volumebinder"
 )
 
 type FailedPredicateMap map[string][]algorithm.PredicateFailureReason
@@ -91,6 +92,7 @@ type genericScheduler struct {
 	lastNodeIndex         uint64
 
 	cachedNodeInfoMap map[string]*schedulercache.NodeInfo
+	volumeBinder      *volumebinder.VolumeBinder
 }
 
 // Schedule tries to schedule the given pod to one of node in the node list.
@@ -867,7 +869,10 @@ func nodesWherePreemptionMightHelp(pod *v1.Pod, nodes []*v1.Node, failedPredicat
 				predicates.ErrNodeNotReady,
 				predicates.ErrNodeNetworkUnavailable,
 				predicates.ErrNodeUnschedulable,
-				predicates.ErrNodeUnknownCondition:
+				predicates.ErrNodeUnknownCondition,
+				predicates.ErrVolumeZoneConflict,
+				predicates.ErrVolumeNodeConflict,
+				predicates.ErrVolumeBindConflict:
 				unresolvableReasonExist = true
 				break
 				// TODO(bsalamat): Please add affinity failure cases once we have specific affinity failure errors.
@@ -909,7 +914,8 @@ func NewGenericScheduler(
 	predicateMetaProducer algorithm.PredicateMetadataProducer,
 	prioritizers []algorithm.PriorityConfig,
 	priorityMetaProducer algorithm.MetadataProducer,
-	extenders []algorithm.SchedulerExtender) algorithm.ScheduleAlgorithm {
+	extenders []algorithm.SchedulerExtender,
+	volumeBinder *volumebinder.VolumeBinder) algorithm.ScheduleAlgorithm {
 	return &genericScheduler{
 		cache:                 cache,
 		equivalenceCache:      eCache,
@@ -920,5 +926,6 @@ func NewGenericScheduler(
 		priorityMetaProducer:  priorityMetaProducer,
 		extenders:             extenders,
 		cachedNodeInfoMap:     make(map[string]*schedulercache.NodeInfo),
+		volumeBinder:          volumeBinder,
 	}
 }
