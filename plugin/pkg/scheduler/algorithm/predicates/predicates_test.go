@@ -24,8 +24,10 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
@@ -72,6 +74,17 @@ func (pvs FakePersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*v1.Pe
 		}
 	}
 	return nil, fmt.Errorf("Unable to find persistent volume: %s", pvID)
+}
+
+type FakeStorageClassInfo []storagev1.StorageClass
+
+func (classes FakeStorageClassInfo) GetStorageClassInfo(name string) (*storagev1.StorageClass, error) {
+	for _, sc := range classes {
+		if sc.Name == name {
+			return &sc, nil
+		}
+	}
+	return nil, fmt.Errorf("Unable to find storage class: %s", name)
 }
 
 var (
@@ -3834,7 +3847,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrVolumeZoneConflict}
 
 	for _, test := range tests {
-		fit := NewVolumeZonePredicate(pvInfo, pvcInfo)
+		fit := NewVolumeZonePredicate(pvInfo, pvcInfo, nil)
 		node := &schedulercache.NodeInfo{}
 		node.SetNode(test.Node)
 
@@ -3927,7 +3940,7 @@ func TestVolumeZonePredicateMultiZone(t *testing.T) {
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrVolumeZoneConflict}
 
 	for _, test := range tests {
-		fit := NewVolumeZonePredicate(pvInfo, pvcInfo)
+		fit := NewVolumeZonePredicate(pvInfo, pvcInfo, nil)
 		node := &schedulercache.NodeInfo{}
 		node.SetNode(test.Node)
 
@@ -3942,6 +3955,130 @@ func TestVolumeZonePredicateMultiZone(t *testing.T) {
 			t.Errorf("%s: expected %v got %v", test.Name, test.Fits, fits)
 		}
 
+	}
+}
+
+func TestVolumeZonePredicateWithVolumeBinding(t *testing.T) {
+	var (
+		modeWait = storagev1.VolumeBindingWaitForFirstConsumer
+
+		class0         = "Class_0"
+		classWait      = "Class_Wait"
+		classImmediate = "Class_Immediate"
+	)
+
+	classInfo := FakeStorageClassInfo{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: classImmediate},
+		},
+		{
+			ObjectMeta:        metav1.ObjectMeta{Name: classWait},
+			VolumeBindingMode: &modeWait,
+		},
+	}
+
+	pvInfo := FakePersistentVolumeInfo{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a"}},
+		},
+	}
+
+	pvcInfo := FakePersistentVolumeClaimInfo{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_NoSC", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &class0},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_EmptySC", Namespace: "default"},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_WaitSC", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &classWait},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "PVC_ImmediateSC", Namespace: "default"},
+			Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &classImmediate},
+		},
+	}
+
+	testNode := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "host1",
+			Labels: map[string]string{kubeletapis.LabelZoneFailureDomain: "us-west1-a", "uselessLabel": "none"},
+		},
+	}
+
+	tests := []struct {
+		Name          string
+		Pod           *v1.Pod
+		Fits          bool
+		Node          *v1.Node
+		ExpectFailure bool
+	}{
+		{
+			Name: "label zone failure domain matched",
+			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_1"),
+			Node: testNode,
+			Fits: true,
+		},
+		{
+			Name:          "unbound volume empty storage class",
+			Pod:           createPodWithVolume("pod_1", "vol_1", "PVC_EmptySC"),
+			Node:          testNode,
+			Fits:          false,
+			ExpectFailure: true,
+		},
+		{
+			Name:          "unbound volume no storage class",
+			Pod:           createPodWithVolume("pod_1", "vol_1", "PVC_NoSC"),
+			Node:          testNode,
+			Fits:          false,
+			ExpectFailure: true,
+		},
+		{
+			Name:          "unbound volume immediate binding mode",
+			Pod:           createPodWithVolume("pod_1", "vol_1", "PVC_ImmediateSC"),
+			Node:          testNode,
+			Fits:          false,
+			ExpectFailure: true,
+		},
+		{
+			Name: "unbound volume wait binding mode",
+			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_WaitSC"),
+			Node: testNode,
+			Fits: true,
+		},
+	}
+
+	err := utilfeature.DefaultFeatureGate.Set("VolumeScheduling=true")
+	if err != nil {
+		t.Fatalf("Failed to enable feature gate for VolumeScheduling: %v", err)
+	}
+
+	for _, test := range tests {
+		fit := NewVolumeZonePredicate(pvInfo, pvcInfo, classInfo)
+		node := &schedulercache.NodeInfo{}
+		node.SetNode(test.Node)
+
+		fits, _, err := fit(test.Pod, nil, node)
+		if !test.ExpectFailure && err != nil {
+			t.Errorf("%s: unexpected error: %v", test.Name, err)
+		}
+		if test.ExpectFailure && err == nil {
+			t.Errorf("%s: expected error, got success", test.Name)
+		}
+		if fits != test.Fits {
+			t.Errorf("%s: expected %v got %v", test.Name, test.Fits, fits)
+		}
+	}
+
+	err = utilfeature.DefaultFeatureGate.Set("VolumeScheduling=false")
+	if err != nil {
+		t.Fatalf("Failed to disable feature gate for VolumeScheduling: %v", err)
 	}
 }
 
