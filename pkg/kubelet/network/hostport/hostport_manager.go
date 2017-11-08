@@ -178,6 +178,8 @@ func (hm *hostportManager) Remove(id string, podPortMapping *PodPortMapping) (er
 	chainsToRemove := []utiliptables.Chain{}
 	for _, pm := range hostportMappings {
 		chainsToRemove = append(chainsToRemove, getHostportChain(id, pm))
+		// TODO remove this, please refer https://github.com/kubernetes/kubernetes/pull/55153
+		chainsToRemove = append(chainsToRemove, getBugyHostportChain(id, pm))
 	}
 
 	// remove rules that consists of target chains
@@ -249,6 +251,13 @@ func (hm *hostportManager) closeHostports(hostportMappings []*PortMapping) error
 // identify existing iptables chains.
 func getHostportChain(id string, pm *PortMapping) utiliptables.Chain {
 	hash := sha256.Sum256([]byte(id + strconv.Itoa(int(pm.HostPort)) + string(pm.Protocol)))
+	encoded := base32.StdEncoding.EncodeToString(hash[:])
+	return utiliptables.Chain(kubeHostportChainPrefix + encoded[:16])
+}
+
+// TODO remove this, please refer https://github.com/kubernetes/kubernetes/pull/55153
+func getBugyHostportChain(id string, pm *PortMapping) utiliptables.Chain {
+	hash := sha256.Sum256([]byte(id + string(pm.HostPort) + string(pm.Protocol)))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
 	return utiliptables.Chain(kubeHostportChainPrefix + encoded[:16])
 }
