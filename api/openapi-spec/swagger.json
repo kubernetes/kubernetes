@@ -19344,111 +19344,7 @@
      "tags": [
       "admissionregistration_v1alpha1"
      ],
-     "operationId": "listAdmissionregistrationV1alpha1MutatingWebhookConfigurationForAllNamespaces",
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.MutatingWebhookConfigurationList"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     },
-     "x-kubernetes-action": "list",
-     "x-kubernetes-group-version-kind": {
-      "group": "admissionregistration.k8s.io",
-      "kind": "MutatingWebhookConfiguration",
-      "version": "v1alpha1"
-     }
-    },
-    "parameters": [
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
-      "name": "continue",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-      "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-      "name": "labelSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "integer",
-      "description": "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
-      "name": "limit",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "If 'true', then the output is pretty printed.",
-      "name": "pretty",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-      "name": "resourceVersion",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "integer",
-      "description": "Timeout for the list/watch call.",
-      "name": "timeoutSeconds",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-      "name": "watch",
-      "in": "query"
-     }
-    ]
-   },
-   "/apis/admissionregistration.k8s.io/v1alpha1/namespaces/{namespace}/mutatingwebhookconfigurations": {
-    "get": {
-     "description": "list or watch objects of kind MutatingWebhookConfiguration",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf",
-      "application/json;stream=watch",
-      "application/vnd.kubernetes.protobuf;stream=watch"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "admissionregistration_v1alpha1"
-     ],
-     "operationId": "listAdmissionregistrationV1alpha1NamespacedMutatingWebhookConfiguration",
+     "operationId": "listAdmissionregistrationV1alpha1MutatingWebhookConfiguration",
      "parameters": [
       {
        "uniqueItems": true,
@@ -19541,7 +19437,7 @@
      "tags": [
       "admissionregistration_v1alpha1"
      ],
-     "operationId": "createAdmissionregistrationV1alpha1NamespacedMutatingWebhookConfiguration",
+     "operationId": "createAdmissionregistrationV1alpha1MutatingWebhookConfiguration",
      "parameters": [
       {
        "name": "body",
@@ -19598,7 +19494,7 @@
      "tags": [
       "admissionregistration_v1alpha1"
      ],
-     "operationId": "deleteAdmissionregistrationV1alpha1CollectionNamespacedMutatingWebhookConfiguration",
+     "operationId": "deleteAdmissionregistrationV1alpha1CollectionMutatingWebhookConfiguration",
      "parameters": [
       {
        "uniqueItems": true,
@@ -19679,21 +19575,13 @@
      {
       "uniqueItems": true,
       "type": "string",
-      "description": "object name and auth scope, such as for teams and projects",
-      "name": "namespace",
-      "in": "path",
-      "required": true
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
       "description": "If 'true', then the output is pretty printed.",
       "name": "pretty",
       "in": "query"
      }
     ]
    },
-   "/apis/admissionregistration.k8s.io/v1alpha1/namespaces/{namespace}/mutatingwebhookconfigurations/{name}": {
+   "/apis/admissionregistration.k8s.io/v1alpha1/mutatingwebhookconfigurations/{name}": {
     "get": {
      "description": "read the specified MutatingWebhookConfiguration",
      "consumes": [
@@ -19710,7 +19598,7 @@
      "tags": [
       "admissionregistration_v1alpha1"
      ],
-     "operationId": "readAdmissionregistrationV1alpha1NamespacedMutatingWebhookConfiguration",
+     "operationId": "readAdmissionregistrationV1alpha1MutatingWebhookConfiguration",
      "parameters": [
       {
        "uniqueItems": true,
@@ -19761,7 +19649,7 @@
      "tags": [
       "admissionregistration_v1alpha1"
      ],
-     "operationId": "replaceAdmissionregistrationV1alpha1NamespacedMutatingWebhookConfiguration",
+     "operationId": "replaceAdmissionregistrationV1alpha1MutatingWebhookConfiguration",
      "parameters": [
       {
        "name": "body",
@@ -19812,7 +19700,7 @@
      "tags": [
       "admissionregistration_v1alpha1"
      ],
-     "operationId": "deleteAdmissionregistrationV1alpha1NamespacedMutatingWebhookConfiguration",
+     "operationId": "deleteAdmissionregistrationV1alpha1MutatingWebhookConfiguration",
      "parameters": [
       {
        "name": "body",
@@ -19880,7 +19768,7 @@
      "tags": [
       "admissionregistration_v1alpha1"
      ],
-     "operationId": "patchAdmissionregistrationV1alpha1NamespacedMutatingWebhookConfiguration",
+     "operationId": "patchAdmissionregistrationV1alpha1MutatingWebhookConfiguration",
      "parameters": [
       {
        "name": "body",
@@ -19915,14 +19803,6 @@
       "type": "string",
       "description": "name of the MutatingWebhookConfiguration",
       "name": "name",
-      "in": "path",
-      "required": true
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "object name and auth scope, such as for teams and projects",
-      "name": "namespace",
       "in": "path",
       "required": true
      },
@@ -20660,7 +20540,7 @@
      "tags": [
       "admissionregistration_v1alpha1"
      ],
-     "operationId": "watchAdmissionregistrationV1alpha1MutatingWebhookConfigurationListForAllNamespaces",
+     "operationId": "watchAdmissionregistrationV1alpha1MutatingWebhookConfigurationList",
      "responses": {
       "200": {
        "description": "OK",
@@ -20745,119 +20625,7 @@
      }
     ]
    },
-   "/apis/admissionregistration.k8s.io/v1alpha1/watch/namespaces/{namespace}/mutatingwebhookconfigurations": {
-    "get": {
-     "description": "watch individual changes to a list of MutatingWebhookConfiguration",
-     "consumes": [
-      "*/*"
-     ],
-     "produces": [
-      "application/json",
-      "application/yaml",
-      "application/vnd.kubernetes.protobuf",
-      "application/json;stream=watch",
-      "application/vnd.kubernetes.protobuf;stream=watch"
-     ],
-     "schemes": [
-      "https"
-     ],
-     "tags": [
-      "admissionregistration_v1alpha1"
-     ],
-     "operationId": "watchAdmissionregistrationV1alpha1NamespacedMutatingWebhookConfigurationList",
-     "responses": {
-      "200": {
-       "description": "OK",
-       "schema": {
-        "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
-       }
-      },
-      "401": {
-       "description": "Unauthorized"
-      }
-     },
-     "x-kubernetes-action": "watchlist",
-     "x-kubernetes-group-version-kind": {
-      "group": "admissionregistration.k8s.io",
-      "kind": "MutatingWebhookConfiguration",
-      "version": "v1alpha1"
-     }
-    },
-    "parameters": [
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "The continue option should be set when retrieving more results from the server. Since this value is server defined, clients may only use the continue value from a previous query result with identical query parameters (except for the value of continue) and the server may reject a continue value it does not recognize. If the specified continue value is no longer valid whether due to expiration (generally five to fifteen minutes) or a configuration change on the server the server will respond with a 410 ResourceExpired error indicating the client must restart their list without the continue field. This field is not supported when watch is true. Clients may start a watch from the last resourceVersion value returned by the server and not miss any modifications.",
-      "name": "continue",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "A selector to restrict the list of returned objects by their fields. Defaults to everything.",
-      "name": "fieldSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "If true, partially initialized resources are included in the response.",
-      "name": "includeUninitialized",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "A selector to restrict the list of returned objects by their labels. Defaults to everything.",
-      "name": "labelSelector",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "integer",
-      "description": "limit is a maximum number of responses to return for a list call. If more items exist, the server will set the `continue` field on the list metadata to a value that can be used with the same initial query to retrieve the next set of results. Setting a limit may return fewer than the requested amount of items (up to zero items) in the event all requested objects are filtered out and clients should only use the presence of the continue field to determine whether more results are available. Servers may choose not to support the limit argument and will return all of the available results. If limit is specified and the continue field is empty, clients may assume that no more results are available. This field is not supported if watch is true.\n\nThe server guarantees that the objects returned when using continue will be identical to issuing a single list call without a limit - that is, no objects created, modified, or deleted after the first request is issued will be included in any subsequent continued requests. This is sometimes referred to as a consistent snapshot, and ensures that a client that is using limit to receive smaller chunks of a very large result can ensure they see all possible objects. If objects are updated during a chunked list the version of the object that was present at the time the first list result was calculated is returned.",
-      "name": "limit",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "object name and auth scope, such as for teams and projects",
-      "name": "namespace",
-      "in": "path",
-      "required": true
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "If 'true', then the output is pretty printed.",
-      "name": "pretty",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "When specified with a watch call, shows changes that occur after that particular version of a resource. Defaults to changes from the beginning of history. When specified for list: - if unset, then the result is returned from remote storage based on quorum-read flag; - if it's 0, then we simply return what we currently have in cache, no guarantee; - if set to non zero, then the result is at least as fresh as given rv.",
-      "name": "resourceVersion",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "integer",
-      "description": "Timeout for the list/watch call.",
-      "name": "timeoutSeconds",
-      "in": "query"
-     },
-     {
-      "uniqueItems": true,
-      "type": "boolean",
-      "description": "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",
-      "name": "watch",
-      "in": "query"
-     }
-    ]
-   },
-   "/apis/admissionregistration.k8s.io/v1alpha1/watch/namespaces/{namespace}/mutatingwebhookconfigurations/{name}": {
+   "/apis/admissionregistration.k8s.io/v1alpha1/watch/mutatingwebhookconfigurations/{name}": {
     "get": {
      "description": "watch changes to an object of kind MutatingWebhookConfiguration",
      "consumes": [
@@ -20876,7 +20644,7 @@
      "tags": [
       "admissionregistration_v1alpha1"
      ],
-     "operationId": "watchAdmissionregistrationV1alpha1NamespacedMutatingWebhookConfiguration",
+     "operationId": "watchAdmissionregistrationV1alpha1MutatingWebhookConfiguration",
      "responses": {
       "200": {
        "description": "OK",
@@ -20936,14 +20704,6 @@
       "type": "string",
       "description": "name of the MutatingWebhookConfiguration",
       "name": "name",
-      "in": "path",
-      "required": true
-     },
-     {
-      "uniqueItems": true,
-      "type": "string",
-      "description": "object name and auth scope, such as for teams and projects",
-      "name": "namespace",
       "in": "path",
       "required": true
      },
@@ -67990,6 +67750,15 @@
      "metadata": {
       "description": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+     },
+     "webhooks": {
+      "description": "Webhooks is a list of webhooks and the affected resources and operations.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.Webhook"
+      },
+      "x-kubernetes-patch-merge-key": "name",
+      "x-kubernetes-patch-strategy": "merge"
      }
     },
     "x-kubernetes-group-version-kind": [
@@ -68037,15 +67806,6 @@
    "io.k8s.api.admissionregistration.v1alpha1.MutatingWebhookConfiguration": {
     "description": "MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.",
     "properties": {
-     "Webhooks": {
-      "description": "Webhooks is a list of webhooks and the affected resources and operations.",
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.Webhook"
-      },
-      "x-kubernetes-patch-merge-key": "name",
-      "x-kubernetes-patch-strategy": "merge"
-     },
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
       "type": "string"
@@ -68057,6 +67817,15 @@
      "metadata": {
       "description": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.",
       "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
+     },
+     "webhooks": {
+      "description": "Webhooks is a list of webhooks and the affected resources and operations.",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.Webhook"
+      },
+      "x-kubernetes-patch-merge-key": "name",
+      "x-kubernetes-patch-strategy": "merge"
      }
     },
     "x-kubernetes-group-version-kind": [
@@ -68180,15 +67949,6 @@
    "io.k8s.api.admissionregistration.v1alpha1.ValidatingWebhookConfiguration": {
     "description": "ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.",
     "properties": {
-     "Webhooks": {
-      "description": "Webhooks is a list of webhooks and the affected resources and operations.",
-      "type": "array",
-      "items": {
-       "$ref": "#/definitions/io.k8s.api.admissionregistration.v1alpha1.Webhook"
-      },
-      "x-kubernetes-patch-merge-key": "name",
-      "x-kubernetes-patch-strategy": "merge"
-     },
      "apiVersion": {
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
       "type": "string"

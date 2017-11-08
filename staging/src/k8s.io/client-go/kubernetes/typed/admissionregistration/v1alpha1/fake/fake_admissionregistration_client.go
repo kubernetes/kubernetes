@@ -30,6 +30,10 @@ func (c *FakeAdmissionregistrationV1alpha1) InitializerConfigurations() v1alpha1
 	return &FakeInitializerConfigurations{c}
 }
 
+func (c *FakeAdmissionregistrationV1alpha1) MutatingWebhookConfigurations() v1alpha1.MutatingWebhookConfigurationInterface {
+	return &FakeMutatingWebhookConfigurations{c}
+}
+
 func (c *FakeAdmissionregistrationV1alpha1) ValidatingWebhookConfigurations() v1alpha1.ValidatingWebhookConfigurationInterface {
 	return &FakeValidatingWebhookConfigurations{c}
 }

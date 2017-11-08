@@ -54,7 +54,6 @@ filegroup(
         "//pkg/client/chaosclient:all-srcs",
         "//pkg/client/clientset_generated/internalclientset:all-srcs",
         "//pkg/client/conditions:all-srcs",
-        "//pkg/client/informers/informers_generated/externalversions:all-srcs",
         "//pkg/client/informers/informers_generated/internalversion:all-srcs",
         "//pkg/client/leaderelectionconfig:all-srcs",
         "//pkg/client/listers/admissionregistration/internalversion:all-srcs",

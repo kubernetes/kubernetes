@@ -26,6 +26,8 @@ import (
 type Interface interface {
 	// InitializerConfigurations returns a InitializerConfigurationInformer.
 	InitializerConfigurations() InitializerConfigurationInformer
+	// MutatingWebhookConfigurations returns a MutatingWebhookConfigurationInformer.
+	MutatingWebhookConfigurations() MutatingWebhookConfigurationInformer
 	// ValidatingWebhookConfigurations returns a ValidatingWebhookConfigurationInformer.
 	ValidatingWebhookConfigurations() ValidatingWebhookConfigurationInformer
 }
@@ -44,6 +46,11 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // InitializerConfigurations returns a InitializerConfigurationInformer.
 func (v *version) InitializerConfigurations() InitializerConfigurationInformer {
 	return &initializerConfigurationInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// MutatingWebhookConfigurations returns a MutatingWebhookConfigurationInformer.
+func (v *version) MutatingWebhookConfigurations() MutatingWebhookConfigurationInformer {
+	return &mutatingWebhookConfigurationInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ValidatingWebhookConfigurations returns a ValidatingWebhookConfigurationInformer.

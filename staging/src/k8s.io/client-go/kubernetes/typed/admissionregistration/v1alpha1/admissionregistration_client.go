@@ -26,6 +26,7 @@ import (
 type AdmissionregistrationV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	InitializerConfigurationsGetter
+	MutatingWebhookConfigurationsGetter
 	ValidatingWebhookConfigurationsGetter
 }
 
@@ -36,6 +37,10 @@ type AdmissionregistrationV1alpha1Client struct {
 
 func (c *AdmissionregistrationV1alpha1Client) InitializerConfigurations() InitializerConfigurationInterface {
 	return newInitializerConfigurations(c)
+}
+
+func (c *AdmissionregistrationV1alpha1Client) MutatingWebhookConfigurations() MutatingWebhookConfigurationInterface {
+	return newMutatingWebhookConfigurations(c)
 }
 
 func (c *AdmissionregistrationV1alpha1Client) ValidatingWebhookConfigurations() ValidatingWebhookConfigurationInterface {

@@ -23,6 +23,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/registry/admissionregistration/initializerconfiguration:all-srcs",
+        "//pkg/registry/admissionregistration/mutatingwebhookconfiguration:all-srcs",
         "//pkg/registry/admissionregistration/rest:all-srcs",
         "//pkg/registry/admissionregistration/validatingwebhookconfiguration:all-srcs",
         "//pkg/registry/apps/controllerrevision:all-srcs",

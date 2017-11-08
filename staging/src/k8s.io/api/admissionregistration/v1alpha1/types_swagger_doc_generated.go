@@ -57,6 +57,26 @@ func (InitializerConfigurationList) SwaggerDoc() map[string]string {
 	return map_InitializerConfigurationList
 }
 
+var map_MutatingWebhookConfiguration = map[string]string{
+	"":         "MutatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and may change the object.",
+	"metadata": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.",
+	"webhooks": "Webhooks is a list of webhooks and the affected resources and operations.",
+}
+
+func (MutatingWebhookConfiguration) SwaggerDoc() map[string]string {
+	return map_MutatingWebhookConfiguration
+}
+
+var map_MutatingWebhookConfigurationList = map[string]string{
+	"":         "MutatingWebhookConfigurationList is a list of MutatingWebhookConfiguration.",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+	"items":    "List of MutatingWebhookConfiguration.",
+}
+
+func (MutatingWebhookConfigurationList) SwaggerDoc() map[string]string {
+	return map_MutatingWebhookConfigurationList
+}
+
 var map_Rule = map[string]string{
 	"":            "Rule is a tuple of APIGroups, APIVersion, and Resources.It is recommended to make sure that all the tuple expansions are valid.",
 	"apiGroups":   "APIGroups is the API groups the resources belong to. '*' is all groups. If '*' is present, the length of the slice must be one. Required.",
@@ -90,7 +110,7 @@ func (ServiceReference) SwaggerDoc() map[string]string {
 var map_ValidatingWebhookConfiguration = map[string]string{
 	"":         "ValidatingWebhookConfiguration describes the configuration of and admission webhook that accept or reject and object without changing it.",
 	"metadata": "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.",
-	"Webhooks": "Webhooks is a list of webhooks and the affected resources and operations.",
+	"webhooks": "Webhooks is a list of webhooks and the affected resources and operations.",
 }
 
 func (ValidatingWebhookConfiguration) SwaggerDoc() map[string]string {

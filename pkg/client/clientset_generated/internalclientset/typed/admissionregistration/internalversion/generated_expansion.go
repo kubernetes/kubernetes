@@ -18,4 +18,6 @@ package internalversion
 
 type InitializerConfigurationExpansion interface{}
 
+type MutatingWebhookConfigurationExpansion interface{}
+
 type ValidatingWebhookConfigurationExpansion interface{}
