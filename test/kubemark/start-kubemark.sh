@@ -218,6 +218,13 @@ function create-and-upload-hollow-node-image {
 # Use bazel rule to create a docker image for hollow-node and upload
 # it to the appropriate docker container registry for the cloud provider.
 function create-and-upload-hollow-node-image-bazel {
+  # https://github.com/bazelbuild/rules_docker#authorization
+  # we need docker-credential-gcr to get authed properly
+  if ! [ -x "$(command -v docker-credential-gcr)" ]; then
+    gcloud components install docker-credential-gcr
+  fi
+  docker-credential-gcr configure-docker
+
   RETRIES=3
   for attempt in $(seq 1 ${RETRIES}); do
     if ! bazel run //cluster/images/kubemark:push --define PROJECT="${PROJECT}"; then
