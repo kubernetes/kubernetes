@@ -99,8 +99,6 @@ function upgrade-master() {
   parse-master-env
   upgrade-master-env
 
-  backfile-kubeletauth-certs
-
   # Delete the master instance. Note that the master-pd is created
   # with auto-delete=no, so it should not be deleted.
   gcloud compute instances delete \
@@ -120,51 +118,6 @@ function upgrade-master-env() {
  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" && "${NODE_PROBLEM_DETECTOR_TOKEN:-}" == "" ]]; then
     NODE_PROBLEM_DETECTOR_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   fi
-}
-
-# TODO(mikedanese): delete when we don't support < 1.6
-function backfile-kubeletauth-certs() {
-  if [[ ! -z "${KUBEAPISERVER_CERT_BASE64:-}" && ! -z "${KUBEAPISERVER_CERT_BASE64:-}" ]]; then
-    return 0
-  fi
-
-  mkdir -p "${KUBE_TEMP}/pki"
-  echo "${CA_KEY_BASE64}" | base64 -d > "${KUBE_TEMP}/pki/ca.key"
-  echo "${CA_CERT_BASE64}" | base64 -d > "${KUBE_TEMP}/pki/ca.crt"
-  (cd "${KUBE_TEMP}/pki"
-    kube::util::ensure-cfssl "${KUBE_TEMP}/cfssl"
-    cat <<EOF > ca-config.json
-{
-  "signing": {
-    "client": {
-      "expiry": "43800h",
-      "usages": [
-        "signing",
-        "key encipherment",
-        "client auth"
-      ]
-    }
-  }
-}
-EOF
-    # the name kube-apiserver is bound to the node proxy
-    # subpaths required for the apiserver to hit proxy
-    # endpoints on the kubelet's handler.
-    cat <<EOF \
-      | "${CFSSL_BIN}" gencert \
-        -ca=ca.crt \
-        -ca-key=ca.key \
-        -config=ca-config.json \
-        -profile=client \
-        - \
-      | "${CFSSLJSON_BIN}" -bare kube-apiserver
-{
-  "CN": "kube-apiserver"
-}
-EOF
-  )
-  KUBEAPISERVER_CERT_BASE64=$(cat "${KUBE_TEMP}/pki/kube-apiserver.pem" | base64 | tr -d '\r\n')
-  KUBEAPISERVER_KEY_BASE64=$(cat "${KUBE_TEMP}/pki/kube-apiserver-key.pem" | base64 | tr -d '\r\n')
 }
 
 function wait-for-master() {
