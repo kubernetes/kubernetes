@@ -144,6 +144,8 @@ func (r *ScaleREST) GroupVersionKind(containingGV schema.GroupVersion) schema.Gr
 }
 
 // New creates a new Scale object
+// There is no way to determine scale subresource type here; as New() is not called by Get()
+// and Update(), it should be fine to fall back to default type of autoscaling.Scale
 func (r *ScaleREST) New() runtime.Object {
 	return &autoscaling.Scale{}
 }
@@ -155,7 +157,6 @@ func (r *ScaleREST) Get(ctx genericapirequest.Context, name string, options *met
 	}
 
 	info, ok := request.RequestInfoFrom(ctx)
-	fmt.Println("info: ", info)
 	if !ok {
 		return nil, fmt.Errorf("failed to obtain request info from context when getting scaleREST")
 	}
@@ -196,9 +197,7 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 	var autoScale *autoscaling.Scale
 	var extensionsScale *extensions.Scale
 	switch groupVersion {
-	case "apps/v1beta1":
-		fallthrough
-	case "apps/v1beta2":
+	case "apps/v1beta1", "apps/v1beta2":
 		extensionsScale, ok = obj.(*extensions.Scale)
 	default:
 		autoScale, ok = obj.(*autoscaling.Scale)
@@ -208,9 +207,7 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 	}
 
 	switch groupVersion {
-	case "apps/v1beta1":
-		fallthrough
-	case "apps/v1beta2":
+	case "apps/v1beta1", "apps/v1beta2":
 		if errs := extvalidation.ValidateScale(extensionsScale); len(errs) > 0 {
 			return nil, false, errors.NewInvalid(extensions.Kind("Scale"), extensionsScale.Name, errs)
 		}
@@ -238,9 +235,7 @@ func (r *ScaleREST) Update(ctx genericapirequest.Context, name string, objInfo r
 // scaleFromStatefulSet returns a scale subresource for a statefulset based on API version.
 func scaleFromStatefulSet(ss *apps.StatefulSet, groupVersion string) (runtime.Object, error) {
 	switch groupVersion {
-	case "apps/v1beta1":
-		fallthrough
-	case "apps/v1beta2":
+	case "apps/v1beta1", "apps/v1beta2":
 		return &extensions.Scale{
 			// TODO: Create a variant of ObjectMeta type that only contains the fields below.
 			ObjectMeta: metav1.ObjectMeta{
