@@ -65,7 +65,18 @@ type StorageClass struct {
 	// for all PVs created from this storageclass.
 	// +optional
 	AllowVolumeExpansion *bool
+
+	// VolumeBindingMode indicates how PersistentVolumeClaims should be
+	// provisioned and bound.  When unset, VolumeBindingImmediate is used.
+	// This field is alpha-level and is only honored by servers that enable
+	// the VolumeTopologyBinding feature.
+	// +optional
+	VolumeBindingMode *VolumeBindingMode
 }
+
+// NoProvisioner is a special Provisioner value to use when a StorageClass
+// is required but there is no dynamic provisioner.
+const NoProvisioner = "kubernetes.io/no-provisioner"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -80,3 +91,18 @@ type StorageClassList struct {
 	// Items is the list of StorageClasses
 	Items []StorageClass
 }
+
+// VolumeBindingMode indicates how PersistentVolumeClaims should be bound.
+type VolumeBindingMode string
+
+const (
+	// VolumeBindingImmediate indicates that PersistentVolumeClaims should be
+	// immediately provisioned and bound.
+	VolumeBindingImmediate VolumeBindingMode = "Immediate"
+
+	// VolumeBindingWaitForFirstConsumer indicates that PersistentVolumeClaims
+	// should not be provisioned and bound until the first Pod is created that
+	// references the PeristentVolumeClaim.  The volume provisioning and
+	// binding will occur during Pod scheduing.
+	VolumeBindingWaitForFirstConsumer VolumeBindingMode = "WaitForFirstConsumer"
+)

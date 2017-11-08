@@ -98,7 +98,7 @@ const (
 	// the API server as the certificate approaches expiration.
 	RotateKubeletClientCertificate utilfeature.Feature = "RotateKubeletClientCertificate"
 
-	// owner: @msau
+	// owner: @msau42
 	// alpha: v1.7
 	//
 	// A new volume type that supports local disks on a node.
@@ -169,6 +169,12 @@ const (
 	//
 	// Enable nodes to exclude themselves from service load balancers
 	ServiceNodeExclusion utilfeature.Feature = "ServiceNodeExclusion"
+
+	// owner: @msau42
+	// alpha: v1.9
+	//
+	// Extend the default scheduler to be aware of PV topology and handle PV binding
+	VolumeTopologyBinding utilfeature.Feature = "VolumeTopologyBinding"
 )
 
 func init() {
@@ -201,6 +207,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	ExpandPersistentVolumes:                     {Default: false, PreRelease: utilfeature.Alpha},
 	CPUManager:                                  {Default: false, PreRelease: utilfeature.Alpha},
 	ServiceNodeExclusion:                        {Default: false, PreRelease: utilfeature.Alpha},
+	VolumeTopologyBinding:                       {Default: false, PreRelease: utilfeature.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

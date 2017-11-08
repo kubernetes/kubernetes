@@ -37,6 +37,7 @@ func ValidateStorageClass(storageClass *storage.StorageClass) field.ErrorList {
 	allErrs = append(allErrs, validateParameters(storageClass.Parameters, field.NewPath("parameters"))...)
 	allErrs = append(allErrs, validateReclaimPolicy(storageClass.ReclaimPolicy, field.NewPath("reclaimPolicy"))...)
 	allErrs = append(allErrs, validateAllowVolumeExpansion(storageClass.AllowVolumeExpansion, field.NewPath("allowVolumeExpansion"))...)
+	allErrs = append(allErrs, validateVolumeBindingMode(storageClass.VolumeBindingMode, field.NewPath("volumeBindingMode"))...)
 
 	return allErrs
 }
@@ -55,6 +56,8 @@ func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageCl
 	if *storageClass.ReclaimPolicy != *oldStorageClass.ReclaimPolicy {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("reclaimPolicy"), "updates to reclaimPolicy are forbidden."))
 	}
+
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(storageClass.VolumeBindingMode, oldStorageClass.VolumeBindingMode, field.NewPath("volumeBindingMode"))...)
 	return allErrs
 }
 
@@ -119,5 +122,22 @@ func validateAllowVolumeExpansion(allowExpand *bool, fldPath *field.Path) field.
 	if allowExpand != nil && !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) {
 		allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate ExpandPersistentVolumes"))
 	}
+	return allErrs
+}
+
+var supportedVolumeBindingModes = sets.NewString(string(storage.VolumeBindingImmediate), string(storage.VolumeBindingWaitForFirstConsumer))
+
+// validateVolumeBindingMode tests that VolumeBindingMode specifies valid values.
+func validateVolumeBindingMode(mode *storage.VolumeBindingMode, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if mode != nil {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeTopologyBinding) {
+			allErrs = append(allErrs, field.Forbidden(fldPath, "field is disabled by feature-gate VolumeTopologyBinding"))
+		}
+		if !supportedVolumeBindingModes.Has(string(*mode)) {
+			allErrs = append(allErrs, field.NotSupported(fldPath, mode, supportedVolumeBindingModes.List()))
+		}
+	}
+
 	return allErrs
 }

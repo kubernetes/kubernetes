@@ -3214,6 +3214,9 @@ func describeStorageClass(sc *storage.StorageClass, events *api.EventList) (stri
 		if sc.ReclaimPolicy != nil {
 			w.Write(LEVEL_0, "ReclaimPolicy:\t%s\n", *sc.ReclaimPolicy)
 		}
+		if sc.VolumeBindingMode != nil {
+			w.Write(LEVEL_0, "VolumeBindingMode:\t%s\n", *sc.VolumeBindingMode)
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}

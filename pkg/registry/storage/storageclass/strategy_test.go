@@ -35,6 +35,7 @@ func TestStorageClassStrategy(t *testing.T) {
 	}
 
 	deleteReclaimPolicy := api.PersistentVolumeReclaimDelete
+	bindingMode := storage.VolumeBindingWaitForFirstConsumer
 	storageClass := &storage.StorageClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "valid-class",
@@ -43,7 +44,8 @@ func TestStorageClassStrategy(t *testing.T) {
 		Parameters: map[string]string{
 			"foo": "bar",
 		},
-		ReclaimPolicy: &deleteReclaimPolicy,
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		VolumeBindingMode: &bindingMode,
 	}
 
 	Strategy.PrepareForCreate(ctx, storageClass)
@@ -62,7 +64,8 @@ func TestStorageClassStrategy(t *testing.T) {
 		Parameters: map[string]string{
 			"foo": "bar",
 		},
-		ReclaimPolicy: &deleteReclaimPolicy,
+		ReclaimPolicy:     &deleteReclaimPolicy,
+		VolumeBindingMode: &bindingMode,
 	}
 
 	Strategy.PrepareForUpdate(ctx, newStorageClass, storageClass)
