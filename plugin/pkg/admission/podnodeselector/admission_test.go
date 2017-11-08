@@ -175,6 +175,12 @@ func TestPodAdmission(t *testing.T) {
 		if test.admit && !labels.Equals(test.mergedNodeSelector, labels.Set(pod.Spec.NodeSelector)) {
 			t.Errorf("Test: %s, expected: %s but got: %s", test.testName, test.mergedNodeSelector, pod.Spec.NodeSelector)
 		}
+		err = handler.Validate(admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+		if test.admit && err != nil {
+			t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
+		} else if !test.admit && err == nil {
+			t.Errorf("Test: %s, expected an error", test.testName)
+		}
 
 		// handles update of uninitialized pod like it's newly created.
 		err = handler.Admit(admission.NewAttributesRecord(pod, &oldPod, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
@@ -185,6 +191,12 @@ func TestPodAdmission(t *testing.T) {
 		}
 		if test.admit && !labels.Equals(test.mergedNodeSelector, labels.Set(pod.Spec.NodeSelector)) {
 			t.Errorf("Test: %s, expected: %s but got: %s", test.testName, test.mergedNodeSelector, pod.Spec.NodeSelector)
+		}
+		err = handler.Validate(admission.NewAttributesRecord(pod, &oldPod, api.Kind("Pod").WithVersion("version"), "testNamespace", namespace.ObjectMeta.Name, api.Resource("pods").WithVersion("version"), "", admission.Update, nil))
+		if test.admit && err != nil {
+			t.Errorf("Test: %s, expected no error but got: %s", test.testName, err)
+		} else if !test.admit && err == nil {
+			t.Errorf("Test: %s, expected an error", test.testName)
 		}
 	}
 }

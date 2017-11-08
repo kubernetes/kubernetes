@@ -69539,7 +69539,11 @@
     ],
     "properties": {
      "allowed": {
-      "description": "Allowed is required.  True if the action would be allowed, false otherwise.",
+      "description": "Allowed is required. True if the action would be allowed, false otherwise.",
+      "type": "boolean"
+     },
+     "denied": {
+      "description": "Denied is optional. True if the action would be denied, otherwise false. If both allowed is false and denied is false, then the authorizer has no opinion on whether to authorize the action. Denied may not be true if Allowed is true.",
       "type": "boolean"
      },
      "evaluationError": {
@@ -69890,7 +69894,11 @@
     ],
     "properties": {
      "allowed": {
-      "description": "Allowed is required.  True if the action would be allowed, false otherwise.",
+      "description": "Allowed is required. True if the action would be allowed, false otherwise.",
+      "type": "boolean"
+     },
+     "denied": {
+      "description": "Denied is optional. True if the action would be denied, otherwise false. If both allowed is false and denied is false, then the authorizer has no opinion on whether to authorize the action. Denied may not be true if Allowed is true.",
       "type": "boolean"
      },
      "evaluationError": {
@@ -70751,7 +70759,7 @@
     ],
     "properties": {
      "concurrencyPolicy": {
-      "description": "Specifies how to treat concurrent executions of a Job. Defaults to Allow.",
+      "description": "Specifies how to treat concurrent executions of a Job. Valid values are: - \"Allow\" (default): allows CronJobs to run concurrently; - \"Forbid\": forbids concurrent runs, skipping next run if previous run hasn't finished yet; - \"Replace\": cancels currently running job and replaces it with a new one",
       "type": "string"
      },
      "failedJobsHistoryLimit": {
@@ -70886,7 +70894,7 @@
     ],
     "properties": {
      "concurrencyPolicy": {
-      "description": "Specifies how to treat concurrent executions of a Job. Defaults to Allow.",
+      "description": "Specifies how to treat concurrent executions of a Job. Valid values are: - \"Allow\" (default): allows CronJobs to run concurrently; - \"Forbid\": forbids concurrent runs, skipping next run if previous run hasn't finished yet; - \"Replace\": cancels currently running job and replaces it with a new one",
       "type": "string"
      },
      "failedJobsHistoryLimit": {

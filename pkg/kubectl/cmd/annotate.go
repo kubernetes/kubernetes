@@ -205,7 +205,7 @@ func (o AnnotateOptions) RunAnnotate(f cmdutil.Factory, cmd *cobra.Command) erro
 			return err
 		}
 
-		b = b.SelectorParam(o.selector).
+		b = b.LabelSelectorParam(o.selector).
 			Unstructured(f.UnstructuredClientForMapping, mapper, typer).
 			ResourceTypeOrNameArgs(o.all, o.resources...).
 			Latest()

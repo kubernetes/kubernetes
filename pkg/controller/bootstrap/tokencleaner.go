@@ -66,13 +66,15 @@ type TokenCleaner struct {
 // NewTokenCleaner returns a new *NewTokenCleaner.
 //
 // TODO: Switch to shared informers
-func NewTokenCleaner(cl clientset.Interface, options TokenCleanerOptions) *TokenCleaner {
+func NewTokenCleaner(cl clientset.Interface, options TokenCleanerOptions) (*TokenCleaner, error) {
 	e := &TokenCleaner{
 		client:               cl,
 		tokenSecretNamespace: options.TokenSecretNamespace,
 	}
 	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("token_cleaner", cl.CoreV1().RESTClient().GetRateLimiter())
+		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("token_cleaner", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+			return nil, err
+		}
 	}
 
 	secretSelector := fields.SelectorFromSet(map[string]string{api.SecretTypeField: string(bootstrapapi.SecretTypeBootstrapToken)})
@@ -94,7 +96,7 @@ func NewTokenCleaner(cl clientset.Interface, options TokenCleanerOptions) *Token
 			UpdateFunc: func(oldSecret, newSecret interface{}) { e.evalSecret(newSecret) },
 		},
 	)
-	return e
+	return e, nil
 }
 
 // Run runs controller loops and returns when they are done

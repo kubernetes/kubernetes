@@ -46,6 +46,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authauthorizer "k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
@@ -148,8 +149,8 @@ func NewMasterComponents(c *Config) *MasterComponents {
 // alwaysAllow always allows an action
 type alwaysAllow struct{}
 
-func (alwaysAllow) Authorize(requestAttributes authauthorizer.Attributes) (bool, string, error) {
-	return true, "always allow", nil
+func (alwaysAllow) Authorize(requestAttributes authauthorizer.Attributes) (authorizer.Decision, string, error) {
+	return authorizer.DecisionAllow, "always allow", nil
 }
 
 // alwaysEmpty simulates "no authentication" for old tests

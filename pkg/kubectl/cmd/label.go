@@ -206,7 +206,7 @@ func (o *LabelOptions) RunLabel(f cmdutil.Factory, cmd *cobra.Command) error {
 			return err
 		}
 
-		b = b.SelectorParam(o.selector).
+		b = b.LabelSelectorParam(o.selector).
 			Unstructured(f.UnstructuredClientForMapping, mapper, typer).
 			ResourceTypeOrNameArgs(o.all, o.resources...).
 			Latest()

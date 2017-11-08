@@ -697,7 +697,7 @@ func TestResourceByNameAndEmptySelector(t *testing.T) {
 		"/namespaces/test/pods/foo": runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
 	}), corev1Codec).
 		NamespaceParam("test").
-		SelectorParam("").
+		LabelSelectorParam("").
 		ResourceTypeOrNameArgs(true, "pods", "foo")
 
 	singleItemImplied := false
@@ -718,14 +718,14 @@ func TestResourceByNameAndEmptySelector(t *testing.T) {
 	}
 }
 
-func TestSelector(t *testing.T) {
+func TestLabelSelector(t *testing.T) {
 	pods, svc := testData()
 	labelKey := metav1.LabelSelectorQueryParam(corev1GV.String())
 	b := NewBuilder(restmapper, LegacyCategoryExpander, scheme.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(corev1Codec, pods),
 		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(corev1Codec, svc),
 	}), corev1Codec).
-		SelectorParam("a=b").
+		LabelSelectorParam("a=b").
 		NamespaceParam("test").
 		Flatten()
 
@@ -751,9 +751,53 @@ func TestSelector(t *testing.T) {
 	}
 }
 
-func TestSelectorRequiresKnownTypes(t *testing.T) {
+func TestLabelSelectorRequiresKnownTypes(t *testing.T) {
 	b := NewBuilder(restmapper, LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
-		SelectorParam("a=b").
+		LabelSelectorParam("a=b").
+		NamespaceParam("test").
+		ResourceTypes("unknown")
+
+	if b.Do().Err() == nil {
+		t.Errorf("unexpected non-error")
+	}
+}
+
+func TestFieldSelector(t *testing.T) {
+	pods, svc := testData()
+	fieldKey := metav1.FieldSelectorQueryParam(corev1GV.String())
+	b := NewBuilder(restmapper, LegacyCategoryExpander, scheme.Scheme, fakeClientWith("", t, map[string]string{
+		"/namespaces/test/pods?" + fieldKey + "=a%3Db":     runtime.EncodeOrDie(corev1Codec, pods),
+		"/namespaces/test/services?" + fieldKey + "=a%3Db": runtime.EncodeOrDie(corev1Codec, svc),
+	}), corev1Codec).
+		FieldSelectorParam("a=b").
+		NamespaceParam("test").
+		Flatten()
+
+	test := &testVisitor{}
+	singleItemImplied := false
+
+	if b.Do().Err() == nil {
+		t.Errorf("unexpected non-error")
+	}
+
+	b.ResourceTypeOrNameArgs(true, "pods,service")
+
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil || singleItemImplied || len(test.Infos) != 3 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
+	}
+	if !apiequality.Semantic.DeepDerivative([]runtime.Object{&pods.Items[0], &pods.Items[1], &svc.Items[0]}, test.Objects()) {
+		t.Errorf("unexpected visited objects: %#v", test.Objects())
+	}
+
+	if _, err := b.Do().ResourceMapping(); err == nil {
+		t.Errorf("unexpected non-error")
+	}
+}
+
+func TestFieldSelectorRequiresKnownTypes(t *testing.T) {
+	b := NewBuilder(restmapper, LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
+		FieldSelectorParam("a=b").
 		NamespaceParam("test").
 		ResourceTypes("unknown")
 
@@ -764,7 +808,7 @@ func TestSelectorRequiresKnownTypes(t *testing.T) {
 
 func TestSingleResourceType(t *testing.T) {
 	b := NewBuilder(restmapper, LegacyCategoryExpander, scheme.Scheme, fakeClient(), corev1Codec).
-		SelectorParam("a=b").
+		LabelSelectorParam("a=b").
 		SingleResourceType().
 		ResourceTypeOrNameArgs(true, "pods,services")
 
@@ -1019,7 +1063,7 @@ func TestListObject(t *testing.T) {
 	b := NewBuilder(restmapper, LegacyCategoryExpander, scheme.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db": runtime.EncodeOrDie(corev1Codec, pods),
 	}), corev1Codec).
-		SelectorParam("a=b").
+		LabelSelectorParam("a=b").
 		NamespaceParam("test").
 		ResourceTypeOrNameArgs(true, "pods").
 		Flatten()
@@ -1053,7 +1097,7 @@ func TestListObjectWithDifferentVersions(t *testing.T) {
 		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(corev1Codec, pods),
 		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(corev1Codec, svc),
 	}), corev1Codec).
-		SelectorParam("a=b").
+		LabelSelectorParam("a=b").
 		NamespaceParam("test").
 		ResourceTypeOrNameArgs(true, "pods,services").
 		Flatten().

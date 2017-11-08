@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/daemon"
+	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -50,13 +51,17 @@ func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *daemon.DaemonS
 	}
 	resyncPeriod := 12 * time.Hour
 	informers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "daemonset-informers")), resyncPeriod)
-	dc := daemon.NewDaemonSetsController(
+	metrics.UnregisterMetricAndUntrackRateLimiterUsage("daemon_controller")
+	dc, err := daemon.NewDaemonSetsController(
 		informers.Extensions().V1beta1().DaemonSets(),
 		informers.Apps().V1beta1().ControllerRevisions(),
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "daemonset-controller")),
 	)
+	if err != nil {
+		t.Fatalf("error creating DaemonSets controller: %v", err)
+	}
 
 	return server, closeFn, dc, informers, clientSet
 }

@@ -110,7 +110,7 @@ func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []strin
 		FilenameParam(enforceNamespace, options).
 		ResourceTypeOrNameArgs(all, args...).
 		Flatten().
-		SelectorParam(selector).
+		LabelSelectorParam(selector).
 		Do()
 	err = r.Err()
 	if resource.IsUsageError(err) {

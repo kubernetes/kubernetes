@@ -92,7 +92,7 @@ type BootstrapSigner struct {
 // NewBootstrapSigner returns a new *BootstrapSigner.
 //
 // TODO: Switch to shared informers
-func NewBootstrapSigner(cl clientset.Interface, options BootstrapSignerOptions) *BootstrapSigner {
+func NewBootstrapSigner(cl clientset.Interface, options BootstrapSignerOptions) (*BootstrapSigner, error) {
 	e := &BootstrapSigner{
 		client:          cl,
 		configMapKey:    options.ConfigMapNamespace + "/" + options.ConfigMapName,
@@ -100,7 +100,9 @@ func NewBootstrapSigner(cl clientset.Interface, options BootstrapSignerOptions) 
 		syncQueue:       workqueue.NewNamed("bootstrap_signer_queue"),
 	}
 	if cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("bootstrap_signer", cl.CoreV1().RESTClient().GetRateLimiter())
+		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("bootstrap_signer", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+			return nil, err
+		}
 	}
 	configMapSelector := fields.SelectorFromSet(map[string]string{api.ObjectNameField: options.ConfigMapName})
 	e.configMaps, e.configMapsController = cache.NewInformer(
@@ -142,7 +144,7 @@ func NewBootstrapSigner(cl clientset.Interface, options BootstrapSignerOptions) 
 			DeleteFunc: func(_ interface{}) { e.pokeConfigMapSync() },
 		},
 	)
-	return e
+	return e, nil
 }
 
 // Run runs controller loops and returns when they are done

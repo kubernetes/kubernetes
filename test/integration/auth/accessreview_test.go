@@ -39,12 +39,12 @@ import (
 // TODO(etune): remove this test once a more comprehensive built-in authorizer is implemented.
 type sarAuthorizer struct{}
 
-func (sarAuthorizer) Authorize(a authorizer.Attributes) (bool, string, error) {
+func (sarAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
 	if a.GetUser().GetName() == "dave" {
-		return false, "no", errors.New("I'm sorry, Dave")
+		return authorizer.DecisionNoOpinion, "no", errors.New("I'm sorry, Dave")
 	}
 
-	return true, "you're not dave", nil
+	return authorizer.DecisionAllow, "you're not dave", nil
 }
 
 func alwaysAlice(req *http.Request) (user.Info, bool, error) {

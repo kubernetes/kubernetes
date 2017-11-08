@@ -66,13 +66,16 @@ type TestAuthorizer struct {
 	usernameToNamespaceToAllowedPSPs map[string]map[string]map[string]bool
 }
 
-func (t *TestAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
+func (t *TestAuthorizer) Authorize(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	if t.usernameToNamespaceToAllowedPSPs == nil {
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
 	allowedInNamespace := t.usernameToNamespaceToAllowedPSPs[a.GetUser().GetName()][a.GetNamespace()][a.GetName()]
 	allowedClusterWide := t.usernameToNamespaceToAllowedPSPs[a.GetUser().GetName()][""][a.GetName()]
-	return (allowedInNamespace || allowedClusterWide), "", nil
+	if allowedInNamespace || allowedClusterWide {
+		return authorizer.DecisionAllow, "", nil
+	}
+	return authorizer.DecisionNoOpinion, "", nil
 }
 
 var _ authorizer.Authorizer = &TestAuthorizer{}

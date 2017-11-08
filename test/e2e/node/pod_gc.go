@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package node
 
 import (
 	"fmt"
@@ -32,7 +32,7 @@ import (
 // This test requires that --terminated-pod-gc-threshold=100 be set on the controller manager
 //
 // Slow by design (7 min)
-var _ = framework.KubeDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]", func() {
+var _ = SIGDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]", func() {
 	f := framework.NewDefaultFramework("pod-garbage-collector")
 	It("should handle the creation of 1000 pods", func() {
 		var count int

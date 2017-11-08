@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	"k8s.io/kubernetes/pkg/util/metrics"
 	serviceaccountadmission "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -63,13 +64,16 @@ const (
 )
 
 func TestServiceAccountAutoCreate(t *testing.T) {
-	c, _, stopFunc := startServiceAccountTestServer(t)
+	c, _, stopFunc, err := startServiceAccountTestServer(t)
 	defer stopFunc()
+	if err != nil {
+		t.Fatalf("failed to setup ServiceAccounts server: %v", err)
+	}
 
 	ns := "test-service-account-creation"
 
 	// Create namespace
-	_, err := c.Core().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
+	_, err = c.Core().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
 	if err != nil {
 		t.Fatalf("could not create namespace: %v", err)
 	}
@@ -97,14 +101,17 @@ func TestServiceAccountAutoCreate(t *testing.T) {
 }
 
 func TestServiceAccountTokenAutoCreate(t *testing.T) {
-	c, _, stopFunc := startServiceAccountTestServer(t)
+	c, _, stopFunc, err := startServiceAccountTestServer(t)
 	defer stopFunc()
+	if err != nil {
+		t.Fatalf("failed to setup ServiceAccounts server: %v", err)
+	}
 
 	ns := "test-service-account-token-creation"
 	name := "my-service-account"
 
 	// Create namespace
-	_, err := c.Core().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
+	_, err = c.Core().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
 	if err != nil {
 		t.Fatalf("could not create namespace: %v", err)
 	}
@@ -192,13 +199,16 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 }
 
 func TestServiceAccountTokenAutoMount(t *testing.T) {
-	c, _, stopFunc := startServiceAccountTestServer(t)
+	c, _, stopFunc, err := startServiceAccountTestServer(t)
 	defer stopFunc()
+	if err != nil {
+		t.Fatalf("failed to setup ServiceAccounts server: %v", err)
+	}
 
 	ns := "auto-mount-ns"
 
 	// Create "my" namespace
-	_, err := c.Core().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
+	_, err = c.Core().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
 	if err != nil && !errors.IsAlreadyExists(err) {
 		t.Fatalf("could not create namespace: %v", err)
 	}
@@ -271,14 +281,17 @@ func TestServiceAccountTokenAutoMount(t *testing.T) {
 }
 
 func TestServiceAccountTokenAuthentication(t *testing.T) {
-	c, config, stopFunc := startServiceAccountTestServer(t)
+	c, config, stopFunc, err := startServiceAccountTestServer(t)
 	defer stopFunc()
+	if err != nil {
+		t.Fatalf("failed to setup ServiceAccounts server: %v", err)
+	}
 
 	myns := "auth-ns"
 	otherns := "other-ns"
 
 	// Create "my" namespace
-	_, err := c.Core().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: myns}})
+	_, err = c.Core().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: myns}})
 	if err != nil && !errors.IsAlreadyExists(err) {
 		t.Fatalf("could not create namespace: %v", err)
 	}
@@ -337,7 +350,7 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 
 // startServiceAccountTestServer returns a started server
 // It is the responsibility of the caller to ensure the returned stopFunc is called
-func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclient.Config, func()) {
+func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclient.Config, func(), error) {
 	// Listener
 	h := &framework.MasterHolder{Initialized: make(chan struct{})}
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -372,7 +385,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	// 1. The "root" user is allowed to do anything
 	// 2. ServiceAccounts named "ro" are allowed read-only operations in their namespace
 	// 3. ServiceAccounts named "rw" are allowed any operation in their namespace
-	authorizer := authorizer.AuthorizerFunc(func(attrs authorizer.Attributes) (bool, string, error) {
+	authorizer := authorizer.AuthorizerFunc(func(attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 		username := ""
 		if user := attrs.GetUser(); user != nil {
 			username = user.GetName()
@@ -382,7 +395,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 		// If the user is "root"...
 		if username == rootUserName {
 			// allow them to do anything
-			return true, "", nil
+			return authorizer.DecisionAllow, "", nil
 		}
 
 		// If the user is a service account...
@@ -392,15 +405,15 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 				switch serviceAccountName {
 				case readOnlyServiceAccountName:
 					if attrs.IsReadOnly() {
-						return true, "", nil
+						return authorizer.DecisionAllow, "", nil
 					}
 				case readWriteServiceAccountName:
-					return true, "", nil
+					return authorizer.DecisionAllow, "", nil
 				}
 			}
 		}
 
-		return false, fmt.Sprintf("User %s is denied (ns=%s, readonly=%v, resource=%s)", username, ns, attrs.IsReadOnly(), attrs.GetResource()), nil
+		return authorizer.DecisionNoOpinion, fmt.Sprintf("User %s is denied (ns=%s, readonly=%v, resource=%s)", username, ns, attrs.IsReadOnly(), attrs.GetResource()), nil
 	})
 
 	// Set up admission plugin to auto-assign serviceaccounts to pods
@@ -419,30 +432,38 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 
 	// Start the service account and service account token controllers
 	stopCh := make(chan struct{})
-	tokenController := serviceaccountcontroller.NewTokensController(
-		informers.Core().V1().ServiceAccounts(),
-		informers.Core().V1().Secrets(),
-		rootClientset,
-		serviceaccountcontroller.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)},
-	)
-	go tokenController.Run(1, stopCh)
-
-	serviceAccountController := serviceaccountcontroller.NewServiceAccountsController(
-		informers.Core().V1().ServiceAccounts(),
-		informers.Core().V1().Namespaces(),
-		rootClientset,
-		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
-	)
-	informers.Start(stopCh)
-	internalInformers.Start(stopCh)
-	go serviceAccountController.Run(5, stopCh)
-
 	stop := func() {
 		close(stopCh)
 		apiServer.Close()
 	}
 
-	return rootClientset, clientConfig, stop
+	metrics.UnregisterMetricAndUntrackRateLimiterUsage("serviceaccount_tokens_controller")
+	tokenController, err := serviceaccountcontroller.NewTokensController(
+		informers.Core().V1().ServiceAccounts(),
+		informers.Core().V1().Secrets(),
+		rootClientset,
+		serviceaccountcontroller.TokensControllerOptions{TokenGenerator: serviceaccount.JWTTokenGenerator(serviceAccountKey)},
+	)
+	if err != nil {
+		return rootClientset, clientConfig, stop, err
+	}
+	go tokenController.Run(1, stopCh)
+
+	metrics.UnregisterMetricAndUntrackRateLimiterUsage("serviceaccount_controller")
+	serviceAccountController, err := serviceaccountcontroller.NewServiceAccountsController(
+		informers.Core().V1().ServiceAccounts(),
+		informers.Core().V1().Namespaces(),
+		rootClientset,
+		serviceaccountcontroller.DefaultServiceAccountsControllerOptions(),
+	)
+	if err != nil {
+		return rootClientset, clientConfig, stop, err
+	}
+	informers.Start(stopCh)
+	internalInformers.Start(stopCh)
+	go serviceAccountController.Run(5, stopCh)
+
+	return rootClientset, clientConfig, stop, nil
 }
 
 func getServiceAccount(c *clientset.Clientset, ns string, name string, shouldWait bool) (*v1.ServiceAccount, error) {

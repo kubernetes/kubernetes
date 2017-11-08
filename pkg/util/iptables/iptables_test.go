@@ -1165,7 +1165,7 @@ func TestRestoreAllWait(t *testing.T) {
 	}
 
 	commandSet := sets.NewString(fcmd.CombinedOutputLog[2]...)
-	if !commandSet.HasAll("iptables-restore", "--wait=2", "--counters", "--noflush") {
+	if !commandSet.HasAll("iptables-restore", WaitSecondsString, "--counters", "--noflush") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
 
@@ -1214,8 +1214,8 @@ func TestRestoreAllWaitOldIptablesRestore(t *testing.T) {
 	if !commandSet.HasAll("iptables-restore", "--counters", "--noflush") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
-	if commandSet.HasAny("--wait=2") {
-		t.Errorf("wrong CombinedOutput() log (unexpected --wait=2 option), got %s", fcmd.CombinedOutputLog[2])
+	if commandSet.HasAny(WaitSecondsString) {
+		t.Errorf("wrong CombinedOutput() log (unexpected %s option), got %s", WaitSecondsString, fcmd.CombinedOutputLog[2])
 	}
 
 	if fcmd.CombinedOutputCalls != 3 {
