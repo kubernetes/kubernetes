@@ -826,12 +826,12 @@ func getServiceExternalIP(svc *api.Service, wide bool) string {
 	case api.ServiceTypeLoadBalancer:
 		lbIps := loadBalancerStatusStringer(svc.Status.LoadBalancer, wide)
 		if len(svc.Spec.ExternalIPs) > 0 {
-			results := []string{}
+			results := sets.NewString()
 			if len(lbIps) > 0 {
-				results = append(results, strings.Split(lbIps, ",")...)
+				results.Insert(strings.Split(lbIps, ",")...)
 			}
-			results = append(results, svc.Spec.ExternalIPs...)
-			return strings.Join(results, ",")
+			results.Insert(svc.Spec.ExternalIPs...)
+			return strings.Join(results.List(), ",")
 		}
 		if len(lbIps) > 0 {
 			return lbIps
