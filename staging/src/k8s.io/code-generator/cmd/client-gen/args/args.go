@@ -53,26 +53,8 @@ type CustomArgs struct {
 	FakeClient bool
 }
 
-var defaultInput = []string{
-	"api/",
-	"admissionregistration/",
-	"authentication/",
-	"authorization/",
-	"autoscaling/",
-	"batch/",
-	"certificates/",
-	"extensions/",
-	"rbac/",
-	"storage/",
-	"apps/",
-	"policy/",
-	"scheduling/",
-	"settings/",
-	"networking/",
-}
-
 func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
-	pflag.Var(NewGVPackagesValue(&ca.GroupVersionToInputPath, &ca.Groups, defaultInput), "input", "group/versions that client-gen will generate clients for. At most one version per group is allowed. Specified in the format \"group1/version1,group2/version2...\".")
+	pflag.Var(NewGVPackagesValue(&ca.GroupVersionToInputPath, &ca.Groups, nil), "input", "group/versions that client-gen will generate clients for. At most one version per group is allowed. Specified in the format \"group1/version1,group2/version2...\".")
 	pflag.Var(NewGVTypesValue(&ca.IncludedTypesOverrides, []string{}), "included-types-overrides", "list of group/version/type for which client should be generated. By default, client is generated for all types which have genclient in types.go. This overrides that. For each groupVersion in this list, only the types mentioned here will be included. The default check of genclient will be used for other group versions.")
 	pflag.StringVar(&ca.InputBasePath, "input-base", "k8s.io/kubernetes/pkg/apis", "base path to look for the api group.")
 	pflag.StringVarP(&ca.ClientsetName, "clientset-name", "n", "internalclientset", "the name of the generated clientset package.")
