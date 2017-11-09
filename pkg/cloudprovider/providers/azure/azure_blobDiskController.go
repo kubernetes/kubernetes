@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"math"
 	"net/url"
-	"os"
 	"regexp"
 	"sync"
 
@@ -70,12 +69,6 @@ var accountsLock = &sync.Mutex{}
 
 func newBlobDiskController(common *controllerCommon) (*BlobDiskController, error) {
 	c := BlobDiskController{common: common}
-	err := c.init()
-
-	if err != nil {
-		return nil, err
-	}
-
 	return &c, nil
 }
 
@@ -316,7 +309,7 @@ func (c *BlobDiskController) DeleteBlobDisk(diskURI string, wasForced bool) erro
 
 // Init tries best effort to ensure that 2 accounts standard/premium were created
 // to be used by shared blob disks. This to increase the speed pvc provisioning (in most of cases)
-func (c *BlobDiskController) init() error {
+func (c *BlobDiskController) InitStorageAccount() error {
 	if !c.shouldInit() {
 		return nil
 	}
@@ -541,13 +534,7 @@ func (c *BlobDiskController) getDiskCount(SAName string) (int, error) {
 // and we only do that in the controller
 
 func (c *BlobDiskController) shouldInit() bool {
-	if os.Args[0] == "kube-controller-manager" || (os.Args[0] == "/hyperkube" && os.Args[1] == "controller-manager") {
-		swapped := atomic.CompareAndSwapInt64(&initFlag, 0, 1)
-		if swapped {
-			return true
-		}
-	}
-	return false
+	return atomic.CompareAndSwapInt64(&initFlag, 0, 1)
 }
 
 func (c *BlobDiskController) getAllStorageAccounts() (map[string]*storageAccountState, error) {
