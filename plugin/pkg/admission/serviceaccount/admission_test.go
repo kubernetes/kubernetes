@@ -222,6 +222,25 @@ func TestFetchesUncachedServiceAccount(t *testing.T) {
 	}
 }
 
+func TestFetchesNilServiceAccount(t *testing.T) {
+	ns := "myns"
+
+	client := fake.NewSimpleClientset(&api.ServiceAccount{})
+
+	admit := NewServiceAccount()
+	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
+	admit.SetInternalKubeInformerFactory(informerFactory)
+	admit.client = client
+	admit.RequireAPIToken = false
+
+	pod := &api.Pod{}
+	attrs := admission.NewAttributesRecord(pod, nil, api.Kind("Pod").WithVersion("version"), ns, "myname", api.Resource("pods").WithVersion("version"), "", admission.Create, nil)
+	err := admit.Admit(attrs)
+	if err == nil || !errors.IsServerTimeout(err) {
+		t.Errorf("Expected server timeout error for fetch nil serviceaccount : %v", err)
+	}
+}
+
 func TestDeniesInvalidServiceAccount(t *testing.T) {
 	ns := "myns"
 
