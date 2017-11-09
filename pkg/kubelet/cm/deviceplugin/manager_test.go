@@ -33,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
@@ -265,6 +267,7 @@ func TestCheckpoint(t *testing.T) {
 		allocatedDevices: make(map[string]sets.String),
 		podDevices:       make(podDevices),
 	}
+	testManager.store, _ = utilstore.NewFileStore("/tmp/", utilfs.DefaultFs{})
 
 	testManager.podDevices.insert("pod1", "con1", resourceName1,
 		constructDevices([]string{"dev1", "dev2"}),
@@ -394,6 +397,7 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		activePods:       podsStub.getActivePods,
 		sourcesReady:     &sourcesReadyStub{},
 	}
+	testManager.store, _ = utilstore.NewFileStore("/tmp/", utilfs.DefaultFs{})
 
 	testManager.allDevices[resourceName1] = sets.NewString()
 	testManager.allDevices[resourceName1].Insert(devID1)
@@ -557,6 +561,7 @@ func TestSanitizeNodeAllocatable(t *testing.T) {
 		allocatedDevices: make(map[string]sets.String),
 		podDevices:       make(podDevices),
 	}
+	testManager.store, _ = utilstore.NewFileStore("/tmp/", utilfs.DefaultFs{})
 	// require one of resource1 and one of resource2
 	testManager.allocatedDevices[resourceName1] = sets.NewString()
 	testManager.allocatedDevices[resourceName1].Insert(devID1)
