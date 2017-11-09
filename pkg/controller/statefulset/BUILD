@@ -57,9 +57,9 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/controller/statefulset",
     library = ":go_default_library",
     deps = [
-        "//pkg/api/install:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/apps/install:go_default_library",
+        "//pkg/apis/core/install:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/history:go_default_library",
         "//vendor/k8s.io/api/apps/v1beta1:go_default_library",

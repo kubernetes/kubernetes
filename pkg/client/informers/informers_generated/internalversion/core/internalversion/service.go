@@ -23,7 +23,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/internalinterfaces"
 	internalversion "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
@@ -54,7 +54,7 @@ func NewServiceInformer(client internalclientset.Interface, namespace string, re
 				return client.Core().Services(namespace).Watch(options)
 			},
 		},
-		&api.Service{},
+		&core.Service{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,7 +65,7 @@ func defaultServiceInformer(client internalclientset.Interface, resyncPeriod tim
 }
 
 func (f *serviceInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api.Service{}, defaultServiceInformer)
+	return f.factory.InformerFor(&core.Service{}, defaultServiceInformer)
 }
 
 func (f *serviceInformer) Lister() internalversion.ServiceLister {

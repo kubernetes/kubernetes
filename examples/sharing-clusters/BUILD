@@ -17,8 +17,8 @@ go_library(
     srcs = ["make_secret.go"],
     importpath = "k8s.io/kubernetes/examples/sharing-clusters",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
     ],

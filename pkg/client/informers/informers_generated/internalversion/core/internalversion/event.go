@@ -23,7 +23,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/internalinterfaces"
 	internalversion "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
@@ -54,7 +54,7 @@ func NewEventInformer(client internalclientset.Interface, namespace string, resy
 				return client.Core().Events(namespace).Watch(options)
 			},
 		},
-		&api.Event{},
+		&core.Event{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,7 +65,7 @@ func defaultEventInformer(client internalclientset.Interface, resyncPeriod time.
 }
 
 func (f *eventInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api.Event{}, defaultEventInformer)
+	return f.factory.InformerFor(&core.Event{}, defaultEventInformer)
 }
 
 func (f *eventInformer) Lister() internalversion.EventLister {

@@ -28,7 +28,7 @@ go_library(
         "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/token:go_default_library",
-        "//pkg/api/validation:go_default_library",
+        "//pkg/apis/core/validation:go_default_library",
         "//pkg/kubeapiserver/authorizer/modes:go_default_library",
         "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/util/node:go_default_library",

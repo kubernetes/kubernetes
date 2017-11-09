@@ -23,7 +23,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/internalinterfaces"
 	internalversion "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
@@ -54,7 +54,7 @@ func NewReplicationControllerInformer(client internalclientset.Interface, namesp
 				return client.Core().ReplicationControllers(namespace).Watch(options)
 			},
 		},
-		&api.ReplicationController{},
+		&core.ReplicationController{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,7 +65,7 @@ func defaultReplicationControllerInformer(client internalclientset.Interface, re
 }
 
 func (f *replicationControllerInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api.ReplicationController{}, defaultReplicationControllerInformer)
+	return f.factory.InformerFor(&core.ReplicationController{}, defaultReplicationControllerInformer)
 }
 
 func (f *replicationControllerInformer) Lister() internalversion.ReplicationControllerLister {

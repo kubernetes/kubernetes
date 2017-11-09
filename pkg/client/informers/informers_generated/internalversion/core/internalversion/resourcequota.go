@@ -23,7 +23,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/internalinterfaces"
 	internalversion "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
@@ -54,7 +54,7 @@ func NewResourceQuotaInformer(client internalclientset.Interface, namespace stri
 				return client.Core().ResourceQuotas(namespace).Watch(options)
 			},
 		},
-		&api.ResourceQuota{},
+		&core.ResourceQuota{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,7 +65,7 @@ func defaultResourceQuotaInformer(client internalclientset.Interface, resyncPeri
 }
 
 func (f *resourceQuotaInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api.ResourceQuota{}, defaultResourceQuotaInformer)
+	return f.factory.InformerFor(&core.ResourceQuota{}, defaultResourceQuotaInformer)
 }
 
 func (f *resourceQuotaInformer) Lister() internalversion.ResourceQuotaLister {

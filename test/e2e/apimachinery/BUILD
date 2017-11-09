@@ -23,8 +23,8 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/apimachinery",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/apis/rbac:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/util/version:go_default_library",

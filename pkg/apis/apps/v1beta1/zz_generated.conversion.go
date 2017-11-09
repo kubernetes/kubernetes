@@ -27,8 +27,8 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	core "k8s.io/kubernetes/pkg/apis/core"
+	core_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 	unsafe "unsafe"
 )
@@ -188,7 +188,7 @@ func Convert_extensions_Deployment_To_v1beta1_Deployment(in *extensions.Deployme
 
 func autoConvert_v1beta1_DeploymentCondition_To_extensions_DeploymentCondition(in *v1beta1.DeploymentCondition, out *extensions.DeploymentCondition, s conversion.Scope) error {
 	out.Type = extensions.DeploymentConditionType(in.Type)
-	out.Status = api.ConditionStatus(in.Status)
+	out.Status = core.ConditionStatus(in.Status)
 	out.LastUpdateTime = in.LastUpdateTime
 	out.LastTransitionTime = in.LastTransitionTime
 	out.Reason = in.Reason
@@ -291,7 +291,7 @@ func autoConvert_v1beta1_DeploymentSpec_To_extensions_DeploymentSpec(in *v1beta1
 		return err
 	}
 	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := core_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_v1beta1_DeploymentStrategy_To_extensions_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
@@ -310,7 +310,7 @@ func autoConvert_extensions_DeploymentSpec_To_v1beta1_DeploymentSpec(in *extensi
 		return err
 	}
 	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := core_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	if err := Convert_extensions_DeploymentStrategy_To_v1beta1_DeploymentStrategy(&in.Strategy, &out.Strategy, s); err != nil {
@@ -586,10 +586,10 @@ func autoConvert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *v1beta1.Sta
 		return err
 	}
 	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := api_v1.Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := core_v1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	out.VolumeClaimTemplates = *(*[]api.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
+	out.VolumeClaimTemplates = *(*[]core.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
 	out.ServiceName = in.ServiceName
 	out.PodManagementPolicy = apps.PodManagementPolicyType(in.PodManagementPolicy)
 	if err := Convert_v1beta1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
@@ -604,7 +604,7 @@ func autoConvert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.Statef
 		return err
 	}
 	out.Selector = (*meta_v1.LabelSelector)(unsafe.Pointer(in.Selector))
-	if err := api_v1.Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
+	if err := core_v1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
 	out.VolumeClaimTemplates = *(*[]v1.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))

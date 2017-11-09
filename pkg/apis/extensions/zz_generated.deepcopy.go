@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	reflect "reflect"
 )
 
@@ -1093,17 +1093,17 @@ func (in *PodSecurityPolicySpec) DeepCopyInto(out *PodSecurityPolicySpec) {
 	*out = *in
 	if in.DefaultAddCapabilities != nil {
 		in, out := &in.DefaultAddCapabilities, &out.DefaultAddCapabilities
-		*out = make([]api.Capability, len(*in))
+		*out = make([]core.Capability, len(*in))
 		copy(*out, *in)
 	}
 	if in.RequiredDropCapabilities != nil {
 		in, out := &in.RequiredDropCapabilities, &out.RequiredDropCapabilities
-		*out = make([]api.Capability, len(*in))
+		*out = make([]core.Capability, len(*in))
 		copy(*out, *in)
 	}
 	if in.AllowedCapabilities != nil {
 		in, out := &in.AllowedCapabilities, &out.AllowedCapabilities
-		*out = make([]api.Capability, len(*in))
+		*out = make([]core.Capability, len(*in))
 		copy(*out, *in)
 	}
 	if in.Volumes != nil {
@@ -1382,7 +1382,7 @@ func (in *SELinuxStrategyOptions) DeepCopyInto(out *SELinuxStrategyOptions) {
 		if *in == nil {
 			*out = nil
 		} else {
-			*out = new(api.SELinuxOptions)
+			*out = new(core.SELinuxOptions)
 			**out = **in
 		}
 	}

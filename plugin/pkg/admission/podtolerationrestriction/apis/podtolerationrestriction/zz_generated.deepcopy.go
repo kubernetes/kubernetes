@@ -23,7 +23,7 @@ package podtolerationrestriction
 import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	reflect "reflect"
 )
 
@@ -50,14 +50,14 @@ func (in *Configuration) DeepCopyInto(out *Configuration) {
 	out.TypeMeta = in.TypeMeta
 	if in.Default != nil {
 		in, out := &in.Default, &out.Default
-		*out = make([]api.Toleration, len(*in))
+		*out = make([]core.Toleration, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.Whitelist != nil {
 		in, out := &in.Whitelist, &out.Whitelist
-		*out = make([]api.Toleration, len(*in))
+		*out = make([]core.Toleration, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

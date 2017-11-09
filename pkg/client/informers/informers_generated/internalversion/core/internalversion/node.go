@@ -23,7 +23,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/internalinterfaces"
 	internalversion "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
@@ -54,7 +54,7 @@ func NewNodeInformer(client internalclientset.Interface, resyncPeriod time.Durat
 				return client.Core().Nodes().Watch(options)
 			},
 		},
-		&api.Node{},
+		&core.Node{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,7 +65,7 @@ func defaultNodeInformer(client internalclientset.Interface, resyncPeriod time.D
 }
 
 func (f *nodeInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api.Node{}, defaultNodeInformer)
+	return f.factory.InformerFor(&core.Node{}, defaultNodeInformer)
 }
 
 func (f *nodeInformer) Lister() internalversion.NodeLister {

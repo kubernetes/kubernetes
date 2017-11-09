@@ -17,8 +17,8 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/apis/autoscaling/v2beta1",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//vendor/k8s.io/api/autoscaling/v2beta1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
@@ -48,10 +48,10 @@ go_test(
     importpath = "k8s.io/kubernetes/pkg/apis/autoscaling/v2beta1_test",
     deps = [
         ":go_default_library",
-        "//pkg/api/install:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/autoscaling/install:go_default_library",
+        "//pkg/apis/core/install:go_default_library",
         "//vendor/k8s.io/api/autoscaling/v2beta1:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",

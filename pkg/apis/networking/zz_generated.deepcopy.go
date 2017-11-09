@@ -25,7 +25,7 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	reflect "reflect"
 )
 
@@ -268,7 +268,7 @@ func (in *NetworkPolicyPort) DeepCopyInto(out *NetworkPolicyPort) {
 		if *in == nil {
 			*out = nil
 		} else {
-			*out = new(api.Protocol)
+			*out = new(core.Protocol)
 			**out = **in
 		}
 	}

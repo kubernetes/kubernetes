@@ -24,7 +24,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities",
     deps = [
-        "//pkg/api/v1/helper:go_default_library",
+        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/util/node:go_default_library",
         "//plugin/pkg/scheduler/algorithm:go_default_library",

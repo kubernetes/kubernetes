@@ -23,7 +23,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	internalclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	internalinterfaces "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion/internalinterfaces"
 	internalversion "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
@@ -54,7 +54,7 @@ func NewPodInformer(client internalclientset.Interface, namespace string, resync
 				return client.Core().Pods(namespace).Watch(options)
 			},
 		},
-		&api.Pod{},
+		&core.Pod{},
 		resyncPeriod,
 		indexers,
 	)
@@ -65,7 +65,7 @@ func defaultPodInformer(client internalclientset.Interface, resyncPeriod time.Du
 }
 
 func (f *podInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&api.Pod{}, defaultPodInformer)
+	return f.factory.InformerFor(&core.Pod{}, defaultPodInformer)
 }
 
 func (f *podInformer) Lister() internalversion.PodLister {

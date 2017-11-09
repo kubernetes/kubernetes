@@ -23,7 +23,7 @@ package settings
 import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	reflect "reflect"
 )
 
@@ -120,28 +120,28 @@ func (in *PodPresetSpec) DeepCopyInto(out *PodPresetSpec) {
 	in.Selector.DeepCopyInto(&out.Selector)
 	if in.Env != nil {
 		in, out := &in.Env, &out.Env
-		*out = make([]api.EnvVar, len(*in))
+		*out = make([]core.EnvVar, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.EnvFrom != nil {
 		in, out := &in.EnvFrom, &out.EnvFrom
-		*out = make([]api.EnvFromSource, len(*in))
+		*out = make([]core.EnvFromSource, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.Volumes != nil {
 		in, out := &in.Volumes, &out.Volumes
-		*out = make([]api.Volume, len(*in))
+		*out = make([]core.Volume, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.VolumeMounts != nil {
 		in, out := &in.VolumeMounts, &out.VolumeMounts
-		*out = make([]api.VolumeMount, len(*in))
+		*out = make([]core.VolumeMount, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

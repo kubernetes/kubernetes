@@ -114,8 +114,8 @@ go_test(
     library = ":go_default_library",
     tags = ["e2e"],
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/v1/node:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//pkg/kubelet/apis/kubeletconfig:go_default_library",

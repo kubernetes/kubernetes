@@ -9,7 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = ["helpers_test.go"],
-    importpath = "k8s.io/kubernetes/pkg/api/v1/helper",
+    importpath = "k8s.io/kubernetes/pkg/apis/core/v1/helper",
     library = ":go_default_library",
     deps = [
         "//vendor/k8s.io/api/core/v1:go_default_library",
@@ -23,9 +23,9 @@ go_test(
 go_library(
     name = "go_default_library",
     srcs = ["helpers.go"],
-    importpath = "k8s.io/kubernetes/pkg/api/v1/helper",
+    importpath = "k8s.io/kubernetes/pkg/apis/core/v1/helper",
     deps = [
-        "//pkg/api/helper:go_default_library",
+        "//pkg/apis/core/helper:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/labels:go_default_library",
@@ -45,7 +45,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/api/v1/helper/qos:all-srcs",
+        "//pkg/apis/core/v1/helper/qos:all-srcs",
     ],
     tags = ["automanaged"],
 )

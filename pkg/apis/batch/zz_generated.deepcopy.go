@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	reflect "reflect"
 )
 
@@ -206,7 +206,7 @@ func (in *CronJobStatus) DeepCopyInto(out *CronJobStatus) {
 	*out = *in
 	if in.Active != nil {
 		in, out := &in.Active, &out.Active
-		*out = make([]api.ObjectReference, len(*in))
+		*out = make([]core.ObjectReference, len(*in))
 		copy(*out, *in)
 	}
 	if in.LastScheduleTime != nil {

@@ -16,9 +16,9 @@ go_library(
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "//pkg/api:go_default_library",
-            "//pkg/api/helper:go_default_library",
             "//pkg/api/service:go_default_library",
+            "//pkg/apis/core:go_default_library",
+            "//pkg/apis/core/helper:go_default_library",
             "//pkg/features:go_default_library",
             "//pkg/proxy:go_default_library",
             "//pkg/proxy/healthcheck:go_default_library",
@@ -48,7 +48,7 @@ go_test(
     library = ":go_default_library",
     deps = select({
         "@io_bazel_rules_go//go/platform:windows_amd64": [
-            "//pkg/api:go_default_library",
+            "//pkg/apis/core:go_default_library",
             "//pkg/proxy:go_default_library",
             "//pkg/util/async:go_default_library",
             "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
