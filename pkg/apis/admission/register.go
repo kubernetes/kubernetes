@@ -46,7 +46,8 @@ var (
 
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&AdmissionReview{},
+		&AdmissionRequest{},
+		&AdmissionResponse{},
 	)
 	return nil
 }

@@ -24,17 +24,14 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// AdmissionReview describes an admission request.
-type AdmissionReview struct {
+// AdmissionRequest describes an admission request.
+type AdmissionRequest struct {
 	metav1.TypeMeta `json:",inline"`
 	// Spec describes the attributes for the admission request.
 	// Since this admission controller is non-mutating the webhook should avoid setting this in its response to avoid the
 	// cost of deserializing it.
 	// +optional
 	Spec AdmissionReviewSpec `json:"spec,omitempty" protobuf:"bytes,1,opt,name=spec"`
-	// Status is filled in by the webhook and indicates whether the admission request should be permitted.
-	// +optional
-	Status AdmissionReviewStatus `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`
 }
 
 // AdmissionReviewSpec describes the admission.Attributes for the admission request.
@@ -66,6 +63,22 @@ type AdmissionReviewSpec struct {
 	SubResource string `json:"subResource,omitempty" protobuf:"bytes,8,opt,name=subResource"`
 	// UserInfo is information about the requesting user
 	UserInfo authenticationv1.UserInfo `json:"userInfo,omitempty" protobuf:"bytes,9,opt,name=userInfo"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// AdmissionResponse describes an admission response.
+type AdmissionResponse struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Status is filled in by the webhook and indicates whether the admission
+	// request should be permitted.
+	// +optional
+	Status AdmissionReviewStatus `json:"status,omitempty" protobuf:"bytes,1,opt,name=status"`
+
+	// The json-patch body. Must be in compliance with RFC 6902.
+	// +optional
+	PatchBody []byte `json:"patchBody,omitempty" protobuf:"bytes,2,opt,name=patchBody"`
 }
 
 // AdmissionReviewStatus describes the status of the admission request.

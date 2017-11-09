@@ -24,16 +24,14 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// AdmissionReview describes an admission request.
-type AdmissionReview struct {
+// AdmissionRequest describes an admission request.
+type AdmissionRequest struct {
 	metav1.TypeMeta
 
 	// Spec describes the attributes for the admission request.
 	// Since this admission controller is non-mutating the webhook should avoid setting this in its response to avoid the
 	// cost of deserializing it.
 	Spec AdmissionReviewSpec
-	// Status is filled in by the webhook and indicates whether the admission request should be permitted.
-	Status AdmissionReviewStatus
 }
 
 // AdmissionReviewSpec describes the admission.Attributes for the admission request.
@@ -61,6 +59,22 @@ type AdmissionReviewSpec struct {
 	SubResource string
 	// UserInfo is information about the requesting user
 	UserInfo authentication.UserInfo
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// AdmissionResponse describes an admission response.
+type AdmissionResponse struct {
+	metav1.TypeMeta
+
+	// Status is filled in by the webhook and indicates whether the admission
+	// request should be permitted.
+	// +optional
+	Status AdmissionReviewStatus
+
+	// The json-patch body. Must be in compliance with RFC 6902.
+	// +optional
+	PatchBody []byte
 }
 
 // AdmissionReviewStatus describes the status of the admission request.
