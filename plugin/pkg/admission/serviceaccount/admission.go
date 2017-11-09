@@ -178,12 +178,8 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 
 	// Ensure the referenced service account exists
 	serviceAccount, err := s.getServiceAccount(a.GetNamespace(), pod.Spec.ServiceAccountName)
-	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("error looking up service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccountName, err))
-	}
-	if serviceAccount == nil {
-		// TODO: convert to a ServerTimeout error (or other error that sends a Retry-After header)
-		return admission.NewForbidden(a, fmt.Errorf("service account %s/%s was not found, retry after the service account is created", a.GetNamespace(), pod.Spec.ServiceAccountName))
+	if err != nil || serviceAccount == nil {
+		return errors.NewServerTimeout(a.GetResource().GroupResource(), "create pod", 0)
 	}
 
 	if s.enforceMountableSecrets(serviceAccount) {
