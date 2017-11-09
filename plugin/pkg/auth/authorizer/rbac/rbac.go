@@ -18,11 +18,10 @@ limitations under the License.
 package rbac
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/golang/glog"
-
-	"bytes"
 
 	"k8s.io/apimachinery/pkg/labels"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
