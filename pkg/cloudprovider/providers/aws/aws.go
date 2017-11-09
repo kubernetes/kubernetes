@@ -1717,6 +1717,9 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 
 	if !alreadyAttached {
 		available, err := c.checkIfAvailable(disk, "attaching", awsInstance.awsID)
+		if err != nil {
+			glog.Error(err)
+		}
 
 		if !available {
 			attachEnded = true
@@ -1955,6 +1958,9 @@ func (c *Cloud) DeleteDisk(volumeName KubernetesVolumeID) (bool, error) {
 		return false, err
 	}
 	available, err := c.checkIfAvailable(awsDisk, "deleting", "")
+	if err != nil {
+		glog.Error(err)
+	}
 
 	if !available {
 		return false, err
@@ -1983,13 +1989,21 @@ func (c *Cloud) checkIfAvailable(disk *awsDisk, opName string, instance string) 
 		// Volume is attached somewhere else and we can not attach it here
 		if len(info.Attachments) > 0 {
 			attachment := info.Attachments[0]
-			attachErr := fmt.Errorf("%s since volume is currently attached to %q", opError, aws.StringValue(attachment.InstanceId))
-			glog.Error(attachErr)
-			return false, attachErr
+			instanceId := aws.StringValue(attachment.InstanceId)
+			attachedInstance, ierr := c.getInstanceByID(instanceId)
+			attachErr := fmt.Sprintf("%s since volume is currently attached to %q", opError, instanceId)
+			if ierr != nil {
+				glog.Error(attachErr)
+				return false, errors.New(attachErr)
+			}
+			devicePath := aws.StringValue(attachment.Device)
+			nodeName := mapInstanceToNodeName(attachedInstance)
+
+			danglingErr := volumeutil.NewDanglingError(attachErr, nodeName, devicePath)
+			return false, danglingErr
 		}
 
 		attachErr := fmt.Errorf("%s since volume is in %q state", opError, volumeState)
-		glog.Error(attachErr)
 		return false, attachErr
 	}
 
