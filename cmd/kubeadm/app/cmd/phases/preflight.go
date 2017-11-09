@@ -22,6 +22,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
+	utilsexec "k8s.io/utils/exec"
 )
 
 // NewCmdPreFlight calls cobra.Command for preflight checks
@@ -44,7 +45,8 @@ func NewCmdPreFlightMaster() *cobra.Command {
 		Short: "Run master pre-flight checks",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := &kubeadmapi.MasterConfiguration{}
-			return preflight.RunInitMasterChecks(cfg)
+			criSocket := ""
+			return preflight.RunInitMasterChecks(utilsexec.New(), cfg, criSocket)
 		},
 	}
 
@@ -58,7 +60,8 @@ func NewCmdPreFlightNode() *cobra.Command {
 		Short: "Run node pre-flight checks",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := &kubeadmapi.NodeConfiguration{}
-			return preflight.RunJoinNodeChecks(cfg)
+			criSocket := ""
+			return preflight.RunJoinNodeChecks(utilsexec.New(), cfg, criSocket)
 		},
 	}
 

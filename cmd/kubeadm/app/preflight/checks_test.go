@@ -30,6 +30,7 @@ import (
 	"os"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/utils/exec"
 )
 
 var (
@@ -217,7 +218,7 @@ func TestRunInitMasterChecks(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := RunInitMasterChecks(rt.cfg)
+		actual := RunInitMasterChecks(exec.New(), rt.cfg, "")
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed RunInitMasterChecks:\n\texpected: %t\n\t  actual: %t\n\t error: %v",
@@ -253,7 +254,7 @@ func TestRunJoinNodeChecks(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		actual := RunJoinNodeChecks(rt.cfg)
+		actual := RunJoinNodeChecks(exec.New(), rt.cfg, "")
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed RunJoinNodeChecks:\n\texpected: %t\n\t  actual: %t",
@@ -280,8 +281,8 @@ func TestRunChecks(t *testing.T) {
 		{[]Checker{FileContentCheck{Path: "/does/not/exist"}}, false, ""},
 		{[]Checker{FileContentCheck{Path: "/"}}, true, ""},
 		{[]Checker{FileContentCheck{Path: "/", Content: []byte("does not exist")}}, false, ""},
-		{[]Checker{InPathCheck{executable: "foobarbaz"}}, true, "[preflight] WARNING: foobarbaz not found in system path\n"},
-		{[]Checker{InPathCheck{executable: "foobarbaz", mandatory: true}}, false, ""},
+		{[]Checker{InPathCheck{executable: "foobarbaz", exec: exec.New()}}, true, "[preflight] WARNING: foobarbaz not found in system path\n"},
+		{[]Checker{InPathCheck{executable: "foobarbaz", mandatory: true, exec: exec.New()}}, false, ""},
 		{[]Checker{ExtraArgsCheck{
 			APIServerExtraArgs:         map[string]string{"secure-port": "1234"},
 			ControllerManagerExtraArgs: map[string]string{"use-service-account-credentials": "true"},
