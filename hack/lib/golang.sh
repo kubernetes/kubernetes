@@ -32,6 +32,7 @@ kube::golang::server_targets() {
     vendor/k8s.io/kube-aggregator
     vendor/k8s.io/apiextensions-apiserver
     plugin/cmd/kube-scheduler
+    cluster/gce/gci/mounter
   )
   echo "${targets[@]}"
 }
@@ -321,7 +322,7 @@ EOF
   local go_version
   go_version=($(go version))
   local minimum_go_version
-  minimum_go_version=go1.8.3
+  minimum_go_version=go1.9.1
   if [[ "${go_version[2]}" < "${minimum_go_version}" && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.

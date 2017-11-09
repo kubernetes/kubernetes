@@ -192,7 +192,7 @@ func MergeContainerResourceLimits(container *v1.Container,
 	if container.Resources.Limits == nil {
 		container.Resources.Limits = make(v1.ResourceList)
 	}
-	for _, resource := range []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory} {
+	for _, resource := range []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage} {
 		if quantity, exists := container.Resources.Limits[resource]; !exists || quantity.IsZero() {
 			if cap, exists := allocatable[resource]; exists {
 				container.Resources.Limits[resource] = *cap.Copy()

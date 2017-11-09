@@ -73,6 +73,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -87,6 +88,7 @@ import (
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/controller"
 	nodectlr "k8s.io/kubernetes/pkg/controller/node"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubectl"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -308,6 +310,12 @@ func SkipUnlessAtLeast(value int, minValue int, message string) {
 func SkipIfProviderIs(unsupportedProviders ...string) {
 	if ProviderIs(unsupportedProviders...) {
 		Skipf("Not supported for providers %v (found %s)", unsupportedProviders, TestContext.Provider)
+	}
+}
+
+func SkipUnlessLocalEphemeralStorageEnabled() {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+		Skipf("Only supported when %v feature is enabled", features.LocalStorageCapacityIsolation)
 	}
 }
 
@@ -591,7 +599,7 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 			replicaOk += rc.Status.ReadyReplicas
 		}
 
-		rsList, err := c.Extensions().ReplicaSets(ns).List(metav1.ListOptions{})
+		rsList, err := c.ExtensionsV1beta1().ReplicaSets(ns).List(metav1.ListOptions{})
 		if err != nil {
 			Logf("Error getting replication sets in namespace %q: %v", ns, err)
 			if IsRetryableAPIError(err) {
@@ -2796,13 +2804,13 @@ func getRuntimeObjectForKind(c clientset.Interface, kind schema.GroupKind, ns, n
 	case api.Kind("ReplicationController"):
 		return c.CoreV1().ReplicationControllers(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("ReplicaSet"), appsinternal.Kind("ReplicaSet"):
-		return c.Extensions().ReplicaSets(ns).Get(name, metav1.GetOptions{})
+		return c.ExtensionsV1beta1().ReplicaSets(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("Deployment"), appsinternal.Kind("Deployment"):
-		return c.Extensions().Deployments(ns).Get(name, metav1.GetOptions{})
+		return c.ExtensionsV1beta1().Deployments(ns).Get(name, metav1.GetOptions{})
 	case extensionsinternal.Kind("DaemonSet"):
-		return c.Extensions().DaemonSets(ns).Get(name, metav1.GetOptions{})
+		return c.ExtensionsV1beta1().DaemonSets(ns).Get(name, metav1.GetOptions{})
 	case batchinternal.Kind("Job"):
-		return c.Batch().Jobs(ns).Get(name, metav1.GetOptions{})
+		return c.BatchV1().Jobs(ns).Get(name, metav1.GetOptions{})
 	default:
 		return nil, fmt.Errorf("Unsupported kind when getting runtime object: %v", kind)
 	}
@@ -2813,13 +2821,13 @@ func deleteResource(c clientset.Interface, kind schema.GroupKind, ns, name strin
 	case api.Kind("ReplicationController"):
 		return c.CoreV1().ReplicationControllers(ns).Delete(name, deleteOption)
 	case extensionsinternal.Kind("ReplicaSet"), appsinternal.Kind("ReplicaSet"):
-		return c.Extensions().ReplicaSets(ns).Delete(name, deleteOption)
+		return c.ExtensionsV1beta1().ReplicaSets(ns).Delete(name, deleteOption)
 	case extensionsinternal.Kind("Deployment"), appsinternal.Kind("Deployment"):
-		return c.Extensions().Deployments(ns).Delete(name, deleteOption)
+		return c.ExtensionsV1beta1().Deployments(ns).Delete(name, deleteOption)
 	case extensionsinternal.Kind("DaemonSet"):
-		return c.Extensions().DaemonSets(ns).Delete(name, deleteOption)
+		return c.ExtensionsV1beta1().DaemonSets(ns).Delete(name, deleteOption)
 	case batchinternal.Kind("Job"):
-		return c.Batch().Jobs(ns).Delete(name, deleteOption)
+		return c.BatchV1().Jobs(ns).Delete(name, deleteOption)
 	default:
 		return fmt.Errorf("Unsupported kind when deleting: %v", kind)
 	}
@@ -3788,19 +3796,39 @@ func RestartKubeProxy(host string) error {
 
 func RestartKubelet(host string) error {
 	// TODO: Make it work for all providers and distros.
-	if !ProviderIs("gce", "aws") {
-		return fmt.Errorf("unsupported provider: %s", TestContext.Provider)
+	supportedProviders := []string{"gce", "aws", "vsphere"}
+	if !ProviderIs(supportedProviders...) {
+		return fmt.Errorf("unsupported provider: %s, supported providers are: %v", TestContext.Provider, supportedProviders)
 	}
 	if ProviderIs("gce") && !NodeOSDistroIs("debian", "gci") {
 		return fmt.Errorf("unsupported node OS distro: %s", TestContext.NodeOSDistro)
 	}
 	var cmd string
+
 	if ProviderIs("gce") && NodeOSDistroIs("debian") {
 		cmd = "sudo /etc/init.d/kubelet restart"
+	} else if ProviderIs("vsphere") {
+		var sudoPresent bool
+		sshResult, err := SSH("sudo --version", host, TestContext.Provider)
+		if err != nil {
+			return fmt.Errorf("Unable to ssh to host %s with error %v", host, err)
+		}
+		if !strings.Contains(sshResult.Stderr, "command not found") {
+			sudoPresent = true
+		}
+		sshResult, err = SSH("systemctl --version", host, TestContext.Provider)
+		if !strings.Contains(sshResult.Stderr, "command not found") {
+			cmd = "systemctl restart kubelet"
+		} else {
+			cmd = "service kubelet restart"
+		}
+		if sudoPresent {
+			cmd = fmt.Sprintf("sudo %s", cmd)
+		}
 	} else {
 		cmd = "sudo systemctl restart kubelet"
 	}
-	Logf("Restarting kubelet via ssh, running: %v", cmd)
+	Logf("Restarting kubelet via ssh on host %s with command %s", host, cmd)
 	result, err := SSH(cmd, host, TestContext.Provider)
 	if err != nil || result.Code != 0 {
 		LogSSHResult(result)
@@ -4096,7 +4124,7 @@ func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []st
 
 // getIngressAddress returns the ips/hostnames associated with the Ingress.
 func getIngressAddress(client clientset.Interface, ns, name string) ([]string, error) {
-	ing, err := client.Extensions().Ingresses(ns).Get(name, metav1.GetOptions{})
+	ing, err := client.ExtensionsV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}

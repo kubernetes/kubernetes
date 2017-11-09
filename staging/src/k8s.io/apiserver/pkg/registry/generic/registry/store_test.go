@@ -311,8 +311,14 @@ func TestStoreCreate(t *testing.T) {
 	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
 	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
 
+	// create the object with denying admission
+	objA, err := registry.Create(testContext, podA, denyCreateValidation, false)
+	if err == nil {
+		t.Errorf("Expected admission error: %v", err)
+	}
+
 	// create the object
-	objA, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, false)
+	objA, err = registry.Create(testContext, podA, rest.ValidateAllObjectFunc, false)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -609,31 +615,53 @@ func TestStoreUpdate(t *testing.T) {
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
 
-	// Test1 try to update a non-existing node
-	_, _, err := registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podA), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	// try to update a non-existing node with denying admission, should still return NotFound
+	_, _, err := registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podA), denyCreateValidation, denyUpdateValidation)
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	// Test2 createIfNotFound and verify
+	// try to update a non-existing node
+	_, _, err = registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podA), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
+	if !errors.IsNotFound(err) {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// allow creation
 	registry.UpdateStrategy.(*testRESTStrategy).allowCreateOnUpdate = true
+
+	// createIfNotFound with denying create admission
+	_, _, err = registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podA), denyCreateValidation, rest.ValidateAllObjectUpdateFunc)
+	if err == nil {
+		t.Errorf("expected admission error on create")
+	}
+
+	// createIfNotFound and verify
 	if !updateAndVerify(t, testContext, registry, podA) {
 		t.Errorf("Unexpected error updating podA")
 	}
+
+	// forbid creation again
 	registry.UpdateStrategy.(*testRESTStrategy).allowCreateOnUpdate = false
 
-	// Test3 outofDate
+	// outofDate
 	_, _, err = registry.Update(testContext, podAWithResourceVersion.Name, rest.DefaultUpdatedObjectInfo(podAWithResourceVersion), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
 	if !errors.IsConflict(err) {
 		t.Errorf("Unexpected error updating podAWithResourceVersion: %v", err)
 	}
 
-	// Test4 normal update and verify
+	// try to update with denying admission
+	_, _, err = registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podA), rest.ValidateAllObjectFunc, denyUpdateValidation)
+	if err == nil {
+		t.Errorf("expected admission error on update")
+	}
+
+	// normal update and verify
 	if !updateAndVerify(t, testContext, registry, podB) {
 		t.Errorf("Unexpected error updating podB")
 	}
 
-	// Test5 unconditional update
+	// unconditional update
 	// NOTE: The logic for unconditional updates doesn't make sense to me, and imho should be removed.
 	// doUnconditionalUpdate := resourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
 	// ^^ That condition can *never be true due to the creation of root objects.
@@ -1968,4 +1996,12 @@ func TestQualifiedResource(t *testing.T) {
 	if !isQualifiedResource(err, qualifiedKind, qualifiedGroup) {
 		t.Fatalf("Unexpected error: %#v", err)
 	}
+}
+
+func denyCreateValidation(obj runtime.Object) error {
+	return fmt.Errorf("admission denied")
+}
+
+func denyUpdateValidation(obj, old runtime.Object) error {
+	return fmt.Errorf("admission denied")
 }

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
 	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
@@ -29,6 +29,20 @@ import (
 
 	"github.com/golang/glog"
 )
+
+var (
+	apiGroupVersions = []schema.GroupVersion{
+		auditv1beta1.SchemeGroupVersion,
+		auditv1alpha1.SchemeGroupVersion,
+	}
+	apiGroupVersionSet = map[schema.GroupVersion]bool{}
+)
+
+func init() {
+	for _, gv := range apiGroupVersions {
+		apiGroupVersionSet[gv] = true
+	}
+}
 
 func LoadPolicyFromFile(filePath string) (*auditinternal.Policy, error) {
 	if filePath == "" {
@@ -40,9 +54,16 @@ func LoadPolicyFromFile(filePath string) (*auditinternal.Policy, error) {
 	}
 
 	policy := &auditinternal.Policy{}
-	decoder := audit.Codecs.UniversalDecoder(auditv1beta1.SchemeGroupVersion, auditv1alpha1.SchemeGroupVersion)
-	if err := runtime.DecodeInto(decoder, policyDef, policy); err != nil {
+	decoder := audit.Codecs.UniversalDecoder(apiGroupVersions...)
+
+	_, gvk, err := decoder.Decode(policyDef, nil, policy)
+	if err != nil {
 		return nil, fmt.Errorf("failed decoding file %q: %v", filePath, err)
+	}
+
+	// Ensure the policy file contained an apiVersion and kind.
+	if !apiGroupVersionSet[schema.GroupVersion{Group: gvk.Group, Version: gvk.Version}] {
+		return nil, fmt.Errorf("unknown group version field %v in policy file %s", gvk, filePath)
 	}
 
 	if err := validation.ValidatePolicy(policy); err != nil {

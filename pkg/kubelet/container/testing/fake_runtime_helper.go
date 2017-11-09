@@ -44,8 +44,8 @@ func (f *FakeRuntimeHelper) GetPodCgroupParent(pod *v1.Pod) string {
 	return ""
 }
 
-func (f *FakeRuntimeHelper) GetClusterDNS(pod *v1.Pod) ([]string, []string, bool, error) {
-	return f.DNSServers, f.DNSSearches, false, f.Err
+func (f *FakeRuntimeHelper) GetClusterDNS(pod *v1.Pod) ([]string, []string, []string, bool, error) {
+	return f.DNSServers, f.DNSSearches, nil, false, f.Err
 }
 
 // This is not used by docker runtime.

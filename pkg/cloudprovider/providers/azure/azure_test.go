@@ -299,7 +299,7 @@ func TestReconcileSecurityGroupNewServiceAddsPort(t *testing.T) {
 
 	sg := getTestSecurityGroup()
 
-	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &svc1, true)
+	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &svc1, to.StringPtr("192.168.0.0"), true)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -313,7 +313,7 @@ func TestReconcileSecurityGroupNewInternalServiceAddsPort(t *testing.T) {
 
 	sg := getTestSecurityGroup()
 
-	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &svc1, true)
+	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &svc1, to.StringPtr("192.168.0.0"), true)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -329,7 +329,7 @@ func TestReconcileSecurityGroupRemoveService(t *testing.T) {
 
 	validateSecurityGroup(t, sg, service1, service2)
 	az := getTestCloud()
-	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &service1, false)
+	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &service1, nil, false)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -344,7 +344,7 @@ func TestReconcileSecurityGroupRemoveServiceRemovesPort(t *testing.T) {
 	sg := getTestSecurityGroup(svc)
 
 	svcUpdated := getTestService("servicea", v1.ProtocolTCP, 80)
-	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &svcUpdated, true)
+	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &svcUpdated, to.StringPtr("192.168.0.0"), true)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -361,7 +361,7 @@ func TestReconcileSecurityWithSourceRanges(t *testing.T) {
 	}
 
 	sg := getTestSecurityGroup(svc)
-	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &svc, true)
+	sg, _, err := az.reconcileSecurityGroup(sg, testClusterName, &svc, to.StringPtr("192.168.0.0"), true)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}

@@ -247,7 +247,7 @@ func TestCRD(t *testing.T) {
 	}
 	createErr := make(chan error, 1)
 	go func() {
-		_, err = barComClient.Resource(&metav1.APIResource{Name: "foos", Namespaced: true}, "default").Create(unstructuredFoo)
+		_, err := barComClient.Resource(&metav1.APIResource{Name: "foos", Namespaced: true}, "default").Create(unstructuredFoo)
 		t.Logf("Foo instance create returned: %v", err)
 		if err != nil {
 			createErr <- err

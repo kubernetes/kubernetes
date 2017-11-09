@@ -73,21 +73,21 @@ type KubeProxyIPVSConfiguration struct {
 // the Kubernetes proxy server.
 type KubeProxyConntrackConfiguration struct {
 	// max is the maximum number of NAT connections to track (0 to
-	// leave as-is).  This takes precedence over conntrackMaxPerCore and conntrackMin.
-	Max int32
+	// leave as-is).  This takes precedence over maxPerCore and min.
+	Max *int32
 	// maxPerCore is the maximum number of NAT connections to track
-	// per CPU core (0 to leave the limit as-is and ignore conntrackMin).
-	MaxPerCore int32
+	// per CPU core (0 to leave the limit as-is and ignore min).
+	MaxPerCore *int32
 	// min is the minimum value of connect-tracking records to allocate,
-	// regardless of conntrackMaxPerCore (set conntrackMaxPerCore=0 to leave the limit as-is).
-	Min int32
+	// regardless of maxPerCore (set maxPerCore=0 to leave the limit as-is).
+	Min *int32
 	// tcpEstablishedTimeout is how long an idle TCP connection will be kept open
-	// (e.g. '2s').  Must be greater than 0.
-	TCPEstablishedTimeout metav1.Duration
+	// (e.g. '2s').  Must be greater than 0 to set.
+	TCPEstablishedTimeout *metav1.Duration
 	// tcpCloseWaitTimeout is how long an idle conntrack entry
 	// in CLOSE_WAIT state will remain in the conntrack
 	// table. (e.g. '60s'). Must be greater than 0 to set.
-	TCPCloseWaitTimeout metav1.Duration
+	TCPCloseWaitTimeout *metav1.Duration
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -171,39 +171,39 @@ const (
 type IPVSSchedulerMethod string
 
 const (
-	// Robin Robin distributes jobs equally amongst the available real servers.
+	// RoundRobin distributes jobs equally amongst the available real servers.
 	RoundRobin IPVSSchedulerMethod = "rr"
-	// Weighted Round Robin assigns jobs to real servers proportionally to there real  servers' weight.
-	// Servers  with  higher weights receive new jobs first and get more jobs than servers with lower weights.
+	// WeightedRoundRobin assigns jobs to real servers proportionally to there real servers' weight.
+	// Servers with higher weights receive new jobs first and get more jobs than servers with lower weights.
 	// Servers with equal weights get an equal distribution of new jobs.
 	WeightedRoundRobin IPVSSchedulerMethod = "wrr"
-	// Least Connection assigns more jobs to real servers with fewer active jobs.
+	// LeastConnection assigns more jobs to real servers with fewer active jobs.
 	LeastConnection IPVSSchedulerMethod = "lc"
-	// Weighted Least Connection assigns more jobs to servers with fewer jobs and
-	// relative to the real servers’weight(Ci/Wi).
+	// WeightedLeastConnection assigns more jobs to servers with fewer jobs and
+	// relative to the real servers' weight(Ci/Wi).
 	WeightedLeastConnection IPVSSchedulerMethod = "wlc"
-	// Locality Based Least Connection assigns jobs destined for the same IP address to the same server if
-	// the server is not overloaded and available; otherwise assign jobs to servers with fewer jobs,
+	// LocalityBasedLeastConnection assigns jobs destined for the same IP address to the same server if
+	// the server is not overloaded and available; otherwise assigns jobs to servers with fewer jobs,
 	// and keep it for future assignment.
 	LocalityBasedLeastConnection IPVSSchedulerMethod = "lblc"
-	// Locality Based Least Connection with Replication assigns jobs destined for the same IP address to the
-	// least-connection node in the server set for the IP address.  If all the node in the server set are over loaded,
-	// it picks up a node with fewer jobs in the cluster and adds it in the sever set for the target.
+	// LocalityBasedLeastConnectionWithReplication with Replication assigns jobs destined for the same IP address to the
+	// least-connection node in the server set for the IP address. If all the node in the server set are overloaded,
+	// it picks up a node with fewer jobs in the cluster and adds it to the sever set for the target.
 	// If the server set has not been modified for the specified time, the most loaded node is removed from the server set,
 	// in order to avoid high degree of replication.
 	LocalityBasedLeastConnectionWithReplication IPVSSchedulerMethod = "lblcr"
-	// Source Hashing assigns jobs to servers through looking up a statically assigned hash table
+	// SourceHashing assigns jobs to servers through looking up a statically assigned hash table
 	// by their source IP addresses.
 	SourceHashing IPVSSchedulerMethod = "sh"
-	// Destination Hashing assigns jobs to servers through looking up a statically assigned hash table
+	// DestinationHashing assigns jobs to servers through looking up a statically assigned hash table
 	// by their destination IP addresses.
 	DestinationHashing IPVSSchedulerMethod = "dh"
-	// Shortest Expected Delay assigns an incoming job to the server with the shortest expected delay.
+	// ShortestExpectedDelay assigns an incoming job to the server with the shortest expected delay.
 	// The expected delay that the job will experience is (Ci + 1) / Ui if sent to the ith server, in which
 	// Ci is the number of jobs on the the ith server and Ui is the fixed service rate (weight) of the ith server.
 	ShortestExpectedDelay IPVSSchedulerMethod = "sed"
-	// Never Queue assigns an incoming job to an idle server if there is, instead of waiting for a fast one;
-	// if all the servers are busy, it adopts the Shortest Expected Delay policy to assign the job.
+	// NeverQueue assigns an incoming job to an idle server if there is, instead of waiting for a fast one;
+	// if all the servers are busy, it adopts the ShortestExpectedDelay policy to assign the job.
 	NeverQueue IPVSSchedulerMethod = "nq"
 )
 

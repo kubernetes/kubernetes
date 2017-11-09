@@ -159,7 +159,7 @@ func NewProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		userspace.CleanupLeftovers(iptInterface)
 		// IPVS Proxier will generate some iptables rules,
 		// need to clean them before switching to other proxy mode.
-		ipvs.CleanupLeftovers(execer, ipvsInterface, iptInterface)
+		ipvs.CleanupLeftovers(ipvsInterface, iptInterface)
 	} else if proxyMode == proxyModeIPVS {
 		glog.V(0).Info("Using ipvs Proxier.")
 		proxierIPVS, err := ipvs.NewProxier(
@@ -220,7 +220,7 @@ func NewProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		iptables.CleanupLeftovers(iptInterface)
 		// IPVS Proxier will generate some iptables rules,
 		// need to clean them before switching to other proxy mode.
-		ipvs.CleanupLeftovers(execer, ipvsInterface, iptInterface)
+		ipvs.CleanupLeftovers(ipvsInterface, iptInterface)
 	}
 
 	iptInterface.AddReloadFunc(proxier.Sync)

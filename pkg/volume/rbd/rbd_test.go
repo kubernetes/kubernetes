@@ -19,6 +19,7 @@ package rbd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
@@ -149,7 +150,7 @@ func checkMounterLog(t *testing.T, fakeMounter *mount.FakeMounter, expected int,
 	lastIndex := len(fakeMounter.Log) - 1
 	lastAction := fakeMounter.Log[lastIndex]
 	if !reflect.DeepEqual(expectedAction, lastAction) {
-		t.Fatalf("fakeMounter.Log[%d] should be %v, not: %v", lastIndex, expectedAction, lastAction)
+		t.Fatalf("fakeMounter.Log[%d] should be %#v, not: %#v", lastIndex, expectedAction, lastAction)
 	}
 }
 
@@ -276,6 +277,10 @@ func TestPlugin(t *testing.T) {
 		t.Fatalf("error creating temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
+	tmpDir, err = filepath.EvalSymlinks(tmpDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	podUID := uuid.NewUUID()
 	var cases []*testcase

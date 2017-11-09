@@ -186,6 +186,16 @@ func (p *testPatcher) Update(ctx request.Context, name string, objInfo rest.Upda
 		return nil, false, apierrors.NewConflict(example.Resource("pods"), inPod.Name, fmt.Errorf("existing %v, new %v", p.updatePod.ResourceVersion, inPod.ResourceVersion))
 	}
 
+	if currentPod == nil {
+		if err := createValidation(currentPod); err != nil {
+			return nil, false, err
+		}
+	} else {
+		if err := updateValidation(currentPod, inPod); err != nil {
+			return nil, false, err
+		}
+	}
+
 	return inPod, false, nil
 }
 
@@ -236,7 +246,7 @@ type patchTestCase struct {
 
 	// admission chain to use, nil is fine
 	admissionMutation   mutateObjectUpdateFunc
-	admissionValidation rest.ValidateObjectUpdateFunc // TODO: add test for this
+	admissionValidation rest.ValidateObjectUpdateFunc
 
 	// startingPod is used as the starting point for the first Update
 	startingPod *example.Pod
@@ -557,35 +567,76 @@ func TestPatchWithAdmissionRejection(t *testing.T) {
 	fifteen := int64(15)
 	thirty := int64(30)
 
-	tc := &patchTestCase{
-		name: "TestPatchWithAdmissionRejection",
-
-		admissionMutation: func(updatedObject runtime.Object, currentObject runtime.Object) error {
-			return errors.New("admission failure")
-		},
-
-		startingPod: &example.Pod{},
-		changedPod:  &example.Pod{},
-		updatePod:   &example.Pod{},
-
-		expectedError: "admission failure",
+	type Test struct {
+		name                string
+		admissionMutation   mutateObjectUpdateFunc
+		admissionValidation rest.ValidateObjectUpdateFunc
+		expectedError       string
 	}
+	for _, test := range []Test{
+		{
+			name: "TestPatchWithMutatingAdmissionRejection",
+			admissionMutation: func(updatedObject runtime.Object, currentObject runtime.Object) error {
+				return errors.New("mutating admission failure")
+			},
+			admissionValidation: rest.ValidateAllObjectUpdateFunc,
+			expectedError:       "mutating admission failure",
+		},
+		{
+			name:              "TestPatchWithValidatingAdmissionRejection",
+			admissionMutation: rest.ValidateAllObjectUpdateFunc,
+			admissionValidation: func(updatedObject runtime.Object, currentObject runtime.Object) error {
+				return errors.New("validating admission failure")
+			},
+			expectedError: "validating admission failure",
+		},
+		{
+			name: "TestPatchWithBothAdmissionRejections",
+			admissionMutation: func(updatedObject runtime.Object, currentObject runtime.Object) error {
+				return errors.New("mutating admission failure")
+			},
+			admissionValidation: func(updatedObject runtime.Object, currentObject runtime.Object) error {
+				return errors.New("validating admission failure")
+			},
+			expectedError: "mutating admission failure",
+		},
+	} {
+		tc := &patchTestCase{
+			name: test.name,
 
-	tc.startingPod.Name = name
-	tc.startingPod.Namespace = namespace
-	tc.startingPod.UID = uid
-	tc.startingPod.ResourceVersion = "1"
-	tc.startingPod.APIVersion = examplev1.SchemeGroupVersion.String()
-	tc.startingPod.Spec.ActiveDeadlineSeconds = &fifteen
+			admissionMutation:   test.admissionMutation,
+			admissionValidation: test.admissionValidation,
 
-	tc.changedPod.Name = name
-	tc.changedPod.Namespace = namespace
-	tc.changedPod.UID = uid
-	tc.changedPod.ResourceVersion = "1"
-	tc.changedPod.APIVersion = examplev1.SchemeGroupVersion.String()
-	tc.changedPod.Spec.ActiveDeadlineSeconds = &thirty
+			startingPod: &example.Pod{},
+			changedPod:  &example.Pod{},
+			updatePod:   &example.Pod{},
 
-	tc.Run(t)
+			expectedError: test.expectedError,
+		}
+
+		tc.startingPod.Name = name
+		tc.startingPod.Namespace = namespace
+		tc.startingPod.UID = uid
+		tc.startingPod.ResourceVersion = "1"
+		tc.startingPod.APIVersion = examplev1.SchemeGroupVersion.String()
+		tc.startingPod.Spec.ActiveDeadlineSeconds = &fifteen
+
+		tc.changedPod.Name = name
+		tc.changedPod.Namespace = namespace
+		tc.changedPod.UID = uid
+		tc.changedPod.ResourceVersion = "1"
+		tc.changedPod.APIVersion = examplev1.SchemeGroupVersion.String()
+		tc.changedPod.Spec.ActiveDeadlineSeconds = &thirty
+
+		tc.updatePod.Name = name
+		tc.updatePod.Namespace = namespace
+		tc.updatePod.UID = uid
+		tc.updatePod.ResourceVersion = "1"
+		tc.updatePod.APIVersion = examplev1.SchemeGroupVersion.String()
+		tc.updatePod.Spec.ActiveDeadlineSeconds = &fifteen
+
+		tc.Run(t)
+	}
 }
 
 func TestPatchWithVersionConflictThenAdmissionFailure(t *testing.T) {

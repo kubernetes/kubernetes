@@ -87,7 +87,7 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 
 		claims := []*v1.PersistentVolumeClaim{pvc}
 
-		pod := framework.MakePod(ns, claims, false, "")
+		pod := framework.MakePod(ns, nil, claims, false, "")
 		pod, err = c.CoreV1().Pods(ns).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -115,7 +115,7 @@ var _ = SIGDescribe("[Serial] Volume metrics", func() {
 		Expect(pvc).ToNot(Equal(nil))
 
 		claims := []*v1.PersistentVolumeClaim{pvc}
-		pod := framework.MakePod(ns, claims, false, "")
+		pod := framework.MakePod(ns, nil, claims, false, "")
 		pod, err = c.CoreV1().Pods(ns).Create(pod)
 		Expect(err).NotTo(HaveOccurred())
 

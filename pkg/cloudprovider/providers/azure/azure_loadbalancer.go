@@ -134,42 +134,6 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 	serviceName := getServiceName(service)
 	glog.V(5).Infof("ensure(%s): START clusterName=%q lbName=%q", serviceName, clusterName, lbName)
 
-	az.operationPollRateLimiter.Accept()
-	glog.V(10).Infof("SecurityGroupsClient.Get(%q): start", az.SecurityGroupName)
-	sg, err := az.SecurityGroupsClient.Get(az.ResourceGroup, az.SecurityGroupName, "")
-	glog.V(10).Infof("SecurityGroupsClient.Get(%q): end", az.SecurityGroupName)
-	if err != nil {
-		return nil, err
-	}
-	sg, sgNeedsUpdate, err := az.reconcileSecurityGroup(sg, clusterName, service, true /* wantLb */)
-	if err != nil {
-		return nil, err
-	}
-	if sgNeedsUpdate {
-		glog.V(3).Infof("ensure(%s): sg(%s) - updating", serviceName, *sg.Name)
-		// azure-sdk-for-go introduced contraint validation which breaks the updating here if we don't set these
-		// to nil. This is a workaround until https://github.com/Azure/go-autorest/issues/112 is fixed
-		sg.SecurityGroupPropertiesFormat.NetworkInterfaces = nil
-		sg.SecurityGroupPropertiesFormat.Subnets = nil
-		az.operationPollRateLimiter.Accept()
-		glog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%q): start", *sg.Name)
-		respChan, errChan := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *sg.Name, sg, nil)
-		resp := <-respChan
-		err := <-errChan
-		glog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%q): end", *sg.Name)
-		if az.CloudProviderBackoff && shouldRetryAPIRequest(resp.Response, err) {
-			glog.V(2).Infof("ensure(%s) backing off: sg(%s) - updating", serviceName, *sg.Name)
-			retryErr := az.CreateOrUpdateSGWithRetry(sg)
-			if retryErr != nil {
-				glog.V(2).Infof("ensure(%s) abort backoff: sg(%s) - updating", serviceName, *sg.Name)
-				return nil, retryErr
-			}
-		}
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	lb, existsLb, err := az.getAzureLoadBalancer(lbName)
 	if err != nil {
 		return nil, err
@@ -257,6 +221,50 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 		}
 	}
 
+	var lbStatus *v1.LoadBalancerStatus
+	if lbIP == nil {
+		lbStatus, exists, err := az.GetLoadBalancer(clusterName, service)
+		if err != nil {
+			return nil, err
+		}
+		if !exists {
+			return nil, fmt.Errorf("ensure(%s): lb(%s) - failed to get back load balancer", serviceName, lbName)
+		}
+		lbIP = &lbStatus.Ingress[0].IP
+	}
+
+	az.operationPollRateLimiter.Accept()
+	glog.V(10).Infof("SecurityGroupsClient.Get(%q): start", az.SecurityGroupName)
+	sg, err := az.SecurityGroupsClient.Get(az.ResourceGroup, az.SecurityGroupName, "")
+	glog.V(10).Infof("SecurityGroupsClient.Get(%q): end", az.SecurityGroupName)
+	if err != nil {
+		return nil, err
+	}
+	sg, sgNeedsUpdate, err := az.reconcileSecurityGroup(sg, clusterName, service, lbIP, true /* wantLb */)
+	if err != nil {
+		return nil, err
+	}
+	if sgNeedsUpdate {
+		glog.V(3).Infof("ensure(%s): sg(%s) - updating", serviceName, *sg.Name)
+		az.operationPollRateLimiter.Accept()
+		glog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%q): start", *sg.Name)
+		respChan, errChan := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *sg.Name, sg, nil)
+		resp := <-respChan
+		err := <-errChan
+		glog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%q): end", *sg.Name)
+		if az.CloudProviderBackoff && shouldRetryAPIRequest(resp.Response, err) {
+			glog.V(2).Infof("ensure(%s) backing off: sg(%s) - updating", serviceName, *sg.Name)
+			retryErr := az.CreateOrUpdateSGWithRetry(sg)
+			if retryErr != nil {
+				glog.V(2).Infof("ensure(%s) abort backoff: sg(%s) - updating", serviceName, *sg.Name)
+				return nil, retryErr
+			}
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Add the machines to the backend pool if they're not already
 	lbBackendName := getBackendPoolName(clusterName)
 	lbBackendPoolID := az.getBackendPoolID(lbName, lbBackendName)
@@ -279,6 +287,10 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 	}
 
 	glog.V(2).Infof("ensure(%s): lb(%s) finished", serviceName, lbName)
+
+	if lbStatus != nil {
+		return lbStatus, nil
+	}
 
 	if lbIP == nil {
 		lbStatus, exists, err := az.GetLoadBalancer(clusterName, service)
@@ -325,16 +337,12 @@ func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servi
 		return err
 	}
 	if existsSg {
-		reconciledSg, sgNeedsUpdate, reconcileErr := az.reconcileSecurityGroup(sg, clusterName, service, false /* wantLb */)
+		reconciledSg, sgNeedsUpdate, reconcileErr := az.reconcileSecurityGroup(sg, clusterName, service, nil, false /* wantLb */)
 		if reconcileErr != nil {
 			return reconcileErr
 		}
 		if sgNeedsUpdate {
 			glog.V(3).Infof("delete(%s): sg(%s) - updating", serviceName, az.SecurityGroupName)
-			// azure-sdk-for-go introduced contraint validation which breaks the updating here if we don't set these
-			// to nil. This is a workaround until https://github.com/Azure/go-autorest/issues/112 is fixed
-			sg.SecurityGroupPropertiesFormat.NetworkInterfaces = nil
-			sg.SecurityGroupPropertiesFormat.Subnets = nil
 			az.operationPollRateLimiter.Accept()
 			glog.V(10).Infof("SecurityGroupsClient.CreateOrUpdate(%q): start", *reconciledSg.Name)
 			respChan, errChan := az.SecurityGroupsClient.CreateOrUpdate(az.ResourceGroup, *reconciledSg.Name, reconciledSg, nil)
@@ -784,13 +792,24 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, fipConfiguration
 
 // This reconciles the Network Security Group similar to how the LB is reconciled.
 // This entails adding required, missing SecurityRules and removing stale rules.
-func (az *Cloud) reconcileSecurityGroup(sg network.SecurityGroup, clusterName string, service *v1.Service, wantLb bool) (network.SecurityGroup, bool, error) {
+func (az *Cloud) reconcileSecurityGroup(sg network.SecurityGroup, clusterName string, service *v1.Service, lbIP *string, wantLb bool) (network.SecurityGroup, bool, error) {
 	serviceName := getServiceName(service)
 	var ports []v1.ServicePort
 	if wantLb {
 		ports = service.Spec.Ports
 	} else {
 		ports = []v1.ServicePort{}
+	}
+
+	destinationIPAddress := ""
+	if wantLb {
+		if lbIP == nil {
+			return sg, false, fmt.Errorf("No load balancer IP for setting up security rules for service %s", service.Name)
+		}
+		destinationIPAddress = *lbIP
+	}
+	if destinationIPAddress == "" {
+		destinationIPAddress = "*"
 	}
 
 	sourceRanges, err := serviceapi.GetLoadBalancerSourceRanges(service)
@@ -824,7 +843,7 @@ func (az *Cloud) reconcileSecurityGroup(sg network.SecurityGroup, clusterName st
 					SourcePortRange:          to.StringPtr("*"),
 					DestinationPortRange:     to.StringPtr(strconv.Itoa(int(port.Port))),
 					SourceAddressPrefix:      to.StringPtr(sourceAddressPrefixes[j]),
-					DestinationAddressPrefix: to.StringPtr("*"),
+					DestinationAddressPrefix: to.StringPtr(destinationIPAddress),
 					Access:    network.SecurityRuleAccessAllow,
 					Direction: network.SecurityRuleDirectionInbound,
 				},

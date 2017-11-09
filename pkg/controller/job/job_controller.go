@@ -770,7 +770,7 @@ func (jm *JobController) manageJob(activePods []*v1.Pod, succeeded int32, job *b
 }
 
 func (jm *JobController) updateJobStatus(job *batch.Job) error {
-	_, err := jm.kubeClient.Batch().Jobs(job.Namespace).UpdateStatus(job)
+	_, err := jm.kubeClient.BatchV1().Jobs(job.Namespace).UpdateStatus(job)
 	return err
 }
 
