@@ -1770,7 +1770,7 @@ function start-kube-addons {
   if [[ "${REGISTER_MASTER_KUBELET:-false}" == "true" ]]; then
     setup-addon-manifests "addons" "rbac/legacy-kubelet-user"
   else
-    setup-addon-manifests "addons" "rbac/legacy-kubelet-user-disabled"
+    setup-addon-manifests "addons" "rbac/legacy-kubelet-user-disable"
   fi
 
   if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
