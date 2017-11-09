@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
+// +k8s:deepcopy-gen=package
 // +groupName=scheduling.k8s.io
 package scheduling // import "k8s.io/kubernetes/pkg/apis/scheduling"

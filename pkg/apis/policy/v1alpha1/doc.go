@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // +k8s:defaulter-gen=TypeMeta
-// +k8s:deepcopy-gen=package,register
+// +k8s:deepcopy-gen=package
 
 // Package policy is for any kind of policy object.  Suitable examples, even if
 // they aren't all here, are PodDisruptionBudget, PodSecurityPolicy,

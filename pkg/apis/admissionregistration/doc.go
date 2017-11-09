@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:deepcopy-gen=package,register
+// +k8s:deepcopy-gen=package
 
 // Package admissionregistration is the internal version of the API.
 // AdmissionConfiguration and AdmissionPluginConfiguration are legacy static admission plugin configuration
