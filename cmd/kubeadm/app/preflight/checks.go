@@ -451,7 +451,7 @@ func (swc SwapCheck) Check() (warnings, errors []error) {
 	}
 
 	if len(buf) > 1 {
-		return []error{fmt.Errorf("Running with swap on is not supported. Please disable swap or set kubelet's --fail-swap-on flag to false.")}, nil
+		return nil, []error{fmt.Errorf("running with swap on is not supported. Please disable swap")}
 	}
 
 	return nil, nil
