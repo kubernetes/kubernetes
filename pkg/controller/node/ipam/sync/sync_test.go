@@ -194,7 +194,8 @@ func TestNodeSyncUpdate(t *testing.T) {
 			wantError: false,
 		},
 	} {
-		sync := New(&tc.fake, &tc.fake, &tc.fake, tc.mode, "node1", cidrset.NewCIDRSet(clusterCIDRRange, 24))
+		cidr, _ := cidrset.NewCIDRSet(clusterCIDRRange, 24)
+		sync := New(&tc.fake, &tc.fake, &tc.fake, tc.mode, "node1", cidr)
 		doneChan := make(chan struct{})
 
 		// Do a single step of the loop.
@@ -225,7 +226,8 @@ func TestNodeSyncResync(t *testing.T) {
 		resyncTimeout: time.Millisecond,
 		reportChan:    make(chan struct{}),
 	}
-	sync := New(fake, fake, fake, SyncFromCluster, "node1", cidrset.NewCIDRSet(clusterCIDRRange, 24))
+	cidr, _ := cidrset.NewCIDRSet(clusterCIDRRange, 24)
+	sync := New(fake, fake, fake, SyncFromCluster, "node1", cidr)
 	doneChan := make(chan struct{})
 
 	go sync.Loop(doneChan)
@@ -267,7 +269,8 @@ func TestNodeSyncDelete(t *testing.T) {
 			},
 		},
 	} {
-		sync := New(&tc.fake, &tc.fake, &tc.fake, tc.mode, "node1", cidrset.NewCIDRSet(clusterCIDRRange, 24))
+		cidr, _ := cidrset.NewCIDRSet(clusterCIDRRange, 24)
+		sync := New(&tc.fake, &tc.fake, &tc.fake, tc.mode, "node1", cidr)
 		doneChan := make(chan struct{})
 
 		// Do a single step of the loop.
