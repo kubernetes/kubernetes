@@ -48,7 +48,6 @@ import (
 
 // NewCmdToken returns cobra.Command for token management
 func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
-
 	var kubeConfigFile string
 	var dryRun bool
 	tokenCmd := &cobra.Command{
@@ -118,7 +117,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	createCmd.Flags().DurationVar(&tokenDuration,
 		"ttl", kubeadmconstants.DefaultTokenDuration, "The duration before the token is automatically deleted (e.g. 1s, 2m, 3h). 0 means 'never expires'.")
 	createCmd.Flags().StringSliceVar(&usages,
-		"usages", kubeadmconstants.DefaultTokenUsages, "The ways in which this token can be used. Valid options: [signing,authentication].")
+		"usages", kubeadmconstants.DefaultTokenUsages, fmt.Sprintf("The ways in which this token can be used. Valid options: [%s].", strings.Join(kubeadmconstants.DefaultTokenUsages, ",")))
 	createCmd.Flags().StringSliceVar(&extraGroups,
 		"groups", []string{kubeadmconstants.NodeBootstrapTokenAuthGroup},
 		fmt.Sprintf("Extra groups that this token will authenticate as when used for authentication. Must match %q.", bootstrapapi.BootstrapGroupPattern))
@@ -194,7 +193,6 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
 func RunCreateToken(out io.Writer, client clientset.Interface, token string, tokenDuration time.Duration, usages []string, extraGroups []string, description string) error {
-
 	if len(token) == 0 {
 		var err error
 		token, err = tokenutil.GenerateToken()
@@ -210,8 +208,9 @@ func RunCreateToken(out io.Writer, client clientset.Interface, token string, tok
 
 	// adding groups only makes sense for authentication
 	usagesSet := sets.NewString(usages...)
-	if len(extraGroups) > 0 && !usagesSet.Has("authentication") {
-		return fmt.Errorf("--groups cannot be specified unless --usages includes \"authentication\"")
+	usageAuthentication := strings.TrimPrefix(bootstrapapi.BootstrapTokenUsageAuthentication, bootstrapapi.BootstrapTokenUsagePrefix)
+	if len(extraGroups) > 0 && !usagesSet.Has(usageAuthentication) {
+		return fmt.Errorf("--groups cannot be specified unless --usages includes %q", usageAuthentication)
 	}
 
 	// validate any extra group names
@@ -221,7 +220,6 @@ func RunCreateToken(out io.Writer, client clientset.Interface, token string, tok
 		}
 	}
 
-	// TODO: Validate usages here so we don't allow something unsupported
 	err := tokenphase.CreateNewToken(client, token, tokenDuration, usages, extraGroups, description)
 	if err != nil {
 		return err
@@ -299,7 +297,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface) er
 		usages := []string{}
 		for k, v := range secret.Data {
 			// Skip all fields that don't include this prefix
-			if !strings.Contains(k, bootstrapapi.BootstrapTokenUsagePrefix) {
+			if !strings.HasPrefix(k, bootstrapapi.BootstrapTokenUsagePrefix) {
 				continue
 			}
 			// Skip those that don't have this usage set to true

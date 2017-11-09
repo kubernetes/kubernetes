@@ -73,7 +73,7 @@ const (
 	FrontProxyCACertAndKeyBaseName = "front-proxy-ca"
 	// FrontProxyCACertName defines front proxy CA certificate name
 	FrontProxyCACertName = "front-proxy-ca.crt"
-	// FrontProxyCAKeyName defaines front proxy CA key name
+	// FrontProxyCAKeyName defines front proxy CA key name
 	FrontProxyCAKeyName = "front-proxy-ca.key"
 
 	// FrontProxyClientCertAndKeyBaseName defines front proxy certificate and key base name
