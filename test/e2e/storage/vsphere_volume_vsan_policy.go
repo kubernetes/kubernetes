@@ -292,7 +292,7 @@ func invokeValidPolicyTest(f *framework.Framework, client clientset.Interface, n
 
 	By("Creating pod to attach PV to the node")
 	// Create pod to attach Volume to Node
-	pod, err := framework.CreatePod(client, namespace, pvclaims, false, "")
+	pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, "")
 	Expect(err).NotTo(HaveOccurred())
 
 	vsp, err := vsphere.GetVSphere()
