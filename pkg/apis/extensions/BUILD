@@ -24,6 +24,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/apis/extensions",
     deps = [
+        "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/networking:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",

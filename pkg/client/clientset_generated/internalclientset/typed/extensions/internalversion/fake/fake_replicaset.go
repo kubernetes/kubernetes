@@ -23,6 +23,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
+	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -138,23 +139,23 @@ func (c *FakeReplicaSets) Patch(name string, pt types.PatchType, data []byte, su
 }
 
 // GetScale takes name of the replicaSet, and returns the corresponding scale object, and an error if there is any.
-func (c *FakeReplicaSets) GetScale(replicaSetName string, options v1.GetOptions) (result *extensions.Scale, err error) {
+func (c *FakeReplicaSets) GetScale(replicaSetName string, options v1.GetOptions) (result *autoscaling.Scale, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetSubresourceAction(replicasetsResource, c.ns, "scale", replicaSetName), &extensions.Scale{})
+		Invokes(testing.NewGetSubresourceAction(replicasetsResource, c.ns, "scale", replicaSetName), &autoscaling.Scale{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.Scale), err
+	return obj.(*autoscaling.Scale), err
 }
 
 // UpdateScale takes the representation of a scale and updates it. Returns the server's representation of the scale, and an error, if there is any.
-func (c *FakeReplicaSets) UpdateScale(replicaSetName string, scale *extensions.Scale) (result *extensions.Scale, err error) {
+func (c *FakeReplicaSets) UpdateScale(replicaSetName string, scale *autoscaling.Scale) (result *autoscaling.Scale, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(replicasetsResource, "scale", c.ns, scale), &extensions.Scale{})
+		Invokes(testing.NewUpdateSubresourceAction(replicasetsResource, "scale", c.ns, scale), &autoscaling.Scale{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*extensions.Scale), err
+	return obj.(*autoscaling.Scale), err
 }

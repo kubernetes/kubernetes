@@ -16,11 +16,10 @@ go_library(
         "fake_ingress.go",
         "fake_podsecuritypolicy.go",
         "fake_replicaset.go",
-        "fake_scale.go",
-        "fake_scale_expansion.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion/fake",
     deps = [
+        "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/extensions:go_default_library",
         "//pkg/client/clientset_generated/internalclientset/typed/extensions/internalversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
