@@ -17,7 +17,7 @@ limitations under the License.
 package persistentvolume
 
 import (
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func getClaimRefNamespace(pv *api.PersistentVolume) string {

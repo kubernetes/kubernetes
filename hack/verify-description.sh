@@ -43,8 +43,7 @@ find_files() {
         -o -wholename '*/vendor/*' \
       \) -prune \
     \) \
-    \( -wholename '*pkg/api/v*/types.go' \
-       -o -wholename '*pkg/apis/*/v*/types.go' \
+    \( -wholename '*pkg/apis/*/v*/types.go' \
        -o -wholename '*pkg/api/unversioned/types.go' \
     \)
 }
@@ -71,7 +70,7 @@ for file in $versioned_api_files; do
   fi
 done
 
-internal_types_files="${KUBE_ROOT}/pkg/api/types.go ${KUBE_ROOT}/pkg/apis/extensions/types.go"
+internal_types_files="${KUBE_ROOT}/pkg/apis/core/types.go ${KUBE_ROOT}/pkg/apis/extensions/types.go"
 for internal_types_file in $internal_types_files; do
   if [[ ! -e $internal_types_file ]]; then
     echo "Internal types file ${internal_types_file} does not exist"

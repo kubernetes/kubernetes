@@ -49,9 +49,9 @@ go_library(
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "//pkg/api/v1/helper:go_default_library",
-            "//pkg/api/v1/helper/qos:go_default_library",
             "//pkg/api/v1/resource:go_default_library",
+            "//pkg/apis/core/v1/helper:go_default_library",
+            "//pkg/apis/core/v1/helper/qos:go_default_library",
             "//pkg/kubelet/cm/deviceplugin:go_default_library",
             "//pkg/kubelet/cm/util:go_default_library",
             "//pkg/kubelet/events:go_default_library",

@@ -22,15 +22,15 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // ComponentStatusLister helps list ComponentStatuses.
 type ComponentStatusLister interface {
 	// List lists all ComponentStatuses in the indexer.
-	List(selector labels.Selector) (ret []*api.ComponentStatus, err error)
+	List(selector labels.Selector) (ret []*core.ComponentStatus, err error)
 	// Get retrieves the ComponentStatus from the index for a given name.
-	Get(name string) (*api.ComponentStatus, error)
+	Get(name string) (*core.ComponentStatus, error)
 	ComponentStatusListerExpansion
 }
 
@@ -45,21 +45,21 @@ func NewComponentStatusLister(indexer cache.Indexer) ComponentStatusLister {
 }
 
 // List lists all ComponentStatuses in the indexer.
-func (s *componentStatusLister) List(selector labels.Selector) (ret []*api.ComponentStatus, err error) {
+func (s *componentStatusLister) List(selector labels.Selector) (ret []*core.ComponentStatus, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.ComponentStatus))
+		ret = append(ret, m.(*core.ComponentStatus))
 	})
 	return ret, err
 }
 
 // Get retrieves the ComponentStatus from the index for a given name.
-func (s *componentStatusLister) Get(name string) (*api.ComponentStatus, error) {
+func (s *componentStatusLister) Get(name string) (*core.ComponentStatus, error) {
 	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("componentstatus"), name)
+		return nil, errors.NewNotFound(core.Resource("componentstatus"), name)
 	}
-	return obj.(*api.ComponentStatus), nil
+	return obj.(*core.ComponentStatus), nil
 }

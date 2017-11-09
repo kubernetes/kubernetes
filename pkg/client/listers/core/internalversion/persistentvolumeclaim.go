@@ -22,13 +22,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // PersistentVolumeClaimLister helps list PersistentVolumeClaims.
 type PersistentVolumeClaimLister interface {
 	// List lists all PersistentVolumeClaims in the indexer.
-	List(selector labels.Selector) (ret []*api.PersistentVolumeClaim, err error)
+	List(selector labels.Selector) (ret []*core.PersistentVolumeClaim, err error)
 	// PersistentVolumeClaims returns an object that can list and get PersistentVolumeClaims.
 	PersistentVolumeClaims(namespace string) PersistentVolumeClaimNamespaceLister
 	PersistentVolumeClaimListerExpansion
@@ -45,9 +45,9 @@ func NewPersistentVolumeClaimLister(indexer cache.Indexer) PersistentVolumeClaim
 }
 
 // List lists all PersistentVolumeClaims in the indexer.
-func (s *persistentVolumeClaimLister) List(selector labels.Selector) (ret []*api.PersistentVolumeClaim, err error) {
+func (s *persistentVolumeClaimLister) List(selector labels.Selector) (ret []*core.PersistentVolumeClaim, err error) {
 	err = cache.ListAll(s.indexer, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.PersistentVolumeClaim))
+		ret = append(ret, m.(*core.PersistentVolumeClaim))
 	})
 	return ret, err
 }
@@ -60,9 +60,9 @@ func (s *persistentVolumeClaimLister) PersistentVolumeClaims(namespace string) P
 // PersistentVolumeClaimNamespaceLister helps list and get PersistentVolumeClaims.
 type PersistentVolumeClaimNamespaceLister interface {
 	// List lists all PersistentVolumeClaims in the indexer for a given namespace.
-	List(selector labels.Selector) (ret []*api.PersistentVolumeClaim, err error)
+	List(selector labels.Selector) (ret []*core.PersistentVolumeClaim, err error)
 	// Get retrieves the PersistentVolumeClaim from the indexer for a given namespace and name.
-	Get(name string) (*api.PersistentVolumeClaim, error)
+	Get(name string) (*core.PersistentVolumeClaim, error)
 	PersistentVolumeClaimNamespaceListerExpansion
 }
 
@@ -74,21 +74,21 @@ type persistentVolumeClaimNamespaceLister struct {
 }
 
 // List lists all PersistentVolumeClaims in the indexer for a given namespace.
-func (s persistentVolumeClaimNamespaceLister) List(selector labels.Selector) (ret []*api.PersistentVolumeClaim, err error) {
+func (s persistentVolumeClaimNamespaceLister) List(selector labels.Selector) (ret []*core.PersistentVolumeClaim, err error) {
 	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*api.PersistentVolumeClaim))
+		ret = append(ret, m.(*core.PersistentVolumeClaim))
 	})
 	return ret, err
 }
 
 // Get retrieves the PersistentVolumeClaim from the indexer for a given namespace and name.
-func (s persistentVolumeClaimNamespaceLister) Get(name string) (*api.PersistentVolumeClaim, error) {
+func (s persistentVolumeClaimNamespaceLister) Get(name string) (*core.PersistentVolumeClaim, error) {
 	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
-		return nil, errors.NewNotFound(api.Resource("persistentvolumeclaim"), name)
+		return nil, errors.NewNotFound(core.Resource("persistentvolumeclaim"), name)
 	}
-	return obj.(*api.PersistentVolumeClaim), nil
+	return obj.(*core.PersistentVolumeClaim), nil
 }

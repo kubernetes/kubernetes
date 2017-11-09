@@ -22,7 +22,7 @@ import (
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // PodRequestsAndLimits returns a dictionary of all defined resources summed up for all

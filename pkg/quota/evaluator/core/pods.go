@@ -31,10 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper/qos"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/api/validation"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
+	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/kubeapiserver/admission/util"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
@@ -219,7 +219,7 @@ func toInternalPodOrError(obj runtime.Object) (*api.Pod, error) {
 	pod := &api.Pod{}
 	switch t := obj.(type) {
 	case *v1.Pod:
-		if err := k8s_api_v1.Convert_v1_Pod_To_api_Pod(t, pod, nil); err != nil {
+		if err := k8s_api_v1.Convert_v1_Pod_To_core_Pod(t, pod, nil); err != nil {
 			return nil, err
 		}
 	case *api.Pod:

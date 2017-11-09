@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 
 	"github.com/spf13/pflag"
 )

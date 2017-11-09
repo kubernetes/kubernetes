@@ -26,9 +26,9 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/api"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	batch_v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	unsafe "unsafe"
 )
 
@@ -166,7 +166,7 @@ func Convert_batch_CronJobSpec_To_v2alpha1_CronJobSpec(in *batch.CronJobSpec, ou
 }
 
 func autoConvert_v2alpha1_CronJobStatus_To_batch_CronJobStatus(in *v2alpha1.CronJobStatus, out *batch.CronJobStatus, s conversion.Scope) error {
-	out.Active = *(*[]api.ObjectReference)(unsafe.Pointer(&in.Active))
+	out.Active = *(*[]core.ObjectReference)(unsafe.Pointer(&in.Active))
 	out.LastScheduleTime = (*v1.Time)(unsafe.Pointer(in.LastScheduleTime))
 	return nil
 }

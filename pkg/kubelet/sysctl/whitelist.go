@@ -21,8 +21,8 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
-	"k8s.io/kubernetes/pkg/api/validation"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )

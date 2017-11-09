@@ -21,7 +21,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	scheme "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/scheme"
 )
 
@@ -33,14 +33,14 @@ type ConfigMapsGetter interface {
 
 // ConfigMapInterface has methods to work with ConfigMap resources.
 type ConfigMapInterface interface {
-	Create(*api.ConfigMap) (*api.ConfigMap, error)
-	Update(*api.ConfigMap) (*api.ConfigMap, error)
+	Create(*core.ConfigMap) (*core.ConfigMap, error)
+	Update(*core.ConfigMap) (*core.ConfigMap, error)
 	Delete(name string, options *v1.DeleteOptions) error
 	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*api.ConfigMap, error)
-	List(opts v1.ListOptions) (*api.ConfigMapList, error)
+	Get(name string, options v1.GetOptions) (*core.ConfigMap, error)
+	List(opts v1.ListOptions) (*core.ConfigMapList, error)
 	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ConfigMap, err error)
+	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ConfigMap, err error)
 	ConfigMapExpansion
 }
 
@@ -59,8 +59,8 @@ func newConfigMaps(c *CoreClient, namespace string) *configMaps {
 }
 
 // Get takes name of the configMap, and returns the corresponding configMap object, and an error if there is any.
-func (c *configMaps) Get(name string, options v1.GetOptions) (result *api.ConfigMap, err error) {
-	result = &api.ConfigMap{}
+func (c *configMaps) Get(name string, options v1.GetOptions) (result *core.ConfigMap, err error) {
+	result = &core.ConfigMap{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("configmaps").
@@ -72,8 +72,8 @@ func (c *configMaps) Get(name string, options v1.GetOptions) (result *api.Config
 }
 
 // List takes label and field selectors, and returns the list of ConfigMaps that match those selectors.
-func (c *configMaps) List(opts v1.ListOptions) (result *api.ConfigMapList, err error) {
-	result = &api.ConfigMapList{}
+func (c *configMaps) List(opts v1.ListOptions) (result *core.ConfigMapList, err error) {
+	result = &core.ConfigMapList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("configmaps").
@@ -94,8 +94,8 @@ func (c *configMaps) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a configMap and creates it.  Returns the server's representation of the configMap, and an error, if there is any.
-func (c *configMaps) Create(configMap *api.ConfigMap) (result *api.ConfigMap, err error) {
-	result = &api.ConfigMap{}
+func (c *configMaps) Create(configMap *core.ConfigMap) (result *core.ConfigMap, err error) {
+	result = &core.ConfigMap{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("configmaps").
@@ -106,8 +106,8 @@ func (c *configMaps) Create(configMap *api.ConfigMap) (result *api.ConfigMap, er
 }
 
 // Update takes the representation of a configMap and updates it. Returns the server's representation of the configMap, and an error, if there is any.
-func (c *configMaps) Update(configMap *api.ConfigMap) (result *api.ConfigMap, err error) {
-	result = &api.ConfigMap{}
+func (c *configMaps) Update(configMap *core.ConfigMap) (result *core.ConfigMap, err error) {
+	result = &core.ConfigMap{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("configmaps").
@@ -141,8 +141,8 @@ func (c *configMaps) DeleteCollection(options *v1.DeleteOptions, listOptions v1.
 }
 
 // Patch applies the patch and returns the patched configMap.
-func (c *configMaps) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *api.ConfigMap, err error) {
-	result = &api.ConfigMap{}
+func (c *configMaps) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *core.ConfigMap, err error) {
+	result = &core.ConfigMap{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("configmaps").

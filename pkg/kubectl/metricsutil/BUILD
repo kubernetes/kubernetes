@@ -15,7 +15,7 @@ go_library(
     ],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/validation:go_default_library",
+        "//pkg/apis/core/validation:go_default_library",
         "//pkg/printers:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/resource:go_default_library",
