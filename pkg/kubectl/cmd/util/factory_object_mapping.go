@@ -43,6 +43,7 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/categories"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	openapivalidation "k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi/validation"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -113,17 +114,17 @@ func (f *ring1Factory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectType
 	return expander, typer, err
 }
 
-func (f *ring1Factory) CategoryExpander() resource.CategoryExpander {
-	legacyExpander := resource.LegacyCategoryExpander
+func (f *ring1Factory) CategoryExpander() categories.CategoryExpander {
+	legacyExpander := categories.LegacyCategoryExpander
 
 	discoveryClient, err := f.clientAccessFactory.DiscoveryClient()
 	if err == nil {
 		// fallback is the legacy expander wrapped with discovery based filtering
-		fallbackExpander, err := resource.NewDiscoveryFilteredExpander(legacyExpander, discoveryClient)
+		fallbackExpander, err := categories.NewDiscoveryFilteredExpander(legacyExpander, discoveryClient)
 		CheckErr(err)
 
 		// by default use the expander that discovers based on "categories" field from the API
-		discoveryCategoryExpander, err := resource.NewDiscoveryCategoryExpander(fallbackExpander, discoveryClient)
+		discoveryCategoryExpander, err := categories.NewDiscoveryCategoryExpander(fallbackExpander, discoveryClient)
 		CheckErr(err)
 
 		return discoveryCategoryExpander

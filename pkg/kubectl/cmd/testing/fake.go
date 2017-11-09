@@ -42,6 +42,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/categories"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 	"k8s.io/kubernetes/pkg/kubectl/plugins"
@@ -241,7 +242,7 @@ type TestFactory struct {
 	Err                error
 	Command            string
 	TmpDir             string
-	CategoryExpander   resource.CategoryExpander
+	CategoryExpander   categories.CategoryExpander
 
 	ClientForMappingFunc             func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	UnstructuredClientForMappingFunc func(mapping *meta.RESTMapping) (resource.RESTClient, error)
@@ -293,8 +294,8 @@ func (f *FakeFactory) UnstructuredObject() (meta.RESTMapper, runtime.ObjectTyper
 	return expander, typer, err
 }
 
-func (f *FakeFactory) CategoryExpander() resource.CategoryExpander {
-	return resource.LegacyCategoryExpander
+func (f *FakeFactory) CategoryExpander() categories.CategoryExpander {
+	return categories.LegacyCategoryExpander
 }
 
 func (f *FakeFactory) Decoder(bool) runtime.Decoder {
@@ -664,7 +665,7 @@ func (f *fakeAPIFactory) DiscoveryClient() (discovery.CachedDiscoveryInterface, 
 	return cmdutil.NewCachedDiscoveryClient(discoveryClient, cacheDir, time.Duration(10*time.Minute)), nil
 }
 
-func (f *fakeAPIFactory) CategoryExpander() resource.CategoryExpander {
+func (f *fakeAPIFactory) CategoryExpander() categories.CategoryExpander {
 	if f.tf.CategoryExpander != nil {
 		return f.tf.CategoryExpander
 	}
