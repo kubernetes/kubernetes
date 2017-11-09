@@ -331,6 +331,12 @@ func SkipUnlessProviderIs(supportedProviders ...string) {
 	}
 }
 
+func SkipUnlessClusterMonitoringModeIs(supportedMonitoring ...string) {
+	if !ClusterMonitoringModeIs(supportedMonitoring...) {
+		Skipf("Only next monitoring modes are supported %v (not %s)", supportedMonitoring, TestContext.ClusterMonitoringMode)
+	}
+}
+
 func SkipUnlessMasterOSDistroIs(supportedMasterOsDistros ...string) {
 	if !MasterOSDistroIs(supportedMasterOsDistros...) {
 		Skipf("Only supported for master OS distro %v (not %s)", supportedMasterOsDistros, TestContext.MasterOSDistro)
@@ -372,6 +378,15 @@ func RunIfSystemSpecNameIs(names ...string) {
 func ProviderIs(providers ...string) bool {
 	for _, provider := range providers {
 		if strings.ToLower(provider) == strings.ToLower(TestContext.Provider) {
+			return true
+		}
+	}
+	return false
+}
+
+func ClusterMonitoringModeIs(monitoringModes ...string) bool {
+	for _, mode := range monitoringModes {
+		if strings.ToLower(mode) == strings.ToLower(TestContext.ClusterMonitoringMode) {
 			return true
 		}
 	}
