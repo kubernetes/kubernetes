@@ -53,7 +53,7 @@ process_content () {
   # Necessary to expand {}
   case ${type} in
       LICENSE) find_names=(-iname 'licen[sc]e*')
-               find_maxdepth=1
+               find_maxdepth=2
                # Sadly inconsistent in the wild, but mostly license files
                # containing copyrights, but no readme/notice files containing
                # licenses (except to "see license file")
