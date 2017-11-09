@@ -484,6 +484,11 @@ var _ = SIGDescribe("Services", func() {
 	It("should be able to change the type and ports of a service [Slow]", func() {
 		// requires cloud load-balancer support
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
+		if framework.ProviderIs("gke", "gce") {
+			// Skipping this test for too large clusters due to issue #52495.
+			// TODO(MrHohn): Get rid of this when gce-side load-balancer improvements are done.
+			framework.SkipUnlessNodeCountIsAtMost(framework.GCPMaxInstancesInInstanceGroup)
+		}
 
 		loadBalancerSupportsUDP := !framework.ProviderIs("aws")
 
