@@ -31,6 +31,7 @@ go_library(
         "vsphere_volume_diskformat.go",
         "vsphere_volume_disksize.go",
         "vsphere_volume_fstype.go",
+        "vsphere_volume_master_restart.go",
         "vsphere_volume_ops_storm.go",
         "vsphere_volume_placement.go",
         "vsphere_volume_vsan_policy.go",
