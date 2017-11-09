@@ -748,7 +748,7 @@ func cleanupIptablesLeftovers(ipt utiliptables.Interface) (encounteredError bool
 }
 
 // CleanupLeftovers clean up all ipvs and iptables rules created by ipvs Proxier.
-func CleanupLeftovers(execer utilexec.Interface, ipvs utilipvs.Interface, ipt utiliptables.Interface) (encounteredError bool) {
+func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface) (encounteredError bool) {
 	// Return immediately when ipvs interface is nil - Probably initialization failed in somewhere.
 	if ipvs == nil {
 		return true
@@ -761,7 +761,8 @@ func CleanupLeftovers(execer utilexec.Interface, ipvs utilipvs.Interface, ipt ut
 		encounteredError = true
 	}
 	// Delete dummy interface created by ipvs Proxier.
-	err = deleteDummyDevice(execer, DefaultDummyDevice)
+	nl := NewNetLinkHandle()
+	err = nl.DeleteDummyDevice(DefaultDummyDevice)
 	if err != nil {
 		encounteredError = true
 	}
@@ -950,7 +951,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// End install iptables
 
 	// make sure dummy interface exists in the system where ipvs Proxier will bind service address on it
-	_, err = ensureDummyDevice(proxier.exec, DefaultDummyDevice)
+	_, err = proxier.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
 	if err != nil {
 		glog.Errorf("Failed to create dummy interface: %s, error: %v", DefaultDummyDevice, err)
 		return
@@ -1523,32 +1524,6 @@ func openLocalPort(lp *utilproxy.LocalPort) (utilproxy.Closeable, error) {
 	}
 	glog.V(2).Infof("Opened local port %s", lp.String())
 	return socket, nil
-}
-
-const cmdIP = "ip"
-
-func ensureDummyDevice(execer utilexec.Interface, dummyDev string) (exist bool, err error) {
-	args := []string{"link", "add", dummyDev, "type", "dummy"}
-	out, err := execer.Command(cmdIP, args...).CombinedOutput()
-	if err != nil {
-		// "exit status code 2" will be returned if the device already exists
-		if ee, ok := err.(utilexec.ExitError); ok {
-			if ee.Exited() && ee.ExitStatus() == 2 {
-				return true, nil
-			}
-		}
-		return false, fmt.Errorf("error creating dummy interface %q: %v: %s", dummyDev, err, out)
-	}
-	return false, nil
-}
-
-func deleteDummyDevice(execer utilexec.Interface, dummyDev string) error {
-	args := []string{"link", "del", dummyDev}
-	out, err := execer.Command(cmdIP, args...).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("error deleting dummy interface %q: %v: %s", dummyDev, err, out)
-	}
-	return nil
 }
 
 // ipvs Proxier fall back on iptables when it needs to do SNAT for engress packets

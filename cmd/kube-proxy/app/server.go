@@ -422,7 +422,7 @@ func (s *ProxyServer) Run() error {
 	if s.CleanupAndExit {
 		encounteredError := userspace.CleanupLeftovers(s.IptInterface)
 		encounteredError = iptables.CleanupLeftovers(s.IptInterface) || encounteredError
-		encounteredError = ipvs.CleanupLeftovers(s.execer, s.IpvsInterface, s.IptInterface) || encounteredError
+		encounteredError = ipvs.CleanupLeftovers(s.IpvsInterface, s.IptInterface) || encounteredError
 		if encounteredError {
 			return errors.New("encountered an error while tearing down rules.")
 		}
