@@ -67,11 +67,8 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 				return "", "", fmt.Errorf("field label not supported for appsv1beta1.StatefulSet: %s", label)
 			}
 		})
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func Convert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *appsv1beta1.StatefulSetSpec, out *apps.StatefulSetSpec, s conversion.Scope) error {
@@ -149,10 +146,9 @@ func Convert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.StatefulSe
 	}
 	out.ServiceName = in.ServiceName
 	out.PodManagementPolicy = appsv1beta1.PodManagementPolicyType(in.PodManagementPolicy)
-	if err := Convert_apps_StatefulSetUpdateStrategy_To_v1beta1_StatefulSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
-		return err
-	}
-	return nil
+	err := Convert_apps_StatefulSetUpdateStrategy_To_v1beta1_StatefulSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s)
+	return err
+
 }
 
 func Convert_v1beta1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(in *appsv1beta1.StatefulSetUpdateStrategy, out *apps.StatefulSetUpdateStrategy, s conversion.Scope) error {
@@ -309,10 +305,9 @@ func Convert_v1beta1_RollingUpdateDeployment_To_extensions_RollingUpdateDeployme
 	if err := s.Convert(in.MaxUnavailable, &out.MaxUnavailable, 0); err != nil {
 		return err
 	}
-	if err := s.Convert(in.MaxSurge, &out.MaxSurge, 0); err != nil {
-		return err
-	}
-	return nil
+	err := s.Convert(in.MaxSurge, &out.MaxSurge, 0)
+	return err
+
 }
 
 func Convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in *extensions.RollingUpdateDeployment, out *appsv1beta1.RollingUpdateDeployment, s conversion.Scope) error {
@@ -325,8 +320,7 @@ func Convert_extensions_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployme
 	if out.MaxSurge == nil {
 		out.MaxSurge = &intstr.IntOrString{}
 	}
-	if err := s.Convert(&in.MaxSurge, out.MaxSurge, 0); err != nil {
-		return err
-	}
-	return nil
+	err := s.Convert(&in.MaxSurge, out.MaxSurge, 0)
+	return err
+
 }
