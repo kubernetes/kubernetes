@@ -27,6 +27,7 @@ import (
 
 	"github.com/golang/glog"
 
+	deployment "k8s.io/api/apps/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -109,7 +110,7 @@ func validateObject(obj runtime.Object) (errors field.ErrorList) {
 			t.Namespace = metav1.NamespaceDefault
 		}
 		errors = validation.ValidateResourceQuota(t)
-	case *extensions.Deployment:
+	case *deployment.Deployment:
 		if t.Namespace == "" {
 			t.Namespace = metav1.NamespaceDefault
 		}
