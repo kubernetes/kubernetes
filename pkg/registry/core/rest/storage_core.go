@@ -35,8 +35,8 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcdutil "k8s.io/apiserver/pkg/storage/etcd/util"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	policyclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -93,19 +93,13 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta:                    *legacyscheme.Registry.GroupOrDie(api.GroupName),
 		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
-		Scheme:                      legacyscheme.Scheme,
-		ParameterCodec:              legacyscheme.ParameterCodec,
-		NegotiatedSerializer:        legacyscheme.Codecs,
-		SubresourceGroupVersionKind: map[string]schema.GroupVersionKind{},
-	}
-	if autoscalingGroupVersion := (schema.GroupVersion{Group: "autoscaling", Version: "v1"}); legacyscheme.Registry.IsEnabledVersion(autoscalingGroupVersion) {
-		apiGroupInfo.SubresourceGroupVersionKind["replicationcontrollers/scale"] = autoscalingGroupVersion.WithKind("Scale")
+		Scheme:               legacyscheme.Scheme,
+		ParameterCodec:       legacyscheme.ParameterCodec,
+		NegotiatedSerializer: legacyscheme.Codecs,
 	}
 
 	var podDisruptionClient policyclient.PodDisruptionBudgetsGetter
 	if policyGroupVersion := (schema.GroupVersion{Group: "policy", Version: "v1beta1"}); legacyscheme.Registry.IsEnabledVersion(policyGroupVersion) {
-		apiGroupInfo.SubresourceGroupVersionKind["pods/eviction"] = policyGroupVersion.WithKind("Eviction")
-
 		var err error
 		podDisruptionClient, err = policyclient.NewForConfig(c.LoopbackClientConfig)
 		if err != nil {

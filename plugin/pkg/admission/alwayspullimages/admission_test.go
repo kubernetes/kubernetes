@@ -22,14 +22,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // TestAdmission verifies all create requests for pods result in every container's image pull policy
 // set to Always
 func TestAdmission(t *testing.T) {
 	namespace := "test"
-	handler := &alwaysPullImages{}
+	handler := &AlwaysPullImages{}
 	pod := api.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: namespace},
 		Spec: api.PodSpec{
@@ -60,6 +60,36 @@ func TestAdmission(t *testing.T) {
 		if c.ImagePullPolicy != api.PullAlways {
 			t.Errorf("Container %v: expected pull always, got %v", c, c.ImagePullPolicy)
 		}
+	}
+}
+
+func TestValidate(t *testing.T) {
+	namespace := "test"
+	handler := &AlwaysPullImages{}
+	pod := api.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "123", Namespace: namespace},
+		Spec: api.PodSpec{
+			InitContainers: []api.Container{
+				{Name: "init1", Image: "image"},
+				{Name: "init2", Image: "image", ImagePullPolicy: api.PullNever},
+				{Name: "init3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
+				{Name: "init4", Image: "image", ImagePullPolicy: api.PullAlways},
+			},
+			Containers: []api.Container{
+				{Name: "ctr1", Image: "image"},
+				{Name: "ctr2", Image: "image", ImagePullPolicy: api.PullNever},
+				{Name: "ctr3", Image: "image", ImagePullPolicy: api.PullIfNotPresent},
+				{Name: "ctr4", Image: "image", ImagePullPolicy: api.PullAlways},
+			},
+		},
+	}
+	expectedError := `pods "123" is forbidden: spec.initContainers[0].imagePullPolicy: Unsupported value: "": supported values: "Always"`
+	err := handler.Validate(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err == nil {
+		t.Fatal("missing expected error")
+	}
+	if err.Error() != expectedError {
+		t.Fatal(err)
 	}
 }
 
@@ -107,7 +137,7 @@ func TestOtherResources(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		handler := &alwaysPullImages{}
+		handler := &AlwaysPullImages{}
 
 		err := handler.Admit(admission.NewAttributesRecord(tc.object, nil, api.Kind(tc.kind).WithVersion("version"), namespace, name, api.Resource(tc.resource).WithVersion("version"), tc.subresource, admission.Create, nil))
 

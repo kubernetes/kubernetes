@@ -21,7 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/networking"
 )
 
@@ -215,6 +215,36 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				PolicyTypes: []networking.PolicyType{networking.PolicyTypeIngress, networking.PolicyTypeEgress},
 			},
 		},
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						Ports: []networking.NetworkPolicyPort{
+							{
+								Protocol: nil,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
+							},
+							{
+								Protocol: &protocolTCP,
+								Port:     nil,
+							},
+							{
+								Protocol: &protocolTCP,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 443},
+							},
+							{
+								Protocol: &protocolUDP,
+								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "dns"},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	// Success cases are expected to pass validation.
@@ -244,6 +274,38 @@ func TestValidateNetworkPolicy(t *testing.T) {
 								},
 							},
 						},
+					},
+				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						To: []networking.NetworkPolicyPeer{
+							{
+								PodSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"c": "d"},
+								},
+								NamespaceSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{"c": "d"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"missing from and to type": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{
+					MatchLabels: map[string]string{"a": "b"},
+				},
+				Ingress: []networking.NetworkPolicyIngressRule{
+					{
+						From: []networking.NetworkPolicyPeer{{}},
+					},
+				},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						To: []networking.NetworkPolicyPeer{{}},
 					},
 				},
 			},
@@ -343,6 +405,54 @@ func TestValidateNetworkPolicy(t *testing.T) {
 								PodSelector: &metav1.LabelSelector{
 									MatchLabels: invalidSelector,
 								},
+							},
+						},
+					},
+				},
+			},
+		},
+		"invalid egress.ports.protocol": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						Ports: []networking.NetworkPolicyPort{
+							{
+								Protocol: &protocolICMP,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
+							},
+						},
+					},
+				},
+			},
+		},
+		"invalid egress.ports.port (int)": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						Ports: []networking.NetworkPolicyPort{
+							{
+								Protocol: &protocolTCP,
+								Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 123456789},
+							},
+						},
+					},
+				},
+			},
+		},
+		"invalid egress.ports.port (str)": {
+			ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Spec: networking.NetworkPolicySpec{
+				PodSelector: metav1.LabelSelector{},
+				Egress: []networking.NetworkPolicyEgressRule{
+					{
+						Ports: []networking.NetworkPolicyPort{
+							{
+								Protocol: &protocolTCP,
+								Port:     &intstr.IntOrString{Type: intstr.String, StrVal: "!@#$"},
 							},
 						},
 					},

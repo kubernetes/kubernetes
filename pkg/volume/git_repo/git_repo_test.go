@@ -306,7 +306,7 @@ func doTestPlugin(scenario struct {
 			fmt.Errorf("TearDown() failed, volume path still exists: %s", path))
 	} else if !os.IsNotExist(err) {
 		allErrs = append(allErrs,
-			fmt.Errorf("SetUp() failed: %v", err))
+			fmt.Errorf("TearDown() failed: %v", err))
 	}
 	return allErrs
 }

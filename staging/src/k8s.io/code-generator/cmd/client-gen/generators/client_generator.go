@@ -103,8 +103,8 @@ func DefaultNameSystem() string {
 	return "public"
 }
 
-func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetPackage string, apiPath string, srcTreePath string, inputPackage string, boilerplate []byte) generator.Package {
-	groupVersionClientPackage := strings.ToLower(filepath.Join(clientsetPackage, "typed", gv.Group.NonEmpty(), gv.Version.NonEmpty()))
+func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, clientsetPackage string, groupPackageName string, groupGoName string, apiPath string, srcTreePath string, inputPackage string, boilerplate []byte) generator.Package {
+	groupVersionClientPackage := strings.ToLower(filepath.Join(clientsetPackage, "typed", groupPackageName, gv.Version.NonEmpty()))
 	return &generator.DefaultPackage{
 		PackageName: strings.ToLower(gv.Version.NonEmpty()),
 		PackagePath: groupVersionClientPackage,
@@ -130,6 +130,7 @@ func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 					clientsetPackage: clientsetPackage,
 					group:            gv.Group.NonEmpty(),
 					version:          gv.Version.String(),
+					groupGoName:      groupGoName,
 					typeToMatch:      t,
 					imports:          generator.NewImportTracker(),
 				})
@@ -137,13 +138,14 @@ func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 
 			generators = append(generators, &genGroup{
 				DefaultGen: generator.DefaultGen{
-					OptionalName: gv.Group.NonEmpty() + "_client",
+					OptionalName: groupPackageName + "_client",
 				},
 				outputPackage:    groupVersionClientPackage,
 				inputPackage:     inputPackage,
 				clientsetPackage: clientsetPackage,
 				group:            gv.Group.NonEmpty(),
 				version:          gv.Version.String(),
+				groupGoName:      groupGoName,
 				apiPath:          apiPath,
 				types:            typeList,
 				imports:          generator.NewImportTracker(),
@@ -166,7 +168,7 @@ func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 	}
 }
 
-func packageForClientset(customArgs *clientgenargs.CustomArgs, clientsetPackage string, boilerplate []byte) generator.Package {
+func packageForClientset(customArgs *clientgenargs.CustomArgs, clientsetPackage string, groupGoNames map[clientgentypes.GroupVersion]string, boilerplate []byte) generator.Package {
 	return &generator.DefaultPackage{
 		PackageName: customArgs.ClientsetName,
 		PackagePath: clientsetPackage,
@@ -186,6 +188,7 @@ func packageForClientset(customArgs *clientgenargs.CustomArgs, clientsetPackage 
 						OptionalName: "clientset",
 					},
 					groups:           customArgs.Groups,
+					groupGoNames:     groupGoNames,
 					clientsetPackage: clientsetPackage,
 					outputPackage:    customArgs.ClientsetName,
 					imports:          generator.NewImportTracker(),
@@ -245,6 +248,8 @@ NextGroup:
 // applyGroupOverrides applies group name overrides to each package, if applicable. If there is a
 // comment of the form "// +groupName=somegroup" or "// +groupName=somegroup.foo.bar.io", use the
 // first field (somegroup) as the name of the group when generating.
+//
+// If the first field of the groupName is not unique within the clientset, use "// +groupName=unique
 func applyGroupOverrides(universe types.Universe, customArgs *clientgenargs.CustomArgs) {
 	// Create a map from "old GV" to "new GV" so we know what changes we need to make.
 	changes := make(map[clientgentypes.GroupVersion]clientgentypes.GroupVersion)
@@ -252,7 +257,7 @@ func applyGroupOverrides(universe types.Universe, customArgs *clientgenargs.Cust
 		p := universe.Package(inputDir)
 		if override := types.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
 			newGV := clientgentypes.GroupVersion{
-				Group:   clientgentypes.Group(strings.SplitN(override[0], ".", 2)[0]),
+				Group:   clientgentypes.Group(override[0]),
 				Version: gv.Version,
 			}
 			changes[gv] = newGV
@@ -269,8 +274,9 @@ func applyGroupOverrides(universe types.Universe, customArgs *clientgenargs.Cust
 		if newGV, ok := changes[gv]; ok {
 			// There's an override, so use it.
 			newGVS := clientgentypes.GroupVersions{
-				Group:    newGV.Group,
-				Versions: gvs.Versions,
+				PackageName: gv.Group.NonEmpty(),
+				Group:       newGV.Group,
+				Versions:    gvs.Versions,
 			}
 			newGroups = append(newGroups, newGVS)
 		} else {
@@ -310,9 +316,18 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	applyGroupOverrides(context.Universe, customArgs)
 
 	gvToTypes := map[clientgentypes.GroupVersion][]*types.Type{}
+	groupGoNames := make(map[clientgentypes.GroupVersion]string)
 	for gv, inputDir := range customArgs.GroupVersionToInputPath {
-		// Package are indexed with the vendor prefix stripped
 		p := context.Universe.Package(path.Vendorless(inputDir))
+
+		// If there's a comment of the form "// +groupGoName=SomeUniqueShortName", use that as
+		// the Go group identifier in CamelCase. It defaults
+		groupGoNames[gv] = namer.IC(strings.Split(gv.Group.NonEmpty(), ".")[0])
+		if override := types.ExtractCommentTags("+", p.Comments)["groupGoName"]; override != nil {
+			groupGoNames[gv] = namer.IC(override[0])
+		}
+
+		// Package are indexed with the vendor prefix stripped
 		for n, t := range p.Types {
 			// filter out types which are not included in user specified overrides.
 			typesOverride, ok := includedTypesOverrides[gv]
@@ -344,10 +359,10 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 	var packageList []generator.Package
 	clientsetPackage := filepath.Join(customArgs.ClientsetOutputPath, customArgs.ClientsetName)
 
-	packageList = append(packageList, packageForClientset(customArgs, clientsetPackage, boilerplate))
+	packageList = append(packageList, packageForClientset(customArgs, clientsetPackage, groupGoNames, boilerplate))
 	packageList = append(packageList, packageForScheme(customArgs, clientsetPackage, arguments.OutputBase, boilerplate))
 	if customArgs.FakeClient {
-		packageList = append(packageList, fake.PackageForClientset(customArgs, clientsetPackage, boilerplate))
+		packageList = append(packageList, fake.PackageForClientset(customArgs, clientsetPackage, groupGoNames, boilerplate))
 	}
 
 	// If --clientset-only=true, we don't regenerate the individual typed clients.
@@ -361,9 +376,9 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			gv := clientgentypes.GroupVersion{Group: group.Group, Version: version}
 			types := gvToTypes[gv]
 			inputPath := customArgs.GroupVersionToInputPath[gv]
-			packageList = append(packageList, packageForGroup(gv, orderer.OrderTypes(types), clientsetPackage, customArgs.ClientsetAPIPath, arguments.OutputBase, inputPath, boilerplate))
+			packageList = append(packageList, packageForGroup(gv, orderer.OrderTypes(types), clientsetPackage, group.PackageName, groupGoNames[gv], customArgs.ClientsetAPIPath, arguments.OutputBase, inputPath, boilerplate))
 			if customArgs.FakeClient {
-				packageList = append(packageList, fake.PackageForGroup(gv, orderer.OrderTypes(types), clientsetPackage, inputPath, boilerplate))
+				packageList = append(packageList, fake.PackageForGroup(gv, orderer.OrderTypes(types), clientsetPackage, group.PackageName, groupGoNames[gv], inputPath, boilerplate))
 			}
 		}
 	}

@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/auth"
 	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/resource"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/rollout"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
@@ -36,22 +37,22 @@ import (
 
 const (
 	bashCompletionFunc = `# call kubectl get $1,
-__kubectl_override_flag_list=(kubeconfig cluster user context namespace server)
+__kubectl_override_flag_list=(--kubeconfig --cluster --user --context --namespace --server -n -s)
 __kubectl_override_flags()
 {
-    local ${__kubectl_override_flag_list[*]} two_word_of of
+    local ${__kubectl_override_flag_list[*]##*-} two_word_of of var
     for w in "${words[@]}"; do
         if [ -n "${two_word_of}" ]; then
-            eval "${two_word_of}=\"--${two_word_of}=\${w}\""
+            eval "${two_word_of##*-}=\"${two_word_of}=\${w}\""
             two_word_of=
             continue
         fi
         for of in "${__kubectl_override_flag_list[@]}"; do
             case "${w}" in
-                --${of}=*)
-                    eval "${of}=\"${w}\""
+                ${of}=*)
+                    eval "${of##*-}=\"${w}\""
                     ;;
-                --${of})
+                ${of})
                     two_word_of="${of}"
                     ;;
             esac
@@ -60,9 +61,9 @@ __kubectl_override_flags()
             namespace="--all-namespaces"
         fi
     done
-    for of in "${__kubectl_override_flag_list[@]}"; do
-        if eval "test -n \"\$${of}\""; then
-            eval "echo \${${of}}"
+    for var in "${__kubectl_override_flag_list[@]##*-}"; do
+        if eval "test -n \"\$${var}\""; then
+            eval "echo \${${var}}"
         fi
     done
 }
@@ -200,51 +201,6 @@ __custom_func() {
     esac
 }
 `
-
-	// If you add a resource to this list, please also take a look at pkg/kubectl/kubectl.go
-	// and add a short forms entry in expandResourceShortcut() when appropriate.
-	// TODO: This should be populated using the discovery information from apiserver.
-	validResources = `Valid resource types include:
-
-    * all
-    * certificatesigningrequests (aka 'csr')
-    * clusterrolebindings
-    * clusterroles
-    * componentstatuses (aka 'cs')
-    * configmaps (aka 'cm')
-    * controllerrevisions
-    * cronjobs
-    * customresourcedefinition (aka 'crd')
-    * daemonsets (aka 'ds')
-    * deployments (aka 'deploy')
-    * endpoints (aka 'ep')
-    * events (aka 'ev')
-    * horizontalpodautoscalers (aka 'hpa')
-    * ingresses (aka 'ing')
-    * jobs
-    * limitranges (aka 'limits')
-    * namespaces (aka 'ns')
-    * networkpolicies (aka 'netpol')
-    * nodes (aka 'no')
-    * persistentvolumeclaims (aka 'pvc')
-    * persistentvolumes (aka 'pv')
-    * poddisruptionbudgets (aka 'pdb')
-    * podpreset
-    * pods (aka 'po')
-    * podsecuritypolicies (aka 'psp')
-    * podtemplates
-    * replicasets (aka 'rs')
-    * replicationcontrollers (aka 'rc')
-    * resourcequotas (aka 'quota')
-    * rolebindings
-    * roles
-    * secrets
-    * serviceaccounts (aka 'sa')
-    * services (aka 'svc')
-    * statefulsets (aka 'sts')
-    * storageclasses (aka 'sc')
-
-`
 )
 
 var (
@@ -297,7 +253,7 @@ func NewKubectlCommand(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cob
 		{
 			Message: "Basic Commands (Intermediate):",
 			Commands: []*cobra.Command{
-				NewCmdGet(f, out, err),
+				resource.NewCmdGet(f, out, err),
 				NewCmdExplain(f, out, err),
 				NewCmdEdit(f, out, err),
 				NewCmdDelete(f, out, err),

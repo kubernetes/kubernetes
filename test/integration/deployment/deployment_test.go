@@ -25,6 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -76,6 +77,120 @@ func TestNewDeployment(t *testing.T) {
 	}
 	if newRS.Annotations[v1.LastAppliedConfigAnnotation] != "" {
 		t.Errorf("expected new ReplicaSet last-applied annotation not copied from Deployment %s", tester.deployment.Name)
+	}
+}
+
+// Deployments should support roll out, roll back, and roll over
+func TestDeploymentRollingUpdate(t *testing.T) {
+	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	defer closeFn()
+	name := "test-rolling-update-deployment"
+	ns := framework.CreateTestingNamespace(name, s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	// Start informer and controllers
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go rm.Run(5, stopCh)
+	go dc.Run(5, stopCh)
+
+	replicas := int32(20)
+	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
+	tester.deployment.Spec.MinReadySeconds = 4
+	quarter := intstr.FromString("25%")
+	tester.deployment.Spec.Strategy.RollingUpdate = &v1beta1.RollingUpdateDeployment{
+		MaxUnavailable: &quarter,
+		MaxSurge:       &quarter,
+	}
+
+	// Create a deployment.
+	var err error
+	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	if err != nil {
+		t.Fatalf("failed to create deployment %s: %v", tester.deployment.Name, err)
+	}
+	oriImage := tester.deployment.Spec.Template.Spec.Containers[0].Image
+	if err := tester.waitForDeploymentRevisionAndImage("1", oriImage); err != nil {
+		t.Fatal(err)
+	}
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Roll out a new image.
+	image := "new-image"
+	if oriImage == image {
+		t.Fatalf("bad test setup, deployment %s roll out with the same image", tester.deployment.Name)
+	}
+	imageFn := func(update *v1beta1.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Image = image
+	}
+	tester.deployment, err = tester.updateDeployment(imageFn)
+	if err != nil {
+		t.Fatalf("failed to update deployment %s: %v", tester.deployment.Name, err)
+	}
+	if err := tester.waitForDeploymentRevisionAndImage("2", image); err != nil {
+		t.Fatal(err)
+	}
+	if err := tester.waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+
+	// 2. Roll back to the last revision.
+	revision := int64(0)
+	rollback := newDeploymentRollback(tester.deployment.Name, nil, revision)
+	if err = c.ExtensionsV1beta1().Deployments(ns.Name).Rollback(rollback); err != nil {
+		t.Fatalf("failed to roll back deployment %s to last revision: %v", tester.deployment.Name, err)
+	}
+	// Wait for the deployment to start rolling back
+	if err = tester.waitForDeploymentRollbackCleared(); err != nil {
+		t.Fatalf("failed to roll back deployment %s to last revision: %v", tester.deployment.Name, err)
+	}
+	// Wait for the deployment to be rolled back to the template stored in revision 1 and rolled forward to revision 3.
+	if err := tester.waitForDeploymentRevisionAndImage("3", oriImage); err != nil {
+		t.Fatal(err)
+	}
+	if err := tester.waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+
+	// 3. Roll over a deployment before the previous rolling update finishes.
+	image = "dont-finish"
+	imageFn = func(update *v1beta1.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Image = image
+	}
+	tester.deployment, err = tester.updateDeployment(imageFn)
+	if err != nil {
+		t.Fatalf("failed to update deployment %s: %v", tester.deployment.Name, err)
+	}
+	if err := tester.waitForDeploymentRevisionAndImage("4", image); err != nil {
+		t.Fatal(err)
+	}
+	// We don't mark pods as ready so that rollout won't finish.
+	// Before the rollout finishes, trigger another rollout.
+	image = "rollover"
+	imageFn = func(update *v1beta1.Deployment) {
+		update.Spec.Template.Spec.Containers[0].Image = image
+	}
+	tester.deployment, err = tester.updateDeployment(imageFn)
+	if err != nil {
+		t.Fatalf("failed to update deployment %s: %v", tester.deployment.Name, err)
+	}
+	if err := tester.waitForDeploymentRevisionAndImage("5", image); err != nil {
+		t.Fatal(err)
+	}
+	if err := tester.waitForDeploymentCompleteAndCheckRollingAndMarkPodsReady(); err != nil {
+		t.Fatal(err)
+	}
+	_, allOldRSs, err := deploymentutil.GetOldReplicaSets(tester.deployment, c.ExtensionsV1beta1())
+	if err != nil {
+		t.Fatalf("failed retrieving old replicasets of deployment %s: %v", tester.deployment.Name, err)
+	}
+	for _, oldRS := range allOldRSs {
+		if *oldRS.Spec.Replicas != 0 {
+			t.Errorf("expected old replicaset %s of deployment %s to have 0 replica, got %d", oldRS.Name, tester.deployment.Name, *oldRS.Spec.Replicas)
+		}
 	}
 }
 
@@ -631,5 +746,133 @@ func TestDeploymentLabelAdopted(t *testing.T) {
 	}
 	if rsHash != podHash {
 		t.Errorf("found mismatching pod-template-hash value: rs hash = %s whereas pod hash = %s", rsHash, podHash)
+	}
+}
+
+// Deployment should have a timeout condition when it fails to progress after given deadline.
+func TestFailedDeployment(t *testing.T) {
+	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	defer closeFn()
+	name := "test-failed-deployment"
+	ns := framework.CreateTestingNamespace(name, s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	deploymentName := "progress-check"
+	replicas := int32(1)
+	three := int32(3)
+	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(deploymentName, ns.Name, replicas)}
+	tester.deployment.Spec.ProgressDeadlineSeconds = &three
+	var err error
+	tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+	if err != nil {
+		t.Fatalf("failed to create deployment %q: %v", deploymentName, err)
+	}
+
+	// Start informer and controllers
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go rm.Run(5, stopCh)
+	go dc.Run(5, stopCh)
+
+	if err = tester.waitForDeploymentUpdatedReplicasLTE(replicas); err != nil {
+		t.Fatal(err)
+	}
+
+	// Pods are not marked as Ready, therefore the deployment progress will eventually timeout after progressDeadlineSeconds has passed.
+	// Wait for the deployment to have a progress timeout condition.
+	if err = tester.waitForDeploymentWithCondition(deploymentutil.TimedOutReason, v1beta1.DeploymentProgressing); err != nil {
+		t.Fatal(err)
+	}
+
+	// Manually mark pods as Ready and wait for deployment to complete.
+	if err := tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+		t.Fatalf("deployment %q fails to have its status becoming valid: %v", deploymentName, err)
+	}
+
+	// Wait for the deployment to have a progress complete condition.
+	if err = tester.waitForDeploymentWithCondition(deploymentutil.NewRSAvailableReason, v1beta1.DeploymentProgressing); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestOverlappingDeployments(t *testing.T) {
+	s, closeFn, rm, dc, informers, c := dcSetup(t)
+	defer closeFn()
+	name := "test-overlapping-deployments"
+	ns := framework.CreateTestingNamespace(name, s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	replicas := int32(1)
+	firstDeploymentName := "first-deployment"
+	secondDeploymentName := "second-deployment"
+	testers := []*deploymentTester{
+		{t: t, c: c, deployment: newDeployment(firstDeploymentName, ns.Name, replicas)},
+		{t: t, c: c, deployment: newDeployment(secondDeploymentName, ns.Name, replicas)},
+	}
+	// Start informer and controllers
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	informers.Start(stopCh)
+	go rm.Run(5, stopCh)
+	go dc.Run(5, stopCh)
+
+	// Create 2 deployments with overlapping selectors
+	var err error
+	var rss []*v1beta1.ReplicaSet
+	for _, tester := range testers {
+		tester.deployment, err = c.ExtensionsV1beta1().Deployments(ns.Name).Create(tester.deployment)
+		dname := tester.deployment.Name
+		if err != nil {
+			t.Fatalf("failed to create deployment %q: %v", dname, err)
+		}
+		// Wait for the deployment to be updated to revision 1
+		if err = tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
+			t.Fatalf("failed to update deployment %q to revision 1: %v", dname, err)
+		}
+		// Make sure the deployment completes while manually marking its pods as ready at the same time
+		if err = tester.waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+			t.Fatalf("deployment %q failed to complete: %v", dname, err)
+		}
+		// Get replicaset of the deployment
+		newRS, err := tester.getNewReplicaSet()
+		if err != nil {
+			t.Fatalf("failed to get new replicaset of deployment %q: %v", dname, err)
+		}
+		if newRS == nil {
+			t.Fatalf("unable to find new replicaset of deployment %q", dname)
+		}
+		// Store the replicaset for future usage
+		rss = append(rss, newRS)
+	}
+
+	// Both deployments should proceed independently, so their respective replicaset should not be the same replicaset
+	if rss[0].UID == rss[1].UID {
+		t.Fatalf("overlapping deployments should not share the same replicaset")
+	}
+
+	// Scale only the first deployment by 1
+	newReplicas := replicas + 1
+	testers[0].deployment, err = testers[0].updateDeployment(func(update *v1beta1.Deployment) {
+		update.Spec.Replicas = &newReplicas
+	})
+	if err != nil {
+		t.Fatalf("failed updating deployment %q: %v", firstDeploymentName, err)
+	}
+
+	// Make sure the deployment completes after scaling
+	if err := testers[0].waitForDeploymentCompleteAndMarkPodsReady(); err != nil {
+		t.Fatalf("deployment %q failed to complete after scaling: %v", firstDeploymentName, err)
+	}
+
+	// Verify replicaset of both deployments has updated number of replicas
+	for i, tester := range testers {
+		rs, err := c.ExtensionsV1beta1().ReplicaSets(ns.Name).Get(rss[i].Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("failed to get replicaset %q: %v", rss[i].Name, err)
+		}
+		if *rs.Spec.Replicas != *tester.deployment.Spec.Replicas {
+			t.Errorf("expected replicaset %q of deployment %q has %d replicas, but found %d replicas", rs.Name, firstDeploymentName, *tester.deployment.Spec.Replicas, *rs.Spec.Replicas)
+		}
 	}
 }

@@ -24,7 +24,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestCreateServiceAccount(t *testing.T) {
@@ -91,10 +91,11 @@ func TestCompileManifests(t *testing.T) {
 	}{
 		{
 			manifest: v180AndAboveKubeDNSDeployment,
-			data: struct{ ImageRepository, Arch, Version, DNSDomain, DNSProbeType, MasterTaintKey string }{
+			data: struct{ ImageRepository, Arch, Version, DNSBindAddr, DNSDomain, DNSProbeType, MasterTaintKey string }{
 				ImageRepository: "foo",
 				Arch:            "foo",
 				Version:         "foo",
+				DNSBindAddr:     "foo",
 				DNSDomain:       "foo",
 				DNSProbeType:    "foo",
 				MasterTaintKey:  "foo",
@@ -105,6 +106,29 @@ func TestCompileManifests(t *testing.T) {
 			manifest: KubeDNSService,
 			data: struct{ DNSIP string }{
 				DNSIP: "foo",
+			},
+			expected: true,
+		},
+		{
+			manifest: CoreDNSDeployment,
+			data: struct{ MasterTaintKey, Version string }{
+				MasterTaintKey: "foo",
+				Version:        "foo",
+			},
+			expected: true,
+		},
+		{
+			manifest: KubeDNSService,
+			data: struct{ DNSIP string }{
+				DNSIP: "foo",
+			},
+			expected: true,
+		},
+		{
+			manifest: CoreDNSConfigMap,
+			data: struct{ DNSDomain, ServiceCIDR string }{
+				DNSDomain:   "foo",
+				ServiceCIDR: "foo",
 			},
 			expected: true,
 		},

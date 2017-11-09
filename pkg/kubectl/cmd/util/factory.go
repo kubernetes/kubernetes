@@ -37,8 +37,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/pkg/api"
-	apiv1 "k8s.io/kubernetes/pkg/api/v1"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/internalversion"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -243,8 +243,10 @@ type BuilderFactory interface {
 	PrinterForMapping(cmd *cobra.Command, isLocal bool, outputOpts *printers.OutputOptions, mapping *meta.RESTMapping, withNamespace bool) (printers.ResourcePrinter, error)
 	// PrintObject prints an api object given command line flags to modify the output format
 	PrintObject(cmd *cobra.Command, isLocal bool, mapper meta.RESTMapper, obj runtime.Object, out io.Writer) error
-	// One stop shopping for a Builder
+	// One stop shopping for a structured Builder
 	NewBuilder() *resource.Builder
+	// One stop shopping for a unstructured Builder
+	NewUnstructuredBuilder() *resource.Builder
 	// PluginLoader provides the implementation to be used to load cli plugins.
 	PluginLoader() plugins.PluginLoader
 	// PluginRunner provides the implementation to be used to run cli plugins.
@@ -295,13 +297,13 @@ func GetFirstPod(client coreclient.PodsGetter, namespace string, selector string
 	for i := range podList.Items {
 		pod := podList.Items[i]
 		externalPod := &v1.Pod{}
-		apiv1.Convert_api_Pod_To_v1_Pod(&pod, externalPod, nil)
+		apiv1.Convert_core_Pod_To_v1_Pod(&pod, externalPod, nil)
 		pods = append(pods, externalPod)
 	}
 	if len(pods) > 0 {
 		sort.Sort(sortBy(pods))
 		internalPod := &api.Pod{}
-		apiv1.Convert_v1_Pod_To_api_Pod(pods[0], internalPod, nil)
+		apiv1.Convert_v1_Pod_To_core_Pod(pods[0], internalPod, nil)
 		return internalPod, len(podList.Items), nil
 	}
 

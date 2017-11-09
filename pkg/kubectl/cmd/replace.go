@@ -120,13 +120,12 @@ func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		return fmt.Errorf("--timeout must have --force specified")
 	}
 
-	mapper, typer, err := f.UnstructuredObject()
+	mapper, _, err := f.UnstructuredObject()
 	if err != nil {
 		return err
 	}
 
-	r := f.NewBuilder().
-		Unstructured(f.UnstructuredClientForMapping, mapper, typer).
+	r := f.NewUnstructuredBuilder().
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -233,7 +232,7 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	if timeout == 0 {
 		timeout = kubectl.Timeout
 	}
-	r.Visit(func(info *resource.Info, err error) error {
+	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
 		}
@@ -245,9 +244,11 @@ func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			return true, nil
 		})
 	})
+	if err != nil {
+		return err
+	}
 
-	r = f.NewBuilder().
-		Unstructured(f.UnstructuredClientForMapping, mapper, typer).
+	r = f.NewUnstructuredBuilder().
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().

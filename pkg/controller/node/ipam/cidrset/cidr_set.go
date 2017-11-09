@@ -48,30 +48,33 @@ const (
 )
 
 var (
-	// ErrCIDRRangeNoCIDRsRemaining occurs when there are no more space
+	// ErrCIDRRangeNoCIDRsRemaining occurs when there is no more space
 	// to allocate CIDR ranges.
 	ErrCIDRRangeNoCIDRsRemaining = errors.New(
 		"CIDR allocation failed; there are no remaining CIDRs left to allocate in the accepted range")
+	// ErrCIDRSetSubNetTooBig occurs when the subnet mask size is too
+	// big compared to the CIDR mask size.
+	ErrCIDRSetSubNetTooBig = errors.New(
+		"New CIDR set failed; the node CIDR size is too big")
 )
 
 // NewCIDRSet creates a new CidrSet.
-func NewCIDRSet(clusterCIDR *net.IPNet, subNetMaskSize int) *CidrSet {
+func NewCIDRSet(clusterCIDR *net.IPNet, subNetMaskSize int) (*CidrSet, error) {
 	clusterMask := clusterCIDR.Mask
 	clusterMaskSize, _ := clusterMask.Size()
 
 	var maxCIDRs int
 	if (clusterCIDR.IP.To4() == nil) && (subNetMaskSize-clusterMaskSize > clusterSubnetMaxDiff) {
-		maxCIDRs = 0
-	} else {
-		maxCIDRs = 1 << uint32(subNetMaskSize-clusterMaskSize)
+		return nil, ErrCIDRSetSubNetTooBig
 	}
+	maxCIDRs = 1 << uint32(subNetMaskSize-clusterMaskSize)
 	return &CidrSet{
 		clusterCIDR:     clusterCIDR,
 		clusterIP:       clusterCIDR.IP,
 		clusterMaskSize: clusterMaskSize,
 		maxCIDRs:        maxCIDRs,
 		subNetMaskSize:  subNetMaskSize,
-	}
+	}, nil
 }
 
 // TODO: Remove this function when upgrading to go 1.9

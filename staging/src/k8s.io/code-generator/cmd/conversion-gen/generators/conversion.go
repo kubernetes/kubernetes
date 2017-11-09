@@ -32,9 +32,23 @@ import (
 	"github.com/golang/glog"
 )
 
+// DefaultBasePeerDirs are the peer-dirs nearly everybody will use, i.e. those coming from
+// apimachinery.
+var DefaultBasePeerDirs = []string{
+	"k8s.io/apimachinery/pkg/apis/meta/v1",
+	"k8s.io/apimachinery/pkg/conversion",
+	"k8s.io/apimachinery/pkg/runtime",
+}
+
 // CustomArgs is used by the gengo framework to pass args specific to this generator.
 type CustomArgs struct {
-	ExtraPeerDirs []string // Always consider these as last-ditch possibilities for conversions.
+	// Base peer dirs which nearly everybody will use, i.e. outside of Kubernetes core.
+	BasePeerDirs []string
+
+	// Custom peer dirs which are application specific. Always consider these as
+	// last-ditch possibilities for conversions.
+	ExtraPeerDirs []string //
+
 	// Skipunsafe indicates whether to generate unsafe conversions to improve the efficiency
 	// of these operations. The unsafe operation is a direct pointer assignment via unsafe
 	// (within the allowed uses of unsafe) and is equivalent to a proposed Golang change to
@@ -247,9 +261,8 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 		skipUnsafe := false
 		if customArgs, ok := arguments.CustomArgs.(*CustomArgs); ok {
-			if len(customArgs.ExtraPeerDirs) > 0 {
-				peerPkgs = append(peerPkgs, customArgs.ExtraPeerDirs...)
-			}
+			peerPkgs = append(peerPkgs, customArgs.BasePeerDirs...)
+			peerPkgs = append(peerPkgs, customArgs.ExtraPeerDirs...)
 			skipUnsafe = customArgs.SkipUnsafe
 		}
 

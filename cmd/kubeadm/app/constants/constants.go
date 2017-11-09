@@ -73,7 +73,7 @@ const (
 	FrontProxyCACertAndKeyBaseName = "front-proxy-ca"
 	// FrontProxyCACertName defines front proxy CA certificate name
 	FrontProxyCACertName = "front-proxy-ca.crt"
-	// FrontProxyCAKeyName defaines front proxy CA key name
+	// FrontProxyCAKeyName defines front proxy CA key name
 	FrontProxyCAKeyName = "front-proxy-ca.key"
 
 	// FrontProxyClientCertAndKeyBaseName defines front proxy certificate and key base name
@@ -171,6 +171,11 @@ const (
 
 	// DefaultCIImageRepository points to image registry where CI uploads images from ci-cross build job
 	DefaultCIImageRepository = "gcr.io/kubernetes-ci-images"
+
+	// CoreDNS defines a variable used internally when referring to the CoreDNS addon for a cluster
+	CoreDNS = "CoreDNS"
+	// KubeDNS defines a variable used internally when referring to the kube-dns addon for a cluster
+	KubeDNS = "kube-dns"
 )
 
 var (
@@ -200,10 +205,6 @@ var (
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
 	MinimumControlPlaneVersion = version.MustParseSemantic("v1.8.0")
-
-	// MinimumCSRAutoApprovalClusterRolesVersion defines whether kubeadm can rely on the built-in CSR approval ClusterRole or not (note, the binding is always created by kubeadm!)
-	// TODO: Remove this when the v1.9 cycle starts and we bump the minimum supported version to v1.8.0
-	MinimumCSRAutoApprovalClusterRolesVersion = version.MustParseSemantic("v1.8.0-alpha.3")
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
 	MinimumKubeletVersion = version.MustParseSemantic("v1.8.0")

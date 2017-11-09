@@ -169,8 +169,14 @@ type SelfSubjectAccessReviewSpec struct {
 
 // SubjectAccessReviewStatus
 type SubjectAccessReviewStatus struct {
-	// Allowed is required.  True if the action would be allowed, false otherwise.
+	// Allowed is required. True if the action would be allowed, false otherwise.
 	Allowed bool `json:"allowed" protobuf:"varint,1,opt,name=allowed"`
+	// Denied is optional. True if the action would be denied, otherwise
+	// false. If both allowed is false and denied is false, then the
+	// authorizer has no opinion on whether to authorize the action. Denied
+	// may not be true if Allowed is true.
+	// +optional
+	Denied bool `json:"denied,omitempty" protobuf:"varint,4,opt,name=denied"`
 	// Reason is optional.  It indicates why a request was allowed or denied.
 	// +optional
 	Reason string `json:"reason,omitempty" protobuf:"bytes,2,opt,name=reason"`

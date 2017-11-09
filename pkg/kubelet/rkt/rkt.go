@@ -842,7 +842,7 @@ func (r *Runtime) newAppcRuntimeApp(pod *v1.Pod, podIP string, c v1.Container, r
 	}
 
 	// TODO: determine how this should be handled for rkt
-	opts, _, err := r.runtimeHelper.GenerateRunContainerOptions(pod, &c, podIP)
+	opts, err := r.runtimeHelper.GenerateRunContainerOptions(pod, &c, podIP)
 	if err != nil {
 		return err
 	}
@@ -1041,7 +1041,7 @@ func (r *Runtime) generateRunCommand(pod *v1.Pod, uuid, networkNamespaceID strin
 		}
 	} else {
 		// Setup DNS.
-		dnsServers, dnsSearches, _, err := r.runtimeHelper.GetClusterDNS(pod)
+		dnsServers, dnsSearches, _, _, err := r.runtimeHelper.GetClusterDNS(pod)
 		if err != nil {
 			return "", err
 		}

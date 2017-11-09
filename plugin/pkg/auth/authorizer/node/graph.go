@@ -19,9 +19,9 @@ package node
 import (
 	"sync"
 
-	"k8s.io/kubernetes/pkg/api"
 	pvutil "k8s.io/kubernetes/pkg/api/persistentvolume"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph/simple"
 )

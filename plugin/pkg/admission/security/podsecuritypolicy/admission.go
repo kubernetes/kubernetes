@@ -31,7 +31,7 @@ import (
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	extensionslisters "k8s.io/kubernetes/pkg/client/listers/extensions/internalversion"
@@ -72,8 +72,8 @@ func (plugin *podSecurityPolicyPlugin) SetAuthorizer(authz authorizer.Authorizer
 	plugin.authz = authz
 }
 
-// Validate ensures an authorizer is set.
-func (plugin *podSecurityPolicyPlugin) Validate() error {
+// ValidateInitialization ensures an authorizer is set.
+func (plugin *podSecurityPolicyPlugin) ValidateInitialization() error {
 	if plugin.authz == nil {
 		return fmt.Errorf("%s requires an authorizer", PluginName)
 	}
@@ -313,11 +313,11 @@ func authorizedForPolicy(info user.Info, namespace string, policy *extensions.Po
 		return false
 	}
 	attr := buildAttributes(info, namespace, policy)
-	allowed, reason, err := authz.Authorize(attr)
+	decision, reason, err := authz.Authorize(attr)
 	if err != nil {
 		glog.V(5).Infof("cannot authorize for policy: %v,%v", reason, err)
 	}
-	return allowed
+	return (decision == authorizer.DecisionAllow)
 }
 
 // buildAttributes builds an attributes record for a SAR based on the user info and policy.

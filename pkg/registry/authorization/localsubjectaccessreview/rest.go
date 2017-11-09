@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 	authorizationvalidation "k8s.io/kubernetes/pkg/apis/authorization/validation"
 	authorizationutil "k8s.io/kubernetes/pkg/registry/authorization/util"
@@ -40,7 +41,7 @@ func (r *REST) New() runtime.Object {
 	return &authorizationapi.LocalSubjectAccessReview{}
 }
 
-func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
+func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	localSubjectAccessReview, ok := obj.(*authorizationapi.LocalSubjectAccessReview)
 	if !ok {
 		return nil, kapierrors.NewBadRequest(fmt.Sprintf("not a LocaLocalSubjectAccessReview: %#v", obj))
@@ -57,10 +58,11 @@ func (r *REST) Create(ctx genericapirequest.Context, obj runtime.Object, include
 	}
 
 	authorizationAttributes := authorizationutil.AuthorizationAttributesFrom(localSubjectAccessReview.Spec)
-	allowed, reason, evaluationErr := r.authorizer.Authorize(authorizationAttributes)
+	decision, reason, evaluationErr := r.authorizer.Authorize(authorizationAttributes)
 
 	localSubjectAccessReview.Status = authorizationapi.SubjectAccessReviewStatus{
-		Allowed: allowed,
+		Allowed: (decision == authorizer.DecisionAllow),
+		Denied:  (decision == authorizer.DecisionDeny),
 		Reason:  reason,
 	}
 	if evaluationErr != nil {

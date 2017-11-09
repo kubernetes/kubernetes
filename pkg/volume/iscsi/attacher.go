@@ -137,7 +137,7 @@ func (plugin *iscsiPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
-func (detacher *iscsiDetacher) Detach(deviceMountPath string, nodeName types.NodeName) error {
+func (detacher *iscsiDetacher) Detach(volumeName string, nodeName types.NodeName) error {
 	return nil
 }
 

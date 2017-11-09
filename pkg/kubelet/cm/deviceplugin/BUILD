@@ -19,9 +19,11 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/cm/deviceplugin",
     deps = [
-        "//pkg/api/v1/helper:go_default_library",
+        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/kubelet/apis/deviceplugin/v1alpha:go_default_library",
         "//pkg/kubelet/container:go_default_library",
+        "//pkg/kubelet/lifecycle:go_default_library",
+        "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/golang.org/x/net/context:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
@@ -55,6 +57,8 @@ go_test(
     library = ":go_default_library",
     deps = [
         "//pkg/kubelet/apis/deviceplugin/v1alpha:go_default_library",
+        "//pkg/kubelet/lifecycle:go_default_library",
+        "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",

@@ -26,8 +26,8 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -45,14 +45,15 @@ import (
 	cmoptions "k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/util/initsystem"
 	versionutil "k8s.io/kubernetes/pkg/util/version"
 	kubeadmversion "k8s.io/kubernetes/pkg/version"
-	schoptions "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
+	schedulerapp "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
 	"k8s.io/kubernetes/test/e2e_node/system"
+	utilsexec "k8s.io/utils/exec"
 )
 
 const (
@@ -80,6 +81,21 @@ func (e *Error) Error() string {
 // successful as often as possilble.
 type Checker interface {
 	Check() (warnings, errors []error)
+}
+
+// CRICheck verifies the container runtime through the CRI.
+type CRICheck struct {
+	socket string
+	exec   utilsexec.Interface
+}
+
+// Check validates the container runtime through the CRI.
+func (criCheck CRICheck) Check() (warnings, errors []error) {
+	if err := criCheck.exec.Command("sh", "-c", fmt.Sprintf("crictl -r %s info", criCheck.socket)).Run(); err != nil {
+		errors = append(errors, fmt.Errorf("unable to check if the container runtime at %q is running: %s", criCheck.socket, err))
+		return warnings, errors
+	}
+	return warnings, errors
 }
 
 // ServiceCheck verifies that the given service is enabled and active. If we do not
@@ -166,18 +182,8 @@ func (poc PortOpenCheck) Check() (warnings, errors []error) {
 	return nil, errors
 }
 
-// IsRootCheck verifies user is root
-type IsRootCheck struct{}
-
-// Check validates if an user has root privileges.
-func (irc IsRootCheck) Check() (warnings, errors []error) {
-	errors = []error{}
-	if os.Getuid() != 0 {
-		errors = append(errors, fmt.Errorf("user is not running as root"))
-	}
-
-	return nil, errors
-}
+// IsPrivilegedUserCheck verifies user is privileged (linux - root, windows - Administrator)
+type IsPrivilegedUserCheck struct{}
 
 // DirAvailableCheck checks if the given directory either does not exist, or is empty.
 type DirAvailableCheck struct {
@@ -268,11 +274,12 @@ func (fcc FileContentCheck) Check() (warnings, errors []error) {
 type InPathCheck struct {
 	executable string
 	mandatory  bool
+	exec       utilsexec.Interface
 }
 
 // Check validates if the given executable is present in the path.
 func (ipc InPathCheck) Check() (warnings, errors []error) {
-	_, err := exec.LookPath(ipc.executable)
+	_, err := ipc.exec.LookPath(ipc.executable)
 	if err != nil {
 		if ipc.mandatory {
 			// Return as an error:
@@ -418,16 +425,18 @@ func (eac ExtraArgsCheck) Check() (warnings, errors []error) {
 		warnings = append(warnings, argsCheck("kube-controller-manager", eac.ControllerManagerExtraArgs, flags)...)
 	}
 	if len(eac.SchedulerExtraArgs) > 0 {
+		command := schedulerapp.NewSchedulerCommand()
 		flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-		s := schoptions.NewSchedulerServer()
-		s.AddFlags(flags)
+		flags.AddFlagSet(command.Flags())
 		warnings = append(warnings, argsCheck("kube-scheduler", eac.SchedulerExtraArgs, flags)...)
 	}
 	return warnings, nil
 }
 
 // SystemVerificationCheck defines struct used for for running the system verification node check in test/e2e_node/system
-type SystemVerificationCheck struct{}
+type SystemVerificationCheck struct {
+	CRISocket string
+}
 
 // Check runs all individual checks
 func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
@@ -438,12 +447,21 @@ func (sysver SystemVerificationCheck) Check() (warnings, errors []error) {
 
 	var errs []error
 	var warns []error
-	// All the validators we'd like to run:
+	// All the common validators we'd like to run:
 	var validators = []system.Validator{
-		&system.OSValidator{Reporter: reporter},
-		&system.KernelValidator{Reporter: reporter},
-		&system.CgroupsValidator{Reporter: reporter},
-		&system.DockerValidator{Reporter: reporter},
+		&system.KernelValidator{Reporter: reporter}}
+
+	// run the docker validator only with dockershim
+	if sysver.CRISocket == "/var/run/dockershim.sock" {
+		// https://github.com/kubernetes/kubeadm/issues/533
+		validators = append(validators, &system.DockerValidator{Reporter: reporter})
+	}
+
+	if runtime.GOOS == "linux" {
+		//add linux validators
+		validators = append(validators,
+			&system.OSValidator{Reporter: reporter},
+			&system.CgroupsValidator{Reporter: reporter})
 	}
 
 	// Run all validators
@@ -503,7 +521,9 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errors []error) {
 }
 
 // KubeletVersionCheck validates installed kubelet version
-type KubeletVersionCheck struct{}
+type KubeletVersionCheck struct {
+	KubernetesVersion string
+}
 
 // Check validates kubelet version. It should be not less than minimal supported version
 func (kubever KubeletVersionCheck) Check() (warnings, errors []error) {
@@ -514,7 +534,17 @@ func (kubever KubeletVersionCheck) Check() (warnings, errors []error) {
 	if kubeletVersion.LessThan(kubeadmconstants.MinimumKubeletVersion) {
 		return nil, []error{fmt.Errorf("Kubelet version %q is lower than kubadm can support. Please upgrade kubelet", kubeletVersion)}
 	}
-	return nil, []error{}
+
+	if kubever.KubernetesVersion != "" {
+		k8sVersion, err := versionutil.ParseSemantic(kubever.KubernetesVersion)
+		if err != nil {
+			return nil, []error{fmt.Errorf("couldn't parse kubernetes version %q: %v", kubever.KubernetesVersion, err)}
+		}
+		if kubeletVersion.Major() > k8sVersion.Major() || kubeletVersion.Minor() > k8sVersion.Minor() {
+			return nil, []error{fmt.Errorf("the kubelet version is higher than the control plane version. This is not a supported version skew and may lead to a malfunctional cluster. Kubelet version: %q Control plane version: %q", kubeletVersion, k8sVersion)}
+		}
+	}
+	return nil, nil
 }
 
 // SwapCheck warns if swap is enabled
@@ -538,7 +568,7 @@ func (swc SwapCheck) Check() (warnings, errors []error) {
 	}
 
 	if len(buf) > 1 {
-		return []error{fmt.Errorf("running with swap on is not supported. Please disable swap or set kubelet's --fail-swap-on flag to false")}, nil
+		return nil, []error{fmt.Errorf("running with swap on is not supported. Please disable swap")}
 	}
 
 	return nil, nil
@@ -682,20 +712,24 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 }
 
 // RunInitMasterChecks executes all individual, applicable to Master node checks.
-func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
+func RunInitMasterChecks(execer utilsexec.Interface, cfg *kubeadmapi.MasterConfiguration, criSocket string) error {
 	// First, check if we're root separately from the other preflight checks and fail fast
 	if err := RunRootCheckOnly(); err != nil {
 		return err
 	}
 
+	// check if we can use crictl to perform checks via the CRI
+	criCtlChecker := InPathCheck{executable: "crictl", mandatory: false, exec: execer}
+	warns, _ := criCtlChecker.Check()
+	useCRI := len(warns) == 0
+
 	checks := []Checker{
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
-		SystemVerificationCheck{},
-		IsRootCheck{},
+		SystemVerificationCheck{CRISocket: criSocket},
+		IsPrivilegedUserCheck{},
 		HostnameCheck{nodeName: cfg.NodeName},
-		KubeletVersionCheck{},
+		KubeletVersionCheck{KubernetesVersion: cfg.KubernetesVersion},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
-		ServiceCheck{Service: "docker", CheckIfActive: true},
 		FirewalldCheck{ports: []int{int(cfg.API.BindPort), 10250}},
 		PortOpenCheck{port: int(cfg.API.BindPort)},
 		PortOpenCheck{port: 10250},
@@ -704,15 +738,16 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
 		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
 		SwapCheck{},
-		InPathCheck{executable: "ip", mandatory: true},
-		InPathCheck{executable: "iptables", mandatory: true},
-		InPathCheck{executable: "mount", mandatory: true},
-		InPathCheck{executable: "nsenter", mandatory: true},
-		InPathCheck{executable: "ebtables", mandatory: false},
-		InPathCheck{executable: "ethtool", mandatory: false},
-		InPathCheck{executable: "socat", mandatory: false},
-		InPathCheck{executable: "tc", mandatory: false},
-		InPathCheck{executable: "touch", mandatory: false},
+		InPathCheck{executable: "ip", mandatory: true, exec: execer},
+		InPathCheck{executable: "iptables", mandatory: true, exec: execer},
+		InPathCheck{executable: "mount", mandatory: true, exec: execer},
+		InPathCheck{executable: "nsenter", mandatory: true, exec: execer},
+		InPathCheck{executable: "ebtables", mandatory: false, exec: execer},
+		InPathCheck{executable: "ethtool", mandatory: false, exec: execer},
+		InPathCheck{executable: "socat", mandatory: false, exec: execer},
+		InPathCheck{executable: "tc", mandatory: false, exec: execer},
+		InPathCheck{executable: "touch", mandatory: false, exec: execer},
+		criCtlChecker,
 		ExtraArgsCheck{
 			APIServerExtraArgs:         cfg.APIServerExtraArgs,
 			ControllerManagerExtraArgs: cfg.ControllerManagerExtraArgs,
@@ -721,6 +756,13 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 		HTTPProxyCheck{Proto: "https", Host: cfg.API.AdvertiseAddress, Port: int(cfg.API.BindPort)},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.ServiceSubnet},
 		HTTPProxyCIDRCheck{Proto: "https", CIDR: cfg.Networking.PodSubnet},
+	}
+
+	if useCRI {
+		checks = append(checks, CRICheck{socket: criSocket, exec: execer})
+	} else {
+		// assume docker
+		checks = append(checks, ServiceCheck{Service: "docker", CheckIfActive: true})
 	}
 
 	if len(cfg.Etcd.Endpoints) == 0 {
@@ -766,34 +808,49 @@ func RunInitMasterChecks(cfg *kubeadmapi.MasterConfiguration) error {
 }
 
 // RunJoinNodeChecks executes all individual, applicable to node checks.
-func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
+func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.NodeConfiguration, criSocket string) error {
 	// First, check if we're root separately from the other preflight checks and fail fast
 	if err := RunRootCheckOnly(); err != nil {
 		return err
 	}
 
+	// check if we can use crictl to perform checks via the CRI
+	criCtlChecker := InPathCheck{executable: "crictl", mandatory: false, exec: execer}
+	warns, _ := criCtlChecker.Check()
+	useCRI := len(warns) == 0
+
 	checks := []Checker{
-		SystemVerificationCheck{},
-		IsRootCheck{},
+		SystemVerificationCheck{CRISocket: criSocket},
+		IsPrivilegedUserCheck{},
 		HostnameCheck{cfg.NodeName},
 		KubeletVersionCheck{},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},
-		ServiceCheck{Service: "docker", CheckIfActive: true},
 		PortOpenCheck{port: 10250},
 		DirAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)},
 		FileAvailableCheck{Path: cfg.CACertPath},
 		FileAvailableCheck{Path: filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.KubeletKubeConfigFileName)},
-		FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
-		SwapCheck{},
-		InPathCheck{executable: "ip", mandatory: true},
-		InPathCheck{executable: "iptables", mandatory: true},
-		InPathCheck{executable: "mount", mandatory: true},
-		InPathCheck{executable: "nsenter", mandatory: true},
-		InPathCheck{executable: "ebtables", mandatory: false},
-		InPathCheck{executable: "ethtool", mandatory: false},
-		InPathCheck{executable: "socat", mandatory: false},
-		InPathCheck{executable: "tc", mandatory: false},
-		InPathCheck{executable: "touch", mandatory: false},
+	}
+	if useCRI {
+		checks = append(checks, CRICheck{socket: criSocket, exec: execer})
+	} else {
+		// assume docker
+		checks = append(checks, ServiceCheck{Service: "docker", CheckIfActive: true})
+	}
+	//non-windows checks
+	if runtime.GOOS == "linux" {
+		checks = append(checks,
+			FileContentCheck{Path: bridgenf, Content: []byte{'1'}},
+			SwapCheck{},
+			InPathCheck{executable: "ip", mandatory: true, exec: execer},
+			InPathCheck{executable: "iptables", mandatory: true, exec: execer},
+			InPathCheck{executable: "mount", mandatory: true, exec: execer},
+			InPathCheck{executable: "nsenter", mandatory: true, exec: execer},
+			InPathCheck{executable: "ebtables", mandatory: false, exec: execer},
+			InPathCheck{executable: "ethtool", mandatory: false, exec: execer},
+			InPathCheck{executable: "socat", mandatory: false, exec: execer},
+			InPathCheck{executable: "tc", mandatory: false, exec: execer},
+			InPathCheck{executable: "touch", mandatory: false, exec: execer},
+			criCtlChecker)
 	}
 
 	if len(cfg.DiscoveryTokenAPIServers) > 0 {
@@ -808,10 +865,10 @@ func RunJoinNodeChecks(cfg *kubeadmapi.NodeConfiguration) error {
 	return RunChecks(checks, os.Stderr)
 }
 
-// RunRootCheckOnly initializes cheks slice of structs and call RunChecks
+// RunRootCheckOnly initializes checks slice of structs and call RunChecks
 func RunRootCheckOnly() error {
 	checks := []Checker{
-		IsRootCheck{},
+		IsPrivilegedUserCheck{},
 	}
 
 	return RunChecks(checks, os.Stderr)

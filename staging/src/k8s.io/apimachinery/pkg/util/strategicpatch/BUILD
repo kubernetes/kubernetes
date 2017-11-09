@@ -25,6 +25,7 @@ go_library(
     srcs = ["patch.go"],
     importpath = "k8s.io/apimachinery/pkg/util/strategicpatch",
     deps = [
+        "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/mergepatch:go_default_library",
         "//vendor/k8s.io/apimachinery/third_party/forked/golang/json:go_default_library",

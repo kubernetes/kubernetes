@@ -112,6 +112,6 @@ func (dc *DeploymentController) emitRollbackNormalEvent(d *extensions.Deployment
 func (dc *DeploymentController) updateDeploymentAndClearRollbackTo(d *extensions.Deployment) error {
 	glog.V(4).Infof("Cleans up rollbackTo of deployment %q", d.Name)
 	d.Spec.RollbackTo = nil
-	_, err := dc.client.Extensions().Deployments(d.Namespace).Update(d)
+	_, err := dc.client.ExtensionsV1beta1().Deployments(d.Namespace).Update(d)
 	return err
 }

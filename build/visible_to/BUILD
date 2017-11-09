@@ -174,6 +174,7 @@ package_group(
         "//pkg/kubectl/cmd",
         "//pkg/kubectl/cmd/auth",
         "//pkg/kubectl/cmd/config",
+        "//pkg/kubectl/cmd/resource",
         "//pkg/kubectl/cmd/rollout",
         "//pkg/kubectl/cmd/set",
         "//pkg/kubectl/cmd/templates",
@@ -194,6 +195,7 @@ package_group(
     packages = [
         "//pkg/kubectl/cmd",
         "//pkg/kubectl/cmd/auth",
+        "//pkg/kubectl/cmd/resource",
         "//pkg/kubectl/cmd/set",
     ],
 )
@@ -207,6 +209,7 @@ package_group(
         "//cmd/clicheck",
         "//cmd/hyperkube",
         "//cmd/kube-proxy/app",
+        "//plugin/cmd/kube-scheduler/app",
     ],
 )
 
@@ -223,6 +226,7 @@ package_group(
         "//pkg/kubectl/cmd",
         "//pkg/kubectl/cmd/auth",
         "//pkg/kubectl/cmd/config",
+        "//pkg/kubectl/cmd/resource",
         "//pkg/kubectl/cmd/rollout",
         "//pkg/kubectl/cmd/set",
         "//pkg/kubectl/cmd/testing",
@@ -290,6 +294,7 @@ package_group(
         "//pkg/kubectl/cmd",
         "//pkg/kubectl/cmd/auth",
         "//pkg/kubectl/cmd/config",
+        "//pkg/kubectl/cmd/resource",
         "//pkg/kubectl/cmd/rollout",
         "//pkg/kubectl/cmd/set",
         "//pkg/kubectl/cmd/testing",

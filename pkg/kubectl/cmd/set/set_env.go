@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	envutil "k8s.io/kubernetes/pkg/kubectl/cmd/util/env"
@@ -238,13 +238,13 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 			FilenameParam(enforceNamespace, &o.FilenameOptions).
 			Flatten()
 
-		if !o.Local {
+		if o.Local {
+			b = b.Local(f.ClientForMapping)
+		} else {
 			b = b.
-				SelectorParam(o.Selector).
+				LabelSelectorParam(o.Selector).
 				ResourceTypeOrNameArgs(o.All, o.From).
 				Latest()
-		} else {
-			b = b.Local(f.ClientForMapping)
 		}
 
 		infos, err := b.Do().Infos()
@@ -302,13 +302,13 @@ func (o *EnvOptions) RunEnv(f cmdutil.Factory) error {
 		FilenameParam(enforceNamespace, &o.FilenameOptions).
 		Flatten()
 
-	if !o.Local {
+	if o.Local {
+		b = b.Local(f.ClientForMapping)
+	} else {
 		b = b.
-			SelectorParam(o.Selector).
+			LabelSelectorParam(o.Selector).
 			ResourceTypeOrNameArgs(o.All, o.Resources...).
 			Latest()
-	} else {
-		b = b.Local(f.ClientForMapping)
 	}
 
 	o.Infos, err = b.Do().Infos()

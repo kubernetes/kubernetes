@@ -21,8 +21,8 @@ import (
 	"io"
 
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
-	apihelper "k8s.io/kubernetes/pkg/api/helper"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	apihelper "k8s.io/kubernetes/pkg/apis/core/helper"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	pvlister "k8s.io/kubernetes/pkg/client/listers/core/internalversion"
 	storagelisters "k8s.io/kubernetes/pkg/client/listers/storage/internalversion"
@@ -43,6 +43,7 @@ func Register(plugins *admission.Plugins) {
 }
 
 var _ admission.Interface = &persistentVolumeClaimResize{}
+var _ admission.ValidationInterface = &persistentVolumeClaimResize{}
 var _ = kubeapiserveradmission.WantsInternalKubeInformerFactory(&persistentVolumeClaimResize{})
 
 type persistentVolumeClaimResize struct {
@@ -68,8 +69,8 @@ func (pvcr *persistentVolumeClaimResize) SetInternalKubeInformerFactory(f inform
 	})
 }
 
-// Validate ensures lister is set.
-func (pvcr *persistentVolumeClaimResize) Validate() error {
+// ValidateInitialization ensures lister is set.
+func (pvcr *persistentVolumeClaimResize) ValidateInitialization() error {
 	if pvcr.pvLister == nil {
 		return fmt.Errorf("missing persistent volume lister")
 	}
@@ -79,7 +80,7 @@ func (pvcr *persistentVolumeClaimResize) Validate() error {
 	return nil
 }
 
-func (pvcr *persistentVolumeClaimResize) Admit(a admission.Attributes) error {
+func (pvcr *persistentVolumeClaimResize) Validate(a admission.Attributes) error {
 	if a.GetResource().GroupResource() != api.Resource("persistentvolumeclaims") {
 		return nil
 	}

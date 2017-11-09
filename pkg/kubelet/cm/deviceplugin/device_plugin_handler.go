@@ -29,19 +29,28 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
+
+// ActivePodsFunc is a function that returns a list of pods to reconcile.
+type ActivePodsFunc func() []*v1.Pod
 
 // Handler defines the functions used to manage and access device plugin resources.
 type Handler interface {
 	// Start starts device plugin registration service.
-	Start() error
+	Start(activePods ActivePodsFunc) error
 	// Devices returns all of registered devices keyed by resourceName.
 	Devices() map[string][]pluginapi.Device
-	// Allocate attempts to allocate all of required extended resources for
-	// the input container, issues an Allocate rpc request for each of such
-	// resources, processes their AllocateResponses, and updates the cached
-	// containerDevices on success.
-	Allocate(pod *v1.Pod, container *v1.Container, activePods []*v1.Pod) error
+	// Allocate scans through containers in the pod spec
+	// If it finds the container requires device plugin resource, it:
+	// 1. Checks whether it already has this information in its cached state.
+	// 2. If not, it calls Allocate and populate its cached state afterwards.
+	// 3. If there is no cached state and Allocate fails, it returns an error.
+	// 4. Otherwise, it updates allocatableResource in nodeInfo if necessary,
+	// to make sure it is at least equal to the pod's requested capacity for
+	// any registered device plugin resource
+	Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error
 	// GetDeviceRunContainerOptions checks whether we have cached containerDevices
 	// for the passed-in <pod, container> and returns its DeviceRunContainerOptions
 	// for the found one. An empty struct is returned in case no cached state is found.
@@ -53,6 +62,10 @@ type HandlerImpl struct {
 	// TODO: consider to change this to RWMutex.
 	sync.Mutex
 	devicePluginManager Manager
+	// activePods is a method for listing active pods on the node
+	// so the amount of pluginResources requested by existing pods
+	// could be counted when updating allocated devices
+	activePods ActivePodsFunc
 	// devicePluginManagerMonitorCallback is used for testing only.
 	devicePluginManagerMonitorCallback MonitorCallback
 	// allDevices contains all of registered resourceNames and their exported device IDs.
@@ -103,16 +116,21 @@ func NewHandlerImpl(updateCapacityFunc func(v1.ResourceList)) (*HandlerImpl, err
 
 	handler.devicePluginManager = mgr
 	handler.devicePluginManagerMonitorCallback = deviceManagerMonitorCallback
-	// Loads in allocatedDevices information from disk.
-	err = handler.readCheckpoint()
-	if err != nil {
-		glog.Warningf("Continue after failing to read checkpoint file. Device allocation info may NOT be up-to-date. Err: %v", err)
-	}
+
 	return handler, nil
 }
 
-// Start starts device plugin registration service.
-func (h *HandlerImpl) Start() error {
+// Start initializes podDevices and allocatedDevices information from checkpoint-ed state
+// and starts device plugin registration service.
+func (h *HandlerImpl) Start(activePods ActivePodsFunc) error {
+	h.activePods = activePods
+
+	// Loads in allocatedDevices information from disk.
+	err := h.readCheckpoint()
+	if err != nil {
+		glog.Warningf("Continue after failing to read checkpoint file. Device allocation info may NOT be up-to-date. Err: %v", err)
+	}
+
 	return h.devicePluginManager.Start()
 }
 
@@ -166,11 +184,11 @@ func (h *HandlerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	return devices, nil
 }
 
-// Allocate attempts to allocate all of required extended resources for
-// the input container, issues an Allocate rpc request for each of such
-// resources, processes their AllocateResponses, and updates the cached
-// containerDevices on success.
-func (h *HandlerImpl) Allocate(pod *v1.Pod, container *v1.Container, activePods []*v1.Pod) error {
+// allocateContainerResources attempts to allocate all of required device
+// plugin resources for the input container, issues an Allocate rpc request
+// for each new device resource requirement, processes their AllocateResponses,
+// and updates the cached containerDevices on success.
+func (h *HandlerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Container) error {
 	podUID := string(pod.UID)
 	contName := container.Name
 	allocatedDevicesUpdated := false
@@ -184,7 +202,7 @@ func (h *HandlerImpl) Allocate(pod *v1.Pod, container *v1.Container, activePods 
 		// Updates allocatedDevices to garbage collect any stranded resources
 		// before doing the device plugin allocation.
 		if !allocatedDevicesUpdated {
-			h.updateAllocatedDevices(activePods)
+			h.updateAllocatedDevices(h.activePods())
 			allocatedDevicesUpdated = true
 		}
 		allocDevices, err := h.devicesToAllocate(podUID, contName, resource, needed)
@@ -224,6 +242,60 @@ func (h *HandlerImpl) Allocate(pod *v1.Pod, container *v1.Container, activePods 
 
 	// Checkpoints device to container allocation information.
 	return h.writeCheckpoint()
+}
+
+// Allocate attempts to allocate all of required device plugin resources,
+// and update Allocatable resources in nodeInfo if necessary
+func (h *HandlerImpl) Allocate(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+	pod := attrs.Pod
+	// TODO: Reuse devices between init containers and regular containers.
+	for _, container := range pod.Spec.InitContainers {
+		if err := h.allocateContainerResources(pod, &container); err != nil {
+			return err
+		}
+	}
+	for _, container := range pod.Spec.Containers {
+		if err := h.allocateContainerResources(pod, &container); err != nil {
+			return err
+		}
+	}
+
+	// quick return if no pluginResources requested
+	if _, podRequireDevicePluginResource := h.podDevices[string(pod.UID)]; !podRequireDevicePluginResource {
+		return nil
+	}
+
+	h.sanitizeNodeAllocatable(node)
+
+	return nil
+}
+
+// sanitizeNodeAllocatable scans through allocatedDevices in DevicePluginHandler
+// and if necessary, updates allocatableResource in nodeInfo to at least equal to
+// the allocated capacity. This allows pods that have already been scheduled on
+// the node to pass GeneralPredicates admission checking even upon device plugin failure.
+func (h *HandlerImpl) sanitizeNodeAllocatable(node *schedulercache.NodeInfo) {
+	var newAllocatableResource *schedulercache.Resource
+	allocatableResource := node.AllocatableResource()
+	if allocatableResource.ScalarResources == nil {
+		allocatableResource.ScalarResources = make(map[v1.ResourceName]int64)
+	}
+	for resource, devices := range h.allocatedDevices {
+		needed := devices.Len()
+		quant, ok := allocatableResource.ScalarResources[v1.ResourceName(resource)]
+		if ok && int(quant) >= needed {
+			continue
+		}
+		// Needs to update nodeInfo.AllocatableResource to make sure
+		// NodeInfo.allocatableResource at least equal to the capacity already allocated.
+		if newAllocatableResource == nil {
+			newAllocatableResource = allocatableResource.Clone()
+		}
+		newAllocatableResource.ScalarResources[v1.ResourceName(resource)] = int64(needed)
+	}
+	if newAllocatableResource != nil {
+		node.SetAllocatableResource(newAllocatableResource)
+	}
 }
 
 // GetDeviceRunContainerOptions checks whether we have cached containerDevices

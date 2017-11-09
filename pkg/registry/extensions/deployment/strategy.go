@@ -17,10 +17,7 @@ limitations under the License.
 package deployment
 
 import (
-	"fmt"
-
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
-	appsv1beta2 "k8s.io/api/apps/v1beta2"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -113,15 +110,11 @@ func (deploymentStrategy) ValidateUpdate(ctx genericapirequest.Context, obj, old
 	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
 		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 		switch groupVersion {
-		case appsv1beta1.SchemeGroupVersion:
+		case appsv1beta1.SchemeGroupVersion, extensionsv1beta1.SchemeGroupVersion:
 			// no-op for compatibility
-		case extensionsv1beta1.SchemeGroupVersion:
-			// no-op for compatibility
-		case appsv1beta2.SchemeGroupVersion:
+		default:
 			// disallow mutation of selector
 			allErrs = append(allErrs, apivalidation.ValidateImmutableField(newDeployment.Spec.Selector, oldDeployment.Spec.Selector, field.NewPath("spec").Child("selector"))...)
-		default:
-			panic(fmt.Sprintf("unexpected group/version: %v", groupVersion))
 		}
 	}
 

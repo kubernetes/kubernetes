@@ -37,8 +37,10 @@ go_library(
         "//pkg/kubelet/cm/cpumanager:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/eviction/api:go_default_library",
+        "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/status:go_default_library",
         "//pkg/util/mount:go_default_library",
+        "//plugin/pkg/scheduler/schedulercache:go_default_library",
         "//vendor/github.com/golang/glog:go_default_library",
         "//vendor/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/types:go_default_library",
@@ -47,9 +49,9 @@ go_library(
         "//vendor/k8s.io/client-go/tools/record:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux_amd64": [
-            "//pkg/api/v1/helper:go_default_library",
-            "//pkg/api/v1/helper/qos:go_default_library",
             "//pkg/api/v1/resource:go_default_library",
+            "//pkg/apis/core/v1/helper:go_default_library",
+            "//pkg/apis/core/v1/helper/qos:go_default_library",
             "//pkg/kubelet/cm/deviceplugin:go_default_library",
             "//pkg/kubelet/cm/util:go_default_library",
             "//pkg/kubelet/events:go_default_library",

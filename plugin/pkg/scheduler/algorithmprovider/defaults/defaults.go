@@ -178,20 +178,24 @@ func defaultPredicates() sets.String {
 
 // ApplyFeatureGates applies algorithm by feature gates.
 func ApplyFeatureGates() {
-	predSet := defaultPredicates()
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
 		// Remove "CheckNodeCondition" predicate
 		factory.RemoveFitPredicate("CheckNodeCondition")
-		predSet.Delete("CheckNodeCondition")
+		// Remove Key "CheckNodeCondition" From All Algorithm Provider
+		// The key will be removed from all providers which in algorithmProviderMap[]
+		// if you just want remove specific provider, call func RemovePredicateKeyFromAlgoProvider()
+		factory.RemovePredicateKeyFromAlgorithmProviderMap("CheckNodeCondition")
 
 		// Fit is determined based on whether a pod can tolerate all of the node's taints
-		predSet.Insert(factory.RegisterMandatoryFitPredicate("PodToleratesNodeTaints", predicates.PodToleratesNodeTaints))
+		factory.RegisterMandatoryFitPredicate("PodToleratesNodeTaints", predicates.PodToleratesNodeTaints)
+		// Insert Key "PodToleratesNodeTaints" To All Algorithm Provider
+		// The key will insert to all providers which in algorithmProviderMap[]
+		// if you just want insert to specific provider, call func InsertPredicateKeyToAlgoProvider()
+		factory.InsertPredicateKeyToAlgorithmProviderMap("PodToleratesNodeTaints")
 
 		glog.Warningf("TaintNodesByCondition is enabled, PodToleratesNodeTaints predicate is mandatory")
 	}
-
-	registerAlgorithmProvider(predSet, defaultPriorities())
 }
 
 func registerAlgorithmProvider(predSet, priSet sets.String) {

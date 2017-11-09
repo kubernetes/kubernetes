@@ -46,6 +46,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	authenticatorunion "k8s.io/apiserver/pkg/authentication/request/union"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authauthorizer "k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	authorizerunion "k8s.io/apiserver/pkg/authorization/union"
@@ -59,10 +60,10 @@ import (
 	extclient "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	policy "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller"
@@ -148,8 +149,8 @@ func NewMasterComponents(c *Config) *MasterComponents {
 // alwaysAllow always allows an action
 type alwaysAllow struct{}
 
-func (alwaysAllow) Authorize(requestAttributes authauthorizer.Attributes) (bool, string, error) {
-	return true, "always allow", nil
+func (alwaysAllow) Authorize(requestAttributes authauthorizer.Attributes) (authorizer.Decision, string, error) {
+	return authorizer.DecisionAllow, "always allow", nil
 }
 
 // alwaysEmpty simulates "no authentication" for old tests

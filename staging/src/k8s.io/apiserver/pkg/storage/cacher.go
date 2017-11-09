@@ -649,7 +649,15 @@ func (c *Cacher) isStopped() bool {
 }
 
 func (c *Cacher) Stop() {
+	// avoid stopping twice (note: cachers are shared with subresources)
+	if c.isStopped() {
+		return
+	}
 	c.stopLock.Lock()
+	if c.stopped {
+		// avoid that it was locked meanwhile as isStopped only read-locks
+		return
+	}
 	c.stopped = true
 	c.stopLock.Unlock()
 	close(c.stopCh)

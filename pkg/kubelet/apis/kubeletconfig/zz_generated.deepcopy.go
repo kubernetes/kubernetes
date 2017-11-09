@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/api"
+	core "k8s.io/kubernetes/pkg/apis/core"
 	reflect "reflect"
 )
 
@@ -137,6 +137,18 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	out.SyncFrequency = in.SyncFrequency
 	out.FileCheckFrequency = in.FileCheckFrequency
 	out.HTTPCheckFrequency = in.HTTPCheckFrequency
+	if in.ManifestURLHeader != nil {
+		in, out := &in.ManifestURLHeader, &out.ManifestURLHeader
+		*out = make(map[string][]string, len(*in))
+		for key, val := range *in {
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				(*out)[key] = make([]string, len(val))
+				copy((*out)[key], val)
+			}
+		}
+	}
 	out.Authentication = in.Authentication
 	out.Authorization = in.Authorization
 	if in.HostNetworkSources != nil {
@@ -167,7 +179,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	if in.RegisterWithTaints != nil {
 		in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
-		*out = make([]api.Taint, len(*in))
+		*out = make([]core.Taint, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

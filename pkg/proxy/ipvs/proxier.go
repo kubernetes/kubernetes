@@ -40,9 +40,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
@@ -649,10 +649,19 @@ func (em proxyEndpointsMap) unmerge(other proxyEndpointsMap) {
 }
 
 // CanUseIPVSProxier returns true if we can use the ipvs Proxier.
-// This is determined by checking if all the required kernel modules are loaded. It may
+// This is determined by checking if all the required kernel modules can be loaded. It may
 // return an error if it fails to get the kernel modules information without error, in which
 // case it will also return false.
 func CanUseIPVSProxier() (bool, error) {
+	// Try to load IPVS required kernel modules using modprobe
+	for _, kmod := range ipvsModules {
+		err := utilexec.New().Command("modprobe", "--", kmod).Run()
+		if err != nil {
+			glog.Warningf("Failed to load kernel module %v with modprobe. "+
+				"You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", kmod)
+		}
+	}
+
 	// Find out loaded kernel modules
 	out, err := utilexec.New().Command("cut", "-f1", "-d", " ", "/proc/modules").CombinedOutput()
 	if err != nil {
@@ -666,7 +675,7 @@ func CanUseIPVSProxier() (bool, error) {
 	loadModules.Insert(mods...)
 	modules := wantModules.Difference(loadModules).List()
 	if len(modules) != 0 {
-		return false, fmt.Errorf("Failed to load kernel modules: %v", modules)
+		return false, fmt.Errorf("IPVS proxier will not be used because the following required kernel modules are not loaded: %v", modules)
 	}
 	return true, nil
 }
@@ -739,7 +748,7 @@ func cleanupIptablesLeftovers(ipt utiliptables.Interface) (encounteredError bool
 }
 
 // CleanupLeftovers clean up all ipvs and iptables rules created by ipvs Proxier.
-func CleanupLeftovers(execer utilexec.Interface, ipvs utilipvs.Interface, ipt utiliptables.Interface) (encounteredError bool) {
+func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface) (encounteredError bool) {
 	// Return immediately when ipvs interface is nil - Probably initialization failed in somewhere.
 	if ipvs == nil {
 		return true
@@ -752,7 +761,8 @@ func CleanupLeftovers(execer utilexec.Interface, ipvs utilipvs.Interface, ipt ut
 		encounteredError = true
 	}
 	// Delete dummy interface created by ipvs Proxier.
-	err = deleteDummyDevice(execer, DefaultDummyDevice)
+	nl := NewNetLinkHandle()
+	err = nl.DeleteDummyDevice(DefaultDummyDevice)
 	if err != nil {
 		encounteredError = true
 	}
@@ -941,7 +951,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// End install iptables
 
 	// make sure dummy interface exists in the system where ipvs Proxier will bind service address on it
-	_, err = ensureDummyDevice(proxier.exec, DefaultDummyDevice)
+	_, err = proxier.netlinkHandle.EnsureDummyDevice(DefaultDummyDevice)
 	if err != nil {
 		glog.Errorf("Failed to create dummy interface: %s, error: %v", DefaultDummyDevice, err)
 		return
@@ -999,7 +1009,7 @@ func (proxier *Proxier) syncProxyRules() {
 			"-A", string(kubeServicesChain),
 			"-m", "comment", "--comment", fmt.Sprintf(`"%s cluster IP"`, svcNameString),
 			"-m", protocol, "-p", protocol,
-			"-d", fmt.Sprintf("%s/32", svcInfo.clusterIP.String()),
+			"-d", utilproxy.ToCIDR(svcInfo.clusterIP),
 			"--dport", strconv.Itoa(svcInfo.port),
 		)
 		if proxier.masqueradeAll {
@@ -1090,7 +1100,7 @@ func (proxier *Proxier) syncProxyRules() {
 						"-A", string(kubeServicesChain),
 						"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcNameString),
 						"-m", string(svcInfo.protocol), "-p", string(svcInfo.protocol),
-						"-d", fmt.Sprintf("%s/32", ingress.IP),
+						"-d", utilproxy.ToCIDR(net.ParseIP(ingress.IP)),
 						"--dport", fmt.Sprintf("%d", svcInfo.port),
 					)
 
@@ -1107,7 +1117,7 @@ func (proxier *Proxier) syncProxyRules() {
 					// loadbalancer's backend hosts. In this case, request will not hit the loadbalancer but loop back directly.
 					// Need to add the following rule to allow request on host.
 					if allowFromNode {
-						writeLine(proxier.natRules, append(args, "-s", fmt.Sprintf("%s/32", ingress.IP), "-j", "ACCEPT")...)
+						writeLine(proxier.natRules, append(args, "-s", utilproxy.ToCIDR(net.ParseIP(ingress.IP)), "-j", "ACCEPT")...)
 					}
 
 					// If the packet was able to reach the end of firewall chain, then it did not get DNATed.
@@ -1154,7 +1164,7 @@ func (proxier *Proxier) syncProxyRules() {
 					continue
 				}
 				if lp.Protocol == "udp" {
-					isIPv6 := svcInfo.clusterIP.To4() != nil
+					isIPv6 := utilproxy.IsIPv6(svcInfo.clusterIP)
 					utilproxy.ClearUDPConntrackForPort(proxier.exec, lp.Port, isIPv6)
 				}
 				replacementPortsMap[lp] = socket
@@ -1514,32 +1524,6 @@ func openLocalPort(lp *utilproxy.LocalPort) (utilproxy.Closeable, error) {
 	}
 	glog.V(2).Infof("Opened local port %s", lp.String())
 	return socket, nil
-}
-
-const cmdIP = "ip"
-
-func ensureDummyDevice(execer utilexec.Interface, dummyDev string) (exist bool, err error) {
-	args := []string{"link", "add", dummyDev, "type", "dummy"}
-	out, err := execer.Command(cmdIP, args...).CombinedOutput()
-	if err != nil {
-		// "exit status code 2" will be returned if the device already exists
-		if ee, ok := err.(utilexec.ExitError); ok {
-			if ee.Exited() && ee.ExitStatus() == 2 {
-				return true, nil
-			}
-		}
-		return false, fmt.Errorf("error creating dummy interface %q: %v: %s", dummyDev, err, out)
-	}
-	return false, nil
-}
-
-func deleteDummyDevice(execer utilexec.Interface, dummyDev string) error {
-	args := []string{"link", "del", dummyDev}
-	out, err := execer.Command(cmdIP, args...).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("error deleting dummy interface %q: %v: %s", dummyDev, err, out)
-	}
-	return nil
 }
 
 // ipvs Proxier fall back on iptables when it needs to do SNAT for engress packets

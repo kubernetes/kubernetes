@@ -17,10 +17,9 @@ limitations under the License.
 package validation
 
 import (
-	"testing"
-
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	internalapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
+	"testing"
 )
 
 func TestValidateConfiguration(t *testing.T) {

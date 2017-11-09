@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
@@ -42,9 +42,9 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
-// denyExec is an implementation of admission.Interface which says no to a pod/exec on
+// DenyExec is an implementation of admission.Interface which says no to a pod/exec on
 // a pod using host based configurations.
-type denyExec struct {
+type DenyExec struct {
 	*admission.Handler
 	client internalclientset.Interface
 
@@ -54,12 +54,14 @@ type denyExec struct {
 	privileged bool
 }
 
-var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&denyExec{})
+var _ admission.ValidationInterface = &DenyExec{}
+
+var _ = kubeapiserveradmission.WantsInternalKubeClientSet(&DenyExec{})
 
 // NewDenyEscalatingExec creates a new admission controller that denies an exec operation on a pod
 // using host based configurations.
-func NewDenyEscalatingExec() admission.Interface {
-	return &denyExec{
+func NewDenyEscalatingExec() *DenyExec {
+	return &DenyExec{
 		Handler:    admission.NewHandler(admission.Connect),
 		hostIPC:    true,
 		hostPID:    true,
@@ -70,8 +72,8 @@ func NewDenyEscalatingExec() admission.Interface {
 // NewDenyExecOnPrivileged creates a new admission controller that is only checking the privileged
 // option.  This is for legacy support of the DenyExecOnPrivileged admission controller.  Most
 // of the time NewDenyEscalatingExec should be preferred.
-func NewDenyExecOnPrivileged() admission.Interface {
-	return &denyExec{
+func NewDenyExecOnPrivileged() *DenyExec {
+	return &DenyExec{
 		Handler:    admission.NewHandler(admission.Connect),
 		hostIPC:    false,
 		hostPID:    false,
@@ -79,7 +81,8 @@ func NewDenyExecOnPrivileged() admission.Interface {
 	}
 }
 
-func (d *denyExec) Admit(a admission.Attributes) (err error) {
+// Validate makes an admission decision based on the request attributes
+func (d *DenyExec) Validate(a admission.Attributes) (err error) {
 	connectRequest, ok := a.GetObject().(*rest.ConnectRequest)
 	if !ok {
 		return errors.NewBadRequest("a connect request was received, but could not convert the request object.")
@@ -129,11 +132,13 @@ func isPrivileged(pod *api.Pod) bool {
 	return false
 }
 
-func (d *denyExec) SetInternalKubeClientSet(client internalclientset.Interface) {
+// SetInternalKubeClientSet implements the WantsInternalKubeClientSet interface.
+func (d *DenyExec) SetInternalKubeClientSet(client internalclientset.Interface) {
 	d.client = client
 }
 
-func (d *denyExec) Validate() error {
+// ValidateInitialization implements the InitializationValidator interface.
+func (d *DenyExec) ValidateInitialization() error {
 	if d.client == nil {
 		return fmt.Errorf("missing client")
 	}

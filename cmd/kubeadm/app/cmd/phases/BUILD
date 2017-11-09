@@ -50,6 +50,7 @@ go_library(
         "//pkg/util/version:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/client-go/kubernetes:go_default_library",
+        "//vendor/k8s.io/utils/exec:go_default_library",
     ],
 )
 

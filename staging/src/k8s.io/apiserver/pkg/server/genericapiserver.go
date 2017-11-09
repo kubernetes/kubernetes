@@ -70,12 +70,6 @@ type APIGroupInfo struct {
 	NegotiatedSerializer runtime.NegotiatedSerializer
 	// ParameterCodec performs conversions for query parameters passed to API calls
 	ParameterCodec runtime.ParameterCodec
-
-	// SubresourceGroupVersionKind contains the GroupVersionKind overrides for each subresource that is
-	// accessible from this API group version. The GroupVersionKind is that of the external version of
-	// the subresource. The key of this map should be the path of the subresource. The keys here should
-	// match the keys in the Storage map above for subresources.
-	SubresourceGroupVersionKind map[string]schema.GroupVersionKind
 }
 
 // GenericAPIServer contains state for a Kubernetes cluster api server.
@@ -435,9 +429,8 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		UnsafeConvertor: runtime.UnsafeObjectConvertor(apiGroupInfo.Scheme),
 		Defaulter:       apiGroupInfo.Scheme,
 		Typer:           apiGroupInfo.Scheme,
-		SubresourceGroupVersionKind: apiGroupInfo.SubresourceGroupVersionKind,
-		Linker: apiGroupInfo.GroupMeta.SelfLinker,
-		Mapper: apiGroupInfo.GroupMeta.RESTMapper,
+		Linker:          apiGroupInfo.GroupMeta.SelfLinker,
+		Mapper:          apiGroupInfo.GroupMeta.RESTMapper,
 
 		Admit:                        s.admissionControl,
 		Context:                      s.RequestContextMapper(),

@@ -25,9 +25,9 @@ import (
 
 type FakeHandler struct {
 	*Handler
-	name        string
-	admit       bool
-	admitCalled bool
+	name                     string
+	admit, admitCalled       bool
+	validate, validateCalled bool
 }
 
 func (h *FakeHandler) Admit(a Attributes) (err error) {
@@ -38,15 +38,24 @@ func (h *FakeHandler) Admit(a Attributes) (err error) {
 	return fmt.Errorf("Don't admit")
 }
 
-func makeHandler(name string, admit bool, ops ...Operation) Interface {
+func (h *FakeHandler) Validate(a Attributes) (err error) {
+	h.validateCalled = true
+	if h.validate {
+		return nil
+	}
+	return fmt.Errorf("Don't validate")
+}
+
+func makeHandler(name string, accept bool, ops ...Operation) Interface {
 	return &FakeHandler{
-		name:    name,
-		admit:   admit,
-		Handler: NewHandler(ops...),
+		name:     name,
+		admit:    accept,
+		validate: accept,
+		Handler:  NewHandler(ops...),
 	}
 }
 
-func TestAdmit(t *testing.T) {
+func TestAdmitAndValidate(t *testing.T) {
 	tests := []struct {
 		name      string
 		operation Operation
@@ -100,6 +109,7 @@ func TestAdmit(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
+		// call admit and check that validate was not called at all
 		err := test.chain.Admit(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", test.operation, nil))
 		accepted := (err == nil)
 		if accepted != test.accept {
@@ -109,8 +119,33 @@ func TestAdmit(t *testing.T) {
 			fake := h.(*FakeHandler)
 			_, shouldBeCalled := test.calls[fake.name]
 			if shouldBeCalled != fake.admitCalled {
-				t.Errorf("%s: handler %s not called as expected: %v", test.name, fake.name, fake.admitCalled)
+				t.Errorf("%s: admit handler %s not called as expected: %v", test.name, fake.name, fake.admitCalled)
 				continue
+			}
+			if fake.validateCalled {
+				t.Errorf("%s: validate handler %s called during admit", test.name, fake.name)
+			}
+
+			// reset value for validation test
+			fake.admitCalled = false
+		}
+
+		// call validate and check that admit was not called at all
+		err = test.chain.Validate(NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", test.operation, nil))
+		accepted = (err == nil)
+		if accepted != test.accept {
+			t.Errorf("%s: unexpected result of validate call: %v\n", test.name, accepted)
+		}
+		for _, h := range test.chain {
+			fake := h.(*FakeHandler)
+			_, shouldBeCalled := test.calls[fake.name]
+			if shouldBeCalled != fake.validateCalled {
+				t.Errorf("%s: validate handler %s not called as expected: %v", test.name, fake.name, fake.validateCalled)
+				continue
+			}
+
+			if fake.admitCalled {
+				t.Errorf("%s: admit handler %s called during admit", test.name, fake.name)
 			}
 		}
 	}

@@ -151,6 +151,14 @@ func NewFromConfigurator(c Configurator, modifiers ...func(c *Config)) (*Schedul
 	return s, nil
 }
 
+// NewFromConfig returns a new scheduler using the provided Config.
+func NewFromConfig(config *Config) *Scheduler {
+	metrics.Register()
+	return &Scheduler{
+		config: config,
+	}
+}
+
 // Run begins watching and scheduling. It waits for cache to be synced, then starts a goroutine and returns immediately.
 func (sched *Scheduler) Run() {
 	if !sched.config.WaitForCacheSync() {
@@ -184,6 +192,9 @@ func (sched *Scheduler) schedule(pod *v1.Pod) (string, error) {
 	return host, err
 }
 
+// preempt tries to create room for a pod that has failed to schedule, by preempting lower priority pods if possible.
+// If it succeeds, it adds the name of the node where preemption has happened to the pod annotations.
+// It returns the node name and an error if any.
 func (sched *Scheduler) preempt(preemptor *v1.Pod, scheduleErr error) (string, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
 		glog.V(3).Infof("Pod priority feature is not enabled. No preemption is performed.")

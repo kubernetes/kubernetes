@@ -24,20 +24,25 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/util/proto/validation"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util/openapi"
 )
 
+// SchemaValidation validates the object against an OpenAPI schema.
 type SchemaValidation struct {
 	resources openapi.Resources
 }
 
+// NewSchemaValidation creates a new SchemaValidation that can be used
+// to validate objects.
 func NewSchemaValidation(resources openapi.Resources) *SchemaValidation {
 	return &SchemaValidation{
 		resources: resources,
 	}
 }
 
+// ValidateBytes will validates the object against using the Resources
+// object.
 func (v *SchemaValidation) ValidateBytes(data []byte) error {
 	obj, err := parse(data)
 	if err != nil {
@@ -80,12 +85,7 @@ func (v *SchemaValidation) validateResource(obj interface{}, gvk schema.GroupVer
 		return nil
 	}
 
-	rootValidation, err := itemFactory(proto.NewPath(gvk.Kind), obj)
-	if err != nil {
-		return []error{err}
-	}
-	resource.Accept(rootValidation)
-	return rootValidation.Errors()
+	return validation.ValidateModel(obj, resource, gvk.Kind)
 }
 
 func parse(data []byte) (interface{}, error) {

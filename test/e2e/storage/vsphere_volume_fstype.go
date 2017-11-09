@@ -128,7 +128,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
 	// Create pod to attach Volume to Node
-	pod, err := framework.CreatePod(client, namespace, pvclaims, false, ExecCommand)
+	pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, ExecCommand)
 	Expect(err).To(HaveOccurred())
 
 	eventList, err := client.CoreV1().Events(namespace).List(metav1.ListOptions{})
@@ -170,7 +170,7 @@ func createPodAndVerifyVolumeAccessible(client clientset.Interface, namespace st
 	pvclaims = append(pvclaims, pvclaim)
 	By("Creating pod to attach PV to the node")
 	// Create pod to attach Volume to Node
-	pod, err := framework.CreatePod(client, namespace, pvclaims, false, ExecCommand)
+	pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, "")
 	Expect(err).NotTo(HaveOccurred())
 
 	// Asserts: Right disk is attached to the pod

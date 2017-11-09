@@ -24,8 +24,9 @@ import (
 
 var storageOperationMetric = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
-		Name: "storage_operation_duration_seconds",
-		Help: "Storage operation duration",
+		Name:    "storage_operation_duration_seconds",
+		Help:    "Storage operation duration",
+		Buckets: []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50},
 	},
 	[]string{"volume_plugin", "operation_name"},
 )

@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // HairpinMode denotes how the kubelet should configure networking to handle
@@ -70,7 +70,7 @@ type KubeletConfiguration struct {
 	ManifestURL string
 	// manifestURLHeader is the HTTP header to use when accessing the manifest
 	// URL, with the key separated from the value with a ':', as in 'key:value'
-	ManifestURLHeader string
+	ManifestURLHeader map[string][]string
 	// enableServer enables the Kubelet's server
 	EnableServer bool
 	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
@@ -181,9 +181,6 @@ type KubeletConfiguration struct {
 	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
 	// +optional
 	CgroupDriver string
-	// Cgroups that container runtime is expected to be isolated in.
-	// +optional
-	RuntimeCgroups string
 	// SystemCgroups is absolute name of cgroups in which to place
 	// all non-kernel processes that are not already in a container. Empty
 	// for no container. Rolling back the flag requires a reboot.
@@ -193,8 +190,6 @@ type KubeletConfiguration struct {
 	// If CgroupsPerQOS is enabled, this is the root of the QoS cgroup hierarchy.
 	// +optional
 	CgroupRoot string
-	// containerRuntime is the container runtime to use.
-	ContainerRuntime string
 	// CPUManagerPolicy is the name of the policy to use.
 	CPUManagerPolicy string
 	// CPU Manager reconciliation period.
@@ -227,7 +222,7 @@ type KubeletConfiguration struct {
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string
 	// ResolverConfig is the resolver configuration file used as the basis
-	// for the container DNS resolution configuration."), []
+	// for the container DNS resolution configuration.
 	ResolverConfig string
 	// cpuCFSQuota is Enable CPU CFS quota enforcement for containers that
 	// specify CPU limits

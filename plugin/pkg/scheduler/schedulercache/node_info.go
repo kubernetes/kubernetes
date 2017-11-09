@@ -24,7 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	clientcache "k8s.io/client-go/tools/cache"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/util"
 )
@@ -253,6 +253,11 @@ func (n *NodeInfo) AllocatableResource() Resource {
 		return emptyResource
 	}
 	return *n.allocatableResource
+}
+
+// SetAllocatableResource sets the allocatableResource information of given node.
+func (n *NodeInfo) SetAllocatableResource(allocatableResource *Resource) {
+	n.allocatableResource = allocatableResource
 }
 
 func (n *NodeInfo) Clone() *NodeInfo {

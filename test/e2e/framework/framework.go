@@ -71,6 +71,7 @@ type Framework struct {
 	Namespace                *v1.Namespace   // Every test has at least one namespace unless creation is skipped
 	namespacesToDelete       []*v1.Namespace // Some tests have more than one.
 	NamespaceDeletionTimeout time.Duration
+	SkipPrivilegedPSPBinding bool // Whether to skip creating a binding to the privileged PSP in the test namespace
 
 	gatherer *containerResourceGatherer
 	// Constraints that passed to a check which is executed after data is gathered to
@@ -373,6 +374,11 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 	if ns != nil {
 		f.namespacesToDelete = append(f.namespacesToDelete, ns)
 	}
+
+	if !f.SkipPrivilegedPSPBinding {
+		CreatePrivilegedPSPBinding(f, ns.Name)
+	}
+
 	return ns, err
 }
 
@@ -632,6 +638,11 @@ func kubectlExec(namespace string, podName, containerName string, args ...string
 // TODO: Support type safe tagging as well https://github.com/kubernetes/kubernetes/pull/22401.
 func KubeDescribe(text string, body func()) bool {
 	return Describe("[k8s.io] "+text, body)
+}
+
+// Wrapper function for ginkgo It.  Adds "[Conformance]" tag and makes static analysis easier.
+func ConformanceIt(text string, body interface{}, timeout ...float64) bool {
+	return It(text+" [Conformance]", body, timeout...)
 }
 
 // PodStateVerification represents a verification of pod state.

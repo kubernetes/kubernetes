@@ -23,7 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -151,12 +151,7 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		IncludeUninitialized(includeUninitialized).
 		Flatten()
 
-	if !o.Local {
-		builder = builder.
-			SelectorParam(o.Selector).
-			ResourceTypeOrNameArgs(o.All, args...).
-			Latest()
-	} else {
+	if o.Local {
 		// if a --local flag was provided, and a resource was specified in the form
 		// <resource>/<name>, fail immediately as --local cannot query the api server
 		// for the specified resource.
@@ -165,6 +160,11 @@ func (o *ResourcesOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 		}
 
 		builder = builder.Local(f.ClientForMapping)
+	} else {
+		builder = builder.
+			LabelSelectorParam(o.Selector).
+			ResourceTypeOrNameArgs(o.All, args...).
+			Latest()
 	}
 
 	o.Infos, err = builder.Do().Infos()

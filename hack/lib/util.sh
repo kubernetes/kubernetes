@@ -268,7 +268,7 @@ kube::util::group-version-to-pkg-path() {
   case "${group_version}" in
     # both group and version are "", this occurs when we generate deep copies for internal objects of the legacy v1 API.
     __internal)
-      echo "pkg/api"
+      echo "pkg/apis/core"
       ;;
     meta/v1)
       echo "vendor/k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -772,6 +772,23 @@ function kube::util::ensure_dockerized {
   else
     echo "ERROR: This script is designed to be run inside a kube-build container"
     exit 1
+  fi
+}
+
+# kube::util::ensure-gnu-sed
+# Determines which sed binary is gnu-sed on linux/darwin
+#
+# Sets:
+#  SED: The name of the gnu-sed binary
+#
+function kube::util::ensure-gnu-sed {
+  if LANG=C sed --help 2>&1 | grep -q GNU; then
+    SED="sed"
+  elif which gsed &>/dev/null; then
+    SED="gsed"
+  else
+    kube::log::error "Failed to find GNU sed as sed or gsed. If you are on Mac: brew install gnu-sed." >&2
+    return 1
   fi
 }
 

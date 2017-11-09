@@ -34,10 +34,10 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	endptspkg "k8s.io/kubernetes/pkg/api/v1/endpoints"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -1039,6 +1039,13 @@ func TestPodChanged(t *testing.T) {
 		t.Errorf("Expected pod to be changed with pod readiness change")
 	}
 	oldPod.Status.Conditions = saveConditions
+
+	now := metav1.NewTime(time.Now().UTC())
+	newPod.ObjectMeta.DeletionTimestamp = &now
+	if !podChanged(oldPod, newPod) {
+		t.Errorf("Expected pod to be changed with DeletionTimestamp change")
+	}
+	newPod.ObjectMeta.DeletionTimestamp = oldPod.ObjectMeta.DeletionTimestamp.DeepCopy()
 }
 
 func TestDetermineNeededServiceUpdates(t *testing.T) {

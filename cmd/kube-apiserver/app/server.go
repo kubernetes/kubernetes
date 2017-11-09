@@ -44,7 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/webhook"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -86,7 +86,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 
 	"k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/util/reflector/prometheus" // for reflector metric registration
 	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
 )
@@ -265,13 +265,6 @@ func CreateKubeAPIServerConfig(s *options.ServerRunOptions, nodeTunneler tunnele
 		return nil, nil, nil, nil, nil, utilerrors.NewAggregate(errs)
 	}
 
-	if s.CloudProvider != nil {
-		// Initialize the cloudprovider once, to give it a chance to register KMS plugins, if any.
-		_, err := cloudprovider.InitCloudProvider(s.CloudProvider.CloudProvider, s.CloudProvider.CloudConfigFile)
-		if err != nil {
-			return nil, nil, nil, nil, nil, err
-		}
-	}
 	genericConfig, sharedInformers, versionedInformers, insecureServingOptions, serviceResolver, err := BuildGenericConfig(s, proxyTransport)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
@@ -506,11 +499,9 @@ func BuildAdmissionPluginInitializer(s *options.ServerRunOptions, client interna
 	// TODO: use a dynamic restmapper. See https://github.com/kubernetes/kubernetes/pull/42615.
 	restMapper := legacyscheme.Registry.RESTMapper()
 
-	// NOTE: we do not provide informers to the quota registry because admission level decisions
-	// do not require us to open watches for all items tracked by quota.
-	quotaRegistry := quotainstall.NewRegistry(nil, nil)
+	quotaConfiguration := quotainstall.NewQuotaConfigurationForAdmission()
 
-	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, restMapper, quotaRegistry, webhookAuthWrapper, serviceResolver)
+	pluginInitializer := kubeapiserveradmission.NewPluginInitializer(client, sharedInformers, cloudConfig, restMapper, quotaConfiguration, webhookAuthWrapper, serviceResolver)
 
 	return pluginInitializer, nil
 }

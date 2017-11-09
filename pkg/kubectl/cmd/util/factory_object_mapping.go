@@ -35,10 +35,10 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller"
@@ -314,26 +314,23 @@ func (f *ring1Factory) Reaper(mapping *meta.RESTMapping) (kubectl.Reaper, error)
 }
 
 func (f *ring1Factory) HistoryViewer(mapping *meta.RESTMapping) (kubectl.HistoryViewer, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	external, err := f.clientAccessFactory.KubernetesClientSet()
 	if err != nil {
 		return nil, err
 	}
-	return kubectl.HistoryViewerFor(mapping.GroupVersionKind.GroupKind(), clientset)
+	return kubectl.HistoryViewerFor(mapping.GroupVersionKind.GroupKind(), external)
 }
 
 func (f *ring1Factory) Rollbacker(mapping *meta.RESTMapping) (kubectl.Rollbacker, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	external, err := f.clientAccessFactory.KubernetesClientSet()
 	if err != nil {
 		return nil, err
 	}
-	return kubectl.RollbackerFor(mapping.GroupVersionKind.GroupKind(), clientset)
+	return kubectl.RollbackerFor(mapping.GroupVersionKind.GroupKind(), external)
 }
 
 func (f *ring1Factory) StatusViewer(mapping *meta.RESTMapping) (kubectl.StatusViewer, error) {
-	mappingVersion := mapping.GroupVersionKind.GroupVersion()
-	clientset, err := f.clientAccessFactory.ClientSetForVersion(&mappingVersion)
+	clientset, err := f.clientAccessFactory.KubernetesClientSet()
 	if err != nil {
 		return nil, err
 	}

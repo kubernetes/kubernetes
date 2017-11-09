@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -84,12 +85,8 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 			`$Credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $User, $PWord`,
 			options[0], options[1])
 
-		driverLetter, err := getAvailableDriveLetter()
-		if err != nil {
-			return err
-		}
-		bindSource = driverLetter + ":"
-		cmdLine += fmt.Sprintf(";New-SmbGlobalMapping -LocalPath %s -RemotePath %s -Credential $Credential", bindSource, source)
+		bindSource = source
+		cmdLine += fmt.Sprintf(";New-SmbGlobalMapping -RemotePath %s -Credential $Credential", source)
 
 		if output, err := exec.Command("powershell", "/c", cmdLine).CombinedOutput(); err != nil {
 			// we don't return error here, even though New-SmbGlobalMapping failed, we still make it successful,
@@ -116,6 +113,16 @@ func (mounter *Mounter) Unmount(target string) error {
 		return err
 	}
 	return nil
+}
+
+// GetMountRefs finds all other references to the device(drive) referenced
+// by mountPath; returns a list of paths.
+func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
+	refs, err := getAllParentLinks(normalizeWindowsPath(mountPath))
+	if err != nil {
+		return nil, err
+	}
+	return refs, nil
 }
 
 // List returns a list of all mounted filesystems. todo
@@ -150,6 +157,33 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 // GetDeviceNameFromMount given a mnt point, find the device
 func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
 	return getDeviceNameFromMount(mounter, mountPath, pluginDir)
+}
+
+// getDeviceNameFromMount find the device(drive) name in which
+// the mount path reference should match the given plugin directory. In case no mount path reference
+// matches, returns the volume name taken from its given mountPath
+func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (string, error) {
+	refs, err := GetMountRefs(mounter, mountPath)
+	if err != nil {
+		glog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
+		return "", err
+	}
+	if len(refs) == 0 {
+		return "", fmt.Errorf("directory %s is not mounted", mountPath)
+	}
+	basemountPath := normalizeWindowsPath(path.Join(pluginDir, MountsInGlobalPDPath))
+	for _, ref := range refs {
+		if strings.Contains(ref, basemountPath) {
+			volumeID, err := filepath.Rel(normalizeWindowsPath(basemountPath), ref)
+			if err != nil {
+				glog.Errorf("Failed to get volume id from mount %s - %v", mountPath, err)
+				return "", err
+			}
+			return volumeID, nil
+		}
+	}
+
+	return path.Base(mountPath), nil
 }
 
 // DeviceOpened determines if the device is in use elsewhere
@@ -260,20 +294,6 @@ func normalizeWindowsPath(path string) string {
 	return normalizedPath
 }
 
-func getAvailableDriveLetter() (string, error) {
-	cmd := "$used = Get-PSDrive | Select-Object -Expand Name | Where-Object { $_.Length -eq 1 }"
-	cmd += ";$drive = 67..90 | ForEach-Object { [string][char]$_ } | Where-Object { $used -notcontains $_ } | Select-Object -First 1;$drive"
-	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("getAvailableDriveLetter failed: %v, output: %q", err, string(output))
-	}
-
-	if len(output) == 0 {
-		return "", fmt.Errorf("azureMount: there is no available drive letter now")
-	}
-	return string(output)[:1], nil
-}
-
 // ValidateDiskNumber : disk number should be a number in [0, 99]
 func ValidateDiskNumber(disk string) error {
 	diskNum, err := strconv.Atoi(disk)
@@ -299,4 +319,31 @@ func getDriveLetterByDiskNumber(diskNum string, exec Exec) (string, error) {
 		return "", fmt.Errorf("azureMount: Get Drive Letter failed, output is empty")
 	}
 	return string(output)[:1], nil
+}
+
+// getAllParentLinks walks all symbolic links and return all the parent targets recursively
+func getAllParentLinks(path string) ([]string, error) {
+	const maxIter = 255
+	links := []string{}
+	for {
+		links = append(links, path)
+		if len(links) > maxIter {
+			return links, fmt.Errorf("unexpected length of parent links: %v", links)
+		}
+
+		fi, err := os.Lstat(path)
+		if err != nil {
+			return links, fmt.Errorf("Lstat: %v", err)
+		}
+		if fi.Mode()&os.ModeSymlink == 0 {
+			break
+		}
+
+		path, err = os.Readlink(path)
+		if err != nil {
+			return links, fmt.Errorf("Readlink error: %v", err)
+		}
+	}
+
+	return links, nil
 }

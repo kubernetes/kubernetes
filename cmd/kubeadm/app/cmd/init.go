@@ -59,6 +59,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/version"
+	utilsexec "k8s.io/utils/exec"
 )
 
 var (
@@ -110,6 +111,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	var skipTokenPrint bool
 	var dryRun bool
 	var featureGatesString string
+	var criSocket string
 
 	cmd := &cobra.Command{
 		Use:   "init",
@@ -124,7 +126,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 			internalcfg := &kubeadmapi.MasterConfiguration{}
 			legacyscheme.Scheme.Convert(cfg, internalcfg, nil)
 
-			i, err := NewInit(cfgPath, internalcfg, skipPreFlight, skipTokenPrint, dryRun)
+			i, err := NewInit(cfgPath, internalcfg, skipPreFlight, skipTokenPrint, dryRun, criSocket)
 			kubeadmutil.CheckErr(err)
 			kubeadmutil.CheckErr(i.Validate(cmd))
 			kubeadmutil.CheckErr(i.Run(out))
@@ -132,7 +134,7 @@ func NewCmdInit(out io.Writer) *cobra.Command {
 	}
 
 	AddInitConfigFlags(cmd.PersistentFlags(), cfg, &featureGatesString)
-	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &skipTokenPrint, &dryRun)
+	AddInitOtherFlags(cmd.PersistentFlags(), &cfgPath, &skipPreFlight, &skipTokenPrint, &dryRun, &criSocket)
 
 	return cmd
 }
@@ -188,7 +190,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiext.MasterConfigur
 }
 
 // AddInitOtherFlags adds init flags that are not bound to a configuration file to the given flagset
-func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, skipTokenPrint, dryRun *bool) {
+func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, skipTokenPrint, dryRun *bool, criSocket *string) {
 	flagSet.StringVar(
 		cfgPath, "config", *cfgPath,
 		"Path to kubeadm config file. WARNING: Usage of a configuration file is experimental.",
@@ -208,10 +210,14 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, cfgPath *string, skipPreFlight, sk
 		dryRun, "dry-run", *dryRun,
 		"Don't apply any changes; just output what would be done.",
 	)
+	flagSet.StringVar(
+		criSocket, "cri-socket", "/var/run/dockershim.sock",
+		`Specify the CRI socket to connect to.`,
+	)
 }
 
 // NewInit validates given arguments and instantiates Init struct with provided information.
-func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight, skipTokenPrint, dryRun bool) (*Init, error) {
+func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight, skipTokenPrint, dryRun bool, criSocket string) (*Init, error) {
 
 	fmt.Println("[kubeadm] WARNING: kubeadm is in beta, please do not use it for production clusters.")
 
@@ -247,7 +253,7 @@ func NewInit(cfgPath string, cfg *kubeadmapi.MasterConfiguration, skipPreFlight,
 	if !skipPreFlight {
 		fmt.Println("[preflight] Running pre-flight checks.")
 
-		if err := preflight.RunInitMasterChecks(cfg); err != nil {
+		if err := preflight.RunInitMasterChecks(utilsexec.New(), cfg, criSocket); err != nil {
 			return nil, err
 		}
 
@@ -287,7 +293,7 @@ func (i *Init) Run(out io.Writer) error {
 	realCertsDir := i.cfg.CertificatesDir
 	certsDirToWriteTo, kubeConfigDir, manifestDir, err := getDirectoriesToUse(i.dryRun, i.cfg.CertificatesDir)
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting directories to use: %v", err)
 	}
 	// certsDirToWriteTo is gonna equal cfg.CertificatesDir in the normal case, but gonna be a temp directory if dryrunning
 	i.cfg.CertificatesDir = certsDirToWriteTo
@@ -316,12 +322,12 @@ func (i *Init) Run(out io.Writer) error {
 
 	// PHASE 3: Bootstrap the control plane
 	if err := controlplanephase.CreateInitStaticPodManifestFiles(manifestDir, i.cfg); err != nil {
-		return err
+		return fmt.Errorf("error creating init static pod manifest files: %v", err)
 	}
 	// Add etcd static pod spec only if external etcd is not configured
 	if len(i.cfg.Etcd.Endpoints) == 0 {
 		if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(manifestDir, i.cfg); err != nil {
-			return err
+			return fmt.Errorf("error creating local etcd static pod manifest file: %v", err)
 		}
 	}
 
@@ -330,13 +336,13 @@ func (i *Init) Run(out io.Writer) error {
 
 	// If we're dry-running, print the generated manifests
 	if err := printFilesIfDryRunning(i.dryRun, manifestDir); err != nil {
-		return err
+		return fmt.Errorf("error printing files on dryrun: %v", err)
 	}
 
 	// Create a kubernetes client and wait for the API server to be healthy (if not dryrunning)
 	client, err := createClient(i.cfg, i.dryRun)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating client: %v", err)
 	}
 
 	// waiter holds the apiclient.Waiter implementation of choice, responsible for querying the API server in various ways and waiting for conditions to be fulfilled
@@ -359,12 +365,12 @@ func (i *Init) Run(out io.Writer) error {
 	// Note: This is done right in the beginning of cluster initialization; as we might want to make other phases
 	// depend on centralized information from this source in the future
 	if err := uploadconfigphase.UploadConfiguration(i.cfg, client); err != nil {
-		return err
+		return fmt.Errorf("error uploading configuration: %v", err)
 	}
 
 	// PHASE 4: Mark the master with the right label/taint
 	if err := markmasterphase.MarkMaster(client, i.cfg.NodeName); err != nil {
-		return err
+		return fmt.Errorf("error marking master: %v", err)
 	}
 
 	// PHASE 5: Set up the node bootstrap tokens
@@ -375,15 +381,15 @@ func (i *Init) Run(out io.Writer) error {
 	// Create the default node bootstrap token
 	tokenDescription := "The default bootstrap token generated by 'kubeadm init'."
 	if err := nodebootstraptokenphase.UpdateOrCreateToken(client, i.cfg.Token, false, i.cfg.TokenTTL.Duration, kubeadmconstants.DefaultTokenUsages, []string{kubeadmconstants.NodeBootstrapTokenAuthGroup}, tokenDescription); err != nil {
-		return err
+		return fmt.Errorf("error updating or creating token: %v", err)
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to post CSRs
 	if err := nodebootstraptokenphase.AllowBootstrapTokensToPostCSRs(client, k8sVersion); err != nil {
-		return err
+		return fmt.Errorf("error allowing bootstrap tokens to post CSRs: %v", err)
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
 	if err := nodebootstraptokenphase.AutoApproveNodeBootstrapTokens(client, k8sVersion); err != nil {
-		return err
+		return fmt.Errorf("error auto-approving node bootstrap tokens: %v", err)
 	}
 
 	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
@@ -393,20 +399,18 @@ func (i *Init) Run(out io.Writer) error {
 
 	// Create the cluster-info ConfigMap with the associated RBAC rules
 	if err := clusterinfophase.CreateBootstrapConfigMapIfNotExists(client, adminKubeConfigPath); err != nil {
-		return err
+		return fmt.Errorf("error creating bootstrap configmap: %v", err)
 	}
 	if err := clusterinfophase.CreateClusterInfoRBACRules(client); err != nil {
-		return err
+		return fmt.Errorf("error creating clusterinfo RBAC rules: %v", err)
 	}
 
-	// PHASE 6: Install and deploy all addons, and configure things as necessary
-
 	if err := dnsaddonphase.EnsureDNSAddon(i.cfg, client); err != nil {
-		return err
+		return fmt.Errorf("error ensuring dns addon: %v", err)
 	}
 
 	if err := proxyaddonphase.EnsureProxyAddon(i.cfg, client); err != nil {
-		return err
+		return fmt.Errorf("error ensuring proxy addon: %v", err)
 	}
 
 	// PHASE 7: Make the control plane self-hosted if feature gate is enabled
@@ -415,7 +419,7 @@ func (i *Init) Run(out io.Writer) error {
 		// plane components and remove the static manifests:
 		fmt.Println("[self-hosted] Creating self-hosted control plane...")
 		if err := selfhostingphase.CreateSelfHostedControlPlane(manifestDir, kubeConfigDir, i.cfg, client, waiter); err != nil {
-			return err
+			return fmt.Errorf("error creating self hosted control plane: %v", err)
 		}
 	}
 
@@ -427,11 +431,14 @@ func (i *Init) Run(out io.Writer) error {
 
 	// Load the CA certificate from so we can pin its public key
 	caCert, err := pkiutil.TryLoadCertFromDisk(i.cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
+	if err != nil {
+		return fmt.Errorf("error loading ca cert from disk: %v", err)
+	}
 
 	// Generate the Master host/port pair used by initDoneTempl
 	masterHostPort, err := kubeadmutil.GetMasterHostPort(i.cfg)
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting master host port: %v", err)
 	}
 
 	ctx := map[string]string{

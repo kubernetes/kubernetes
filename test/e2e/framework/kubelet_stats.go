@@ -280,33 +280,17 @@ func HighLatencyKubeletOperations(c clientset.Interface, threshold time.Duration
 
 // getStatsSummary contacts kubelet for the container information.
 func getStatsSummary(c clientset.Interface, nodeName string) (*stats.Summary, error) {
-	subResourceProxyAvailable, err := ServerVersionGTE(SubResourceServiceAndNodeProxyVersion, c.Discovery())
-	if err != nil {
-		return nil, err
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), SingleCallTimeout)
 	defer cancel()
 
-	var data []byte
-	if subResourceProxyAvailable {
-		data, err = c.CoreV1().RESTClient().Get().
-			Context(ctx).
-			Resource("nodes").
-			SubResource("proxy").
-			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
-			Suffix("stats/summary").
-			Do().Raw()
+	data, err := c.CoreV1().RESTClient().Get().
+		Context(ctx).
+		Resource("nodes").
+		SubResource("proxy").
+		Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
+		Suffix("stats/summary").
+		Do().Raw()
 
-	} else {
-		data, err = c.CoreV1().RESTClient().Get().
-			Context(ctx).
-			Prefix("proxy").
-			Resource("nodes").
-			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
-			Suffix("stats/summary").
-			Do().Raw()
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -406,30 +390,14 @@ func getOneTimeResourceUsageOnNode(
 }
 
 func getNodeStatsSummary(c clientset.Interface, nodeName string) (*stats.Summary, error) {
-	subResourceProxyAvailable, err := ServerVersionGTE(SubResourceServiceAndNodeProxyVersion, c.Discovery())
-	if err != nil {
-		return nil, err
-	}
+	data, err := c.CoreV1().RESTClient().Get().
+		Resource("nodes").
+		SubResource("proxy").
+		Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
+		Suffix("stats/summary").
+		SetHeader("Content-Type", "application/json").
+		Do().Raw()
 
-	var data []byte
-	if subResourceProxyAvailable {
-		data, err = c.CoreV1().RESTClient().Get().
-			Resource("nodes").
-			SubResource("proxy").
-			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
-			Suffix("stats/summary").
-			SetHeader("Content-Type", "application/json").
-			Do().Raw()
-
-	} else {
-		data, err = c.CoreV1().RESTClient().Get().
-			Prefix("proxy").
-			Resource("nodes").
-			Name(fmt.Sprintf("%v:%v", nodeName, ports.KubeletPort)).
-			Suffix("stats/summary").
-			SetHeader("Content-Type", "application/json").
-			Do().Raw()
-	}
 	if err != nil {
 		return nil, err
 	}

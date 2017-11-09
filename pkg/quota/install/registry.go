@@ -17,15 +17,42 @@ limitations under the License.
 package install
 
 import (
-	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/evaluator/core"
+	"k8s.io/kubernetes/pkg/quota/generic"
 )
 
-// NewRegistry returns a registry of quota evaluators.
-// If a shared informer factory is provided, it is used by evaluators rather than performing direct queries.
-func NewRegistry(kubeClient clientset.Interface, f informers.SharedInformerFactory) quota.Registry {
-	// TODO: when quota supports resources in other api groups, we will need to merge
-	return core.NewRegistry(kubeClient, f)
+// NewQuotaConfigurationForAdmission returns a quota configuration for admission control.
+func NewQuotaConfigurationForAdmission() quota.Configuration {
+	evaluators := core.NewEvaluators(nil)
+	return generic.NewConfiguration(evaluators, DefaultIgnoredResources())
+}
+
+// NewQuotaConfigurationForControllers returns a quota configuration for controllers.
+func NewQuotaConfigurationForControllers(f quota.ListerForResourceFunc) quota.Configuration {
+	evaluators := core.NewEvaluators(f)
+	return generic.NewConfiguration(evaluators, DefaultIgnoredResources())
+}
+
+// ignoredResources are ignored by quota by default
+var ignoredResources = map[schema.GroupResource]struct{}{
+	{Group: "extensions", Resource: "replicationcontrollers"}:              {},
+	{Group: "extensions", Resource: "networkpolicies"}:                     {},
+	{Group: "", Resource: "bindings"}:                                      {},
+	{Group: "", Resource: "componentstatuses"}:                             {},
+	{Group: "", Resource: "events"}:                                        {},
+	{Group: "authentication.k8s.io", Resource: "tokenreviews"}:             {},
+	{Group: "authorization.k8s.io", Resource: "subjectaccessreviews"}:      {},
+	{Group: "authorization.k8s.io", Resource: "selfsubjectaccessreviews"}:  {},
+	{Group: "authorization.k8s.io", Resource: "localsubjectaccessreviews"}: {},
+	{Group: "authorization.k8s.io", Resource: "selfsubjectrulesreviews"}:   {},
+	{Group: "apiregistration.k8s.io", Resource: "apiservices"}:             {},
+	{Group: "apiextensions.k8s.io", Resource: "customresourcedefinitions"}: {},
+}
+
+// DefaultIgnoredResources returns the default set of resources that quota system
+// should ignore. This is exposed so downstream integrators can have access to them.
+func DefaultIgnoredResources() map[schema.GroupResource]struct{} {
+	return ignoredResources
 }

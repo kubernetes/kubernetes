@@ -85,7 +85,7 @@ const (
 	// Ports of different e2e services.
 	kubeletPort          = "10250"
 	kubeletReadOnlyPort  = "10255"
-	kubeletRootDirectory = "/var/lib/kubelet"
+	KubeletRootDirectory = "/var/lib/kubelet"
 	// Health check url of kubelet
 	kubeletHealthCheckURL = "http://127.0.0.1:" + kubeletReadOnlyPort + "/healthz"
 )
@@ -110,7 +110,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		return nil, err
 	}
 	e.rmDirs = append(e.rmDirs, manifestPath)
-	err = createRootDirectory(kubeletRootDirectory)
+	err = createRootDirectory(KubeletRootDirectory)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		"--address", "0.0.0.0",
 		"--port", kubeletPort,
 		"--read-only-port", kubeletReadOnlyPort,
-		"--root-dir", kubeletRootDirectory,
+		"--root-dir", KubeletRootDirectory,
 		"--volume-stats-agg-period", "10s", // Aggregate volumes frequently so tests don't need to wait as long
 		"--allow-privileged", "true",
 		"--serialize-image-pulls", "false",

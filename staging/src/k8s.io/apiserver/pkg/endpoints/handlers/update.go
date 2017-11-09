@@ -86,18 +86,25 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			return
 		}
 
+		userInfo, _ := request.UserFrom(ctx)
+		staticAdmissionAttributes := admission.NewAttributesRecord(nil, nil, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo)
 		var transformers []rest.TransformFunc
-		if admit != nil && admit.Handles(admission.Update) {
+		if mutatingAdmission, ok := admit.(admission.MutationInterface); ok && mutatingAdmission.Handles(admission.Update) {
 			transformers = append(transformers, func(ctx request.Context, newObj, oldObj runtime.Object) (runtime.Object, error) {
-				userInfo, _ := request.UserFrom(ctx)
-				return newObj, admit.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
+				return newObj, mutatingAdmission.Admit(admission.NewAttributesRecord(newObj, oldObj, scope.Kind, namespace, name, scope.Resource, scope.Subresource, admission.Update, userInfo))
 			})
 		}
 
 		trace.Step("About to store object in database")
 		wasCreated := false
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			obj, created, err := r.Update(ctx, name, rest.DefaultUpdatedObjectInfo(obj, transformers...))
+			obj, created, err := r.Update(
+				ctx,
+				name,
+				rest.DefaultUpdatedObjectInfo(obj, transformers...),
+				rest.AdmissionToValidateObjectFunc(admit, staticAdmissionAttributes),
+				rest.AdmissionToValidateObjectUpdateFunc(admit, staticAdmissionAttributes),
+			)
 			wasCreated = created
 			return obj, err
 		})

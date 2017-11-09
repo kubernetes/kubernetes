@@ -18,6 +18,7 @@ package parse
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/kube-openapi/pkg/util/proto"
 )
@@ -123,6 +124,22 @@ func (v *kindSchemaVisitor) VisitKind(result *proto.Kind) {
 // VisitReference implements openapi
 func (v *kindSchemaVisitor) VisitReference(reference proto.Reference) {
 	reference.SubSchema().Accept(v)
+	if v.Err == nil {
+		v.Err = copyExtensions(reference.GetPath().String(), reference.GetExtensions(), v.Result.Extensions)
+	}
+}
+
+func copyExtensions(field string, from, to map[string]interface{}) error {
+	// Copy extensions from field to type for references
+	for key, val := range from {
+		if curr, found := to[key]; found {
+			// Don't allow the same extension to be defined both on the field and on the type
+			return fmt.Errorf("Cannot override value for extension %s on field %s from %v to %v",
+				key, field, curr, val)
+		}
+		to[key] = val
+	}
+	return nil
 }
 
 type mapSchemaVisitor struct {
@@ -139,6 +156,9 @@ func (v *mapSchemaVisitor) VisitMap(result *proto.Map) {
 // VisitReference implements openapi
 func (v *mapSchemaVisitor) VisitReference(reference proto.Reference) {
 	reference.SubSchema().Accept(v)
+	if v.Err == nil {
+		v.Err = copyExtensions(reference.GetPath().String(), reference.GetExtensions(), v.Result.Extensions)
+	}
 }
 
 type arraySchemaVisitor struct {
@@ -150,11 +170,41 @@ type arraySchemaVisitor struct {
 func (v *arraySchemaVisitor) VisitArray(result *proto.Array) {
 	v.Result = result
 	v.Kind = "array"
+	v.Err = copySubElementPatchStrategy(result.Path.String(), result.GetExtensions(), result.SubType.GetExtensions())
+}
+
+// copyPatchStrategy copies the strategies to subelements to the subtype
+// e.g. PodTemplate.Volumes is a []Volume with "x-kubernetes-patch-strategy": "merge,retainKeys"
+// the "retainKeys" strategy applies to merging Volumes, and must be copied to the sub element
+func copySubElementPatchStrategy(field string, from, to map[string]interface{}) error {
+	// Check if the parent has a patch strategy extension
+	if ext, found := from["x-kubernetes-patch-strategy"]; found {
+		strategy, ok := ext.(string)
+		if !ok {
+			return fmt.Errorf("Expected string value for x-kubernetes-patch-strategy on %s, was %T",
+				field, ext)
+		}
+		// Check of the parent patch strategy has a sub patch strategy, and if so copy to the sub type
+		if strings.Contains(strategy, ",") {
+			strategies := strings.Split(strategy, ",")
+			if len(strategies) != 2 {
+				// Only 1 sub strategy is supported
+				return fmt.Errorf(
+					"Expected between 0 and 2 elements for x-kubernetes-patch-merge-strategy by got %v",
+					strategies)
+			}
+			to["x-kubernetes-patch-strategy"] = strategies[1]
+		}
+	}
+	return nil
 }
 
 // MergePrimitive implements openapi
 func (v *arraySchemaVisitor) VisitReference(reference proto.Reference) {
 	reference.SubSchema().Accept(v)
+	if v.Err == nil {
+		v.Err = copyExtensions(reference.GetPath().String(), reference.GetExtensions(), v.Result.Extensions)
+	}
 }
 
 type primitiveSchemaVisitor struct {
@@ -171,4 +221,7 @@ func (v *primitiveSchemaVisitor) VisitPrimitive(result *proto.Primitive) {
 // VisitReference implements openapi
 func (v *primitiveSchemaVisitor) VisitReference(reference proto.Reference) {
 	reference.SubSchema().Accept(v)
+	if v.Err == nil {
+		v.Err = copyExtensions(reference.GetPath().String(), reference.GetExtensions(), v.Result.Extensions)
+	}
 }

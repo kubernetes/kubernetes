@@ -109,7 +109,7 @@ var _ = SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Creating pod to attach PVs to the node")
-		pod, err := framework.CreatePod(client, namespace, pvclaims, false, "")
+		pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, "")
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Verify all volumes are accessible and available in the pod")

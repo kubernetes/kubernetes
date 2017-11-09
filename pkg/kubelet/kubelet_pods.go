@@ -44,11 +44,11 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	v1helper "k8s.io/kubernetes/pkg/api/v1/helper"
-	v1qos "k8s.io/kubernetes/pkg/api/v1/helper/qos"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
-	"k8s.io/kubernetes/pkg/api/v1/validation"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
 	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/v1alpha1/runtime"
@@ -381,18 +381,17 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) string {
 
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
-func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, bool, error) {
-	useClusterFirstPolicy := false
-	opts, err := kl.containerManager.GetResources(pod, container, kl.GetActivePods())
+func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
+	opts, err := kl.containerManager.GetResources(pod, container)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	cgroupParent := kl.GetPodCgroupParent(pod)
 	opts.CgroupParent = cgroupParent
 	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	opts.Hostname = hostname
 	podName := volumehelper.GetUniquePodName(pod)
@@ -402,19 +401,19 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	// TODO(random-liu): Move following convert functions into pkg/kubelet/container
 	devices, err := kl.makeDevices(pod, container)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	opts.Devices = append(opts.Devices, devices...)
 
 	mounts, err := makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	opts.Mounts = append(opts.Mounts, mounts...)
 
 	envs, err := kl.makeEnvironmentVariables(pod, container, podIP)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	opts.Envs = append(opts.Envs, envs...)
 
@@ -429,17 +428,12 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 		}
 	}
 
-	opts.DNS, opts.DNSSearch, useClusterFirstPolicy, err = kl.GetClusterDNS(pod)
-	if err != nil {
-		return nil, false, err
-	}
-
 	// only do this check if the experimental behavior is enabled, otherwise allow it to default to false
 	if kl.experimentalHostUserNamespaceDefaulting {
 		opts.EnableHostUserNamespace = kl.enableHostUserNamespace(pod)
 	}
 
-	return opts, useClusterFirstPolicy, nil
+	return opts, nil
 }
 
 var masterServices = sets.NewString("kubernetes")

@@ -30,6 +30,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/client-go/scale/scheme/appsint:all-srcs",
+        "//staging/src/k8s.io/client-go/scale/scheme/appsv1beta1:all-srcs",
+        "//staging/src/k8s.io/client-go/scale/scheme/appsv1beta2:all-srcs",
         "//staging/src/k8s.io/client-go/scale/scheme/autoscalingv1:all-srcs",
         "//staging/src/k8s.io/client-go/scale/scheme/extensionsint:all-srcs",
         "//staging/src/k8s.io/client-go/scale/scheme/extensionsv1beta1:all-srcs",

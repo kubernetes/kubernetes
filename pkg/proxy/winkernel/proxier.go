@@ -37,9 +37,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
@@ -1043,8 +1043,8 @@ func (proxier *Proxier) syncProxyRules() {
 			false,
 			svcInfo.clusterIP.String(),
 			Enum(svcInfo.protocol),
-			uint16(svcInfo.port),
 			uint16(svcInfo.targetPort),
+			uint16(svcInfo.port),
 		)
 		if err != nil {
 			glog.Errorf("Policy creation failed: %v", err)
@@ -1081,8 +1081,8 @@ func (proxier *Proxier) syncProxyRules() {
 				false,
 				externalIp.ip,
 				Enum(svcInfo.protocol),
-				uint16(svcInfo.port),
 				uint16(svcInfo.targetPort),
+				uint16(svcInfo.port),
 			)
 			if err != nil {
 				glog.Errorf("Policy creation failed: %v", err)
@@ -1099,8 +1099,8 @@ func (proxier *Proxier) syncProxyRules() {
 				false,
 				lbIngressIp.ip,
 				Enum(svcInfo.protocol),
-				uint16(svcInfo.port),
 				uint16(svcInfo.targetPort),
+				uint16(svcInfo.port),
 			)
 			if err != nil {
 				glog.Errorf("Policy creation failed: %v", err)

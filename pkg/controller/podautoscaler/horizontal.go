@@ -623,7 +623,7 @@ func (a *HorizontalController) updateStatus(hpa *autoscalingv2.HorizontalPodAuto
 	return nil
 }
 
-// unsafeConvertToVersionVia is like api.Scheme.UnsafeConvertToVersion, but it does so via an internal version first.
+// unsafeConvertToVersionVia is like Scheme.UnsafeConvertToVersion, but it does so via an internal version first.
 // We use it since working with v2alpha1 is convenient here, but we want to use the v1 client (and
 // can't just use the internal version).  Note that conversion mutates the object, so you need to deepcopy
 // *before* you call this if the input object came out of a shared cache.

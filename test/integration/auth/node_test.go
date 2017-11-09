@@ -31,8 +31,8 @@ import (
 	"k8s.io/apiserver/pkg/authentication/token/tokenfile"
 	"k8s.io/apiserver/pkg/authentication/user"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -83,7 +83,7 @@ func TestNodeAuthorizer(t *testing.T) {
 	// Set up NodeRestriction admission
 	nodeRestrictionAdmission := noderestriction.NewPlugin(nodeidentifier.NewDefaultNodeIdentifier())
 	nodeRestrictionAdmission.SetInternalKubeClientSet(superuserClient)
-	if err := nodeRestrictionAdmission.Validate(); err != nil {
+	if err := nodeRestrictionAdmission.ValidateInitialization(); err != nil {
 		t.Fatal(err)
 	}
 

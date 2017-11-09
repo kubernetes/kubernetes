@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kadmission "k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/settings"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -393,7 +393,7 @@ func TestMergeVolumes(t *testing.T) {
 
 // NewTestAdmission provides an admission plugin with test implementations of internal structs.  It uses
 // an authorizer that always returns true.
-func NewTestAdmission(lister settingslisters.PodPresetLister, objects ...runtime.Object) kadmission.Interface {
+func NewTestAdmission(lister settingslisters.PodPresetLister, objects ...runtime.Object) kadmission.MutationInterface {
 	// Build a test client that the admission plugin can use to look up the service account missing from its cache
 	client := fake.NewSimpleClientset(objects...)
 

@@ -17,10 +17,9 @@ limitations under the License.
 package winuserspace
 
 import (
-	"net"
-
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/proxy"
+	"net"
 )
 
 // LoadBalancer is an interface for distributing incoming requests to service endpoints.

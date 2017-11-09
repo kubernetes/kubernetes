@@ -59,7 +59,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	utilversion "k8s.io/kubernetes/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/generated"
 	"k8s.io/kubernetes/test/e2e/scheduling"
@@ -119,44 +118,6 @@ var testImages = struct {
 }
 var (
 	proxyRegexp = regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
-
-	// Extended pod logging options were introduced in #13780 (v1.1.0) so we don't expect tests
-	// that rely on extended pod logging options to work on clusters before that.
-	//
-	// TODO(ihmccreery): remove once we don't care about v1.0 anymore, (tentatively in v1.3).
-	extendedPodLogFilterVersion = utilversion.MustParseSemantic("v1.1.0")
-
-	// NodePorts were made optional in #12831 (v1.1.0) so we don't expect tests that used to
-	// require NodePorts but no longer include them to work on clusters before that.
-	//
-	// TODO(ihmccreery): remove once we don't care about v1.0 anymore, (tentatively in v1.3).
-	nodePortsOptionalVersion = utilversion.MustParseSemantic("v1.1.0")
-
-	// Jobs were introduced in v1.1, so we don't expect tests that rely on jobs to work on
-	// clusters before that.
-	//
-	// TODO(ihmccreery): remove once we don't care about v1.0 anymore, (tentatively in v1.3).
-	jobsVersion = utilversion.MustParseSemantic("v1.1.0")
-
-	// Deployments were introduced by default in v1.2, so we don't expect tests that rely on
-	// deployments to work on clusters before that.
-	//
-	// TODO(ihmccreery): remove once we don't care about v1.1 anymore, (tentatively in v1.4).
-	deploymentsVersion = utilversion.MustParseSemantic("v1.2.0-alpha.7.726")
-
-	// Pod probe parameters were introduced in #15967 (v1.2) so we don't expect tests that use
-	// these probe parameters to work on clusters before that.
-	//
-	// TODO(ihmccreery): remove once we don't care about v1.1 anymore, (tentatively in v1.4).
-	podProbeParametersVersion = utilversion.MustParseSemantic("v1.2.0-alpha.4")
-
-	// 'kubectl create quota' was introduced in #28351 (v1.4) so we don't expect tests that use
-	// 'kubectl create quota' to work on kubectl clients before that.
-	kubectlCreateQuotaVersion = utilversion.MustParseSemantic("v1.4.0-alpha.2")
-
-	// Returning container command exit codes in kubectl run/exec was introduced in #26541 (v1.4)
-	// so we don't expect tests that verifies return code to work on kubectl clients before that.
-	kubectlContainerExitCodeVersion = utilversion.MustParseSemantic("v1.4.0-alpha.3")
 
 	CronJobGroupVersionResourceAlpha = schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}
 	CronJobGroupVersionResourceBeta  = schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}
@@ -305,7 +266,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			nautilus = substituteImageName(string(generated.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml.in"))))
 			kitten = substituteImageName(string(generated.ReadOrDie(filepath.Join(updateDemoRoot, "kitten-rc.yaml.in"))))
 		})
-		It("should create and stop a replication controller [Conformance]", func() {
+		framework.ConformanceIt("should create and stop a replication controller ", func() {
 			defer cleanupKubectlInputs(nautilus, ns, updateDemoSelector)
 
 			By("creating a replication controller")
@@ -313,7 +274,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
 
-		It("should scale a replication controller [Conformance]", func() {
+		framework.ConformanceIt("should scale a replication controller ", func() {
 			defer cleanupKubectlInputs(nautilus, ns, updateDemoSelector)
 
 			By("creating a replication controller")
@@ -327,7 +288,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
 
-		It("should do a rolling update of a replication controller [Conformance]", func() {
+		framework.ConformanceIt("should do a rolling update of a replication controller ", func() {
 			By("creating the initial replication controller")
 			framework.RunKubectlOrDieInput(string(nautilus[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
 			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
@@ -354,9 +315,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			}
 		}
 
-		It("should create and stop a working application [Conformance]", func() {
-			framework.SkipUnlessServerVersionGTE(deploymentsVersion, c.Discovery())
-
+		framework.ConformanceIt("should create and stop a working application ", func() {
 			defer forEachGBFile(func(contents string) {
 				cleanupKubectlInputs(contents, ns)
 			})
@@ -483,7 +442,6 @@ var _ = SIGDescribe("Kubectl client", func() {
 		})
 
 		It("should return command exit codes", func() {
-			framework.SkipUnlessKubectlVersionGTE(kubectlContainerExitCodeVersion)
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("execing into a container with a successful command")
@@ -528,7 +486,6 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 		It("should support inline execution and attach", func() {
 			framework.SkipIfContainerRuntimeIs("rkt") // #23335
-			framework.SkipUnlessServerVersionGTE(jobsVersion, c.Discovery())
 
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
@@ -538,7 +495,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				ExecOrDie()
 			Expect(runOutput).To(ContainSubstring("abcd1234"))
 			Expect(runOutput).To(ContainSubstring("stdin closed"))
-			Expect(c.Batch().Jobs(ns).Delete("run-test", nil)).To(BeNil())
+			Expect(c.BatchV1().Jobs(ns).Delete("run-test", nil)).To(BeNil())
 
 			By("executing a command with run and attach without stdin")
 			runOutput = framework.NewKubectlCommand(fmt.Sprintf("--namespace=%v", ns), "run", "run-test-2", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
@@ -546,7 +503,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				ExecOrDie()
 			Expect(runOutput).ToNot(ContainSubstring("abcd1234"))
 			Expect(runOutput).To(ContainSubstring("stdin closed"))
-			Expect(c.Batch().Jobs(ns).Delete("run-test-2", nil)).To(BeNil())
+			Expect(c.BatchV1().Jobs(ns).Delete("run-test-2", nil)).To(BeNil())
 
 			By("executing a command with run and attach with stdin with open stdin should remain running")
 			runOutput = framework.NewKubectlCommand(nsFlag, "run", "run-test-3", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
@@ -577,7 +534,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			}
 			Expect(err).To(BeNil())
 
-			Expect(c.Batch().Jobs(ns).Delete("run-test-3", nil)).To(BeNil())
+			Expect(c.BatchV1().Jobs(ns).Delete("run-test-3", nil)).To(BeNil())
 		})
 
 		It("should support port-forward", func() {
@@ -722,7 +679,7 @@ metadata:
 	})
 
 	framework.KubeDescribe("Kubectl api-versions", func() {
-		It("should check if v1 is in available api versions [Conformance]", func() {
+		framework.ConformanceIt("should check if v1 is in available api versions ", func() {
 			By("validating api versions")
 			output := framework.RunKubectlOrDie("api-versions")
 			if !strings.Contains(output, "v1") {
@@ -813,7 +770,7 @@ metadata:
 	})
 
 	framework.KubeDescribe("Kubectl cluster-info", func() {
-		It("should check if Kubernetes master services is included in cluster-info [Conformance]", func() {
+		framework.ConformanceIt("should check if Kubernetes master services is included in cluster-info ", func() {
 			By("validating cluster-info")
 			output := framework.RunKubectlOrDie("cluster-info")
 			// Can't check exact strings due to terminal control commands (colors)
@@ -830,8 +787,7 @@ metadata:
 	})
 
 	framework.KubeDescribe("Kubectl describe", func() {
-		It("should check if kubectl describe prints relevant information for rc and pods [Conformance]", func() {
-			framework.SkipUnlessServerVersionGTE(nodePortsOptionalVersion, c.Discovery())
+		framework.ConformanceIt("should check if kubectl describe prints relevant information for rc and pods ", func() {
 			kv, err := framework.KubectlVersion()
 			Expect(err).NotTo(HaveOccurred())
 			framework.SkipUnlessServerVersionGTE(kv, c.Discovery())
@@ -857,7 +813,6 @@ metadata:
 					{"Annotations:"},
 					{"Status:", "Running"},
 					{"IP:"},
-					{"Created By:", "ReplicationController/redis-master"},
 					{"Controlled By:", "ReplicationController/redis-master"},
 					{"Image:", redisImage},
 					{"State:", "Running"},
@@ -935,7 +890,7 @@ metadata:
 	})
 
 	framework.KubeDescribe("Kubectl expose", func() {
-		It("should create services for rc [Conformance]", func() {
+		framework.ConformanceIt("should create services for rc ", func() {
 			controllerJson := substituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
@@ -1026,7 +981,7 @@ metadata:
 			cleanupKubectlInputs(podYaml, ns, pausePodSelector)
 		})
 
-		It("should update the label on a resource [Conformance]", func() {
+		framework.ConformanceIt("should update the label on a resource ", func() {
 			labelName := "testing-label"
 			labelValue := "testing-label-value"
 
@@ -1061,9 +1016,7 @@ metadata:
 			cleanupKubectlInputs(rc, ns, simplePodSelector)
 		})
 
-		It("should be able to retrieve and filter logs [Conformance]", func() {
-			framework.SkipUnlessServerVersionGTE(extendedPodLogFilterVersion, c.Discovery())
-
+		framework.ConformanceIt("should be able to retrieve and filter logs ", func() {
 			// Split("something\n", "\n") returns ["something", ""], so
 			// strip trailing newline first
 			lines := func(out string) []string {
@@ -1114,7 +1067,7 @@ metadata:
 	})
 
 	framework.KubeDescribe("Kubectl patch", func() {
-		It("should add annotations for pods in rc [Conformance]", func() {
+		framework.ConformanceIt("should add annotations for pods in rc ", func() {
 			controllerJson := substituteImageName(string(readTestFileOrDie(redisControllerFilename)))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			By("creating Redis RC")
@@ -1143,7 +1096,7 @@ metadata:
 	})
 
 	framework.KubeDescribe("Kubectl version", func() {
-		It("should check is all data is printed [Conformance]", func() {
+		framework.ConformanceIt("should check is all data is printed ", func() {
 			version := framework.RunKubectlOrDie("version")
 			requiredItems := []string{"Client Version:", "Server Version:", "Major:", "Minor:", "GitCommit:"}
 			for _, item := range requiredItems {
@@ -1162,24 +1115,15 @@ metadata:
 
 		BeforeEach(func() {
 			nsFlag = fmt.Sprintf("--namespace=%v", ns)
-			gte, err := framework.ServerVersionGTE(deploymentsVersion, c.Discovery())
-			if err != nil {
-				framework.Failf("Failed to get server version: %v", err)
-			}
-			if gte {
-				name = "e2e-test-nginx-deployment"
-				cleanUp = func() { framework.RunKubectlOrDie("delete", "deployment", name, nsFlag) }
-			} else {
-				name = "e2e-test-nginx-rc"
-				cleanUp = func() { framework.RunKubectlOrDie("delete", "rc", name, nsFlag) }
-			}
+			name = "e2e-test-nginx-deployment"
+			cleanUp = func() { framework.RunKubectlOrDie("delete", "deployment", name, nsFlag) }
 		})
 
 		AfterEach(func() {
 			cleanUp()
 		})
 
-		It("should create an rc or deployment from an image [Conformance]", func() {
+		framework.ConformanceIt("should create an rc or deployment from an image ", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", name, "--image="+nginxImage, nsFlag)
 			By("verifying the pod controlled by " + name + " gets created")
@@ -1209,7 +1153,7 @@ metadata:
 			framework.RunKubectlOrDie("delete", "rc", rcName, nsFlag)
 		})
 
-		It("should create an rc from an image [Conformance]", func() {
+		framework.ConformanceIt("should create an rc from an image ", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", rcName, "--image="+nginxImage, "--generator=run/v1", nsFlag)
 			By("verifying the rc " + rcName + " was created")
@@ -1265,7 +1209,7 @@ metadata:
 			framework.RunKubectlOrDie("delete", "rc", rcName, nsFlag)
 		})
 
-		It("should support rolling-update to same image [Conformance]", func() {
+		framework.ConformanceIt("should support rolling-update to same image ", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", rcName, "--image="+nginxImage, "--generator=run/v1", nsFlag)
 			By("verifying the rc " + rcName + " was created")
@@ -1309,13 +1253,11 @@ metadata:
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("should create a deployment from an image [Conformance]", func() {
-			framework.SkipUnlessServerVersionGTE(deploymentsVersion, c.Discovery())
-
+		framework.ConformanceIt("should create a deployment from an image ", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", dName, "--image="+nginxImage, "--generator=deployment/v1beta1", nsFlag)
 			By("verifying the deployment " + dName + " was created")
-			d, err := c.Extensions().Deployments(ns).Get(dName, metav1.GetOptions{})
+			d, err := c.ExtensionsV1beta1().Deployments(ns).Get(dName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting deployment %s: %v", dName, err)
 			}
@@ -1351,13 +1293,11 @@ metadata:
 			framework.RunKubectlOrDie("delete", "jobs", jobName, nsFlag)
 		})
 
-		It("should create a job from an image when restart is OnFailure [Conformance]", func() {
-			framework.SkipUnlessServerVersionGTE(jobsVersion, c.Discovery())
-
+		framework.ConformanceIt("should create a job from an image when restart is OnFailure ", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", jobName, "--restart=OnFailure", "--generator=job/v1", "--image="+nginxImage, nsFlag)
 			By("verifying the job " + jobName + " was created")
-			job, err := c.Batch().Jobs(ns).Get(jobName, metav1.GetOptions{})
+			job, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
 			if err != nil {
 				framework.Failf("Failed getting job %s: %v", jobName, err)
 			}
@@ -1421,9 +1361,7 @@ metadata:
 			framework.RunKubectlOrDie("delete", "pods", podName, nsFlag)
 		})
 
-		It("should create a pod from an image when restart is Never [Conformance]", func() {
-			framework.SkipUnlessServerVersionGTE(jobsVersion, c.Discovery())
-
+		framework.ConformanceIt("should create a pod from an image when restart is Never ", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", podName, "--restart=Never", "--generator=run-pod/v1", "--image="+nginxImage, nsFlag)
 			By("verifying the pod " + podName + " was created")
@@ -1454,9 +1392,7 @@ metadata:
 			framework.RunKubectlOrDie("delete", "pods", podName, nsFlag)
 		})
 
-		It("should update a single-container pod's image [Conformance]", func() {
-			framework.SkipUnlessServerVersionGTE(jobsVersion, c.Discovery())
-
+		framework.ConformanceIt("should update a single-container pod's image ", func() {
 			By("running the image " + nginxImage)
 			framework.RunKubectlOrDie("run", podName, "--generator=run-pod/v1", "--image="+nginxImage, "--labels=run="+podName, nsFlag)
 
@@ -1492,12 +1428,11 @@ metadata:
 	framework.KubeDescribe("Kubectl run --rm job", func() {
 		jobName := "e2e-test-rm-busybox-job"
 
-		It("should create a job from an image, then delete the job [Conformance]", func() {
+		framework.ConformanceIt("should create a job from an image, then delete the job ", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			// The rkt runtime doesn't support attach, see #23335
 			framework.SkipIfContainerRuntimeIs("rkt")
-			framework.SkipUnlessServerVersionGTE(jobsVersion, c.Discovery())
 
 			By("executing a command with run --rm and attach with stdin")
 			t := time.NewTimer(runJobTimeout)
@@ -1510,7 +1445,7 @@ metadata:
 			Expect(runOutput).To(ContainSubstring("stdin closed"))
 
 			By("verifying the job " + jobName + " was deleted")
-			_, err := c.Batch().Jobs(ns).Get(jobName, metav1.GetOptions{})
+			_, err := c.BatchV1().Jobs(ns).Get(jobName, metav1.GetOptions{})
 			Expect(err).To(HaveOccurred())
 			Expect(apierrs.IsNotFound(err)).To(BeTrue())
 		})
@@ -1518,7 +1453,7 @@ metadata:
 
 	framework.KubeDescribe("Proxy server", func() {
 		// TODO: test proxy options (static, prefix, etc)
-		It("should support proxy with --port 0 [Conformance]", func() {
+		framework.ConformanceIt("should support proxy with --port 0 ", func() {
 			By("starting the proxy server")
 			port, cmd, err := startProxyServer()
 			if cmd != nil {
@@ -1538,7 +1473,7 @@ metadata:
 			}
 		})
 
-		It("should support --unix-socket=/path [Conformance]", func() {
+		framework.ConformanceIt("should support --unix-socket=/path ", func() {
 			By("Starting the proxy")
 			tmpdir, err := ioutil.TempDir("", "kubectl-proxy-unix")
 			if err != nil {
@@ -1671,7 +1606,6 @@ metadata:
 
 	framework.KubeDescribe("Kubectl create quota", func() {
 		It("should create a quota without scopes", func() {
-			framework.SkipUnlessKubectlVersionGTE(kubectlCreateQuotaVersion)
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			quotaName := "million"
 
@@ -1701,7 +1635,6 @@ metadata:
 		})
 
 		It("should create a quota with scopes", func() {
-			framework.SkipUnlessKubectlVersionGTE(kubectlCreateQuotaVersion)
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			quotaName := "scopes"
 
@@ -1730,7 +1663,6 @@ metadata:
 		})
 
 		It("should reject quota with invalid scopes", func() {
-			framework.SkipUnlessKubectlVersionGTE(kubectlCreateQuotaVersion)
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			quotaName := "scopes"
 
@@ -1991,34 +1923,19 @@ func getUDData(jpgExpected string, ns string) func(clientset.Interface, string) 
 	// getUDData validates data.json in the update-demo (returns nil if data is ok).
 	return func(c clientset.Interface, podID string) error {
 		framework.Logf("validating pod %s", podID)
-		subResourceProxyAvailable, err := framework.ServerVersionGTE(framework.SubResourcePodProxyVersion, c.Discovery())
-		if err != nil {
-			return err
-		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
 		defer cancel()
 
-		var body []byte
-		if subResourceProxyAvailable {
-			body, err = c.CoreV1().RESTClient().Get().
-				Namespace(ns).
-				Resource("pods").
-				SubResource("proxy").
-				Name(podID).
-				Suffix("data.json").
-				Do().
-				Raw()
-		} else {
-			body, err = c.CoreV1().RESTClient().Get().
-				Prefix("proxy").
-				Namespace(ns).
-				Resource("pods").
-				Name(podID).
-				Suffix("data.json").
-				Do().
-				Raw()
-		}
+		body, err := c.CoreV1().RESTClient().Get().
+			Namespace(ns).
+			Resource("pods").
+			SubResource("proxy").
+			Name(podID).
+			Suffix("data.json").
+			Do().
+			Raw()
+
 		if err != nil {
 			if ctx.Err() != nil {
 				framework.Failf("Failed to retrieve data from container: %v", err)

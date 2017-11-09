@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
@@ -57,71 +57,71 @@ func TestAuthorizer(t *testing.T) {
 	tests := []struct {
 		name   string
 		attrs  authorizer.AttributesRecord
-		expect bool
+		expect authorizer.Decision
 	}{
 		{
 			name:   "allowed configmap",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node0", Namespace: "ns0"},
-			expect: true,
+			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:   "allowed secret via pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-pod0-node0", Namespace: "ns0"},
-			expect: true,
+			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:   "allowed shared secret via pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-shared", Namespace: "ns0"},
-			expect: true,
+			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:   "allowed shared secret via pvc",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret-pv0-pod0-node0-ns0", Namespace: "ns0"},
-			expect: true,
+			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:   "allowed pvc",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumeclaims", Name: "pvc0-pod0-node0", Namespace: "ns0"},
-			expect: true,
+			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:   "allowed pv",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumes", Name: "pv0-pod0-node0-ns0", Namespace: ""},
-			expect: true,
+			expect: authorizer.DecisionAllow,
 		},
 
 		{
 			name:   "disallowed configmap",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node1", Namespace: "ns0"},
-			expect: false,
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed secret via pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-pod0-node1", Namespace: "ns0"},
-			expect: false,
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed shared secret via pvc",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret-pv0-pod0-node1-ns0", Namespace: "ns0"},
-			expect: false,
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed pvc",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumeclaims", Name: "pvc0-pod0-node1", Namespace: "ns0"},
-			expect: false,
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed pv",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumes", Name: "pv0-pod0-node1-ns0", Namespace: ""},
-			expect: false,
+			expect: authorizer.DecisionNoOpinion,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ok, _, _ := authz.Authorize(tc.attrs)
-			if ok != tc.expect {
-				t.Errorf("expected %v, got %v", tc.expect, ok)
+			decision, _, _ := authz.Authorize(tc.attrs)
+			if decision != tc.expect {
+				t.Errorf("expected %v, got %v", tc.expect, decision)
 			}
 		})
 	}
@@ -186,13 +186,13 @@ func TestAuthorizerSharedResources(t *testing.T) {
 	}
 
 	for i, tc := range testcases {
-		ok, _, err := authz.Authorize(authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
+		decision, _, err := authz.Authorize(authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
 		if err != nil {
 			t.Errorf("%d: unexpected error: %v", i, err)
 			continue
 		}
-		if ok != tc.ExpectAllowed {
-			t.Errorf("%d: expected %v, got %v", i, tc.ExpectAllowed, ok)
+		if (decision == authorizer.DecisionAllow) != tc.ExpectAllowed {
+			t.Errorf("%d: expected %v, got %v", i, tc.ExpectAllowed, decision)
 		}
 	}
 }
@@ -301,47 +301,47 @@ func BenchmarkAuthorization(b *testing.B) {
 	tests := []struct {
 		name   string
 		attrs  authorizer.AttributesRecord
-		expect bool
+		expect authorizer.Decision
 	}{
 		{
 			name:   "allowed configmap",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node0", Namespace: "ns0"},
-			expect: true,
+			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:   "allowed secret via pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-pod0-node0", Namespace: "ns0"},
-			expect: true,
+			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:   "allowed shared secret via pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-shared", Namespace: "ns0"},
-			expect: true,
+			expect: authorizer.DecisionAllow,
 		},
 		{
 			name:   "disallowed configmap",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "configmaps", Name: "configmap0-pod0-node1", Namespace: "ns0"},
-			expect: false,
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed secret via pod",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret0-pod0-node1", Namespace: "ns0"},
-			expect: false,
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed shared secret via pvc",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "secrets", Name: "secret-pv0-pod0-node1-ns0", Namespace: "ns0"},
-			expect: false,
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed pvc",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumeclaims", Name: "pvc0-pod0-node1", Namespace: "ns0"},
-			expect: false,
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
 			name:   "disallowed pv",
 			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "persistentvolumes", Name: "pv0-pod0-node1-ns0", Namespace: ""},
-			expect: false,
+			expect: authorizer.DecisionNoOpinion,
 		},
 	}
 
@@ -349,9 +349,9 @@ func BenchmarkAuthorization(b *testing.B) {
 	for _, tc := range tests {
 		b.Run(tc.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				ok, _, _ := authz.Authorize(tc.attrs)
-				if ok != tc.expect {
-					b.Errorf("expected %v, got %v", tc.expect, ok)
+				decision, _, _ := authz.Authorize(tc.attrs)
+				if decision != tc.expect {
+					b.Errorf("expected %v, got %v", tc.expect, decision)
 				}
 			}
 		})

@@ -1039,7 +1039,7 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 		if err != nil || len(internalDNS) == 0 {
 			//TODO: It would be nice to be able to determine the reason for the failure,
 			// but the AWS client masks all failures with the same error description.
-			glog.V(2).Info("Could not determine private DNS from AWS metadata.")
+			glog.V(4).Info("Could not determine private DNS from AWS metadata.")
 		} else {
 			addresses = append(addresses, v1.NodeAddress{Type: v1.NodeInternalDNS, Address: internalDNS})
 		}
@@ -1048,7 +1048,7 @@ func (c *Cloud) NodeAddresses(name types.NodeName) ([]v1.NodeAddress, error) {
 		if err != nil || len(externalDNS) == 0 {
 			//TODO: It would be nice to be able to determine the reason for the failure,
 			// but the AWS client masks all failures with the same error description.
-			glog.V(2).Info("Could not determine public DNS from AWS metadata.")
+			glog.V(4).Info("Could not determine public DNS from AWS metadata.")
 		} else {
 			addresses = append(addresses, v1.NodeAddress{Type: v1.NodeExternalDNS, Address: externalDNS})
 		}
@@ -1716,6 +1716,12 @@ func (c *Cloud) AttachDisk(diskName KubernetesVolumeID, nodeName types.NodeName,
 	ec2Device := "/dev/xvd" + string(mountDevice)
 
 	if !alreadyAttached {
+		available, err := c.checkIfAvailable(disk, "attaching", awsInstance.awsID)
+
+		if !available {
+			attachEnded = true
+			return "", err
+		}
 		request := &ec2.AttachVolumeInput{
 			Device:     aws.String(ec2Device),
 			InstanceId: aws.String(awsInstance.awsID),
@@ -1948,7 +1954,46 @@ func (c *Cloud) DeleteDisk(volumeName KubernetesVolumeID) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	available, err := c.checkIfAvailable(awsDisk, "deleting", "")
+
+	if !available {
+		return false, err
+	}
+
 	return awsDisk.deleteVolume()
+}
+
+func (c *Cloud) checkIfAvailable(disk *awsDisk, opName string, instance string) (bool, error) {
+	info, err := disk.describeVolume()
+
+	if err != nil {
+		glog.Errorf("Error describing volume %q: %q", disk.awsID, err)
+		// if for some reason we can not describe volume we will return error
+		return false, err
+	}
+
+	volumeState := aws.StringValue(info.State)
+	opError := fmt.Sprintf("Error %s EBS volume %q", opName, disk.awsID)
+	if len(instance) != 0 {
+		opError = fmt.Sprintf("%q to instance %q", opError, instance)
+	}
+
+	// Only available volumes can be attached or deleted
+	if volumeState != "available" {
+		// Volume is attached somewhere else and we can not attach it here
+		if len(info.Attachments) > 0 {
+			attachment := info.Attachments[0]
+			attachErr := fmt.Errorf("%s since volume is currently attached to %q", opError, aws.StringValue(attachment.InstanceId))
+			glog.Error(attachErr)
+			return false, attachErr
+		}
+
+		attachErr := fmt.Errorf("%s since volume is in %q state", opError, volumeState)
+		glog.Error(attachErr)
+		return false, attachErr
+	}
+
+	return true, nil
 }
 
 func (c *Cloud) GetLabelsForVolume(pv *v1.PersistentVolume) (map[string]string, error) {

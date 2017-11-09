@@ -246,14 +246,7 @@ setup() {
   kube::etcd::start
 
   # Find a standard sed instance for use with edit scripts
-  SED=sed
-  if which gsed &>/dev/null; then
-    SED=gsed
-  fi
-  if ! ($SED --version 2>&1 | grep -q GNU); then
-    echo "!!! GNU sed is required.  If on OS X, use 'brew install gnu-sed'."
-    exit 1
-  fi
+  kube::util::ensure-gnu-sed
 
   kube::log::status "Building kubectl"
   make -C "${KUBE_ROOT}" WHAT="cmd/kubectl"
@@ -400,7 +393,7 @@ run_pod_tests() {
   create_and_use_new_namespace
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
-  echo "${output_pod}" | $SED '/namespace:/d' | kubectl create -f - "${kube_flags[@]}"
+  echo "${output_pod}" | ${SED} '/namespace:/d' | kubectl create -f - "${kube_flags[@]}"
   # Post-condition: valid-pod POD is created
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
 
@@ -437,6 +430,13 @@ run_pod_tests() {
   kubectl create -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
   # Post-condition: valid-pod POD is created
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+  # Command
+  output_message=$(kubectl get pods --field-selector metadata.name=valid-pod "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" "valid-pod"
+  # Command
+  phase=$(kubectl get "${kube_flags[@]}" pod valid-pod -o go-template='{{ .status.phase }}')
+  output_message=$(kubectl get pods --field-selector status.phase="${phase}" "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" "valid-pod"
 
   ### Delete PODs with no parameter mustn't kill everything
   # Pre-condition: valid-pod POD exists
@@ -655,7 +655,7 @@ run_pod_tests() {
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   ## kubectl create --edit can update the label filed of multiple resources. tmp-editor.sh is a fake editor
   TEMP=$(mktemp /tmp/tmp-editor-XXXXXXXX.sh)
-  echo -e "#!/bin/bash\n$SED -i \"s/mock/modified/g\" \$1" > ${TEMP}
+  echo -e "#!/bin/bash\n${SED} -i \"s/mock/modified/g\" \$1" > ${TEMP}
   chmod +x ${TEMP}
   # Command
   EDITOR=${TEMP} kubectl create --edit -f hack/testdata/multi-resource-json.json "${kube_flags[@]}"
@@ -758,7 +758,7 @@ run_pod_tests() {
 
   ## --force replace pod can change other field, e.g., spec.container.name
   # Command
-  kubectl get "${kube_flags[@]}" pod valid-pod -o json | $SED 's/"kubernetes-serve-hostname"/"replaced-k8s-serve-hostname"/g' > /tmp/tmp-valid-pod.json
+  kubectl get "${kube_flags[@]}" pod valid-pod -o json | ${SED} 's/"kubernetes-serve-hostname"/"replaced-k8s-serve-hostname"/g' > /tmp/tmp-valid-pod.json
   kubectl replace "${kube_flags[@]}" --force -f /tmp/tmp-valid-pod.json
   # Post-condition: spec.container.name = "replaced-k8s-serve-hostname"
   kube::test::get_object_assert 'pod valid-pod' "{{(index .spec.containers 0).name}}" 'replaced-k8s-serve-hostname'
@@ -802,7 +802,7 @@ __EOF__
   kubectl delete node node-v1-test "${kube_flags[@]}"
 
   ## kubectl edit can update the image field of a POD. tmp-editor.sh is a fake editor
-  echo -e "#!/bin/bash\n$SED -i \"s/nginx/gcr.io\/google_containers\/serve_hostname/g\" \$1" > /tmp/tmp-editor.sh
+  echo -e "#!/bin/bash\n${SED} -i \"s/nginx/gcr.io\/google_containers\/serve_hostname/g\" \$1" > /tmp/tmp-editor.sh
   chmod +x /tmp/tmp-editor.sh
   # Pre-condition: valid-pod POD has image nginx
   kube::test::get_object_assert pods "{{range.items}}{{$image_field}}:{{end}}" 'nginx:'
@@ -882,7 +882,7 @@ __EOF__
   # Post-Condition: pod "test-pod" doesn't have configuration annotation
   ! [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
   ## 2. kubectl replace doesn't set the annotation
-  kubectl get pods test-pod -o yaml "${kube_flags[@]}" | $SED 's/test-pod-label/test-pod-replaced/g' > "${KUBE_TEMP}"/test-pod-replace.yaml
+  kubectl get pods test-pod -o yaml "${kube_flags[@]}" | ${SED} 's/test-pod-label/test-pod-replaced/g' > "${KUBE_TEMP}"/test-pod-replace.yaml
   # Command: replace the pod "test-pod"
   kubectl replace -f "${KUBE_TEMP}"/test-pod-replace.yaml "${kube_flags[@]}"
   # Post-Condition: pod "test-pod" is replaced
@@ -898,7 +898,7 @@ __EOF__
   [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
   kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration > "${KUBE_TEMP}"/annotation-configuration
   ## 4. kubectl replace updates an existing annotation
-  kubectl get pods test-pod -o yaml "${kube_flags[@]}" | $SED 's/test-pod-applied/test-pod-replaced/g' > "${KUBE_TEMP}"/test-pod-replace.yaml
+  kubectl get pods test-pod -o yaml "${kube_flags[@]}" | ${SED} 's/test-pod-applied/test-pod-replaced/g' > "${KUBE_TEMP}"/test-pod-replace.yaml
   # Command: replace the pod "test-pod"
   kubectl replace -f "${KUBE_TEMP}"/test-pod-replace.yaml "${kube_flags[@]}"
   # Post-Condition: pod "test-pod" is replaced
@@ -1149,6 +1149,24 @@ run_kubectl_apply_deployments_tests() {
   kube::test::wait_object_assert replicasets "{{range.items}}{{$id_field}}:{{end}}" ''
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
 
+  # kubectl apply deployment --overwrite=true --force=true
+  # Pre-Condition: no deployment exists
+  kube::test::get_object_assert deployments "{{range.items}}{{$id_field}}:{{end}}" ''
+  # apply deployment nginx
+  kubectl apply -f hack/testdata/deployment-label-change1.yaml "${kube_flags[@]}"
+  # check right deployment exists
+  kube::test::get_object_assert 'deployment nginx' "{{${id_field}}}" 'nginx'
+  # apply deployment with wrong labels mismatch selector throws errors
+  output_message=$(! kubectl apply -f hack/testdata/deployment-label-change2.yaml 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'Invalid value'
+  # apply deployment with --force and --overwrite will success
+  kubectl apply -f hack/testdata/deployment-label-change2.yaml --overwrite=true  --force=true --grace-period=10
+  # check the changed deployment
+  output_message=$(kubectl apply view-last-applied deploy/nginx -o json 2>&1 "${kube_flags[@]}" |grep nginx2)
+  kube::test::if_has_string "${output_message}" '"name": "nginx2"'
+  # cleanup
+  kubectl delete deployments --all --grace-period=10
+
   set +o nounset
   set +o errexit
 }
@@ -1178,7 +1196,7 @@ run_save_config_tests() {
   ! [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
   # Command: edit the pod "test-pod"
   temp_editor="${KUBE_TEMP}/tmp-editor.sh"
-  echo -e "#!/bin/bash\n$SED -i \"s/test-pod-label/test-pod-label-edited/g\" \$@" > "${temp_editor}"
+  echo -e "#!/bin/bash\n${SED} -i \"s/test-pod-label/test-pod-label-edited/g\" \$@" > "${temp_editor}"
   chmod +x "${temp_editor}"
   EDITOR=${temp_editor} kubectl edit pod test-pod --save-config "${kube_flags[@]}"
   # Post-Condition: pod "test-pod" has configuration annotation
@@ -1253,7 +1271,7 @@ run_kubectl_run_tests() {
   # Post-Condition: Job "pi" is created
   kube::test::get_object_assert jobs "{{range.items}}{{$id_field}}:{{end}}" 'pi:'
   # Describe command (resource only) should print detailed information
-  kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Created By"
+  kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Controlled By"
   # Clean up
   kubectl delete jobs pi "${kube_flags[@]}"
   # Post-condition: no pods exist.
@@ -1374,16 +1392,27 @@ run_kubectl_get_tests() {
   fi
 
   ### Test kubectl get all
-  output_message=$(kubectl --v=6 --namespace default get all 2>&1 "${kube_flags[@]}")
+  output_message=$(kubectl --v=6 --namespace default get all --chunk-size=0 2>&1 "${kube_flags[@]}")
   # Post-condition: Check if we get 200 OK from all the url(s)
   kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/pods 200 OK"
   kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/replicationcontrollers 200 OK"
   kube::test::if_has_string "${output_message}" "/api/v1/namespaces/default/services 200 OK"
-  kube::test::if_has_string "${output_message}" "/apis/apps/v1beta1/namespaces/default/statefulsets 200 OK"
+  kube::test::if_has_string "${output_message}" "/apis/apps/v1/namespaces/default/statefulsets 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/autoscaling/v1/namespaces/default/horizontalpodautoscalers 200"
   kube::test::if_has_string "${output_message}" "/apis/batch/v1/namespaces/default/jobs 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/deployments 200 OK"
   kube::test::if_has_string "${output_message}" "/apis/extensions/v1beta1/namespaces/default/replicasets 200 OK"
+
+  ### Test kubectl get chunk size
+  output_message=$(kubectl --v=6 get clusterrole --chunk-size=10 2>&1 "${kube_flags[@]}")
+  # Post-condition: Check if we get a limit and continue
+  kube::test::if_has_string "${output_message}" "/clusterroles?limit=10 200 OK"
+  kube::test::if_has_string "${output_message}" "/v1/clusterroles?continue="
+
+  ### Test kubectl get chunk size defaults to 500
+  output_message=$(kubectl --v=6 get clusterrole 2>&1 "${kube_flags[@]}")
+  # Post-condition: Check if we get a limit and continue
+  kube::test::if_has_string "${output_message}" "/clusterroles?limit=500 200 OK"
 
   ### Test --allow-missing-template-keys
   # Pre-condition: no POD exists
@@ -2727,7 +2756,7 @@ run_deployment_tests() {
   output_message=$(kubectl get deployment.extensions -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'extensions/v1beta1'
   output_message=$(kubectl get deployment.apps -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'apps/v1beta1'
+  kube::test::if_has_string "${output_message}" 'apps/v1'
   # Clean up
   kubectl delete deployment test-nginx-extensions "${kube_flags[@]}"
 
@@ -2742,11 +2771,11 @@ run_deployment_tests() {
   output_message=$(kubectl get deployment.extensions -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'extensions/v1beta1'
   output_message=$(kubectl get deployment.apps -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'apps/v1beta1'
+  kube::test::if_has_string "${output_message}" 'apps/v1'
   # Describe command (resource only) should print detailed information
   kube::test::describe_resource_assert rs "Name:" "Pod Template:" "Labels:" "Selector:" "Controlled By" "Replicas:" "Pods Status:" "Volumes:"
   # Describe command (resource only) should print detailed information
-  kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Created By" "Controlled By"
+  kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Controlled By"
   # Clean up
   kubectl delete deployment test-nginx-apps "${kube_flags[@]}"
 
@@ -2846,7 +2875,7 @@ run_deployment_tests() {
   kubectl get rs "${newrs}" -o yaml | grep "deployment.kubernetes.io/revision-history: 1,3"
   # Check that trying to watch the status of a superseded revision returns an error
   ! kubectl rollout status deployment/nginx --revision=3
-  cat hack/testdata/deployment-revision1.yaml | $SED "s/name: nginx$/name: nginx2/" | kubectl create -f - "${kube_flags[@]}"
+  cat hack/testdata/deployment-revision1.yaml | ${SED} "s/name: nginx$/name: nginx2/" | kubectl create -f - "${kube_flags[@]}"
   # Deletion of both deployments should not be blocked
   kubectl delete deployment nginx2 "${kube_flags[@]}"
   # Clean up
@@ -2986,7 +3015,7 @@ run_rs_tests() {
   # Describe command should print events information when show-events=true
   kube::test::describe_resource_events_assert rs true
   # Describe command (resource only) should print detailed information
-  kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Created By" "Controlled By"
+  kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Controlled By"
 
   ### Scale replica set frontend with current-replicas and replicas
   # Pre-condition: 3 replicas
@@ -3326,7 +3355,7 @@ run_multi_resources_tests() {
     fi
     # Command: kubectl edit multiple resources
     temp_editor="${KUBE_TEMP}/tmp-editor.sh"
-    echo -e "#!/bin/bash\n$SED -i \"s/status\:\ replaced/status\:\ edited/g\" \$@" > "${temp_editor}"
+    echo -e "#!/bin/bash\n${SED} -i \"s/status\:\ replaced/status\:\ edited/g\" \$@" > "${temp_editor}"
     chmod +x "${temp_editor}"
     EDITOR="${temp_editor}" kubectl edit "${kube_flags[@]}" -f "${file}"
     # Post-condition: mock service (and mock2) and mock rc (and mock2) are edited
@@ -3551,7 +3580,7 @@ run_clusterroles_tests() {
   kubectl set subject "${kube_flags[@]}" clusterrolebinding super-sa --serviceaccount=otherfoo:foo
   kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.namespace}}:{{end}}" 'otherns:otherfoo:'
   kube::test::get_object_assert clusterrolebinding/super-sa "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:'
- 
+
   # test `kubectl create rolebinding`
   # test `kubectl set subject rolebinding`
   kubectl create "${kube_flags[@]}" rolebinding admin --clusterrole=admin --user=default-admin
@@ -3730,13 +3759,13 @@ run_client_config_tests() {
   # Pre-condition: context "missing-context" does not exist
   # Command
   output_message=$(! kubectl get pod --context="missing-context" 2>&1)
-  kube::test::if_has_string "${output_message}" 'context "missing-context" does not exist'
+  kube::test::if_has_string "${output_message}" 'context was not found for specified context: missing-context'
   # Post-condition: invalid or missing context returns error
 
   # Pre-condition: cluster "missing-cluster" does not exist
   # Command
   output_message=$(! kubectl get pod --cluster="missing-cluster" 2>&1)
-  kube::test::if_has_string "${output_message}" 'cluster "missing-cluster" does not exist'
+  kube::test::if_has_string "${output_message}" 'no server found for cluster "missing-cluster"'
   # Post-condition: invalid or missing cluster returns error
 
   # Pre-condition: user "missing-user" does not exist
@@ -4206,6 +4235,14 @@ run_kubectl_all_namespace_tests() {
   kubectl delete "${kube_flags[@]}" pod valid-pod --grace-period=0 --force
   # Post-condition: valid-pod doesn't exist
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+
+  ### Verify flag all-namespaces is ignored for rootScoped resources
+  # Pre-condition: node exists
+  kube::test::get_object_assert nodes "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:'
+  # Command
+  output_message=$(kubectl get nodes --all-namespaces 2>&1)
+  # Post-condition: output with no NAMESPACE field
+  kube::test::if_has_not_string "${output_message}" "NAMESPACE"
 
   set +o nounset
   set +o errexit
@@ -4896,7 +4933,9 @@ runTests() {
   ############################
 
   if kube::test::if_supports_resource "${pods}" ; then
-    record_command run_kubectl_all_namespace_tests
+    if kube::test::if_supports_resource "${nodes}" ; then
+      record_command run_kubectl_all_namespace_tests
+    fi
   fi
 
   ################

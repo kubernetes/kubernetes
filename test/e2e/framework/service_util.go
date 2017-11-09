@@ -37,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	azurecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
@@ -639,7 +639,7 @@ func (j *ServiceTestJig) AddRCAntiAffinity(rc *v1.ReplicationController) {
 
 func (j *ServiceTestJig) CreatePDBOrFail(namespace string, rc *v1.ReplicationController) *policyv1beta1.PodDisruptionBudget {
 	pdb := j.newPDBTemplate(namespace, rc)
-	newPdb, err := j.Client.Policy().PodDisruptionBudgets(namespace).Create(pdb)
+	newPdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(namespace).Create(pdb)
 	if err != nil {
 		Failf("Failed to create PDB %q %v", pdb.Name, err)
 	}
@@ -696,7 +696,7 @@ func (j *ServiceTestJig) RunOrFail(namespace string, tweak func(rc *v1.Replicati
 func (j *ServiceTestJig) waitForPdbReady(namespace string) error {
 	timeout := 2 * time.Minute
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
-		pdb, err := j.Client.Policy().PodDisruptionBudgets(namespace).Get(j.Name, metav1.GetOptions{})
+		pdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(namespace).Get(j.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}

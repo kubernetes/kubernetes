@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
 	"k8s.io/kubernetes/pkg/controller"
@@ -272,7 +272,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 	ctrl := newPlugin()
 	informerFactory := informers.NewSharedInformerFactory(nil, controller.NoResyncPeriodFunc())
 	ctrl.SetInternalKubeInformerFactory(informerFactory)
-	err := ctrl.Validate()
+	err := ctrl.ValidateInitialization()
 	if err != nil {
 		t.Fatalf("neither pv lister nor storageclass lister can be nil")
 	}
@@ -323,7 +323,7 @@ func TestPVCResizeAdmission(t *testing.T) {
 		operation := admission.Update
 		attributes := admission.NewAttributesRecord(tc.newObj, tc.oldObj, schema.GroupVersionKind{}, metav1.NamespaceDefault, "foo", tc.resource, tc.subresource, operation, nil)
 
-		err := ctrl.Admit(attributes)
+		err := ctrl.Validate(attributes)
 		fmt.Println(tc.name)
 		fmt.Println(err)
 		if !tc.checkError(err) {

@@ -32,9 +32,9 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
+	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/kubeproxyconfig"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
@@ -53,12 +53,12 @@ import (
 )
 
 // NewProxyServer returns a new ProxyServer.
-func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndExit bool, scheme *runtime.Scheme, master string) (*ProxyServer, error) {
+func NewProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExit bool, scheme *runtime.Scheme, master string) (*ProxyServer, error) {
 	if config == nil {
 		return nil, errors.New("config is required")
 	}
 
-	if c, err := configz.New("componentconfig"); err == nil {
+	if c, err := configz.New(proxyconfigapi.GroupName); err == nil {
 		c.Set(config)
 	} else {
 		return nil, fmt.Errorf("unable to register configz: %s", err)
@@ -159,7 +159,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 		userspace.CleanupLeftovers(iptInterface)
 		// IPVS Proxier will generate some iptables rules,
 		// need to clean them before switching to other proxy mode.
-		ipvs.CleanupLeftovers(execer, ipvsInterface, iptInterface)
+		ipvs.CleanupLeftovers(ipvsInterface, iptInterface)
 	} else if proxyMode == proxyModeIPVS {
 		glog.V(0).Info("Using ipvs Proxier.")
 		proxierIPVS, err := ipvs.NewProxier(
@@ -220,7 +220,7 @@ func NewProxyServer(config *componentconfig.KubeProxyConfiguration, cleanupAndEx
 		iptables.CleanupLeftovers(iptInterface)
 		// IPVS Proxier will generate some iptables rules,
 		// need to clean them before switching to other proxy mode.
-		ipvs.CleanupLeftovers(execer, ipvsInterface, iptInterface)
+		ipvs.CleanupLeftovers(ipvsInterface, iptInterface)
 	}
 
 	iptInterface.AddReloadFunc(proxier.Sync)
@@ -275,8 +275,8 @@ func tryIPVSProxy(iptver iptables.IPTablesVersioner, kcompat iptables.KernelComp
 	// IPVS Proxier relies on iptables
 	useIPVSProxy, err := ipvs.CanUseIPVSProxier()
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("can't determine whether to use ipvs proxy, using userspace proxier: %v", err))
-		return proxyModeUserspace
+		// Try to fallback to iptables before falling back to userspace
+		utilruntime.HandleError(fmt.Errorf("can't determine whether to use ipvs proxy, error: %v", err))
 	}
 	if useIPVSProxy {
 		return proxyModeIPVS

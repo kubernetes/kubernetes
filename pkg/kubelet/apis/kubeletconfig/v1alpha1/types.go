@@ -66,7 +66,7 @@ type KubeletConfiguration struct {
 	ManifestURL string `json:"manifestURL"`
 	// manifestURLHeader is the HTTP header to use when accessing the manifest
 	// URL, with the key separated from the value with a ':', as in 'key:value'
-	ManifestURLHeader string `json:"manifestURLHeader"`
+	ManifestURLHeader map[string][]string `json:"manifestURLHeader"`
 	// enableServer enables the Kubelet's server
 	EnableServer *bool `json:"enableServer"`
 	// address is the IP address for the Kubelet to serve on (set to 0.0.0.0
@@ -169,8 +169,6 @@ type KubeletConfiguration struct {
 	VolumePluginDir string `json:"volumePluginDir"`
 	// kubeletCgroups is the absolute name of cgroups to isolate the kubelet in.
 	KubeletCgroups string `json:"kubeletCgroups"`
-	// runtimeCgroups are cgroups that container runtime is expected to be isolated in.
-	RuntimeCgroups string `json:"runtimeCgroups"`
 	// systemCgroups is absolute name of cgroups in which to place
 	// all non-kernel processes that are not already in a container. Empty
 	// for no container. Rolling back the flag requires a reboot.
@@ -186,8 +184,6 @@ type KubeletConfiguration struct {
 	// driver that the kubelet uses to manipulate cgroups on the host (cgroupfs or systemd)
 	// +optional
 	CgroupDriver string `json:"cgroupDriver,omitempty"`
-	// containerRuntime is the container runtime to use.
-	ContainerRuntime string `json:"containerRuntime"`
 	// CPUManagerPolicy is the name of the policy to use.
 	CPUManagerPolicy string `json:"cpuManagerPolicy"`
 	// CPU Manager reconciliation period.
@@ -219,7 +215,7 @@ type KubeletConfiguration struct {
 	// In cluster mode, this is obtained from the master.
 	PodCIDR string `json:"podCIDR"`
 	// ResolverConfig is the resolver configuration file used as the basis
-	// for the container DNS resolution configuration."), []
+	// for the container DNS resolution configuration.
 	ResolverConfig string `json:"resolvConf"`
 	// cpuCFSQuota is Enable CPU CFS quota enforcement for containers that
 	// specify CPU limits

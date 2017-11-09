@@ -25,8 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	admission "k8s.io/apiserver/pkg/admission"
-	api "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/helper"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
 	informers "k8s.io/kubernetes/pkg/client/informers/informers_generated/internalversion"
@@ -69,8 +69,8 @@ func (a *claimDefaulterPlugin) SetInternalKubeInformerFactory(f informers.Shared
 	a.SetReadyFunc(informer.Informer().HasSynced)
 }
 
-// Validate ensures lister is set.
-func (a *claimDefaulterPlugin) Validate() error {
+// ValidateInitialization ensures lister is set.
+func (a *claimDefaulterPlugin) ValidateInitialization() error {
 	if a.lister == nil {
 		return fmt.Errorf("missing lister")
 	}

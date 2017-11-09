@@ -69,7 +69,7 @@ var _ = SIGDescribe("Services", func() {
 	   Testname: service-kubernetes-exists
 	   Description: Make sure kubernetes service does exist.
 	*/
-	It("should provide secure master service [Conformance]", func() {
+	framework.ConformanceIt("should provide secure master service ", func() {
 		_, err := cs.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -79,7 +79,7 @@ var _ = SIGDescribe("Services", func() {
 		    Description: Ensure a service with no pod, one pod or two pods has
 			valid/accessible endpoints (same port number for service and pods).
 	*/
-	It("should serve a basic endpoint from pods [Conformance]", func() {
+	framework.ConformanceIt("should serve a basic endpoint from pods ", func() {
 		// TODO: use the ServiceTestJig here
 		serviceName := "endpoint-test2"
 		ns := f.Namespace.Name
@@ -144,7 +144,7 @@ var _ = SIGDescribe("Services", func() {
 		    Description: Ensure a service with no pod, one pod or two pods has
 			valid/accessible endpoints (different port number for pods).
 	*/
-	It("should serve multiport endpoints from pods [Conformance]", func() {
+	framework.ConformanceIt("should serve multiport endpoints from pods ", func() {
 		// TODO: use the ServiceTestJig here
 		// repacking functionality is intentionally not tested here - it's better to test it in an integration test.
 		serviceName := "multi-endpoint-test"
@@ -1449,6 +1449,10 @@ var _ = SIGDescribe("ESIPP [Slow]", func() {
 	BeforeEach(func() {
 		// requires cloud load-balancer support - this feature currently supported only on GCE/GKE
 		framework.SkipUnlessProviderIs("gce", "gke")
+
+		// Skipping this test for too large clusters due to issue #52495.
+		// TODO(MrHohn): Get rid of this when gce-side load-balancer improvements are done.
+		framework.SkipUnlessNodeCountIsAtMost(framework.GCPMaxInstancesInInstanceGroup)
 
 		cs = f.ClientSet
 		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > framework.LargeClusterMinNodesNumber {

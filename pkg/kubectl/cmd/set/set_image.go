@@ -25,8 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -147,12 +147,7 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		IncludeUninitialized(includeUninitialized).
 		Flatten()
 
-	if !o.Local {
-		builder = builder.
-			SelectorParam(o.Selector).
-			ResourceTypeOrNameArgs(o.All, o.Resources...).
-			Latest()
-	} else {
+	if o.Local {
 		// if a --local flag was provided, and a resource was specified in the form
 		// <resource>/<name>, fail immediately as --local cannot query the api server
 		// for the specified resource.
@@ -161,6 +156,11 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 		}
 
 		builder = builder.Local(f.ClientForMapping)
+	} else {
+		builder = builder.
+			LabelSelectorParam(o.Selector).
+			ResourceTypeOrNameArgs(o.All, o.Resources...).
+			Latest()
 	}
 
 	o.Infos, err = builder.Do().Infos()

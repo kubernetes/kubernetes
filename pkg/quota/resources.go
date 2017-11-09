@@ -20,7 +20,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // Equals returns true if the two lists are equivalent
@@ -247,7 +247,7 @@ func CalculateUsage(namespaceName string, scopes []api.ResourceQuotaScope, hardL
 	// look to measure updated usage stats for
 	hardResources := ResourceNames(hardLimits)
 	potentialResources := []api.ResourceName{}
-	evaluators := registry.Evaluators()
+	evaluators := registry.List()
 	for _, evaluator := range evaluators {
 		potentialResources = append(potentialResources, evaluator.MatchingResources(hardResources)...)
 	}

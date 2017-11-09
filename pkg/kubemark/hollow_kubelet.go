@@ -140,9 +140,7 @@ func GetHollowKubeletConfig(
 	c.ImageGCLowThresholdPercent = 80
 	c.VolumeStatsAggPeriod.Duration = time.Minute
 	c.CgroupRoot = ""
-	c.ContainerRuntime = kubetypes.DockerContainerRuntime
 	c.CPUCFSQuota = true
-	c.RuntimeCgroups = ""
 	c.EnableControllerAttachDetach = false
 	c.EnableDebuggingHandlers = true
 	c.EnableServer = true

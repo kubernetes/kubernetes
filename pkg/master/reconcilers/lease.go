@@ -33,9 +33,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/endpoints"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/endpoint"
 )
 
@@ -220,7 +221,7 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 	}
 
 	glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, masterIPs)
-	return r.endpointRegistry.UpdateEndpoints(ctx, e)
+	return r.endpointRegistry.UpdateEndpoints(ctx, e, rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc)
 }
 
 // checkEndpointSubsetFormatWithLease determines if the endpoint is in the

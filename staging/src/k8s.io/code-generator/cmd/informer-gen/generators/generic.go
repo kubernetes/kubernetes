@@ -33,6 +33,7 @@ type genericGenerator struct {
 	outputPackage        string
 	imports              namer.ImportTracker
 	groupVersions        map[string]clientgentypes.GroupVersions
+	groupGoNames         map[string]string
 	typesForGroupVersion map[clientgentypes.GroupVersion][]*types.Type
 	filtered             bool
 }
@@ -65,8 +66,9 @@ func (g *genericGenerator) Imports(c *generator.Context) (imports []string) {
 }
 
 type group struct {
-	Name     string
-	Versions []*version
+	GroupGoName string
+	Name        string
+	Versions    []*version
 }
 
 type groupSort []group
@@ -77,6 +79,7 @@ func (g groupSort) Swap(i, j int)      { g[i], g[j] = g[j], g[i] }
 
 type version struct {
 	Name      string
+	GoName    string
 	Resources []*types.Type
 }
 
@@ -95,15 +98,17 @@ func (g *genericGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 	schemeGVs := make(map[*version]*types.Type)
 
 	orderer := namer.Orderer{Namer: namer.NewPrivateNamer(0)}
-	for _, groupVersions := range g.groupVersions {
+	for groupPackageName, groupVersions := range g.groupVersions {
 		group := group{
-			Name:     namer.IC(groupVersions.Group.NonEmpty()),
-			Versions: []*version{},
+			GroupGoName: g.groupGoNames[groupPackageName],
+			Name:        groupVersions.Group.NonEmpty(),
+			Versions:    []*version{},
 		}
 		for _, v := range groupVersions.Versions {
 			gv := clientgentypes.GroupVersion{Group: groupVersions.Group, Version: v}
 			version := &version{
-				Name:      namer.IC(v.NonEmpty()),
+				Name:      v.NonEmpty(),
+				GoName:    namer.IC(v.NonEmpty()),
 				Resources: orderer.OrderTypes(g.typesForGroupVersion[gv]),
 			}
 			schemeGVs[version] = c.Universe.Variable(types.Name{Package: g.typesForGroupVersion[gv][0].Name.Package, Name: "SchemeGroupVersion"})
@@ -159,12 +164,12 @@ var forResource = `
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource {{.schemaGroupVersionResource|raw}}) (GenericInformer, error) {
 	switch resource {
-		{{range $group := .groups -}}
+		{{range $group := .groups -}}{{$GroupGoName := .GroupGoName -}}
 			{{range $version := .Versions -}}
-		// Group={{$group.Name}}, Version={{.Name}}
+	// Group={{$group.Name}}, Version={{.Name}}
 				{{range .Resources -}}
 	case {{index $.schemeGVs $version|raw}}.WithResource("{{.|allLowercasePlural}}"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.{{$group.Name}}().{{$version.Name}}().{{.|publicPlural}}().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.{{$GroupGoName}}().{{$version.GoName}}().{{.|publicPlural}}().Informer()}, nil
 				{{end}}
 			{{end}}
 		{{end -}}

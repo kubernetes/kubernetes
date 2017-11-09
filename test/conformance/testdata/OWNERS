@@ -1,0 +1,9 @@
+# To be owned by sig-architecture.
+# TODO(mml): Exclude parent owners once
+# https://github.com/kubernetes/test-infra/issues/5197 is implemented.
+reviewers:
+  - bgrant0607
+  - smarterclayton
+approvers:
+  - bgrant0607
+  - smarterclayton

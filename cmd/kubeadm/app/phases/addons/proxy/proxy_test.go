@@ -24,7 +24,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 func TestCreateServiceAccount(t *testing.T) {
@@ -115,11 +115,12 @@ func TestCompileManifests(t *testing.T) {
 		},
 		{
 			manifest: KubeProxyDaemonSet,
-			data: struct{ ImageRepository, Arch, Version, ImageOverride, ClusterCIDR, MasterTaintKey, CloudTaintKey string }{
+			data: struct{ ImageRepository, Arch, Version, ImageOverride, ExtraParams, ClusterCIDR, MasterTaintKey, CloudTaintKey string }{
 				ImageRepository: "foo",
 				Arch:            "foo",
 				Version:         "foo",
 				ImageOverride:   "foo",
+				ExtraParams:     "foo",
 				ClusterCIDR:     "foo",
 				MasterTaintKey:  "foo",
 				CloudTaintKey:   "foo",

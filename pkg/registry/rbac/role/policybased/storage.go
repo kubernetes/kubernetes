@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	kapihelper "k8s.io/kubernetes/pkg/api/helper"
+	kapihelper "k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
@@ -40,9 +40,9 @@ func NewStorage(s rest.StandardStorage, ruleResolver rbacregistryvalidation.Auth
 	return &Storage{s, ruleResolver}
 }
 
-func (s *Storage) Create(ctx genericapirequest.Context, obj runtime.Object, includeUninitialized bool) (runtime.Object, error) {
+func (s *Storage) Create(ctx genericapirequest.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, includeUninitialized bool) (runtime.Object, error) {
 	if rbacregistry.EscalationAllowed(ctx) {
-		return s.StandardStorage.Create(ctx, obj, includeUninitialized)
+		return s.StandardStorage.Create(ctx, obj, createValidation, includeUninitialized)
 	}
 
 	role := obj.(*rbac.Role)
@@ -50,12 +50,12 @@ func (s *Storage) Create(ctx genericapirequest.Context, obj runtime.Object, incl
 	if err := rbacregistryvalidation.ConfirmNoEscalation(ctx, s.ruleResolver, rules); err != nil {
 		return nil, errors.NewForbidden(groupResource, role.Name, err)
 	}
-	return s.StandardStorage.Create(ctx, obj, includeUninitialized)
+	return s.StandardStorage.Create(ctx, obj, createValidation, includeUninitialized)
 }
 
-func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc) (runtime.Object, bool, error) {
 	if rbacregistry.EscalationAllowed(ctx) {
-		return s.StandardStorage.Update(ctx, name, obj)
+		return s.StandardStorage.Update(ctx, name, obj, createValidation, updateValidation)
 	}
 
 	nonEscalatingInfo := rest.WrapUpdatedObjectInfo(obj, func(ctx genericapirequest.Context, obj runtime.Object, oldObj runtime.Object) (runtime.Object, error) {
@@ -73,5 +73,5 @@ func (s *Storage) Update(ctx genericapirequest.Context, name string, obj rest.Up
 		return obj, nil
 	})
 
-	return s.StandardStorage.Update(ctx, name, nonEscalatingInfo)
+	return s.StandardStorage.Update(ctx, name, nonEscalatingInfo, createValidation, updateValidation)
 }

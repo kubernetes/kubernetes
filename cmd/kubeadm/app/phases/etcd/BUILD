@@ -41,6 +41,9 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//cmd/kubeadm/app/phases/etcd/spec:all-srcs",
+    ],
     tags = ["automanaged"],
 )

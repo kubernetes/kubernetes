@@ -111,6 +111,7 @@ release_filegroup(
     name = "node-targets",
     srcs = [
         "//cmd/kube-proxy",
+        "//cmd/kubeadm",
         "//cmd/kubelet",
     ],
 )
@@ -121,11 +122,11 @@ release_filegroup(
 release_filegroup(
     name = "server-targets",
     srcs = [
+        "//cluster/gce/gci/mounter",
         "//cmd/cloud-controller-manager",
         "//cmd/hyperkube",
         "//cmd/kube-apiserver",
         "//cmd/kube-controller-manager",
-        "//cmd/kubeadm",
         "//plugin/cmd/kube-scheduler",
         "//vendor/k8s.io/kube-aggregator",
     ],

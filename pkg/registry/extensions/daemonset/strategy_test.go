@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -51,6 +51,26 @@ func TestSelectorImmutability(t *testing.T) {
 		newSelectorLabels map[string]string
 		expectedErrorList field.ErrorList
 	}{
+		{
+			genericapirequest.RequestInfo{
+				APIGroup:   "apps",
+				APIVersion: "v1",
+				Resource:   "daemonsets",
+			},
+			map[string]string{"a": "b"},
+			map[string]string{"c": "d"},
+			field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: field.NewPath("spec").Child("selector").String(),
+					BadValue: &metav1.LabelSelector{
+						MatchLabels:      map[string]string{"c": "d"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+					Detail: "field is immutable",
+				},
+			},
+		},
 		{
 			genericapirequest.RequestInfo{
 				APIGroup:   "apps",

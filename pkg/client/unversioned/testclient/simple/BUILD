@@ -10,9 +10,9 @@ go_library(
     srcs = ["simple_testclient.go"],
     importpath = "k8s.io/kubernetes/pkg/client/unversioned/testclient/simple",
     deps = [
-        "//pkg/api:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/testapi:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/client/clientset_generated/internalclientset:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

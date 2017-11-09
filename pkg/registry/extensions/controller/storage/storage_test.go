@@ -26,7 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
-	"k8s.io/kubernetes/pkg/api"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
@@ -123,7 +123,7 @@ func TestUpdate(t *testing.T) {
 		},
 	}
 
-	if _, _, err := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update)); err != nil {
+	if _, _, err := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})

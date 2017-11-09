@@ -19,7 +19,6 @@ package internalversion
 import (
 	"bytes"
 	"crypto/x509"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -47,10 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	clientextensionsv1beta1 "k8s.io/client-go/kubernetes/typed/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/events"
-	"k8s.io/kubernetes/pkg/api/helper"
-	"k8s.io/kubernetes/pkg/api/helper/qos"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/ref"
 	resourcehelper "k8s.io/kubernetes/pkg/api/resource"
@@ -58,6 +54,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
+	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -622,6 +621,10 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", pod.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", pod.Namespace)
+		if pod.Spec.Priority != nil {
+			w.Write(LEVEL_0, "Priority:\t%d\n", *pod.Spec.Priority)
+			w.Write(LEVEL_0, "PriorityClassName:\t%s\n", stringOrNone(pod.Spec.PriorityClassName))
+		}
 		if pod.Spec.NodeName == "" {
 			w.Write(LEVEL_0, "Node:\t<none>\n")
 		} else {
@@ -645,9 +648,6 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 			w.Write(LEVEL_0, "Message:\t%s\n", pod.Status.Message)
 		}
 		w.Write(LEVEL_0, "IP:\t%s\n", pod.Status.PodIP)
-		if createdBy := printCreator(pod.Annotations); len(createdBy) > 0 {
-			w.Write(LEVEL_0, "Created By:\t%s\n", createdBy)
-		}
 		if controlledBy := printController(pod); len(controlledBy) > 0 {
 			w.Write(LEVEL_0, "Controlled By:\t%s\n", controlledBy)
 		}
@@ -682,18 +682,6 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 func printController(controllee metav1.Object) string {
 	if controllerRef := metav1.GetControllerOf(controllee); controllerRef != nil {
 		return fmt.Sprintf("%s/%s", controllerRef.Kind, controllerRef.Name)
-	}
-	return ""
-}
-
-func printCreator(annotation map[string]string) string {
-	value, ok := annotation[api.CreatedByAnnotation]
-	if ok {
-		var r api.SerializedReference
-		err := json.Unmarshal([]byte(value), &r)
-		if err == nil {
-			return fmt.Sprintf("%s/%s", r.Reference.Kind, r.Reference.Name)
-		}
 	}
 	return ""
 }
@@ -1704,8 +1692,8 @@ func describeJob(job *batch.Job, events *api.EventList) (string, error) {
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
 		printLabelsMultiline(w, "Labels", job.Labels)
 		printAnnotationsMultiline(w, "Annotations", job.Annotations)
-		if createdBy := printCreator(job.Annotations); len(createdBy) > 0 {
-			w.Write(LEVEL_0, "Created By:\t%s\n", createdBy)
+		if controlledBy := printController(job); len(controlledBy) > 0 {
+			w.Write(LEVEL_0, "Controlled By:\t%s\n", controlledBy)
 		}
 		w.Write(LEVEL_0, "Parallelism:\t%d\n", *job.Spec.Parallelism)
 		if job.Spec.Completions != nil {
@@ -2100,7 +2088,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 			if sp.TargetPort.Type == intstr.Type(intstr.Int) {
 				w.Write(LEVEL_0, "TargetPort:\t%d/%s\n", sp.TargetPort.IntVal, sp.Protocol)
 			} else {
-				w.Write(LEVEL_0, "TargetPort:\t%d/%s\n", sp.TargetPort.StrVal, sp.Protocol)
+				w.Write(LEVEL_0, "TargetPort:\t%s/%s\n", sp.TargetPort.StrVal, sp.Protocol)
 			}
 			if sp.NodePort != 0 {
 				w.Write(LEVEL_0, "NodePort:\t%s\t%d/%s\n", name, sp.NodePort, sp.Protocol)
@@ -3092,11 +3080,109 @@ func describeNetworkPolicy(networkPolicy *networking.NetworkPolicy) (string, err
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", networkPolicy.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", networkPolicy.Namespace)
+		w.Write(LEVEL_0, "Created on:\t%s\n", networkPolicy.CreationTimestamp)
 		printLabelsMultiline(w, "Labels", networkPolicy.Labels)
 		printAnnotationsMultiline(w, "Annotations", networkPolicy.Annotations)
-
+		describeNetworkPolicySpec(networkPolicy.Spec, w)
 		return nil
 	})
+}
+
+func describeNetworkPolicySpec(nps networking.NetworkPolicySpec, w PrefixWriter) {
+	w.Write(LEVEL_0, "Spec:\n")
+	w.Write(LEVEL_1, "PodSelector: ")
+	if len(nps.PodSelector.MatchLabels) == 0 && len(nps.PodSelector.MatchExpressions) == 0 {
+		w.Write(LEVEL_2, "<none> (Allowing the specific traffic to all pods in this namespace)\n")
+	} else {
+		w.Write(LEVEL_2, "%s\n", metav1.FormatLabelSelector(&nps.PodSelector))
+	}
+	w.Write(LEVEL_1, "Allowing ingress traffic:\n")
+	printNetworkPolicySpecIngressFrom(nps.Ingress, "    ", w)
+	w.Write(LEVEL_1, "Allowing egress traffic:\n")
+	printNetworkPolicySpecEgressTo(nps.Egress, "    ", w)
+	w.Write(LEVEL_1, "Policy Types: %v\n", policyTypesToString(nps.PolicyTypes))
+}
+
+func printNetworkPolicySpecIngressFrom(npirs []networking.NetworkPolicyIngressRule, initialIndent string, w PrefixWriter) {
+	if len(npirs) == 0 {
+		w.Write(LEVEL_0, "%s%s\n", initialIndent, "<none> (Selected pods are isolated for ingress connectivity)")
+		return
+	}
+	for i, npir := range npirs {
+		if len(npir.Ports) == 0 {
+			w.Write(LEVEL_0, "%s%s\n", initialIndent, "To Port: <any> (traffic allowed to all ports)")
+		} else {
+			for _, port := range npir.Ports {
+				var proto api.Protocol
+				if port.Protocol != nil {
+					proto = *port.Protocol
+				} else {
+					proto = api.ProtocolTCP
+				}
+				w.Write(LEVEL_0, "%s%s: %s/%s\n", initialIndent, "To Port", port.Port, proto)
+			}
+		}
+		if len(npir.From) == 0 {
+			w.Write(LEVEL_0, "%s%s\n", initialIndent, "From: <any> (traffic not restricted by source)")
+		} else {
+			for _, from := range npir.From {
+				w.Write(LEVEL_0, "%s", initialIndent)
+				if from.PodSelector != nil {
+					w.Write(LEVEL_0, "%s: %s\n", "From PodSelector", metav1.FormatLabelSelector(from.PodSelector))
+				} else if from.NamespaceSelector != nil {
+					w.Write(LEVEL_0, "%s: %s\n", "From NamespaceSelector", metav1.FormatLabelSelector(from.NamespaceSelector))
+				} else if from.IPBlock != nil {
+					w.Write(LEVEL_0, "From IPBlock:\n")
+					w.Write(LEVEL_0, "%s%sCIDR: %s\n", initialIndent, initialIndent, from.IPBlock.CIDR)
+					w.Write(LEVEL_0, "%s%sExcept: %v\n", initialIndent, initialIndent, strings.Join(from.IPBlock.Except, ", "))
+				}
+			}
+		}
+		if i != len(npirs)-1 {
+			w.Write(LEVEL_0, "%s%s\n", initialIndent, "----------")
+		}
+	}
+}
+
+func printNetworkPolicySpecEgressTo(npers []networking.NetworkPolicyEgressRule, initialIndent string, w PrefixWriter) {
+	if len(npers) == 0 {
+		w.Write(LEVEL_0, "%s%s\n", initialIndent, "<none> (Selected pods are isolated for egress connectivity)")
+		return
+	}
+	for i, nper := range npers {
+		if len(nper.Ports) == 0 {
+			w.Write(LEVEL_0, "%s%s\n", initialIndent, "To Port: <any> (traffic allowed to all ports)")
+		} else {
+			for _, port := range nper.Ports {
+				var proto api.Protocol
+				if port.Protocol != nil {
+					proto = *port.Protocol
+				} else {
+					proto = api.ProtocolTCP
+				}
+				w.Write(LEVEL_0, "%s%s: %s/%s\n", initialIndent, "To Port", port.Port, proto)
+			}
+		}
+		if len(nper.To) == 0 {
+			w.Write(LEVEL_0, "%s%s\n", initialIndent, "To: <any> (traffic not restricted by source)")
+		} else {
+			for _, to := range nper.To {
+				w.Write(LEVEL_0, "%s", initialIndent)
+				if to.PodSelector != nil {
+					w.Write(LEVEL_0, "%s: %s\n", "To PodSelector", metav1.FormatLabelSelector(to.PodSelector))
+				} else if to.NamespaceSelector != nil {
+					w.Write(LEVEL_0, "%s: %s\n", "To NamespaceSelector", metav1.FormatLabelSelector(to.NamespaceSelector))
+				} else if to.IPBlock != nil {
+					w.Write(LEVEL_0, "To IPBlock:\n")
+					w.Write(LEVEL_0, "%s%sCIDR: %s\n", initialIndent, initialIndent, to.IPBlock.CIDR)
+					w.Write(LEVEL_0, "%s%sExcept: %v\n", initialIndent, initialIndent, strings.Join(to.IPBlock.Except, ", "))
+				}
+			}
+		}
+		if i != len(npers)-1 {
+			w.Write(LEVEL_0, "%s%s\n", initialIndent, "----------")
+		}
+	}
 }
 
 type StorageClassDescriber struct {
@@ -3279,13 +3365,6 @@ func describePodSecurityPolicy(psp *extensions.PodSecurityPolicy) (string, error
 	})
 }
 
-func stringOrAll(s string) string {
-	if len(s) > 0 {
-		return s
-	}
-	return "*"
-}
-
 func stringOrNone(s string) string {
 	if len(s) > 0 {
 		return s
@@ -3345,6 +3424,18 @@ func capsToString(caps []api.Capability) string {
 			strCaps = append(strCaps, string(c))
 		}
 		formattedString = strings.Join(strCaps, ",")
+	}
+	return stringOrNone(formattedString)
+}
+
+func policyTypesToString(pts []networking.PolicyType) string {
+	formattedString := ""
+	if pts != nil {
+		strPts := []string{}
+		for _, p := range pts {
+			strPts = append(strPts, string(p))
+		}
+		formattedString = strings.Join(strPts, ", ")
 	}
 	return stringOrNone(formattedString)
 }

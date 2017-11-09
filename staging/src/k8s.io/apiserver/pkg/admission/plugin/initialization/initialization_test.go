@@ -109,11 +109,11 @@ type fakeAuthorizer struct {
 	accept bool
 }
 
-func (f *fakeAuthorizer) Authorize(a authorizer.Attributes) (bool, string, error) {
+func (f *fakeAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
 	if f.accept {
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
-	return false, "denied", nil
+	return authorizer.DecisionNoOpinion, "denied", nil
 }
 
 func TestAdmitUpdate(t *testing.T) {

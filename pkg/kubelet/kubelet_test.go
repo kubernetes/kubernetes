@@ -19,6 +19,7 @@ package kubelet
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"sort"
 	"testing"
@@ -72,6 +73,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/volume/host_path"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 func init() {
@@ -284,7 +286,7 @@ func newTestKubeletWithImageList(
 	kubelet.evictionManager = evictionManager
 	kubelet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
 	// Add this as cleanup predicate pod admitter
-	kubelet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub()))
+	kubelet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources))
 
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	var prober volume.DynamicPluginProber = nil // TODO (#51147) inject mock
@@ -571,6 +573,116 @@ func TestHandleMemExceeded(t *testing.T) {
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, notfittingPod, v1.PodFailed)
 	checkPodStatus(t, kl, fittingPod, v1.PodPending)
+}
+
+// Tests that we handle result of interface UpdatePluginResources correctly
+// by setting corresponding status in status map.
+func TestHandlePluginResources(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	testKubelet.chainMock()
+	kl := testKubelet.kubelet
+
+	adjustedResource := v1.ResourceName("domain1.com/adjustedResource")
+	unadjustedResouce := v1.ResourceName("domain2.com/unadjustedResouce")
+	failedResource := v1.ResourceName("domain2.com/failedResource")
+	resourceQuantity1 := *resource.NewQuantity(int64(1), resource.DecimalSI)
+	resourceQuantity2 := *resource.NewQuantity(int64(2), resource.DecimalSI)
+	resourceQuantityInvalid := *resource.NewQuantity(int64(-1), resource.DecimalSI)
+	allowedPodQuantity := *resource.NewQuantity(int64(10), resource.DecimalSI)
+	nodes := []*v1.Node{
+		{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+			Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: v1.ResourceList{
+				adjustedResource:  resourceQuantity1,
+				unadjustedResouce: resourceQuantity1,
+				v1.ResourcePods:   allowedPodQuantity,
+			}}},
+	}
+	kl.nodeInfo = testNodeInfo{nodes: nodes}
+
+	updatePluginResourcesFunc := func(node *schedulercache.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+		// Maps from resourceName to the value we use to set node.allocatableResource[resourceName].
+		// A resource with invalid value (< 0) causes the function to return an error
+		// to emulate resource Allocation failure.
+		// Resources not contained in this map will have their node.allocatableResource
+		// quantity unchanged.
+		updateResourceMap := map[v1.ResourceName]resource.Quantity{
+			adjustedResource: resourceQuantity2,
+			failedResource:   resourceQuantityInvalid,
+		}
+		pod := attrs.Pod
+		allocatableResource := node.AllocatableResource()
+		newAllocatableResource := allocatableResource.Clone()
+		for _, container := range pod.Spec.Containers {
+			for resource := range container.Resources.Requests {
+				newQuantity, exist := updateResourceMap[resource]
+				if !exist {
+					continue
+				}
+				if newQuantity.Value() < 0 {
+					return fmt.Errorf("Allocation failed")
+				}
+				newAllocatableResource.ScalarResources[resource] = newQuantity.Value()
+			}
+		}
+		node.SetAllocatableResource(newAllocatableResource)
+		return nil
+	}
+
+	// add updatePluginResourcesFunc to admission handler, to test it's behavior.
+	kl.admitHandlers = lifecycle.PodAdmitHandlers{}
+	kl.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kl.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), updatePluginResourcesFunc))
+
+	// pod requiring adjustedResource can be successfully allocated because updatePluginResourcesFunc
+	// adjusts node.allocatableResource for this resource to a sufficient value.
+	fittingPodspec := v1.PodSpec{NodeName: string(kl.nodeName),
+		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
+			Limits: v1.ResourceList{
+				adjustedResource: resourceQuantity2,
+			},
+			Requests: v1.ResourceList{
+				adjustedResource: resourceQuantity2,
+			},
+		}}},
+	}
+	// pod requiring unadjustedResouce with insufficient quantity will still fail PredicateAdmit.
+	exceededPodSpec := v1.PodSpec{NodeName: string(kl.nodeName),
+		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
+			Limits: v1.ResourceList{
+				unadjustedResouce: resourceQuantity2,
+			},
+			Requests: v1.ResourceList{
+				unadjustedResouce: resourceQuantity2,
+			},
+		}}},
+	}
+	// pod requiring failedResource will fail with the resource failed to be allocated.
+	failedPodSpec := v1.PodSpec{NodeName: string(kl.nodeName),
+		Containers: []v1.Container{{Resources: v1.ResourceRequirements{
+			Limits: v1.ResourceList{
+				failedResource: resourceQuantity1,
+			},
+			Requests: v1.ResourceList{
+				failedResource: resourceQuantity1,
+			},
+		}}},
+	}
+	pods := []*v1.Pod{
+		podWithUIDNameNsSpec("123", "fittingpod", "foo", fittingPodspec),
+		podWithUIDNameNsSpec("456", "exceededpod", "foo", exceededPodSpec),
+		podWithUIDNameNsSpec("789", "failedpod", "foo", failedPodSpec),
+	}
+	// The latter two pod should be rejected.
+	fittingPod := pods[0]
+	exceededPod := pods[1]
+	failedPod := pods[2]
+
+	kl.HandlePodAdditions(pods)
+
+	// Check pod status stored in the status map.
+	checkPodStatus(t, kl, fittingPod, v1.PodPending)
+	checkPodStatus(t, kl, exceededPod, v1.PodFailed)
+	checkPodStatus(t, kl, failedPod, v1.PodFailed)
 }
 
 // TODO(filipg): This test should be removed once StatusSyncer can do garbage collection without external signal.
@@ -2059,3 +2171,90 @@ type podsByUID []*v1.Pod
 func (p podsByUID) Len() int           { return len(p) }
 func (p podsByUID) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p podsByUID) Less(i, j int) bool { return p[i].UID < p[j].UID }
+
+func TestGetClusterDNS(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	clusterNS := "203.0.113.1"
+	kubelet.clusterDomain = "kubernetes.io"
+	kubelet.clusterDNS = []net.IP{net.ParseIP(clusterNS)}
+
+	pods := newTestPods(4)
+	pods[0].Spec.DNSPolicy = v1.DNSClusterFirstWithHostNet
+	pods[1].Spec.DNSPolicy = v1.DNSClusterFirst
+	pods[2].Spec.DNSPolicy = v1.DNSClusterFirst
+	pods[2].Spec.HostNetwork = false
+	pods[3].Spec.DNSPolicy = v1.DNSDefault
+
+	options := make([]struct {
+		DNS       []string
+		DNSSearch []string
+	}, 4)
+	for i, pod := range pods {
+		var err error
+		options[i].DNS, options[i].DNSSearch, _, _, err = kubelet.GetClusterDNS(pod)
+		if err != nil {
+			t.Fatalf("failed to generate container options: %v", err)
+		}
+	}
+	if len(options[0].DNS) != 1 || options[0].DNS[0] != clusterNS {
+		t.Errorf("expected nameserver %s, got %+v", clusterNS, options[0].DNS)
+	}
+	if len(options[0].DNSSearch) == 0 || options[0].DNSSearch[0] != ".svc."+kubelet.clusterDomain {
+		t.Errorf("expected search %s, got %+v", ".svc."+kubelet.clusterDomain, options[0].DNSSearch)
+	}
+	if len(options[1].DNS) != 1 || options[1].DNS[0] != "127.0.0.1" {
+		t.Errorf("expected nameserver 127.0.0.1, got %+v", options[1].DNS)
+	}
+	if len(options[1].DNSSearch) != 1 || options[1].DNSSearch[0] != "." {
+		t.Errorf("expected search \".\", got %+v", options[1].DNSSearch)
+	}
+	if len(options[2].DNS) != 1 || options[2].DNS[0] != clusterNS {
+		t.Errorf("expected nameserver %s, got %+v", clusterNS, options[2].DNS)
+	}
+	if len(options[2].DNSSearch) == 0 || options[2].DNSSearch[0] != ".svc."+kubelet.clusterDomain {
+		t.Errorf("expected search %s, got %+v", ".svc."+kubelet.clusterDomain, options[2].DNSSearch)
+	}
+	if len(options[3].DNS) != 1 || options[3].DNS[0] != "127.0.0.1" {
+		t.Errorf("expected nameserver 127.0.0.1, got %+v", options[3].DNS)
+	}
+	if len(options[3].DNSSearch) != 1 || options[3].DNSSearch[0] != "." {
+		t.Errorf("expected search \".\", got %+v", options[3].DNSSearch)
+	}
+
+	kubelet.resolverConfig = "/etc/resolv.conf"
+	for i, pod := range pods {
+		var err error
+		options[i].DNS, options[i].DNSSearch, _, _, err = kubelet.GetClusterDNS(pod)
+		if err != nil {
+			t.Fatalf("failed to generate container options: %v", err)
+		}
+	}
+	t.Logf("nameservers %+v", options[1].DNS)
+	if len(options[0].DNS) != 1 {
+		t.Errorf("expected cluster nameserver only, got %+v", options[0].DNS)
+	} else if options[0].DNS[0] != clusterNS {
+		t.Errorf("expected nameserver %s, got %v", clusterNS, options[0].DNS[0])
+	}
+	expLength := len(options[1].DNSSearch) + 3
+	if expLength > 6 {
+		expLength = 6
+	}
+	if len(options[0].DNSSearch) != expLength {
+		t.Errorf("expected prepend of cluster domain, got %+v", options[0].DNSSearch)
+	} else if options[0].DNSSearch[0] != ".svc."+kubelet.clusterDomain {
+		t.Errorf("expected domain %s, got %s", ".svc."+kubelet.clusterDomain, options[0].DNSSearch)
+	}
+	if len(options[2].DNS) != 1 {
+		t.Errorf("expected cluster nameserver only, got %+v", options[2].DNS)
+	} else if options[2].DNS[0] != clusterNS {
+		t.Errorf("expected nameserver %s, got %v", clusterNS, options[2].DNS[0])
+	}
+	if len(options[2].DNSSearch) != expLength {
+		t.Errorf("expected prepend of cluster domain, got %+v", options[2].DNSSearch)
+	} else if options[2].DNSSearch[0] != ".svc."+kubelet.clusterDomain {
+		t.Errorf("expected domain %s, got %s", ".svc."+kubelet.clusterDomain, options[0].DNSSearch)
+	}
+}

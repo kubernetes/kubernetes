@@ -43,8 +43,8 @@ import (
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/tokentest"
 	clienttypedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/test/integration"
@@ -58,11 +58,11 @@ const (
 
 type allowAliceAuthorizer struct{}
 
-func (allowAliceAuthorizer) Authorize(a authorizer.Attributes) (bool, string, error) {
+func (allowAliceAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
 	if a.GetUser() != nil && a.GetUser().GetName() == "alice" {
-		return true, "", nil
+		return authorizer.DecisionAllow, "", nil
 	}
-	return false, "I can't allow that.  Go ask alice.", nil
+	return authorizer.DecisionNoOpinion, "I can't allow that.  Go ask alice.", nil
 }
 
 func testPrefix(t *testing.T, prefix string) {
