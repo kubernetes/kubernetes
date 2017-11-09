@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 )
 
+// ViewOptions holds command line options required to run the command.
 type ViewOptions struct {
 	ConfigAccess clientcmd.ConfigAccess
 	Merge        flag.Tristate
@@ -44,12 +45,12 @@ type ViewOptions struct {
 }
 
 var (
-	view_long = templates.LongDesc(`
+	viewLong = templates.LongDesc(`
 		Display merged kubeconfig settings or a specified kubeconfig file.
 
 		You can use --output jsonpath={...} to extract specific values using a jsonpath expression.`)
 
-	view_example = templates.Examples(`
+	viewExample = templates.Examples(`
 		# Show Merged kubeconfig settings.
 		kubectl config view
 
@@ -57,6 +58,7 @@ var (
 		kubectl config view -o jsonpath='{.users[?(@.name == "e2e")].user.password}'`)
 )
 
+// NewCmdConfigView creates the `view` subcommand.
 func NewCmdConfigView(out, errOut io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &ViewOptions{ConfigAccess: ConfigAccess}
 	// Default to yaml
@@ -65,8 +67,8 @@ func NewCmdConfigView(out, errOut io.Writer, ConfigAccess clientcmd.ConfigAccess
 	cmd := &cobra.Command{
 		Use:     "view",
 		Short:   i18n.T("Display merged kubeconfig settings or a specified kubeconfig file"),
-		Long:    view_long,
-		Example: view_example,
+		Long:    viewLong,
+		Example: viewExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			options.Complete()
 			outputFormat := cmdutil.GetFlagString(cmd, "output")
@@ -101,6 +103,7 @@ func NewCmdConfigView(out, errOut io.Writer, ConfigAccess clientcmd.ConfigAccess
 	return cmd
 }
 
+// Run implements the actual command.
 func (o ViewOptions) Run(out io.Writer, printer printers.ResourcePrinter) error {
 	config, err := o.loadConfig()
 	if err != nil {
@@ -129,6 +132,7 @@ func (o ViewOptions) Run(out io.Writer, printer printers.ResourcePrinter) error 
 	return nil
 }
 
+// Complete completes all the required options.
 func (o *ViewOptions) Complete() bool {
 	if o.ConfigAccess.IsExplicitFile() {
 		if !o.Merge.Provided() {
@@ -149,6 +153,7 @@ func (o ViewOptions) loadConfig() (*clientcmdapi.Config, error) {
 	return config, err
 }
 
+// Validate command options for sufficient information to run the command.
 func (o ViewOptions) Validate() error {
 	if !o.Merge.Value() && !o.ConfigAccess.IsExplicitFile() {
 		return errors.New("if merge==false a precise file must to specified")

@@ -56,6 +56,7 @@ var (
 		kubectl auth reconcile -f my-rbac-rules.yaml`)
 )
 
+// NewCmdReconcile creates the `reconcile` sub command.
 func NewCmdReconcile(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	fileOptions := &resource.FilenameOptions{}
 	o := &ReconcileOptions{
@@ -71,7 +72,7 @@ func NewCmdReconcile(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(cmd, f, args, fileOptions))
 			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.RunReconcile())
+			cmdutil.CheckErr(o.Run())
 		},
 	}
 
@@ -83,6 +84,7 @@ func NewCmdReconcile(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	return cmd
 }
 
+// Complete completes all the required options.
 func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args []string, options *resource.FilenameOptions) error {
 	if len(args) > 0 {
 		return errors.New("no arguments are allowed")
@@ -120,11 +122,13 @@ func (o *ReconcileOptions) Complete(cmd *cobra.Command, f cmdutil.Factory, args 
 	return nil
 }
 
+// Validate command options for sufficient information to run the command.
 func (o *ReconcileOptions) Validate() error {
 	return nil
 }
 
-func (o *ReconcileOptions) RunReconcile() error {
+// Run implements the actual command.
+func (o *ReconcileOptions) Run() error {
 	r := o.ResourceBuilder.Do()
 	err := r.Err()
 	if err != nil {

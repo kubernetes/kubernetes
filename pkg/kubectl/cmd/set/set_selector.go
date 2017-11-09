@@ -202,7 +202,7 @@ func (o *SelectorOptions) RunSelector() error {
 		if o.record || cmdutil.ContainsChangeCause(info) {
 			if err := cmdutil.RecordChangeCause(patched, o.changeCause); err == nil {
 				if patched, err = resource.NewHelper(info.Client, info.Mapping).Replace(info.Namespace, info.Name, false, patched); err != nil {
-					return fmt.Errorf("changes to %s/%s can't be recorded: %v\n", info.Mapping.Resource, info.Name, err)
+					return fmt.Errorf("changes to %s/%s can't be recorded: %v", info.Mapping.Resource, info.Name, err)
 				}
 			}
 		}

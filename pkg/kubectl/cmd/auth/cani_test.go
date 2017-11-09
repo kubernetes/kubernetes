@@ -30,7 +30,7 @@ import (
 	cmdtesting "k8s.io/kubernetes/pkg/kubectl/cmd/testing"
 )
 
-func TestRunAccessCheck(t *testing.T) {
+func TestRun(t *testing.T) {
 	tests := []struct {
 		name      string
 		o         *CanIOptions
@@ -159,7 +159,7 @@ func TestRunAccessCheck(t *testing.T) {
 			continue
 		}
 
-		actualAllowed, err := test.o.RunAccessCheck()
+		actualAllowed, err := test.o.Run()
 		switch {
 		case test.serverErr == nil && err == nil:
 			// pass

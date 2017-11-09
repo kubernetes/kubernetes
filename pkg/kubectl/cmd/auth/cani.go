@@ -81,6 +81,7 @@ var (
 		kubectl auth can-i get /logs/`)
 )
 
+// NewCmdCanI creates the `can-i` subcommand.
 func NewCmdCanI(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	o := &CanIOptions{
 		Out: out,
@@ -96,7 +97,7 @@ func NewCmdCanI(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 			cmdutil.CheckErr(o.Complete(f, args))
 			cmdutil.CheckErr(o.Validate())
 
-			allowed, err := o.RunAccessCheck()
+			allowed, err := o.Run()
 			if err == nil {
 				if o.Quiet && !allowed {
 					os.Exit(1)
@@ -113,6 +114,7 @@ func NewCmdCanI(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	return cmd
 }
 
+// Complete completes all the required options.
 func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 	if o.Quiet {
 		o.Out = ioutil.Discard
@@ -153,6 +155,7 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 	return nil
 }
 
+// Validate command options for sufficient information to run the command.
 func (o *CanIOptions) Validate() error {
 	if o.NonResourceURL != "" {
 		if o.Subresource != "" {
@@ -165,7 +168,8 @@ func (o *CanIOptions) Validate() error {
 	return nil
 }
 
-func (o *CanIOptions) RunAccessCheck() (bool, error) {
+// Run implements the actual command.
+func (o *CanIOptions) Run() (bool, error) {
 	var sar *authorizationapi.SelfSubjectAccessReview
 	if o.NonResourceURL == "" {
 		sar = &authorizationapi.SelfSubjectAccessReview{

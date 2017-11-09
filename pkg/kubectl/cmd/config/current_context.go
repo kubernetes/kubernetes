@@ -28,27 +28,29 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
+// CurrentContextOptions holds command line options required to run the command.
 type CurrentContextOptions struct {
 	ConfigAccess clientcmd.ConfigAccess
 }
 
 var (
-	current_context_long = templates.LongDesc(`
+	currentContextLong = templates.LongDesc(`
 		Displays the current-context`)
 
-	current_context_example = templates.Examples(`
+	currentContextExample = templates.Examples(`
 		# Display the current-context
 		kubectl config current-context`)
 )
 
+// NewCmdConfigCurrentContext creates the `current-context` subcommand.
 func NewCmdConfigCurrentContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &CurrentContextOptions{ConfigAccess: configAccess}
 
 	cmd := &cobra.Command{
 		Use:     "current-context",
 		Short:   i18n.T("Displays the current-context"),
-		Long:    current_context_long,
-		Example: current_context_example,
+		Long:    currentContextLong,
+		Example: currentContextExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunCurrentContext(out, options)
 			cmdutil.CheckErr(err)
@@ -58,6 +60,7 @@ func NewCmdConfigCurrentContext(out io.Writer, configAccess clientcmd.ConfigAcce
 	return cmd
 }
 
+// RunCurrentContext implements the actual command.
 func RunCurrentContext(out io.Writer, options *CurrentContextOptions) error {
 	config, err := options.ConfigAccess.GetStartingConfig()
 	if err != nil {
@@ -65,10 +68,10 @@ func RunCurrentContext(out io.Writer, options *CurrentContextOptions) error {
 	}
 
 	if config.CurrentContext == "" {
-		err = fmt.Errorf("current-context is not set\n")
+		err = fmt.Errorf("current-context is not set")
 		return err
 	}
 
-	fmt.Fprintf(out, "%s\n", config.CurrentContext)
+	fmt.Fprintf(out, "%s", config.CurrentContext)
 	return nil
 }

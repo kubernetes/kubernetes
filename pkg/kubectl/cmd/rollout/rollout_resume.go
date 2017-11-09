@@ -34,9 +34,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
-// ResumeConfig is the start of the data required to perform the operation.  As new fields are added, add them here instead of
-// referencing the cmd.Flags()
-type ResumeConfig struct {
+// ResumeOptions holds command line options required to run the command.
+type ResumeOptions struct {
 	resource.FilenameOptions
 
 	Resumer func(object *resource.Info) ([]byte, error)
@@ -49,20 +48,21 @@ type ResumeConfig struct {
 }
 
 var (
-	resume_long = templates.LongDesc(`
+	resumeLong = templates.LongDesc(`
 		Resume a paused resource
 
 		Paused resources will not be reconciled by a controller. By resuming a
 		resource, we allow it to be reconciled again.
 		Currently only deployments support being resumed.`)
 
-	resume_example = templates.Examples(`
+	resumeExample = templates.Examples(`
 		# Resume an already paused deployment
 		kubectl rollout resume deployment/nginx`)
 )
 
+// NewCmdRolloutResume creates the `resume` subcommand.
 func NewCmdRolloutResume(f cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &ResumeConfig{}
+	options := &ResumeOptions{}
 
 	validArgs := []string{"deployment"}
 	argAliases := kubectl.ResourceAliases(validArgs)
@@ -70,15 +70,15 @@ func NewCmdRolloutResume(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "resume RESOURCE",
 		Short:   i18n.T("Resume a paused resource"),
-		Long:    resume_long,
-		Example: resume_example,
+		Long:    resumeLong,
+		Example: resumeExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			allErrs := []error{}
-			err := options.CompleteResume(f, cmd, out, args)
+			err := options.Complete(f, cmd, out, args)
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
-			err = options.RunResume()
+			err = options.Run()
 			if err != nil {
 				allErrs = append(allErrs, err)
 			}
@@ -93,7 +93,8 @@ func NewCmdRolloutResume(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
+// Complete completes all the required options.
+func (o *ResumeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
 	if len(args) == 0 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
 		return cmdutil.UsageErrorf(cmd, "%s", cmd.Use)
 	}
@@ -135,7 +136,8 @@ func (o *ResumeConfig) CompleteResume(f cmdutil.Factory, cmd *cobra.Command, out
 	return nil
 }
 
-func (o ResumeConfig) RunResume() error {
+// Run implements the actual command.
+func (o ResumeOptions) Run() error {
 	allErrs := []error{}
 	for _, patch := range set.CalculatePatches(o.Infos, o.Encoder, o.Resumer) {
 		info := patch.Info

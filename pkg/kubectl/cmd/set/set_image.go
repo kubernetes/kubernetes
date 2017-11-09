@@ -33,8 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 )
 
-// ImageOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
-// referencing the cmd.Flags()
+// ImageOptions holds command line options required to run the command.
 type ImageOptions struct {
 	resource.FilenameOptions
 
@@ -62,16 +61,16 @@ type ImageOptions struct {
 }
 
 var (
-	image_resources = `
+	imageResources = `
   	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), replicaset (rs)`
 
-	image_long = templates.LongDesc(`
+	imageLong = templates.LongDesc(`
 		Update existing container image(s) of resources.
 
 		Possible resources include (case insensitive):
-		` + image_resources)
+		` + imageResources)
 
-	image_example = templates.Examples(`
+	imageExample = templates.Examples(`
 		# Set a deployment's nginx container image to 'nginx:1.9.1', and its busybox container image to 'busybox'.
 		kubectl set image deployment/nginx busybox=busybox nginx=nginx:1.9.1
 
@@ -85,6 +84,7 @@ var (
 		kubectl set image -f path/to/file.yaml nginx=nginx:1.9.1 --local -o yaml`)
 )
 
+// NewCmdImage creates the `image` subcommand.
 func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	options := &ImageOptions{
 		Out: out,
@@ -94,8 +94,8 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "image (-f FILENAME | TYPE NAME) CONTAINER_NAME_1=CONTAINER_IMAGE_1 ... CONTAINER_NAME_N=CONTAINER_IMAGE_N",
 		Short:   i18n.T("Update image of a pod template"),
-		Long:    image_long,
-		Example: image_example,
+		Long:    imageLong,
+		Example: imageExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.Validate())
@@ -112,9 +112,11 @@ func NewCmdImage(f cmdutil.Factory, out, err io.Writer) *cobra.Command {
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddIncludeUninitializedFlag(cmd)
+
 	return cmd
 }
 
+// Complete completes all the required options.
 func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Mapper, o.Typer = f.Object()
 	o.UpdatePodSpecForObject = f.UpdatePodSpecForObject
@@ -171,6 +173,7 @@ func (o *ImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	return nil
 }
 
+// Validate command options for sufficient information to run the command.
 func (o *ImageOptions) Validate() error {
 	errors := []error{}
 	if len(o.Resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.Filenames) {
@@ -184,6 +187,7 @@ func (o *ImageOptions) Validate() error {
 	return utilerrors.NewAggregate(errors)
 }
 
+// Run implements the actual command.
 func (o *ImageOptions) Run() error {
 	allErrs := []error{}
 
@@ -236,7 +240,7 @@ func (o *ImageOptions) Run() error {
 	for _, patch := range patches {
 		info := patch.Info
 		if patch.Err != nil {
-			allErrs = append(allErrs, fmt.Errorf("error: %s/%s %v\n", info.Mapping.Resource, info.Name, patch.Err))
+			allErrs = append(allErrs, fmt.Errorf("error: %s/%s %v", info.Mapping.Resource, info.Name, patch.Err))
 			continue
 		}
 
@@ -255,7 +259,7 @@ func (o *ImageOptions) Run() error {
 		// patch the change
 		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch)
 		if err != nil {
-			allErrs = append(allErrs, fmt.Errorf("failed to patch image update to pod template: %v\n", err))
+			allErrs = append(allErrs, fmt.Errorf("failed to patch image update to pod template: %v", err))
 			continue
 		}
 		info.Refresh(obj, true)
@@ -264,7 +268,7 @@ func (o *ImageOptions) Run() error {
 		if o.Record || cmdutil.ContainsChangeCause(info) {
 			if patch, patchType, err := cmdutil.ChangeResourcePatch(info, o.ChangeCause); err == nil {
 				if obj, err = resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, patchType, patch); err != nil {
-					fmt.Fprintf(o.Err, "WARNING: changes to %s/%s can't be recorded: %v\n", info.Mapping.Resource, info.Name, err)
+					fmt.Fprintf(o.Err, "WARNING: changes to %s/%s can't be recorded: %v", info.Mapping.Resource, info.Name, err)
 				}
 			}
 		}

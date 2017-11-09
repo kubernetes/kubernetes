@@ -31,16 +31,18 @@ import (
 )
 
 var (
-	use_context_example = templates.Examples(`
+	useContextExample = templates.Examples(`
 		# Use the context for the minikube cluster
 		kubectl config use-context minikube`)
 )
 
+// useContextOptions holds command line options required to run the command.
 type useContextOptions struct {
 	configAccess clientcmd.ConfigAccess
 	contextName  string
 }
 
+// NewCmdConfigUseContext creates the `use-context` subcommand.
 func NewCmdConfigUseContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &useContextOptions{configAccess: configAccess}
 
@@ -49,7 +51,7 @@ func NewCmdConfigUseContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 		Short:   i18n.T("Sets the current-context in a kubeconfig file"),
 		Aliases: []string{"use"},
 		Long:    `Sets the current-context in a kubeconfig file`,
-		Example: use_context_example,
+		Example: useContextExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			cmdutil.CheckErr(options.run())
@@ -60,6 +62,7 @@ func NewCmdConfigUseContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	return cmd
 }
 
+// run implements the actual command.
 func (o useContextOptions) run() error {
 	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {
@@ -76,6 +79,7 @@ func (o useContextOptions) run() error {
 	return clientcmd.ModifyConfig(o.configAccess, *config, true)
 }
 
+// complete completes all the required options.
 func (o *useContextOptions) complete(cmd *cobra.Command) error {
 	endingArgs := cmd.Flags().Args()
 	if len(endingArgs) != 1 {
@@ -86,6 +90,7 @@ func (o *useContextOptions) complete(cmd *cobra.Command) error {
 	return nil
 }
 
+// validate command options for sufficient information to run the command.
 func (o useContextOptions) validate(config *clientcmdapi.Config) error {
 	if len(o.contextName) == 0 {
 		return errors.New("you must specify a current-context")
@@ -97,5 +102,5 @@ func (o useContextOptions) validate(config *clientcmdapi.Config) error {
 		}
 	}
 
-	return fmt.Errorf("no context exists with the name: %q.", o.contextName)
+	return fmt.Errorf("no context exists with the name: %q", o.contextName)
 }

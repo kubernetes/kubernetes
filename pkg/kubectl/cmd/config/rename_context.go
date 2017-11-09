@@ -28,7 +28,7 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-// RenameContextOptions contains the options for running the rename-context cli command.
+// RenameContextOptions holds command line options required to run the command.
 type RenameContextOptions struct {
 	configAccess clientcmd.ConfigAccess
 	contextName  string
@@ -91,6 +91,7 @@ func (o *RenameContextOptions) Complete(cmd *cobra.Command, args []string, out i
 	return nil
 }
 
+// Validate command options for sufficient information to run the command.
 func (o RenameContextOptions) Validate() error {
 	if len(o.newName) == 0 {
 		return errors.New("You must specify a new non-empty context name")
@@ -98,6 +99,7 @@ func (o RenameContextOptions) Validate() error {
 	return nil
 }
 
+// RunRenameContext implements the actual command.
 func (o RenameContextOptions) RunRenameContext(out io.Writer) error {
 	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {

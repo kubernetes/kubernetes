@@ -28,17 +28,18 @@ import (
 )
 
 var (
-	delete_context_example = templates.Examples(`
+	deleteContextExample = templates.Examples(`
 		# Delete the context for the minikube cluster
 		kubectl config delete-context minikube`)
 )
 
+// NewCmdConfigDeleteContext creates the `delete-context` subcommand.
 func NewCmdConfigDeleteContext(out, errOut io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete-context NAME",
 		Short:   i18n.T("Delete the specified context from the kubeconfig"),
 		Long:    "Delete the specified context from the kubeconfig",
-		Example: delete_context_example,
+		Example: deleteContextExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := runDeleteContext(out, errOut, configAccess, cmd)
 			cmdutil.CheckErr(err)
@@ -48,6 +49,7 @@ func NewCmdConfigDeleteContext(out, errOut io.Writer, configAccess clientcmd.Con
 	return cmd
 }
 
+// runDeleteContext implements the actual command.
 func runDeleteContext(out, errOut io.Writer, configAccess clientcmd.ConfigAccess, cmd *cobra.Command) error {
 	config, err := configAccess.GetStartingConfig()
 	if err != nil {

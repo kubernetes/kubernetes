@@ -26,21 +26,22 @@ import (
 )
 
 var (
-	set_long = templates.LongDesc(`
+	setLong = templates.LongDesc(`
 		Configure application resources
 
 		These commands help you make changes to existing application resources.`)
 )
 
+// NewCmdSet creates the `set` subcommand.
 func NewCmdSet(f cmdutil.Factory, in io.Reader, out, err io.Writer) *cobra.Command {
+
 	cmd := &cobra.Command{
 		Use:   "set SUBCOMMAND",
 		Short: i18n.T("Set specific features on objects"),
-		Long:  set_long,
+		Long:  setLong,
 		Run:   cmdutil.DefaultSubCommandRun(err),
 	}
 
-	// add subcommands
 	cmd.AddCommand(NewCmdImage(f, out, err))
 	cmd.AddCommand(NewCmdResources(f, out, err))
 	cmd.AddCommand(NewCmdSelector(f, out))
