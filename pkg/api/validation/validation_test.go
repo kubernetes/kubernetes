@@ -3056,6 +3056,7 @@ func TestValidateResourceQuotaWithAlphaLocalStorageCapacityIsolation(t *testing.
 }
 
 func TestValidatePorts(t *testing.T) {
+	allPortNames := sets.String{}
 	successCase := []api.ContainerPort{
 		{Name: "abc", ContainerPort: 80, HostPort: 80, Protocol: "TCP"},
 		{Name: "easy", ContainerPort: 82, Protocol: "TCP"},
@@ -3063,14 +3064,15 @@ func TestValidatePorts(t *testing.T) {
 		{Name: "do-re-me", ContainerPort: 84, Protocol: "UDP"},
 		{ContainerPort: 85, Protocol: "TCP"},
 	}
-	if errs := validateContainerPorts(successCase, field.NewPath("field")); len(errs) != 0 {
+	if errs := validateContainerPorts(successCase, &allPortNames, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
+	allPortNames = sets.String{}
 	nonCanonicalCase := []api.ContainerPort{
 		{ContainerPort: 80, Protocol: "TCP"},
 	}
-	if errs := validateContainerPorts(nonCanonicalCase, field.NewPath("field")); len(errs) != 0 {
+	if errs := validateContainerPorts(nonCanonicalCase, &allPortNames, field.NewPath("field")); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -3135,7 +3137,8 @@ func TestValidatePorts(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := validateContainerPorts(v.P, field.NewPath("field"))
+		allPortNames = sets.String{}
+		errs := validateContainerPorts(v.P, &allPortNames, field.NewPath("field"))
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -4160,6 +4163,12 @@ func TestValidateContainers(t *testing.T) {
 			{Name: "abc", Image: "image", Ports: []api.ContainerPort{{ContainerPort: 80, HostPort: 80, Protocol: "TCP"}},
 				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 			{Name: "def", Image: "image", Ports: []api.ContainerPort{{ContainerPort: 81, HostPort: 80, Protocol: "TCP"}},
+				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+		},
+		"port name not unique": {
+			{Name: "abc", Image: "image", Ports: []api.ContainerPort{{Name: "port1", ContainerPort: 80, HostPort: 80, Protocol: "TCP"}},
+				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
+			{Name: "def", Image: "image", Ports: []api.ContainerPort{{Name: "port1", ContainerPort: 81, HostPort: 82, Protocol: "TCP"}},
 				ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"},
 		},
 		"invalid env var name": {
