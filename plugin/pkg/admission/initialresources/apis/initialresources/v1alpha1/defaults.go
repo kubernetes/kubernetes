@@ -16,10 +16,34 @@ limitations under the License.
 
 package v1alpha1
 
-import kruntime "k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/runtime"
+import "k8s.io/apimachinery/pkg/runtime"
 
-func addDefaultingFuncs(scheme *kruntime.Scheme) error {
-	return nil
+func addDefaultingFuncs(scheme *runtime.Scheme) error {
+	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_Configuration(obj *Configuration) {}
+func SetDefaults_Configuration(obj *Configuration) {
+	if obj.Percentile == 0 {
+		obj.Percentile = 90
+	}
+
+	if obj.DataSourceInfo.DataSource == "" {
+		obj.DataSourceInfo.DataSource = Influxdb
+	}
+
+	if obj.DataSourceInfo.InfluxdbHost == "" {
+		obj.DataSourceInfo.InfluxdbHost = "localhost:8080/api/v1/namespaces/kube-system/services/monitoring-influxdb:api/proxy"
+	}
+
+	if obj.DataSourceInfo.InfluxdbUser == "" {
+		obj.DataSourceInfo.InfluxdbUser = "root"
+	}
+
+	if obj.DataSourceInfo.InfluxdbPassword == "" {
+		obj.DataSourceInfo.InfluxdbPassword = "root"
+	}
+
+	if obj.DataSourceInfo.InfluxdbName == "" {
+		obj.DataSourceInfo.InfluxdbName = "k8s"
+	}
+}

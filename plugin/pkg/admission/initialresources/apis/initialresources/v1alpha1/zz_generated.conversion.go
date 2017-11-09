@@ -75,7 +75,7 @@ func autoConvert_v1alpha1_DataSourceInfo_To_initialresources_DataSourceInfo(in *
 	out.InfluxdbUser = in.InfluxdbUser
 	out.InfluxdbPassword = in.InfluxdbPassword
 	out.InfluxdbName = in.InfluxdbName
-	out.HawkularUrl = in.HawkularUrl
+	out.HawkularURL = in.HawkularURL
 	return nil
 }
 
@@ -90,7 +90,7 @@ func autoConvert_initialresources_DataSourceInfo_To_v1alpha1_DataSourceInfo(in *
 	out.InfluxdbUser = in.InfluxdbUser
 	out.InfluxdbPassword = in.InfluxdbPassword
 	out.InfluxdbName = in.InfluxdbName
-	out.HawkularUrl = in.HawkularUrl
+	out.HawkularURL = in.HawkularURL
 	return nil
 }
 

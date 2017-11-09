@@ -12,7 +12,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
-        "//vendor/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
     ],
@@ -31,6 +30,7 @@ filegroup(
         ":package-srcs",
         "//plugin/pkg/admission/initialresources/apis/initialresources/install:all-srcs",
         "//plugin/pkg/admission/initialresources/apis/initialresources/v1alpha1:all-srcs",
+        "//plugin/pkg/admission/initialresources/apis/initialresources/validation:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

@@ -63,6 +63,7 @@ BASH_TARGETS="
 	update-swagger-spec
 	update-openapi-spec
 	update-api-reference-docs
+	update-staging-godeps
 	update-bazel"
 
 for t in $BASH_TARGETS; do

@@ -24,8 +24,11 @@ import (
 type DataSourceType string
 
 const (
+	// Influxdb data source type
 	Influxdb DataSourceType = "influxdb"
-	Gcm      DataSourceType = "gcm"
+	// Gcm data source type
+	Gcm DataSourceType = "gcm"
+	// Hawkular data source type
 	Hawkular DataSourceType = "hawkular"
 )
 
@@ -62,5 +65,5 @@ type DataSourceInfo struct {
 	InfluxdbName string `json:"influxdbname,omitempty"`
 
 	// Hawkular configuration URL
-	HawkularUrl string `json:"hawkularurl,omitempty"`
+	HawkularURL string `json:"hawkularurl,omitempty"`
 }

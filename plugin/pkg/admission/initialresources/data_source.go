@@ -17,19 +17,11 @@ limitations under the License.
 package initialresources
 
 import (
-	"flag"
 	"fmt"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"time"
-)
 
-var (
-	influxdbHost = flag.String("ir-influxdb-host", "localhost:8080/api/v1/namespaces/kube-system/services/monitoring-influxdb:api/proxy", "Address of InfluxDB which contains metrics required by InitialResources")
-	user         = flag.String("ir-user", "root", "User used for connecting to InfluxDB")
-	// TODO: figure out how to better pass password here
-	password       = flag.String("ir-password", "root", "Password used for connecting to InfluxDB")
-	db             = flag.String("ir-dbname", "k8s", "InfluxDB database name which contains metrics required by InitialResources")
-	hawkularConfig = flag.String("ir-hawkular", "", "Hawkular configuration URL")
+	api "k8s.io/kubernetes/pkg/apis/core"
+	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/initialresources/apis/initialresources"
 )
 
 // WARNING: If you are planning to add another implementation of dataSource interface please bear in mind,
@@ -42,15 +34,23 @@ type dataSource interface {
 	GetUsagePercentile(kind api.ResourceName, perc int64, image, namespace string, exactMatch bool, start, end time.Time) (usage int64, samples int64, err error)
 }
 
-func newDataSource(kind string) (dataSource, error) {
-	if kind == "influxdb" {
-		return newInfluxdbSource(*influxdbHost, *user, *password, *db)
+func newDataSource(pluginConfig *pluginapi.Configuration) (dataSource, error) {
+	if pluginConfig == nil {
+		return nil, fmt.Errorf("empty data source configuration")
 	}
-	if kind == "gcm" {
+
+	switch pluginConfig.DataSourceInfo.DataSource {
+	case pluginapi.Influxdb:
+		influxdbHost := pluginConfig.DataSourceInfo.InfluxdbHost
+		user := pluginConfig.DataSourceInfo.InfluxdbUser
+		password := pluginConfig.DataSourceInfo.InfluxdbPassword
+		db := pluginConfig.DataSourceInfo.InfluxdbName
+		return newInfluxdbSource(influxdbHost, user, password, db)
+	case pluginapi.Gcm:
 		return newGcmSource()
+	case pluginapi.Hawkular:
+		return newHawkularSource(pluginConfig.DataSourceInfo.HawkularURL)
+	default:
+		return nil, fmt.Errorf("unknown data source %v", pluginConfig.DataSourceInfo.DataSource)
 	}
-	if kind == "hawkular" {
-		return newHawkularSource(*hawkularConfig)
-	}
-	return nil, fmt.Errorf("unknown data source %v", kind)
 }
